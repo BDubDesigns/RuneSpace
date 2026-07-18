@@ -28,9 +28,6 @@ jobs:
         with:
           node-version: 22
           cache: pnpm
-          # Use the exact pnpm pinned in package.json's `packageManager` field so the
-          # frozen lockfile (and its pinned TypeScript version) is honored deterministically.
-          corepack: true
 
       - name: Install (frozen lockfile)
         run: pnpm install --frozen-lockfile
