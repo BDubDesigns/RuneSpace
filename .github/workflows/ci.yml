@@ -39,12 +39,17 @@ jobs:
         run: pnpm test
 
       - name: Production build
-        # The production build imports server/env.ts which validates DATABASE_URL,
-        # and Next sets NODE_ENV=production automatically. CI has no database, so a
-        # syntactically valid placeholder is sufficient; no real connection is made
-        # during `next build`. These are scoped to this step only so that the earlier
-        # `pnpm install` keeps devDependencies (NODE_ENV=production would skip them).
+        # The production build imports server/env.ts which validates DATABASE_URL
+        # (and Better Auth requires BETTER_AUTH_SECRET). CI has no database and no
+        # real auth secret, so syntactically valid placeholders are sufficient; no
+        # real connection is made during `next build`. These are scoped to this step
+        # only so that the earlier `pnpm install` keeps devDependencies
+        # (NODE_ENV=production would skip them).
         env:
           DATABASE_URL: postgres://runespace:runespace@localhost:5432/runespace
           NODE_ENV: production
+          # Insecure placeholder used ONLY for the CI build step. Real deployments
+          # MUST set a strong BETTER_AUTH_SECRET; server/env.ts requires it at runtime.
+          BETTER_AUTH_SECRET: "insecure-ci-build-only-secret-do-not-use-in-prod-0000000000"
+          BETTER_AUTH_URL: "http://localhost:3000"
         run: pnpm build
