@@ -18,6 +18,12 @@ function uniqueEmail() {
   return `player-${Date.now()}-${Math.floor(Math.random() * 1e6)}@example.com`;
 }
 
+// Unique-per-run character name so the e2e is isolated from any leftover rows
+// in a shared database (the temp PostgreSQL used for validation persists).
+function uniqueName(prefix: string) {
+  return `${prefix} ${Math.random().toString(36).slice(2, 8)}`;
+}
+
 test("register, create, and select a character; ownership boundary enforced", async ({ page }) => {
   const email = uniqueEmail();
   const password = "sup3r-secret-password";
@@ -41,17 +47,18 @@ test("register, create, and select a character; ownership boundary enforced", as
   await page.getByRole("link", { name: "New character" }).click();
   await expect(page.getByRole("heading", { name: "New character" })).toBeVisible();
 
-  await page.getByLabel("Character name").fill("Star Drifter");
+  const hero = uniqueName("Star Drifter");
+  await page.getByLabel("Character name").fill(hero);
   await page.getByRole("button", { name: "Create character" }).click();
 
   // Lands on the protected placeholder for the created character.
   await page.waitForURL("**/play/**");
-  await expect(page.getByRole("heading", { name: "Star Drifter" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: hero })).toBeVisible();
 
   // Back to characters: the slot is now occupied with preserved display casing.
   await page.getByRole("link", { name: "Back to characters" }).click();
   await page.waitForURL("**/characters");
-  await expect(page.getByText("Star Drifter")).toBeVisible();
+  await expect(page.getByText(hero)).toBeVisible();
 
   // Ownership boundary: a forged/foreign character id redirects away.
   await page.goto("/play/00000000-0000-0000-0000-000000000000");
@@ -72,13 +79,15 @@ test("character names are unique after normalization (case-insensitive collision
   await page.waitForURL("**/characters");
 
   await page.getByRole("link", { name: "New character" }).click();
-  await page.getByLabel("Character name").fill("Nova Prime");
+  const hero = uniqueName("Nova Prime");
+  await page.getByLabel("Character name").fill(hero);
   await page.getByRole("button", { name: "Create character" }).click();
   await page.waitForURL("**/play/**");
 
-  // Return and try to create a differently-cased/whitespaced collision.
+  // Return and try to create a differently-cased/whitespaced collision of the
+  // SAME per-run base — normalization must still detect the clash.
   await page.goto("/characters/new");
-  await page.getByLabel("Character name").fill("  nova  PRIME ");
+  await page.getByLabel("Character name").fill(`  ${hero.toLowerCase()} `);
   await page.getByRole("button", { name: "Create character" }).click();
 
   // Stays on the new-character page with a "already taken" error (no redirect).
