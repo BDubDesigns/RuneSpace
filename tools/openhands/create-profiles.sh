@@ -16,13 +16,10 @@
 #   OPENCODE_API_KEY=... OPENROUTER_API_KEY=... \
 #     bash tools/openhands/create-profiles.sh
 #
-# The OpenCode Go / Zen base URLs are operator-specific. Provide them via env:
-#   OPENCODE_GO_BASE_URL   (default: https://go.opencode.example/v1)
-#   OPENCODE_ZEN_BASE_URL  (default: https://zen.opencode.example/v1)
-#
-# If the default placeholders are used, the profile will be created but the
-# deeper-model delegation will only work once Brandon replaces the base_url
-# with the real OpenCode endpoint in ~/.openhands/profiles/deepseek-v4-pro.json.
+# The OpenCode Go / Zen base URLs default to the documented public endpoints:
+#   OPENCODE_GO_BASE_URL   (default: https://opencode.ai/zen/go/v1)
+#   OPENCODE_ZEN_BASE_URL  (default: https://opencode.ai/zen/v1)
+# Override them via env only if your deployment uses different endpoints.
 
 set -euo pipefail
 
@@ -42,12 +39,14 @@ OPENCODE_ZEN_BASE_URL="${OPENCODE_ZEN_BASE_URL:-https://opencode.ai/zen/v1}"
 
 # Derive the Fernet key exactly the way the agent-server does (sha256(OH_SECRET_KEY)
 # -> urlsafe base64). Encrypt the raw key into a token that starts with "gAAAAA".
+# Secrets are read from os.environ inside Python so they never appear in process
+# argv (avoids leaking them via `ps`/process listings).
 encrypt_key() {
-  python3 - "$OH_SECRET_KEY" "$OPENCODE_API_KEY" <<'PY'
+  python3 - <<'PY'
 import os, sys, json, hashlib, base64
 from cryptography.fernet import Fernet
-sec = sys.argv[1].encode()
-raw = sys.argv[2].encode()
+sec = os.environ["OH_SECRET_KEY"].encode()
+raw = os.environ["OPENCODE_API_KEY"].encode()
 fk = base64.b64encode(hashlib.sha256(sec).digest())
 token = Fernet(fk).encrypt(raw).decode()
 assert token.startswith("gAAAAA"), "encryption did not produce a Fernet token"

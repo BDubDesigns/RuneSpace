@@ -65,10 +65,36 @@ describe("create-profiles.sh secret handling", () => {
 
 describe("validate-delegation.sh profile rejection", () => {
   it("rejects a profile whose api_key is not a Fernet token", () => {
-    const dir = join(tmp, "plain");
-    mkdirSync(dir, { recursive: true });
+    // Build a *valid* temporary git repo that satisfies the script's
+    // preconditions: it has at least one commit and the real .agents/agents
+    // definitions (so the script reaches the profile check instead of failing
+    // earlier on missing agent defs).
+    const fakeRepo = join(tmp, "fakerepo");
+    mkdirSync(fakeRepo, { recursive: true });
+    execFileSync("git", ["init", "-q", fakeRepo]);
+    execFileSync("git", ["-C", fakeRepo, "config", "user.email", "test@example.com"]);
+    execFileSync("git", ["-C", fakeRepo, "config", "user.name", "test"]);
+    // Copy the real agent definitions so load_agent_def succeeds.
+    const agentsSrc = join(repoRoot, ".agents/agents");
+    const agentsDst = join(fakeRepo, ".agents/agents");
+    mkdirSync(agentsDst, { recursive: true });
+    for (const f of ["runespace-hard-problem-advisor.md", "runespace-reviewer.md"]) {
+      writeFileSync(join(agentsDst, f), require("node:fs").readFileSync(join(agentsSrc, f)));
+    }
+    writeFileSync(join(fakeRepo, "README.md"), "# fake\n");
+    execFileSync("git", ["-C", fakeRepo, "add", "-A"]);
+    execFileSync("git", ["-C", fakeRepo, "commit", "-qm", "init"]);
+
+    // validate-delegation.sh reads profiles from $HOME/.openhands/profiles, so
+    // point HOME at a temp dir and drop a plaintext (non-Fernet) profile there.
+    // It also creates an isolated snapshot under $HOME/workspace, so that dir
+    // must exist for the script to reach the profile check.
+    const home = join(tmp, "home");
+    mkdirSync(join(home, "workspace"), { recursive: true });
+    const profDir = join(home, ".openhands/profiles");
+    mkdirSync(profDir, { recursive: true });
     writeFileSync(
-      join(dir, "deepseek-v4-pro.json"),
+      join(profDir, "deepseek-v4-pro.json"),
       JSON.stringify({
         model: "openai/deepseek-v4-pro",
         api_key: "PLAINTEXT-KEY-MUST-NOT-APPEAR",
@@ -76,18 +102,17 @@ describe("validate-delegation.sh profile rejection", () => {
         base_url: "https://opencode.ai/zen/go/v1",
       }),
     );
-    chmodSync(join(dir, "deepseek-v4-pro.json"), 0o600);
-    // Use a tiny temp git repo so the script's `git clone` snapshot is fast and
-    // does not pull the entire real RuneSpace tree into the test.
-    const fakeRepo = join(tmp, "fakerepo");
-    mkdirSync(fakeRepo, { recursive: true });
-    execFileSync("git", ["init", "-q", fakeRepo]);
-    const { code } = run("bash", [validateScript], {
+    chmodSync(join(profDir, "deepseek-v4-pro.json"), 0o600);
+
+    const { code, out } = run("bash", [validateScript], {
       ...process.env,
-      OPENHANDS_PROFILE_DIR: dir,
+      HOME: home,
       RUNESPACE_REPO: fakeRepo,
       SESSION_API_KEY: "dummy",
     });
     expect(code).not.toBe(0);
+    // The rejection must come specifically from the Fernet-token check, not from
+    // some unrelated precondition (e.g. missing agent defs).
+    expect(out).toMatch(/not a Fernet token/i);
   });
 });

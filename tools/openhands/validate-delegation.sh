@@ -59,6 +59,24 @@ AGENTS_DIR="$REPO_PATH/.agents/agents"
 
 test -d "$AGENTS_DIR" || { echo "ERROR: agent defs not found at $AGENTS_DIR" >&2; exit 1; }
 
+# ---- pre-flight: reject non-Fernet profiles before any delegation -------------
+# Runs at the top level so a bad profile aborts the whole script immediately
+# (a plaintext key inside a command substitution would otherwise only fail the
+# subshell and let the monitor loop hang). No plaintext fallback is allowed.
+verify_profiles() {
+  for p in "$ADVISOR_PROFILE" "$REVIEWER_PROFILE"; do
+    local f="$HOME/.openhands/profiles/$p.json"
+    test -f "$f" || { echo "ERROR: profile '$p' not found at $f. Run tools/openhands/create-profiles.sh first." >&2; exit 1; }
+    local ak
+    ak="$(jq -r '.api_key' "$f")"
+    if [[ "$ak" != gAAAAA* ]]; then
+      echo "ERROR: profile '$p' api_key is NOT a Fernet token (must start with gAAAAA). Plaintext keys are forbidden." >&2
+      exit 1
+    fi
+  done
+}
+verify_profiles
+
 # ---- non-destructive snapshot of the real repo --------------------------------
 REAL_HEAD_BEFORE="$(git -C "$REPO_PATH" rev-parse HEAD)"
 REAL_STATUS_BEFORE="$(git -C "$REPO_PATH" status --porcelain | md5sum | cut -d' ' -f1)"
