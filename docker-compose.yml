@@ -1,0 +1,26 @@
+# Local development stack for RuneSpace.
+#
+# Brings up PostgreSQL so Drizzle and the connection pool have something to
+# target. The app itself is run with `pnpm dev` on the host (see README).
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: runespace-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: runespace
+      POSTGRES_PASSWORD: runespace
+      POSTGRES_DB: runespace
+    ports:
+      - "5432:5432"
+    volumes:
+      - runespace-pg:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U runespace -d runespace"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  runespace-pg:
