@@ -15,6 +15,11 @@ const nodeEnvSchema = z.enum(["development", "test", "production"]);
 const envSchema = z.object({
   NODE_ENV: nodeEnvSchema.default("development"),
   DATABASE_URL: z.string().min(1, "DATABASE_URL is required"),
+  // Better Auth owns credential and session security. The secret signs session
+  // tokens; the base URL is used for callback/cookie origins. Both MUST come
+  // from the environment and never be hardcoded.
+  BETTER_AUTH_SECRET: z.string().min(1, "BETTER_AUTH_SECRET is required"),
+  BETTER_AUTH_URL: z.string().min(1, "BETTER_AUTH_URL is required"),
 });
 
 export type AppEnv = z.infer<typeof envSchema>;
