@@ -19,7 +19,6 @@
     "incremental": true,
     "verbatimModuleSyntax": true,
     "plugins": [{ "name": "next" }],
-    "baseUrl": ".",
     "paths": {
       "@/*": ["./*"]
     }
