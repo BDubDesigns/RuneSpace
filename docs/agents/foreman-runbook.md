@@ -75,13 +75,14 @@ so no secrets are committed). The Foreman's `hy3-free` profile already exists.
 Create the two RuneSpace specialist/fallback profiles with the provided script:
 
 ```bash
-OPENCODE_API_KEY=... \
-OPENCODE_GO_BASE_URL="https://<your-opencode-go-endpoint>/v1" \
-OPENCODE_ZEN_BASE_URL="https://<your-opencode-zen-endpoint>/v1" \
+# Defaults (already correct for the documented OpenCode endpoints):
+#   OPENCODE_GO_BASE_URL=https://opencode.ai/zen/go/v1
+#   OPENCODE_ZEN_BASE_URL=https://opencode.ai/zen/v1
+OPENCODE_API_KEY="$OPENCODE_API_KEY" \
   bash tools/openhands/create-profiles.sh
 ```
 
-This writes:
+This writes (with **owner-only 0600 perms** and a **Fernet-encrypted** `api_key`):
 
 - `deepseek-v4-pro.json` — `openai/deepseek-v4-pro` via `OPENCODE_GO_BASE_URL`,
   using the shared `OPENCODE_API_KEY`. **Note the `openai/` provider prefix** —
@@ -89,6 +90,11 @@ This writes:
   agent server throws `LLMBadRequestError: LLM Provider NOT provided`.
 - `hy3-opencode-zen.json` — HY3 fallback via `OPENCODE_ZEN_BASE_URL`, using the
   **same** shared `OPENCODE_API_KEY`.
+
+The key is encrypted with the agent-server's `OH_SECRET_KEY` derivation (sha256 →
+base64 Fernet key) so the Agent Canvas conversation API can decrypt it server-side
+(`secrets_encrypted: true`). `create-profiles.sh` aborts if `OH_SECRET_KEY` or
+`OPENCODE_API_KEY` is missing, and never writes a plaintext key to disk.
 
 > The shared `OPENCODE_API_KEY` authenticates both the OpenCode Go (escalation)
 > and OpenCode Zen (HY3 fallback) endpoints. `OPENROUTER_API_KEY` powers the
@@ -219,19 +225,36 @@ presented as proof that the stronger-model advisors work.
 
 ## Known limitations (installed OpenHands 1.35.0 / Agent Canvas v1.4.0)
 
+- **No native `agent_name` execution.** The Agent Canvas `POST /api/conversations`
+  API has **no field** to execute a discovered `.agents/agents/*.md` file agent by
+  name (no `agent_name`/`sub_agent` parameter). To keep the repository definitions
+  as the single source of truth, `validate-delegation.sh` **loads** the real agent
+  file (frontmatter + Markdown system prompt) and applies it as the conversation's
+  `system_prompt` + `tools` + `model`. This proves the committed definition governs
+  the run without duplicating the prompt. If a future Agent Canvas version adds
+  named-agent execution, switch to it and delete the loader.
 - **`agent_profile_id` gives zero exec tools.** When delegating via a named
   profile through the Agent Canvas conversation API, the profile-based path
-  cannot attach tools. The validation script works around this by reading the
-  profile's encrypted `api_key`/`base_url`/`model` and sending them as encrypted
-  `agent_settings` with tools merged in (`secrets_encrypted: true`). Keep this if
-  you need tool-using specialists on a non-Foreman model.
+  cannot attach tools. The validation script reads the profile's encrypted
+  `api_key`/`base_url`/`model` and sends them as encrypted `agent_settings` with
+  tools merged in (`secrets_encrypted: true`). Plaintext keys are forbidden.
 - **One profile per conversation.** There is no automatic in-runtime provider
   fallback; switches are manual/documented (see *Provider ladder*).
+- **Non-destructive validation.** Specialists run against an ISOLATED `git clone`
+  of the repo (temp dir), never the real working tree. The script asserts the real
+  repo's HEAD + `git status` are unchanged before/after; it fails if they differ.
+  The agent `.md` files include `file_editor` (so a specialist *could* propose a
+  patch), but read-only behavior is enforced two ways: (1) the agent's explicit
+  "read-only" hard constraint in its system prompt, and (2) the fact that it runs
+  on a throwaway clone — any write lands in `/tmp`, never in the real branch.
 - **OpenCode endpoints are operator-specific.** The repo intentionally does not
   hard-code base URLs or keys. `create-profiles.sh` takes them from the
-  environment. The documented OpenCode Go endpoint (`https://opencode.ai/zen/go/v1`)
-  and the `deepseek-v4-pro` model are verified working in this sandbox; the
-  `hy3-opencode-zen` HY3 fallback is configured the same way for Foreman use only
-  if OpenRouter is unavailable.
-- **No secrets in the repo.** Profiles are operator-local. Agent `.md` files only
-  name profiles; they contain no credentials.
+  environment and now defaults to the documented endpoints
+  (`https://opencode.ai/zen/go/v1` and `https://opencode.ai/zen/v1`). These are
+  verified working in this sandbox; the `hy3-opencode-zen` HY3 fallback is
+  configured the same way for Foreman use only if OpenRouter is unavailable.
+- **No secrets in the repo.** Profiles are operator-local (0600, Fernet-encrypted).
+  Agent `.md` files only name profiles; they contain no credentials.
+- **Tribal knowledge.** The persistent `/projects/AGENT_BUILDING_GUIDE.md` is a
+  working note; the authoritative version-controlled reference is this runbook
+  plus the script headers. Do not rely on the external file for CI.

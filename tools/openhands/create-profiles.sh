@@ -29,26 +29,49 @@ set -euo pipefail
 PROFILE_DIR="${OPENHANDS_PROFILE_DIR:-$HOME/.openhands/profiles}"
 mkdir -p "$PROFILE_DIR"
 
+# --- Fail-safe secret handling -------------------------------------------------
+# Never write a plaintext credential to disk. The key is Fernet-encrypted with
+# the agent-server's own OH_SECRET_KEY derivation so the Agent Canvas conversation
+# API can decrypt it server-side (secrets_encrypted: true). If either secret is
+# missing, abort — no plaintext fallback is allowed.
+: "${OH_SECRET_KEY:?OH_SECRET_KEY is required (agent-server secret key for Fernet encryption)}"
 : "${OPENCODE_API_KEY:?OPENCODE_API_KEY is required (shared credential for OpenCode Zen + Go)}"
-OPENCODE_GO_BASE_URL="${OPENCODE_GO_BASE_URL:-https://go.opencode.example/v1}"
-OPENCODE_ZEN_BASE_URL="${OPENCODE_ZEN_BASE_URL:-https://zen.opencode.example/v1}"
 
-# Refuse to write non-functional placeholder endpoints. The operator must supply
-# the real OpenCode base URLs via env vars; otherwise delegation silently fails.
-if [[ "$OPENCODE_GO_BASE_URL" == *".example/"* || "$OPENCODE_ZEN_BASE_URL" == *".example/"* ]]; then
-  echo "ERROR: OPENCODE_GO_BASE_URL / OPENCODE_ZEN_BASE_URL still point at the placeholder" >&2
-  echo "       '.example' domain. Set the real OpenCode endpoints (see the Issue #2 runbook)" >&2
-  echo "       before running this script." >&2
+OPENCODE_GO_BASE_URL="${OPENCODE_GO_BASE_URL:-https://opencode.ai/zen/go/v1}"
+OPENCODE_ZEN_BASE_URL="${OPENCODE_ZEN_BASE_URL:-https://opencode.ai/zen/v1}"
+
+# Derive the Fernet key exactly the way the agent-server does (sha256(OH_SECRET_KEY)
+# -> urlsafe base64). Encrypt the raw key into a token that starts with "gAAAAA".
+encrypt_key() {
+  python3 - "$OH_SECRET_KEY" "$OPENCODE_API_KEY" <<'PY'
+import os, sys, json, hashlib, base64
+from cryptography.fernet import Fernet
+sec = sys.argv[1].encode()
+raw = sys.argv[2].encode()
+fk = base64.b64encode(hashlib.sha256(sec).digest())
+token = Fernet(fk).encrypt(raw).decode()
+assert token.startswith("gAAAAA"), "encryption did not produce a Fernet token"
+sys.stdout.write(token)
+PY
+}
+
+ENCRYPTED_KEY="$(encrypt_key)"
+
+# Sanity: refuse to proceed if encryption did not produce a Fernet token.
+if [[ "$ENCRYPTED_KEY" != gAAAAA* ]]; then
+  echo "ERROR: OPENCODE_API_KEY encryption failed (expected Fernet token)." >&2
   exit 1
 fi
 
 write_profile() {
-  local name="$1" model="$2" base_url="$3" key="$4"
+  local name="$1" model="$2" base_url="$3"
   local path="$PROFILE_DIR/$name.json"
+  # Write with owner-only permissions from the start, then chmod 0600.
+  umask 077
   cat > "$path" <<EOF
 {
   "model": "$model",
-  "api_key": "$key",
+  "api_key": "$ENCRYPTED_KEY",
   "auth_type": "api_key",
   "base_url": "$base_url",
   "openrouter_site_url": "https://docs.all-hands.dev/",
@@ -77,17 +100,18 @@ write_profile() {
   "schema_version": 1
 }
 EOF
-  echo "wrote profile: $path"
+  chmod 0600 "$path"
+  echo "wrote profile (0600, encrypted key): $path"
 }
 
 # DeepSeek V4 Pro through the OpenCode Go-compatible endpoint.
-# Shares OPENCODE_API_KEY with the Zen fallback.
-write_profile "deepseek-v4-pro" "openai/deepseek-v4-pro" "$OPENCODE_GO_BASE_URL" "$OPENCODE_API_KEY"
+# Shares the encrypted OPENCODE_API_KEY with the Zen fallback.
+write_profile "deepseek-v4-pro" "openai/deepseek-v4-pro" "$OPENCODE_GO_BASE_URL"
 
 # HY3 fallback through the OpenCode Zen-compatible endpoint.
-# Shares the same OPENCODE_API_KEY.
-write_profile "hy3-opencode-zen" "openai/hy3-free" "$OPENCODE_ZEN_BASE_URL" "$OPENCODE_API_KEY"
+# Shares the same encrypted OPENCODE_API_KEY.
+write_profile "hy3-opencode-zen" "openai/hy3-free" "$OPENCODE_ZEN_BASE_URL"
 
-echo "Profiles created in $PROFILE_DIR"
-echo "Both 'deepseek-v4-pro' and 'hy3-opencode-zen' reference the shared OPENCODE_API_KEY."
+echo "Profiles created in $PROFILE_DIR (mode 0600, api_key is Fernet-encrypted)."
+echo "Both 'deepseek-v4-pro' and 'hy3-opencode-zen' use the encrypted shared OPENCODE_API_KEY."
 echo "The model strings use the 'openai/' provider prefix required by litellm for custom base_urls."
