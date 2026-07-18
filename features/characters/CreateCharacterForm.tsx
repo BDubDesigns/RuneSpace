@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useFormStatus } from "react-dom";
 import { createCharacterAction } from "@/server/actions";
+import { CHARACTER_NAME_MIN, CHARACTER_NAME_MAX } from "@/game/domain/character-name";
 
 function SubmitButton({ label }: { label: string }) {
   const { pending } = useFormStatus();
@@ -39,8 +40,8 @@ export function CreateCharacterForm() {
           name="name"
           type="text"
           required
-          minLength={2}
-          maxLength={24}
+          minLength={CHARACTER_NAME_MIN}
+          maxLength={CHARACTER_NAME_MAX}
           placeholder="e.g. Star Drifter"
           className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-950/60 px-3 py-2 text-slate-100 outline-none focus:border-emerald-500"
         />

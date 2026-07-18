@@ -1,7 +1,7 @@
 import { and, eq } from "drizzle-orm";
 import { db } from "@/db";
 import { characters, playerAccounts, SLOT_MIN, SLOT_MAX, type Character } from "@/db/rune-space";
-import { validateCharacterName, normalizeCharacterName } from "@/game/domain/character-name";
+import { validateCharacterName } from "@/game/domain/character-name";
 
 /** Postgres unique-violation error code. */
 const UNIQUE_VIOLATION = "23505";
@@ -105,7 +105,7 @@ export async function createCharacter(
       throw new CharacterError("All character slots are full", 409);
     }
 
-    const normalized = normalizeCharacterName(validation.display);
+    const normalized = validation.normalized;
 
     // Friendly pre-check for a globally duplicate name. The DB unique index is
     // the authoritative backstop; this gives a clear message in the common case.
