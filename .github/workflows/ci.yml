@@ -1,0 +1,50 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  fast-checks:
+    name: Install, typecheck, lint, test, build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install (frozen lockfile)
+        run: pnpm install --frozen-lockfile
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Format check
+        run: pnpm format:check
+
+      - name: Unit tests
+        run: pnpm test
+
+      - name: Production build
+        # The production build imports server/env.ts which validates DATABASE_URL,
+        # and Next sets NODE_ENV=production automatically. CI has no database, so a
+        # syntactically valid placeholder is sufficient; no real connection is made
+        # during `next build`. These are scoped to this step only so that the earlier
+        # `pnpm install` keeps devDependencies (NODE_ENV=production would skip them).
+        env:
+          DATABASE_URL: postgres://runespace:runespace@localhost:5432/runespace
+          NODE_ENV: production
+        run: pnpm build
