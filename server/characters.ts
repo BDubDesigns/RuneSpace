@@ -6,14 +6,20 @@ import { validateCharacterName, normalizeCharacterName } from "@/game/domain/cha
 /** Postgres unique-violation error code. */
 const UNIQUE_VIOLATION = "23505";
 
-function isUniqueViolation(err: unknown): boolean {
-  return (
-    typeof err === "object" &&
-    err !== null &&
-    "code" in err &&
-    (err as { code?: string }).code === UNIQUE_VIOLATION
-  );
+function isUniqueViolation(err: unknown, constraintName?: string): boolean {
+  if (typeof err !== "object" || err === null) return false;
+  const pgErr = err as { code?: string; constraint?: string };
+  if (pgErr.code !== UNIQUE_VIOLATION) return false;
+  // When a constraint name is supplied, only match that specific unique index.
+  // This prevents future unique constraints on `characters` from being
+  // misattributed as "name already taken" (SSOT: characters_normalized_name_unique
+  // is the global-name backstop).
+  if (constraintName && pgErr.constraint !== constraintName) return false;
+  return true;
 }
+
+/** The single global-name uniqueness backstop (see db/rune-space.ts). */
+const GLOBAL_NAME_UNIQUE = "characters_normalized_name_unique";
 
 /**
  * Server-authoritative character operations.
@@ -113,20 +119,19 @@ export async function createCharacter(
     }
 
     try {
-      await tx
-        .insert(characters)
-        .values({
-          playerAccountId,
-          slot: freeSlot,
-          displayName: validation.display,
-          normalizedName: normalized,
-        })
-        .onConflictDoNothing({
-          target: [characters.playerAccountId, characters.slot],
-        });
+      // Plain insert: the (player_account_id, slot) unique index cannot be hit
+      // here because the FOR UPDATE lock serialized all creations for this
+      // account. The only unique violation that can occur is the global
+      // characters_normalized_name_unique index, caught below.
+      await tx.insert(characters).values({
+        playerAccountId,
+        slot: freeSlot,
+        displayName: validation.display,
+        normalizedName: normalized,
+      });
     } catch (err) {
       // The normalized_name unique index can still reject a concurrent clash.
-      if (isUniqueViolation(err)) {
+      if (isUniqueViolation(err, GLOBAL_NAME_UNIQUE)) {
         throw new CharacterError("That character name is already taken", 409);
       }
       throw err;

@@ -2,7 +2,7 @@
 
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
-import { ensurePlayerAccount, requireCurrentUser } from "@/server/ownership";
+import { ensurePlayerAccount, requireCurrentUser, OwnershipError } from "@/server/ownership";
 import { createCharacter, CharacterError } from "@/server/characters";
 
 /**
@@ -29,6 +29,7 @@ export async function createCharacterAction(formData: FormData): Promise<ActionR
     redirect(`/play/${character.id}`);
   } catch (err) {
     if (err instanceof CharacterError) return { error: err.message };
+    if (err instanceof OwnershipError) return { error: err.message };
     // Re-throw redirect navigation and any unexpected error.
     throw err;
   }
