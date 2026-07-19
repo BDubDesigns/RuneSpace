@@ -9,18 +9,23 @@ playable activities.
 - A game tick is exactly 600 milliseconds.
 - An action is an ongoing character activity. An attempt is one server-resolved
   outcome after its whole-tick duration elapses.
-- Activities define base attempt durations in whole ticks. Speed modifiers reduce
-  duration and round upward to a whole tick.
+- Activities define base attempt durations in whole ticks. Player-facing speed
+  multipliers divide duration and round upward to a whole tick: 2x speed makes a
+  10-tick attempt take 5 ticks.
 - A character may have only one active action.
 - The server resolves actions lazily when a character is loaded or a
   state-changing command runs. There is no client tick loop, worker, or timer.
 - Standard accounts resolve only the latest one hour of unresolved time. The
-  durable cursor advances atomically, including past capped older time, so it
-  cannot be replayed later.
+  durable cursor advances atomically past capped older time, then only through
+  ticks an action resolver actually consumed; partial attempt progress remains.
 - Every state-changing character command must lock, resolve pending action work,
   persist its outcome and cursor, then validate and apply the requested command
   in the same transaction. Retried or concurrent requests must not duplicate an
   outcome.
+- Resolution loads action-specific authoritative state under that same lock,
+  passes an immutable snapshot to pure deterministic resolution, and gives the
+  following command the reloaded final action state after continuing, stopping,
+  or replacing an action.
 
 ## Progression
 

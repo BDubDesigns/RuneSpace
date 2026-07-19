@@ -1,25 +1,36 @@
 import type { ItemId } from "@/game/config/foundations";
 
-export type StackState = {
+export type StackState<Id = string> = {
+  id: Id;
   itemId: ItemId;
   quantity: number;
 };
 
-export type StackAdditionPlan = {
-  updatedStacks: readonly StackState[];
-  createdStacks: readonly StackState[];
+export type StackUpdate<Id> = {
+  id: Id;
+  quantity: number;
+};
+
+export type NewStack = {
+  itemId: ItemId;
+  quantity: number;
+};
+
+export type StackAdditionPlan<Id> = {
+  updatedStacks: readonly StackUpdate<Id>[];
+  createdStacks: readonly NewStack[];
   remainingQuantity: number;
 };
 
-export function planStackAddition(
-  existingStacks: readonly StackState[],
+export function planStackAddition<Id>(
+  existingStacks: readonly StackState<Id>[],
   itemId: ItemId,
   quantity: number,
   stackLimit: number,
   availableSlots: number,
   availableWeight: number = Number.POSITIVE_INFINITY,
   itemWeight: number = 0,
-): StackAdditionPlan {
+): StackAdditionPlan<Id> {
   if (!Number.isInteger(quantity) || quantity < 0)
     throw new RangeError("Quantity must be non-negative");
   if (!Number.isInteger(stackLimit) || stackLimit <= 0)
@@ -36,18 +47,18 @@ export function planStackAddition(
   const weightLimitedQuantity =
     itemWeight === 0 ? quantity : Math.min(quantity, Math.floor(availableWeight / itemWeight));
   let remainingQuantity = weightLimitedQuantity;
-  const updatedStacks: StackState[] = [];
+  const updatedStacks: StackUpdate<Id>[] = [];
   for (const stack of existingStacks) {
     if (stack.itemId !== itemId || remainingQuantity === 0) continue;
     if (!Number.isInteger(stack.quantity) || stack.quantity <= 0 || stack.quantity > stackLimit) {
       throw new RangeError("Existing stack quantity is invalid");
     }
     const added = Math.min(stackLimit - stack.quantity, remainingQuantity);
-    if (added > 0) updatedStacks.push({ ...stack, quantity: stack.quantity + added });
+    if (added > 0) updatedStacks.push({ id: stack.id, quantity: stack.quantity + added });
     remainingQuantity -= added;
   }
 
-  const createdStacks: StackState[] = [];
+  const createdStacks: NewStack[] = [];
   while (remainingQuantity > 0 && createdStacks.length < availableSlots) {
     const stackQuantity = Math.min(stackLimit, remainingQuantity);
     createdStacks.push({ itemId, quantity: stackQuantity });

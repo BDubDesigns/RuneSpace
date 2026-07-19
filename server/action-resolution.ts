@@ -7,7 +7,11 @@ import {
   type ActiveAction,
   type Character,
 } from "@/db/rune-space";
-import { calculateResolutionWindow, type ResolutionWindow } from "@/game/domain/timing";
+import {
+  calculateResolutionWindow,
+  cursorAfterConsumedTicks,
+  type ResolutionWindow,
+} from "@/game/domain/timing";
 import { OwnershipError, requireCurrentUser } from "@/server/ownership";
 
 export type DatabaseTransaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
@@ -17,10 +21,48 @@ export type DatabaseTransaction = Parameters<Parameters<typeof db.transaction>[0
  * It has no registry, scheduler, or production fallback: a caller supplies the
  * action implementation and its atomic persistence work.
  */
-export type ActionResolver<Outcome> = {
-  resolve(input: { action: ActiveAction; window: ResolutionWindow }): Outcome | Promise<Outcome>;
+export type ReadonlySnapshot<Value> = Value extends (...args: never[]) => unknown
+  ? Value
+  : Value extends readonly (infer Item)[]
+    ? readonly ReadonlySnapshot<Item>[]
+    : Value extends object
+      ? { readonly [Key in keyof Value]: ReadonlySnapshot<Value[Key]> }
+      : Value;
+
+export type ActionTransition =
+  | { kind: "continue"; consumedTicks: number }
+  | { kind: "stop"; consumedTicks: number }
+  | {
+      kind: "replace";
+      consumedTicks: number;
+      action: Pick<ActiveAction, "actionId" | "startedAt" | "resolvedThroughAt">;
+    };
+
+export type ActionResolution<Outcome> = {
+  outcome: Outcome;
+  transition: ActionTransition;
+};
+
+export type ActionResolver<Snapshot, Outcome> = {
+  load(
+    transaction: DatabaseTransaction,
+    input: { character: Character; action: ActiveAction },
+  ): Snapshot | Promise<Snapshot>;
+  resolve(input: {
+    action: ActiveAction;
+    snapshot: ReadonlySnapshot<Snapshot>;
+    window: ResolutionWindow;
+  }): ActionResolution<Outcome> | Promise<ActionResolution<Outcome>>;
   persist(transaction: DatabaseTransaction, outcome: Outcome): Promise<void>;
 };
+
+function asReadonlySnapshot<Snapshot>(snapshot: Snapshot): ReadonlySnapshot<Snapshot> {
+  if (snapshot !== null && typeof snapshot === "object") {
+    Object.freeze(snapshot);
+    for (const value of Object.values(snapshot)) asReadonlySnapshot(value);
+  }
+  return snapshot as ReadonlySnapshot<Snapshot>;
+}
 
 export type ResolvedCharacterContext = {
   character: Character;
@@ -32,10 +74,10 @@ export type ResolvedCharacterContext = {
  * command in the same transaction. Locking the character serializes concurrent
  * commands, while the durable action cursor makes retries observe prior work.
  */
-export async function withResolvedOwnedCharacter<Outcome, Result>(
+export async function withResolvedOwnedCharacter<Snapshot, Outcome, Result>(
   userId: string,
   characterId: string,
-  resolver: ActionResolver<Outcome>,
+  resolver: ActionResolver<Snapshot, Outcome>,
   command: (transaction: DatabaseTransaction, context: ResolvedCharacterContext) => Promise<Result>,
   now: Date = new Date(),
 ): Promise<Result> {
@@ -68,24 +110,48 @@ export async function withResolvedOwnedCharacter<Outcome, Result>(
     if (action) {
       const window = calculateResolutionWindow(action.resolvedThroughAt, now);
       if (window.elapsedTicks > 0) {
-        const outcome = await resolver.resolve({ action, window });
-        await resolver.persist(transaction, outcome);
-        await transaction
-          .update(activeActions)
-          .set({ resolvedThroughAt: window.resolvedThroughAt })
-          .where(eq(activeActions.characterId, character.id));
+        const snapshot = asReadonlySnapshot(
+          await resolver.load(transaction, { character, action }),
+        );
+        const resolution = await resolver.resolve({ action, snapshot, window });
+        const resolvedThroughAt = cursorAfterConsumedTicks(
+          window,
+          resolution.transition.consumedTicks,
+        );
+        await resolver.persist(transaction, resolution.outcome);
+
+        if (resolution.transition.kind === "continue") {
+          await transaction
+            .update(activeActions)
+            .set({ resolvedThroughAt })
+            .where(eq(activeActions.characterId, character.id));
+        } else if (resolution.transition.kind === "stop") {
+          await transaction
+            .delete(activeActions)
+            .where(eq(activeActions.characterId, character.id));
+        } else {
+          await transaction
+            .update(activeActions)
+            .set({ ...resolution.transition.action, resolvedThroughAt })
+            .where(eq(activeActions.characterId, character.id));
+        }
       }
     }
 
-    return command(transaction, { character, action });
+    const finalActionRows = await transaction
+      .select()
+      .from(activeActions)
+      .where(eq(activeActions.characterId, character.id))
+      .for("update");
+    return command(transaction, { character, action: finalActionRows[0] });
   });
 }
 
 /** Authenticate a request before entering the shared owned-character command path. */
-export async function withResolvedCurrentCharacter<Outcome, Result>(
+export async function withResolvedCurrentCharacter<Snapshot, Outcome, Result>(
   headers: Headers,
   characterId: string,
-  resolver: ActionResolver<Outcome>,
+  resolver: ActionResolver<Snapshot, Outcome>,
   command: (transaction: DatabaseTransaction, context: ResolvedCharacterContext) => Promise<Result>,
   now?: Date,
 ): Promise<Result> {

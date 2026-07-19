@@ -14,7 +14,7 @@ export function ticksToMilliseconds(ticks: number): number {
   return ticks * GAME_TICK_MS;
 }
 
-/** Speed multipliers below one reduce duration and always round up to a tick. */
+/** Player-facing speed multipliers reduce duration and always round up to a tick. */
 export function effectiveAttemptDurationTicks(baseTicks: number, speedMultiplier: number): number {
   if (!Number.isInteger(baseTicks) || baseTicks <= 0) {
     throw new RangeError("Base attempt duration must be a positive whole tick count");
@@ -22,7 +22,7 @@ export function effectiveAttemptDurationTicks(baseTicks: number, speedMultiplier
   if (!Number.isFinite(speedMultiplier) || speedMultiplier <= 0) {
     throw new RangeError("Speed multiplier must be a positive finite number");
   }
-  return Math.max(1, Math.ceil(baseTicks * speedMultiplier));
+  return Math.max(1, Math.ceil(baseTicks / speedMultiplier));
 }
 
 export function resolvableAttemptCount(elapsedTicks: number, attemptDurationTicks: number): number {
@@ -36,9 +36,24 @@ export function resolvableAttemptCount(elapsedTicks: number, attemptDurationTick
 }
 
 export type ResolutionWindow = {
+  /** The first timestamp that may be resolved in this invocation. */
+  startsAt: Date;
   elapsedTicks: number;
-  resolvedThroughAt: Date;
+  /** The end of the whole-tick resolution window, not a cursor to persist blindly. */
+  availableThroughAt: Date;
 };
+
+/** Convert a resolver's exact consumed tick count into its durable cursor. */
+export function cursorAfterConsumedTicks(window: ResolutionWindow, consumedTicks: number): Date {
+  if (
+    !Number.isInteger(consumedTicks) ||
+    consumedTicks < 0 ||
+    consumedTicks > window.elapsedTicks
+  ) {
+    throw new RangeError("Consumed ticks must be within the available resolution window");
+  }
+  return new Date(window.startsAt.getTime() + ticksToMilliseconds(consumedTicks));
+}
 
 /**
  * Resolve only the latest configured offline window. Advancing the durable
@@ -56,7 +71,8 @@ export function calculateResolutionWindow(
   const cappedStart = new Date(Math.max(resolvedThroughAt.getTime(), now.getTime() - offlineCapMs));
   const elapsedTicks = millisecondsToWholeTicks(Math.max(0, now.getTime() - cappedStart.getTime()));
   return {
+    startsAt: cappedStart,
     elapsedTicks,
-    resolvedThroughAt: new Date(cappedStart.getTime() + ticksToMilliseconds(elapsedTicks)),
+    availableThroughAt: new Date(cappedStart.getTime() + ticksToMilliseconds(elapsedTicks)),
   };
 }

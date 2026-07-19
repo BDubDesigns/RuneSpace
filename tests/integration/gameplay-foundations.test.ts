@@ -167,7 +167,8 @@ suite("gameplay foundations (real PostgreSQL)", () => {
       releaseFirstPersistence = resolve;
     });
     const resolver = {
-      resolve: () => 5,
+      load: () => ({ source: "test" }),
+      resolve: () => ({ outcome: 5, transition: { kind: "continue" as const, consumedTicks: 1 } }),
       persist: async (transaction: DatabaseTransaction, award: number) => {
         resolverCalls += 1;
         if (resolverCalls === 1) {
@@ -237,6 +238,119 @@ suite("gameplay foundations (real PostgreSQL)", () => {
     expect(actionRows[0]?.resolvedThroughAt).toEqual(now);
   });
 
+  it("loads a transaction-locked snapshot and advances only through consumed partial attempts", async () => {
+    const { userId, character } = await makeCharacter();
+    const startedAt = new Date("2026-01-01T00:00:00.000Z");
+    const now = new Date("2026-01-01T00:00:06.600Z");
+    await db.insert(rune.inventoryStacks).values({
+      characterId: character.id,
+      itemId: ITEM_IDS.ferriteShale,
+      quantity: 1,
+    });
+    await db.insert(rune.activeActions).values({
+      characterId: character.id,
+      actionId: "test_action",
+      startedAt,
+      resolvedThroughAt: startedAt,
+    });
+
+    const resolver = {
+      load: async (transaction: DatabaseTransaction) => {
+        const stacks = await transaction
+          .select()
+          .from(rune.inventoryStacks)
+          .where(eq(rune.inventoryStacks.characterId, character.id))
+          .for("update");
+        return { stackCount: stacks.length };
+      },
+      resolve: ({ snapshot }: { snapshot: { readonly stackCount: number } }) => {
+        expect(Object.isFrozen(snapshot)).toBe(true);
+        expect(snapshot.stackCount).toBe(1);
+        return { outcome: undefined, transition: { kind: "continue" as const, consumedTicks: 10 } };
+      },
+      persist: async () => undefined,
+    };
+
+    const actionAfterResolution = await resolution.withResolvedOwnedCharacter(
+      userId,
+      character.id,
+      resolver,
+      async (_transaction, context) => context.action,
+      now,
+    );
+    expect(actionAfterResolution?.resolvedThroughAt).toEqual(new Date("2026-01-01T00:00:06.000Z"));
+  });
+
+  it("returns the replacement action with its consumed cursor to the command", async () => {
+    const { userId, character } = await makeCharacter();
+    const startedAt = new Date("2026-01-01T00:00:00.000Z");
+    const now = new Date("2026-01-01T00:00:00.600Z");
+    await db.insert(rune.activeActions).values({
+      characterId: character.id,
+      actionId: "test_action",
+      startedAt,
+      resolvedThroughAt: startedAt,
+    });
+
+    const actionAfterResolution = await resolution.withResolvedOwnedCharacter(
+      userId,
+      character.id,
+      {
+        load: () => ({}),
+        resolve: () => ({
+          outcome: undefined,
+          transition: {
+            kind: "replace" as const,
+            consumedTicks: 1,
+            action: {
+              actionId: "replacement_action",
+              startedAt,
+              resolvedThroughAt: startedAt,
+            },
+          },
+        }),
+        persist: async () => undefined,
+      },
+      async (_transaction, context) => context.action,
+      now,
+    );
+    expect(actionAfterResolution).toMatchObject({
+      actionId: "replacement_action",
+      resolvedThroughAt: now,
+    });
+  });
+
+  it("returns an absent action to the command after resolution stops it", async () => {
+    const { userId, character } = await makeCharacter();
+    const startedAt = new Date("2026-01-01T00:00:00.000Z");
+    const now = new Date("2026-01-01T00:00:00.600Z");
+    await db.insert(rune.activeActions).values({
+      characterId: character.id,
+      actionId: "test_action",
+      startedAt,
+      resolvedThroughAt: startedAt,
+    });
+
+    const actionAfterResolution = await resolution.withResolvedOwnedCharacter(
+      userId,
+      character.id,
+      {
+        load: () => ({}),
+        resolve: () => ({
+          outcome: undefined,
+          transition: { kind: "stop" as const, consumedTicks: 1 },
+        }),
+        persist: async () => undefined,
+      },
+      async (_transaction, context) => context.action,
+      now,
+    );
+    expect(actionAfterResolution).toBeUndefined();
+    await expect(
+      db.select().from(rune.activeActions).where(eq(rune.activeActions.characterId, character.id)),
+    ).resolves.toEqual([]);
+  });
+
   it("rolls back XP, inventory, and cursor when resolution fails before commit", async () => {
     const { userId, character } = await makeCharacter();
     const startedAt = new Date("2026-01-01T00:00:00.000Z");
@@ -249,7 +363,11 @@ suite("gameplay foundations (real PostgreSQL)", () => {
     });
 
     const failingResolver = {
-      resolve: () => undefined,
+      load: () => ({}),
+      resolve: () => ({
+        outcome: undefined,
+        transition: { kind: "continue" as const, consumedTicks: 1 },
+      }),
       persist: async (transaction: DatabaseTransaction) => {
         await transaction.insert(rune.characterSkillXp).values({
           characterId: character.id,

@@ -10,6 +10,7 @@ import {
 import { grantSkillXp, levelFromXp, type LevelThreshold } from "@/game/domain/progression";
 import {
   calculateResolutionWindow,
+  cursorAfterConsumedTicks,
   effectiveAttemptDurationTicks,
   millisecondsToWholeTicks,
   resolvableAttemptCount,
@@ -31,15 +32,24 @@ describe("gameplay timing", () => {
   });
 
   it("rounds speed-modified attempt durations upward to whole ticks", () => {
-    expect(effectiveAttemptDurationTicks(5, 0.5)).toBe(3);
-    expect(resolvableAttemptCount(11, 3)).toBe(3);
+    expect(effectiveAttemptDurationTicks(10, 2)).toBe(5);
+    expect(effectiveAttemptDurationTicks(9, 2)).toBe(5);
+    expect(resolvableAttemptCount(11, 10)).toBe(1);
   });
 
   it("caps lazy resolution to the most recent hour", () => {
     const now = new Date("2026-01-01T02:00:00.000Z");
     const window = calculateResolutionWindow(new Date("2026-01-01T00:00:00.000Z"), now);
     expect(window.elapsedTicks).toBe(6000);
-    expect(window.resolvedThroughAt).toEqual(now);
+    expect(window.availableThroughAt).toEqual(now);
+  });
+
+  it("retains partial attempt progress in the durable cursor", () => {
+    const start = new Date("2026-01-01T00:00:00.000Z");
+    const window = calculateResolutionWindow(start, new Date("2026-01-01T00:00:06.600Z"));
+    expect(window.elapsedTicks).toBe(11);
+    expect(resolvableAttemptCount(window.elapsedTicks, 10)).toBe(1);
+    expect(cursorAfterConsumedTicks(window, 10)).toEqual(new Date("2026-01-01T00:00:06.000Z"));
   });
 });
 
@@ -65,15 +75,26 @@ describe("progression", () => {
 describe("inventory", () => {
   it("fills compatible partial stacks before opening new slots", () => {
     const plan = planStackAddition(
-      [{ itemId: ITEM_IDS.ferriteShale, quantity: 7 }],
+      [{ id: "stack-1", itemId: ITEM_IDS.ferriteShale, quantity: 7 }],
       ITEM_IDS.ferriteShale,
       8,
       10,
       1,
     );
-    expect(plan.updatedStacks).toEqual([{ itemId: ITEM_IDS.ferriteShale, quantity: 10 }]);
+    expect(plan.updatedStacks).toEqual([{ id: "stack-1", quantity: 10 }]);
     expect(plan.createdStacks).toEqual([{ itemId: ITEM_IDS.ferriteShale, quantity: 5 }]);
     expect(plan.remainingQuantity).toBe(0);
+  });
+
+  it("retains persistent stack identity for planned updates", () => {
+    const plan = planStackAddition(
+      [{ id: 42, itemId: ITEM_IDS.ferriteShale, quantity: 9 }],
+      ITEM_IDS.ferriteShale,
+      1,
+      10,
+      0,
+    );
+    expect(plan.updatedStacks).toEqual([{ id: 42, quantity: 10 }]);
   });
 
   it("leaves overflow when inventory slots are exhausted", () => {
