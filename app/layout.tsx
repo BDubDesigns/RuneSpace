@@ -3,7 +3,7 @@ import type { ReactNode } from "react";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "RuneSpace — Development Scaffold",
+  title: "RuneSpace — Development Build",
   description: "RuneSpace foundation scaffold. Early development build; not a playable game.",
 };
 
@@ -20,7 +20,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className="min-h-full bg-slate-950 text-slate-100 antialiased">{children}</body>
+      <body className="min-h-full antialiased">{children}</body>
     </html>
   );
 }

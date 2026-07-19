@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { authClient } from "./auth-client";
+import { ActionButton } from "@/components/ui/ActionButton";
 
 /**
  * Sign-out button (client component). Clears the Better Auth session cookie via
@@ -11,16 +12,16 @@ export function SignOutButton() {
   const router = useRouter();
 
   return (
-    <button
+    <ActionButton
       type="button"
       onClick={async () => {
         await authClient.signOut();
         router.push("/");
         router.refresh();
       }}
-      className="text-sm text-slate-400 underline"
+      intent="secondary"
     >
       Sign out
-    </button>
+    </ActionButton>
   );
 }

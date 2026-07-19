@@ -1,6 +1,7 @@
-import Link from "next/link";
 import { headers } from "next/headers";
 import { ScaffoldScreen } from "@/components/ScaffoldScreen";
+import { ActionLink } from "@/components/ui/ActionLink";
+import { SectionHeader } from "@/components/ui/SectionHeader";
 import { auth } from "@/server/auth";
 
 /**
@@ -16,36 +17,23 @@ export default async function HomePage() {
 
   return (
     <ScaffoldScreen>
-      <h1 className="font-mono text-2xl font-bold tracking-tight text-emerald-400 sm:text-3xl">
-        RuneSpace
-      </h1>
-      <p className="mt-2 text-sm text-slate-400">Development scaffold online.</p>
-      <p className="mt-4 text-xs leading-relaxed text-slate-500">
+      <SectionHeader eyebrow="Development build">RuneSpace</SectionHeader>
+      <p className="mt-2 text-sm text-[color:var(--rs-text-secondary)]">
+        Development scaffold online.
+      </p>
+      <p className="mt-4 text-sm leading-relaxed text-[color:var(--rs-text-muted)]">
         Systems initializing. This is an early foundation build, not a playable game. Architecture,
         tooling, and tests are being established before gameplay work begins.
       </p>
       <div className="mt-6 flex gap-3">
         {session?.user ? (
-          <Link
-            href="/characters"
-            className="rounded-lg bg-emerald-500 px-4 py-2 text-sm font-medium text-slate-950 transition hover:bg-emerald-400"
-          >
-            My characters
-          </Link>
+          <ActionLink href="/characters">My characters</ActionLink>
         ) : (
           <>
-            <Link
-              href="/register"
-              className="rounded-lg bg-emerald-500 px-4 py-2 text-sm font-medium text-slate-950 transition hover:bg-emerald-400"
-            >
-              Register
-            </Link>
-            <Link
-              href="/sign-in"
-              className="rounded-lg border border-slate-700 px-4 py-2 text-sm font-medium text-slate-200 transition hover:border-emerald-500"
-            >
+            <ActionLink href="/register">Register</ActionLink>
+            <ActionLink href="/sign-in" intent="secondary">
               Sign in
-            </Link>
+            </ActionLink>
           </>
         )}
       </div>

@@ -1,7 +1,8 @@
-import Link from "next/link";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { ScaffoldScreen } from "@/components/ScaffoldScreen";
+import { SectionHeader } from "@/components/ui/SectionHeader";
+import { TextLink } from "@/components/ui/TextLink";
 import { SignOutButton } from "@/features/auth/SignOutButton";
 import { auth } from "@/server/auth";
 import { requireCurrentUser, requireOwnedCharacter, OwnershipError } from "@/server/ownership";
@@ -34,19 +35,15 @@ export default async function PlayPage({ params }: { params: Promise<{ character
   return (
     <ScaffoldScreen>
       <div className="flex items-center justify-between">
-        <h1 className="font-mono text-2xl font-bold tracking-tight text-emerald-400">
-          {displayName}
-        </h1>
+        <SectionHeader eyebrow="Protected character">{displayName}</SectionHeader>
         <SignOutButton />
       </div>
-      <p className="mt-4 text-sm leading-relaxed text-slate-400">
+      <p className="mt-4 text-sm leading-relaxed text-[color:var(--rs-text-secondary)]">
         This is a protected placeholder. Gameplay, maps, and the rest of the world arrive in later
         issues. Your session and character ownership are verified server-side on every request.
       </p>
-      <p className="mt-6 text-sm text-slate-400">
-        <Link href="/characters" className="text-emerald-400 underline">
-          Back to characters
-        </Link>
+      <p className="mt-6 text-sm text-[color:var(--rs-text-secondary)]">
+        <TextLink href="/characters">Back to characters</TextLink>
       </p>
     </ScaffoldScreen>
   );

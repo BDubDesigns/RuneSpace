@@ -1,5 +1,8 @@
 import { defineConfig, devices } from "@playwright/test";
 
+const port = process.env.PLAYWRIGHT_PORT ?? "3000";
+const baseURL = process.env.BASE_URL ?? `http://127.0.0.1:${port}`;
+
 /**
  * Playwright configuration.
  *
@@ -8,7 +11,7 @@ import { defineConfig, devices } from "@playwright/test";
  * fast PR checks lightweight and reliable. Run locally with `pnpm test:e2e`.
  *
  * The webServer builds and starts the production server, then waits for the
- * smoke screen to be reachable.
+ * registration screen to be reachable without requiring a seeded session.
  */
 
 export default defineConfig({
@@ -18,7 +21,7 @@ export default defineConfig({
   retries: process.env.CI ? 1 : 0,
   reporter: "list",
   use: {
-    baseURL: process.env.BASE_URL ?? "http://127.0.0.1:3000",
+    baseURL,
     trace: "on-first-retry",
   },
   projects: [
@@ -32,8 +35,10 @@ export default defineConfig({
     },
   ],
   webServer: {
-    command: "pnpm build && pnpm start",
-    url: process.env.BASE_URL ?? "http://127.0.0.1:3000",
+    command: process.env.PLAYWRIGHT_DEV_SERVER
+      ? `pnpm exec next dev -p ${port}`
+      : `pnpm build && pnpm exec next start -p ${port}`,
+    url: `${baseURL}/register`,
     reuseExistingServer: !process.env.CI,
     timeout: 120_000,
   },
