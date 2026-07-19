@@ -101,10 +101,10 @@ See `.env.example`. Validated at startup by `server/env.ts` (Zod).
 - `Dockerfile` is a multi-stage build (deps → build → runner) on `node:22-slim`.
   Coolify can deploy the image directly; set `DATABASE_URL` and `NODE_ENV` via
   the Coolify environment UI. The runtime exposes port `3000`.
+- Database migration and recovery instructions are in
+  [`docs/deployment-database.md`](./docs/deployment-database.md).
 - `docker-compose.yml` provides a local PostgreSQL for development. The app
   itself is run with `pnpm dev` on the host (the container only covers the DB).
-- No real gameplay migration is required; the foundation migration creates a
-  single meta table used for a smoke health check.
 
 ## Architecture & docs
 
