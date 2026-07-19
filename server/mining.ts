@@ -18,6 +18,7 @@ import {
   type StackState,
 } from "@/game/domain/inventory";
 import {
+  miningPreflightStopReason,
   resolveCrashSiteMining,
   type MiningRandom,
   type MiningResolution,
@@ -67,6 +68,7 @@ export type MiningGameplayState = {
   };
   recentResult: { successes: number; failures: number; awardedXp: number };
   stoppingReason?: MiningStopReason;
+  commandError?: "another_action_active";
 };
 
 async function ensureStarterMiningState(
@@ -270,23 +272,9 @@ function createMiningResolver(
   onOutcome?: (outcome: PersistedMiningOutcome) => void,
 ): ActionResolver<MiningSnapshot, PersistedMiningOutcome> {
   return {
+    supports: (action) => action.actionId === ACTION_IDS.crashSiteMining,
     load: async (transaction, { character }) => loadMiningSnapshot(transaction, character.id),
     resolve: ({ action, snapshot, window }) => {
-      if (action.actionId !== ACTION_IDS.crashSiteMining) {
-        return {
-          outcome: {
-            characterId: action.characterId,
-            consumedTicks: 0,
-            successes: 0,
-            failures: 0,
-            awardedXp: 0,
-            stackUpdates: [],
-            createdStacks: [],
-            stopReason: "action_replaced",
-          },
-          transition: { kind: "stop", consumedTicks: 0 },
-        };
-      }
       const outcome = {
         characterId: action.characterId,
         ...resolveCrashSiteMining({
@@ -342,6 +330,7 @@ async function stateFromTransaction(
   characterId: string,
   recentResult: MiningGameplayState["recentResult"],
   stoppingReason?: MiningStopReason,
+  commandError?: MiningGameplayState["commandError"],
 ): Promise<MiningGameplayState> {
   const balance = getEffectiveGameBalance();
   const snapshot = await loadMiningSnapshot(transaction, characterId);
@@ -398,6 +387,7 @@ async function stateFromTransaction(
       : (stoppingReason ??
         (miningStateRows[0]?.lastStopReason as MiningStopReason | null) ??
         undefined),
+    commandError,
   };
 }
 
@@ -427,6 +417,9 @@ export async function getMiningGameplayState(
             }
           : { successes: 0, failures: 0, awardedXp: 0 },
         outcome?.stopReason,
+        context.action && context.action.actionId !== ACTION_IDS.crashSiteMining
+          ? "another_action_active"
+          : undefined,
       );
     },
     now,
@@ -448,11 +441,13 @@ export async function startCrashSiteMining(
     }),
     async (transaction, context) => {
       await ensureStarterMiningState(transaction, context.character.id);
-      if (context.action?.actionId !== ACTION_IDS.crashSiteMining) {
-        if (context.action)
-          await transaction
-            .delete(activeActions)
-            .where(eq(activeActions.characterId, context.character.id));
+      const unsupportedAction =
+        context.action && context.action.actionId !== ACTION_IDS.crashSiteMining;
+      const snapshot = await loadMiningSnapshot(transaction, context.character.id);
+      const preflightStopReason = context.action
+        ? undefined
+        : miningPreflightStopReason(snapshot, getEffectiveGameBalance());
+      if (!context.action && !preflightStopReason) {
         await transaction.insert(activeActions).values({
           characterId: context.character.id,
           actionId: ACTION_IDS.crashSiteMining,
@@ -460,13 +455,14 @@ export async function startCrashSiteMining(
           resolvedThroughAt: now,
         });
       }
-      await transaction
-        .insert(characterMiningState)
-        .values({ characterId: context.character.id, lastStopReason: null })
-        .onConflictDoUpdate({
-          target: characterMiningState.characterId,
-          set: { lastStopReason: null, updatedAt: now },
-        });
+      if (!unsupportedAction && !preflightStopReason)
+        await transaction
+          .insert(characterMiningState)
+          .values({ characterId: context.character.id, lastStopReason: null })
+          .onConflictDoUpdate({
+            target: characterMiningState.characterId,
+            set: { lastStopReason: null, updatedAt: now },
+          });
       return stateFromTransaction(
         transaction,
         context.character.id,
@@ -477,7 +473,8 @@ export async function startCrashSiteMining(
               awardedXp: outcome.awardedXp,
             }
           : { successes: 0, failures: 0, awardedXp: 0 },
-        outcome?.stopReason,
+        preflightStopReason ?? outcome?.stopReason,
+        unsupportedAction ? "another_action_active" : undefined,
       );
     },
     now,
@@ -523,6 +520,9 @@ export async function stopMining(
             }
           : { successes: 0, failures: 0, awardedXp: 0 },
         manuallyStopped ? "manually_stopped" : outcome?.stopReason,
+        context.action && context.action.actionId !== ACTION_IDS.crashSiteMining
+          ? "another_action_active"
+          : undefined,
       );
     },
     now,

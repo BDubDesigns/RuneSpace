@@ -29,6 +29,10 @@ test("owned character can start, observe, stop, and restore Crash Site Mining", 
   await expect(page.getByText(/successful, .* failed attempts|Mining stopped/)).toBeVisible();
   await page.getByRole("button", { name: "Stop Mining" }).click();
   await expect(page.getByRole("button", { name: "Start Mining" })).toBeVisible();
+  await expect(page.getByText("Mining stopped.")).toBeVisible();
+  await page.getByRole("button", { name: "Start Mining" }).click();
+  await expect(page.getByRole("button", { name: "Stop Mining" })).toBeVisible();
+  await expect(page.getByText("Mining stopped.")).toBeHidden();
   await page.reload();
   await expect(page.getByText("Ferrite Shale")).toBeVisible();
 });

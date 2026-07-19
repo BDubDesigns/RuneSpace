@@ -110,6 +110,30 @@ describe("Crash Site Ferrite Shale resolution", () => {
     expect(outcome.createdStacks).toEqual([]);
   });
 
+  it("keeps created stack output separate after a later capacity stop", () => {
+    const outcome = resolveCrashSiteMining({
+      elapsedTicks: 110,
+      snapshot: {
+        ...ready,
+        existingStacks: [{ id: "new-0-1", itemId: ITEM_IDS.ferriteShale, quantity: 10 }],
+        slotsAvailable: 1,
+        massAvailableGrams: 35_000,
+      },
+      balance,
+      random: rolls(
+        Array.from({ length: 10 }, () => 0),
+        Array.from({ length: 10 }, () => 0),
+      ),
+    });
+    expect(outcome).toMatchObject({
+      successes: 10,
+      consumedTicks: 100,
+      stopReason: "inventory_slots_full",
+    });
+    expect(outcome.stackUpdates).toEqual([{ id: "new-0-1", quantity: 10 }]);
+    expect(outcome.createdStacks).toEqual([{ itemId: ITEM_IDS.ferriteShale, quantity: 10 }]);
+  });
+
   it("stops before rolling for full slots, mass, or missing tool", () => {
     const noSlots = resolveCrashSiteMining({
       elapsedTicks: 10,

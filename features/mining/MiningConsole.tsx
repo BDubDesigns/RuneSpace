@@ -25,6 +25,12 @@ function stopMessage(reason: NonNullable<MiningGameplayState["stoppingReason"]>)
   }[reason];
 }
 
+function commandErrorMessage(error: NonNullable<MiningGameplayState["commandError"]>) {
+  return {
+    another_action_active: "Another activity is active. Mining cannot change it.",
+  }[error];
+}
+
 export function MiningConsole({
   characterName,
   initialState,
@@ -52,11 +58,13 @@ export function MiningConsole({
     }
     if (result.state) {
       setState(result.state);
-      if (result.state.stoppingReason) setMessage(stopMessage(result.state.stoppingReason));
+      if (result.state.commandError) setMessage(commandErrorMessage(result.state.commandError));
+      else if (result.state.stoppingReason) setMessage(stopMessage(result.state.stoppingReason));
       else if (result.state.recentResult.successes || result.state.recentResult.failures)
         setMessage(
           `${result.state.recentResult.successes} successful, ${result.state.recentResult.failures} failed attempt${result.state.recentResult.successes + result.state.recentResult.failures === 1 ? "" : "s"}.`,
         );
+      else setMessage(undefined);
     }
   }
   function command(action: (id: string) => ReturnType<typeof refreshMiningAction>) {
@@ -125,7 +133,7 @@ export function MiningConsole({
           <Feedback>Mining is idle. Attempts take six seconds and resolve on the server.</Feedback>
         )}
         {message ? (
-          <Feedback tone={state.stoppingReason ? "danger" : "muted"}>{message}</Feedback>
+          <Feedback tone={state.stoppingReason && !active ? "danger" : "muted"}>{message}</Feedback>
         ) : null}
       </Panel>
       <div className="grid gap-4 sm:grid-cols-2">

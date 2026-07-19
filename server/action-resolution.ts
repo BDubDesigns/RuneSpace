@@ -44,6 +44,8 @@ export type ActionResolution<Outcome> = {
 };
 
 export type ActionResolver<Snapshot, Outcome> = {
+  /** An activity-specific caller must never resolve an action it does not own. */
+  supports?(action: ActiveAction): boolean;
   load(
     transaction: DatabaseTransaction,
     input: { character: Character; action: ActiveAction },
@@ -107,7 +109,7 @@ export async function withResolvedOwnedCharacter<Snapshot, Outcome, Result>(
       .for("update");
     const action = actionRows[0];
 
-    if (action) {
+    if (action && (resolver.supports?.(action) ?? true)) {
       const window = calculateResolutionWindow(action.resolvedThroughAt, now);
       if (window.elapsedTicks > 0) {
         const snapshot = asReadonlySnapshot(

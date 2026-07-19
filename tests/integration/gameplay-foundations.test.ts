@@ -448,4 +448,41 @@ suite("gameplay foundations (real PostgreSQL)", () => {
       .where(eq(rune.itemInstances.characterId, character.id));
     expect(starterItems).toHaveLength(2);
   });
+
+  it("preserves an unsupported active action during Mining commands", async () => {
+    const { userId, character } = await makeCharacter();
+    const startedAt = new Date("2026-01-01T00:00:00.000Z");
+    const resolvedThroughAt = new Date("2026-01-01T00:00:03.000Z");
+    await db.insert(rune.activeActions).values({
+      characterId: character.id,
+      actionId: "future_activity",
+      startedAt,
+      resolvedThroughAt,
+    });
+
+    const state = await mining.startCrashSiteMining(
+      userId,
+      character.id,
+      new Date("2026-01-01T00:01:00.000Z"),
+    );
+    expect(state.commandError).toBe("another_action_active");
+    const actions = await db
+      .select()
+      .from(rune.activeActions)
+      .where(eq(rune.activeActions.characterId, character.id));
+    expect(actions[0]).toMatchObject({ actionId: "future_activity", startedAt, resolvedThroughAt });
+  });
+
+  it("does not create a Mining action when the preflight has no compatible tool", async () => {
+    const { userId, character } = await makeCharacter();
+    const now = new Date("2026-01-01T00:00:00.000Z");
+    await mining.getMiningGameplayState(userId, character.id, now);
+    await db.delete(rune.equippedItems).where(eq(rune.equippedItems.characterId, character.id));
+
+    const state = await mining.startCrashSiteMining(userId, character.id, now);
+    expect(state.stoppingReason).toBe("compatible_mining_tool_missing");
+    await expect(
+      db.select().from(rune.activeActions).where(eq(rune.activeActions.characterId, character.id)),
+    ).resolves.toEqual([]);
+  });
 });

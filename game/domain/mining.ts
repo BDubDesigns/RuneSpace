@@ -43,6 +43,27 @@ export type MiningResolution<Id = string> = {
   stopReason?: MiningStopReason;
 };
 
+/** Shared preflight for starting and resolving a Mining attempt. */
+export function miningPreflightStopReason<Id>(
+  snapshot: MiningSnapshot<Id>,
+  balance: EffectiveGameBalance,
+): MiningStopReason | undefined {
+  if (!snapshot.hasCompatibleTool) return "compatible_mining_tool_missing";
+  const plan = planStackAddition(
+    snapshot.existingStacks,
+    balance.items.ferriteShale.itemId,
+    balance.mining.yieldMinimum,
+    balance.items.ferriteShale.stackLimit,
+    snapshot.slotsAvailable,
+    snapshot.massAvailableGrams,
+    balance.items.ferriteShale.massGrams,
+  );
+  if (plan.remainingQuantity === 0) return undefined;
+  return snapshot.massAvailableGrams < balance.items.ferriteShale.massGrams
+    ? "carried_mass_capacity_reached"
+    : "inventory_slots_full";
+}
+
 export function resolveCrashSiteMining<Id>(input: {
   elapsedTicks: number;
   snapshot: MiningSnapshot<Id>;
@@ -51,7 +72,8 @@ export function resolveCrashSiteMining<Id>(input: {
 }): MiningResolution<Id> {
   const { balance, snapshot, random } = input;
   const attempts = resolvableAttemptCount(input.elapsedTicks, balance.mining.attemptDurationTicks);
-  if (!snapshot.hasCompatibleTool)
+  const initialStopReason = miningPreflightStopReason(snapshot, balance);
+  if (initialStopReason)
     return {
       consumedTicks: 0,
       successes: 0,
@@ -59,38 +81,35 @@ export function resolveCrashSiteMining<Id>(input: {
       awardedXp: 0,
       stackUpdates: [],
       createdStacks: [],
-      stopReason: "compatible_mining_tool_missing",
+      stopReason: initialStopReason,
     };
-  let stacks = snapshot.existingStacks.map((stack) => ({ ...stack }));
+  let stacks = snapshot.existingStacks.map((stack) => ({ ...stack, persisted: true }));
   let slotsAvailable = snapshot.slotsAvailable;
   let massAvailableGrams = snapshot.massAvailableGrams;
   let successes = 0;
   let failures = 0;
   for (let index = 0; index < attempts; index += 1) {
     // A minimum successful yield must fit before chance is rolled.
-    const minimumPlan = planStackAddition(
-      stacks,
-      balance.items.ferriteShale.itemId,
-      balance.mining.yieldMinimum,
-      balance.items.ferriteShale.stackLimit,
+    const currentSnapshot = {
+      ...snapshot,
+      existingStacks: stacks,
       slotsAvailable,
       massAvailableGrams,
-      balance.items.ferriteShale.massGrams,
-    );
-    if (minimumPlan.remainingQuantity > 0) {
+    };
+    const stopReason = miningPreflightStopReason(currentSnapshot, balance);
+    if (stopReason) {
       return {
         consumedTicks: index * balance.mining.attemptDurationTicks,
         successes,
         failures,
         awardedXp: successes * balance.mining.successXp,
-        stackUpdates: stacks.map(({ id, quantity }) => ({ id, quantity })),
+        stackUpdates: stacks
+          .filter((stack) => stack.persisted)
+          .map(({ id, quantity }) => ({ id, quantity })),
         createdStacks: stacks
-          .filter((stack) => !snapshot.existingStacks.some((existing) => existing.id === stack.id))
+          .filter((stack) => !stack.persisted)
           .map(({ itemId, quantity }) => ({ itemId, quantity })),
-        stopReason:
-          massAvailableGrams < balance.items.ferriteShale.massGrams
-            ? "carried_mass_capacity_reached"
-            : "inventory_slots_full",
+        stopReason,
       };
     }
     if (random.nextBasisPoints() >= miningSuccessChanceBps(snapshot.miningLevel, balance)) {
@@ -113,14 +132,27 @@ export function resolveCrashSiteMining<Id>(input: {
     // mass boundary, retain a valid one-unit yield rather than partially adding a two-unit roll.
     if (plan.remainingQuantity > 0) {
       quantity = balance.mining.yieldMinimum;
-      plan = minimumPlan;
+      plan = planStackAddition(
+        stacks,
+        balance.items.ferriteShale.itemId,
+        quantity,
+        balance.items.ferriteShale.stackLimit,
+        slotsAvailable,
+        massAvailableGrams,
+        balance.items.ferriteShale.massGrams,
+      );
     }
     for (const update of plan.updatedStacks) {
       const stack = stacks.find((candidate) => candidate.id === update.id);
       if (stack) stack.quantity = update.quantity;
     }
     for (const created of plan.createdStacks)
-      stacks.push({ id: `new-${index}-${stacks.length}` as Id, ...created });
+      stacks.push({
+        // A symbol prevents temporary planning IDs from colliding with persisted text IDs.
+        id: Symbol(`mining-stack-${index}-${stacks.length}`) as unknown as Id,
+        ...created,
+        persisted: false,
+      });
     slotsAvailable -= plan.createdStacks.length;
     massAvailableGrams -= quantity * balance.items.ferriteShale.massGrams;
     successes += 1;
@@ -131,10 +163,10 @@ export function resolveCrashSiteMining<Id>(input: {
     failures,
     awardedXp: successes * balance.mining.successXp,
     stackUpdates: stacks
-      .filter((stack) => snapshot.existingStacks.some((existing) => existing.id === stack.id))
+      .filter((stack) => stack.persisted)
       .map(({ id, quantity }) => ({ id, quantity })),
     createdStacks: stacks
-      .filter((stack) => !snapshot.existingStacks.some((existing) => existing.id === stack.id))
+      .filter((stack) => !stack.persisted)
       .map(({ itemId, quantity }) => ({ itemId, quantity })),
   };
 }
