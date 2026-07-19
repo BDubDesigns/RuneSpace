@@ -4,6 +4,12 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { ensurePlayerAccount, requireCurrentUser, OwnershipError } from "@/server/ownership";
 import { createCharacter, CharacterError } from "@/server/characters";
+import {
+  getMiningGameplayState,
+  startCrashSiteMining,
+  stopMining,
+  type MiningGameplayState,
+} from "@/server/mining";
 
 /**
  * Player-facing server action for character creation (thin composition over
@@ -33,4 +39,31 @@ export async function createCharacterAction(formData: FormData): Promise<ActionR
     // Re-throw redirect navigation and any unexpected error.
     throw err;
   }
+}
+
+export type MiningActionResult = { state?: MiningGameplayState; error?: string };
+
+async function runMiningAction(
+  characterId: string,
+  command: (userId: string, id: string) => Promise<MiningGameplayState>,
+): Promise<MiningActionResult> {
+  try {
+    const user = await requireCurrentUser(await headers());
+    return { state: await command(user.id, characterId) };
+  } catch (error) {
+    if (error instanceof OwnershipError) return { error: error.message };
+    throw error;
+  }
+}
+
+export async function refreshMiningAction(characterId: string): Promise<MiningActionResult> {
+  return runMiningAction(characterId, getMiningGameplayState);
+}
+
+export async function startMiningAction(characterId: string): Promise<MiningActionResult> {
+  return runMiningAction(characterId, startCrashSiteMining);
+}
+
+export async function stopMiningAction(characterId: string): Promise<MiningActionResult> {
+  return runMiningAction(characterId, stopMining);
 }

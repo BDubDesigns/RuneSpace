@@ -21,6 +21,11 @@ const itemIds = {
   crashGradeStructuralAlloy: asContentId("crash_grade_structural_alloy"),
   salvageCutter: asContentId("salvage_cutter"),
   powerCell: asContentId("power_cell"),
+  mykeaSchleppraum8: asContentId("mykea_schleppraum_8"),
+} as const satisfies Record<string, ContentId>;
+
+export const ACTION_IDS = {
+  crashSiteMining: asContentId("crash_site_ferrite_shale_mining"),
 } as const satisfies Record<string, ContentId>;
 
 export const SKILL_IDS = skillIds;
