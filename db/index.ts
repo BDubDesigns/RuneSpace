@@ -10,8 +10,7 @@ import { env } from "@/server/env";
  * code must not construct their own pools; they receive a `Database` handle via
  * the server orchestration layer so persistence stays behind a clear boundary.
  *
- * No gameplay tables exist yet. `schema` currently holds only the migration
- * bookkeeping Drizzle needs; real game tables arrive in later issues.
+ * Gameplay persistence is defined alongside ownership in `db/rune-space.ts`.
  */
 
 const globalForDb = globalThis as unknown as {

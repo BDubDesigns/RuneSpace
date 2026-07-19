@@ -3,7 +3,8 @@
 > **This document records stable current design direction only. It does NOT
 > define the full game and establishes NO balance values, lore, NPCs, quests,
 > resources, or mechanics.** Those are future issues. Nothing here is
-> implemented in the foundation scaffold.
+> implemented outside the server-authoritative foundations documented in
+> `docs/gameplay-foundations.md`.
 
 ## Platform
 - RuneSpace is **browser-first** and **mobile-friendly**.
@@ -18,6 +19,8 @@
   client never computes offline gains.
 - **Botting is forbidden.** Any authorized automation must be an in-world system
   introduced later, not client-side scripting.
+- Authoritative timing, action resolution, inventory, and XP contracts are in
+  `docs/gameplay-foundations.md`.
 
 ## World & skills (directions, not implementations)
 - The opening direction is a **one-way crash-site tutorial planet**.
@@ -33,8 +36,7 @@
   inline literals in UI code.
 
 ## Non-goals (currently)
-Tutorial gameplay, hex exploration, fuel consumption, Mining/Welding, accounts,
-inventory, quests, ships/speeders, offline progression, combat, Phaser
-minigames, chat/clans/multiplayer/economy/trading, a CMS, background workers, and
-autonomous issue selection are all out of scope for the foundation and belong to
-later issues.
+Tutorial gameplay, hex exploration, fuel consumption, playable Mining/Welding,
+quests, ships/speeders, combat, Phaser minigames, chat/clans/multiplayer/economy/
+trading, a CMS, background workers, and autonomous issue selection remain out of
+scope until later issues.

@@ -49,8 +49,7 @@ docker compose up -d
 cp .env.example .env
 #   (default DATABASE_URL matches docker-compose.yml)
 
-# 4. Apply the foundation migration (creates the single meta table)
-pnpm drizzle-kit generate
+# 4. Apply committed migrations
 pnpm drizzle-kit migrate
 
 # 5. Run the dev server
@@ -85,11 +84,14 @@ See `.env.example`. Validated at startup by `server/env.ts` (Zod).
 | `pnpm format:check`| Prettier check                       |
 | `pnpm typecheck`   | `tsc --noEmit` (strict)              |
 | `pnpm test`        | Vitest unit tests                    |
+| `pnpm test:integration` | Vitest PostgreSQL integration tests |
 | `pnpm test:e2e`    | Playwright browser tests (local)     |
 
 ## Testing
 
 - **Unit:** `pnpm test` (Vitest, pure domain/schema logic — fast, no DOM).
+- **Integration:** `pnpm test:integration` (Vitest against PostgreSQL; apply
+  committed migrations first).
 - **Browser:** `pnpm test:e2e` (Playwright, minimal mobile journeys — local).
   Playwright is intentionally **not** part of the fast CI workflow to keep PR
   checks lightweight; see `docs/testing-strategy.md`.
@@ -114,8 +116,9 @@ Read these before contributing:
   testing, draft-PR workflow).
 - [`docs/architecture.md`](./docs/architecture.md) — modular monolith,
   server-authoritative model, boundaries, dependency direction.
-- [`docs/game-rules.md`](./docs/game-rules.md) — current design direction (no
-  implemented rules).
+- [`docs/game-rules.md`](./docs/game-rules.md) — current design direction.
+- [`docs/gameplay-foundations.md`](./docs/gameplay-foundations.md) —
+  server-authoritative timing, progression, inventory, and action contracts.
 - [`docs/component-boundaries.md`](./docs/component-boundaries.md) — extraction
   rules.
 - [`docs/testing-strategy.md`](./docs/testing-strategy.md) — risk-based testing.

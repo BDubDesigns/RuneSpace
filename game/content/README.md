@@ -6,6 +6,6 @@ rewards, and progression data.
 Content here is data-driven and validated (see `game/schemas/`). It is referenced
 by stable IDs from `game/schemas/ids.ts`, never by inline literals in UI code.
 
-No game content is defined yet. Real definitions arrive in later issues. Nothing
-here should invent lore, NPCs, quests, resources, or balance values. See
-`docs/architecture.md` and `docs/game-rules.md`.
+Issue #16 establishes approved stable IDs only; typed item definitions and their
+balance values arrive later. Nothing here should invent lore, NPCs, quests,
+resources, or balance values. See `docs/gameplay-foundations.md`.

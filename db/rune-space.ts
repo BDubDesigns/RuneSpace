@@ -1,5 +1,16 @@
 import { relations, sql } from "drizzle-orm";
-import { pgTable, text, integer, timestamp, uniqueIndex, index, check } from "drizzle-orm/pg-core";
+import {
+  bigint,
+  check,
+  foreignKey,
+  index,
+  integer,
+  pgTable,
+  text,
+  timestamp,
+  unique,
+  uniqueIndex,
+} from "drizzle-orm/pg-core";
 import { user } from "./auth-schema";
 
 /**
@@ -93,7 +104,138 @@ export const charactersRelations = relations(characters, ({ one }) => ({
   }),
 }));
 
+/** Total skill XP is persisted; levels remain a domain-derived value. */
+export const characterSkillXp = pgTable(
+  "character_skill_xp",
+  {
+    characterId: text("character_id")
+      .notNull()
+      .references(() => characters.id, { onDelete: "restrict" }),
+    skillId: text("skill_id").notNull(),
+    totalXp: bigint("total_xp", { mode: "number" }).notNull().default(0),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    check("character_skill_xp_total_non_negative", sql`${table.totalXp} >= 0`),
+    uniqueIndex("character_skill_xp_character_skill_unique").on(table.characterId, table.skillId),
+    index("character_skill_xp_character_id_idx").on(table.characterId),
+  ],
+);
+
+/** Fungible carried items. Each row represents exactly one occupied inventory slot. */
+export const inventoryStacks = pgTable(
+  "inventory_stacks",
+  {
+    id: text("id")
+      .primaryKey()
+      .default(sql`gen_random_uuid()`),
+    characterId: text("character_id")
+      .notNull()
+      .references(() => characters.id, { onDelete: "restrict" }),
+    itemId: text("item_id").notNull(),
+    quantity: integer("quantity").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    check("inventory_stacks_quantity_positive", sql`${table.quantity} > 0`),
+    index("inventory_stacks_character_id_idx").on(table.characterId),
+  ],
+);
+
+/**
+ * Non-stackable items retain mutable instance state only. Their shared item
+ * facts belong to typed content definitions, never these rows.
+ */
+export const itemInstances = pgTable(
+  "item_instances",
+  {
+    id: text("id")
+      .primaryKey()
+      .default(sql`gen_random_uuid()`),
+    characterId: text("character_id")
+      .notNull()
+      .references(() => characters.id, { onDelete: "restrict" }),
+    itemId: text("item_id").notNull(),
+    currentCharge: integer("current_charge"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    check(
+      "item_instances_current_charge_non_negative",
+      sql`${table.currentCharge} IS NULL OR ${table.currentCharge} >= 0`,
+    ),
+    unique("item_instances_character_id_id_unique").on(table.characterId, table.id),
+    index("item_instances_character_id_idx").on(table.characterId),
+  ],
+);
+
+/**
+ * A unique instance can be equipped in one suit slot. Container-versus-gear
+ * classification comes from its future typed item definition, so no duplicate
+ * mutable item facts are stored here.
+ */
+export const equippedItems = pgTable(
+  "equipped_items",
+  {
+    characterId: text("character_id")
+      .notNull()
+      .references(() => characters.id, { onDelete: "restrict" }),
+    // This assignment namespace keeps container slots distinct from gear slots.
+    // Future content verifies that an item's equipment class matches this value.
+    assignmentKind: text("assignment_kind").notNull(),
+    suitSlotId: text("suit_slot_id").notNull(),
+    itemInstanceId: text("item_instance_id").notNull(),
+    equippedAt: timestamp("equipped_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    foreignKey({
+      columns: [table.characterId, table.itemInstanceId],
+      foreignColumns: [itemInstances.characterId, itemInstances.id],
+      name: "equipped_items_owned_instance_fk",
+    }).onDelete("restrict"),
+    check(
+      "equipped_items_assignment_kind_valid",
+      sql`${table.assignmentKind} IN ('gear', 'container')`,
+    ),
+    uniqueIndex("equipped_items_character_slot_unique").on(
+      table.characterId,
+      table.assignmentKind,
+      table.suitSlotId,
+    ),
+    uniqueIndex("equipped_items_character_instance_unique").on(
+      table.characterId,
+      table.itemInstanceId,
+    ),
+  ],
+);
+
+/** One row per character structurally enforces the one-active-action rule. */
+export const activeActions = pgTable(
+  "active_actions",
+  {
+    characterId: text("character_id")
+      .primaryKey()
+      .references(() => characters.id, { onDelete: "restrict" }),
+    actionId: text("action_id").notNull(),
+    startedAt: timestamp("started_at", { withTimezone: true }).notNull(),
+    resolvedThroughAt: timestamp("resolved_through_at", { withTimezone: true }).notNull(),
+  },
+  (table) => [
+    check(
+      "active_actions_cursor_after_start",
+      sql`${table.resolvedThroughAt} >= ${table.startedAt}`,
+    ),
+  ],
+);
+
 export type PlayerAccount = typeof playerAccounts.$inferSelect;
 export type NewPlayerAccount = typeof playerAccounts.$inferInsert;
 export type Character = typeof characters.$inferSelect;
 export type NewCharacter = typeof characters.$inferInsert;
+export type CharacterSkillXp = typeof characterSkillXp.$inferSelect;
+export type InventoryStack = typeof inventoryStacks.$inferSelect;
+export type ItemInstance = typeof itemInstances.$inferSelect;
+export type EquippedItem = typeof equippedItems.$inferSelect;
+export type ActiveAction = typeof activeActions.$inferSelect;

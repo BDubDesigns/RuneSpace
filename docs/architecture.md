@@ -82,6 +82,7 @@ server-validated. They are not part of this foundation issue.
 
 ## Current status
 
-This document describes the target architecture. The foundation scaffold
-implements the boundaries and tooling but **no gameplay systems** yet. Real
-domain rules, content, and persistence tables arrive in later issues.
+The foundation implements the ownership model and server-authoritative gameplay
+contracts for timing, progression, inventory state, equipment state, and lazy
+action resolution. Playable activities and player-facing gameplay UI arrive in
+later issues.

@@ -8,6 +8,7 @@ Rules here must be:
 - deterministic and side-effect free where possible
 - the single source of truth for any computed value
 
-Real domain logic (XP curves, fuel costs, travel rules, inventory rules, quest
-requirements) arrives in later issues. Nothing here should invent balance
-values, content, or mechanics. See `docs/architecture.md`.
+Foundational timing, progression, and inventory contracts live here. Final XP
+curves, activity values, fuel costs, travel rules, and quests remain later work.
+Nothing here should invent balance values, content, or mechanics. See
+`docs/gameplay-foundations.md`.

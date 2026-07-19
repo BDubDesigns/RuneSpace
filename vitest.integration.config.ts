@@ -2,9 +2,9 @@ import { defineConfig } from "vitest/config";
 import { fileURLToPath } from "node:url";
 
 /**
- * Integration test config — runs the real-PostgreSQL ownership/character tests
- * in `tests/integration`. These are intentionally excluded from the fast unit
- * suite so CI stays lightweight; run them locally against a live database:
+ * Integration test config — runs real-PostgreSQL ownership and gameplay tests
+ * in `tests/integration`. They run in the dedicated CI database job and can run
+ * locally against a live database:
  *
  *   DATABASE_URL=postgres://runespace:runespace@127.0.0.1:5432/runespace \
  *     pnpm test:integration

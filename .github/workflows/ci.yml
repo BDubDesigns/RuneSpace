@@ -53,3 +53,45 @@ jobs:
           BETTER_AUTH_SECRET: "insecure-ci-build-only-secret-do-not-use-in-prod-0000000000"
           BETTER_AUTH_URL: "http://localhost:3000"
         run: pnpm build
+
+  integration:
+    name: PostgreSQL integration tests
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: runespace
+          POSTGRES_PASSWORD: runespace
+          POSTGRES_DB: runespace
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U runespace -d runespace"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DATABASE_URL: postgres://runespace:runespace@localhost:5432/runespace
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install (frozen lockfile)
+        run: pnpm install --frozen-lockfile
+
+      - name: Apply migrations
+        run: pnpm drizzle-kit migrate
+
+      - name: PostgreSQL integration tests
+        run: pnpm test:integration

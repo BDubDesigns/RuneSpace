@@ -52,7 +52,8 @@ The PR must include:
 - screenshots at narrow mobile and desktop widths (for UI issues)
 - key architectural decisions
 - unresolved questions, limitations, or version mismatches
-- confirmation that no gameplay was implemented
+- confirmation of the issue's gameplay scope and any intentionally omitted
+  player-facing gameplay
 
 ## Model-assisted review
 For difficult reasoning or final review, use a separate model pass when the
