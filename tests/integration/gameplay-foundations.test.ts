@@ -19,6 +19,7 @@ suite("gameplay foundations (real PostgreSQL)", () => {
   let rune: typeof import("@/db/rune-space");
   let ownership: typeof import("@/server/ownership");
   let characters: typeof import("@/server/characters");
+  let mining: typeof import("@/server/mining");
   let resolution: typeof import("@/server/action-resolution");
   const createdUsers: string[] = [];
 
@@ -28,6 +29,7 @@ suite("gameplay foundations (real PostgreSQL)", () => {
     rune = await import("@/db/rune-space");
     ownership = await import("@/server/ownership");
     characters = await import("@/server/characters");
+    mining = await import("@/server/mining");
     resolution = await import("@/server/action-resolution");
   });
 
@@ -62,6 +64,12 @@ suite("gameplay foundations (real PostgreSQL)", () => {
         .from(rune.characters)
         .where(eq(rune.characters.playerAccountId, account.id));
       for (const character of characterRows) {
+        await db
+          .delete(rune.characterMiningState)
+          .where(eq(rune.characterMiningState.characterId, character.id));
+        await db
+          .delete(rune.characterStarterProvisioning)
+          .where(eq(rune.characterStarterProvisioning.characterId, character.id));
         await db.delete(rune.equippedItems).where(eq(rune.equippedItems.characterId, character.id));
         await db.delete(rune.activeActions).where(eq(rune.activeActions.characterId, character.id));
         await db
@@ -408,5 +416,36 @@ suite("gameplay foundations (real PostgreSQL)", () => {
       .from(rune.activeActions)
       .where(eq(rune.activeActions.characterId, character.id));
     expect(actions[0]?.resolvedThroughAt).toEqual(startedAt);
+  });
+
+  it("provisions a starter loadout once and resolves a retried Mining attempt once", async () => {
+    const { userId, character } = await makeCharacter();
+    const startedAt = new Date("2026-01-01T00:00:00.000Z");
+    const random = { nextBasisPoints: () => 0, nextUnit: () => 0 };
+    await mining.getMiningGameplayState(userId, character.id, startedAt, random);
+    await Promise.all([
+      mining.startCrashSiteMining(userId, character.id, startedAt, random),
+      mining.startCrashSiteMining(userId, character.id, startedAt, random),
+    ]);
+    const resolved = await mining.getMiningGameplayState(
+      userId,
+      character.id,
+      new Date("2026-01-01T00:00:06.000Z"),
+      random,
+    );
+    expect(resolved.ferriteShaleQuantity).toBe(1);
+    expect(resolved.mining.totalXp).toBe(15);
+    const repeat = await mining.getMiningGameplayState(
+      userId,
+      character.id,
+      new Date("2026-01-01T00:00:06.000Z"),
+      random,
+    );
+    expect(repeat.ferriteShaleQuantity).toBe(1);
+    const starterItems = await db
+      .select()
+      .from(rune.itemInstances)
+      .where(eq(rune.itemInstances.characterId, character.id));
+    expect(starterItems).toHaveLength(2);
   });
 });

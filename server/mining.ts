@@ -1,0 +1,532 @@
+import { randomInt } from "node:crypto";
+import { eq } from "drizzle-orm";
+import { db } from "@/db";
+import {
+  activeActions,
+  characterMiningState,
+  characterSkillXp,
+  characterStarterProvisioning,
+  equippedItems,
+  inventoryStacks,
+  itemInstances,
+} from "@/db/rune-space";
+import { getEffectiveGameBalance, miningLevelThresholds } from "@/game/config/balance";
+import { ACTION_IDS, ITEM_IDS, SKILL_IDS } from "@/game/config/foundations";
+import {
+  inventorySlotCapacityFromContainers,
+  inventorySlotsUsed,
+  type StackState,
+} from "@/game/domain/inventory";
+import {
+  resolveCrashSiteMining,
+  type MiningRandom,
+  type MiningResolution,
+  type MiningStopReason,
+} from "@/game/domain/mining";
+import { levelFromXp } from "@/game/domain/progression";
+import { ticksToMilliseconds } from "@/game/domain/timing";
+import {
+  type ActionResolver,
+  type DatabaseTransaction,
+  withResolvedOwnedCharacter,
+} from "@/server/action-resolution";
+import { grantCharacterSkillXp } from "@/server/progression";
+
+const systemRandom: MiningRandom = {
+  nextBasisPoints: () => randomInt(10_000),
+  nextUnit: () => randomInt(2) / 2,
+};
+
+type MiningSnapshot = {
+  miningLevel: number;
+  hasCompatibleTool: boolean;
+  existingStacks: readonly StackState<string>[];
+  slotsAvailable: number;
+  massAvailableGrams: number;
+  slotsUsed: number;
+  slotCapacity: number;
+};
+
+type PersistedMiningOutcome = MiningResolution<string> & { characterId: string };
+
+export type MiningGameplayState = {
+  characterId: string;
+  activeAction?: {
+    actionId: string;
+    resolvedThroughAt: string;
+    nextAttemptAt: string;
+    progressStartedAt: string;
+  };
+  mining: { totalXp: number; level: number; xpToNextLevel?: number; xpIntoLevel: number };
+  ferriteShaleQuantity: number;
+  inventory: {
+    slotsUsed: number;
+    slotsAvailable: number;
+    massGrams: number;
+    capacityGrams: number;
+  };
+  recentResult: { successes: number; failures: number; awardedXp: number };
+  stoppingReason?: MiningStopReason;
+};
+
+async function ensureStarterMiningState(
+  transaction: DatabaseTransaction,
+  characterId: string,
+): Promise<void> {
+  const balance = getEffectiveGameBalance();
+  const marker = await transaction
+    .insert(characterStarterProvisioning)
+    .values({ characterId })
+    .onConflictDoNothing({ target: characterStarterProvisioning.characterId })
+    .returning({ characterId: characterStarterProvisioning.characterId });
+  if (!marker[0]) return;
+
+  await transaction
+    .insert(characterSkillXp)
+    .values([
+      { characterId, skillId: SKILL_IDS.mining, totalXp: 0 },
+      { characterId, skillId: SKILL_IDS.strength, totalXp: 0 },
+    ])
+    .onConflictDoNothing();
+  await transaction
+    .insert(characterMiningState)
+    .values({ characterId })
+    .onConflictDoNothing({ target: characterMiningState.characterId });
+  const instances = await transaction
+    .select()
+    .from(itemInstances)
+    .where(eq(itemInstances.characterId, characterId))
+    .for("update");
+  const assignments = await transaction
+    .select()
+    .from(equippedItems)
+    .where(eq(equippedItems.characterId, characterId))
+    .for("update");
+  const equippedIds = new Set(assignments.map((assignment) => assignment.itemInstanceId));
+  const hasCutter = assignments.some(
+    (assignment) =>
+      assignment.assignmentKind === "gear" &&
+      assignment.suitSlotId === balance.items.salvageCutter.suitSlotId &&
+      instances.some(
+        (instance) =>
+          instance.id === assignment.itemInstanceId &&
+          instance.itemId === balance.items.salvageCutter.itemId,
+      ),
+  );
+  if (
+    !hasCutter &&
+    !assignments.some(
+      (assignment) =>
+        assignment.assignmentKind === "gear" &&
+        assignment.suitSlotId === balance.items.salvageCutter.suitSlotId,
+    )
+  ) {
+    let cutter = instances.find(
+      (instance) =>
+        instance.itemId === balance.items.salvageCutter.itemId && !equippedIds.has(instance.id),
+    );
+    if (!cutter) {
+      cutter = (
+        await transaction
+          .insert(itemInstances)
+          .values({ characterId, itemId: balance.items.salvageCutter.itemId })
+          .returning()
+      )[0]!;
+    }
+    await transaction.insert(equippedItems).values({
+      characterId,
+      assignmentKind: "gear",
+      suitSlotId: balance.items.salvageCutter.suitSlotId,
+      itemInstanceId: cutter.id,
+    });
+  }
+  const hasContainer = assignments.some(
+    (assignment) =>
+      assignment.assignmentKind === "container" &&
+      instances.some(
+        (instance) =>
+          instance.id === assignment.itemInstanceId &&
+          instance.itemId === balance.items.starterContainer.itemId,
+      ),
+  );
+  if (!hasContainer) {
+    const availableSlot = balance.carrying.containerSuitSlotIds.find(
+      (slot) =>
+        !assignments.some(
+          (assignment) =>
+            assignment.assignmentKind === "container" && assignment.suitSlotId === slot,
+        ),
+    );
+    if (availableSlot) {
+      let container = instances.find(
+        (instance) =>
+          instance.itemId === balance.items.starterContainer.itemId &&
+          !equippedIds.has(instance.id),
+      );
+      if (!container) {
+        container = (
+          await transaction
+            .insert(itemInstances)
+            .values({ characterId, itemId: balance.items.starterContainer.itemId })
+            .returning()
+        )[0]!;
+      }
+      await transaction.insert(equippedItems).values({
+        characterId,
+        assignmentKind: "container",
+        suitSlotId: availableSlot,
+        itemInstanceId: container.id,
+      });
+    }
+  }
+}
+
+async function loadMiningSnapshot(
+  transaction: DatabaseTransaction,
+  characterId: string,
+): Promise<MiningSnapshot> {
+  const balance = getEffectiveGameBalance();
+  const [xpRows, stacks, instances, assignments] = await Promise.all([
+    transaction
+      .select()
+      .from(characterSkillXp)
+      .where(eq(characterSkillXp.characterId, characterId))
+      .for("update"),
+    transaction
+      .select()
+      .from(inventoryStacks)
+      .where(eq(inventoryStacks.characterId, characterId))
+      .for("update"),
+    transaction
+      .select()
+      .from(itemInstances)
+      .where(eq(itemInstances.characterId, characterId))
+      .for("update"),
+    transaction
+      .select()
+      .from(equippedItems)
+      .where(eq(equippedItems.characterId, characterId))
+      .for("update"),
+  ]);
+  const miningXp = xpRows.find((row) => row.skillId === SKILL_IDS.mining)?.totalXp ?? 0;
+  const equippedIds = new Set(assignments.map((assignment) => assignment.itemInstanceId));
+  const equipped = assignments.flatMap((assignment) => {
+    const instance = instances.find((item) => item.id === assignment.itemInstanceId);
+    return instance ? [{ assignment, instance }] : [];
+  });
+  const hasCompatibleTool = equipped.some(
+    ({ assignment, instance }) =>
+      assignment.assignmentKind === "gear" &&
+      assignment.suitSlotId === balance.items.salvageCutter.suitSlotId &&
+      instance.itemId === balance.items.salvageCutter.itemId,
+  );
+  const containerCapacity = inventorySlotCapacityFromContainers(
+    equipped
+      .filter(
+        ({ assignment, instance }) =>
+          assignment.assignmentKind === "container" &&
+          instance.itemId === balance.items.starterContainer.itemId,
+      )
+      .map(() => balance.items.starterContainer.slotCapacity),
+  );
+  const stackMass = stacks.reduce(
+    (total, stack) =>
+      total +
+      (stack.itemId === balance.items.ferriteShale.itemId
+        ? stack.quantity * balance.items.ferriteShale.massGrams
+        : 0),
+    0,
+  );
+  const instanceMass = instances.reduce(
+    (total, instance) =>
+      total +
+      (instance.itemId === balance.items.salvageCutter.itemId
+        ? balance.items.salvageCutter.massGrams
+        : instance.itemId === balance.items.starterContainer.itemId
+          ? balance.items.starterContainer.massGrams
+          : 0),
+    0,
+  );
+  const slotsUsed = inventorySlotsUsed(
+    stacks.length,
+    instances.filter((item) => !equippedIds.has(item.id)).length,
+  );
+  return {
+    miningLevel: levelFromXp(miningXp, miningLevelThresholds(balance)),
+    hasCompatibleTool,
+    existingStacks: stacks,
+    slotsAvailable: Math.max(0, containerCapacity - slotsUsed),
+    massAvailableGrams: Math.max(
+      0,
+      balance.carrying.startingCapacityGrams - stackMass - instanceMass,
+    ),
+    slotsUsed,
+    slotCapacity: containerCapacity,
+  };
+}
+
+function createMiningResolver(
+  random: MiningRandom,
+  onOutcome?: (outcome: PersistedMiningOutcome) => void,
+): ActionResolver<MiningSnapshot, PersistedMiningOutcome> {
+  return {
+    load: async (transaction, { character }) => loadMiningSnapshot(transaction, character.id),
+    resolve: ({ action, snapshot, window }) => {
+      if (action.actionId !== ACTION_IDS.crashSiteMining) {
+        return {
+          outcome: {
+            characterId: action.characterId,
+            consumedTicks: 0,
+            successes: 0,
+            failures: 0,
+            awardedXp: 0,
+            stackUpdates: [],
+            createdStacks: [],
+            stopReason: "action_replaced",
+          },
+          transition: { kind: "stop", consumedTicks: 0 },
+        };
+      }
+      const outcome = {
+        characterId: action.characterId,
+        ...resolveCrashSiteMining({
+          elapsedTicks: window.elapsedTicks,
+          snapshot,
+          balance: getEffectiveGameBalance(),
+          random,
+        }),
+      };
+      return {
+        outcome,
+        transition: outcome.stopReason
+          ? { kind: "stop", consumedTicks: outcome.consumedTicks }
+          : { kind: "continue", consumedTicks: outcome.consumedTicks },
+      };
+    },
+    persist: async (transaction, outcome) => {
+      if (outcome.awardedXp > 0)
+        await grantCharacterSkillXp(transaction, {
+          characterId: outcome.characterId,
+          skillId: SKILL_IDS.mining,
+          awardedXp: outcome.awardedXp,
+          thresholds: miningLevelThresholds(),
+        });
+      for (const update of outcome.stackUpdates)
+        await transaction
+          .update(inventoryStacks)
+          .set({ quantity: update.quantity, updatedAt: new Date() })
+          .where(eq(inventoryStacks.id, update.id));
+      if (outcome.createdStacks.length)
+        await transaction.insert(inventoryStacks).values(
+          outcome.createdStacks.map((stack) => ({
+            characterId: outcome.characterId,
+            itemId: stack.itemId,
+            quantity: stack.quantity,
+          })),
+        );
+      if (outcome.stopReason)
+        await transaction
+          .insert(characterMiningState)
+          .values({ characterId: outcome.characterId, lastStopReason: outcome.stopReason })
+          .onConflictDoUpdate({
+            target: characterMiningState.characterId,
+            set: { lastStopReason: outcome.stopReason, updatedAt: new Date() },
+          });
+      onOutcome?.(outcome);
+    },
+  };
+}
+
+async function stateFromTransaction(
+  transaction: DatabaseTransaction,
+  characterId: string,
+  recentResult: MiningGameplayState["recentResult"],
+  stoppingReason?: MiningStopReason,
+): Promise<MiningGameplayState> {
+  const balance = getEffectiveGameBalance();
+  const snapshot = await loadMiningSnapshot(transaction, characterId);
+  const [xpRows, stacks, actionRows, miningStateRows] = await Promise.all([
+    transaction
+      .select()
+      .from(characterSkillXp)
+      .where(eq(characterSkillXp.characterId, characterId)),
+    transaction.select().from(inventoryStacks).where(eq(inventoryStacks.characterId, characterId)),
+    transaction.select().from(activeActions).where(eq(activeActions.characterId, characterId)),
+    transaction
+      .select()
+      .from(characterMiningState)
+      .where(eq(characterMiningState.characterId, characterId)),
+  ]);
+  const totalXp = xpRows.find((row) => row.skillId === SKILL_IDS.mining)?.totalXp ?? 0;
+  const thresholds = miningLevelThresholds(balance);
+  const level = levelFromXp(totalXp, thresholds);
+  const next = thresholds.find((threshold) => threshold.level === level + 1);
+  const action = actionRows[0];
+  return {
+    characterId,
+    activeAction:
+      action?.actionId === ACTION_IDS.crashSiteMining
+        ? {
+            actionId: action.actionId,
+            resolvedThroughAt: action.resolvedThroughAt.toISOString(),
+            progressStartedAt: action.resolvedThroughAt.toISOString(),
+            nextAttemptAt: new Date(
+              action.resolvedThroughAt.getTime() +
+                ticksToMilliseconds(balance.mining.attemptDurationTicks),
+            ).toISOString(),
+          }
+        : undefined,
+    mining: {
+      totalXp,
+      level,
+      xpToNextLevel: next ? next.totalXp - totalXp : undefined,
+      xpIntoLevel:
+        totalXp - (thresholds.find((threshold) => threshold.level === level)?.totalXp ?? 0),
+    },
+    ferriteShaleQuantity: stacks
+      .filter((stack) => stack.itemId === ITEM_IDS.ferriteShale)
+      .reduce((total, stack) => total + stack.quantity, 0),
+    inventory: {
+      slotsUsed: snapshot.slotsUsed,
+      slotsAvailable: snapshot.slotsAvailable,
+      massGrams: balance.carrying.startingCapacityGrams - snapshot.massAvailableGrams,
+      capacityGrams: balance.carrying.startingCapacityGrams,
+    },
+    recentResult,
+    stoppingReason: action
+      ? undefined
+      : (stoppingReason ??
+        (miningStateRows[0]?.lastStopReason as MiningStopReason | null) ??
+        undefined),
+  };
+}
+
+export async function getMiningGameplayState(
+  userId: string,
+  characterId: string,
+  now = new Date(),
+  random = systemRandom,
+): Promise<MiningGameplayState> {
+  let outcome: PersistedMiningOutcome | undefined;
+  return withResolvedOwnedCharacter(
+    userId,
+    characterId,
+    createMiningResolver(random, (value) => {
+      outcome = value;
+    }),
+    async (transaction, context) => {
+      await ensureStarterMiningState(transaction, context.character.id);
+      return stateFromTransaction(
+        transaction,
+        context.character.id,
+        outcome
+          ? {
+              successes: outcome.successes,
+              failures: outcome.failures,
+              awardedXp: outcome.awardedXp,
+            }
+          : { successes: 0, failures: 0, awardedXp: 0 },
+        outcome?.stopReason,
+      );
+    },
+    now,
+  );
+}
+
+export async function startCrashSiteMining(
+  userId: string,
+  characterId: string,
+  now = new Date(),
+  random = systemRandom,
+): Promise<MiningGameplayState> {
+  let outcome: PersistedMiningOutcome | undefined;
+  return withResolvedOwnedCharacter(
+    userId,
+    characterId,
+    createMiningResolver(random, (value) => {
+      outcome = value;
+    }),
+    async (transaction, context) => {
+      await ensureStarterMiningState(transaction, context.character.id);
+      if (context.action?.actionId !== ACTION_IDS.crashSiteMining) {
+        if (context.action)
+          await transaction
+            .delete(activeActions)
+            .where(eq(activeActions.characterId, context.character.id));
+        await transaction.insert(activeActions).values({
+          characterId: context.character.id,
+          actionId: ACTION_IDS.crashSiteMining,
+          startedAt: now,
+          resolvedThroughAt: now,
+        });
+      }
+      await transaction
+        .insert(characterMiningState)
+        .values({ characterId: context.character.id, lastStopReason: null })
+        .onConflictDoUpdate({
+          target: characterMiningState.characterId,
+          set: { lastStopReason: null, updatedAt: now },
+        });
+      return stateFromTransaction(
+        transaction,
+        context.character.id,
+        outcome
+          ? {
+              successes: outcome.successes,
+              failures: outcome.failures,
+              awardedXp: outcome.awardedXp,
+            }
+          : { successes: 0, failures: 0, awardedXp: 0 },
+        outcome?.stopReason,
+      );
+    },
+    now,
+  );
+}
+
+export async function stopMining(
+  userId: string,
+  characterId: string,
+  now = new Date(),
+  random = systemRandom,
+): Promise<MiningGameplayState> {
+  let outcome: PersistedMiningOutcome | undefined;
+  return withResolvedOwnedCharacter(
+    userId,
+    characterId,
+    createMiningResolver(random, (value) => {
+      outcome = value;
+    }),
+    async (transaction, context) => {
+      await ensureStarterMiningState(transaction, context.character.id);
+      const manuallyStopped = context.action?.actionId === ACTION_IDS.crashSiteMining;
+      if (manuallyStopped)
+        await transaction
+          .delete(activeActions)
+          .where(eq(activeActions.characterId, context.character.id));
+      if (manuallyStopped)
+        await transaction
+          .insert(characterMiningState)
+          .values({ characterId: context.character.id, lastStopReason: "manually_stopped" })
+          .onConflictDoUpdate({
+            target: characterMiningState.characterId,
+            set: { lastStopReason: "manually_stopped", updatedAt: now },
+          });
+      return stateFromTransaction(
+        transaction,
+        context.character.id,
+        outcome
+          ? {
+              successes: outcome.successes,
+              failures: outcome.failures,
+              awardedXp: outcome.awardedXp,
+            }
+          : { successes: 0, failures: 0, awardedXp: 0 },
+        manuallyStopped ? "manually_stopped" : outcome?.stopReason,
+      );
+    },
+    now,
+  );
+}
+
+export const miningTestInternals = { createMiningResolver, ensureStarterMiningState };

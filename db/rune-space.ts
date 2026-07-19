@@ -230,6 +230,23 @@ export const activeActions = pgTable(
   ],
 );
 
+/** Durable idempotency marker for the one-time Issue #18 starter loadout. */
+export const characterStarterProvisioning = pgTable("character_starter_provisioning", {
+  characterId: text("character_id")
+    .primaryKey()
+    .references(() => characters.id, { onDelete: "restrict" }),
+  provisionedAt: timestamp("provisioned_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+/** A bounded player-facing stop status, not an attempt history. */
+export const characterMiningState = pgTable("character_mining_state", {
+  characterId: text("character_id")
+    .primaryKey()
+    .references(() => characters.id, { onDelete: "restrict" }),
+  lastStopReason: text("last_stop_reason"),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
 export type PlayerAccount = typeof playerAccounts.$inferSelect;
 export type NewPlayerAccount = typeof playerAccounts.$inferInsert;
 export type Character = typeof characters.$inferSelect;
