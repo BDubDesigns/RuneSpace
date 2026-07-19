@@ -96,11 +96,11 @@ See `.env.example`. Validated at startup by `server/env.ts` (Zod).
 - **Strategy:** risk-based — pure rules, server/persistence boundaries, and a
   few critical mobile journeys. See `docs/testing-strategy.md`.
 
-## Docker / Coolify
+## Coolify
 
-- `Dockerfile` is a multi-stage build (deps → build → runner) on `node:22-slim`.
-  Coolify can deploy the image directly; set `DATABASE_URL` and `NODE_ENV` via
-  the Coolify environment UI. The runtime exposes port `3000`.
+- The current Coolify application uses Nixpacks. `nixpacks.toml` retains the
+  package `build` and `start` behavior while asserting the committed Drizzle
+  migration assets are available to the runtime.
 - Database migration and recovery instructions are in
   [`docs/deployment-database.md`](./docs/deployment-database.md).
 - `docker-compose.yml` provides a local PostgreSQL for development. The app

@@ -10,9 +10,29 @@ Committed Drizzle migrations are the authoritative database structure. They are
 run manually, rather than at application startup or every deploy, so an operator
 can review and control each schema change.
 
+## Deployment path
+
+Coolify must use the **Nixpacks** build pack with the repository root as its
+source directory. This is RuneSpace's authoritative Coolify deployment path;
+the repository `Dockerfile` is not used by the live application.
+
+Repository configuration is in `nixpacks.toml`. It preserves the package
+`build` and `start` commands, then asserts that `drizzle.config.ts`, the
+committed `drizzle/meta/_journal.json` and SQL migration, and the `drizzle-kit`
+executable exist. The Nixpacks Node provider honors the repository's Node 22 and
+pnpm declarations and installs all package dependencies, including
+`drizzle-kit`. No reduced runtime image or runtime file allowlist is configured,
+so Nixpacks copies the application directory, including those verified migration
+assets, into the running application container.
+
+Coolify UI configuration selects the build pack and injects runtime environment
+variables; it is not committed to this repository. The deployed runtime contains
+the source and dependencies produced by that Nixpacks configuration. Keep
+`DATABASE_URL` configured only in Coolify and do not expose its value.
+
 ## Apply migrations in Coolify
 
-After a RuneSpace deployment that contains the migration assets, open the
+After merging and redeploying this Nixpacks configuration, open the
 **RuneSpace application** terminal in Coolify, not the PostgreSQL resource
 terminal, and run:
 
@@ -20,14 +40,17 @@ terminal, and run:
 pnpm drizzle-kit migrate
 ```
 
-The deployed image includes `drizzle.config.ts` and `drizzle/` specifically for
-this command. `drizzle-kit` is already present in the image dependencies. Do not
-use `drizzle-kit push` against the live database.
+The Nixpacks build log must show the installed `drizzle-kit` version after the
+application build; that assertion confirms the migration config, journal, SQL,
+and CLI were present in the artifact before deployment. Do not use
+`drizzle-kit push` against the live database.
 
 On a database with unapplied migrations, Drizzle reports the configuration and
 applies each committed migration. A successful command exits with status `0`.
-Re-running it after success should report that no migrations are pending. After
-the initial RuneSpace migration, verify the application can register an
+Expect output that identifies `drizzle.config.ts`, the `pg` driver, and the
+migration application; it must not report a missing configuration or migration
+directory. Re-running it after success should report that no migrations are
+pending. After the initial RuneSpace migration, verify the application can register an
 account; this confirms the Better Auth `user`, `session`, `account`, and
 `verification` tables exist. Creating a character also confirms the
 `player_accounts` and `characters` ownership tables exist.

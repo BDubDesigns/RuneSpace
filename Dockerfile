@@ -37,10 +37,6 @@ COPY --from=builder /app/package.json ./package.json
 COPY --from=builder /app/next.config.ts ./next.config.ts
 COPY --from=builder /app/db ./db
 COPY --from=builder /app/server ./server
-# Keep the committed migration assets available for the operator-run Drizzle command.
-COPY --from=builder /app/drizzle.config.ts ./drizzle.config.ts
-COPY --from=builder /app/drizzle ./drizzle
-RUN test -f drizzle.config.ts && test -f drizzle/meta/_journal.json
 
 EXPOSE 3000
 CMD ["pnpm", "start"]
