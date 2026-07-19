@@ -20,6 +20,7 @@ test("owned character can start, observe, stop, and restore Crash Site Mining", 
   await page.getByRole("button", { name: "Create character" }).click();
 
   await expect(page.getByText("Ferrite Shale")).toBeVisible();
+  await expect(page.getByText(/Success chance: 35.00%/)).toBeVisible();
   await expect(page.getByText(/Salvage Cutter and MYKEA SCHLEPPRAUM-8 equipped/)).toBeVisible();
   await page.getByRole("button", { name: "Start Mining" }).click();
   await expect(page.getByRole("button", { name: "Stop Mining" })).toBeVisible();
@@ -27,6 +28,13 @@ test("owned character can start, observe, stop, and restore Crash Site Mining", 
   await page.waitForTimeout(6_300);
   await page.getByRole("button", { name: "Refresh status" }).click();
   await expect(page.getByText(/successful, .* failed attempts|Mining stopped/)).toBeVisible();
+  await expect(page.getByText("This mining run")).toBeVisible();
+  await expect(page.getByLabel("Latest mining attempts")).toContainText(/Attempt 1/);
+  await page.getByRole("button", { name: /Inventory [01]\/8/ }).click();
+  await expect(page.getByRole("dialog", { name: "Inventory" })).toBeVisible();
+  await expect(page.getByLabel("Eight inventory slots")).toBeVisible();
+  await page.screenshot({ path: "test-results/mining-mobile-inventory.png", fullPage: true });
+  await page.getByRole("button", { name: "Close inventory" }).click();
   await page.getByRole("button", { name: "Stop Mining" }).click();
   await expect(page.getByRole("button", { name: "Start Mining" })).toBeVisible();
   await expect(page.getByText("Mining stopped.")).toBeVisible();
@@ -35,4 +43,7 @@ test("owned character can start, observe, stop, and restore Crash Site Mining", 
   await expect(page.getByText("Mining stopped.")).toBeHidden();
   await page.reload();
   await expect(page.getByText("Ferrite Shale")).toBeVisible();
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.getByRole("button", { name: /Inventory/ }).click();
+  await page.screenshot({ path: "test-results/mining-desktop-inventory.png", fullPage: true });
 });

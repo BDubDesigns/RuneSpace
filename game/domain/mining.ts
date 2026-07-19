@@ -40,8 +40,24 @@ export type MiningResolution<Id = string> = {
   awardedXp: number;
   stackUpdates: readonly { id: Id; quantity: number }[];
   createdStacks: readonly { itemId: string; quantity: number }[];
+  attempts: readonly MiningResolvedAttempt[];
   stopReason?: MiningStopReason;
 };
+
+export type MiningResolvedAttempt = {
+  success: boolean;
+  rolledBasisPoints: number;
+  thresholdBasisPoints: number;
+  shaleAwarded: number;
+  xpAwarded: number;
+};
+
+export function miningNearMissBasisPoints(
+  rolledBasisPoints: number,
+  thresholdBasisPoints: number,
+): number {
+  return Math.max(0, rolledBasisPoints - thresholdBasisPoints);
+}
 
 /** Shared preflight for starting and resolving a Mining attempt. */
 export function miningPreflightStopReason<Id>(
@@ -81,6 +97,7 @@ export function resolveCrashSiteMining<Id>(input: {
       awardedXp: 0,
       stackUpdates: [],
       createdStacks: [],
+      attempts: [],
       stopReason: initialStopReason,
     };
   let stacks = snapshot.existingStacks.map((stack) => ({ ...stack, persisted: true }));
@@ -88,6 +105,8 @@ export function resolveCrashSiteMining<Id>(input: {
   let massAvailableGrams = snapshot.massAvailableGrams;
   let successes = 0;
   let failures = 0;
+  const resolvedAttempts: MiningResolvedAttempt[] = [];
+  const thresholdBasisPoints = miningSuccessChanceBps(snapshot.miningLevel, balance);
   for (let index = 0; index < attempts; index += 1) {
     // A minimum successful yield must fit before chance is rolled.
     const currentSnapshot = {
@@ -109,11 +128,20 @@ export function resolveCrashSiteMining<Id>(input: {
         createdStacks: stacks
           .filter((stack) => !stack.persisted)
           .map(({ itemId, quantity }) => ({ itemId, quantity })),
+        attempts: resolvedAttempts,
         stopReason,
       };
     }
-    if (random.nextBasisPoints() >= miningSuccessChanceBps(snapshot.miningLevel, balance)) {
+    const rolledBasisPoints = random.nextBasisPoints();
+    if (rolledBasisPoints >= thresholdBasisPoints) {
       failures += 1;
+      resolvedAttempts.push({
+        success: false,
+        rolledBasisPoints,
+        thresholdBasisPoints,
+        shaleAwarded: 0,
+        xpAwarded: 0,
+      });
       continue;
     }
     const rolledQuantity =
@@ -156,6 +184,13 @@ export function resolveCrashSiteMining<Id>(input: {
     slotsAvailable -= plan.createdStacks.length;
     massAvailableGrams -= quantity * balance.items.ferriteShale.massGrams;
     successes += 1;
+    resolvedAttempts.push({
+      success: true,
+      rolledBasisPoints,
+      thresholdBasisPoints,
+      shaleAwarded: quantity,
+      xpAwarded: balance.mining.successXp,
+    });
   }
   return {
     consumedTicks: attempts * balance.mining.attemptDurationTicks,
@@ -168,5 +203,6 @@ export function resolveCrashSiteMining<Id>(input: {
     createdStacks: stacks
       .filter((stack) => !stack.persisted)
       .map(({ itemId, quantity }) => ({ itemId, quantity })),
+    attempts: resolvedAttempts,
   };
 }

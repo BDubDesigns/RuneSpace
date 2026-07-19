@@ -26,8 +26,8 @@ small number of critical mobile player journeys.
   screen, then core loops as they ship). Avoid large suites of shallow UI tests.
 - The scaffold includes a minimal app-loading smoke test
   (`tests/e2e/smoke.spec.ts`).
-- Run locally: `pnpm test:e2e`. Playwright is **not** run in the fast CI
-  workflow (see below) to keep PR checks lightweight and reliable.
+- Run locally: `pnpm test:e2e`. The focused Mining journey runs in its own CI
+  job with a disposable PostgreSQL service and uploads Playwright artifacts.
 
 ## What to test when systems arrive
 For progression-sensitive systems, prioritize:
@@ -42,6 +42,5 @@ For progression-sensitive systems, prioritize:
 - Testing implementation details instead of observable outcomes.
 
 ## CI scope
-CI runs typecheck, lint, format check, unit tests, production build, and a
-separate PostgreSQL migration/integration-test job. Playwright is intentionally
-excluded because it requires a longer-lived browser and would slow feedback.
+CI runs typecheck, lint, format check, unit tests, production build, a separate
+PostgreSQL migration/integration-test job, and a focused Mining Playwright job.

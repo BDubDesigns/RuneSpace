@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition, type RefObject } from "react";
 import { ActionButton } from "@/components/ui/ActionButton";
 import { Feedback } from "@/components/ui/Feedback";
 import { Panel } from "@/components/ui/Panel";
@@ -8,6 +8,7 @@ import { SectionHeader } from "@/components/ui/SectionHeader";
 import { StatusMeter } from "@/components/ui/StatusMeter";
 import { getEffectiveGameBalance } from "@/game/config/balance";
 import { GAME_TICK_MS } from "@/game/config/foundations";
+import { miningNearMissBasisPoints } from "@/game/domain/mining";
 import type { MiningGameplayState } from "@/server/mining";
 import { refreshMiningAction, startMiningAction, stopMiningAction } from "@/server/actions";
 
@@ -31,6 +32,111 @@ function commandErrorMessage(error: NonNullable<MiningGameplayState["commandErro
   }[error];
 }
 
+function percentage(basisPoints: number) {
+  return (basisPoints / 100).toFixed(2);
+}
+
+function InventoryPanel({
+  state,
+  onClose,
+  triggerRef,
+}: {
+  state: MiningGameplayState;
+  onClose: () => void;
+  triggerRef: RefObject<HTMLButtonElement | null>;
+}) {
+  const closeButton = useRef<HTMLButtonElement>(null);
+  const panel = useRef<HTMLElement>(null);
+  function close() {
+    onClose();
+    triggerRef.current?.focus();
+  }
+  useEffect(() => {
+    closeButton.current?.focus();
+  }, []);
+  useEffect(() => {
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        onClose();
+        triggerRef.current?.focus();
+        return;
+      }
+      if (event.key !== "Tab" || !panel.current) return;
+      const focusable = panel.current.querySelectorAll<HTMLElement>(
+        'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+      );
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (!first || !last) return;
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    }
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [onClose, triggerRef]);
+  const totalSlots = state.inventory.slotsUsed + state.inventory.slotsAvailable;
+  return (
+    <div
+      className="bg-[color:var(--rs-surface-page)]/95 fixed inset-0 z-50 flex items-end p-3 sm:items-center sm:justify-end"
+      role="presentation"
+    >
+      <section
+        aria-label="Inventory"
+        aria-modal="true"
+        className="max-h-[min(78dvh,42rem)] w-full max-w-xl overflow-y-auto border border-[color:var(--rs-border-structural)] bg-[color:var(--rs-surface-raised)] p-4 pb-[max(1rem,env(safe-area-inset-bottom))] [box-shadow:var(--rs-shadow-panel)] sm:max-h-full"
+        ref={panel}
+        role="dialog"
+      >
+        <div className="flex items-center justify-between gap-3">
+          <SectionHeader eyebrow="MYKEA SCHLEPPRAUM-8">Container inventory</SectionHeader>
+          <ActionButton ref={closeButton} intent="secondary" onClick={close}>
+            Close inventory
+          </ActionButton>
+        </div>
+        <p className="mt-2 text-sm text-[color:var(--rs-text-secondary)]">
+          {state.inventory.slotsUsed} occupied / {totalSlots} slots
+        </p>
+        <div
+          className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4"
+          aria-label="Eight inventory slots"
+        >
+          {Array.from({ length: totalSlots }, (_, index) => {
+            const stack = state.inventory.stacks[index];
+            return stack ? (
+              <article
+                className="relative min-h-28 border border-[color:var(--rs-accent-mining)] bg-[color:var(--rs-accent-mining-subtle)] p-3"
+                key={stack.id}
+              >
+                <div
+                  aria-hidden="true"
+                  className="mb-3 h-8 border border-dashed border-[color:var(--rs-border-subtle)]"
+                />
+                <p className="font-display text-xs uppercase tracking-wide">{stack.name}</p>
+                <span className="absolute right-2 top-2 border border-[color:var(--rs-accent-mining)] px-1.5 py-0.5 font-display text-xs">
+                  x{stack.quantity}
+                </span>
+              </article>
+            ) : (
+              <div
+                aria-label={`Empty inventory slot ${index + 1}`}
+                className="min-h-28 border border-dashed border-[color:var(--rs-border-subtle)] bg-[color:var(--rs-surface-panel)] p-3 text-xs uppercase tracking-wide text-[color:var(--rs-text-muted)]"
+                key={`empty-${index}`}
+              >
+                Empty slot
+              </div>
+            );
+          })}
+        </div>
+      </section>
+    </div>
+  );
+}
+
 export function MiningConsole({
   characterName,
   initialState,
@@ -44,6 +150,8 @@ export function MiningConsole({
   );
   const [now, setNow] = useState(Date.now());
   const [pending, startTransition] = useTransition();
+  const [inventoryOpen, setInventoryOpen] = useState(false);
+  const inventoryTrigger = useRef<HTMLButtonElement>(null);
   const balance = getEffectiveGameBalance();
   const active = state.activeAction;
   const durationMs = balance.mining.attemptDurationTicks * GAME_TICK_MS;
@@ -121,6 +229,9 @@ export function MiningConsole({
             Refresh status
           </ActionButton>
         </div>
+        <p className="mt-3 font-display text-sm uppercase tracking-wide text-[color:var(--rs-accent-mining)]">
+          Success chance: {percentage(state.successChanceBps)}%
+        </p>
         {active ? (
           <div className="mt-5">
             <StatusMeter
@@ -193,6 +304,85 @@ export function MiningConsole({
           </div>
         </Panel>
       </div>
+      <Panel>
+        <SectionHeader eyebrow="Server-resolved">This mining run</SectionHeader>
+        <div className="mt-4 grid grid-cols-2 gap-3 text-sm sm:grid-cols-5">
+          <p>
+            <strong>{state.run.attempts}</strong> attempts
+          </p>
+          <p>
+            <strong>{state.run.successes}</strong> successful
+          </p>
+          <p>
+            <strong>{state.run.failures}</strong> failed
+          </p>
+          <p>
+            <strong>{state.run.shaleGained}</strong> shale gained
+          </p>
+          <p>
+            <strong>{state.run.xpGained}</strong> Mining XP
+          </p>
+        </div>
+        <div
+          className="mt-5 max-h-72 space-y-2 overflow-y-auto pr-1"
+          aria-label="Latest mining attempts"
+        >
+          {[...state.run.recentAttempts].reverse().map((attempt) => (
+            <article
+              className="border-l-2 border-[color:var(--rs-border-structural)] bg-[color:var(--rs-surface-panel)] px-3 py-2 text-sm"
+              key={attempt.sequence}
+            >
+              <p className="font-display uppercase tracking-wide">
+                Attempt {attempt.sequence} - {attempt.success ? "Success" : "Failed"}
+              </p>
+              <p className="text-[color:var(--rs-text-secondary)]">
+                Roll {percentage(attempt.rolledBasisPoints)} | Needed below{" "}
+                {percentage(attempt.thresholdBasisPoints)}
+              </p>
+              <p className="text-xs text-[color:var(--rs-text-muted)]">
+                Resolved {new Date(attempt.resolvedAt).toLocaleTimeString()}
+              </p>
+              {attempt.success ? (
+                <p>
+                  {attempt.shaleAwarded} Ferrite Shale | {attempt.xpAwarded} Mining XP
+                </p>
+              ) : (
+                <p>
+                  Missed by{" "}
+                  {percentage(
+                    miningNearMissBasisPoints(
+                      attempt.rolledBasisPoints,
+                      attempt.thresholdBasisPoints,
+                    ),
+                  )}
+                </p>
+              )}
+            </article>
+          ))}
+          {state.run.recentAttempts.length === 0 ? (
+            <p className="text-sm text-[color:var(--rs-text-muted)]">
+              No resolved attempts in this run yet.
+            </p>
+          ) : null}
+        </div>
+      </Panel>
+      <div className="sticky bottom-0 z-40 -mx-4 border-t border-[color:var(--rs-border-structural)] bg-[color:var(--rs-surface-raised)] px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-3 sm:fixed sm:bottom-4 sm:left-4 sm:right-4 sm:mx-0">
+        <ActionButton
+          ref={inventoryTrigger}
+          intent="secondary"
+          onClick={() => setInventoryOpen((open) => !open)}
+        >
+          Inventory {state.inventory.slotsUsed}/
+          {state.inventory.slotsUsed + state.inventory.slotsAvailable}
+        </ActionButton>
+      </div>
+      {inventoryOpen ? (
+        <InventoryPanel
+          state={state}
+          onClose={() => setInventoryOpen(false)}
+          triggerRef={inventoryTrigger}
+        />
+      ) : null}
     </div>
   );
 }

@@ -53,6 +53,10 @@ loadout is provisioned once transactionally: a 5 kg Salvage Cutter, one 10 kg
 MYKEA SCHLEPPRAUM-8 eight-slot container, and the approved 50 kg carry capacity.
 No quest state is associated with the damaged-ship guidance.
 
+The current Mining run is bounded per-character state. Aggregate totals survive
+refreshes and stopping; only the latest ten immutable server-resolved attempt
+summaries are retained. Starting a genuinely new Mining action resets this run.
+
 ## Inventory and equipment
 
 - Fungible items are carried as positive-quantity stacks. Unique items are
