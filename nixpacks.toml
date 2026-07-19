@@ -1,0 +1,2 @@
+[phases.build]
+cmds = ["pnpm build", "test -f drizzle.config.ts && test -f drizzle/meta/_journal.json && test -f drizzle/0000_wise_vertigo.sql && test -x node_modules/.bin/drizzle-kit && node_modules/.bin/drizzle-kit --version"]
