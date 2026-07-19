@@ -36,9 +36,10 @@ test("owned character can start, observe, stop, and restore Crash Site Mining", 
     itemId: ITEM_IDS.ferriteShale,
     quantity: 10,
   });
+  const twoAttemptsAgo = new Date(Date.now() - 12_100);
   await db
     .update(activeActions)
-    .set({ resolvedThroughAt: new Date(Date.now() - 12_100) })
+    .set({ startedAt: twoAttemptsAgo, resolvedThroughAt: twoAttemptsAgo })
     .where(eq(activeActions.characterId, characterId));
   await page.getByRole("button", { name: "Refresh status" }).click();
   await expect(page.getByText("This mining run")).toBeVisible();
