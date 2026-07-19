@@ -35,7 +35,7 @@ export type ActionTransition =
   | {
       kind: "replace";
       consumedTicks: number;
-      action: Pick<ActiveAction, "actionId" | "startedAt" | "resolvedThroughAt">;
+      action: Pick<ActiveAction, "actionId" | "startedAt">;
     };
 
 export type ActionResolution<Outcome> = {
@@ -132,7 +132,11 @@ export async function withResolvedOwnedCharacter<Snapshot, Outcome, Result>(
         } else {
           await transaction
             .update(activeActions)
-            .set({ ...resolution.transition.action, resolvedThroughAt })
+            .set({
+              actionId: resolution.transition.action.actionId,
+              startedAt: resolution.transition.action.startedAt,
+              resolvedThroughAt,
+            })
             .where(eq(activeActions.characterId, character.id));
         }
       }

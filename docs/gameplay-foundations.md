@@ -25,7 +25,8 @@ playable activities.
 - Resolution loads action-specific authoritative state under that same lock,
   passes an immutable snapshot to pure deterministic resolution, and gives the
   following command the reloaded final action state after continuing, stopping,
-  or replacing an action.
+  or replacing an action. Replacement resolvers provide only their action ID and
+  start time; orchestration remains the sole owner of durable resolution cursors.
 
 ## Progression
 

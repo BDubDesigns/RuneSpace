@@ -305,7 +305,6 @@ suite("gameplay foundations (real PostgreSQL)", () => {
             action: {
               actionId: "replacement_action",
               startedAt,
-              resolvedThroughAt: startedAt,
             },
           },
         }),
