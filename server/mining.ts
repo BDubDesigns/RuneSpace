@@ -39,6 +39,27 @@ const systemRandom: MiningRandom = {
   nextUnit: () => randomInt(2) / 2,
 };
 
+/**
+ * CI-only deterministic source for the focused browser journey. It is selected
+ * only by explicit CI configuration, never by a request or normal runtime user.
+ */
+function e2eMiningRandom(): MiningRandom {
+  let attemptIndex = 0;
+  return {
+    nextBasisPoints: () => [0, 3_500][attemptIndex++ % 2]!,
+    nextUnit: () => 0,
+  };
+}
+
+function defaultMiningRandom(): MiningRandom {
+  const databaseHost = process.env.DATABASE_URL ? new URL(process.env.DATABASE_URL).hostname : "";
+  return process.env.CI === "true" &&
+    process.env.RUNESPACE_E2E_MINING === "true" &&
+    (databaseHost === "localhost" || databaseHost === "127.0.0.1")
+    ? e2eMiningRandom()
+    : systemRandom;
+}
+
 type MiningSnapshot = {
   miningLevel: number;
   hasCompatibleTool: boolean;
@@ -474,7 +495,7 @@ export async function getMiningGameplayState(
   userId: string,
   characterId: string,
   now = new Date(),
-  random = systemRandom,
+  random = defaultMiningRandom(),
 ): Promise<MiningGameplayState> {
   let outcome: PersistedMiningOutcome | undefined;
   return withResolvedOwnedCharacter(
@@ -509,7 +530,7 @@ export async function startCrashSiteMining(
   userId: string,
   characterId: string,
   now = new Date(),
-  random = systemRandom,
+  random = defaultMiningRandom(),
 ): Promise<MiningGameplayState> {
   let outcome: PersistedMiningOutcome | undefined;
   return withResolvedOwnedCharacter(
@@ -588,7 +609,7 @@ export async function stopMining(
   userId: string,
   characterId: string,
   now = new Date(),
-  random = systemRandom,
+  random = defaultMiningRandom(),
 ): Promise<MiningGameplayState> {
   let outcome: PersistedMiningOutcome | undefined;
   return withResolvedOwnedCharacter(

@@ -56,7 +56,9 @@ export function miningNearMissBasisPoints(
   rolledBasisPoints: number,
   thresholdBasisPoints: number,
 ): number {
-  return Math.max(0, rolledBasisPoints - thresholdBasisPoints);
+  // Rolls are discrete and success is strictly below the threshold. The nearest
+  // success is therefore threshold - 1, so equality is a one-basis-point miss.
+  return Math.max(0, rolledBasisPoints - thresholdBasisPoints + 1);
 }
 
 /** Shared preflight for starting and resolving a Mining attempt. */

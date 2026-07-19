@@ -115,6 +115,7 @@ jobs:
       BETTER_AUTH_SECRET: insecure-ci-browser-only-secret-do-not-use-in-prod-0000000000
       BETTER_AUTH_URL: http://127.0.0.1:3000
       CI: true
+      RUNESPACE_E2E_MINING: true
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -127,7 +128,7 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm exec playwright install --with-deps chromium
       - run: pnpm drizzle-kit migrate
-      - run: pnpm test:e2e mining
+      - run: pnpm test:e2e mining --project=chromium
       - uses: actions/upload-artifact@v4
         if: always()
         with:

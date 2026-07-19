@@ -125,7 +125,13 @@ describe("Crash Site Ferrite Shale resolution", () => {
         xpAwarded: 15,
       },
     ]);
-    expect(miningNearMissBasisPoints(3602, 3500)).toBe(102);
+    expect(miningNearMissBasisPoints(3602, 3500)).toBe(103);
+  });
+
+  it("measures misses from the highest successful discrete roll", () => {
+    expect(miningNearMissBasisPoints(3500, 3500)).toBe(1);
+    expect(miningNearMissBasisPoints(3501, 3500)).toBe(2);
+    expect(miningNearMissBasisPoints(3499, 3500)).toBe(0);
   });
 
   it("rolls one or two shale equally and awards the same XP", () => {

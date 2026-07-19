@@ -514,6 +514,50 @@ suite("gameplay foundations (real PostgreSQL)", () => {
     });
   });
 
+  it("creates one persisted stack after a full Ferrite Shale stack without replaying it", async () => {
+    const { userId, character } = await makeCharacter();
+    const startedAt = new Date("2026-01-01T00:00:00.000Z");
+    const random = { nextBasisPoints: () => 0, nextUnit: () => 0 };
+    await mining.getMiningGameplayState(userId, character.id, startedAt, random);
+    await db.insert(rune.inventoryStacks).values({
+      characterId: character.id,
+      itemId: ITEM_IDS.ferriteShale,
+      quantity: 10,
+    });
+    await mining.startCrashSiteMining(userId, character.id, startedAt, random);
+    const resolved = await mining.getMiningGameplayState(
+      userId,
+      character.id,
+      new Date("2026-01-01T00:00:06.000Z"),
+      random,
+    );
+    expect(resolved.inventory.stacks.map((stack) => stack.quantity).sort((a, b) => b - a)).toEqual([
+      10, 1,
+    ]);
+    expect(resolved.inventory.slotsUsed).toBe(2);
+    expect(resolved.run).toMatchObject({
+      attempts: 1,
+      successes: 1,
+      shaleGained: 1,
+      xpGained: 15,
+    });
+    const retry = await mining.getMiningGameplayState(
+      userId,
+      character.id,
+      new Date("2026-01-01T00:00:06.000Z"),
+      random,
+    );
+    expect(retry.inventory.stacks.map((stack) => stack.quantity).sort((a, b) => b - a)).toEqual([
+      10, 1,
+    ]);
+    expect(retry.run.attempts).toBe(1);
+    const rows = await db
+      .select()
+      .from(rune.inventoryStacks)
+      .where(eq(rune.inventoryStacks.characterId, character.id));
+    expect(rows.map((stack) => stack.quantity).sort((a, b) => b - a)).toEqual([10, 1]);
+  });
+
   it("preserves an unsupported active action during Mining commands", async () => {
     const { userId, character } = await makeCharacter();
     const startedAt = new Date("2026-01-01T00:00:00.000Z");

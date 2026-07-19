@@ -28,6 +28,9 @@ small number of critical mobile player journeys.
   (`tests/e2e/smoke.spec.ts`).
 - Run locally: `pnpm test:e2e`. The focused Mining journey runs in its own CI
   job with a disposable PostgreSQL service and uploads Playwright artifacts.
+- That journey may use `RUNESPACE_E2E_MINING=true` only in CI to select a
+  server-internal deterministic Mining random source. Browser clients cannot
+  send, select, or observe that switch; PostgreSQL fixtures remain test code.
 
 ## What to test when systems arrive
 For progression-sensitive systems, prioritize:
