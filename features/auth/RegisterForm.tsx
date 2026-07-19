@@ -3,6 +3,9 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { authClient } from "./auth-client";
+import { ActionButton } from "@/components/ui/ActionButton";
+import { Feedback } from "@/components/ui/Feedback";
+import { FormField } from "@/components/ui/FormField";
 
 /**
  * Registration form (client component).
@@ -38,54 +41,28 @@ export function RegisterForm() {
 
   return (
     <form onSubmit={onSubmit} className="mt-6 space-y-4">
-      <div>
-        <label htmlFor="name" className="block text-sm text-slate-300">
-          Display name
-        </label>
-        <input
-          id="name"
-          name="name"
-          type="text"
-          required
-          autoComplete="nickname"
-          className="mt-1 w-full rounded-lg border border-slate-800 bg-slate-950/60 px-3 py-2 text-slate-100 outline-none focus:border-emerald-500"
-        />
-      </div>
-      <div>
-        <label htmlFor="email" className="block text-sm text-slate-300">
-          Email
-        </label>
-        <input
-          id="email"
-          name="email"
-          type="email"
-          required
-          autoComplete="email"
-          className="mt-1 w-full rounded-lg border border-slate-800 bg-slate-950/60 px-3 py-2 text-slate-100 outline-none focus:border-emerald-500"
-        />
-      </div>
-      <div>
-        <label htmlFor="password" className="block text-sm text-slate-300">
-          Password
-        </label>
-        <input
-          id="password"
-          name="password"
-          type="password"
-          required
-          minLength={8}
-          autoComplete="new-password"
-          className="mt-1 w-full rounded-lg border border-slate-800 bg-slate-950/60 px-3 py-2 text-slate-100 outline-none focus:border-emerald-500"
-        />
-      </div>
-      {error ? <p className="text-sm text-red-400">{error}</p> : null}
-      <button
-        type="submit"
-        disabled={pending}
-        className="w-full rounded-lg bg-emerald-500 px-4 py-2 text-sm font-medium text-slate-950 transition hover:bg-emerald-400 disabled:opacity-60"
-      >
-        Create account
-      </button>
+      <FormField
+        id="name"
+        name="name"
+        type="text"
+        required
+        autoComplete="nickname"
+        label="Display name"
+      />
+      <FormField id="email" name="email" type="email" required autoComplete="email" label="Email" />
+      <FormField
+        id="password"
+        name="password"
+        type="password"
+        required
+        minLength={8}
+        autoComplete="new-password"
+        label="Password"
+      />
+      {error ? <Feedback tone="danger">{error}</Feedback> : null}
+      <ActionButton type="submit" loading={pending} className="w-full">
+        {pending ? "Creating account" : "Create account"}
+      </ActionButton>
     </form>
   );
 }

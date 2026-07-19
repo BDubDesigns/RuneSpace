@@ -4,9 +4,94 @@
 
 :root {
   color-scheme: dark;
+  --rs-surface-page: #05090f;
+  --rs-surface-raised: #091522;
+  --rs-surface-navigation: rgb(9 21 34 / 0.985);
+  --rs-surface-panel: #0b1824;
+  --rs-surface-control: #0e2130;
+  --rs-text-primary: #e8f4f7;
+  --rs-text-secondary: #b4c6cf;
+  --rs-text-muted: #718895;
+  --rs-border-structural: #1f5268;
+  --rs-border-subtle: #18313f;
+  --rs-accent-primary: #4bd8f5;
+  --rs-accent-secondary: #4caec7;
+  --rs-accent-success: #88d763;
+  --rs-accent-mining: #f5c451;
+  --rs-accent-arcane: #c48cff;
+  --rs-accent-danger: #f16c75;
+  --rs-accent-primary-subtle: rgb(75 216 245 / 0.12);
+  --rs-accent-primary-hover: rgb(75 216 245 / 0.2);
+  --rs-accent-success-subtle: rgb(136 215 99 / 0.1);
+  --rs-accent-success-hover: rgb(136 215 99 / 0.17);
+  --rs-accent-mining-subtle: rgb(245 196 81 / 0.1);
+  --rs-accent-mining-hover: rgb(245 196 81 / 0.17);
+  --rs-accent-arcane-subtle: rgb(196 140 255 / 0.1);
+  --rs-accent-arcane-hover: rgb(196 140 255 / 0.17);
+  --rs-accent-danger-subtle: rgb(241 108 117 / 0.1);
+  --rs-accent-danger-hover: rgb(241 108 117 / 0.17);
+  --rs-focus-ring: #a5efff;
+  --rs-space-1: 0.25rem;
+  --rs-space-2: 0.5rem;
+  --rs-space-3: 0.75rem;
+  --rs-space-4: 1rem;
+  --rs-space-5: 1.25rem;
+  --rs-space-6: 1.5rem;
+  --rs-space-8: 2rem;
+  --rs-bevel: 0.65rem;
+  --rs-bevel-small: 0.4rem;
+  --rs-font-display: ui-monospace, SFMono-Regular, Menlo, monospace;
+  --rs-font-body: ui-sans-serif, system-ui, sans-serif;
+  --rs-shadow-panel: 0 16px 42px rgb(0 0 0 / 0.34);
+  --rs-glow-primary: 0 0 20px rgb(75 216 245 / 0.18);
+  --rs-duration-fast: 120ms;
+  --rs-duration-standard: 180ms;
+  --rs-control-height: 2.75rem;
+  --rs-touch-target: 2.75rem;
 }
 
 html,
 body {
   height: 100%;
+  background: radial-gradient(circle at 20% -10%, rgb(34 112 143 / 0.2), transparent 30rem),
+    var(--rs-surface-page);
+  color: var(--rs-text-primary);
+  font-family: var(--rs-font-body);
+}
+
+* {
+  border-color: var(--rs-border-subtle);
+}
+
+::selection {
+  background: rgb(75 216 245 / 0.3);
+}
+
+.rs-bevel {
+  clip-path: polygon(
+    0 var(--rs-bevel-small),
+    var(--rs-bevel-small) 0,
+    calc(100% - var(--rs-bevel-small)) 0,
+    100% var(--rs-bevel-small),
+    100% calc(100% - var(--rs-bevel-small)),
+    calc(100% - var(--rs-bevel-small)) 100%,
+    var(--rs-bevel-small) 100%,
+    0 calc(100% - var(--rs-bevel-small))
+  );
+}
+
+.rs-focus:focus-visible {
+  outline: 2px solid var(--rs-focus-ring);
+  outline-offset: 3px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
 }
