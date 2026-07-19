@@ -19,7 +19,7 @@ test("owned character can start, observe, stop, and restore Crash Site Mining", 
     .fill(`Ore Runner ${Math.random().toString(36).slice(2, 8)}`);
   await page.getByRole("button", { name: "Create character" }).click();
 
-  await expect(page.getByText("Ferrite Shale")).toBeVisible();
+  await expect(page.getByText("Ferrite Shale", { exact: true }).first()).toBeVisible();
   await expect(page.getByText(/Success chance: 35.00%/)).toBeVisible();
   await expect(page.getByText(/Salvage Cutter and MYKEA SCHLEPPRAUM-8 equipped/)).toBeVisible();
   await page.getByRole("button", { name: "Start Mining" }).click();
@@ -42,7 +42,7 @@ test("owned character can start, observe, stop, and restore Crash Site Mining", 
   await expect(page.getByRole("button", { name: "Stop Mining" })).toBeVisible();
   await expect(page.getByText("Mining stopped.")).toBeHidden();
   await page.reload();
-  await expect(page.getByText("Ferrite Shale")).toBeVisible();
+  await expect(page.getByText("Ferrite Shale", { exact: true }).first()).toBeVisible();
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.getByRole("button", { name: /Inventory/ }).click();
   await page.screenshot({ path: "test-results/mining-desktop-inventory.png", fullPage: true });
