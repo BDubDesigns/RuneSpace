@@ -9,8 +9,8 @@ small number of critical mobile player journeys.
   transitions, and validation contracts in `game/schemas/`.
 - Environment: `node` (no DOM needed for pure logic).
 - Must be fast, deterministic, and free of network/DB.
-- The foundation scaffold includes a meaningful smoke test for the content-ID
-  contract (`tests/unit/ids.test.ts`). More arrive as domain logic lands.
+- Foundational timing, inventory, and progression rules have focused unit
+  coverage alongside the content-ID contract.
 - Run: `pnpm test`.
 
 ## 2. Integration tests
@@ -18,7 +18,8 @@ small number of critical mobile player journeys.
   Drizzle queries in `db/`, and end-to-end resolution of player intent against a
   real (or test) database.
 - These assert that domain outcomes are actually persisted and that the server
-  is the authority. Established when the first real feature lands.
+  is the authority. Ownership and gameplay-foundation tests run against the
+  PostgreSQL service in the dedicated CI job and via `pnpm test:integration`.
 
 ## 3. Browser tests (Playwright)
 - Target: a **small number** of important mobile player journeys (the smoke
@@ -41,8 +42,6 @@ For progression-sensitive systems, prioritize:
 - Testing implementation details instead of observable outcomes.
 
 ## CI scope
-The first CI workflow runs typecheck, lint, format check, unit tests, and
-production build. Playwright is intentionally excluded from CI for now because it
-requires a longer-lived browser + optional DB and would slow the fast feedback
-loop. It is documented here and runnable locally. Revisit once the first
-real feature ships and a stable browser matrix is justified.
+CI runs typecheck, lint, format check, unit tests, production build, and a
+separate PostgreSQL migration/integration-test job. Playwright is intentionally
+excluded because it requires a longer-lived browser and would slow feedback.
