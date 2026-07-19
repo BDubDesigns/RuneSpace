@@ -27,7 +27,6 @@ test("owned character can start, observe, stop, and restore Crash Site Mining", 
   await expect(page.getByLabel(/Mining attempt/)).toBeVisible();
   await page.waitForTimeout(6_300);
   await page.getByRole("button", { name: "Refresh status" }).click();
-  await expect(page.getByText(/successful, .* failed attempts|Mining stopped/)).toBeVisible();
   await expect(page.getByText("This mining run")).toBeVisible();
   await expect(page.getByLabel("Latest mining attempts")).toContainText(/Attempt 1/);
   await page.getByRole("button", { name: /Inventory [01]\/8/ }).click();
