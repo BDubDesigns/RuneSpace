@@ -53,6 +53,22 @@ test.describe("development design-system preview", () => {
     expect(width).toBeLessThanOrEqual(390);
   });
 
+  test("final panel clears the fixed navigation when scrolled to the bottom", async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto("/design-system");
+    await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
+
+    const panel = page.locator("#states");
+    const navigation = page.getByRole("navigation", { name: "Primary" });
+    const [panelBox, navigationBox] = await Promise.all([
+      panel.boundingBox(),
+      navigation.boundingBox(),
+    ]);
+    expect(panelBox).not.toBeNull();
+    expect(navigationBox).not.toBeNull();
+    expect(panelBox!.y + panelBox!.height).toBeLessThanOrEqual(navigationBox!.y);
+  });
+
   test("captures deterministic review screenshots", async ({ page }, testInfo) => {
     const viewport =
       testInfo.project.name === "mobile"

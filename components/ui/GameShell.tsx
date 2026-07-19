@@ -13,7 +13,7 @@ export function BottomNav({ children }: { children: ReactNode }) {
   return (
     <nav
       aria-label="Primary"
-      className="bg-[color:var(--rs-surface-raised)]/95 fixed inset-x-0 bottom-0 z-10 border-t border-[color:var(--rs-border-structural)] p-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] backdrop-blur"
+      className="fixed inset-x-0 bottom-0 z-10 border-t border-[color:var(--rs-border-structural)] bg-[color:var(--rs-surface-navigation)] p-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] backdrop-blur-sm"
     >
       {children}
     </nav>

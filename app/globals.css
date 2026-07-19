@@ -6,6 +6,7 @@
   color-scheme: dark;
   --rs-surface-page: #05090f;
   --rs-surface-raised: #091522;
+  --rs-surface-navigation: rgb(9 21 34 / 0.985);
   --rs-surface-panel: #0b1824;
   --rs-surface-control: #0e2130;
   --rs-text-primary: #e8f4f7;
