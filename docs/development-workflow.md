@@ -25,7 +25,11 @@ pnpm typecheck
 pnpm lint
 pnpm format:check
 pnpm test
-pnpm build
+DATABASE_URL=postgres://runespace:runespace@localhost:5432/runespace \
+  NODE_ENV=production \
+  BETTER_AUTH_SECRET=insecure-ci-build-only-secret-do-not-use-in-prod-0000000000 \
+  BETTER_AUTH_URL=http://localhost:3000 \
+  pnpm build
 # optional, local only:
 pnpm test:e2e
 ```
@@ -50,7 +54,8 @@ The PR must include:
 - unresolved questions, limitations, or version mismatches
 - confirmation that no gameplay was implemented
 
-## Future multi-agent workflow
-These rules are designed so a future OpenHands Foreman / Reviewer / sub-agent
-orchestration can build on them (see issue #2). The foundation does not implement
-that orchestration itself.
+## Model-assisted review
+For difficult reasoning or final review, use a separate model pass when the
+active harness supports it. Manual model switching in OpenCode is allowed.
+Unavailable delegation must not block ordinary issue work: complete a careful
+self-review and document the review approach in the draft PR.

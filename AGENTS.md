@@ -1,8 +1,8 @@
 # AGENTS.md — Read this before editing RuneSpace
 
-RuneSpace is developed with OpenHands agents. These rules keep the codebase safe
-to modify and consistent with the architecture. **Read the relevant `docs/`
-before editing, and re-read them when the change crosses a boundary.**
+RuneSpace can be developed with any capable coding harness. These rules keep the
+codebase safe to modify and consistent with the architecture. **Read the relevant
+`docs/` before editing, and re-read them when the change crosses a boundary.**
 
 ## Before you plan
 - Read the docs that govern the area you are touching: `docs/architecture.md`,
@@ -66,54 +66,35 @@ before editing, and re-read them when the change crosses a boundary.**
    - Confirm no gameplay was implemented.
 4. **Never merge your own work.**
 
-## RuneSpace Foreman (Issue execution) protocol
+## Issue execution workflow
 
-When a fresh HY3 project conversation is asked to work on **one** approved GitHub
-issue (e.g. the user says "Work on issue #N" or pastes an issue URL), it operates
-as the **Foreman**: it implements that single issue itself with HY3, and
-conditionally delegates hard reasoning and final review to stronger project-local
-specialists. The specialist definitions live in `.agents/agents/` and are the
-single source of truth for their behavior. This protocol is authoritative for
-issue execution; it does not replace the architecture/scope rules above.
-
-Foreman must:
+When asked to work on one approved GitHub issue, the active model implements that
+issue. This workflow is harness-neutral and does not require project-local
+subagents or automation that may be unavailable.
 
 1. **One issue only.** Work the single approved issue you were given. Do not begin
    another issue, and do not self-select issues. Stop after this issue is done.
-2. **Read first.** Read the issue, this `AGENTS.md`, and the relevant `docs/`
-   (especially `docs/architecture.md`, `docs/component-boundaries.md`,
-   `docs/development-workflow.md`) before planning.
-3. **Inspect before planning.** Explore the existing code, patterns, and tests
-   relevant to the change. Do not invent mechanics, content, or architecture.
-4. **Visible evidence-based checklist.** Maintain a task list (the `task_tracker`
-   tool) showing the acceptance criteria and their status. Keep it visible.
-5. **Conditional Advisor.** Delegate to the **Hard-Problem Advisor**
-   (`.agents/agents/runespace-hard-problem-advisor.md`, profile `deepseek-v4-pro`)
-   only when an escalation trigger is met: boundary/SSOT ambiguity, a contract or
-   type problem, a transaction/race/replay question, a test-vs-docs conflict,
-   unclear extraction ownership, a security/auth/secret concern, or two failed
-   attempts. Send a compact packet: goal, governing rules, files inspected,
-   approach, exact failure, attempts, options, and one precise question.
-6. **Mandatory Reviewer.** Before opening or updating the draft PR, delegate to the
-   **Reviewer** (`.agents/agents/runespace-reviewer.md`, profile `deepseek-v4-pro`).
-   It returns exactly one verdict: `merge-worthy` | `not ready` | `blocker found`.
-7. **Address blockers.** If the Reviewer returns `not ready` or `blocker found`,
-   fix the listed items (citing file:line and the violated rule) and re-run review.
-   Do not open a PR that the Reviewer has not cleared.
-8. **Clean CI-parity.** Run `pnpm install --frozen-lockfile`, `pnpm typecheck`,
-   `pnpm lint`, `pnpm format:check`, `pnpm test`, `pnpm build` (mirror
-   `.github/workflows/ci.yml` order and env). All must pass before pushing.
-9. **Inspect remote Actions.** After pushing, use `gh run watch` (or the GitHub API)
-   to confirm the required GitHub Actions run is green. Keep fixing the same branch
-   and draft PR until CI is green or a genuine external blocker is documented.
-10. **One draft PR.** Create or update exactly one draft pull request for the issue.
-    Include setup/validation commands, results, agent roles, provider/model profile
-    names, and evidence of Advisor + Reviewer delegation. Do **not** merge it.
-11. **Stop for human review.** When the draft PR is ready and CI is green, stop.
-    Never merge your own work. Never start the next issue.
-
-Tooling for this workflow (operator-only, outside the app runtime) is under
-`tools/openhands/`; the runbook is `docs/agents/foreman-runbook.md`.
+2. **Read and inspect first.** Read the issue, this `AGENTS.md`, the relevant
+   `docs/`, and the existing code and tests before planning. Do not invent
+   mechanics, content, or architecture.
+3. **Plan against evidence.** Keep a checklist of the issue acceptance criteria and
+   their status using the harness's available task-tracking mechanism, if any.
+4. **Seek a separate model pass when available.** For boundary or SSOT ambiguity,
+   contracts, concurrency, security, test/documentation conflicts, two failed
+   attempts, or substantial scope growth, ask a separate model to review the
+   problem. Before a draft PR, request a separate-model final review when the
+   harness supports it. Automated delegation being unavailable must not block
+   ordinary work; perform and document a careful self-review instead. OpenCode
+   users may switch models manually for either pass.
+5. **Clean CI-parity.** Run `pnpm install --frozen-lockfile`, `pnpm typecheck`,
+   `pnpm lint`, `pnpm format:check`, `pnpm test`, and `pnpm build`, mirroring
+   `.github/workflows/ci.yml` environment requirements. Resolve failures or
+   document genuine external blockers.
+6. **One draft PR.** Create or update exactly one draft pull request for the issue.
+   Include validation commands and results, key architectural decisions, review
+   approach, and unresolved questions. Do **not** merge it.
+7. **Stop for human review.** After the draft PR is ready, inspect remote CI when
+   available and stop. Never merge your own work or start the next issue.
 
 ## Tooling reference
 - pnpm is the package manager; the lockfile is committed and installs are frozen.
