@@ -54,8 +54,7 @@ test("owned character can start, observe, stop, and restore Crash Site Mining", 
   await expect(history).toContainText("Roll 35.00 | Needed below 35.00");
   await expect(history).toContainText("Missed by 0.01");
   await expect(history).toContainText("Roll 0.00 | Needed below 35.00");
-  await page.getByText("This mining run").scrollIntoViewIfNeeded();
-  await page.screenshot({ path: "test-results/mining-mobile-run-history.png" });
+  await page.screenshot({ path: "test-results/mining-mobile-run-history.png", fullPage: true });
   await page.getByRole("button", { name: "Inventory 2/8" }).click();
   const inventory = page.getByRole("dialog", { name: "Inventory" });
   await expect(inventory).toBeVisible();
