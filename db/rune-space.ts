@@ -8,6 +8,7 @@ import {
   pgTable,
   text,
   timestamp,
+  unique,
   uniqueIndex,
 } from "drizzle-orm/pg-core";
 import { user } from "./auth-schema";
@@ -165,7 +166,7 @@ export const itemInstances = pgTable(
       "item_instances_current_charge_non_negative",
       sql`${table.currentCharge} IS NULL OR ${table.currentCharge} >= 0`,
     ),
-    uniqueIndex("item_instances_character_id_id_unique").on(table.characterId, table.id),
+    unique("item_instances_character_id_id_unique").on(table.characterId, table.id),
     index("item_instances_character_id_idx").on(table.characterId),
   ],
 );

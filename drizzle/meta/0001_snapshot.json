@@ -1,5 +1,5 @@
 {
-  "id": "15da9ace-b62d-4745-bde5-749c6eecfa6b",
+  "id": "13f867d3-03fe-4a72-ac14-9c9995e1d827",
   "prevId": "4b435753-6598-418a-a15a-35eae8bc2df0",
   "version": "7",
   "dialect": "postgresql",
@@ -701,6 +701,12 @@
           "primaryKey": false,
           "notNull": true
         },
+        "assignment_kind": {
+          "name": "assignment_kind",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
         "suit_slot_id": {
           "name": "suit_slot_id",
           "type": "text",
@@ -727,6 +733,12 @@
           "columns": [
             {
               "expression": "character_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "assignment_kind",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
@@ -798,7 +810,12 @@
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "policies": {},
-      "checkConstraints": {},
+      "checkConstraints": {
+        "equipped_items_assignment_kind_valid": {
+          "name": "equipped_items_assignment_kind_valid",
+          "value": "\"equipped_items\".\"assignment_kind\" IN ('gear', 'container')"
+        }
+      },
       "isRLSEnabled": false
     },
     "public.inventory_stacks": {
@@ -933,27 +950,6 @@
         }
       },
       "indexes": {
-        "item_instances_character_id_id_unique": {
-          "name": "item_instances_character_id_id_unique",
-          "columns": [
-            {
-              "expression": "character_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
         "item_instances_character_id_idx": {
           "name": "item_instances_character_id_idx",
           "columns": [
@@ -986,7 +982,16 @@
         }
       },
       "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
+      "uniqueConstraints": {
+        "item_instances_character_id_id_unique": {
+          "name": "item_instances_character_id_id_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "character_id",
+            "id"
+          ]
+        }
+      },
       "policies": {},
       "checkConstraints": {
         "item_instances_current_charge_non_negative": {
