@@ -115,8 +115,10 @@ test("owned character can start, observe, stop, and restore Crash Site Mining", 
   ]);
   expect(nameBox).not.toBeNull();
   expect(trackBox).not.toBeNull();
-  expect(nameBox!.left - trackBox!.right).toBeGreaterThanOrEqual(4);
-  expect(Math.abs(nameBox!.bottom - slotBox!.bottom)).toBeLessThanOrEqual(1);
+  expect(nameBox!.x - (trackBox!.x + trackBox!.width)).toBeGreaterThanOrEqual(4);
+  expect(
+    Math.abs(nameBox!.y + nameBox!.height - (slotBox!.y + slotBox!.height)),
+  ).toBeLessThanOrEqual(1);
   await expect(inventory.locator('[data-stack-fill="100"]')).toBeVisible();
   await expect(inventory.locator('[data-stack-fill="10"]')).toBeVisible();
   await expect(inventory.locator("[data-stack-fill]")).toHaveCount(2);
