@@ -118,7 +118,6 @@ jobs:
       RUNESPACE_RELEASE_ID: ${{ github.sha }}
       CI: true
       RUNESPACE_E2E_MINING: true
-      RUNESPACE_E2E_PLAY_ERROR: true
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4

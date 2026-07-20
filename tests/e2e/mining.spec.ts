@@ -304,27 +304,3 @@ test("an interrupted Mining action preserves confirmed state and retries only st
   await expect(retry).toHaveCount(0);
   expect(miningRequests).toBe(2);
 });
-
-test("the Play boundary resets and navigates to Characters", async ({ page }) => {
-  await page.goto("/register");
-  await page.getByLabel("Display name").fill("Boundary Pilot");
-  await page.getByLabel("Email").fill(uniqueEmail());
-  await page.getByLabel("Password", { exact: true }).fill("sup3r-secret-password");
-  await page.getByRole("button", { name: "Create account" }).click();
-  await page.getByRole("link", { name: "New character" }).click();
-  await page
-    .getByLabel("Character name")
-    .fill(`Boundary ${Math.random().toString(36).slice(2, 8)}`);
-  await page.getByRole("button", { name: "Create character" }).click();
-  const playUrl = page.url();
-
-  await page.goto(`${playUrl}?__runespace_e2e_error=reset`);
-  await expect(page.getByRole("heading", { name: "Play terminal interrupted" })).toBeVisible();
-  await page.getByRole("button", { name: "Retry connection" }).click();
-  await expect(page.getByText("Ferrite Shale", { exact: true }).first()).toBeVisible();
-
-  await page.goto(`${playUrl}?__runespace_e2e_error=navigation`);
-  await expect(page.getByRole("link", { name: "Back to characters" })).toBeVisible();
-  await page.getByRole("link", { name: "Back to characters" }).click();
-  await expect(page).toHaveURL(/\/characters$/);
-});

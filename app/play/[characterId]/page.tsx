@@ -10,19 +10,6 @@ import { getMiningGameplayState } from "@/server/mining";
 
 export const metadata = { title: "Play — RuneSpace" };
 
-const e2eErrorTokens = new Set<string>();
-
-function shouldInjectE2eError(token: string | undefined) {
-  const databaseHost = process.env.DATABASE_URL ? new URL(process.env.DATABASE_URL).hostname : "";
-  return (
-    process.env.CI === "true" &&
-    process.env.RUNESPACE_E2E_PLAY_ERROR === "true" &&
-    (databaseHost === "localhost" || databaseHost === "127.0.0.1") &&
-    (token === "reset" || token === "navigation") &&
-    !e2eErrorTokens.has(token)
-  );
-}
-
 /**
  * Protected placeholder screen for a single owned character.
  *
@@ -31,19 +18,8 @@ function shouldInjectE2eError(token: string | undefined) {
  * another user's character ID yields a 404-style redirect — never another
  * player's data.
  */
-export default async function PlayPage({
-  params,
-  searchParams,
-}: {
-  params: Promise<{ characterId: string }>;
-  searchParams: Promise<{ __runespace_e2e_error?: string }>;
-}) {
+export default async function PlayPage({ params }: { params: Promise<{ characterId: string }> }) {
   const { characterId } = await params;
-  const { __runespace_e2e_error: e2eErrorToken } = await searchParams;
-  if (shouldInjectE2eError(e2eErrorToken)) {
-    e2eErrorTokens.add(e2eErrorToken!);
-    throw new Error("Play boundary e2e failure");
-  }
   const session = await auth.api.getSession({ headers: await headers() });
   if (!session?.user) redirect("/sign-in");
 
