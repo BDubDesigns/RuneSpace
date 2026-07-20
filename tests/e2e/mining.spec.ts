@@ -4,6 +4,14 @@ import { db } from "@/db";
 import { activeActions, inventoryStacks } from "@/db/rune-space";
 import { ITEM_IDS } from "@/game/config/foundations";
 
+const e2eDatabaseHost = process.env.DATABASE_URL ? new URL(process.env.DATABASE_URL).hostname : "";
+
+test.beforeAll(() => {
+  if (e2eDatabaseHost !== "localhost" && e2eDatabaseHost !== "127.0.0.1") {
+    throw new Error("Mining E2E fixtures require a disposable localhost PostgreSQL database");
+  }
+});
+
 function uniqueEmail() {
   return `miner-${Date.now()}-${Math.floor(Math.random() * 1e6)}@example.com`;
 }
