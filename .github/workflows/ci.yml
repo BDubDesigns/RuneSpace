@@ -52,6 +52,7 @@ jobs:
           # MUST set a strong BETTER_AUTH_SECRET; server/env.ts requires it at runtime.
           BETTER_AUTH_SECRET: "insecure-ci-build-only-secret-do-not-use-in-prod-0000000000"
           BETTER_AUTH_URL: "http://localhost:3000"
+          RUNESPACE_RELEASE_ID: ${{ github.sha }}
         run: pnpm build
 
   integration:
