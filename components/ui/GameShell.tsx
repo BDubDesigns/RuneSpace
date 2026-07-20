@@ -32,7 +32,9 @@ export function GameShell({
   aside?: ReactNode;
 }) {
   return (
-    <div className="mx-auto min-h-screen max-w-7xl px-3 py-3 pb-24 sm:px-6 lg:grid lg:grid-cols-[minmax(0,1fr)_20rem] lg:gap-5 lg:pb-6">
+    <div
+      className={`mx-auto min-h-screen max-w-7xl px-3 py-3 ${bottomNav ? "pb-24" : "pb-6"} sm:px-6 lg:grid lg:grid-cols-[minmax(0,1fr)_20rem] lg:gap-5 lg:pb-6`}
+    >
       <div className="min-w-0 space-y-4">
         {topBar}
         <main>{children}</main>

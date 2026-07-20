@@ -210,7 +210,7 @@ export function MiningConsole({
   }, [active?.nextAttemptAt]);
 
   return (
-    <div className="space-y-4 pb-24 sm:pb-0">
+    <div className="space-y-4">
       <Panel tone="raised">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <SectionHeader eyebrow="Crash Site // Sector 01">{characterName}</SectionHeader>
