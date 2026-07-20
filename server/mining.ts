@@ -11,6 +11,7 @@ import {
   itemInstances,
 } from "@/db/rune-space";
 import { getEffectiveGameBalance, miningLevelThresholds } from "@/game/config/balance";
+import { getItemPresentation } from "@/game/content/item-presentation";
 import { ACTION_IDS, ITEM_IDS, SKILL_IDS } from "@/game/config/foundations";
 import {
   inventorySlotCapacityFromContainers,
@@ -484,7 +485,7 @@ async function stateFromTransaction(
       stacks: stacks.map((stack) => ({
         id: stack.id,
         itemId: stack.itemId,
-        name: stack.itemId === ITEM_IDS.ferriteShale ? "Ferrite Shale" : stack.itemId,
+        name: getItemPresentation(stack.itemId)?.displayName ?? stack.itemId,
         quantity: stack.quantity,
         stackLimit:
           stack.itemId === balance.items.ferriteShale.itemId

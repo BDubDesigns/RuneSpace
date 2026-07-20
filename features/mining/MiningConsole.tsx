@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, useTransition, type RefObject } from "react";
 import { ActionButton } from "@/components/ui/ActionButton";
+import { ItemVisual } from "@/components/items/ItemVisual";
 import { Feedback } from "@/components/ui/Feedback";
 import { Panel } from "@/components/ui/Panel";
 import { SectionHeader } from "@/components/ui/SectionHeader";
@@ -121,24 +122,20 @@ function InventoryPanel({
               >
                 <div
                   aria-hidden="true"
-                  className="absolute inset-x-0 bottom-0 z-0 border-t border-[color:var(--rs-accent-mining)] bg-[color:var(--rs-accent-mining-subtle)] transition-[height] duration-[var(--rs-duration-fast)]"
-                  data-stack-fill={Math.round(
-                    inventoryStackFillFraction(stack.quantity, stack.stackLimit) * 100,
-                  )}
-                  style={{
-                    height: `${inventoryStackFillFraction(stack.quantity, stack.stackLimit) * 100}%`,
-                  }}
-                />
-                <div
-                  aria-hidden="true"
-                  className="relative z-10 mb-3 h-8 border border-dashed border-[color:var(--rs-border-subtle)]"
-                />
-                <p className="relative z-10 font-display text-xs uppercase tracking-wide">
-                  {stack.name}
-                </p>
-                <span className="absolute right-2 top-2 z-10 border border-[color:var(--rs-accent-mining)] bg-[color:var(--rs-surface-raised)] px-1.5 py-0.5 font-display text-xs">
-                  x{stack.quantity}
-                </span>
+                  className="absolute inset-y-0 left-0 z-0 w-2 overflow-hidden bg-[color:var(--rs-accent-mining-stack-track)]"
+                  data-stack-track
+                >
+                  <div
+                    className="absolute inset-x-0 bottom-0 bg-[color:var(--rs-accent-mining)] transition-[height] duration-[var(--rs-duration-fast)]"
+                    data-stack-fill={Math.round(
+                      inventoryStackFillFraction(stack.quantity, stack.stackLimit) * 100,
+                    )}
+                    style={{
+                      height: `${inventoryStackFillFraction(stack.quantity, stack.stackLimit) * 100}%`,
+                    }}
+                  />
+                </div>
+                <ItemVisual itemId={stack.itemId} name={stack.name} quantity={stack.quantity} />
               </article>
             ) : (
               <div
