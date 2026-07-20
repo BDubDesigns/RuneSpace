@@ -75,6 +75,33 @@ test("owned character can start, observe, stop, and restore Crash Site Mining", 
   await expect(inventory.locator('[data-stack-fill="100"]')).toBeVisible();
   await expect(inventory.locator('[data-stack-fill="10"]')).toBeVisible();
   await expect(inventory.locator("[data-stack-fill]")).toHaveCount(2);
+  const fullFill = await inventory.locator('[data-stack-fill="100"]').evaluate((fill) => {
+    const slot = fill.parentElement!;
+    return {
+      fraction: fill.getBoundingClientRect().height / slot.getBoundingClientRect().height,
+      background: getComputedStyle(fill).backgroundColor,
+      fillZIndex: getComputedStyle(fill).zIndex,
+      textZIndex: getComputedStyle(slot.querySelector("p")!).zIndex,
+    };
+  });
+  const partialFill = await inventory.locator('[data-stack-fill="10"]').evaluate((fill) => {
+    const slot = fill.parentElement!;
+    return {
+      fraction: fill.getBoundingClientRect().height / slot.getBoundingClientRect().height,
+      background: getComputedStyle(fill).backgroundColor,
+      fillZIndex: getComputedStyle(fill).zIndex,
+      textZIndex: getComputedStyle(slot.querySelector("p")!).zIndex,
+    };
+  });
+  expect(fullFill.fraction).toBeGreaterThan(0.95);
+  expect(fullFill.background).not.toBe("rgba(0, 0, 0, 0)");
+  expect(fullFill.fillZIndex).toBe("0");
+  expect(fullFill.textZIndex).toBe("10");
+  expect(partialFill.fraction).toBeGreaterThan(0.08);
+  expect(partialFill.fraction).toBeLessThan(0.12);
+  expect(partialFill.background).not.toBe("rgba(0, 0, 0, 0)");
+  expect(partialFill.fillZIndex).toBe("0");
+  expect(partialFill.textZIndex).toBe("10");
   await expect(inventory.getByLabel(/Empty inventory slot/)).toHaveCount(6);
   await page.screenshot({ path: "test-results/mining-mobile-inventory-10-plus-1.png" });
   await page.getByRole("button", { name: "Close inventory" }).click();

@@ -116,12 +116,12 @@ function InventoryPanel({
             const stack = state.inventory.stacks[index];
             return stack ? (
               <article
-                className="relative min-h-28 border border-[color:var(--rs-accent-mining)] bg-[color:var(--rs-accent-mining-subtle)] p-3"
+                className="relative min-h-28 overflow-hidden border border-[color:var(--rs-accent-mining)] bg-[color:var(--rs-surface-panel)] p-3"
                 key={stack.id}
               >
                 <div
                   aria-hidden="true"
-                  className="bg-[color:var(--rs-accent-mining)]/20 absolute inset-x-0 bottom-0 transition-[height] duration-[var(--rs-duration-fast)]"
+                  className="absolute inset-x-0 bottom-0 z-0 border-t border-[color:var(--rs-accent-mining)] bg-[color:var(--rs-accent-mining-subtle)] transition-[height] duration-[var(--rs-duration-fast)]"
                   data-stack-fill={Math.round(
                     inventoryStackFillFraction(stack.quantity, stack.stackLimit) * 100,
                   )}
@@ -131,9 +131,9 @@ function InventoryPanel({
                 />
                 <div
                   aria-hidden="true"
-                  className="relative mb-3 h-8 border border-dashed border-[color:var(--rs-border-subtle)]"
+                  className="relative z-10 mb-3 h-8 border border-dashed border-[color:var(--rs-border-subtle)]"
                 />
-                <p className="relative font-display text-xs uppercase tracking-wide">
+                <p className="relative z-10 font-display text-xs uppercase tracking-wide">
                   {stack.name}
                 </p>
                 <span className="absolute right-2 top-2 z-10 border border-[color:var(--rs-accent-mining)] bg-[color:var(--rs-surface-raised)] px-1.5 py-0.5 font-display text-xs">
