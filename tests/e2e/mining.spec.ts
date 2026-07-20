@@ -106,7 +106,29 @@ test("owned character can start, observe, stop, and restore Crash Site Mining", 
   await page.screenshot({ path: "test-results/mining-mobile-inventory-10-plus-1.png" });
   await page.getByRole("button", { name: "Close inventory" }).click();
   await expect(page.getByRole("button", { name: "Inventory 2/8" })).toBeFocused();
+  const inventoryToolbar = page.getByRole("button", { name: "Inventory 2/8" }).locator("..");
+  const backToCharacters = page.getByRole("link", { name: "Back to characters" });
+  await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
+  await expect(history).toBeVisible();
+  await expect(inventoryToolbar).toBeVisible();
+  await expect(backToCharacters).toBeVisible();
+  const [historyBox, toolbarBox, backLinkBox] = await Promise.all([
+    history.boundingBox(),
+    inventoryToolbar.boundingBox(),
+    backToCharacters.boundingBox(),
+  ]);
+  expect(historyBox).not.toBeNull();
+  expect(toolbarBox).not.toBeNull();
+  expect(backLinkBox).not.toBeNull();
+  expect(historyBox!.y + historyBox!.height).toBeLessThanOrEqual(toolbarBox!.y);
+  expect(backLinkBox!.y - (toolbarBox!.y + toolbarBox!.height)).toBeGreaterThanOrEqual(0);
+  expect(backLinkBox!.y - (toolbarBox!.y + toolbarBox!.height)).toBeLessThan(48);
+  expect(backLinkBox!.y).toBeGreaterThanOrEqual(0);
+  expect(844 - (backLinkBox!.y + backLinkBox!.height)).toBeLessThan(64);
+  expect(backLinkBox!.y + backLinkBox!.height).toBeLessThanOrEqual(844);
+  await page.screenshot({ path: "test-results/mining-mobile-page-bottom.png" });
   await page.setViewportSize({ width: 1440, height: 900 });
+  await expect(inventoryToolbar).toHaveCSS("position", "fixed");
   await page.getByRole("button", { name: "Inventory 2/8" }).click();
   await expect(inventory.getByText("x10", { exact: true })).toBeVisible();
   await page.screenshot({ path: "test-results/mining-desktop-inventory-10-plus-1.png" });
