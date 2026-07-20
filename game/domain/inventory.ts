@@ -100,6 +100,12 @@ export function inventorySlotsUsed(stackCount: number, carriedUniqueItemCount: n
   return stackCount + carriedUniqueItemCount;
 }
 
+/** Clamp a stack's UI fill level without making presentation infer item rules. */
+export function inventoryStackFillFraction(quantity: number, stackLimit: number): number {
+  if (!Number.isFinite(quantity) || !Number.isFinite(stackLimit) || stackLimit <= 0) return 0;
+  return Math.min(1, Math.max(0, quantity / stackLimit));
+}
+
 /**
  * The future Strength formula supplies its contribution. This helper combines
  * that authoritative contribution with equipped and buff contributions only.

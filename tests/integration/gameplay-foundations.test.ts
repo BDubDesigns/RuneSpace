@@ -435,6 +435,23 @@ suite("gameplay foundations (real PostgreSQL)", () => {
     );
     expect(resolved.ferriteShaleQuantity).toBe(1);
     expect(resolved.mining.totalXp).toBe(15);
+    expect(resolved.run).toMatchObject({
+      attempts: 1,
+      successes: 1,
+      failures: 0,
+      shaleGained: 1,
+      xpGained: 15,
+    });
+    expect(resolved.run.recentAttempts).toMatchObject([
+      {
+        sequence: 1,
+        success: true,
+        rolledBasisPoints: 0,
+        thresholdBasisPoints: 3500,
+        shaleAwarded: 1,
+        xpAwarded: 15,
+      },
+    ]);
     const repeat = await mining.getMiningGameplayState(
       userId,
       character.id,
@@ -442,11 +459,104 @@ suite("gameplay foundations (real PostgreSQL)", () => {
       random,
     );
     expect(repeat.ferriteShaleQuantity).toBe(1);
+    expect(repeat.run.attempts).toBe(1);
     const starterItems = await db
       .select()
       .from(rune.itemInstances)
       .where(eq(rune.itemInstances.characterId, character.id));
     expect(starterItems).toHaveLength(2);
+  });
+
+  it("retains only the latest ten details while run totals preserve an offline batch", async () => {
+    const { userId, character } = await makeCharacter();
+    const startedAt = new Date("2026-01-01T00:00:00.000Z");
+    const random = { nextBasisPoints: () => 9_999, nextUnit: () => 0 };
+    await mining.getMiningGameplayState(userId, character.id, startedAt, random);
+    await mining.startCrashSiteMining(userId, character.id, startedAt, random);
+    const resolved = await mining.getMiningGameplayState(
+      userId,
+      character.id,
+      new Date("2026-01-01T00:01:12.000Z"),
+      random,
+    );
+    expect(resolved.run).toMatchObject({
+      attempts: 12,
+      successes: 0,
+      failures: 12,
+      shaleGained: 0,
+      xpGained: 0,
+    });
+    expect(resolved.run.recentAttempts).toHaveLength(10);
+    expect(resolved.run.recentAttempts.map((attempt) => attempt.sequence)).toEqual([
+      3, 4, 5, 6, 7, 8, 9, 10, 11, 12,
+    ]);
+    await mining.stopMining(userId, character.id, new Date("2026-01-01T00:01:12.000Z"), random);
+    const stopped = await mining.getMiningGameplayState(
+      userId,
+      character.id,
+      new Date("2026-01-01T00:01:12.000Z"),
+      random,
+    );
+    expect(stopped.run.attempts).toBe(12);
+    const restarted = await mining.startCrashSiteMining(
+      userId,
+      character.id,
+      new Date("2026-01-01T00:01:13.000Z"),
+      random,
+    );
+    expect(restarted.run).toMatchObject({
+      attempts: 0,
+      successes: 0,
+      failures: 0,
+      shaleGained: 0,
+      xpGained: 0,
+      recentAttempts: [],
+    });
+  });
+
+  it("creates one persisted stack after a full Ferrite Shale stack without replaying it", async () => {
+    const { userId, character } = await makeCharacter();
+    const startedAt = new Date("2026-01-01T00:00:00.000Z");
+    const random = { nextBasisPoints: () => 0, nextUnit: () => 0 };
+    await mining.getMiningGameplayState(userId, character.id, startedAt, random);
+    await db.insert(rune.inventoryStacks).values({
+      characterId: character.id,
+      itemId: ITEM_IDS.ferriteShale,
+      quantity: 10,
+    });
+    await mining.startCrashSiteMining(userId, character.id, startedAt, random);
+    const resolved = await mining.getMiningGameplayState(
+      userId,
+      character.id,
+      new Date("2026-01-01T00:00:06.000Z"),
+      random,
+    );
+    expect(resolved.inventory.stacks.map((stack) => stack.quantity).sort((a, b) => b - a)).toEqual([
+      10, 1,
+    ]);
+    expect(resolved.inventory.stacks.map((stack) => stack.stackLimit)).toEqual([10, 10]);
+    expect(resolved.inventory.slotsUsed).toBe(2);
+    expect(resolved.run).toMatchObject({
+      attempts: 1,
+      successes: 1,
+      shaleGained: 1,
+      xpGained: 15,
+    });
+    const retry = await mining.getMiningGameplayState(
+      userId,
+      character.id,
+      new Date("2026-01-01T00:00:06.000Z"),
+      random,
+    );
+    expect(retry.inventory.stacks.map((stack) => stack.quantity).sort((a, b) => b - a)).toEqual([
+      10, 1,
+    ]);
+    expect(retry.run.attempts).toBe(1);
+    const rows = await db
+      .select()
+      .from(rune.inventoryStacks)
+      .where(eq(rune.inventoryStacks.characterId, character.id));
+    expect(rows.map((stack) => stack.quantity).sort((a, b) => b - a)).toEqual([10, 1]);
   });
 
   it("preserves an unsupported active action during Mining commands", async () => {

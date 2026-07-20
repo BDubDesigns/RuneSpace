@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { getEffectiveGameBalance, miningLevelThresholds } from "@/game/config/balance";
 import { ITEM_IDS } from "@/game/config/foundations";
+import { inventoryStackFillFraction } from "@/game/domain/inventory";
 import {
   miningSuccessChanceBps,
+  miningNearMissBasisPoints,
   resolveCrashSiteMining,
   type MiningRandom,
 } from "@/game/domain/mining";
@@ -46,6 +48,19 @@ describe("approved Crash Site Mining balance", () => {
   });
 });
 
+describe("inventory stack presentation", () => {
+  it("derives clamped fill fractions from supplied stack limits", () => {
+    expect(inventoryStackFillFraction(1, 10)).toBe(0.1);
+    expect(inventoryStackFillFraction(5, 10)).toBe(0.5);
+    expect(inventoryStackFillFraction(10, 10)).toBe(1);
+    expect(inventoryStackFillFraction(20, 10)).toBe(1);
+    expect(inventoryStackFillFraction(-1, 10)).toBe(0);
+    expect(inventoryStackFillFraction(1, 0)).toBe(0);
+    expect(inventoryStackFillFraction(0, 10)).toBe(0);
+    expect(inventoryStackFillFraction(1, 1)).toBe(1);
+  });
+});
+
 describe("Crash Site Ferrite Shale resolution", () => {
   it("takes ten ticks and preserves partial attempt progress", () => {
     expect(
@@ -74,6 +89,63 @@ describe("Crash Site Ferrite Shale resolution", () => {
       random: rolls([3500]),
     });
     expect(failure).toMatchObject({ successes: 0, failures: 1, awardedXp: 0, createdStacks: [] });
+    expect(success.attempts).toEqual([
+      {
+        success: true,
+        rolledBasisPoints: 3499,
+        thresholdBasisPoints: 3500,
+        shaleAwarded: 1,
+        xpAwarded: 15,
+      },
+    ]);
+    expect(failure.attempts).toEqual([
+      {
+        success: false,
+        rolledBasisPoints: 3500,
+        thresholdBasisPoints: 3500,
+        shaleAwarded: 0,
+        xpAwarded: 0,
+      },
+    ]);
+  });
+
+  it("retains one immutable outcome per resolved attempt in chronological order", () => {
+    const outcome = resolveCrashSiteMining({
+      elapsedTicks: 30,
+      snapshot: ready,
+      balance,
+      random: rolls([0, 3500, 0], [0, 0.5]),
+    });
+    expect(outcome.attempts).toEqual([
+      {
+        success: true,
+        rolledBasisPoints: 0,
+        thresholdBasisPoints: 3500,
+        shaleAwarded: 1,
+        xpAwarded: 15,
+      },
+      {
+        success: false,
+        rolledBasisPoints: 3500,
+        thresholdBasisPoints: 3500,
+        shaleAwarded: 0,
+        xpAwarded: 0,
+      },
+      {
+        success: true,
+        rolledBasisPoints: 0,
+        thresholdBasisPoints: 3500,
+        shaleAwarded: 2,
+        xpAwarded: 15,
+      },
+    ]);
+    expect(miningNearMissBasisPoints(3602, 3500)).toBe(103);
+  });
+
+  it("measures misses from the highest successful discrete roll", () => {
+    expect(miningNearMissBasisPoints(3500, 3500)).toBe(1);
+    expect(miningNearMissBasisPoints(3501, 3500)).toBe(2);
+    expect(miningNearMissBasisPoints(3499, 3500)).toBe(0);
   });
 
   it("rolls one or two shale equally and awards the same XP", () => {

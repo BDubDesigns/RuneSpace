@@ -5,6 +5,7 @@ import {
   foreignKey,
   index,
   integer,
+  jsonb,
   pgTable,
   text,
   timestamp,
@@ -244,6 +245,12 @@ export const characterMiningState = pgTable("character_mining_state", {
     .primaryKey()
     .references(() => characters.id, { onDelete: "restrict" }),
   lastStopReason: text("last_stop_reason"),
+  runAttempts: integer("run_attempts").notNull().default(0),
+  runSuccesses: integer("run_successes").notNull().default(0),
+  runShaleGained: integer("run_shale_gained").notNull().default(0),
+  runXpGained: integer("run_xp_gained").notNull().default(0),
+  /** Latest ten immutable server-resolved attempt summaries for the current run. */
+  recentAttempts: jsonb("recent_attempts").notNull().default([]),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
 

@@ -18,6 +18,7 @@ import {
   type StackState,
 } from "@/game/domain/inventory";
 import {
+  miningSuccessChanceBps,
   miningPreflightStopReason,
   resolveCrashSiteMining,
   type MiningRandom,
@@ -38,6 +39,27 @@ const systemRandom: MiningRandom = {
   nextUnit: () => randomInt(2) / 2,
 };
 
+/**
+ * CI-only deterministic source for the focused browser journey. It is selected
+ * only by explicit CI configuration, never by a request or normal runtime user.
+ */
+function e2eMiningRandom(): MiningRandom {
+  let attemptIndex = 0;
+  return {
+    nextBasisPoints: () => [0, 3_500][attemptIndex++ % 2]!,
+    nextUnit: () => 0,
+  };
+}
+
+function defaultMiningRandom(): MiningRandom {
+  const databaseHost = process.env.DATABASE_URL ? new URL(process.env.DATABASE_URL).hostname : "";
+  return process.env.CI === "true" &&
+    process.env.RUNESPACE_E2E_MINING === "true" &&
+    (databaseHost === "localhost" || databaseHost === "127.0.0.1")
+    ? e2eMiningRandom()
+    : systemRandom;
+}
+
 type MiningSnapshot = {
   miningLevel: number;
   hasCompatibleTool: boolean;
@@ -48,7 +70,29 @@ type MiningSnapshot = {
   slotCapacity: number;
 };
 
-type PersistedMiningOutcome = MiningResolution<string> & { characterId: string };
+type PersistedMiningOutcome = MiningResolution<string> & {
+  characterId: string;
+  attemptResolvedAt: readonly string[];
+};
+
+export type MiningRunAttempt = {
+  sequence: number;
+  resolvedAt: string;
+  success: boolean;
+  rolledBasisPoints: number;
+  thresholdBasisPoints: number;
+  shaleAwarded: number;
+  xpAwarded: number;
+};
+
+type MiningRunState = {
+  attempts: number;
+  successes: number;
+  failures: number;
+  shaleGained: number;
+  xpGained: number;
+  recentAttempts: readonly MiningRunAttempt[];
+};
 
 export type MiningGameplayState = {
   characterId: string;
@@ -59,13 +103,22 @@ export type MiningGameplayState = {
     progressStartedAt: string;
   };
   mining: { totalXp: number; level: number; xpToNextLevel?: number; xpIntoLevel: number };
+  successChanceBps: number;
   ferriteShaleQuantity: number;
   inventory: {
     slotsUsed: number;
     slotsAvailable: number;
     massGrams: number;
     capacityGrams: number;
+    stacks: readonly {
+      id: string;
+      itemId: string;
+      name: string;
+      quantity: number;
+      stackLimit: number;
+    }[];
   };
+  run: MiningRunState;
   recentResult: { successes: number; failures: number; awardedXp: number };
   stoppingReason?: MiningStopReason;
   commandError?: "another_action_active";
@@ -275,14 +328,21 @@ function createMiningResolver(
     supports: (action) => action.actionId === ACTION_IDS.crashSiteMining,
     load: async (transaction, { character }) => loadMiningSnapshot(transaction, character.id),
     resolve: ({ action, snapshot, window }) => {
-      const outcome = {
+      const resolved = resolveCrashSiteMining({
+        elapsedTicks: window.elapsedTicks,
+        snapshot,
+        balance: getEffectiveGameBalance(),
+        random,
+      });
+      const attemptDurationMs = ticksToMilliseconds(
+        getEffectiveGameBalance().mining.attemptDurationTicks,
+      );
+      const outcome: PersistedMiningOutcome = {
         characterId: action.characterId,
-        ...resolveCrashSiteMining({
-          elapsedTicks: window.elapsedTicks,
-          snapshot,
-          balance: getEffectiveGameBalance(),
-          random,
-        }),
+        ...resolved,
+        attemptResolvedAt: resolved.attempts.map((_, index) =>
+          new Date(window.startsAt.getTime() + (index + 1) * attemptDurationMs).toISOString(),
+        ),
       };
       return {
         outcome,
@@ -312,6 +372,37 @@ function createMiningResolver(
             quantity: stack.quantity,
           })),
         );
+      if (outcome.attempts.length) {
+        const state = (
+          await transaction
+            .select()
+            .from(characterMiningState)
+            .where(eq(characterMiningState.characterId, outcome.characterId))
+            .for("update")
+        )[0];
+        if (!state) throw new Error("Mining state must exist before resolution");
+        const existing = state.recentAttempts as MiningRunAttempt[];
+        const firstSequence = state.runAttempts + 1;
+        const appended = outcome.attempts.map((attempt, index) => ({
+          sequence: firstSequence + index,
+          resolvedAt: outcome.attemptResolvedAt[index]!,
+          ...attempt,
+        }));
+        const recentAttempts = [...existing, ...appended].slice(-10);
+        await transaction
+          .update(characterMiningState)
+          .set({
+            runAttempts: state.runAttempts + outcome.attempts.length,
+            runSuccesses: state.runSuccesses + outcome.successes,
+            runShaleGained:
+              state.runShaleGained +
+              appended.reduce((total, attempt) => total + attempt.shaleAwarded, 0),
+            runXpGained: state.runXpGained + outcome.awardedXp,
+            recentAttempts,
+            updatedAt: new Date(),
+          })
+          .where(eq(characterMiningState.characterId, outcome.characterId));
+      }
       if (outcome.stopReason)
         await transaction
           .insert(characterMiningState)
@@ -351,6 +442,15 @@ async function stateFromTransaction(
   const level = levelFromXp(totalXp, thresholds);
   const next = thresholds.find((threshold) => threshold.level === level + 1);
   const action = actionRows[0];
+  const miningState = miningStateRows[0];
+  const run: MiningRunState = {
+    attempts: miningState?.runAttempts ?? 0,
+    successes: miningState?.runSuccesses ?? 0,
+    failures: (miningState?.runAttempts ?? 0) - (miningState?.runSuccesses ?? 0),
+    shaleGained: miningState?.runShaleGained ?? 0,
+    xpGained: miningState?.runXpGained ?? 0,
+    recentAttempts: (miningState?.recentAttempts as MiningRunAttempt[] | undefined) ?? [],
+  };
   return {
     characterId,
     activeAction:
@@ -372,6 +472,7 @@ async function stateFromTransaction(
       xpIntoLevel:
         totalXp - (thresholds.find((threshold) => threshold.level === level)?.totalXp ?? 0),
     },
+    successChanceBps: miningSuccessChanceBps(level, balance),
     ferriteShaleQuantity: stacks
       .filter((stack) => stack.itemId === ITEM_IDS.ferriteShale)
       .reduce((total, stack) => total + stack.quantity, 0),
@@ -380,13 +481,22 @@ async function stateFromTransaction(
       slotsAvailable: snapshot.slotsAvailable,
       massGrams: balance.carrying.startingCapacityGrams - snapshot.massAvailableGrams,
       capacityGrams: balance.carrying.startingCapacityGrams,
+      stacks: stacks.map((stack) => ({
+        id: stack.id,
+        itemId: stack.itemId,
+        name: stack.itemId === ITEM_IDS.ferriteShale ? "Ferrite Shale" : stack.itemId,
+        quantity: stack.quantity,
+        stackLimit:
+          stack.itemId === balance.items.ferriteShale.itemId
+            ? balance.items.ferriteShale.stackLimit
+            : 1,
+      })),
     },
+    run,
     recentResult,
     stoppingReason: action
       ? undefined
-      : (stoppingReason ??
-        (miningStateRows[0]?.lastStopReason as MiningStopReason | null) ??
-        undefined),
+      : (stoppingReason ?? (miningState?.lastStopReason as MiningStopReason | null) ?? undefined),
     commandError,
   };
 }
@@ -395,7 +505,7 @@ export async function getMiningGameplayState(
   userId: string,
   characterId: string,
   now = new Date(),
-  random = systemRandom,
+  random = defaultMiningRandom(),
 ): Promise<MiningGameplayState> {
   let outcome: PersistedMiningOutcome | undefined;
   return withResolvedOwnedCharacter(
@@ -430,7 +540,7 @@ export async function startCrashSiteMining(
   userId: string,
   characterId: string,
   now = new Date(),
-  random = systemRandom,
+  random = defaultMiningRandom(),
 ): Promise<MiningGameplayState> {
   let outcome: PersistedMiningOutcome | undefined;
   return withResolvedOwnedCharacter(
@@ -454,6 +564,30 @@ export async function startCrashSiteMining(
           startedAt: now,
           resolvedThroughAt: now,
         });
+        await transaction
+          .insert(characterMiningState)
+          .values({
+            characterId: context.character.id,
+            runAttempts: 0,
+            runSuccesses: 0,
+            runShaleGained: 0,
+            runXpGained: 0,
+            recentAttempts: [],
+            lastStopReason: null,
+            updatedAt: now,
+          })
+          .onConflictDoUpdate({
+            target: characterMiningState.characterId,
+            set: {
+              runAttempts: 0,
+              runSuccesses: 0,
+              runShaleGained: 0,
+              runXpGained: 0,
+              recentAttempts: [],
+              lastStopReason: null,
+              updatedAt: now,
+            },
+          });
       }
       if (!unsupportedAction && !preflightStopReason)
         await transaction
@@ -485,7 +619,7 @@ export async function stopMining(
   userId: string,
   characterId: string,
   now = new Date(),
-  random = systemRandom,
+  random = defaultMiningRandom(),
 ): Promise<MiningGameplayState> {
   let outcome: PersistedMiningOutcome | undefined;
   return withResolvedOwnedCharacter(

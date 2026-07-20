@@ -95,3 +95,44 @@ jobs:
 
       - name: PostgreSQL integration tests
         run: pnpm test:integration
+
+  mining-e2e:
+    name: Mining browser journey
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: runespace
+          POSTGRES_PASSWORD: runespace
+          POSTGRES_DB: runespace
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U runespace -d runespace"
+          --health-interval 5s --health-timeout 5s --health-retries 5
+    env:
+      DATABASE_URL: postgres://runespace:runespace@localhost:5432/runespace
+      BETTER_AUTH_SECRET: insecure-ci-browser-only-secret-do-not-use-in-prod-0000000000
+      BETTER_AUTH_URL: http://127.0.0.1:3000
+      CI: true
+      RUNESPACE_E2E_MINING: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec playwright install --with-deps chromium
+      - run: pnpm drizzle-kit migrate
+      - run: pnpm test:e2e mining --project=chromium
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: mining-playwright-report
+          path: |
+            playwright-report/
+            test-results/
