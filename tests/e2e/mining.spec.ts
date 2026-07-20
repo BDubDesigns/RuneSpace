@@ -129,10 +129,9 @@ test("owned character can start, observe, stop, and restore Crash Site Mining", 
       trackTop: trackBox.top,
       trackWidth: trackBox.width,
       slotLeft: slotBox.left,
+      slotBottom: slotBox.bottom,
       slotTop: slotBox.top,
       slotWidth: slotBox.width,
-      slotHeight: slotBox.height,
-      trackHeight: trackBox.height,
       trackZIndex: getComputedStyle(track).zIndex,
       textZIndex: getComputedStyle(slot.querySelector("p")!).zIndex,
     };
@@ -153,10 +152,9 @@ test("owned character can start, observe, stop, and restore Crash Site Mining", 
       trackTop: trackBox.top,
       trackWidth: trackBox.width,
       slotLeft: slotBox.left,
+      slotBottom: slotBox.bottom,
       slotTop: slotBox.top,
       slotWidth: slotBox.width,
-      slotHeight: slotBox.height,
-      trackHeight: trackBox.height,
       trackZIndex: getComputedStyle(track).zIndex,
       textZIndex: getComputedStyle(slot.querySelector("p")!).zIndex,
     };
@@ -168,7 +166,7 @@ test("owned character can start, observe, stop, and restore Crash Site Mining", 
   expect(fullFill.trackWidth).toBe(8);
   expect(Math.abs(fullFill.trackLeft - fullFill.slotLeft)).toBeLessThanOrEqual(1);
   expect(Math.abs(fullFill.trackTop - fullFill.slotTop)).toBeLessThanOrEqual(1);
-  expect(Math.abs(fullFill.trackHeight - fullFill.slotHeight)).toBeLessThanOrEqual(1);
+  expect(Math.abs(fullFill.trackBottom - fullFill.slotBottom)).toBeLessThanOrEqual(1);
   expect(Math.abs(fullFill.fillBottom - fullFill.trackBottom)).toBeLessThanOrEqual(1);
   expect(fullFill.trackWidth).toBeLessThan(fullFill.slotWidth);
   expect(fullFill.trackZIndex).toBe("0");
@@ -180,7 +178,7 @@ test("owned character can start, observe, stop, and restore Crash Site Mining", 
   expect(partialFill.trackWidth).toBe(8);
   expect(Math.abs(partialFill.trackLeft - partialFill.slotLeft)).toBeLessThanOrEqual(1);
   expect(Math.abs(partialFill.trackTop - partialFill.slotTop)).toBeLessThanOrEqual(1);
-  expect(Math.abs(partialFill.trackHeight - partialFill.slotHeight)).toBeLessThanOrEqual(1);
+  expect(Math.abs(partialFill.trackBottom - partialFill.slotBottom)).toBeLessThanOrEqual(1);
   expect(Math.abs(partialFill.fillBottom - partialFill.trackBottom)).toBeLessThanOrEqual(1);
   expect(partialFill.trackWidth).toBeLessThan(partialFill.slotWidth);
   expect(partialFill.trackZIndex).toBe("0");
