@@ -24,12 +24,17 @@ export default function PlayError({
         <p className="font-display text-xs uppercase tracking-[0.16em] text-[color:var(--rs-accent-danger)]">
           Terminal fault
         </p>
-        <h1 className="mt-2 font-display text-2xl font-bold">Play terminal interrupted</h1>
+        <h1 className="mt-2 font-display text-2xl font-bold">
+          Play terminal interrupted
+        </h1>
         <Feedback tone="danger">
-          Comms interruption. The play terminal could not complete its last request.
+          Comms interruption. The play terminal could not complete its last
+          request.
         </Feedback>
         {incidentId ? (
-          <p className="mt-3 text-xs text-[color:var(--rs-text-muted)]">Incident {incidentId}</p>
+          <p className="mt-3 text-xs text-[color:var(--rs-text-muted)]">
+            Incident {incidentId}
+          </p>
         ) : null}
         <div className="mt-5 flex flex-wrap gap-3">
           <ActionButton intent="mining" onClick={reset}>

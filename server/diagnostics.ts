@@ -1,6 +1,11 @@
 import type { ClientDiagnostic } from "@/game/schemas/diagnostics";
 
-type SafeError = { name: string; message: string; stack?: string; digest?: string };
+type SafeError = {
+  name: string;
+  message: string;
+  stack?: string;
+  digest?: string;
+};
 
 const reportedErrors = new WeakSet<object>();
 
@@ -10,7 +15,10 @@ function truncate(value: string, length: number) {
     .replace(/(?:https?:\/\/|file:|webpack:|blob:|\/)[^\s"']+/gi, "[location]")
     .replace(/[\w.+-]+@[\w.-]+\.[a-z]{2,}/gi, "[email]")
     .replace(/[a-f0-9]{8}-[a-f0-9-]{27,}/gi, "[identifier]")
-    .replace(/(?:bearer|authorization|cookie|set-cookie|token|secret|password|session|api[_-]?key)\s*[:=]\s*[^\s,;]+/gi, "[redacted]")
+    .replace(
+      /(?:bearer|authorization|cookie|set-cookie|token|secret|password|session|api[_-]?key)\s*[:=]\s*[^\s,;]+/gi,
+      "[redacted]",
+    )
     .replace(/[A-Za-z0-9_-]{32,}/g, "[opaque]")
     .slice(0, length);
 }
@@ -21,7 +29,10 @@ export function releaseId() {
 
 export function safeError(error: unknown): SafeError {
   if (error instanceof Error) {
-    const digest = "digest" in error && typeof error.digest === "string" ? error.digest : undefined;
+    const digest =
+      "digest" in error && typeof error.digest === "string"
+        ? error.digest
+        : undefined;
     return {
       name: truncate(error.name || "Error", 100),
       message: truncate(error.message || "Unexpected error", 500),
@@ -29,7 +40,10 @@ export function safeError(error: unknown): SafeError {
       digest: digest ? truncate(digest, 100) : undefined,
     };
   }
-  return { name: "NonErrorThrown", message: "Unexpected non-error value was thrown" };
+  return {
+    name: "NonErrorThrown",
+    message: "Unexpected non-error value was thrown",
+  };
 }
 
 export function logDiagnostic(
