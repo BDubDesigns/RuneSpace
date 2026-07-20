@@ -13,6 +13,7 @@ import { inventoryStackFillFraction } from "@/game/domain/inventory";
 import { miningNearMissBasisPoints } from "@/game/domain/mining";
 import type { MiningGameplayState } from "@/server/mining";
 import { refreshMiningAction, startMiningAction, stopMiningAction } from "@/server/actions";
+import { reportClientDiagnostic } from "@/features/diagnostics/client";
 
 function kilograms(grams: number) {
   return `${(grams / 1_000).toLocaleString(undefined, { maximumFractionDigits: 1 })} kg`;
@@ -167,6 +168,8 @@ export function MiningConsole({
   const [now, setNow] = useState(Date.now());
   const [pending, startTransition] = useTransition();
   const [inventoryOpen, setInventoryOpen] = useState(false);
+  const [recovery, setRecovery] = useState<(() => void) | undefined>();
+  const commandInFlight = useRef(false);
   const inventoryTrigger = useRef<HTMLButtonElement>(null);
   const balance = getEffectiveGameBalance();
   const active = state.activeAction;
@@ -192,7 +195,23 @@ export function MiningConsole({
     }
   }
   function command(action: (id: string) => ReturnType<typeof refreshMiningAction>) {
-    startTransition(async () => apply(await action(state.characterId)));
+    if (commandInFlight.current) return;
+    commandInFlight.current = true;
+    setRecovery(undefined);
+    startTransition(async () => {
+      try {
+        // Expected domain/ownership errors are returned by the action and retain
+        // their existing player-facing behavior. Transport/runtime failures are
+        // separately recoverable and never replace the last confirmed state.
+        apply(await action(state.characterId));
+      } catch (error) {
+        reportClientDiagnostic("mining-command", error, { miningActive: Boolean(active) });
+        setMessage("Comms interruption. Mining status could not be confirmed.");
+        setRecovery(() => () => command(action));
+      } finally {
+        commandInFlight.current = false;
+      }
+    });
   }
 
   useEffect(() => {
@@ -261,6 +280,11 @@ export function MiningConsole({
         )}
         {message ? (
           <Feedback tone={state.stoppingReason && !active ? "danger" : "muted"}>{message}</Feedback>
+        ) : null}
+        {recovery ? (
+          <ActionButton className="mt-3" intent="secondary" onClick={recovery}>
+            Retry status check
+          </ActionButton>
         ) : null}
       </Panel>
       <div className="grid gap-4 sm:grid-cols-2">
