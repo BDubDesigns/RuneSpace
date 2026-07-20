@@ -91,7 +91,7 @@ test("owned character can start, observe, stop, and restore Crash Site Mining", 
   const firstSlot = inventory.locator("article").first();
   const firstSlotName = firstSlot.getByText("Ferrite Shale", { exact: true });
   const firstSlotQuantity = firstSlot.getByText("x10", { exact: true });
-  await expect(firstSlotName).toHaveCSS("background-color", "rgba(9, 21, 34, 0.42)");
+  await expect(firstSlotName).toHaveCSS("background-color", "rgba(9, 21, 34, 0.9)");
   await expect(firstSlotName).toHaveCSS("white-space", "nowrap");
   await expect(firstSlotName).toHaveCSS("text-overflow", "ellipsis");
   await expect(firstSlotQuantity).toHaveCSS("background-color", "rgba(9, 21, 34, 0.42)");
@@ -109,6 +109,14 @@ test("owned character can start, observe, stop, and restore Crash Site Mining", 
     Math.abs(slotBox!.y + slotBox!.height / 2 - (artworkBox!.y + artworkBox!.height / 2)),
   ).toBeLessThanOrEqual(1);
   await expect(inventory.locator("[data-stack-track]")).toHaveCount(2);
+  const [nameBox, trackBox] = await Promise.all([
+    firstSlotName.boundingBox(),
+    inventory.locator("[data-stack-track]").first().boundingBox(),
+  ]);
+  expect(nameBox).not.toBeNull();
+  expect(trackBox).not.toBeNull();
+  expect(nameBox!.left - trackBox!.right).toBeGreaterThanOrEqual(4);
+  expect(Math.abs(nameBox!.bottom - slotBox!.bottom)).toBeLessThanOrEqual(1);
   await expect(inventory.locator('[data-stack-fill="100"]')).toBeVisible();
   await expect(inventory.locator('[data-stack-fill="10"]')).toBeVisible();
   await expect(inventory.locator("[data-stack-fill]")).toHaveCount(2);

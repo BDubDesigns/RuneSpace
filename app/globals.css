@@ -33,6 +33,7 @@
   --rs-accent-danger-hover: rgb(241 108 117 / 0.17);
   --rs-focus-ring: #a5efff;
   --rs-item-plate-surface: rgb(9 21 34 / 0.42);
+  --rs-item-nameplate-surface: rgb(9 21 34 / 0.9);
   --rs-item-plate-border: rgb(75 216 245 / 0.2);
   --rs-space-1: 0.25rem;
   --rs-space-2: 0.5rem;
