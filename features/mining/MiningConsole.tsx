@@ -284,7 +284,7 @@ export function MiningConsole({
           <Feedback tone={state.stoppingReason && !active ? "danger" : "muted"}>{message}</Feedback>
         ) : null}
         {recovery ? (
-          <ActionButton className="mt-3" intent="secondary" onClick={recovery}>
+          <ActionButton className="mt-3" disabled={pending} intent="secondary" onClick={recovery}>
             Retry status check
           </ActionButton>
         ) : null}

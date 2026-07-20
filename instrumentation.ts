@@ -4,16 +4,10 @@ import type { Instrumentation } from "next";
 export async function register() {}
 
 export function safeRoute(routePath: string) {
-  return /^\/play\/(?:\[characterId\]|[^/]+)$/.test(routePath)
-    ? "/play/[characterId]"
-    : "/other";
+  return /^\/play\/(?:\[characterId\]|[^/]+)$/.test(routePath) ? "/play/[characterId]" : "/other";
 }
 
-export const onRequestError: Instrumentation.onRequestError = (
-  error,
-  request,
-  context,
-) => {
+export const onRequestError: Instrumentation.onRequestError = (error, request, context) => {
   logDiagnostic(
     "server",
     {

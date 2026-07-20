@@ -235,3 +235,96 @@ test("owned character can start, observe, stop, and restore Crash Site Mining", 
   await expect(page.getByText("0 attempts", { exact: true })).toBeVisible();
   await expect(history).toContainText("No resolved attempts in this run yet.");
 });
+
+test("an interrupted Mining action preserves confirmed state and retries only status refresh", async ({
+  page,
+}) => {
+  await page.goto("/register");
+  await page.getByLabel("Display name").fill("Recovery Pilot");
+  await page.getByLabel("Email").fill(uniqueEmail());
+  await page.getByLabel("Password", { exact: true }).fill("sup3r-secret-password");
+  await page.getByRole("button", { name: "Create account" }).click();
+  await page.getByRole("link", { name: "New character" }).click();
+  await page
+    .getByLabel("Character name")
+    .fill(`Recovery ${Math.random().toString(36).slice(2, 8)}`);
+  await page.getByRole("button", { name: "Create character" }).click();
+
+  const isMiningAction = (request: import("@playwright/test").Request) =>
+    request.method() === "POST" && Boolean(request.headers()["next-action"]);
+  await expect(page.getByText(/Success chance: 35.00%/)).toBeVisible();
+  const baselineRequest = page.waitForRequest(isMiningAction);
+  await page.getByRole("button", { name: "Refresh status" }).click();
+  const refreshActionId = (await baselineRequest).headers()["next-action"];
+  expect(refreshActionId).toBeTruthy();
+
+  let aborted = false;
+  let miningRequests = 0;
+  page.on("request", (request) => {
+    if (isMiningAction(request)) miningRequests += 1;
+  });
+  await page.route("**/*", async (route) => {
+    const request = route.request();
+    if (
+      !aborted &&
+      isMiningAction(request) &&
+      request.headers()["next-action"] === refreshActionId
+    ) {
+      aborted = true;
+      await route.abort("failed");
+      return;
+    }
+    await route.continue();
+  });
+
+  await page.getByRole("button", { name: "Refresh status" }).click();
+  await expect(
+    page.getByText("Comms interruption. Mining status could not be confirmed."),
+  ).toBeVisible();
+  await expect(page.getByText(/Success chance: 35.00%/)).toBeVisible();
+  await expect(page.getByText("Application error")).toHaveCount(0);
+  const retry = page.getByRole("button", { name: "Retry status check" });
+  await expect(retry).toHaveCount(1);
+  await page.waitForTimeout(300);
+  expect(aborted).toBe(true);
+  expect(miningRequests).toBe(1);
+
+  await page.unroute("**/*");
+  const recoveredRequest = page.waitForRequest(
+    (request) => isMiningAction(request) && request.headers()["next-action"] === refreshActionId,
+  );
+  await retry.evaluate((button) => {
+    button.click();
+    button.click();
+  });
+  await recoveredRequest;
+  await expect(
+    page.getByText("Comms interruption. Mining status could not be confirmed."),
+  ).toBeHidden();
+  await expect(retry).toHaveCount(0);
+  expect(miningRequests).toBe(2);
+});
+
+test("the Play boundary resets and navigates to Characters", async ({ page }) => {
+  await page.goto("/register");
+  await page.getByLabel("Display name").fill("Boundary Pilot");
+  await page.getByLabel("Email").fill(uniqueEmail());
+  await page.getByLabel("Password", { exact: true }).fill("sup3r-secret-password");
+  await page.getByRole("button", { name: "Create account" }).click();
+  await page.getByRole("link", { name: "New character" }).click();
+  await page
+    .getByLabel("Character name")
+    .fill(`Boundary ${Math.random().toString(36).slice(2, 8)}`);
+  await page.getByRole("button", { name: "Create character" }).click();
+  const playUrl = page.url();
+
+  await page.goto(`${playUrl}?__runespace_e2e_error=reset`);
+  await expect(page.getByRole("heading", { name: "Play terminal interrupted" })).toBeVisible();
+  await page.getByRole("button", { name: "Retry connection" }).click();
+  await expect(page.getByText("Ferrite Shale", { exact: true }).first()).toBeVisible();
+
+  await page.goto(`${playUrl}?__runespace_e2e_error=navigation`);
+  await expect(page.getByRole("link", { name: "Back to characters" })).toBeVisible();
+  await page.getByRole("link", { name: "Back to characters" }).click();
+  await expect(page).toHaveURL(/\/characters$/);
+});

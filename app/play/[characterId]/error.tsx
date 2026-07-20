@@ -6,6 +6,7 @@ import { ActionLink } from "@/components/ui/ActionLink";
 import { Feedback } from "@/components/ui/Feedback";
 import { Panel } from "@/components/ui/Panel";
 import { reportClientDiagnostic } from "@/features/diagnostics/client";
+import { sanitizeDiagnosticText } from "@/game/schemas/diagnostics";
 
 export default function PlayError({
   error,
@@ -14,9 +15,11 @@ export default function PlayError({
   error: Error & { digest?: string };
   reset: () => void;
 }) {
-  const [incidentId] = useState<string | undefined>(error.digest);
+  const [incidentId, setIncidentId] = useState<string | undefined>(() =>
+    typeof error.digest === "string" ? sanitizeDiagnosticText(error.digest, 100) : undefined,
+  );
   useEffect(() => {
-    reportClientDiagnostic("play-boundary", error);
+    reportClientDiagnostic("play-boundary", error, { onAccepted: setIncidentId });
   }, [error]);
   return (
     <main className="mx-auto flex min-h-screen max-w-xl items-center p-4">
@@ -24,17 +27,12 @@ export default function PlayError({
         <p className="font-display text-xs uppercase tracking-[0.16em] text-[color:var(--rs-accent-danger)]">
           Terminal fault
         </p>
-        <h1 className="mt-2 font-display text-2xl font-bold">
-          Play terminal interrupted
-        </h1>
+        <h1 className="mt-2 font-display text-2xl font-bold">Play terminal interrupted</h1>
         <Feedback tone="danger">
-          Comms interruption. The play terminal could not complete its last
-          request.
+          Comms interruption. The play terminal could not complete its last request.
         </Feedback>
         {incidentId ? (
-          <p className="mt-3 text-xs text-[color:var(--rs-text-muted)]">
-            Incident {incidentId}
-          </p>
+          <p className="mt-3 text-xs text-[color:var(--rs-text-muted)]">Incident {incidentId}</p>
         ) : null}
         <div className="mt-5 flex flex-wrap gap-3">
           <ActionButton intent="mining" onClick={reset}>
