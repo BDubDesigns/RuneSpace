@@ -14,17 +14,13 @@ export function ItemVisual({ itemId, name, quantity }: ItemVisualProps) {
 
   return (
     <>
-      <div
-        aria-label={presentation.accessibleDescription}
-        className="relative z-10 mb-2 flex h-12 items-center justify-center"
-      >
+      <div className="relative z-10 mb-2 flex h-12 items-center justify-center">
         {presentation.artworkSrc ? (
           <Image
-            alt=""
-            className="h-full w-full object-contain"
+            alt={presentation.accessibleDescription}
+            className="h-20 w-20 max-w-full object-contain"
             data-testid="item-artwork"
             height={512}
-            priority
             src={presentation.artworkSrc}
             width={512}
           />

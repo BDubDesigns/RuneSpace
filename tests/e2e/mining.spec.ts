@@ -72,6 +72,19 @@ test("owned character can start, observe, stop, and restore Crash Site Mining", 
   await expect(inventory.getByText("Ferrite Shale", { exact: true })).toHaveCount(2);
   const ferriteArtwork = inventory.getByTestId("item-artwork");
   await expect(ferriteArtwork).toHaveCount(2);
+  await expect
+    .poll(() =>
+      ferriteArtwork.first().evaluate((image) => image.complete && image.naturalWidth > 0),
+    )
+    .toBe(true);
+  const artworkState = await ferriteArtwork.first().evaluate((image) => ({
+    assetPath: new URL(image.currentSrc).searchParams.get("url"),
+    complete: image.complete,
+    naturalWidth: image.naturalWidth,
+  }));
+  expect(artworkState.assetPath).toBe("/item-art/ferrite-shale.webp");
+  expect(artworkState.complete).toBe(true);
+  expect(artworkState.naturalWidth).toBeGreaterThan(0);
   await expect(ferriteArtwork.first()).toHaveCSS("object-fit", "contain");
   await expect(inventory.getByText("x10", { exact: true })).toBeVisible();
   await expect(inventory.getByText("x1", { exact: true })).toBeVisible();
