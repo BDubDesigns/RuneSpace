@@ -43,7 +43,7 @@ export function logDiagnostic(
     JSON.stringify({
       event: "runespace.diagnostic",
       timestamp: new Date().toISOString(),
-      releaseId: releaseId(),
+      serverReleaseId: releaseId(),
       source,
       ...details,
       ...(error ? safeError(error) : {}),
@@ -54,6 +54,5 @@ export function logDiagnostic(
 export function logClientDiagnostic(diagnostic: ClientDiagnostic) {
   // The deployment's configured release is authoritative; never let a browser
   // supplied value overwrite it in application logs.
-  const { releaseId: _clientReleaseId, ...safeDiagnostic } = diagnostic;
-  logDiagnostic("client", safeDiagnostic);
+  logDiagnostic("client", diagnostic);
 }

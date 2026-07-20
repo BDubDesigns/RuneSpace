@@ -12,10 +12,11 @@ const report = {
 };
 
 describe("client diagnostic contract", () => {
-  it("accepts a redacted play route and configured release identifier", () => {
-    expect(clientDiagnosticSchema.parse({ ...report, releaseId: "deploy-abc" }).releaseId).toBe(
-      "deploy-abc",
-    );
+  it("accepts a redacted play route and browser release identifier", () => {
+    expect(
+      clientDiagnosticSchema.parse({ ...report, clientReleaseId: "browser-deploy-abc" })
+        .clientReleaseId,
+    ).toBe("browser-deploy-abc");
   });
   it("rejects unknown sensitive fields and raw dynamic routes", () => {
     expect(clientDiagnosticSchema.safeParse({ ...report, cookie: "secret" }).success).toBe(false);

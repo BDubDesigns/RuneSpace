@@ -1,16 +1,13 @@
 import { logDiagnostic } from "@/server/diagnostics";
+import type { Instrumentation } from "next";
 
 export async function register() {}
 
-export function onRequestError(
-  error: unknown,
-  request: { method: string },
-  context: {
-    routePath: string;
-    routerKind: string;
-    routeType: "render" | "route" | "action" | "middleware";
-  },
-) {
+export function safeRoute(routePath: string) {
+  return /^\/play\/(?:\[characterId\]|[^/]+)$/.test(routePath) ? "/play/[characterId]" : "/other";
+}
+
+export const onRequestError: Instrumentation.onRequestError = (error, request, context) => {
   logDiagnostic(
     "server",
     {
@@ -20,10 +17,10 @@ export function onRequestError(
           : context.routeType === "render"
             ? "render-failure"
             : "request-failure",
-      route: context.routePath === "/play/[characterId]" ? "/play/[characterId]" : "/other",
+      route: safeRoute(context.routePath),
       method: request.method,
       router: context.routerKind,
     },
     error,
   );
-}
+};

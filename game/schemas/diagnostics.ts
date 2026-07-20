@@ -9,7 +9,7 @@ export const clientDiagnosticSchema = z
   .object({
     timestamp: z.string().datetime(),
     incidentId: z.string().regex(/^rs-[a-z0-9]{8,32}$/),
-    releaseId: z.string().max(100).optional(),
+    clientReleaseId: z.string().max(100).optional(),
     source: z.enum(["window-error", "unhandled-rejection", "play-boundary", "mining-command"]),
     errorName: safeText,
     message: safeText,

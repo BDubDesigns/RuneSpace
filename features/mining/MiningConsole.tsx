@@ -207,7 +207,9 @@ export function MiningConsole({
       } catch (error) {
         reportClientDiagnostic("mining-command", error, { miningActive: Boolean(active) });
         setMessage("Comms interruption. Mining status could not be confirmed.");
-        setRecovery(() => () => command(action));
+        // A mutation might have reached the server despite its rejected response.
+        // Reconcile only; never replay Start/Stop from uncertain client state.
+        setRecovery(() => () => command(refreshMiningAction));
       } finally {
         commandInFlight.current = false;
       }
