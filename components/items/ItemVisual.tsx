@@ -30,10 +30,10 @@ export function ItemVisual({ itemId, name, quantity }: ItemVisualProps) {
           </span>
         )}
       </div>
-      <p className="absolute bottom-2 left-2 z-20 bg-[rgb(107_114_128_/_0.5)] px-1.5 py-0.5 font-display text-xs uppercase tracking-wide">
+      <p className="absolute bottom-2 left-5 z-20 border border-[color:var(--rs-item-plate-border)] bg-[color:var(--rs-item-plate-surface)] px-1.5 py-0.5 font-display text-xs uppercase tracking-wide">
         {displayName}
       </p>
-      <span className="absolute right-2 top-2 z-20 bg-[rgb(107_114_128_/_0.5)] px-1.5 py-0.5 font-display text-xs">
+      <span className="absolute right-2 top-2 z-20 border border-[color:var(--rs-item-plate-border)] bg-[color:var(--rs-item-plate-surface)] px-1.5 py-0.5 font-display text-xs">
         x{quantity}
       </span>
     </>

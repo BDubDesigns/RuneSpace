@@ -122,14 +122,19 @@ function InventoryPanel({
               >
                 <div
                   aria-hidden="true"
-                  className="absolute inset-x-0 bottom-0 z-0 border-t border-t-[color:var(--rs-accent-mining-stack-fill-border)] bg-[color:var(--rs-accent-mining-stack-fill)] transition-[height] duration-[var(--rs-duration-fast)]"
-                  data-stack-fill={Math.round(
-                    inventoryStackFillFraction(stack.quantity, stack.stackLimit) * 100,
-                  )}
-                  style={{
-                    height: `${inventoryStackFillFraction(stack.quantity, stack.stackLimit) * 100}%`,
-                  }}
-                />
+                  className="absolute inset-y-2 left-2 z-0 w-2 overflow-hidden bg-[color:var(--rs-accent-mining-stack-track)]"
+                  data-stack-track
+                >
+                  <div
+                    className="absolute inset-x-0 bottom-0 bg-[color:var(--rs-accent-mining)] transition-[height] duration-[var(--rs-duration-fast)]"
+                    data-stack-fill={Math.round(
+                      inventoryStackFillFraction(stack.quantity, stack.stackLimit) * 100,
+                    )}
+                    style={{
+                      height: `${inventoryStackFillFraction(stack.quantity, stack.stackLimit) * 100}%`,
+                    }}
+                  />
+                </div>
                 <ItemVisual itemId={stack.itemId} name={stack.name} quantity={stack.quantity} />
               </article>
             ) : (

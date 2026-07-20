@@ -25,14 +25,15 @@
   --rs-accent-success-subtle: rgb(136 215 99 / 0.1);
   --rs-accent-success-hover: rgb(136 215 99 / 0.17);
   --rs-accent-mining-subtle: rgb(245 196 81 / 0.1);
-  --rs-accent-mining-stack-fill: rgb(245 196 81 / 0.06);
-  --rs-accent-mining-stack-fill-border: rgb(245 196 81 / 0.1);
+  --rs-accent-mining-stack-track: rgb(245 196 81 / 0.14);
   --rs-accent-mining-hover: rgb(245 196 81 / 0.17);
   --rs-accent-arcane-subtle: rgb(196 140 255 / 0.1);
   --rs-accent-arcane-hover: rgb(196 140 255 / 0.17);
   --rs-accent-danger-subtle: rgb(241 108 117 / 0.1);
   --rs-accent-danger-hover: rgb(241 108 117 / 0.17);
   --rs-focus-ring: #a5efff;
+  --rs-item-plate-surface: rgb(9 21 34 / 0.42);
+  --rs-item-plate-border: rgb(75 216 245 / 0.2);
   --rs-space-1: 0.25rem;
   --rs-space-2: 0.5rem;
   --rs-space-3: 0.75rem;

@@ -91,9 +91,9 @@ test("owned character can start, observe, stop, and restore Crash Site Mining", 
   const firstSlot = inventory.locator("article").first();
   const firstSlotName = firstSlot.getByText("Ferrite Shale", { exact: true });
   const firstSlotQuantity = firstSlot.getByText("x10", { exact: true });
-  await expect(firstSlotName).toHaveCSS("background-color", "rgba(107, 114, 128, 0.5)");
-  await expect(firstSlotQuantity).toHaveCSS("background-color", "rgba(107, 114, 128, 0.5)");
-  await expect(firstSlotQuantity).toHaveCSS("border-top-width", "0px");
+  await expect(firstSlotName).toHaveCSS("background-color", "rgba(9, 21, 34, 0.42)");
+  await expect(firstSlotQuantity).toHaveCSS("background-color", "rgba(9, 21, 34, 0.42)");
+  await expect(firstSlotQuantity).toHaveCSS("border-top-color", "rgba(75, 216, 245, 0.2)");
   const [slotBox, artworkBox] = await Promise.all([
     firstSlot.boundingBox(),
     ferriteArtwork.first().boundingBox(),
@@ -106,37 +106,70 @@ test("owned character can start, observe, stop, and restore Crash Site Mining", 
   expect(
     Math.abs(slotBox!.y + slotBox!.height / 2 - (artworkBox!.y + artworkBox!.height / 2)),
   ).toBeLessThanOrEqual(1);
+  await expect(inventory.locator("[data-stack-track]")).toHaveCount(2);
   await expect(inventory.locator('[data-stack-fill="100"]')).toBeVisible();
   await expect(inventory.locator('[data-stack-fill="10"]')).toBeVisible();
   await expect(inventory.locator("[data-stack-fill]")).toHaveCount(2);
   const fullFill = await inventory.locator('[data-stack-fill="100"]').evaluate((fill) => {
-    const slot = fill.parentElement!;
+    const track = fill.parentElement!;
+    const slot = track.parentElement!;
+    const fillBox = fill.getBoundingClientRect();
+    const trackBox = track.getBoundingClientRect();
+    const slotBox = slot.getBoundingClientRect();
     return {
-      fraction: fill.getBoundingClientRect().height / slot.getBoundingClientRect().height,
+      fraction: fillBox.height / trackBox.height,
       background: getComputedStyle(fill).backgroundColor,
-      border: getComputedStyle(fill).borderTopColor,
-      fillZIndex: getComputedStyle(fill).zIndex,
+      fillBottom: fillBox.bottom,
+      fillWidth: fillBox.width,
+      trackBackground: getComputedStyle(track).backgroundColor,
+      trackBottom: trackBox.bottom,
+      trackLeft: trackBox.left,
+      trackWidth: trackBox.width,
+      slotLeft: slotBox.left,
+      slotWidth: slotBox.width,
+      trackZIndex: getComputedStyle(track).zIndex,
       textZIndex: getComputedStyle(slot.querySelector("p")!).zIndex,
     };
   });
   const partialFill = await inventory.locator('[data-stack-fill="10"]').evaluate((fill) => {
-    const slot = fill.parentElement!;
+    const track = fill.parentElement!;
+    const slot = track.parentElement!;
+    const fillBox = fill.getBoundingClientRect();
+    const trackBox = track.getBoundingClientRect();
+    const slotBox = slot.getBoundingClientRect();
     return {
-      fraction: fill.getBoundingClientRect().height / slot.getBoundingClientRect().height,
+      fraction: fillBox.height / trackBox.height,
       background: getComputedStyle(fill).backgroundColor,
-      fillZIndex: getComputedStyle(fill).zIndex,
+      fillBottom: fillBox.bottom,
+      fillWidth: fillBox.width,
+      trackBottom: trackBox.bottom,
+      trackLeft: trackBox.left,
+      trackWidth: trackBox.width,
+      slotLeft: slotBox.left,
+      slotWidth: slotBox.width,
+      trackZIndex: getComputedStyle(track).zIndex,
       textZIndex: getComputedStyle(slot.querySelector("p")!).zIndex,
     };
   });
   expect(fullFill.fraction).toBeGreaterThan(0.95);
-  expect(fullFill.background).toBe("rgba(245, 196, 81, 0.06)");
-  expect(fullFill.border).toBe("rgba(245, 196, 81, 0.1)");
-  expect(fullFill.fillZIndex).toBe("0");
+  expect(fullFill.background).toBe("rgb(245, 196, 81)");
+  expect(fullFill.trackBackground).toBe("rgba(245, 196, 81, 0.14)");
+  expect(fullFill.fillWidth).toBe(8);
+  expect(fullFill.trackWidth).toBe(8);
+  expect(Math.abs(fullFill.trackLeft - fullFill.slotLeft - 8)).toBeLessThanOrEqual(1);
+  expect(Math.abs(fullFill.fillBottom - fullFill.trackBottom)).toBeLessThanOrEqual(1);
+  expect(fullFill.trackWidth).toBeLessThan(fullFill.slotWidth);
+  expect(fullFill.trackZIndex).toBe("0");
   expect(fullFill.textZIndex).toBe("20");
   expect(partialFill.fraction).toBeGreaterThan(0.08);
   expect(partialFill.fraction).toBeLessThan(0.12);
-  expect(partialFill.background).not.toBe("rgba(0, 0, 0, 0)");
-  expect(partialFill.fillZIndex).toBe("0");
+  expect(partialFill.background).toBe("rgb(245, 196, 81)");
+  expect(partialFill.fillWidth).toBe(8);
+  expect(partialFill.trackWidth).toBe(8);
+  expect(Math.abs(partialFill.trackLeft - partialFill.slotLeft - 8)).toBeLessThanOrEqual(1);
+  expect(Math.abs(partialFill.fillBottom - partialFill.trackBottom)).toBeLessThanOrEqual(1);
+  expect(partialFill.trackWidth).toBeLessThan(partialFill.slotWidth);
+  expect(partialFill.trackZIndex).toBe("0");
   expect(partialFill.textZIndex).toBe("20");
   await expect(inventory.getByLabel(/Empty inventory slot/)).toHaveCount(6);
   await page.screenshot({ path: "test-results/mining-mobile-inventory-10-plus-1.png" });
