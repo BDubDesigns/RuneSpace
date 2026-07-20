@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, useTransition, type RefObject } from "react";
 import { ActionButton } from "@/components/ui/ActionButton";
+import { ItemVisual } from "@/components/items/ItemVisual";
 import { Feedback } from "@/components/ui/Feedback";
 import { Panel } from "@/components/ui/Panel";
 import { SectionHeader } from "@/components/ui/SectionHeader";
@@ -129,16 +130,7 @@ function InventoryPanel({
                     height: `${inventoryStackFillFraction(stack.quantity, stack.stackLimit) * 100}%`,
                   }}
                 />
-                <div
-                  aria-hidden="true"
-                  className="relative z-10 mb-3 h-8 border border-dashed border-[color:var(--rs-border-subtle)]"
-                />
-                <p className="relative z-10 font-display text-xs uppercase tracking-wide">
-                  {stack.name}
-                </p>
-                <span className="absolute right-2 top-2 z-10 border border-[color:var(--rs-accent-mining)] bg-[color:var(--rs-surface-raised)] px-1.5 py-0.5 font-display text-xs">
-                  x{stack.quantity}
-                </span>
+                <ItemVisual itemId={stack.itemId} name={stack.name} quantity={stack.quantity} />
               </article>
             ) : (
               <div

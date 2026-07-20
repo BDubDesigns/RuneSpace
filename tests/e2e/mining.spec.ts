@@ -70,6 +70,9 @@ test("owned character can start, observe, stop, and restore Crash Site Mining", 
   await expect(inventory).toBeVisible();
   await expect(inventory.getByText("2 occupied / 8 slots")).toBeVisible();
   await expect(inventory.getByText("Ferrite Shale", { exact: true })).toHaveCount(2);
+  const ferriteArtwork = inventory.getByTestId("item-artwork");
+  await expect(ferriteArtwork).toHaveCount(2);
+  await expect(ferriteArtwork.first()).toHaveCSS("object-fit", "contain");
   await expect(inventory.getByText("x10", { exact: true })).toBeVisible();
   await expect(inventory.getByText("x1", { exact: true })).toBeVisible();
   await expect(inventory.locator('[data-stack-fill="100"]')).toBeVisible();
