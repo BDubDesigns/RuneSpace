@@ -25,6 +25,8 @@
   --rs-accent-success-subtle: rgb(136 215 99 / 0.1);
   --rs-accent-success-hover: rgb(136 215 99 / 0.17);
   --rs-accent-mining-subtle: rgb(245 196 81 / 0.1);
+  --rs-accent-mining-stack-fill: rgb(245 196 81 / 0.06);
+  --rs-accent-mining-stack-fill-border: rgb(245 196 81 / 0.1);
   --rs-accent-mining-hover: rgb(245 196 81 / 0.17);
   --rs-accent-arcane-subtle: rgb(196 140 255 / 0.1);
   --rs-accent-arcane-hover: rgb(196 140 255 / 0.17);

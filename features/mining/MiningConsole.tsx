@@ -122,7 +122,7 @@ function InventoryPanel({
               >
                 <div
                   aria-hidden="true"
-                  className="absolute inset-x-0 bottom-0 z-0 border-t border-[color:var(--rs-accent-mining)] bg-[color:var(--rs-accent-mining-subtle)] transition-[height] duration-[var(--rs-duration-fast)]"
+                  className="absolute inset-x-0 bottom-0 z-0 border-t border-t-[color:var(--rs-accent-mining-stack-fill-border)] bg-[color:var(--rs-accent-mining-stack-fill)] transition-[height] duration-[var(--rs-duration-fast)]"
                   data-stack-fill={Math.round(
                     inventoryStackFillFraction(stack.quantity, stack.stackLimit) * 100,
                   )}

@@ -88,6 +88,24 @@ test("owned character can start, observe, stop, and restore Crash Site Mining", 
   await expect(ferriteArtwork.first()).toHaveCSS("object-fit", "contain");
   await expect(inventory.getByText("x10", { exact: true })).toBeVisible();
   await expect(inventory.getByText("x1", { exact: true })).toBeVisible();
+  const firstSlot = inventory.locator("article").first();
+  const firstSlotName = firstSlot.getByText("Ferrite Shale", { exact: true });
+  const firstSlotQuantity = firstSlot.getByText("x10", { exact: true });
+  await expect(firstSlotName).toHaveCSS("background-color", "rgba(107, 114, 128, 0.5)");
+  await expect(firstSlotQuantity).toHaveCSS("background-color", "rgba(107, 114, 128, 0.5)");
+  await expect(firstSlotQuantity).toHaveCSS("border-top-width", "0px");
+  const [slotBox, artworkBox] = await Promise.all([
+    firstSlot.boundingBox(),
+    ferriteArtwork.first().boundingBox(),
+  ]);
+  expect(slotBox).not.toBeNull();
+  expect(artworkBox).not.toBeNull();
+  expect(
+    Math.abs(slotBox!.x + slotBox!.width / 2 - (artworkBox!.x + artworkBox!.width / 2)),
+  ).toBeLessThanOrEqual(1);
+  expect(
+    Math.abs(slotBox!.y + slotBox!.height / 2 - (artworkBox!.y + artworkBox!.height / 2)),
+  ).toBeLessThanOrEqual(1);
   await expect(inventory.locator('[data-stack-fill="100"]')).toBeVisible();
   await expect(inventory.locator('[data-stack-fill="10"]')).toBeVisible();
   await expect(inventory.locator("[data-stack-fill]")).toHaveCount(2);
@@ -96,6 +114,7 @@ test("owned character can start, observe, stop, and restore Crash Site Mining", 
     return {
       fraction: fill.getBoundingClientRect().height / slot.getBoundingClientRect().height,
       background: getComputedStyle(fill).backgroundColor,
+      border: getComputedStyle(fill).borderTopColor,
       fillZIndex: getComputedStyle(fill).zIndex,
       textZIndex: getComputedStyle(slot.querySelector("p")!).zIndex,
     };
@@ -110,14 +129,15 @@ test("owned character can start, observe, stop, and restore Crash Site Mining", 
     };
   });
   expect(fullFill.fraction).toBeGreaterThan(0.95);
-  expect(fullFill.background).not.toBe("rgba(0, 0, 0, 0)");
+  expect(fullFill.background).toBe("rgba(245, 196, 81, 0.06)");
+  expect(fullFill.border).toBe("rgba(245, 196, 81, 0.1)");
   expect(fullFill.fillZIndex).toBe("0");
-  expect(fullFill.textZIndex).toBe("10");
+  expect(fullFill.textZIndex).toBe("20");
   expect(partialFill.fraction).toBeGreaterThan(0.08);
   expect(partialFill.fraction).toBeLessThan(0.12);
   expect(partialFill.background).not.toBe("rgba(0, 0, 0, 0)");
   expect(partialFill.fillZIndex).toBe("0");
-  expect(partialFill.textZIndex).toBe("10");
+  expect(partialFill.textZIndex).toBe("20");
   await expect(inventory.getByLabel(/Empty inventory slot/)).toHaveCount(6);
   await page.screenshot({ path: "test-results/mining-mobile-inventory-10-plus-1.png" });
   await page.getByRole("button", { name: "Close inventory" }).click();

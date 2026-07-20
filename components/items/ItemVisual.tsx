@@ -14,7 +14,7 @@ export function ItemVisual({ itemId, name, quantity }: ItemVisualProps) {
 
   return (
     <>
-      <div className="relative z-10 mb-2 flex h-12 items-center justify-center">
+      <div className="absolute inset-0 z-10 flex items-center justify-center">
         {presentation.artworkSrc ? (
           <Image
             alt={presentation.accessibleDescription}
@@ -30,8 +30,10 @@ export function ItemVisual({ itemId, name, quantity }: ItemVisualProps) {
           </span>
         )}
       </div>
-      <p className="relative z-10 font-display text-xs uppercase tracking-wide">{displayName}</p>
-      <span className="absolute right-2 top-2 z-20 border border-[color:var(--rs-accent-mining)] bg-[color:var(--rs-surface-raised)] px-1.5 py-0.5 font-display text-xs">
+      <p className="absolute bottom-2 left-2 z-20 bg-[rgb(107_114_128_/_0.5)] px-1.5 py-0.5 font-display text-xs uppercase tracking-wide">
+        {displayName}
+      </p>
+      <span className="absolute right-2 top-2 z-20 bg-[rgb(107_114_128_/_0.5)] px-1.5 py-0.5 font-display text-xs">
         x{quantity}
       </span>
     </>
