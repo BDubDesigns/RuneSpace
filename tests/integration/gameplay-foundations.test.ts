@@ -534,6 +534,7 @@ suite("gameplay foundations (real PostgreSQL)", () => {
     expect(resolved.inventory.stacks.map((stack) => stack.quantity).sort((a, b) => b - a)).toEqual([
       10, 1,
     ]);
+    expect(resolved.inventory.stacks.map((stack) => stack.stackLimit)).toEqual([10, 10]);
     expect(resolved.inventory.slotsUsed).toBe(2);
     expect(resolved.run).toMatchObject({
       attempts: 1,

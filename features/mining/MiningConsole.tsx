@@ -8,6 +8,7 @@ import { SectionHeader } from "@/components/ui/SectionHeader";
 import { StatusMeter } from "@/components/ui/StatusMeter";
 import { getEffectiveGameBalance } from "@/game/config/balance";
 import { GAME_TICK_MS } from "@/game/config/foundations";
+import { inventoryStackFillFraction } from "@/game/domain/inventory";
 import { miningNearMissBasisPoints } from "@/game/domain/mining";
 import type { MiningGameplayState } from "@/server/mining";
 import { refreshMiningAction, startMiningAction, stopMiningAction } from "@/server/actions";
@@ -120,10 +121,22 @@ function InventoryPanel({
               >
                 <div
                   aria-hidden="true"
-                  className="mb-3 h-8 border border-dashed border-[color:var(--rs-border-subtle)]"
+                  className="bg-[color:var(--rs-accent-mining)]/20 absolute inset-x-0 bottom-0 transition-[height] duration-[var(--rs-duration-fast)]"
+                  data-stack-fill={Math.round(
+                    inventoryStackFillFraction(stack.quantity, stack.stackLimit) * 100,
+                  )}
+                  style={{
+                    height: `${inventoryStackFillFraction(stack.quantity, stack.stackLimit) * 100}%`,
+                  }}
                 />
-                <p className="font-display text-xs uppercase tracking-wide">{stack.name}</p>
-                <span className="absolute right-2 top-2 border border-[color:var(--rs-accent-mining)] px-1.5 py-0.5 font-display text-xs">
+                <div
+                  aria-hidden="true"
+                  className="relative mb-3 h-8 border border-dashed border-[color:var(--rs-border-subtle)]"
+                />
+                <p className="relative font-display text-xs uppercase tracking-wide">
+                  {stack.name}
+                </p>
+                <span className="absolute right-2 top-2 z-10 border border-[color:var(--rs-accent-mining)] bg-[color:var(--rs-surface-raised)] px-1.5 py-0.5 font-display text-xs">
                   x{stack.quantity}
                 </span>
               </article>

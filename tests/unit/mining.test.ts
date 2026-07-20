@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { getEffectiveGameBalance, miningLevelThresholds } from "@/game/config/balance";
 import { ITEM_IDS } from "@/game/config/foundations";
+import { inventoryStackFillFraction } from "@/game/domain/inventory";
 import {
   miningSuccessChanceBps,
   miningNearMissBasisPoints,
@@ -44,6 +45,19 @@ describe("approved Crash Site Mining balance", () => {
     expect(miningSuccessChanceBps(15, balance)).toBe(6637);
     expect(miningSuccessChanceBps(30, balance)).toBe(10_000);
     expect(miningSuccessChanceBps(99, balance)).toBe(10_000);
+  });
+});
+
+describe("inventory stack presentation", () => {
+  it("derives clamped fill fractions from supplied stack limits", () => {
+    expect(inventoryStackFillFraction(1, 10)).toBe(0.1);
+    expect(inventoryStackFillFraction(5, 10)).toBe(0.5);
+    expect(inventoryStackFillFraction(10, 10)).toBe(1);
+    expect(inventoryStackFillFraction(20, 10)).toBe(1);
+    expect(inventoryStackFillFraction(-1, 10)).toBe(0);
+    expect(inventoryStackFillFraction(1, 0)).toBe(0);
+    expect(inventoryStackFillFraction(0, 10)).toBe(0);
+    expect(inventoryStackFillFraction(1, 1)).toBe(1);
   });
 });
 

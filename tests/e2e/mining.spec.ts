@@ -72,6 +72,9 @@ test("owned character can start, observe, stop, and restore Crash Site Mining", 
   await expect(inventory.getByText("Ferrite Shale", { exact: true })).toHaveCount(2);
   await expect(inventory.getByText("x10", { exact: true })).toBeVisible();
   await expect(inventory.getByText("x1", { exact: true })).toBeVisible();
+  await expect(inventory.locator('[data-stack-fill="100"]')).toBeVisible();
+  await expect(inventory.locator('[data-stack-fill="10"]')).toBeVisible();
+  await expect(inventory.locator("[data-stack-fill]")).toHaveCount(2);
   await expect(inventory.getByLabel(/Empty inventory slot/)).toHaveCount(6);
   await page.screenshot({ path: "test-results/mining-mobile-inventory-10-plus-1.png" });
   await page.getByRole("button", { name: "Close inventory" }).click();

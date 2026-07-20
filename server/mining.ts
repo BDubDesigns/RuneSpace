@@ -110,7 +110,13 @@ export type MiningGameplayState = {
     slotsAvailable: number;
     massGrams: number;
     capacityGrams: number;
-    stacks: readonly { id: string; itemId: string; name: string; quantity: number }[];
+    stacks: readonly {
+      id: string;
+      itemId: string;
+      name: string;
+      quantity: number;
+      stackLimit: number;
+    }[];
   };
   run: MiningRunState;
   recentResult: { successes: number; failures: number; awardedXp: number };
@@ -480,6 +486,10 @@ async function stateFromTransaction(
         itemId: stack.itemId,
         name: stack.itemId === ITEM_IDS.ferriteShale ? "Ferrite Shale" : stack.itemId,
         quantity: stack.quantity,
+        stackLimit:
+          stack.itemId === balance.items.ferriteShale.itemId
+            ? balance.items.ferriteShale.stackLimit
+            : 1,
       })),
     },
     run,
