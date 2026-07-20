@@ -82,20 +82,26 @@ function InventoryPanel({
   const totalSlots = state.inventory.slotsUsed + state.inventory.slotsAvailable;
   return (
     <div
-      className="bg-[color:var(--rs-surface-page)]/95 fixed inset-0 z-50 flex items-end p-3 sm:items-center sm:justify-end"
+      className="bg-[color:var(--rs-surface-page)]/90 fixed inset-0 z-50 flex items-end p-3 sm:items-center sm:justify-end sm:p-4"
       role="presentation"
     >
       <section
         aria-label="Inventory"
         aria-modal="true"
-        className="max-h-[min(78dvh,42rem)] w-full max-w-xl overflow-y-auto border border-[color:var(--rs-border-structural)] bg-[color:var(--rs-surface-raised)] p-4 pb-[max(1rem,env(safe-area-inset-bottom))] [box-shadow:var(--rs-shadow-panel)] sm:max-h-full"
+        className="max-h-[min(78dvh,42rem)] w-full max-w-xl overflow-y-auto border border-[color:var(--rs-border-structural)] bg-[color:var(--rs-surface-raised)] p-4 pb-[max(1rem,env(safe-area-inset-bottom))] [box-shadow:var(--rs-shadow-panel)] sm:max-h-[calc(100dvh-2rem)] sm:w-[min(34rem,calc(100vw-2rem))]"
         ref={panel}
         role="dialog"
       >
-        <div className="flex items-center justify-between gap-3">
-          <SectionHeader eyebrow="MYKEA SCHLEPPRAUM-8">Container inventory</SectionHeader>
-          <ActionButton ref={closeButton} intent="secondary" onClick={close}>
-            Close inventory
+        <div className="flex items-start justify-between gap-3">
+          <SectionHeader eyebrow="MYKEA SCHLEPPRAUM-8">Inventory</SectionHeader>
+          <ActionButton
+            ref={closeButton}
+            aria-label="Close inventory"
+            className="shrink-0 px-3"
+            intent="secondary"
+            onClick={close}
+          >
+            Close
           </ActionButton>
         </div>
         <p className="mt-2 text-sm text-[color:var(--rs-text-secondary)]">
@@ -191,7 +197,7 @@ export function MiningConsole({
   }, [active?.nextAttemptAt]);
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 pb-24 sm:pb-0">
       <Panel tone="raised">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <SectionHeader eyebrow="Crash Site // Sector 01">{characterName}</SectionHeader>
@@ -366,7 +372,7 @@ export function MiningConsole({
           ) : null}
         </div>
       </Panel>
-      <div className="sticky bottom-0 z-40 -mx-4 border-t border-[color:var(--rs-border-structural)] bg-[color:var(--rs-surface-raised)] px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-3 sm:fixed sm:bottom-4 sm:left-4 sm:right-4 sm:mx-0">
+      <div className="sticky bottom-0 z-40 -mx-4 border-t border-[color:var(--rs-border-structural)] bg-[color:var(--rs-surface-raised)] px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-3 sm:fixed sm:bottom-6 sm:left-auto sm:right-6 sm:mx-0 sm:w-fit sm:border sm:px-2 sm:py-2 sm:[box-shadow:var(--rs-shadow-panel)]">
         <ActionButton
           ref={inventoryTrigger}
           intent="secondary"
