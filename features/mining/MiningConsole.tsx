@@ -122,7 +122,7 @@ function InventoryPanel({
               >
                 <div
                   aria-hidden="true"
-                  className="absolute inset-y-2 left-2 z-0 w-2 overflow-hidden bg-[color:var(--rs-accent-mining-stack-track)]"
+                  className="absolute inset-y-0 left-0 z-0 w-2 overflow-hidden bg-[color:var(--rs-accent-mining-stack-track)]"
                   data-stack-track
                 >
                   <div

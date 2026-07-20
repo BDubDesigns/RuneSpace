@@ -92,6 +92,8 @@ test("owned character can start, observe, stop, and restore Crash Site Mining", 
   const firstSlotName = firstSlot.getByText("Ferrite Shale", { exact: true });
   const firstSlotQuantity = firstSlot.getByText("x10", { exact: true });
   await expect(firstSlotName).toHaveCSS("background-color", "rgba(9, 21, 34, 0.42)");
+  await expect(firstSlotName).toHaveCSS("white-space", "nowrap");
+  await expect(firstSlotName).toHaveCSS("text-overflow", "ellipsis");
   await expect(firstSlotQuantity).toHaveCSS("background-color", "rgba(9, 21, 34, 0.42)");
   await expect(firstSlotQuantity).toHaveCSS("border-top-color", "rgba(75, 216, 245, 0.2)");
   const [slotBox, artworkBox] = await Promise.all([
@@ -124,9 +126,13 @@ test("owned character can start, observe, stop, and restore Crash Site Mining", 
       trackBackground: getComputedStyle(track).backgroundColor,
       trackBottom: trackBox.bottom,
       trackLeft: trackBox.left,
+      trackTop: trackBox.top,
       trackWidth: trackBox.width,
       slotLeft: slotBox.left,
+      slotTop: slotBox.top,
       slotWidth: slotBox.width,
+      slotHeight: slotBox.height,
+      trackHeight: trackBox.height,
       trackZIndex: getComputedStyle(track).zIndex,
       textZIndex: getComputedStyle(slot.querySelector("p")!).zIndex,
     };
@@ -144,9 +150,13 @@ test("owned character can start, observe, stop, and restore Crash Site Mining", 
       fillWidth: fillBox.width,
       trackBottom: trackBox.bottom,
       trackLeft: trackBox.left,
+      trackTop: trackBox.top,
       trackWidth: trackBox.width,
       slotLeft: slotBox.left,
+      slotTop: slotBox.top,
       slotWidth: slotBox.width,
+      slotHeight: slotBox.height,
+      trackHeight: trackBox.height,
       trackZIndex: getComputedStyle(track).zIndex,
       textZIndex: getComputedStyle(slot.querySelector("p")!).zIndex,
     };
@@ -156,7 +166,9 @@ test("owned character can start, observe, stop, and restore Crash Site Mining", 
   expect(fullFill.trackBackground).toBe("rgba(245, 196, 81, 0.14)");
   expect(fullFill.fillWidth).toBe(8);
   expect(fullFill.trackWidth).toBe(8);
-  expect(Math.abs(fullFill.trackLeft - fullFill.slotLeft - 8)).toBeLessThanOrEqual(1);
+  expect(Math.abs(fullFill.trackLeft - fullFill.slotLeft)).toBeLessThanOrEqual(1);
+  expect(Math.abs(fullFill.trackTop - fullFill.slotTop)).toBeLessThanOrEqual(1);
+  expect(Math.abs(fullFill.trackHeight - fullFill.slotHeight)).toBeLessThanOrEqual(1);
   expect(Math.abs(fullFill.fillBottom - fullFill.trackBottom)).toBeLessThanOrEqual(1);
   expect(fullFill.trackWidth).toBeLessThan(fullFill.slotWidth);
   expect(fullFill.trackZIndex).toBe("0");
@@ -166,7 +178,9 @@ test("owned character can start, observe, stop, and restore Crash Site Mining", 
   expect(partialFill.background).toBe("rgb(245, 196, 81)");
   expect(partialFill.fillWidth).toBe(8);
   expect(partialFill.trackWidth).toBe(8);
-  expect(Math.abs(partialFill.trackLeft - partialFill.slotLeft - 8)).toBeLessThanOrEqual(1);
+  expect(Math.abs(partialFill.trackLeft - partialFill.slotLeft)).toBeLessThanOrEqual(1);
+  expect(Math.abs(partialFill.trackTop - partialFill.slotTop)).toBeLessThanOrEqual(1);
+  expect(Math.abs(partialFill.trackHeight - partialFill.slotHeight)).toBeLessThanOrEqual(1);
   expect(Math.abs(partialFill.fillBottom - partialFill.trackBottom)).toBeLessThanOrEqual(1);
   expect(partialFill.trackWidth).toBeLessThan(partialFill.slotWidth);
   expect(partialFill.trackZIndex).toBe("0");
