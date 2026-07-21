@@ -389,18 +389,17 @@ test("the Play boundary resets, navigates, and hides failure details", async ({ 
     .getByLabel("Character name")
     .fill(`Boundary ${Math.random().toString(36).slice(2, 8)}`);
   await page.getByRole("button", { name: "Create character" }).click();
-  const playUrl = page.url();
 
-  await page.setExtraHTTPHeaders({ "x-runespace-e2e-play-error": "1" });
-  await page.goto(playUrl);
+  await page.evaluate(() => window.sessionStorage.setItem("runespace-e2e-play-error", "1"));
+  await page.reload();
   await expect(page.getByRole("heading", { name: "Play terminal interrupted" })).toBeVisible();
   await expect(page.getByText("Play boundary e2e failure")).toHaveCount(0);
-  await page.setExtraHTTPHeaders({});
+  await page.evaluate(() => window.sessionStorage.removeItem("runespace-e2e-play-error"));
   await page.getByRole("button", { name: "Retry connection" }).click();
   await expect(page.getByText("Ferrite Shale", { exact: true }).first()).toBeVisible();
 
-  await page.setExtraHTTPHeaders({ "x-runespace-e2e-play-error": "1" });
-  await page.goto(playUrl);
+  await page.evaluate(() => window.sessionStorage.setItem("runespace-e2e-play-error", "1"));
+  await page.reload();
   await expect(page.getByRole("link", { name: "Back to characters" })).toBeVisible();
   await page.getByRole("link", { name: "Back to characters" }).click();
   await expect(page).toHaveURL(/\/characters$/);
