@@ -1,18 +1,16 @@
 # RuneSpace
 
-> **Status: Foundation / scaffold only.** This repository is an early development
-> scaffold. It establishes architecture, tooling, tests, and documentation. It
-> is **not a playable game** — no gameplay, lore, quests, NPCs, resources,
-> balance values, or minigames are implemented yet.
+> **Status: Active foundation.** The repository includes authentication,
+> character ownership, and a playable server-authoritative Crash Site Mining
+> slice. Other gameplay systems remain intentionally scoped to approved issues.
 
 RuneSpace is a planned browser-first, mobile-friendly, low-fi sci-fi RPG inspired
 by the progression, quests, social texture, and long-term grind of old-school
 MMORPGs and action-point games. It is not a RuneScape clone.
 
 The architecture is a **modular monolith** with a **server-authoritative** game
-model: the browser is never the trusted source of progression. Future gameplay
-(inventory, XP, fuel, quests, travel, ships, minigames) will be resolved by
-server-side domain logic and persisted server-side.
+model: the browser is never the trusted source of progression. Gameplay outcomes
+are resolved by server-side domain logic and persisted server-side.
 
 ## Stack
 
@@ -92,9 +90,8 @@ See `.env.example`. Validated at startup by `server/env.ts` (Zod).
 - **Unit:** `pnpm test` (Vitest, pure domain/schema logic — fast, no DOM).
 - **Integration:** `pnpm test:integration` (Vitest against PostgreSQL; apply
   committed migrations first).
-- **Browser:** `pnpm test:e2e` (Playwright, minimal mobile journeys — local).
-  Playwright is intentionally **not** part of the fast CI workflow to keep PR
-  checks lightweight; see `docs/testing-strategy.md`.
+- **Browser:** `pnpm test:e2e` (Playwright, focused mobile journeys). CI runs a
+  dedicated Mining browser job; see `docs/testing-strategy.md`.
 - **Strategy:** risk-based — pure rules, server/persistence boundaries, and a
   few critical mobile journeys. See `docs/testing-strategy.md`.
 

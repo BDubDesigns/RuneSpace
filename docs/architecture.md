@@ -13,10 +13,10 @@ explicit decision.
 
 ## Server-authoritative game model
 
-The browser is **never** the trusted source of progression. Future inventories,
-XP, fuel, rewards, quest state, timers, and travel outcomes are resolved by
-server-authoritative domain logic and persisted server-side. Clients send
-intent; the server validates, resolves, and stores the result.
+The browser is **never** the trusted source of progression. Inventories, XP,
+rewards, and action outcomes are resolved by server-authoritative domain logic
+and persisted server-side. Clients send intent; the server validates, resolves,
+and stores the result.
 
 This means:
 
@@ -58,7 +58,7 @@ Lower layers never import higher layers. Domain logic never imports UI.
 
 1. Player interacts in `app/` / `features/` (UI only).
 2. UI calls a server action or route handler in `server/`.
-3. `server/` authenticates (later), loads data via `db/`, and calls pure rules
+3. `server/` authenticates, loads data via `db/`, and calls pure rules
    in `game/domain/`.
 4. Domain rules resolve the outcome from authoritative inputs (content from
    `game/content/`, validated by `game/schemas/`).
@@ -82,7 +82,7 @@ server-validated. They are not part of this foundation issue.
 
 ## Current status
 
-The foundation implements the ownership model and server-authoritative gameplay
-contracts for timing, progression, inventory state, equipment state, and lazy
-action resolution. Playable activities and player-facing gameplay UI arrive in
-later issues.
+The foundation implements authentication and character ownership alongside
+server-authoritative timing, progression, inventory, equipment, and lazy action
+resolution. Crash Site Mining is the current playable player-facing slice; other
+activities and gameplay UI remain scoped to later approved issues.

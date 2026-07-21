@@ -7,14 +7,14 @@ every repeated snippet into an abstraction, and keep game logic out of UI.
 
 ### In `components/`
 A **reusable visual primitive**: presentational React with no feature behavior
-and no game rules. Examples the scaffold establishes: `ScaffoldScreen` (a styled
-card). If a component needs feature behavior or domain logic, it belongs in
-`features/` or `game/domain/`.
+and no game rules. Examples include `ScaffoldScreen` and shared UI primitives.
+If a component needs feature behavior or domain logic, it belongs in `features/`
+or `game/domain/`.
 
 ### In a feature module (`features/`)
 Player-facing vertical behavior that **composes** UI from `components/` and wires
 it to `server/` actions. A feature is a thin composition layer; it does not own
-game rules or persistence. (No features exist yet.)
+game rules or persistence.
 
 ### In `game/domain/`
 A **pure rule, calculation, state transition, or ID contract**: framework-free,
@@ -24,13 +24,13 @@ source of truth for computed values.
 
 ### In `game/schemas/`
 **Zod validation** for content and request boundaries. Example established by the
-scaffold: `ids.ts` (the stable content-ID contract). No game content is defined
-here yet — only validation contracts other modules reuse.
+application: `ids.ts` (the stable content-ID contract). Validation contracts are
+reused across the application.
 
 ### In `server/`
-Orchestration: authenticated commands (later), persistence transactions, timer
-resolution, and server-authoritative actions. Calls `game/domain/` and `db/`.
-Never imports React.
+Orchestration: authenticated commands, persistence transactions, timer resolution,
+and server-authoritative actions. Calls `game/domain/` and `db/`. Never imports
+React.
 
 ### In `db/`
 Drizzle schema, migrations, and narrowly scoped persistence code. One pool, owned
