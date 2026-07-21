@@ -1,5 +1,5 @@
 import { randomInt } from "node:crypto";
-import { eq } from "drizzle-orm";
+import { asc, eq } from "drizzle-orm";
 import { db } from "@/db";
 import {
   activeActions,
@@ -431,7 +431,11 @@ async function stateFromTransaction(
       .select()
       .from(characterSkillXp)
       .where(eq(characterSkillXp.characterId, characterId)),
-    transaction.select().from(inventoryStacks).where(eq(inventoryStacks.characterId, characterId)),
+    transaction
+      .select()
+      .from(inventoryStacks)
+      .where(eq(inventoryStacks.characterId, characterId))
+      .orderBy(asc(inventoryStacks.createdAt), asc(inventoryStacks.id)),
     transaction.select().from(activeActions).where(eq(activeActions.characterId, characterId)),
     transaction
       .select()

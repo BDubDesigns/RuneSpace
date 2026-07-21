@@ -559,6 +559,69 @@ suite("gameplay foundations (real PostgreSQL)", () => {
     expect(rows.map((stack) => stack.quantity).sort((a, b) => b - a)).toEqual([10, 1]);
   });
 
+  it("returns inventory stacks in stable creation order with accurate totals", async () => {
+    const { userId, character } = await makeCharacter();
+    const now = new Date("2026-01-01T00:00:00.000Z");
+    await mining.getMiningGameplayState(userId, character.id, now);
+    await db.insert(rune.inventoryStacks).values([
+      {
+        id: "stack-later",
+        characterId: character.id,
+        itemId: ITEM_IDS.ferriteShale,
+        quantity: 5,
+        createdAt: new Date("2026-01-01T00:00:02.000Z"),
+      },
+      {
+        id: "stack-tie-b",
+        characterId: character.id,
+        itemId: ITEM_IDS.ferriteShale,
+        quantity: 4,
+        createdAt: new Date("2026-01-01T00:00:01.000Z"),
+      },
+      {
+        id: "stack-earlier",
+        characterId: character.id,
+        itemId: ITEM_IDS.ferriteShale,
+        quantity: 2,
+        createdAt: new Date("2026-01-01T00:00:00.000Z"),
+      },
+      {
+        id: "stack-tie-a",
+        characterId: character.id,
+        itemId: ITEM_IDS.ferriteShale,
+        quantity: 3,
+        createdAt: new Date("2026-01-01T00:00:01.000Z"),
+      },
+    ]);
+
+    const expectedStackIds = ["stack-earlier", "stack-tie-a", "stack-tie-b", "stack-later"];
+    const first = await mining.getMiningGameplayState(userId, character.id, now);
+    const repeat = await mining.getMiningGameplayState(userId, character.id, now);
+    expect(first.inventory.stacks.map((stack) => stack.id)).toEqual(expectedStackIds);
+    expect(repeat.inventory.stacks.map((stack) => stack.id)).toEqual(expectedStackIds);
+    expect(first.inventory).toMatchObject({
+      slotsUsed: 4,
+      slotsAvailable: 4,
+      massGrams: 16_400,
+      capacityGrams: 50_000,
+    });
+    expect(first.ferriteShaleQuantity).toBe(14);
+
+    await db
+      .update(rune.inventoryStacks)
+      .set({ quantity: 6, updatedAt: new Date("2026-01-01T00:00:03.000Z") })
+      .where(eq(rune.inventoryStacks.id, "stack-earlier"));
+    const afterQuantityUpdate = await mining.getMiningGameplayState(userId, character.id, now);
+    expect(afterQuantityUpdate.inventory.stacks.map((stack) => stack.id)).toEqual(expectedStackIds);
+    expect(afterQuantityUpdate.inventory).toMatchObject({
+      slotsUsed: first.inventory.slotsUsed,
+      slotsAvailable: first.inventory.slotsAvailable,
+      massGrams: 16_800,
+      capacityGrams: first.inventory.capacityGrams,
+    });
+    expect(afterQuantityUpdate.ferriteShaleQuantity).toBe(18);
+  });
+
   it("preserves an unsupported active action during Mining commands", async () => {
     const { userId, character } = await makeCharacter();
     const startedAt = new Date("2026-01-01T00:00:00.000Z");
