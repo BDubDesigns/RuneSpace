@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { GameShell, TopBar } from "@/components/ui/GameShell";
 import { TextLink } from "@/components/ui/TextLink";
 import { SignOutButton } from "@/features/auth/SignOutButton";
+import { PlayBoundaryTestTrigger } from "@/features/diagnostics/PlayBoundaryTestTrigger";
 import { MiningConsole } from "@/features/mining/MiningConsole";
 import { auth } from "@/server/auth";
 import { requireCurrentUser, requireOwnedCharacter, OwnershipError } from "@/server/ownership";
@@ -32,7 +33,7 @@ export default async function PlayPage({ params }: { params: Promise<{ character
   const { characterId } = await params;
   const session = await auth.api.getSession({ headers: await headers() });
   if (!session?.user) redirect("/sign-in");
-  if (shouldInjectE2ePlayError(await headers())) throw new Error("Play boundary e2e failure");
+  const injectE2ePlayError = shouldInjectE2ePlayError(await headers());
 
   let displayName = "Character";
   let miningState;
@@ -60,6 +61,7 @@ export default async function PlayPage({ params }: { params: Promise<{ character
         </p>
       }
     >
+      <PlayBoundaryTestTrigger enabled={injectE2ePlayError} />
       <MiningConsole characterName={displayName} initialState={miningState!} />
     </GameShell>
   );
