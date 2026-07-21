@@ -2,12 +2,15 @@
 
 import { useEffect, useState } from "react";
 
-export function PlayBoundaryTestTrigger({ testMode }: { testMode: boolean }) {
+export function PlayBoundaryTestTrigger() {
   const [shouldThrow, setShouldThrow] = useState(false);
   useEffect(() => {
-    if (testMode && window.sessionStorage.getItem("runespace-e2e-play-error") === "1")
+    if (
+      process.env.NEXT_PUBLIC_RUNESPACE_E2E_PLAY_ERROR === "true" &&
+      window.sessionStorage.getItem("runespace-e2e-play-error") === "1"
+    )
       setShouldThrow(true);
-  }, [testMode]);
+  }, []);
   if (shouldThrow) throw new Error("Play boundary e2e failure");
   return null;
 }

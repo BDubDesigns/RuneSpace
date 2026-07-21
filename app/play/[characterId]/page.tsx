@@ -23,7 +23,6 @@ export default async function PlayPage({ params }: { params: Promise<{ character
   const { characterId } = await params;
   const session = await auth.api.getSession({ headers: await headers() });
   if (!session?.user) redirect("/sign-in");
-  const e2ePlayErrorMode = process.env.RUNESPACE_E2E_PLAY_ERROR === "true";
 
   let displayName = "Character";
   let miningState;
@@ -51,7 +50,7 @@ export default async function PlayPage({ params }: { params: Promise<{ character
         </p>
       }
     >
-      <PlayBoundaryTestTrigger testMode={e2ePlayErrorMode} />
+      <PlayBoundaryTestTrigger />
       <MiningConsole characterName={displayName} initialState={miningState!} />
     </GameShell>
   );

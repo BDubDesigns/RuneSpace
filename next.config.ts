@@ -5,6 +5,8 @@ const nextConfig: NextConfig = {
   env: {
     // The release is the only deployment value exposed to browser diagnostics.
     NEXT_PUBLIC_RUNESPACE_RELEASE_ID: process.env.RUNESPACE_RELEASE_ID ?? "",
+    NEXT_PUBLIC_RUNESPACE_E2E_PLAY_ERROR:
+      process.env.RUNESPACE_E2E_PLAY_ERROR === "true" ? "true" : "",
   },
   ...(process.env.RUNESPACE_RELEASE_ID ? { deploymentId: process.env.RUNESPACE_RELEASE_ID } : {}),
 };
