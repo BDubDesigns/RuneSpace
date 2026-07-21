@@ -6,6 +6,7 @@ import { ITEM_IDS } from "@/game/config/foundations";
 import { miningStorageStatePath } from "./mining.setup";
 
 const e2eDatabaseHost = process.env.DATABASE_URL ? new URL(process.env.DATABASE_URL).hostname : "";
+const RESULT_FEEDBACK_DURATION_MS = 3_600;
 
 function animationDurationSeconds(value: string): number {
   const duration = Number.parseFloat(value);
@@ -266,7 +267,7 @@ test("owned character can start, observe, stop, and restore Crash Site Mining", 
   await page.screenshot({ path: "test-results/mining-desktop-success.png" });
   await page.setViewportSize({ width: 390, height: 844 });
   await page.screenshot({ path: "test-results/mining-mobile-success.png" });
-  await page.waitForTimeout(1_900);
+  await page.waitForTimeout(RESULT_FEEDBACK_DURATION_MS + 250);
   await expect(latestResult).toHaveAttribute("data-feedback-state", "calm");
   await page.waitForTimeout(300);
   await expect(latestResult).toHaveAttribute("data-feedback-state", "calm");

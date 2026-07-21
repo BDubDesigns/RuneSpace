@@ -18,6 +18,8 @@ import { reportClientDiagnostic } from "@/features/diagnostics/client";
 import { latestMiningAttempt, resolvedAttemptCount } from "./latest-result";
 import { useMiningPlay } from "./MiningPlayContext";
 
+const RESULT_FEEDBACK_DURATION_MS = 3_600;
+
 function kilograms(grams: number) {
   return `${(grams / 1_000).toLocaleString(undefined, { maximumFractionDigits: 1 })} kg`;
 }
@@ -314,7 +316,7 @@ export function MiningConsole({ characterName }: { characterName: string }) {
       attempts: resolvedAttemptCount(previousAttempts, state.run.attempts),
     };
     setFeedback(nextFeedback);
-    const timeout = window.setTimeout(() => setFeedback(undefined), 1_800);
+    const timeout = window.setTimeout(() => setFeedback(undefined), RESULT_FEEDBACK_DURATION_MS);
     return () => window.clearTimeout(timeout);
   }, [latestAttempt?.sequence, state.run.attempts]);
 

@@ -48,8 +48,8 @@
   --rs-font-body: ui-sans-serif, system-ui, sans-serif;
   --rs-shadow-panel: 0 16px 42px rgb(0 0 0 / 0.34);
   --rs-glow-primary: 0 0 20px rgb(75 216 245 / 0.18);
-  --rs-glow-success: 0 0 24px rgb(136 215 99 / 0.42);
-  --rs-glow-danger: 0 0 24px rgb(241 108 117 / 0.34);
+  --rs-glow-success: 0 0 32px rgb(136 215 99 / 0.66);
+  --rs-glow-danger: 0 0 32px rgb(241 108 117 / 0.58);
   --rs-duration-fast: 120ms;
   --rs-duration-standard: 180ms;
   --rs-control-height: 2.75rem;
@@ -92,22 +92,28 @@ body {
 }
 
 @keyframes rs-result-success {
-  0%,
-  100% {
+  0% {
     box-shadow: none;
   }
-  24% {
+  12%,
+  55% {
     box-shadow: var(--rs-glow-success);
+  }
+  100% {
+    box-shadow: none;
   }
 }
 
 @keyframes rs-result-danger {
-  0%,
-  100% {
+  0% {
     box-shadow: none;
   }
-  24% {
+  12%,
+  55% {
     box-shadow: var(--rs-glow-danger);
+  }
+  100% {
+    box-shadow: none;
   }
 }
 
@@ -124,11 +130,11 @@ body {
 }
 
 .rs-result-feedback-success {
-  animation: rs-result-success 1.8s ease-out;
+  animation: rs-result-success 3.6s ease-out;
 }
 
 .rs-result-feedback-danger {
-  animation: rs-result-danger 1.8s ease-out;
+  animation: rs-result-danger 3.6s ease-out;
 }
 
 .rs-reward-feedback {
