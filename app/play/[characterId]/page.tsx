@@ -1,10 +1,6 @@
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
-import { GameShell, TopBar } from "@/components/ui/GameShell";
-import { TextLink } from "@/components/ui/TextLink";
-import { SignOutButton } from "@/features/auth/SignOutButton";
-import { PlayBoundaryTestTrigger } from "@/features/diagnostics/PlayBoundaryTestTrigger";
-import { MiningConsole } from "@/features/mining/MiningConsole";
+import { MiningPlayScreen } from "@/features/mining/MiningPlayScreen";
 import { auth } from "@/server/auth";
 import { requireCurrentUser, requireOwnedCharacter, OwnershipError } from "@/server/ownership";
 import { getMiningGameplayState } from "@/server/mining";
@@ -36,22 +32,5 @@ export default async function PlayPage({ params }: { params: Promise<{ character
     throw err;
   }
 
-  return (
-    <GameShell
-      topBar={
-        <div className="flex items-center justify-between gap-3">
-          <TopBar title="RuneSpace" detail="Crash Site Mining" />
-          <SignOutButton />
-        </div>
-      }
-      aside={
-        <p className="text-sm text-[color:var(--rs-text-secondary)]">
-          <TextLink href="/characters">Back to characters</TextLink>
-        </p>
-      }
-    >
-      <PlayBoundaryTestTrigger />
-      <MiningConsole characterName={displayName} initialState={miningState!} />
-    </GameShell>
-  );
+  return <MiningPlayScreen characterName={displayName} initialState={miningState!} />;
 }
