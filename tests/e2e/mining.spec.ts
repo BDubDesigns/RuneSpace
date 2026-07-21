@@ -254,7 +254,7 @@ test("owned character can start, observe, stop, and restore Crash Site Mining", 
   await expect(latestResult.getByText("XP", { exact: true })).toBeVisible();
   await expect(latestResult.getByText("Mining", { exact: true })).toBeVisible();
   await expect(latestResult.getByText("+15", { exact: true })).toBeVisible();
-  await expect(latestResult).toHaveCSS("animation-duration", "0.01ms");
+  await expect(latestResult).toHaveCSS("animation-duration", "1e-05s");
   await page.screenshot({ path: "test-results/mining-desktop-success.png" });
   await page.setViewportSize({ width: 390, height: 844 });
   await page.screenshot({ path: "test-results/mining-mobile-success.png" });
