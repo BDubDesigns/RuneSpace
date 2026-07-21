@@ -4,6 +4,9 @@ RuneSpace can be developed with any capable coding harness. These rules keep the
 codebase safe to modify and consistent with the architecture. **Read the relevant
 `docs/` before editing, and re-read them when the change crosses a boundary.**
 
+This is the repository's sole normative authority for agent behavior. See
+`docs/development-workflow.md` for supporting procedure.
+
 ## Before you plan
 - Read the docs that govern the area you are touching: `docs/architecture.md`,
   `docs/game-rules.md`, `docs/component-boundaries.md`, `docs/testing-strategy.md`,
@@ -16,6 +19,8 @@ codebase safe to modify and consistent with the architecture. **Read the relevan
 - **Never invent** game mechanics, balance values, content, lore, NPCs, quests,
   resources, or architecture without explicit approval. If the issue does not
   specify it, do not add it.
+- Request product-owner approval before choosing unresolved gameplay values or
+  visual direction.
 - Implement only the acceptance criteria of the issue. Do not perform unrelated
   cleanup or scope expansion.
 
@@ -54,18 +59,6 @@ codebase safe to modify and consistent with the architecture. **Read the relevan
   stack (Next.js, React, Tailwind, Drizzle, pg, Zod, Vitest, Playwright, pnpm).
   If you must add one, note the justification in the PR and docs.
 
-## Before completion
-1. Run the required checks: `pnpm typecheck`, `pnpm lint`, `pnpm format:check`,
-   `pnpm test`, `pnpm build` (and `pnpm test:e2e` locally where possible).
-2. Self-review the final diff for: duplication, missed component/module
-   extraction, premature abstraction, game logic in UI, unjustified
-   dependencies, and scope creep.
-3. Open or update a **draft** pull request and **stop for human review**.
-   - Include commands run, results, screenshots (mobile + desktop), key
-     architectural decisions, and any unresolved questions.
-   - Confirm no gameplay was implemented.
-4. **Never merge your own work.**
-
 ## Issue execution workflow
 
 When asked to work on one approved GitHub issue, the active model implements that
@@ -74,27 +67,37 @@ subagents or automation that may be unavailable.
 
 1. **One issue only.** Work the single approved issue you were given. Do not begin
    another issue, and do not self-select issues. Stop after this issue is done.
-2. **Read and inspect first.** Read the issue, this `AGENTS.md`, the relevant
-   `docs/`, and the existing code and tests before planning. Do not invent
-   mechanics, content, or architecture.
-3. **Plan against evidence.** Keep a checklist of the issue acceptance criteria and
+2. **Start from current remote state.** Fetch the remote, then create one fresh
+   branch from the latest `origin/main`, not an assumed local branch.
+3. **Read and inspect first.** Read the issue, this `AGENTS.md`, the relevant
+   `docs/`, code, tests, package scripts, and CI workflow before planning. Do
+   not invent mechanics, content, lore, balance, architecture, or visual direction.
+4. **Plan against evidence.** Keep a checklist of the issue acceptance criteria and
    their status using the harness's available task-tracking mechanism, if any.
-4. **Seek a separate model pass when available.** For boundary or SSOT ambiguity,
+5. **Seek a separate model pass when available.** For boundary or SSOT ambiguity,
    contracts, concurrency, security, test/documentation conflicts, two failed
    attempts, or substantial scope growth, ask a separate model to review the
    problem. Before a draft PR, request a separate-model final review when the
    harness supports it. Automated delegation being unavailable must not block
    ordinary work; perform and document a careful self-review instead. OpenCode
    users may switch models manually for either pass.
-5. **Clean CI-parity.** Run `pnpm install --frozen-lockfile`, `pnpm typecheck`,
+6. **Clean CI-parity.** Run `pnpm install --frozen-lockfile`, `pnpm typecheck`,
    `pnpm lint`, `pnpm format:check`, `pnpm test`, and `pnpm build`, mirroring
    `.github/workflows/ci.yml` environment requirements. Resolve failures or
    document genuine external blockers.
-6. **One draft PR.** Create or update exactly one draft pull request for the issue.
-   Include validation commands and results, key architectural decisions, review
-   approach, and unresolved questions. Do **not** merge it.
-7. **Stop for human review.** After the draft PR is ready, inspect remote CI when
-   available and stop. Never merge your own work or start the next issue.
+7. **One draft PR.** Create or update exactly one draft pull request for the issue.
+   Keep it draft until human review and never merge without explicit product-owner
+   approval. Include the exact branch, commit, PR, local validation results,
+   canonical CI result, required artifact evidence, architectural decisions,
+   review approach, limitations, and unresolved questions. State exactly whether
+   gameplay, balance, persistence, or player-facing behavior changed and which
+   approved decisions governed those changes.
+8. **Follow canonical CI through completion.** Remain active after pushing until
+   canonical CI completes. For a failed run, inspect the actual failed job and
+   step logs, repair relevant failures on the same branch, push, and wait for the
+   replacement run. Stop only when CI is green or a genuine external blocker is
+   precisely documented. Treat optional improvements separately from blockers.
+   Never begin another issue early.
 
 ## Tooling reference
 - pnpm is the package manager; the lockfile is committed and installs are frozen.

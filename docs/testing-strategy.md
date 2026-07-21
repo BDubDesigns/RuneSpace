@@ -31,6 +31,16 @@ small number of critical mobile player journeys.
 - That journey may use `RUNESPACE_E2E_MINING=true` only in CI to select a
   server-internal deterministic Mining random source. Browser clients cannot
   send, select, or observe that switch; PostgreSQL fixtures remain test code.
+- Prefer accessible roles, labels, visible outcomes, stable test hooks, and
+  tolerant geometry checks. Avoid brittle selectors, exact browser-serialized
+  CSS strings, and internal DOM structure unless that representation is an
+  acceptance criterion.
+- Do not add screenshot machinery solely to capture transient animation unless
+  explicitly required. Test transient feedback through semantic state, duration,
+  stable end state, and reduced-motion behavior where appropriate.
+- Uploading an artifact is not proof that promised evidence exists. Verify each
+  expected evidence file before upload, and inspect artifact contents whenever
+  evidence is part of the definition of done.
 
 ## What to test when systems arrive
 For progression-sensitive systems, prioritize:

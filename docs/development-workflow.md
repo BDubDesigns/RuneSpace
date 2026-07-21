@@ -1,24 +1,16 @@
 # Development Workflow
 
+Follow `AGENTS.md` for the normative architecture, scope, and agent-behavior
+contract. This document provides the supporting procedure.
+
 ## One issue, one branch, one draft PR
-- Each issue is worked on a **dedicated branch** created from `main`.
+- Fetch `origin`, then create each dedicated branch from the latest `origin/main`.
 - Produce **one draft pull request** per issue. Do not open multiple PRs for the
   same issue.
 - **Never merge your own work.** Stop at the draft PR for human review.
 
-## Inspect before implementation
-- Read `AGENTS.md` and the relevant `docs/` for the area you will touch.
-- Inspect existing code. Search for an existing component, domain rule, schema,
-  or helper before adding a new one.
-- Plan from the **actual repository state**, not assumptions.
-
-## Implement only acceptance criteria
-- Implement only what the issue's acceptance criteria require.
-- Do not invent gameplay, lore, balance values, content, or architecture.
-- Do not perform unrelated cleanup or scope expansion.
-
-## Run checks before completion
-Required local checks:
+## Validate locally
+Baseline local checks mirror the fast CI job:
 ```bash
 pnpm install --frozen-lockfile
 pnpm typecheck
@@ -29,31 +21,40 @@ DATABASE_URL=postgres://runespace:runespace@localhost:5432/runespace \
   NODE_ENV=production \
   BETTER_AUTH_SECRET=insecure-ci-build-only-secret-do-not-use-in-prod-0000000000 \
   BETTER_AUTH_URL=http://localhost:3000 \
+  RUNESPACE_RELEASE_ID=local \
   pnpm build
-# optional, local only:
-pnpm test:e2e
 ```
 
+Run affected focused checks when their required environment is available. For
+example, integration tests require PostgreSQL and browser tests require the
+Playwright browser dependencies and their database setup.
+
+Canonical CI also runs PostgreSQL integration tests and the focused Mining
+Playwright journey. A local skip or unavailable environment is not a pass: report
+it as unexecuted and wait for the corresponding canonical CI result.
+
 ## Self-review the diff
-Before opening/updating the draft PR, inspect the final diff and explicitly
-report:
-1. any unnecessarily duplicated rule, identifier, config value, or doc statement
-2. any component or module that should have been extracted
-3. any abstraction introduced without a second real use case
-4. any game logic that accidentally entered UI code
-5. any dependency without a concrete justification
-6. whether the implementation exceeded the issue's scope
-7. whether all checks pass
+Before opening or updating the draft PR, inspect the final diff for scope,
+duplication, premature abstraction, unjustified dependencies, accidental game
+logic in UI, broken documentation links, and unsupported claims about repository
+behavior.
 
 ## Draft PR content
 The PR must include:
 - a clear summary of what changed
-- exact commands run and their results
-- screenshots at narrow mobile and desktop widths (for UI issues)
-- key architectural decisions
-- unresolved questions, limitations, or version mismatches
-- confirmation of the issue's gameplay scope and any intentionally omitted
-  player-facing gameplay
+- the exact branch, commit, PR, local validation results, canonical CI status,
+  and required artifact evidence
+- screenshots at narrow mobile and desktop widths for UI issues
+- key architectural decisions, review approach, and unresolved questions or
+  limitations
+- whether gameplay, balance, persistence, or player-facing behavior changed and
+  the approved decisions governing any such change
+
+## Follow canonical CI
+Keep the PR draft while canonical CI completes. If a job fails, inspect the
+failed job and step logs, fix relevant failures on the same branch, push the fix,
+and wait for the replacement run. Report genuine external blockers precisely;
+record optional improvements separately.
 
 ## Model-assisted review
 For difficult reasoning or final review, use a separate model pass when the

@@ -1,10 +1,9 @@
 # Game Rules (current design direction)
 
-> **This document records stable current design direction only. It does NOT
-> define the full game and establishes NO balance values, lore, NPCs, quests,
-> resources, or mechanics.** Those are future issues. Nothing here is
-> implemented outside the server-authoritative foundations documented in
-> `docs/gameplay-foundations.md`.
+> **This document records stable current design direction only. It does not
+> define the full game.** Except for approved server-authoritative foundations
+> and the current Mining slice in `docs/gameplay-foundations.md`, balance values,
+> lore, NPCs, quests, resources, and mechanics require future approval.
 
 ## Platform
 - RuneSpace is **browser-first** and **mobile-friendly**.
@@ -36,7 +35,7 @@
   inline literals in UI code.
 
 ## Non-goals (currently)
-Tutorial gameplay, hex exploration, fuel consumption, playable Mining/Welding,
+Tutorial gameplay, hex exploration, fuel consumption, playable Welding,
 quests, ships/speeders, combat, Phaser minigames, chat/clans/multiplayer/economy/
 trading, a CMS, background workers, and autonomous issue selection remain out of
 scope until later issues.

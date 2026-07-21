@@ -1,8 +1,8 @@
 # Gameplay Foundations
 
 This is the authoritative design record for the server-authoritative foundations
-introduced in issue #16. It defines contracts, not unfinished balance values or
-playable activities.
+introduced in issue #16 and the approved Crash Site Mining slice. It defines
+contracts and approved values, not unfinished balance values or future activities.
 
 ## Time and actions
 
