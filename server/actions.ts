@@ -10,6 +10,12 @@ import {
   stopMining,
   type MiningGameplayState,
 } from "@/server/mining";
+import { changeEquipment } from "@/server/equipment";
+import { EquipmentRuleError } from "@/game/domain/equipment";
+import {
+  EquipEquipmentRequestSchema,
+  UnequipEquipmentRequestSchema,
+} from "@/game/schemas/gameplay";
 
 /**
  * Player-facing server action for character creation (thin composition over
@@ -66,4 +72,45 @@ export async function startMiningAction(characterId: string): Promise<MiningActi
 
 export async function stopMiningAction(characterId: string): Promise<MiningActionResult> {
   return runMiningAction(characterId, stopMining);
+}
+
+type EquipmentActionRequest = {
+  characterId: string;
+  target: { assignmentKind: "gear" | "container"; suitSlotId: string };
+  itemInstanceId?: string;
+};
+
+async function runEquipmentAction(
+  request: EquipmentActionRequest,
+  change: (request: EquipmentActionRequest) => Parameters<typeof changeEquipment>[2],
+): Promise<MiningActionResult> {
+  try {
+    const user = await requireCurrentUser(await headers());
+    return {
+      state: await changeEquipment(user.id, request.characterId, change(request)),
+    };
+  } catch (error) {
+    if (error instanceof OwnershipError || error instanceof EquipmentRuleError)
+      return { error: error.message };
+    throw error;
+  }
+}
+
+export async function equipEquipmentAction(input: unknown): Promise<MiningActionResult> {
+  const request = EquipEquipmentRequestSchema.safeParse(input);
+  if (!request.success) return { error: "Invalid equipment command." };
+  return runEquipmentAction(request.data, (request) => ({
+    kind: "equip",
+    itemInstanceId: request.itemInstanceId!,
+    target: request.target,
+  }));
+}
+
+export async function unequipEquipmentAction(input: unknown): Promise<MiningActionResult> {
+  const request = UnequipEquipmentRequestSchema.safeParse(input);
+  if (!request.success) return { error: "Invalid equipment command." };
+  return runEquipmentAction(request.data, (request) => ({
+    kind: "unequip",
+    target: request.target,
+  }));
 }

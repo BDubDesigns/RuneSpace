@@ -15,7 +15,11 @@ import type { MiningGameplayState } from "@/server/mining";
 type MiningPlayContextValue = {
   inventoryOpen: boolean;
   inventoryTrigger: RefObject<HTMLButtonElement | null>;
+  equipmentOpen: boolean;
+  equipmentTrigger: RefObject<HTMLButtonElement | null>;
+  commandInFlight: RefObject<boolean>;
   setInventoryOpen: Dispatch<SetStateAction<boolean>>;
+  setEquipmentOpen: Dispatch<SetStateAction<boolean>>;
   setState: Dispatch<SetStateAction<MiningGameplayState>>;
   state: MiningGameplayState;
 };
@@ -31,10 +35,23 @@ export function MiningPlayProvider({
 }) {
   const [state, setState] = useState(initialState);
   const [inventoryOpen, setInventoryOpen] = useState(false);
+  const [equipmentOpen, setEquipmentOpen] = useState(false);
   const inventoryTrigger = useRef<HTMLButtonElement>(null);
+  const equipmentTrigger = useRef<HTMLButtonElement>(null);
+  const commandInFlight = useRef(false);
   return (
     <MiningPlayContext.Provider
-      value={{ inventoryOpen, inventoryTrigger, setInventoryOpen, setState, state }}
+      value={{
+        inventoryOpen,
+        inventoryTrigger,
+        equipmentOpen,
+        equipmentTrigger,
+        commandInFlight,
+        setInventoryOpen,
+        setEquipmentOpen,
+        setState,
+        state,
+      }}
     >
       {children}
     </MiningPlayContext.Provider>

@@ -138,6 +138,8 @@ jobs:
           test -s test-results/mining-desktop-no-yield.png
           test -s test-results/mining-mobile-success.png
           test -s test-results/mining-desktop-success.png
+          test -s test-results/mining-mobile-equipment.png
+          test -s test-results/mining-desktop-equipment.png
       - uses: actions/upload-artifact@v4
         if: always()
         with:

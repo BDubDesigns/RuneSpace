@@ -20,4 +20,15 @@ describe("item presentation content", () => {
       textFallback: "Refined Ferrite",
     });
   });
+
+  it("centralizes deliberate fallback presentation for current equipment without artwork", () => {
+    expect(getItemPresentation(ITEM_IDS.salvageCutter)).toMatchObject({
+      displayName: "Salvage Cutter",
+      textFallback: "SC",
+    });
+    expect(getItemPresentation(ITEM_IDS.mykeaSchleppraum8)).toMatchObject({
+      displayName: "MYKEA SCHLEPPRAUM-8",
+      textFallback: "MY-8",
+    });
+  });
 });

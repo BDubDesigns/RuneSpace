@@ -1,7 +1,14 @@
 import { expect, test } from "@playwright/test";
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
-import { activeActions, characterMiningState, inventoryStacks } from "@/db/rune-space";
+import {
+  activeActions,
+  characterMiningState,
+  characterStarterProvisioning,
+  equippedItems,
+  inventoryStacks,
+  itemInstances,
+} from "@/db/rune-space";
 import { ITEM_IDS } from "@/game/config/foundations";
 import { miningStorageStatePath } from "./mining.setup";
 
@@ -35,7 +42,12 @@ test.beforeEach(async ({ page }) => {
     db.delete(activeActions).where(eq(activeActions.characterId, characterId)),
     db.delete(characterMiningState).where(eq(characterMiningState.characterId, characterId)),
     db.delete(inventoryStacks).where(eq(inventoryStacks.characterId, characterId)),
+    db
+      .delete(characterStarterProvisioning)
+      .where(eq(characterStarterProvisioning.characterId, characterId)),
   ]);
+  await db.delete(equippedItems).where(eq(equippedItems.characterId, characterId));
+  await db.delete(itemInstances).where(eq(itemInstances.characterId, characterId));
   await page.reload();
 });
 
@@ -45,7 +57,6 @@ test("owned character can start, observe, stop, and restore Crash Site Mining", 
   await page.setViewportSize({ width: 390, height: 844 });
   await expect(page.getByText("Ferrite Shale", { exact: true }).first()).toBeVisible();
   await expect(page.getByText(/Success chance: 35.00%/)).toBeVisible();
-  await expect(page.getByText(/Salvage Cutter and MYKEA SCHLEPPRAUM-8 equipped/)).toBeVisible();
   await page.getByRole("button", { name: "Start Mining" }).click();
   await expect(page.getByRole("button", { name: "Stop Mining" })).toBeVisible();
   const characterId = page.url().split("/").at(-1)!;
@@ -283,6 +294,65 @@ test("footer Characters navigation uses a compact visible label", async ({ page 
   await expect(characters).toHaveText("Chars");
   await characters.click();
   await expect(page).toHaveURL(/\/characters$/);
+});
+
+test("equipment drawer shows and updates the approved Mining loadout", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  const footer = page.getByRole("navigation", { name: "Primary" });
+  const equipmentTrigger = footer.getByRole("button", { name: "Equipment" });
+  await equipmentTrigger.click();
+  const equipment = page.getByRole("dialog", { name: "Equipment" });
+  const miningTool = equipment.getByLabel("Mining tool");
+  const firstContainer = equipment.getByLabel("Container attachment 1");
+  const secondContainer = equipment.getByLabel("Container attachment 2");
+  await expect(equipment).toBeVisible();
+  await expect(miningTool.getByText("Salvage Cutter", { exact: true }).first()).toBeVisible();
+  await expect(miningTool.getByText("5 kg", { exact: true })).toBeVisible();
+  await expect(
+    firstContainer.getByText("MYKEA SCHLEPPRAUM-8", { exact: true }).first(),
+  ).toBeVisible();
+  await expect(firstContainer.getByText("10 kg", { exact: true })).toBeVisible();
+  await expect(secondContainer.getByText("Empty", { exact: true })).toBeVisible();
+  await expect(equipment.getByText("8 slots", { exact: true })).toBeVisible();
+  await expect(equipment.getByText("15 kg / 50 kg", { exact: true })).toBeVisible();
+  await firstContainer.getByRole("button", { name: "Unequip" }).click();
+  await expect(equipment.getByRole("alert")).toContainText(
+    "At least one compatible container must remain equipped.",
+  );
+  await page.keyboard.press("Escape");
+  await expect(equipmentTrigger).toBeFocused();
+
+  const characterId = page.url().split("/").at(-1)!;
+  await db.insert(itemInstances).values({
+    characterId,
+    itemId: ITEM_IDS.mykeaSchleppraum8,
+  });
+  await page.getByRole("button", { name: "Refresh status" }).click();
+  await equipmentTrigger.click();
+  await expect(secondContainer.getByText("MYKEA SCHLEPPRAUM-8", { exact: true })).toHaveCount(0);
+  const equipSecondContainer = secondContainer.getByRole("button", {
+    name: "Equip in Container attachment 2",
+  });
+  const mobileControlBox = await equipSecondContainer.boundingBox();
+  expect(mobileControlBox).not.toBeNull();
+  expect(mobileControlBox!.height).toBeGreaterThanOrEqual(44);
+  await equipSecondContainer.click();
+  await expect(
+    secondContainer.getByText("MYKEA SCHLEPPRAUM-8", { exact: true }).first(),
+  ).toBeVisible();
+  await expect(equipment.getByText("16 slots", { exact: true })).toBeVisible();
+  await equipment.getByRole("button", { name: "Close equipment" }).click();
+  const inventoryTrigger = footer.getByRole("button", { name: "Inventory 0/16" });
+  await expect(inventoryTrigger).toBeVisible();
+  await inventoryTrigger.click();
+  const inventory = page.getByRole("dialog", { name: "Inventory" });
+  await expect(inventory.getByLabel("16 inventory slots")).toBeVisible();
+  await inventory.getByRole("button", { name: "Close inventory" }).click();
+  await equipmentTrigger.click();
+  await page.screenshot({ path: "test-results/mining-mobile-equipment.png" });
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await expect(equipment).toBeVisible();
+  await page.screenshot({ path: "test-results/mining-desktop-equipment.png" });
 });
 
 test("an interrupted Mining action preserves confirmed state and retries only status refresh", async ({

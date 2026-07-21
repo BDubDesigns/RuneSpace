@@ -32,7 +32,6 @@ const balanceSchema = z.object({
     }),
     starterContainer: z.object({
       itemId: z.literal(ITEM_IDS.mykeaSchleppraum8),
-      name: z.literal("MYKEA SCHLEPPRAUM-8"),
       massGrams: z.literal(10_000),
       slotCapacity: z.literal(8),
     }),
@@ -66,7 +65,6 @@ const defaults = balanceSchema.parse({
     salvageCutter: { itemId: ITEM_IDS.salvageCutter, massGrams: 5_000, suitSlotId: "mining_tool" },
     starterContainer: {
       itemId: ITEM_IDS.mykeaSchleppraum8,
-      name: "MYKEA SCHLEPPRAUM-8",
       massGrams: 10_000,
       slotCapacity: 8,
     },

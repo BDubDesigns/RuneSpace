@@ -11,13 +11,16 @@ import {
   itemInstances,
 } from "@/db/rune-space";
 import { getEffectiveGameBalance, miningLevelThresholds } from "@/game/config/balance";
-import { getItemPresentation } from "@/game/content/item-presentation";
+import { resolveItemPresentation } from "@/game/content/item-presentation";
 import { ACTION_IDS, ITEM_IDS, SKILL_IDS } from "@/game/config/foundations";
 import {
-  inventorySlotCapacityFromContainers,
-  inventorySlotsUsed,
-  type StackState,
-} from "@/game/domain/inventory";
+  carriedItemMassGrams,
+  deriveEquipmentLoadout,
+  isCompatibleEquipmentAssignment,
+  type EquipmentLoadout,
+  type EquipmentTarget,
+} from "@/game/domain/equipment";
+import { type StackState } from "@/game/domain/inventory";
 import {
   miningSuccessChanceBps,
   miningPreflightStopReason,
@@ -52,7 +55,7 @@ function e2eMiningRandom(): MiningRandom {
   };
 }
 
-function defaultMiningRandom(): MiningRandom {
+export function defaultMiningRandom(): MiningRandom {
   const databaseHost = process.env.DATABASE_URL ? new URL(process.env.DATABASE_URL).hostname : "";
   return process.env.CI === "true" &&
     process.env.RUNESPACE_E2E_MINING === "true" &&
@@ -69,6 +72,8 @@ type MiningSnapshot = {
   massAvailableGrams: number;
   slotsUsed: number;
   slotCapacity: number;
+  equipmentLoadout: EquipmentLoadout;
+  itemInstances: readonly { id: string; itemId: string }[];
 };
 
 type PersistedMiningOutcome = MiningResolution<string> & {
@@ -119,13 +124,27 @@ export type MiningGameplayState = {
       stackLimit: number;
     }[];
   };
+  equipment: {
+    aggregateContainerSlots: number;
+    slots: readonly {
+      target: EquipmentTarget;
+      label: string;
+      item?: { itemInstanceId: string; itemId: string; name: string; massGrams: number };
+      eligibleItems: readonly {
+        itemInstanceId: string;
+        itemId: string;
+        name: string;
+        massGrams: number;
+      }[];
+    }[];
+  };
   run: MiningRunState;
   recentResult: { successes: number; failures: number; awardedXp: number };
   stoppingReason?: MiningStopReason;
   commandError?: "another_action_active";
 };
 
-async function ensureStarterMiningState(
+export async function ensureStarterMiningState(
   transaction: DatabaseTransaction,
   characterId: string,
 ): Promise<void> {
@@ -162,11 +181,10 @@ async function ensureStarterMiningState(
   const hasCutter = assignments.some(
     (assignment) =>
       assignment.assignmentKind === "gear" &&
-      assignment.suitSlotId === balance.items.salvageCutter.suitSlotId &&
       instances.some(
         (instance) =>
           instance.id === assignment.itemInstanceId &&
-          instance.itemId === balance.items.salvageCutter.itemId,
+          isCompatibleEquipmentAssignment(instance.itemId, assignment, balance),
       ),
   );
   if (
@@ -196,14 +214,13 @@ async function ensureStarterMiningState(
       itemInstanceId: cutter.id,
     });
   }
-  const hasContainer = assignments.some(
-    (assignment) =>
-      assignment.assignmentKind === "container" &&
-      instances.some(
-        (instance) =>
-          instance.id === assignment.itemInstanceId &&
-          instance.itemId === balance.items.starterContainer.itemId,
-      ),
+  const hasContainer = assignments.some((assignment) =>
+    instances.some(
+      (instance) =>
+        instance.id === assignment.itemInstanceId &&
+        isCompatibleEquipmentAssignment(instance.itemId, assignment, balance) &&
+        assignment.assignmentKind === "container",
+    ),
   );
   if (!hasContainer) {
     const availableSlot = balance.carrying.containerSuitSlotIds.find(
@@ -265,63 +282,32 @@ async function loadMiningSnapshot(
       .for("update"),
   ]);
   const miningXp = xpRows.find((row) => row.skillId === SKILL_IDS.mining)?.totalXp ?? 0;
-  const equippedIds = new Set(assignments.map((assignment) => assignment.itemInstanceId));
-  const equipped = assignments.flatMap((assignment) => {
-    const instance = instances.find((item) => item.id === assignment.itemInstanceId);
-    return instance ? [{ assignment, instance }] : [];
+  const equipmentLoadout = deriveEquipmentLoadout({
+    assignments,
+    instances,
+    stacks,
+    balance,
   });
-  const hasCompatibleTool = equipped.some(
-    ({ assignment, instance }) =>
-      assignment.assignmentKind === "gear" &&
-      assignment.suitSlotId === balance.items.salvageCutter.suitSlotId &&
-      instance.itemId === balance.items.salvageCutter.itemId,
-  );
-  const containerCapacity = inventorySlotCapacityFromContainers(
-    equipped
-      .filter(
-        ({ assignment, instance }) =>
-          assignment.assignmentKind === "container" &&
-          instance.itemId === balance.items.starterContainer.itemId,
-      )
-      .map(() => balance.items.starterContainer.slotCapacity),
-  );
-  const stackMass = stacks.reduce(
-    (total, stack) =>
-      total +
-      (stack.itemId === balance.items.ferriteShale.itemId
-        ? stack.quantity * balance.items.ferriteShale.massGrams
-        : 0),
-    0,
-  );
-  const instanceMass = instances.reduce(
-    (total, instance) =>
-      total +
-      (instance.itemId === balance.items.salvageCutter.itemId
-        ? balance.items.salvageCutter.massGrams
-        : instance.itemId === balance.items.starterContainer.itemId
-          ? balance.items.starterContainer.massGrams
-          : 0),
-    0,
-  );
-  const slotsUsed = inventorySlotsUsed(
-    stacks.length,
-    instances.filter((item) => !equippedIds.has(item.id)).length,
-  );
   return {
     miningLevel: levelFromXp(miningXp, miningLevelThresholds(balance)),
-    hasCompatibleTool,
+    hasCompatibleTool: equipmentLoadout.hasCompatibleMiningTool,
     existingStacks: stacks,
-    slotsAvailable: Math.max(0, containerCapacity - slotsUsed),
+    slotsAvailable: Math.max(
+      0,
+      equipmentLoadout.containerSlotCapacity - equipmentLoadout.inventorySlotsUsed,
+    ),
     massAvailableGrams: Math.max(
       0,
-      balance.carrying.startingCapacityGrams - stackMass - instanceMass,
+      equipmentLoadout.maximumCarryCapacityGrams - equipmentLoadout.carriedMassGrams,
     ),
-    slotsUsed,
-    slotCapacity: containerCapacity,
+    slotsUsed: equipmentLoadout.inventorySlotsUsed,
+    slotCapacity: equipmentLoadout.containerSlotCapacity,
+    equipmentLoadout,
+    itemInstances: instances,
   };
 }
 
-function createMiningResolver(
+export function createMiningResolver(
   random: MiningRandom,
   onOutcome?: (outcome: PersistedMiningOutcome) => void,
 ): ActionResolver<MiningSnapshot, PersistedMiningOutcome> {
@@ -417,7 +403,7 @@ function createMiningResolver(
   };
 }
 
-async function stateFromTransaction(
+export async function stateFromTransaction(
   transaction: DatabaseTransaction,
   characterId: string,
   recentResult: MiningGameplayState["recentResult"],
@@ -489,13 +475,62 @@ async function stateFromTransaction(
       stacks: stacks.map((stack) => ({
         id: stack.id,
         itemId: stack.itemId,
-        name: getItemPresentation(stack.itemId)?.displayName ?? stack.itemId,
+        name: resolveItemPresentation(stack.itemId, stack.itemId).displayName,
         quantity: stack.quantity,
         stackLimit:
           stack.itemId === balance.items.ferriteShale.itemId
             ? balance.items.ferriteShale.stackLimit
             : 1,
       })),
+    },
+    equipment: {
+      aggregateContainerSlots: snapshot.equipmentLoadout.containerSlotCapacity,
+      slots: [
+        {
+          target: {
+            assignmentKind: "gear" as const,
+            suitSlotId: balance.items.salvageCutter.suitSlotId,
+          },
+          label: "Mining tool",
+        },
+        ...balance.carrying.containerSuitSlotIds.map((suitSlotId, index) => ({
+          target: { assignmentKind: "container" as const, suitSlotId },
+          label: `Container attachment ${index + 1}`,
+        })),
+      ].map((slot) => {
+        const assignment = snapshot.equipmentLoadout.assignments.find(
+          (candidate) =>
+            candidate.assignmentKind === slot.target.assignmentKind &&
+            candidate.suitSlotId === slot.target.suitSlotId,
+        );
+        const item = assignment
+          ? snapshot.itemInstances.find((instance) => instance.id === assignment.itemInstanceId)
+          : undefined;
+        const eligibleItems = snapshot.itemInstances
+          .filter(
+            (instance) =>
+              !snapshot.equipmentLoadout.equippedItemInstanceIds.has(instance.id) &&
+              isCompatibleEquipmentAssignment(instance.itemId, slot.target, balance),
+          )
+          .map((instance) => ({
+            itemInstanceId: instance.id,
+            itemId: instance.itemId,
+            name: resolveItemPresentation(instance.itemId, instance.itemId).displayName,
+            massGrams: carriedItemMassGrams(instance.itemId, balance),
+          }));
+        return {
+          ...slot,
+          item: item
+            ? {
+                itemInstanceId: item.id,
+                itemId: item.itemId,
+                name: resolveItemPresentation(item.itemId, item.itemId).displayName,
+                massGrams: carriedItemMassGrams(item.itemId, balance),
+              }
+            : undefined,
+          eligibleItems,
+        };
+      }),
     },
     run,
     recentResult,

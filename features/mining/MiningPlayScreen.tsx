@@ -10,7 +10,8 @@ import { MiningConsole } from "./MiningConsole";
 import { MiningPlayProvider, useMiningPlay } from "./MiningPlayContext";
 
 function MiningFooter() {
-  const { inventoryTrigger, setInventoryOpen, state } = useMiningPlay();
+  const { equipmentTrigger, inventoryTrigger, setEquipmentOpen, setInventoryOpen, state } =
+    useMiningPlay();
   const totalSlots = state.inventory.slotsUsed + state.inventory.slotsAvailable;
   return (
     <div className="mx-auto flex w-full max-w-xl gap-2 sm:max-w-7xl sm:justify-end">
@@ -29,6 +30,14 @@ function MiningFooter() {
         onClick={() => setInventoryOpen(true)}
       >
         Inventory {state.inventory.slotsUsed}/{totalSlots}
+      </ActionButton>
+      <ActionButton
+        ref={equipmentTrigger}
+        className="flex-1 sm:flex-none"
+        intent="secondary"
+        onClick={() => setEquipmentOpen(true)}
+      >
+        Equipment
       </ActionButton>
     </div>
   );

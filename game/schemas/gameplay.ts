@@ -20,6 +20,19 @@ export const ItemIdSchema = z.enum(itemIdValues);
  */
 export const SuitSlotIdSchema = ContentId;
 export const EquipmentAssignmentKindSchema = z.enum(EQUIPMENT_ASSIGNMENT_KINDS);
+export const EquipmentTargetSchema = z.object({
+  assignmentKind: EquipmentAssignmentKindSchema,
+  suitSlotId: SuitSlotIdSchema,
+});
+export const EquipEquipmentRequestSchema = z.object({
+  characterId: z.string().uuid(),
+  itemInstanceId: z.string().uuid(),
+  target: EquipmentTargetSchema,
+});
+export const UnequipEquipmentRequestSchema = z.object({
+  characterId: z.string().uuid(),
+  target: EquipmentTargetSchema,
+});
 
 /** Containers can only hold non-container item definitions. */
 export const ContainerContentItemSchema = z.object({

@@ -6,6 +6,7 @@ import { ItemVisual } from "@/components/items/ItemVisual";
 import { VisualTile } from "@/components/items/VisualTile";
 import { Feedback } from "@/components/ui/Feedback";
 import { Panel } from "@/components/ui/Panel";
+import { Drawer } from "@/components/ui/Drawer";
 import { SectionHeader } from "@/components/ui/SectionHeader";
 import { StatusMeter } from "@/components/ui/StatusMeter";
 import { getEffectiveGameBalance } from "@/game/config/balance";
@@ -17,6 +18,7 @@ import { refreshMiningAction, startMiningAction, stopMiningAction } from "@/serv
 import { reportClientDiagnostic } from "@/features/diagnostics/client";
 import { latestMiningAttempt, resolvedAttemptCount } from "./latest-result";
 import { useMiningPlay } from "./MiningPlayContext";
+import { EquipmentPanel } from "./EquipmentPanel";
 
 const RESULT_FEEDBACK_DURATION_MS = 3_600;
 
@@ -126,123 +128,81 @@ function InventoryPanel({
   onClose: () => void;
   triggerRef: RefObject<HTMLButtonElement | null>;
 }) {
-  const closeButton = useRef<HTMLButtonElement>(null);
-  const panel = useRef<HTMLElement>(null);
-  function close() {
-    onClose();
-    triggerRef.current?.focus();
-  }
-  useEffect(() => {
-    closeButton.current?.focus();
-  }, []);
-  useEffect(() => {
-    function onKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape") {
-        onClose();
-        triggerRef.current?.focus();
-        return;
-      }
-      if (event.key !== "Tab" || !panel.current) return;
-      const focusable = panel.current.querySelectorAll<HTMLElement>(
-        'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
-      );
-      const first = focusable[0];
-      const last = focusable[focusable.length - 1];
-      if (!first || !last) return;
-      if (event.shiftKey && document.activeElement === first) {
-        event.preventDefault();
-        last.focus();
-      } else if (!event.shiftKey && document.activeElement === last) {
-        event.preventDefault();
-        first.focus();
-      }
-    }
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, [onClose, triggerRef]);
   const totalSlots = state.inventory.slotsUsed + state.inventory.slotsAvailable;
   return (
-    <div
-      className="bg-[color:var(--rs-surface-page)]/90 fixed inset-0 z-50 flex items-end p-3 sm:items-center sm:justify-end sm:p-4"
-      role="presentation"
+    <Drawer
+      eyebrow="MYKEA SCHLEPPRAUM-8"
+      label="Inventory"
+      onClose={onClose}
+      title="Inventory"
+      triggerRef={triggerRef}
     >
-      <section
-        aria-label="Inventory"
-        aria-modal="true"
-        className="max-h-[min(78dvh,42rem)] w-full max-w-xl overflow-y-auto border border-[color:var(--rs-border-structural)] bg-[color:var(--rs-surface-raised)] p-4 pb-[max(1rem,env(safe-area-inset-bottom))] [box-shadow:var(--rs-shadow-panel)] sm:max-h-[calc(100dvh-2rem)] sm:w-[min(34rem,calc(100vw-2rem))]"
-        ref={panel}
-        role="dialog"
+      <p className="mt-2 text-sm text-[color:var(--rs-text-secondary)]">
+        {state.inventory.slotsUsed} occupied / {totalSlots} slots
+      </p>
+      <div
+        className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4"
+        aria-label={`${totalSlots} inventory slots`}
       >
-        <div className="flex items-start justify-between gap-3">
-          <SectionHeader eyebrow="MYKEA SCHLEPPRAUM-8">Inventory</SectionHeader>
-          <ActionButton
-            ref={closeButton}
-            aria-label="Close inventory"
-            className="shrink-0 px-3"
-            intent="secondary"
-            onClick={close}
-          >
-            Close
-          </ActionButton>
-        </div>
-        <p className="mt-2 text-sm text-[color:var(--rs-text-secondary)]">
-          {state.inventory.slotsUsed} occupied / {totalSlots} slots
-        </p>
-        <div
-          className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4"
-          aria-label="Eight inventory slots"
-        >
-          {Array.from({ length: totalSlots }, (_, index) => {
-            const stack = state.inventory.stacks[index];
-            return stack ? (
-              <ItemVisual
-                background={
+        {Array.from({ length: totalSlots }, (_, index) => {
+          const stack = state.inventory.stacks[index];
+          return stack ? (
+            <ItemVisual
+              background={
+                <div
+                  aria-hidden="true"
+                  className="absolute inset-y-0 left-0 z-0 w-2 overflow-hidden bg-[color:var(--rs-accent-mining-stack-track)]"
+                  data-stack-track
+                >
                   <div
-                    aria-hidden="true"
-                    className="absolute inset-y-0 left-0 z-0 w-2 overflow-hidden bg-[color:var(--rs-accent-mining-stack-track)]"
-                    data-stack-track
-                  >
-                    <div
-                      className="absolute inset-x-0 bottom-0 bg-[color:var(--rs-accent-mining)] transition-[height] duration-[var(--rs-duration-fast)]"
-                      data-stack-fill={Math.round(
-                        inventoryStackFillFraction(stack.quantity, stack.stackLimit) * 100,
-                      )}
-                      style={{
-                        height: `${inventoryStackFillFraction(stack.quantity, stack.stackLimit) * 100}%`,
-                      }}
-                    />
-                  </div>
-                }
-                itemId={stack.itemId}
-                key={stack.id}
-                name={stack.name}
-                quantity={stack.quantity}
-              />
-            ) : (
-              <div
-                aria-label={`Empty inventory slot ${index + 1}`}
-                className="min-h-28 border border-dashed border-[color:var(--rs-border-subtle)] bg-[color:var(--rs-surface-panel)] p-3 text-xs uppercase tracking-wide text-[color:var(--rs-text-muted)]"
-                key={`empty-${index}`}
-              >
-                Empty slot
-              </div>
-            );
-          })}
-        </div>
-      </section>
-    </div>
+                    className="absolute inset-x-0 bottom-0 bg-[color:var(--rs-accent-mining)] transition-[height] duration-[var(--rs-duration-fast)]"
+                    data-stack-fill={Math.round(
+                      inventoryStackFillFraction(stack.quantity, stack.stackLimit) * 100,
+                    )}
+                    style={{
+                      height: `${inventoryStackFillFraction(stack.quantity, stack.stackLimit) * 100}%`,
+                    }}
+                  />
+                </div>
+              }
+              itemId={stack.itemId}
+              key={stack.id}
+              name={stack.name}
+              quantity={stack.quantity}
+            />
+          ) : (
+            <div
+              aria-label={`Empty inventory slot ${index + 1}`}
+              className="min-h-28 border border-dashed border-[color:var(--rs-border-subtle)] bg-[color:var(--rs-surface-panel)] p-3 text-xs uppercase tracking-wide text-[color:var(--rs-text-muted)]"
+              key={`empty-${index}`}
+            >
+              Empty slot
+            </div>
+          );
+        })}
+      </div>
+    </Drawer>
   );
 }
 
 export function MiningConsole({ characterName }: { characterName: string }) {
-  const { inventoryOpen, inventoryTrigger, setInventoryOpen, setState, state } = useMiningPlay();
+  const {
+    commandInFlight,
+    equipmentOpen,
+    equipmentTrigger,
+    inventoryOpen,
+    inventoryTrigger,
+    setEquipmentOpen,
+    setInventoryOpen,
+    setState,
+    state,
+  } = useMiningPlay();
   const [message, setMessage] = useState<string | undefined>(
     state.stoppingReason ? stopMessage(state.stoppingReason) : undefined,
   );
   const [now, setNow] = useState(Date.now());
   const [pending, startTransition] = useTransition();
   const [recovery, setRecovery] = useState<(() => void) | undefined>();
-  const commandInFlight = useRef(false);
   const observedAttempts = useRef(state.run.attempts);
   const observedSequence = useRef(latestMiningAttempt(state.run.recentAttempts)?.sequence);
   const [feedback, setFeedback] = useState<{ sequence: number; attempts: number }>();
@@ -430,9 +390,6 @@ export function MiningConsole({ characterName }: { characterName: string }) {
           </p>
           <p className="mt-3 font-display text-3xl font-bold">{state.ferriteShaleQuantity}</p>
           <p className="text-sm text-[color:var(--rs-text-secondary)]">Ferrite Shale</p>
-          <p className="mt-3 text-sm text-[color:var(--rs-text-secondary)]">
-            Salvage Cutter and MYKEA SCHLEPPRAUM-8 equipped
-          </p>
           <div className="mt-4 space-y-3">
             <StatusMeter
               label="Inventory slots"
@@ -520,6 +477,13 @@ export function MiningConsole({ characterName }: { characterName: string }) {
           state={state}
           onClose={() => setInventoryOpen(false)}
           triggerRef={inventoryTrigger}
+        />
+      ) : null}
+      {equipmentOpen ? (
+        <EquipmentPanel
+          onClose={() => setEquipmentOpen(false)}
+          state={state}
+          triggerRef={equipmentTrigger}
         />
       ) : null}
     </div>
