@@ -10,6 +10,16 @@ import { getMiningGameplayState } from "@/server/mining";
 
 export const metadata = { title: "Play — RuneSpace" };
 
+function shouldInjectE2ePlayError(requestHeaders: Headers) {
+  const databaseHost = process.env.DATABASE_URL ? new URL(process.env.DATABASE_URL).hostname : "";
+  return (
+    process.env.CI === "true" &&
+    process.env.RUNESPACE_E2E_PLAY_ERROR === "true" &&
+    (databaseHost === "localhost" || databaseHost === "127.0.0.1") &&
+    requestHeaders.get("x-runespace-e2e-play-error") === "1"
+  );
+}
+
 /**
  * Protected placeholder screen for a single owned character.
  *
@@ -22,6 +32,7 @@ export default async function PlayPage({ params }: { params: Promise<{ character
   const { characterId } = await params;
   const session = await auth.api.getSession({ headers: await headers() });
   if (!session?.user) redirect("/sign-in");
+  if (shouldInjectE2ePlayError(await headers())) throw new Error("Play boundary e2e failure");
 
   let displayName = "Character";
   let miningState;

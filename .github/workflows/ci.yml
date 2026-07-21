@@ -118,6 +118,7 @@ jobs:
       RUNESPACE_RELEASE_ID: ${{ github.sha }}
       CI: true
       RUNESPACE_E2E_MINING: true
+      RUNESPACE_E2E_PLAY_ERROR: true
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -130,7 +131,7 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm exec playwright install --with-deps chromium
       - run: pnpm drizzle-kit migrate
-      - run: pnpm test:e2e mining --project=chromium
+      - run: pnpm test:e2e mining --project=chromium --repeat-each=3
       - uses: actions/upload-artifact@v4
         if: always()
         with:

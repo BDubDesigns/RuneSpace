@@ -8,6 +8,19 @@ import { Panel } from "@/components/ui/Panel";
 import { reportClientDiagnostic } from "@/features/diagnostics/client";
 import { sanitizeDiagnosticText } from "@/game/schemas/diagnostics";
 
+export function playBoundaryIncidentId(error: Error & { digest?: string }) {
+  return typeof error.digest === "string" ? sanitizeDiagnosticText(error.digest, 100) : undefined;
+}
+
+export function reportPlayBoundaryDiagnostic(
+  error: Error & { digest?: string },
+  onAccepted: (incidentId: string) => void,
+) {
+  const digest = playBoundaryIncidentId(error);
+  reportClientDiagnostic("play-boundary", error, digest ? {} : { onAccepted });
+  return digest;
+}
+
 export default function PlayError({
   error,
   reset,
@@ -16,10 +29,10 @@ export default function PlayError({
   reset: () => void;
 }) {
   const [incidentId, setIncidentId] = useState<string | undefined>(() =>
-    typeof error.digest === "string" ? sanitizeDiagnosticText(error.digest, 100) : undefined,
+    playBoundaryIncidentId(error),
   );
   useEffect(() => {
-    reportClientDiagnostic("play-boundary", error, { onAccepted: setIncidentId });
+    reportPlayBoundaryDiagnostic(error, setIncidentId);
   }, [error]);
   return (
     <main className="mx-auto flex min-h-screen max-w-xl items-center p-4">
