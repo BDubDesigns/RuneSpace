@@ -19,6 +19,7 @@ test.describe.configure({ mode: "serial" });
 async function openMiningFixture(page: import("@playwright/test").Page) {
   await page.goto("/characters");
   await page.getByRole("link", { name: "Play" }).click();
+  await page.waitForURL(/\/play\/[^/]+$/);
   return page.url().split("/").at(-1)!;
 }
 
