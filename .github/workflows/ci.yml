@@ -52,6 +52,7 @@ jobs:
           # MUST set a strong BETTER_AUTH_SECRET; server/env.ts requires it at runtime.
           BETTER_AUTH_SECRET: "insecure-ci-build-only-secret-do-not-use-in-prod-0000000000"
           BETTER_AUTH_URL: "http://localhost:3000"
+          RUNESPACE_RELEASE_ID: ${{ github.sha }}
         run: pnpm build
 
   integration:
@@ -114,8 +115,10 @@ jobs:
       DATABASE_URL: postgres://runespace:runespace@localhost:5432/runespace
       BETTER_AUTH_SECRET: insecure-ci-browser-only-secret-do-not-use-in-prod-0000000000
       BETTER_AUTH_URL: http://127.0.0.1:3000
+      RUNESPACE_RELEASE_ID: ${{ github.sha }}
       CI: true
       RUNESPACE_E2E_MINING: true
+      RUNESPACE_E2E_PLAY_ERROR: true
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -129,6 +132,7 @@ jobs:
       - run: pnpm exec playwright install --with-deps chromium
       - run: pnpm drizzle-kit migrate
       - run: pnpm test:e2e mining --project=chromium
+      - run: pnpm test:e2e mining --project=chromium --grep "Play boundary" --repeat-each=3 --workers=1
       - uses: actions/upload-artifact@v4
         if: always()
         with:

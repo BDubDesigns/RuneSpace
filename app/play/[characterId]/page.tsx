@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { GameShell, TopBar } from "@/components/ui/GameShell";
 import { TextLink } from "@/components/ui/TextLink";
 import { SignOutButton } from "@/features/auth/SignOutButton";
+import { PlayBoundaryTestTrigger } from "@/features/diagnostics/PlayBoundaryTestTrigger";
 import { MiningConsole } from "@/features/mining/MiningConsole";
 import { auth } from "@/server/auth";
 import { requireCurrentUser, requireOwnedCharacter, OwnershipError } from "@/server/ownership";
@@ -49,6 +50,7 @@ export default async function PlayPage({ params }: { params: Promise<{ character
         </p>
       }
     >
+      <PlayBoundaryTestTrigger />
       <MiningConsole characterName={displayName} initialState={miningState!} />
     </GameShell>
   );

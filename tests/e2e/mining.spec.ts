@@ -1,8 +1,9 @@
 import { expect, test } from "@playwright/test";
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
-import { activeActions, inventoryStacks } from "@/db/rune-space";
+import { activeActions, characterMiningState, inventoryStacks } from "@/db/rune-space";
 import { ITEM_IDS } from "@/game/config/foundations";
+import { miningStorageStatePath } from "./mining.setup";
 
 const e2eDatabaseHost = process.env.DATABASE_URL ? new URL(process.env.DATABASE_URL).hostname : "";
 
@@ -12,25 +13,30 @@ test.beforeAll(() => {
   }
 });
 
-function uniqueEmail() {
-  return `miner-${Date.now()}-${Math.floor(Math.random() * 1e6)}@example.com`;
+test.use({ storageState: miningStorageStatePath });
+test.describe.configure({ mode: "serial" });
+
+async function openMiningFixture(page: import("@playwright/test").Page) {
+  await page.goto("/characters");
+  await page.getByRole("link", { name: "Play" }).click();
+  await page.waitForURL(/\/play\/[^/]+$/);
+  return page.url().split("/").at(-1)!;
 }
+
+test.beforeEach(async ({ page }) => {
+  const characterId = await openMiningFixture(page);
+  await Promise.all([
+    db.delete(activeActions).where(eq(activeActions.characterId, characterId)),
+    db.delete(characterMiningState).where(eq(characterMiningState.characterId, characterId)),
+    db.delete(inventoryStacks).where(eq(inventoryStacks.characterId, characterId)),
+  ]);
+  await page.reload();
+});
 
 test("owned character can start, observe, stop, and restore Crash Site Mining", async ({
   page,
 }) => {
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.goto("/register");
-  await page.getByLabel("Display name").fill("Mining Pilot");
-  await page.getByLabel("Email").fill(uniqueEmail());
-  await page.getByLabel("Password", { exact: true }).fill("sup3r-secret-password");
-  await page.getByRole("button", { name: "Create account" }).click();
-  await page.getByRole("link", { name: "New character" }).click();
-  await page
-    .getByLabel("Character name")
-    .fill(`Ore Runner ${Math.random().toString(36).slice(2, 8)}`);
-  await page.getByRole("button", { name: "Create character" }).click();
-
   await expect(page.getByText("Ferrite Shale", { exact: true }).first()).toBeVisible();
   await expect(page.getByText(/Success chance: 35.00%/)).toBeVisible();
   await expect(page.getByText(/Salvage Cutter and MYKEA SCHLEPPRAUM-8 equipped/)).toBeVisible();
@@ -234,4 +240,140 @@ test("owned character can start, observe, stop, and restore Crash Site Mining", 
   await expect(page.getByText("Mining stopped.")).toBeHidden();
   await expect(page.getByText("0 attempts", { exact: true })).toBeVisible();
   await expect(history).toContainText("No resolved attempts in this run yet.");
+});
+
+test("an interrupted Mining action preserves confirmed state and retries only status refresh", async ({
+  page,
+}) => {
+  const isMiningAction = (request: import("@playwright/test").Request) =>
+    request.method() === "POST" && Boolean(request.headers()["next-action"]);
+  await expect(page.getByText(/Success chance: 35.00%/)).toBeVisible();
+  const baselineRequest = page.waitForRequest(isMiningAction);
+  await page.getByRole("button", { name: "Refresh status" }).click();
+  const refreshActionId = (await baselineRequest).headers()["next-action"];
+  expect(refreshActionId).toBeTruthy();
+
+  let aborted = false;
+  let miningRequests = 0;
+  page.on("request", (request) => {
+    if (isMiningAction(request)) miningRequests += 1;
+  });
+  await page.route("**/*", async (route) => {
+    const request = route.request();
+    if (
+      !aborted &&
+      isMiningAction(request) &&
+      request.headers()["next-action"] === refreshActionId
+    ) {
+      aborted = true;
+      await route.abort("failed");
+      return;
+    }
+    await route.continue();
+  });
+
+  await page.getByRole("button", { name: "Refresh status" }).click();
+  await expect(
+    page.getByText("Comms interruption. Mining status could not be confirmed."),
+  ).toBeVisible();
+  await expect(page.getByText(/Success chance: 35.00%/)).toBeVisible();
+  await expect(page.getByText("Application error")).toHaveCount(0);
+  const retry = page.getByRole("button", { name: "Retry status check" });
+  await expect(retry).toHaveCount(1);
+  await page.waitForTimeout(300);
+  expect(aborted).toBe(true);
+  expect(miningRequests).toBe(1);
+
+  await page.unroute("**/*");
+  const recoveredRequest = page.waitForRequest(
+    (request) => isMiningAction(request) && request.headers()["next-action"] === refreshActionId,
+  );
+  await retry.evaluate((button) => {
+    button.click();
+    button.click();
+  });
+  await recoveredRequest;
+  await expect(
+    page.getByText("Comms interruption. Mining status could not be confirmed."),
+  ).toBeHidden();
+  await expect(retry).toHaveCount(0);
+  expect(miningRequests).toBe(2);
+});
+
+test("an uncertain Start retries status refresh without replaying the mutation", async ({
+  page,
+}) => {
+  const isMiningAction = (request: import("@playwright/test").Request) =>
+    request.method() === "POST" && Boolean(request.headers()["next-action"]);
+  await expect(page.getByRole("button", { name: "Start Mining" })).toBeVisible();
+  const startRequest = page.waitForRequest(isMiningAction);
+  await page.getByRole("button", { name: "Start Mining" }).click();
+  const startActionId = (await startRequest).headers()["next-action"];
+  await expect(page.getByRole("button", { name: "Stop Mining" })).toBeVisible();
+  await page.getByRole("button", { name: "Stop Mining" }).click();
+  await expect(page.getByRole("button", { name: "Start Mining" })).toBeVisible();
+  const refreshRequest = page.waitForRequest(isMiningAction);
+  await page.getByRole("button", { name: "Refresh status" }).click();
+  const refreshActionId = (await refreshRequest).headers()["next-action"];
+  expect(startActionId).toBeTruthy();
+  expect(refreshActionId).toBeTruthy();
+  expect(refreshActionId).not.toBe(startActionId);
+
+  const actionIds: string[] = [];
+  page.on("request", (request) => {
+    if (isMiningAction(request)) actionIds.push(request.headers()["next-action"]!);
+  });
+  let aborted = false;
+  await page.route("**/*", async (route) => {
+    const request = route.request();
+    if (!aborted && isMiningAction(request) && request.headers()["next-action"] === startActionId) {
+      aborted = true;
+      await route.abort("failed");
+      return;
+    }
+    await route.continue();
+  });
+
+  await page.getByRole("button", { name: "Start Mining" }).click();
+  await expect(
+    page.getByText("Comms interruption. Mining status could not be confirmed."),
+  ).toBeVisible();
+  await expect(page.getByRole("button", { name: "Start Mining" })).toBeVisible();
+  await expect(page.getByText("Application error")).toHaveCount(0);
+  const retry = page.getByRole("button", { name: "Retry status check" });
+  await expect(retry).toHaveCount(1);
+  await page.waitForTimeout(300);
+  expect(aborted).toBe(true);
+  expect(actionIds).toEqual([startActionId]);
+
+  await page.unroute("**/*");
+  const recoveredRequest = page.waitForRequest(
+    (request) => isMiningAction(request) && request.headers()["next-action"] === refreshActionId,
+  );
+  await retry.evaluate((button) => {
+    button.click();
+    button.click();
+  });
+  await recoveredRequest;
+  await expect(
+    page.getByText("Comms interruption. Mining status could not be confirmed."),
+  ).toBeHidden();
+  await expect(retry).toHaveCount(0);
+  expect(actionIds).toEqual([startActionId, refreshActionId]);
+});
+
+test("the Play boundary resets, navigates, and hides failure details", async ({ page }) => {
+  await page.evaluate(() => window.sessionStorage.setItem("runespace-e2e-play-error", "1"));
+  await page.reload();
+  await expect(page.getByRole("heading", { name: "Play terminal interrupted" })).toBeVisible();
+  await expect(page.getByText("Play boundary e2e failure")).toHaveCount(0);
+  await page.evaluate(() => window.sessionStorage.removeItem("runespace-e2e-play-error"));
+  await page.getByRole("button", { name: "Retry connection" }).click();
+  await expect(page.getByText("Ferrite Shale", { exact: true }).first()).toBeVisible();
+
+  await page.evaluate(() => window.sessionStorage.setItem("runespace-e2e-play-error", "1"));
+  await page.reload();
+  await expect(page.getByRole("link", { name: "Back to characters" })).toBeVisible();
+  await page.getByRole("link", { name: "Back to characters" }).click();
+  await expect(page).toHaveURL(/\/characters$/);
 });
