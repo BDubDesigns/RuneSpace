@@ -3,17 +3,20 @@
 import { useEffect, useRef, useState, useTransition, type RefObject } from "react";
 import { ActionButton } from "@/components/ui/ActionButton";
 import { ItemVisual } from "@/components/items/ItemVisual";
+import { VisualTile } from "@/components/items/VisualTile";
 import { Feedback } from "@/components/ui/Feedback";
 import { Panel } from "@/components/ui/Panel";
 import { SectionHeader } from "@/components/ui/SectionHeader";
 import { StatusMeter } from "@/components/ui/StatusMeter";
 import { getEffectiveGameBalance } from "@/game/config/balance";
-import { GAME_TICK_MS } from "@/game/config/foundations";
+import { GAME_TICK_MS, ITEM_IDS } from "@/game/config/foundations";
 import { inventoryStackFillFraction } from "@/game/domain/inventory";
 import { miningNearMissBasisPoints } from "@/game/domain/mining";
-import type { MiningGameplayState } from "@/server/mining";
+import type { MiningGameplayState, MiningRunAttempt } from "@/server/mining";
 import { refreshMiningAction, startMiningAction, stopMiningAction } from "@/server/actions";
 import { reportClientDiagnostic } from "@/features/diagnostics/client";
+import { latestMiningAttempt, resolvedAttemptCount } from "./latest-result";
+import { useMiningPlay } from "./MiningPlayContext";
 
 function kilograms(grams: number) {
   return `${(grams / 1_000).toLocaleString(undefined, { maximumFractionDigits: 1 })} kg`;
@@ -37,6 +40,79 @@ function commandErrorMessage(error: NonNullable<MiningGameplayState["commandErro
 
 function percentage(basisPoints: number) {
   return (basisPoints / 100).toFixed(2);
+}
+
+function latestAttemptAnnouncement(attempt: MiningRunAttempt, attemptsResolved: number) {
+  const catchUp = attemptsResolved > 1 ? `${attemptsResolved} attempts resolved while away. ` : "";
+  const roll = `Roll ${percentage(attempt.rolledBasisPoints)}. Needed below ${percentage(attempt.thresholdBasisPoints)}.`;
+  return attempt.success
+    ? `${catchUp}Success. ${roll} ${attempt.shaleAwarded} Ferrite Shale earned. ${attempt.xpAwarded} Mining XP earned.`
+    : `${catchUp}No yield. ${roll} Missed by ${percentage(miningNearMissBasisPoints(attempt.rolledBasisPoints, attempt.thresholdBasisPoints))}.`;
+}
+
+function LatestAttemptResult({
+  attempt,
+  attemptsResolved,
+  feedback,
+}: {
+  attempt: MiningRunAttempt;
+  attemptsResolved: number;
+  feedback: boolean;
+}) {
+  const feedbackTone = feedback ? (attempt.success ? "success" : "danger") : "calm";
+  return (
+    <section
+      aria-label="Latest mining attempt"
+      className={`mt-4 border border-[color:var(--rs-border-structural)] bg-[color:var(--rs-surface-panel)] p-3 ${feedback ? `rs-result-feedback-${feedbackTone}` : ""}`}
+      data-feedback-state={feedback ? "new" : "calm"}
+      data-result-outcome={attempt.success ? "success" : "no-yield"}
+    >
+      <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+        <p className="font-display text-sm uppercase tracking-wide">
+          Latest attempt: {attempt.success ? "Success" : "No yield"}
+        </p>
+        {attemptsResolved > 1 ? (
+          <p className="text-xs text-[color:var(--rs-text-secondary)]">
+            {attemptsResolved} attempts resolved while away
+          </p>
+        ) : null}
+      </div>
+      <p className="mt-2 text-sm text-[color:var(--rs-text-secondary)]">
+        Roll {percentage(attempt.rolledBasisPoints)} | Needed below{" "}
+        {percentage(attempt.thresholdBasisPoints)}
+      </p>
+      {attempt.success ? (
+        <>
+          <p className="mt-3 font-display text-xs uppercase tracking-[0.16em] text-[color:var(--rs-accent-mining)]">
+            Rewards
+          </p>
+          <div className="mt-2 grid max-w-sm grid-cols-2 gap-2 sm:grid-cols-3">
+            <ItemVisual
+              accessibleLabel={`${attempt.shaleAwarded} Ferrite Shale earned`}
+              className={feedback ? "rs-reward-feedback" : ""}
+              itemId={ITEM_IDS.ferriteShale}
+              name="Ferrite Shale"
+              quantity={attempt.shaleAwarded}
+            />
+            <VisualTile
+              accessibleLabel={`${attempt.xpAwarded} Mining XP earned`}
+              badge={`+${attempt.xpAwarded}`}
+              className={feedback ? "rs-reward-feedback [animation-delay:90ms]" : ""}
+              fallbackText="XP"
+              name="Mining"
+            />
+          </div>
+        </>
+      ) : (
+        <p className="mt-2 text-sm text-[color:var(--rs-text-secondary)]">
+          Missed by{" "}
+          {percentage(
+            miningNearMissBasisPoints(attempt.rolledBasisPoints, attempt.thresholdBasisPoints),
+          )}
+        </p>
+      )}
+    </section>
+  );
 }
 
 function InventoryPanel({
@@ -117,27 +193,29 @@ function InventoryPanel({
           {Array.from({ length: totalSlots }, (_, index) => {
             const stack = state.inventory.stacks[index];
             return stack ? (
-              <article
-                className="relative min-h-28 overflow-hidden border border-[color:var(--rs-accent-mining)] bg-[color:var(--rs-surface-panel)] p-3"
-                key={stack.id}
-              >
-                <div
-                  aria-hidden="true"
-                  className="absolute inset-y-0 left-0 z-0 w-2 overflow-hidden bg-[color:var(--rs-accent-mining-stack-track)]"
-                  data-stack-track
-                >
+              <ItemVisual
+                background={
                   <div
-                    className="absolute inset-x-0 bottom-0 bg-[color:var(--rs-accent-mining)] transition-[height] duration-[var(--rs-duration-fast)]"
-                    data-stack-fill={Math.round(
-                      inventoryStackFillFraction(stack.quantity, stack.stackLimit) * 100,
-                    )}
-                    style={{
-                      height: `${inventoryStackFillFraction(stack.quantity, stack.stackLimit) * 100}%`,
-                    }}
-                  />
-                </div>
-                <ItemVisual itemId={stack.itemId} name={stack.name} quantity={stack.quantity} />
-              </article>
+                    aria-hidden="true"
+                    className="absolute inset-y-0 left-0 z-0 w-2 overflow-hidden bg-[color:var(--rs-accent-mining-stack-track)]"
+                    data-stack-track
+                  >
+                    <div
+                      className="absolute inset-x-0 bottom-0 bg-[color:var(--rs-accent-mining)] transition-[height] duration-[var(--rs-duration-fast)]"
+                      data-stack-fill={Math.round(
+                        inventoryStackFillFraction(stack.quantity, stack.stackLimit) * 100,
+                      )}
+                      style={{
+                        height: `${inventoryStackFillFraction(stack.quantity, stack.stackLimit) * 100}%`,
+                      }}
+                    />
+                  </div>
+                }
+                itemId={stack.itemId}
+                key={stack.id}
+                name={stack.name}
+                quantity={stack.quantity}
+              />
             ) : (
               <div
                 aria-label={`Empty inventory slot ${index + 1}`}
@@ -154,23 +232,18 @@ function InventoryPanel({
   );
 }
 
-export function MiningConsole({
-  characterName,
-  initialState,
-}: {
-  characterName: string;
-  initialState: MiningGameplayState;
-}) {
-  const [state, setState] = useState(initialState);
+export function MiningConsole({ characterName }: { characterName: string }) {
+  const { inventoryOpen, inventoryTrigger, setInventoryOpen, setState, state } = useMiningPlay();
   const [message, setMessage] = useState<string | undefined>(
-    initialState.stoppingReason ? stopMessage(initialState.stoppingReason) : undefined,
+    state.stoppingReason ? stopMessage(state.stoppingReason) : undefined,
   );
   const [now, setNow] = useState(Date.now());
   const [pending, startTransition] = useTransition();
-  const [inventoryOpen, setInventoryOpen] = useState(false);
   const [recovery, setRecovery] = useState<(() => void) | undefined>();
   const commandInFlight = useRef(false);
-  const inventoryTrigger = useRef<HTMLButtonElement>(null);
+  const observedAttempts = useRef(state.run.attempts);
+  const observedSequence = useRef(latestMiningAttempt(state.run.recentAttempts)?.sequence);
+  const [feedback, setFeedback] = useState<{ sequence: number; attempts: number }>();
   const balance = getEffectiveGameBalance();
   const active = state.activeAction;
   const durationMs = balance.mining.attemptDurationTicks * GAME_TICK_MS;
@@ -187,10 +260,6 @@ export function MiningConsole({
       setState(result.state);
       if (result.state.commandError) setMessage(commandErrorMessage(result.state.commandError));
       else if (result.state.stoppingReason) setMessage(stopMessage(result.state.stoppingReason));
-      else if (result.state.recentResult.successes || result.state.recentResult.failures)
-        setMessage(
-          `${result.state.recentResult.successes} successful, ${result.state.recentResult.failures} failed attempt${result.state.recentResult.successes + result.state.recentResult.failures === 1 ? "" : "s"}.`,
-        );
       else setMessage(undefined);
     }
   }
@@ -226,6 +295,28 @@ export function MiningConsole({
       window.clearTimeout(refresh);
     };
   }, [active?.nextAttemptAt]);
+
+  const latestAttempt = latestMiningAttempt(state.run.recentAttempts);
+  const recentBatchCount = state.recentResult.successes + state.recentResult.failures;
+  useEffect(() => {
+    const previousAttempts = observedAttempts.current;
+    const previousSequence = observedSequence.current;
+    observedAttempts.current = state.run.attempts;
+    observedSequence.current = latestAttempt?.sequence;
+    if (
+      !latestAttempt ||
+      state.run.attempts <= previousAttempts ||
+      latestAttempt.sequence === previousSequence
+    )
+      return;
+    const nextFeedback = {
+      sequence: latestAttempt.sequence,
+      attempts: resolvedAttemptCount(previousAttempts, state.run.attempts),
+    };
+    setFeedback(nextFeedback);
+    const timeout = window.setTimeout(() => setFeedback(undefined), 1_800);
+    return () => window.clearTimeout(timeout);
+  }, [latestAttempt?.sequence, state.run.attempts]);
 
   return (
     <div className="space-y-4">
@@ -280,6 +371,20 @@ export function MiningConsole({
         ) : (
           <Feedback>Mining is idle. Attempts take six seconds and resolve on the server.</Feedback>
         )}
+        {latestAttempt ? (
+          <LatestAttemptResult
+            attempt={latestAttempt}
+            attemptsResolved={
+              feedback?.sequence === latestAttempt.sequence ? feedback.attempts : recentBatchCount
+            }
+            feedback={feedback?.sequence === latestAttempt.sequence}
+          />
+        ) : null}
+        <p aria-live="polite" className="sr-only">
+          {feedback && latestAttempt && feedback.sequence === latestAttempt.sequence
+            ? latestAttemptAnnouncement(latestAttempt, feedback.attempts)
+            : ""}
+        </p>
         {message ? (
           <Feedback tone={state.stoppingReason && !active ? "danger" : "muted"}>{message}</Feedback>
         ) : null}
@@ -367,7 +472,7 @@ export function MiningConsole({
         </div>
         <div
           className="mt-5 max-h-72 space-y-2 overflow-y-auto pr-1"
-          aria-label="Latest mining attempts"
+          aria-label="Mining attempt history"
         >
           {[...state.run.recentAttempts].reverse().map((attempt) => (
             <article
@@ -408,16 +513,6 @@ export function MiningConsole({
           ) : null}
         </div>
       </Panel>
-      <div className="sticky bottom-0 z-40 -mx-4 border-t border-[color:var(--rs-border-structural)] bg-[color:var(--rs-surface-raised)] px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-3 sm:fixed sm:bottom-6 sm:left-auto sm:right-6 sm:mx-0 sm:w-fit sm:border sm:px-2 sm:py-2 sm:[box-shadow:var(--rs-shadow-panel)]">
-        <ActionButton
-          ref={inventoryTrigger}
-          intent="secondary"
-          onClick={() => setInventoryOpen((open) => !open)}
-        >
-          Inventory {state.inventory.slotsUsed}/
-          {state.inventory.slotsUsed + state.inventory.slotsAvailable}
-        </ActionButton>
-      </div>
       {inventoryOpen ? (
         <InventoryPanel
           state={state}

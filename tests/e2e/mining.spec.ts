@@ -7,6 +7,11 @@ import { miningStorageStatePath } from "./mining.setup";
 
 const e2eDatabaseHost = process.env.DATABASE_URL ? new URL(process.env.DATABASE_URL).hostname : "";
 
+function animationDurationSeconds(value: string): number {
+  const duration = Number.parseFloat(value);
+  return value.endsWith("ms") ? duration / 1_000 : duration;
+}
+
 test.beforeAll(() => {
   if (e2eDatabaseHost !== "localhost" && e2eDatabaseHost !== "127.0.0.1") {
     throw new Error("Mining E2E fixtures require a disposable localhost PostgreSQL database");
@@ -56,13 +61,26 @@ test("owned character can start, observe, stop, and restore Crash Site Mining", 
     .set({ startedAt: twoAttemptsAgo, resolvedThroughAt: twoAttemptsAgo })
     .where(eq(activeActions.characterId, characterId));
   await page.getByRole("button", { name: "Refresh status" }).click();
+  const footer = page.getByRole("navigation", { name: "Primary" });
+  const latestResult = page.getByRole("region", {
+    name: "Latest mining attempt",
+    exact: true,
+  });
+  await expect(footer.getByRole("link", { name: "Characters" })).toHaveText("Chars");
+  await expect(footer.getByRole("button", { name: "Inventory 2/8" })).toBeVisible();
+  await expect(latestResult).toContainText("Latest attempt: No yield");
+  await expect(latestResult).toContainText("Roll 35.00 | Needed below 35.00");
+  await expect(latestResult).toContainText("Missed by 0.01");
+  await expect(latestResult).toContainText("2 attempts resolved while away");
+  await expect(latestResult).toHaveAttribute("data-feedback-state", "new");
+  await page.screenshot({ path: "test-results/mining-mobile-no-yield.png" });
   await expect(page.getByText("This mining run")).toBeVisible();
   await expect(page.getByText("2 attempts", { exact: true })).toBeVisible();
   await expect(page.getByText("1 successful", { exact: true })).toBeVisible();
   await expect(page.getByText("1 failed", { exact: true })).toBeVisible();
   await expect(page.getByText("1 shale gained", { exact: true })).toBeVisible();
   await expect(page.getByText("15 Mining XP", { exact: true })).toBeVisible();
-  const history = page.getByLabel("Latest mining attempts");
+  const history = page.getByLabel("Mining attempt history", { exact: true });
   await expect(history).toContainText("Attempt 2 - Failed");
   await expect(history).toContainText("Attempt 1 - Success");
   await expect(history).toContainText("Roll 35.00 | Needed below 35.00");
@@ -203,29 +221,17 @@ test("owned character can start, observe, stop, and restore Crash Site Mining", 
   await page.screenshot({ path: "test-results/mining-mobile-inventory-10-plus-1.png" });
   await page.getByRole("button", { name: "Close inventory" }).click();
   await expect(page.getByRole("button", { name: "Inventory 2/8" })).toBeFocused();
-  const inventoryToolbar = page.getByRole("button", { name: "Inventory 2/8" }).locator("..");
-  const backToCharacters = page.getByRole("link", { name: "Back to characters" });
   await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
   await expect(history).toBeVisible();
-  await expect(inventoryToolbar).toBeVisible();
-  await expect(backToCharacters).toBeVisible();
-  const [historyBox, toolbarBox, backLinkBox] = await Promise.all([
-    history.boundingBox(),
-    inventoryToolbar.boundingBox(),
-    backToCharacters.boundingBox(),
-  ]);
+  await expect(footer).toBeVisible();
+  const [historyBox, footerBox] = await Promise.all([history.boundingBox(), footer.boundingBox()]);
   expect(historyBox).not.toBeNull();
-  expect(toolbarBox).not.toBeNull();
-  expect(backLinkBox).not.toBeNull();
-  expect(historyBox!.y + historyBox!.height).toBeLessThanOrEqual(toolbarBox!.y);
-  expect(backLinkBox!.y - (toolbarBox!.y + toolbarBox!.height)).toBeGreaterThanOrEqual(0);
-  expect(backLinkBox!.y - (toolbarBox!.y + toolbarBox!.height)).toBeLessThan(48);
-  expect(backLinkBox!.y).toBeGreaterThanOrEqual(0);
-  expect(844 - (backLinkBox!.y + backLinkBox!.height)).toBeLessThan(64);
-  expect(backLinkBox!.y + backLinkBox!.height).toBeLessThanOrEqual(844);
+  expect(footerBox).not.toBeNull();
+  expect(historyBox!.y + historyBox!.height).toBeLessThanOrEqual(footerBox!.y);
   await page.screenshot({ path: "test-results/mining-mobile-page-bottom.png" });
   await page.setViewportSize({ width: 1440, height: 900 });
-  await expect(inventoryToolbar).toHaveCSS("position", "fixed");
+  await expect(footer).toHaveCSS("position", "fixed");
+  await page.screenshot({ path: "test-results/mining-desktop-no-yield.png" });
   await page.getByRole("button", { name: "Inventory 2/8" }).click();
   await expect(inventory.getByText("x10", { exact: true })).toBeVisible();
   await page.screenshot({ path: "test-results/mining-desktop-inventory-10-plus-1.png" });
@@ -235,11 +241,47 @@ test("owned character can start, observe, stop, and restore Crash Site Mining", 
   await expect(page.getByRole("button", { name: "Start Mining" })).toBeVisible();
   await expect(page.getByText("Mining stopped.")).toBeVisible();
   await expect(page.getByText("2 attempts", { exact: true })).toBeVisible();
+  await page.emulateMedia({ reducedMotion: "reduce" });
   await page.getByRole("button", { name: "Start Mining" }).click();
   await expect(page.getByRole("button", { name: "Stop Mining" })).toBeVisible();
   await expect(page.getByText("Mining stopped.")).toBeHidden();
   await expect(page.getByText("0 attempts", { exact: true })).toBeVisible();
   await expect(history).toContainText("No resolved attempts in this run yet.");
+  const oneAttemptAgo = new Date(Date.now() - 6_100);
+  await db
+    .update(activeActions)
+    .set({ startedAt: oneAttemptAgo, resolvedThroughAt: oneAttemptAgo })
+    .where(eq(activeActions.characterId, characterId));
+  await page.getByRole("button", { name: "Refresh status" }).click();
+  await expect(latestResult).toContainText("Latest attempt: Success");
+  await expect(latestResult.getByLabel("1 Ferrite Shale earned")).toBeVisible();
+  await expect(latestResult.getByLabel("15 Mining XP earned")).toBeVisible();
+  await expect(latestResult.getByText("XP", { exact: true })).toBeVisible();
+  await expect(latestResult.getByText("Mining", { exact: true })).toBeVisible();
+  await expect(latestResult.getByText("+15", { exact: true })).toBeVisible();
+  const reducedMotionDuration = await latestResult.evaluate(
+    (element) => getComputedStyle(element).animationDuration,
+  );
+  expect(animationDurationSeconds(reducedMotionDuration)).toBeLessThanOrEqual(0.0001);
+  await page.screenshot({ path: "test-results/mining-desktop-success.png" });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.screenshot({ path: "test-results/mining-mobile-success.png" });
+  await page.waitForTimeout(1_900);
+  await expect(latestResult).toHaveAttribute("data-feedback-state", "calm");
+  await page.waitForTimeout(300);
+  await expect(latestResult).toHaveAttribute("data-feedback-state", "calm");
+  await page.getByRole("button", { name: "Refresh status" }).click();
+  await expect(latestResult).toHaveAttribute("data-feedback-state", "calm");
+});
+
+test("footer Characters navigation uses a compact visible label", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  const characters = page.getByRole("navigation", { name: "Primary" }).getByRole("link", {
+    name: "Characters",
+  });
+  await expect(characters).toHaveText("Chars");
+  await characters.click();
+  await expect(page).toHaveURL(/\/characters$/);
 });
 
 test("an interrupted Mining action preserves confirmed state and retries only status refresh", async ({
