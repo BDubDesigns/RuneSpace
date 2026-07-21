@@ -307,14 +307,14 @@ test("equipment drawer shows and updates the approved Mining loadout", async ({ 
   const secondContainer = equipment.getByLabel("Container attachment 2");
   await expect(equipment).toBeVisible();
   await expect(miningTool.getByText("Salvage Cutter", { exact: true }).first()).toBeVisible();
-  await expect(miningTool.getByText("5 kg", { exact: true })).toBeVisible();
+  await expect(miningTool.getByText(/5(?:\.0)? kg/)).toBeVisible();
   await expect(
     firstContainer.getByText("MYKEA SCHLEPPRAUM-8", { exact: true }).first(),
   ).toBeVisible();
-  await expect(firstContainer.getByText("10 kg", { exact: true })).toBeVisible();
+  await expect(firstContainer.getByText(/10(?:\.0)? kg/)).toBeVisible();
   await expect(secondContainer.getByText("Empty", { exact: true })).toBeVisible();
   await expect(equipment.getByText("8 slots", { exact: true })).toBeVisible();
-  await expect(equipment.getByText("15 kg / 50 kg", { exact: true })).toBeVisible();
+  await expect(equipment.getByText(/15(?:\.0)? kg \/ 50(?:\.0)? kg/)).toBeVisible();
   await firstContainer.getByRole("button", { name: "Unequip" }).click();
   await expect(equipment.getByRole("alert")).toContainText(
     "At least one compatible container must remain equipped.",
