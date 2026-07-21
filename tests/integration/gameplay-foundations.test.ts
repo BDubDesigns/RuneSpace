@@ -20,6 +20,7 @@ suite("gameplay foundations (real PostgreSQL)", () => {
   let ownership: typeof import("@/server/ownership");
   let characters: typeof import("@/server/characters");
   let mining: typeof import("@/server/mining");
+  let equipment: typeof import("@/server/equipment");
   let resolution: typeof import("@/server/action-resolution");
   const createdUsers: string[] = [];
 
@@ -30,6 +31,7 @@ suite("gameplay foundations (real PostgreSQL)", () => {
     ownership = await import("@/server/ownership");
     characters = await import("@/server/characters");
     mining = await import("@/server/mining");
+    equipment = await import("@/server/equipment");
     resolution = await import("@/server/action-resolution");
   });
 
@@ -657,5 +659,231 @@ suite("gameplay foundations (real PostgreSQL)", () => {
     await expect(
       db.select().from(rune.activeActions).where(eq(rune.activeActions.characterId, character.id)),
     ).resolves.toEqual([]);
+  });
+
+  it("authorizes equipment changes and rolls back a rejected container removal", async () => {
+    const owner = await makeCharacter();
+    const outsider = await makeCharacter();
+    const now = new Date("2026-01-01T00:00:00.000Z");
+    await mining.getMiningGameplayState(owner.userId, owner.character.id, now);
+    await db.insert(rune.inventoryStacks).values({
+      characterId: owner.character.id,
+      itemId: ITEM_IDS.ferriteShale,
+      quantity: 1,
+    });
+    const target = { assignmentKind: "container" as const, suitSlotId: "container_attachment_1" };
+    await expect(
+      equipment.changeEquipment(outsider.userId, owner.character.id, {
+        kind: "unequip",
+        target,
+      }),
+    ).rejects.toThrow(/not found/i);
+    const beforeAssignments = await db
+      .select()
+      .from(rune.equippedItems)
+      .where(eq(rune.equippedItems.characterId, owner.character.id));
+    const beforeStacks = await db
+      .select()
+      .from(rune.inventoryStacks)
+      .where(eq(rune.inventoryStacks.characterId, owner.character.id));
+    await expect(
+      equipment.changeEquipment(owner.userId, owner.character.id, {
+        kind: "unequip",
+        target,
+      }),
+    ).rejects.toThrow(/at least one compatible container/i);
+    await expect(
+      db
+        .select()
+        .from(rune.equippedItems)
+        .where(eq(rune.equippedItems.characterId, owner.character.id)),
+    ).resolves.toEqual(beforeAssignments);
+    await expect(
+      db
+        .select()
+        .from(rune.inventoryStacks)
+        .where(eq(rune.inventoryStacks.characterId, owner.character.id)),
+    ).resolves.toEqual(beforeStacks);
+  });
+
+  it("serializes concurrent commands so one unique container cannot occupy two assignments", async () => {
+    const { userId, character } = await makeCharacter();
+    const now = new Date("2026-01-01T00:00:00.000Z");
+    await mining.getMiningGameplayState(userId, character.id, now);
+    const extraContainer = (
+      await db
+        .insert(rune.itemInstances)
+        .values({ characterId: character.id, itemId: ITEM_IDS.mykeaSchleppraum8 })
+        .returning()
+    )[0]!;
+    const change = {
+      kind: "equip" as const,
+      itemInstanceId: extraContainer.id,
+      target: { assignmentKind: "container" as const, suitSlotId: "container_attachment_2" },
+    };
+    const outcomes = await Promise.allSettled([
+      equipment.changeEquipment(userId, character.id, change, now),
+      equipment.changeEquipment(userId, character.id, change, now),
+    ]);
+    expect(outcomes.filter((outcome) => outcome.status === "fulfilled")).toHaveLength(1);
+    expect(outcomes.filter((outcome) => outcome.status === "rejected")).toHaveLength(1);
+    const assignments = await db
+      .select()
+      .from(rune.equippedItems)
+      .where(eq(rune.equippedItems.characterId, character.id));
+    expect(
+      assignments.filter((assignment) => assignment.itemInstanceId === extraContainer.id),
+    ).toHaveLength(1);
+    expect(
+      assignments.find((assignment) => assignment.itemInstanceId === extraContainer.id),
+    ).toMatchObject(change.target);
+  });
+
+  it("resolves completed Mining once before tool removal and atomically stops further attempts", async () => {
+    const { userId, character } = await makeCharacter();
+    const startedAt = new Date("2026-01-01T00:00:00.000Z");
+    const completedAt = new Date("2026-01-01T00:00:06.000Z");
+    const random = { nextBasisPoints: () => 0, nextUnit: () => 0 };
+    await mining.getMiningGameplayState(userId, character.id, startedAt, random);
+    await mining.startCrashSiteMining(userId, character.id, startedAt, random);
+    const removed = await equipment.changeEquipment(
+      userId,
+      character.id,
+      {
+        kind: "unequip",
+        target: { assignmentKind: "gear", suitSlotId: "mining_tool" },
+      },
+      completedAt,
+      random,
+    );
+    expect(removed.run).toMatchObject({ attempts: 1, successes: 1, shaleGained: 1, xpGained: 15 });
+    expect(removed.stoppingReason).toBe("compatible_mining_tool_missing");
+    expect(removed.activeAction).toBeUndefined();
+    await expect(
+      db.select().from(rune.activeActions).where(eq(rune.activeActions.characterId, character.id)),
+    ).resolves.toEqual([]);
+    const retry = await mining.getMiningGameplayState(userId, character.id, completedAt, random);
+    expect(retry.run).toMatchObject({ attempts: 1, successes: 1, shaleGained: 1, xpGained: 15 });
+    expect(retry.ferriteShaleQuantity).toBe(1);
+  });
+
+  it("rolls back pending Mining resolution when a loadout mutation is refused", async () => {
+    const { userId, character } = await makeCharacter();
+    const startedAt = new Date("2026-01-01T00:00:00.000Z");
+    const completedAt = new Date("2026-01-01T00:00:06.000Z");
+    const random = { nextBasisPoints: () => 0, nextUnit: () => 0 };
+    await mining.getMiningGameplayState(userId, character.id, startedAt, random);
+    await mining.startCrashSiteMining(userId, character.id, startedAt, random);
+    await expect(
+      equipment.changeEquipment(
+        userId,
+        character.id,
+        {
+          kind: "unequip",
+          target: { assignmentKind: "container", suitSlotId: "container_attachment_1" },
+        },
+        completedAt,
+        random,
+      ),
+    ).rejects.toThrow(/at least one compatible container/i);
+    const actionAfterRollback = await db
+      .select()
+      .from(rune.activeActions)
+      .where(eq(rune.activeActions.characterId, character.id));
+    expect(actionAfterRollback[0]?.resolvedThroughAt).toEqual(startedAt);
+    await expect(
+      db
+        .select()
+        .from(rune.inventoryStacks)
+        .where(eq(rune.inventoryStacks.characterId, character.id)),
+    ).resolves.toEqual([]);
+    const resolved = await mining.getMiningGameplayState(userId, character.id, completedAt, random);
+    expect(resolved.run).toMatchObject({ attempts: 1, successes: 1, shaleGained: 1, xpGained: 15 });
+    expect(resolved.ferriteShaleQuantity).toBe(1);
+  });
+
+  it("replacing an active Mining tool resolves, stops, and preserves rewards atomically", async () => {
+    const { userId, character } = await makeCharacter();
+    const startedAt = new Date("2026-01-01T00:00:00.000Z");
+    const completedAt = new Date("2026-01-01T00:00:06.000Z");
+    const random = { nextBasisPoints: () => 0, nextUnit: () => 0 };
+    await mining.getMiningGameplayState(userId, character.id, startedAt, random);
+    await mining.startCrashSiteMining(userId, character.id, startedAt, random);
+
+    const spareCutter = (
+      await db
+        .insert(rune.itemInstances)
+        .values({ characterId: character.id, itemId: ITEM_IDS.salvageCutter })
+        .returning()
+    )[0]!;
+    const beforeInstances = await db
+      .select()
+      .from(rune.itemInstances)
+      .where(eq(rune.itemInstances.characterId, character.id));
+    const beforeCutterIds = beforeInstances
+      .filter((i) => i.itemId === ITEM_IDS.salvageCutter)
+      .map((i) => i.id);
+    expect(beforeCutterIds).toHaveLength(2);
+
+    const replaced = await equipment.changeEquipment(
+      userId,
+      character.id,
+      {
+        kind: "equip",
+        itemInstanceId: spareCutter.id,
+        target: { assignmentKind: "gear", suitSlotId: "mining_tool" },
+      },
+      completedAt,
+      random,
+    );
+    // One attempt resolved before the tool replacement stopped Mining.
+    expect(replaced.run).toMatchObject({ attempts: 1, successes: 1, shaleGained: 1, xpGained: 15 });
+    expect(replaced.ferriteShaleQuantity).toBe(1);
+    expect(replaced.stoppingReason).toBe("mining_tool_replaced");
+    expect(replaced.activeAction).toBeUndefined();
+
+    const assignments = await db
+      .select()
+      .from(rune.equippedItems)
+      .where(eq(rune.equippedItems.characterId, character.id));
+    const toolAssignment = assignments.find(
+      (a) => a.assignmentKind === "gear" && a.suitSlotId === "mining_tool",
+    );
+    expect(toolAssignment).toBeDefined();
+    expect(toolAssignment!.itemInstanceId).toBe(spareCutter.id);
+
+    // The previous Cutter is now carried and contributes an inventory slot.
+    const instanceIds = assignments.map((a) => a.itemInstanceId);
+    const previousCutter = beforeCutterIds.find((id) => id !== spareCutter.id)!;
+    expect(instanceIds).not.toContain(previousCutter);
+
+    // A later refresh must not resolve the same attempt again.
+    const retry = await mining.getMiningGameplayState(userId, character.id, completedAt, random);
+    expect(retry.run).toMatchObject({ attempts: 1, successes: 1, shaleGained: 1, xpGained: 15 });
+    expect(retry.ferriteShaleQuantity).toBe(1);
+    expect(retry.activeAction).toBeUndefined();
+
+    // Retried replacement must not duplicate anything.
+    await expect(
+      equipment.changeEquipment(
+        userId,
+        character.id,
+        {
+          kind: "equip",
+          itemInstanceId: spareCutter.id,
+          target: { assignmentKind: "gear", suitSlotId: "mining_tool" },
+        },
+        completedAt,
+        random,
+      ),
+    ).rejects.toThrow(/already equipped/i);
+    const later = await mining.getMiningGameplayState(
+      userId,
+      character.id,
+      new Date("2026-01-01T00:00:12.000Z"),
+      random,
+    );
+    expect(later.run).toMatchObject({ attempts: 1, successes: 1, shaleGained: 1, xpGained: 15 });
+    expect(later.ferriteShaleQuantity).toBe(1);
   });
 });

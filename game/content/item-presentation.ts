@@ -19,6 +19,16 @@ const itemPresentations = {
     textFallback: "FS",
     artworkSrc: "/item-art/ferrite-shale.webp",
   },
+  [ITEM_IDS.salvageCutter]: {
+    displayName: "Salvage Cutter",
+    accessibleDescription: "Salvage Cutter mining tool",
+    textFallback: "SC",
+  },
+  [ITEM_IDS.mykeaSchleppraum8]: {
+    displayName: "MYKEA SCHLEPPRAUM-8",
+    accessibleDescription: "MYKEA SCHLEPPRAUM-8 container",
+    textFallback: "MY-8",
+  },
 } as const satisfies Partial<Record<ItemId, ItemPresentation>>;
 
 export function getItemPresentation(itemId: string): ItemPresentation | undefined {
