@@ -5,7 +5,7 @@ import {
   sanitizeClientDiagnostic,
 } from "@/game/schemas/diagnostics";
 import { installClientDiagnostics, reportClientDiagnostic } from "@/features/diagnostics/client";
-import { logClientDiagnostic } from "@/server/diagnostics";
+import { logClientDiagnostic, logDiagnostic } from "@/server/diagnostics";
 
 const report = {
   timestamp: "2026-01-01T00:00:00.000Z",
@@ -81,6 +81,67 @@ describe("diagnostic safety", () => {
     expect(line).toContain('"clientReleaseId":"browser-release"');
     expect(line).toContain('"serverReleaseId":"server-release"');
     process.env.RUNESPACE_RELEASE_ID = previousRelease;
+  });
+
+  it("removes credentials, state, and identifiers from final browser and server logs", () => {
+    const logged = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const cases = [
+      { text: "Authorization: Basic dXNlcjpwYXNz", privateValues: ["dXNlcjpwYXNz"] },
+      { text: "Proxy-Authorization: Bearer proxy-private", privateValues: ["proxy-private"] },
+      { text: "cookie: session=abc; auth=def", privateValues: ["session=abc", "auth=def"] },
+      { text: "Set-Cookie: session=another-private; HttpOnly", privateValues: ["another-private"] },
+      { text: "token=supersecret", privateValues: ["supersecret"] },
+      { text: "password is hunter2", privateValues: ["hunter2"] },
+      { text: "password => arrow-private", privateValues: ["arrow-private"] },
+      {
+        text: "credential: credential-private auth=auth-private session id: session-private api key=key-private secret is secret-private",
+        privateValues: [
+          "credential-private",
+          "auth-private",
+          "session-private",
+          "key-private",
+          "secret-private",
+        ],
+      },
+      {
+        text: 'state={"inventory":[{"itemId":"ore","quantity":999}]}',
+        privateValues: ['"inventory"'],
+      },
+      { text: "characterId=character-private-42", privateValues: ["character-private-42"] },
+      {
+        text: "database=postgres://db-user:db-private@db.internal/runespace",
+        privateValues: ["db-private", "db.internal"],
+      },
+      { text: "Cookie: session=abc\n folded-private", privateValues: ["folded-private"] },
+    ];
+
+    for (const [index, diagnosticCase] of cases.entries()) {
+      logClientDiagnostic({
+        ...report,
+        incidentId: `rs-browsercase${index}`,
+        message: diagnosticCase.text,
+        stack: diagnosticCase.text,
+      });
+      logDiagnostic(
+        "server",
+        { category: "render-failure", route: "/play/[characterId]" },
+        new Error(diagnosticCase.text),
+      );
+    }
+
+    for (const [index, diagnosticCase] of cases.entries()) {
+      const browserLine = String(logged.mock.calls[index * 2]?.[0]);
+      const serverLine = String(logged.mock.calls[index * 2 + 1]?.[0]);
+      for (const line of [browserLine, serverLine]) {
+        for (const privateValue of diagnosticCase.privateValues)
+          expect(line).not.toContain(privateValue);
+      }
+      expect(browserLine).toContain('"route":"/play/[characterId]"');
+      expect(browserLine).toContain('"source":"mining-command"');
+      expect(serverLine).toContain('"route":"/play/[characterId]"');
+      expect(serverLine).toContain('"category":"render-failure"');
+    }
+    expect(logged).toHaveBeenCalledTimes(cases.length * 2);
   });
 
   it("never lets reporter failures escape and retains one incident id per Error", () => {

@@ -10,22 +10,47 @@ const releaseId = z
   .max(100)
   .regex(/^[A-Za-z0-9._-]+$/);
 
+const authorizationHeader = /\b(proxy-authorization|authorization)\s*(?::|=)\s*.*/gi;
+const cookieHeader = /\b(set-cookie|cookie)\s*(?::|=)\s*.*/gi;
+const sensitiveHeader = /\b(?:proxy-authorization|authorization|set-cookie|cookie)\s*(?::|=)/i;
+const bearerValue = /\bbearer\s+[^\s,;]+/gi;
 const sensitiveValue =
-  /(?:bearer\s+|authorization\s*[:=]\s*(?:bearer\s+)?|cookie\s*[:=]|set-cookie\s*[:=]|session(?:[_-]?id)?\s*[:=]|(?:access|refresh)[_-]?token\s*[:=]|api[_-]?key\s*[:=]|password\s*[:=]|secret\s*[:=])[^\s,;]+/gi;
+  /\b(?:token|credential|auth|session(?:[ _-]?id)?|(?:access|refresh)(?:[ _-]?token)|api(?:[ _-]?key)|password|secret|character(?:[ _-]?id)?|player(?:[ _-]?id)?)\s*(?:=>|:|=|\bis\b)\s*(?:"[^"]*"|'[^']*'|[^\s,;]+)/gi;
+
+function sanitizeDiagnosticLine(line: string) {
+  // JSON-like fragments can embed complete player state; do not try to preserve them.
+  if (/[{[]/.test(line) && /(?:["']?[\w-]+["']?\s*:|\[\s*[{"'])/.test(line)) {
+    return "[redacted structured data]";
+  }
+  return line
+    .replace(authorizationHeader, "$1: [redacted]")
+    .replace(cookieHeader, "$1: [redacted]")
+    .replace(bearerValue, "[redacted]")
+    .replace(sensitiveValue, "[redacted]");
+}
+
+function sanitizeDiagnosticLines(lines: string[]) {
+  let redactContinuation = false;
+  return lines.map((line) => {
+    if (redactContinuation && /^\s/.test(line)) return "[redacted]";
+    redactContinuation = sensitiveHeader.test(line);
+    return sanitizeDiagnosticLine(line);
+  });
+}
 
 /** Remove values that must never enter a diagnostic record, even from an untrusted client. */
 export function sanitizeDiagnosticText(value: unknown, max: number, maxLines = 1) {
   if (typeof value !== "string") return undefined;
+  const lines = sanitizeDiagnosticLines(value.split(/\r?\n/).slice(0, maxLines));
   return (
-    value
+    lines
+      .join("\n")
       .replace(/(?:https?:\/\/|file:|webpack:|blob:|data:|javascript:)[^\s"')]+/gi, "[location]")
       .replace(/(?<![\w.-])\/(?:[^\s"')]|\/(?!\s))+/g, "[location]")
       .replace(/[\w.+-]+@[\w.-]+\.[a-z]{2,}/gi, "[email]")
       .replace(/\b[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}\b/gi, "[identifier]")
-      .replace(sensitiveValue, "[redacted]")
       .replace(/\b[A-Za-z0-9_-]{24,}\b/g, "[opaque]")
       .split(/\r?\n/)
-      .slice(0, maxLines)
       .map((line) => line.slice(0, Math.max(1, Math.floor(max / maxLines))))
       .join("\n")
       .slice(0, max)
