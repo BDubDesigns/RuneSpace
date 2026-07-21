@@ -57,20 +57,17 @@ test("owned character can start, observe, stop, and restore Crash Site Mining", 
     .where(eq(activeActions.characterId, characterId));
   await page.getByRole("button", { name: "Refresh status" }).click();
   const footer = page.getByRole("navigation", { name: "Primary" });
+  const latestResult = page.getByRole("region", {
+    name: "Latest mining attempt",
+    exact: true,
+  });
   await expect(footer.getByRole("link", { name: "Characters" })).toHaveText("Chars");
   await expect(footer.getByRole("button", { name: "Inventory 2/8" })).toBeVisible();
-  await expect(page.getByLabel("Latest mining attempt")).toContainText("Latest attempt: No yield");
-  await expect(page.getByLabel("Latest mining attempt")).toContainText(
-    "Roll 35.00 | Needed below 35.00",
-  );
-  await expect(page.getByLabel("Latest mining attempt")).toContainText("Missed by 0.01");
-  await expect(page.getByLabel("Latest mining attempt")).toContainText(
-    "2 attempts resolved while away",
-  );
-  await expect(page.getByLabel("Latest mining attempt")).toHaveAttribute(
-    "data-feedback-state",
-    "new",
-  );
+  await expect(latestResult).toContainText("Latest attempt: No yield");
+  await expect(latestResult).toContainText("Roll 35.00 | Needed below 35.00");
+  await expect(latestResult).toContainText("Missed by 0.01");
+  await expect(latestResult).toContainText("2 attempts resolved while away");
+  await expect(latestResult).toHaveAttribute("data-feedback-state", "new");
   await page.screenshot({ path: "test-results/mining-mobile-no-yield.png" });
   await expect(page.getByText("This mining run")).toBeVisible();
   await expect(page.getByText("2 attempts", { exact: true })).toBeVisible();
@@ -78,7 +75,7 @@ test("owned character can start, observe, stop, and restore Crash Site Mining", 
   await expect(page.getByText("1 failed", { exact: true })).toBeVisible();
   await expect(page.getByText("1 shale gained", { exact: true })).toBeVisible();
   await expect(page.getByText("15 Mining XP", { exact: true })).toBeVisible();
-  const history = page.getByLabel("Latest mining attempts");
+  const history = page.getByLabel("Mining attempt history", { exact: true });
   await expect(history).toContainText("Attempt 2 - Failed");
   await expect(history).toContainText("Attempt 1 - Success");
   await expect(history).toContainText("Roll 35.00 | Needed below 35.00");
@@ -251,7 +248,6 @@ test("owned character can start, observe, stop, and restore Crash Site Mining", 
     .set({ startedAt: oneAttemptAgo, resolvedThroughAt: oneAttemptAgo })
     .where(eq(activeActions.characterId, characterId));
   await page.getByRole("button", { name: "Refresh status" }).click();
-  const latestResult = page.getByLabel("Latest mining attempt");
   await expect(latestResult).toContainText("Latest attempt: Success");
   await expect(latestResult.getByLabel("1 Ferrite Shale earned")).toBeVisible();
   await expect(latestResult.getByLabel("15 Mining XP earned")).toBeVisible();

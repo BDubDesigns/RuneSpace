@@ -472,7 +472,7 @@ export function MiningConsole({ characterName }: { characterName: string }) {
         </div>
         <div
           className="mt-5 max-h-72 space-y-2 overflow-y-auto pr-1"
-          aria-label="Latest mining attempts"
+          aria-label="Mining attempt history"
         >
           {[...state.run.recentAttempts].reverse().map((attempt) => (
             <article
