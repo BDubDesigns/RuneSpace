@@ -7,7 +7,8 @@ contract. This document provides the supporting procedure.
 - Fetch `origin`, then create each dedicated branch from the latest `origin/main`.
 - Produce **one draft pull request** per issue. Do not open multiple PRs for the
   same issue.
-- **Never merge your own work.** Stop at the draft PR for human review.
+- Work stops at a draft PR for human review. Do not merge unless the product owner
+  explicitly instructs it to merge after review.
 
 ## Validate locally
 Baseline local checks mirror the fast CI job:

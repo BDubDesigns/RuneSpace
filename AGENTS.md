@@ -86,12 +86,13 @@ subagents or automation that may be unavailable.
    `.github/workflows/ci.yml` environment requirements. Resolve failures or
    document genuine external blockers.
 7. **One draft PR.** Create or update exactly one draft pull request for the issue.
-   Keep it draft until human review and never merge without explicit product-owner
-   approval. Include the exact branch, commit, PR, local validation results,
-   canonical CI result, required artifact evidence, architectural decisions,
-   review approach, limitations, and unresolved questions. State exactly whether
-   gameplay, balance, persistence, or player-facing behavior changed and which
-   approved decisions governed those changes.
+   Work stops at a draft PR for human review. Do not merge unless the product
+   owner explicitly instructs it to merge after review. Include the exact branch,
+   commit, PR, local validation results, canonical CI result, required artifact
+   evidence, architectural decisions, review approach, limitations, and unresolved
+   questions. State exactly whether gameplay, balance, persistence, or
+   player-facing behavior changed and which approved decisions governed those
+   changes.
 8. **Follow canonical CI through completion.** Remain active after pushing until
    canonical CI completes. For a failed run, inspect the actual failed job and
    step logs, repair relevant failures on the same branch, push, and wait for the
@@ -102,5 +103,5 @@ subagents or automation that may be unavailable.
 ## Tooling reference
 - pnpm is the package manager; the lockfile is committed and installs are frozen.
 - Node 22 and pnpm 9.15.4 are pinned (see `package.json` `engines`/`packageManager`).
-- Scripts: `dev`, `build`, `start`, `lint`, `format`, `format:check`,
-  `typecheck`, `test`, `test:e2e`.
+- Key scripts: `dev`, `build`, `start`, `lint`, `format`, `format:check`,
+  `typecheck`, `test`, `test:integration`, `test:e2e`.
