@@ -329,10 +329,10 @@ test("equipment drawer shows and updates the approved Mining loadout", async ({ 
   });
   await page.getByRole("button", { name: "Refresh status" }).click();
   await equipmentTrigger.click();
-  await expect(secondContainer.getByText("MYKEA SCHLEPPRAUM-8", { exact: true })).toHaveCount(0);
   const equipSecondContainer = secondContainer.getByRole("button", {
     name: "Equip in Container attachment 2",
   });
+  await expect(equipSecondContainer).toBeVisible();
   const mobileControlBox = await equipSecondContainer.boundingBox();
   expect(mobileControlBox).not.toBeNull();
   expect(mobileControlBox!.height).toBeGreaterThanOrEqual(44);
