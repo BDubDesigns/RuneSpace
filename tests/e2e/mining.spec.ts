@@ -1,8 +1,9 @@
 import { expect, test } from "@playwright/test";
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
-import { activeActions, inventoryStacks } from "@/db/rune-space";
+import { activeActions, characterMiningState, inventoryStacks } from "@/db/rune-space";
 import { ITEM_IDS } from "@/game/config/foundations";
+import { miningStorageStatePath } from "./mining.setup";
 
 const e2eDatabaseHost = process.env.DATABASE_URL ? new URL(process.env.DATABASE_URL).hostname : "";
 
@@ -12,25 +13,29 @@ test.beforeAll(() => {
   }
 });
 
-function uniqueEmail() {
-  return `miner-${Date.now()}-${Math.floor(Math.random() * 1e6)}@example.com`;
+test.use({ storageState: miningStorageStatePath });
+test.describe.configure({ mode: "serial" });
+
+async function openMiningFixture(page: import("@playwright/test").Page) {
+  await page.goto("/characters");
+  await page.getByRole("link", { name: "Play" }).click();
+  return page.url().split("/").at(-1)!;
 }
+
+test.beforeEach(async ({ page }) => {
+  const characterId = await openMiningFixture(page);
+  await Promise.all([
+    db.delete(activeActions).where(eq(activeActions.characterId, characterId)),
+    db.delete(characterMiningState).where(eq(characterMiningState.characterId, characterId)),
+    db.delete(inventoryStacks).where(eq(inventoryStacks.characterId, characterId)),
+  ]);
+  await page.reload();
+});
 
 test("owned character can start, observe, stop, and restore Crash Site Mining", async ({
   page,
 }) => {
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.goto("/register");
-  await page.getByLabel("Display name").fill("Mining Pilot");
-  await page.getByLabel("Email").fill(uniqueEmail());
-  await page.getByLabel("Password", { exact: true }).fill("sup3r-secret-password");
-  await page.getByRole("button", { name: "Create account" }).click();
-  await page.getByRole("link", { name: "New character" }).click();
-  await page
-    .getByLabel("Character name")
-    .fill(`Ore Runner ${Math.random().toString(36).slice(2, 8)}`);
-  await page.getByRole("button", { name: "Create character" }).click();
-
   await expect(page.getByText("Ferrite Shale", { exact: true }).first()).toBeVisible();
   await expect(page.getByText(/Success chance: 35.00%/)).toBeVisible();
   await expect(page.getByText(/Salvage Cutter and MYKEA SCHLEPPRAUM-8 equipped/)).toBeVisible();
@@ -239,17 +244,6 @@ test("owned character can start, observe, stop, and restore Crash Site Mining", 
 test("an interrupted Mining action preserves confirmed state and retries only status refresh", async ({
   page,
 }) => {
-  await page.goto("/register");
-  await page.getByLabel("Display name").fill("Recovery Pilot");
-  await page.getByLabel("Email").fill(uniqueEmail());
-  await page.getByLabel("Password", { exact: true }).fill("sup3r-secret-password");
-  await page.getByRole("button", { name: "Create account" }).click();
-  await page.getByRole("link", { name: "New character" }).click();
-  await page
-    .getByLabel("Character name")
-    .fill(`Recovery ${Math.random().toString(36).slice(2, 8)}`);
-  await page.getByRole("button", { name: "Create character" }).click();
-
   const isMiningAction = (request: import("@playwright/test").Request) =>
     request.method() === "POST" && Boolean(request.headers()["next-action"]);
   await expect(page.getByText(/Success chance: 35.00%/)).toBeVisible();
@@ -308,17 +302,6 @@ test("an interrupted Mining action preserves confirmed state and retries only st
 test("an uncertain Start retries status refresh without replaying the mutation", async ({
   page,
 }) => {
-  await page.goto("/register");
-  await page.getByLabel("Display name").fill("Start Recovery Pilot");
-  await page.getByLabel("Email").fill(uniqueEmail());
-  await page.getByLabel("Password", { exact: true }).fill("sup3r-secret-password");
-  await page.getByRole("button", { name: "Create account" }).click();
-  await page.getByRole("link", { name: "New character" }).click();
-  await page
-    .getByLabel("Character name")
-    .fill(`Start Recovery ${Math.random().toString(36).slice(2, 8)}`);
-  await page.getByRole("button", { name: "Create character" }).click();
-
   const isMiningAction = (request: import("@playwright/test").Request) =>
     request.method() === "POST" && Boolean(request.headers()["next-action"]);
   await expect(page.getByRole("button", { name: "Start Mining" })).toBeVisible();
@@ -379,17 +362,6 @@ test("an uncertain Start retries status refresh without replaying the mutation",
 });
 
 test("the Play boundary resets, navigates, and hides failure details", async ({ page }) => {
-  await page.goto("/register");
-  await page.getByLabel("Display name").fill("Boundary Pilot");
-  await page.getByLabel("Email").fill(uniqueEmail());
-  await page.getByLabel("Password", { exact: true }).fill("sup3r-secret-password");
-  await page.getByRole("button", { name: "Create account" }).click();
-  await page.getByRole("link", { name: "New character" }).click();
-  await page
-    .getByLabel("Character name")
-    .fill(`Boundary ${Math.random().toString(36).slice(2, 8)}`);
-  await page.getByRole("button", { name: "Create character" }).click();
-
   await page.evaluate(() => window.sessionStorage.setItem("runespace-e2e-play-error", "1"));
   await page.reload();
   await expect(page.getByRole("heading", { name: "Play terminal interrupted" })).toBeVisible();
