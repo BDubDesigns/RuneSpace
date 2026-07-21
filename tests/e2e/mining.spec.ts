@@ -7,6 +7,11 @@ import { miningStorageStatePath } from "./mining.setup";
 
 const e2eDatabaseHost = process.env.DATABASE_URL ? new URL(process.env.DATABASE_URL).hostname : "";
 
+function animationDurationSeconds(value: string): number {
+  const duration = Number.parseFloat(value);
+  return value.endsWith("ms") ? duration / 1_000 : duration;
+}
+
 test.beforeAll(() => {
   if (e2eDatabaseHost !== "localhost" && e2eDatabaseHost !== "127.0.0.1") {
     throw new Error("Mining E2E fixtures require a disposable localhost PostgreSQL database");
@@ -254,7 +259,10 @@ test("owned character can start, observe, stop, and restore Crash Site Mining", 
   await expect(latestResult.getByText("XP", { exact: true })).toBeVisible();
   await expect(latestResult.getByText("Mining", { exact: true })).toBeVisible();
   await expect(latestResult.getByText("+15", { exact: true })).toBeVisible();
-  await expect(latestResult).toHaveCSS("animation-duration", "1e-05s");
+  const reducedMotionDuration = await latestResult.evaluate(
+    (element) => getComputedStyle(element).animationDuration,
+  );
+  expect(animationDurationSeconds(reducedMotionDuration)).toBeLessThanOrEqual(0.0001);
   await page.screenshot({ path: "test-results/mining-desktop-success.png" });
   await page.setViewportSize({ width: 390, height: 844 });
   await page.screenshot({ path: "test-results/mining-mobile-success.png" });
