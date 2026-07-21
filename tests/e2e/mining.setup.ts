@@ -1,8 +1,8 @@
 import { chromium, expect, type FullConfig } from "@playwright/test";
-import { mkdir } from "node:fs/promises";
+import { access, mkdir } from "node:fs/promises";
 import { dirname } from "node:path";
 
-export const miningStorageStatePath = "test-results/mining-auth-state.json";
+export const miningStorageStatePath = ".playwright/mining-auth-state.json";
 
 function uniqueEmail() {
   return `mining-fixture-${Date.now()}-${Math.floor(Math.random() * 1e6)}@example.com`;
@@ -25,17 +25,31 @@ export default async function setupMiningFixture(config: FullConfig) {
 
   await mkdir(dirname(miningStorageStatePath), { recursive: true });
   const browser = await chromium.launch();
-  const context = await browser.newContext({ baseURL });
-  const page = await context.newPage();
 
   try {
+    try {
+      await access(miningStorageStatePath);
+      const existingContext = await browser.newContext({
+        baseURL,
+        storageState: miningStorageStatePath,
+      });
+      const existingPage = await existingContext.newPage();
+      await existingPage.goto("/characters");
+      if (await existingPage.getByRole("link", { name: "Play" }).count()) return;
+      await existingContext.close();
+    } catch {
+      // A missing or expired state belongs to a prior local database; replace it.
+    }
+
+    const context = await browser.newContext({ baseURL });
+    const page = await context.newPage();
     await page.goto("/register");
     await page.getByLabel("Display name").fill("Mining Fixture");
     await page.getByLabel("Email").fill(uniqueEmail());
     await page.getByLabel("Password", { exact: true }).fill("sup3r-secret-password");
     await page.getByRole("button", { name: "Create account" }).click();
     await page.getByRole("link", { name: "New character" }).click();
-    await page.getByLabel("Character name").fill("Mining Fixture Pilot");
+    await page.getByLabel("Character name").fill(`Mining Fixture ${Date.now()}`);
     await page.getByRole("button", { name: "Create character" }).click();
     await expect(page.getByText("Ferrite Shale", { exact: true }).first()).toBeVisible();
     await context.storageState({ path: miningStorageStatePath });
