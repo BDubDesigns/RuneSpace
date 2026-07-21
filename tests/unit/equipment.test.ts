@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { getEffectiveGameBalance } from "@/game/config/balance";
 import { ITEM_IDS } from "@/game/config/foundations";
 import {
-  canStoreItemInContainer,
+  carriedItemMassGrams,
   deriveEquipmentLoadout,
   isCompatibleEquipmentAssignment,
   planEquipmentChange,
@@ -64,9 +64,20 @@ describe("equipment loadout rules", () => {
     ).toThrow(/cannot be equipped twice/i);
   });
 
-  it("rejects nested containers", () => {
-    expect(canStoreItemInContainer(ITEM_IDS.salvageCutter, balance)).toBe(true);
-    expect(canStoreItemInContainer(ITEM_IDS.mykeaSchleppraum8, balance)).toBe(false);
+  it("counts a carried spare container as one inventory slot with mass but no capacity", () => {
+    const loadout = deriveEquipmentLoadout({
+      balance,
+      instances: [cutter, firstContainer],
+      stacks: [],
+      assignments: [{ ...toolTarget, itemInstanceId: cutter.id }],
+    });
+    // Only the Cutter is equipped, so no slots from containers.
+    expect(loadout.containerSlotCapacity).toBe(0);
+    // The unequipped MYKEA consumes one inventory slot.
+    expect(loadout.inventorySlotsUsed).toBe(1);
+    // Both items contribute mass.
+    expect(loadout.carriedMassGrams).toBe(15_000);
+    expect(carriedItemMassGrams(ITEM_IDS.mykeaSchleppraum8, balance)).toBe(10_000);
   });
 
   it("requires at least one compatible container to remain equipped", () => {

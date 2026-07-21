@@ -62,11 +62,17 @@ export async function changeEquipment(
           .where(eq(inventoryStacks.characterId, context.character.id))
           .for("update"),
       ]);
+      const balance = getEffectiveGameBalance();
+      const miningToolSlotId = balance.items.salvageCutter.suitSlotId;
+      const previousToolAssignment = assignments.find(
+        (a) => a.assignmentKind === "gear" && a.suitSlotId === miningToolSlotId,
+      );
+
       const nextLoadout = planEquipmentChange({
         assignments,
         instances,
         stacks,
-        balance: getEffectiveGameBalance(),
+        balance,
         change,
       });
 
@@ -82,10 +88,16 @@ export async function changeEquipment(
         })),
       );
 
-      const miningToolRemoved =
+      const currentToolAssignment = nextLoadout.assignments.find(
+        (a) => a.assignmentKind === "gear" && a.suitSlotId === miningToolSlotId,
+      );
+      const miningToolChanged =
         context.action?.actionId === ACTION_IDS.crashSiteMining &&
-        !nextLoadout.hasCompatibleMiningTool;
-      if (miningToolRemoved) {
+        previousToolAssignment?.itemInstanceId !== currentToolAssignment?.itemInstanceId;
+      if (miningToolChanged) {
+        const stopReason: MiningGameplayState["stoppingReason"] = currentToolAssignment
+          ? "mining_tool_replaced"
+          : "compatible_mining_tool_missing";
         await transaction
           .delete(activeActions)
           .where(eq(activeActions.characterId, context.character.id));
@@ -93,14 +105,14 @@ export async function changeEquipment(
           .insert(characterMiningState)
           .values({
             characterId: context.character.id,
-            lastStopReason: "compatible_mining_tool_missing",
+            lastStopReason: stopReason,
             updatedAt: now,
           })
           .onConflictDoUpdate({
             target: characterMiningState.characterId,
-            set: { lastStopReason: "compatible_mining_tool_missing", updatedAt: now },
+            set: { lastStopReason: stopReason, updatedAt: now },
           });
-        resolvedStopReason = "compatible_mining_tool_missing";
+        resolvedStopReason = stopReason;
       }
       return stateFromTransaction(
         transaction,

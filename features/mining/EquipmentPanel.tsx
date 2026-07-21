@@ -22,8 +22,8 @@ export function EquipmentPanel({
   onClose: () => void;
   triggerRef: RefObject<HTMLButtonElement | null>;
 }) {
-  const { commandInFlight, setState } = useMiningPlay();
-  const [pending, startTransition] = useTransition();
+  const { acquireCommand, busy, releaseCommand, setState } = useMiningPlay();
+  const [, startTransition] = useTransition();
   const [message, setMessage] = useState<string>();
 
   function apply(result: Awaited<ReturnType<typeof equipEquipmentAction>>) {
@@ -38,15 +38,14 @@ export function EquipmentPanel({
   }
 
   function command(action: () => ReturnType<typeof equipEquipmentAction>) {
-    if (commandInFlight.current) return;
-    commandInFlight.current = true;
+    if (!acquireCommand()) return;
     startTransition(async () => {
       try {
         apply(await action());
       } catch {
         setMessage("Comms interruption. Equipment could not be confirmed.");
       } finally {
-        commandInFlight.current = false;
+        releaseCommand();
       }
     });
   }
@@ -102,7 +101,7 @@ export function EquipmentPanel({
                   </p>
                 </div>
                 <ActionButton
-                  disabled={pending}
+                  disabled={busy}
                   intent="secondary"
                   onClick={() =>
                     command(() =>
@@ -143,7 +142,7 @@ export function EquipmentPanel({
                       </p>
                     </div>
                     <ActionButton
-                      disabled={pending}
+                      disabled={busy}
                       intent="mining"
                       onClick={() =>
                         command(() =>

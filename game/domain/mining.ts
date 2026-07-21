@@ -7,6 +7,7 @@ export const MINING_STOP_REASONS = [
   "inventory_slots_full",
   "carried_mass_capacity_reached",
   "compatible_mining_tool_missing",
+  "mining_tool_replaced",
   "action_replaced",
 ] as const;
 export type MiningStopReason = (typeof MINING_STOP_REASONS)[number];

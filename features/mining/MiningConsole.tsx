@@ -32,6 +32,7 @@ function stopMessage(reason: NonNullable<MiningGameplayState["stoppingReason"]>)
     inventory_slots_full: "Mining stopped: inventory slots are full.",
     carried_mass_capacity_reached: "Mining stopped: carried-mass capacity reached.",
     compatible_mining_tool_missing: "Mining stopped: equip a Salvage Cutter.",
+    mining_tool_replaced: "Mining stopped: the mining tool was replaced.",
     action_replaced: "Mining stopped because another action replaced it.",
   }[reason];
 }
@@ -187,13 +188,17 @@ function InventoryPanel({
 
 export function MiningConsole({ characterName }: { characterName: string }) {
   const {
-    commandInFlight,
+    acquireCommand,
+    busy,
     equipmentOpen,
     equipmentTrigger,
     inventoryOpen,
     inventoryTrigger,
+    releaseCommand,
+    requestAutoRefresh,
     setEquipmentOpen,
     setInventoryOpen,
+    setRefreshCallback,
     setState,
     state,
   } = useMiningPlay();
@@ -201,7 +206,7 @@ export function MiningConsole({ characterName }: { characterName: string }) {
     state.stoppingReason ? stopMessage(state.stoppingReason) : undefined,
   );
   const [now, setNow] = useState(Date.now());
-  const [pending, startTransition] = useTransition();
+  const [, startTransition] = useTransition();
   const [recovery, setRecovery] = useState<(() => void) | undefined>();
   const observedAttempts = useRef(state.run.attempts);
   const observedSequence = useRef(latestMiningAttempt(state.run.recentAttempts)?.sequence);
@@ -226,8 +231,7 @@ export function MiningConsole({ characterName }: { characterName: string }) {
     }
   }
   function command(action: (id: string) => ReturnType<typeof refreshMiningAction>) {
-    if (commandInFlight.current) return;
-    commandInFlight.current = true;
+    if (!acquireCommand()) return;
     setRecovery(undefined);
     startTransition(async () => {
       try {
@@ -242,21 +246,24 @@ export function MiningConsole({ characterName }: { characterName: string }) {
         // Reconcile only; never replay Start/Stop from uncertain client state.
         setRecovery(() => () => command(refreshMiningAction));
       } finally {
-        commandInFlight.current = false;
+        releaseCommand();
       }
     });
   }
+  useEffect(() => {
+    setRefreshCallback(() => command(refreshMiningAction));
+  });
 
   useEffect(() => {
     if (!active) return;
     const clock = window.setInterval(() => setNow(Date.now()), 250);
     const delay = Math.max(100, new Date(active.nextAttemptAt).getTime() - Date.now() + 100);
-    const refresh = window.setTimeout(() => command(refreshMiningAction), delay);
+    const refresh = window.setTimeout(() => requestAutoRefresh(), delay);
     return () => {
       window.clearInterval(clock);
       window.clearTimeout(refresh);
     };
-  }, [active?.nextAttemptAt]);
+  }, [active?.nextAttemptAt, requestAutoRefresh]);
 
   const latestAttempt = latestMiningAttempt(state.run.recentAttempts);
   const recentBatchCount = state.recentResult.successes + state.recentResult.failures;
@@ -295,25 +302,17 @@ export function MiningConsole({ characterName }: { characterName: string }) {
         </p>
         <div className="mt-5 flex flex-wrap gap-3">
           {active ? (
-            <ActionButton
-              intent="danger"
-              loading={pending}
-              onClick={() => command(stopMiningAction)}
-            >
+            <ActionButton intent="danger" loading={busy} onClick={() => command(stopMiningAction)}>
               Stop Mining
             </ActionButton>
           ) : (
-            <ActionButton
-              intent="mining"
-              loading={pending}
-              onClick={() => command(startMiningAction)}
-            >
+            <ActionButton intent="mining" loading={busy} onClick={() => command(startMiningAction)}>
               Start Mining
             </ActionButton>
           )}
           <ActionButton
             intent="secondary"
-            disabled={pending}
+            disabled={busy}
             onClick={() => command(refreshMiningAction)}
           >
             Refresh status
@@ -351,7 +350,7 @@ export function MiningConsole({ characterName }: { characterName: string }) {
           <Feedback tone={state.stoppingReason && !active ? "danger" : "muted"}>{message}</Feedback>
         ) : null}
         {recovery ? (
-          <ActionButton className="mt-3" disabled={pending} intent="secondary" onClick={recovery}>
+          <ActionButton className="mt-3" disabled={busy} intent="secondary" onClick={recovery}>
             Retry status check
           </ActionButton>
         ) : null}

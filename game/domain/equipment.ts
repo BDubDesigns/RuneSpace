@@ -61,15 +61,6 @@ function itemEquipmentDefinition(itemId: string, balance: EffectiveGameBalance) 
   return undefined;
 }
 
-export function isContainerItem(itemId: string, balance: EffectiveGameBalance): boolean {
-  return itemEquipmentDefinition(itemId, balance)?.assignmentKind === "container";
-}
-
-/** Containers hold loose non-container items only; nesting is never valid. */
-export function canStoreItemInContainer(itemId: string, balance: EffectiveGameBalance): boolean {
-  return !isContainerItem(itemId, balance);
-}
-
 export function isApprovedEquipmentTarget(
   target: EquipmentTarget,
   balance: EffectiveGameBalance,
