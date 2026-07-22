@@ -415,6 +415,7 @@ test("equipment and inventory rendering shows artwork for illustrated items and 
   await expect(cutterArt).toHaveCSS("object-fit", "contain");
   await expect(mykeaArt).toHaveCSS("object-fit", "contain");
 
+  await page.setViewportSize({ width: 390, height: 844 });
   await page.screenshot({ path: "test-results/mining-mobile-equipment-artwork.png" });
 
   // Desktop equipment view
@@ -448,6 +449,7 @@ test("equipment and inventory rendering shows artwork for illustrated items and 
   expect(invArtState.cssWidth).toBe("80px");
   expect(invArtState.cssHeight).toBe("80px");
 
+  await page.setViewportSize({ width: 390, height: 844 });
   await page.screenshot({ path: "test-results/mining-mobile-inventory-mixed.png" });
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.screenshot({ path: "test-results/mining-desktop-inventory-mixed.png" });
