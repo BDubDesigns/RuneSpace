@@ -1,8 +1,9 @@
 import Image from "next/image";
-import type { ReactNode } from "react";
+import { useId, type ReactNode } from "react";
 
 type VisualTileProps = {
   accessibleLabel: string;
+  accessibleDescription?: string;
   artworkSrc?: string;
   badge: string;
   background?: ReactNode;
@@ -14,6 +15,7 @@ type VisualTileProps = {
 /** Shared compact frame for inventory content and non-inventory reward presentation. */
 export function VisualTile({
   accessibleLabel,
+  accessibleDescription,
   artworkSrc,
   badge,
   background,
@@ -21,11 +23,18 @@ export function VisualTile({
   fallbackText,
   name,
 }: VisualTileProps) {
+  const descriptionId = useId();
   return (
     <article
+      aria-describedby={accessibleDescription ? descriptionId : undefined}
       aria-label={accessibleLabel}
       className={`relative min-h-28 overflow-hidden border border-[color:var(--rs-accent-mining)] bg-[color:var(--rs-surface-panel)] p-3 ${className}`}
     >
+      {accessibleDescription ? (
+        <span className="sr-only" id={descriptionId}>
+          {accessibleDescription}
+        </span>
+      ) : null}
       {background}
       <div className="absolute inset-0 z-10 flex items-center justify-center">
         {artworkSrc ? (
@@ -33,9 +42,10 @@ export function VisualTile({
             alt=""
             className="h-20 w-20 max-w-full object-contain"
             data-testid="item-artwork"
-            height={512}
+            height={160}
+            sizes="80px"
             src={artworkSrc}
-            width={512}
+            width={160}
           />
         ) : (
           <span className="font-display text-sm uppercase tracking-[0.16em] text-[color:var(--rs-text-secondary)]">

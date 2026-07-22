@@ -355,6 +355,146 @@ test("equipment drawer shows and updates the approved Mining loadout", async ({ 
   await page.screenshot({ path: "test-results/mining-desktop-equipment.png" });
 });
 
+test("equipment and inventory rendering shows artwork for illustrated items and fallback for the rest", async ({
+  page,
+}) => {
+  // Populate inventory with one illustrated stack (Ferrite Shale) and one
+  // deliberate text-fallback stack (Refined Ferrite) so both paths coexist.
+  const characterId = page.url().split("/").at(-1)!;
+  await db.insert(inventoryStacks).values([
+    {
+      characterId,
+      itemId: ITEM_IDS.ferriteShale,
+      quantity: 5,
+    },
+    {
+      characterId,
+      itemId: ITEM_IDS.refinedFerrite,
+      quantity: 1,
+    },
+  ]);
+  await page.getByRole("button", { name: "Refresh status" }).click();
+
+  // Open equipment drawer and verify equipped items show artwork.
+  const footer = page.getByRole("navigation", { name: "Primary" });
+  await footer.getByRole("button", { name: "Equipment" }).click();
+  const equipment = page.getByRole("dialog", { name: "Equipment" });
+
+  const miningTool = equipment.getByLabel("Mining tool");
+  const firstContainer = equipment.getByLabel("Container attachment 1");
+
+  // Salvage Cutter artwork
+  const cutterArt = miningTool.getByTestId("item-artwork");
+  await expect(cutterArt).toHaveCount(1);
+  await expect
+    .poll(() => cutterArt.evaluate((image) => image.complete && image.naturalWidth > 0))
+    .toBe(true);
+  const cutterState = await cutterArt.evaluate((image) => ({
+    src: image.getAttribute("src"),
+    naturalWidth: image.naturalWidth,
+    naturalHeight: image.naturalHeight,
+    cssWidth: getComputedStyle(image).width,
+    cssHeight: getComputedStyle(image).height,
+  }));
+  expect(cutterState.naturalWidth).toBeGreaterThan(0);
+  expect(cutterState.naturalHeight).toBeGreaterThan(0);
+  expect(cutterState.cssWidth).toBe("80px");
+  expect(cutterState.cssHeight).toBe("80px");
+
+  // Verify accessible description and name on the Cutter tile
+  const cutterTile = miningTool.locator("article").first();
+  await expect(cutterTile).toHaveAccessibleName("Salvage Cutter equipped");
+  const cutterDescId = await cutterTile.getAttribute("aria-describedby");
+  expect(cutterDescId).toBeTruthy();
+  const cutterDesc = miningTool.locator(`#${cutterDescId}`);
+  await expect(cutterDesc).toContainText("Vice-jaw improvised Salvage Cutter mining tool");
+
+  // MYKEA container artwork
+  const mykeaArt = firstContainer.getByTestId("item-artwork");
+  await expect(mykeaArt).toHaveCount(1);
+  await expect
+    .poll(() => mykeaArt.evaluate((image) => image.complete && image.naturalWidth > 0))
+    .toBe(true);
+  const mykeaState = await mykeaArt.evaluate((image) => ({
+    naturalWidth: image.naturalWidth,
+    naturalHeight: image.naturalHeight,
+    cssWidth: getComputedStyle(image).width,
+    cssHeight: getComputedStyle(image).height,
+  }));
+  expect(mykeaState.naturalWidth).toBeGreaterThan(0);
+  expect(mykeaState.naturalHeight).toBeGreaterThan(0);
+  expect(mykeaState.cssWidth).toBe("80px");
+  expect(mykeaState.cssHeight).toBe("80px");
+
+  await expect(cutterArt).toHaveCSS("object-fit", "contain");
+  await expect(mykeaArt).toHaveCSS("object-fit", "contain");
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.screenshot({ path: "test-results/mining-mobile-equipment-artwork.png" });
+
+  // Desktop equipment view
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.screenshot({ path: "test-results/mining-desktop-equipment-artwork.png" });
+
+  await equipment.getByRole("button", { name: "Close equipment" }).click();
+
+  // Open inventory — should show one illustrated and one fallback stack
+  await footer.getByRole("button", { name: "Inventory 2/8" }).click();
+  const inventory = page.getByRole("dialog", { name: "Inventory" });
+  await expect(inventory.getByText("2 occupied / 8 slots")).toBeVisible();
+
+  // Illustrated stack: Ferrite Shale
+  const ferriteTile = inventory.locator("article").filter({ hasText: "Ferrite Shale" });
+  await expect(ferriteTile).toHaveAccessibleName("5 Ferrite Shale");
+  await expect(ferriteTile.getByText("Ferrite Shale", { exact: true })).toBeVisible();
+  await expect(ferriteTile.getByText("x5", { exact: true })).toBeVisible();
+  const ferriteArt = ferriteTile.getByTestId("item-artwork");
+  await expect(ferriteArt).toHaveCount(1);
+  await expect
+    .poll(() => ferriteArt.evaluate((image) => image.complete && image.naturalWidth > 0))
+    .toBe(true);
+  const ferriteDescId = await ferriteTile.getAttribute("aria-describedby");
+  expect(ferriteDescId).toBeTruthy();
+  await expect(inventory.locator(`#${ferriteDescId}`)).toContainText(
+    "Ferrite Shale mineral fragment",
+  );
+
+  // Fallback stack: Refined Ferrite (no artwork, renders textFallback "RF")
+  const refinedTile = inventory.locator("article").filter({ hasText: "Refined Ferrite" });
+  await expect(refinedTile).toHaveAccessibleName("1 Refined Ferrite");
+  await expect(refinedTile.getByText("Refined Ferrite", { exact: true })).toBeVisible();
+  await expect(refinedTile.getByText("x1", { exact: true })).toBeVisible();
+  // No artwork for fallback items
+  await expect(refinedTile.getByTestId("item-artwork")).toHaveCount(0);
+  // Fallback text renders
+  await expect(refinedTile.locator("span").filter({ hasText: "RF" })).toBeVisible();
+  // Accessible description still works for fallback items
+  const refinedDescId = await refinedTile.getAttribute("aria-describedby");
+  expect(refinedDescId).toBeTruthy();
+  await expect(inventory.locator(`#${refinedDescId}`)).toContainText("Purified Ferrite material");
+
+  await expect(inventory.getByLabel(/Empty inventory slot/)).toHaveCount(6);
+
+  // Verify artwork sizing in inventory context
+  const invArtState = await ferriteArt.evaluate((image) => ({
+    naturalWidth: image.naturalWidth,
+    naturalHeight: image.naturalHeight,
+    cssWidth: getComputedStyle(image).width,
+    cssHeight: getComputedStyle(image).height,
+  }));
+  expect(invArtState.naturalWidth).toBeGreaterThan(0);
+  expect(invArtState.naturalHeight).toBeGreaterThan(0);
+  expect(invArtState.cssWidth).toBe("80px");
+  expect(invArtState.cssHeight).toBe("80px");
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.screenshot({ path: "test-results/mining-mobile-inventory-mixed.png" });
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.screenshot({ path: "test-results/mining-desktop-inventory-mixed.png" });
+
+  await page.setViewportSize({ width: 390, height: 844 });
+}, 30_000);
+
 test("an interrupted Mining action preserves confirmed state and retries only status refresh", async ({
   page,
 }) => {

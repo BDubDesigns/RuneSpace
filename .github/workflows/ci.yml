@@ -140,6 +140,10 @@ jobs:
           test -s test-results/mining-desktop-success.png
           test -s test-results/mining-mobile-equipment.png
           test -s test-results/mining-desktop-equipment.png
+          test -s test-results/mining-mobile-equipment-artwork.png
+          test -s test-results/mining-desktop-equipment-artwork.png
+          test -s test-results/mining-mobile-inventory-mixed.png
+          test -s test-results/mining-desktop-inventory-mixed.png
       - uses: actions/upload-artifact@v4
         if: always()
         with:
