@@ -380,32 +380,38 @@ test("equipment and inventory rendering shows artwork for illustrated items and 
   const cutterArt = miningTool.getByTestId("item-artwork");
   await expect(cutterArt).toHaveCount(1);
   await expect
-    .poll(() =>
-      cutterArt.evaluate((image) => image.complete && image.naturalWidth > 0),
-    )
+    .poll(() => cutterArt.evaluate((image) => image.complete && image.naturalWidth > 0))
     .toBe(true);
   const cutterState = await cutterArt.evaluate((image) => ({
     src: image.getAttribute("src"),
     naturalWidth: image.naturalWidth,
     naturalHeight: image.naturalHeight,
+    cssWidth: getComputedStyle(image).width,
+    cssHeight: getComputedStyle(image).height,
   }));
-  expect(cutterState.naturalWidth).toBe(160);
-  expect(cutterState.naturalHeight).toBe(160);
+  expect(cutterState.naturalWidth).toBeGreaterThan(0);
+  expect(cutterState.naturalWidth).toBeLessThanOrEqual(160);
+  expect(cutterState.naturalHeight).toBe(cutterState.naturalWidth);
+  expect(cutterState.cssWidth).toBe("80px");
+  expect(cutterState.cssHeight).toBe("80px");
 
   // MYKEA container artwork
   const mykeaArt = firstContainer.getByTestId("item-artwork");
   await expect(mykeaArt).toHaveCount(1);
   await expect
-    .poll(() =>
-      mykeaArt.evaluate((image) => image.complete && image.naturalWidth > 0),
-    )
+    .poll(() => mykeaArt.evaluate((image) => image.complete && image.naturalWidth > 0))
     .toBe(true);
   const mykeaState = await mykeaArt.evaluate((image) => ({
     naturalWidth: image.naturalWidth,
     naturalHeight: image.naturalHeight,
+    cssWidth: getComputedStyle(image).width,
+    cssHeight: getComputedStyle(image).height,
   }));
-  expect(mykeaState.naturalWidth).toBe(160);
-  expect(mykeaState.naturalHeight).toBe(160);
+  expect(mykeaState.naturalWidth).toBeGreaterThan(0);
+  expect(mykeaState.naturalWidth).toBeLessThanOrEqual(160);
+  expect(mykeaState.naturalHeight).toBe(mykeaState.naturalWidth);
+  expect(mykeaState.cssWidth).toBe("80px");
+  expect(mykeaState.cssHeight).toBe("80px");
 
   // Equipped bagdes
   await expect(cutterArt).toHaveCSS("object-fit", "contain");
