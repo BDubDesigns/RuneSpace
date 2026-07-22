@@ -444,7 +444,7 @@ test("equipment and inventory rendering shows artwork for illustrated items and 
   await expect(inventory.getByText("2 occupied / 8 slots")).toBeVisible();
 
   // Illustrated stack: Ferrite Shale
-  const ferriteTile = inventory.locator("article").first();
+  const ferriteTile = inventory.locator("article").filter({ hasText: "Ferrite Shale" });
   await expect(ferriteTile).toHaveAccessibleName("5 Ferrite Shale");
   await expect(ferriteTile.getByText("Ferrite Shale", { exact: true })).toBeVisible();
   await expect(ferriteTile.getByText("x5", { exact: true })).toBeVisible();
@@ -460,7 +460,7 @@ test("equipment and inventory rendering shows artwork for illustrated items and 
   );
 
   // Fallback stack: Refined Ferrite (no artwork, renders textFallback "RF")
-  const refinedTile = inventory.locator("article").nth(1);
+  const refinedTile = inventory.locator("article").filter({ hasText: "Refined Ferrite" });
   await expect(refinedTile).toHaveAccessibleName("1 Refined Ferrite");
   await expect(refinedTile.getByText("Refined Ferrite", { exact: true })).toBeVisible();
   await expect(refinedTile.getByText("x1", { exact: true })).toBeVisible();
