@@ -21,13 +21,21 @@ const itemPresentations = {
   },
   [ITEM_IDS.salvageCutter]: {
     displayName: "Salvage Cutter",
-    accessibleDescription: "Salvage Cutter mining tool",
+    accessibleDescription: "Vice-jaw improvised Salvage Cutter mining tool",
     textFallback: "SC",
+    artworkSrc: "/item-art/salvage-cutter.png",
   },
   [ITEM_IDS.mykeaSchleppraum8]: {
     displayName: "MYKEA SCHLEPPRAUM-8",
-    accessibleDescription: "MYKEA SCHLEPPRAUM-8 container",
+    accessibleDescription: "White-and-blue MYKEA industrial flat-pack container with eight drawers",
     textFallback: "MY-8",
+    artworkSrc: "/item-art/mykea-schleppraum-8.png",
+  },
+  [ITEM_IDS.powerCell]: {
+    displayName: "Power Cell",
+    accessibleDescription: "Salvaged DeWhat? power cell with QC FAILED marking and visible repairs",
+    textFallback: "PC",
+    artworkSrc: "/item-art/power-cell.png",
   },
 } as const satisfies Partial<Record<ItemId, ItemPresentation>>;
 

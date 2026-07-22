@@ -33,9 +33,10 @@ export function VisualTile({
             alt=""
             className="h-20 w-20 max-w-full object-contain"
             data-testid="item-artwork"
-            height={512}
+            height={160}
+            sizes="80px"
             src={artworkSrc}
-            width={512}
+            width={160}
           />
         ) : (
           <span className="font-display text-sm uppercase tracking-[0.16em] text-[color:var(--rs-text-secondary)]">

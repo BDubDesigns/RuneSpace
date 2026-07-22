@@ -355,6 +355,97 @@ test("equipment drawer shows and updates the approved Mining loadout", async ({ 
   await page.screenshot({ path: "test-results/mining-desktop-equipment.png" });
 });
 
+test("equipment and inventory rendering shows artwork for illustrated items and fallback for the rest", async ({
+  page,
+}) => {
+  // Populate inventory with a Ferrite Shale stack so both artwork and non-artwork
+  // inventory slots coexist alongside the equipped Cutter and container.
+  const characterId = page.url().split("/").at(-1)!;
+  await db.insert(inventoryStacks).values({
+    characterId,
+    itemId: ITEM_IDS.ferriteShale,
+    quantity: 5,
+  });
+  await page.getByRole("button", { name: "Refresh status" }).click();
+
+  // Open equipment drawer and verify equipped items show artwork.
+  const footer = page.getByRole("navigation", { name: "Primary" });
+  await footer.getByRole("button", { name: "Equipment" }).click();
+  const equipment = page.getByRole("dialog", { name: "Equipment" });
+
+  const miningTool = equipment.getByLabel("Mining tool");
+  const firstContainer = equipment.getByLabel("Container attachment 1");
+
+  // Salvage Cutter artwork
+  const cutterArt = miningTool.getByTestId("item-artwork");
+  await expect(cutterArt).toHaveCount(1);
+  await expect
+    .poll(() =>
+      cutterArt.evaluate((image) => image.complete && image.naturalWidth > 0),
+    )
+    .toBe(true);
+  const cutterState = await cutterArt.evaluate((image) => ({
+    src: image.getAttribute("src"),
+    naturalWidth: image.naturalWidth,
+    naturalHeight: image.naturalHeight,
+  }));
+  expect(cutterState.naturalWidth).toBe(160);
+  expect(cutterState.naturalHeight).toBe(160);
+
+  // MYKEA container artwork
+  const mykeaArt = firstContainer.getByTestId("item-artwork");
+  await expect(mykeaArt).toHaveCount(1);
+  await expect
+    .poll(() =>
+      mykeaArt.evaluate((image) => image.complete && image.naturalWidth > 0),
+    )
+    .toBe(true);
+  const mykeaState = await mykeaArt.evaluate((image) => ({
+    naturalWidth: image.naturalWidth,
+    naturalHeight: image.naturalHeight,
+  }));
+  expect(mykeaState.naturalWidth).toBe(160);
+  expect(mykeaState.naturalHeight).toBe(160);
+
+  // Equipped bagdes
+  await expect(cutterArt).toHaveCSS("object-fit", "contain");
+  await expect(mykeaArt).toHaveCSS("object-fit", "contain");
+
+  await page.screenshot({ path: "test-results/mining-mobile-equipment-artwork.png" });
+
+  // Desktop equipment view
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.screenshot({ path: "test-results/mining-desktop-equipment-artwork.png" });
+
+  await equipment.getByRole("button", { name: "Close equipment" }).click();
+
+  // Open inventory — should show one Ferrite Shale stack with artwork
+  await footer.getByRole("button", { name: "Inventory 1/8" }).click();
+  const inventory = page.getByRole("dialog", { name: "Inventory" });
+  const ferriteArt = inventory.getByTestId("item-artwork");
+  await expect(ferriteArt).toHaveCount(1);
+  await expect(inventory.getByText("Ferrite Shale")).toBeVisible();
+  await expect(inventory.getByText("x5", { exact: true })).toBeVisible();
+  await expect(inventory.getByLabel(/Empty inventory slot/)).toHaveCount(7);
+
+  // Verify artwork sizing in inventory context
+  const invArtState = await ferriteArt.evaluate((image) => ({
+    naturalWidth: image.naturalWidth,
+    naturalHeight: image.naturalHeight,
+    cssWidth: getComputedStyle(image).width,
+    cssHeight: getComputedStyle(image).height,
+  }));
+  // CSS is 5rem (80px) in the VisualTile layout
+  expect(invArtState.cssWidth).toBe("80px");
+  expect(invArtState.cssHeight).toBe("80px");
+
+  await page.screenshot({ path: "test-results/mining-mobile-inventory-mixed.png" });
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.screenshot({ path: "test-results/mining-desktop-inventory-mixed.png" });
+
+  await page.setViewportSize({ width: 390, height: 844 });
+}, 30_000);
+
 test("an interrupted Mining action preserves confirmed state and retries only status refresh", async ({
   page,
 }) => {
