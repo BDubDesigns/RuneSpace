@@ -370,7 +370,7 @@ test("equipment and inventory rendering shows artwork for illustrated items and 
     {
       characterId,
       itemId: ITEM_IDS.refinedFerrite,
-      quantity: 3,
+      quantity: 1,
     },
   ]);
   await page.getByRole("button", { name: "Refresh status" }).click();
@@ -401,8 +401,9 @@ test("equipment and inventory rendering shows artwork for illustrated items and 
   expect(cutterState.cssWidth).toBe("80px");
   expect(cutterState.cssHeight).toBe("80px");
 
-  // Verify accessible description exists on the Cutter tile
+  // Verify accessible description and name on the Cutter tile
   const cutterTile = miningTool.locator("article").first();
+  await expect(cutterTile).toHaveAccessibleName("Salvage Cutter equipped");
   const cutterDescId = await cutterTile.getAttribute("aria-describedby");
   expect(cutterDescId).toBeTruthy();
   const cutterDesc = miningTool.locator(`#${cutterDescId}`);
@@ -444,6 +445,7 @@ test("equipment and inventory rendering shows artwork for illustrated items and 
 
   // Illustrated stack: Ferrite Shale
   const ferriteTile = inventory.locator("article").first();
+  await expect(ferriteTile).toHaveAccessibleName("5 Ferrite Shale");
   await expect(ferriteTile.getByText("Ferrite Shale", { exact: true })).toBeVisible();
   await expect(ferriteTile.getByText("x5", { exact: true })).toBeVisible();
   const ferriteArt = ferriteTile.getByTestId("item-artwork");
@@ -459,8 +461,9 @@ test("equipment and inventory rendering shows artwork for illustrated items and 
 
   // Fallback stack: Refined Ferrite (no artwork, renders textFallback "RF")
   const refinedTile = inventory.locator("article").nth(1);
+  await expect(refinedTile).toHaveAccessibleName("1 Refined Ferrite");
   await expect(refinedTile.getByText("Refined Ferrite", { exact: true })).toBeVisible();
-  await expect(refinedTile.getByText("x3", { exact: true })).toBeVisible();
+  await expect(refinedTile.getByText("x1", { exact: true })).toBeVisible();
   // No artwork for fallback items
   await expect(refinedTile.getByTestId("item-artwork")).toHaveCount(0);
   // Fallback text renders
