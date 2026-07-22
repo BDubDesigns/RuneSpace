@@ -52,12 +52,20 @@ describe("item presentation content", () => {
     expect(getItemPresentation(ITEM_IDS.powerCell)?.textFallback).toBe("PC");
   });
 
-  it("uses the supplied item name as text fallback when artwork metadata is unavailable", () => {
-    expect(getItemPresentation(ITEM_IDS.refinedFerrite)).toBeUndefined();
-    expect(resolveItemPresentation(ITEM_IDS.refinedFerrite, "Refined Ferrite")).toEqual({
+  it("resolves Refined Ferrite to its deliberate text fallback without artwork", () => {
+    expect(getItemPresentation(ITEM_IDS.refinedFerrite)).toMatchObject({
       displayName: "Refined Ferrite",
-      accessibleDescription: "Refined Ferrite",
-      textFallback: "Refined Ferrite",
+      textFallback: "RF",
+    });
+    expect(getItemPresentation(ITEM_IDS.refinedFerrite)?.artworkSrc).toBeUndefined();
+  });
+
+  it("uses the supplied item name as text fallback when artwork metadata is unavailable", () => {
+    expect(getItemPresentation(ITEM_IDS.slag)).toBeUndefined();
+    expect(resolveItemPresentation(ITEM_IDS.slag, "Slag")).toEqual({
+      displayName: "Slag",
+      accessibleDescription: "Slag",
+      textFallback: "Slag",
     });
   });
 

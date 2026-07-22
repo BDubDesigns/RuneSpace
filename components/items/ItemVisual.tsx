@@ -24,6 +24,7 @@ export function ItemVisual({
   const presentation = resolveItemPresentation(itemId, name);
   return (
     <VisualTile
+      accessibleDescription={presentation.accessibleDescription}
       accessibleLabel={accessibleLabel ?? `${quantity ?? 1} ${presentation.displayName}`}
       artworkSrc={presentation.artworkSrc}
       background={background}

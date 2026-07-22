@@ -37,6 +37,11 @@ const itemPresentations = {
     textFallback: "PC",
     artworkSrc: "/item-art/power-cell.png",
   },
+  [ITEM_IDS.refinedFerrite]: {
+    displayName: "Refined Ferrite",
+    accessibleDescription: "Purified Ferrite material refined from raw mineral shale",
+    textFallback: "RF",
+  },
 } as const satisfies Partial<Record<ItemId, ItemPresentation>>;
 
 export function getItemPresentation(itemId: string): ItemPresentation | undefined {
