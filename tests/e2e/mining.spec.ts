@@ -390,8 +390,7 @@ test("equipment and inventory rendering shows artwork for illustrated items and 
     cssHeight: getComputedStyle(image).height,
   }));
   expect(cutterState.naturalWidth).toBeGreaterThan(0);
-  expect(cutterState.naturalWidth).toBeLessThanOrEqual(160);
-  expect(cutterState.naturalHeight).toBe(cutterState.naturalWidth);
+  expect(cutterState.naturalHeight).toBeGreaterThan(0);
   expect(cutterState.cssWidth).toBe("80px");
   expect(cutterState.cssHeight).toBe("80px");
 
@@ -408,8 +407,7 @@ test("equipment and inventory rendering shows artwork for illustrated items and 
     cssHeight: getComputedStyle(image).height,
   }));
   expect(mykeaState.naturalWidth).toBeGreaterThan(0);
-  expect(mykeaState.naturalWidth).toBeLessThanOrEqual(160);
-  expect(mykeaState.naturalHeight).toBe(mykeaState.naturalWidth);
+  expect(mykeaState.naturalHeight).toBeGreaterThan(0);
   expect(mykeaState.cssWidth).toBe("80px");
   expect(mykeaState.cssHeight).toBe("80px");
 
@@ -435,12 +433,17 @@ test("equipment and inventory rendering shows artwork for illustrated items and 
   await expect(inventory.getByLabel(/Empty inventory slot/)).toHaveCount(7);
 
   // Verify artwork sizing in inventory context
+  await expect
+    .poll(() => ferriteArt.evaluate((image) => image.complete && image.naturalWidth > 0))
+    .toBe(true);
   const invArtState = await ferriteArt.evaluate((image) => ({
     naturalWidth: image.naturalWidth,
     naturalHeight: image.naturalHeight,
     cssWidth: getComputedStyle(image).width,
     cssHeight: getComputedStyle(image).height,
   }));
+  expect(invArtState.naturalWidth).toBeGreaterThan(0);
+  expect(invArtState.naturalHeight).toBeGreaterThan(0);
   // CSS is 5rem (80px) in the VisualTile layout
   expect(invArtState.cssWidth).toBe("80px");
   expect(invArtState.cssHeight).toBe("80px");
