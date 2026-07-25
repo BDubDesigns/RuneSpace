@@ -19,6 +19,11 @@ const balanceSchema = z.object({
     yieldMinimum: z.literal(1),
     yieldMaximum: z.literal(2),
   }),
+  travel: z.object({
+    actionId: z.literal(ACTION_IDS.travel),
+    /** Approved initial adjacent walking duration (issue #40): 40 ticks / 24s. */
+    adjacentWalkDurationTicks: z.literal(40),
+  }),
   items: z.object({
     ferriteShale: z.object({
       itemId: z.literal(ITEM_IDS.ferriteShale),
@@ -59,6 +64,10 @@ const defaults = balanceSchema.parse({
     successXp: 15,
     yieldMinimum: 1,
     yieldMaximum: 2,
+  },
+  travel: {
+    actionId: ACTION_IDS.travel,
+    adjacentWalkDurationTicks: 40,
   },
   items: {
     ferriteShale: { itemId: ITEM_IDS.ferriteShale, massGrams: 100, stackLimit: 10 },

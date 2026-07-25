@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { ensurePlayerAccount, requireCurrentUser, OwnershipError } from "@/server/ownership";
 import { createCharacter, CharacterError } from "@/server/characters";
 import {
+  beginTravel,
   getMiningGameplayState,
   startCrashSiteMining,
   stopMining,
@@ -12,9 +13,11 @@ import {
 } from "@/server/mining";
 import { changeEquipment } from "@/server/equipment";
 import { EquipmentRuleError } from "@/game/domain/equipment";
+import { TravelRuleError } from "@/server/travel";
 import {
   EquipEquipmentRequestSchema,
   UnequipEquipmentRequestSchema,
+  BeginTravelRequestSchema,
 } from "@/game/schemas/gameplay";
 
 /**
@@ -72,6 +75,25 @@ export async function startMiningAction(characterId: string): Promise<MiningActi
 
 export async function stopMiningAction(characterId: string): Promise<MiningActionResult> {
   return runMiningAction(characterId, stopMining);
+}
+
+export async function beginTravelAction(input: unknown): Promise<MiningActionResult> {
+  const request = BeginTravelRequestSchema.safeParse(input);
+  if (!request.success) return { error: "Invalid travel command." };
+  try {
+    const user = await requireCurrentUser(await headers());
+    return {
+      state: await beginTravel(
+        user.id,
+        request.data.characterId,
+        request.data.destinationLocationId,
+      ),
+    };
+  } catch (error) {
+    if (error instanceof OwnershipError) return { error: error.message };
+    if (error instanceof TravelRuleError) return { error: error.message };
+    throw error;
+  }
 }
 
 type EquipmentActionRequest = {

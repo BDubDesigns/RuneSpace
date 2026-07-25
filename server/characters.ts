@@ -1,7 +1,15 @@
 import { and, eq } from "drizzle-orm";
 import { db } from "@/db";
-import { characters, playerAccounts, SLOT_MIN, SLOT_MAX, type Character } from "@/db/rune-space";
+import {
+  characters,
+  characterTravelState,
+  playerAccounts,
+  SLOT_MIN,
+  SLOT_MAX,
+  type Character,
+} from "@/db/rune-space";
 import { validateCharacterName } from "@/game/domain/character-name";
+import { LOCATION_IDS } from "@/game/config/foundations";
 
 /** Postgres unique-violation error code. */
 const UNIQUE_VIOLATION = "23505";
@@ -128,6 +136,7 @@ export async function createCharacter(
         slot: freeSlot,
         displayName: validation.display,
         normalizedName: normalized,
+        currentLocationId: LOCATION_IDS.crashSite,
       });
     } catch (err) {
       // The normalized_name unique index can still reject a concurrent clash.
@@ -150,4 +159,14 @@ export async function createCharacter(
     }
     return row;
   });
+}
+
+/** Remove any in-transit travel state for a character within a transaction. */
+export async function deleteTravelState(
+  transaction: Parameters<Parameters<typeof db.transaction>[0]>[0],
+  characterId: string,
+): Promise<void> {
+  await transaction
+    .delete(characterTravelState)
+    .where(eq(characterTravelState.characterId, characterId));
 }

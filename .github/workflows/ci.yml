@@ -132,6 +132,7 @@ jobs:
       - run: pnpm exec playwright install --with-deps chromium
       - run: pnpm drizzle-kit migrate
       - run: pnpm test:e2e mining --project=chromium
+      - run: pnpm test:e2e travel --project=chromium
       - name: Verify Mining review screenshots
         run: |
           test -s test-results/mining-mobile-no-yield.png
@@ -144,6 +145,15 @@ jobs:
           test -s test-results/mining-desktop-equipment-artwork.png
           test -s test-results/mining-mobile-inventory-mixed.png
           test -s test-results/mining-desktop-inventory-mixed.png
+      - name: Verify Travel review screenshots
+        run: |
+          test -s test-results/travel-mobile-selected.png
+          test -s test-results/travel-mobile-in-transit.png
+          test -s test-results/travel-mobile-arrived.png
+          test -s test-results/travel-desktop-stationary.png
+          test -s test-results/travel-desktop-selected.png
+          test -s test-results/travel-desktop-in-transit.png
+          test -s test-results/travel-desktop-arrived.png
       - uses: actions/upload-artifact@v4
         if: always()
         with:

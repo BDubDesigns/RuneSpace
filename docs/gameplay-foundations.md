@@ -86,3 +86,95 @@ components. Fabrication assembles finished objects. Machining creates precise
 components. Salvage, Fabrication, Machining, Speeder Piloting, and Ship Piloting
 are documented future skill directions only; they have no persistence
 initialization or gameplay in this foundation.
+
+## World and Travel (issue #40)
+
+RuneSpace's production stages require movement between distinct places. Travel is
+a real, server-authoritative, blocking character activity — not an instant tab
+switch or a client timer. Issue #40 establishes the smallest correct
+world-and-travel foundation on which later Metallurgy, Welding, exploration, fog
+of war, fuel, hauling, and transportation upgrades build.
+
+### Persistent location
+
+- Every character has exactly one authoritative persistent current location.
+- The `characters.current_location_id` column is the single source of truth. It
+  defaults to the Crash Site for existing characters (migration backfill) and for
+  newly provisioned characters (authoritative provisioning path). Clients cannot
+  submit or overwrite it.
+- Locations are data-driven, validated content resolved from a typed registry
+  (`game/content/locations.ts`). Each location defines its stable ID, display
+  name, description, directly adjacent location IDs, available activity IDs, and
+  dormant (future) activities. Adjacency is validated as bidirectional so a
+  one-way edge can never silently ship.
+
+### The initial two-location world
+
+- **Crash Site** (`crash_site`): the existing infinite Ferrite Shale deposit.
+  Mining is the only available activity.
+- **Abandoned Processing Yard** (`abandoned_processing_yard`): a dormant
+  industrial location. Its future Metallurgy activity is presented as dormant
+  only and performs no refining in this issue.
+
+These two locations are connected by exactly one bidirectional route. No further
+locations, content, or map systems (no world grid, coordinates, procedural
+generation, fog of war, or art generation) are introduced by this issue.
+
+### Travel is a blocking one-active-action activity
+
+- Travel reuses the existing one-active-action and lazy server-resolution model.
+  It is an `active_actions` row (`travel`) owning a `character_travel_state` row
+  (origin, destination, departure timestamp). The current location stays the
+  authoritative origin until arrival commits; the travel state owns the
+  destination and timing, so there is no competing source of truth.
+- The approved initial adjacent walking duration is **40 game ticks = 24
+  seconds** (canonical 600 ms tick), sourced from the typed authoritative
+  balance boundary (`game/config/balance.ts`), not from React or command code.
+  This is an initial playtest value; not every future adjacent route must share
+  it.
+- Resolution is lazy: a normal page load or state-changing command resolves
+  arrival after the 40 ticks elapse, advancing the action cursor exactly once,
+  setting the current location to the destination, and clearing travel state.
+  There is no worker, WebSocket, client progression loop, or background timer.
+- Travel progress (partial cursor) survives refresh, reconnect, logout, and
+  deployment. Partial or concurrent resolution cannot move the character twice.
+
+### Selecting vs. confirming travel
+
+- Selecting a hex on the two-hex local map only inspects/selects it.
+- A separate explicit confirmation control ("Walk to … — 24 sec") invokes the
+  server-authoritative begin-travel command. The same interaction works in
+  reverse after arrival.
+
+### Atomic Mining → Travel replacement
+
+When Travel replaces an active Mining action:
+
+1. The character and active-action state is locked.
+2. Only Mining attempts already completed before the command are resolved,
+   exactly once, and persisted (XP, inventory, history, cursor).
+3. Mining stops.
+4. Travel begins from the still-current origin to the validated destination.
+5. The entire transition is committed atomically.
+
+Mining may never progress during Travel, and the server enforces this
+server-side even against a stale or manipulated client.
+
+### Location/activity gating
+
+- Crash Site Mining may start only at the Crash Site while stationary.
+- Mining cannot start at the Processing Yard.
+- Mining cannot start while Travel is active.
+- Conflicting state-changing commands are rejected clearly and server-side.
+- Inventory and Equipment remain inspectable during Travel.
+
+### Deferred (not in this issue)
+
+Metallurgy, refining, Slag/Refined Ferrite production, Welding, Power Cell
+behavior, fuel, Speeders/ships, exploration XP, fog of war, undiscovered hexes,
+a large hex grid or full planet map, world coordinates, terrain simulation,
+pathfinding, multi-hop routing, route queues, random encounters, fast travel,
+teleportation, recalls, Travel cancellation, background workers, WebSockets,
+client-authoritative timers, Phaser/canvas/WebGL map rendering, and Inventory/
+Equipment overlay polish from issue #41 are all explicitly out of scope here.
+

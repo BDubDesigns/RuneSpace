@@ -11,6 +11,7 @@ import { SectionHeader } from "@/components/ui/SectionHeader";
 import { StatusMeter } from "@/components/ui/StatusMeter";
 import { getEffectiveGameBalance } from "@/game/config/balance";
 import { GAME_TICK_MS, ITEM_IDS } from "@/game/config/foundations";
+import { getLocation } from "@/game/content/locations";
 import { inventoryStackFillFraction } from "@/game/domain/inventory";
 import { miningNearMissBasisPoints } from "@/game/domain/mining";
 import type { MiningGameplayState, MiningRunAttempt } from "@/server/mining";
@@ -19,6 +20,7 @@ import { reportClientDiagnostic } from "@/features/diagnostics/client";
 import { latestMiningAttempt, resolvedAttemptCount } from "./latest-result";
 import { useMiningPlay } from "./MiningPlayContext";
 import { EquipmentPanel } from "./EquipmentPanel";
+import { LocalMapPanel } from "@/features/travel/LocalMapPanel";
 
 const RESULT_FEEDBACK_DURATION_MS = 3_600;
 
@@ -213,6 +215,9 @@ export function MiningConsole({ characterName }: { characterName: string }) {
   const [feedback, setFeedback] = useState<{ sequence: number; attempts: number }>();
   const balance = getEffectiveGameBalance();
   const active = state.activeAction;
+  const inTransit = Boolean(state.travelState);
+  const currentLocationId = state.location.currentLocationId;
+  const atCrashSite = currentLocationId === "crash_site";
   const durationMs = balance.mining.attemptDurationTicks * GAME_TICK_MS;
   const elapsed = active ? Math.max(0, now - new Date(active.progressStartedAt).getTime()) : 0;
   const progress = active ? Math.min(100, (elapsed / durationMs) * 100) : 0;
@@ -255,15 +260,22 @@ export function MiningConsole({ characterName }: { characterName: string }) {
   });
 
   useEffect(() => {
-    if (!active) return;
+    if (!active && !state.travelState) return;
     const clock = window.setInterval(() => setNow(Date.now()), 250);
-    const delay = Math.max(100, new Date(active.nextAttemptAt).getTime() - Date.now() + 100);
+    let delay = Number.POSITIVE_INFINITY;
+    if (active) {
+      delay = Math.max(100, new Date(active.nextAttemptAt).getTime() - Date.now() + 100);
+    }
+    if (state.travelState) {
+      const arrivesAt = new Date(state.travelState.arrivesAt).getTime();
+      delay = Math.min(delay, Math.max(120, arrivesAt - Date.now() + 150));
+    }
     const refresh = window.setTimeout(() => requestAutoRefresh(), delay);
     return () => {
       window.clearInterval(clock);
       window.clearTimeout(refresh);
     };
-  }, [active?.nextAttemptAt, requestAutoRefresh]);
+  }, [active?.nextAttemptAt, state.travelState?.arrivesAt, requestAutoRefresh]);
 
   const latestAttempt = latestMiningAttempt(state.run.recentAttempts);
   const recentBatchCount = state.recentResult.successes + state.recentResult.failures;
@@ -291,46 +303,84 @@ export function MiningConsole({ characterName }: { characterName: string }) {
     <div className="space-y-4">
       <Panel tone="raised">
         <div className="flex flex-wrap items-start justify-between gap-4">
-          <SectionHeader eyebrow="Crash Site // Sector 01">{characterName}</SectionHeader>
-          <span className="border border-[color:var(--rs-accent-mining)] bg-[color:var(--rs-accent-mining-subtle)] px-2 py-1 font-display text-xs uppercase tracking-wide text-[color:var(--rs-accent-mining)]">
-            Ferrite Shale
-          </span>
-        </div>
-        <p className="mt-4 max-w-2xl text-sm leading-relaxed text-[color:var(--rs-text-secondary)]">
-          The damaged ship needs raw material. Cut Ferrite Shale from the infinite crash-site
-          deposit to prepare for repairs.
-        </p>
-        <div className="mt-5 flex flex-wrap gap-3">
-          {active ? (
-            <ActionButton intent="danger" loading={busy} onClick={() => command(stopMiningAction)}>
-              Stop Mining
-            </ActionButton>
-          ) : (
-            <ActionButton intent="mining" loading={busy} onClick={() => command(startMiningAction)}>
-              Start Mining
-            </ActionButton>
-          )}
-          <ActionButton
-            intent="secondary"
-            disabled={busy}
-            onClick={() => command(refreshMiningAction)}
+          <SectionHeader
+            eyebrow={
+              inTransit ? "In transit" : (getLocation(currentLocationId)?.displayName ?? "Location")
+            }
           >
-            Refresh status
-          </ActionButton>
+            {characterName}
+          </SectionHeader>
+          {atCrashSite && !inTransit ? (
+            <span className="border border-[color:var(--rs-accent-mining)] bg-[color:var(--rs-accent-mining-subtle)] px-2 py-1 font-display text-xs uppercase tracking-wide text-[color:var(--rs-accent-mining)]">
+              Ferrite Shale
+            </span>
+          ) : null}
         </div>
-        <p className="mt-3 font-display text-sm uppercase tracking-wide text-[color:var(--rs-accent-mining)]">
-          Success chance: {percentage(state.successChanceBps)}%
-        </p>
-        {active ? (
-          <div className="mt-5">
-            <StatusMeter
-              label="Mining attempt"
-              value={progress}
-              detail={`${secondsRemaining.toFixed(1)}s to next attempt`}
-            />
-          </div>
+
+        {inTransit ? (
+          <p className="mt-4 max-w-2xl text-sm leading-relaxed text-[color:var(--rs-text-secondary)]">
+            You are walking between locations. Mining and other actions are paused until you arrive.
+            Use the world map below to follow your journey.
+          </p>
+        ) : atCrashSite ? (
+          <>
+            <p className="mt-4 max-w-2xl text-sm leading-relaxed text-[color:var(--rs-text-secondary)]">
+              The damaged ship needs raw material. Cut Ferrite Shale from the infinite crash-site
+              deposit to prepare for repairs.
+            </p>
+            <div className="mt-5 flex flex-wrap gap-3">
+              {active ? (
+                <ActionButton
+                  intent="danger"
+                  loading={busy}
+                  onClick={() => command(stopMiningAction)}
+                >
+                  Stop Mining
+                </ActionButton>
+              ) : (
+                <ActionButton
+                  intent="mining"
+                  loading={busy}
+                  onClick={() => command(startMiningAction)}
+                >
+                  Start Mining
+                </ActionButton>
+              )}
+              <ActionButton
+                intent="secondary"
+                disabled={busy}
+                onClick={() => command(refreshMiningAction)}
+              >
+                Refresh status
+              </ActionButton>
+            </div>
+            <p className="mt-3 font-display text-sm uppercase tracking-wide text-[color:var(--rs-accent-mining)]">
+              Success chance: {percentage(state.successChanceBps)}%
+            </p>
+            {active ? (
+              <div className="mt-5">
+                <StatusMeter
+                  label="Mining attempt"
+                  value={progress}
+                  detail={`${secondsRemaining.toFixed(1)}s to next attempt`}
+                />
+              </div>
+            ) : (
+              <Feedback>
+                Mining is idle. Attempts take six seconds and resolve on the server.
+              </Feedback>
+            )}
+          </>
         ) : (
-          <Feedback>Mining is idle. Attempts take six seconds and resolve on the server.</Feedback>
+          <div className="mt-4">
+            <p className="max-w-2xl text-sm leading-relaxed text-[color:var(--rs-text-secondary)]">
+              {getLocation(currentLocationId)?.description}
+            </p>
+            <Feedback tone="muted">
+              Mining is only available at the Crash Site. This location&apos;s future Metallurgy
+              activity is not yet operational.
+            </Feedback>
+          </div>
         )}
         {latestAttempt ? (
           <LatestAttemptResult
@@ -355,6 +405,7 @@ export function MiningConsole({ characterName }: { characterName: string }) {
           </ActionButton>
         ) : null}
       </Panel>
+      <LocalMapPanel />
       <div className="grid gap-4 sm:grid-cols-2">
         <Panel>
           <p className="font-display text-xs uppercase tracking-[0.16em] text-[color:var(--rs-accent-mining)]">

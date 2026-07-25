@@ -11,7 +11,7 @@ import { planEquipmentChange, type EquipmentChange } from "@/game/domain/equipme
 import { ACTION_IDS } from "@/game/config/foundations";
 import { withResolvedOwnedCharacter } from "@/server/action-resolution";
 import {
-  createMiningResolver,
+  createPlayResolver,
   defaultMiningRandom,
   ensureStarterMiningState,
   stateFromTransaction,
@@ -35,7 +35,7 @@ export async function changeEquipment(
   return withResolvedOwnedCharacter(
     userId,
     characterId,
-    createMiningResolver(random, (outcome) => {
+    createPlayResolver(random, (outcome) => {
       resolvedAttempts = {
         successes: outcome.successes,
         failures: outcome.failures,
