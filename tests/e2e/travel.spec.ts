@@ -3,10 +3,14 @@ import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import {
   activeActions,
+  characters,
   characterMiningState,
+  characterSkillXp,
   characterStarterProvisioning,
   characterTravelState,
+  equippedItems,
   inventoryStacks,
+  itemInstances,
 } from "@/db/rune-space";
 import { LOCATION_IDS } from "@/game/config/foundations";
 import { miningStorageStatePath } from "./mining.setup";
@@ -32,13 +36,22 @@ async function openTravelFixture(page: import("@playwright/test").Page) {
 test.beforeEach(async ({ page }) => {
   const characterId = await openTravelFixture(page);
   await Promise.all([
+    // Clear all mutable gameplay rows to ensure per-test isolation.
     db.delete(activeActions).where(eq(activeActions.characterId, characterId)),
     db.delete(characterTravelState).where(eq(characterTravelState.characterId, characterId)),
     db.delete(characterMiningState).where(eq(characterMiningState.characterId, characterId)),
     db.delete(inventoryStacks).where(eq(inventoryStacks.characterId, characterId)),
+    db.delete(itemInstances).where(eq(itemInstances.characterId, characterId)),
+    db.delete(equippedItems).where(eq(equippedItems.characterId, characterId)),
+    db.delete(characterSkillXp).where(eq(characterSkillXp.characterId, characterId)),
     db
       .delete(characterStarterProvisioning)
       .where(eq(characterStarterProvisioning.characterId, characterId)),
+    // Reset character location to the authoritative start.
+    db
+      .update(characters)
+      .set({ currentLocationId: LOCATION_IDS.crashSite })
+      .where(eq(characters.id, characterId)),
   ]);
   await page.reload();
   await expect(page.getByText("World map")).toBeVisible();

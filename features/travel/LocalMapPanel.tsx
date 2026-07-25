@@ -8,6 +8,7 @@ import { SectionHeader } from "@/components/ui/SectionHeader";
 import { StatusMeter } from "@/components/ui/StatusMeter";
 import { GAME_TICK_MS } from "@/game/config/foundations";
 import { getEffectiveGameBalance } from "@/game/config/balance";
+import { LOCATION_IDS, ACTION_IDS } from "@/game/config/foundations";
 import { LOCATIONS, getLocation } from "@/game/content/locations";
 import { beginTravelAction } from "@/server/actions";
 import { useMiningPlay } from "@/features/mining/MiningPlayContext";
@@ -92,7 +93,7 @@ export function LocalMapPanel() {
   const currentLocationId = state.location.currentLocationId;
   const travel = state.travelState;
   const inTransit = Boolean(travel);
-  const miningActive = state.activeAction?.actionId === "crash_site_ferrite_shale_mining";
+  const miningActive = state.activeAction?.actionId === ACTION_IDS.crashSiteMining;
 
   useEffect(() => {
     if (!inTransit) return;
@@ -230,7 +231,9 @@ export function LocalMapPanel() {
                   >
                     {location.availableActionIds.length > 0
                       ? "Mining available"
-                      : "Metallurgy dormant"}
+                      : location.dormantActivities[0]?.label
+                        ? `${location.dormantActivities[0].label} dormant`
+                        : "No activities"}
                   </span>
                 </HexCell>
               </div>
@@ -291,7 +294,9 @@ export function LocalMapPanel() {
             <p className="mt-2 text-xs text-[color:var(--rs-text-muted)]">
               {selectedLocation.availableActionIds.length > 0
                 ? "Mining is available here."
-                : "Metallurgy is dormant here and not yet operational."}
+                : selectedLocation.dormantActivities[0]?.label
+                  ? `${selectedLocation.dormantActivities[0].label} is dormant here and not yet operational.`
+                  : "No activities are available here yet."}
             </p>
           )}
         </div>

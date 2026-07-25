@@ -124,9 +124,9 @@ generation, fog of war, or art generation) are introduced by this issue.
 
 - Travel reuses the existing one-active-action and lazy server-resolution model.
   It is an `active_actions` row (`travel`) owning a `character_travel_state` row
-  (origin, destination, departure timestamp). The current location stays the
-  authoritative origin until arrival commits; the travel state owns the
-  destination and timing, so there is no competing source of truth.
+  (origin, destination). The active action's `started_at` is the sole
+  authoritative travel start time; the travel row stores only route data. The
+  current location stays the authoritative origin until arrival commits.
 - The approved initial adjacent walking duration is **40 game ticks = 24
   seconds** (canonical 600 ms tick), sourced from the typed authoritative
   balance boundary (`game/config/balance.ts`), not from React or command code.

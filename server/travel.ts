@@ -92,8 +92,15 @@ export function createTravelResolver(): ActionResolver<TravelSnapshot, TravelRes
         .limit(1);
       const travel = travelRows[0];
 
-      // A concurrent resolution may have already cleared the row — no-op.
-      if (!travel) return;
+      // A Travel action reaching the persist step with no travel state row is
+      // corrupt state. Throw so the transaction rolls back, preserving the
+      // character location and active action.
+      if (!travel) {
+        throw new TravelRuleError(
+          "Active Travel action has no corresponding travel state row",
+          "unknown_destination",
+        );
+      }
 
       const { originLocationId: storedOrigin, destinationLocationId: storedDestination } = travel;
 

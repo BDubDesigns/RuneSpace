@@ -10,7 +10,7 @@ import { Drawer } from "@/components/ui/Drawer";
 import { SectionHeader } from "@/components/ui/SectionHeader";
 import { StatusMeter } from "@/components/ui/StatusMeter";
 import { getEffectiveGameBalance } from "@/game/config/balance";
-import { GAME_TICK_MS, ITEM_IDS } from "@/game/config/foundations";
+import { GAME_TICK_MS, ITEM_IDS, LOCATION_IDS } from "@/game/config/foundations";
 import { getLocation } from "@/game/content/locations";
 import { inventoryStackFillFraction } from "@/game/domain/inventory";
 import { miningNearMissBasisPoints } from "@/game/domain/mining";
@@ -217,7 +217,7 @@ export function MiningConsole({ characterName }: { characterName: string }) {
   const active = state.activeAction;
   const inTransit = Boolean(state.travelState);
   const currentLocationId = state.location.currentLocationId;
-  const atCrashSite = currentLocationId === "crash_site";
+  const atCrashSite = currentLocationId === LOCATION_IDS.crashSite;
   const durationMs = balance.mining.attemptDurationTicks * GAME_TICK_MS;
   const elapsed = active ? Math.max(0, now - new Date(active.progressStartedAt).getTime()) : 0;
   const progress = active ? Math.min(100, (elapsed / durationMs) * 100) : 0;

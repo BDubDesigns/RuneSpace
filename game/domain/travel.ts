@@ -1,6 +1,6 @@
 import { ACTION_IDS, LOCATION_IDS, type LocationId } from "@/game/config/foundations";
 import { getEffectiveGameBalance } from "@/game/config/balance";
-import { areLocationsAdjacent } from "@/game/content/locations";
+import { areLocationsAdjacent, getLocation } from "@/game/content/locations";
 import { ticksToMilliseconds } from "./timing";
 
 /** Reasons the server may refuse a begin-travel command. */
@@ -23,10 +23,7 @@ export function planTravel(input: {
   destinationLocationId: string;
   alreadyTraveling: boolean;
 }): TravelPlan {
-  if (
-    input.destinationLocationId !== LOCATION_IDS.crashSite &&
-    input.destinationLocationId !== LOCATION_IDS.abandonedProcessingYard
-  ) {
+  if (!getLocation(input.destinationLocationId)) {
     return { ok: false, reason: "unknown_destination" };
   }
   if (input.destinationLocationId === input.currentLocationId) {
