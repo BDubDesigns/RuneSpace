@@ -61,6 +61,7 @@ async function runMiningAction(
     return { state: await command(user.id, characterId) };
   } catch (error) {
     if (error instanceof OwnershipError) return { error: error.message };
+    if (error instanceof TravelRuleError) return { error: error.message };
     throw error;
   }
 }

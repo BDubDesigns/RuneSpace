@@ -238,8 +238,13 @@ export const activeActions = pgTable(
 /**
  * Durable travel state for the one active Travel action. The character's
  * `current_location_id` remains the authoritative origin until arrival commits;
- * this row owns the destination and departure timestamp for that journey. It
- * exists only while the character is in transit and is cleared on arrival.
+ * this row owns the destination for that journey. It exists only while the
+ * character is in transit and is cleared on arrival.
+ *
+ * `active_actions.started_at` is the sole authoritative Travel start time.
+ * `active_actions.resolved_through_at` is the durable action cursor.
+ * This table stores only route-specific durable state: character ID, origin
+ * location ID, and destination location ID.
  */
 export const characterTravelState = pgTable(
   "character_travel_state",
@@ -249,7 +254,6 @@ export const characterTravelState = pgTable(
       .references(() => characters.id, { onDelete: "restrict" }),
     originLocationId: text("origin_location_id").notNull(),
     destinationLocationId: text("destination_location_id").notNull(),
-    startedAt: timestamp("started_at", { withTimezone: true }).notNull(),
   },
   (table) => [
     check(

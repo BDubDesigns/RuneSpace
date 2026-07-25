@@ -11,7 +11,6 @@ CREATE TABLE "character_travel_state" (
   "character_id" text PRIMARY KEY,
   "origin_location_id" text NOT NULL,
   "destination_location_id" text NOT NULL,
-  "started_at" timestamptz NOT NULL,
   CONSTRAINT "character_travel_state_character_id_fkey"
     FOREIGN KEY ("character_id") REFERENCES "characters" ("id") ON DELETE restrict,
   CONSTRAINT "character_travel_state_distinct_ends"

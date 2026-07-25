@@ -47,18 +47,21 @@ test.beforeEach(async ({ page }) => {
 test("selecting a destination does not begin travel; confirmation is required", async ({
   page,
 }) => {
-  await page.setViewportSize({ width: 390, height: 844 });
   const characterId = page.url().split("/").at(-1)!;
 
   // Stationary at the Crash Site.
+  await page.setViewportSize({ width: 390, height: 844 });
   await expect(page.getByText("You are here", { exact: false }).first()).toBeVisible();
   await expect(page.getByRole("button", { name: /Crash Site/ }).first()).toHaveAttribute(
     "aria-current",
     "true",
   );
+  await page.screenshot({ path: "test-results/travel-mobile-stationary.png" });
 
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.screenshot({ path: "test-results/travel-desktop-stationary.png" });
+
+  await page.setViewportSize({ width: 390, height: 844 });
 
   // Select the Processing Yard — Travel must NOT start yet.
   await page.getByRole("button", { name: /Abandoned Processing Yard/ }).click();
@@ -79,8 +82,10 @@ test("selecting a destination does not begin travel; confirmation is required", 
 });
 
 test("the full journey walks, arrives, and returns between the two locations", async ({ page }) => {
-  await page.setViewportSize({ width: 390, height: 844 });
   const characterId = page.url().split("/").at(-1)!;
+
+  // Stationary at the Crash Site — screenshot.
+  await page.setViewportSize({ width: 390, height: 844 });
 
   // Start Mining and resolve one controlled attempt.
   await page.getByRole("button", { name: "Start Mining" }).click();
@@ -97,7 +102,8 @@ test("the full journey walks, arrives, and returns between the two locations", a
   await page.getByRole("button", { name: /Abandoned Processing Yard/ }).click();
   await expect(page.getByText(/Departing resolves your completed Mining work/)).toBeVisible();
   await page.getByRole("button", { name: /Walk to Abandoned Processing Yard/ }).click();
-  await expect(page.getByText("In transit", { exact: false })).toBeVisible();
+  // The authoritative state is applied immediately — verify the transit UI.
+  await expect(page.getByText("Journey progress")).toBeVisible();
   // Mining stopped; completed work retained.
   await expect(page.getByText("1 successful", { exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: "Start Mining" })).toHaveCount(0);
@@ -113,11 +119,8 @@ test("the full journey walks, arrives, and returns between the two locations", a
     .update(activeActions)
     .set({ startedAt: departPast, resolvedThroughAt: departPast })
     .where(eq(activeActions.characterId, characterId));
-  await db
-    .update(characterTravelState)
-    .set({ startedAt: departPast })
-    .where(eq(characterTravelState.characterId, characterId));
-  await page.getByRole("button", { name: "Refresh status" }).click();
+  await page.reload();
+  await expect(page.getByText("World map")).toBeVisible();
 
   // Arrived at the Processing Yard.
   await expect(page.getByText("You are here", { exact: false }).first()).toBeVisible();
@@ -139,18 +142,15 @@ test("the full journey walks, arrives, and returns between the two locations", a
     .click();
   await expect(page.getByRole("button", { name: /Walk to Crash Site/ })).toBeVisible();
   await page.getByRole("button", { name: /Walk to Crash Site/ }).click();
-  await expect(page.getByText("In transit", { exact: false })).toBeVisible();
+  await expect(page.getByText("Journey progress")).toBeVisible();
 
   const returnPast = new Date(Date.now() - 25_000);
   await db
     .update(activeActions)
     .set({ startedAt: returnPast, resolvedThroughAt: returnPast })
     .where(eq(activeActions.characterId, characterId));
-  await db
-    .update(characterTravelState)
-    .set({ startedAt: returnPast })
-    .where(eq(characterTravelState.characterId, characterId));
-  await page.getByRole("button", { name: "Refresh status" }).click();
+  await page.reload();
+  await expect(page.getByText("World map")).toBeVisible();
 
   // Back at the Crash Site, Mining is available again.
   await expect(page.getByRole("button", { name: /Crash Site/ }).first()).toHaveAttribute(
@@ -164,14 +164,55 @@ test("the full journey walks, arrives, and returns between the two locations", a
 
 test("keyboard users can select and confirm a destination", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
-  const yard = page.getByRole("button", { name: /Abandoned Processing Yard/ });
+  const characterId = page.url().split("/").at(-1)!;
+
+  // 1. Focus the reachable destination hex.
+  const yard = page.getByRole("button", { name: /Abandoned Processing Yard/ }).first();
   await yard.focus();
   await expect(yard).toBeFocused();
+
+  // 2. Activate it using Enter.
   await page.keyboard.press("Enter");
+
+  // 3. Assert selected state on the hex cell (before the Walk button
+  //    introduces a second match for the same name pattern).
+  await expect(yard).toHaveAttribute("aria-pressed", "true");
+
+  // 4. Verify no Travel row has started.
+  await expect(
+    db.select().from(characterTravelState).where(eq(characterTravelState.characterId, characterId)),
+  ).resolves.toEqual([]);
+
+  // 5. Verify the confirmation control appears.
+  const confirmButton = page.getByRole("button", { name: /Walk to Abandoned Processing Yard/ });
+  await expect(confirmButton).toBeVisible();
+
+  // 6-7. Focus and activate the confirmation control with a second Enter.
+  await confirmButton.focus();
+  await page.keyboard.press("Enter");
+
+  // 8. Verify IN TRANSIT appears immediately from the server-returned state.
+  await expect(page.getByText("Journey progress")).toBeVisible();
+});
+
+test("reduced-motion presentation retains equivalent travel information", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  // Emulate prefers-reduced-motion.
+  await page.emulateMedia({ reducedMotion: "reduce" });
+
+  // Stationary state must show current location.
+  await expect(page.getByText("You are here", { exact: false }).first()).toBeVisible();
+
+  // Select the Processing Yard — details visible without animation.
+  await page.getByRole("button", { name: /Abandoned Processing Yard/ }).click();
+  await expect(page.getByText("Walking time: 24 seconds")).toBeVisible();
   await expect(
     page.getByRole("button", { name: /Walk to Abandoned Processing Yard/ }),
   ).toBeVisible();
-  await expect(yard).toHaveAttribute("aria-pressed", "false");
-  await page.keyboard.press("Enter");
-  await expect(page.getByText("In transit", { exact: false })).toBeVisible();
+
+  // Confirm and verify in-transit status is announced.
+  await page.getByRole("button", { name: /Walk to Abandoned Processing Yard/ }).click();
+  await expect(page.getByText("Journey progress")).toBeVisible();
+  // The aria-live region announces progress without animation dependency.
+  await expect(page.getByText(/seconds remaining/)).toBeVisible();
 });

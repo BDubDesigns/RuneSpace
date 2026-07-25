@@ -514,9 +514,9 @@ export async function stateFromTransaction(
       ? {
           originLocationId: travel.originLocationId,
           destinationLocationId: travel.destinationLocationId,
-          startedAt: travel.startedAt.toISOString(),
+          startedAt: action.startedAt.toISOString(),
           arrivesAt: new Date(
-            travel.startedAt.getTime() + ticksToMilliseconds(adjacentWalkDurationTicks()),
+            action.startedAt.getTime() + ticksToMilliseconds(adjacentWalkDurationTicks()),
           ).toISOString(),
         }
       : undefined;
@@ -877,7 +877,21 @@ export async function beginTravel(
         );
       }
 
-      // Replace any active Mining (or other) action atomically, resolving only
+      // Only approved Crash Site Mining may be replaced atomically by Travel.
+      // Unknown, unsupported, future, or malformed active actions block Travel
+      // and must remain completely untouched.
+      if (context.action && context.action.actionId !== ACTION_IDS.crashSiteMining) {
+        return stateFromTransaction(
+          transaction,
+          context.character.id,
+          recentFrom(miningOutcome),
+          miningOutcome?.stopReason,
+          "another_action_active",
+          undefined,
+        );
+      }
+
+      // Replace active Crash Site Mining atomically, resolving only
       // already-completed Mining work exactly once before Travel begins.
       if (context.action) {
         await transaction
@@ -901,7 +915,6 @@ export async function beginTravel(
         characterId: context.character.id,
         originLocationId: currentLocationId,
         destinationLocationId,
-        startedAt: now,
       });
 
       return stateFromTransaction(

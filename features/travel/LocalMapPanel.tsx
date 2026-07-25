@@ -44,6 +44,7 @@ function HexCell({
   ]
     .filter(Boolean)
     .join(" ");
+
   return (
     <button
       type="button"
@@ -53,21 +54,21 @@ function HexCell({
       aria-describedby={`loc-desc-${locationId}`}
       disabled={disabled}
       onClick={onSelect}
-      className={`rs-focus group relative flex min-h-[var(--rs-touch-target)] flex-col items-center justify-center gap-1 border-2 px-3 py-3 text-center transition disabled:cursor-not-allowed disabled:opacity-70 ${
+      className={`rs-focus group relative flex min-h-[130px] min-w-[120px] flex-col items-center justify-center gap-0.5 text-center transition before:absolute before:inset-2 before:-z-10 before:transition-colors before:[clip-path:polygon(25%_0%,75%_0%,100%_50%,75%_100%,25%_100%,0%_50%)] disabled:cursor-not-allowed disabled:opacity-70 sm:min-h-[160px] sm:min-w-[160px] ${
         youAreHere
-          ? "border-[color:var(--rs-accent-primary)] bg-[color:var(--rs-accent-primary-subtle)] shadow-[var(--rs-glow-primary)]"
+          ? "before:border-2 before:border-[color:var(--rs-accent-primary)] before:bg-[color:var(--rs-accent-primary-subtle)] before:shadow-[0_0_12px_var(--rs-accent-primary)]"
           : selected
-            ? "border-[color:var(--rs-accent-mining)] bg-[color:var(--rs-accent-mining-subtle)]"
-            : "border-[color:var(--rs-border-structural)] bg-[color:var(--rs-surface-raised)] hover:border-[color:var(--rs-accent-secondary)]"
-      }`}
+            ? "before:border-2 before:border-[color:var(--rs-accent-mining)] before:bg-[color:var(--rs-accent-mining-subtle)] before:ring-2 before:ring-inset before:ring-[color:var(--rs-accent-mining)]"
+            : "before:border-2 before:border-[color:var(--rs-border-structural)] before:bg-[color:var(--rs-surface-raised)] hover:before:border-[color:var(--rs-accent-secondary)]"
+      } focus:outline-none focus-visible:before:ring-2 focus-visible:before:ring-[color:var(--rs-accent-primary)] motion-safe:transition-transform motion-safe:hover:scale-105`}
     >
       <span
         aria-hidden="true"
-        className="pointer-events-none absolute inset-x-2 top-1 font-display text-[10px] uppercase tracking-[0.18em] text-[color:var(--rs-text-muted)]"
+        className="pointer-events-none font-display text-[10px] uppercase tracking-[0.18em] text-[color:var(--rs-text-muted)]"
       >
         {youAreHere ? "You are here" : selected ? "Selected" : "Location"}
       </span>
-      <span className="mt-3 font-display text-sm font-bold text-[color:var(--rs-text-primary)]">
+      <span className="font-display text-sm font-bold text-[color:var(--rs-text-primary)]">
         {name}
       </span>
       <span id={`loc-desc-${locationId}`} className="sr-only">
@@ -79,11 +80,12 @@ function HexCell({
 }
 
 export function LocalMapPanel() {
-  const { state, acquireCommand, releaseCommand, busy, requestAutoRefresh } = useMiningPlay();
+  const { state, setState, acquireCommand, releaseCommand, busy, requestAutoRefresh } =
+    useMiningPlay();
   const [selected, setSelected] = useState<string | undefined>();
   const [message, setMessage] = useState<string | undefined>();
   const [now, setNow] = useState(Date.now());
-  const [isPending, startTransition] = useTransition();
+  const [, startTransition] = useTransition();
   const [transitioning, setTransitioning] = useState(false);
   const observedTravel = useRef(state.travelState?.destinationLocationId);
 
@@ -106,7 +108,6 @@ export function LocalMapPanel() {
 
   useEffect(() => {
     if (inTransit) return;
-    // Announce arrival: the selected destination became the current location.
     const previous = observedTravel.current;
     if (previous && previous === currentLocationId) {
       setMessage(`Arrived at ${getLocation(currentLocationId)?.displayName ?? "destination"}.`);
@@ -124,15 +125,24 @@ export function LocalMapPanel() {
             characterId: state.characterId,
             destinationLocationId: destinationId,
           });
-          if (result.error) setMessage(result.error);
-          else if (result.state?.travelError) {
-            setMessage(travelErrorMessage(result.state.travelError));
-          } else {
-            setMessage(undefined);
-            setSelected(undefined);
+          if (result.error) {
+            setMessage(result.error);
+            return;
           }
+          if (result.state?.travelError) {
+            setMessage(travelErrorMessage(result.state.travelError));
+            return;
+          }
+          // Apply the authoritative server-returned Travel state immediately
+          // so the UI enters IN TRANSIT without waiting for a timer or refresh.
+          setState(result.state!);
+          setMessage(undefined);
+          setSelected(undefined);
         } catch {
           setMessage("Comms interruption. Travel could not be confirmed.");
+          // Trigger a safe reconciliation refresh instead of replaying the
+          // uncertain mutation.
+          requestAutoRefresh();
         } finally {
           setTransitioning(false);
           releaseCommand();
@@ -179,39 +189,54 @@ export function LocalMapPanel() {
         to walk there.
       </p>
 
-      <div className="mt-4 flex flex-col gap-3" role="group" aria-label="Local map">
-        <div className="flex items-stretch justify-center gap-3 sm:gap-6">
-          {LOCATIONS.map((location) => {
+      {/* Two-hex map with a visible structural route connecting them. */}
+      <div className="mt-4" role="group" aria-label="Local map">
+        <div className="flex items-center justify-center gap-0 px-2 sm:px-4">
+          {LOCATIONS.map((location, index) => {
             const isCurrent = location.id === currentLocationId;
             return (
-              <HexCell
-                key={location.id}
-                locationId={location.id}
-                name={location.displayName}
-                description={location.description}
-                selected={selected === location.id}
-                current={isCurrent}
-                disabled={inTransit}
-                onSelect={() => !inTransit && setSelected(location.id)}
-              >
-                <span
-                  className={`mt-1 font-display text-[10px] uppercase tracking-wide ${
-                    isCurrent
-                      ? "text-[color:var(--rs-accent-primary)]"
-                      : "text-[color:var(--rs-text-muted)]"
-                  }`}
+              <div key={location.id} className="flex items-center">
+                {index > 0 && (
+                  <div className="relative z-0 mx-[-6px] sm:mx-[-8px]">
+                    {/* Route connector: a narrow bar linking the two hexes. */}
+                    <div
+                      className="h-0.5 w-6 bg-[color:var(--rs-border-structural)] sm:w-10"
+                      aria-hidden="true"
+                    />
+                    {inTransit && (
+                      <div
+                        className="motion-safe:duration-250 absolute inset-y-0 left-0 h-full bg-[color:var(--rs-accent-arcane)] transition-[width] ease-linear"
+                        style={{ width: `${transitProgress}%` }}
+                        aria-hidden="true"
+                      />
+                    )}
+                  </div>
+                )}
+                <HexCell
+                  locationId={location.id}
+                  name={location.displayName}
+                  description={location.description}
+                  selected={selected === location.id}
+                  current={isCurrent}
+                  disabled={inTransit}
+                  onSelect={() => !inTransit && setSelected(location.id)}
                 >
-                  {location.availableActionIds.length > 0
-                    ? "Mining available"
-                    : "Metallurgy dormant"}
-                </span>
-              </HexCell>
+                  <span
+                    className={`mt-1 font-display text-[10px] uppercase tracking-wide ${
+                      isCurrent
+                        ? "text-[color:var(--rs-accent-primary)]"
+                        : "text-[color:var(--rs-text-muted)]"
+                    }`}
+                  >
+                    {location.availableActionIds.length > 0
+                      ? "Mining available"
+                      : "Metallurgy dormant"}
+                  </span>
+                </HexCell>
+              </div>
             );
           })}
         </div>
-        <p className="text-center text-xs text-[color:var(--rs-text-muted)]">
-          Route: {LOCATIONS.map((l) => l.displayName).join(" ↔ ")}
-        </p>
       </div>
 
       {inTransit ? (

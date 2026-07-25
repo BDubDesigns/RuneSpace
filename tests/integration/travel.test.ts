@@ -301,4 +301,152 @@ suite("issue #40 persistent locations and timed travel (real PostgreSQL)", () =>
     const unknown = await mining.beginTravel(userId, character.id, "deep_void", startedAt);
     expect(unknown.travelError).toBe("unknown_destination");
   });
+
+  it("refuses to replace an unsupported active action with Travel", async () => {
+    const { userId, character } = await makeCharacter();
+    const startedAt = new Date("2026-01-01T00:00:00.000Z");
+    // Insert an unsupported active action — not Mining, not Travel.
+    await db.insert(rune.activeActions).values({
+      characterId: character.id,
+      actionId: "future_activity",
+      startedAt,
+      resolvedThroughAt: startedAt,
+    });
+    const result = await mining.beginTravel(
+      userId,
+      character.id,
+      LOCATION_IDS.abandonedProcessingYard,
+      startedAt,
+    );
+    // Travel is refused.
+    expect(result.commandError).toBe("another_action_active");
+    // The unsupported action row remains completely untouched.
+    const actions = await db
+      .select()
+      .from(rune.activeActions)
+      .where(eq(rune.activeActions.characterId, character.id));
+    expect(actions).toHaveLength(1);
+    expect(actions[0]?.actionId).toBe("future_activity");
+    // No Travel row is created.
+    const travelRows = await db
+      .select()
+      .from(rune.characterTravelState)
+      .where(eq(rune.characterTravelState.characterId, character.id));
+    expect(travelRows).toHaveLength(0);
+    // currentLocationId remains unchanged.
+    const chars = await db
+      .select()
+      .from(rune.characters)
+      .where(eq(rune.characters.id, character.id));
+    expect(chars[0]?.currentLocationId).toBe(LOCATION_IDS.crashSite);
+  });
+
+  it("rejects arrival when the persisted travel row is missing", async () => {
+    const { userId, character } = await makeCharacter();
+    const startedAt = new Date("2026-01-01T00:00:00.000Z");
+    await mining.beginTravel(userId, character.id, LOCATION_IDS.abandonedProcessingYard, startedAt);
+    // Delete the travel row to simulate corrupted state.
+    await db
+      .delete(rune.characterTravelState)
+      .where(eq(rune.characterTravelState.characterId, character.id));
+    // Resolving arrival must fail with an integrity error; the action and
+    // location remain intact.
+    await expect(
+      mining.getMiningGameplayState(userId, character.id, new Date("2026-01-01T00:00:24.600Z")),
+    ).rejects.toThrow(/travel state row/);
+    const actions = await db
+      .select()
+      .from(rune.activeActions)
+      .where(eq(rune.activeActions.characterId, character.id));
+    expect(actions).toHaveLength(1);
+    expect(actions[0]?.actionId).toBe(ACTION_IDS.travel);
+    const chars = await db
+      .select()
+      .from(rune.characters)
+      .where(eq(rune.characters.id, character.id));
+    expect(chars[0]?.currentLocationId).toBe(LOCATION_IDS.crashSite);
+  });
+
+  it("rejects arrival with an unknown persisted destination", async () => {
+    const { userId, character } = await makeCharacter();
+    const startedAt = new Date("2026-01-01T00:00:00.000Z");
+    await mining.beginTravel(userId, character.id, LOCATION_IDS.abandonedProcessingYard, startedAt);
+    // Corrupt the travel row with an unknown destination.
+    await db
+      .update(rune.characterTravelState)
+      .set({ destinationLocationId: "deep_void" })
+      .where(eq(rune.characterTravelState.characterId, character.id));
+    await expect(
+      mining.getMiningGameplayState(userId, character.id, new Date("2026-01-01T00:00:24.600Z")),
+    ).rejects.toThrow(/Unknown persisted destination/);
+    const actions = await db
+      .select()
+      .from(rune.activeActions)
+      .where(eq(rune.activeActions.characterId, character.id));
+    expect(actions).toHaveLength(1);
+    expect(actions[0]?.actionId).toBe(ACTION_IDS.travel);
+    const chars = await db
+      .select()
+      .from(rune.characters)
+      .where(eq(rune.characters.id, character.id));
+    expect(chars[0]?.currentLocationId).toBe(LOCATION_IDS.crashSite);
+  });
+
+  it("rejects arrival when the stored origin differs from the character location", async () => {
+    const { userId, character } = await makeCharacter();
+    const startedAt = new Date("2026-01-01T00:00:00.000Z");
+    await mining.beginTravel(userId, character.id, LOCATION_IDS.abandonedProcessingYard, startedAt);
+    // Corrupt: set origin to a string that differs from the character's
+    // authoritative current location (crash_site) but still satisfies the
+    // DB CHECK (origin ≠ destination).
+    await db
+      .update(rune.characterTravelState)
+      .set({ originLocationId: "alien_landing_zone" })
+      .where(eq(rune.characterTravelState.characterId, character.id));
+    await expect(
+      mining.getMiningGameplayState(userId, character.id, new Date("2026-01-01T00:00:24.600Z")),
+    ).rejects.toThrow(/Unknown persisted origin/);
+    const actions = await db
+      .select()
+      .from(rune.activeActions)
+      .where(eq(rune.activeActions.characterId, character.id));
+    expect(actions).toHaveLength(1);
+    expect(actions[0]?.actionId).toBe(ACTION_IDS.travel);
+    const chars = await db
+      .select()
+      .from(rune.characters)
+      .where(eq(rune.characters.id, character.id));
+    expect(chars[0]?.currentLocationId).toBe(LOCATION_IDS.crashSite);
+  });
+
+  it("rejects arrival when the stored origin is known but does not match the character location", async () => {
+    const { userId, character } = await makeCharacter();
+    const startedAt = new Date("2026-01-01T00:00:00.000Z");
+    await mining.beginTravel(userId, character.id, LOCATION_IDS.abandonedProcessingYard, startedAt);
+    // The travel row stores origin=crash_site, destination=abandoned_processing_yard.
+    // Simulate corruption: directly set the character's current location to the
+    // Processing Yard so it no longer matches the stored origin.
+    await db
+      .update(rune.characters)
+      .set({ currentLocationId: LOCATION_IDS.abandonedProcessingYard })
+      .where(eq(rune.characters.id, character.id));
+    await expect(
+      mining.getMiningGameplayState(userId, character.id, new Date("2026-01-01T00:00:24.600Z")),
+    ).rejects.toThrow(/does not match stored travel origin/);
+    const actions = await db
+      .select()
+      .from(rune.activeActions)
+      .where(eq(rune.activeActions.characterId, character.id));
+    expect(actions).toHaveLength(1);
+    expect(actions[0]?.actionId).toBe(ACTION_IDS.travel);
+    // Location is restored after rollback.
+    // Note: the rollback also restores the character location to what it was
+    // when the transaction started (which was abandoned_processing_yard after
+    // our corruption). We verify the row is unchanged.
+    const chars = await db
+      .select()
+      .from(rune.characters)
+      .where(eq(rune.characters.id, character.id));
+    expect(chars[0]?.currentLocationId).toBe(LOCATION_IDS.abandonedProcessingYard);
+  });
 });
