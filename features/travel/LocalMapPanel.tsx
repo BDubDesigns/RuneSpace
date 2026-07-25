@@ -6,9 +6,8 @@ import { Feedback } from "@/components/ui/Feedback";
 import { Panel } from "@/components/ui/Panel";
 import { SectionHeader } from "@/components/ui/SectionHeader";
 import { StatusMeter } from "@/components/ui/StatusMeter";
-import { GAME_TICK_MS } from "@/game/config/foundations";
+import { ACTION_IDS, GAME_TICK_MS } from "@/game/config/foundations";
 import { getEffectiveGameBalance } from "@/game/config/balance";
-import { LOCATION_IDS, ACTION_IDS } from "@/game/config/foundations";
 import { LOCATIONS, getLocation } from "@/game/content/locations";
 import { beginTravelAction } from "@/server/actions";
 import { useMiningPlay } from "@/features/mining/MiningPlayContext";
@@ -23,6 +22,7 @@ function HexCell({
   description,
   selected,
   current,
+  transitRole,
   disabled,
   onSelect,
   children,
@@ -32,11 +32,21 @@ function HexCell({
   description: string;
   selected: boolean;
   current: boolean;
+  transitRole?: "origin" | "destination";
   disabled: boolean;
   onSelect: () => void;
   children: React.ReactNode;
 }) {
   const youAreHere = current;
+  const stateLabel = transitRole
+    ? transitRole === "origin"
+      ? "Origin"
+      : "Destination"
+    : youAreHere
+      ? "You are here"
+      : selected
+        ? "Selected"
+        : "Reachable";
   const accessibleName = [
     name,
     youAreHere ? "You are here." : "Reachable destination.",
@@ -55,21 +65,58 @@ function HexCell({
       aria-describedby={`loc-desc-${locationId}`}
       disabled={disabled}
       onClick={onSelect}
-      className={`rs-focus group relative flex min-h-[130px] min-w-[120px] flex-col items-center justify-center gap-0.5 text-center transition before:absolute before:inset-2 before:-z-10 before:transition-colors before:[clip-path:polygon(25%_0%,75%_0%,100%_50%,75%_100%,25%_100%,0%_50%)] disabled:cursor-not-allowed disabled:opacity-70 sm:min-h-[160px] sm:min-w-[160px] ${
+      className={`rs-focus group relative z-10 flex h-[132px] w-[150px] flex-none flex-col items-center justify-center gap-0.5 px-5 text-center outline-none transition sm:h-[164px] sm:w-[190px] sm:px-7 ${
         youAreHere
-          ? "before:border-2 before:border-[color:var(--rs-accent-primary)] before:bg-[color:var(--rs-accent-primary-subtle)] before:shadow-[0_0_12px_var(--rs-accent-primary)]"
+          ? "text-[color:var(--rs-text-primary)]"
           : selected
-            ? "before:border-2 before:border-[color:var(--rs-accent-mining)] before:bg-[color:var(--rs-accent-mining-subtle)] before:ring-2 before:ring-inset before:ring-[color:var(--rs-accent-mining)]"
-            : "before:border-2 before:border-[color:var(--rs-border-structural)] before:bg-[color:var(--rs-surface-raised)] hover:before:border-[color:var(--rs-accent-secondary)]"
-      } focus:outline-none focus-visible:before:ring-2 focus-visible:before:ring-[color:var(--rs-accent-primary)] motion-safe:transition-transform motion-safe:hover:scale-105`}
+            ? "text-[color:var(--rs-text-primary)]"
+            : "text-[color:var(--rs-text-primary)] hover:brightness-125"
+      } disabled:cursor-not-allowed disabled:opacity-70 motion-safe:transition-transform motion-safe:hover:scale-[1.025]`}
     >
+      <svg
+        aria-hidden="true"
+        viewBox="0 0 200 174"
+        preserveAspectRatio="none"
+        className="pointer-events-none absolute inset-0 h-full w-full overflow-visible"
+      >
+        <polygon
+          points="50,2 150,2 198,87 150,172 50,172 2,87"
+          className={`transition-colors ${
+            youAreHere
+              ? "fill-[color:var(--rs-accent-primary-subtle)] stroke-[color:var(--rs-accent-primary)]"
+              : selected
+                ? "fill-[color:var(--rs-accent-mining-subtle)] stroke-[color:var(--rs-accent-mining)]"
+                : "fill-[color:var(--rs-surface-raised)] stroke-[color:var(--rs-border-structural)] group-hover:stroke-[color:var(--rs-accent-secondary)]"
+          } group-focus-visible:stroke-[color:var(--rs-accent-primary)]`}
+          strokeWidth="3"
+        />
+        {selected && !youAreHere ? (
+          <path
+            d="M148 39 L154 45 L166 31"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            className="text-[color:var(--rs-accent-mining)]"
+          />
+        ) : null}
+        {transitRole ? (
+          <circle
+            cx={transitRole === "origin" ? "32" : "168"}
+            cy="87"
+            r="5"
+            className="fill-[color:var(--rs-accent-arcane)]"
+          />
+        ) : null}
+      </svg>
       <span
         aria-hidden="true"
-        className="pointer-events-none font-display text-[10px] uppercase tracking-[0.18em] text-[color:var(--rs-text-muted)]"
+        className="pointer-events-none relative z-10 font-display text-[9px] uppercase tracking-[0.18em] text-[color:var(--rs-text-muted)] sm:text-[10px]"
       >
-        {youAreHere ? "You are here" : selected ? "Selected" : "Location"}
+        {stateLabel}
       </span>
-      <span className="font-display text-sm font-bold text-[color:var(--rs-text-primary)]">
+      <span className="relative z-10 max-w-[108px] font-display text-[13px] font-bold leading-tight text-[color:var(--rs-text-primary)] sm:max-w-[138px] sm:text-sm">
         {name}
       </span>
       <span id={`loc-desc-${locationId}`} className="sr-only">
@@ -198,15 +245,15 @@ export function LocalMapPanel() {
             return (
               <div key={location.id} className="flex items-center">
                 {index > 0 && (
-                  <div className="relative z-0 mx-[-6px] sm:mx-[-8px]">
-                    {/* Route connector: a narrow bar linking the two hexes. */}
+                  <div className="relative z-0 h-[132px] w-7 flex-none sm:h-[164px] sm:w-12">
+                    {/* The route starts and ends at the two facing hex vertices. */}
                     <div
-                      className="h-0.5 w-6 bg-[color:var(--rs-border-structural)] sm:w-10"
+                      className="absolute left-0 top-1/2 h-0.5 w-full -translate-y-1/2 bg-[color:var(--rs-border-structural)]"
                       aria-hidden="true"
                     />
                     {inTransit && (
                       <div
-                        className="motion-safe:duration-250 absolute inset-y-0 left-0 h-full bg-[color:var(--rs-accent-arcane)] transition-[width] ease-linear"
+                        className="motion-safe:duration-250 absolute left-0 top-1/2 h-0.5 -translate-y-1/2 bg-[color:var(--rs-accent-arcane)] transition-[width] ease-linear"
                         style={{ width: `${transitProgress}%` }}
                         aria-hidden="true"
                       />
@@ -219,6 +266,13 @@ export function LocalMapPanel() {
                   description={location.description}
                   selected={selected === location.id}
                   current={isCurrent}
+                  transitRole={
+                    inTransit && travel?.originLocationId === location.id
+                      ? "origin"
+                      : inTransit && travel?.destinationLocationId === location.id
+                        ? "destination"
+                        : undefined
+                  }
                   disabled={inTransit}
                   onSelect={() => !inTransit && setSelected(location.id)}
                 >
