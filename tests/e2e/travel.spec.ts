@@ -33,6 +33,15 @@ async function openTravelFixture(page: import("@playwright/test").Page) {
   return page.url().split("/").at(-1)!;
 }
 
+/** Scroll the local map into the center of the viewport so neither hex is
+ * hidden by the fixed bottom navigation. */
+async function scrollMapIntoView(page: import("@playwright/test").Page) {
+  await page.evaluate(() => {
+    const el = document.querySelector('[aria-label="Local map"]');
+    if (el) el.scrollIntoView({ block: "center" });
+  });
+}
+
 test.beforeEach(async ({ page }) => {
   const characterId = await openTravelFixture(page);
   await db.transaction(async (transaction) => {
@@ -74,9 +83,11 @@ test("selecting a destination does not begin travel; confirmation is required", 
     "aria-current",
     "true",
   );
+  await scrollMapIntoView(page);
   await page.screenshot({ path: "test-results/travel-mobile-stationary.png" });
 
   await page.setViewportSize({ width: 1440, height: 900 });
+  await scrollMapIntoView(page);
   await page.screenshot({ path: "test-results/travel-desktop-stationary.png" });
 
   await page.setViewportSize({ width: 390, height: 844 });
@@ -94,8 +105,10 @@ test("selecting a destination does not begin travel; confirmation is required", 
     db.select().from(characterTravelState).where(eq(characterTravelState.characterId, characterId)),
   ).resolves.toEqual([]);
 
+  await scrollMapIntoView(page);
   await page.screenshot({ path: "test-results/travel-mobile-selected.png" });
   await page.setViewportSize({ width: 1440, height: 900 });
+  await scrollMapIntoView(page);
   await page.screenshot({ path: "test-results/travel-desktop-selected.png" });
 });
 
@@ -126,8 +139,10 @@ test("the full journey walks, arrives, and returns between the two locations", a
   await expect(page.getByText("1 successful", { exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: "Start Mining" })).toHaveCount(0);
 
+  await scrollMapIntoView(page);
   await page.screenshot({ path: "test-results/travel-mobile-in-transit.png" });
   await page.setViewportSize({ width: 1440, height: 900 });
+  await scrollMapIntoView(page);
   await page.screenshot({ path: "test-results/travel-desktop-in-transit.png" });
   await page.setViewportSize({ width: 390, height: 844 });
 
@@ -148,8 +163,10 @@ test("the full journey walks, arrives, and returns between the two locations", a
   await expect(page.getByText(/Mining is only available at the Crash Site/)).toBeVisible();
   await expect(page.getByRole("button", { name: "Start Mining" })).toHaveCount(0);
 
+  await scrollMapIntoView(page);
   await page.screenshot({ path: "test-results/travel-mobile-arrived.png" });
   await page.setViewportSize({ width: 1440, height: 900 });
+  await scrollMapIntoView(page);
   await page.screenshot({ path: "test-results/travel-desktop-arrived.png" });
   await page.setViewportSize({ width: 390, height: 844 });
 

@@ -377,8 +377,8 @@ export function MiningConsole({ characterName }: { characterName: string }) {
               {getLocation(currentLocationId)?.description}
             </p>
             <Feedback tone="muted">
-              Mining is only available at the Crash Site. This location&apos;s future Metallurgy
-              activity is not yet operational.
+              Mining is only available at the Crash Site. The processing equipment is offline and
+              refining is not available yet.
             </Feedback>
           </div>
         )}

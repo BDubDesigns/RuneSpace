@@ -14,7 +14,7 @@ import {
  *
  * - Crash Site: the existing Ferrite Shale deposit where Mining is available.
  * - Abandoned Processing Yard: a dormant industrial location whose future
- *   Metallurgy activity is shown as dormant only — it performs no refining.
+ *   Metallurgy activity is shown as offline only — it performs no refining.
  */
 const locationDefinitions = [
   {
@@ -33,15 +33,14 @@ const locationDefinitions = [
   {
     id: LOCATION_IDS.abandonedProcessingYard,
     displayName: "Abandoned Processing Yard",
-    description:
-      "A dormant industrial yard of silent stamping presses and cold smelters. Its machinery waits for a future Metallurgy activity that is not yet operational.",
+    description: "The processing equipment is offline. Refining is not available yet.",
     adjacentLocationIds: [LOCATION_IDS.crashSite],
     availableActionIds: [],
     dormantActivities: [
       {
         skillId: SKILL_IDS.metallurgy,
         label: "Metallurgy",
-        status: "Dormant — not yet operational",
+        status: "Offline — not yet operational",
       },
     ],
     presentation: {
