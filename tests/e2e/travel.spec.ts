@@ -42,6 +42,55 @@ async function scrollMapIntoView(page: import("@playwright/test").Page) {
   });
 }
 
+async function expectMiningDashboardsVisible(page: import("@playwright/test").Page) {
+  await expect(page.getByRole("button", { name: "Start Mining" })).toBeVisible();
+  await expect(page.getByText("Success chance:", { exact: false })).toBeVisible();
+  await expect(page.getByText("Mining progression", { exact: true })).toBeVisible();
+  await expect(page.getByText("Cargo readout", { exact: true })).toBeVisible();
+  await expect(page.getByText("This mining run", { exact: true })).toBeVisible();
+}
+
+async function expectMiningDashboardsHidden(page: import("@playwright/test").Page) {
+  await expect(page.getByRole("button", { name: "Start Mining" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Stop Mining" })).toHaveCount(0);
+  await expect(page.getByText("Success chance:", { exact: false })).toHaveCount(0);
+  await expect(page.getByText("Mining attempt", { exact: true })).toHaveCount(0);
+  await expect(page.getByText("Latest attempt:", { exact: false })).toHaveCount(0);
+  await expect(page.getByText("Mining progression", { exact: true })).toHaveCount(0);
+  await expect(page.getByText("Cargo readout", { exact: true })).toHaveCount(0);
+  await expect(page.getByText("This mining run", { exact: true })).toHaveCount(0);
+}
+
+async function expectRouteProgressStartsAt(
+  page: import("@playwright/test").Page,
+  originLocationId: string,
+) {
+  const map = page.locator('[aria-label="Local map"]');
+  const staticRoute = map.locator("line:not([data-route-progress])");
+  const progressRoute = map.locator("line[data-route-progress]");
+  await expect(progressRoute).toHaveAttribute("data-route-start-location", originLocationId);
+  await expect(progressRoute).toHaveAttribute(
+    "data-route-end-location",
+    originLocationId === LOCATION_IDS.crashSite
+      ? LOCATION_IDS.abandonedProcessingYard
+      : LOCATION_IDS.crashSite,
+  );
+  const expectedStart =
+    originLocationId === LOCATION_IDS.crashSite
+      ? await staticRoute.getAttribute("x1")
+      : await staticRoute.getAttribute("x2");
+  const actualStart = await progressRoute.getAttribute("x1");
+  expect(actualStart).toBe(expectedStart);
+  await page.waitForTimeout(300);
+  const progressEnd = Number(await progressRoute.getAttribute("x2"));
+  expect(progressEnd).not.toBe(Number(actualStart));
+  if (originLocationId === LOCATION_IDS.crashSite) {
+    expect(progressEnd).toBeGreaterThan(Number(actualStart));
+  } else {
+    expect(progressEnd).toBeLessThan(Number(actualStart));
+  }
+}
+
 test.beforeEach(async ({ page }) => {
   const characterId = await openTravelFixture(page);
   await db.transaction(async (transaction) => {
@@ -79,6 +128,7 @@ test("selecting a destination does not begin travel; confirmation is required", 
   // Stationary at the Crash Site.
   await page.setViewportSize({ width: 390, height: 844 });
   await expect(page.getByText("You are here", { exact: false }).first()).toBeVisible();
+  await expectMiningDashboardsVisible(page);
   await expect(page.getByRole("button", { name: /Crash Site/ }).first()).toHaveAttribute(
     "aria-current",
     "true",
@@ -128,6 +178,7 @@ test("the full journey walks, arrives, and returns between the two locations", a
     .where(eq(activeActions.characterId, characterId));
   await page.getByRole("button", { name: "Refresh status" }).click();
   await expect(page.getByText("1 successful", { exact: true })).toBeVisible();
+  await expect(page.getByText("Latest attempt:", { exact: false })).toBeVisible();
 
   // Select the destination and confirm departure.
   await page.getByRole("button", { name: /Abandoned Processing Yard/ }).click();
@@ -135,9 +186,18 @@ test("the full journey walks, arrives, and returns between the two locations", a
   await page.getByRole("button", { name: /Walk to Abandoned Processing Yard/ }).click();
   // The authoritative state is applied immediately — verify the transit UI.
   await expect(page.getByText("Journey progress")).toBeVisible();
-  // Mining stopped; completed work retained.
-  await expect(page.getByText("1 successful", { exact: true })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Start Mining" })).toHaveCount(0);
+  await expect(
+    page.getByText("Mining stopped before departure. No new activity can begin until you arrive."),
+  ).toBeVisible();
+  await expect(
+    page.getByText(
+      "You are walking between locations. Mining stopped before departure, and no new activity can begin until you arrive. Use the world map below to follow your journey.",
+    ),
+  ).toBeVisible();
+  await expect(page.getByText(/paused/i)).toHaveCount(0);
+  await expectMiningDashboardsHidden(page);
+  await expectRouteProgressStartsAt(page, LOCATION_IDS.crashSite);
+  await expect(page.locator('[aria-label="Local map"] svg circle')).toHaveCount(0);
 
   await scrollMapIntoView(page);
   await page.screenshot({ path: "test-results/travel-mobile-in-transit.png" });
@@ -160,8 +220,12 @@ test("the full journey walks, arrives, and returns between the two locations", a
   await expect(
     page.getByRole("button", { name: /Abandoned Processing Yard/ }).first(),
   ).toHaveAttribute("aria-current", "true");
-  await expect(page.getByText(/Mining is only available at the Crash Site/)).toBeVisible();
-  await expect(page.getByRole("button", { name: "Start Mining" })).toHaveCount(0);
+  await expect(
+    page.getByText("The processing equipment is offline. Refining is not available yet."),
+  ).toBeVisible();
+  await expectMiningDashboardsHidden(page);
+  await expect(page.getByText(/Metallurgy progression/i)).toHaveCount(0);
+  await expect(page.getByRole("button", { name: /Refine/i })).toHaveCount(0);
 
   await scrollMapIntoView(page);
   await page.screenshot({ path: "test-results/travel-mobile-arrived.png" });
@@ -178,6 +242,9 @@ test("the full journey walks, arrives, and returns between the two locations", a
   await expect(page.getByRole("button", { name: /Walk to Crash Site/ })).toBeVisible();
   await page.getByRole("button", { name: /Walk to Crash Site/ }).click();
   await expect(page.getByText("Journey progress")).toBeVisible();
+  await expectMiningDashboardsHidden(page);
+  await expectRouteProgressStartsAt(page, LOCATION_IDS.abandonedProcessingYard);
+  await expect(page.locator('[aria-label="Local map"] svg circle')).toHaveCount(0);
 
   const returnPast = new Date(Date.now() - 25_000);
   await db
@@ -193,6 +260,8 @@ test("the full journey walks, arrives, and returns between the two locations", a
     "true",
   );
   await expect(page.getByRole("button", { name: "Start Mining" })).toBeVisible();
+  await expectMiningDashboardsVisible(page);
+  await expect(page.getByText("Latest attempt:", { exact: false })).toBeVisible();
   await page.getByRole("button", { name: "Start Mining" }).click();
   await expect(page.getByRole("button", { name: "Stop Mining" })).toBeVisible();
 });

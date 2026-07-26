@@ -11,6 +11,7 @@ import { getEffectiveGameBalance } from "@/game/config/balance";
 import { LOCATIONS, getLocation } from "@/game/content/locations";
 import { beginTravelAction } from "@/server/actions";
 import { useMiningPlay } from "@/features/mining/MiningPlayContext";
+import { routeProgressSegment } from "./route-progress";
 
 const WALK_SECONDS = Math.round(
   (getEffectiveGameBalance().travel.adjacentWalkDurationTicks * GAME_TICK_MS) / 1000,
@@ -186,6 +187,8 @@ function HexMapSvg({
   yardTransitRole,
   inTransit,
   transitProgress,
+  travelOriginLocationId,
+  travelDestinationLocationId,
 }: {
   crashCurrent: boolean;
   yardCurrent: boolean;
@@ -195,6 +198,8 @@ function HexMapSvg({
   yardTransitRole?: "origin" | "destination";
   inTransit: boolean;
   transitProgress: number;
+  travelOriginLocationId?: (typeof LOCATION_IDS)[keyof typeof LOCATION_IDS];
+  travelDestinationLocationId?: (typeof LOCATION_IDS)[keyof typeof LOCATION_IDS];
 }) {
   const crashPoints = hexPoints(CRASH_CX, CRASH_CY, HEX_W);
   const yardPoints = hexPoints(YARD_CX, YARD_CY, HEX_W);
@@ -217,15 +222,16 @@ function HexMapSvg({
     />
   );
 
-  const transitDot = (cx: number, cy: number, role?: "origin" | "destination") =>
-    role ? (
-      <circle
-        cx={cx + (role === "origin" ? -HEX_W * 0.35 : HEX_W * 0.35)}
-        cy={cy}
-        r="4"
-        className="fill-[color:var(--rs-accent-arcane)]"
-      />
-    ) : null;
+  const routeProgress =
+    inTransit && travelOriginLocationId && travelDestinationLocationId
+      ? routeProgressSegment({
+          originLocationId: travelOriginLocationId,
+          destinationLocationId: travelDestinationLocationId,
+          crashEndpoint: { x: ROUTE_X1, y: ROUTE_Y1 },
+          processingYardEndpoint: { x: ROUTE_X2, y: ROUTE_Y2 },
+          progress: transitProgress,
+        })
+      : undefined;
 
   return (
     <svg
@@ -241,11 +247,9 @@ function HexMapSvg({
         strokeWidth="3"
       />
       {crashSelected && !crashCurrent ? selectedMarker(CRASH_CX, CRASH_CY) : null}
-      {transitDot(CRASH_CX, CRASH_CY, crashTransitRole)}
 
       <polygon points={yardPoints} className={hexFill(yardCurrent, yardSelected)} strokeWidth="3" />
       {yardSelected && !yardCurrent ? selectedMarker(YARD_CX, YARD_CY) : null}
-      {transitDot(YARD_CX, YARD_CY, yardTransitRole)}
 
       {/* Diagonal route segment bridging the nearest angled edges (drawn
           after hexes for visibility). Uses a brighter structural color. */}
@@ -258,12 +262,15 @@ function HexMapSvg({
         strokeWidth="3"
         strokeLinecap="round"
       />
-      {inTransit ? (
+      {routeProgress ? (
         <line
-          x1={ROUTE_X1}
-          y1={ROUTE_Y1}
-          x2={ROUTE_X1 + (ROUTE_X2 - ROUTE_X1) * (transitProgress / 100)}
-          y2={ROUTE_Y1 + (ROUTE_Y2 - ROUTE_Y1) * (transitProgress / 100)}
+          data-route-progress
+          data-route-start-location={routeProgress.originLocationId}
+          data-route-end-location={routeProgress.destinationLocationId}
+          x1={routeProgress.routeStart.x}
+          y1={routeProgress.routeStart.y}
+          x2={routeProgress.progressEnd.x}
+          y2={routeProgress.progressEnd.y}
           className="stroke-[color:var(--rs-accent-arcane)]"
           strokeWidth="3.5"
           strokeLinecap="round"
@@ -436,6 +443,8 @@ export function LocalMapPanel() {
           }
           inTransit={inTransit}
           transitProgress={transitProgress}
+          travelOriginLocationId={travel?.originLocationId}
+          travelDestinationLocationId={travel?.destinationLocationId}
         />
         {LOCATIONS.map((location) => {
           const isCrash = location.id === LOCATION_IDS.crashSite;
@@ -490,7 +499,7 @@ export function LocalMapPanel() {
             />
           </div>
           <p className="mt-2 text-xs text-[color:var(--rs-text-muted)]">
-            Mining and other actions are paused until you arrive.
+            Mining stopped before departure. No new activity can begin until you arrive.
           </p>
         </div>
       ) : selectedLocation ? (
