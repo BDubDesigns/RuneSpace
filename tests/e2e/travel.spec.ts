@@ -221,7 +221,9 @@ test("the full journey walks, arrives, and returns between the two locations", a
     page.getByRole("button", { name: /Abandoned Processing Yard/ }).first(),
   ).toHaveAttribute("aria-current", "true");
   await expect(
-    page.getByText("The processing equipment is offline. Refining is not available yet."),
+    page
+      .getByRole("paragraph")
+      .filter({ hasText: "The processing equipment is offline. Refining is not available yet." }),
   ).toBeVisible();
   await expectMiningDashboardsHidden(page);
   await expect(page.getByText(/Metallurgy progression/i)).toHaveCount(0);
