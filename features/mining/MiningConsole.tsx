@@ -10,7 +10,8 @@ import { Drawer } from "@/components/ui/Drawer";
 import { SectionHeader } from "@/components/ui/SectionHeader";
 import { StatusMeter } from "@/components/ui/StatusMeter";
 import { getEffectiveGameBalance } from "@/game/config/balance";
-import { GAME_TICK_MS, ITEM_IDS } from "@/game/config/foundations";
+import { GAME_TICK_MS, ITEM_IDS, LOCATION_IDS } from "@/game/config/foundations";
+import { getLocation } from "@/game/content/locations";
 import { inventoryStackFillFraction } from "@/game/domain/inventory";
 import { miningNearMissBasisPoints } from "@/game/domain/mining";
 import type { MiningGameplayState, MiningRunAttempt } from "@/server/mining";
@@ -19,6 +20,7 @@ import { reportClientDiagnostic } from "@/features/diagnostics/client";
 import { latestMiningAttempt, resolvedAttemptCount } from "./latest-result";
 import { useMiningPlay } from "./MiningPlayContext";
 import { EquipmentPanel } from "./EquipmentPanel";
+import { LocalMapPanel } from "@/features/travel/LocalMapPanel";
 
 const RESULT_FEEDBACK_DURATION_MS = 3_600;
 
@@ -33,7 +35,7 @@ function stopMessage(reason: NonNullable<MiningGameplayState["stoppingReason"]>)
     carried_mass_capacity_reached: "Mining stopped: carried-mass capacity reached.",
     compatible_mining_tool_missing: "Mining stopped: equip a Salvage Cutter.",
     mining_tool_replaced: "Mining stopped: the mining tool was replaced.",
-    action_replaced: "Mining stopped because another action replaced it.",
+    action_replaced: "Mining stopped when Travel began.",
   }[reason];
 }
 
@@ -213,6 +215,10 @@ export function MiningConsole({ characterName }: { characterName: string }) {
   const [feedback, setFeedback] = useState<{ sequence: number; attempts: number }>();
   const balance = getEffectiveGameBalance();
   const active = state.activeAction;
+  const inTransit = Boolean(state.travelState);
+  const currentLocationId = state.location.currentLocationId;
+  const atCrashSite = currentLocationId === LOCATION_IDS.crashSite;
+  const showMiningActivity = atCrashSite && !inTransit;
   const durationMs = balance.mining.attemptDurationTicks * GAME_TICK_MS;
   const elapsed = active ? Math.max(0, now - new Date(active.progressStartedAt).getTime()) : 0;
   const progress = active ? Math.min(100, (elapsed / durationMs) * 100) : 0;
@@ -255,15 +261,22 @@ export function MiningConsole({ characterName }: { characterName: string }) {
   });
 
   useEffect(() => {
-    if (!active) return;
+    if (!active && !state.travelState) return;
     const clock = window.setInterval(() => setNow(Date.now()), 250);
-    const delay = Math.max(100, new Date(active.nextAttemptAt).getTime() - Date.now() + 100);
+    let delay = Number.POSITIVE_INFINITY;
+    if (active) {
+      delay = Math.max(100, new Date(active.nextAttemptAt).getTime() - Date.now() + 100);
+    }
+    if (state.travelState) {
+      const arrivesAt = new Date(state.travelState.arrivesAt).getTime();
+      delay = Math.min(delay, Math.max(120, arrivesAt - Date.now() + 150));
+    }
     const refresh = window.setTimeout(() => requestAutoRefresh(), delay);
     return () => {
       window.clearInterval(clock);
       window.clearTimeout(refresh);
     };
-  }, [active?.nextAttemptAt, requestAutoRefresh]);
+  }, [active?.nextAttemptAt, state.travelState?.arrivesAt, requestAutoRefresh]);
 
   const latestAttempt = latestMiningAttempt(state.run.recentAttempts);
   const recentBatchCount = state.recentResult.successes + state.recentResult.failures;
@@ -291,48 +304,86 @@ export function MiningConsole({ characterName }: { characterName: string }) {
     <div className="space-y-4">
       <Panel tone="raised">
         <div className="flex flex-wrap items-start justify-between gap-4">
-          <SectionHeader eyebrow="Crash Site // Sector 01">{characterName}</SectionHeader>
-          <span className="border border-[color:var(--rs-accent-mining)] bg-[color:var(--rs-accent-mining-subtle)] px-2 py-1 font-display text-xs uppercase tracking-wide text-[color:var(--rs-accent-mining)]">
-            Ferrite Shale
-          </span>
-        </div>
-        <p className="mt-4 max-w-2xl text-sm leading-relaxed text-[color:var(--rs-text-secondary)]">
-          The damaged ship needs raw material. Cut Ferrite Shale from the infinite crash-site
-          deposit to prepare for repairs.
-        </p>
-        <div className="mt-5 flex flex-wrap gap-3">
-          {active ? (
-            <ActionButton intent="danger" loading={busy} onClick={() => command(stopMiningAction)}>
-              Stop Mining
-            </ActionButton>
-          ) : (
-            <ActionButton intent="mining" loading={busy} onClick={() => command(startMiningAction)}>
-              Start Mining
-            </ActionButton>
-          )}
-          <ActionButton
-            intent="secondary"
-            disabled={busy}
-            onClick={() => command(refreshMiningAction)}
+          <SectionHeader
+            eyebrow={
+              inTransit ? "In transit" : (getLocation(currentLocationId)?.displayName ?? "Location")
+            }
           >
-            Refresh status
-          </ActionButton>
+            {characterName}
+          </SectionHeader>
+          {atCrashSite && !inTransit ? (
+            <span className="border border-[color:var(--rs-accent-mining)] bg-[color:var(--rs-accent-mining-subtle)] px-2 py-1 font-display text-xs uppercase tracking-wide text-[color:var(--rs-accent-mining)]">
+              Ferrite Shale
+            </span>
+          ) : null}
         </div>
-        <p className="mt-3 font-display text-sm uppercase tracking-wide text-[color:var(--rs-accent-mining)]">
-          Success chance: {percentage(state.successChanceBps)}%
-        </p>
-        {active ? (
-          <div className="mt-5">
-            <StatusMeter
-              label="Mining attempt"
-              value={progress}
-              detail={`${secondsRemaining.toFixed(1)}s to next attempt`}
-            />
-          </div>
+
+        {inTransit ? (
+          <p className="mt-4 max-w-2xl text-sm leading-relaxed text-[color:var(--rs-text-secondary)]">
+            You are walking between locations. Mining stopped before departure, and no new activity
+            can begin until you arrive. Use the world map below to follow your journey.
+          </p>
+        ) : atCrashSite ? (
+          <>
+            <p className="mt-4 max-w-2xl text-sm leading-relaxed text-[color:var(--rs-text-secondary)]">
+              The damaged ship needs raw material. Cut Ferrite Shale from the infinite crash-site
+              deposit to prepare for repairs.
+            </p>
+            <div className="mt-5 flex flex-wrap gap-3">
+              {active ? (
+                <ActionButton
+                  intent="danger"
+                  loading={busy}
+                  onClick={() => command(stopMiningAction)}
+                >
+                  Stop Mining
+                </ActionButton>
+              ) : (
+                <ActionButton
+                  intent="mining"
+                  loading={busy}
+                  onClick={() => command(startMiningAction)}
+                >
+                  Start Mining
+                </ActionButton>
+              )}
+              <ActionButton
+                intent="secondary"
+                disabled={busy}
+                onClick={() => command(refreshMiningAction)}
+              >
+                Refresh status
+              </ActionButton>
+            </div>
+            <p className="mt-3 font-display text-sm uppercase tracking-wide text-[color:var(--rs-accent-mining)]">
+              Success chance: {percentage(state.successChanceBps)}%
+            </p>
+            {active ? (
+              <div className="mt-5">
+                <StatusMeter
+                  label="Mining attempt"
+                  value={progress}
+                  detail={`${secondsRemaining.toFixed(1)}s to next attempt`}
+                />
+              </div>
+            ) : (
+              <Feedback>
+                Mining is idle. Attempts take six seconds and resolve on the server.
+              </Feedback>
+            )}
+          </>
         ) : (
-          <Feedback>Mining is idle. Attempts take six seconds and resolve on the server.</Feedback>
+          <div className="mt-4">
+            <p className="max-w-2xl text-sm leading-relaxed text-[color:var(--rs-text-secondary)]">
+              {getLocation(currentLocationId)?.description}
+            </p>
+            <Feedback tone="muted">
+              Mining is only available at the Crash Site. The processing equipment is offline and
+              refining is not available yet.
+            </Feedback>
+          </div>
         )}
-        {latestAttempt ? (
+        {showMiningActivity && latestAttempt ? (
           <LatestAttemptResult
             attempt={latestAttempt}
             attemptsResolved={
@@ -346,131 +397,136 @@ export function MiningConsole({ characterName }: { characterName: string }) {
             ? latestAttemptAnnouncement(latestAttempt, feedback.attempts)
             : ""}
         </p>
-        {message ? (
+        {showMiningActivity && message ? (
           <Feedback tone={state.stoppingReason && !active ? "danger" : "muted"}>{message}</Feedback>
         ) : null}
-        {recovery ? (
+        {showMiningActivity && recovery ? (
           <ActionButton className="mt-3" disabled={busy} intent="secondary" onClick={recovery}>
             Retry status check
           </ActionButton>
         ) : null}
       </Panel>
-      <div className="grid gap-4 sm:grid-cols-2">
-        <Panel>
-          <p className="font-display text-xs uppercase tracking-[0.16em] text-[color:var(--rs-accent-mining)]">
-            Mining progression
-          </p>
-          <p className="mt-3 font-display text-3xl font-bold">Level {state.mining.level}</p>
-          <StatusMeter
-            label="Mining XP"
-            value={
-              state.mining.xpToNextLevel
-                ? Math.min(
-                    100,
-                    (state.mining.xpIntoLevel /
-                      (state.mining.xpIntoLevel + state.mining.xpToNextLevel)) *
-                      100,
-                  )
-                : 100
-            }
-            detail={
-              state.mining.xpToNextLevel
-                ? `${state.mining.xpToNextLevel} XP to next level`
-                : "Maximum level"
-            }
-          />
-          <p className="mt-3 text-sm text-[color:var(--rs-text-secondary)]">
-            {state.mining.totalXp.toLocaleString()} total XP
-          </p>
-        </Panel>
-        <Panel>
-          <p className="font-display text-xs uppercase tracking-[0.16em] text-[color:var(--rs-accent-mining)]">
-            Cargo readout
-          </p>
-          <p className="mt-3 font-display text-3xl font-bold">{state.ferriteShaleQuantity}</p>
-          <p className="text-sm text-[color:var(--rs-text-secondary)]">Ferrite Shale</p>
-          <div className="mt-4 space-y-3">
-            <StatusMeter
-              label="Inventory slots"
-              value={
-                state.inventory.slotsUsed + state.inventory.slotsAvailable
-                  ? (state.inventory.slotsUsed /
-                      (state.inventory.slotsUsed + state.inventory.slotsAvailable)) *
-                    100
-                  : 0
-              }
-              detail={`${state.inventory.slotsUsed} used / ${state.inventory.slotsAvailable} available`}
-            />
-            <StatusMeter
-              label="Carried mass"
-              value={(state.inventory.massGrams / state.inventory.capacityGrams) * 100}
-              detail={`${kilograms(state.inventory.massGrams)} / ${kilograms(state.inventory.capacityGrams)}`}
-            />
+      <LocalMapPanel />
+      {showMiningActivity ? (
+        <>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Panel>
+              <p className="font-display text-xs uppercase tracking-[0.16em] text-[color:var(--rs-accent-mining)]">
+                Mining progression
+              </p>
+              <p className="mt-3 font-display text-3xl font-bold">Level {state.mining.level}</p>
+              <StatusMeter
+                label="Mining XP"
+                value={
+                  state.mining.xpToNextLevel
+                    ? Math.min(
+                        100,
+                        (state.mining.xpIntoLevel /
+                          (state.mining.xpIntoLevel + state.mining.xpToNextLevel)) *
+                          100,
+                      )
+                    : 100
+                }
+                detail={
+                  state.mining.xpToNextLevel
+                    ? `${state.mining.xpToNextLevel} XP to next level`
+                    : "Maximum level"
+                }
+              />
+              <p className="mt-3 text-sm text-[color:var(--rs-text-secondary)]">
+                {state.mining.totalXp.toLocaleString()} total XP
+              </p>
+            </Panel>
+            <Panel>
+              <p className="font-display text-xs uppercase tracking-[0.16em] text-[color:var(--rs-accent-mining)]">
+                Cargo readout
+              </p>
+              <p className="mt-3 font-display text-3xl font-bold">{state.ferriteShaleQuantity}</p>
+              <p className="text-sm text-[color:var(--rs-text-secondary)]">Ferrite Shale</p>
+              <div className="mt-4 space-y-3">
+                <StatusMeter
+                  label="Inventory slots"
+                  value={
+                    state.inventory.slotsUsed + state.inventory.slotsAvailable
+                      ? (state.inventory.slotsUsed /
+                          (state.inventory.slotsUsed + state.inventory.slotsAvailable)) *
+                        100
+                      : 0
+                  }
+                  detail={`${state.inventory.slotsUsed} used / ${state.inventory.slotsAvailable} available`}
+                />
+                <StatusMeter
+                  label="Carried mass"
+                  value={(state.inventory.massGrams / state.inventory.capacityGrams) * 100}
+                  detail={`${kilograms(state.inventory.massGrams)} / ${kilograms(state.inventory.capacityGrams)}`}
+                />
+              </div>
+            </Panel>
           </div>
-        </Panel>
-      </div>
-      <Panel>
-        <SectionHeader eyebrow="Server-resolved">This mining run</SectionHeader>
-        <div className="mt-4 grid grid-cols-2 gap-3 text-sm sm:grid-cols-5">
-          <p>
-            <strong>{state.run.attempts}</strong> attempts
-          </p>
-          <p>
-            <strong>{state.run.successes}</strong> successful
-          </p>
-          <p>
-            <strong>{state.run.failures}</strong> failed
-          </p>
-          <p>
-            <strong>{state.run.shaleGained}</strong> shale gained
-          </p>
-          <p>
-            <strong>{state.run.xpGained}</strong> Mining XP
-          </p>
-        </div>
-        <div
-          className="mt-5 max-h-72 space-y-2 overflow-y-auto pr-1"
-          aria-label="Mining attempt history"
-        >
-          {[...state.run.recentAttempts].reverse().map((attempt) => (
-            <article
-              className="border-l-2 border-[color:var(--rs-border-structural)] bg-[color:var(--rs-surface-panel)] px-3 py-2 text-sm"
-              key={attempt.sequence}
+          <Panel>
+            <SectionHeader eyebrow="Server-resolved">This mining run</SectionHeader>
+            <div className="mt-4 grid grid-cols-2 gap-3 text-sm sm:grid-cols-5">
+              <p>
+                <strong>{state.run.attempts}</strong> attempts
+              </p>
+              <p>
+                <strong>{state.run.successes}</strong> successful
+              </p>
+              <p>
+                <strong>{state.run.failures}</strong> failed
+              </p>
+              <p>
+                <strong>{state.run.shaleGained}</strong> shale gained
+              </p>
+              <p>
+                <strong>{state.run.xpGained}</strong> Mining XP
+              </p>
+            </div>
+            <div
+              className="mt-5 max-h-72 space-y-2 overflow-y-auto pr-1"
+              aria-label="Mining attempt history"
             >
-              <p className="font-display uppercase tracking-wide">
-                Attempt {attempt.sequence} - {attempt.success ? "Success" : "Failed"}
-              </p>
-              <p className="text-[color:var(--rs-text-secondary)]">
-                Roll {percentage(attempt.rolledBasisPoints)} | Needed below{" "}
-                {percentage(attempt.thresholdBasisPoints)}
-              </p>
-              <p className="text-xs text-[color:var(--rs-text-muted)]">
-                Resolved {new Date(attempt.resolvedAt).toLocaleTimeString()}
-              </p>
-              {attempt.success ? (
-                <p>
-                  {attempt.shaleAwarded} Ferrite Shale | {attempt.xpAwarded} Mining XP
-                </p>
-              ) : (
-                <p>
-                  Missed by{" "}
-                  {percentage(
-                    miningNearMissBasisPoints(
-                      attempt.rolledBasisPoints,
-                      attempt.thresholdBasisPoints,
-                    ),
+              {[...state.run.recentAttempts].reverse().map((attempt) => (
+                <article
+                  className="border-l-2 border-[color:var(--rs-border-structural)] bg-[color:var(--rs-surface-panel)] px-3 py-2 text-sm"
+                  key={attempt.sequence}
+                >
+                  <p className="font-display uppercase tracking-wide">
+                    Attempt {attempt.sequence} - {attempt.success ? "Success" : "Failed"}
+                  </p>
+                  <p className="text-[color:var(--rs-text-secondary)]">
+                    Roll {percentage(attempt.rolledBasisPoints)} | Needed below{" "}
+                    {percentage(attempt.thresholdBasisPoints)}
+                  </p>
+                  <p className="text-xs text-[color:var(--rs-text-muted)]">
+                    Resolved {new Date(attempt.resolvedAt).toLocaleTimeString()}
+                  </p>
+                  {attempt.success ? (
+                    <p>
+                      {attempt.shaleAwarded} Ferrite Shale | {attempt.xpAwarded} Mining XP
+                    </p>
+                  ) : (
+                    <p>
+                      Missed by{" "}
+                      {percentage(
+                        miningNearMissBasisPoints(
+                          attempt.rolledBasisPoints,
+                          attempt.thresholdBasisPoints,
+                        ),
+                      )}
+                    </p>
                   )}
+                </article>
+              ))}
+              {state.run.recentAttempts.length === 0 ? (
+                <p className="text-sm text-[color:var(--rs-text-muted)]">
+                  No resolved attempts in this run yet.
                 </p>
-              )}
-            </article>
-          ))}
-          {state.run.recentAttempts.length === 0 ? (
-            <p className="text-sm text-[color:var(--rs-text-muted)]">
-              No resolved attempts in this run yet.
-            </p>
-          ) : null}
-        </div>
-      </Panel>
+              ) : null}
+            </div>
+          </Panel>
+        </>
+      ) : null}
       {inventoryOpen ? (
         <InventoryPanel
           state={state}

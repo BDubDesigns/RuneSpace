@@ -7,6 +7,7 @@ import {
   type SkillId,
 } from "@/game/config/foundations";
 import { ContentId } from "./ids";
+import { LocationIdSchema } from "./locations";
 
 const skillIdValues = Object.values(SKILL_IDS) as [SkillId, ...SkillId[]];
 const itemIdValues = Object.values(ITEM_IDS) as [ItemId, ...ItemId[]];
@@ -32,6 +33,12 @@ export const EquipEquipmentRequestSchema = z.object({
 export const UnequipEquipmentRequestSchema = z.object({
   characterId: z.string().uuid(),
   target: EquipmentTargetSchema,
+});
+
+/** A begin-travel command: the client supplies only the destination location. */
+export const BeginTravelRequestSchema = z.object({
+  characterId: z.string().uuid(),
+  destinationLocationId: LocationIdSchema,
 });
 
 /** Containers can only hold non-container item definitions. */

@@ -104,4 +104,35 @@ subagents or automation that may be unavailable.
 - pnpm is the package manager; the lockfile is committed and installs are frozen.
 - Node 22 and pnpm 9.15.4 are pinned (see `package.json` `engines`/`packageManager`).
 - Key scripts: `dev`, `build`, `start`, `lint`, `format`, `format:check`,
-  `typecheck`, `test`, `test:integration`, `test:e2e`.
+  `typecheck`, `test`, `test:integration`, `test:e2e`, `test:e2e:canonical`.
+- `test:e2e` is a quick development command; `test:e2e:canonical` is the
+  required CI-parity browser command that agents must use to validate E2E
+  behavior and screenshots.
+- **Host Node note:** Some development hosts may have a user-local Node 24
+  installation (e.g., at `~/.local/node-v24.18.0-linux-x64/bin/node`) that
+  `.bashrc` prepends to `PATH` for interactive shells. Non-interactive shells
+  (including this harness) do not source `.bashrc` and fall back to the system
+  Node 22 at `/usr/bin/node`. Both versions coexist; do not uninstall either.
+  Verify the active version with `node --version` before running validation.
+
+### Host-local PostgreSQL
+- On Brandon's managed RuneSpace host checkout, database-backed commands must first load
+  `/home/brandon/.config/runespace/dev.env` with `source /home/brandon/.config/runespace/dev.env`.
+  This private file exists outside the repository and supplies `DATABASE_URL`.
+- Never print, `cat`, `echo`, log, commit, or include the private file's contents in reports.
+  Do not guess PostgreSQL credentials or substitute Docker Compose credentials from `.env.example`.
+  Do not use `postgres://runespace:runespace@localhost:5432/runespace` on this managed host.
+- If the private file is missing or unreadable, stop and report the environment blocker rather
+  than inventing fallback credentials. Database-backed commands include `pnpm drizzle-kit migrate`,
+  `pnpm test:integration`, and `pnpm test:e2e:canonical`.
+- The canonical runner's localhost safety check remains authoritative. Never access the Coolify
+  production database for local testing.
+- Managed-host command sequence (Node must report 22.x):
+  ```bash
+  cd /home/brandon/workspace/projects/runespace
+  source /home/brandon/.config/runespace/dev.env
+  export PATH="/usr/bin:$PATH"
+  node --version
+  pnpm test:integration
+  pnpm test:e2e:canonical
+  ```

@@ -78,6 +78,10 @@ export const characters = pgTable(
       .$onUpdate(() => new Date()),
     // Only set when a character is actually entered/played. Null until first play.
     lastPlayedAt: timestamp("last_played_at", { withTimezone: true }),
+    // Authoritative persistent current location. Every character resolves from
+    // the typed location registry; new characters default to the Crash Site
+    // through the authoritative provisioning path and the migration backfill.
+    currentLocationId: text("current_location_id").notNull().default("crash_site"),
   },
   (table) => [
     check(
@@ -231,6 +235,34 @@ export const activeActions = pgTable(
   ],
 );
 
+/**
+ * Durable travel state for the one active Travel action. The character's
+ * `current_location_id` remains the authoritative origin until arrival commits;
+ * this row owns the destination for that journey. It exists only while the
+ * character is in transit and is cleared on arrival.
+ *
+ * `active_actions.started_at` is the sole authoritative Travel start time.
+ * `active_actions.resolved_through_at` is the durable action cursor.
+ * This table stores only route-specific durable state: character ID, origin
+ * location ID, and destination location ID.
+ */
+export const characterTravelState = pgTable(
+  "character_travel_state",
+  {
+    characterId: text("character_id")
+      .primaryKey()
+      .references(() => characters.id, { onDelete: "restrict" }),
+    originLocationId: text("origin_location_id").notNull(),
+    destinationLocationId: text("destination_location_id").notNull(),
+  },
+  (table) => [
+    check(
+      "character_travel_state_distinct_ends",
+      sql`${table.originLocationId} <> ${table.destinationLocationId}`,
+    ),
+  ],
+);
+
 /** Durable idempotency marker for the one-time Issue #18 starter loadout. */
 export const characterStarterProvisioning = pgTable("character_starter_provisioning", {
   characterId: text("character_id")
@@ -263,3 +295,4 @@ export type InventoryStack = typeof inventoryStacks.$inferSelect;
 export type ItemInstance = typeof itemInstances.$inferSelect;
 export type EquippedItem = typeof equippedItems.$inferSelect;
 export type ActiveAction = typeof activeActions.$inferSelect;
+export type CharacterTravelState = typeof characterTravelState.$inferSelect;

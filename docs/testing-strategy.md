@@ -26,18 +26,25 @@ small number of critical mobile player journeys.
   screen, then core loops as they ship). Avoid large suites of shallow UI tests.
 - The scaffold includes a minimal app-loading smoke test
   (`tests/e2e/smoke.spec.ts`).
-- Run locally: `pnpm test:e2e`. The focused Mining journey runs in its own CI
-  job with a disposable PostgreSQL service and uploads Playwright artifacts.
-- That journey may use `RUNESPACE_E2E_MINING=true` only in CI to select a
-  server-internal deterministic Mining random source. Browser clients cannot
-  send, select, or observe that switch; PostgreSQL fixtures remain test code.
-- Prefer accessible roles, labels, visible outcomes, stable test hooks, and
-  tolerant geometry checks. Avoid brittle selectors, exact browser-serialized
-  CSS strings, and internal DOM structure unless that representation is an
-  acceptance criterion.
-- Do not add screenshot machinery solely to capture transient animation unless
-  explicitly required. Test transient feedback through semantic state, duration,
-  stable end state, and reduced-motion behavior where appropriate.
+- Quick local development: `pnpm test:e2e`. Uses the dev web server and may
+  reuse an existing server for speed. Does **not** count as CI-parity validation.
+- The canonical CI-parity command: `pnpm test:e2e:canonical`. This is the single
+  source of truth for local and CI artifact verification. It:
+  - requires Node 22.x
+  - requires a localhost-only disposable PostgreSQL database (refuses remote)
+  - selects a dedicated test port
+  - removes stale authentication and test state
+  - runs committed migrations
+  - starts a fresh production build and server
+  - runs the Mining Chromium journey
+  - runs the Travel Chromium journey
+  - runs the repeated Mining play-boundary check
+  - preserves intentional screenshots in `artifacts/e2e-review/`
+  - verifies the complete screenshot manifest (exists, nonempty, correct names)
+- Agents may not report browser or CI parity as passing unless the canonical
+  command actually passed.
+- GitHub Actions remains the final authority; canonical execution must use the
+  same `pnpm test:e2e:canonical` command.
 - Uploading an artifact is not proof that promised evidence exists. Verify each
   expected evidence file before upload, and inspect artifact contents whenever
   evidence is part of the definition of done.
@@ -56,4 +63,7 @@ For progression-sensitive systems, prioritize:
 
 ## CI scope
 CI runs typecheck, lint, format check, unit tests, production build, a separate
-PostgreSQL migration/integration-test job, and a focused Mining Playwright job.
+PostgreSQL migration/integration-test job, and a focused Mining/Playwright job
+that runs the single canonical `pnpm test:e2e:canonical` command. The canonical
+runner is the single source of truth for E2E screenshots and artifact
+verification in both local development and GitHub Actions.

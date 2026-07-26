@@ -6,13 +6,16 @@ import {
   characterMiningState,
   characterSkillXp,
   characterStarterProvisioning,
+  characters,
+  characterTravelState,
   equippedItems,
   inventoryStacks,
   itemInstances,
 } from "@/db/rune-space";
 import { getEffectiveGameBalance, miningLevelThresholds } from "@/game/config/balance";
 import { resolveItemPresentation } from "@/game/content/item-presentation";
-import { ACTION_IDS, ITEM_IDS, SKILL_IDS } from "@/game/config/foundations";
+import { isActionAvailableAtLocation } from "@/game/content/locations";
+import { ACTION_IDS, ITEM_IDS, LOCATION_IDS, SKILL_IDS } from "@/game/config/foundations";
 import {
   carriedItemMassGrams,
   deriveEquipmentLoadout,
@@ -30,12 +33,14 @@ import {
   type MiningStopReason,
 } from "@/game/domain/mining";
 import { levelFromXp } from "@/game/domain/progression";
+import { adjacentWalkDurationTicks, planTravel } from "@/game/domain/travel";
 import { ticksToMilliseconds } from "@/game/domain/timing";
 import {
   type ActionResolver,
   type DatabaseTransaction,
   withResolvedOwnedCharacter,
 } from "@/server/action-resolution";
+import { createTravelResolver, type TravelResolution, type TravelSnapshot } from "@/server/travel";
 import { grantCharacterSkillXp } from "@/server/progression";
 
 const systemRandom: MiningRandom = {
@@ -142,6 +147,22 @@ export type MiningGameplayState = {
   recentResult: { successes: number; failures: number; awardedXp: number };
   stoppingReason?: MiningStopReason;
   commandError?: "another_action_active";
+  /** Authoritative persistent current location (stable ID from the registry). */
+  location: { currentLocationId: string };
+  /** Present only while the character is in transit (server-authoritative). */
+  travelState?: {
+    originLocationId: string;
+    destinationLocationId: string;
+    startedAt: string;
+    arrivesAt: string;
+  };
+  /** Set when a begin-travel command was refused by the authoritative rules. */
+  travelError?:
+    | "unknown_destination"
+    | "same_location"
+    | "not_adjacent"
+    | "already_traveling"
+    | "mining_unavailable_here";
 };
 
 export async function ensureStarterMiningState(
@@ -403,16 +424,53 @@ export function createMiningResolver(
   };
 }
 
+export function createPlayResolver(
+  random: MiningRandom,
+  onMiningOutcome?: (outcome: PersistedMiningOutcome) => void,
+  onTravelArrival?: (outcome: TravelResolution) => void,
+): ActionResolver<MiningSnapshot | TravelSnapshot, PersistedMiningOutcome | TravelResolution> {
+  const mining = createMiningResolver(random, onMiningOutcome);
+  const travel = createTravelResolver();
+  return {
+    supports: (action) =>
+      (mining.supports?.(action) ?? true) || (travel.supports?.(action) ?? true),
+    load: (transaction, input) => {
+      if (travel.supports?.(input.action)) {
+        return travel.load(transaction, input) as Promise<MiningSnapshot | TravelSnapshot>;
+      }
+      return mining.load(transaction, input) as Promise<MiningSnapshot | TravelSnapshot>;
+    },
+    resolve: (input) => {
+      if (travel.supports?.(input.action)) {
+        return travel.resolve(
+          input as unknown as Parameters<typeof travel.resolve>[0],
+        ) as unknown as ReturnType<typeof mining.resolve>;
+      }
+      return mining.resolve(
+        input as unknown as Parameters<typeof mining.resolve>[0],
+      ) as unknown as ReturnType<typeof mining.resolve>;
+    },
+    persist: (transaction, outcome, context) => {
+      if ((outcome as TravelResolution).arrived !== undefined) {
+        return travel.persist(transaction, outcome as TravelResolution, context);
+      }
+      return mining.persist(transaction, outcome as PersistedMiningOutcome);
+    },
+  };
+}
+
 export async function stateFromTransaction(
   transaction: DatabaseTransaction,
   characterId: string,
   recentResult: MiningGameplayState["recentResult"],
   stoppingReason?: MiningStopReason,
   commandError?: MiningGameplayState["commandError"],
+  travelError?: MiningGameplayState["travelError"],
+  characterRow?: { currentLocationId: string },
 ): Promise<MiningGameplayState> {
   const balance = getEffectiveGameBalance();
   const snapshot = await loadMiningSnapshot(transaction, characterId);
-  const [xpRows, stacks, actionRows, miningStateRows] = await Promise.all([
+  const [xpRows, stacks, actionRows, miningStateRows, travelRows, character] = await Promise.all([
     transaction
       .select()
       .from(characterSkillXp)
@@ -427,6 +485,13 @@ export async function stateFromTransaction(
       .select()
       .from(characterMiningState)
       .where(eq(characterMiningState.characterId, characterId)),
+    transaction
+      .select()
+      .from(characterTravelState)
+      .where(eq(characterTravelState.characterId, characterId)),
+    characterRow
+      ? Promise.resolve([characterRow])
+      : transaction.select().from(characters).where(eq(characters.id, characterId)).limit(1),
   ]);
   const totalXp = xpRows.find((row) => row.skillId === SKILL_IDS.mining)?.totalXp ?? 0;
   const thresholds = miningLevelThresholds(balance);
@@ -434,6 +499,7 @@ export async function stateFromTransaction(
   const next = thresholds.find((threshold) => threshold.level === level + 1);
   const action = actionRows[0];
   const miningState = miningStateRows[0];
+  const travel = travelRows[0];
   const run: MiningRunState = {
     attempts: miningState?.runAttempts ?? 0,
     successes: miningState?.runSuccesses ?? 0,
@@ -442,8 +508,22 @@ export async function stateFromTransaction(
     xpGained: miningState?.runXpGained ?? 0,
     recentAttempts: (miningState?.recentAttempts as MiningRunAttempt[] | undefined) ?? [],
   };
+  const currentLocationId = character[0]?.currentLocationId ?? LOCATION_IDS.crashSite;
+  const travelState =
+    travel && action?.actionId === ACTION_IDS.travel
+      ? {
+          originLocationId: travel.originLocationId,
+          destinationLocationId: travel.destinationLocationId,
+          startedAt: action.startedAt.toISOString(),
+          arrivesAt: new Date(
+            action.startedAt.getTime() + ticksToMilliseconds(adjacentWalkDurationTicks()),
+          ).toISOString(),
+        }
+      : undefined;
   return {
     characterId,
+    location: { currentLocationId },
+    travelState,
     activeAction:
       action?.actionId === ACTION_IDS.crashSiteMining
         ? {
@@ -538,6 +618,7 @@ export async function stateFromTransaction(
       ? undefined
       : (stoppingReason ?? (miningState?.lastStopReason as MiningStopReason | null) ?? undefined),
     commandError,
+    travelError,
   };
 }
 
@@ -551,7 +632,7 @@ export async function getMiningGameplayState(
   return withResolvedOwnedCharacter(
     userId,
     characterId,
-    createMiningResolver(random, (value) => {
+    createPlayResolver(random, (value) => {
       outcome = value;
     }),
     async (transaction, context) => {
@@ -570,6 +651,7 @@ export async function getMiningGameplayState(
         context.action && context.action.actionId !== ACTION_IDS.crashSiteMining
           ? "another_action_active"
           : undefined,
+        undefined,
       );
     },
     now,
@@ -586,18 +668,33 @@ export async function startCrashSiteMining(
   return withResolvedOwnedCharacter(
     userId,
     characterId,
-    createMiningResolver(random, (value) => {
+    createPlayResolver(random, (value) => {
       outcome = value;
     }),
     async (transaction, context) => {
       await ensureStarterMiningState(transaction, context.character.id);
       const unsupportedAction =
         context.action && context.action.actionId !== ACTION_IDS.crashSiteMining;
+      // Reload the character after lazy resolution so location reflects any
+      // travel arrival that just committed in this same transaction.
+      const [reloaded] = await transaction
+        .select()
+        .from(characters)
+        .where(eq(characters.id, context.character.id))
+        .limit(1);
+      const currentLocationId = reloaded?.currentLocationId ?? LOCATION_IDS.crashSite;
+      const traveling = context.action?.actionId === ACTION_IDS.travel;
+      // Mining may only start at the Crash Site while stationary.
+      const miningBlockedHere = !isActionAvailableAtLocation(
+        currentLocationId,
+        ACTION_IDS.crashSiteMining,
+      );
       const snapshot = await loadMiningSnapshot(transaction, context.character.id);
-      const preflightStopReason = context.action
-        ? undefined
-        : miningPreflightStopReason(snapshot, getEffectiveGameBalance());
-      if (!context.action && !preflightStopReason) {
+      const preflightStopReason =
+        context.action || traveling || miningBlockedHere
+          ? undefined
+          : miningPreflightStopReason(snapshot, getEffectiveGameBalance());
+      if (!context.action && !preflightStopReason && !miningBlockedHere) {
         await transaction.insert(activeActions).values({
           characterId: context.character.id,
           actionId: ACTION_IDS.crashSiteMining,
@@ -649,6 +746,7 @@ export async function startCrashSiteMining(
           : { successes: 0, failures: 0, awardedXp: 0 },
         preflightStopReason ?? outcome?.stopReason,
         unsupportedAction ? "another_action_active" : undefined,
+        miningBlockedHere ? "mining_unavailable_here" : undefined,
       );
     },
     now,
@@ -665,7 +763,7 @@ export async function stopMining(
   return withResolvedOwnedCharacter(
     userId,
     characterId,
-    createMiningResolver(random, (value) => {
+    createPlayResolver(random, (value) => {
       outcome = value;
     }),
     async (transaction, context) => {
@@ -697,10 +795,145 @@ export async function stopMining(
         context.action && context.action.actionId !== ACTION_IDS.crashSiteMining
           ? "another_action_active"
           : undefined,
+        undefined,
+        context.character,
       );
     },
     now,
   );
 }
 
-export const miningTestInternals = { createMiningResolver, ensureStarterMiningState };
+export async function beginTravel(
+  userId: string,
+  characterId: string,
+  destinationLocationId: string,
+  now = new Date(),
+  random = defaultMiningRandom(),
+): Promise<MiningGameplayState> {
+  let miningOutcome: PersistedMiningOutcome | undefined;
+  return withResolvedOwnedCharacter(
+    userId,
+    characterId,
+    createPlayResolver(random, (value) => {
+      miningOutcome = value;
+    }),
+    async (transaction, context) => {
+      await ensureStarterMiningState(transaction, context.character.id);
+
+      // Reload the character after lazy resolution so origin reflects any travel
+      // arrival that committed earlier in this same transaction.
+      const [reloaded] = await transaction
+        .select()
+        .from(characters)
+        .where(eq(characters.id, context.character.id))
+        .limit(1);
+      const currentLocationId = reloaded?.currentLocationId ?? LOCATION_IDS.crashSite;
+      const alreadyTraveling = context.action?.actionId === ACTION_IDS.travel;
+      const travelRows = await transaction
+        .select()
+        .from(characterTravelState)
+        .where(eq(characterTravelState.characterId, context.character.id))
+        .for("update");
+      const travel = travelRows[0];
+
+      if (alreadyTraveling) {
+        const sameDestination = travel?.destinationLocationId === destinationLocationId;
+        if (sameDestination) {
+          // Idempotent retry: the journey is already underway to this destination.
+          return stateFromTransaction(
+            transaction,
+            context.character.id,
+            recentFrom(miningOutcome),
+            miningOutcome?.stopReason,
+            undefined,
+            undefined,
+          );
+        }
+        return stateFromTransaction(
+          transaction,
+          context.character.id,
+          recentFrom(miningOutcome),
+          miningOutcome?.stopReason,
+          undefined,
+          "already_traveling",
+        );
+      }
+
+      const plan = planTravel({
+        currentLocationId,
+        destinationLocationId,
+        alreadyTraveling: false,
+      });
+      if (!plan.ok) {
+        return stateFromTransaction(
+          transaction,
+          context.character.id,
+          recentFrom(miningOutcome),
+          miningOutcome?.stopReason,
+          context.action && context.action.actionId !== ACTION_IDS.crashSiteMining
+            ? "another_action_active"
+            : undefined,
+          plan.reason,
+        );
+      }
+
+      // Only approved Crash Site Mining may be replaced atomically by Travel.
+      // Unknown, unsupported, future, or malformed active actions block Travel
+      // and must remain completely untouched.
+      if (context.action && context.action.actionId !== ACTION_IDS.crashSiteMining) {
+        return stateFromTransaction(
+          transaction,
+          context.character.id,
+          recentFrom(miningOutcome),
+          miningOutcome?.stopReason,
+          "another_action_active",
+          undefined,
+        );
+      }
+
+      // Replace active Crash Site Mining atomically, resolving only
+      // already-completed Mining work exactly once before Travel begins.
+      if (context.action) {
+        await transaction
+          .delete(activeActions)
+          .where(eq(activeActions.characterId, context.character.id));
+        await transaction
+          .insert(characterMiningState)
+          .values({ characterId: context.character.id, lastStopReason: "action_replaced" })
+          .onConflictDoUpdate({
+            target: characterMiningState.characterId,
+            set: { lastStopReason: "action_replaced", updatedAt: now },
+          });
+      }
+      await transaction.insert(activeActions).values({
+        characterId: context.character.id,
+        actionId: ACTION_IDS.travel,
+        startedAt: now,
+        resolvedThroughAt: now,
+      });
+      await transaction.insert(characterTravelState).values({
+        characterId: context.character.id,
+        originLocationId: currentLocationId,
+        destinationLocationId,
+      });
+
+      return stateFromTransaction(
+        transaction,
+        context.character.id,
+        recentFrom(miningOutcome),
+        miningOutcome?.stopReason,
+        undefined,
+        undefined,
+      );
+    },
+    now,
+  );
+}
+
+function recentFrom(
+  outcome: PersistedMiningOutcome | undefined,
+): MiningGameplayState["recentResult"] {
+  return outcome
+    ? { successes: outcome.successes, failures: outcome.failures, awardedXp: outcome.awardedXp }
+    : { successes: 0, failures: 0, awardedXp: 0 };
+}

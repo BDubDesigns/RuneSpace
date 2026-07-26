@@ -11,20 +11,39 @@ contract. This document provides the supporting procedure.
   explicitly instructs it to merge after review.
 
 ## Validate locally
-Baseline local checks mirror the fast CI job:
+
+### Managed RuneSpace host
+On Brandon's managed RuneSpace host, load the private environment before every
+database-backed command. Do not print its contents. It supplies the host-local
+`DATABASE_URL`; do not replace it with Docker example credentials.
+
 ```bash
+cd /home/brandon/workspace/projects/runespace
+source /home/brandon/.config/runespace/dev.env
+export PATH="/usr/bin:$PATH"
+node --version # Must report 22.x
+
 pnpm install --frozen-lockfile
 pnpm typecheck
 pnpm lint
 pnpm format:check
 pnpm test
-DATABASE_URL=postgres://runespace:runespace@localhost:5432/runespace \
-  NODE_ENV=production \
-  BETTER_AUTH_SECRET=insecure-ci-build-only-secret-do-not-use-in-prod-0000000000 \
-  BETTER_AUTH_URL=http://localhost:3000 \
-  RUNESPACE_RELEASE_ID=local \
-  pnpm build
+pnpm drizzle-kit migrate
+pnpm test:integration
+pnpm build
+pnpm test:e2e:canonical
 ```
+
+If `/home/brandon/.config/runespace/dev.env` is missing or unreadable, stop and
+report the environment blocker. Never guess credentials, inspect or report the
+private file's contents, or use the Coolify production database for local testing.
+The canonical runner's localhost-only database safety check remains authoritative.
+
+### Generic fresh clone or Docker Compose setup
+For a separately created generic local Docker database, `.env.example` contains
+example Docker Compose credentials. Those credentials apply only to that Docker
+database after it has been created; they must not override a managed host's
+private environment.
 
 Run affected focused checks when their required environment is available. For
 example, integration tests require PostgreSQL and browser tests require the

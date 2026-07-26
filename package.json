@@ -19,7 +19,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:integration": "vitest run --config vitest.integration.config.ts",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "test:e2e:canonical": "node scripts/run-canonical-e2e.mjs"
   },
   "dependencies": {
     "next": "15.5.20",

@@ -113,12 +113,6 @@ jobs:
           --health-interval 5s --health-timeout 5s --health-retries 5
     env:
       DATABASE_URL: postgres://runespace:runespace@localhost:5432/runespace
-      BETTER_AUTH_SECRET: insecure-ci-browser-only-secret-do-not-use-in-prod-0000000000
-      BETTER_AUTH_URL: http://127.0.0.1:3000
-      RUNESPACE_RELEASE_ID: ${{ github.sha }}
-      CI: true
-      RUNESPACE_E2E_MINING: true
-      RUNESPACE_E2E_PLAY_ERROR: true
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -130,24 +124,10 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm exec playwright install --with-deps chromium
-      - run: pnpm drizzle-kit migrate
-      - run: pnpm test:e2e mining --project=chromium
-      - name: Verify Mining review screenshots
-        run: |
-          test -s test-results/mining-mobile-no-yield.png
-          test -s test-results/mining-desktop-no-yield.png
-          test -s test-results/mining-mobile-success.png
-          test -s test-results/mining-desktop-success.png
-          test -s test-results/mining-mobile-equipment.png
-          test -s test-results/mining-desktop-equipment.png
-          test -s test-results/mining-mobile-equipment-artwork.png
-          test -s test-results/mining-desktop-equipment-artwork.png
-          test -s test-results/mining-mobile-inventory-mixed.png
-          test -s test-results/mining-desktop-inventory-mixed.png
+      - run: pnpm test:e2e:canonical
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: mining-playwright-report
-          path: test-results/
+          name: e2e-review-screenshots
+          path: artifacts/e2e-review/
           if-no-files-found: error
-      - run: pnpm test:e2e mining --project=chromium --grep "Play boundary" --repeat-each=3 --workers=1

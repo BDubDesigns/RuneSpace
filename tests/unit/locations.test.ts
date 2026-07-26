@@ -1,0 +1,52 @@
+import { describe, expect, it } from "vitest";
+import { LOCATION_IDS } from "@/game/config/foundations";
+import {
+  LOCATIONS,
+  areLocationsAdjacent,
+  getLocation,
+  isActionAvailableAtLocation,
+} from "@/game/content/locations";
+import { ACTION_IDS } from "@/game/config/foundations";
+
+describe("issue #40 location content", () => {
+  it("defaults new characters to the Crash Site matching the migration backfill", () => {
+    // The committed migration uses the literal 'crash_site' default; keep the
+    // authoritative constant and the persistent default in lockstep.
+    expect(LOCATION_IDS.crashSite).toBe("crash_site");
+  });
+
+  it("resolves exactly the two approved initial locations", () => {
+    expect(LOCATIONS.map((l) => l.id).sort()).toEqual(
+      [LOCATION_IDS.crashSite, LOCATION_IDS.abandonedProcessingYard].sort(),
+    );
+    expect(getLocation(LOCATION_IDS.crashSite)?.displayName).toBe("Crash Site");
+    expect(getLocation(LOCATION_IDS.abandonedProcessingYard)?.displayName).toBe(
+      "Abandoned Processing Yard",
+    );
+  });
+
+  it("adjacency is authoritative and bidirectional", () => {
+    expect(areLocationsAdjacent(LOCATION_IDS.crashSite, LOCATION_IDS.abandonedProcessingYard)).toBe(
+      true,
+    );
+    expect(areLocationsAdjacent(LOCATION_IDS.abandonedProcessingYard, LOCATION_IDS.crashSite)).toBe(
+      true,
+    );
+    // No other edges exist in the initial world.
+    expect(areLocationsAdjacent(LOCATION_IDS.crashSite, LOCATION_IDS.crashSite)).toBe(false);
+  });
+
+  it("derives activity availability from authoritative location content", () => {
+    expect(isActionAvailableAtLocation(LOCATION_IDS.crashSite, ACTION_IDS.crashSiteMining)).toBe(
+      true,
+    );
+    expect(
+      isActionAvailableAtLocation(LOCATION_IDS.abandonedProcessingYard, ACTION_IDS.crashSiteMining),
+    ).toBe(false);
+    // The Processing Yard's Metallurgy is dormant, not an enabled action.
+    expect(getLocation(LOCATION_IDS.abandonedProcessingYard)?.availableActionIds).toHaveLength(0);
+    expect(getLocation(LOCATION_IDS.abandonedProcessingYard)?.dormantActivities[0]?.skillId).toBe(
+      "metallurgy",
+    );
+  });
+});

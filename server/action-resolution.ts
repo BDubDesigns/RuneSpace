@@ -55,7 +55,14 @@ export type ActionResolver<Snapshot, Outcome> = {
     snapshot: ReadonlySnapshot<Snapshot>;
     window: ResolutionWindow;
   }): ActionResolution<Outcome> | Promise<ActionResolution<Outcome>>;
-  persist(transaction: DatabaseTransaction, outcome: Outcome): Promise<void>;
+  persist(
+    transaction: DatabaseTransaction,
+    outcome: Outcome,
+    context?: {
+      character: Character;
+      action: ActiveAction & { destinationLocationId?: string };
+    },
+  ): Promise<void>;
 };
 
 function asReadonlySnapshot<Snapshot>(snapshot: Snapshot): ReadonlySnapshot<Snapshot> {
@@ -120,7 +127,12 @@ export async function withResolvedOwnedCharacter<Snapshot, Outcome, Result>(
           window,
           resolution.transition.consumedTicks,
         );
-        await resolver.persist(transaction, resolution.outcome);
+        // Persist the authoritative outcome (e.g. Mining rewards, or a Travel
+        // arrival committing the destination location and clearing travel state)
+        // before the transition mutates the action row. For a stop this runs
+        // before the action is deleted; for a continue/replace it runs before the
+        // cursor is advanced.
+        await resolver.persist(transaction, resolution.outcome, { character, action });
 
         if (resolution.transition.kind === "continue") {
           await transaction

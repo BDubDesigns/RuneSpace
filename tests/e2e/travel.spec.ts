@@ -1,0 +1,324 @@
+import { expect, test } from "@playwright/test";
+import { eq } from "drizzle-orm";
+import { db } from "@/db";
+import {
+  activeActions,
+  characters,
+  characterMiningState,
+  characterSkillXp,
+  characterStarterProvisioning,
+  characterTravelState,
+  equippedItems,
+  inventoryStacks,
+  itemInstances,
+} from "@/db/rune-space";
+import { LOCATION_IDS } from "@/game/config/foundations";
+import { miningStorageStatePath } from "./mining.setup";
+
+const e2eDatabaseHost = process.env.DATABASE_URL ? new URL(process.env.DATABASE_URL).hostname : "";
+
+test.beforeAll(() => {
+  if (e2eDatabaseHost !== "localhost" && e2eDatabaseHost !== "127.0.0.1") {
+    throw new Error("Travel E2E fixtures require a disposable localhost PostgreSQL database");
+  }
+});
+
+test.use({ storageState: miningStorageStatePath });
+test.describe.configure({ mode: "serial" });
+
+async function openTravelFixture(page: import("@playwright/test").Page) {
+  await page.goto("/characters");
+  await page.getByRole("link", { name: "Play" }).click();
+  await page.waitForURL(/\/play\/[^/]+$/);
+  return page.url().split("/").at(-1)!;
+}
+
+/** Scroll the local map into the center of the viewport so neither hex is
+ * hidden by the fixed bottom navigation. */
+async function scrollMapIntoView(page: import("@playwright/test").Page) {
+  await page.evaluate(() => {
+    const el = document.querySelector('[aria-label="Local map"]');
+    if (el) el.scrollIntoView({ block: "center" });
+  });
+}
+
+async function expectMiningDashboardsVisible(page: import("@playwright/test").Page) {
+  await expect(page.getByRole("button", { name: "Start Mining" })).toBeVisible();
+  await expect(page.getByText("Success chance:", { exact: false })).toBeVisible();
+  await expect(page.getByText("Mining progression", { exact: true })).toBeVisible();
+  await expect(page.getByText("Cargo readout", { exact: true })).toBeVisible();
+  await expect(page.getByText("This mining run", { exact: true })).toBeVisible();
+}
+
+async function expectMiningDashboardsHidden(page: import("@playwright/test").Page) {
+  await expect(page.getByRole("button", { name: "Start Mining" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Stop Mining" })).toHaveCount(0);
+  await expect(page.getByText("Success chance:", { exact: false })).toHaveCount(0);
+  await expect(page.getByText("Mining attempt", { exact: true })).toHaveCount(0);
+  await expect(page.getByText("Latest attempt:", { exact: false })).toHaveCount(0);
+  await expect(page.getByText("Mining progression", { exact: true })).toHaveCount(0);
+  await expect(page.getByText("Cargo readout", { exact: true })).toHaveCount(0);
+  await expect(page.getByText("This mining run", { exact: true })).toHaveCount(0);
+}
+
+async function expectRouteProgressStartsAt(
+  page: import("@playwright/test").Page,
+  originLocationId: string,
+) {
+  const map = page.locator('[aria-label="Local map"]');
+  const staticRoute = map.locator("line:not([data-route-progress])");
+  const progressRoute = map.locator("line[data-route-progress]");
+  await expect(progressRoute).toHaveAttribute("data-route-start-location", originLocationId);
+  await expect(progressRoute).toHaveAttribute(
+    "data-route-end-location",
+    originLocationId === LOCATION_IDS.crashSite
+      ? LOCATION_IDS.abandonedProcessingYard
+      : LOCATION_IDS.crashSite,
+  );
+  const expectedStart =
+    originLocationId === LOCATION_IDS.crashSite
+      ? await staticRoute.getAttribute("x1")
+      : await staticRoute.getAttribute("x2");
+  const actualStart = await progressRoute.getAttribute("x1");
+  expect(actualStart).toBe(expectedStart);
+  await page.waitForTimeout(300);
+  const progressEnd = Number(await progressRoute.getAttribute("x2"));
+  expect(progressEnd).not.toBe(Number(actualStart));
+  if (originLocationId === LOCATION_IDS.crashSite) {
+    expect(progressEnd).toBeGreaterThan(Number(actualStart));
+  } else {
+    expect(progressEnd).toBeLessThan(Number(actualStart));
+  }
+}
+
+test.beforeEach(async ({ page }) => {
+  const characterId = await openTravelFixture(page);
+  await db.transaction(async (transaction) => {
+    // Clear all mutable gameplay rows to ensure per-test isolation.
+    await transaction.delete(activeActions).where(eq(activeActions.characterId, characterId));
+    await transaction
+      .delete(characterTravelState)
+      .where(eq(characterTravelState.characterId, characterId));
+    await transaction
+      .delete(characterMiningState)
+      .where(eq(characterMiningState.characterId, characterId));
+    await transaction.delete(inventoryStacks).where(eq(inventoryStacks.characterId, characterId));
+    // `equipped_items` has a composite foreign key to item instances.
+    await transaction.delete(equippedItems).where(eq(equippedItems.characterId, characterId));
+    await transaction.delete(itemInstances).where(eq(itemInstances.characterId, characterId));
+    await transaction.delete(characterSkillXp).where(eq(characterSkillXp.characterId, characterId));
+    await transaction
+      .delete(characterStarterProvisioning)
+      .where(eq(characterStarterProvisioning.characterId, characterId));
+    // Reset character location to the authoritative start.
+    await transaction
+      .update(characters)
+      .set({ currentLocationId: LOCATION_IDS.crashSite })
+      .where(eq(characters.id, characterId));
+  });
+  await page.reload();
+  await expect(page.getByText("World map")).toBeVisible();
+});
+
+test("selecting a destination does not begin travel; confirmation is required", async ({
+  page,
+}) => {
+  const characterId = page.url().split("/").at(-1)!;
+
+  // Stationary at the Crash Site.
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect(page.getByText("You are here", { exact: false }).first()).toBeVisible();
+  await expectMiningDashboardsVisible(page);
+  await expect(page.getByRole("button", { name: /Crash Site/ }).first()).toHaveAttribute(
+    "aria-current",
+    "true",
+  );
+  await scrollMapIntoView(page);
+  await page.screenshot({ path: "test-results/travel-mobile-stationary.png" });
+
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await scrollMapIntoView(page);
+  await page.screenshot({ path: "test-results/travel-desktop-stationary.png" });
+
+  await page.setViewportSize({ width: 390, height: 844 });
+
+  // Select the Processing Yard — Travel must NOT start yet.
+  await page.getByRole("button", { name: /Abandoned Processing Yard/ }).click();
+  await expect(
+    page.getByRole("button", { name: /Walk to Abandoned Processing Yard/ }),
+  ).toBeVisible();
+  await expect(page.getByText("Walking time: 24 seconds")).toBeVisible();
+  // The map remains read-only: no IN TRANSIT yet.
+  await expect(page.getByText("In transit", { exact: false })).toHaveCount(0);
+  // Selecting again does not create a journey server-side.
+  await expect(
+    db.select().from(characterTravelState).where(eq(characterTravelState.characterId, characterId)),
+  ).resolves.toEqual([]);
+
+  await scrollMapIntoView(page);
+  await page.screenshot({ path: "test-results/travel-mobile-selected.png" });
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await scrollMapIntoView(page);
+  await page.screenshot({ path: "test-results/travel-desktop-selected.png" });
+});
+
+test("the full journey walks, arrives, and returns between the two locations", async ({ page }) => {
+  const characterId = page.url().split("/").at(-1)!;
+
+  // Stationary at the Crash Site — screenshot.
+  await page.setViewportSize({ width: 390, height: 844 });
+
+  // Start Mining and resolve one controlled attempt.
+  await page.getByRole("button", { name: "Start Mining" }).click();
+  await expect(page.getByRole("button", { name: "Stop Mining" })).toBeVisible();
+  const twoAttemptsAgo = new Date(Date.now() - 12_100);
+  await db
+    .update(activeActions)
+    .set({ startedAt: twoAttemptsAgo, resolvedThroughAt: twoAttemptsAgo })
+    .where(eq(activeActions.characterId, characterId));
+  await page.getByRole("button", { name: "Refresh status" }).click();
+  await expect(page.getByText("1 successful", { exact: true })).toBeVisible();
+  await expect(page.getByText("Latest attempt:", { exact: false })).toBeVisible();
+
+  // Select the destination and confirm departure.
+  await page.getByRole("button", { name: /Abandoned Processing Yard/ }).click();
+  await expect(page.getByText(/Departing resolves your completed Mining work/)).toBeVisible();
+  await page.getByRole("button", { name: /Walk to Abandoned Processing Yard/ }).click();
+  // The authoritative state is applied immediately — verify the transit UI.
+  await expect(page.getByText("Journey progress")).toBeVisible();
+  await expect(
+    page.getByText("Mining stopped before departure. No new activity can begin until you arrive."),
+  ).toBeVisible();
+  await expect(
+    page.getByText(
+      "You are walking between locations. Mining stopped before departure, and no new activity can begin until you arrive. Use the world map below to follow your journey.",
+    ),
+  ).toBeVisible();
+  await expect(page.getByText(/paused/i)).toHaveCount(0);
+  await expectMiningDashboardsHidden(page);
+  await expectRouteProgressStartsAt(page, LOCATION_IDS.crashSite);
+  await expect(page.locator('[aria-label="Local map"] svg circle')).toHaveCount(0);
+
+  await scrollMapIntoView(page);
+  await page.screenshot({ path: "test-results/travel-mobile-in-transit.png" });
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await scrollMapIntoView(page);
+  await page.screenshot({ path: "test-results/travel-desktop-in-transit.png" });
+  await page.setViewportSize({ width: 390, height: 844 });
+
+  // Fast-forward the journey server-side, then refresh to resolve arrival.
+  const departPast = new Date(Date.now() - 25_000);
+  await db
+    .update(activeActions)
+    .set({ startedAt: departPast, resolvedThroughAt: departPast })
+    .where(eq(activeActions.characterId, characterId));
+  await page.reload();
+  await expect(page.getByText("World map")).toBeVisible();
+
+  // Arrived at the Processing Yard.
+  await expect(page.getByText("You are here", { exact: false }).first()).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: /Abandoned Processing Yard/ }).first(),
+  ).toHaveAttribute("aria-current", "true");
+  await expect(
+    page
+      .getByRole("paragraph")
+      .filter({ hasText: "The processing equipment is offline. Refining is not available yet." }),
+  ).toBeVisible();
+  await expectMiningDashboardsHidden(page);
+  await expect(page.getByText(/Metallurgy progression/i)).toHaveCount(0);
+  await expect(page.getByRole("button", { name: /Refine/i })).toHaveCount(0);
+
+  await scrollMapIntoView(page);
+  await page.screenshot({ path: "test-results/travel-mobile-arrived.png" });
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await scrollMapIntoView(page);
+  await page.screenshot({ path: "test-results/travel-desktop-arrived.png" });
+  await page.setViewportSize({ width: 390, height: 844 });
+
+  // Return journey: select the Crash Site and walk back.
+  await page
+    .getByRole("button", { name: /Crash Site/ })
+    .first()
+    .click();
+  await expect(page.getByRole("button", { name: /Walk to Crash Site/ })).toBeVisible();
+  await page.getByRole("button", { name: /Walk to Crash Site/ }).click();
+  await expect(page.getByText("Journey progress")).toBeVisible();
+  await expectMiningDashboardsHidden(page);
+  await expectRouteProgressStartsAt(page, LOCATION_IDS.abandonedProcessingYard);
+  await expect(page.locator('[aria-label="Local map"] svg circle')).toHaveCount(0);
+
+  const returnPast = new Date(Date.now() - 25_000);
+  await db
+    .update(activeActions)
+    .set({ startedAt: returnPast, resolvedThroughAt: returnPast })
+    .where(eq(activeActions.characterId, characterId));
+  await page.reload();
+  await expect(page.getByText("World map")).toBeVisible();
+
+  // Back at the Crash Site, Mining is available again.
+  await expect(page.getByRole("button", { name: /Crash Site/ }).first()).toHaveAttribute(
+    "aria-current",
+    "true",
+  );
+  await expect(page.getByRole("button", { name: "Start Mining" })).toBeVisible();
+  await expectMiningDashboardsVisible(page);
+  await expect(page.getByText("Latest attempt:", { exact: false })).toBeVisible();
+  await page.getByRole("button", { name: "Start Mining" }).click();
+  await expect(page.getByRole("button", { name: "Stop Mining" })).toBeVisible();
+});
+
+test("keyboard users can select and confirm a destination", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  const characterId = page.url().split("/").at(-1)!;
+
+  // 1. Focus the reachable destination hex.
+  const yard = page.getByRole("button", { name: /Abandoned Processing Yard/ }).first();
+  await yard.focus();
+  await expect(yard).toBeFocused();
+
+  // 2. Activate it using Enter.
+  await page.keyboard.press("Enter");
+
+  // 3. Assert selected state on the hex cell (before the Walk button
+  //    introduces a second match for the same name pattern).
+  await expect(yard).toHaveAttribute("aria-pressed", "true");
+
+  // 4. Verify no Travel row has started.
+  await expect(
+    db.select().from(characterTravelState).where(eq(characterTravelState.characterId, characterId)),
+  ).resolves.toEqual([]);
+
+  // 5. Verify the confirmation control appears.
+  const confirmButton = page.getByRole("button", { name: /Walk to Abandoned Processing Yard/ });
+  await expect(confirmButton).toBeVisible();
+
+  // 6-7. Focus and activate the confirmation control with a second Enter.
+  await confirmButton.focus();
+  await page.keyboard.press("Enter");
+
+  // 8. Verify IN TRANSIT appears immediately from the server-returned state.
+  await expect(page.getByText("Journey progress")).toBeVisible();
+});
+
+test("reduced-motion presentation retains equivalent travel information", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  // Emulate prefers-reduced-motion.
+  await page.emulateMedia({ reducedMotion: "reduce" });
+
+  // Stationary state must show current location.
+  await expect(page.getByText("You are here", { exact: false }).first()).toBeVisible();
+
+  // Select the Processing Yard — details visible without animation.
+  await page.getByRole("button", { name: /Abandoned Processing Yard/ }).click();
+  await expect(page.getByText("Walking time: 24 seconds")).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: /Walk to Abandoned Processing Yard/ }),
+  ).toBeVisible();
+
+  // Confirm and verify in-transit status is announced.
+  await page.getByRole("button", { name: /Walk to Abandoned Processing Yard/ }).click();
+  await expect(page.getByText("Journey progress")).toBeVisible();
+  // The aria-live region announces progress without animation dependency.
+  await expect(page.getByText(/seconds remaining/)).toBeVisible();
+});

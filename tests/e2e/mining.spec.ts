@@ -622,7 +622,8 @@ test("the Play boundary resets, navigates, and hides failure details", async ({ 
   await expect(page.getByText("Play boundary e2e failure")).toHaveCount(0);
   await page.evaluate(() => window.sessionStorage.removeItem("runespace-e2e-play-error"));
   await page.getByRole("button", { name: "Retry connection" }).click();
-  await expect(page.getByText("Ferrite Shale", { exact: true }).first()).toBeVisible();
+  // Recovery returns to the current location, which may not be Crash Site after Travel E2E.
+  await expect(page.getByText("World map", { exact: true })).toBeVisible();
 
   await page.evaluate(() => window.sessionStorage.setItem("runespace-e2e-play-error", "1"));
   await page.reload();

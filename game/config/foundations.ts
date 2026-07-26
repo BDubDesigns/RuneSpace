@@ -26,6 +26,13 @@ const itemIds = {
 
 export const ACTION_IDS = {
   crashSiteMining: asContentId("crash_site_ferrite_shale_mining"),
+  travel: asContentId("travel"),
+} as const satisfies Record<string, ContentId>;
+
+/** Stable identities for the approved initial two-location world (issue #40). */
+export const LOCATION_IDS = {
+  crashSite: asContentId("crash_site"),
+  abandonedProcessingYard: asContentId("abandoned_processing_yard"),
 } as const satisfies Record<string, ContentId>;
 
 export const SKILL_IDS = skillIds;
@@ -33,3 +40,5 @@ export const ITEM_IDS = itemIds;
 
 export type SkillId = (typeof SKILL_IDS)[keyof typeof SKILL_IDS];
 export type ItemId = (typeof ITEM_IDS)[keyof typeof ITEM_IDS];
+export type LocationId = (typeof LOCATION_IDS)[keyof typeof LOCATION_IDS];
+export type ActionId = (typeof ACTION_IDS)[keyof typeof ACTION_IDS];
