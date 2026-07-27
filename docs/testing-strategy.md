@@ -37,6 +37,7 @@ small number of critical mobile player journeys.
   - runs committed migrations
   - starts a fresh production build and server
   - runs the Mining Chromium journey
+  - runs the Overlay Chromium journey (modal-overlay behavior shared by Inventory/Equipment)
   - runs the Travel Chromium journey
   - runs the repeated Mining play-boundary check
   - preserves intentional screenshots in `artifacts/e2e-review/`

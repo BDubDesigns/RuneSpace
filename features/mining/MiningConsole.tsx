@@ -533,8 +533,7 @@ export function MiningConsole({ characterName }: { characterName: string }) {
           onClose={() => setInventoryOpen(false)}
           triggerRef={inventoryTrigger}
         />
-      ) : null}
-      {equipmentOpen ? (
+      ) : equipmentOpen ? (
         <EquipmentPanel
           onClose={() => setEquipmentOpen(false)}
           state={state}

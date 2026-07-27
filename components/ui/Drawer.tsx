@@ -4,7 +4,7 @@ import { useEffect, useRef, type ReactNode, type RefObject } from "react";
 import { ActionButton } from "./ActionButton";
 import { SectionHeader } from "./SectionHeader";
 
-/** Modal drawer convention shared by persistent player-footer controls. */
+/** Shared modal overlay used by Inventory and Equipment. */
 export function Drawer({
   children,
   label,
@@ -20,20 +20,27 @@ export function Drawer({
   onClose: () => void;
   triggerRef: RefObject<HTMLButtonElement | null>;
 }) {
+  const backdrop = useRef<HTMLDivElement>(null);
   const closeButton = useRef<HTMLButtonElement>(null);
   const panel = useRef<HTMLElement>(null);
+  const closing = useRef(false);
+
   function close() {
+    closing.current = true;
     onClose();
     triggerRef.current?.focus();
   }
+
+  // Move focus into the modal on open.
   useEffect(() => {
     closeButton.current?.focus();
   }, []);
+
+  // Keyboard: Escape dismisses, Tab cycles within the modal.
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
       if (event.key === "Escape") {
-        onClose();
-        triggerRef.current?.focus();
+        close();
         return;
       }
       if (event.key !== "Tab" || !panel.current) return;
@@ -53,16 +60,70 @@ export function Drawer({
     }
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [onClose, triggerRef]);
+
+  // Focus containment: if focus ever escapes the panel (e.g. after a button
+  // becomes disabled), redirect it back to the close button.
+  // Does not apply while the modal is intentionally closing.
+  useEffect(() => {
+    function onFocusIn(event: FocusEvent) {
+      if (closing.current) return;
+      if (panel.current && event.target instanceof Node && !panel.current.contains(event.target)) {
+        closeButton.current?.focus();
+      }
+    }
+    document.addEventListener("focusin", onFocusIn);
+    return () => document.removeEventListener("focusin", onFocusIn);
+  }, []);
+
+  // Lock document scroll while open; restore on close/unmount.
+  // Uses position:fixed + scrollY save/restore for iOS Safari compatibility.
+  useEffect(() => {
+    const scrollY = window.scrollY;
+    const scrollbarWidth = window.innerWidth - document.documentElement.clientWidth;
+    const originalOverflow = document.body.style.overflow;
+    const originalPosition = document.body.style.position;
+    const originalTop = document.body.style.top;
+    const originalWidth = document.body.style.width;
+    const originalPaddingRight = document.body.style.paddingRight;
+
+    document.body.style.overflow = "hidden";
+    document.body.style.position = "fixed";
+    document.body.style.top = `-${scrollY}px`;
+    document.body.style.width = "100%";
+    if (scrollbarWidth > 0) {
+      document.body.style.paddingRight = `${scrollbarWidth}px`;
+    }
+
+    return () => {
+      document.body.style.overflow = originalOverflow;
+      document.body.style.position = originalPosition;
+      document.body.style.top = originalTop;
+      document.body.style.width = originalWidth;
+      document.body.style.paddingRight = originalPaddingRight;
+      window.scrollTo(0, scrollY);
+    };
+  }, []);
+
+  // Backdrop click dismisses.  Clicking inside the panel does not.
+  function onBackdropClick(event: React.MouseEvent) {
+    if (event.target === backdrop.current) {
+      close();
+    }
+  }
+
   return (
     <div
-      className="bg-[color:var(--rs-surface-page)]/90 fixed inset-0 z-50 flex items-end p-3 sm:items-center sm:justify-end sm:p-4"
+      ref={backdrop}
+      className="rs-overlay-backdrop bg-[color:var(--rs-surface-page)]/90 fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4"
+      onClick={onBackdropClick}
       role="presentation"
     >
       <section
         aria-label={label}
         aria-modal="true"
-        className="max-h-[min(78dvh,42rem)] w-full max-w-xl overflow-y-auto border border-[color:var(--rs-border-structural)] bg-[color:var(--rs-surface-raised)] p-4 pb-[max(1rem,env(safe-area-inset-bottom))] [box-shadow:var(--rs-shadow-panel)] sm:max-h-[calc(100dvh-2rem)] sm:w-[min(34rem,calc(100vw-2rem))]"
+        className="rs-overlay-panel max-h-[min(78dvh,42rem)] w-full max-w-xl overflow-y-auto border border-[color:var(--rs-border-structural)] bg-[color:var(--rs-surface-raised)] p-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-[max(1rem,env(safe-area-inset-top))] [box-shadow:var(--rs-shadow-panel),var(--rs-glow-primary)] sm:max-h-[calc(100dvh-2rem)] sm:w-[min(34rem,calc(100vw-2rem))]"
         ref={panel}
         role="dialog"
       >

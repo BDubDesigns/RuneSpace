@@ -41,6 +41,7 @@ for (const p of cleanupPaths) {
   if (existsSync(p)) execSync(`rm -rf "${p}"`, { stdio: "inherit", cwd: ROOT });
 }
 mkdirSync(resolve(ROOT, "artifacts/e2e-review/mining"), { recursive: true });
+mkdirSync(resolve(ROOT, "artifacts/e2e-review/overlay"), { recursive: true });
 mkdirSync(resolve(ROOT, "artifacts/e2e-review/travel"), { recursive: true });
 
 // ---- 5. Select dedicated test port ----
@@ -92,6 +93,15 @@ const MINING_REQUIRED = [
   "mining-desktop-inventory-mixed.png",
 ];
 
+const OVERLAY_REQUIRED = [
+  "overlay-mobile-inventory.png",
+  "overlay-desktop-inventory.png",
+  "overlay-mobile-equipment.png",
+  "overlay-desktop-equipment.png",
+  "overlay-mobile-contact-sheet.png",
+  "overlay-desktop-contact-sheet.png",
+];
+
 const TRAVEL_REQUIRED = [
   "travel-mobile-stationary.png",
   "travel-desktop-stationary.png",
@@ -120,15 +130,19 @@ function verifyAndCopyScreenshots(required, destDir) {
 runPlaywright(["mining", "--project=chromium"], "Mining E2E");
 verifyAndCopyScreenshots(MINING_REQUIRED, resolve(ROOT, "artifacts/e2e-review/mining"));
 
-// ---- 10. Remove auth state so Travel gets fresh account/character ----
+// ---- 10. Overlay E2E (reuses Mining auth state) ----
+runPlaywright(["overlay", "--project=chromium"], "Overlay E2E");
+verifyAndCopyScreenshots(OVERLAY_REQUIRED, resolve(ROOT, "artifacts/e2e-review/overlay"));
+
+// ---- 11. Remove auth state so Travel gets fresh account/character ----
 const authFile = resolve(ROOT, ".playwright/mining-auth-state.json");
 if (existsSync(authFile)) unlinkSync(authFile);
 
-// ---- 11. Travel E2E ----
+// ---- 12. Travel E2E ----
 runPlaywright(["travel", "--project=chromium"], "Travel E2E");
 verifyAndCopyScreenshots(TRAVEL_REQUIRED, resolve(ROOT, "artifacts/e2e-review/travel"));
 
-// ---- 12. Play boundary flake check ----
+// ---- 13. Play boundary flake check ----
 log("Running Mining play-boundary check...");
 const boundary = spawnSync(
   "pnpm",
@@ -146,6 +160,6 @@ const boundary = spawnSync(
 if (boundary.status !== 0 && boundary.status !== null)
   fail("Play boundary check failed (exit " + boundary.status + ")");
 
-// ---- 13. Final manifest verification ----
+// ---- 14. Final manifest verification ----
 log("Final screenshot manifest verified.");
 log("All canonical E2E checks passed.");

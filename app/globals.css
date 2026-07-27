@@ -141,7 +141,38 @@ body {
   animation: rs-reward-rise 1.8s ease-out both;
 }
 
+@keyframes rs-overlay-backdrop-enter {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes rs-overlay-panel-enter {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.rs-overlay-backdrop {
+  animation: rs-overlay-backdrop-enter 150ms ease-out;
+}
+
+.rs-overlay-panel {
+  animation: rs-overlay-panel-enter 200ms ease-out;
+}
+
 @media (prefers-reduced-motion: reduce) {
+  .rs-overlay-backdrop,
+  .rs-overlay-panel {
+    animation: none;
+  }
+
   *,
   *::before,
   *::after {
