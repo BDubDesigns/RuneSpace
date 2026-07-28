@@ -116,14 +116,14 @@ export function Drawer({
   return (
     <div
       ref={backdrop}
-      className="rs-overlay-backdrop bg-[color:var(--rs-surface-page)]/90 fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4"
+      className="rs-overlay-backdrop bg-[color:var(--rs-surface-page)]/70 fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4"
       onClick={onBackdropClick}
       role="presentation"
     >
       <section
         aria-label={label}
         aria-modal="true"
-        className="rs-overlay-panel max-h-[min(78dvh,42rem)] w-full max-w-xl overflow-y-auto border border-[color:var(--rs-border-structural)] bg-[color:var(--rs-surface-raised)] p-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-[max(1rem,env(safe-area-inset-top))] [box-shadow:var(--rs-shadow-panel),var(--rs-glow-primary)] sm:max-h-[calc(100dvh-2rem)] sm:w-[min(34rem,calc(100vw-2rem))]"
+        className="rs-overlay-panel max-h-[min(78dvh,42rem)] w-full max-w-xl overflow-y-auto border border-[color:var(--rs-border-structural)] bg-[color:var(--rs-surface-raised)] p-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-[max(1rem,env(safe-area-inset-top))] [box-shadow:var(--rs-shadow-panel),0_0_28px_rgb(75_216_245_/_0.28)] sm:max-h-[calc(100dvh-2rem)] sm:w-[min(34rem,calc(100vw-2rem))]"
         ref={panel}
         role="dialog"
       >
