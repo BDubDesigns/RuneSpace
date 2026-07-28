@@ -322,6 +322,72 @@ test("reduced-motion disables overlay animations", async ({ page }) => {
   expect(panelSeconds).toBeLessThanOrEqual(0.001);
 });
 
+// Records whether an overlay exit-animation class is ever applied after this is
+// called. Uses a MutationObserver so the assertion is timing-free: it does not
+// depend on racing the ~200ms fade against Playwright polling.
+async function trackOverlayExitClass(page: import("@playwright/test").Page) {
+  await page.evaluate(() => {
+    const w = window as unknown as {
+      __sawOverlayExit?: boolean;
+      __overlayExitObs?: MutationObserver;
+    };
+    w.__sawOverlayExit = false;
+    w.__overlayExitObs?.disconnect();
+    const obs = new MutationObserver((mutations) => {
+      for (const mutation of mutations) {
+        const className = (mutation.target as HTMLElement).className;
+        if (typeof className === "string" && /rs-overlay-(backdrop|panel)-exit/.test(className)) {
+          w.__sawOverlayExit = true;
+        }
+      }
+    });
+    obs.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ["class"],
+      subtree: true,
+    });
+    w.__overlayExitObs = obs;
+  });
+}
+
+async function sawOverlayExitClass(page: import("@playwright/test").Page) {
+  return page.evaluate(() =>
+    Boolean((window as unknown as { __sawOverlayExit?: boolean }).__sawOverlayExit),
+  );
+}
+
+test("closing plays an exit fade and only unmounts after it finishes", async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: "no-preference" });
+  await page.setViewportSize({ width: 390, height: 844 });
+  const nav = page.getByRole("navigation", { name: "Primary" });
+  await nav.getByRole("button", { name: /Inventory/ }).click();
+  const dialog = page.getByRole("dialog", { name: "Inventory" });
+  await expect(dialog).toBeVisible();
+  await trackOverlayExitClass(page);
+  await dialog.getByRole("button", { name: "Close inventory" }).click();
+  // The exit animation class is applied while the fade plays — proof the close
+  // is deferred rather than an instant unmount ...
+  await expect(dialog).toHaveClass(/rs-overlay-panel-exit/);
+  // ... and the dialog leaves the DOM only once the fade completes.
+  await expect(dialog).toHaveCount(0);
+  expect(await sawOverlayExitClass(page)).toBe(true);
+});
+
+test("reduced motion closes immediately without an exit fade", async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.setViewportSize({ width: 390, height: 844 });
+  const nav = page.getByRole("navigation", { name: "Primary" });
+  await nav.getByRole("button", { name: /Inventory/ }).click();
+  const dialog = page.getByRole("dialog", { name: "Inventory" });
+  await expect(dialog).toBeVisible();
+  await trackOverlayExitClass(page);
+  await page.keyboard.press("Escape");
+  // No exit animation ever engages under reduced motion ...
+  expect(await sawOverlayExitClass(page)).toBe(false);
+  // ... and the dialog is gone (instant unmount, no deferred window).
+  await expect(dialog).toHaveCount(0);
+});
+
 test("generate mobile and desktop contact sheets", async ({ browser }) => {
   const { readFileSync, existsSync, mkdirSync } = await import("node:fs");
   const { resolve } = await import("node:path");

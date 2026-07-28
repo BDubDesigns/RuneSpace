@@ -53,6 +53,11 @@
      truth. The slash-opacity modifier cannot alpha a hex CSS variable, so the
      alpha is baked into this token instead. */
   --rs-overlay-scrim: color-mix(in srgb, var(--rs-surface-page) 60%, transparent);
+  /* Modal overlay fade timings. Single source of truth for BOTH the enter and
+     exit animations so the fade-in and fade-out can never drift apart. The exit
+     unmount in Drawer.tsx keys off the panel animation, never a JS copy of these. */
+  --rs-overlay-dur-veil: 150ms;
+  --rs-overlay-dur-box: 200ms;
   --rs-glow-success: 0 0 32px rgb(136 215 99 / 0.66);
   --rs-glow-danger: 0 0 32px rgb(241 108 117 / 0.58);
   --rs-duration-fast: 120ms;
@@ -164,17 +169,47 @@ body {
   }
 }
 
+@keyframes rs-overlay-backdrop-exit {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+@keyframes rs-overlay-panel-exit {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
 .rs-overlay-backdrop {
-  animation: rs-overlay-backdrop-enter 150ms ease-out;
+  animation: rs-overlay-backdrop-enter var(--rs-overlay-dur-veil) ease-out;
 }
 
 .rs-overlay-panel {
-  animation: rs-overlay-panel-enter 200ms ease-out;
+  animation: rs-overlay-panel-enter var(--rs-overlay-dur-box) ease-out;
+}
+
+/* Exit classes are swapped in by Drawer.tsx when a close begins. `forwards`
+   holds the element at opacity 0 across the brief gap before React unmounts. */
+.rs-overlay-backdrop-exit {
+  animation: rs-overlay-backdrop-exit var(--rs-overlay-dur-veil) ease-out forwards;
+}
+
+.rs-overlay-panel-exit {
+  animation: rs-overlay-panel-exit var(--rs-overlay-dur-box) ease-out forwards;
 }
 
 @media (prefers-reduced-motion: reduce) {
   .rs-overlay-backdrop,
-  .rs-overlay-panel {
+  .rs-overlay-panel,
+  .rs-overlay-backdrop-exit,
+  .rs-overlay-panel-exit {
     animation: none;
   }
 
