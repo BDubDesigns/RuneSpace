@@ -10,7 +10,7 @@ import { expect, test } from "@playwright/test";
  * request; another player's id is never revealed).
  *
  * Run locally with a live PostgreSQL:
- *   DATABASE_URL=... BETTER_AUTH_SECRET=... BETTER_AUTH_URL=http://127.0.0.1:3000 \
+ *   DATABASE_URL=... BETTER_AUTH_SECRET=... \
  *     pnpm test:e2e ownership
  */
 

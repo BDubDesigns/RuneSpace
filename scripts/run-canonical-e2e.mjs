@@ -46,7 +46,7 @@ mkdirSync(resolve(ROOT, "artifacts/e2e-review/travel"), { recursive: true });
 
 // ---- 5. Select dedicated test port ----
 // Openchamber may occupy 3000 locally; use 3200 to avoid conflicts.
-// Better Auth validates BETTER_AUTH_URL against this port.
+// Better Auth validates allowed origins against this port.
 execSync(`fuser -k 3200/tcp 2>/dev/null || true`, { stdio: "inherit", cwd: ROOT });
 const PORT = 3200;
 const BASE_URL = `http://127.0.0.1:${PORT}`;
@@ -58,9 +58,9 @@ const env = {
   RUNESPACE_E2E_MINING: "true",
   RUNESPACE_E2E_PLAY_ERROR: "true",
   RUNESPACE_E2E_TRAVEL: "true",
+  RUNESPACE_E2E_CANONICAL_HTTP: "true",
   RUNESPACE_RELEASE_ID: "local-ci-parity",
   BETTER_AUTH_SECRET: "canonical-e2e-local-test-secret-not-for-production",
-  BETTER_AUTH_URL: BASE_URL,
   PLAYWRIGHT_PORT: String(PORT),
   PORT: String(PORT),
 };

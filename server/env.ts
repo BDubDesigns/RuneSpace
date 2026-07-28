@@ -8,6 +8,10 @@ import { z } from "zod";
  *
  * This module intentionally validates ONLY deployment/infrastructure config.
  * Game content and request boundary validation belongs in `game/schemas/`.
+ *
+ * NOTE: BETTER_AUTH_URL is no longer required. Better Auth host/origin
+ * resolution is configured explicitly via the dynamic baseURL object in
+ * server/auth-options.ts.
  */
 
 const nodeEnvSchema = z.enum(["development", "test", "production"]);
@@ -26,11 +30,9 @@ const envSchema = z.object({
   NODE_ENV: nodeEnvSchema.default("development"),
   DATABASE_URL: z.string().min(1, "DATABASE_URL is required"),
   // Better Auth owns credential and session security. The secret signs session
-  // tokens; the base URL is used for callback/cookie origins. Both MUST come
-  // from the environment and never be hardcoded. BETTER_AUTH_URL is optional —
-  // Better Auth derives the origin from the request when it is unset.
+  // tokens and MUST come from the environment. The host/origin boundary is
+  // configured explicitly via the dynamic baseURL object in auth-options.ts.
   BETTER_AUTH_SECRET: betterAuthSecretField,
-  BETTER_AUTH_URL: z.string().url().optional(),
 });
 
 export type AppEnv = z.infer<typeof envSchema>;
