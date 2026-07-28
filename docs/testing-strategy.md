@@ -42,8 +42,23 @@ small number of critical mobile player journeys.
   - runs the repeated Mining play-boundary check
   - preserves intentional screenshots in `artifacts/e2e-review/`
   - verifies the complete screenshot manifest (exists, nonempty, correct names)
+  - sets `RUNESPACE_E2E_CANONICAL_HTTP=true`, which disables Better Auth `Secure`
+    cookies for this runner only. Production-mode Better Auth issues `Secure`
+    cookies that a plain-HTTP test origin (`http://127.0.0.1:<port>`) discards,
+    dropping the session after sign-up; this gate is a test-runner-only exception
+    (see `docs/authentication.md`) and is never set for CI builds, preview, or
+    production.
 - Agents may not report browser or CI parity as passing unless the canonical
   command actually passed.
+- The canonical command is expensive by design: every invocation runs a full
+  production `next build` and `next start`, so one run spans several minutes
+  across all suites. For a CSS or visual-only change, run the affected spec
+  locally (`pnpm test:e2e <spec> --project=chromium`) as quick evidence instead
+  of the full canonical run. This skips the full *suite* but not necessarily a
+  build (the Playwright web server builds unless a server is already reusable or
+  `PLAYWRIGHT_DEV_SERVER` is set), and it is never a substitute for the canonical
+  command — only `pnpm test:e2e:canonical` and the matching CI job establish CI
+  parity.
 - GitHub Actions remains the final authority; canonical execution must use the
   same `pnpm test:e2e:canonical` command.
 - Uploading an artifact is not proof that promised evidence exists. Verify each

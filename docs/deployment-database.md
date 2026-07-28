@@ -6,6 +6,10 @@ RuneSpace uses one private, persistent Coolify PostgreSQL database during the
 early playable-development phase. The application receives its `DATABASE_URL`
 through Coolify environment configuration; never commit or print that value.
 
+Better Auth host/origin, cookie, and auth-environment configuration — including
+the post-deploy removal of `BETTER_AUTH_URL` from Coolify — lives in
+`docs/authentication.md`, not in this database-operations document.
+
 Committed Drizzle migrations are the authoritative database structure. They are
 run manually, rather than at application startup or every deploy, so an operator
 can review and control each schema change.

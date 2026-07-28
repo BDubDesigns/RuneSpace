@@ -70,11 +70,17 @@ The PR must include:
 - whether gameplay, balance, persistence, or player-facing behavior changed and
   the approved decisions governing any such change
 
-## Follow canonical CI
+## Observe CI and deployment progress
 Keep the PR draft while canonical CI completes. If a job fails, inspect the
 failed job and step logs, fix relevant failures on the same branch, push the fix,
 and wait for the replacement run. Report genuine external blockers precisely;
 record optional improvements separately.
+
+When waiting for a GitHub Actions run or a Coolify preview redeploy, observe
+actual state in a short bounded loop (poll `gh pr checks <pr>`, or probe the
+preview URL) rather than issuing a long fixed `sleep`. A blind wait is dead
+wall-clock and hides whether the thing you are waiting on actually progressed or
+failed.
 
 ## Model-assisted review
 For difficult reasoning or final review, use a separate model pass when the

@@ -8,9 +8,18 @@ This is the repository's sole normative authority for agent behavior. See
 `docs/development-workflow.md` for supporting procedure.
 
 ## Before you plan
-- Read the docs that govern the area you are touching: `docs/architecture.md`,
-  `docs/game-rules.md`, `docs/component-boundaries.md`, `docs/testing-strategy.md`,
-  `docs/development-workflow.md`.
+- Read the docs that govern the area you are touching. Route by area:
+  - Architecture, boundaries, single source of truth: `docs/architecture.md`,
+    `docs/component-boundaries.md`.
+  - Game rules, content, balance: `docs/game-rules.md`,
+    `docs/gameplay-foundations.md`.
+  - UI tokens, styling, or overlay motion: `docs/design-system.md`.
+  - Authentication, trusted hosts/origins, cookies, or auth env:
+    `docs/authentication.md`.
+  - Tests and the canonical E2E runner: `docs/testing-strategy.md`.
+  - Branch/PR procedure, validation, observing CI/deploys:
+    `docs/development-workflow.md`.
+  - Coolify/database operations: `docs/deployment-database.md`.
 - Inspect existing code first. Search for an existing component, domain rule,
   schema, or helper before creating a new one.
 
