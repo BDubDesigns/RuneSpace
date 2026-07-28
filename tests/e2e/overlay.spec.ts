@@ -44,6 +44,12 @@ test("Inventory opens as a centered modal with a dimmed backdrop", async ({ page
   // The backdrop is a sibling div with role="presentation".
   const backdrop = page.locator('[role="presentation"]').filter({ has: dialog });
   await expect(backdrop).toBeVisible();
+  // The backdrop must actually paint a dimming scrim — a transparent backdrop
+  // (e.g. from an invalid colour/alpha declaration the browser drops) would let
+  // the play screen show through at full brightness. Guard the regression.
+  const backdropBg = await backdrop.evaluate((el) => getComputedStyle(el).backgroundColor);
+  expect(backdropBg).not.toBe("rgba(0, 0, 0, 0)");
+  expect(backdropBg).not.toBe("transparent");
   // Verify body scroll is locked.
   const bodyOverflow = await page.evaluate(() => document.body.style.overflow);
   expect(bodyOverflow).toBe("hidden");

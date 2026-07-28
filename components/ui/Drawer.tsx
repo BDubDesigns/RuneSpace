@@ -116,7 +116,7 @@ export function Drawer({
   return (
     <div
       ref={backdrop}
-      className="rs-overlay-backdrop bg-[color:var(--rs-surface-page)]/70 fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4"
+      className="rs-overlay-backdrop fixed inset-0 z-50 flex items-center justify-center bg-[color:var(--rs-overlay-scrim)] p-3 sm:p-4"
       onClick={onBackdropClick}
       role="presentation"
     >
