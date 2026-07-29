@@ -24,6 +24,11 @@ export default defineConfig({
   use: {
     baseURL,
     trace: "on-first-retry",
+    // Failure diagnostics are always retained (bounded to failing tests) so a
+    // broken run leaves a screenshot + trace in test-results/, independent of the
+    // opt-in frozen review screenshots. Intentional review screenshots are taken
+    // explicitly by the specs and only verified/uploaded when requested.
+    screenshot: "only-on-failure",
   },
   projects: [
     {

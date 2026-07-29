@@ -12,6 +12,15 @@ const fail = (msg) => {
   process.exit(1);
 };
 
+// ---- Frozen review screenshots are OPT-IN ----
+// The behavioral E2E assertions always run; the curated screenshot package in
+// artifacts/e2e-review/ is only produced and verified when explicitly requested
+// (the CI workflow sets this from the `e2e-screenshots` PR label). The default
+// successful run is green on behavior alone and uploads no frozen package.
+// Per-test failure screenshots are handled separately by Playwright
+// (screenshot: "only-on-failure") and uploaded by CI on failure regardless.
+const captureScreenshots = process.env.RUNESPACE_E2E_SCREENSHOTS === "true";
+
 // ---- 1. Verify Node ----
 const nodeVersion = process.versions.node;
 if (!nodeVersion.startsWith("22.")) fail(`Node 22.x required, found ${nodeVersion}`);
@@ -40,9 +49,17 @@ const cleanupPaths = [
 for (const p of cleanupPaths) {
   if (existsSync(p)) execSync(`rm -rf "${p}"`, { stdio: "inherit", cwd: ROOT });
 }
-mkdirSync(resolve(ROOT, "artifacts/e2e-review/mining"), { recursive: true });
-mkdirSync(resolve(ROOT, "artifacts/e2e-review/overlay"), { recursive: true });
-mkdirSync(resolve(ROOT, "artifacts/e2e-review/travel"), { recursive: true });
+if (captureScreenshots) {
+  mkdirSync(resolve(ROOT, "artifacts/e2e-review/mining"), { recursive: true });
+  mkdirSync(resolve(ROOT, "artifacts/e2e-review/overlay"), { recursive: true });
+  mkdirSync(resolve(ROOT, "artifacts/e2e-review/travel"), { recursive: true });
+  log("Frozen review screenshots: ENABLED (manifest will be verified and uploaded).");
+} else {
+  log(
+    "Frozen review screenshots: disabled (behavioral assertions only). " +
+      "Set RUNESPACE_E2E_SCREENSHOTS=true, or add the `e2e-screenshots` PR label, to capture them.",
+  );
+}
 
 // ---- 5. Select dedicated test port ----
 // Openchamber may occupy 3000 locally; use 3200 to avoid conflicts.
@@ -128,11 +145,13 @@ function verifyAndCopyScreenshots(required, destDir) {
 
 // ---- 9. Mining E2E ----
 runPlaywright(["mining", "--project=chromium"], "Mining E2E");
-verifyAndCopyScreenshots(MINING_REQUIRED, resolve(ROOT, "artifacts/e2e-review/mining"));
+if (captureScreenshots)
+  verifyAndCopyScreenshots(MINING_REQUIRED, resolve(ROOT, "artifacts/e2e-review/mining"));
 
 // ---- 10. Overlay E2E (reuses Mining auth state) ----
 runPlaywright(["overlay", "--project=chromium"], "Overlay E2E");
-verifyAndCopyScreenshots(OVERLAY_REQUIRED, resolve(ROOT, "artifacts/e2e-review/overlay"));
+if (captureScreenshots)
+  verifyAndCopyScreenshots(OVERLAY_REQUIRED, resolve(ROOT, "artifacts/e2e-review/overlay"));
 
 // ---- 11. Remove auth state so Travel gets fresh account/character ----
 const authFile = resolve(ROOT, ".playwright/mining-auth-state.json");
@@ -140,7 +159,8 @@ if (existsSync(authFile)) unlinkSync(authFile);
 
 // ---- 12. Travel E2E ----
 runPlaywright(["travel", "--project=chromium"], "Travel E2E");
-verifyAndCopyScreenshots(TRAVEL_REQUIRED, resolve(ROOT, "artifacts/e2e-review/travel"));
+if (captureScreenshots)
+  verifyAndCopyScreenshots(TRAVEL_REQUIRED, resolve(ROOT, "artifacts/e2e-review/travel"));
 
 // ---- 13. Play boundary flake check ----
 log("Running Mining play-boundary check...");
@@ -160,6 +180,10 @@ const boundary = spawnSync(
 if (boundary.status !== 0 && boundary.status !== null)
   fail("Play boundary check failed (exit " + boundary.status + ")");
 
-// ---- 14. Final manifest verification ----
-log("Final screenshot manifest verified.");
+// ---- 14. Final verification ----
+if (captureScreenshots) {
+  log("Final screenshot manifest verified.");
+} else {
+  log("Frozen screenshot manifest not requested; behavioral E2E passed without it.");
+}
 log("All canonical E2E checks passed.");

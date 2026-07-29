@@ -97,17 +97,23 @@ subagents or automation that may be unavailable.
 7. **One draft PR.** Create or update exactly one draft pull request for the issue.
    Work stops at a draft PR for human review. Do not merge unless the product
    owner explicitly instructs it to merge after review. Include the exact branch,
-   commit, PR, local validation results, canonical CI result, required artifact
-   evidence, architectural decisions, review approach, limitations, and unresolved
-   questions. State exactly whether gameplay, balance, persistence, or
-   player-facing behavior changed and which approved decisions governed those
-   changes.
-8. **Follow canonical CI through completion.** Remain active after pushing until
-   canonical CI completes. For a failed run, inspect the actual failed job and
-   step logs, repair relevant failures on the same branch, push, and wait for the
-   replacement run. Stop only when CI is green or a genuine external blocker is
-   precisely documented. Treat optional improvements separately from blockers.
-   Never begin another issue early.
+   PR, local validation results, canonical CI result, architectural decisions,
+   review approach, limitations, and unresolved questions; for UI changes include
+   the preview URL as the default visual evidence (frozen screenshots only when
+   requested or the preview is unavailable). Do not hand-maintain a commit SHA in
+   the body — GitHub shows the head commit. State exactly whether gameplay,
+   balance, persistence, or player-facing behavior changed and which approved
+   decisions governed those changes.
+8. **Follow canonical CI to a terminal state.** After pushing, follow the run
+   until every required job is green or a genuine external blocker is precisely
+   documented — an in-progress run is not a pass, and a docs-only change being
+   unable to cause an application/test regression is not a green result either.
+   Poll actual state (`gh pr checks`, preview probe) at short, individually
+   bounded intervals — never one long blind `sleep` — and you may do other useful
+   review/reporting work between polls. For a failed run, inspect the failed
+   job/step logs, repair on the same branch, push, and follow the replacement run.
+   Treat optional improvements separately from blockers. Never begin another issue
+   early.
 
 ## Tooling reference
 - pnpm is the package manager; the lockfile is committed and installs are frozen.
@@ -116,7 +122,8 @@ subagents or automation that may be unavailable.
   `typecheck`, `test`, `test:integration`, `test:e2e`, `test:e2e:canonical`.
 - `test:e2e` is a quick development command; `test:e2e:canonical` is the
   required CI-parity browser command that agents must use to validate E2E
-  behavior and screenshots.
+  behavior (and frozen screenshots when requested via
+  `RUNESPACE_E2E_SCREENSHOTS=true`).
 - **Host Node note:** Some development hosts may have a user-local Node 24
   installation (e.g., at `~/.local/node-v24.18.0-linux-x64/bin/node`) that
   `.bashrc` prepends to `PATH` for interactive shells. Non-interactive shells

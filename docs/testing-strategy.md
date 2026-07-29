@@ -29,7 +29,8 @@ small number of critical mobile player journeys.
 - Quick local development: `pnpm test:e2e`. Uses the dev web server and may
   reuse an existing server for speed. Does **not** count as CI-parity validation.
 - The canonical CI-parity command: `pnpm test:e2e:canonical`. This is the single
-  source of truth for local and CI artifact verification. It:
+  source of truth for local and CI behavioral verification, and for
+  frozen-screenshot verification when screenshots are requested. It:
   - requires Node 22.x
   - requires a localhost-only disposable PostgreSQL database (refuses remote)
   - selects a dedicated test port
@@ -40,8 +41,17 @@ small number of critical mobile player journeys.
   - runs the Overlay Chromium journey (modal-overlay behavior shared by Inventory/Equipment)
   - runs the Travel Chromium journey
   - runs the repeated Mining play-boundary check
-  - preserves intentional screenshots in `artifacts/e2e-review/`
-  - verifies the complete screenshot manifest (exists, nonempty, correct names)
+  - captures frozen review screenshots into `artifacts/e2e-review/` **only when
+    requested** via `RUNESPACE_E2E_SCREENSHOTS=true` (the CI workflow sets this
+    from the `e2e-screenshots` PR label); in that mode it verifies the complete
+    manifest (exists, nonempty, correct names) and fails if any are missing
+  - when screenshots are not requested (the default), runs the same behavioral
+    assertions but produces and verifies no frozen package — a successful run is
+    green on behavior alone, and CI uploads no screenshot artifact for it
+  - on failure, Playwright's `screenshot: "only-on-failure"` and
+    `trace: "on-first-retry"` write per-test screenshots and traces into
+    `test-results/`; CI uploads those as a bounded failure-diagnostics artifact
+    regardless of the screenshot opt-in
   - sets `RUNESPACE_E2E_CANONICAL_HTTP=true`, which disables Better Auth `Secure`
     cookies for this runner only. Production-mode Better Auth issues `Secure`
     cookies that a plain-HTTP test origin (`http://127.0.0.1:<port>`) discards,
@@ -79,7 +89,9 @@ For progression-sensitive systems, prioritize:
 
 ## CI scope
 CI runs typecheck, lint, format check, unit tests, production build, a separate
-PostgreSQL migration/integration-test job, and a focused Mining/Playwright job
-that runs the single canonical `pnpm test:e2e:canonical` command. The canonical
-runner is the single source of truth for E2E screenshots and artifact
-verification in both local development and GitHub Actions.
+PostgreSQL migration/integration-test job, and a canonical E2E browser-journey
+job (Mining, Overlay, Travel, and the repeated Mining play-boundary check) that
+runs the single `pnpm test:e2e:canonical` command. The canonical runner is the
+single source of truth for E2E behavioral verification in both local development
+and GitHub Actions; frozen review screenshots are produced and uploaded only when
+explicitly requested (see §3), and per-failure diagnostics are always retained.

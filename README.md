@@ -90,8 +90,10 @@ See `.env.example`. Validated at startup by `server/env.ts` (Zod).
 - **Unit:** `pnpm test` (Vitest, pure domain/schema logic — fast, no DOM).
 - **Integration:** `pnpm test:integration` (Vitest against PostgreSQL; apply
   committed migrations first).
-- **Browser:** `pnpm test:e2e` (Playwright, focused mobile journeys). CI runs a
-  dedicated Mining browser job; see `docs/testing-strategy.md`.
+- **Browser:** `pnpm test:e2e` (Playwright, focused mobile journeys). CI runs the
+  canonical E2E browser-journey job (Mining, Overlay, Travel, and the repeated
+  Mining play-boundary check) via `pnpm test:e2e:canonical`; see
+  `docs/testing-strategy.md`.
 - **Strategy:** risk-based — pure rules, server/persistence boundaries, and a
   few critical mobile journeys. See `docs/testing-strategy.md`.
 

@@ -96,8 +96,8 @@ jobs:
       - name: PostgreSQL integration tests
         run: pnpm test:integration
 
-  mining-e2e:
-    name: Mining browser journey
+  canonical-e2e:
+    name: Canonical E2E browser journeys
     runs-on: ubuntu-latest
     services:
       postgres:
@@ -112,6 +112,11 @@ jobs:
           --health-interval 5s --health-timeout 5s --health-retries 5
     env:
       DATABASE_URL: postgres://runespace:runespace@localhost:5432/runespace
+      # Opt-in frozen review screenshots. Off by default (the live PR preview is
+      # the normal visual-review evidence); add the `e2e-screenshots` label to a
+      # PR to capture and verify the curated screenshot package on the next run.
+      # push-to-main has no PR/label context, so it stays off there too.
+      RUNESPACE_E2E_SCREENSHOTS: ${{ github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'e2e-screenshots') }}
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -124,9 +129,24 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm exec playwright install --with-deps chromium
       - run: pnpm test:e2e:canonical
-      - uses: actions/upload-artifact@v4
-        if: always()
+      # Frozen review package: only when explicitly requested, and then mandatory
+      # (error if the runner did not produce it). Skipped entirely on a default
+      # run, so a successful default run uploads nothing here.
+      - name: Upload frozen review screenshots (opt-in)
+        uses: actions/upload-artifact@v4
+        if: success() && env.RUNESPACE_E2E_SCREENSHOTS == 'true'
         with:
           name: e2e-review-screenshots
           path: artifacts/e2e-review/
           if-no-files-found: error
+      # Failure diagnostics: always retained on a failed run, bounded to Playwright
+      # output (screenshots, traces, report) — never unrelated build output.
+      - name: Upload failure diagnostics
+        uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: e2e-failure-diagnostics
+          path: |
+            test-results/
+            playwright-report/
+          if-no-files-found: ignore
