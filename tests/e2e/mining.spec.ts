@@ -3,13 +3,14 @@ import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import {
   activeActions,
+  characters,
   characterMiningState,
   characterStarterProvisioning,
   equippedItems,
   inventoryStacks,
   itemInstances,
 } from "@/db/rune-space";
-import { ITEM_IDS } from "@/game/config/foundations";
+import { ITEM_IDS, LOCATION_IDS } from "@/game/config/foundations";
 import { miningStorageStatePath } from "./mining.setup";
 
 const e2eDatabaseHost = process.env.DATABASE_URL ? new URL(process.env.DATABASE_URL).hostname : "";
@@ -42,6 +43,10 @@ test.beforeEach(async ({ page }) => {
     db.delete(activeActions).where(eq(activeActions.characterId, characterId)),
     db.delete(characterMiningState).where(eq(characterMiningState.characterId, characterId)),
     db.delete(inventoryStacks).where(eq(inventoryStacks.characterId, characterId)),
+    db
+      .update(characters)
+      .set({ currentLocationId: LOCATION_IDS.crashSite })
+      .where(eq(characters.id, characterId)),
     db
       .delete(characterStarterProvisioning)
       .where(eq(characterStarterProvisioning.characterId, characterId)),
@@ -294,6 +299,102 @@ test("footer Characters navigation uses a compact visible label", async ({ page 
   await expect(characters).toHaveText("Chars");
   await characters.click();
   await expect(page).toHaveURL(/\/characters$/);
+});
+
+test("shell reserves the fixed footer once and keeps the global background fixed", async ({
+  page,
+}) => {
+  // Playwright's viewport is synthetic: it cannot reproduce mobile Chrome's
+  // changing visible viewport while browser chrome expands and collapses. The
+  // shared shells therefore use dynamic viewport units, and these assertions
+  // verify the content/viewport contract at representative states.
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/characters");
+  const characterMetrics = await page.evaluate(() => ({
+    clientHeight: document.documentElement.clientHeight,
+    scrollHeight: document.documentElement.scrollHeight,
+  }));
+  expect(characterMetrics.scrollHeight - characterMetrics.clientHeight).toBeLessThanOrEqual(2);
+  await page.screenshot({ path: "test-results/layout-mobile-characters.png" });
+
+  const playHref = await page.getByRole("link", { name: "Play" }).getAttribute("href");
+  const characterId = playHref?.split("/").at(-1);
+  expect(characterId).toBeTruthy();
+  await db
+    .update(characters)
+    .set({ currentLocationId: LOCATION_IDS.abandonedProcessingYard })
+    .where(eq(characters.id, characterId!));
+  await page.getByRole("link", { name: "Play" }).click();
+  await page.waitForURL(/\/play\/[^/]+$/);
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.reload();
+  await expect(page.getByText("World map", { exact: true })).toBeVisible();
+
+  const yardGeometry = await page.evaluate(() => ({
+    clientHeight: document.documentElement.clientHeight,
+    scrollHeight: document.documentElement.scrollHeight,
+  }));
+  expect(yardGeometry.scrollHeight - yardGeometry.clientHeight).toBeLessThanOrEqual(2);
+  await page.screenshot({ path: "test-results/layout-mobile-play-yard.png" });
+
+  const background = await page.evaluate(() => ({
+    htmlAttachment: getComputedStyle(document.documentElement).backgroundAttachment,
+    htmlImage: getComputedStyle(document.documentElement).backgroundImage,
+    bodyImage: getComputedStyle(document.body).backgroundImage,
+  }));
+  expect(
+    background.htmlAttachment.split(",").every((attachment) => attachment.trim() === "fixed"),
+  ).toBe(true);
+  expect(background.htmlImage).toContain("radial-gradient");
+  expect(background.bodyImage).toBe("none");
+
+  await db
+    .update(characters)
+    .set({ currentLocationId: LOCATION_IDS.crashSite })
+    .where(eq(characters.id, characterId!));
+  await page.reload();
+  await expect(page.getByRole("button", { name: "Start Mining" })).toBeVisible();
+
+  const crashGeometry = await page.evaluate(() => ({
+    clientHeight: document.documentElement.clientHeight,
+    scrollHeight: document.documentElement.scrollHeight,
+  }));
+  expect(crashGeometry.scrollHeight - crashGeometry.clientHeight).toBeGreaterThan(10);
+  await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
+  const bottomGeometry = await page.evaluate(() => {
+    const content = document.querySelector("main");
+    const nav = document.querySelector('nav[aria-label="Primary"]');
+    return {
+      contentBottom: content?.getBoundingClientRect().bottom ?? 0,
+      navTop: nav?.getBoundingClientRect().top ?? 0,
+      navPosition: nav ? getComputedStyle(nav).position : "",
+    };
+  });
+  expect(bottomGeometry.navPosition).toBe("fixed");
+  // At the document's real end, the last content is reachable immediately
+  // above the fixed toolbar; the old pb-24 reserve left a visible blank tail.
+  expect(Math.abs(bottomGeometry.contentBottom - bottomGeometry.navTop)).toBeLessThanOrEqual(2);
+  await page.screenshot({ path: "test-results/layout-mobile-play-bottom.png" });
+
+  // A viewport-height change (a proxy for browser-chrome/orientation changes)
+  // must not create a tail, while the genuinely tall Crash Site state remains
+  // scrollable. Real mobile Chrome is the decisive dynamic-viewport check.
+  await page.setViewportSize({ width: 844, height: 390 });
+  await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
+  const landscapeGeometry = await page.evaluate(() => {
+    const content = document.querySelector("main");
+    const nav = document.querySelector('nav[aria-label="Primary"]');
+    return {
+      contentBottom: content?.getBoundingClientRect().bottom ?? 0,
+      navTop: nav?.getBoundingClientRect().top ?? 0,
+      scrollRange: document.documentElement.scrollHeight - document.documentElement.clientHeight,
+    };
+  });
+  expect(landscapeGeometry.scrollRange).toBeGreaterThan(10);
+  expect(Math.abs(landscapeGeometry.contentBottom - landscapeGeometry.navTop)).toBeLessThanOrEqual(
+    2,
+  );
+  await page.screenshot({ path: "test-results/layout-mobile-play-scrolled-background.png" });
 });
 
 test("equipment drawer shows and updates the approved Mining loadout", async ({ page }) => {

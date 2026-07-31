@@ -18,7 +18,7 @@ function MiningFooter() {
     <div className="mx-auto flex w-full max-w-xl gap-2 sm:max-w-7xl sm:justify-end">
       <ActionLink
         aria-label="Characters"
-        className="flex-1 sm:flex-none"
+        className="flex-1 whitespace-nowrap sm:flex-none"
         href="/characters"
         intent="secondary"
       >
@@ -26,7 +26,7 @@ function MiningFooter() {
       </ActionLink>
       <ActionButton
         ref={inventoryTrigger}
-        className="flex-[1.4] sm:flex-none"
+        className="flex-[1.4] whitespace-nowrap sm:flex-none"
         intent="secondary"
         onClick={() => {
           setEquipmentOpen(false);
@@ -37,7 +37,7 @@ function MiningFooter() {
       </ActionButton>
       <ActionButton
         ref={equipmentTrigger}
-        className="flex-1 sm:flex-none"
+        className="flex-1 whitespace-nowrap sm:flex-none"
         intent="secondary"
         onClick={() => {
           setInventoryOpen(false);
