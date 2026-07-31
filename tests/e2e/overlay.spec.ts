@@ -23,6 +23,42 @@ async function openMiningPage(page: import("@playwright/test").Page) {
   return page.url().split("/").at(-1)!;
 }
 
+async function expectBackdropCoversViewport(
+  page: import("@playwright/test").Page,
+  dialog: import("@playwright/test").Locator,
+) {
+  const backdrop = page.locator('[role="presentation"]').filter({ has: dialog });
+  await page.waitForTimeout(250);
+  const geometry = await backdrop.evaluate((element) => {
+    const rect = element.getBoundingClientRect();
+    const viewport = window.visualViewport;
+    const viewportWidth = viewport?.width ?? window.innerWidth;
+    const viewportHeight = viewport?.height ?? window.innerHeight;
+    const topHit = document.elementFromPoint(viewportWidth / 2, 1);
+    const style = getComputedStyle(element);
+    return {
+      backgroundColor: style.backgroundColor,
+      bottom: rect.bottom,
+      height: rect.height,
+      left: rect.left,
+      position: style.position,
+      top: rect.top,
+      topHitIsBackdrop: topHit instanceof Node && element.contains(topHit),
+      viewportHeight,
+      viewportWidth,
+      width: rect.width,
+    };
+  });
+  expect(geometry.position).toBe("fixed");
+  expect(geometry.top).toBeLessThanOrEqual(1);
+  expect(geometry.left).toBeLessThanOrEqual(1);
+  expect(geometry.bottom).toBeGreaterThanOrEqual(geometry.viewportHeight - 1);
+  expect(geometry.width).toBeGreaterThanOrEqual(geometry.viewportWidth - 1);
+  expect(geometry.topHitIsBackdrop).toBe(true);
+  expect(geometry.backgroundColor).not.toBe("rgba(0, 0, 0, 0)");
+  expect(geometry.backgroundColor).not.toBe("transparent");
+}
+
 test.beforeEach(async ({ page }) => {
   const characterId = await openMiningPage(page);
   // Seed two stacks so inventory has content to render.
@@ -50,6 +86,7 @@ test("Inventory opens as a centered modal with a dimmed backdrop", async ({ page
   const backdropBg = await backdrop.evaluate((el) => getComputedStyle(el).backgroundColor);
   expect(backdropBg).not.toBe("rgba(0, 0, 0, 0)");
   expect(backdropBg).not.toBe("transparent");
+  await expectBackdropCoversViewport(page, dialog);
   // Verify body scroll is locked.
   const bodyOverflow = await page.evaluate(() => document.body.style.overflow);
   expect(bodyOverflow).toBe("hidden");
@@ -62,6 +99,7 @@ test("Equipment opens through the same shared modal pattern", async ({ page }) =
   await nav.getByRole("button", { name: "Equipment" }).click();
   const dialog = page.getByRole("dialog", { name: "Equipment" });
   await expect(dialog).toBeVisible();
+  await expectBackdropCoversViewport(page, dialog);
   await expect(dialog).toHaveAttribute("aria-modal", "true");
   // Verify the edge glow is present.
   const boxShadow = await dialog.evaluate((el) => getComputedStyle(el).boxShadow);
@@ -213,19 +251,24 @@ test("document scroll is locked while overlay is open and restored on close", as
   const originalPaddingRight = await page.evaluate(() => document.body.style.paddingRight);
 
   // Open overlay.
+  await page.evaluate(() => window.scrollTo(0, 200));
+  const scrollBefore = await page.evaluate(() => window.scrollY);
   await nav.getByRole("button", { name: /Inventory/ }).click();
   const dialog = page.getByRole("dialog", { name: "Inventory" });
   await expect(dialog).toBeVisible();
+  await expectBackdropCoversViewport(page, dialog);
 
   // Scroll should be locked.
   const lockedOverflow = await page.evaluate(() => document.body.style.overflow);
   expect(lockedOverflow).toBe("hidden");
+  const lockedBodyTop = await page.evaluate(() => document.body.style.top);
+  expect(lockedBodyTop).toBe(`-${scrollBefore}px`);
 
   // Try scrolling the document.
-  const scrollBefore = await page.evaluate(() => window.scrollY);
-  await page.mouse.wheel(0, 200);
   const scrollAfter = await page.evaluate(() => window.scrollY);
-  expect(scrollAfter).toBe(scrollBefore);
+  expect(scrollAfter).toBe(0);
+  await page.mouse.wheel(0, 200);
+  await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(0);
 
   // Close via Close button.
   await dialog.getByRole("button", { name: "Close inventory" }).click();
@@ -254,6 +297,7 @@ test("internal modal content scrolls when it overflows", async ({ page }) => {
   await nav.getByRole("button", { name: /Inventory/ }).click();
   const dialog = page.getByRole("dialog", { name: "Inventory" });
   await expect(dialog).toBeVisible();
+  await expectBackdropCoversViewport(page, dialog);
   // The dialog should have overflow-y auto and be scrollable.
   const overflowY = await dialog.evaluate((el) => getComputedStyle(el).overflowY);
   expect(overflowY).toBe("auto");

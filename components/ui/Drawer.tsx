@@ -185,7 +185,7 @@ export function Drawer({
   return (
     <div
       ref={backdrop}
-      className={`${backdropAnim} fixed inset-0 z-50 flex items-center justify-center bg-[color:var(--rs-overlay-scrim)] p-3 sm:p-4`}
+      className={`${backdropAnim} fixed inset-0 z-50 !mt-0 flex items-center justify-center bg-[color:var(--rs-overlay-scrim)] p-3 sm:p-4`}
       onClick={onBackdropClick}
       role="presentation"
     >
