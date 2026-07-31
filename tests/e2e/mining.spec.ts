@@ -296,6 +296,77 @@ test("footer Characters navigation uses a compact visible label", async ({ page 
   await expect(page).toHaveURL(/\/characters$/);
 });
 
+test("shell reserves the fixed footer once and keeps the global background fixed", async ({
+  page,
+}) => {
+  // Character selection is intentionally short at this typical mobile viewport.
+  // At 568px tall its real card content is taller than the usable viewport, so
+  // that smaller state is legitimate scrolling rather than an empty tail.
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/characters");
+  const characterMetrics = await page.evaluate(() => ({
+    clientHeight: document.documentElement.clientHeight,
+    scrollHeight: document.documentElement.scrollHeight,
+  }));
+  expect(characterMetrics.scrollHeight - characterMetrics.clientHeight).toBeLessThanOrEqual(2);
+  await page.screenshot({ path: "test-results/layout-mobile-characters.png" });
+
+  await page.getByRole("link", { name: "Play" }).click();
+  await page.waitForURL(/\/play\/[^/]+$/);
+  await page.setViewportSize({ width: 390, height: 844 });
+
+  const background = await page.evaluate(() => ({
+    htmlAttachment: getComputedStyle(document.documentElement).backgroundAttachment,
+    htmlImage: getComputedStyle(document.documentElement).backgroundImage,
+    bodyImage: getComputedStyle(document.body).backgroundImage,
+  }));
+  expect(
+    background.htmlAttachment.split(",").every((attachment) => attachment.trim() === "fixed"),
+  ).toBe(true);
+  expect(background.htmlImage).toContain("radial-gradient");
+  expect(background.bodyImage).toBe("none");
+
+  const initialGeometry = await page.evaluate(() => ({
+    clientHeight: document.documentElement.clientHeight,
+    scrollHeight: document.documentElement.scrollHeight,
+  }));
+  expect(initialGeometry.scrollHeight).toBeGreaterThan(initialGeometry.clientHeight);
+  await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
+  const bottomGeometry = await page.evaluate(() => {
+    const content = document.querySelector("main");
+    const nav = document.querySelector('nav[aria-label="Primary"]');
+    return {
+      contentBottom: content?.getBoundingClientRect().bottom ?? 0,
+      navTop: nav?.getBoundingClientRect().top ?? 0,
+      navPosition: nav ? getComputedStyle(nav).position : "",
+    };
+  });
+  expect(bottomGeometry.navPosition).toBe("fixed");
+  // At the document's real end, the last content is reachable immediately
+  // above the fixed toolbar; the old pb-24 reserve left a visible blank tail.
+  expect(Math.abs(bottomGeometry.contentBottom - bottomGeometry.navTop)).toBeLessThanOrEqual(2);
+  await page.screenshot({ path: "test-results/layout-mobile-play-bottom.png" });
+
+  // A viewport-height change (the browser-chrome/orientation proxy) must not
+  // create a new tail, while the genuinely tall play page remains scrollable.
+  await page.setViewportSize({ width: 844, height: 390 });
+  await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
+  const landscapeGeometry = await page.evaluate(() => {
+    const content = document.querySelector("main");
+    const nav = document.querySelector('nav[aria-label="Primary"]');
+    return {
+      contentBottom: content?.getBoundingClientRect().bottom ?? 0,
+      navTop: nav?.getBoundingClientRect().top ?? 0,
+      scrollRange: document.documentElement.scrollHeight - document.documentElement.clientHeight,
+    };
+  });
+  expect(landscapeGeometry.scrollRange).toBeGreaterThan(10);
+  expect(Math.abs(landscapeGeometry.contentBottom - landscapeGeometry.navTop)).toBeLessThanOrEqual(
+    2,
+  );
+  await page.screenshot({ path: "test-results/layout-mobile-play-scrolled-background.png" });
+});
+
 test("equipment drawer shows and updates the approved Mining loadout", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   const footer = page.getByRole("navigation", { name: "Primary" });

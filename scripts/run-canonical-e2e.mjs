@@ -108,6 +108,9 @@ const MINING_REQUIRED = [
   "mining-desktop-equipment-artwork.png",
   "mining-mobile-inventory-mixed.png",
   "mining-desktop-inventory-mixed.png",
+  "layout-mobile-characters.png",
+  "layout-mobile-play-bottom.png",
+  "layout-mobile-play-scrolled-background.png",
 ];
 
 const OVERLAY_REQUIRED = [

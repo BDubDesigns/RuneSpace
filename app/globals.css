@@ -64,13 +64,25 @@
   --rs-duration-standard: 180ms;
   --rs-control-height: 2.75rem;
   --rs-touch-target: 2.75rem;
+  /* The shell reserves exactly the fixed BottomNav border, padding, and
+     minimum control height. Keep this calculation beside the shared tokens so
+     footer clearance cannot drift from the footer's actual box. */
+  --rs-bottom-nav-clearance: calc(
+    1px + var(--rs-touch-target) + var(--rs-space-2) +
+      max(var(--rs-space-2), env(safe-area-inset-bottom))
+  );
 }
 
-html,
-body {
+html {
   height: 100%;
   background: radial-gradient(circle at 20% -10%, rgb(34 112 143 / 0.2), transparent 30rem),
     var(--rs-surface-page);
+  background-attachment: fixed;
+}
+
+body {
+  min-height: 100%;
+  background: transparent;
   color: var(--rs-text-primary);
   font-family: var(--rs-font-body);
 }
