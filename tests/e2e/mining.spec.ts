@@ -3,13 +3,14 @@ import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import {
   activeActions,
+  characters,
   characterMiningState,
   characterStarterProvisioning,
   equippedItems,
   inventoryStacks,
   itemInstances,
 } from "@/db/rune-space";
-import { ITEM_IDS } from "@/game/config/foundations";
+import { ITEM_IDS, LOCATION_IDS } from "@/game/config/foundations";
 import { miningStorageStatePath } from "./mining.setup";
 
 const e2eDatabaseHost = process.env.DATABASE_URL ? new URL(process.env.DATABASE_URL).hostname : "";
@@ -42,6 +43,10 @@ test.beforeEach(async ({ page }) => {
     db.delete(activeActions).where(eq(activeActions.characterId, characterId)),
     db.delete(characterMiningState).where(eq(characterMiningState.characterId, characterId)),
     db.delete(inventoryStacks).where(eq(inventoryStacks.characterId, characterId)),
+    db
+      .update(characters)
+      .set({ currentLocationId: LOCATION_IDS.crashSite })
+      .where(eq(characters.id, characterId)),
     db
       .delete(characterStarterProvisioning)
       .where(eq(characterStarterProvisioning.characterId, characterId)),
@@ -299,9 +304,10 @@ test("footer Characters navigation uses a compact visible label", async ({ page 
 test("shell reserves the fixed footer once and keeps the global background fixed", async ({
   page,
 }) => {
-  // Character selection is intentionally short at this typical mobile viewport.
-  // At 568px tall its real card content is taller than the usable viewport, so
-  // that smaller state is legitimate scrolling rather than an empty tail.
+  // Playwright's viewport is synthetic: it cannot reproduce mobile Chrome's
+  // changing visible viewport while browser chrome expands and collapses. The
+  // shared shells therefore use dynamic viewport units, and these assertions
+  // verify the content/viewport contract at representative states.
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/characters");
   const characterMetrics = await page.evaluate(() => ({
@@ -311,9 +317,25 @@ test("shell reserves the fixed footer once and keeps the global background fixed
   expect(characterMetrics.scrollHeight - characterMetrics.clientHeight).toBeLessThanOrEqual(2);
   await page.screenshot({ path: "test-results/layout-mobile-characters.png" });
 
+  const playHref = await page.getByRole("link", { name: "Play" }).getAttribute("href");
+  const characterId = playHref?.split("/").at(-1);
+  expect(characterId).toBeTruthy();
+  await db
+    .update(characters)
+    .set({ currentLocationId: LOCATION_IDS.abandonedProcessingYard })
+    .where(eq(characters.id, characterId!));
   await page.getByRole("link", { name: "Play" }).click();
   await page.waitForURL(/\/play\/[^/]+$/);
   await page.setViewportSize({ width: 390, height: 844 });
+  await page.reload();
+  await expect(page.getByText("World map", { exact: true })).toBeVisible();
+
+  const yardGeometry = await page.evaluate(() => ({
+    clientHeight: document.documentElement.clientHeight,
+    scrollHeight: document.documentElement.scrollHeight,
+  }));
+  expect(yardGeometry.scrollHeight - yardGeometry.clientHeight).toBeLessThanOrEqual(2);
+  await page.screenshot({ path: "test-results/layout-mobile-play-yard.png" });
 
   const background = await page.evaluate(() => ({
     htmlAttachment: getComputedStyle(document.documentElement).backgroundAttachment,
@@ -326,11 +348,18 @@ test("shell reserves the fixed footer once and keeps the global background fixed
   expect(background.htmlImage).toContain("radial-gradient");
   expect(background.bodyImage).toBe("none");
 
-  const initialGeometry = await page.evaluate(() => ({
+  await db
+    .update(characters)
+    .set({ currentLocationId: LOCATION_IDS.crashSite })
+    .where(eq(characters.id, characterId!));
+  await page.reload();
+  await expect(page.getByRole("button", { name: "Start Mining" })).toBeVisible();
+
+  const crashGeometry = await page.evaluate(() => ({
     clientHeight: document.documentElement.clientHeight,
     scrollHeight: document.documentElement.scrollHeight,
   }));
-  expect(initialGeometry.scrollHeight).toBeGreaterThan(initialGeometry.clientHeight);
+  expect(crashGeometry.scrollHeight - crashGeometry.clientHeight).toBeGreaterThan(10);
   await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
   const bottomGeometry = await page.evaluate(() => {
     const content = document.querySelector("main");
@@ -347,8 +376,9 @@ test("shell reserves the fixed footer once and keeps the global background fixed
   expect(Math.abs(bottomGeometry.contentBottom - bottomGeometry.navTop)).toBeLessThanOrEqual(2);
   await page.screenshot({ path: "test-results/layout-mobile-play-bottom.png" });
 
-  // A viewport-height change (the browser-chrome/orientation proxy) must not
-  // create a new tail, while the genuinely tall play page remains scrollable.
+  // A viewport-height change (a proxy for browser-chrome/orientation changes)
+  // must not create a tail, while the genuinely tall Crash Site state remains
+  // scrollable. Real mobile Chrome is the decisive dynamic-viewport check.
   await page.setViewportSize({ width: 844, height: 390 });
   await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
   const landscapeGeometry = await page.evaluate(() => {

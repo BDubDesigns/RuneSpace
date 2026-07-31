@@ -12,7 +12,7 @@ import { Panel } from "./ui/Panel";
 
 export function ScaffoldScreen({ children }: { children: ReactNode }) {
   return (
-    <main className="flex min-h-screen items-center justify-center px-4 py-10">
+    <main className="rs-viewport-shell flex items-center justify-center px-4 py-10">
       <Panel className="w-full max-w-md sm:p-7">{children}</Panel>
     </main>
   );
