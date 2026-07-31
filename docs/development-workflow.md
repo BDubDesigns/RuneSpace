@@ -49,9 +49,10 @@ Run affected focused checks when their required environment is available. For
 example, integration tests require PostgreSQL and browser tests require the
 Playwright browser dependencies and their database setup.
 
-Canonical CI also runs PostgreSQL integration tests and the focused Mining
-Playwright journey. A local skip or unavailable environment is not a pass: report
-it as unexecuted and wait for the corresponding canonical CI result.
+Canonical CI also runs PostgreSQL integration tests and the canonical E2E
+browser-journey job (Mining, Overlay, Travel, and the repeated Mining
+play-boundary check). A local skip or unavailable environment is not a pass:
+report it as unexecuted and wait for the corresponding canonical CI result.
 
 ## Self-review the diff
 Before opening or updating the draft PR, inspect the final diff for scope,
@@ -62,19 +63,34 @@ behavior.
 ## Draft PR content
 The PR must include:
 - a clear summary of what changed
-- the exact branch, commit, PR, local validation results, canonical CI status,
-  and required artifact evidence
-- screenshots at narrow mobile and desktop widths for UI issues
+- the exact branch, PR, local validation results, and canonical CI status
+- for UI changes, the working PR preview URL as the default visual-review
+  evidence; include frozen screenshots only when explicitly requested, when the
+  preview is unavailable, or when before/after frozen evidence materially helps
+  review (request them in CI with the `e2e-screenshots` label)
 - key architectural decisions, review approach, and unresolved questions or
   limitations
 - whether gameplay, balance, persistence, or player-facing behavior changed and
   the approved decisions governing any such change
 
-## Follow canonical CI
-Keep the PR draft while canonical CI completes. If a job fails, inspect the
-failed job and step logs, fix relevant failures on the same branch, push the fix,
-and wait for the replacement run. Report genuine external blockers precisely;
-record optional improvements separately.
+## Observe CI and deployment progress
+Keep the PR draft while canonical CI runs, and follow the run to a terminal
+state: continue until every required job reports success, or a genuine external
+blocker is precisely documented. Do not treat an in-progress job as a pass, and
+do not claim canonical CI is green until it actually reports success. A docs-only
+change may be *described* as unable to introduce an application- or test-code
+regression — which explains why you might prioritize other work while it runs —
+but that description is not a substitute for the green result.
+
+Observe by polling actual state at short, individually bounded intervals (for
+example `gh pr checks <pr>` for GitHub Actions, or probing the preview URL for a
+Coolify redeploy); each polling command must be bounded on its own. Never use one
+long fixed `sleep` — a blind multi-minute wait is dead wall-clock and hides
+whether the thing you are watching progressed or failed. Between polls you may do
+other useful review or reporting work; return to poll until the run is terminal.
+If a job fails, inspect the failed job and step logs, fix relevant failures on
+the same branch, push the fix, and follow the replacement run to a terminal
+state. Record optional improvements separately from blockers.
 
 ## Model-assisted review
 For difficult reasoning or final review, use a separate model pass when the

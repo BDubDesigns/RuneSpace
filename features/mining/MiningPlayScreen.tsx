@@ -28,7 +28,10 @@ function MiningFooter() {
         ref={inventoryTrigger}
         className="flex-[1.4] sm:flex-none"
         intent="secondary"
-        onClick={() => setInventoryOpen(true)}
+        onClick={() => {
+          setEquipmentOpen(false);
+          setInventoryOpen(true);
+        }}
       >
         Inventory {state.inventory.slotsUsed}/{totalSlots}
       </ActionButton>
@@ -36,7 +39,10 @@ function MiningFooter() {
         ref={equipmentTrigger}
         className="flex-1 sm:flex-none"
         intent="secondary"
-        onClick={() => setEquipmentOpen(true)}
+        onClick={() => {
+          setInventoryOpen(false);
+          setEquipmentOpen(true);
+        }}
       >
         Equipment
       </ActionButton>

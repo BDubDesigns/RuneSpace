@@ -1,10 +1,20 @@
 "use client";
 
-import { useEffect, useRef, type ReactNode, type RefObject } from "react";
+import { useEffect, useRef, useState, type ReactNode, type RefObject } from "react";
 import { ActionButton } from "./ActionButton";
 import { SectionHeader } from "./SectionHeader";
 
-/** Modal drawer convention shared by persistent player-footer controls. */
+const REDUCED_MOTION_QUERY = "(prefers-reduced-motion: reduce)";
+
+// Safety net for the exit fade. The *visible* timing lives in CSS
+// (--rs-overlay-dur-box); the unmount normally fires on the panel's
+// animationend. This timeout only guarantees we still unmount if that event
+// never fires (element hidden, animation disabled, etc.). It must exceed the
+// longest exit duration (200ms) plus margin, and is never the source of truth
+// for what the player sees.
+const EXIT_FALLBACK_MS = 400;
+
+/** Shared modal overlay used by Inventory and Equipment. */
 export function Drawer({
   children,
   label,
@@ -20,20 +30,59 @@ export function Drawer({
   onClose: () => void;
   triggerRef: RefObject<HTMLButtonElement | null>;
 }) {
+  const backdrop = useRef<HTMLDivElement>(null);
   const closeButton = useRef<HTMLButtonElement>(null);
   const panel = useRef<HTMLElement>(null);
-  function close() {
-    onClose();
+  const closingRef = useRef(false); // re-entrancy guard for close()
+  const finishedRef = useRef(false); // true once we return focus + unmount
+  const exitTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [exiting, setExiting] = useState(false);
+
+  // The single unmount path. Idempotent: animationend and the fallback timer
+  // both call this, so the guard prevents a double onClose()/focus jump.
+  function finishClose() {
+    if (finishedRef.current) return;
+    finishedRef.current = true;
+    if (exitTimer.current) {
+      clearTimeout(exitTimer.current);
+      exitTimer.current = null;
+    }
+    // Focus returns at the END of the fade, just before the dialog unmounts.
     triggerRef.current?.focus();
+    onClose();
   }
+
+  // Begin closing. Either unmounts instantly (reduced motion) or starts the
+  // exit fade and defers the unmount until the animation finishes.
+  function close() {
+    if (closingRef.current) return; // ignore repeated Escape/backdrop/Close
+    closingRef.current = true;
+
+    if (typeof window !== "undefined" && window.matchMedia(REDUCED_MOTION_QUERY).matches) {
+      finishClose();
+      return;
+    }
+
+    // Keep the keyboard trap valid for the whole fade: if focus has somehow
+    // left the panel, park it on the Close button before we start fading so
+    // Tab can never slip behind the still-visible backdrop.
+    const active = document.activeElement;
+    if (!(active instanceof Node && panel.current?.contains(active))) {
+      closeButton.current?.focus();
+    }
+    setExiting(true);
+  }
+
+  // Move focus into the modal on open.
   useEffect(() => {
     closeButton.current?.focus();
   }, []);
+
+  // Keyboard: Escape dismisses, Tab cycles within the modal.
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
       if (event.key === "Escape") {
-        onClose();
-        triggerRef.current?.focus();
+        close();
         return;
       }
       if (event.key !== "Tab" || !panel.current) return;
@@ -53,16 +102,98 @@ export function Drawer({
     }
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [onClose, triggerRef]);
+
+  // Focus containment while open AND during the fade-out. finishedRef lets the
+  // final focus-return-to-trigger pass through without being trapped back into
+  // the (about-to-unmount) panel.
+  useEffect(() => {
+    function onFocusIn(event: FocusEvent) {
+      if (finishedRef.current) return;
+      if (panel.current && event.target instanceof Node && !panel.current.contains(event.target)) {
+        closeButton.current?.focus();
+      }
+    }
+    document.addEventListener("focusin", onFocusIn);
+    return () => document.removeEventListener("focusin", onFocusIn);
+  }, []);
+
+  // Lock document scroll while open; restore on close/unmount.
+  // Uses position:fixed + scrollY save/restore for iOS Safari compatibility.
+  // Cleanup runs on unmount, so the page stays locked through the whole fade
+  // (no background jump) and restores the instant the dialog is removed.
+  useEffect(() => {
+    const scrollY = window.scrollY;
+    const scrollbarWidth = window.innerWidth - document.documentElement.clientWidth;
+    const originalOverflow = document.body.style.overflow;
+    const originalPosition = document.body.style.position;
+    const originalTop = document.body.style.top;
+    const originalWidth = document.body.style.width;
+    const originalPaddingRight = document.body.style.paddingRight;
+
+    document.body.style.overflow = "hidden";
+    document.body.style.position = "fixed";
+    document.body.style.top = `-${scrollY}px`;
+    document.body.style.width = "100%";
+    if (scrollbarWidth > 0) {
+      document.body.style.paddingRight = `${scrollbarWidth}px`;
+    }
+
+    return () => {
+      document.body.style.overflow = originalOverflow;
+      document.body.style.position = originalPosition;
+      document.body.style.top = originalTop;
+      document.body.style.width = originalWidth;
+      document.body.style.paddingRight = originalPaddingRight;
+      window.scrollTo(0, scrollY);
+    };
+  }, []);
+
+  // Deferred unmount: once the exit fade starts, unmount on the panel's exit
+  // animationend, with a timeout safety net in case the event never fires.
+  useEffect(() => {
+    if (!exiting) return;
+    exitTimer.current = setTimeout(finishClose, EXIT_FALLBACK_MS);
+    return () => {
+      if (exitTimer.current) {
+        clearTimeout(exitTimer.current);
+        exitTimer.current = null;
+      }
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [exiting]);
+
+  // Unmount when the panel's own exit animation ends. Guard on target + name so
+  // bubbled animationend from descendants (and the enter animation) are ignored.
+  function onPanelAnimationEnd(event: React.AnimationEvent<HTMLElement>) {
+    if (event.target !== panel.current) return;
+    if (event.animationName !== "rs-overlay-panel-exit") return;
+    finishClose();
+  }
+
+  // Backdrop click dismisses.  Clicking inside the panel does not.
+  function onBackdropClick(event: React.MouseEvent) {
+    if (event.target === backdrop.current) {
+      close();
+    }
+  }
+
+  const backdropAnim = exiting ? "rs-overlay-backdrop-exit" : "rs-overlay-backdrop";
+  const panelAnim = exiting ? "rs-overlay-panel-exit" : "rs-overlay-panel";
+
   return (
     <div
-      className="bg-[color:var(--rs-surface-page)]/90 fixed inset-0 z-50 flex items-end p-3 sm:items-center sm:justify-end sm:p-4"
+      ref={backdrop}
+      className={`${backdropAnim} fixed inset-0 z-50 flex items-center justify-center bg-[color:var(--rs-overlay-scrim)] p-3 sm:p-4`}
+      onClick={onBackdropClick}
       role="presentation"
     >
       <section
         aria-label={label}
         aria-modal="true"
-        className="max-h-[min(78dvh,42rem)] w-full max-w-xl overflow-y-auto border border-[color:var(--rs-border-structural)] bg-[color:var(--rs-surface-raised)] p-4 pb-[max(1rem,env(safe-area-inset-bottom))] [box-shadow:var(--rs-shadow-panel)] sm:max-h-[calc(100dvh-2rem)] sm:w-[min(34rem,calc(100vw-2rem))]"
+        className={`${panelAnim} max-h-[min(78dvh,42rem)] w-full max-w-xl overflow-y-auto border border-[color:var(--rs-border-structural)] bg-[color:var(--rs-surface-raised)] p-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-[max(1rem,env(safe-area-inset-top))] [box-shadow:var(--rs-shadow-panel),0_0_28px_rgb(75_216_245_/_0.28)] sm:max-h-[calc(100dvh-2rem)] sm:w-[min(34rem,calc(100vw-2rem))]`}
+        onAnimationEnd={onPanelAnimationEnd}
         ref={panel}
         role="dialog"
       >
