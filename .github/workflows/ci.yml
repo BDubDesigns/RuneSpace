@@ -20,8 +20,8 @@ on:
 
 concurrency:
   # Pull-request runs replace one another, but main and manual runs each keep a
-  # distinct group. A non-full label (for example e2e-screenshots) starts a
-  # cheap decision run without cancelling an in-flight full gate.
+  # distinct group. A non-full label (for example e2e-screenshots) does not
+  # cancel an in-flight full gate; its queued run applies the current PR policy.
   group: >-
     ${{ github.event_name == 'pull_request'
       && format('ci-pr-{0}', github.event.pull_request.number)
