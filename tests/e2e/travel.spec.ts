@@ -14,7 +14,7 @@ import {
   inventoryStacks,
   itemInstances,
 } from "@/db/rune-space";
-import { ITEM_IDS, LOCATION_IDS } from "@/game/config/foundations";
+import { ACTION_IDS, ITEM_IDS, LOCATION_IDS } from "@/game/config/foundations";
 import { POWER_CELL_DAILY_ALLOTMENT } from "@/game/domain/power-annex";
 import { miningStorageStatePath } from "./mining.setup";
 
@@ -339,6 +339,36 @@ test("selecting a destination does not begin travel; confirmation is required", 
   await page.setViewportSize({ width: 1440, height: 900 });
   await scrollMapIntoView(page);
   await page.screenshot({ path: "test-results/travel-desktop-selected.png" });
+});
+
+test("automatically reconciles arrival without refresh or reload", async ({ page }) => {
+  const characterId = page.url().split("/").at(-1)!;
+  await page.goto("/characters");
+  const boundaryStart = new Date(Date.now() - 23_400);
+  await db.insert(activeActions).values({
+    characterId,
+    actionId: ACTION_IDS.travel,
+    startedAt: boundaryStart,
+    resolvedThroughAt: boundaryStart,
+  });
+  await db.insert(characterTravelState).values({
+    characterId,
+    originLocationId: LOCATION_IDS.crashSite,
+    destinationLocationId: LOCATION_IDS.abandonedProcessingYard,
+  });
+  await page.getByRole("link", { name: "Play" }).click();
+  await page.waitForURL(/\/play\/[^/]+$/);
+
+  await expect(page.getByText("Journey progress")).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: /Abandoned Processing Yard/ }).first(),
+  ).toHaveAttribute("aria-current", "true", { timeout: 10_000 });
+  await expect(
+    db.select().from(activeActions).where(eq(activeActions.characterId, characterId)),
+  ).resolves.toEqual([]);
+  await expect(
+    db.select().from(characterTravelState).where(eq(characterTravelState.characterId, characterId)),
+  ).resolves.toEqual([]);
 });
 
 test("the full journey walks, arrives, and returns between the original locations", async ({

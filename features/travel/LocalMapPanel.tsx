@@ -263,14 +263,10 @@ export function LocalMapPanel() {
   useEffect(() => {
     if (!inTransit) return;
     const clock = window.setInterval(() => setNow(Date.now()), 250);
-    const arrivesAt = new Date(travel!.arrivesAt).getTime();
-    const delay = Math.max(120, arrivesAt - Date.now() + 150);
-    const refresh = window.setTimeout(() => requestAutoRefresh(), delay);
     return () => {
       window.clearInterval(clock);
-      window.clearTimeout(refresh);
     };
-  }, [inTransit, travel?.arrivesAt, requestAutoRefresh]);
+  }, [inTransit]);
 
   useEffect(() => {
     if (inTransit) return;

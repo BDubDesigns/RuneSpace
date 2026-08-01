@@ -225,7 +225,6 @@ export function MiningConsole({ characterName }: { characterName: string }) {
     inventoryOpen,
     inventoryTrigger,
     releaseCommand,
-    requestAutoRefresh,
     setEquipmentOpen,
     setInventoryOpen,
     setRefreshCallback,
@@ -300,20 +299,10 @@ export function MiningConsole({ characterName }: { characterName: string }) {
   useEffect(() => {
     if (!active && !state.travelState) return;
     const clock = window.setInterval(() => setNow(Date.now()), 250);
-    let delay = Number.POSITIVE_INFINITY;
-    if (active) {
-      delay = Math.max(100, new Date(active.nextAttemptAt).getTime() - Date.now() + 100);
-    }
-    if (state.travelState) {
-      const arrivesAt = new Date(state.travelState.arrivesAt).getTime();
-      delay = Math.min(delay, Math.max(120, arrivesAt - Date.now() + 150));
-    }
-    const refresh = window.setTimeout(() => requestAutoRefresh(), delay);
     return () => {
       window.clearInterval(clock);
-      window.clearTimeout(refresh);
     };
-  }, [active?.nextAttemptAt, state.travelState?.arrivesAt, requestAutoRefresh]);
+  }, [Boolean(active), Boolean(state.travelState)]);
 
   const latestAttempt = latestMiningAttempt(state.run.recentAttempts);
   const recentBatchCount = state.recentResult.successes + state.recentResult.failures;

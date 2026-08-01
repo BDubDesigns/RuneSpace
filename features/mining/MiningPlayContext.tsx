@@ -2,6 +2,7 @@
 
 import {
   createContext,
+  useEffect,
   useCallback,
   useContext,
   useRef,
@@ -31,6 +32,9 @@ type MiningPlayContextValue = {
 };
 
 const MiningPlayContext = createContext<MiningPlayContextValue | undefined>(undefined);
+
+const BOUNDARY_REFRESH_RETRY_DELAYS_MS = [250, 500, 1_000, 1_500, 2_000] as const;
+const BOUNDARY_REFRESH_GRACE_MS = 150;
 
 export function MiningPlayProvider({
   children,
@@ -70,6 +74,41 @@ export function MiningPlayProvider({
   const setRefreshCallback = useCallback((fn: () => void) => {
     refreshCallback.current = fn;
   }, []);
+
+  // One bounded scheduler owns the play boundary for both Mining and Travel.
+  // The display clocks remain in their feature components, but reconciliation
+  // must survive a request that arrives just before the server's whole-tick
+  // deadline and returns the same authoritative timestamp.
+  const boundaryKey = state.travelState
+    ? `travel:${state.travelState.originLocationId}:${state.travelState.destinationLocationId}:${state.travelState.arrivesAt}`
+    : state.activeAction
+      ? `action:${state.activeAction.actionId}:${state.activeAction.nextAttemptAt}`
+      : undefined;
+  const boundaryAt = state.travelState?.arrivesAt ?? state.activeAction?.nextAttemptAt;
+
+  useEffect(() => {
+    if (!boundaryKey || !boundaryAt) return;
+    const boundaryTime = new Date(boundaryAt).getTime();
+    if (!Number.isFinite(boundaryTime)) return;
+
+    let retryIndex = 0;
+    let timer: number | undefined;
+    const schedule = (delay: number) => {
+      timer = window.setTimeout(() => {
+        requestAutoRefresh();
+        const retryDelay = BOUNDARY_REFRESH_RETRY_DELAYS_MS[retryIndex];
+        if (retryDelay !== undefined) {
+          retryIndex += 1;
+          schedule(retryDelay);
+        }
+      }, delay);
+    };
+
+    schedule(Math.max(100, boundaryTime - Date.now() + BOUNDARY_REFRESH_GRACE_MS));
+    return () => {
+      if (timer !== undefined) window.clearTimeout(timer);
+    };
+  }, [boundaryAt, boundaryKey, requestAutoRefresh]);
 
   return (
     <MiningPlayContext.Provider

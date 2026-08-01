@@ -10,7 +10,7 @@ import {
   inventoryStacks,
   itemInstances,
 } from "@/db/rune-space";
-import { ITEM_IDS, LOCATION_IDS } from "@/game/config/foundations";
+import { ACTION_IDS, ITEM_IDS, LOCATION_IDS } from "@/game/config/foundations";
 import { miningStorageStatePath } from "./mining.setup";
 
 const e2eDatabaseHost = process.env.DATABASE_URL ? new URL(process.env.DATABASE_URL).hostname : "";
@@ -289,6 +289,103 @@ test("owned character can start, observe, stop, and restore Crash Site Mining", 
   await expect(latestResult).toHaveAttribute("data-feedback-state", "calm");
   await page.getByRole("button", { name: "Refresh status" }).click();
   await expect(latestResult).toHaveAttribute("data-feedback-state", "calm");
+});
+
+test("automatically resolves Mining and starts the next authoritative timer", async ({ page }) => {
+  const characterId = page.url().split("/").at(-1)!;
+  await page.goto("/characters");
+  const boundaryStart = new Date(Date.now() - 4_500);
+  await db.insert(activeActions).values({
+    characterId,
+    actionId: ACTION_IDS.crashSiteMining,
+    startedAt: boundaryStart,
+    resolvedThroughAt: boundaryStart,
+  });
+  await page.getByRole("link", { name: "Play" }).click();
+  await page.waitForURL(/\/play\/[^/]+$/);
+
+  await expect(page.getByText("1 successful", { exact: true })).toBeVisible({ timeout: 10_000 });
+  await expect(page.getByText("NORMAL TIMING · Next attempt: 10 ticks")).toBeVisible();
+  const persisted = await db
+    .select()
+    .from(characterMiningState)
+    .where(eq(characterMiningState.characterId, characterId));
+  expect(persisted[0]?.runAttempts).toBe(1);
+});
+
+test("automatically resolves a boosted Mining attempt and decrements charge once", async ({
+  page,
+}) => {
+  const characterId = page.url().split("/").at(-1)!;
+  await page.goto("/characters");
+  const cutter = (
+    await db
+      .select()
+      .from(itemInstances)
+      .where(
+        and(
+          eq(itemInstances.characterId, characterId),
+          eq(itemInstances.itemId, ITEM_IDS.salvageCutter),
+        ),
+      )
+  )[0]!;
+  await db.update(itemInstances).set({ currentCharge: 1 }).where(eq(itemInstances.id, cutter.id));
+  const boundaryStart = new Date(Date.now() - 2_400);
+  await db.insert(activeActions).values({
+    characterId,
+    actionId: ACTION_IDS.crashSiteMining,
+    startedAt: boundaryStart,
+    resolvedThroughAt: boundaryStart,
+  });
+  await page.getByRole("link", { name: "Play" }).click();
+  await page.waitForURL(/\/play\/[^/]+$/);
+
+  await expect(page.getByText("POWER CELL BOOST · 1 / 10")).toBeVisible();
+  await expect(page.getByRole("region", { name: "Latest mining attempt" })).toContainText(
+    "Power Cell charge consumed",
+  );
+  await expect(page.getByText("NORMAL TIMING · Next attempt: 10 ticks")).toBeVisible({
+    timeout: 10_000,
+  });
+  const [persistedHistory, persistedCutter] = await Promise.all([
+    db.select().from(characterMiningState).where(eq(characterMiningState.characterId, characterId)),
+    db.select().from(itemInstances).where(eq(itemInstances.id, cutter.id)),
+  ]);
+  expect(persistedHistory[0]?.runAttempts).toBe(1);
+  expect(persistedCutter[0]?.currentCharge).toBe(0);
+});
+
+test("retries an early unchanged Mining boundary without duplicating the attempt", async ({
+  page,
+}) => {
+  const characterId = page.url().split("/").at(-1)!;
+  const refreshRequests: string[] = [];
+  page.on("request", (request) => {
+    if (request.method() === "POST" && request.headers()["next-action"])
+      refreshRequests.push(request.headers()["next-action"]!);
+  });
+  await page.addInitScript(() => {
+    const realNow = Date.now;
+    Date.now = () => realNow() + 2_000;
+  });
+  await page.goto("/characters");
+  const boundaryStart = new Date(Date.now() - 4_500);
+  await db.insert(activeActions).values({
+    characterId,
+    actionId: ACTION_IDS.crashSiteMining,
+    startedAt: boundaryStart,
+    resolvedThroughAt: boundaryStart,
+  });
+  await page.getByRole("link", { name: "Play" }).click();
+  await page.waitForURL(/\/play\/[^/]+$/);
+
+  await expect(page.getByText("1 successful", { exact: true })).toBeVisible({ timeout: 10_000 });
+  expect(refreshRequests.length).toBeGreaterThanOrEqual(2);
+  const persisted = await db
+    .select()
+    .from(characterMiningState)
+    .where(eq(characterMiningState.characterId, characterId));
+  expect(persisted[0]?.runAttempts).toBe(1);
 });
 
 test("footer Characters navigation uses a compact visible label", async ({ page }) => {
