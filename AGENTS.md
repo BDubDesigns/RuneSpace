@@ -90,10 +90,19 @@ subagents or automation that may be unavailable.
    harness supports it. Automated delegation being unavailable must not block
    ordinary work; perform and document a careful self-review instead. OpenCode
    users may switch models manually for either pass.
-6. **Clean CI-parity.** Run `pnpm install --frozen-lockfile`, `pnpm typecheck`,
-   `pnpm lint`, `pnpm format:check`, `pnpm test`, and `pnpm build`, mirroring
-   `.github/workflows/ci.yml` environment requirements. Resolve failures or
-   document genuine external blockers.
+6. **Validate proportionally.** During implementation, run focused checks for
+   the touched boundary plus enough static validation to avoid pushing an
+   obviously broken checkpoint. A coherent draft preview push is allowed before
+   the complete local CI-parity sequence when real-device review is the goal;
+   Coolify preview deployment remains independent of the expensive gate. Before
+   marking a PR ready or requesting final review, run the complete local
+   CI-parity sequence when the environment is available:
+   `pnpm install --frozen-lockfile`, `pnpm typecheck`, `pnpm lint`,
+   `pnpm format:check`, `pnpm test`, `pnpm build`, integration tests, and
+   `pnpm test:e2e:canonical`. Resolve failures or document genuine external
+   blockers. After a correction to a ready PR, focused local evidence plus the
+   required remote gate rerun is sufficient; do not blindly repeat the entire
+   local suite after every small correction.
 7. **One draft PR.** Create or update exactly one draft pull request for the issue.
    Work stops at a draft PR for human review. Do not merge unless the product
    owner explicitly instructs it to merge after review. Include the exact branch,
@@ -104,16 +113,17 @@ subagents or automation that may be unavailable.
    the body — GitHub shows the head commit. State exactly whether gameplay,
    balance, persistence, or player-facing behavior changed and which approved
    decisions governed those changes.
-8. **Follow canonical CI to a terminal state.** After pushing, follow the run
-   until every required job is green or a genuine external blocker is precisely
-   documented — an in-progress run is not a pass, and a docs-only change being
-   unable to cause an application/test regression is not a green result either.
-   Poll actual state (`gh pr checks`, preview probe) at short, individually
-   bounded intervals — never one long blind `sleep` — and you may do other useful
-   review/reporting work between polls. For a failed run, inspect the failed
-   job/step logs, repair on the same branch, push, and follow the replacement run.
-   Treat optional improvements separately from blockers. Never begin another issue
-   early.
+8. **Follow every workflow that actually triggers.** Draft synchronization runs
+   the fast checks and intentionally does not run the PostgreSQL or canonical
+   jobs unless `full-ci` is present. Applying `full-ci`, marking the PR ready,
+   pushing to a ready PR, pushing to `main`, or manually dispatching the workflow
+   requests the full gate. Follow triggered jobs until every required job is green
+   or a genuine external blocker is precisely documented — an in-progress run is
+   not a pass. Poll actual state (`gh pr checks`, preview probe) at short,
+   individually bounded intervals — never one long blind `sleep`. For a failed
+   job, inspect the logs, repair on the same branch, push, and follow the
+   replacement run. Treat optional improvements separately from blockers. Never
+   begin another issue early.
 
 ## Tooling reference
 - pnpm is the package manager; the lockfile is committed and installs are frozen.
