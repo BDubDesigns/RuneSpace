@@ -35,6 +35,11 @@ const balanceSchema = z.object({
       massGrams: z.literal(5_000),
       suitSlotId: z.literal("mining_tool"),
     }),
+    powerCell: z.object({
+      itemId: z.literal(ITEM_IDS.powerCell),
+      massGrams: z.literal(500),
+      stackLimit: z.literal(5),
+    }),
     starterContainer: z.object({
       itemId: z.literal(ITEM_IDS.mykeaSchleppraum8),
       massGrams: z.literal(10_000),
@@ -72,6 +77,7 @@ const defaults = balanceSchema.parse({
   items: {
     ferriteShale: { itemId: ITEM_IDS.ferriteShale, massGrams: 100, stackLimit: 10 },
     salvageCutter: { itemId: ITEM_IDS.salvageCutter, massGrams: 5_000, suitSlotId: "mining_tool" },
+    powerCell: { itemId: ITEM_IDS.powerCell, massGrams: 500, stackLimit: 5 },
     starterContainer: {
       itemId: ITEM_IDS.mykeaSchleppraum8,
       massGrams: 10_000,

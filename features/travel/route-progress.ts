@@ -1,32 +1,33 @@
-import { LOCATION_IDS, type LocationId } from "@/game/config/foundations";
+import type { LocationId } from "@/game/config/foundations";
 
 export type RoutePoint = { x: number; y: number };
+export type RouteSegmentEndpoints = { start: RoutePoint; end: RoutePoint };
+
+export function routeSegmentKey(originLocationId: string, destinationLocationId: string): string {
+  return `${originLocationId}->${destinationLocationId}`;
+}
 
 export function routeProgressSegment({
   originLocationId,
   destinationLocationId,
-  crashEndpoint,
-  processingYardEndpoint,
+  routeSegments,
   progress,
 }: {
   originLocationId: LocationId;
   destinationLocationId: LocationId;
-  crashEndpoint: RoutePoint;
-  processingYardEndpoint: RoutePoint;
+  routeSegments: Readonly<Record<string, RouteSegmentEndpoints>>;
   progress: number;
 }) {
-  const routeStart =
-    originLocationId === LOCATION_IDS.crashSite ? crashEndpoint : processingYardEndpoint;
-  const routeEnd =
-    destinationLocationId === LOCATION_IDS.crashSite ? crashEndpoint : processingYardEndpoint;
+  const segment = routeSegments[routeSegmentKey(originLocationId, destinationLocationId)];
+  if (!segment) throw new Error("Missing route geometry for travel segment");
   const clampedProgress = Math.min(100, Math.max(0, progress)) / 100;
 
   return {
-    routeStart,
-    routeEnd,
+    routeStart: segment.start,
+    routeEnd: segment.end,
     progressEnd: {
-      x: routeStart.x + (routeEnd.x - routeStart.x) * clampedProgress,
-      y: routeStart.y + (routeEnd.y - routeStart.y) * clampedProgress,
+      x: segment.start.x + (segment.end.x - segment.start.x) * clampedProgress,
+      y: segment.start.y + (segment.end.y - segment.start.y) * clampedProgress,
     },
     originLocationId,
     destinationLocationId,

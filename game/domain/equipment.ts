@@ -92,6 +92,7 @@ export function isCompatibleEquipmentAssignment(
 
 export function carriedItemMassGrams(itemId: string, balance: EffectiveGameBalance): number {
   if (itemId === balance.items.ferriteShale.itemId) return balance.items.ferriteShale.massGrams;
+  if (itemId === balance.items.powerCell.itemId) return balance.items.powerCell.massGrams;
   return itemEquipmentDefinition(itemId, balance)?.massGrams ?? 0;
 }
 

@@ -7,6 +7,7 @@ type ItemVisualProps = {
   quantity?: number;
   badge?: string;
   accessibleLabel?: string;
+  mutedArtwork?: boolean;
   background?: React.ReactNode;
   className?: string;
 };
@@ -18,6 +19,7 @@ export function ItemVisual({
   quantity,
   badge,
   accessibleLabel,
+  mutedArtwork,
   background,
   className,
 }: ItemVisualProps) {
@@ -31,6 +33,7 @@ export function ItemVisual({
       badge={badge ?? `x${quantity ?? 1}`}
       className={className}
       fallbackText={presentation.textFallback}
+      mutedArtwork={mutedArtwork}
       name={presentation.displayName}
     />
   );

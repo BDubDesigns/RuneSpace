@@ -21,6 +21,7 @@ import { latestMiningAttempt, resolvedAttemptCount } from "./latest-result";
 import { useMiningPlay } from "./MiningPlayContext";
 import { EquipmentPanel } from "./EquipmentPanel";
 import { LocalMapPanel } from "@/features/travel/LocalMapPanel";
+import { PowerAnnexClaimPanel } from "@/features/power-annex/PowerAnnexClaimPanel";
 
 const RESULT_FEEDBACK_DURATION_MS = 3_600;
 
@@ -407,6 +408,7 @@ export function MiningConsole({ characterName }: { characterName: string }) {
         ) : null}
       </Panel>
       <LocalMapPanel />
+      <PowerAnnexClaimPanel />
       {showMiningActivity ? (
         <>
           <div className="grid gap-4 sm:grid-cols-2">

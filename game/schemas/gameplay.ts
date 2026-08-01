@@ -41,6 +41,11 @@ export const BeginTravelRequestSchema = z.object({
   destinationLocationId: LocationIdSchema,
 });
 
+/** The Power Annex command supplies only the owned character identity. */
+export const ClaimPowerCellsRequestSchema = z.object({
+  characterId: z.string().uuid(),
+});
+
 /** Containers can only hold non-container item definitions. */
 export const ContainerContentItemSchema = z.object({
   itemId: ItemIdSchema,

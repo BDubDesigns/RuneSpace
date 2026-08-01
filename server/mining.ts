@@ -1,9 +1,10 @@
 import { randomInt } from "node:crypto";
-import { asc, eq } from "drizzle-orm";
+import { and, asc, eq } from "drizzle-orm";
 import { db } from "@/db";
 import {
   activeActions,
   characterMiningState,
+  characterPowerCellDailyClaims,
   characterSkillXp,
   characterStarterProvisioning,
   characters,
@@ -16,6 +17,8 @@ import { getEffectiveGameBalance, miningLevelThresholds } from "@/game/config/ba
 import { resolveItemPresentation } from "@/game/content/item-presentation";
 import { isActionAvailableAtLocation } from "@/game/content/locations";
 import { ACTION_IDS, ITEM_IDS, LOCATION_IDS, SKILL_IDS } from "@/game/config/foundations";
+import { POWER_ANNEX_REWARD_SOURCE_ID, pacificResetDate } from "@/game/domain/power-annex";
+import { powerAnnexNow } from "@/server/power-annex-clock";
 import {
   carriedItemMassGrams,
   deriveEquipmentLoadout,
@@ -156,6 +159,8 @@ export type MiningGameplayState = {
     startedAt: string;
     arrivesAt: string;
   };
+  /** Current Pacific-day claim state, only when the character is at the Annex. */
+  powerAnnex?: { resetDate: string; claimed: boolean };
   /** Set when a begin-travel command was refused by the authoritative rules. */
   travelError?:
     | "unknown_destination"
@@ -467,32 +472,45 @@ export async function stateFromTransaction(
   commandError?: MiningGameplayState["commandError"],
   travelError?: MiningGameplayState["travelError"],
   characterRow?: { currentLocationId: string },
+  now = new Date(),
 ): Promise<MiningGameplayState> {
   const balance = getEffectiveGameBalance();
   const snapshot = await loadMiningSnapshot(transaction, characterId);
-  const [xpRows, stacks, actionRows, miningStateRows, travelRows, character] = await Promise.all([
-    transaction
-      .select()
-      .from(characterSkillXp)
-      .where(eq(characterSkillXp.characterId, characterId)),
-    transaction
-      .select()
-      .from(inventoryStacks)
-      .where(eq(inventoryStacks.characterId, characterId))
-      .orderBy(asc(inventoryStacks.createdAt), asc(inventoryStacks.id)),
-    transaction.select().from(activeActions).where(eq(activeActions.characterId, characterId)),
-    transaction
-      .select()
-      .from(characterMiningState)
-      .where(eq(characterMiningState.characterId, characterId)),
-    transaction
-      .select()
-      .from(characterTravelState)
-      .where(eq(characterTravelState.characterId, characterId)),
-    characterRow
-      ? Promise.resolve([characterRow])
-      : transaction.select().from(characters).where(eq(characters.id, characterId)).limit(1),
-  ]);
+  const resetDate = pacificResetDate(powerAnnexNow(now));
+  const [xpRows, stacks, actionRows, miningStateRows, travelRows, claimRows, character] =
+    await Promise.all([
+      transaction
+        .select()
+        .from(characterSkillXp)
+        .where(eq(characterSkillXp.characterId, characterId)),
+      transaction
+        .select()
+        .from(inventoryStacks)
+        .where(eq(inventoryStacks.characterId, characterId))
+        .orderBy(asc(inventoryStacks.createdAt), asc(inventoryStacks.id)),
+      transaction.select().from(activeActions).where(eq(activeActions.characterId, characterId)),
+      transaction
+        .select()
+        .from(characterMiningState)
+        .where(eq(characterMiningState.characterId, characterId)),
+      transaction
+        .select()
+        .from(characterTravelState)
+        .where(eq(characterTravelState.characterId, characterId)),
+      transaction
+        .select({ characterId: characterPowerCellDailyClaims.characterId })
+        .from(characterPowerCellDailyClaims)
+        .where(
+          and(
+            eq(characterPowerCellDailyClaims.characterId, characterId),
+            eq(characterPowerCellDailyClaims.rewardSourceId, POWER_ANNEX_REWARD_SOURCE_ID),
+            eq(characterPowerCellDailyClaims.resetDate, resetDate),
+          ),
+        ),
+      characterRow
+        ? Promise.resolve([characterRow])
+        : transaction.select().from(characters).where(eq(characters.id, characterId)).limit(1),
+    ]);
   const totalXp = xpRows.find((row) => row.skillId === SKILL_IDS.mining)?.totalXp ?? 0;
   const thresholds = miningLevelThresholds(balance);
   const level = levelFromXp(totalXp, thresholds);
@@ -524,6 +542,10 @@ export async function stateFromTransaction(
     characterId,
     location: { currentLocationId },
     travelState,
+    powerAnnex:
+      currentLocationId === LOCATION_IDS.emergencyPowerAnnex
+        ? { resetDate, claimed: claimRows.length > 0 }
+        : undefined,
     activeAction:
       action?.actionId === ACTION_IDS.crashSiteMining
         ? {
@@ -560,7 +582,9 @@ export async function stateFromTransaction(
         stackLimit:
           stack.itemId === balance.items.ferriteShale.itemId
             ? balance.items.ferriteShale.stackLimit
-            : 1,
+            : stack.itemId === balance.items.powerCell.itemId
+              ? balance.items.powerCell.stackLimit
+              : 1,
       })),
     },
     equipment: {
@@ -652,6 +676,8 @@ export async function getMiningGameplayState(
           ? "another_action_active"
           : undefined,
         undefined,
+        undefined,
+        now,
       );
     },
     now,
@@ -747,6 +773,8 @@ export async function startCrashSiteMining(
         preflightStopReason ?? outcome?.stopReason,
         unsupportedAction ? "another_action_active" : undefined,
         miningBlockedHere ? "mining_unavailable_here" : undefined,
+        undefined,
+        now,
       );
     },
     now,
@@ -797,6 +825,7 @@ export async function stopMining(
           : undefined,
         undefined,
         context.character,
+        now,
       );
     },
     now,
@@ -847,6 +876,8 @@ export async function beginTravel(
             miningOutcome?.stopReason,
             undefined,
             undefined,
+            undefined,
+            now,
           );
         }
         return stateFromTransaction(
@@ -856,6 +887,8 @@ export async function beginTravel(
           miningOutcome?.stopReason,
           undefined,
           "already_traveling",
+          undefined,
+          now,
         );
       }
 
@@ -874,6 +907,8 @@ export async function beginTravel(
             ? "another_action_active"
             : undefined,
           plan.reason,
+          undefined,
+          now,
         );
       }
 
@@ -888,6 +923,8 @@ export async function beginTravel(
           miningOutcome?.stopReason,
           "another_action_active",
           undefined,
+          undefined,
+          now,
         );
       }
 
@@ -924,6 +961,8 @@ export async function beginTravel(
         miningOutcome?.stopReason,
         undefined,
         undefined,
+        undefined,
+        now,
       );
     },
     now,

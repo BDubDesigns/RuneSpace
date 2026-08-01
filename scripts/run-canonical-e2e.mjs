@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 import { execSync, spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, copyFileSync, unlinkSync, statSync } from "node:fs";
+import { existsSync, mkdirSync, copyFileSync, unlinkSync, statSync, writeFileSync } from "node:fs";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -49,6 +49,8 @@ const cleanupPaths = [
 for (const p of cleanupPaths) {
   if (existsSync(p)) execSync(`rm -rf "${p}"`, { stdio: "inherit", cwd: ROOT });
 }
+mkdirSync(resolve(ROOT, ".playwright"), { recursive: true });
+writeFileSync(resolve(ROOT, ".playwright/power-annex-clock"), "", "utf8");
 if (captureScreenshots) {
   mkdirSync(resolve(ROOT, "artifacts/e2e-review/mining"), { recursive: true });
   mkdirSync(resolve(ROOT, "artifacts/e2e-review/overlay"), { recursive: true });
@@ -75,6 +77,7 @@ const env = {
   RUNESPACE_E2E_MINING: "true",
   RUNESPACE_E2E_PLAY_ERROR: "true",
   RUNESPACE_E2E_TRAVEL: "true",
+  RUNESPACE_POWER_ANNEX_CLOCK_FILE: resolve(ROOT, ".playwright/power-annex-clock"),
   RUNESPACE_E2E_CANONICAL_HTTP: "true",
   RUNESPACE_RELEASE_ID: "local-ci-parity",
   BETTER_AUTH_SECRET: "canonical-e2e-local-test-secret-not-for-production",
@@ -132,6 +135,10 @@ const TRAVEL_REQUIRED = [
   "travel-desktop-in-transit.png",
   "travel-mobile-arrived.png",
   "travel-desktop-arrived.png",
+  "power-annex-mobile-available.png",
+  "power-annex-mobile-claimed.png",
+  "power-annex-desktop-available.png",
+  "power-annex-desktop-claimed.png",
 ];
 
 function verifyAndCopyScreenshots(required, destDir) {

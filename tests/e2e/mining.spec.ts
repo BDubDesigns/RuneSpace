@@ -330,11 +330,50 @@ test("shell reserves the fixed footer once and keeps the global background fixed
   await page.reload();
   await expect(page.getByText("World map", { exact: true })).toBeVisible();
 
-  const yardGeometry = await page.evaluate(() => ({
-    clientHeight: document.documentElement.clientHeight,
-    scrollHeight: document.documentElement.scrollHeight,
-  }));
-  expect(yardGeometry.scrollHeight - yardGeometry.clientHeight).toBeLessThanOrEqual(2);
+  const yardGeometry = await page.evaluate(() => {
+    const spacingProbe = document.createElement("div");
+    spacingProbe.style.position = "absolute";
+    document.body.append(spacingProbe);
+    spacingProbe.style.height = "var(--rs-space-3)";
+    const expectedGap = spacingProbe.getBoundingClientRect().height;
+    spacingProbe.style.height = "var(--rs-bottom-nav-box-height)";
+    const expectedBoxHeight = spacingProbe.getBoundingClientRect().height;
+    spacingProbe.style.height = "var(--rs-bottom-nav-clearance)";
+    const expectedClearance = spacingProbe.getBoundingClientRect().height;
+    spacingProbe.remove();
+    const nav = document.querySelector('nav[aria-label="Primary"]');
+    return {
+      clientHeight: document.documentElement.clientHeight,
+      scrollHeight: document.documentElement.scrollHeight,
+      expectedGap,
+      expectedBoxHeight,
+      expectedClearance,
+      navHeight: nav?.getBoundingClientRect().height ?? 0,
+    };
+  });
+  expect(Math.abs(yardGeometry.navHeight - yardGeometry.expectedBoxHeight)).toBeLessThanOrEqual(2);
+  expect(
+    Math.abs(
+      yardGeometry.expectedClearance - yardGeometry.expectedBoxHeight - yardGeometry.expectedGap,
+    ),
+  ).toBeLessThanOrEqual(2);
+  expect(yardGeometry.scrollHeight - yardGeometry.clientHeight).toBeLessThanOrEqual(
+    yardGeometry.expectedGap + 2,
+  );
+  await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
+  const yardBottomGeometry = await page.evaluate(() => {
+    const content = document.querySelector("main");
+    const nav = document.querySelector('nav[aria-label="Primary"]');
+    return {
+      contentBottom: content?.getBoundingClientRect().bottom ?? 0,
+      navTop: nav?.getBoundingClientRect().top ?? 0,
+    };
+  });
+  expect(
+    Math.abs(
+      yardBottomGeometry.navTop - yardBottomGeometry.contentBottom - yardGeometry.expectedGap,
+    ),
+  ).toBeLessThanOrEqual(2);
   await page.screenshot({ path: "test-results/layout-mobile-play-yard.png" });
 
   const background = await page.evaluate(() => ({
@@ -364,16 +403,24 @@ test("shell reserves the fixed footer once and keeps the global background fixed
   const bottomGeometry = await page.evaluate(() => {
     const content = document.querySelector("main");
     const nav = document.querySelector('nav[aria-label="Primary"]');
+    const spacingProbe = document.createElement("div");
+    spacingProbe.style.height = "var(--rs-space-3)";
+    spacingProbe.style.position = "absolute";
+    document.body.append(spacingProbe);
+    const expectedGap = spacingProbe.getBoundingClientRect().height;
+    spacingProbe.remove();
     return {
       contentBottom: content?.getBoundingClientRect().bottom ?? 0,
       navTop: nav?.getBoundingClientRect().top ?? 0,
       navPosition: nav ? getComputedStyle(nav).position : "",
+      expectedGap,
     };
   });
   expect(bottomGeometry.navPosition).toBe("fixed");
-  // At the document's real end, the last content is reachable immediately
-  // above the fixed toolbar; the old pb-24 reserve left a visible blank tail.
-  expect(Math.abs(bottomGeometry.contentBottom - bottomGeometry.navTop)).toBeLessThanOrEqual(2);
+  // The document's real end keeps the shared space-3 breathing room above the
+  // fixed toolbar without changing the toolbar's own box height.
+  const bottomGap = bottomGeometry.navTop - bottomGeometry.contentBottom;
+  expect(Math.abs(bottomGap - bottomGeometry.expectedGap)).toBeLessThanOrEqual(2);
   await page.screenshot({ path: "test-results/layout-mobile-play-bottom.png" });
 
   // A viewport-height change (a proxy for browser-chrome/orientation changes)
@@ -384,16 +431,22 @@ test("shell reserves the fixed footer once and keeps the global background fixed
   const landscapeGeometry = await page.evaluate(() => {
     const content = document.querySelector("main");
     const nav = document.querySelector('nav[aria-label="Primary"]');
+    const spacingProbe = document.createElement("div");
+    spacingProbe.style.height = "var(--rs-space-3)";
+    spacingProbe.style.position = "absolute";
+    document.body.append(spacingProbe);
+    const expectedGap = spacingProbe.getBoundingClientRect().height;
+    spacingProbe.remove();
     return {
       contentBottom: content?.getBoundingClientRect().bottom ?? 0,
       navTop: nav?.getBoundingClientRect().top ?? 0,
       scrollRange: document.documentElement.scrollHeight - document.documentElement.clientHeight,
+      expectedGap,
     };
   });
   expect(landscapeGeometry.scrollRange).toBeGreaterThan(10);
-  expect(Math.abs(landscapeGeometry.contentBottom - landscapeGeometry.navTop)).toBeLessThanOrEqual(
-    2,
-  );
+  const landscapeGap = landscapeGeometry.navTop - landscapeGeometry.contentBottom;
+  expect(Math.abs(landscapeGap - landscapeGeometry.expectedGap)).toBeLessThanOrEqual(2);
   await page.screenshot({ path: "test-results/layout-mobile-play-scrolled-background.png" });
 });
 

@@ -2,11 +2,13 @@ import { relations, sql } from "drizzle-orm";
 import {
   bigint,
   check,
+  date,
   foreignKey,
   index,
   integer,
   jsonb,
   pgTable,
+  primaryKey,
   text,
   timestamp,
   unique,
@@ -286,6 +288,30 @@ export const characterMiningState = pgTable("character_mining_state", {
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
+/**
+ * Immutable per-character Power Annex eligibility records. Eligibility is
+ * derived by looking up the current Pacific calendar date; nothing is cleared
+ * at midnight by a background process.
+ */
+export const characterPowerCellDailyClaims = pgTable(
+  "character_power_cell_daily_claims",
+  {
+    characterId: text("character_id")
+      .notNull()
+      .references(() => characters.id, { onDelete: "restrict" }),
+    rewardSourceId: text("reward_source_id").notNull(),
+    resetDate: date("reset_date", { mode: "string" }).notNull(),
+    claimedAt: timestamp("claimed_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    primaryKey({
+      columns: [table.characterId, table.rewardSourceId, table.resetDate],
+      name: "character_power_cell_daily_claims_pk",
+    }),
+    index("character_power_cell_daily_claims_character_id_idx").on(table.characterId),
+  ],
+);
+
 export type PlayerAccount = typeof playerAccounts.$inferSelect;
 export type NewPlayerAccount = typeof playerAccounts.$inferInsert;
 export type Character = typeof characters.$inferSelect;
@@ -296,3 +322,4 @@ export type ItemInstance = typeof itemInstances.$inferSelect;
 export type EquippedItem = typeof equippedItems.$inferSelect;
 export type ActiveAction = typeof activeActions.$inferSelect;
 export type CharacterTravelState = typeof characterTravelState.$inferSelect;
+export type CharacterPowerCellDailyClaim = typeof characterPowerCellDailyClaims.$inferSelect;

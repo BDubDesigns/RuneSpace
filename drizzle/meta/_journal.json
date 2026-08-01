@@ -36,6 +36,13 @@
       "when": 1784500000000,
       "tag": "0004_persistent_locations_travel",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1785547624471,
+      "tag": "0005_power_cell_daily_claims",
+      "breakpoints": true
     }
   ]
 }
