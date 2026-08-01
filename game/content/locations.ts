@@ -6,15 +6,16 @@ import {
 } from "@/game/schemas/locations";
 
 /**
- * The authoritative two-location world for issue #40 (single source of truth).
+ * The authoritative local world for issues #40 and #47 (single source of truth).
  *
  * Server validation, UI projection, and adjacency checks all read from this
- * registry. The product owner approved exactly two connected locations for this
- * slice; no further locations, content, or map systems are introduced here.
+ * registry. The product owner approved exactly three connected locations for
+ * this slice; no further locations, content, or map systems are introduced here.
  *
  * - Crash Site: the existing Ferrite Shale deposit where Mining is available.
  * - Abandoned Processing Yard: a dormant industrial location whose future
  *   Metallurgy activity is shown as offline only — it performs no refining.
+ * - DeWhat? Emergency Power Annex: the daily Power Cell reward source.
  */
 const locationDefinitions = [
   {
@@ -22,7 +23,7 @@ const locationDefinitions = [
     displayName: "Crash Site",
     description:
       "The damaged ship rests on broken ground. An infinite Ferrite Shale deposit is exposed at the impact scar, ready to be cut.",
-    adjacentLocationIds: [LOCATION_IDS.abandonedProcessingYard],
+    adjacentLocationIds: [LOCATION_IDS.abandonedProcessingYard, LOCATION_IDS.emergencyPowerAnnex],
     availableActionIds: [ACTION_IDS.crashSiteMining],
     dormantActivities: [],
     presentation: {
@@ -34,7 +35,7 @@ const locationDefinitions = [
     id: LOCATION_IDS.abandonedProcessingYard,
     displayName: "Abandoned Processing Yard",
     description: "The processing equipment is offline. Refining is not available yet.",
-    adjacentLocationIds: [LOCATION_IDS.crashSite],
+    adjacentLocationIds: [LOCATION_IDS.crashSite, LOCATION_IDS.emergencyPowerAnnex],
     availableActionIds: [],
     dormantActivities: [
       {
@@ -46,6 +47,19 @@ const locationDefinitions = [
     presentation: {
       mapIconKey: "processing_yard" as const,
       layout: "processing_yard" as const,
+    },
+  },
+  {
+    id: LOCATION_IDS.emergencyPowerAnnex,
+    displayName: "DeWhat? Emergency Power Annex",
+    description:
+      "A mostly intact DeWhat? emergency-supply depot can dispense one registered worker allotment per Pacific reset day.",
+    adjacentLocationIds: [LOCATION_IDS.crashSite, LOCATION_IDS.abandonedProcessingYard],
+    availableActionIds: [],
+    dormantActivities: [],
+    presentation: {
+      mapIconKey: "power_annex" as const,
+      layout: "power_annex" as const,
     },
   },
 ] as const satisfies readonly LocationDefinition[];
@@ -75,8 +89,9 @@ export function areLocationsAdjacent(originId: string, destinationId: string): b
   return getLocation(originId)?.adjacentLocationIds.includes(destinationId as never) ?? false;
 }
 
-/** The ordered two-location local map for the issue #40 slice. */
+/** The ordered three-location local map for the issue #47 slice. */
 export const LOCAL_MAP_LOCATION_IDS: readonly string[] = [
   LOCATION_IDS.crashSite,
   LOCATION_IDS.abandonedProcessingYard,
+  LOCATION_IDS.emergencyPowerAnnex,
 ];

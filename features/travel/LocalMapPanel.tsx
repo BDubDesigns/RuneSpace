@@ -6,19 +6,19 @@ import { Feedback } from "@/components/ui/Feedback";
 import { Panel } from "@/components/ui/Panel";
 import { SectionHeader } from "@/components/ui/SectionHeader";
 import { StatusMeter } from "@/components/ui/StatusMeter";
-import { ACTION_IDS, GAME_TICK_MS, LOCATION_IDS } from "@/game/config/foundations";
+import { ACTION_IDS, GAME_TICK_MS, LOCATION_IDS, type LocationId } from "@/game/config/foundations";
 import { getEffectiveGameBalance } from "@/game/config/balance";
 import { LOCATIONS, getLocation } from "@/game/content/locations";
 import { beginTravelAction } from "@/server/actions";
 import { useMiningPlay } from "@/features/mining/MiningPlayContext";
-import { routeProgressSegment } from "./route-progress";
+import { routeProgressSegment, type RouteSegmentEndpoints } from "./route-progress";
 
 const WALK_SECONDS = Math.round(
   (getEffectiveGameBalance().travel.adjacentWalkDurationTicks * GAME_TICK_MS) / 1000,
 );
 
 // ---------------------------------------------------------------------------
-// Flat-top regular hexagon geometry (issue #40 two-hex local map)
+// Flat-top regular hexagon geometry for the three-location local map.
 // ---------------------------------------------------------------------------
 // For a regular flat-top hexagon of width W:
 //   height H = W × √3/2 = W × 0.8660254
@@ -28,37 +28,34 @@ const WALK_SECONDS = Math.round(
 //   right        ( W/2,    0 )    bottom-right( W/4,  H/2)
 //   bottom-left  (-W/4,  H/2)     left        (-W/2,   0 )
 //
-// Diagonal-neighbor center offset:
-//   Δx = 0.75 × W    (75% of hex width to the right)
-//   Δy = 0.50 × H    (50% of hex height upward)
-//
-// Crash Site = lower-left hex; Processing Yard = upper-right hex.
+// Crash Site and Processing Yard form the lower edge; the Power Annex sits
+// above them so all three approved routes read as a triangle.
 
 const HEX_ASPECT = 0.8660254;
-const HEX_W = 140;
+// Keep the triangular composition within the existing mobile shell without
+// introducing a second navigation surface; the labels remain readable inside
+// the accessible button overlays at this compact map scale.
+const HEX_W = 100;
 const HEX_H = HEX_W * HEX_ASPECT;
-// Base diagonal-neighbor offset: 75% width, 50% height.
-const BASE_OFFSET_X = HEX_W * 0.75;
-const BASE_OFFSET_Y = HEX_H * 0.5;
-// Add EDGE_GAP along the diagonal direction so the facing angled edges
-// are visibly separated with room for a short route bridge.
-const _diagLen = Math.sqrt(BASE_OFFSET_X ** 2 + BASE_OFFSET_Y ** 2);
-const EDGE_GAP = 14;
-const GAP_SCALE = EDGE_GAP / _diagLen;
-const OFFSET_X = BASE_OFFSET_X + BASE_OFFSET_X * GAP_SCALE;
-const OFFSET_Y = BASE_OFFSET_Y + BASE_OFFSET_Y * GAP_SCALE;
 const PAD = 14;
+const HEX_GAP = 14;
 
 // Composition bounding box (SVG viewBox + container size).
-const COMP_W = PAD * 2 + HEX_W + OFFSET_X;
-// Y span: from bottom of Crash Site to top of Processing Yard.
-const COMP_H = PAD * 2 + HEX_H + OFFSET_Y;
-
-// Center coordinates of each hex within the composition.
 const CRASH_CX = PAD + HEX_W / 2;
-const CRASH_CY = COMP_H - PAD - HEX_H / 2;
-const YARD_CX = CRASH_CX + OFFSET_X;
-const YARD_CY = CRASH_CY - OFFSET_Y;
+const YARD_CX = CRASH_CX + HEX_W + HEX_GAP;
+const ANNEX_CX = (CRASH_CX + YARD_CX) / 2;
+const ANNEX_CY = PAD + HEX_H / 2;
+const CRASH_CY = ANNEX_CY + HEX_H + HEX_GAP;
+const YARD_CY = CRASH_CY;
+const COMP_W = YARD_CX + HEX_W / 2 + PAD;
+const COMP_H = CRASH_CY + HEX_H / 2 + PAD;
+
+type HexLayout = { cx: number; cy: number };
+const HEX_LAYOUTS: Record<LocationId, HexLayout> = {
+  [LOCATION_IDS.crashSite]: { cx: CRASH_CX, cy: CRASH_CY },
+  [LOCATION_IDS.abandonedProcessingYard]: { cx: YARD_CX, cy: YARD_CY },
+  [LOCATION_IDS.emergencyPowerAnnex]: { cx: ANNEX_CX, cy: ANNEX_CY },
+};
 
 /** Flat-top hex vertex points as an SVG polygon string. */
 function hexPoints(cx: number, cy: number, w: number): string {
@@ -75,27 +72,61 @@ function hexPoints(cx: number, cy: number, w: number): string {
     .join(" ");
 }
 
-/** Midpoint of Crash Site's upper-right angled edge (top-right → right). */
-function crashEdgeMid(): [number, number] {
-  const h = HEX_H;
-  return [(HEX_W / 4 + HEX_W / 2) / 2, (-h / 2 + 0) / 2];
+function edgePoint(
+  layout: HexLayout,
+  edge: "right" | "left" | "upperRight" | "upperLeft" | "lowerRight" | "lowerLeft",
+) {
+  const xOffset = edge.includes("Right")
+    ? HEX_W * 0.375
+    : edge.includes("Left")
+      ? -HEX_W * 0.375
+      : 0;
+  const yOffset = edge.includes("upper")
+    ? -HEX_H * 0.25
+    : edge.includes("lower")
+      ? HEX_H * 0.25
+      : 0;
+  return {
+    x: layout.cx + (edge === "right" ? HEX_W / 2 : edge === "left" ? -HEX_W / 2 : xOffset),
+    y: layout.cy + yOffset,
+  };
 }
 
-/** Midpoint of Processing Yard's lower-left angled edge (left → bottom-left). */
-function yardEdgeMid(): [number, number] {
-  const h = HEX_H;
-  return [(-HEX_W / 2 - HEX_W / 4) / 2, (0 + h / 2) / 2];
+const routeSegments: Record<string, RouteSegmentEndpoints> = {};
+function addRoute(
+  origin: LocationId,
+  destination: LocationId,
+  originEdge: Parameters<typeof edgePoint>[1],
+  destinationEdge: Parameters<typeof edgePoint>[1],
+) {
+  routeSegments[`${origin}->${destination}`] = {
+    start: edgePoint(HEX_LAYOUTS[origin]!, originEdge),
+    end: edgePoint(HEX_LAYOUTS[destination]!, destinationEdge),
+  };
 }
 
-// Route line endpoints: connect edge midpoints directly. The centers are
-// inflated by EDGE_GAP along the diagonal so the edge midpoints are already
-// EDGE_GAP apart, creating a visible gap plus a short diagonal bridge.
-const [rawRouteX1, rawRouteY1] = crashEdgeMid();
-const [rawRouteX2, rawRouteY2] = yardEdgeMid();
-const ROUTE_X1 = CRASH_CX + rawRouteX1;
-const ROUTE_Y1 = CRASH_CY + rawRouteY1;
-const ROUTE_X2 = YARD_CX + rawRouteX2;
-const ROUTE_Y2 = YARD_CY + rawRouteY2;
+addRoute(LOCATION_IDS.crashSite, LOCATION_IDS.abandonedProcessingYard, "right", "left");
+addRoute(LOCATION_IDS.abandonedProcessingYard, LOCATION_IDS.crashSite, "left", "right");
+addRoute(LOCATION_IDS.crashSite, LOCATION_IDS.emergencyPowerAnnex, "upperRight", "lowerLeft");
+addRoute(LOCATION_IDS.emergencyPowerAnnex, LOCATION_IDS.crashSite, "lowerLeft", "upperRight");
+addRoute(
+  LOCATION_IDS.abandonedProcessingYard,
+  LOCATION_IDS.emergencyPowerAnnex,
+  "upperLeft",
+  "lowerRight",
+);
+addRoute(
+  LOCATION_IDS.emergencyPowerAnnex,
+  LOCATION_IDS.abandonedProcessingYard,
+  "lowerRight",
+  "upperLeft",
+);
+
+const staticRoutes = [
+  routeSegments[`${LOCATION_IDS.crashSite}->${LOCATION_IDS.abandonedProcessingYard}`]!,
+  routeSegments[`${LOCATION_IDS.crashSite}->${LOCATION_IDS.emergencyPowerAnnex}`]!,
+  routeSegments[`${LOCATION_IDS.abandonedProcessingYard}->${LOCATION_IDS.emergencyPowerAnnex}`]!,
+];
 
 // ---------------------------------------------------------------------------
 // Hex button layer (native <button> for semantics, transparent over the SVG)
@@ -175,35 +206,24 @@ function HexButton({
 }
 
 // ---------------------------------------------------------------------------
-// SVG visual layer: hex outlines, state markers, diagonal route
+// SVG visual layer: hex outlines, state markers, and the three routes
 // ---------------------------------------------------------------------------
 
 function HexMapSvg({
-  crashCurrent,
-  yardCurrent,
-  crashSelected,
-  yardSelected,
-  crashTransitRole,
-  yardTransitRole,
+  currentLocationId,
+  selectedLocationId,
   inTransit,
   transitProgress,
   travelOriginLocationId,
   travelDestinationLocationId,
 }: {
-  crashCurrent: boolean;
-  yardCurrent: boolean;
-  crashSelected: boolean;
-  yardSelected: boolean;
-  crashTransitRole?: "origin" | "destination";
-  yardTransitRole?: "origin" | "destination";
+  currentLocationId: string;
+  selectedLocationId?: string;
   inTransit: boolean;
   transitProgress: number;
   travelOriginLocationId?: (typeof LOCATION_IDS)[keyof typeof LOCATION_IDS];
   travelDestinationLocationId?: (typeof LOCATION_IDS)[keyof typeof LOCATION_IDS];
 }) {
-  const crashPoints = hexPoints(CRASH_CX, CRASH_CY, HEX_W);
-  const yardPoints = hexPoints(YARD_CX, YARD_CY, HEX_W);
-
   const hexFill = (current: boolean, selected: boolean) =>
     current
       ? "fill-[color:var(--rs-accent-primary-subtle)] stroke-[color:var(--rs-accent-primary)]"
@@ -227,8 +247,7 @@ function HexMapSvg({
       ? routeProgressSegment({
           originLocationId: travelOriginLocationId,
           destinationLocationId: travelDestinationLocationId,
-          crashEndpoint: { x: ROUTE_X1, y: ROUTE_Y1 },
-          processingYardEndpoint: { x: ROUTE_X2, y: ROUTE_Y2 },
+          routeSegments,
           progress: transitProgress,
         })
       : undefined;
@@ -240,28 +259,36 @@ function HexMapSvg({
       viewBox={`0 0 ${COMP_W} ${COMP_H}`}
       preserveAspectRatio="xMidYMid meet"
     >
-      {/* Hexes first (route drawn after for contrast) */}
-      <polygon
-        points={crashPoints}
-        className={hexFill(crashCurrent, crashSelected)}
-        strokeWidth="3"
-      />
-      {crashSelected && !crashCurrent ? selectedMarker(CRASH_CX, CRASH_CY) : null}
+      {/* Hexes first (routes are drawn after for contrast). */}
+      {LOCATIONS.map((location) => {
+        const layout = HEX_LAYOUTS[location.id as LocationId];
+        if (!layout) return null;
+        const current = location.id === currentLocationId;
+        const selected = location.id === selectedLocationId;
+        return (
+          <g key={location.id}>
+            <polygon
+              points={hexPoints(layout.cx, layout.cy, HEX_W)}
+              className={hexFill(current, selected)}
+              strokeWidth="3"
+            />
+            {selected && !current ? selectedMarker(layout.cx, layout.cy) : null}
+          </g>
+        );
+      })}
 
-      <polygon points={yardPoints} className={hexFill(yardCurrent, yardSelected)} strokeWidth="3" />
-      {yardSelected && !yardCurrent ? selectedMarker(YARD_CX, YARD_CY) : null}
-
-      {/* Diagonal route segment bridging the nearest angled edges (drawn
-          after hexes for visibility). Uses a brighter structural color. */}
-      <line
-        x1={ROUTE_X1}
-        y1={ROUTE_Y1}
-        x2={ROUTE_X2}
-        y2={ROUTE_Y2}
-        className="stroke-[color:var(--rs-accent-secondary)]"
-        strokeWidth="3"
-        strokeLinecap="round"
-      />
+      {staticRoutes.map((route, index) => (
+        <line
+          key={`route-${index}`}
+          x1={route.start.x}
+          y1={route.start.y}
+          x2={route.end.x}
+          y2={route.end.y}
+          className="stroke-[color:var(--rs-accent-secondary)]"
+          strokeWidth="3"
+          strokeLinecap="round"
+        />
+      ))}
       {routeProgress ? (
         <line
           data-route-progress
@@ -386,23 +413,22 @@ export function LocalMapPanel() {
   function tileStatusLabel(locationId: string): string {
     const loc = getLocation(locationId);
     if (!loc) return "";
+    if (locationId === LOCATION_IDS.emergencyPowerAnnex) return "Power Cells daily";
     return loc.availableActionIds.length > 0 ? "Mining available" : "Processing offline";
   }
 
   // Button positions: each button is positioned to overlay its hex in the SVG.
   // The button's top-left is at (cx - W/2, cy - H/2) and size is W × H.
-  const crashBtnStyle: CSSProperties = {
-    left: `${CRASH_CX - HEX_W / 2}px`,
-    top: `${CRASH_CY - HEX_H / 2}px`,
-    width: `${HEX_W}px`,
-    height: `${HEX_H}px`,
-  };
-  const yardBtnStyle: CSSProperties = {
-    left: `${YARD_CX - HEX_W / 2}px`,
-    top: `${YARD_CY - HEX_H / 2}px`,
-    width: `${HEX_W}px`,
-    height: `${HEX_H}px`,
-  };
+  function hexButtonStyle(locationId: string): CSSProperties {
+    const layout = HEX_LAYOUTS[locationId as LocationId];
+    if (!layout) throw new Error(`Missing map layout for ${locationId}`);
+    return {
+      left: `${layout.cx - HEX_W / 2}px`,
+      top: `${layout.cy - HEX_H / 2}px`,
+      width: `${HEX_W}px`,
+      height: `${HEX_H}px`,
+    };
+  }
 
   return (
     <Panel tone="raised">
@@ -412,10 +438,9 @@ export function LocalMapPanel() {
         to walk there.
       </p>
 
-      {/* Two-hex diagonal map. Crash Site is lower-left; Processing Yard is
-          upper-right. The SVG renders complete hex outlines and a diagonal
-          route; native <button> elements overlay each hex for semantics
-          and text labels. */}
+      {/* Three flat-top hexes form a triangle. The SVG renders complete hex
+          outlines and all approved routes; native buttons overlay each hex for
+          semantics and text labels. */}
       <div
         className="relative mx-auto mt-4"
         role="group"
@@ -423,31 +448,14 @@ export function LocalMapPanel() {
         style={{ width: `${COMP_W}px`, height: `${COMP_H}px` }}
       >
         <HexMapSvg
-          crashCurrent={currentLocationId === LOCATION_IDS.crashSite}
-          yardCurrent={currentLocationId === LOCATION_IDS.abandonedProcessingYard}
-          crashSelected={selected === LOCATION_IDS.crashSite}
-          yardSelected={selected === LOCATION_IDS.abandonedProcessingYard}
-          crashTransitRole={
-            inTransit && travel?.originLocationId === LOCATION_IDS.crashSite
-              ? "origin"
-              : inTransit && travel?.destinationLocationId === LOCATION_IDS.crashSite
-                ? "destination"
-                : undefined
-          }
-          yardTransitRole={
-            inTransit && travel?.originLocationId === LOCATION_IDS.abandonedProcessingYard
-              ? "origin"
-              : inTransit && travel?.destinationLocationId === LOCATION_IDS.abandonedProcessingYard
-                ? "destination"
-                : undefined
-          }
+          currentLocationId={currentLocationId}
+          selectedLocationId={selected}
           inTransit={inTransit}
           transitProgress={transitProgress}
           travelOriginLocationId={travel?.originLocationId}
           travelDestinationLocationId={travel?.destinationLocationId}
         />
         {LOCATIONS.map((location) => {
-          const isCrash = location.id === LOCATION_IDS.crashSite;
           const isCurrent = location.id === currentLocationId;
           return (
             <HexButton
@@ -466,7 +474,7 @@ export function LocalMapPanel() {
               }
               disabled={inTransit}
               onSelect={() => !inTransit && setSelected(location.id)}
-              style={isCrash ? crashBtnStyle : yardBtnStyle}
+              style={hexButtonStyle(location.id)}
             >
               <span
                 className={`mt-0.5 font-display text-[10px] uppercase tracking-wide ${
@@ -534,7 +542,9 @@ export function LocalMapPanel() {
             <p className="mt-2 text-xs text-[color:var(--rs-text-secondary)]">
               {selectedLocation.availableActionIds.length > 0
                 ? "Mining is available here."
-                : "The processing equipment is offline. Refining is not available yet."}
+                : selectedLocation.id === LOCATION_IDS.emergencyPowerAnnex
+                  ? "Claim five Power Cells here once per Pacific reset day."
+                  : "The processing equipment is offline. Refining is not available yet."}
             </p>
           )}
         </div>

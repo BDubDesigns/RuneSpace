@@ -1,0 +1,104 @@
+"use client";
+
+import { useState, useTransition } from "react";
+import { ItemVisual } from "@/components/items/ItemVisual";
+import { ActionButton } from "@/components/ui/ActionButton";
+import { Feedback } from "@/components/ui/Feedback";
+import { Panel } from "@/components/ui/Panel";
+import { SectionHeader } from "@/components/ui/SectionHeader";
+import { ITEM_IDS, LOCATION_IDS } from "@/game/config/foundations";
+import { POWER_ANNEX_RESET_TIME_ZONE, POWER_CELL_DAILY_ALLOTMENT } from "@/game/domain/power-annex";
+import { claimPowerCellsAction } from "@/server/actions";
+import { useMiningPlay } from "@/features/mining/MiningPlayContext";
+
+export function PowerAnnexClaimPanel() {
+  const { acquireCommand, busy, releaseCommand, requestAutoRefresh, setState, state } =
+    useMiningPlay();
+  const [, startTransition] = useTransition();
+  const [message, setMessage] = useState<string>();
+  const [messageTone, setMessageTone] = useState<"danger" | "muted">("muted");
+
+  if (state.location.currentLocationId !== LOCATION_IDS.emergencyPowerAnnex) return null;
+
+  const claimed = state.powerAnnex?.claimed ?? false;
+  const resetDate = state.powerAnnex?.resetDate ?? "today";
+
+  function claim() {
+    if (!acquireCommand()) return;
+    startTransition(async () => {
+      try {
+        const result = await claimPowerCellsAction({ characterId: state.characterId });
+        if ("error" in result) {
+          setMessage(result.error);
+          setMessageTone("danger");
+        } else {
+          setState(result.state);
+          if (result.claim.status === "error") {
+            setMessage(result.claim.message);
+            setMessageTone("danger");
+          } else if (result.claim.status === "claimed") {
+            setMessage(
+              `Today's emergency allotment claimed: ${POWER_CELL_DAILY_ALLOTMENT} Power Cells awarded.`,
+            );
+            setMessageTone("muted");
+          } else {
+            setMessage("Today's emergency allotment has already been claimed.");
+            setMessageTone("muted");
+          }
+        }
+      } catch {
+        setMessage("Comms interruption. The Power Annex could not confirm your claim.");
+        setMessageTone("danger");
+        requestAutoRefresh();
+      } finally {
+        releaseCommand();
+      }
+    });
+  }
+
+  return (
+    <Panel tone="raised">
+      <SectionHeader eyebrow="Daily emergency allotment">
+        DeWhat? Emergency Power Annex
+      </SectionHeader>
+      <p className="mt-3 max-w-2xl text-sm leading-relaxed text-[color:var(--rs-text-secondary)]">
+        The damaged depot dispenses one registered worker allotment per RuneSpace reset day.
+        Eligibility belongs to this character and requires being stationary at the Annex.
+      </p>
+      <div className="mt-4 grid gap-3 sm:grid-cols-[7rem_minmax(0,1fr)]">
+        <ItemVisual
+          accessibleLabel={`${POWER_CELL_DAILY_ALLOTMENT} Power Cells available in today's allotment`}
+          itemId={ITEM_IDS.powerCell}
+          name="Power Cell"
+          quantity={POWER_CELL_DAILY_ALLOTMENT}
+        />
+        <div className="self-center text-sm text-[color:var(--rs-text-secondary)]">
+          <p className="font-display text-base font-bold text-[color:var(--rs-text-primary)]">
+            {POWER_CELL_DAILY_ALLOTMENT} Power Cells
+          </p>
+          <p className="mt-1">500 g each · stack limit 5 · 2,500 g total</p>
+          <p className="mt-1 text-xs text-[color:var(--rs-text-muted)]">
+            Reset date: {resetDate}. New eligibility begins at midnight Pacific (
+            {POWER_ANNEX_RESET_TIME_ZONE}).
+          </p>
+        </div>
+      </div>
+      {message ? (
+        <div className="mt-4">
+          <Feedback tone={messageTone}>{message}</Feedback>
+        </div>
+      ) : null}
+      <div className="mt-4">
+        {claimed ? (
+          <p className="font-display text-sm uppercase tracking-wide text-[color:var(--rs-accent-primary)]">
+            Today&apos;s allotment claimed · next reset at midnight Pacific
+          </p>
+        ) : (
+          <ActionButton disabled={busy} intent="primary" loading={busy} onClick={claim}>
+            Claim Power Cells
+          </ActionButton>
+        )}
+      </div>
+    </Panel>
+  );
+}

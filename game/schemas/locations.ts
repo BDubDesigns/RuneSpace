@@ -14,9 +14,9 @@ export const LocationDormantActivitySchema = z.object({
 });
 
 /**
- * The smallest typed, validated location contract for the issue #40 two-location
- * world. Locations are referenced by stable ID; adjacency, available activities,
- * and presentation metadata belong here, never in UI literals.
+ * The smallest typed, validated location contract for the local world. Locations
+ * are referenced by stable ID; adjacency, available activities, and presentation
+ * metadata belong here, never in UI literals.
  */
 export const LocationDefinitionSchema = z
   .object({
@@ -27,8 +27,8 @@ export const LocationDefinitionSchema = z
     availableActionIds: z.array(z.string()),
     dormantActivities: z.array(LocationDormantActivitySchema),
     presentation: z.object({
-      mapIconKey: z.enum(["crash_site_deposit", "processing_yard"]),
-      layout: z.enum(["crash_site", "processing_yard"]),
+      mapIconKey: z.enum(["crash_site_deposit", "processing_yard", "power_annex"]),
+      layout: z.enum(["crash_site", "processing_yard", "power_annex"]),
     }),
   })
   .strict();

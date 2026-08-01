@@ -40,6 +40,9 @@ small number of critical mobile player journeys.
   - runs the Mining Chromium journey
   - runs the Overlay Chromium journey (modal-overlay behavior shared by Inventory/Equipment)
   - runs the Travel Chromium journey
+  - the Power Annex journey uses a disposable runner-only clock file, gated to
+    CI against localhost PostgreSQL, to cross a Pacific reset boundary without
+    depending on the host wall clock
   - runs the repeated Mining play-boundary check
   - captures frozen review screenshots into `artifacts/e2e-review/` **only when
     requested** via `RUNESPACE_E2E_SCREENSHOTS=true` (the CI workflow sets this

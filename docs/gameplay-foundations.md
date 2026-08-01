@@ -87,7 +87,7 @@ components. Salvage, Fabrication, Machining, Speeder Piloting, and Ship Piloting
 are documented future skill directions only; they have no persistence
 initialization or gameplay in this foundation.
 
-## World and Travel (issue #40)
+## World and Travel (issues #40 and #47)
 
 RuneSpace's production stages require movement between distinct places. Travel is
 a real, server-authoritative, blocking character activity — not an instant tab
@@ -108,17 +108,21 @@ of war, fuel, hauling, and transportation upgrades build.
   dormant (future) activities. Adjacency is validated as bidirectional so a
   one-way edge can never silently ship.
 
-### The initial two-location world
+### The initial three-location world
 
 - **Crash Site** (`crash_site`): the existing infinite Ferrite Shale deposit.
   Mining is the only available activity.
 - **Abandoned Processing Yard** (`abandoned_processing_yard`): a dormant
   industrial location. Its future Metallurgy activity is presented as dormant
   only and performs no refining in this issue.
+- **DeWhat? Emergency Power Annex** (`dewhat_emergency_power_annex`): an
+  adjacent emergency-supply depot. It is directly adjacent to both existing
+  locations and is the authoritative renewable source for the daily Power Cell
+  allotment below.
 
-These two locations are connected by exactly one bidirectional route. No further
-locations, content, or map systems (no world grid, coordinates, procedural
-generation, fog of war, or art generation) are introduced by this issue.
+All three locations are connected by bidirectional routes. No further locations,
+content, or map systems (no world grid, coordinates, procedural generation, fog
+of war, or art generation) are introduced by this issue.
 
 ### Travel is a blocking one-active-action activity
 
@@ -141,7 +145,7 @@ generation, fog of war, or art generation) are introduced by this issue.
 
 ### Selecting vs. confirming travel
 
-- Selecting a hex on the two-hex local map only inspects/selects it.
+- Selecting a hex on the three-hex local map only inspects/selects it.
 - A separate explicit confirmation control ("Walk to … — 24 sec") invokes the
   server-authoritative begin-travel command. The same interaction works in
   reverse after arrival.
@@ -168,13 +172,32 @@ server-side even against a stale or manipulated client.
 - Conflicting state-changing commands are rejected clearly and server-side.
 - Inventory and Equipment remain inspectable during Travel.
 
+### Daily Power Annex claim (issue #47)
+
+- RuneSpace daily reset dates are calendar dates in the IANA timezone
+  `America/Los_Angeles`, changing at local midnight. Daylight-saving transitions
+  are handled by timezone-aware date calculation; this is not a rolling
+  24-hour timer.
+- Each character may claim exactly five loose `power_cell` items once per
+  Pacific reset date after physically traveling to and stopping at the DeWhat?
+  Emergency Power Annex. Eligibility is per character, not per account.
+- Each loose Power Cell weighs **500 g** and stacks to **5**. The full allotment
+  weighs **2,500 g** and is awarded all-or-nothing: existing partial stacks are
+  filled before only the required new stack rows are created, subject to slot
+  and carried-mass capacity.
+- Claims are immutable character/source/reset-date records with a uniqueness
+  boundary; no mutable claimed flag or midnight background job clears state.
+  The inventory award and claim record commit atomically. The Annex is the only
+  approved source in this slice; there are no starter or backfilled Power Cells.
+- Power Cell boosting or Salvage Cutter consumption remains Issue #24 and is
+  not implemented here.
+
 ### Deferred (not in this issue)
 
-Metallurgy, refining, Slag/Refined Ferrite production, Welding, Power Cell
-behavior, fuel, Speeders/ships, exploration XP, fog of war, undiscovered hexes,
+  Metallurgy, refining, Slag/Refined Ferrite production, Power Cell boosting,
+  Welding, fuel, Speeders/ships, exploration XP, fog of war, undiscovered hexes,
 a large hex grid or full planet map, world coordinates, terrain simulation,
 pathfinding, multi-hop routing, route queues, random encounters, fast travel,
 teleportation, recalls, Travel cancellation, background workers, WebSockets,
 client-authoritative timers, Phaser/canvas/WebGL map rendering, and Inventory/
 Equipment overlay polish from issue #41 are all explicitly out of scope here.
-

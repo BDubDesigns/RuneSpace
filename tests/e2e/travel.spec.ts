@@ -1,10 +1,12 @@
 import { expect, test } from "@playwright/test";
+import { writeFile } from "node:fs/promises";
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import {
   activeActions,
   characters,
   characterMiningState,
+  characterPowerCellDailyClaims,
   characterSkillXp,
   characterStarterProvisioning,
   characterTravelState,
@@ -66,7 +68,9 @@ async function expectRouteProgressStartsAt(
   originLocationId: string,
 ) {
   const map = page.locator('[aria-label="Local map"]');
-  const staticRoute = map.locator("line:not([data-route-progress])");
+  // The first static line is the original Crash Site ↔ Processing Yard route;
+  // the helper is intentionally scoped to the existing two-location journey.
+  const staticRoute = map.locator("line:not([data-route-progress])").first();
   const progressRoute = map.locator("line[data-route-progress]");
   await expect(progressRoute).toHaveAttribute("data-route-start-location", originLocationId);
   await expect(progressRoute).toHaveAttribute(
@@ -91,6 +95,11 @@ async function expectRouteProgressStartsAt(
   }
 }
 
+async function setPowerAnnexClock(instant: string) {
+  const clockPath = process.env.RUNESPACE_POWER_ANNEX_CLOCK_FILE;
+  if (clockPath) await writeFile(clockPath, instant, "utf8");
+}
+
 test.beforeEach(async ({ page }) => {
   const characterId = await openTravelFixture(page);
   await db.transaction(async (transaction) => {
@@ -102,6 +111,9 @@ test.beforeEach(async ({ page }) => {
     await transaction
       .delete(characterMiningState)
       .where(eq(characterMiningState.characterId, characterId));
+    await transaction
+      .delete(characterPowerCellDailyClaims)
+      .where(eq(characterPowerCellDailyClaims.characterId, characterId));
     await transaction.delete(inventoryStacks).where(eq(inventoryStacks.characterId, characterId));
     // `equipped_items` has a composite foreign key to item instances.
     await transaction.delete(equippedItems).where(eq(equippedItems.characterId, characterId));
@@ -162,7 +174,9 @@ test("selecting a destination does not begin travel; confirmation is required", 
   await page.screenshot({ path: "test-results/travel-desktop-selected.png" });
 });
 
-test("the full journey walks, arrives, and returns between the two locations", async ({ page }) => {
+test("the full journey walks, arrives, and returns between the original locations", async ({
+  page,
+}) => {
   const characterId = page.url().split("/").at(-1)!;
 
   // Stationary at the Crash Site — screenshot.
@@ -321,4 +335,67 @@ test("reduced-motion presentation retains equivalent travel information", async 
   await expect(page.getByText("Journey progress")).toBeVisible();
   // The aria-live region announces progress without animation dependency.
   await expect(page.getByText(/seconds remaining/)).toBeVisible();
+});
+
+test("travels to the Power Annex and claims independently by Pacific reset date", async ({
+  page,
+}) => {
+  const characterId = await openTravelFixture(page);
+  const controlledClock = Boolean(process.env.RUNESPACE_POWER_ANNEX_CLOCK_FILE);
+  await page.setViewportSize({ width: 390, height: 844 });
+  const annex = page.getByRole("button", { name: /DeWhat\? Emergency Power Annex/ }).first();
+  await expect(annex).toBeVisible();
+  await annex.click();
+  await expect(
+    page.getByRole("button", { name: /Walk to DeWhat\? Emergency Power Annex/ }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: /Walk to DeWhat\? Emergency Power Annex/ }).click();
+  await expect(page.getByText("Journey progress")).toBeVisible();
+
+  const arrivedPast = new Date(Date.now() - 25_000);
+  await db
+    .update(activeActions)
+    .set({ startedAt: arrivedPast, resolvedThroughAt: arrivedPast })
+    .where(eq(activeActions.characterId, characterId));
+  await page.reload();
+  await expect(
+    page.getByRole("button", { name: /DeWhat\? Emergency Power Annex/ }).first(),
+  ).toHaveAttribute("aria-current", "true");
+
+  await setPowerAnnexClock("2026-01-02T07:59:59.000Z");
+  await page.reload();
+  await expect(page.getByRole("button", { name: "Claim Power Cells" })).toBeVisible();
+  await page.screenshot({ path: "test-results/power-annex-mobile-available.png" });
+  await page.getByRole("button", { name: "Claim Power Cells" }).click();
+  await expect(
+    page.getByText(/Today's emergency allotment claimed: 5 Power Cells awarded/),
+  ).toBeVisible();
+  await expect(page.getByText(/Today's allotment claimed/)).toBeVisible();
+
+  await page.getByRole("button", { name: /Inventory/ }).click();
+  const claimedCell = page.getByLabel("5 Power Cell", { exact: true });
+  await expect(claimedCell).toBeVisible();
+  await expect(claimedCell.locator("img")).toHaveAttribute("src", /power-cell/);
+  await page.getByRole("button", { name: "Close inventory" }).click();
+  await page.reload();
+  await expect(page.getByText(/Today's allotment claimed/)).toBeVisible();
+  await expect(page.getByRole("button", { name: "Claim Power Cells" })).toHaveCount(0);
+
+  if (!controlledClock) {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.screenshot({ path: "test-results/power-annex-desktop-available.png" });
+    return;
+  }
+
+  await setPowerAnnexClock("2026-01-02T08:00:00.000Z");
+  await page.reload();
+  await expect(page.getByRole("button", { name: "Claim Power Cells" })).toBeVisible();
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.screenshot({ path: "test-results/power-annex-desktop-available.png" });
+  await page.getByRole("button", { name: "Claim Power Cells" }).click();
+  await expect(
+    page.getByText(/Today's emergency allotment claimed: 5 Power Cells awarded/),
+  ).toBeVisible();
+  await page.getByRole("button", { name: /Inventory/ }).click();
+  await expect(page.getByLabel("5 Power Cell", { exact: true })).toHaveCount(2);
 });

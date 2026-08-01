@@ -78,6 +78,45 @@ export type ResolvedCharacterContext = {
   action: ActiveAction | undefined;
 };
 
+async function lockOwnedCharacter(
+  transaction: DatabaseTransaction,
+  userId: string,
+  characterId: string,
+): Promise<Character> {
+  const accounts = await transaction
+    .select({ id: playerAccounts.id })
+    .from(playerAccounts)
+    .where(eq(playerAccounts.userId, userId))
+    .limit(1);
+  const account = accounts[0];
+  if (!account) throw new OwnershipError("Player account not found", 404);
+
+  const characterRows = await transaction
+    .select()
+    .from(characters)
+    .where(and(eq(characters.id, characterId), eq(characters.playerAccountId, account.id)))
+    .for("update");
+  const character = characterRows[0];
+  if (!character) throw new OwnershipError("Character not found", 404);
+  return character;
+}
+
+/**
+ * Lock an owned character without resolving its active action. Instantaneous
+ * location interactions use this boundary so an expired Mining or Travel row
+ * cannot be implicitly progressed as a side effect of the interaction.
+ */
+export async function withLockedOwnedCharacter<Result>(
+  userId: string,
+  characterId: string,
+  command: (transaction: DatabaseTransaction, context: { character: Character }) => Promise<Result>,
+): Promise<Result> {
+  return db.transaction(async (transaction) => {
+    const character = await lockOwnedCharacter(transaction, userId, characterId);
+    return command(transaction, { character });
+  });
+}
+
 /**
  * Authorize, lock, lazily resolve, and then run one state-changing character
  * command in the same transaction. Locking the character serializes concurrent
@@ -91,23 +130,9 @@ export async function withResolvedOwnedCharacter<Snapshot, Outcome, Result>(
   now: Date = new Date(),
 ): Promise<Result> {
   return db.transaction(async (transaction) => {
-    const accounts = await transaction
-      .select({ id: playerAccounts.id })
-      .from(playerAccounts)
-      .where(eq(playerAccounts.userId, userId))
-      .limit(1);
-    const account = accounts[0];
-    if (!account) throw new OwnershipError("Player account not found", 404);
-
     // All state-changing character commands use this row lock as their shared
     // concurrency boundary, including future action start/stop commands.
-    const characterRows = await transaction
-      .select()
-      .from(characters)
-      .where(and(eq(characters.id, characterId), eq(characters.playerAccountId, account.id)))
-      .for("update");
-    const character = characterRows[0];
-    if (!character) throw new OwnershipError("Character not found", 404);
+    const character = await lockOwnedCharacter(transaction, userId, characterId);
 
     const actionRows = await transaction
       .select()

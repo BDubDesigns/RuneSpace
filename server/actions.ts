@@ -14,10 +14,12 @@ import {
 import { changeEquipment } from "@/server/equipment";
 import { EquipmentRuleError } from "@/game/domain/equipment";
 import { TravelRuleError } from "@/server/travel";
+import { claimPowerCells, type PowerAnnexClaimResult } from "@/server/power-annex";
 import {
   EquipEquipmentRequestSchema,
   UnequipEquipmentRequestSchema,
   BeginTravelRequestSchema,
+  ClaimPowerCellsRequestSchema,
 } from "@/game/schemas/gameplay";
 
 /**
@@ -136,4 +138,18 @@ export async function unequipEquipmentAction(input: unknown): Promise<MiningActi
     kind: "unequip",
     target: request.target,
   }));
+}
+
+export type PowerAnnexActionResult = PowerAnnexClaimResult | { error: string };
+
+export async function claimPowerCellsAction(input: unknown): Promise<PowerAnnexActionResult> {
+  const request = ClaimPowerCellsRequestSchema.safeParse(input);
+  if (!request.success) return { error: "Invalid Power Annex command." };
+  try {
+    const user = await requireCurrentUser(await headers());
+    return await claimPowerCells(user.id, request.data.characterId);
+  } catch (error) {
+    if (error instanceof OwnershipError) return { error: error.message };
+    throw error;
+  }
 }

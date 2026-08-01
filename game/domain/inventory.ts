@@ -22,6 +22,10 @@ export type StackAdditionPlan<Id> = {
   remainingQuantity: number;
 };
 
+export type ExactStackAdditionPlan<Id> =
+  | { ok: true; plan: StackAdditionPlan<Id> }
+  | { ok: false; reason: "slots" | "mass"; missingQuantity: number };
+
 export function planStackAddition<Id>(
   existingStacks: readonly StackState<Id>[],
   itemId: ItemId,
@@ -68,6 +72,40 @@ export function planStackAddition<Id>(
     updatedStacks,
     createdStacks,
     remainingQuantity: remainingQuantity + quantity - weightLimitedQuantity,
+  };
+}
+
+/**
+ * Plan an all-or-nothing stack addition. The ordinary mining planner is
+ * intentionally allowed to return a partial result; instantaneous rewards
+ * such as the Power Annex allotment must use this boundary instead.
+ */
+export function planExactStackAddition<Id>(
+  existingStacks: readonly StackState<Id>[],
+  itemId: ItemId,
+  quantity: number,
+  stackLimit: number,
+  availableSlots: number,
+  availableWeight: number = Number.POSITIVE_INFINITY,
+  itemWeight: number = 0,
+): ExactStackAdditionPlan<Id> {
+  const plan = planStackAddition(
+    existingStacks,
+    itemId,
+    quantity,
+    stackLimit,
+    availableSlots,
+    availableWeight,
+    itemWeight,
+  );
+  if (plan.remainingQuantity === 0) return { ok: true, plan };
+
+  const weightLimitedQuantity =
+    itemWeight === 0 ? quantity : Math.min(quantity, Math.floor(availableWeight / itemWeight));
+  return {
+    ok: false,
+    reason: weightLimitedQuantity < quantity ? "mass" : "slots",
+    missingQuantity: plan.remainingQuantity,
   };
 }
 
