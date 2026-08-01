@@ -90,6 +90,57 @@ For progression-sensitive systems, prioritize:
 - **replay / duplicate-claim prevention** (idempotent commands)
 - **persistence correctness** (the stored state matches the resolved outcome)
 
+## Choosing the cheapest reliable layer (ownership guide)
+
+Every important behavior needs one **primary proof at the cheapest reliable
+layer**. Higher layers add smoke coverage only where the higher layer itself is
+part of the contract. Do not prove every requirement at every layer.
+
+Decide top-down:
+
+1. **Can the behavior be proven without PostgreSQL and without a browser?**
+   Prove it in `tests/unit/`. Examples from the current suite:
+   - pure formulas and balance derivation — `mining.test.ts`, `gameplay-foundations.test.ts`
+   - deterministic domain transitions and cursor math — `gameplay-foundations.test.ts`
+   - inventory planning and capacity rules — `planStackAddition`, `planExactStackAddition`
+   - command-gate/scheduler model behavior — `command-gate.test.ts`
+   - timing, IDs, validation schemas, route-progress geometry — `travel.test.ts`,
+     `ids.test.ts`, `route-progress.test.ts`, `local-map-layout.test.ts`
+
+2. **Is persistence, concurrency, or ownership the point of the behavior?**
+   Prove it in `tests/integration/` against real PostgreSQL. The browser cannot
+   prove that a durable cursor, charge, claim, or reward was committed exactly
+   once. Examples: transaction rollback, row-lock serialization, constraint and
+   migration behavior, ownership boundaries, atomic multi-row gameplay commands
+   (`gameplay-foundations.test.ts`, `travel.test.ts`, `power-annex.test.ts`,
+   `power-cell-boost.test.ts`).
+
+3. **Is the browser itself part of the contract?**
+   Prove it in `tests/e2e/`. Keep the journey representative rather than
+   exhaustive. Examples: automatic Mining/Travel boundary reconciliation
+   (browser timers), overlay focus/scroll-lock/keyboard behavior, accessible
+   names and announcements, responsive mobile layout, and rendering integration
+   that cannot be trusted from unit or database tests alone. E2E should **not**
+   re-prove every server formula, persistence branch, or edge case already
+   covered below it.
+
+When a behavior already has a primary proof at a cheaper layer, higher-layer
+tests assert only the *layer-specific* outcome:
+- a unit test proves boosted Mining timing and charge math;
+- the integration test proves charge/XP/cursor commit and rollback as one unit;
+- the E2E test proves the boosted-timer boundary reconciles automatically in the
+  browser — it does not re-derive the timing table.
+
+Only keep visual assertions that encode an approved durable layout/accessibility
+contract or protect a demonstrated regression. Do not assert exact token colors
+or pixel values (the `--rs-*` tokens in `app/globals.css` are the single source
+of truth); do assert that a layer actually paints (never a dropped-transparent
+layer) where that regression class is documented.
+
+Before adding a new test, search the layer below it: if the behavior is already
+proved there, prefer strengthening that proof or moving the assertion down.
+Before removing or weakening a test, record where the behavior remains protected.
+
 ## Avoid
 - Test duplication across layers.
 - Excessive shallow component tests that assert markup without behavior.

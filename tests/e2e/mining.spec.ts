@@ -132,11 +132,39 @@ test("owned character can start, observe, stop, and restore Crash Site Mining", 
   const firstSlot = inventory.locator("article").first();
   const firstSlotName = firstSlot.getByText("Ferrite Shale", { exact: true });
   const firstSlotQuantity = firstSlot.getByText("x10", { exact: true });
-  await expect(firstSlotName).toHaveCSS("background-color", "rgba(9, 21, 34, 0.9)");
-  await expect(firstSlotName).toHaveCSS("white-space", "nowrap");
-  await expect(firstSlotName).toHaveCSS("text-overflow", "ellipsis");
-  await expect(firstSlotQuantity).toHaveCSS("background-color", "rgba(9, 21, 34, 0.42)");
-  await expect(firstSlotQuantity).toHaveCSS("border-top-color", "rgba(75, 216, 245, 0.2)");
+  // The nameplate and quantity plate must paint a real scrim so text stays
+  // readable over artwork; the border must paint a visible delimiter. Exact
+  // token-derived rgba values are not durable contracts (the --rs-* tokens in
+  // app/globals.css are the single source of truth), but a dropped alpha that
+  // makes the layer transparent is a documented regression class.
+  const plateStyles = await Promise.all([
+    firstSlotName.evaluate((element) => {
+      const style = getComputedStyle(element);
+      return {
+        backgroundColor: style.backgroundColor,
+        borderTopColor: "",
+        textOverflow: style.textOverflow,
+        whiteSpace: style.whiteSpace,
+      };
+    }),
+    firstSlotQuantity.evaluate((element) => {
+      const style = getComputedStyle(element);
+      return {
+        backgroundColor: style.backgroundColor,
+        borderTopColor: style.borderTopColor,
+        textOverflow: "",
+        whiteSpace: "",
+      };
+    }),
+  ]);
+  for (const plate of plateStyles) {
+    expect(plate.backgroundColor).not.toBe("rgba(0, 0, 0, 0)");
+    expect(plate.backgroundColor).not.toBe("transparent");
+  }
+  expect(plateStyles[1]!.borderTopColor).not.toBe("rgba(0, 0, 0, 0)");
+  expect(plateStyles[1]!.borderTopColor).not.toBe("transparent");
+  expect(plateStyles[0]!.whiteSpace).toBe("nowrap");
+  expect(plateStyles[0]!.textOverflow).toBe("ellipsis");
   const [slotBox, artworkBox] = await Promise.all([
     firstSlot.boundingBox(),
     ferriteArtwork.first().boundingBox(),
@@ -163,77 +191,80 @@ test("owned character can start, observe, stop, and restore Crash Site Mining", 
   await expect(inventory.locator('[data-stack-fill="100"]')).toBeVisible();
   await expect(inventory.locator('[data-stack-fill="10"]')).toBeVisible();
   await expect(inventory.locator("[data-stack-fill]")).toHaveCount(2);
-  const fullFill = await inventory.locator('[data-stack-fill="100"]').evaluate((fill) => {
-    const track = fill.parentElement!;
-    const slot = track.parentElement!;
-    const fillBox = fill.getBoundingClientRect();
-    const trackBox = track.getBoundingClientRect();
-    const slotBox = slot.getBoundingClientRect();
-    return {
-      fraction: fillBox.height / trackBox.height,
-      background: getComputedStyle(fill).backgroundColor,
-      fillBottom: fillBox.bottom,
-      fillWidth: fillBox.width,
-      trackBackground: getComputedStyle(track).backgroundColor,
-      trackBottom: trackBox.bottom,
-      trackLeft: trackBox.left,
-      trackTop: trackBox.top,
-      trackWidth: trackBox.width,
-      slotLeft: slotBox.left,
-      slotBottom: slotBox.bottom,
-      slotTop: slotBox.top,
-      slotWidth: slotBox.width,
-      trackZIndex: getComputedStyle(track).zIndex,
-      textZIndex: getComputedStyle(slot.querySelector("p")!).zIndex,
-    };
-  });
-  const partialFill = await inventory.locator('[data-stack-fill="10"]').evaluate((fill) => {
-    const track = fill.parentElement!;
-    const slot = track.parentElement!;
-    const fillBox = fill.getBoundingClientRect();
-    const trackBox = track.getBoundingClientRect();
-    const slotBox = slot.getBoundingClientRect();
-    return {
-      fraction: fillBox.height / trackBox.height,
-      background: getComputedStyle(fill).backgroundColor,
-      fillBottom: fillBox.bottom,
-      fillWidth: fillBox.width,
-      trackBottom: trackBox.bottom,
-      trackLeft: trackBox.left,
-      trackTop: trackBox.top,
-      trackWidth: trackBox.width,
-      slotLeft: slotBox.left,
-      slotBottom: slotBox.bottom,
-      slotTop: slotBox.top,
-      slotWidth: slotBox.width,
-      trackZIndex: getComputedStyle(track).zIndex,
-      textZIndex: getComputedStyle(slot.querySelector("p")!).zIndex,
-    };
-  });
+
+  // The stack meter contract: the fill spans the track width, is anchored to the
+  // track bottom, tracks the slot edges, and stays beneath the nameplate text.
+  // Exact fill/track pixel widths and token colors are not durable contracts;
+  // the fill and its track must still paint a real color (never a
+  // dropped-transparent layer).
+  const [fullFill, partialFill] = await Promise.all([
+    inventory.locator('[data-stack-fill="100"]').evaluate((fill) => {
+      const track = fill.parentElement!;
+      const slot = track.parentElement!;
+      const fillBox = fill.getBoundingClientRect();
+      const trackBox = track.getBoundingClientRect();
+      const slotBox = slot.getBoundingClientRect();
+      return {
+        fraction: fillBox.height / trackBox.height,
+        background: getComputedStyle(fill).backgroundColor,
+        fillBottom: fillBox.bottom,
+        fillWidth: fillBox.width,
+        trackBackground: getComputedStyle(track).backgroundColor,
+        trackBottom: trackBox.bottom,
+        trackLeft: trackBox.left,
+        trackTop: trackBox.top,
+        trackWidth: trackBox.width,
+        slotLeft: slotBox.left,
+        slotBottom: slotBox.bottom,
+        slotTop: slotBox.top,
+        slotWidth: slotBox.width,
+        trackZIndex: getComputedStyle(track).zIndex,
+        textZIndex: getComputedStyle(slot.querySelector("p")!).zIndex,
+      };
+    }),
+    inventory.locator('[data-stack-fill="10"]').evaluate((fill) => {
+      const track = fill.parentElement!;
+      const slot = track.parentElement!;
+      const fillBox = fill.getBoundingClientRect();
+      const trackBox = track.getBoundingClientRect();
+      const slotBox = slot.getBoundingClientRect();
+      return {
+        fraction: fillBox.height / trackBox.height,
+        background: getComputedStyle(fill).backgroundColor,
+        fillBottom: fillBox.bottom,
+        fillWidth: fillBox.width,
+        trackBackground: getComputedStyle(track).backgroundColor,
+        trackBottom: trackBox.bottom,
+        trackLeft: trackBox.left,
+        trackTop: trackBox.top,
+        trackWidth: trackBox.width,
+        slotLeft: slotBox.left,
+        slotBottom: slotBox.bottom,
+        slotTop: slotBox.top,
+        slotWidth: slotBox.width,
+        trackZIndex: getComputedStyle(track).zIndex,
+        textZIndex: getComputedStyle(slot.querySelector("p")!).zIndex,
+      };
+    }),
+  ]);
+  for (const fill of [fullFill, partialFill]) {
+    expect(fill.fraction).toBeGreaterThan(0);
+    expect(fill.trackWidth).toBeGreaterThan(0);
+    for (const color of [fill.background, fill.trackBackground]) {
+      expect(color).not.toBe("rgba(0, 0, 0, 0)");
+      expect(color).not.toBe("transparent");
+    }
+    expect(Math.abs(fill.fillWidth - fill.trackWidth)).toBeLessThanOrEqual(1);
+    expect(Math.abs(fill.trackLeft - fill.slotLeft)).toBeLessThanOrEqual(1);
+    expect(Math.abs(fill.trackTop - fill.slotTop)).toBeLessThanOrEqual(1);
+    expect(Math.abs(fill.trackBottom - fill.slotBottom)).toBeLessThanOrEqual(1);
+    expect(Math.abs(fill.fillBottom - fill.trackBottom)).toBeLessThanOrEqual(1);
+    expect(fill.trackWidth).toBeLessThan(fill.slotWidth);
+    expect(Number(fill.trackZIndex)).toBeLessThan(Number(fill.textZIndex));
+  }
   expect(fullFill.fraction).toBeGreaterThan(0.95);
-  expect(fullFill.background).toBe("rgb(245, 196, 81)");
-  expect(fullFill.trackBackground).toBe("rgba(245, 196, 81, 0.14)");
-  expect(fullFill.fillWidth).toBe(8);
-  expect(fullFill.trackWidth).toBe(8);
-  expect(Math.abs(fullFill.trackLeft - fullFill.slotLeft)).toBeLessThanOrEqual(1);
-  expect(Math.abs(fullFill.trackTop - fullFill.slotTop)).toBeLessThanOrEqual(1);
-  expect(Math.abs(fullFill.trackBottom - fullFill.slotBottom)).toBeLessThanOrEqual(1);
-  expect(Math.abs(fullFill.fillBottom - fullFill.trackBottom)).toBeLessThanOrEqual(1);
-  expect(fullFill.trackWidth).toBeLessThan(fullFill.slotWidth);
-  expect(fullFill.trackZIndex).toBe("0");
-  expect(fullFill.textZIndex).toBe("20");
   expect(partialFill.fraction).toBeGreaterThan(0.08);
   expect(partialFill.fraction).toBeLessThan(0.12);
-  expect(partialFill.background).toBe("rgb(245, 196, 81)");
-  expect(partialFill.fillWidth).toBe(8);
-  expect(partialFill.trackWidth).toBe(8);
-  expect(Math.abs(partialFill.trackLeft - partialFill.slotLeft)).toBeLessThanOrEqual(1);
-  expect(Math.abs(partialFill.trackTop - partialFill.slotTop)).toBeLessThanOrEqual(1);
-  expect(Math.abs(partialFill.trackBottom - partialFill.slotBottom)).toBeLessThanOrEqual(1);
-  expect(Math.abs(partialFill.fillBottom - partialFill.trackBottom)).toBeLessThanOrEqual(1);
-  expect(partialFill.trackWidth).toBeLessThan(partialFill.slotWidth);
-  expect(partialFill.trackZIndex).toBe("0");
-  expect(partialFill.textZIndex).toBe("20");
   await expect(inventory.getByLabel(/Empty inventory slot/)).toHaveCount(6);
   await page.screenshot({ path: "test-results/mining-mobile-inventory-10-plus-1.png" });
   await page.getByRole("button", { name: "Close inventory" }).click();

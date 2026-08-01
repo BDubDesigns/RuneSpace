@@ -101,9 +101,13 @@ test("Equipment opens through the same shared modal pattern", async ({ page }) =
   await expect(dialog).toBeVisible();
   await expectBackdropCoversViewport(page, dialog);
   await expect(dialog).toHaveAttribute("aria-modal", "true");
-  // Verify the edge glow is present.
+  // The panel must paint an edge glow. The exact token color is not a durable
+  // contract (the --rs-* tokens in app/globals.css are the single source of
+  // truth); asserting that a box-shadow exists guards the regression where the
+  // glow is dropped entirely.
   const boxShadow = await dialog.evaluate((el) => getComputedStyle(el).boxShadow);
-  expect(boxShadow).toContain("rgba(75, 216, 245");
+  expect(boxShadow).not.toBe("none");
+  expect(boxShadow).not.toBe("");
   await page.screenshot({ path: "test-results/overlay-mobile-equipment.png" });
 });
 
@@ -153,28 +157,25 @@ test("clicking inside the panel does not close the overlay", async ({ page }) =>
   await expect(dialog).toBeVisible();
 });
 
-test("Close control closes the overlay and restores focus", async ({ page }) => {
+test("Close and Escape close the overlay and restore focus", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   const nav = page.getByRole("navigation", { name: "Primary" });
   const inventoryTrigger = nav.getByRole("button", { name: /Inventory/ });
+
+  // Close control.
   await inventoryTrigger.click();
   const dialog = page.getByRole("dialog", { name: "Inventory" });
   await expect(dialog).toBeVisible();
   await dialog.getByRole("button", { name: "Close inventory" }).click();
   await expect(dialog).toHaveCount(0);
   await expect(inventoryTrigger).toBeFocused();
-});
 
-test("Escape closes the overlay and restores focus", async ({ page }) => {
-  await page.setViewportSize({ width: 390, height: 844 });
-  const nav = page.getByRole("navigation", { name: "Primary" });
-  const equipmentTrigger = nav.getByRole("button", { name: "Equipment" });
-  await equipmentTrigger.click();
-  const dialog = page.getByRole("dialog", { name: "Equipment" });
+  // Escape.
+  await inventoryTrigger.click();
   await expect(dialog).toBeVisible();
   await page.keyboard.press("Escape");
   await expect(dialog).toHaveCount(0);
-  await expect(equipmentTrigger).toBeFocused();
+  await expect(inventoryTrigger).toBeFocused();
 });
 
 test("focus moves into the overlay and is contained within it", async ({ page }) => {
@@ -223,23 +224,6 @@ test("focus returns to the trigger after Escape, Close, and backdrop dismissal",
   const backdrop = page.locator('[role="presentation"]').filter({ has: dialog3 });
   await backdrop.click({ position: { x: 5, y: 5 } });
   await expect(inventoryTrigger).toBeFocused();
-});
-
-test("background controls are blocked while overlay is open", async ({ page }) => {
-  await page.setViewportSize({ width: 390, height: 844 });
-  const nav = page.getByRole("navigation", { name: "Primary" });
-  await nav.getByRole("button", { name: /Inventory/ }).click();
-  const dialog = page.getByRole("dialog", { name: "Inventory" });
-  await expect(dialog).toBeVisible();
-  // Overlay should still be open regardless of clicks behind it.
-  await expect(dialog).toBeVisible();
-  // Verify the dialog has the full viewport backdrop covering everything.
-  const backdrop = page.locator('[role="presentation"]').filter({ has: dialog });
-  const backdropBox = await backdrop.boundingBox();
-  expect(backdropBox).not.toBeNull();
-  // The backdrop should cover the full viewport.
-  expect(backdropBox!.width).toBeGreaterThanOrEqual(380);
-  expect(backdropBox!.height).toBeGreaterThanOrEqual(800);
 });
 
 test("document scroll is locked while overlay is open and restored on close", async ({ page }) => {

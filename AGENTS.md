@@ -16,7 +16,8 @@ This is the repository's sole normative authority for agent behavior. See
   - UI tokens, styling, or overlay motion: `docs/design-system.md`.
   - Authentication, trusted hosts/origins, cookies, or auth env:
     `docs/authentication.md`.
-  - Tests and the canonical E2E runner: `docs/testing-strategy.md`.
+  - Tests and the canonical E2E runner: `docs/testing-strategy.md`. Choose the
+    cheapest reliable test layer (unit → integration → E2E) per its ownership guide.
   - Branch/PR procedure, validation, observing CI/deploys:
     `docs/development-workflow.md`.
   - Coolify/database operations: `docs/deployment-database.md`.

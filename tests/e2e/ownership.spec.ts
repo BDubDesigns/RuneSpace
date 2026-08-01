@@ -55,8 +55,12 @@ test("register, create, and select a character; ownership boundary enforced", as
   await page.waitForURL("**/play/**");
   await expect(page.getByRole("heading", { name: hero })).toBeVisible();
 
-  // Back to characters: the slot is now occupied with preserved display casing.
-  await page.getByRole("link", { name: "Back to characters" }).click();
+  // Back to characters via the play footer: the slot is now occupied with
+  // preserved display casing.
+  await page
+    .getByRole("navigation", { name: "Primary" })
+    .getByRole("link", { name: "Characters" })
+    .click();
   await page.waitForURL("**/characters");
   await expect(page.getByText(hero)).toBeVisible();
 
