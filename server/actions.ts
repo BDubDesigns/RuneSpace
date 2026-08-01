@@ -9,6 +9,8 @@ import {
   getMiningGameplayState,
   startCrashSiteMining,
   stopMining,
+  loadSalvageCutterPowerCell,
+  type LoadPowerCellResult,
   type MiningGameplayState,
 } from "@/server/mining";
 import { changeEquipment } from "@/server/equipment";
@@ -20,6 +22,7 @@ import {
   UnequipEquipmentRequestSchema,
   BeginTravelRequestSchema,
   ClaimPowerCellsRequestSchema,
+  LoadPowerCellRequestSchema,
 } from "@/game/schemas/gameplay";
 
 /**
@@ -78,6 +81,20 @@ export async function startMiningAction(characterId: string): Promise<MiningActi
 
 export async function stopMiningAction(characterId: string): Promise<MiningActionResult> {
   return runMiningAction(characterId, stopMining);
+}
+
+export type LoadPowerCellActionResult = LoadPowerCellResult | { error: string };
+
+export async function loadPowerCellAction(input: unknown): Promise<LoadPowerCellActionResult> {
+  const request = LoadPowerCellRequestSchema.safeParse(input);
+  if (!request.success) return { error: "Invalid Power Cell load command." };
+  try {
+    const user = await requireCurrentUser(await headers());
+    return await loadSalvageCutterPowerCell(user.id, request.data.characterId);
+  } catch (error) {
+    if (error instanceof OwnershipError) return { error: error.message };
+    throw error;
+  }
 }
 
 export async function beginTravelAction(input: unknown): Promise<MiningActionResult> {

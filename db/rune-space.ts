@@ -164,6 +164,9 @@ export const itemInstances = pgTable(
       .notNull()
       .references(() => characters.id, { onDelete: "restrict" }),
     itemId: text("item_id").notNull(),
+    // Salvage Cutter Power Cell charge is the only current mutable gameplay
+    // state for this slice; uncharged Cutter rows use zero (legacy null is
+    // normalized at the server boundary).
     currentCharge: integer("current_charge"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),

@@ -3,6 +3,7 @@ import { getEffectiveGameBalance, miningLevelThresholds } from "@/game/config/ba
 import { ITEM_IDS } from "@/game/config/foundations";
 import { inventoryStackFillFraction } from "@/game/domain/inventory";
 import {
+  boostedMiningAttemptDurationTicks,
   miningSuccessChanceBps,
   miningNearMissBasisPoints,
   resolveCrashSiteMining,
@@ -96,6 +97,10 @@ describe("Crash Site Ferrite Shale resolution", () => {
         thresholdBasisPoints: 3500,
         shaleAwarded: 1,
         xpAwarded: 15,
+        boosted: false,
+        durationTicks: 10,
+        chargeConsumed: false,
+        remainingCharge: 0,
       },
     ]);
     expect(failure.attempts).toEqual([
@@ -105,6 +110,10 @@ describe("Crash Site Ferrite Shale resolution", () => {
         thresholdBasisPoints: 3500,
         shaleAwarded: 0,
         xpAwarded: 0,
+        boosted: false,
+        durationTicks: 10,
+        chargeConsumed: false,
+        remainingCharge: 0,
       },
     ]);
   });
@@ -123,6 +132,10 @@ describe("Crash Site Ferrite Shale resolution", () => {
         thresholdBasisPoints: 3500,
         shaleAwarded: 1,
         xpAwarded: 15,
+        boosted: false,
+        durationTicks: 10,
+        chargeConsumed: false,
+        remainingCharge: 0,
       },
       {
         success: false,
@@ -130,6 +143,10 @@ describe("Crash Site Ferrite Shale resolution", () => {
         thresholdBasisPoints: 3500,
         shaleAwarded: 0,
         xpAwarded: 0,
+        boosted: false,
+        durationTicks: 10,
+        chargeConsumed: false,
+        remainingCharge: 0,
       },
       {
         success: true,
@@ -137,6 +154,10 @@ describe("Crash Site Ferrite Shale resolution", () => {
         thresholdBasisPoints: 3500,
         shaleAwarded: 2,
         xpAwarded: 15,
+        boosted: false,
+        durationTicks: 10,
+        chargeConsumed: false,
+        remainingCharge: 0,
       },
     ]);
     expect(miningNearMissBasisPoints(3602, 3500)).toBe(103);
@@ -230,6 +251,111 @@ describe("Crash Site Ferrite Shale resolution", () => {
     expect(noTool).toMatchObject({
       consumedTicks: 0,
       stopReason: "compatible_mining_tool_missing",
+    });
+  });
+
+  it("derives the current 10-tick Mining boost as five ticks", () => {
+    expect(boostedMiningAttemptDurationTicks(balance)).toBe(5);
+  });
+
+  it("consumes one charge for both boosted success and boosted failure", () => {
+    const success = resolveCrashSiteMining({
+      elapsedTicks: 5,
+      snapshot: { ...ready, cutterCharge: 2 },
+      balance,
+      random: rolls([0], [0]),
+    });
+    const failure = resolveCrashSiteMining({
+      elapsedTicks: 5,
+      snapshot: { ...ready, cutterCharge: 2 },
+      balance,
+      random: rolls([3500]),
+    });
+    expect(success).toMatchObject({ consumedTicks: 5, successes: 1, remainingCutterCharge: 1 });
+    expect(failure).toMatchObject({ consumedTicks: 5, failures: 1, remainingCutterCharge: 1 });
+    expect(success.attempts[0]).toMatchObject({
+      boosted: true,
+      durationTicks: 5,
+      chargeConsumed: true,
+      remainingCharge: 1,
+    });
+    expect(failure.attempts[0]).toMatchObject({
+      boosted: true,
+      durationTicks: 5,
+      chargeConsumed: true,
+      remainingCharge: 1,
+    });
+  });
+
+  it("does not consume charge or cursor ticks when preflight stops resolution", () => {
+    const outcome = resolveCrashSiteMining({
+      elapsedTicks: 50,
+      snapshot: { ...ready, cutterCharge: 4, slotsAvailable: 0 },
+      balance,
+      random: rolls([0]),
+    });
+    expect(outcome).toMatchObject({
+      consumedTicks: 0,
+      remainingCutterCharge: 4,
+      stopReason: "inventory_slots_full",
+    });
+    expect(outcome.attempts).toEqual([]);
+  });
+
+  it("crosses the charge depletion boundary using normal duration in one batch", () => {
+    const outcome = resolveCrashSiteMining({
+      elapsedTicks: 60,
+      snapshot: { ...ready, cutterCharge: 2 },
+      balance,
+      random: rolls(Array.from({ length: 8 }, () => 3500)),
+    });
+    expect(outcome).toMatchObject({
+      consumedTicks: 60,
+      failures: 7,
+      remainingCutterCharge: 0,
+    });
+    expect(outcome.attempts.map((attempt) => attempt.durationTicks)).toEqual([
+      5, 5, 10, 10, 10, 10, 10,
+    ]);
+    expect(outcome.attempts.slice(0, 2).every((attempt) => attempt.boosted)).toBe(true);
+    expect(outcome.attempts.slice(2).every((attempt) => !attempt.boosted)).toBe(true);
+  });
+
+  it("leaves insufficient partial progress for the next actual attempt", () => {
+    const outcome = resolveCrashSiteMining({
+      elapsedTicks: 9,
+      snapshot: { ...ready, cutterCharge: 1 },
+      balance,
+      random: rolls([0], [0]),
+    });
+    expect(outcome).toMatchObject({ consumedTicks: 5, successes: 1, remainingCutterCharge: 0 });
+    // Four whole ticks remain in the durable window toward the next 10-tick attempt.
+    expect(outcome.attempts).toHaveLength(1);
+  });
+
+  it("keeps chance, yield, and XP unchanged between normal and boosted attempts", () => {
+    const normal = resolveCrashSiteMining({
+      elapsedTicks: 10,
+      snapshot: { ...ready, cutterCharge: 0 },
+      balance,
+      random: rolls([0], [0.5]),
+    });
+    const boosted = resolveCrashSiteMining({
+      elapsedTicks: 5,
+      snapshot: { ...ready, cutterCharge: 1 },
+      balance,
+      random: rolls([0], [0.5]),
+    });
+    expect(boosted).toMatchObject({
+      successes: normal.successes,
+      failures: normal.failures,
+      awardedXp: normal.awardedXp,
+    });
+    expect(boosted.attempts[0]).toMatchObject({
+      rolledBasisPoints: normal.attempts[0]?.rolledBasisPoints,
+      thresholdBasisPoints: normal.attempts[0]?.thresholdBasisPoints,
+      shaleAwarded: normal.attempts[0]?.shaleAwarded,
+      xpAwarded: normal.attempts[0]?.xpAwarded,
     });
   });
 });

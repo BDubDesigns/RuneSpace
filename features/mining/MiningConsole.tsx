@@ -13,7 +13,7 @@ import { getEffectiveGameBalance } from "@/game/config/balance";
 import { GAME_TICK_MS, ITEM_IDS, LOCATION_IDS } from "@/game/config/foundations";
 import { getLocation } from "@/game/content/locations";
 import { inventoryStackFillFraction } from "@/game/domain/inventory";
-import { miningNearMissBasisPoints } from "@/game/domain/mining";
+import { boostedMiningAttemptDurationTicks, miningNearMissBasisPoints } from "@/game/domain/mining";
 import type { MiningGameplayState, MiningRunAttempt } from "@/server/mining";
 import { refreshMiningAction, startMiningAction, stopMiningAction } from "@/server/actions";
 import { reportClientDiagnostic } from "@/features/diagnostics/client";
@@ -27,6 +27,10 @@ const RESULT_FEEDBACK_DURATION_MS = 3_600;
 
 function kilograms(grams: number) {
   return `${(grams / 1_000).toLocaleString(undefined, { maximumFractionDigits: 1 })} kg`;
+}
+
+function secondsForTicks(ticks: number) {
+  return (ticks * GAME_TICK_MS) / 1_000;
 }
 
 function stopMessage(reason: NonNullable<MiningGameplayState["stoppingReason"]>) {
@@ -50,22 +54,35 @@ function percentage(basisPoints: number) {
   return (basisPoints / 100).toFixed(2);
 }
 
-function latestAttemptAnnouncement(attempt: MiningRunAttempt, attemptsResolved: number) {
+function latestAttemptAnnouncement(
+  attempt: MiningRunAttempt,
+  attemptsResolved: number,
+  maximumCharge: number,
+) {
   const catchUp = attemptsResolved > 1 ? `${attemptsResolved} attempts resolved while away. ` : "";
   const roll = `Roll ${percentage(attempt.rolledBasisPoints)}. Needed below ${percentage(attempt.thresholdBasisPoints)}.`;
+  const charge = attempt.chargeConsumed
+    ? `Power Cell charge consumed · ${attempt.remainingCharge} / ${maximumCharge} remaining.`
+    : "";
+  const depleted =
+    attempt.boosted && attempt.remainingCharge === 0
+      ? " Power Cell depleted · Mining continues at normal speed."
+      : "";
   return attempt.success
-    ? `${catchUp}Success. ${roll} ${attempt.shaleAwarded} Ferrite Shale earned. ${attempt.xpAwarded} Mining XP earned.`
-    : `${catchUp}No yield. ${roll} Missed by ${percentage(miningNearMissBasisPoints(attempt.rolledBasisPoints, attempt.thresholdBasisPoints))}.`;
+    ? `${catchUp}Success. ${roll} ${attempt.shaleAwarded} Ferrite Shale earned. ${attempt.xpAwarded} Mining XP earned. ${charge}${depleted}`
+    : `${catchUp}No yield. ${roll} Missed by ${percentage(miningNearMissBasisPoints(attempt.rolledBasisPoints, attempt.thresholdBasisPoints))}. ${charge}${depleted}`;
 }
 
 function LatestAttemptResult({
   attempt,
   attemptsResolved,
   feedback,
+  maximumCharge,
 }: {
   attempt: MiningRunAttempt;
   attemptsResolved: number;
   feedback: boolean;
+  maximumCharge: number;
 }) {
   const feedbackTone = feedback ? (attempt.success ? "success" : "danger") : "calm";
   return (
@@ -89,6 +106,16 @@ function LatestAttemptResult({
         Roll {percentage(attempt.rolledBasisPoints)} | Needed below{" "}
         {percentage(attempt.thresholdBasisPoints)}
       </p>
+      <p className="mt-2 text-xs uppercase tracking-wide text-[color:var(--rs-text-muted)]">
+        {attempt.boosted
+          ? `Power Cell boosted · ${attempt.durationTicks} ticks · ${attempt.chargeConsumed ? `Power Cell charge consumed · ${attempt.remainingCharge} / ${maximumCharge} remaining` : "charge not consumed"}`
+          : `Normal attempt · ${attempt.durationTicks} ticks`}
+      </p>
+      {attempt.boosted && attempt.remainingCharge === 0 ? (
+        <p className="mt-2 text-sm text-[color:var(--rs-accent-mining)]">
+          Power Cell depleted · Mining continues at normal speed
+        </p>
+      ) : null}
       {attempt.success ? (
         <>
           <p className="mt-3 font-display text-xs uppercase tracking-[0.16em] text-[color:var(--rs-accent-mining)]">
@@ -220,10 +247,19 @@ export function MiningConsole({ characterName }: { characterName: string }) {
   const currentLocationId = state.location.currentLocationId;
   const atCrashSite = currentLocationId === LOCATION_IDS.crashSite;
   const showMiningActivity = atCrashSite && !inTransit;
-  const durationMs = balance.mining.attemptDurationTicks * GAME_TICK_MS;
+  const durationTicks = active?.nextAttemptDurationTicks ?? balance.mining.attemptDurationTicks;
+  const durationMs = durationTicks * GAME_TICK_MS;
   const elapsed = active ? Math.max(0, now - new Date(active.progressStartedAt).getTime()) : 0;
   const progress = active ? Math.min(100, (elapsed / durationMs) * 100) : 0;
-  const secondsRemaining = active ? Math.max(0, (durationMs - elapsed) / 1_000) : 0;
+  const secondsRemaining = active
+    ? Math.max(0, (new Date(active.nextAttemptAt).getTime() - now) / 1_000)
+    : 0;
+  const cutter = state.equipment.salvageCutter;
+  const nextMiningDurationTicks =
+    active?.nextAttemptDurationTicks ??
+    (cutter && cutter.currentCharge > 0
+      ? boostedMiningAttemptDurationTicks(balance)
+      : balance.mining.attemptDurationTicks);
 
   function apply(result: Awaited<ReturnType<typeof refreshMiningAction>>) {
     if (result.error) {
@@ -359,6 +395,18 @@ export function MiningConsole({ characterName }: { characterName: string }) {
             <p className="mt-3 font-display text-sm uppercase tracking-wide text-[color:var(--rs-accent-mining)]">
               Success chance: {percentage(state.successChanceBps)}%
             </p>
+            {active && !active.nextAttemptBoosted ? (
+              <p className="mt-3 font-display text-sm uppercase tracking-wide text-[color:var(--rs-text-secondary)]">
+                NORMAL TIMING · Next attempt: {active.nextAttemptDurationTicks} ticks
+              </p>
+            ) : cutter && cutter.currentCharge > 0 ? (
+              <p className="mt-3 font-display text-sm uppercase tracking-wide text-[color:var(--rs-accent-mining)]">
+                POWER CELL BOOST · {cutter.currentCharge} / {cutter.maximumCharge}
+                <span className="ml-2 text-[color:var(--rs-text-secondary)]">
+                  Next attempt: {nextMiningDurationTicks} ticks
+                </span>
+              </p>
+            ) : null}
             {active ? (
               <div className="mt-5">
                 <StatusMeter
@@ -369,7 +417,9 @@ export function MiningConsole({ characterName }: { characterName: string }) {
               </div>
             ) : (
               <Feedback>
-                Mining is idle. Attempts take six seconds and resolve on the server.
+                Mining is idle. Normal attempts take {balance.mining.attemptDurationTicks} ticks /{" "}
+                {secondsForTicks(balance.mining.attemptDurationTicks)} seconds and resolve on the
+                server.
               </Feedback>
             )}
           </>
@@ -391,11 +441,16 @@ export function MiningConsole({ characterName }: { characterName: string }) {
               feedback?.sequence === latestAttempt.sequence ? feedback.attempts : recentBatchCount
             }
             feedback={feedback?.sequence === latestAttempt.sequence}
+            maximumCharge={balance.items.salvageCutter.maximumCharge}
           />
         ) : null}
         <p aria-live="polite" className="sr-only">
           {feedback && latestAttempt && feedback.sequence === latestAttempt.sequence
-            ? latestAttemptAnnouncement(latestAttempt, feedback.attempts)
+            ? latestAttemptAnnouncement(
+                latestAttempt,
+                feedback.attempts,
+                balance.items.salvageCutter.maximumCharge,
+              )
             : ""}
         </p>
         {showMiningActivity && message ? (
@@ -499,6 +554,11 @@ export function MiningConsole({ characterName }: { characterName: string }) {
                   <p className="text-[color:var(--rs-text-secondary)]">
                     Roll {percentage(attempt.rolledBasisPoints)} | Needed below{" "}
                     {percentage(attempt.thresholdBasisPoints)}
+                  </p>
+                  <p className="text-xs uppercase tracking-wide text-[color:var(--rs-text-muted)]">
+                    {attempt.boosted
+                      ? `Boosted · ${attempt.durationTicks} ticks · charge consumed: ${attempt.chargeConsumed ? "yes" : "no"} · ${attempt.remainingCharge} / ${balance.items.salvageCutter.maximumCharge} remaining`
+                      : `Normal · ${attempt.durationTicks} ticks`}
                   </p>
                   <p className="text-xs text-[color:var(--rs-text-muted)]">
                     Resolved {new Date(attempt.resolvedAt).toLocaleTimeString()}

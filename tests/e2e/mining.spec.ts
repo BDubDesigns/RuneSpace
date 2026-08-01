@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { db } from "@/db";
 import {
   activeActions,
@@ -507,6 +507,83 @@ test("equipment drawer shows and updates the approved Mining loadout", async ({ 
   await page.setViewportSize({ width: 1440, height: 900 });
   await expect(equipment).toBeVisible();
   await page.screenshot({ path: "test-results/mining-desktop-equipment.png" });
+});
+
+test("Power Cell loading boosts Mining attempts and falls back after depletion", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  const characterId = page.url().split("/").at(-1)!;
+  await db.insert(inventoryStacks).values({
+    characterId,
+    itemId: ITEM_IDS.powerCell,
+    quantity: 2,
+  });
+  await page.getByRole("button", { name: "Refresh status" }).click();
+
+  await page.getByRole("button", { name: "Equipment" }).click();
+  const equipment = page.getByRole("dialog", { name: "Equipment" });
+  await expect(equipment.getByText("Depleted · 0 / 10", { exact: true })).toBeVisible();
+  await expect(equipment.getByText("Carried Power Cells: 2", { exact: true })).toBeVisible();
+  await expect(equipment.getByRole("button", { name: "Load Power Cell" })).toBeVisible();
+  await equipment.getByRole("button", { name: "Load Power Cell" }).click();
+  await expect(equipment.getByText("Loaded · 10 / 10", { exact: true })).toBeVisible();
+  await expect(equipment.getByText("Carried Power Cells: 1", { exact: true })).toBeVisible();
+  await expect(equipment.getByText("Power Cell loaded · 10 boosted attempts ready.")).toBeVisible();
+  await equipment.getByRole("button", { name: "Close equipment" }).click();
+
+  await page.getByRole("button", { name: "Start Mining" }).click();
+  const firstBoostedBatch = new Date(Date.now() - 6_100);
+  await db
+    .update(activeActions)
+    .set({ startedAt: firstBoostedBatch, resolvedThroughAt: firstBoostedBatch })
+    .where(eq(activeActions.characterId, characterId));
+  await page.getByRole("button", { name: "Refresh status" }).click();
+  await expect(page.getByText(/POWER CELL BOOST · [89] \/ 10/)).toBeVisible();
+  await expect(page.getByRole("region", { name: "Latest mining attempt" })).toContainText(
+    "Power Cell charge consumed",
+  );
+  await expect(page.getByLabel("Mining attempt history", { exact: true })).toContainText(
+    "Boosted · 5 ticks",
+  );
+
+  // Stop/start preserves the Cutter instance charge while avoiding the client
+  // refresh timer racing the deterministic depletion boundary below.
+  await page.getByRole("button", { name: "Stop Mining" }).click();
+  await page.getByRole("button", { name: "Start Mining" }).click();
+  const cutterRow = (
+    await db
+      .select()
+      .from(itemInstances)
+      .where(
+        and(
+          eq(itemInstances.characterId, characterId),
+          eq(itemInstances.itemId, ITEM_IDS.salvageCutter),
+        ),
+      )
+  )[0]!;
+  await db
+    .update(itemInstances)
+    .set({ currentCharge: 1 })
+    .where(eq(itemInstances.id, cutterRow.id));
+  const depletionBatch = new Date(Date.now() - 3_100);
+  await db
+    .update(activeActions)
+    .set({ startedAt: depletionBatch, resolvedThroughAt: depletionBatch })
+    .where(eq(activeActions.characterId, characterId));
+  await page.getByRole("button", { name: "Refresh status" }).click();
+  await expect(
+    page.getByText("Power Cell depleted · Mining continues at normal speed", { exact: true }),
+  ).toBeVisible();
+  await expect(page.getByText("NORMAL TIMING · Next attempt: 10 ticks")).toBeVisible();
+
+  const normalBatch = new Date(Date.now() - 6_100);
+  await db
+    .update(activeActions)
+    .set({ startedAt: normalBatch, resolvedThroughAt: normalBatch })
+    .where(eq(activeActions.characterId, characterId));
+  await page.getByRole("button", { name: "Refresh status" }).click();
+  await expect(page.getByText(/Normal attempt · 10 ticks/).last()).toBeVisible();
 });
 
 test("equipment and inventory rendering shows artwork for illustrated items and fallback for the rest", async ({
