@@ -11,3 +11,8 @@ export function shouldRunFullGate(input: {
   eventName: string;
   event: PullRequestGateEvent;
 }): boolean;
+
+export function shouldRequireMergeGate(input: {
+  eventName: string;
+  event: PullRequestGateEvent;
+}): boolean;

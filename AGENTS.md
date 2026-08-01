@@ -122,8 +122,11 @@ subagents or automation that may be unavailable.
    not a pass. Poll actual state (`gh pr checks`, preview probe) at short,
    individually bounded intervals — never one long blind `sleep`. For a failed
    job, inspect the logs, repair on the same branch, push, and follow the
-   replacement run. Treat optional improvements separately from blockers. Never
-   begin another issue early.
+   replacement run. The required `Merge gate` is intentionally unsatisfied on
+   draft-only checkpoints so skipped expensive jobs cannot satisfy branch
+   protection; do not mistake that expected draft guard for an application
+   regression. Treat optional improvements separately from blockers. Never begin
+   another issue early.
 
 ## Tooling reference
 - pnpm is the package manager; the lockfile is committed and installs are frozen.

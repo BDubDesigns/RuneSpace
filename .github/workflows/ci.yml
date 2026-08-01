@@ -88,6 +88,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       full: ${{ steps.select.outputs.full }}
+      merge_required: ${{ steps.select.outputs.merge_required }}
     env:
       CI_CHECKOUT_REF: ${{ github.event_name == 'workflow_dispatch' && inputs.ref || github.sha }}
     steps:
@@ -104,10 +105,7 @@ jobs:
         run: node scripts/select-ci-gate.mjs
 
   integration:
-    name: >-
-      ${{ needs.gate-decision.outputs.full == 'true'
-        && 'PostgreSQL integration tests'
-        || 'Full gate not requested - PostgreSQL integration tests' }}
+    name: PostgreSQL integration tests
     if: ${{ needs.gate-decision.outputs.full == 'true' }}
     needs: gate-decision
     runs-on: ubuntu-latest
@@ -154,10 +152,7 @@ jobs:
         run: pnpm test:integration
 
   canonical-e2e:
-    name: >-
-      ${{ needs.gate-decision.outputs.full == 'true'
-        && 'Canonical E2E browser journeys'
-        || 'Full gate not requested - Canonical E2E browser journeys' }}
+    name: Canonical E2E browser journeys
     if: ${{ needs.gate-decision.outputs.full == 'true' }}
     needs: gate-decision
     runs-on: ubuntu-latest
@@ -215,3 +210,64 @@ jobs:
             test-results/
             playwright-report/
           if-no-files-found: ignore
+
+  full-gate:
+    name: Full gate
+    if: ${{ always() }}
+    needs: [gate-decision, integration, canonical-e2e]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify full validation result
+        env:
+          DECISION_RESULT: ${{ needs.gate-decision.result }}
+          FULL: ${{ needs.gate-decision.outputs.full }}
+          INTEGRATION_RESULT: ${{ needs.integration.result }}
+          E2E_RESULT: ${{ needs.canonical-e2e.result }}
+        run: |
+          set -euo pipefail
+          if [[ "$DECISION_RESULT" != "success" ]]; then
+            echo "Full gate decision failed."
+            exit 1
+          fi
+          if [[ "$FULL" != "true" ]]; then
+            echo "Full gate not requested for this draft checkpoint."
+            exit 0
+          fi
+          if [[ "$INTEGRATION_RESULT" != "success" || "$E2E_RESULT" != "success" ]]; then
+            echo "Full validation requires successful integration and canonical E2E jobs."
+            exit 1
+          fi
+          echo "Full validation passed."
+
+  merge-gate:
+    name: Merge gate
+    if: ${{ always() }}
+    needs: [gate-decision, integration, canonical-e2e, full-gate]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Enforce merge validation
+        env:
+          DECISION_RESULT: ${{ needs.gate-decision.result }}
+          FULL: ${{ needs.gate-decision.outputs.full }}
+          MERGE_REQUIRED: ${{ needs.gate-decision.outputs.merge_required }}
+          INTEGRATION_RESULT: ${{ needs.integration.result }}
+          E2E_RESULT: ${{ needs.canonical-e2e.result }}
+          FULL_GATE_RESULT: ${{ needs.full-gate.result }}
+        run: |
+          set -euo pipefail
+          if [[ "$DECISION_RESULT" != "success" ]]; then
+            echo "Gate decision failed."
+            exit 1
+          fi
+          if [[ "$MERGE_REQUIRED" != "true" ]]; then
+            echo "Draft checkpoint: merge validation is intentionally unsatisfied."
+            exit 1
+          fi
+          if [[ "$FULL" != "true" ||
+                "$INTEGRATION_RESULT" != "success" ||
+                "$E2E_RESULT" != "success" ||
+                "$FULL_GATE_RESULT" != "success" ]]; then
+            echo "Merge validation requires successful integration and canonical E2E."
+            exit 1
+          fi
+          echo "Merge validation passed."

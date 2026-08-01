@@ -15,9 +15,28 @@ export function shouldRunFullGate({ eventName: name, event: payload }) {
   const hasFullCiLabel = labels.includes("full-ci");
 
   if (action === "ready_for_review") return true;
-  if (action === "labeled") return payload.label?.name === "full-ci";
+  if (action === "labeled") {
+    return payload.label?.name === "full-ci" || pullRequest?.draft === false;
+  }
   if (action === "opened" || action === "reopened" || action === "synchronize") {
     return pullRequest?.draft === false || hasFullCiLabel;
+  }
+
+  return false;
+}
+
+export function shouldRequireMergeGate({ eventName: name, event: payload }) {
+  if (name === "push" || name === "workflow_dispatch") return true;
+  if (name !== "pull_request") return false;
+
+  if (payload.action === "ready_for_review") return true;
+  if (payload.action === "labeled") return payload.pull_request?.draft === false;
+  if (
+    payload.action === "opened" ||
+    payload.action === "reopened" ||
+    payload.action === "synchronize"
+  ) {
+    return payload.pull_request?.draft === false;
   }
 
   return false;
@@ -34,6 +53,10 @@ if (fileURLToPath(import.meta.url) === process.argv[1]) {
 
   const event = JSON.parse(readFileSync(eventPath, "utf8"));
   const full = shouldRunFullGate({ eventName, event });
+  const mergeRequired = shouldRequireMergeGate({ eventName, event });
   appendFileSync(outputPath, `full=${full}\n`);
-  console.log(`[ci-gate] ${full ? "full" : "fast-only"}`);
+  appendFileSync(outputPath, `merge_required=${mergeRequired}\n`);
+  console.log(
+    `[ci-gate] ${full ? "full" : "fast-only"}, ${mergeRequired ? "merge-required" : "draft"}`,
+  );
 }

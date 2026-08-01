@@ -102,24 +102,26 @@ format check, unit tests, and one production build) for PR revisions and pushes
 to `main`. PostgreSQL integration and canonical E2E are selected by the explicit
 full-gate policy:
 
-| Event | Fast checks | PostgreSQL + canonical E2E |
-| --- | --- | --- |
-| Draft PR opened, reopened, or pushed | Yes | No |
-| `full-ci` applied to a draft | Yes | Yes |
-| Push while `full-ci` remains applied | Yes | Yes |
-| Draft converted to ready | Yes | Yes, without a code push |
-| Push to a ready PR | Yes | Yes |
-| Push to `main` | Yes | Yes |
-| Manual `workflow_dispatch` with an explicit ref/SHA | Yes | Yes |
+| Event | Fast checks | PostgreSQL + canonical E2E | Merge gate |
+| --- | --- | --- | --- |
+| Draft PR opened, reopened, or pushed | Yes | No | Intentionally unsatisfied |
+| `full-ci` applied to a draft | Yes | Yes | Intentionally unsatisfied |
+| Push while `full-ci` remains applied | Yes | Yes | Intentionally unsatisfied while draft |
+| Draft converted to ready | Yes | Yes, without a code push | Required |
+| Push to a ready PR | Yes | Yes | Required |
+| Push to `main` | Yes | Yes | Required |
+| Manual `workflow_dispatch` with an explicit ref/SHA | Yes | Yes | Required |
 
-Other labels do not request a full gate. PR runs use a per-PR concurrency group
-so obsolete work is canceled only for that PR; main and manual runs use unique
-groups. The full jobs have stable required names only when they actually run.
-Draft-only skipped jobs use non-required placeholder names, because GitHub marks
-a skipped required job successful and would otherwise permit a bypass. Require
-the actual fast, PostgreSQL, and canonical check names in the `main` branch
-protection/ruleset; this repository currently has no such protection configured,
-so a maintainer must verify those settings separately.
+Labels on ready PRs request the full gate so adding `e2e-screenshots` captures
+the requested manifest without invalidating an otherwise ready head. PR runs use
+a per-PR concurrency group so obsolete work is canceled only for that PR; main
+and manual runs use unique groups. The static `Merge gate` is required and
+intentionally fails on draft checkpoints. This is necessary because GitHub
+marks a skipped required job successful; a green draft decision would otherwise
+be reusable when the PR becomes ready without a new commit. Require only the
+fast check and `Merge gate` in the `main` branch protection/ruleset; this
+repository currently has no such protection configured, so a maintainer must
+verify those settings separately.
 
 CI retains a separate PostgreSQL integration job and canonical E2E job. The
 canonical runner is the single source of truth for E2E behavioral verification

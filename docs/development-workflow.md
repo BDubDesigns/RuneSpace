@@ -82,17 +82,18 @@ The full gate keeps the PostgreSQL integration and canonical E2E jobs separately
 diagnosable. PR concurrency cancels obsolete runs only for that PR; main and
 manual runs use unique groups and are not canceled by PR activity.
 
-Require the actual stable checks `PostgreSQL integration tests` and `Canonical
-E2E browser journeys` in addition to `Install, typecheck, lint, test, build` in
-the `main` branch protection/ruleset. The expensive jobs use a different
-non-required placeholder name when a draft-only run skips them, so a skipped
-draft job cannot falsely satisfy either required full check. Draft PRs are not
-mergeable; when the PR becomes ready, the `ready_for_review` event creates the
-real full checks for the current merge candidate. Do not require the decision
-job or placeholder names, and verify the exact check names in repository
-settings after enabling protection. This repository currently has no main
-branch protection configured, so settings verification is a maintainer action
-outside this code change.
+Require the stable checks `Install, typecheck, lint, test, build` and `Merge gate`
+in the `main` branch protection/ruleset. `PostgreSQL integration tests`,
+`Canonical E2E browser journeys`, `Full gate`, and `Full gate decision` remain
+independently diagnosable but are not required contexts: they are intentionally
+skipped on ordinary draft checkpoints. `Merge gate` explicitly fails with an
+expected "draft checkpoint" message until the PR is ready, so a skipped full
+job cannot falsely satisfy branch protection on the unchanged head when
+`ready_for_review` triggers the full run. On a ready PR, `Merge gate` succeeds
+only when both full jobs succeed. Do not require the diagnostic job names, and
+verify the exact required names in repository settings after enabling
+protection. This repository currently has no main branch protection configured,
+so settings verification is a maintainer action outside this code change.
 
 Before marking ready or requesting final review, run the complete local
 CI-parity sequence once when the managed PostgreSQL and Playwright environment

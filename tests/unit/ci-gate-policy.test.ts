@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { shouldRunFullGate } from "@/scripts/select-ci-gate.mjs";
+import { shouldRequireMergeGate, shouldRunFullGate } from "@/scripts/select-ci-gate.mjs";
 
 function pullRequestEvent(
   action: string,
@@ -73,6 +73,48 @@ describe("full CI gate selection", () => {
   it("runs the full gate on main pushes and manual dispatch", () => {
     expect(shouldRunFullGate({ eventName: "push", event: {} })).toBe(true);
     expect(shouldRunFullGate({ eventName: "workflow_dispatch", event: {} })).toBe(true);
+  });
+
+  it("keeps the merge gate unsatisfied for draft checkpoints", () => {
+    expect(
+      shouldRequireMergeGate({
+        eventName: "pull_request",
+        event: pullRequestEvent("synchronize"),
+      }),
+    ).toBe(false);
+    expect(
+      shouldRequireMergeGate({
+        eventName: "pull_request",
+        event: pullRequestEvent("labeled", { labels: ["full-ci"] }),
+      }),
+    ).toBe(false);
+  });
+
+  it("requires the merge gate for ready PR revisions and ready-label events", () => {
+    expect(
+      shouldRequireMergeGate({
+        eventName: "pull_request",
+        event: pullRequestEvent("ready_for_review", { draft: false }),
+      }),
+    ).toBe(true);
+    expect(
+      shouldRequireMergeGate({
+        eventName: "pull_request",
+        event: pullRequestEvent("synchronize", { draft: false }),
+      }),
+    ).toBe(true);
+    expect(
+      shouldRequireMergeGate({
+        eventName: "pull_request",
+        event: pullRequestEvent("labeled", { draft: false, labels: ["e2e-screenshots"] }),
+      }),
+    ).toBe(true);
+    expect(
+      shouldRunFullGate({
+        eventName: "pull_request",
+        event: pullRequestEvent("labeled", { draft: false, labels: ["e2e-screenshots"] }),
+      }),
+    ).toBe(true);
   });
 
   it("does not run the full gate when a ready PR is converted back to draft", () => {
