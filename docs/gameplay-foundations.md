@@ -10,8 +10,9 @@ contracts and approved values, not unfinished balance values or future activitie
 - An action is an ongoing character activity. An attempt is one server-resolved
   outcome after its whole-tick duration elapses.
 - Activities define base attempt durations in whole ticks. Player-facing speed
-  multipliers divide duration and round upward to a whole tick: 2x speed makes a
-  10-tick attempt take 5 ticks.
+  multipliers divide duration and round upward to a whole tick:
+  `ceil(normalAttemptTicks / speedMultiplier)`. The approved Power Cell Mining
+  boost is 2x, so a 10-tick attempt takes 5 ticks.
 - A character may have only one active action.
 - The server resolves actions lazily when a character is loaded or a
   state-changing command runs. There is no client tick loop, worker, or timer.
@@ -41,7 +42,7 @@ contracts and approved values, not unfinished balance values or future activitie
 
 The first playable action is infinite Crash Site Ferrite Shale Mining. Its concrete
 values live only in `game/config/balance.ts` behind `getEffectiveGameBalance()`:
-10 ticks (six seconds) per attempt; 15 Mining XP on success; 1 or 2 shale per
+10 ticks (six seconds) per normal attempt; 15 Mining XP on success; 1 or 2 shale per
 success; 100 g shale units with a 10-unit stack limit; and the approved level-1
 35% to level-30 guaranteed-success basis-point formula. Failures grant neither
 shale nor XP. Server-generated randomness is resolved in the locked action
@@ -189,12 +190,39 @@ server-side even against a stale or manipulated client.
   boundary; no mutable claimed flag or midnight background job clears state.
   The inventory award and claim record commit atomically. The Annex is the only
   approved source in this slice; there are no starter or backfilled Power Cells.
-- Power Cell boosting or Salvage Cutter consumption remains Issue #24 and is
-  not implemented here.
+- Power Cell boosting is defined in the Issue #24 section below.
+
+### Salvage Cutter Power Cell boost (issue #24)
+
+- A loose `power_cell` is a 500 g fungible stack item with a stack limit of five.
+  Issue #47's DeWhat? Emergency Power Annex is the renewable source; there are no
+  starter or backfilled cells.
+- Loading one carried Power Cell into the equipped, depleted Salvage Cutter
+  consumes the cell completely and sets the Cutter's durable charge to ten.
+  Loading is allowed while idle or while another action is active; if Mining is
+  active, due Mining work is resolved first in the same transaction. A nonzero
+  charge cannot be overwritten.
+- While charge is greater than zero, each next Mining attempt uses
+  `ceil(normalAttemptTicks / 2)` (currently 5 ticks / 3 seconds). The boost changes
+  timing only: success chance, random rolls, yield, XP, inventory planning, and
+  progression are unchanged.
+- Every resolved boosted success or failure consumes exactly one charge. A
+  preflight stop consumes no charge. When the tenth boosted attempt reaches zero,
+  the same Mining action continues automatically at its normal 10-tick duration.
+- Resolution walks the durable action cursor sequentially, choosing the current
+  boosted or normal duration for each attempt. A single active/offline batch may
+  therefore cross from 5-tick boosted attempts to 10-tick normal attempts; the
+  cursor advances only by the actual whole ticks consumed and preserves partial
+  progress toward the next attempt.
+- Cutter charge is stored on the unique `item_instances.current_charge` row, so
+  refresh, reconnect, stop/start, travel, offline resolution, and re-equipping the
+  same instance preserve it. Attempt history remains bounded to the latest ten
+  summaries and records boost mode, actual duration, charge consumption, and
+  remaining charge.
 
 ### Deferred (not in this issue)
 
-  Metallurgy, refining, Slag/Refined Ferrite production, Power Cell boosting,
+  Metallurgy, refining, Slag/Refined Ferrite production,
   Welding, fuel, Speeders/ships, exploration XP, fog of war, undiscovered hexes,
 a large hex grid or full planet map, world coordinates, terrain simulation,
 pathfinding, multi-hop routing, route queues, random encounters, fast travel,

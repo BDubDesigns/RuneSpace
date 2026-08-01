@@ -30,6 +30,8 @@ import { type StackState } from "@/game/domain/inventory";
 import {
   miningSuccessChanceBps,
   miningPreflightStopReason,
+  normalizeCutterCharge,
+  boostedMiningAttemptDurationTicks,
   resolveCrashSiteMining,
   type MiningRandom,
   type MiningResolution,
@@ -81,11 +83,15 @@ type MiningSnapshot = {
   slotsUsed: number;
   slotCapacity: number;
   equipmentLoadout: EquipmentLoadout;
-  itemInstances: readonly { id: string; itemId: string }[];
+  itemInstances: readonly { id: string; itemId: string; currentCharge: number | null }[];
+  equippedCutterInstanceId?: string;
+  cutterCharge: number;
 };
 
 type PersistedMiningOutcome = MiningResolution<string> & {
   characterId: string;
+  cutterInstanceId?: string;
+  cutterChargeBefore: number;
   attemptResolvedAt: readonly string[];
 };
 
@@ -97,6 +103,10 @@ export type MiningRunAttempt = {
   thresholdBasisPoints: number;
   shaleAwarded: number;
   xpAwarded: number;
+  boosted: boolean;
+  durationTicks: number;
+  chargeConsumed: boolean;
+  remainingCharge: number;
 };
 
 type MiningRunState = {
@@ -115,6 +125,8 @@ export type MiningGameplayState = {
     resolvedThroughAt: string;
     nextAttemptAt: string;
     progressStartedAt: string;
+    nextAttemptBoosted: boolean;
+    nextAttemptDurationTicks: number;
   };
   mining: { totalXp: number; level: number; xpToNextLevel?: number; xpIntoLevel: number };
   successChanceBps: number;
@@ -134,6 +146,12 @@ export type MiningGameplayState = {
   };
   equipment: {
     aggregateContainerSlots: number;
+    carriedPowerCellQuantity: number;
+    salvageCutter?: {
+      currentCharge: number;
+      maximumCharge: number;
+      boostedAttemptDurationTicks: number;
+    };
     slots: readonly {
       target: EquipmentTarget;
       label: string;
@@ -229,7 +247,7 @@ export async function ensureStarterMiningState(
       cutter = (
         await transaction
           .insert(itemInstances)
-          .values({ characterId, itemId: balance.items.salvageCutter.itemId })
+          .values({ characterId, itemId: balance.items.salvageCutter.itemId, currentCharge: 0 })
           .returning()
       )[0]!;
     }
@@ -314,6 +332,18 @@ async function loadMiningSnapshot(
     stacks,
     balance,
   });
+  const cutterAssignment = assignments.find(
+    (assignment) =>
+      assignment.assignmentKind === "gear" &&
+      assignment.suitSlotId === balance.items.salvageCutter.suitSlotId,
+  );
+  const cutter = cutterAssignment
+    ? instances.find(
+        (instance) =>
+          instance.id === cutterAssignment.itemInstanceId &&
+          instance.itemId === balance.items.salvageCutter.itemId,
+      )
+    : undefined;
   return {
     miningLevel: levelFromXp(miningXp, miningLevelThresholds(balance)),
     hasCompatibleTool: equipmentLoadout.hasCompatibleMiningTool,
@@ -330,6 +360,8 @@ async function loadMiningSnapshot(
     slotCapacity: equipmentLoadout.containerSlotCapacity,
     equipmentLoadout,
     itemInstances: instances,
+    equippedCutterInstanceId: cutter?.id,
+    cutterCharge: normalizeCutterCharge(cutter?.currentCharge, balance),
   };
 }
 
@@ -347,14 +379,19 @@ export function createMiningResolver(
         balance: getEffectiveGameBalance(),
         random,
       });
-      const attemptDurationMs = ticksToMilliseconds(
-        getEffectiveGameBalance().mining.attemptDurationTicks,
-      );
+      let cumulativeAttemptTicks = 0;
       const outcome: PersistedMiningOutcome = {
         characterId: action.characterId,
         ...resolved,
+        cutterInstanceId: snapshot.equippedCutterInstanceId,
+        cutterChargeBefore: snapshot.cutterCharge,
         attemptResolvedAt: resolved.attempts.map((_, index) =>
-          new Date(window.startsAt.getTime() + (index + 1) * attemptDurationMs).toISOString(),
+          new Date(
+            window.startsAt.getTime() +
+              ticksToMilliseconds(
+                (cumulativeAttemptTicks += resolved.attempts[index]!.durationTicks),
+              ),
+          ).toISOString(),
         ),
       };
       return {
@@ -365,6 +402,20 @@ export function createMiningResolver(
       };
     },
     persist: async (transaction, outcome) => {
+      if (
+        outcome.cutterInstanceId &&
+        outcome.remainingCutterCharge !== outcome.cutterChargeBefore
+      ) {
+        await transaction
+          .update(itemInstances)
+          .set({ currentCharge: outcome.remainingCutterCharge, updatedAt: new Date() })
+          .where(
+            and(
+              eq(itemInstances.id, outcome.cutterInstanceId),
+              eq(itemInstances.characterId, outcome.characterId),
+            ),
+          );
+      }
       if (outcome.awardedXp > 0)
         await grantCharacterSkillXp(transaction, {
           characterId: outcome.characterId,
@@ -538,6 +589,14 @@ export async function stateFromTransaction(
           ).toISOString(),
         }
       : undefined;
+  const cutterCharge = snapshot.cutterCharge;
+  const nextAttemptBoosted = cutterCharge > 0;
+  const nextAttemptDurationTicks = nextAttemptBoosted
+    ? boostedMiningAttemptDurationTicks(balance)
+    : balance.mining.attemptDurationTicks;
+  const carriedPowerCellQuantity = stacks
+    .filter((stack) => stack.itemId === ITEM_IDS.powerCell)
+    .reduce((total, stack) => total + stack.quantity, 0);
   return {
     characterId,
     location: { currentLocationId },
@@ -553,9 +612,10 @@ export async function stateFromTransaction(
             resolvedThroughAt: action.resolvedThroughAt.toISOString(),
             progressStartedAt: action.resolvedThroughAt.toISOString(),
             nextAttemptAt: new Date(
-              action.resolvedThroughAt.getTime() +
-                ticksToMilliseconds(balance.mining.attemptDurationTicks),
+              action.resolvedThroughAt.getTime() + ticksToMilliseconds(nextAttemptDurationTicks),
             ).toISOString(),
+            nextAttemptBoosted,
+            nextAttemptDurationTicks,
           }
         : undefined,
     mining: {
@@ -589,6 +649,14 @@ export async function stateFromTransaction(
     },
     equipment: {
       aggregateContainerSlots: snapshot.equipmentLoadout.containerSlotCapacity,
+      carriedPowerCellQuantity,
+      salvageCutter: snapshot.equippedCutterInstanceId
+        ? {
+            currentCharge: cutterCharge,
+            maximumCharge: balance.items.salvageCutter.maximumCharge,
+            boostedAttemptDurationTicks: boostedMiningAttemptDurationTicks(balance),
+          }
+        : undefined,
       slots: [
         {
           target: {
@@ -827,6 +895,163 @@ export async function stopMining(
         context.character,
         now,
       );
+    },
+    now,
+  );
+}
+
+export type LoadPowerCellStatus =
+  | { status: "loaded"; remainingCharge: number }
+  | { status: "already_loaded"; remainingCharge: number; message: string }
+  | { status: "no_cutter" | "no_cell"; message: string };
+
+export type LoadPowerCellResult = {
+  state: MiningGameplayState;
+  load: LoadPowerCellStatus;
+};
+
+/**
+ * Load exactly one loose Power Cell into the equipped Cutter. The shared
+ * character lock first resolves any due active action work, then this command
+ * changes the Cutter and inventory in the same transaction. Loading is allowed
+ * while idle, Mining, or another action is in progress; only due Mining work is
+ * resolved by the supplied play resolver.
+ */
+export async function loadSalvageCutterPowerCell(
+  userId: string,
+  characterId: string,
+  now = new Date(),
+  random = defaultMiningRandom(),
+): Promise<LoadPowerCellResult> {
+  let outcome: PersistedMiningOutcome | undefined;
+  return withResolvedOwnedCharacter(
+    userId,
+    characterId,
+    createPlayResolver(random, (value) => {
+      outcome = value;
+    }),
+    async (transaction, context) => {
+      await ensureStarterMiningState(transaction, context.character.id);
+      const balance = getEffectiveGameBalance();
+      const [instances, assignments, stacks] = await Promise.all([
+        transaction
+          .select()
+          .from(itemInstances)
+          .where(eq(itemInstances.characterId, context.character.id))
+          .for("update"),
+        transaction
+          .select()
+          .from(equippedItems)
+          .where(eq(equippedItems.characterId, context.character.id))
+          .for("update"),
+        transaction
+          .select()
+          .from(inventoryStacks)
+          .where(eq(inventoryStacks.characterId, context.character.id))
+          .orderBy(asc(inventoryStacks.createdAt), asc(inventoryStacks.id))
+          .for("update"),
+      ]);
+      const cutterAssignment = assignments.find(
+        (assignment) =>
+          assignment.assignmentKind === "gear" &&
+          assignment.suitSlotId === balance.items.salvageCutter.suitSlotId,
+      );
+      const cutter = cutterAssignment
+        ? instances.find(
+            (instance) =>
+              instance.id === cutterAssignment.itemInstanceId &&
+              instance.itemId === balance.items.salvageCutter.itemId &&
+              isCompatibleEquipmentAssignment(instance.itemId, cutterAssignment, balance),
+          )
+        : undefined;
+
+      if (!cutter) {
+        return {
+          state: await stateFromTransaction(
+            transaction,
+            context.character.id,
+            recentFrom(outcome),
+            outcome?.stopReason,
+            undefined,
+            undefined,
+            undefined,
+            now,
+          ),
+          load: {
+            status: "no_cutter",
+            message: "Equip a Salvage Cutter before loading a Power Cell.",
+          },
+        };
+      }
+
+      const currentCharge = normalizeCutterCharge(cutter.currentCharge, balance);
+      if (currentCharge > 0) {
+        return {
+          state: await stateFromTransaction(
+            transaction,
+            context.character.id,
+            recentFrom(outcome),
+            outcome?.stopReason,
+            undefined,
+            undefined,
+            undefined,
+            now,
+          ),
+          load: {
+            status: "already_loaded",
+            remainingCharge: currentCharge,
+            message: `Power Cell already loaded — ${currentCharge} boosted attempts remain.`,
+          },
+        };
+      }
+
+      const cellStack = stacks.find(
+        (stack) => stack.itemId === balance.items.powerCell.itemId && stack.quantity > 0,
+      );
+      if (!cellStack) {
+        return {
+          state: await stateFromTransaction(
+            transaction,
+            context.character.id,
+            recentFrom(outcome),
+            outcome?.stopReason,
+            undefined,
+            undefined,
+            undefined,
+            now,
+          ),
+          load: { status: "no_cell", message: "No loose Power Cells are carried." },
+        };
+      }
+
+      if (cellStack.quantity === 1) {
+        await transaction.delete(inventoryStacks).where(eq(inventoryStacks.id, cellStack.id));
+      } else {
+        await transaction
+          .update(inventoryStacks)
+          .set({ quantity: cellStack.quantity - 1, updatedAt: now })
+          .where(eq(inventoryStacks.id, cellStack.id));
+      }
+      await transaction
+        .update(itemInstances)
+        .set({ currentCharge: balance.items.salvageCutter.maximumCharge, updatedAt: now })
+        .where(
+          and(eq(itemInstances.id, cutter.id), eq(itemInstances.characterId, context.character.id)),
+        );
+
+      return {
+        state: await stateFromTransaction(
+          transaction,
+          context.character.id,
+          recentFrom(outcome),
+          outcome?.stopReason,
+          undefined,
+          undefined,
+          undefined,
+          now,
+        ),
+        load: { status: "loaded", remainingCharge: balance.items.salvageCutter.maximumCharge },
+      };
     },
     now,
   );

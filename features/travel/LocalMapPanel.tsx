@@ -235,7 +235,7 @@ function HexMapSvg({
 // ---------------------------------------------------------------------------
 
 export function LocalMapPanel() {
-  const { state, setState, acquireCommand, releaseCommand, busy, requestAutoRefresh } =
+  const { state, acceptState, acquireCommand, releaseCommand, busy, requestAutoRefresh } =
     useMiningPlay();
   const [selected, setSelected] = useState<string | undefined>();
   const [message, setMessage] = useState<string | undefined>();
@@ -263,14 +263,10 @@ export function LocalMapPanel() {
   useEffect(() => {
     if (!inTransit) return;
     const clock = window.setInterval(() => setNow(Date.now()), 250);
-    const arrivesAt = new Date(travel!.arrivesAt).getTime();
-    const delay = Math.max(120, arrivesAt - Date.now() + 150);
-    const refresh = window.setTimeout(() => requestAutoRefresh(), delay);
     return () => {
       window.clearInterval(clock);
-      window.clearTimeout(refresh);
     };
-  }, [inTransit, travel?.arrivesAt, requestAutoRefresh]);
+  }, [inTransit]);
 
   useEffect(() => {
     if (inTransit) return;
@@ -299,7 +295,7 @@ export function LocalMapPanel() {
             setMessage(travelErrorMessage(result.state.travelError));
             return;
           }
-          setState(result.state!);
+          acceptState(result.state!);
           setMessage(undefined);
           setSelected(undefined);
         } catch {

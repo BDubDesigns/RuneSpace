@@ -1,6 +1,6 @@
 import type { EffectiveGameBalance } from "@/game/config/balance";
 import { planStackAddition, type StackState } from "@/game/domain/inventory";
-import { resolvableAttemptCount } from "@/game/domain/timing";
+import { effectiveAttemptDurationTicks } from "@/game/domain/timing";
 
 export const MINING_STOP_REASONS = [
   "manually_stopped",
@@ -30,6 +30,8 @@ export function miningSuccessChanceBps(level: number, balance: EffectiveGameBala
 export type MiningSnapshot<Id = string> = {
   miningLevel: number;
   hasCompatibleTool: boolean;
+  /** Null is the established uncharged representation for legacy Cutter rows. */
+  cutterCharge?: number | null;
   existingStacks: readonly StackState<Id>[];
   slotsAvailable: number;
   massAvailableGrams: number;
@@ -42,6 +44,7 @@ export type MiningResolution<Id = string> = {
   stackUpdates: readonly { id: Id; quantity: number }[];
   createdStacks: readonly { itemId: string; quantity: number }[];
   attempts: readonly MiningResolvedAttempt[];
+  remainingCutterCharge: number;
   stopReason?: MiningStopReason;
 };
 
@@ -51,7 +54,33 @@ export type MiningResolvedAttempt = {
   thresholdBasisPoints: number;
   shaleAwarded: number;
   xpAwarded: number;
+  boosted: boolean;
+  durationTicks: number;
+  chargeConsumed: boolean;
+  remainingCharge: number;
 };
+
+export function boostedMiningAttemptDurationTicks(balance: EffectiveGameBalance): number {
+  return effectiveAttemptDurationTicks(
+    balance.mining.attemptDurationTicks,
+    balance.mining.powerCellBoost.speedMultiplier,
+  );
+}
+
+export function normalizeCutterCharge(
+  currentCharge: number | null | undefined,
+  balance: EffectiveGameBalance,
+): number {
+  const charge = currentCharge ?? 0;
+  if (
+    !Number.isInteger(charge) ||
+    charge < 0 ||
+    charge > balance.items.salvageCutter.maximumCharge
+  ) {
+    throw new RangeError("Salvage Cutter charge is outside the approved range");
+  }
+  return charge;
+}
 
 export function miningNearMissBasisPoints(
   rolledBasisPoints: number,
@@ -90,7 +119,13 @@ export function resolveCrashSiteMining<Id>(input: {
   random: MiningRandom;
 }): MiningResolution<Id> {
   const { balance, snapshot, random } = input;
-  const attempts = resolvableAttemptCount(input.elapsedTicks, balance.mining.attemptDurationTicks);
+  if (!Number.isInteger(input.elapsedTicks) || input.elapsedTicks < 0)
+    throw new RangeError("Elapsed ticks must be a non-negative integer");
+  const normalDurationTicks = balance.mining.attemptDurationTicks;
+  const boostedDurationTicks = boostedMiningAttemptDurationTicks(balance);
+  let remainingTicks = input.elapsedTicks;
+  let consumedTicks = 0;
+  let remainingCutterCharge = normalizeCutterCharge(snapshot.cutterCharge, balance);
   const initialStopReason = miningPreflightStopReason(snapshot, balance);
   if (initialStopReason)
     return {
@@ -101,6 +136,7 @@ export function resolveCrashSiteMining<Id>(input: {
       stackUpdates: [],
       createdStacks: [],
       attempts: [],
+      remainingCutterCharge,
       stopReason: initialStopReason,
     };
   let stacks = snapshot.existingStacks.map((stack) => ({ ...stack, persisted: true }));
@@ -110,7 +146,7 @@ export function resolveCrashSiteMining<Id>(input: {
   let failures = 0;
   const resolvedAttempts: MiningResolvedAttempt[] = [];
   const thresholdBasisPoints = miningSuccessChanceBps(snapshot.miningLevel, balance);
-  for (let index = 0; index < attempts; index += 1) {
+  while (true) {
     // A minimum successful yield must fit before chance is rolled.
     const currentSnapshot = {
       ...snapshot,
@@ -121,7 +157,7 @@ export function resolveCrashSiteMining<Id>(input: {
     const stopReason = miningPreflightStopReason(currentSnapshot, balance);
     if (stopReason) {
       return {
-        consumedTicks: index * balance.mining.attemptDurationTicks,
+        consumedTicks,
         successes,
         failures,
         awardedXp: successes * balance.mining.successXp,
@@ -132,18 +168,29 @@ export function resolveCrashSiteMining<Id>(input: {
           .filter((stack) => !stack.persisted)
           .map(({ itemId, quantity }) => ({ itemId, quantity })),
         attempts: resolvedAttempts,
+        remainingCutterCharge,
         stopReason,
       };
     }
+    const boosted = remainingCutterCharge > 0;
+    const durationTicks = boosted ? boostedDurationTicks : normalDurationTicks;
+    if (remainingTicks < durationTicks) break;
+    remainingTicks -= durationTicks;
+    consumedTicks += durationTicks;
     const rolledBasisPoints = random.nextBasisPoints();
     if (rolledBasisPoints >= thresholdBasisPoints) {
       failures += 1;
+      if (boosted) remainingCutterCharge -= 1;
       resolvedAttempts.push({
         success: false,
         rolledBasisPoints,
         thresholdBasisPoints,
         shaleAwarded: 0,
         xpAwarded: 0,
+        boosted,
+        durationTicks,
+        chargeConsumed: boosted,
+        remainingCharge: remainingCutterCharge,
       });
       continue;
     }
@@ -180,23 +227,28 @@ export function resolveCrashSiteMining<Id>(input: {
     for (const created of plan.createdStacks)
       stacks.push({
         // A symbol prevents temporary planning IDs from colliding with persisted text IDs.
-        id: Symbol(`mining-stack-${index}-${stacks.length}`) as unknown as Id,
+        id: Symbol(`mining-stack-${resolvedAttempts.length}-${stacks.length}`) as unknown as Id,
         ...created,
         persisted: false,
       });
     slotsAvailable -= plan.createdStacks.length;
     massAvailableGrams -= quantity * balance.items.ferriteShale.massGrams;
     successes += 1;
+    if (boosted) remainingCutterCharge -= 1;
     resolvedAttempts.push({
       success: true,
       rolledBasisPoints,
       thresholdBasisPoints,
       shaleAwarded: quantity,
       xpAwarded: balance.mining.successXp,
+      boosted,
+      durationTicks,
+      chargeConsumed: boosted,
+      remainingCharge: remainingCutterCharge,
     });
   }
   return {
-    consumedTicks: attempts * balance.mining.attemptDurationTicks,
+    consumedTicks,
     successes,
     failures,
     awardedXp: successes * balance.mining.successXp,
@@ -207,5 +259,6 @@ export function resolveCrashSiteMining<Id>(input: {
       .filter((stack) => !stack.persisted)
       .map(({ itemId, quantity }) => ({ itemId, quantity })),
     attempts: resolvedAttempts,
+    remainingCutterCharge,
   };
 }

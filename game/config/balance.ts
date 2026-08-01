@@ -12,6 +12,9 @@ const balanceSchema = z.object({
     actionId: z.literal(ACTION_IDS.crashSiteMining),
     skillId: z.literal(SKILL_IDS.mining),
     attemptDurationTicks: z.literal(10),
+    powerCellBoost: z.object({
+      speedMultiplier: z.literal(2),
+    }),
     successAtLevelOneBps: z.literal(3_500),
     guaranteedSuccessLevel: z.literal(30),
     successRangeBps: z.literal(6_500),
@@ -34,6 +37,7 @@ const balanceSchema = z.object({
       itemId: z.literal(ITEM_IDS.salvageCutter),
       massGrams: z.literal(5_000),
       suitSlotId: z.literal("mining_tool"),
+      maximumCharge: z.literal(10),
     }),
     powerCell: z.object({
       itemId: z.literal(ITEM_IDS.powerCell),
@@ -63,6 +67,7 @@ const defaults = balanceSchema.parse({
     actionId: ACTION_IDS.crashSiteMining,
     skillId: SKILL_IDS.mining,
     attemptDurationTicks: 10,
+    powerCellBoost: { speedMultiplier: 2 },
     successAtLevelOneBps: 3_500,
     guaranteedSuccessLevel: 30,
     successRangeBps: 6_500,
@@ -76,7 +81,12 @@ const defaults = balanceSchema.parse({
   },
   items: {
     ferriteShale: { itemId: ITEM_IDS.ferriteShale, massGrams: 100, stackLimit: 10 },
-    salvageCutter: { itemId: ITEM_IDS.salvageCutter, massGrams: 5_000, suitSlotId: "mining_tool" },
+    salvageCutter: {
+      itemId: ITEM_IDS.salvageCutter,
+      massGrams: 5_000,
+      suitSlotId: "mining_tool",
+      maximumCharge: 10,
+    },
     powerCell: { itemId: ITEM_IDS.powerCell, massGrams: 500, stackLimit: 5 },
     starterContainer: {
       itemId: ITEM_IDS.mykeaSchleppraum8,

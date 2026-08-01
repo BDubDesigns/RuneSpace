@@ -11,6 +11,10 @@ describe("latest Mining attempt presentation", () => {
       thresholdBasisPoints: 3500,
       shaleAwarded: 1,
       xpAwarded: 15,
+      boosted: false,
+      durationTicks: 10,
+      chargeConsumed: false,
+      remainingCharge: 0,
     },
     {
       sequence: 5,
@@ -20,6 +24,10 @@ describe("latest Mining attempt presentation", () => {
       thresholdBasisPoints: 3500,
       shaleAwarded: 0,
       xpAwarded: 0,
+      boosted: false,
+      durationTicks: 10,
+      chargeConsumed: false,
+      remainingCharge: 0,
     },
   ];
 

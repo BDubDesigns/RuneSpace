@@ -46,6 +46,11 @@ export const ClaimPowerCellsRequestSchema = z.object({
   characterId: z.string().uuid(),
 });
 
+/** Loading supplies only the owned character identity; all item state is server-resolved. */
+export const LoadPowerCellRequestSchema = z.object({
+  characterId: z.string().uuid(),
+});
+
 /** Containers can only hold non-container item definitions. */
 export const ContainerContentItemSchema = z.object({
   itemId: ItemIdSchema,

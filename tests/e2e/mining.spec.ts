@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { db } from "@/db";
 import {
   activeActions,
@@ -10,7 +10,7 @@ import {
   inventoryStacks,
   itemInstances,
 } from "@/db/rune-space";
-import { ITEM_IDS, LOCATION_IDS } from "@/game/config/foundations";
+import { ACTION_IDS, ITEM_IDS, LOCATION_IDS } from "@/game/config/foundations";
 import { miningStorageStatePath } from "./mining.setup";
 
 const e2eDatabaseHost = process.env.DATABASE_URL ? new URL(process.env.DATABASE_URL).hostname : "";
@@ -291,6 +291,103 @@ test("owned character can start, observe, stop, and restore Crash Site Mining", 
   await expect(latestResult).toHaveAttribute("data-feedback-state", "calm");
 });
 
+test("automatically resolves Mining and starts the next authoritative timer", async ({ page }) => {
+  const characterId = page.url().split("/").at(-1)!;
+  await page.goto("/characters");
+  const boundaryStart = new Date(Date.now() - 4_500);
+  await db.insert(activeActions).values({
+    characterId,
+    actionId: ACTION_IDS.crashSiteMining,
+    startedAt: boundaryStart,
+    resolvedThroughAt: boundaryStart,
+  });
+  await page.getByRole("link", { name: "Play" }).click();
+  await page.waitForURL(/\/play\/[^/]+$/);
+
+  await expect(page.getByText("1 successful", { exact: true })).toBeVisible({ timeout: 10_000 });
+  await expect(page.getByText("NORMAL TIMING · Next attempt: 10 ticks")).toBeVisible();
+  const persisted = await db
+    .select()
+    .from(characterMiningState)
+    .where(eq(characterMiningState.characterId, characterId));
+  expect(persisted[0]?.runAttempts).toBe(1);
+});
+
+test("automatically resolves a boosted Mining attempt and decrements charge once", async ({
+  page,
+}) => {
+  const characterId = page.url().split("/").at(-1)!;
+  await page.goto("/characters");
+  const cutter = (
+    await db
+      .select()
+      .from(itemInstances)
+      .where(
+        and(
+          eq(itemInstances.characterId, characterId),
+          eq(itemInstances.itemId, ITEM_IDS.salvageCutter),
+        ),
+      )
+  )[0]!;
+  await db.update(itemInstances).set({ currentCharge: 1 }).where(eq(itemInstances.id, cutter.id));
+  const boundaryStart = new Date(Date.now() - 2_400);
+  await db.insert(activeActions).values({
+    characterId,
+    actionId: ACTION_IDS.crashSiteMining,
+    startedAt: boundaryStart,
+    resolvedThroughAt: boundaryStart,
+  });
+  await page.getByRole("link", { name: "Play" }).click();
+  await page.waitForURL(/\/play\/[^/]+$/);
+
+  await expect(page.getByText("POWER CELL BOOST · 1 / 10")).toBeVisible();
+  await expect(page.getByRole("region", { name: "Latest mining attempt" })).toContainText(
+    "Power Cell charge consumed",
+  );
+  await expect(page.getByText("NORMAL TIMING · Next attempt: 10 ticks")).toBeVisible({
+    timeout: 10_000,
+  });
+  const [persistedHistory, persistedCutter] = await Promise.all([
+    db.select().from(characterMiningState).where(eq(characterMiningState.characterId, characterId)),
+    db.select().from(itemInstances).where(eq(itemInstances.id, cutter.id)),
+  ]);
+  expect(persistedHistory[0]?.runAttempts).toBe(1);
+  expect(persistedCutter[0]?.currentCharge).toBe(0);
+});
+
+test("retries an early unchanged Mining boundary without duplicating the attempt", async ({
+  page,
+}) => {
+  const characterId = page.url().split("/").at(-1)!;
+  const refreshRequests: string[] = [];
+  page.on("request", (request) => {
+    if (request.method() === "POST" && request.headers()["next-action"])
+      refreshRequests.push(request.headers()["next-action"]!);
+  });
+  await page.addInitScript(() => {
+    const realNow = Date.now;
+    Date.now = () => realNow() + 2_000;
+  });
+  await page.goto("/characters");
+  const boundaryStart = new Date(Date.now() - 4_500);
+  await db.insert(activeActions).values({
+    characterId,
+    actionId: ACTION_IDS.crashSiteMining,
+    startedAt: boundaryStart,
+    resolvedThroughAt: boundaryStart,
+  });
+  await page.getByRole("link", { name: "Play" }).click();
+  await page.waitForURL(/\/play\/[^/]+$/);
+
+  await expect(page.getByText("1 successful", { exact: true })).toBeVisible({ timeout: 10_000 });
+  expect(refreshRequests.length).toBeGreaterThanOrEqual(2);
+  const persisted = await db
+    .select()
+    .from(characterMiningState)
+    .where(eq(characterMiningState.characterId, characterId));
+  expect(persisted[0]?.runAttempts).toBe(1);
+});
+
 test("footer Characters navigation uses a compact visible label", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   const characters = page.getByRole("navigation", { name: "Primary" }).getByRole("link", {
@@ -507,6 +604,135 @@ test("equipment drawer shows and updates the approved Mining loadout", async ({ 
   await page.setViewportSize({ width: 1440, height: 900 });
   await expect(equipment).toBeVisible();
   await page.screenshot({ path: "test-results/mining-desktop-equipment.png" });
+});
+
+test("Power Cell loading boosts Mining attempts and falls back after depletion", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  const characterId = page.url().split("/").at(-1)!;
+  await db.insert(inventoryStacks).values({
+    characterId,
+    itemId: ITEM_IDS.powerCell,
+    quantity: 2,
+  });
+  await page.getByRole("button", { name: "Refresh status" }).click();
+
+  await page.getByRole("button", { name: "Equipment" }).click();
+  const equipment = page.getByRole("dialog", { name: "Equipment" });
+  await expect(equipment.getByText("Depleted · 0 / 10", { exact: true })).toBeVisible();
+  await expect(equipment.getByText("Carried Power Cells: 2", { exact: true })).toBeVisible();
+  await expect(equipment.getByRole("button", { name: "Load Power Cell" })).toBeVisible();
+  await equipment.getByRole("button", { name: "Load Power Cell" }).click();
+  await expect(equipment.getByText("Loaded · 10 / 10", { exact: true })).toBeVisible();
+  await expect(equipment.getByText("Carried Power Cells: 1", { exact: true })).toBeVisible();
+  const loadSuccess = equipment.getByText("Power Cell loaded · 10 boosted attempts ready.", {
+    exact: true,
+  });
+  await expect(loadSuccess).toBeVisible();
+  // Success feedback must not be presented as an error (alert role is reserved
+  // for genuine errors/refusals).
+  await expect(equipment.getByRole("alert")).toHaveCount(0);
+  await expect(loadSuccess).not.toHaveAttribute("role", "alert");
+  await equipment.getByRole("button", { name: "Close equipment" }).click();
+
+  await page.getByRole("button", { name: "Start Mining" }).click();
+  const firstBoostedBatch = new Date(Date.now() - 6_100);
+  await db
+    .update(activeActions)
+    .set({ startedAt: firstBoostedBatch, resolvedThroughAt: firstBoostedBatch })
+    .where(eq(activeActions.characterId, characterId));
+  await page.getByRole("button", { name: "Refresh status" }).click();
+  await expect(page.getByText(/POWER CELL BOOST · [89] \/ 10/)).toBeVisible();
+  await expect(page.getByRole("region", { name: "Latest mining attempt" })).toContainText(
+    "Power Cell charge consumed",
+  );
+  await expect(page.getByLabel("Mining attempt history", { exact: true })).toContainText(
+    "Boosted · 5 ticks",
+  );
+
+  // Stop/start preserves the Cutter instance charge while avoiding the client
+  // refresh timer racing the deterministic depletion boundary below.
+  await page.getByRole("button", { name: "Stop Mining" }).click();
+  await page.getByRole("button", { name: "Start Mining" }).click();
+  const cutterRow = (
+    await db
+      .select()
+      .from(itemInstances)
+      .where(
+        and(
+          eq(itemInstances.characterId, characterId),
+          eq(itemInstances.itemId, ITEM_IDS.salvageCutter),
+        ),
+      )
+  )[0]!;
+  await db
+    .update(itemInstances)
+    .set({ currentCharge: 1 })
+    .where(eq(itemInstances.id, cutterRow.id));
+  const depletionBatch = new Date(Date.now() - 3_100);
+  await db
+    .update(activeActions)
+    .set({ startedAt: depletionBatch, resolvedThroughAt: depletionBatch })
+    .where(eq(activeActions.characterId, characterId));
+  await page.getByRole("button", { name: "Refresh status" }).click();
+  await expect(
+    page.getByText("Power Cell depleted · Mining continues at normal speed", { exact: true }),
+  ).toBeVisible();
+  await expect(page.getByText("NORMAL TIMING · Next attempt: 10 ticks")).toBeVisible();
+
+  const normalBatch = new Date(Date.now() - 6_100);
+  await db
+    .update(activeActions)
+    .set({ startedAt: normalBatch, resolvedThroughAt: normalBatch })
+    .where(eq(activeActions.characterId, characterId));
+  await page.getByRole("button", { name: "Refresh status" }).click();
+  await expect(page.getByText(/Normal attempt · 10 ticks/).last()).toBeVisible();
+});
+
+test("an interrupted equipment command is presented as an error after a muted success", async ({
+  page,
+}) => {
+  const isMiningAction = (request: import("@playwright/test").Request) =>
+    request.method() === "POST" && Boolean(request.headers()["next-action"]);
+  await page.setViewportSize({ width: 390, height: 844 });
+  const characterId = page.url().split("/").at(-1)!;
+  await db.insert(inventoryStacks).values({
+    characterId,
+    itemId: ITEM_IDS.powerCell,
+    quantity: 2,
+  });
+  await page.getByRole("button", { name: "Refresh status" }).click();
+
+  await page.getByRole("button", { name: "Equipment" }).click();
+  const equipment = page.getByRole("dialog", { name: "Equipment" });
+  await equipment.getByRole("button", { name: "Load Power Cell" }).click();
+  await expect(equipment.getByText("Power Cell loaded · 10 boosted attempts ready.")).toBeVisible();
+  // The successful load is muted, never an alert.
+  await expect(equipment.getByRole("alert")).toHaveCount(0);
+
+  // A later transport interruption for an equipment command must still be an
+  // alert even though the previous message was a muted success.
+  await db.insert(itemInstances).values({
+    characterId,
+    itemId: ITEM_IDS.mykeaSchleppraum8,
+  });
+  await equipment.getByRole("button", { name: "Close equipment" }).click();
+  await page.getByRole("button", { name: "Refresh status" }).click();
+  await page.route("**/*", async (route) => {
+    const request = route.request();
+    if (isMiningAction(request)) {
+      await route.abort("failed");
+      return;
+    }
+    await route.continue();
+  });
+  await page.getByRole("button", { name: "Equipment" }).click();
+  const secondContainer = equipment.getByLabel("Container attachment 2");
+  await secondContainer.getByRole("button", { name: "Equip in Container attachment 2" }).click();
+  const interruption = equipment.getByRole("alert");
+  await expect(interruption).toContainText("Comms interruption. Equipment could not be confirmed.");
+  await page.unroute("**/*");
 });
 
 test("equipment and inventory rendering shows artwork for illustrated items and fallback for the rest", async ({
