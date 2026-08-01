@@ -69,16 +69,36 @@ export function PowerAnnexClaimPanel() {
         The damaged depot dispenses one registered worker allotment per RuneSpace reset day.
         Eligibility belongs to this character and requires being stationary at the Annex.
       </p>
-      <div className="mt-4 grid min-w-0 grid-cols-[7rem_minmax(0,1fr)] gap-3">
-        <ItemVisual
-          accessibleLabel={itemAccessibleLabel}
-          badge={`x${availableQuantity}`}
-          itemId={ITEM_IDS.powerCell}
-          mutedArtwork={claimed}
-          name="Power Cell"
-          quantity={availableQuantity}
-        />
-        <div className="min-w-0 self-center text-sm text-[color:var(--rs-text-secondary)]">
+      <div
+        className="mt-4 grid min-w-0 grid-cols-[7rem_minmax(0,1fr)] items-center gap-3"
+        data-power-annex-reward-grid
+      >
+        <div className="flex min-w-0 flex-col items-center" data-power-annex-reward-left>
+          <ItemVisual
+            accessibleLabel={itemAccessibleLabel}
+            badge={`x${availableQuantity}`}
+            className="w-full"
+            itemId={ITEM_IDS.powerCell}
+            mutedArtwork={claimed}
+            name="Power Cell"
+            quantity={availableQuantity}
+          />
+          {!claimed ? (
+            <ActionButton
+              className="mt-3 w-full max-w-full px-2 text-xs leading-tight"
+              disabled={busy}
+              intent="primary"
+              loading={busy}
+              onClick={claim}
+            >
+              Claim Power Cells
+            </ActionButton>
+          ) : null}
+        </div>
+        <div
+          className="min-w-0 self-center text-sm text-[color:var(--rs-text-secondary)]"
+          data-power-annex-reward-info
+        >
           <p className="font-display text-base font-bold text-[color:var(--rs-text-primary)]">
             {availableQuantity} Power Cells currently available
           </p>
@@ -92,6 +112,11 @@ export function PowerAnnexClaimPanel() {
             Reset date: {resetDate}. Next eligibility begins at midnight Pacific (
             {POWER_ANNEX_RESET_TIME_ZONE}).
           </p>
+          {claimed ? (
+            <p className="mt-1 font-display text-xs uppercase tracking-wide text-[color:var(--rs-accent-primary)]">
+              Today&apos;s allotment claimed · next reset at midnight Pacific
+            </p>
+          ) : null}
         </div>
       </div>
       {message ? (
@@ -99,17 +124,6 @@ export function PowerAnnexClaimPanel() {
           <Feedback tone={messageTone}>{message}</Feedback>
         </div>
       ) : null}
-      <div className="mt-4">
-        {claimed ? (
-          <p className="font-display text-sm uppercase tracking-wide text-[color:var(--rs-accent-primary)]">
-            Today&apos;s allotment claimed · next reset at midnight Pacific
-          </p>
-        ) : (
-          <ActionButton disabled={busy} intent="primary" loading={busy} onClick={claim}>
-            Claim Power Cells
-          </ActionButton>
-        )}
-      </div>
     </Panel>
   );
 }

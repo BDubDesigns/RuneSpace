@@ -48,13 +48,13 @@ type HexButtonProps = {
   locationId: string;
   name: string;
   accessibleName: string;
+  statusLabel: string;
   description: string;
   selected: boolean;
   current: boolean;
   transitRole?: "origin" | "destination";
   disabled: boolean;
   onSelect: () => void;
-  children: React.ReactNode;
   style: CSSProperties;
 };
 
@@ -62,13 +62,13 @@ function HexButton({
   locationId,
   name,
   accessibleName,
+  statusLabel,
   description,
   selected,
   current,
   transitRole,
   disabled,
   onSelect,
-  children,
   style,
 }: HexButtonProps) {
   const youAreHere = current;
@@ -97,6 +97,7 @@ function HexButton({
       aria-current={youAreHere ? "true" : undefined}
       aria-label={accessibleLabel}
       aria-describedby={`loc-desc-${locationId}`}
+      data-map-location={locationId}
       disabled={disabled}
       onClick={onSelect}
       style={style}
@@ -114,7 +115,13 @@ function HexButton({
       <span id={`loc-desc-${locationId}`} className="sr-only">
         {description}
       </span>
-      {children}
+      <span
+        aria-hidden="true"
+        className="relative z-10 max-w-[76%] truncate border border-[color:var(--rs-item-plate-border)] bg-[color:var(--rs-item-plate-surface)] px-1 py-0.5 font-display text-[8px] uppercase leading-none tracking-[0.08em] text-[color:var(--rs-text-secondary)] sm:text-[9px]"
+        data-map-status
+      >
+        {statusLabel}
+      </span>
     </button>
   );
 }
@@ -183,6 +190,7 @@ function HexMapSvg({
         return (
           <g key={layout.locationId}>
             <polygon
+              data-map-hex={layout.locationId}
               points={hexPoints(layout.center.x, layout.center.y, hexWidth)}
               className={hexFill(current, selected)}
               strokeWidth="3"
@@ -339,8 +347,8 @@ export function LocalMapPanel() {
   function tileStatusLabel(locationId: string): string {
     const loc = getLocation(locationId);
     if (!loc) return "";
-    if (locationId === LOCATION_IDS.emergencyPowerAnnex) return "Power Cells daily";
-    return loc.availableActionIds.length > 0 ? "Mining available" : "Processing offline";
+    if (locationId === LOCATION_IDS.emergencyPowerAnnex) return "Daily cells";
+    return loc.availableActionIds.length > 0 ? "Mining" : "Offline";
   }
 
   // Button positions: each button is positioned to overlay its hex in the SVG.
@@ -392,6 +400,7 @@ export function LocalMapPanel() {
               locationId={location.id}
               name={location.presentation.localMap.label}
               accessibleName={location.displayName}
+              statusLabel={tileStatusLabel(location.id)}
               description={location.description}
               selected={selected === location.id}
               current={isCurrent}
@@ -405,17 +414,7 @@ export function LocalMapPanel() {
               disabled={inTransit}
               onSelect={() => !inTransit && setSelected(location.id)}
               style={hexButtonStyle(location.id)}
-            >
-              <span
-                className={`mt-0.5 font-display text-[10px] uppercase tracking-wide ${
-                  isCurrent
-                    ? "text-[color:var(--rs-accent-primary)]"
-                    : "text-[color:var(--rs-text-secondary)]"
-                }`}
-              >
-                {tileStatusLabel(location.id)}
-              </span>
-            </HexButton>
+            />
           );
         })}
       </div>

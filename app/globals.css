@@ -64,13 +64,14 @@
   --rs-duration-standard: 180ms;
   --rs-control-height: 2.75rem;
   --rs-touch-target: 2.75rem;
-  /* The shell reserves exactly the fixed BottomNav border, padding, and
-     minimum control height. Keep this calculation beside the shared tokens so
-     footer clearance cannot drift from the footer's actual box. */
-  --rs-bottom-nav-clearance: calc(
+  /* Keep the fixed BottomNav box height distinct from the page clearance. The
+     latter adds visual breathing room above the footer without changing the
+     footer's position, controls, or safe-area treatment. */
+  --rs-bottom-nav-box-height: calc(
     1px + var(--rs-touch-target) + var(--rs-space-2) +
       max(var(--rs-space-2), env(safe-area-inset-bottom))
   );
+  --rs-bottom-nav-clearance: calc(var(--rs-bottom-nav-box-height) + var(--rs-space-3));
 }
 
 html {
