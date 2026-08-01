@@ -33,7 +33,7 @@ export function EquipmentPanel({
   onClose: () => void;
   triggerRef: RefObject<HTMLButtonElement | null>;
 }) {
-  const { acquireCommand, busy, releaseCommand, setState } = useMiningPlay();
+  const { acquireCommand, acceptState, busy, releaseCommand } = useMiningPlay();
   const [, startTransition] = useTransition();
   const [message, setMessage] = useState<string>();
   const miningToolSlotId = getEffectiveGameBalance().items.salvageCutter.suitSlotId;
@@ -44,7 +44,7 @@ export function EquipmentPanel({
       return;
     }
     if (result.state) {
-      setState(result.state);
+      acceptState(result.state);
       setMessage(undefined);
     }
   }
@@ -71,7 +71,7 @@ export function EquipmentPanel({
           setMessage(result.error);
           return;
         }
-        setState(result.state);
+        acceptState(result.state);
         setMessage(
           result.load.status === "loaded"
             ? `Power Cell loaded · ${result.load.remainingCharge} boosted attempts ready.`

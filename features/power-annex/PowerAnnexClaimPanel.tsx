@@ -12,7 +12,7 @@ import { claimPowerCellsAction } from "@/server/actions";
 import { useMiningPlay } from "@/features/mining/MiningPlayContext";
 
 export function PowerAnnexClaimPanel() {
-  const { acquireCommand, busy, releaseCommand, requestAutoRefresh, setState, state } =
+  const { acquireCommand, acceptState, busy, releaseCommand, requestAutoRefresh, state } =
     useMiningPlay();
   const [, startTransition] = useTransition();
   const [message, setMessage] = useState<string>();
@@ -36,7 +36,7 @@ export function PowerAnnexClaimPanel() {
           setMessage(result.error);
           setMessageTone("danger");
         } else {
-          setState(result.state);
+          acceptState(result.state);
           if (result.claim.status === "error") {
             setMessage(result.claim.message);
             setMessageTone("danger");

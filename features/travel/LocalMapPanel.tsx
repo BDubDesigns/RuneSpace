@@ -235,7 +235,7 @@ function HexMapSvg({
 // ---------------------------------------------------------------------------
 
 export function LocalMapPanel() {
-  const { state, setState, acquireCommand, releaseCommand, busy, requestAutoRefresh } =
+  const { state, acceptState, acquireCommand, releaseCommand, busy, requestAutoRefresh } =
     useMiningPlay();
   const [selected, setSelected] = useState<string | undefined>();
   const [message, setMessage] = useState<string | undefined>();
@@ -295,7 +295,7 @@ export function LocalMapPanel() {
             setMessage(travelErrorMessage(result.state.travelError));
             return;
           }
-          setState(result.state!);
+          acceptState(result.state!);
           setMessage(undefined);
           setSelected(undefined);
         } catch {

@@ -228,7 +228,7 @@ export function MiningConsole({ characterName }: { characterName: string }) {
     setEquipmentOpen,
     setInventoryOpen,
     setRefreshCallback,
-    setState,
+    acceptState,
     state,
   } = useMiningPlay();
   const [message, setMessage] = useState<string | undefined>(
@@ -266,7 +266,7 @@ export function MiningConsole({ characterName }: { characterName: string }) {
       return;
     }
     if (result.state) {
-      setState(result.state);
+      acceptState(result.state);
       if (result.state.commandError) setMessage(commandErrorMessage(result.state.commandError));
       else if (result.state.stoppingReason) setMessage(stopMessage(result.state.stoppingReason));
       else setMessage(undefined);

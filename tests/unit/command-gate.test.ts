@@ -71,4 +71,16 @@ describe("command gate", () => {
     expect(manualGate.pending).toBe(true);
     expect(release(manualGate)).toBe(true);
   });
+
+  it("does not release a scheduler refresh after a delayed command changes the boundary", () => {
+    const gate = model();
+    expect(tryAcquire(gate)).toBe(true);
+    expect(requestRefresh(gate, 7)).toBe(false);
+
+    // The authoritative response can be accepted before React runs the
+    // boundary effect cleanup. Invalidation must happen before release().
+    cancelRefresh(gate, 7);
+    expect(release(gate)).toBe(false);
+    expect(gate.pending).toBe(false);
+  });
 });
