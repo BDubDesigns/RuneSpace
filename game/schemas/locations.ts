@@ -29,6 +29,12 @@ export const LocationDefinitionSchema = z
     presentation: z.object({
       mapIconKey: z.enum(["crash_site_deposit", "processing_yard", "power_annex"]),
       layout: z.enum(["crash_site", "processing_yard", "power_annex"]),
+      localMap: z
+        .object({
+          axial: z.object({ q: z.number().int(), r: z.number().int() }).strict(),
+          label: z.string().min(1),
+        })
+        .strict(),
     }),
   })
   .strict();

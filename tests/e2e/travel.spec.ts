@@ -14,7 +14,8 @@ import {
   inventoryStacks,
   itemInstances,
 } from "@/db/rune-space";
-import { LOCATION_IDS } from "@/game/config/foundations";
+import { ITEM_IDS, LOCATION_IDS } from "@/game/config/foundations";
+import { POWER_CELL_DAILY_ALLOTMENT } from "@/game/domain/power-annex";
 import { miningStorageStatePath } from "./mining.setup";
 
 const e2eDatabaseHost = process.env.DATABASE_URL ? new URL(process.env.DATABASE_URL).hostname : "";
@@ -98,6 +99,27 @@ async function expectRouteProgressStartsAt(
 async function setPowerAnnexClock(instant: string) {
   const clockPath = process.env.RUNESPACE_POWER_ANNEX_CLOCK_FILE;
   if (clockPath) await writeFile(clockPath, instant, "utf8");
+}
+
+async function arriveAtPowerAnnex(page: import("@playwright/test").Page, characterId: string) {
+  const annex = page.getByRole("button", { name: /DeWhat\? Emergency Power Annex/ }).first();
+  await expect(annex).toBeVisible();
+  await annex.click();
+  await expect(
+    page.getByRole("button", { name: /Walk to DeWhat\? Emergency Power Annex/ }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: /Walk to DeWhat\? Emergency Power Annex/ }).click();
+  await expect(page.getByText("Journey progress")).toBeVisible();
+
+  const arrivedPast = new Date(Date.now() - 25_000);
+  await db
+    .update(activeActions)
+    .set({ startedAt: arrivedPast, resolvedThroughAt: arrivedPast })
+    .where(eq(activeActions.characterId, characterId));
+  await page.reload();
+  await expect(
+    page.getByRole("button", { name: /DeWhat\? Emergency Power Annex/ }).first(),
+  ).toHaveAttribute("aria-current", "true");
 }
 
 test.beforeEach(async ({ page }) => {
@@ -343,34 +365,33 @@ test("travels to the Power Annex and claims independently by Pacific reset date"
   const characterId = await openTravelFixture(page);
   const controlledClock = Boolean(process.env.RUNESPACE_POWER_ANNEX_CLOCK_FILE);
   await page.setViewportSize({ width: 390, height: 844 });
-  const annex = page.getByRole("button", { name: /DeWhat\? Emergency Power Annex/ }).first();
-  await expect(annex).toBeVisible();
-  await annex.click();
-  await expect(
-    page.getByRole("button", { name: /Walk to DeWhat\? Emergency Power Annex/ }),
-  ).toBeVisible();
-  await page.getByRole("button", { name: /Walk to DeWhat\? Emergency Power Annex/ }).click();
-  await expect(page.getByText("Journey progress")).toBeVisible();
-
-  const arrivedPast = new Date(Date.now() - 25_000);
-  await db
-    .update(activeActions)
-    .set({ startedAt: arrivedPast, resolvedThroughAt: arrivedPast })
-    .where(eq(activeActions.characterId, characterId));
-  await page.reload();
-  await expect(
-    page.getByRole("button", { name: /DeWhat\? Emergency Power Annex/ }).first(),
-  ).toHaveAttribute("aria-current", "true");
+  await arriveAtPowerAnnex(page, characterId);
 
   await setPowerAnnexClock("2026-01-02T07:59:59.000Z");
   await page.reload();
   await expect(page.getByRole("button", { name: "Claim Power Cells" })).toBeVisible();
+  const availableTile = page.getByRole("article", { name: "5 Power Cells available to claim" });
+  await expect(availableTile.getByText("x5", { exact: true })).toBeVisible();
+  await expect(availableTile.locator("img")).not.toHaveClass(/grayscale/);
+  const availableTileBox = await availableTile.boundingBox();
+  expect(availableTileBox?.width ?? 0).toBeLessThan(200);
   await page.screenshot({ path: "test-results/power-annex-mobile-available.png" });
   await page.getByRole("button", { name: "Claim Power Cells" }).click();
   await expect(
     page.getByText(/Today's emergency allotment claimed: 5 Power Cells awarded/),
   ).toBeVisible();
   await expect(page.getByText(/Today's allotment claimed/)).toBeVisible();
+  const claimedTile = page.getByRole("article", {
+    name: /0 Power Cells currently available/,
+  });
+  await expect(claimedTile.getByText("x0", { exact: true })).toBeVisible();
+  await expect(claimedTile.locator("img")).toHaveClass(/grayscale/);
+  await expect(
+    page.getByText(
+      new RegExp(`Today's ${POWER_CELL_DAILY_ALLOTMENT}-cell allotment has already been claimed`),
+    ),
+  ).toBeVisible();
+  await page.screenshot({ path: "test-results/power-annex-mobile-claimed.png" });
 
   await page.getByRole("button", { name: /Inventory/ }).click();
   const claimedCell = page.getByLabel("5 Power Cell", { exact: true });
@@ -390,12 +411,46 @@ test("travels to the Power Annex and claims independently by Pacific reset date"
   await setPowerAnnexClock("2026-01-02T08:00:00.000Z");
   await page.reload();
   await expect(page.getByRole("button", { name: "Claim Power Cells" })).toBeVisible();
+  await expect(
+    page.getByRole("article", { name: "5 Power Cells available to claim" }).getByText("x5", {
+      exact: true,
+    }),
+  ).toBeVisible();
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.screenshot({ path: "test-results/power-annex-desktop-available.png" });
   await page.getByRole("button", { name: "Claim Power Cells" }).click();
   await expect(
     page.getByText(/Today's emergency allotment claimed: 5 Power Cells awarded/),
   ).toBeVisible();
+  const desktopClaimedTile = page.getByRole("article", {
+    name: /0 Power Cells currently available/,
+  });
+  await expect(desktopClaimedTile.getByText("x0", { exact: true })).toBeVisible();
+  await expect(desktopClaimedTile.locator("img")).toHaveClass(/grayscale/);
+  await page.screenshot({ path: "test-results/power-annex-desktop-claimed.png" });
   await page.getByRole("button", { name: /Inventory/ }).click();
   await expect(page.getByLabel("5 Power Cell", { exact: true })).toHaveCount(2);
+});
+
+test("a capacity refusal keeps the Power Annex allotment available", async ({ page }) => {
+  const characterId = await openTravelFixture(page);
+  await page.setViewportSize({ width: 390, height: 844 });
+  await arriveAtPowerAnnex(page, characterId);
+
+  await db.insert(inventoryStacks).values(
+    Array.from({ length: 8 }, (_, index) => ({
+      characterId,
+      itemId: ITEM_IDS.ferriteShale,
+      quantity: index + 1,
+    })),
+  );
+  await page.reload();
+
+  const availableTile = page.getByRole("article", { name: "5 Power Cells available to claim" });
+  await expect(availableTile.getByText("x5", { exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Claim Power Cells" })).toBeVisible();
+  await page.getByRole("button", { name: "Claim Power Cells" }).click();
+  await expect(page.getByText(/full five-cell allotment will not fit/)).toBeVisible();
+  await expect(availableTile.getByText("x5", { exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Claim Power Cells" })).toBeVisible();
 });

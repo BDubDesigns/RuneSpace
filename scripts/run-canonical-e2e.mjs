@@ -136,7 +136,9 @@ const TRAVEL_REQUIRED = [
   "travel-mobile-arrived.png",
   "travel-desktop-arrived.png",
   "power-annex-mobile-available.png",
+  "power-annex-mobile-claimed.png",
   "power-annex-desktop-available.png",
+  "power-annex-desktop-claimed.png",
 ];
 
 function verifyAndCopyScreenshots(required, destDir) {

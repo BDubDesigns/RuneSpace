@@ -22,6 +22,10 @@ export function PowerAnnexClaimPanel() {
 
   const claimed = state.powerAnnex?.claimed ?? false;
   const resetDate = state.powerAnnex?.resetDate ?? "today";
+  const availableQuantity = claimed ? 0 : POWER_CELL_DAILY_ALLOTMENT;
+  const itemAccessibleLabel = claimed
+    ? `0 Power Cells currently available; today's ${POWER_CELL_DAILY_ALLOTMENT}-cell allotment has been claimed`
+    : `${POWER_CELL_DAILY_ALLOTMENT} Power Cells available to claim`;
 
   function claim() {
     if (!acquireCommand()) return;
@@ -65,20 +69,27 @@ export function PowerAnnexClaimPanel() {
         The damaged depot dispenses one registered worker allotment per RuneSpace reset day.
         Eligibility belongs to this character and requires being stationary at the Annex.
       </p>
-      <div className="mt-4 grid gap-3 sm:grid-cols-[7rem_minmax(0,1fr)]">
+      <div className="mt-4 grid min-w-0 grid-cols-[7rem_minmax(0,1fr)] gap-3">
         <ItemVisual
-          accessibleLabel={`${POWER_CELL_DAILY_ALLOTMENT} Power Cells available in today's allotment`}
+          accessibleLabel={itemAccessibleLabel}
+          badge={`x${availableQuantity}`}
           itemId={ITEM_IDS.powerCell}
+          mutedArtwork={claimed}
           name="Power Cell"
-          quantity={POWER_CELL_DAILY_ALLOTMENT}
+          quantity={availableQuantity}
         />
-        <div className="self-center text-sm text-[color:var(--rs-text-secondary)]">
+        <div className="min-w-0 self-center text-sm text-[color:var(--rs-text-secondary)]">
           <p className="font-display text-base font-bold text-[color:var(--rs-text-primary)]">
-            {POWER_CELL_DAILY_ALLOTMENT} Power Cells
+            {availableQuantity} Power Cells currently available
           </p>
           <p className="mt-1">500 g each · stack limit 5 · 2,500 g total</p>
+          {claimed ? (
+            <p className="mt-1 text-xs text-[color:var(--rs-text-muted)]">
+              Today&apos;s {POWER_CELL_DAILY_ALLOTMENT}-cell allotment has already been claimed.
+            </p>
+          ) : null}
           <p className="mt-1 text-xs text-[color:var(--rs-text-muted)]">
-            Reset date: {resetDate}. New eligibility begins at midnight Pacific (
+            Reset date: {resetDate}. Next eligibility begins at midnight Pacific (
             {POWER_ANNEX_RESET_TIME_ZONE}).
           </p>
         </div>

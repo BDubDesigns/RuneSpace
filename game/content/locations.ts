@@ -29,6 +29,7 @@ const locationDefinitions = [
     presentation: {
       mapIconKey: "crash_site_deposit" as const,
       layout: "crash_site" as const,
+      localMap: { axial: { q: 0, r: 1 }, label: "Crash Site" },
     },
   },
   {
@@ -47,6 +48,7 @@ const locationDefinitions = [
     presentation: {
       mapIconKey: "processing_yard" as const,
       layout: "processing_yard" as const,
+      localMap: { axial: { q: 1, r: 0 }, label: "Processing Yard" },
     },
   },
   {
@@ -60,6 +62,7 @@ const locationDefinitions = [
     presentation: {
       mapIconKey: "power_annex" as const,
       layout: "power_annex" as const,
+      localMap: { axial: { q: 0, r: 0 }, label: "Power Annex" },
     },
   },
 ] as const satisfies readonly LocationDefinition[];
@@ -90,7 +93,7 @@ export function areLocationsAdjacent(originId: string, destinationId: string): b
 }
 
 /** The ordered three-location local map for the issue #47 slice. */
-export const LOCAL_MAP_LOCATION_IDS: readonly string[] = [
+export const LOCAL_MAP_LOCATION_IDS: readonly LocationDefinition["id"][] = [
   LOCATION_IDS.crashSite,
   LOCATION_IDS.abandonedProcessingYard,
   LOCATION_IDS.emergencyPowerAnnex,
