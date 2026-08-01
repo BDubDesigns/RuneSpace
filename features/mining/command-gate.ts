@@ -2,6 +2,7 @@
 export type GateModel = {
   locked: boolean;
   pending: boolean;
+  pendingToken?: number;
 };
 
 export function tryAcquire(model: GateModel): boolean {
@@ -19,6 +20,7 @@ export function release(model: GateModel): boolean {
   model.locked = false;
   if (model.pending) {
     model.pending = false;
+    model.pendingToken = undefined;
     return true;
   }
   return false;
@@ -31,10 +33,19 @@ export function release(model: GateModel): boolean {
  * when a command is in flight; the gate will schedule exactly one
  * refresh after that command settles.
  */
-export function requestRefresh(model: GateModel): boolean {
+export function requestRefresh(model: GateModel, token?: number): boolean {
   if (model.locked) {
     model.pending = true;
+    model.pendingToken = token;
     return false;
   }
   return true;
+}
+
+/** Cancel only a coalesced refresh belonging to the supplied scheduler cycle. */
+export function cancelRefresh(model: GateModel, token: number): void {
+  if (model.pending && model.pendingToken === token) {
+    model.pending = false;
+    model.pendingToken = undefined;
+  }
 }

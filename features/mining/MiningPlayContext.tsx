@@ -13,7 +13,7 @@ import {
   type SetStateAction,
 } from "react";
 import type { MiningGameplayState } from "@/server/mining";
-import { tryAcquire, release, requestRefresh, type GateModel } from "./command-gate";
+import { cancelRefresh, tryAcquire, release, requestRefresh, type GateModel } from "./command-gate";
 
 type MiningPlayContextValue = {
   inventoryOpen: boolean;
@@ -23,7 +23,7 @@ type MiningPlayContextValue = {
   busy: boolean;
   acquireCommand: () => boolean;
   releaseCommand: () => void;
-  requestAutoRefresh: () => void;
+  requestAutoRefresh: (schedulerToken?: number) => void;
   setRefreshCallback: (fn: () => void) => void;
   setInventoryOpen: Dispatch<SetStateAction<boolean>>;
   setEquipmentOpen: Dispatch<SetStateAction<boolean>>;
@@ -51,6 +51,7 @@ export function MiningPlayProvider({
   const equipmentTrigger = useRef<HTMLButtonElement>(null);
   const gateModel = useRef<GateModel>({ locked: false, pending: false });
   const refreshCallback = useRef<() => void>(undefined);
+  const boundaryGeneration = useRef(0);
 
   const acquireCommand = useCallback(() => {
     const ok = tryAcquire(gateModel.current);
@@ -60,13 +61,16 @@ export function MiningPlayProvider({
 
   const releaseCommand = useCallback(() => {
     setBusy(false);
+    const pendingToken = gateModel.current.pendingToken;
     if (release(gateModel.current)) {
+      if (pendingToken !== undefined && pendingToken !== boundaryGeneration.current) return;
       refreshCallback.current?.();
     }
   }, []);
 
-  const requestAutoRefresh = useCallback(() => {
-    if (requestRefresh(gateModel.current)) {
+  const requestAutoRefresh = useCallback((schedulerToken?: number) => {
+    if (schedulerToken !== undefined && schedulerToken !== boundaryGeneration.current) return;
+    if (requestRefresh(gateModel.current, schedulerToken)) {
       refreshCallback.current?.();
     }
   }, []);
@@ -91,11 +95,13 @@ export function MiningPlayProvider({
     const boundaryTime = new Date(boundaryAt).getTime();
     if (!Number.isFinite(boundaryTime)) return;
 
+    const schedulerToken = boundaryGeneration.current + 1;
+    boundaryGeneration.current = schedulerToken;
     let retryIndex = 0;
     let timer: number | undefined;
     const schedule = (delay: number) => {
       timer = window.setTimeout(() => {
-        requestAutoRefresh();
+        requestAutoRefresh(schedulerToken);
         const retryDelay = BOUNDARY_REFRESH_RETRY_DELAYS_MS[retryIndex];
         if (retryDelay !== undefined) {
           retryIndex += 1;
@@ -107,6 +113,8 @@ export function MiningPlayProvider({
     schedule(Math.max(100, boundaryTime - Date.now() + BOUNDARY_REFRESH_GRACE_MS));
     return () => {
       if (timer !== undefined) window.clearTimeout(timer);
+      cancelRefresh(gateModel.current, schedulerToken);
+      if (boundaryGeneration.current === schedulerToken) boundaryGeneration.current += 1;
     };
   }, [boundaryAt, boundaryKey, requestAutoRefresh]);
 
