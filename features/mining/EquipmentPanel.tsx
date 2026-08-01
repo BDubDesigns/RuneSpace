@@ -58,6 +58,7 @@ export function EquipmentPanel({
         apply(await action());
       } catch {
         setMessage("Comms interruption. Equipment could not be confirmed.");
+        setMessageTone("danger");
       } finally {
         releaseCommand();
       }
@@ -83,6 +84,7 @@ export function EquipmentPanel({
         setMessageTone(result.load.status === "loaded" ? "muted" : "danger");
       } catch {
         setMessage("Comms interruption. Power Cell load could not be confirmed.");
+        setMessageTone("danger");
       } finally {
         releaseCommand();
       }

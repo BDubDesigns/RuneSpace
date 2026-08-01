@@ -690,6 +690,51 @@ test("Power Cell loading boosts Mining attempts and falls back after depletion",
   await expect(page.getByText(/Normal attempt · 10 ticks/).last()).toBeVisible();
 });
 
+test("an interrupted equipment command is presented as an error after a muted success", async ({
+  page,
+}) => {
+  const isMiningAction = (request: import("@playwright/test").Request) =>
+    request.method() === "POST" && Boolean(request.headers()["next-action"]);
+  await page.setViewportSize({ width: 390, height: 844 });
+  const characterId = page.url().split("/").at(-1)!;
+  await db.insert(inventoryStacks).values({
+    characterId,
+    itemId: ITEM_IDS.powerCell,
+    quantity: 2,
+  });
+  await page.getByRole("button", { name: "Refresh status" }).click();
+
+  await page.getByRole("button", { name: "Equipment" }).click();
+  const equipment = page.getByRole("dialog", { name: "Equipment" });
+  await equipment.getByRole("button", { name: "Load Power Cell" }).click();
+  await expect(equipment.getByText("Power Cell loaded · 10 boosted attempts ready.")).toBeVisible();
+  // The successful load is muted, never an alert.
+  await expect(equipment.getByRole("alert")).toHaveCount(0);
+
+  // A later transport interruption for an equipment command must still be an
+  // alert even though the previous message was a muted success.
+  await db.insert(itemInstances).values({
+    characterId,
+    itemId: ITEM_IDS.mykeaSchleppraum8,
+  });
+  await equipment.getByRole("button", { name: "Close equipment" }).click();
+  await page.getByRole("button", { name: "Refresh status" }).click();
+  await page.route("**/*", async (route) => {
+    const request = route.request();
+    if (isMiningAction(request)) {
+      await route.abort("failed");
+      return;
+    }
+    await route.continue();
+  });
+  await page.getByRole("button", { name: "Equipment" }).click();
+  const secondContainer = equipment.getByLabel("Container attachment 2");
+  await secondContainer.getByRole("button", { name: "Equip in Container attachment 2" }).click();
+  const interruption = equipment.getByRole("alert");
+  await expect(interruption).toContainText("Comms interruption. Equipment could not be confirmed.");
+  await page.unroute("**/*");
+});
+
 test("equipment and inventory rendering shows artwork for illustrated items and fallback for the rest", async ({
   page,
 }) => {
