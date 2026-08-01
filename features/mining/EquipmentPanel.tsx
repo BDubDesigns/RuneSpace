@@ -36,11 +36,13 @@ export function EquipmentPanel({
   const { acquireCommand, acceptState, busy, releaseCommand } = useMiningPlay();
   const [, startTransition] = useTransition();
   const [message, setMessage] = useState<string>();
+  const [messageTone, setMessageTone] = useState<"muted" | "danger">("muted");
   const miningToolSlotId = getEffectiveGameBalance().items.salvageCutter.suitSlotId;
 
   function apply(result: Awaited<ReturnType<typeof equipEquipmentAction>>) {
     if (result.error) {
       setMessage(result.error);
+      setMessageTone("danger");
       return;
     }
     if (result.state) {
@@ -69,6 +71,7 @@ export function EquipmentPanel({
         const result = await loadPowerCellAction({ characterId: state.characterId });
         if ("error" in result) {
           setMessage(result.error);
+          setMessageTone("danger");
           return;
         }
         acceptState(result.state);
@@ -77,6 +80,7 @@ export function EquipmentPanel({
             ? `Power Cell loaded · ${result.load.remainingCharge} boosted attempts ready.`
             : result.load.message,
         );
+        setMessageTone(result.load.status === "loaded" ? "muted" : "danger");
       } catch {
         setMessage("Comms interruption. Power Cell load could not be confirmed.");
       } finally {
@@ -107,7 +111,7 @@ export function EquipmentPanel({
       </div>
       {message ? (
         <div className="mt-4">
-          <Feedback tone="danger">{message}</Feedback>
+          <Feedback tone={messageTone}>{message}</Feedback>
         </div>
       ) : null}
       <div className="mt-4 space-y-4">

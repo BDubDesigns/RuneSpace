@@ -626,7 +626,14 @@ test("Power Cell loading boosts Mining attempts and falls back after depletion",
   await equipment.getByRole("button", { name: "Load Power Cell" }).click();
   await expect(equipment.getByText("Loaded · 10 / 10", { exact: true })).toBeVisible();
   await expect(equipment.getByText("Carried Power Cells: 1", { exact: true })).toBeVisible();
-  await expect(equipment.getByText("Power Cell loaded · 10 boosted attempts ready.")).toBeVisible();
+  const loadSuccess = equipment.getByText("Power Cell loaded · 10 boosted attempts ready.", {
+    exact: true,
+  });
+  await expect(loadSuccess).toBeVisible();
+  // Success feedback must not be presented as an error (alert role is reserved
+  // for genuine errors/refusals).
+  await expect(equipment.getByRole("alert")).toHaveCount(0);
+  await expect(loadSuccess).not.toHaveAttribute("role", "alert");
   await equipment.getByRole("button", { name: "Close equipment" }).click();
 
   await page.getByRole("button", { name: "Start Mining" }).click();
