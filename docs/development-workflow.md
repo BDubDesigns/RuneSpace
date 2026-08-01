@@ -10,7 +10,7 @@ contract. This document provides the supporting procedure.
 - Work stops at a draft PR for human review. Do not merge unless the product owner
   explicitly instructs it to merge after review.
 
-## Validate locally
+## Validate locally and choose the confidence level
 
 ### Managed RuneSpace host
 On Brandon's managed RuneSpace host, load the private environment before every
@@ -54,6 +54,55 @@ browser-journey job (Mining, Overlay, Travel, and the repeated Mining
 play-boundary check). A local skip or unavailable environment is not a pass:
 report it as unexecuted and wait for the corresponding canonical CI result.
 
+### Focused implementation checks
+
+During implementation, run checks proportional to the touched boundary: unit
+tests for pure rules, the relevant integration test for a persistence boundary,
+or a focused Playwright spec for a browser change. Run typecheck, lint, and
+format checks early enough to avoid pushing an obviously broken checkpoint.
+Batch related local commits into a coherent state rather than pushing after
+every tiny edit.
+
+### Draft preview checkpoint
+
+A draft PR push always runs the fast CI job (frozen install, typecheck, lint,
+format check, unit tests, and one production build). It intentionally does not
+run PostgreSQL integration or canonical E2E unless the PR has the `full-ci`
+label. A coherent, focused-validated draft push is therefore allowed before
+full local parity when the purpose is real-device phone/desktop review. The
+Coolify branch preview deploys pushed checkpoints independently of this CI
+split; it is visual-review evidence, not the merge gate.
+
+### Ready-for-review and merge-gate validation
+
+The same workflow requests the full gate when `full-ci` is applied, when a draft
+is marked ready without a code push, on every new commit to a ready PR, on every
+push to `main`, and through `workflow_dispatch` (with an explicit ref or SHA).
+The full gate keeps the PostgreSQL integration and canonical E2E jobs separately
+diagnosable. PR concurrency cancels obsolete runs only for that PR; main and
+manual runs use unique groups and are not canceled by PR activity.
+
+Require the stable checks `Install, typecheck, lint, test, build` and `Merge gate`
+in the `main` branch protection/ruleset. `PostgreSQL integration tests`,
+`Canonical E2E browser journeys`, `Full gate`, and `Full gate decision` remain
+independently diagnosable but are not required contexts: they are intentionally
+skipped on ordinary draft checkpoints. `Merge gate` explicitly fails with an
+expected "draft checkpoint" message until the PR is ready, so a skipped full
+job cannot falsely satisfy branch protection on the unchanged head when
+`ready_for_review` triggers the full run. On a ready PR, `Merge gate` succeeds
+only when both full jobs succeed. Do not require the diagnostic job names, and
+verify the exact required names in repository settings after enabling
+protection. This repository currently has no main branch protection configured,
+so settings verification is a maintainer action outside this code change.
+
+Before marking ready or requesting final review, run the complete local
+CI-parity sequence once when the managed PostgreSQL and Playwright environment
+is available, request the configured separate-model review, push the merge
+candidate, and follow every full remote job to a terminal state. After a
+correction to a ready PR, run focused checks for that correction and let the
+remote full gate rerun; do not repeat the complete local suite blindly after
+every small fix.
+
 ## Self-review the diff
 Before opening or updating the draft PR, inspect the final diff for scope,
 duplication, premature abstraction, unjustified dependencies, accidental game
@@ -76,11 +125,14 @@ The PR must include:
 ## Observe CI and deployment progress
 Keep the PR draft while canonical CI runs, and follow the run to a terminal
 state: continue until every required job reports success, or a genuine external
-blocker is precisely documented. Do not treat an in-progress job as a pass, and
-do not claim canonical CI is green until it actually reports success. A docs-only
-change may be *described* as unable to introduce an application- or test-code
-regression — which explains why you might prioritize other work while it runs —
-but that description is not a substitute for the green result.
+blocker is precisely documented. Do not wait for PostgreSQL or canonical jobs
+that intentionally did not trigger on a draft-only checkpoint, but do not claim
+the full gate is green until the PR has a real full run. Do not treat an
+in-progress job as a pass, and do not claim canonical CI is green until it
+actually reports success. A docs-only change may be *described* as unable to
+introduce an application- or test-code regression — which explains why you
+might prioritize other work while it runs — but that description is not a
+substitute for the green result.
 
 Observe by polling actual state at short, individually bounded intervals (for
 example `gh pr checks <pr>` for GitHub Actions, or probing the preview URL for a

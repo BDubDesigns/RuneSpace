@@ -4,13 +4,42 @@ on:
   push:
     branches: [main]
   pull_request:
+    types:
+      - opened
+      - reopened
+      - synchronize
+      - ready_for_review
+      - converted_to_draft
+      - labeled
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: Ref or SHA to validate
+        required: true
+        type: string
+
+concurrency:
+  # Pull-request runs replace one another, but main and manual runs each keep a
+  # distinct group. A non-full label (for example e2e-screenshots) does not
+  # cancel an in-flight full gate; its queued run applies the current PR policy.
+  group: >-
+    ${{ github.event_name == 'pull_request'
+      && format('ci-pr-{0}', github.event.pull_request.number)
+      || format('ci-run-{0}', github.run_id) }}
+  cancel-in-progress: >-
+    ${{ github.event_name == 'pull_request'
+      && (github.event.action != 'labeled' || github.event.label.name == 'full-ci') }}
 
 jobs:
   fast-checks:
     name: Install, typecheck, lint, test, build
     runs-on: ubuntu-latest
+    env:
+      CI_CHECKOUT_REF: ${{ github.event_name == 'workflow_dispatch' && inputs.ref || github.sha }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.CI_CHECKOUT_REF }}
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
@@ -51,11 +80,34 @@ jobs:
           # Insecure placeholder used ONLY for the CI build step. Real deployments
           # MUST set a strong BETTER_AUTH_SECRET; server/env.ts requires it at runtime.
           BETTER_AUTH_SECRET: "insecure-ci-build-only-secret-do-not-use-in-prod-0000000000"
-          RUNESPACE_RELEASE_ID: ${{ github.sha }}
+          RUNESPACE_RELEASE_ID: ${{ env.CI_CHECKOUT_REF }}
         run: pnpm build
+
+  gate-decision:
+    name: Full gate decision
+    runs-on: ubuntu-latest
+    outputs:
+      full: ${{ steps.select.outputs.full }}
+      merge_required: ${{ steps.select.outputs.merge_required }}
+    env:
+      CI_CHECKOUT_REF: ${{ github.event_name == 'workflow_dispatch' && inputs.ref || github.sha }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.CI_CHECKOUT_REF }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Select validation gate
+        id: select
+        run: node scripts/select-ci-gate.mjs
 
   integration:
     name: PostgreSQL integration tests
+    if: ${{ needs.gate-decision.outputs.full == 'true' }}
+    needs: gate-decision
     runs-on: ubuntu-latest
     services:
       postgres:
@@ -73,8 +125,11 @@ jobs:
           --health-retries 5
     env:
       DATABASE_URL: postgres://runespace:runespace@localhost:5432/runespace
+      CI_CHECKOUT_REF: ${{ github.event_name == 'workflow_dispatch' && inputs.ref || github.sha }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.CI_CHECKOUT_REF }}
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
@@ -98,6 +153,8 @@ jobs:
 
   canonical-e2e:
     name: Canonical E2E browser journeys
+    if: ${{ needs.gate-decision.outputs.full == 'true' }}
+    needs: gate-decision
     runs-on: ubuntu-latest
     services:
       postgres:
@@ -117,8 +174,11 @@ jobs:
       # PR to capture and verify the curated screenshot package on the next run.
       # push-to-main has no PR/label context, so it stays off there too.
       RUNESPACE_E2E_SCREENSHOTS: ${{ github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'e2e-screenshots') }}
+      CI_CHECKOUT_REF: ${{ github.event_name == 'workflow_dispatch' && inputs.ref || github.sha }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.CI_CHECKOUT_REF }}
       - uses: pnpm/action-setup@v4
         with:
           version: 9.15.4
@@ -150,3 +210,64 @@ jobs:
             test-results/
             playwright-report/
           if-no-files-found: ignore
+
+  full-gate:
+    name: Full gate
+    if: ${{ always() }}
+    needs: [gate-decision, integration, canonical-e2e]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify full validation result
+        env:
+          DECISION_RESULT: ${{ needs.gate-decision.result }}
+          FULL: ${{ needs.gate-decision.outputs.full }}
+          INTEGRATION_RESULT: ${{ needs.integration.result }}
+          E2E_RESULT: ${{ needs.canonical-e2e.result }}
+        run: |
+          set -euo pipefail
+          if [[ "$DECISION_RESULT" != "success" ]]; then
+            echo "Full gate decision failed."
+            exit 1
+          fi
+          if [[ "$FULL" != "true" ]]; then
+            echo "Full gate not requested for this draft checkpoint."
+            exit 0
+          fi
+          if [[ "$INTEGRATION_RESULT" != "success" || "$E2E_RESULT" != "success" ]]; then
+            echo "Full validation requires successful integration and canonical E2E jobs."
+            exit 1
+          fi
+          echo "Full validation passed."
+
+  merge-gate:
+    name: Merge gate
+    if: ${{ always() }}
+    needs: [gate-decision, integration, canonical-e2e, full-gate]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Enforce merge validation
+        env:
+          DECISION_RESULT: ${{ needs.gate-decision.result }}
+          FULL: ${{ needs.gate-decision.outputs.full }}
+          MERGE_REQUIRED: ${{ needs.gate-decision.outputs.merge_required }}
+          INTEGRATION_RESULT: ${{ needs.integration.result }}
+          E2E_RESULT: ${{ needs.canonical-e2e.result }}
+          FULL_GATE_RESULT: ${{ needs.full-gate.result }}
+        run: |
+          set -euo pipefail
+          if [[ "$DECISION_RESULT" != "success" ]]; then
+            echo "Gate decision failed."
+            exit 1
+          fi
+          if [[ "$MERGE_REQUIRED" != "true" ]]; then
+            echo "Draft checkpoint: merge validation is intentionally unsatisfied."
+            exit 1
+          fi
+          if [[ "$FULL" != "true" ||
+                "$INTEGRATION_RESULT" != "success" ||
+                "$E2E_RESULT" != "success" ||
+                "$FULL_GATE_RESULT" != "success" ]]; then
+            echo "Merge validation requires successful integration and canonical E2E."
+            exit 1
+          fi
+          echo "Merge validation passed."

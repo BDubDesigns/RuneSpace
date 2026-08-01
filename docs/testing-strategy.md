@@ -26,8 +26,10 @@ small number of critical mobile player journeys.
   screen, then core loops as they ship). Avoid large suites of shallow UI tests.
 - The scaffold includes a minimal app-loading smoke test
   (`tests/e2e/smoke.spec.ts`).
-- Quick local development: `pnpm test:e2e`. Uses the dev web server and may
-  reuse an existing server for speed. Does **not** count as CI-parity validation.
+- Quick local development: `pnpm test:e2e`. It uses the production server by
+  default and may reuse an existing server outside CI; set
+  `PLAYWRIGHT_DEV_SERVER=true` for a development server. It does **not** count
+  as CI-parity validation.
 - The canonical CI-parity command: `pnpm test:e2e:canonical`. This is the single
   source of truth for local and CI behavioral verification, and for
   frozen-screenshot verification when screenshots are requested. It:
@@ -36,7 +38,9 @@ small number of critical mobile player journeys.
   - selects a dedicated test port
   - removes stale authentication and test state
   - runs committed migrations
-  - starts a fresh production build and server
+  - runs one production build and starts one long-lived production server; all
+    canonical phases reuse that server and teardown is deterministic on success,
+    failure, timeout, or signal
   - runs the Mining Chromium journey
   - runs the Overlay Chromium journey (modal-overlay behavior shared by Inventory/Equipment)
   - runs the Travel Chromium journey
@@ -63,15 +67,16 @@ small number of critical mobile player journeys.
     production.
 - Agents may not report browser or CI parity as passing unless the canonical
   command actually passed.
-- The canonical command is expensive by design: every invocation runs a full
-  production `next build` and `next start`, so one run spans several minutes
-  across all suites. For a CSS or visual-only change, run the affected spec
-  locally (`pnpm test:e2e <spec> --project=chromium`) as quick evidence instead
-  of the full canonical run. This skips the full *suite* but not necessarily a
-  build (the Playwright web server builds unless a server is already reusable or
-  `PLAYWRIGHT_DEV_SERVER` is set), and it is never a substitute for the canonical
-  command — only `pnpm test:e2e:canonical` and the matching CI job establish CI
-  parity.
+- The canonical command is expensive by design: one invocation performs one
+  full production `next build`, one `next start`, and all suites, so it spans
+  several minutes. Multiple Playwright commands remain to preserve fixture and
+  auth-state isolation, but the runner's explicit external-server boundary
+  prevents another build or server restart for each phase. For focused local
+  iteration, run the affected spec (`pnpm test:e2e <spec> --project=chromium`).
+  Ordinary `pnpm test:e2e` owns its server: it uses production build/start by
+  default, or a development server when `PLAYWRIGHT_DEV_SERVER=true` is set.
+  Focused evidence is never a substitute for the canonical command — only
+  `pnpm test:e2e:canonical` and the matching CI job establish CI parity.
 - GitHub Actions remains the final authority; canonical execution must use the
   same `pnpm test:e2e:canonical` command.
 - Uploading an artifact is not proof that promised evidence exists. Verify each
@@ -90,11 +95,36 @@ For progression-sensitive systems, prioritize:
 - Excessive shallow component tests that assert markup without behavior.
 - Testing implementation details instead of observable outcomes.
 
-## CI scope
-CI runs typecheck, lint, format check, unit tests, production build, a separate
-PostgreSQL migration/integration-test job, and a canonical E2E browser-journey
-job (Mining, Overlay, Travel, and the repeated Mining play-boundary check) that
-runs the single `pnpm test:e2e:canonical` command. The canonical runner is the
-single source of truth for E2E behavioral verification in both local development
-and GitHub Actions; frozen review screenshots are produced and uploaded only when
-explicitly requested (see §3), and per-failure diagnostics are always retained.
+## CI scope and event matrix
+
+The `CI` workflow always runs the fast job (frozen install, typecheck, lint,
+format check, unit tests, and one production build) for PR revisions and pushes
+to `main`. PostgreSQL integration and canonical E2E are selected by the explicit
+full-gate policy:
+
+| Event | Fast checks | PostgreSQL + canonical E2E | Merge gate |
+| --- | --- | --- | --- |
+| Draft PR opened, reopened, or pushed | Yes | No | Intentionally unsatisfied |
+| `full-ci` applied to a draft | Yes | Yes | Intentionally unsatisfied |
+| Push while `full-ci` remains applied | Yes | Yes | Intentionally unsatisfied while draft |
+| Draft converted to ready | Yes | Yes, without a code push | Required |
+| Push to a ready PR | Yes | Yes | Required |
+| Push to `main` | Yes | Yes | Required |
+| Manual `workflow_dispatch` with an explicit ref/SHA | Yes | Yes | Required |
+
+Labels on ready PRs request the full gate so adding `e2e-screenshots` captures
+the requested manifest without invalidating an otherwise ready head. PR runs use
+a per-PR concurrency group so obsolete work is canceled only for that PR; main
+and manual runs use unique groups. The static `Merge gate` is required and
+intentionally fails on draft checkpoints. This is necessary because GitHub
+marks a skipped required job successful; a green draft decision would otherwise
+be reusable when the PR becomes ready without a new commit. Require only the
+fast check and `Merge gate` in the `main` branch protection/ruleset; this
+repository currently has no such protection configured, so a maintainer must
+verify those settings separately.
+
+CI retains a separate PostgreSQL integration job and canonical E2E job. The
+canonical runner is the single source of truth for E2E behavioral verification
+in both local development and GitHub Actions; frozen review screenshots are
+produced and uploaded only when explicitly requested (see §3), and per-failure
+diagnostics are always retained.
