@@ -1,8 +1,8 @@
-import { randomUUID } from "node:crypto";
 import { and, eq, inArray } from "drizzle-orm";
 import { afterEach, beforeAll, describe, expect, it } from "vitest";
 import { ITEM_IDS, LOCATION_IDS } from "@/game/config/foundations";
 import { POWER_ANNEX_REWARD_SOURCE_ID } from "@/game/domain/power-annex";
+import { cleanupTestUser, createCharacterForUser, createTestUser } from "./fixtures";
 
 const DATABASE_URL = process.env.DATABASE_URL;
 const suite = DATABASE_URL ? describe : describe.skip;
@@ -28,67 +28,27 @@ suite("Issue #47 Power Annex claims (real PostgreSQL)", () => {
   });
 
   afterEach(async () => {
-    for (const userId of createdUsers.splice(0)) await cleanupUser(userId);
+    for (const userId of createdUsers.splice(0))
+      await cleanupTestUser(db, authSchema, rune, userId);
   });
 
   async function makeAccount(characterCount = 1) {
-    const userId = randomUUID();
+    const userId = await createTestUser(db, authSchema, "Power Annex Tester");
     createdUsers.push(userId);
-    await db.insert(authSchema.user).values({
-      id: userId,
-      name: "Power Annex Tester",
-      email: `${userId}@example.com`,
-      emailVerified: false,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    });
-    const account = await ownership.ensurePlayerAccount(userId);
     const created = [];
     for (let slot = 0; slot < characterCount; slot += 1) {
       created.push(
-        await characters.createCharacter(account.id, `Annex ${userId.slice(0, 6)} ${slot}`),
+        await createCharacterForUser(
+          db,
+          rune,
+          ownership,
+          characters,
+          userId,
+          `Annex ${userId.slice(0, 6)} ${slot}`,
+        ),
       );
     }
     return { userId, characters: created };
-  }
-
-  async function cleanupUser(userId: string) {
-    const accounts = await db
-      .select({ id: rune.playerAccounts.id })
-      .from(rune.playerAccounts)
-      .where(eq(rune.playerAccounts.userId, userId));
-    for (const account of accounts) {
-      const characterRows = await db
-        .select({ id: rune.characters.id })
-        .from(rune.characters)
-        .where(eq(rune.characters.playerAccountId, account.id));
-      for (const character of characterRows) {
-        await db
-          .delete(rune.characterPowerCellDailyClaims)
-          .where(eq(rune.characterPowerCellDailyClaims.characterId, character.id));
-        await db
-          .delete(rune.characterMiningState)
-          .where(eq(rune.characterMiningState.characterId, character.id));
-        await db
-          .delete(rune.characterStarterProvisioning)
-          .where(eq(rune.characterStarterProvisioning.characterId, character.id));
-        await db
-          .delete(rune.characterTravelState)
-          .where(eq(rune.characterTravelState.characterId, character.id));
-        await db.delete(rune.equippedItems).where(eq(rune.equippedItems.characterId, character.id));
-        await db.delete(rune.activeActions).where(eq(rune.activeActions.characterId, character.id));
-        await db
-          .delete(rune.characterSkillXp)
-          .where(eq(rune.characterSkillXp.characterId, character.id));
-        await db
-          .delete(rune.inventoryStacks)
-          .where(eq(rune.inventoryStacks.characterId, character.id));
-        await db.delete(rune.itemInstances).where(eq(rune.itemInstances.characterId, character.id));
-      }
-      await db.delete(rune.characters).where(eq(rune.characters.playerAccountId, account.id));
-    }
-    await db.delete(rune.playerAccounts).where(eq(rune.playerAccounts.userId, userId));
-    await db.delete(authSchema.user).where(eq(authSchema.user.id, userId));
   }
 
   async function powerCellStacks(characterId: string) {

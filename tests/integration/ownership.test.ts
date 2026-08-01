@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { eq } from "drizzle-orm";
 import { describe, it, expect, beforeAll } from "vitest";
+import { cleanupTestUser, createTestUser } from "./fixtures";
 
 /**
  * Integration tests for the server-authoritative ownership + character rules,
@@ -37,33 +38,11 @@ suite("ownership & character rules (real PostgreSQL)", () => {
   });
 
   async function makeUser(email: string) {
-    const id = randomUUID();
-    await db.insert(authSchema.user).values({
-      id,
-      name: "Tester",
-      email,
-      emailVerified: false,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    });
-    return id;
+    return createTestUser(db, authSchema, "Tester", email);
   }
 
   // Short unique token for character names (validated to <= 24 chars, letters/digits).
   const short = () => Math.random().toString(36).slice(2, 10);
-
-  async function cleanupUser(userId: string) {
-    // Ownership FK is RESTRICT; delete children then parents, scoped to this user.
-    const accounts = await db
-      .select({ id: rune.playerAccounts.id })
-      .from(rune.playerAccounts)
-      .where(eq(rune.playerAccounts.userId, userId));
-    for (const acc of accounts) {
-      await db.delete(rune.characters).where(eq(rune.characters.playerAccountId, acc.id));
-    }
-    await db.delete(rune.playerAccounts).where(eq(rune.playerAccounts.userId, userId));
-    await db.delete(authSchema.user).where(eq(authSchema.user.id, userId));
-  }
 
   it("creates exactly one player account per Better Auth user (concurrency-safe)", async () => {
     const userId = await makeUser(`one-${randomUUID()}@example.com`);
@@ -79,7 +58,7 @@ suite("ownership & character rules (real PostgreSQL)", () => {
         .where(eq(rune.playerAccounts.userId, userId));
       expect(rows).toHaveLength(1);
     } finally {
-      await cleanupUser(userId);
+      await cleanupTestUser(db, authSchema, rune, userId);
     }
   });
 
@@ -102,7 +81,7 @@ suite("ownership & character rules (real PostgreSQL)", () => {
       expect(c1.displayName).toBe(`${base} One`);
       expect(c1.normalizedName).toBe(`${base.toLowerCase()} one`);
     } finally {
-      await cleanupUser(userId);
+      await cleanupTestUser(db, authSchema, rune, userId);
     }
   });
 
@@ -123,8 +102,8 @@ suite("ownership & character rules (real PostgreSQL)", () => {
         /already taken/i,
       );
     } finally {
-      await cleanupUser(u1);
-      await cleanupUser(u2);
+      await cleanupTestUser(db, authSchema, rune, u1);
+      await cleanupTestUser(db, authSchema, rune, u2);
     }
   });
 
@@ -145,8 +124,8 @@ suite("ownership & character rules (real PostgreSQL)", () => {
         /not found/i,
       );
     } finally {
-      await cleanupUser(owner);
-      await cleanupUser(stranger);
+      await cleanupTestUser(db, authSchema, rune, owner);
+      await cleanupTestUser(db, authSchema, rune, stranger);
     }
   });
 
@@ -162,7 +141,7 @@ suite("ownership & character rules (real PostgreSQL)", () => {
         db.delete(authSchema.user).where(eq(authSchema.user.id, userId)),
       ).rejects.toThrow();
     } finally {
-      await cleanupUser(userId);
+      await cleanupTestUser(db, authSchema, rune, userId);
     }
   });
 });

@@ -90,10 +90,4 @@ describe("issue #40 travel domain", () => {
     });
     expect(overdue).toEqual({ arrived: true, consumedTicks: 40 });
   });
-
-  it("blocks conflicting activity during travel via the shared action model", () => {
-    // Travel is a single active action; the one-active-action rule is enforced
-    // by the orchestrator, which prevents Mining from starting in transit.
-    expect(adjacentWalkDurationTicks()).toBeGreaterThan(0);
-  });
 });

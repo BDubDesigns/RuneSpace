@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 /**
  * Tests for the Better Auth dynamic baseURL host/origin boundary.
@@ -96,32 +96,45 @@ describe("Better Auth dynamic baseURL allowed hosts — pattern matching", () =>
 });
 
 describe("Better Auth baseURL configuration contract", () => {
-  // These tests validate the static contract that auth-options.ts must uphold.
-  // They do not import the module to avoid triggering env parsing in unit tests.
+  // The runtime configuration lives in server/auth-options.ts. It parses the
+  // server environment at module load, so the module graph must be reset and
+  // stubbed before importing; no database connection is ever made by these
+  // assertions (server/env.ts validates configuration only).
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    vi.resetModules();
+  });
 
-  it("must configure baseURL with the approved allowedHosts", () => {
-    const expected = [
+  it("configures the approved allowedHosts without a fallback", async () => {
+    vi.stubEnv("NODE_ENV", "test");
+    vi.stubEnv("DATABASE_URL", "postgres://test:test@localhost:5432/test");
+    vi.stubEnv("BETTER_AUTH_SECRET", "test-secret-1234567890123456");
+    vi.resetModules();
+    const { authOptions } = await import("@/server/auth-options");
+
+    // Better Auth accepts either a string or a config object; the approved
+    // contract is the object form with an explicit allowed-hosts boundary.
+    const baseUrl = authOptions.baseURL;
+    expect(typeof baseUrl).toBe("object");
+    const config = baseUrl as { allowedHosts?: string[]; protocol?: string };
+    expect(config.allowedHosts).toEqual([
       "runespace.qcfailed.com",
       "pr-*.runespace.qcfailed.com",
       "localhost:*",
       "127.0.0.1:*",
-    ];
-    expect(expected).toContain("runespace.qcfailed.com");
-    expect(expected).toContain("pr-*.runespace.qcfailed.com");
-    expect(expected).toContain("localhost:*");
-    expect(expected).toContain("127.0.0.1:*");
-    expect(expected).toHaveLength(4);
+    ]);
   });
 
-  it("must not configure a fallback (unknown hosts fail closed)", () => {
-    // The auth-options.ts module must not set a fallback on the baseURL object.
-    // This test encodes the requirement; the module itself is the authority.
-    const hasFallback = false; // Contract: no fallback
-    expect(hasFallback).toBe(false);
-  });
+  it("uses protocol auto for request-derived origins", async () => {
+    vi.stubEnv("NODE_ENV", "test");
+    vi.stubEnv("DATABASE_URL", "postgres://test:test@localhost:5432/test");
+    vi.stubEnv("BETTER_AUTH_SECRET", "test-secret-1234567890123456");
+    vi.resetModules();
+    const { authOptions } = await import("@/server/auth-options");
 
-  it("must use protocol: auto", () => {
-    const protocol = "auto"; // Contract: protocol auto
-    expect(protocol).toBe("auto");
+    const baseUrl = authOptions.baseURL;
+    expect(typeof baseUrl).toBe("object");
+    expect((baseUrl as { protocol?: string }).protocol).toBe("auto");
+    expect("fallback" in (baseUrl as Record<string, unknown>)).toBe(false);
   });
 });
