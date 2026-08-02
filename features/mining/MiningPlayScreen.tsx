@@ -3,6 +3,7 @@
 import { ActionButton } from "@/components/ui/ActionButton";
 import { ActionLink } from "@/components/ui/ActionLink";
 import { GameShell, TopBar } from "@/components/ui/GameShell";
+import { RuneSpaceBrand } from "@/components/branding/RuneSpaceBrand";
 import { SignOutButton } from "@/features/auth/SignOutButton";
 import { PlayBoundaryTestTrigger } from "@/features/diagnostics/PlayBoundaryTestTrigger";
 import { getLocation } from "@/game/content/locations";
@@ -57,7 +58,9 @@ function PlayTopBar() {
     : (getLocation(state.location.currentLocationId)?.displayName ?? "Location");
   return (
     <div className="flex items-center justify-between gap-3">
-      <TopBar title="RuneSpace" detail={detail} />
+      <div className="min-w-0 flex-1">
+        <TopBar title={<RuneSpaceBrand />} detail={detail} />
+      </div>
       <SignOutButton />
     </div>
   );

@@ -12,6 +12,7 @@ test("smoke screen loads and identifies as scaffold", async ({ page }) => {
   await page.goto("/");
 
   await expect(page.getByRole("heading", { name: "RuneSpace" })).toBeVisible();
+  await expect(page.getByRole("img", { name: "RuneSpace" })).toBeVisible();
   await expect(page.getByText("Development scaffold online.")).toBeVisible();
   await expect(page.getByText(/early foundation build, not a playable game/i)).toBeVisible();
 });

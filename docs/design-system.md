@@ -25,3 +25,15 @@ Controls use a 44px practical minimum target and visible `:focus-visible` ring. 
 ## Feature Styling
 
 Pages and features compose primitives and may add layout-only classes. Feature code must not own visual recipes or game rules. Authentication and character ownership remain in `features/` and `server/`; this system contains no inventory, resource, map, quest, or progression logic.
+
+## Branding
+
+The approved RuneSpace identity is a small set of committed production assets. Agents must use these exact files and must never recreate the logo in CSS, redraw it from memory, or substitute placeholder artwork.
+
+Canonical asset paths:
+
+- `public/branding/runespace-header-lockup.png` — the horizontal **RuneSpace wordmark / lockup** for the authenticated game header. Intrinsic size 1455×376. Render it through the shared `components/branding/RuneSpaceBrand.tsx` component, which sets the accessible name (`alt="RuneSpace"`) and fixed intrinsic dimensions; consumers scale it with a height class such as `h-7 w-auto` (the header default, matching the 28px title line height it replaces) so the header does not jump while the image loads.
+- `public/branding/runespace-emblem.png` — the standalone **R emblem master**, used as the source for favicon/app-icon exports. Do not use it as the header lockup.
+- `public/favicon.ico`, `public/favicon-16x16.png`, `public/favicon-32x32.png`, `public/apple-touch-icon.png`, `public/icon-192.png`, `public/icon-512.png` — exported emblem icons referenced by the app metadata in `app/layout.tsx`.
+
+Sizing and clear space: keep the lockup compact in the header (`h-7`); do not let it crowd the Sign out control or the location subtitle. Always preserve the live location subtitle as text and keep the accessible brand name. Do not change the approved files' contents, compression, or dimensions.

@@ -272,6 +272,8 @@ const MINING_REQUIRED = [
   "mining-desktop-equipment-artwork.png",
   "mining-mobile-inventory-mixed.png",
   "mining-desktop-inventory-mixed.png",
+  "mining-mobile-header.png",
+  "mining-desktop-header.png",
   "layout-mobile-characters.png",
   "layout-mobile-play-yard.png",
   "layout-mobile-play-bottom.png",
@@ -367,6 +369,8 @@ async function runCanonical() {
     ["mining", "--project=chromium", "--grep", "Play boundary", "--repeat-each=3", "--workers=1"],
     "Mining play-boundary check",
   );
+
+  await runPlaywright(["signout", "--project=chromium"], "Sign-out E2E");
 }
 
 function onSignal(signal) {

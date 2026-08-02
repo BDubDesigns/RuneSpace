@@ -1,5 +1,6 @@
 import { headers } from "next/headers";
 import { ScaffoldScreen } from "@/components/ScaffoldScreen";
+import { RuneSpaceBrand } from "@/components/branding/RuneSpaceBrand";
 import { ActionLink } from "@/components/ui/ActionLink";
 import { SectionHeader } from "@/components/ui/SectionHeader";
 import { auth } from "@/server/auth";
@@ -17,7 +18,9 @@ export default async function HomePage() {
 
   return (
     <ScaffoldScreen>
-      <SectionHeader eyebrow="Development build">RuneSpace</SectionHeader>
+      <SectionHeader eyebrow="Development build">
+        <RuneSpaceBrand className="block h-9 w-auto" sizes="160px" />
+      </SectionHeader>
       <p className="mt-2 text-sm text-[color:var(--rs-text-secondary)]">
         Development scaffold online.
       </p>

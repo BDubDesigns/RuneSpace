@@ -1,9 +1,11 @@
 import type { ReactNode } from "react";
 
-export function TopBar({ title, detail }: { title: string; detail?: string }) {
+export function TopBar({ title, detail }: { title: ReactNode; detail?: string }) {
   return (
     <header className="rs-bevel border border-[color:var(--rs-border-structural)] bg-[color:var(--rs-surface-raised)] px-4 py-3 shadow-[var(--rs-glow-primary)]">
-      <p className="font-display text-lg font-bold text-[color:var(--rs-text-primary)]">{title}</p>
+      <div className="font-display text-lg font-bold text-[color:var(--rs-text-primary)]">
+        {title}
+      </div>
       {detail ? <p className="text-xs text-[color:var(--rs-text-muted)]">{detail}</p> : null}
     </header>
   );
