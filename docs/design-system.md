@@ -32,8 +32,12 @@ The approved RuneSpace identity is a small set of committed production assets. A
 
 Canonical asset paths:
 
-- `public/branding/runespace-header-lockup.png` — the horizontal **RuneSpace wordmark / lockup** for the authenticated game header. Intrinsic size 1455×376. Render it through the shared `components/branding/RuneSpaceBrand.tsx` component, which sets the accessible name (`alt="RuneSpace"`) and fixed intrinsic dimensions; consumers scale it with a height class such as `h-7 w-auto` (the header default, matching the 28px title line height it replaces) so the header does not jump while the image loads.
+- `public/branding/runespace-header-lockup.png` — the horizontal **RuneSpace wordmark / lockup** for the authenticated game header. Intrinsic size 1455×376. Render it through the shared `components/branding/RuneSpaceBrand.tsx` component, which sets the accessible name (`alt="RuneSpace"`) and fixed intrinsic dimensions so the header does not jump while the image loads.
 - `public/branding/runespace-emblem.png` — the standalone **R emblem master**, used as the source for favicon/app-icon exports. Do not use it as the header lockup.
 - `public/favicon.ico`, `public/favicon-16x16.png`, `public/favicon-32x32.png`, `public/apple-touch-icon.png`, `public/icon-192.png`, `public/icon-512.png` — exported emblem icons referenced by the app metadata in `app/layout.tsx`.
 
-Sizing and clear space: keep the lockup compact in the header (`h-7`); do not let it crowd the Sign out control or the location subtitle. Always preserve the live location subtitle as text and keep the accessible brand name. Do not change the approved files' contents, compression, or dimensions.
+Sizing and clear space (approved by the product owner; supersedes the earlier location-subtitle-in-header requirement):
+
+- Authenticated game header: `RuneSpaceBrand`'s default `h-11 w-auto max-w-[52vw] sm:h-12 sm:max-w-[13rem]` (~44px on mobile, ~48px from the `sm` breakpoint). The lockup sits on one row with the Sign out control; the width caps keep it from pushing Sign out off-row or overflowing the viewport. The header deliberately no longer repeats the current-location or `In transit` subtitle — the main page location/activity panel is the authoritative visible location presentation.
+- Signed-out landing: override with `h-14 w-auto sm:h-16` (~56px on mobile, ~64px from the `sm` breakpoint), inside the existing `Development build` heading card.
+- Keep the accessible brand name; do not change the approved files' contents, compression, or dimensions.

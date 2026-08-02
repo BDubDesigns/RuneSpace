@@ -11,13 +11,15 @@ const LOCKUP_HEIGHT = 376;
  * `public/branding/runespace-header-lockup.png` (see docs/design-system.md).
  *
  * Intrinsic dimensions are fixed so the header does not jump while the image
- * loads; consumers scale it with a height class (e.g. `h-7 w-auto` in the
- * header, matching the 28px title line height it replaces, or a larger height
- * on the landing page). The `alt` text provides the accessible brand name.
+ * loads. The default treatment is the authenticated header sizing approved by
+ * the product owner: about 44px tall on mobile and 48px from the `sm`
+ * breakpoint, capped so the lockup cannot push the Sign out control off-row or
+ * overflow the viewport. The signed-out landing passes a larger override
+ * (`h-14`/`sm:h-16`). The `alt` text provides the accessible brand name.
  */
 export function RuneSpaceBrand({
-  className = "block h-7 w-auto",
-  sizes = "128px",
+  className = "block h-11 w-auto max-w-[52vw] sm:h-12 sm:max-w-[13rem]",
+  sizes = "192px",
   priority = true,
 }: {
   className?: string;

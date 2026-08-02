@@ -1045,11 +1045,12 @@ test("the Play boundary resets, navigates, and hides failure details", async ({ 
 
 /**
  * Production header branding (Issue #52). Non-destructive: it verifies the
- * lockup, live location, overflow freedom, and icon metadata without signing
- * out. Sign-out operability is covered by the dedicated `signout` spec so this
- * serial group's shared session (and its CI retries) stay intact.
+ * larger lockup, one-row Sign out, overflow freedom, icon metadata, and that
+ * the banner no longer duplicates the location subtitle. Sign-out operability
+ * is covered by the dedicated `signout` spec so this serial group's shared
+ * session (and its CI retries) stay intact.
  */
-test("production header shows the RuneSpace lockup, live location, and committed icon metadata", async ({
+test("production header shows the larger RuneSpace lockup without duplicating the location", async ({
   page,
 }) => {
   await page.setViewportSize({ width: 390, height: 844 });
@@ -1062,11 +1063,26 @@ test("production header shows the RuneSpace lockup, live location, and committed
     .poll(() => lockup.evaluate((image) => image.complete && image.naturalWidth > 0))
     .toBe(true);
 
-  // The current location remains authoritative live text beneath the brand.
-  await expect(header.getByText("Crash Site", { exact: true })).toBeVisible();
-  // Sign out remains present beside the brand.
+  // The lockup is the approved larger header treatment (~44px on mobile).
+  const mobileLockup = await lockup.boundingBox();
+  expect(mobileLockup).not.toBeNull();
+  expect(mobileLockup!.height).toBeGreaterThanOrEqual(40);
+  expect(mobileLockup!.height).toBeLessThanOrEqual(50);
+
+  // Sign out remains present beside the brand on the same row.
   const signOut = page.getByRole("button", { name: "Sign out" });
   await expect(signOut).toBeVisible();
+  const signOutBox = await signOut.boundingBox();
+  expect(signOutBox).not.toBeNull();
+  expect(Math.abs(signOutBox!.y - mobileLockup!.y)).toBeLessThanOrEqual(signOutBox!.height);
+
+  // The banner no longer duplicates the location subtitle; the main page
+  // location panel is the authoritative presentation.
+  await expect(header.getByText("Crash Site", { exact: true })).toHaveCount(0);
+  await expect(header.getByText(/In transit/)).toHaveCount(0);
+  await expect(
+    page.getByRole("main").getByText("Crash Site", { exact: true }).first(),
+  ).toBeVisible();
 
   // The lockup must not create horizontal document overflow at mobile width.
   const mobileWidth = await page.evaluate(
@@ -1077,8 +1093,13 @@ test("production header shows the RuneSpace lockup, live location, and committed
 
   await page.setViewportSize({ width: 1440, height: 900 });
   await expect(lockup).toBeVisible();
-  await expect(header.getByText("Crash Site", { exact: true })).toBeVisible();
+  // ~48px at the larger breakpoint.
+  const desktopLockup = await lockup.boundingBox();
+  expect(desktopLockup).not.toBeNull();
+  expect(desktopLockup!.height).toBeGreaterThanOrEqual(44);
+  expect(desktopLockup!.height).toBeLessThanOrEqual(56);
   await expect(signOut).toBeVisible();
+  await expect(header.getByText("Crash Site", { exact: true })).toHaveCount(0);
   const desktopWidth = await page.evaluate(
     () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
   );

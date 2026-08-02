@@ -19,7 +19,7 @@ export default async function HomePage() {
   return (
     <ScaffoldScreen>
       <SectionHeader eyebrow="Development build">
-        <RuneSpaceBrand className="block h-9 w-auto" sizes="160px" />
+        <RuneSpaceBrand className="block h-14 w-auto sm:h-16" sizes="256px" />
       </SectionHeader>
       <p className="mt-2 text-sm text-[color:var(--rs-text-secondary)]">
         Development scaffold online.

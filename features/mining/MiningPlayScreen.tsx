@@ -6,7 +6,6 @@ import { GameShell, TopBar } from "@/components/ui/GameShell";
 import { RuneSpaceBrand } from "@/components/branding/RuneSpaceBrand";
 import { SignOutButton } from "@/features/auth/SignOutButton";
 import { PlayBoundaryTestTrigger } from "@/features/diagnostics/PlayBoundaryTestTrigger";
-import { getLocation } from "@/game/content/locations";
 import type { MiningGameplayState } from "@/server/mining";
 import { MiningConsole } from "./MiningConsole";
 import { MiningPlayProvider, useMiningPlay } from "./MiningPlayContext";
@@ -52,14 +51,10 @@ function MiningFooter() {
 }
 
 function PlayTopBar() {
-  const { state } = useMiningPlay();
-  const detail = state.travelState
-    ? `In transit to ${getLocation(state.travelState.destinationLocationId)?.displayName ?? ""}`
-    : (getLocation(state.location.currentLocationId)?.displayName ?? "Location");
   return (
     <div className="flex items-center justify-between gap-3">
       <div className="min-w-0 flex-1">
-        <TopBar title={<RuneSpaceBrand />} detail={detail} />
+        <TopBar title={<RuneSpaceBrand />} />
       </div>
       <SignOutButton />
     </div>
