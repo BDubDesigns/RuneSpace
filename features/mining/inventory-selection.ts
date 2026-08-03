@@ -36,6 +36,19 @@ export function resolveInventorySelection(
   return entry ? { kind: "unique", entry } : undefined;
 }
 
+/**
+ * Selecting the already-selected entry toggles it closed; any other selection
+ * replaces the current one. Returns `undefined` when the player dismisses the
+ * current details panel by activating its tile again.
+ */
+export function toggleInventorySelection(
+  current: InventorySelection | undefined,
+  next: InventorySelection,
+): InventorySelection | undefined {
+  if (current && current.kind === next.kind && current.id === next.id) return undefined;
+  return next;
+}
+
 export type StackDropAction = { mode: "one" | "stack"; label: string };
 
 /**

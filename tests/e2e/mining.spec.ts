@@ -893,7 +893,7 @@ test("equipment and inventory rendering shows artwork for illustrated items and 
   await refinedTile.click();
   await expect(refinedTile).toHaveAttribute("aria-pressed", "true");
   const refinedDetails = inventory.getByRole("region", { name: "Refined Ferrite details" });
-  await expect(refinedDetails.getByText("Quantity: 1", { exact: true })).toBeVisible();
+  await expect(refinedDetails.locator('[data-stat="quantity"] dd')).toHaveText("1");
   await expect(refinedDetails.getByRole("button", { name: "Drop item" })).toBeVisible();
   await refinedDetails.getByRole("button", { name: "Drop item" }).click();
   const refinedConfirmation = inventory.getByRole("alert");
@@ -1001,10 +1001,17 @@ test("a carried unequipped Cutter occupies one visible Inventory slot and leaves
   await cutterTile.click();
   await expect(cutterTile).toHaveAttribute("aria-pressed", "true");
   const cutterDetails = inventory.getByRole("region", { name: "Salvage Cutter details" });
-  await expect(cutterDetails.getByText("5 kg", { exact: true })).toBeVisible();
+  await expect(cutterDetails.locator('[data-stat="mass"] dd')).toHaveText("5 kg");
   await expect(cutterDetails.getByText("3 of 10 charges remaining", { exact: true })).toBeVisible();
   await expect(cutterDetails.getByText("Unique item — cannot be dropped.")).toBeVisible();
   await expect(cutterDetails.getByRole("button", { name: /Drop|Load/ })).toHaveCount(0);
+  // Unique items never receive the stack-fill treatment.
+  await expect(cutterDetails.locator("[data-stack-track]")).toHaveCount(0);
+  await expect(
+    cutterDetails.getByRole("progressbar", {
+      name: "Cutter charge: 3 of 10 charges remaining",
+    }),
+  ).toBeVisible();
   await page.screenshot({
     path: "test-results/mining-mobile-inventory-carried-cutter-selected.png",
   });
@@ -1292,13 +1299,48 @@ test("a full Inventory stack is dropped through inline confirmation and frees on
   await page.keyboard.press("Enter");
   await expect(ferriteTile).toHaveAttribute("aria-pressed", "true");
 
-  // The in-drawer details show the authoritative stack facts and Drop actions.
+  // The in-drawer dossier shows the authoritative stack facts and Drop actions.
   const details = inventory.getByRole("region", { name: "Ferrite Shale details" });
-  await expect(details.getByText("Quantity: 10", { exact: true })).toBeVisible();
-  await expect(details.getByText(/Mass: 100 g each · 1 kg total/)).toBeVisible();
-  await expect(details.getByText("Stack limit: 10", { exact: true })).toBeVisible();
+  const detailsHeading = inventory.getByRole("heading", { name: "Item details" });
+  // Reveal: after selecting a first-row tile of a full Inventory, the details
+  // panel is scrolled into the visible drawer viewport and focus reaches its
+  // heading so keyboard and assistive-technology users know new content
+  // appeared.
+  await expect(detailsHeading).toBeFocused();
+  const drawerBox = (await inventory.boundingBox())!;
+  await expect
+    .poll(async () => {
+      const box = await details.boundingBox();
+      if (!box) return Number.POSITIVE_INFINITY;
+      return Math.max(drawerBox.y - box.y, box.y + box.height - (drawerBox.y + drawerBox.height));
+    })
+    .toBeLessThanOrEqual(1);
+  await expect(details.locator('[data-stat="quantity"] dd')).toHaveText("10");
+  await expect(details.locator('[data-stat="stack-limit"] dd')).toHaveText("10");
+  await expect(details.locator('[data-stat="unit-mass"] dd')).toHaveText("100 g");
+  await expect(details.locator('[data-stat="total-mass"] dd')).toHaveText("1 kg");
   await expect(details.getByRole("button", { name: "Drop 1" })).toBeVisible();
   await expect(details.getByRole("button", { name: "Drop stack (10)" })).toBeVisible();
+
+  // The selected stack preview reuses the grid's stack-fill treatment: the
+  // same derived fill from the same authoritative quantity and stack limit.
+  await expect(details.locator("[data-stack-track]")).toHaveCount(1);
+  await expect(details.locator("[data-stack-fill]")).toHaveAttribute("data-stack-fill", "100");
+  await expect(inventory.locator("[data-stack-fill]").first()).toHaveAttribute(
+    "data-stack-fill",
+    "100",
+  );
+  // The preview stays compact at the tile height instead of stretching to the
+  // height of the description column.
+  const [previewBox, statsBox] = await Promise.all([
+    details.locator("article").boundingBox(),
+    details.locator("dl").boundingBox(),
+  ]);
+  expect(previewBox).not.toBeNull();
+  expect(statsBox).not.toBeNull();
+  expect(previewBox!.height).toBeGreaterThanOrEqual(104);
+  expect(previewBox!.height).toBeLessThanOrEqual(120);
+  expect(statsBox!.height).toBeGreaterThan(previewBox!.height);
   await page.screenshot({ path: "test-results/mining-mobile-inventory-selection.png" });
 
   // Drop stack enters the inline permanent-destruction confirmation.
@@ -1358,10 +1400,16 @@ test("a selected Power Cell loads the depleted equipped Cutter from Inventory", 
 
   // Authoritative Power Cell facts and timing-only boost language.
   const details = inventory.getByRole("region", { name: "Power Cell details" });
-  await expect(details.getByText("Quantity: 2", { exact: true })).toBeVisible();
-  await expect(details.getByText(/Mass: 500 g each · 1 kg total/)).toBeVisible();
-  await expect(details.getByText("Stack limit: 5", { exact: true })).toBeVisible();
-  await expect(details.getByText(/boosted attempts\. Boost changes timing only/)).toBeVisible();
+  await expect(details.locator('[data-stat="quantity"] dd')).toHaveText("2");
+  await expect(details.locator('[data-stat="stack-limit"] dd')).toHaveText("5");
+  await expect(details.locator('[data-stat="unit-mass"] dd')).toHaveText("500 g");
+  await expect(details.locator('[data-stat="total-mass"] dd')).toHaveText("1 kg");
+  await expect(details.getByText("Load effect", { exact: true })).toBeVisible();
+  await expect(details.getByText("10 boosted attempts", { exact: true })).toBeVisible();
+  await expect(details.getByText("Speeds attempt timing only", { exact: true })).toBeVisible();
+  await expect(
+    details.getByText("Success chance, yield, and XP remain unchanged", { exact: true }),
+  ).toBeVisible();
   const loadButton = details.getByRole("button", { name: "Load into Salvage Cutter" });
   await expect(loadButton).toBeEnabled();
 
@@ -1375,7 +1423,7 @@ test("a selected Power Cell loads the depleted equipped Cutter from Inventory", 
   await expect(success).not.toHaveAttribute("role", "alert");
   await expect(inventory.getByRole("alert")).toHaveCount(0);
   // Inventory stays open and the selected stack quantity updates in place.
-  await expect(details.getByText("Quantity: 1", { exact: true })).toBeVisible();
+  await expect(details.locator('[data-stat="quantity"] dd')).toHaveText("1");
 
   // The charged Cutter now refuses an immediate second load with the reason.
   await expect(loadButton).toBeDisabled();
@@ -1389,4 +1437,92 @@ test("a selected Power Cell loads the depleted equipped Cutter from Inventory", 
   const equipment = page.getByRole("dialog", { name: "Equipment" });
   await expect(equipment.getByText("Loaded · 10 / 10", { exact: true })).toBeVisible();
   await expect(equipment.getByText("Carried Power Cells: 1", { exact: true })).toBeVisible();
+});
+
+test("selected details stay open through actions and dismiss deliberately", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  // This journey exercises the reduced-motion reveal path end to end.
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  const footer = page.getByRole("navigation", { name: "Primary" });
+  const characterId = page.url().split("/").at(-1)!;
+  await db.insert(inventoryStacks).values([
+    { characterId, itemId: ITEM_IDS.powerCell, quantity: 2 },
+    ...Array.from({ length: 6 }, () => ({
+      characterId,
+      itemId: ITEM_IDS.ferriteShale,
+      quantity: 2,
+    })),
+  ]);
+  await page.getByRole("button", { name: "Refresh status" }).click();
+  await expect(footer.getByRole("button", { name: "Inventory 7/8" })).toBeVisible();
+
+  await footer.getByRole("button", { name: "Inventory 7/8" }).click();
+  const inventory = page.getByRole("dialog", { name: "Inventory" });
+  const powerCellDetails = inventory.getByRole("region", { name: "Power Cell details" });
+  const powerCellTile = inventory.locator("button[aria-pressed]").filter({ hasText: "Power Cell" });
+  await powerCellTile.click();
+  await expect(powerCellDetails).toBeVisible();
+  // The reduced-motion reveal still moves focus to the details heading.
+  await expect(inventory.getByRole("heading", { name: "Item details" })).toBeFocused();
+
+  // Opening and cancelling the destructive confirmation keeps details open.
+  await powerCellDetails.getByRole("button", { name: "Drop 1" }).click();
+  const confirmation = inventory.getByRole("alert");
+  await expect(confirmation).toBeVisible();
+  await expect(powerCellDetails).toBeVisible();
+  await confirmation.getByRole("button", { name: "Cancel" }).click();
+  await expect(confirmation).toHaveCount(0);
+  await expect(powerCellDetails).toBeVisible();
+
+  // Interacting with Load keeps the details open and updates them in place.
+  await powerCellDetails.getByRole("button", { name: "Load into Salvage Cutter" }).click();
+  await expect(
+    inventory.getByText("Power Cell loaded · 10 boosted attempts ready.", { exact: true }),
+  ).toBeVisible();
+  await expect(powerCellDetails).toBeVisible();
+  await expect(powerCellDetails.locator('[data-stat="quantity"] dd')).toHaveText("1");
+
+  // Selecting the same tile again toggles details closed.
+  await powerCellTile.click();
+  await expect(powerCellDetails).toHaveCount(0);
+
+  // Selecting an empty slot clears the selection.
+  const ferriteTile = inventory.getByRole("button", { name: "2 Ferrite Shale" }).first();
+  await ferriteTile.click();
+  const ferriteDetails = inventory.getByRole("region", { name: "Ferrite Shale details" });
+  await expect(ferriteDetails).toBeVisible();
+  await inventory
+    .getByLabel(/Empty inventory slot/)
+    .first()
+    .click();
+  await expect(ferriteDetails).toHaveCount(0);
+
+  // Clicking unused drawer space clears the selection.
+  await ferriteTile.click();
+  await expect(ferriteDetails).toBeVisible();
+  const surface = inventory.locator("[data-inventory-surface]");
+  const surfaceBox = (await surface.boundingBox())!;
+  await surface.click({ position: { x: surfaceBox.width - 4, y: surfaceBox.height - 4 } });
+  await expect(ferriteDetails).toHaveCount(0);
+
+  // Close details is keyboard reachable.
+  await ferriteTile.click();
+  await expect(ferriteDetails).toBeVisible();
+  const closeDetails = inventory.getByRole("button", { name: "Close details" });
+  await closeDetails.focus();
+  await page.keyboard.press("Enter");
+  await expect(ferriteDetails).toHaveCount(0);
+
+  // No horizontal overflow while details are open on mobile.
+  await ferriteTile.click();
+  await expect(ferriteDetails).toBeVisible();
+  const pageOverflow = await page.evaluate(
+    () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+  );
+  expect(pageOverflow).toBeLessThanOrEqual(0);
+  const drawerOverflow = await inventory.evaluate(
+    (element) => element.scrollWidth - element.clientWidth,
+  );
+  expect(drawerOverflow).toBeLessThanOrEqual(1);
+  await page.screenshot({ path: "test-results/mining-mobile-inventory-dossier.png" });
 });

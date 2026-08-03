@@ -276,6 +276,7 @@ const MINING_REQUIRED = [
   "mining-mobile-inventory-drop-confirmation.png",
   "mining-mobile-inventory-drop-success.png",
   "mining-mobile-inventory-cell-loaded.png",
+  "mining-mobile-inventory-dossier.png",
   "mining-mobile-inventory-carried-cutter-selected.png",
   "mining-mobile-header.png",
   "mining-desktop-header.png",

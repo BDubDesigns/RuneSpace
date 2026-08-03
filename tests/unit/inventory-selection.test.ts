@@ -5,6 +5,7 @@ import {
   derivePowerCellLoadAvailability,
   resolveInventorySelection,
   stackDropActions,
+  toggleInventorySelection,
 } from "@/features/mining/inventory-selection";
 import { DiscardInventoryStackRequestSchema } from "@/game/schemas/gameplay";
 
@@ -129,6 +130,37 @@ describe("stack drop action derivation", () => {
 
   it("exposes no destructive actions for impossible empty stacks", () => {
     expect(stackDropActions(0)).toEqual([]);
+  });
+});
+
+describe("selection toggling", () => {
+  it("selecting the currently selected entry toggles the selection off", () => {
+    const current = { kind: "stack" as const, id: ferriteStack.id };
+    expect(toggleInventorySelection(current, { kind: "stack", id: ferriteStack.id })).toBe(
+      undefined,
+    );
+    const unique = { kind: "unique" as const, id: carriedCutter.id };
+    expect(toggleInventorySelection(unique, { kind: "unique", id: carriedCutter.id })).toBe(
+      undefined,
+    );
+  });
+
+  it("selecting another item replaces the current selection", () => {
+    const current = { kind: "stack" as const, id: ferriteStack.id };
+    expect(toggleInventorySelection(current, { kind: "unique", id: carriedCutter.id })).toEqual({
+      kind: "unique",
+      id: carriedCutter.id,
+    });
+    expect(toggleInventorySelection(undefined, { kind: "stack", id: ferriteStack.id })).toEqual({
+      kind: "stack",
+      id: ferriteStack.id,
+    });
+  });
+
+  it("does not toggle off across identity namespaces that share an ID", () => {
+    expect(
+      toggleInventorySelection({ kind: "stack", id: "same-id" }, { kind: "unique", id: "same-id" }),
+    ).toEqual({ kind: "unique", id: "same-id" });
   });
 });
 
