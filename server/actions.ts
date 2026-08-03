@@ -14,6 +14,7 @@ import {
   type MiningGameplayState,
 } from "@/server/mining";
 import { changeEquipment } from "@/server/equipment";
+import { discardInventoryStack, type DiscardInventoryStackResult } from "@/server/inventory";
 import { EquipmentRuleError } from "@/game/domain/equipment";
 import { TravelRuleError } from "@/server/travel";
 import { claimPowerCells, type PowerAnnexClaimResult } from "@/server/power-annex";
@@ -23,6 +24,7 @@ import {
   BeginTravelRequestSchema,
   ClaimPowerCellsRequestSchema,
   LoadPowerCellRequestSchema,
+  DiscardInventoryStackRequestSchema,
 } from "@/game/schemas/gameplay";
 
 /**
@@ -91,6 +93,26 @@ export async function loadPowerCellAction(input: unknown): Promise<LoadPowerCell
   try {
     const user = await requireCurrentUser(await headers());
     return await loadSalvageCutterPowerCell(user.id, request.data.characterId);
+  } catch (error) {
+    if (error instanceof OwnershipError) return { error: error.message };
+    throw error;
+  }
+}
+
+export type DiscardInventoryStackActionResult = DiscardInventoryStackResult | { error: string };
+
+export async function discardInventoryStackAction(
+  input: unknown,
+): Promise<DiscardInventoryStackActionResult> {
+  const request = DiscardInventoryStackRequestSchema.safeParse(input);
+  if (!request.success) return { error: "Invalid inventory command." };
+  try {
+    const user = await requireCurrentUser(await headers());
+    return await discardInventoryStack(user.id, request.data.characterId, {
+      stackId: request.data.stackId,
+      mode: request.data.mode,
+      expectedQuantity: request.data.expectedQuantity,
+    });
   } catch (error) {
     if (error instanceof OwnershipError) return { error: error.message };
     throw error;

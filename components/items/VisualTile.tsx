@@ -10,8 +10,17 @@ type VisualTileProps = {
   background?: ReactNode;
   className?: string;
   fallbackText: string;
+  /**
+   * Render the tile as a native button so occupied inventory tiles are
+   * operable by mouse, touch, and keyboard. The internal layers are phrasing
+   * content so the button stays valid HTML.
+   */
+  interactive?: boolean;
   mutedArtwork?: boolean;
   name: string;
+  onSelect?: () => void;
+  /** Exposed accessibly through `aria-pressed` and visually through a ring. */
+  selected?: boolean;
 };
 
 /** Shared compact frame for inventory content and non-inventory reward presentation. */
@@ -23,23 +32,28 @@ export function VisualTile({
   background,
   className = "",
   fallbackText,
+  interactive = false,
   mutedArtwork = false,
   name,
+  onSelect,
+  selected = false,
 }: VisualTileProps) {
   const descriptionId = useId();
-  return (
-    <article
-      aria-describedby={accessibleDescription ? descriptionId : undefined}
-      aria-label={accessibleLabel}
-      className={`relative min-h-28 overflow-hidden border border-[color:var(--rs-accent-mining)] bg-[color:var(--rs-surface-panel)] p-3 ${className}`}
-    >
+  const rootClassName = `relative min-h-28 overflow-hidden border border-[color:var(--rs-accent-mining)] bg-[color:var(--rs-surface-panel)] p-3 ${interactive ? "rs-focus w-full cursor-pointer text-left" : ""} ${selected ? "ring-2 ring-[color:var(--rs-accent-mining)]" : ""} ${className}`;
+  const rootProps = {
+    "aria-describedby": accessibleDescription ? descriptionId : undefined,
+    "aria-label": accessibleLabel,
+    className: rootClassName,
+  };
+  const content = (
+    <>
       {accessibleDescription ? (
         <span className="sr-only" id={descriptionId}>
           {accessibleDescription}
         </span>
       ) : null}
       {background}
-      <div className="absolute inset-0 z-10 flex items-center justify-center">
+      <span className="absolute inset-0 z-10 flex items-center justify-center">
         {artworkSrc ? (
           <Image
             alt=""
@@ -51,19 +65,33 @@ export function VisualTile({
             width={160}
           />
         ) : (
-          <span className="font-display text-sm uppercase tracking-[0.16em] text-[color:var(--rs-text-secondary)]">
+          <span
+            data-item-fallback
+            className="font-display text-sm uppercase tracking-[0.16em] text-[color:var(--rs-text-secondary)]"
+          >
             {fallbackText}
           </span>
         )}
-      </div>
-      <p className="absolute bottom-0 left-3 right-0 z-20 truncate border-t border-[color:var(--rs-item-plate-border)] bg-[color:var(--rs-item-nameplate-surface)] px-2 py-0.5 font-display text-xs uppercase tracking-wide">
+      </span>
+      <span
+        data-nameplate
+        className="absolute bottom-0 left-3 right-0 z-20 block truncate border-t border-[color:var(--rs-item-plate-border)] bg-[color:var(--rs-item-nameplate-surface)] px-2 py-0.5 font-display text-xs uppercase tracking-wide"
+      >
         {name}
-      </p>
+      </span>
       {badge !== undefined ? (
         <span className="absolute right-2 top-2 z-20 border border-[color:var(--rs-item-plate-border)] bg-[color:var(--rs-item-plate-surface)] px-1.5 py-0.5 font-display text-xs">
           {badge}
         </span>
       ) : null}
-    </article>
+    </>
   );
+  if (interactive) {
+    return (
+      <button {...rootProps} aria-pressed={selected} onClick={onSelect} type="button">
+        {content}
+      </button>
+    );
+  }
+  return <article {...rootProps}>{content}</article>;
 }
