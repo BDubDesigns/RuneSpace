@@ -8,12 +8,9 @@ import { Feedback } from "@/components/ui/Feedback";
 import { StatusMeter } from "@/components/ui/StatusMeter";
 import { getEffectiveGameBalance } from "@/game/config/balance";
 import { GAME_TICK_MS } from "@/game/config/foundations";
-import {
-  equipEquipmentAction,
-  loadPowerCellAction,
-  unequipEquipmentAction,
-} from "@/server/actions";
+import { equipEquipmentAction, unequipEquipmentAction } from "@/server/actions";
 import type { MiningGameplayState } from "@/server/mining";
+import { useLoadPowerCell } from "./useLoadPowerCell";
 import { useMiningPlay } from "./MiningPlayContext";
 
 function kilograms(grams: number) {
@@ -37,6 +34,10 @@ export function EquipmentPanel({
   const [, startTransition] = useTransition();
   const [message, setMessage] = useState<string>();
   const [messageTone, setMessageTone] = useState<"muted" | "danger">("muted");
+  const { busy: loadBusy, loadPowerCell } = useLoadPowerCell((feedback) => {
+    setMessage(feedback.message);
+    setMessageTone(feedback.tone);
+  });
   const miningToolSlotId = getEffectiveGameBalance().items.salvageCutter.suitSlotId;
 
   function apply(result: Awaited<ReturnType<typeof equipEquipmentAction>>) {
@@ -58,32 +59,6 @@ export function EquipmentPanel({
         apply(await action());
       } catch {
         setMessage("Comms interruption. Equipment could not be confirmed.");
-        setMessageTone("danger");
-      } finally {
-        releaseCommand();
-      }
-    });
-  }
-
-  function loadPowerCell() {
-    if (!acquireCommand()) return;
-    startTransition(async () => {
-      try {
-        const result = await loadPowerCellAction({ characterId: state.characterId });
-        if ("error" in result) {
-          setMessage(result.error);
-          setMessageTone("danger");
-          return;
-        }
-        acceptState(result.state);
-        setMessage(
-          result.load.status === "loaded"
-            ? `Power Cell loaded · ${result.load.remainingCharge} boosted attempts ready.`
-            : result.load.message,
-        );
-        setMessageTone(result.load.status === "loaded" ? "muted" : "danger");
-      } catch {
-        setMessage("Comms interruption. Power Cell load could not be confirmed.");
         setMessageTone("danger");
       } finally {
         releaseCommand();
@@ -187,7 +162,7 @@ export function EquipmentPanel({
                         className="mt-3"
                         disabled={busy}
                         intent="mining"
-                        loading={busy}
+                        loading={loadBusy}
                         onClick={loadPowerCell}
                       >
                         Load Power Cell

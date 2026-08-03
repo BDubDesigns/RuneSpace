@@ -1,18 +1,16 @@
 "use client";
 
-import { useEffect, useRef, useState, useTransition, type RefObject } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { ActionButton } from "@/components/ui/ActionButton";
 import { ItemVisual } from "@/components/items/ItemVisual";
 import { VisualTile } from "@/components/items/VisualTile";
 import { Feedback } from "@/components/ui/Feedback";
 import { Panel } from "@/components/ui/Panel";
-import { Drawer } from "@/components/ui/Drawer";
 import { SectionHeader } from "@/components/ui/SectionHeader";
 import { StatusMeter } from "@/components/ui/StatusMeter";
 import { getEffectiveGameBalance } from "@/game/config/balance";
 import { GAME_TICK_MS, ITEM_IDS, LOCATION_IDS } from "@/game/config/foundations";
 import { getLocation } from "@/game/content/locations";
-import { inventoryStackFillFraction } from "@/game/domain/inventory";
 import { boostedMiningAttemptDurationTicks, miningNearMissBasisPoints } from "@/game/domain/mining";
 import type { MiningGameplayState, MiningRunAttempt } from "@/server/mining";
 import { refreshMiningAction, startMiningAction, stopMiningAction } from "@/server/actions";
@@ -20,6 +18,7 @@ import { reportClientDiagnostic } from "@/features/diagnostics/client";
 import { latestMiningAttempt, resolvedAttemptCount } from "./latest-result";
 import { useMiningPlay } from "./MiningPlayContext";
 import { EquipmentPanel } from "./EquipmentPanel";
+import { InventoryPanel } from "./InventoryPanel";
 import { LocalMapPanel } from "@/features/travel/LocalMapPanel";
 import { PowerAnnexClaimPanel } from "@/features/power-annex/PowerAnnexClaimPanel";
 
@@ -147,89 +146,6 @@ function LatestAttemptResult({
         </p>
       )}
     </section>
-  );
-}
-
-function InventoryPanel({
-  state,
-  onClose,
-  triggerRef,
-}: {
-  state: MiningGameplayState;
-  onClose: () => void;
-  triggerRef: RefObject<HTMLButtonElement | null>;
-}) {
-  const totalSlots = state.inventory.slotsUsed + state.inventory.slotsAvailable;
-  const balance = getEffectiveGameBalance();
-  return (
-    <Drawer
-      eyebrow="MYKEA SCHLEPPRAUM-8"
-      label="Inventory"
-      onClose={onClose}
-      title="Inventory"
-      triggerRef={triggerRef}
-    >
-      <p className="mt-2 text-sm text-[color:var(--rs-text-secondary)]">
-        {state.inventory.slotsUsed} occupied / {totalSlots} slots
-      </p>
-      <div
-        className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4"
-        aria-label={`${totalSlots} inventory slots`}
-      >
-        {state.inventory.stacks.map((stack) => (
-          <ItemVisual
-            background={
-              <div
-                aria-hidden="true"
-                className="absolute inset-y-0 left-0 z-0 w-2 overflow-hidden bg-[color:var(--rs-accent-mining-stack-track)]"
-                data-stack-track
-              >
-                <div
-                  className="absolute inset-x-0 bottom-0 bg-[color:var(--rs-accent-mining)] transition-[height] duration-[var(--rs-duration-fast)]"
-                  data-stack-fill={Math.round(
-                    inventoryStackFillFraction(stack.quantity, stack.stackLimit) * 100,
-                  )}
-                  style={{
-                    height: `${inventoryStackFillFraction(stack.quantity, stack.stackLimit) * 100}%`,
-                  }}
-                />
-              </div>
-            }
-            itemId={stack.itemId}
-            key={stack.id}
-            name={stack.name}
-            quantity={stack.quantity}
-          />
-        ))}
-        {state.inventory.uniqueItems.map((item) => (
-          <ItemVisual
-            accessibleLabel={item.name}
-            additionalDescription={
-              item.currentCharge !== undefined
-                ? `${item.currentCharge} of ${balance.items.salvageCutter.maximumCharge} charges remaining`
-                : undefined
-            }
-            badge={
-              item.currentCharge !== undefined
-                ? `${item.currentCharge}/${balance.items.salvageCutter.maximumCharge}`
-                : undefined
-            }
-            itemId={item.itemId}
-            key={item.id}
-            name={item.name}
-          />
-        ))}
-        {Array.from({ length: Math.max(0, totalSlots - state.inventory.slotsUsed) }, (_, index) => (
-          <div
-            aria-label={`Empty inventory slot ${state.inventory.slotsUsed + index + 1}`}
-            className="min-h-28 border border-dashed border-[color:var(--rs-border-subtle)] bg-[color:var(--rs-surface-panel)] p-3 text-xs uppercase tracking-wide text-[color:var(--rs-text-muted)]"
-            key={`empty-${state.inventory.slotsUsed + index}`}
-          >
-            Empty slot
-          </div>
-        ))}
-      </div>
-    </Drawer>
   );
 }
 

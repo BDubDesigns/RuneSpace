@@ -16,6 +16,10 @@ type ItemVisualProps = {
   mutedArtwork?: boolean;
   background?: React.ReactNode;
   className?: string;
+  /** Render as a selectable native button (occupied Inventory tiles). */
+  interactive?: boolean;
+  selected?: boolean;
+  onSelect?: () => void;
 };
 
 /** A compact, read-only item treatment for inventory and future equipment views. */
@@ -29,6 +33,9 @@ export function ItemVisual({
   mutedArtwork,
   background,
   className,
+  interactive,
+  selected,
+  onSelect,
 }: ItemVisualProps) {
   const presentation = resolveItemPresentation(itemId, name);
   return (
@@ -49,8 +56,11 @@ export function ItemVisual({
       badge={badge ?? (quantity !== undefined ? `x${quantity}` : undefined)}
       className={className}
       fallbackText={presentation.textFallback}
+      interactive={interactive}
       mutedArtwork={mutedArtwork}
       name={presentation.displayName}
+      onSelect={onSelect}
+      selected={selected}
     />
   );
 }

@@ -80,6 +80,35 @@ summaries are retained. Starting a genuinely new Mining action resets this run.
 - Item names, weights, stack limits, maximum charges, container capacities, and
   equipment classification belong to validated typed content, not player rows.
 
+### Inventory item actions (issue #58)
+
+- Selecting an occupied Inventory tile (mouse, touch, or keyboard) opens one
+  compact detail/action area inside the existing Inventory drawer. One entry is
+  selected at a time; selecting another entry replaces the selection, and empty
+  slots stay non-interactive. Selection and pending confirmation are transient
+  drawer state: closing Inventory clears them, and an authoritative update that
+  removes the selected entry clears or safely transitions the selection.
+- Stack details come from the authoritative projection and typed content:
+  approved artwork, display name, quantity, per-item and total mass, and the
+  approved stack limit. Carried unique items show their artwork, display name,
+  mass, and approved persistent state (such as Cutter charge) and carry no
+  Drop, Equip, Use, or Destroy action.
+- `Drop 1` and `Drop stack` are available for stack rows only. Both require an
+  inline confirmation stating the item, the exact quantity, and that dropped
+  items are **permanently destroyed in the current development build**. The
+  server-authoritative `discardInventoryStack` command locks the owned stack,
+  validates the confirmed quantity after any due-work reconciliation, and
+  refuses safely when the stack changed. Real ground items, map coordinates,
+  visibility to other players, pickup, trading, and transfers remain future
+  work; no world object is created by dropping.
+- Inventory Power Cell loading is a convenience route to the same
+  server-authoritative `loadSalvageCutterPowerCell` command and transaction the
+  Equipment surface uses, via the same `loadPowerCellAction` client action. It
+  is enabled only when the authoritative state shows a loose cell, an equipped
+  depleted Cutter, and no conflicting command in flight, and it explains the
+  reason whenever it is unavailable. Equipment remains the full Cutter
+  charge/status surface.
+
 ## Approved identities and boundaries
 
 Near-term stable skills are Mining, Metallurgy, Welding, and Strength. Stable

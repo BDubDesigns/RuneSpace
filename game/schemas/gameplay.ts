@@ -51,6 +51,19 @@ export const LoadPowerCellRequestSchema = z.object({
   characterId: z.string().uuid(),
 });
 
+/**
+ * Discarding identifies only the operation: the authoritative stack row, the
+ * narrow mode, and the expected selected-stack quantity as an optimistic
+ * concurrency precondition. Item identity, mass, names, stack limits, and
+ * resulting quantities are always server-resolved.
+ */
+export const DiscardInventoryStackRequestSchema = z.object({
+  characterId: z.string().uuid(),
+  stackId: z.string().uuid(),
+  mode: z.enum(["one", "stack"]),
+  expectedQuantity: z.number().int().positive(),
+});
+
 /** Containers can only hold non-container item definitions. */
 export const ContainerContentItemSchema = z.object({
   itemId: ItemIdSchema,
