@@ -25,19 +25,24 @@ test("Sign out from the authenticated header returns to the signed-out landing",
     throw new Error("Sign-out E2E fixtures require a disposable localhost PostgreSQL database");
   }
 
-  // Register a fresh account and character for this isolated check.
+  // Register a fresh account and character for this isolated check. The
+  // character name must stay within the 24-character limit (a longer name is
+  // truncated and its truncated timestamp can collide with an earlier run on
+  // the shared database), so use a compact base-36 timestamp plus a random
+  // digit.
   await page.goto("/register");
   await page.getByLabel("Display name").fill("Sign-out Fixture");
   await page.getByLabel("Email").fill(uniqueEmail());
   await page.getByLabel("Password", { exact: true }).fill("sup3r-secret-password");
   await page.getByRole("button", { name: "Create account" }).click();
   await page.getByRole("link", { name: "New character" }).click();
-  await page.getByLabel("Character name").fill(`Sign-out Fixture ${Date.now()}`);
+  const characterName = `Signout ${Date.now().toString(36)}${Math.floor(Math.random() * 36).toString(36)}`;
+  await page.getByLabel("Character name").fill(characterName);
   await page.getByRole("button", { name: "Create character" }).click();
   await expect(page.getByRole("img", { name: "RuneSpace" })).toBeVisible();
 
-  // The control is present beside the brand in the authenticated header.
-  const signOut = page.getByRole("button", { name: "Sign out" });
+  // The control is present inside the single header panel beside the brand.
+  const signOut = page.getByRole("banner").getByRole("button", { name: "Sign out" });
   await expect(signOut).toBeVisible();
 
   // Activating it clears the session and returns to the signed-out landing.

@@ -51,14 +51,7 @@ function MiningFooter() {
 }
 
 function PlayTopBar() {
-  return (
-    <div className="flex items-center justify-between gap-3">
-      <div className="min-w-0 flex-1">
-        <TopBar title={<RuneSpaceBrand />} />
-      </div>
-      <SignOutButton />
-    </div>
-  );
+  return <TopBar title={<RuneSpaceBrand />} trailing={<SignOutButton />} />;
 }
 
 export function MiningPlayScreen({

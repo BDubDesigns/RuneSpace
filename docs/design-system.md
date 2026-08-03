@@ -38,6 +38,6 @@ Canonical asset paths:
 
 Sizing and clear space (approved by the product owner; supersedes the earlier location-subtitle-in-header requirement):
 
-- Authenticated game header: `RuneSpaceBrand`'s default `h-11 w-auto max-w-[52vw] sm:h-12 sm:max-w-[13rem]` (~44px on mobile, ~48px from the `sm` breakpoint). The lockup sits on one row with the Sign out control; the width caps keep it from pushing Sign out off-row or overflowing the viewport. The header deliberately no longer repeats the current-location or `In transit` subtitle — the main page location/activity panel is the authoritative visible location presentation.
+- Authenticated game header: one full-width beveled header panel spanning the game-shell content width. `RuneSpaceBrand`'s default `h-auto w-auto max-h-11 max-w-[min(52vw,100%)] sm:max-h-12 sm:max-w-[min(13rem,100%)]` renders the lockup at ~44px on mobile and ~48px from the `sm` breakpoint; the caps let it shrink responsively before wrapping or overflowing, while the shared `TopBar` `trailing` slot keeps the Sign out control vertically centered inside the same panel. The header deliberately does not repeat the current-location or `In transit` subtitle — the main page location/activity panel is the authoritative visible location presentation.
 - Signed-out landing: override with `h-14 w-auto sm:h-16` (~56px on mobile, ~64px from the `sm` breakpoint), inside the existing `Development build` heading card.
 - Keep the accessible brand name; do not change the approved files' contents, compression, or dimensions.

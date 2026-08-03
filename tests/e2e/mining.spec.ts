@@ -1045,12 +1045,13 @@ test("the Play boundary resets, navigates, and hides failure details", async ({ 
 
 /**
  * Production header branding (Issue #52). Non-destructive: it verifies the
- * larger lockup, one-row Sign out, overflow freedom, icon metadata, and that
- * the banner no longer duplicates the location subtitle. Sign-out operability
- * is covered by the dedicated `signout` spec so this serial group's shared
- * session (and its CI retries) stay intact.
+ * single full-width header panel containing both the larger lockup and Sign
+ * out, overflow freedom, icon metadata, and that the banner no longer
+ * duplicates the location subtitle. Sign-out operability is covered by the
+ * dedicated `signout` spec so this serial group's shared session (and its CI
+ * retries) stay intact.
  */
-test("production header shows the larger RuneSpace lockup without duplicating the location", async ({
+test("production header is one full-width panel with the larger lockup and Sign out", async ({
   page,
 }) => {
   await page.setViewportSize({ width: 390, height: 844 });
@@ -1063,18 +1064,28 @@ test("production header shows the larger RuneSpace lockup without duplicating th
     .poll(() => lockup.evaluate((image) => image.complete && image.naturalWidth > 0))
     .toBe(true);
 
+  // The single header panel spans the full game-shell content width.
+  const headerBox = await header.boundingBox();
+  const mainBox = await page.getByRole("main").boundingBox();
+  expect(headerBox).not.toBeNull();
+  expect(mainBox).not.toBeNull();
+  expect(Math.abs(headerBox!.width - mainBox!.width)).toBeLessThanOrEqual(2);
+
   // The lockup is the approved larger header treatment (~44px on mobile).
   const mobileLockup = await lockup.boundingBox();
   expect(mobileLockup).not.toBeNull();
   expect(mobileLockup!.height).toBeGreaterThanOrEqual(40);
   expect(mobileLockup!.height).toBeLessThanOrEqual(50);
 
-  // Sign out remains present beside the brand on the same row.
-  const signOut = page.getByRole("button", { name: "Sign out" });
+  // Sign out lives inside the same header panel, vertically centered on one row.
+  const signOut = header.getByRole("button", { name: "Sign out" });
   await expect(signOut).toBeVisible();
   const signOutBox = await signOut.boundingBox();
   expect(signOutBox).not.toBeNull();
-  expect(Math.abs(signOutBox!.y - mobileLockup!.y)).toBeLessThanOrEqual(signOutBox!.height);
+  expect(signOutBox!.height).toBeGreaterThanOrEqual(44);
+  const lockupCenterY = mobileLockup!.y + mobileLockup!.height / 2;
+  const signOutCenterY = signOutBox!.y + signOutBox!.height / 2;
+  expect(Math.abs(lockupCenterY - signOutCenterY)).toBeLessThanOrEqual(2);
 
   // The banner no longer duplicates the location subtitle; the main page
   // location panel is the authoritative presentation.
@@ -1084,7 +1095,7 @@ test("production header shows the larger RuneSpace lockup without duplicating th
     page.getByRole("main").getByText("Crash Site", { exact: true }).first(),
   ).toBeVisible();
 
-  // The lockup must not create horizontal document overflow at mobile width.
+  // The single panel must not create horizontal document overflow at mobile width.
   const mobileWidth = await page.evaluate(
     () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
   );
