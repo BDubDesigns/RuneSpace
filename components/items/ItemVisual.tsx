@@ -7,6 +7,12 @@ type ItemVisualProps = {
   quantity?: number;
   badge?: string;
   accessibleLabel?: string;
+  /**
+   * Item-specific player-facing state (e.g., "3 of 10 charges remaining"),
+   * appended to the item's approved presentation description so screen-reader
+   * users receive the same state the tile shows visually.
+   */
+  additionalDescription?: string;
   mutedArtwork?: boolean;
   background?: React.ReactNode;
   className?: string;
@@ -19,6 +25,7 @@ export function ItemVisual({
   quantity,
   badge,
   accessibleLabel,
+  additionalDescription,
   mutedArtwork,
   background,
   className,
@@ -26,11 +33,20 @@ export function ItemVisual({
   const presentation = resolveItemPresentation(itemId, name);
   return (
     <VisualTile
-      accessibleDescription={presentation.accessibleDescription}
-      accessibleLabel={accessibleLabel ?? `${quantity ?? 1} ${presentation.displayName}`}
+      accessibleDescription={
+        additionalDescription
+          ? `${presentation.accessibleDescription}. ${additionalDescription}`
+          : presentation.accessibleDescription
+      }
+      accessibleLabel={
+        accessibleLabel ??
+        (quantity !== undefined
+          ? `${quantity} ${presentation.displayName}`
+          : presentation.displayName)
+      }
       artworkSrc={presentation.artworkSrc}
       background={background}
-      badge={badge ?? `x${quantity ?? 1}`}
+      badge={badge ?? (quantity !== undefined ? `x${quantity}` : undefined)}
       className={className}
       fallbackText={presentation.textFallback}
       mutedArtwork={mutedArtwork}

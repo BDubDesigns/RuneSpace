@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { ITEM_IDS, SKILL_IDS } from "@/game/config/foundations";
 import {
   calculateCarriedWeight,
+  deriveCarriedUniqueItems,
   deriveCarryingCapacity,
   inventorySlotCapacityFromContainers,
   inventorySlotsUsed,
@@ -123,6 +124,33 @@ describe("inventory", () => {
         equipmentCapacities: [3],
       }),
     ).toBe(15);
+  });
+
+  it("projects carried unique items excluding equipped instances", () => {
+    const carried = deriveCarriedUniqueItems(
+      [
+        { id: "cutter", itemId: ITEM_IDS.salvageCutter, createdAt: "2026-01-01T00:00:00.000Z" },
+        {
+          id: "container",
+          itemId: ITEM_IDS.mykeaSchleppraum8,
+          createdAt: "2026-01-02T00:00:00.000Z",
+        },
+      ],
+      new Set(["cutter"]),
+    );
+    expect(carried.map((item) => item.id)).toEqual(["container"]);
+  });
+
+  it("orders carried unique items deterministically by creation time and ID", () => {
+    const instances = [
+      { id: "b", itemId: ITEM_IDS.salvageCutter, createdAt: "2026-01-01T00:00:01.000Z" },
+      { id: "a", itemId: ITEM_IDS.salvageCutter, createdAt: "2026-01-01T00:00:01.000Z" },
+      { id: "c", itemId: ITEM_IDS.mykeaSchleppraum8, createdAt: "2026-01-01T00:00:00.000Z" },
+    ];
+    const once = deriveCarriedUniqueItems(instances, new Set());
+    const twice = deriveCarriedUniqueItems([...instances].reverse(), new Set());
+    expect(once.map((item) => item.id)).toEqual(["c", "a", "b"]);
+    expect(twice.map((item) => item.id)).toEqual(["c", "a", "b"]);
   });
 
   it("rejects nested containers at the validation boundary", () => {

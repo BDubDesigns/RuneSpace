@@ -5,7 +5,8 @@ type VisualTileProps = {
   accessibleLabel: string;
   accessibleDescription?: string;
   artworkSrc?: string;
-  badge: string;
+  /** Omit to render no corner plate (unique items carry no fake stack quantity). */
+  badge?: string;
   background?: ReactNode;
   className?: string;
   fallbackText: string;
@@ -58,9 +59,11 @@ export function VisualTile({
       <p className="absolute bottom-0 left-3 right-0 z-20 truncate border-t border-[color:var(--rs-item-plate-border)] bg-[color:var(--rs-item-nameplate-surface)] px-2 py-0.5 font-display text-xs uppercase tracking-wide">
         {name}
       </p>
-      <span className="absolute right-2 top-2 z-20 border border-[color:var(--rs-item-plate-border)] bg-[color:var(--rs-item-plate-surface)] px-1.5 py-0.5 font-display text-xs">
-        {badge}
-      </span>
+      {badge !== undefined ? (
+        <span className="absolute right-2 top-2 z-20 border border-[color:var(--rs-item-plate-border)] bg-[color:var(--rs-item-plate-surface)] px-1.5 py-0.5 font-display text-xs">
+          {badge}
+        </span>
+      ) : null}
     </article>
   );
 }

@@ -138,6 +138,31 @@ export function inventorySlotsUsed(stackCount: number, carriedUniqueItemCount: n
   return stackCount + carriedUniqueItemCount;
 }
 
+/**
+ * A carried unique item instance in authoritative, deterministic presentation
+ * order. `createdAt` must be a canonical sortable string (callers supply
+ * `Date#toISOString()`); the ID breaks insertion-time ties.
+ */
+export type CarriedUniqueItemInstance = {
+  id: string;
+  itemId: ItemId;
+  createdAt: string;
+};
+
+/**
+ * The carried-unique-item projection: every owned instance that is not
+ * currently equipped, in stable (createdAt, id) order so refreshes and
+ * equipment changes never reshuffle the remaining tiles.
+ */
+export function deriveCarriedUniqueItems<Instance extends CarriedUniqueItemInstance>(
+  instances: readonly Instance[],
+  equippedItemInstanceIds: ReadonlySet<string>,
+): Instance[] {
+  return instances
+    .filter((instance) => !equippedItemInstanceIds.has(instance.id))
+    .sort((a, b) => a.createdAt.localeCompare(b.createdAt) || a.id.localeCompare(b.id));
+}
+
 /** Clamp a stack's UI fill level without making presentation infer item rules. */
 export function inventoryStackFillFraction(quantity: number, stackLimit: number): number {
   if (!Number.isFinite(quantity) || !Number.isFinite(stackLimit) || stackLimit <= 0) return 0;
