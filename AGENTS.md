@@ -110,10 +110,13 @@ subagents or automation that may be unavailable.
    PR, local validation results, canonical CI result, architectural decisions,
    review approach, limitations, and unresolved questions; for UI changes include
    the preview URL as the default visual evidence (frozen screenshots only when
-   requested or the preview is unavailable). Do not hand-maintain a commit SHA in
-   the body — GitHub shows the head commit. State exactly whether gameplay,
-   balance, persistence, or player-facing behavior changed and which approved
-   decisions governed those changes.
+   requested or the preview is unavailable). Include `closes #<issue number>` in
+   the PR body: the closing keyword is a body reference that takes effect only
+   when the PR is merged, and merging remains the product owner's explicit
+   action — a branch name or PR title does not replace the body reference. Do not
+   hand-maintain a commit SHA in the body — GitHub shows the head commit. State
+   exactly whether gameplay, balance, persistence, or player-facing behavior
+   changed and which approved decisions governed those changes.
 8. **Follow every workflow that actually triggers.** Draft synchronization runs
    the fast checks and intentionally does not run the PostgreSQL or canonical
    jobs unless `full-ci` is present. Applying `full-ci`, marking the PR ready,
@@ -166,3 +169,16 @@ subagents or automation that may be unavailable.
   pnpm test:integration
   pnpm test:e2e:canonical
   ```
+
+### Managed-host ports and process cleanup
+- Port `3000` belongs to OpenChamber. Never use it for RuneSpace work and never
+  kill its process.
+- Port `3200` belongs to the canonical RuneSpace E2E runner
+  (`scripts/run-canonical-e2e.mjs`).
+- An independent focused E2E run must use a separately confirmed-free high port,
+  never `3000` or `3200`. `pnpm test:e2e:focused` defaults to `3310` and refuses
+  to start unless that port is confirmed available.
+- Before cleaning up any listener, inspect the owning PID with `ss -tlnp` and
+  kill only a positively identified RuneSpace-owned test-server PID with a
+  targeted `kill <pid>`. Never use broad `pkill -f` or blanket Next.js
+  cleanup.

@@ -37,8 +37,11 @@ must never be printed or committed.
 Better Auth derives cookie `Secure`/attributes from the resolved protocol and
 environment. In production mode it issues `Secure` cookies, which an HTTP origin
 cannot store. Production and preview deployments run over HTTPS and keep this
-default. The only exception is the canonical E2E runner, which runs the
-production server over plain HTTP; see `docs/testing-strategy.md` for the
-`RUNESPACE_E2E_CANONICAL_HTTP` gate that disables `Secure` cookies for that
-runner alone. Never generalize that exception to CI, preview, or production, and
-never gate it on a generic `CI` flag.
+default. The only exceptions are the repository's local production E2E runners
+(the canonical runner and the focused runner from `docs/development-workflow.md`),
+which run the production server over plain HTTP; see `docs/testing-strategy.md`
+for the `RUNESPACE_E2E_CANONICAL_HTTP` gate that disables `Secure` cookies for
+those runners alone. The gate applies only to the plain-HTTP loopback server
+the runner itself owns — including canonical execution in GitHub Actions — and
+is never set for the ordinary CI build job, previews, or deployments, and never
+gated on a generic `CI` flag.

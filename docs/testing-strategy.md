@@ -29,7 +29,10 @@ small number of critical mobile player journeys.
 - Quick local development: `pnpm test:e2e`. It uses the production server by
   default and may reuse an existing server outside CI; set
   `PLAYWRIGHT_DEV_SERVER=true` for a development server. It does **not** count
-  as CI-parity validation.
+  as CI-parity validation. On the managed RuneSpace host, plain `pnpm test:e2e`
+  defaults to port `3000`, which belongs to OpenChamber; never run it there
+  without a different `PLAYWRIGHT_PORT` — use `pnpm test:e2e:focused <phase>`
+  for managed-host iteration instead.
 - The canonical CI-parity command: `pnpm test:e2e:canonical`. This is the single
   source of truth for local and CI behavioral verification, and for
   frozen-screenshot verification when screenshots are requested. It:
@@ -59,11 +62,21 @@ small number of critical mobile player journeys.
     `trace: "on-first-retry"` write per-test screenshots and traces into
     `test-results/`; CI uploads those as a bounded failure-diagnostics artifact
     regardless of the screenshot opt-in
+  - `test-results/` belongs to an individual Playwright invocation and may be
+    cleaned or replaced by a later invocation (the focused runner does exactly
+    that). Failure diagnostics are bounded to failing tests. Curated screenshots
+    survive the complete canonical sequence only when
+    `RUNESPACE_E2E_SCREENSHOTS=true` causes the canonical runner to copy and
+    verify them under `artifacts/e2e-review/`; expected per-invocation cleanup
+    is not lost output.
   - sets `RUNESPACE_E2E_CANONICAL_HTTP=true`, which disables Better Auth `Secure`
-    cookies for this runner only. Production-mode Better Auth issues `Secure`
+    cookies for the local production E2E runners (canonical and focused) only.
+    Production-mode Better Auth issues `Secure`
     cookies that a plain-HTTP test origin (`http://127.0.0.1:<port>`) discards,
     dropping the session after sign-up; this gate is a test-runner-only exception
-    (see `docs/authentication.md`) and is never set for CI builds, preview, or
+    (see `docs/authentication.md`). It applies only to the plain-HTTP loopback
+    server those runners own, including canonical execution in GitHub Actions;
+    it is never set for the ordinary CI build job, for previews, or for
     production.
 - Agents may not report browser or CI parity as passing unless the canonical
   command actually passed.
@@ -77,6 +90,16 @@ small number of critical mobile player journeys.
   default, or a development server when `PLAYWRIGHT_DEV_SERVER=true` is set.
   Focused evidence is never a substitute for the canonical command — only
   `pnpm test:e2e:canonical` and the matching CI job establish CI parity.
+- Managed-host focused iteration uses `pnpm test:e2e:focused <phase>` (currently
+  `mining`; recipe in `docs/development-workflow.md`). The focused runner
+  reuses the canonical primitives from `scripts/e2e-shared.mjs` (localhost-only
+  database safety, Node 22 validation, port availability, targeted process
+  termination) and owns a separate high port (default `3310`, never `3000` or
+  `3200`), a local build-and-runtime auth placeholder, and a small lifecycle:
+  stale auth-state cleanup, migrations, one production build and server, the
+  selected phase, then deterministic teardown of only its own processes.
+  Focused results are iteration evidence only; only `pnpm test:e2e:canonical`
+  and the matching CI job establish CI parity.
 - GitHub Actions remains the final authority; canonical execution must use the
   same `pnpm test:e2e:canonical` command.
 - Uploading an artifact is not proof that promised evidence exists. Verify each
@@ -171,8 +194,11 @@ intentionally fails on draft checkpoints. This is necessary because GitHub
 marks a skipped required job successful; a green draft decision would otherwise
 be reusable when the PR becomes ready without a new commit. Require only the
 fast check and `Merge gate` in the `main` branch protection/ruleset; this
-repository currently has no such protection configured, so a maintainer must
-verify those settings separately.
+repository currently has no such protection configured — API-verified for
+Issue #61 on 2026-08-03 (the GitHub REST branch-protection endpoint returns
+`Branch not protected`, and the repository rulesets list is empty) — so a
+maintainer must verify those settings separately. Treat that snapshot as dated
+repository state and re-verify before acting on it.
 
 CI retains a separate PostgreSQL integration job and canonical E2E job. The
 canonical runner is the single source of truth for E2E behavioral verification
