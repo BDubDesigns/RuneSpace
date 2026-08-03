@@ -30,7 +30,16 @@ pnpm format:check
 pnpm test
 pnpm drizzle-kit migrate
 pnpm test:integration
+
+# Production build: `next build` runs as production, so server/env.ts requires a
+# BETTER_AUTH_SECRET of at least 16 characters. Export a clearly fake
+# build-only placeholder, then unset it. The placeholder shape follows
+# .github/workflows/ci.yml — the source of truth for this shape. It is valid
+# for this local/CI build command only and must never be used in a deployment.
+export BETTER_AUTH_SECRET="insecure-ci-build-only-secret-do-not-use-in-prod-0000000000"
 pnpm build
+unset BETTER_AUTH_SECRET
+
 pnpm test:e2e:canonical
 ```
 
@@ -38,6 +47,39 @@ If `/home/brandon/.config/runespace/dev.env` is missing or unreadable, stop and
 report the environment blocker. Never guess credentials, inspect or report the
 private file's contents, or use the Coolify production database for local testing.
 The canonical runner's localhost-only database safety check remains authoritative.
+
+### Managed-host ports, cleanup, and focused E2E
+- Port `3000` belongs to OpenChamber. Never use it for RuneSpace work and never
+  kill its process.
+- Port `3200` is the canonical runner's dedicated port
+  (`scripts/run-canonical-e2e.mjs`).
+- A focused run must use a separately confirmed-free high port, never `3000` or
+  `3200`. `pnpm test:e2e:focused` defaults to `3310`, refuses to start unless
+  that port is confirmed available, and accepts an override through
+  `RUNESPACE_FOCUSED_E2E_PORT` (a validated high port in `1024..65535`).
+- Cleanup: inspect listeners and owning PIDs with `ss -tlnp`, then kill only a
+  positively identified RuneSpace-owned test-server PID with a targeted
+  `kill <pid>`. Never use broad `pkill -f` or blanket Next.js cleanup. If the
+  focused port is occupied by an uncertain process, choose another inspected
+  free high port instead of killing it.
+- One focused phase from a clean state:
+
+```bash
+source /home/brandon/.config/runespace/dev.env
+export PATH="/usr/bin:$PATH"
+node --version # Must report 22.x
+pnpm test:e2e:focused mining
+```
+
+The focused runner (`scripts/run-focused-e2e.mjs`) reuses the canonical
+primitives and process supervisor from `scripts/e2e-shared.mjs`. It validates
+the localhost-only database and Node 22, selects and verifies its high port,
+cleans stale auth state and per-invocation Playwright output (never the curated
+`artifacts/e2e-review/`), applies migrations, performs one production build with
+a local build-and-runtime auth placeholder, starts the production server, waits
+for readiness, runs the selected phase (`--project=chromium`), and terminates
+only its own processes. Focused execution is iteration evidence only — only
+`pnpm test:e2e:canonical` and the matching CI job establish CI parity.
 
 ### Generic fresh clone or Docker Compose setup
 For a separately created generic local Docker database, `.env.example` contains
@@ -92,8 +134,12 @@ job cannot falsely satisfy branch protection on the unchanged head when
 `ready_for_review` triggers the full run. On a ready PR, `Merge gate` succeeds
 only when both full jobs succeed. Do not require the diagnostic job names, and
 verify the exact required names in repository settings after enabling
-protection. This repository currently has no main branch protection configured,
-so settings verification is a maintainer action outside this code change.
+protection. This repository currently has no main branch protection configured —
+API-verified for Issue #61 on 2026-08-03 (the GitHub REST branch-protection
+endpoint returns `Branch not protected`, and the repository rulesets list is
+empty) — so settings verification is a maintainer action outside this code
+change. Treat that snapshot as dated repository state and re-verify before
+acting on it.
 
 Before marking ready or requesting final review, run the complete local
 CI-parity sequence once when the managed PostgreSQL and Playwright environment
@@ -113,6 +159,10 @@ behavior.
 The PR must include:
 - a clear summary of what changed
 - the exact branch, PR, local validation results, and canonical CI status
+- `closes #<issue number>` in the PR body for the delivered issue. The closing
+  keyword is a body reference that takes effect only when the PR is merged;
+  merging remains the product owner's explicit action, and a branch name or PR
+  title does not replace the body reference
 - for UI changes, the working PR preview URL as the default visual-review
   evidence; include frozen screenshots only when explicitly requested, when the
   preview is unavailable, or when before/after frozen evidence materially helps

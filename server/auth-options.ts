@@ -30,11 +30,12 @@ export const authOptions: BetterAuthOptions = {
     requireEmailVerification: false,
     minPasswordLength: 8,
   },
-  // Canonical E2E runs the production server over plain HTTP. Better Auth's
-  // default `protocol: "auto"` + production NODE_ENV sets Secure cookies that
-  // Chromium discards. This env-controlled override allows the canonical runner
-  // to disable Secure cookies EXCLUSIVELY for the E2E browser session, never for
-  // preview or production deployments.
+  // The local production E2E runners (canonical and focused) run the production
+  // server over plain HTTP. Better Auth's default `protocol: "auto"` +
+  // production NODE_ENV sets Secure cookies that Chromium discards. This
+  // env-controlled override allows those runners to disable Secure cookies
+  // EXCLUSIVELY for the E2E browser session, never for preview or production
+  // deployments.
   advanced: {
     useSecureCookies: process.env.RUNESPACE_E2E_CANONICAL_HTTP === "true" ? false : undefined,
   },
