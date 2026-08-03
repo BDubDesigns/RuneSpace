@@ -32,13 +32,13 @@ pnpm drizzle-kit migrate
 pnpm test:integration
 
 # Production build: `next build` runs as production, so server/env.ts requires a
-# BETTER_AUTH_SECRET of at least 16 characters. Export a clearly fake
-# build-only placeholder, then unset it. The placeholder shape follows
+# BETTER_AUTH_SECRET of at least 16 characters. Scope a clearly fake
+# build-only placeholder to this single build invocation only, so an existing
+# shell value is never overwritten or removed. The placeholder shape follows
 # .github/workflows/ci.yml — the source of truth for this shape. It is valid
 # for this local/CI build command only and must never be used in a deployment.
-export BETTER_AUTH_SECRET="insecure-ci-build-only-secret-do-not-use-in-prod-0000000000"
-pnpm build
-unset BETTER_AUTH_SECRET
+BETTER_AUTH_SECRET="insecure-ci-build-only-secret-do-not-use-in-prod-0000000000" \
+  pnpm build
 
 pnpm test:e2e:canonical
 ```
