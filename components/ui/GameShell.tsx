@@ -1,10 +1,23 @@
 import type { ReactNode } from "react";
 
-export function TopBar({ title, detail }: { title: string; detail?: string }) {
+export function TopBar({
+  title,
+  detail,
+  trailing,
+}: {
+  title: ReactNode;
+  detail?: string;
+  trailing?: ReactNode;
+}) {
   return (
     <header className="rs-bevel border border-[color:var(--rs-border-structural)] bg-[color:var(--rs-surface-raised)] px-4 py-3 shadow-[var(--rs-glow-primary)]">
-      <p className="font-display text-lg font-bold text-[color:var(--rs-text-primary)]">{title}</p>
-      {detail ? <p className="text-xs text-[color:var(--rs-text-muted)]">{detail}</p> : null}
+      <div className="flex items-center justify-between gap-3">
+        <div className="min-w-0 font-display text-lg font-bold text-[color:var(--rs-text-primary)]">
+          {title}
+        </div>
+        {trailing ? <div className="shrink-0">{trailing}</div> : null}
+      </div>
+      {detail ? <p className="mt-2 text-xs text-[color:var(--rs-text-muted)]">{detail}</p> : null}
     </header>
   );
 }

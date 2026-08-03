@@ -1042,3 +1042,97 @@ test("the Play boundary resets, navigates, and hides failure details", async ({ 
   await page.getByRole("link", { name: "Back to characters" }).click();
   await expect(page).toHaveURL(/\/characters$/);
 });
+
+/**
+ * Production header branding (Issue #52). Non-destructive: it verifies the
+ * single full-width header panel containing both the larger lockup and Sign
+ * out, overflow freedom, icon metadata, and that the banner no longer
+ * duplicates the location subtitle. Sign-out operability is covered by the
+ * dedicated `signout` spec so this serial group's shared session (and its CI
+ * retries) stay intact.
+ */
+test("production header is one full-width panel with the larger lockup and Sign out", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+
+  // The header banner renders the approved lockup with an accessible name.
+  const header = page.getByRole("banner");
+  const lockup = header.getByRole("img", { name: "RuneSpace" });
+  await expect(lockup).toBeVisible();
+  await expect
+    .poll(() => lockup.evaluate((image) => image.complete && image.naturalWidth > 0))
+    .toBe(true);
+
+  // The single header panel spans the full game-shell content width.
+  const headerBox = await header.boundingBox();
+  const mainBox = await page.getByRole("main").boundingBox();
+  expect(headerBox).not.toBeNull();
+  expect(mainBox).not.toBeNull();
+  expect(Math.abs(headerBox!.width - mainBox!.width)).toBeLessThanOrEqual(2);
+
+  // The lockup is the approved larger header treatment (~44px on mobile).
+  const mobileLockup = await lockup.boundingBox();
+  expect(mobileLockup).not.toBeNull();
+  expect(mobileLockup!.height).toBeGreaterThanOrEqual(40);
+  expect(mobileLockup!.height).toBeLessThanOrEqual(50);
+
+  // Sign out lives inside the same header panel, vertically centered on one row.
+  const signOut = header.getByRole("button", { name: "Sign out" });
+  await expect(signOut).toBeVisible();
+  const signOutBox = await signOut.boundingBox();
+  expect(signOutBox).not.toBeNull();
+  expect(signOutBox!.height).toBeGreaterThanOrEqual(44);
+  const lockupCenterY = mobileLockup!.y + mobileLockup!.height / 2;
+  const signOutCenterY = signOutBox!.y + signOutBox!.height / 2;
+  expect(Math.abs(lockupCenterY - signOutCenterY)).toBeLessThanOrEqual(2);
+
+  // The banner no longer duplicates the location subtitle; the main page
+  // location panel is the authoritative presentation.
+  await expect(header.getByText("Crash Site", { exact: true })).toHaveCount(0);
+  await expect(header.getByText(/In transit/)).toHaveCount(0);
+  await expect(
+    page.getByRole("main").getByText("Crash Site", { exact: true }).first(),
+  ).toBeVisible();
+
+  // The single panel must not create horizontal document overflow at mobile width.
+  const mobileWidth = await page.evaluate(
+    () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+  );
+  expect(mobileWidth).toBeLessThanOrEqual(0);
+  await page.screenshot({ path: "test-results/mining-mobile-header.png" });
+
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await expect(lockup).toBeVisible();
+  // ~48px at the larger breakpoint.
+  const desktopLockup = await lockup.boundingBox();
+  expect(desktopLockup).not.toBeNull();
+  expect(desktopLockup!.height).toBeGreaterThanOrEqual(44);
+  expect(desktopLockup!.height).toBeLessThanOrEqual(56);
+  await expect(signOut).toBeVisible();
+  await expect(header.getByText("Crash Site", { exact: true })).toHaveCount(0);
+  const desktopWidth = await page.evaluate(
+    () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+  );
+  expect(desktopWidth).toBeLessThanOrEqual(0);
+  await page.screenshot({ path: "test-results/mining-desktop-header.png" });
+
+  // The app metadata must reference the committed emblem icon assets, and each
+  // referenced URL must be served with a non-empty body.
+  const iconHrefs = await page
+    .locator('link[rel~="icon"], link[rel="apple-touch-icon"]')
+    .evaluateAll((links) => links.map((link) => link.getAttribute("href") ?? ""));
+  for (const icon of [
+    "/favicon.ico",
+    "/favicon-16x16.png",
+    "/favicon-32x32.png",
+    "/icon-192.png",
+    "/icon-512.png",
+    "/apple-touch-icon.png",
+  ]) {
+    expect(iconHrefs.some((href) => href.includes(icon))).toBe(true);
+    const response = await page.request.get(icon);
+    expect(response.status()).toBe(200);
+    expect((await response.body()).length).toBeGreaterThan(0);
+  }
+});

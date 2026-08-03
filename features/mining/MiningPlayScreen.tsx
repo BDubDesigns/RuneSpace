@@ -3,9 +3,9 @@
 import { ActionButton } from "@/components/ui/ActionButton";
 import { ActionLink } from "@/components/ui/ActionLink";
 import { GameShell, TopBar } from "@/components/ui/GameShell";
+import { RuneSpaceBrand } from "@/components/branding/RuneSpaceBrand";
 import { SignOutButton } from "@/features/auth/SignOutButton";
 import { PlayBoundaryTestTrigger } from "@/features/diagnostics/PlayBoundaryTestTrigger";
-import { getLocation } from "@/game/content/locations";
 import type { MiningGameplayState } from "@/server/mining";
 import { MiningConsole } from "./MiningConsole";
 import { MiningPlayProvider, useMiningPlay } from "./MiningPlayContext";
@@ -51,16 +51,7 @@ function MiningFooter() {
 }
 
 function PlayTopBar() {
-  const { state } = useMiningPlay();
-  const detail = state.travelState
-    ? `In transit to ${getLocation(state.travelState.destinationLocationId)?.displayName ?? ""}`
-    : (getLocation(state.location.currentLocationId)?.displayName ?? "Location");
-  return (
-    <div className="flex items-center justify-between gap-3">
-      <TopBar title="RuneSpace" detail={detail} />
-      <SignOutButton />
-    </div>
-  );
+  return <TopBar title={<RuneSpaceBrand />} trailing={<SignOutButton />} />;
 }
 
 export function MiningPlayScreen({

@@ -397,6 +397,12 @@ test("the full journey walks, arrives, and returns between the original location
   await page.getByRole("button", { name: /Walk to Abandoned Processing Yard/ }).click();
   // The authoritative state is applied immediately — verify the transit UI.
   await expect(page.getByText("Journey progress")).toBeVisible();
+  // The header banner no longer repeats the transit subtitle; the main activity
+  // panel exposes the in-transit heading instead (Issue #52 sizing decision).
+  await expect(page.getByRole("banner").getByText(/In transit/)).toHaveCount(0);
+  await expect(
+    page.getByRole("main").getByText("In transit", { exact: true }).first(),
+  ).toBeVisible();
   await expect(
     page.getByText("Mining stopped before departure. No new activity can begin until you arrive."),
   ).toBeVisible();
