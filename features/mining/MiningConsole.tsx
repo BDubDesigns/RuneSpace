@@ -160,6 +160,7 @@ function InventoryPanel({
   triggerRef: RefObject<HTMLButtonElement | null>;
 }) {
   const totalSlots = state.inventory.slotsUsed + state.inventory.slotsAvailable;
+  const balance = getEffectiveGameBalance();
   return (
     <Drawer
       eyebrow="MYKEA SCHLEPPRAUM-8"
@@ -175,42 +176,58 @@ function InventoryPanel({
         className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4"
         aria-label={`${totalSlots} inventory slots`}
       >
-        {Array.from({ length: totalSlots }, (_, index) => {
-          const stack = state.inventory.stacks[index];
-          return stack ? (
-            <ItemVisual
-              background={
+        {state.inventory.stacks.map((stack) => (
+          <ItemVisual
+            background={
+              <div
+                aria-hidden="true"
+                className="absolute inset-y-0 left-0 z-0 w-2 overflow-hidden bg-[color:var(--rs-accent-mining-stack-track)]"
+                data-stack-track
+              >
                 <div
-                  aria-hidden="true"
-                  className="absolute inset-y-0 left-0 z-0 w-2 overflow-hidden bg-[color:var(--rs-accent-mining-stack-track)]"
-                  data-stack-track
-                >
-                  <div
-                    className="absolute inset-x-0 bottom-0 bg-[color:var(--rs-accent-mining)] transition-[height] duration-[var(--rs-duration-fast)]"
-                    data-stack-fill={Math.round(
-                      inventoryStackFillFraction(stack.quantity, stack.stackLimit) * 100,
-                    )}
-                    style={{
-                      height: `${inventoryStackFillFraction(stack.quantity, stack.stackLimit) * 100}%`,
-                    }}
-                  />
-                </div>
-              }
-              itemId={stack.itemId}
-              key={stack.id}
-              name={stack.name}
-              quantity={stack.quantity}
-            />
-          ) : (
-            <div
-              aria-label={`Empty inventory slot ${index + 1}`}
-              className="min-h-28 border border-dashed border-[color:var(--rs-border-subtle)] bg-[color:var(--rs-surface-panel)] p-3 text-xs uppercase tracking-wide text-[color:var(--rs-text-muted)]"
-              key={`empty-${index}`}
-            >
-              Empty slot
-            </div>
-          );
-        })}
+                  className="absolute inset-x-0 bottom-0 bg-[color:var(--rs-accent-mining)] transition-[height] duration-[var(--rs-duration-fast)]"
+                  data-stack-fill={Math.round(
+                    inventoryStackFillFraction(stack.quantity, stack.stackLimit) * 100,
+                  )}
+                  style={{
+                    height: `${inventoryStackFillFraction(stack.quantity, stack.stackLimit) * 100}%`,
+                  }}
+                />
+              </div>
+            }
+            itemId={stack.itemId}
+            key={stack.id}
+            name={stack.name}
+            quantity={stack.quantity}
+          />
+        ))}
+        {state.inventory.uniqueItems.map((item) => (
+          <ItemVisual
+            accessibleLabel={item.name}
+            additionalDescription={
+              item.currentCharge !== undefined
+                ? `${item.currentCharge} of ${balance.items.salvageCutter.maximumCharge} charges remaining`
+                : undefined
+            }
+            badge={
+              item.currentCharge !== undefined
+                ? `${item.currentCharge}/${balance.items.salvageCutter.maximumCharge}`
+                : undefined
+            }
+            itemId={item.itemId}
+            key={item.id}
+            name={item.name}
+          />
+        ))}
+        {Array.from({ length: Math.max(0, totalSlots - state.inventory.slotsUsed) }, (_, index) => (
+          <div
+            aria-label={`Empty inventory slot ${state.inventory.slotsUsed + index + 1}`}
+            className="min-h-28 border border-dashed border-[color:var(--rs-border-subtle)] bg-[color:var(--rs-surface-panel)] p-3 text-xs uppercase tracking-wide text-[color:var(--rs-text-muted)]"
+            key={`empty-${state.inventory.slotsUsed + index}`}
+          >
+            Empty slot
+          </div>
+        ))}
       </div>
     </Drawer>
   );

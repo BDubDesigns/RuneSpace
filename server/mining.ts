@@ -26,7 +26,7 @@ import {
   type EquipmentLoadout,
   type EquipmentTarget,
 } from "@/game/domain/equipment";
-import { type StackState } from "@/game/domain/inventory";
+import { type StackState, deriveCarriedUniqueItems } from "@/game/domain/inventory";
 import {
   miningSuccessChanceBps,
   miningPreflightStopReason,
@@ -83,7 +83,12 @@ type MiningSnapshot = {
   slotsUsed: number;
   slotCapacity: number;
   equipmentLoadout: EquipmentLoadout;
-  itemInstances: readonly { id: string; itemId: string; currentCharge: number | null }[];
+  itemInstances: readonly {
+    id: string;
+    itemId: string;
+    currentCharge: number | null;
+    createdAt: Date;
+  }[];
   equippedCutterInstanceId?: string;
   cutterCharge: number;
 };
@@ -142,6 +147,14 @@ export type MiningGameplayState = {
       name: string;
       quantity: number;
       stackLimit: number;
+    }[];
+    uniqueItems: readonly {
+      id: string;
+      itemId: string;
+      name: string;
+      massGrams: number;
+      /** Present only for items with approved displayable persistent state. */
+      currentCharge?: number;
     }[];
   };
   equipment: {
@@ -645,6 +658,26 @@ export async function stateFromTransaction(
             : stack.itemId === balance.items.powerCell.itemId
               ? balance.items.powerCell.stackLimit
               : 1,
+      })),
+      uniqueItems: deriveCarriedUniqueItems(
+        snapshot.itemInstances.map((instance) => ({
+          id: instance.id,
+          itemId: instance.itemId,
+          createdAt: instance.createdAt.toISOString(),
+        })),
+        snapshot.equipmentLoadout.equippedItemInstanceIds,
+      ).map((item) => ({
+        id: item.id,
+        itemId: item.itemId,
+        name: resolveItemPresentation(item.itemId, item.itemId).displayName,
+        massGrams: carriedItemMassGrams(item.itemId, balance),
+        currentCharge:
+          item.itemId === balance.items.salvageCutter.itemId
+            ? normalizeCutterCharge(
+                snapshot.itemInstances.find((instance) => instance.id === item.id)?.currentCharge,
+                balance,
+              )
+            : undefined,
       })),
     },
     equipment: {

@@ -906,6 +906,95 @@ test("equipment and inventory rendering shows artwork for illustrated items and 
   await page.setViewportSize({ width: 390, height: 844 });
 }, 30_000);
 
+test("a carried unequipped Cutter occupies one visible Inventory slot and leaves on re-equip", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  const footer = page.getByRole("navigation", { name: "Primary" });
+  const characterId = page.url().split("/").at(-1)!;
+
+  // Seven stacks use seven of the eight aggregate slots; the Cutter keeps three
+  // charge so the carried tile can prove persistent state survives unequip.
+  await db.insert(inventoryStacks).values(
+    Array.from({ length: 7 }, (_, index) => ({
+      characterId,
+      itemId: ITEM_IDS.ferriteShale,
+      quantity: index + 1,
+    })),
+  );
+  const cutterRow = (
+    await db
+      .select()
+      .from(itemInstances)
+      .where(
+        and(
+          eq(itemInstances.characterId, characterId),
+          eq(itemInstances.itemId, ITEM_IDS.salvageCutter),
+        ),
+      )
+  )[0]!;
+  await db
+    .update(itemInstances)
+    .set({ currentCharge: 3 })
+    .where(eq(itemInstances.id, cutterRow.id));
+  await page.getByRole("button", { name: "Refresh status" }).click();
+  await expect(footer.getByRole("button", { name: "Inventory 7/8" })).toBeVisible();
+
+  // Unequip the Cutter with exactly one slot remaining.
+  await footer.getByRole("button", { name: "Equipment" }).click();
+  const equipment = page.getByRole("dialog", { name: "Equipment" });
+  const miningTool = equipment.getByLabel("Mining tool");
+  await miningTool.getByRole("button", { name: "Unequip" }).click();
+  await expect(equipment.getByRole("alert")).toHaveCount(0);
+  await expect(miningTool.getByText("Empty", { exact: true })).toBeVisible();
+  await equipment.getByRole("button", { name: "Close equipment" }).click();
+  await expect(equipment).toBeHidden();
+
+  // Inventory renders eight occupied tiles: seven stacks plus the carried Cutter.
+  await footer.getByRole("button", { name: "Inventory 8/8" }).click();
+  const inventory = page.getByRole("dialog", { name: "Inventory" });
+  await expect(inventory.getByText("8 occupied / 8 slots")).toBeVisible();
+  await expect(inventory.locator("article")).toHaveCount(8);
+  const cutterTile = inventory.locator("article").filter({ hasText: "Salvage Cutter" });
+  await expect(cutterTile).toHaveCount(1);
+  await expect(cutterTile).toHaveAccessibleName("Salvage Cutter");
+  const cutterArt = cutterTile.getByTestId("item-artwork");
+  await expect(cutterArt).toHaveCount(1);
+  await expect
+    .poll(() => cutterArt.evaluate((image) => image.complete && image.naturalWidth > 0))
+    .toBe(true);
+  await expect(cutterArt).toHaveAttribute("src", /salvage-cutter/);
+  // Persistent charge is shown compactly and no fake stack quantity appears.
+  await expect(cutterTile.getByText("3/10", { exact: true })).toBeVisible();
+  await expect(cutterTile.getByText(/^x/)).toHaveCount(0);
+  // Screen readers receive the same charge state through the tile description.
+  const cutterDescId = await cutterTile.getAttribute("aria-describedby");
+  expect(cutterDescId).toBeTruthy();
+  await expect(inventory.locator(`#${cutterDescId}`)).toContainText("3 of 10 charges remaining");
+  // Every slot is occupied: no empty tile remains.
+  await expect(inventory.getByLabel(/Empty inventory slot/)).toHaveCount(0);
+  await page.screenshot({ path: "test-results/mining-mobile-inventory-carried-cutter.png" });
+  await inventory.getByRole("button", { name: "Close inventory" }).click();
+
+  // Re-equipping the same instance removes it from Inventory again.
+  await footer.getByRole("button", { name: "Equipment" }).click();
+  const reequipTool = equipment.getByLabel("Mining tool");
+  await reequipTool.getByRole("button", { name: "Equip in Mining tool" }).click();
+  await expect(reequipTool.getByText("Salvage Cutter", { exact: true }).first()).toBeVisible();
+  await expect(equipment.getByRole("alert")).toHaveCount(0);
+  await equipment.getByRole("button", { name: "Close equipment" }).click();
+  await expect(equipment).toBeHidden();
+
+  await expect(footer.getByRole("button", { name: "Inventory 7/8" })).toBeVisible();
+  await footer.getByRole("button", { name: "Inventory 7/8" }).click();
+  const inventoryAfterReequip = page.getByRole("dialog", { name: "Inventory" });
+  await expect(inventoryAfterReequip.getByText("7 occupied / 8 slots")).toBeVisible();
+  await expect(
+    inventoryAfterReequip.locator("article").filter({ hasText: "Salvage Cutter" }),
+  ).toHaveCount(0);
+  await expect(inventoryAfterReequip.getByLabel(/Empty inventory slot/)).toHaveCount(1);
+});
+
 test("an interrupted Mining action preserves confirmed state and retries only status refresh", async ({
   page,
 }) => {

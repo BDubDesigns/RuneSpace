@@ -64,6 +64,12 @@ summaries are retained. Starting a genuinely new Mining action resets this run.
   individual instances and may contain mutable state such as current charge.
 - A stack and each carried unique instance consume one inventory slot. Compatible
   partial stacks fill before new stacks are created.
+- The Inventory screen renders every carried entry: each stack occupies one tile
+  and each unequipped unique item instance (such as a carried Salvage Cutter)
+  occupies one tile with its approved artwork, display name, and any approved
+  persistent state. Equipped items never appear in Inventory. The reported
+  occupied count always equals the rendered stacks plus carried unique
+  instances, and empty tiles begin only after every carried entry.
 - Slot capacity is the sum of equipped container capacities. Carry capacity is
   independently derived from supplied Strength, buff, and equipment
   contributions. Neither derived capacity is persisted.
