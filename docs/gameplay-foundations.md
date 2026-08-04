@@ -186,6 +186,40 @@ of war, or art generation) are introduced by this issue.
   server-authoritative begin-travel command. The same interaction works in
   reverse after arrival.
 
+### Location population (issue #62)
+
+The current-location map tile shows the other characters currently persisted
+at that same location, so the world feels inhabited:
+
+- **Source of truth:** `characters.current_location_id`. The read boundary is
+  scoped by the owned active character; the server resolves the location and
+  the browser can never enumerate a location directly. A character in transit
+  keeps its authoritative origin location until arrival commits, so it counts
+  as present there — the population read adds no new presence rule.
+- **Which characters appear:** every *other* character whose authoritative
+  location matches, including multiple characters owned by the same player as
+  separate entries and the requesting player's other same-location characters.
+  Only the active character itself is excluded.
+- **Information shown:** each entry shows the character display name, the
+  character's current derived level (the existing Mining progression boundary
+  over persisted skill XP — no new level formula or stored level), and the
+  owner's public name (`user.name`). Emails, account IDs, character database
+  IDs, and private state are never exposed.
+- **Presentation:** a compact count indicator on the occupied tile plus an
+  accessible disclosure revealing the list, associated with that tile.
+- **Current low-population version:** all matching persisted characters are
+  shown regardless of `lastPlayedAt` or any activity notion. Refresh happens on
+  initial load and whenever the active character receives refreshed
+  authoritative gameplay state (for example completing Travel or a status
+  refresh); there is no presence system, heartbeat, or real-time
+  infrastructure.
+- **Deferred future work:** when population grows, RuneSpace should show only
+  characters active within the previous ten minutes, with Mining activity
+  counting as activity even without repeated commands. That requires a
+  deliberate authoritative activity definition and persistence/update
+  semantics and is explicitly **not** implemented here; no ten-minute filter,
+  heartbeat, or `updatedAt`-as-presence rule exists in this version.
+
 ### Atomic Mining → Travel replacement
 
 When Travel replaces an active Mining action:

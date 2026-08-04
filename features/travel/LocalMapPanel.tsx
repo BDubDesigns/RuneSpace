@@ -9,6 +9,7 @@ import { StatusMeter } from "@/components/ui/StatusMeter";
 import { ACTION_IDS, GAME_TICK_MS, LOCATION_IDS } from "@/game/config/foundations";
 import { getEffectiveGameBalance } from "@/game/config/balance";
 import { getLocation } from "@/game/content/locations";
+import type { LocationPopulationEntry } from "@/game/domain/location-population";
 import { beginTravelAction } from "@/server/actions";
 import { useMiningPlay } from "@/features/mining/MiningPlayContext";
 import {
@@ -52,6 +53,8 @@ type HexButtonProps = {
   description: string;
   selected: boolean;
   current: boolean;
+  /** Other characters at this location (only the current tile shows them). */
+  populationCount: number;
   transitRole?: "origin" | "destination";
   disabled: boolean;
   onSelect: () => void;
@@ -66,6 +69,7 @@ function HexButton({
   description,
   selected,
   current,
+  populationCount,
   transitRole,
   disabled,
   onSelect,
@@ -84,6 +88,9 @@ function HexButton({
   const accessibleLabel = [
     accessibleName,
     youAreHere ? "You are here." : "Reachable destination.",
+    youAreHere && populationCount > 0
+      ? `${populationCount} other ${populationCount === 1 ? "character" : "characters"} here.`
+      : "",
     selected && !youAreHere ? "Selected." : "",
     disabled ? "Travel in progress; map is read-only." : "",
   ]
@@ -115,6 +122,15 @@ function HexButton({
       <span id={`loc-desc-${locationId}`} className="sr-only">
         {description}
       </span>
+      {current && populationCount > 0 ? (
+        <span
+          aria-hidden="true"
+          className="relative z-10 max-w-[64%] truncate border border-[color:var(--rs-accent-primary)] bg-[color:var(--rs-accent-primary-subtle)] px-1 py-0.5 font-display text-[8px] uppercase leading-none tracking-[0.08em] text-[color:var(--rs-accent-primary)] sm:text-[9px]"
+          data-map-population
+        >
+          {populationCount} here
+        </span>
+      ) : null}
       <span
         aria-hidden="true"
         className="relative z-10 max-w-[76%] truncate border border-[color:var(--rs-item-plate-border)] bg-[color:var(--rs-item-plate-surface)] px-1 py-0.5 font-display text-[8px] uppercase leading-none tracking-[0.08em] text-[color:var(--rs-text-secondary)] sm:text-[9px]"
@@ -231,6 +247,92 @@ function HexMapSvg({
 }
 
 // ---------------------------------------------------------------------------
+// Location population disclosure (issue #62)
+// ---------------------------------------------------------------------------
+
+/**
+ * Compact disclosure trigger associated with the current-location tile. The
+ * tile's hex button shows the aria-hidden count indicator; this header
+ * control reveals the full public list (character name, derived level, owner
+ * name) fetched from the server's narrow read boundary. It lives in the map
+ * panel's header row so the panel height — and the yard page's no-scroll
+ * layout contract — is unchanged.
+ */
+function LocationPopulationTrigger({
+  count,
+  open,
+  onToggle,
+}: {
+  count: number;
+  open: boolean;
+  onToggle: () => void;
+}) {
+  return (
+    <ActionButton
+      aria-controls="location-population-list"
+      aria-expanded={open}
+      aria-label={
+        count > 0
+          ? `Who is here — ${count} other ${count === 1 ? "character" : "characters"}`
+          : "Who is here — no other characters"
+      }
+      className="shrink-0 px-3"
+      intent="secondary"
+      onClick={onToggle}
+    >
+      Who is here{count > 0 ? ` — ${count}` : ""}
+    </ActionButton>
+  );
+}
+
+/**
+ * The revealed population list, rendered directly below the map. It stays
+ * mounted (hidden when closed) so the disclosure trigger's `aria-controls`
+ * always references an existing region; content renders only for the
+ * location the entries were fetched for.
+ */
+function LocationPopulationList({
+  entries,
+  error,
+  matchesLocation,
+  open,
+}: {
+  entries: readonly LocationPopulationEntry[];
+  error?: string;
+  matchesLocation: boolean;
+  open: boolean;
+}) {
+  return (
+    <div
+      id="location-population-list"
+      className="mt-4 space-y-2 border border-[color:var(--rs-border-structural)] bg-[color:var(--rs-surface-panel)] p-3"
+      hidden={!open}
+    >
+      {!matchesLocation ? null : error ? (
+        <Feedback tone="muted">{error}</Feedback>
+      ) : entries.length === 0 ? (
+        <p className="text-sm text-[color:var(--rs-text-secondary)]">No other characters here</p>
+      ) : (
+        entries.map((entry) => (
+          <article
+            aria-label={`${entry.displayName}, Level ${entry.level}, player ${entry.ownerName}`}
+            className="border-l-2 border-[color:var(--rs-border-structural)] px-2 py-1"
+            key={entry.displayName}
+          >
+            <p className="break-words font-display text-sm font-bold text-[color:var(--rs-text-primary)]">
+              {entry.displayName} · Level {entry.level}
+            </p>
+            <p className="break-words text-xs text-[color:var(--rs-text-secondary)]">
+              Player: {entry.ownerName}
+            </p>
+          </article>
+        ))
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Main panel
 // ---------------------------------------------------------------------------
 
@@ -244,6 +346,11 @@ export function LocalMapPanel() {
   const [, startTransition] = useTransition();
   const [transitioning, setTransitioning] = useState(false);
   const observedTravel = useRef(state.travelState?.destinationLocationId);
+  const [population, setPopulation] = useState<readonly LocationPopulationEntry[]>([]);
+  const [populationLocationId, setPopulationLocationId] = useState<string | undefined>();
+  const [populationError, setPopulationError] = useState<string | undefined>();
+  const [populationOpen, setPopulationOpen] = useState(false);
+  const populationRequest = useRef(0);
 
   const currentLocationId = state.location.currentLocationId;
   const travel = state.travelState;
@@ -276,6 +383,60 @@ export function LocalMapPanel() {
     }
     observedTravel.current = state.travelState?.destinationLocationId;
   }, [inTransit, currentLocationId, state.travelState?.destinationLocationId]);
+
+  // When the authoritative location changes, immediately drop the previous
+  // location's population and collapse the disclosure: the old tile's entries
+  // must never render on the new tile, not even for a single frame or while a
+  // replacement read is in flight.
+  useEffect(() => {
+    setPopulationOpen(false);
+    setPopulation([]);
+    setPopulationLocationId(undefined);
+  }, [currentLocationId]);
+
+  // The population read is scoped to the owned active character server-side.
+  // It revalidates on every accepted authoritative gameplay revision (initial
+  // load, Refresh status, Mining commands, Travel arrival) through the
+  // existing state boundary — no polling, presence, or real-time system. A
+  // request generation token discards completions that raced a newer one.
+  // The read is a plain route-handler GET: server-action responses carry
+  // flight revalidation that can corrupt the Next.js Router when a read fires
+  // during error-boundary recovery.
+  useEffect(() => {
+    const locationId = currentLocationId;
+    const token = populationRequest.current + 1;
+    populationRequest.current = token;
+    fetch(`/api/location-population?characterId=${encodeURIComponent(state.characterId)}`, {
+      headers: { accept: "application/json" },
+    }).then(
+      async (response) => {
+        if (token !== populationRequest.current) return;
+        const body = (await response.json().catch(() => null)) as {
+          characters?: readonly LocationPopulationEntry[];
+          error?: string;
+        } | null;
+        if (!response.ok || !body?.characters) {
+          setPopulation([]);
+          setPopulationLocationId(undefined);
+          setPopulationError(body?.error ?? "The location population could not be loaded.");
+          return;
+        }
+        setPopulationError(undefined);
+        setPopulation(body.characters);
+        setPopulationLocationId(locationId);
+      },
+      // A transport interruption of this read is non-fatal: the location
+      // guard keeps the previous tile's entries hidden; the next accepted
+      // gameplay revision revalidates.
+      () => {
+        if (token !== populationRequest.current) return;
+        setPopulationError(undefined);
+      },
+    );
+    // `state` identity changes exactly when accepted authoritative gameplay
+    // state arrives, so every accepted revision revalidates the population.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state.characterId, state.location.currentLocationId, state]);
 
   function travelTo(destinationId: string) {
     if (!acquireCommand()) return;
@@ -338,6 +499,10 @@ export function LocalMapPanel() {
 
   const selectedLocation = selected ? getLocation(selected) : undefined;
   const selectedIsDestination = selectedLocation && !inTransit && selected !== currentLocationId;
+  // Entries are only shown for the location they were fetched for: after a
+  // travel arrival the previous tile's population must never leak onto the
+  // new tile while the replacement read is in flight.
+  const populationMatchesLocation = populationLocationId === currentLocationId;
 
   // Helper: determine the status label for a location tile.
   function tileStatusLabel(locationId: string): string {
@@ -362,7 +527,14 @@ export function LocalMapPanel() {
 
   return (
     <Panel tone="raised">
-      <SectionHeader eyebrow="Local area">World map</SectionHeader>
+      <div className="flex items-start justify-between gap-3">
+        <SectionHeader eyebrow="Local area">World map</SectionHeader>
+        <LocationPopulationTrigger
+          count={populationMatchesLocation ? population.length : 0}
+          open={populationOpen}
+          onToggle={() => setPopulationOpen((open) => !open)}
+        />
+      </div>
       <p className="mt-2 text-sm text-[color:var(--rs-text-secondary)]">
         Locations are hexes connected by routes. Select a reachable hex to inspect it, then confirm
         to walk there.
@@ -400,6 +572,7 @@ export function LocalMapPanel() {
               description={location.description}
               selected={selected === location.id}
               current={isCurrent}
+              populationCount={isCurrent && populationMatchesLocation ? population.length : 0}
               transitRole={
                 inTransit && travel?.originLocationId === location.id
                   ? "origin"
@@ -414,6 +587,13 @@ export function LocalMapPanel() {
           );
         })}
       </div>
+
+      <LocationPopulationList
+        entries={population}
+        error={populationError}
+        matchesLocation={populationMatchesLocation}
+        open={populationOpen}
+      />
 
       {inTransit ? (
         <div className="mt-4 rounded-sm border border-[color:var(--rs-accent-arcane)] bg-[color:var(--rs-accent-arcane-subtle)] p-3">

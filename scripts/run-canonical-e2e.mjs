@@ -125,6 +125,11 @@ const TRAVEL_REQUIRED = [
   "power-annex-desktop-claimed.png",
 ];
 
+const LOCATION_POPULATION_REQUIRED = [
+  "location-population-mobile-list.png",
+  "location-population-mobile-yard.png",
+];
+
 function verifyAndCopyScreenshots(required, destDir) {
   log("Verifying and preserving screenshots...");
   for (const filename of required) {
@@ -151,6 +156,7 @@ async function prepareState() {
     mkdirSync(resolve(ROOT, "artifacts/e2e-review/mining"), { recursive: true });
     mkdirSync(resolve(ROOT, "artifacts/e2e-review/overlay"), { recursive: true });
     mkdirSync(resolve(ROOT, "artifacts/e2e-review/travel"), { recursive: true });
+    mkdirSync(resolve(ROOT, "artifacts/e2e-review/location-population"), { recursive: true });
     log("Frozen review screenshots: ENABLED (manifest will be verified and uploaded).");
   } else {
     log(
@@ -185,6 +191,13 @@ async function runCanonical() {
   await runPlaywright(["travel", "--project=chromium"], "Travel E2E");
   if (captureScreenshots)
     verifyAndCopyScreenshots(TRAVEL_REQUIRED, resolve(ROOT, "artifacts/e2e-review/travel"));
+
+  await runPlaywright(["location-population", "--project=chromium"], "Location population E2E");
+  if (captureScreenshots)
+    verifyAndCopyScreenshots(
+      LOCATION_POPULATION_REQUIRED,
+      resolve(ROOT, "artifacts/e2e-review/location-population"),
+    );
 
   await runPlaywright(
     ["mining", "--project=chromium", "--grep", "Play boundary", "--repeat-each=3", "--workers=1"],
