@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { ACTION_IDS, ITEM_IDS, SKILL_IDS } from "@/game/config/foundations";
+import { ACTION_IDS, ITEM_IDS, SKILL_IDS, type SkillId } from "@/game/config/foundations";
 import type { LevelThreshold } from "@/game/domain/progression";
 
 const balanceSchema = z.object({
@@ -117,4 +117,22 @@ export function miningLevelThresholds(
     requirement = Math.floor((requirement * balance.progression.perLevelGrowthBps) / 10_000);
   }
   return thresholds;
+}
+
+/**
+ * Authoritative level-curve sources per stable skill ID — the single place
+ * that decides which skills have an approved progression curve. A skill
+ * without an entry has no approved curve and is never presented in
+ * progression surfaces. Adding a future skill curve is one entry here; the
+ * callers (Mining state, location population, character profiles) need no
+ * per-skill conditionals. Factories are invoked per call so future approved
+ * balance overrides (Issue #19) stay live.
+ */
+const skillLevelCurves = {
+  [SKILL_IDS.mining]: miningLevelThresholds,
+} as const satisfies Partial<Record<SkillId, () => readonly LevelThreshold[]>>;
+
+/** The approved level-curve source for a skill, or undefined when none exists. */
+export function skillLevelThresholds(skillId: string): readonly LevelThreshold[] | undefined {
+  return skillLevelCurves[skillId as SkillId]?.();
 }

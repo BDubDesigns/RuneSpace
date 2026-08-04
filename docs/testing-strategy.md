@@ -47,6 +47,9 @@ small number of critical mobile player journeys.
   - runs the Mining Chromium journey
   - runs the Overlay Chromium journey (modal-overlay behavior shared by Inventory/Equipment)
   - runs the Travel Chromium journey
+  - runs the Character Profile Chromium journey (same-location public profile
+    panel: open, switch target in place, close/focus return, keyboard,
+    mobile viewport, no private data, location-change invalidation)
   - the Power Annex journey uses a disposable runner-only clock file, gated to
     CI against localhost PostgreSQL, to cross a Pacific reset boundary without
     depending on the host wall clock
@@ -91,7 +94,7 @@ small number of critical mobile player journeys.
   Focused evidence is never a substitute for the canonical command — only
   `pnpm test:e2e:canonical` and the matching CI job establish CI parity.
 - Managed-host focused iteration uses `pnpm test:e2e:focused <phase>` (currently
-  `mining`; recipe in `docs/development-workflow.md`). The focused runner
+  `mining`, `character-profile`, and `location-population`; recipe in `docs/development-workflow.md`). The focused runner
   reuses the canonical primitives from `scripts/e2e-shared.mjs` (localhost-only
   database safety, Node 22 validation, port availability, targeted process
   termination) and owns a separate high port (default `3310`, never `3000` or

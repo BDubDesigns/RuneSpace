@@ -16,6 +16,20 @@ export type XpGrantResult = SkillProgress & {
   awardedXp: number;
 };
 
+export type SkillLevelProgress = {
+  level: number;
+  totalXp: number;
+  /** XP earned within the current level (total XP minus the level's threshold). */
+  xpIntoLevel: number;
+  /**
+   * XP required to reach the next level, or undefined at the maximum level:
+   * no requirement is fabricated for a level that does not exist.
+   */
+  xpToNextLevel?: number;
+  /** True when the derived level is the maximum level of the threshold source. */
+  atMaximumLevel: boolean;
+};
+
 function validateThresholds(thresholds: readonly LevelThreshold[]): void {
   if (thresholds.length === 0) throw new RangeError("At least one level threshold is required");
 
@@ -69,5 +83,28 @@ export function grantSkillXp(
     awardedXp,
     previousLevel,
     level: levelFromXp(totalXp, thresholds),
+  };
+}
+
+/**
+ * Derive one skill's level and its next-level progress from the caller's
+ * single authoritative threshold source. This is the shared boundary for every
+ * player-facing level presentation (Mining state projection and the public
+ * character-profile projection); consumers never re-implement threshold
+ * lookups or XP deltas.
+ */
+export function skillLevelProgress(
+  totalXp: number,
+  thresholds: readonly LevelThreshold[],
+): SkillLevelProgress {
+  const level = levelFromXp(totalXp, thresholds);
+  const current = thresholds.find((threshold) => threshold.level === level) ?? thresholds[0]!;
+  const next = thresholds.find((threshold) => threshold.level === level + 1);
+  return {
+    level,
+    totalXp,
+    xpIntoLevel: totalXp - current.totalXp,
+    xpToNextLevel: next ? next.totalXp - totalXp : undefined,
+    atMaximumLevel: level === thresholds[thresholds.length - 1]!.level,
   };
 }

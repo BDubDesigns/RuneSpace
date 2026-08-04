@@ -37,7 +37,7 @@ import {
   type MiningResolution,
   type MiningStopReason,
 } from "@/game/domain/mining";
-import { levelFromXp } from "@/game/domain/progression";
+import { levelFromXp, skillLevelProgress } from "@/game/domain/progression";
 import { adjacentWalkDurationTicks, planTravel } from "@/game/domain/travel";
 import { ticksToMilliseconds } from "@/game/domain/timing";
 import {
@@ -577,8 +577,7 @@ export async function stateFromTransaction(
     ]);
   const totalXp = xpRows.find((row) => row.skillId === SKILL_IDS.mining)?.totalXp ?? 0;
   const thresholds = miningLevelThresholds(balance);
-  const level = levelFromXp(totalXp, thresholds);
-  const next = thresholds.find((threshold) => threshold.level === level + 1);
+  const miningProgress = skillLevelProgress(totalXp, thresholds);
   const action = actionRows[0];
   const miningState = miningStateRows[0];
   const travel = travelRows[0];
@@ -633,12 +632,11 @@ export async function stateFromTransaction(
         : undefined,
     mining: {
       totalXp,
-      level,
-      xpToNextLevel: next ? next.totalXp - totalXp : undefined,
-      xpIntoLevel:
-        totalXp - (thresholds.find((threshold) => threshold.level === level)?.totalXp ?? 0),
+      level: miningProgress.level,
+      xpToNextLevel: miningProgress.xpToNextLevel,
+      xpIntoLevel: miningProgress.xpIntoLevel,
     },
-    successChanceBps: miningSuccessChanceBps(level, balance),
+    successChanceBps: miningSuccessChanceBps(miningProgress.level, balance),
     ferriteShaleQuantity: stacks
       .filter((stack) => stack.itemId === ITEM_IDS.ferriteShale)
       .reduce((total, stack) => total + stack.quantity, 0),
