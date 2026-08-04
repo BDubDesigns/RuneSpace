@@ -130,7 +130,10 @@ const LOCATION_POPULATION_REQUIRED = [
   "location-population-mobile-yard.png",
 ];
 
-const CHARACTER_PROFILE_REQUIRED = ["character-profile-mobile-panel.png"];
+const CHARACTER_PROFILE_REQUIRED = [
+  "character-profile-mobile-panel.png",
+  "character-profile-mobile-rows.png",
+];
 
 function verifyAndCopyScreenshots(required, destDir) {
   log("Verifying and preserving screenshots...");

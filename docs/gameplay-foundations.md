@@ -206,7 +206,12 @@ at that same location, so the world feels inhabited:
   owner's public name (`user.name`). Emails, account IDs, character database
   IDs, and private state are never exposed.
 - **Presentation:** a compact count indicator on the occupied tile plus an
-  accessible disclosure revealing the list, associated with that tile.
+  accessible "Characters here" disclosure (label, compact count badge, and
+  disclosure chevron) revealing the list, associated with that tile. Each
+  entry is an interactive row — character name, owner name, and a compact
+  level badge with a chevron affordance — and the row of the character whose
+  profile is open stays visibly selected (gold accent, tinted background, and
+  a "Viewing" indicator) until the panel closes or is invalidated.
 - **Current low-population version:** all matching persisted characters are
   shown regardless of `lastPlayedAt` or any activity notion. Refresh happens on
   initial load and whenever the active character receives refreshed

@@ -178,9 +178,14 @@ test("the occupied tile shows other characters and owners, and re-scopes on trav
   );
   expect(overflow).toBeLessThanOrEqual(0);
 
-  // The disclosure reveals the approved public entries.
-  const disclosure = page.getByRole("button", { name: /Who is here/ });
+  // The disclosure reveals the approved public entries. Its compact count
+  // badge always matches the tile indicator count (both come from the same
+  // authoritative read).
+  const disclosure = page.getByRole("button", { name: /^(Show|Hide) .*characters here$/ });
   await expect(disclosure).toHaveAttribute("aria-expanded", "false");
+  const badge = page.locator("[data-population-count]");
+  await expect(badge).toBeVisible();
+  expect(Number((await badge.textContent())?.trim())).toBe(before);
   await disclosure.click();
   await expect(disclosure).toHaveAttribute("aria-expanded", "true");
   await expect(
@@ -242,11 +247,10 @@ test("the occupied tile shows other characters and owners, and re-scopes on trav
 
   // The yard population lists the yard character and none of the Crash Site
   // characters; the disclosure collapsed on arrival and reopens cleanly.
-  await expect(page.getByRole("button", { name: /Who is here/ })).toHaveAttribute(
-    "aria-expanded",
-    "false",
-  );
-  await page.getByRole("button", { name: /Who is here/ }).click();
+  await expect(
+    page.getByRole("button", { name: /^(Show|Hide) .*characters here$/ }),
+  ).toHaveAttribute("aria-expanded", "false");
+  await page.getByRole("button", { name: /^(Show|Hide) .*characters here$/ }).click();
   await expect(
     page.getByRole("button", { name: `${yardGhost}, Level 1, player Kael Brighthome` }),
   ).toBeVisible();
@@ -260,7 +264,7 @@ test("the occupied tile shows other characters and owners, and re-scopes on trav
 test("the population surface is keyboard reachable with announced state", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
 
-  const disclosure = page.getByRole("button", { name: /Who is here/ });
+  const disclosure = page.getByRole("button", { name: /^(Show|Hide) .*characters here$/ });
   await disclosure.focus();
   await expect(disclosure).toBeFocused();
   await page.keyboard.press("Enter");

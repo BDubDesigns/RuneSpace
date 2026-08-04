@@ -37,7 +37,7 @@ import {
 
 export const DEFAULT_FOCUSED_PORT = 3310;
 export const RESERVED_FOCUSED_PORTS = [3000, 3200];
-export const FOCUSED_PHASES = ["mining", "character-profile"];
+export const FOCUSED_PHASES = ["mining", "character-profile", "location-population"];
 // Local E2E build-and-runtime placeholder only: the production build and
 // `next start` both run as production, so server/env.ts requires a
 // BETTER_AUTH_SECRET of at least 16 characters. Never used in a deployment.

@@ -132,7 +132,14 @@ test.beforeEach(async ({ page }) => {
 
 test("selecting a same-location character opens its public profile panel", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.getByRole("button", { name: /Who is here/ }).click();
+  const disclosure = page.getByRole("button", { name: /^(Show|Hide) .*characters here$/ });
+  // The disclosure label is "Characters here" with a compact count badge and
+  // a truthful show/hide accessible label.
+  await expect(disclosure).toHaveAttribute("aria-label", /^Show \d+ characters here$/);
+  const badge = page.locator("[data-population-count]");
+  await expect(badge).toBeVisible();
+  expect(Number((await badge.textContent())?.trim())).toBeGreaterThanOrEqual(3);
+  await disclosure.click();
 
   const radaTrigger = page.getByRole("button", {
     name: `${radaOne}, Level 2, player Rada Stonehand`,
@@ -141,9 +148,15 @@ test("selecting a same-location character opens its public profile panel", async
   const panel = page.locator("[data-character-profile-panel]");
   await expect(panel).toBeVisible();
   await expect(radaTrigger).toHaveAttribute("aria-expanded", "true");
+  // The opened character's row stays visibly selected (Viewing indicator,
+  // never color alone) and transfers only to the newly selected row.
+  await expect(radaTrigger.getByText("Viewing", { exact: true })).toBeVisible();
+  await expect(radaTrigger.getByText("Lv 2", { exact: true })).toBeVisible();
 
-  // Portrait area, identity, overall level, and the generic skill list.
-  await expect(panel.locator("[data-character-portrait]")).toBeVisible();
+  // Portrait area is a neutral decorative placeholder (silhouette, no
+  // first-letter glyph that could read like a numeric stat).
+  await expect(panel.locator("[data-character-portrait] svg")).toBeVisible();
+  expect(await panel.locator("[data-character-portrait]").innerText()).toBe("");
   await expect(panel.getByText(radaOne, { exact: true })).toBeVisible();
   await expect(panel.getByText("Player: Rada Stonehand")).toBeVisible();
   await expect(panel.getByText("Overall level 2")).toBeVisible();
@@ -158,7 +171,8 @@ test("selecting a same-location character opens its public profile panel", async
   await expect(panel.getByText("@")).toHaveCount(0);
   await expect(panel.getByText(/email/i)).toHaveCount(0);
 
-  // Selecting a second character updates the SAME panel rather than stacking.
+  // Selecting a second character updates the SAME panel rather than stacking,
+  // and the selected treatment transfers immediately to the new row.
   const kaelTrigger = page.getByRole("button", {
     name: `${kaelCutter}, Level 2, player Kael Brighthome`,
   });
@@ -169,6 +183,8 @@ test("selecting a same-location character opens its public profile panel", async
   await expect(panel.getByText(radaOne, { exact: true })).toHaveCount(0);
   await expect(kaelTrigger).toHaveAttribute("aria-expanded", "true");
   await expect(radaTrigger).toHaveAttribute("aria-expanded", "false");
+  await expect(kaelTrigger.getByText("Viewing", { exact: true })).toBeVisible();
+  await expect(radaTrigger.getByText("Viewing", { exact: true })).toHaveCount(0);
 
   // Mobile-first: no horizontal overflow at the canonical phone viewport.
   const overflow = await page.evaluate(
@@ -176,20 +192,28 @@ test("selecting a same-location character opens its public profile panel", async
   );
   expect(overflow).toBeLessThanOrEqual(0);
 
+  // Review evidence: the selected row (gold accent, tint, "Viewing" indicator,
+  // gold level badge) and the profile panel (neutral silhouette portrait,
+  // identity, overall level, skill progress).
+  await kaelTrigger.scrollIntoViewIfNeeded();
+  await page.screenshot({ path: "test-results/character-profile-mobile-rows.png" });
   await panel.scrollIntoViewIfNeeded();
   await page.screenshot({ path: "test-results/character-profile-mobile-panel.png" });
 
-  // Closing returns focus predictably to the name that opened the view.
+  // Closing returns focus predictably to the name that opened the view and
+  // removes the selected treatment from every row.
   await panel.getByRole("button", { name: "Close character profile" }).click();
   await expect(panel).toBeHidden();
   await expect(kaelTrigger).toBeFocused();
+  await expect(kaelTrigger).toHaveAttribute("aria-expanded", "false");
+  await expect(page.getByText("Viewing", { exact: true })).toHaveCount(0);
 });
 
 test("the profile panel works from the keyboard with predictable focus return", async ({
   page,
 }) => {
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.getByRole("button", { name: /Who is here/ }).click();
+  await page.getByRole("button", { name: /^(Show|Hide) .*characters here$/ }).click();
 
   const opener = page.getByRole("button", {
     name: `${radaOne}, Level 2, player Rada Stonehand`,
@@ -226,7 +250,7 @@ test("the profile panel works from the keyboard with predictable focus return", 
 
   // Closing with the disclosure collapsed must not strand focus on the hidden
   // list button: Escape falls back to the persistent disclosure trigger.
-  const disclosure = page.getByRole("button", { name: /Who is here/ });
+  const disclosure = page.getByRole("button", { name: /^(Show|Hide) .*characters here$/ });
   await disclosure.click();
   await expect(page.locator("#location-population-list")).toBeHidden();
   await page.keyboard.press("Escape");
@@ -236,7 +260,7 @@ test("the profile panel works from the keyboard with predictable focus return", 
 
 test("a failed profile read shows visible accessible feedback", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.getByRole("button", { name: /Who is here/ }).click();
+  await page.getByRole("button", { name: /^(Show|Hide) .*characters here$/ }).click();
   await page.route("**/api/character-profile?*", (route) => route.abort());
   await page.getByRole("button", { name: `${radaOne}, Level 2, player Rada Stonehand` }).click();
   const panel = page.locator("[data-character-profile-panel]");
@@ -252,7 +276,7 @@ test("an authoritative location change invalidates the open profile panel", asyn
   test.setTimeout(120_000);
   await page.setViewportSize({ width: 390, height: 844 });
   const characterId = page.url().split("/").at(-1)!;
-  await page.getByRole("button", { name: /Who is here/ }).click();
+  await page.getByRole("button", { name: /^(Show|Hide) .*characters here$/ }).click();
   const trigger = page.getByRole("button", {
     name: `${radaOne}, Level 2, player Rada Stonehand`,
   });
@@ -283,7 +307,7 @@ test("an authoritative location change invalidates the open profile panel", asyn
   // persistent disclosure trigger instead of a missing control.
   await page.keyboard.press("Escape");
   await expect(panel).toBeHidden();
-  await expect(page.getByRole("button", { name: /Who is here/ })).toBeFocused();
+  await expect(page.getByRole("button", { name: /^(Show|Hide) .*characters here$/ })).toBeFocused();
 
   // Reopen for the travel-invalidation assertion below.
   await page.getByRole("button", { name: `${radaTwo}, Level 1, player Rada Stonehand` }).click();

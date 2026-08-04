@@ -255,16 +255,46 @@ function HexMapSvg({
 }
 
 // ---------------------------------------------------------------------------
-// Location population disclosure (issue #62)
+// Location population disclosure (issue #62) and character rows (issue #64)
 // ---------------------------------------------------------------------------
+
+/**
+ * Small disclosure/affordance chevron drawn with the repository's inline-SVG
+ * technique (the map layer uses inline SVG; there is no icon font). Rotating
+ * it (or leaving it static) is the caller's choice via `className`.
+ */
+function ChevronIcon({ className = "" }: { className?: string }) {
+  return (
+    <svg
+      aria-hidden="true"
+      className={className}
+      fill="none"
+      stroke="currentColor"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth="2"
+      viewBox="0 0 16 16"
+    >
+      <path d="M4 6l4 4 4-4" />
+    </svg>
+  );
+}
 
 /**
  * Compact disclosure trigger associated with the current-location tile. The
  * tile's hex button shows the aria-hidden count indicator; this header
  * control reveals the full public list (character name, derived level, owner
- * name) fetched from the server's narrow read boundary. It lives in the map
- * panel's header row so the panel height — and the yard page's no-scroll
- * layout contract — is unchanged.
+ * name) fetched from the server's narrow read boundary. The visible label is
+ * "Characters here" — the entries are characters, not unique players, because
+ * multiple listed characters may share one owner — with a compact count badge
+ * and a disclosure chevron. The accessible label states the action truthfully
+ * ("Show N characters here" / "Hide characters here").
+ *
+ * This is a deliberately compact control (not the ActionButton primitive,
+ * whose fixed `px-4 gap-2` metrics would push the panel header's "World map"
+ * heading onto a second line and break the yard page's no-scroll layout
+ * contract at the canonical viewport). It reuses the secondary intent tokens
+ * and the shared rs-focus/rs-bevel treatments.
  */
 function LocationPopulationTrigger({
   count,
@@ -278,21 +308,33 @@ function LocationPopulationTrigger({
   triggerRef: RefObject<HTMLButtonElement | null>;
 }) {
   return (
-    <ActionButton
+    <button
       aria-controls="location-population-list"
       aria-expanded={open}
       aria-label={
-        count > 0
-          ? `Who is here — ${count} other ${count === 1 ? "character" : "characters"}`
-          : "Who is here — no other characters"
+        open
+          ? "Hide characters here"
+          : `Show ${count} ${count === 1 ? "character" : "characters"} here`
       }
-      className="shrink-0 px-3"
-      intent="secondary"
+      className={`rs-bevel rs-focus inline-flex min-h-[var(--rs-touch-target)] shrink-0 items-center justify-center gap-1.5 border border-[color:var(--rs-border-structural)] bg-[color:var(--rs-surface-control)] px-2 text-sm font-semibold text-[color:var(--rs-text-primary)] outline-none transition duration-[var(--rs-duration-fast)] hover:border-[color:var(--rs-accent-secondary)]`}
       onClick={onToggle}
       ref={triggerRef}
+      type="button"
     >
-      Who is here{count > 0 ? ` — ${count}` : ""}
-    </ActionButton>
+      <span className="tracking-tight">Characters here</span>
+      <span
+        aria-hidden="true"
+        className="min-w-4 rounded-sm border border-[color:var(--rs-accent-primary)] bg-[color:var(--rs-accent-primary-subtle)] px-0.5 py-0.5 text-center font-display text-[10px] leading-none text-[color:var(--rs-accent-primary)]"
+        data-population-count
+      >
+        {count}
+      </span>
+      <ChevronIcon
+        className={`h-3 w-3 shrink-0 text-[color:var(--rs-text-secondary)] motion-safe:transition-transform ${
+          open ? "rotate-180" : ""
+        }`}
+      />
+    </button>
   );
 }
 
@@ -300,9 +342,14 @@ function LocationPopulationTrigger({
  * The revealed population list, rendered directly below the map. It stays
  * mounted (hidden when closed) so the disclosure trigger's `aria-controls`
  * always references an existing region; content renders only for the
- * location the entries were fetched for. Each character name is an accessible
- * interactive control (issue #64): selecting one opens the shared profile
- * panel, and selecting another updates that same panel.
+ * location the entries were fetched for. Each character entry is a deliberate
+ * interactive row (issue #64): the character name is the strongest text, the
+ * public owner name sits underneath, the derived overall level is a compact
+ * badge, and a chevron communicates that the row opens a profile. The row of
+ * the character whose profile is open stays visibly selected (gold accent
+ * border, tinted background, and a "Viewing" indicator — never color alone),
+ * transfers immediately when another row is selected, and unselects when the
+ * panel closes or is invalidated.
  */
 function LocationPopulationList({
   entries,
@@ -323,32 +370,66 @@ function LocationPopulationList({
   return (
     <div
       id="location-population-list"
-      className="mt-4 space-y-2 border border-[color:var(--rs-border-structural)] bg-[color:var(--rs-surface-panel)] p-3"
+      className="mt-4 divide-y divide-[color:var(--rs-border-subtle)] border border-[color:var(--rs-border-structural)] bg-[color:var(--rs-surface-panel)] p-1.5"
       hidden={!open}
     >
       {!matchesLocation ? null : error ? (
         <Feedback tone="muted">{error}</Feedback>
       ) : entries.length === 0 ? (
-        <p className="text-sm text-[color:var(--rs-text-secondary)]">No other characters here</p>
+        <p className="px-2 py-2 text-sm text-[color:var(--rs-text-secondary)]">
+          No other characters here
+        </p>
       ) : (
-        entries.map((entry) => (
-          <button
-            aria-controls="character-profile-panel"
-            aria-expanded={profileTarget === entry.displayName}
-            aria-label={`${entry.displayName}, Level ${entry.level}, player ${entry.ownerName}`}
-            className="rs-focus block w-full border-l-2 border-[color:var(--rs-border-structural)] px-2 py-1 text-left outline-none"
-            key={entry.displayName}
-            onClick={(event) => onOpenProfile(entry.displayName, event.currentTarget)}
-            type="button"
-          >
-            <span className="block break-words font-display text-sm font-bold text-[color:var(--rs-text-primary)]">
-              {entry.displayName} · Level {entry.level}
-            </span>
-            <span className="block break-words text-xs text-[color:var(--rs-text-secondary)]">
-              Player: {entry.ownerName}
-            </span>
-          </button>
-        ))
+        entries.map((entry) => {
+          const selected = profileTarget === entry.displayName;
+          return (
+            <button
+              aria-controls="character-profile-panel"
+              aria-expanded={selected}
+              aria-label={`${entry.displayName}, Level ${entry.level}, player ${entry.ownerName}`}
+              className={`rs-focus flex min-h-[var(--rs-touch-target)] w-full items-center gap-3 border-l-2 px-2 py-2 text-left outline-none motion-safe:transition-colors ${
+                selected
+                  ? "border-[color:var(--rs-accent-mining)] bg-[color:var(--rs-accent-mining-hover)]"
+                  : "border-transparent hover:bg-[color:var(--rs-accent-mining-subtle)] active:bg-[color:var(--rs-accent-mining-hover)]"
+              }`}
+              key={entry.displayName}
+              onClick={(event) => onOpenProfile(entry.displayName, event.currentTarget)}
+              type="button"
+            >
+              <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+                <span className="flex min-w-0 items-center gap-2">
+                  <span className="min-w-0 truncate font-display text-sm font-bold text-[color:var(--rs-text-primary)]">
+                    {entry.displayName}
+                  </span>
+                  {selected ? (
+                    <span className="shrink-0 font-display text-[9px] uppercase tracking-[0.14em] text-[color:var(--rs-accent-mining)]">
+                      Viewing
+                    </span>
+                  ) : null}
+                </span>
+                <span className="truncate text-xs text-[color:var(--rs-text-secondary)]">
+                  Player: {entry.ownerName}
+                </span>
+              </span>
+              <span
+                className={`shrink-0 border px-1.5 py-0.5 font-display text-[10px] uppercase leading-none tracking-[0.08em] ${
+                  selected
+                    ? "border-[color:var(--rs-accent-mining)] bg-[color:var(--rs-accent-mining-subtle)] text-[color:var(--rs-accent-mining)]"
+                    : "border-[color:var(--rs-item-plate-border)] bg-[color:var(--rs-item-plate-surface)] text-[color:var(--rs-text-secondary)]"
+                }`}
+              >
+                Lv {entry.level}
+              </span>
+              <ChevronIcon
+                className={`h-3 w-3 shrink-0 ${
+                  selected
+                    ? "text-[color:var(--rs-accent-mining)]"
+                    : "text-[color:var(--rs-text-muted)]"
+                }`}
+              />
+            </button>
+          );
+        })
       )}
     </div>
   );
@@ -589,7 +670,7 @@ export function LocalMapPanel() {
 
   return (
     <Panel tone="raised">
-      <div className="flex items-start justify-between gap-3">
+      <div className="flex items-start justify-between gap-2">
         <SectionHeader eyebrow="Local area">World map</SectionHeader>
         <LocationPopulationTrigger
           count={populationMatchesLocation ? population.length : 0}
