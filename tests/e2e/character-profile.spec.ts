@@ -9,6 +9,7 @@ import { createCharacter } from "@/server/characters";
 import { ensurePlayerAccount } from "@/server/ownership";
 import { cleanupTestUser, createTestUser } from "../integration/fixtures";
 import { miningStorageStatePath } from "./mining.setup";
+import { populationDisclosure } from "./population-disclosure";
 
 const e2eDatabaseHost = process.env.DATABASE_URL ? new URL(process.env.DATABASE_URL).hostname : "";
 
@@ -132,7 +133,7 @@ test.beforeEach(async ({ page }) => {
 
 test("selecting a same-location character opens its public profile panel", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
-  const disclosure = page.getByRole("button", { name: /^(Show|Hide) .*characters here$/ });
+  const disclosure = populationDisclosure(page);
   // The disclosure label is "Characters here" with a compact count badge and
   // a truthful show/hide accessible label.
   await expect(disclosure).toHaveAttribute("aria-label", /^Show \d+ characters here$/);
@@ -243,7 +244,7 @@ test("the profile panel works from the keyboard with predictable focus return", 
   page,
 }) => {
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.getByRole("button", { name: /^(Show|Hide) .*characters here$/ }).click();
+  await populationDisclosure(page).click();
 
   const opener = page.getByRole("button", {
     name: `${radaOne}, Level 2, player Rada Stonehand`,
@@ -280,7 +281,7 @@ test("the profile panel works from the keyboard with predictable focus return", 
 
   // Closing with the disclosure collapsed must not strand focus on the hidden
   // list button: Escape falls back to the persistent disclosure trigger.
-  const disclosure = page.getByRole("button", { name: /^(Show|Hide) .*characters here$/ });
+  const disclosure = populationDisclosure(page);
   await disclosure.click();
   await expect(page.locator("#location-population-list")).toBeHidden();
   await page.keyboard.press("Escape");
@@ -290,7 +291,7 @@ test("the profile panel works from the keyboard with predictable focus return", 
 
 test("a failed profile read shows visible accessible feedback", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.getByRole("button", { name: /^(Show|Hide) .*characters here$/ }).click();
+  await populationDisclosure(page).click();
   await page.route("**/api/character-profile?*", (route) => route.abort());
   await page.getByRole("button", { name: `${radaOne}, Level 2, player Rada Stonehand` }).click();
   const panel = page.locator("[data-character-profile-panel]");
@@ -306,7 +307,7 @@ test("an authoritative location change invalidates the open profile panel", asyn
   test.setTimeout(120_000);
   await page.setViewportSize({ width: 390, height: 844 });
   const characterId = page.url().split("/").at(-1)!;
-  await page.getByRole("button", { name: /^(Show|Hide) .*characters here$/ }).click();
+  await populationDisclosure(page).click();
   const trigger = page.getByRole("button", {
     name: `${radaOne}, Level 2, player Rada Stonehand`,
   });
@@ -337,7 +338,7 @@ test("an authoritative location change invalidates the open profile panel", asyn
   // persistent disclosure trigger instead of a missing control.
   await page.keyboard.press("Escape");
   await expect(panel).toBeHidden();
-  await expect(page.getByRole("button", { name: /^(Show|Hide) .*characters here$/ })).toBeFocused();
+  await expect(populationDisclosure(page)).toBeFocused();
 
   // Reopen for the travel-invalidation assertion below.
   await page.getByRole("button", { name: `${radaTwo}, Level 1, player Rada Stonehand` }).click();
