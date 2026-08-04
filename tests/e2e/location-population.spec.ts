@@ -184,18 +184,18 @@ test("the occupied tile shows other characters and owners, and re-scopes on trav
   await disclosure.click();
   await expect(disclosure).toHaveAttribute("aria-expanded", "true");
   await expect(
-    page.getByRole("article", { name: `${radaOne}, Level 2, player Rada Stonehand` }),
+    page.getByRole("button", { name: `${radaOne}, Level 2, player Rada Stonehand` }),
   ).toBeVisible();
   await expect(
-    page.getByRole("article", { name: `${radaTwo}, Level 1, player Rada Stonehand` }),
+    page.getByRole("button", { name: `${radaTwo}, Level 1, player Rada Stonehand` }),
   ).toBeVisible();
   await expect(
-    page.getByRole("article", { name: `${kaelCutter}, Level 2, player Kael Brighthome` }),
+    page.getByRole("button", { name: `${kaelCutter}, Level 2, player Kael Brighthome` }),
   ).toBeVisible();
   // Multiple characters owned by one player stay separate; the active
   // character is not listed.
-  await expect(page.getByRole("article", { name: /player Rada Stonehand/ })).toHaveCount(2);
-  await expect(page.getByRole("article", { name: new RegExp(`^${activeName},`) })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: /player Rada Stonehand/ })).toHaveCount(2);
+  await expect(page.getByRole("button", { name: new RegExp(`^${activeName},`) })).toHaveCount(0);
 
   await scrollMapIntoView(page);
   await page.screenshot({ path: "test-results/location-population-mobile-list.png" });
@@ -206,7 +206,7 @@ test("the occupied tile shows other characters and owners, and re-scopes on trav
   await seedCharacter("Rada Stonehand", radaThree);
   await page.getByRole("button", { name: "Refresh status" }).click();
   await expect(
-    page.getByRole("article", { name: `${radaThree}, Level 1, player Rada Stonehand` }),
+    page.getByRole("button", { name: `${radaThree}, Level 1, player Rada Stonehand` }),
   ).toBeVisible();
   expect(await indicatorCount(page)).toBe(before + 1);
 
@@ -248,10 +248,10 @@ test("the occupied tile shows other characters and owners, and re-scopes on trav
   );
   await page.getByRole("button", { name: /Who is here/ }).click();
   await expect(
-    page.getByRole("article", { name: `${yardGhost}, Level 1, player Kael Brighthome` }),
+    page.getByRole("button", { name: `${yardGhost}, Level 1, player Kael Brighthome` }),
   ).toBeVisible();
   for (const absent of [radaOne, radaTwo, kaelCutter]) {
-    await expect(page.getByRole("article", { name: new RegExp(`^${absent},`) })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: new RegExp(`^${absent},`) })).toHaveCount(0);
   }
   await scrollMapIntoView(page);
   await page.screenshot({ path: "test-results/location-population-mobile-yard.png" });
@@ -266,7 +266,7 @@ test("the population surface is keyboard reachable with announced state", async 
   await page.keyboard.press("Enter");
   await expect(disclosure).toHaveAttribute("aria-expanded", "true");
   await expect(
-    page.getByRole("article", { name: `${radaOne}, Level 2, player Rada Stonehand` }),
+    page.getByRole("button", { name: `${radaOne}, Level 2, player Rada Stonehand` }),
   ).toBeVisible();
 
   // Enter closes the disclosure and focus remains on the trigger; the

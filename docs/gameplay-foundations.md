@@ -220,6 +220,54 @@ at that same location, so the world feels inhabited:
   semantics and is explicitly **not** implemented here; no ten-minute filter,
   heartbeat, or `updatedAt`-as-presence rule exists in this version.
 
+### Same-location character profiles (issue #64)
+
+Every visible character name in the #62 same-location list is an accessible
+interactive control that opens one compact, mobile-first public profile panel:
+
+- **Public fields only:** character display name, the owner's public name
+  (`user.name`), a neutral placeholder portrait, the character's overall level,
+  and one generic skill row per published skill. Emails, account IDs,
+  character database IDs, skill IDs, inventory, equipment, charge, current
+  action, and other private state are never exposed.
+- **Interaction:** selecting a name opens the panel; selecting another visible
+  name updates the same panel rather than stacking panels; Close and Escape
+  return focus to the name that opened the current view. The panel is a
+  non-modal inline region so the name list stays interactive; the shared modal
+  Drawer is not used for this surface.
+- **Server revalidation:** the profile read is a narrow authenticated boundary
+  scoped by the owned active character (the same authenticated scope as #62).
+  The target is identified by its public display name only — no character IDs
+  leave the server — and one set-based statement requires, in the same database
+  snapshot, that the target is a different character whose authoritative
+  `current_location_id` equals the active character's current location at read
+  time. Unknown, invalid, active-character, and other-location targets all
+  receive one indistinguishable refusal. The panel re-reads on every open,
+  every target switch, and every accepted authoritative gameplay revision, and
+  is invalidated immediately when the active location changes.
+- **Overall-level rule:** the overall level is the highest derived level across
+  the character's published skills (skills with an approved level curve), with
+  level 1 as the baseline; with Mining as the only published skill it equals
+  the Mining level. No total-level field is persisted and no formula is
+  duplicated in the UI.
+- **Skill rows:** each published skill shows its player-facing name (from the
+  authoritative skill-presentation content boundary), current derived level,
+  total XP, XP earned within the current level, XP required for the next level,
+  and an accessible progress meter. All thresholds come from the authoritative
+  balance boundary (`skillLevelThresholds` in `game/config/balance.ts`) through
+  the shared `skillLevelProgress` domain helper — the same helper the Mining
+  state projection uses. At the maximum level the panel shows the level cap and
+  total XP truthfully and fabricates no further requirement.
+- **Current scope:** Mining is the only skill with an approved level curve and
+  is therefore the only published skill. Strength has a persisted starter XP
+  row but no approved curve and is not presented. A future approved curve (one
+  entry in the balance boundary) publishes that skill automatically — no
+  Mining-specific component or projection branch exists.
+- **Portrait:** the panel renders a neutral, decorative placeholder portrait
+  with a stable aspect ratio and intrinsic dimensions behind one narrow
+  presentation boundary. Portrait assets, generation, and player portrait
+  selection are deferred to a separate issue.
+
 ### Atomic Mining → Travel replacement
 
 When Travel replaces an active Mining action:

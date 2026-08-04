@@ -1,6 +1,13 @@
 "use client";
 
-import { useEffect, useRef, useState, useTransition, type CSSProperties } from "react";
+import {
+  useEffect,
+  useRef,
+  useState,
+  useTransition,
+  type CSSProperties,
+  type RefObject,
+} from "react";
 import { ActionButton } from "@/components/ui/ActionButton";
 import { Feedback } from "@/components/ui/Feedback";
 import { Panel } from "@/components/ui/Panel";
@@ -12,6 +19,7 @@ import { getLocation } from "@/game/content/locations";
 import type { LocationPopulationEntry } from "@/game/domain/location-population";
 import { beginTravelAction } from "@/server/actions";
 import { useMiningPlay } from "@/features/mining/MiningPlayContext";
+import { CharacterProfilePanel } from "./CharacterProfilePanel";
 import {
   buildLocalMapGeometry,
   LOCAL_MAP_GEOMETRY,
@@ -262,10 +270,12 @@ function LocationPopulationTrigger({
   count,
   open,
   onToggle,
+  triggerRef,
 }: {
   count: number;
   open: boolean;
   onToggle: () => void;
+  triggerRef: RefObject<HTMLButtonElement | null>;
 }) {
   return (
     <ActionButton
@@ -279,6 +289,7 @@ function LocationPopulationTrigger({
       className="shrink-0 px-3"
       intent="secondary"
       onClick={onToggle}
+      ref={triggerRef}
     >
       Who is here{count > 0 ? ` — ${count}` : ""}
     </ActionButton>
@@ -289,18 +300,25 @@ function LocationPopulationTrigger({
  * The revealed population list, rendered directly below the map. It stays
  * mounted (hidden when closed) so the disclosure trigger's `aria-controls`
  * always references an existing region; content renders only for the
- * location the entries were fetched for.
+ * location the entries were fetched for. Each character name is an accessible
+ * interactive control (issue #64): selecting one opens the shared profile
+ * panel, and selecting another updates that same panel.
  */
 function LocationPopulationList({
   entries,
   error,
   matchesLocation,
   open,
+  profileTarget,
+  onOpenProfile,
 }: {
   entries: readonly LocationPopulationEntry[];
   error?: string;
   matchesLocation: boolean;
   open: boolean;
+  /** Display name of the character whose profile is currently open, if any. */
+  profileTarget?: string;
+  onOpenProfile: (displayName: string, trigger: HTMLButtonElement) => void;
 }) {
   return (
     <div
@@ -314,18 +332,22 @@ function LocationPopulationList({
         <p className="text-sm text-[color:var(--rs-text-secondary)]">No other characters here</p>
       ) : (
         entries.map((entry) => (
-          <article
+          <button
+            aria-controls="character-profile-panel"
+            aria-expanded={profileTarget === entry.displayName}
             aria-label={`${entry.displayName}, Level ${entry.level}, player ${entry.ownerName}`}
-            className="border-l-2 border-[color:var(--rs-border-structural)] px-2 py-1"
+            className="rs-focus block w-full border-l-2 border-[color:var(--rs-border-structural)] px-2 py-1 text-left outline-none"
             key={entry.displayName}
+            onClick={(event) => onOpenProfile(entry.displayName, event.currentTarget)}
+            type="button"
           >
-            <p className="break-words font-display text-sm font-bold text-[color:var(--rs-text-primary)]">
+            <span className="block break-words font-display text-sm font-bold text-[color:var(--rs-text-primary)]">
               {entry.displayName} · Level {entry.level}
-            </p>
-            <p className="break-words text-xs text-[color:var(--rs-text-secondary)]">
+            </span>
+            <span className="block break-words text-xs text-[color:var(--rs-text-secondary)]">
               Player: {entry.ownerName}
-            </p>
-          </article>
+            </span>
+          </button>
         ))
       )}
     </div>
@@ -351,6 +373,18 @@ export function LocalMapPanel() {
   const [populationError, setPopulationError] = useState<string | undefined>();
   const [populationOpen, setPopulationOpen] = useState(false);
   const populationRequest = useRef(0);
+  // One shared profile panel (issue #64): only the selected target's display
+  // name is state; the panel stays mounted so every entry's aria-controls
+  // stays valid, and switching targets updates the same panel. The trigger
+  // ref receives the button that opened the current view so closing returns
+  // focus predictably to it.
+  const [profileTarget, setProfileTarget] = useState<string | undefined>();
+  const profileTriggerRef = useRef<HTMLButtonElement>(null);
+  const profilePanelRef = useRef<HTMLElement>(null);
+  // Persistent fallback focus target: the population disclosure trigger is
+  // always mounted and visible, so focus can never end up on a hidden or
+  // removed list button when a profile closes or is invalidated.
+  const populationTriggerRef = useRef<HTMLButtonElement>(null);
 
   const currentLocationId = state.location.currentLocationId;
   const travel = state.travelState;
@@ -387,11 +421,19 @@ export function LocalMapPanel() {
   // When the authoritative location changes, immediately drop the previous
   // location's population and collapse the disclosure: the old tile's entries
   // must never render on the new tile, not even for a single frame or while a
-  // replacement read is in flight.
+  // replacement read is in flight. The open profile panel is invalidated the
+  // same way; if focus is inside the panel it is moved to the population
+  // disclosure BEFORE the panel hides, so focus never lands on a hidden
+  // control.
   useEffect(() => {
     setPopulationOpen(false);
     setPopulation([]);
     setPopulationLocationId(undefined);
+    const active = document.activeElement;
+    if (active instanceof Node && profilePanelRef.current?.contains(active)) {
+      populationTriggerRef.current?.focus();
+    }
+    setProfileTarget(undefined);
   }, [currentLocationId]);
 
   // The population read is scoped to the owned active character server-side.
@@ -480,6 +522,26 @@ export function LocalMapPanel() {
     }[reason];
   }
 
+  /** Open (or switch) the shared profile panel for one visible character. */
+  function openProfile(targetName: string, trigger: HTMLButtonElement) {
+    profileTriggerRef.current = trigger;
+    setProfileTarget(targetName);
+  }
+
+  /** Close the profile panel and return focus to the name that opened it. */
+  function closeProfile() {
+    const opener = profileTriggerRef.current;
+    if (opener && opener.isConnected && opener.offsetParent !== null) {
+      opener.focus();
+    } else {
+      // The opener is hidden (disclosure collapsed) or was removed by a
+      // refreshed population: focus the persistent disclosure trigger so the
+      // close never strands focus on a hidden or missing control.
+      populationTriggerRef.current?.focus();
+    }
+    setProfileTarget(undefined);
+  }
+
   const transitProgress =
     travel && travel.startedAt && travel.arrivesAt
       ? Math.min(
@@ -531,8 +593,9 @@ export function LocalMapPanel() {
         <SectionHeader eyebrow="Local area">World map</SectionHeader>
         <LocationPopulationTrigger
           count={populationMatchesLocation ? population.length : 0}
-          open={populationOpen}
           onToggle={() => setPopulationOpen((open) => !open)}
+          open={populationOpen}
+          triggerRef={populationTriggerRef}
         />
       </div>
       <p className="mt-2 text-sm text-[color:var(--rs-text-secondary)]">
@@ -592,7 +655,18 @@ export function LocalMapPanel() {
         entries={population}
         error={populationError}
         matchesLocation={populationMatchesLocation}
+        onOpenProfile={openProfile}
         open={populationOpen}
+        profileTarget={profileTarget}
+      />
+
+      <CharacterProfilePanel
+        activeCharacterId={state.characterId}
+        onClose={closeProfile}
+        openerRef={profileTriggerRef}
+        panelRef={profilePanelRef}
+        refreshKey={state}
+        targetName={profileTarget}
       />
 
       {inTransit ? (
