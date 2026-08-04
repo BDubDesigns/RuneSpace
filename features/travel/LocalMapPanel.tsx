@@ -350,6 +350,13 @@ function LocationPopulationTrigger({
  * border, tinted background, and a "Viewing" indicator — never color alone),
  * transfers immediately when another row is selected, and unselects when the
  * panel closes or is invalidated.
+ *
+ * Row structure: each row button is wrapped in a plain divider div. The
+ * container's `divide-y` treatment applies the inter-row separator to the
+ * wrappers, never to the buttons, so the wrapper's top border can never
+ * recolor the button's own left selection rail — selected rows look identical
+ * whether they are first, middle, or last, and unselected rows show no stray
+ * vertical line.
  */
 function LocationPopulationList({
   entries,
@@ -383,51 +390,52 @@ function LocationPopulationList({
         entries.map((entry) => {
           const selected = profileTarget === entry.displayName;
           return (
-            <button
-              aria-controls="character-profile-panel"
-              aria-expanded={selected}
-              aria-label={`${entry.displayName}, Level ${entry.level}, player ${entry.ownerName}`}
-              className={`rs-focus flex min-h-[var(--rs-touch-target)] w-full items-center gap-3 border-l-2 px-2 py-2 text-left outline-none motion-safe:transition-colors ${
-                selected
-                  ? "border-[color:var(--rs-accent-mining)] bg-[color:var(--rs-accent-mining-hover)]"
-                  : "border-transparent hover:bg-[color:var(--rs-accent-mining-subtle)] active:bg-[color:var(--rs-accent-mining-hover)]"
-              }`}
-              key={entry.displayName}
-              onClick={(event) => onOpenProfile(entry.displayName, event.currentTarget)}
-              type="button"
-            >
-              <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-                <span className="flex min-w-0 items-center gap-2">
-                  <span className="min-w-0 truncate font-display text-sm font-bold text-[color:var(--rs-text-primary)]">
-                    {entry.displayName}
-                  </span>
-                  {selected ? (
-                    <span className="shrink-0 font-display text-[9px] uppercase tracking-[0.14em] text-[color:var(--rs-accent-mining)]">
-                      Viewing
-                    </span>
-                  ) : null}
-                </span>
-                <span className="truncate text-xs text-[color:var(--rs-text-secondary)]">
-                  Player: {entry.ownerName}
-                </span>
-              </span>
-              <span
-                className={`shrink-0 border px-1.5 py-0.5 font-display text-[10px] uppercase leading-none tracking-[0.08em] ${
+            <div key={entry.displayName}>
+              <button
+                aria-controls="character-profile-panel"
+                aria-expanded={selected}
+                aria-label={`${entry.displayName}, Level ${entry.level}, player ${entry.ownerName}`}
+                className={`rs-focus flex min-h-[var(--rs-touch-target)] w-full items-center gap-3 border-l-2 px-2 py-2 text-left outline-none motion-safe:transition-colors ${
                   selected
-                    ? "border-[color:var(--rs-accent-mining)] bg-[color:var(--rs-accent-mining-subtle)] text-[color:var(--rs-accent-mining)]"
-                    : "border-[color:var(--rs-item-plate-border)] bg-[color:var(--rs-item-plate-surface)] text-[color:var(--rs-text-secondary)]"
+                    ? "border-[color:var(--rs-accent-mining)] bg-[color:var(--rs-accent-mining-hover)]"
+                    : "border-transparent hover:bg-[color:var(--rs-accent-mining-subtle)] active:bg-[color:var(--rs-accent-mining-hover)]"
                 }`}
+                onClick={(event) => onOpenProfile(entry.displayName, event.currentTarget)}
+                type="button"
               >
-                Lv {entry.level}
-              </span>
-              <ChevronIcon
-                className={`h-3 w-3 shrink-0 ${
-                  selected
-                    ? "text-[color:var(--rs-accent-mining)]"
-                    : "text-[color:var(--rs-text-muted)]"
-                }`}
-              />
-            </button>
+                <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+                  <span className="flex min-w-0 items-center gap-2">
+                    <span className="min-w-0 truncate font-display text-sm font-bold text-[color:var(--rs-text-primary)]">
+                      {entry.displayName}
+                    </span>
+                    {selected ? (
+                      <span className="shrink-0 font-display text-[9px] uppercase tracking-[0.14em] text-[color:var(--rs-accent-mining)]">
+                        Viewing
+                      </span>
+                    ) : null}
+                  </span>
+                  <span className="truncate text-xs text-[color:var(--rs-text-secondary)]">
+                    Player: {entry.ownerName}
+                  </span>
+                </span>
+                <span
+                  className={`shrink-0 border px-1.5 py-0.5 font-display text-[10px] uppercase leading-none tracking-[0.08em] ${
+                    selected
+                      ? "border-[color:var(--rs-accent-mining)] bg-[color:var(--rs-accent-mining-subtle)] text-[color:var(--rs-accent-mining)]"
+                      : "border-[color:var(--rs-item-plate-border)] bg-[color:var(--rs-item-plate-surface)] text-[color:var(--rs-text-secondary)]"
+                  }`}
+                >
+                  Lv {entry.level}
+                </span>
+                <ChevronIcon
+                  className={`h-3 w-3 shrink-0 ${
+                    selected
+                      ? "text-[color:var(--rs-accent-mining)]"
+                      : "text-[color:var(--rs-text-muted)]"
+                  }`}
+                />
+              </button>
+            </div>
           );
         })
       )}

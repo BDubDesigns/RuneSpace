@@ -172,9 +172,15 @@ test("selecting a same-location character opens its public profile panel", async
   await expect(panel.getByText(/email/i)).toHaveCount(0);
 
   // Selecting a second character updates the SAME panel rather than stacking,
-  // and the selected treatment transfers immediately to the new row.
+  // and the selected treatment transfers immediately to the new row. The
+  // selected row's gold left rail comes from the button's own border (never
+  // the inter-row separator), so it is visible in any list position; the
+  // unselected non-first row must show no stray left rail.
   const kaelTrigger = page.getByRole("button", {
     name: `${kaelCutter}, Level 2, player Kael Brighthome`,
+  });
+  const radaTwoTrigger = page.getByRole("button", {
+    name: `${radaTwo}, Level 1, player Rada Stonehand`,
   });
   await kaelTrigger.click();
   await expect(panel).toHaveCount(1);
@@ -185,6 +191,30 @@ test("selecting a same-location character opens its public profile panel", async
   await expect(radaTrigger).toHaveAttribute("aria-expanded", "false");
   await expect(kaelTrigger.getByText("Viewing", { exact: true })).toBeVisible();
   await expect(radaTrigger.getByText("Viewing", { exact: true })).toHaveCount(0);
+  await expect(kaelTrigger).toHaveCSS("border-left-color", "rgb(245, 196, 81)");
+  await expect(kaelTrigger).toHaveCSS("border-left-width", "2px");
+  await expect(radaTwoTrigger).toHaveCSS("border-left-color", "rgba(0, 0, 0, 0)");
+  await expect(radaTwoTrigger).toHaveCSS("border-left-width", "2px");
+
+  // Selecting a later row (Rada Two is never the first row of the sorted
+  // fixture list) must show the SAME gold rail: the inter-row separator can
+  // never recolor the selection rail.
+  await radaTwoTrigger.click();
+  await expect(panel).toHaveCount(1);
+  await expect(panel.getByText(radaTwo, { exact: true })).toBeVisible();
+  await expect(panel.getByText("Player: Rada Stonehand")).toBeVisible();
+  await expect(panel.getByText("Overall level 1")).toBeVisible();
+  await expect(panel.locator("[data-character-portrait] svg")).toBeVisible();
+  await expect(radaTwoTrigger).toHaveAttribute("aria-expanded", "true");
+  await expect(kaelTrigger).toHaveAttribute("aria-expanded", "false");
+  await expect(radaTwoTrigger.getByText("Viewing", { exact: true })).toBeVisible();
+  await expect(kaelTrigger.getByText("Viewing", { exact: true })).toHaveCount(0);
+  await expect(radaTwoTrigger).toHaveCSS("border-left-color", "rgb(245, 196, 81)");
+  await expect(radaTwoTrigger).toHaveCSS("border-left-width", "2px");
+  await expect(kaelTrigger).toHaveCSS("border-left-color", "rgba(0, 0, 0, 0)");
+  await expect(kaelTrigger).toHaveCSS("border-left-width", "2px");
+  // Exactly one row is selected at any time.
+  await expect(page.getByText("Viewing", { exact: true })).toHaveCount(1);
 
   // Mobile-first: no horizontal overflow at the canonical phone viewport.
   const overflow = await page.evaluate(
@@ -192,10 +222,10 @@ test("selecting a same-location character opens its public profile panel", async
   );
   expect(overflow).toBeLessThanOrEqual(0);
 
-  // Review evidence: the selected row (gold accent, tint, "Viewing" indicator,
-  // gold level badge) and the profile panel (neutral silhouette portrait,
-  // identity, overall level, skill progress).
-  await kaelTrigger.scrollIntoViewIfNeeded();
+  // Review evidence: a LATER row selected (the gold rail regression case) and
+  // the profile panel (neutral silhouette portrait, identity, overall level,
+  // skill progress).
+  await radaTwoTrigger.scrollIntoViewIfNeeded();
   await page.screenshot({ path: "test-results/character-profile-mobile-rows.png" });
   await panel.scrollIntoViewIfNeeded();
   await page.screenshot({ path: "test-results/character-profile-mobile-panel.png" });
@@ -204,8 +234,8 @@ test("selecting a same-location character opens its public profile panel", async
   // removes the selected treatment from every row.
   await panel.getByRole("button", { name: "Close character profile" }).click();
   await expect(panel).toBeHidden();
-  await expect(kaelTrigger).toBeFocused();
-  await expect(kaelTrigger).toHaveAttribute("aria-expanded", "false");
+  await expect(radaTwoTrigger).toBeFocused();
+  await expect(radaTwoTrigger).toHaveAttribute("aria-expanded", "false");
   await expect(page.getByText("Viewing", { exact: true })).toHaveCount(0);
 });
 
