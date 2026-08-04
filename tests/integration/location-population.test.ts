@@ -203,17 +203,21 @@ suite("issue #62 location population read boundary (real PostgreSQL)", () => {
     await makeCharacterAt(fillerOwner, zuluName, LOCATION_IDS.crashSite);
     await makeCharacterAt(fillerOwner, alphaName, LOCATION_IDS.crashSite);
     await makeCharacterAt(fillerOwner, mikeName, LOCATION_IDS.crashSite);
+    const fixtureNames = [alphaName, mikeName, zuluName];
 
     const first = await population.getLocationPopulation(owner, active.id);
     const second = await population.getLocationPopulation(owner, active.id);
-    // The full read is stable across calls, and this suite's fixtures appear
-    // in deterministic name order regardless of pre-existing rows.
-    expect(first.characters.map((entry) => entry.displayName)).toEqual(
-      second.characters.map((entry) => entry.displayName),
-    );
-    const ordered = first.characters
+    // Scope the ordering proof to this suite's fixtures: unrelated rows created
+    // or removed by a concurrently running integration suite between the two
+    // reads must not change the assertion. Both reads must return all three
+    // fixtures in deterministic character-name order.
+    const firstOrdered = first.characters
       .map((entry) => entry.displayName)
-      .filter((name) => [alphaName, mikeName, zuluName].includes(name));
-    expect(ordered).toEqual([alphaName, mikeName, zuluName]);
+      .filter((name) => fixtureNames.includes(name));
+    const secondOrdered = second.characters
+      .map((entry) => entry.displayName)
+      .filter((name) => fixtureNames.includes(name));
+    expect(firstOrdered).toEqual([alphaName, mikeName, zuluName]);
+    expect(secondOrdered).toEqual([alphaName, mikeName, zuluName]);
   });
 });
