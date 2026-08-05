@@ -133,11 +133,14 @@ version and new byte sizes in the PR.
   Nixpacks (not the Dockerfile), which copies the application directory —
   masters therefore remain in the Nixpacks runtime filesystem but are never
   HTTP-served (Next.js serves only `public/`) and are never imported by code.
-- `tests/unit/portrait-catalog.test.ts` proves: catalog/registry ID parity,
-  unique IDs and paths, exactly ten starters, baker/milkman npc-only, 13
-  reserved, selectable subset = starters only, deterministic ordering,
-  concept-based naming (no ethnicity terms), categories absent from paths,
-  masters outside `public/`, derivative paths canonical, and the exact
-  on-disk asset sets (25 masters, 25 derivatives, no staging leftovers).
+- `tests/unit/portrait-catalog.test.ts` proves: catalog/registry ID parity and
+  unique identities and paths, exactly the ten approved starter identities in
+  approved picker order, baker/milkman as the only npc-only portraits,
+  starter-only selection helpers, the neutral canonical ID/filename format
+  (concept-first naming itself is a documentation and human-review policy, not
+  a regex), categories absent from asset paths, masters outside `public/` and
+  derivatives under the canonical public path, expected derivative metadata and
+  accessible descriptions, and exact catalog-to-filesystem parity with no
+  missing or orphan assets.
 - No selection UI, persistence, NPC system, quest, unlock, purchase, or generic
   cosmetics framework is added; Issue #65 consumes this catalog.
