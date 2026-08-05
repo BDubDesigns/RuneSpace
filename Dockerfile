@@ -20,18 +20,19 @@ COPY . .
 # Build needs a DATABASE_URL present; the runtime value is injected at deploy.
 ARG DATABASE_URL=postgres://runespace:runespace@localhost:5432/runespace
 ENV DATABASE_URL=$DATABASE_URL
-# Build-only placeholder with the same shape as the CI build step
-# (.github/workflows/ci.yml). It is never used in a deployment; a real secret is
-# injected through the Coolify/Nixpacks environment at runtime.
-ARG BETTER_AUTH_SECRET=insecure-ci-build-only-secret-do-not-use-in-prod-0000000000
-ENV BETTER_AUTH_SECRET=$BETTER_AUTH_SECRET
+# Build-only placeholder so an ordinary `docker build` succeeds (`next build`
+# runs with NODE_ENV=production and requires BETTER_AUTH_SECRET). It is scoped
+# to the single build command below — never promoted to an ENV and never used
+# at runtime. Coolify supplies the real BETTER_AUTH_SECRET when the
+# application runs.
+ARG BUILD_ONLY_BETTER_AUTH_SECRET=insecure-ci-build-only-secret-do-not-use-in-prod-0000000000
 ENV NODE_ENV=production
 # Issue #70: the canonical portrait master directory must never enter the
 # Docker build context (.dockerignore) — this assertion fails the build if it
 # does, proving the production image ships only the committed derivatives.
 RUN test ! -e assets/character-portraits \
   && echo "portrait masters correctly excluded from the Docker build context"
-RUN pnpm build
+RUN BETTER_AUTH_SECRET="$BUILD_ONLY_BETTER_AUTH_SECRET" pnpm build
 
 # ---- runner ----
 FROM node:22-slim AS runner

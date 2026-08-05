@@ -50,6 +50,14 @@ masters are already square full-frame compositions. Masters keep their 1254×125
 PNG form as the future-art-work source; derivatives are committed before CI and
 deployment and are never regenerated at build, startup, or request time.
 
+Consumption boundary: application code references only the committed
+`public/character-portraits/` derivative — never the high-resolution source
+master. Issue #65 renders that committed derivative through the repository's
+normal `next/image` boundary; Next may generate and cache responsive delivery
+variants from the committed derivative. That request-time variant generation
+does not regenerate or replace the canonical derivative and is not a separate
+runtime image service.
+
 ## Per-portrait inventory
 
 All masters are 1254×1254 PNG; all derivatives are 512×512 WebP quality 80.
@@ -129,10 +137,22 @@ version and new byte sizes in the PR.
 
 - Masters are excluded from the Docker build context by the narrow
   `.dockerignore` rule `assets/character-portraits`; the Dockerfile asserts the
-  directory is absent after `COPY . .`. The live Coolify deployment uses
-  Nixpacks (not the Dockerfile), which copies the application directory —
-  masters therefore remain in the Nixpacks runtime filesystem but are never
-  HTTP-served (Next.js serves only `public/`) and are never imported by code.
+  directory is absent after `COPY . .`.
+- Deployment mechanism (Coolify/Nixpacks): the live Coolify deployment uses
+  Nixpacks (nixpacks.toml), not the repository Dockerfile. Whether the masters
+  are copied into the Nixpacks runtime filesystem **could not be verified from
+  the actual preview build**: the Coolify build logs are login-protected and
+  were not accessible to the implementation agent. Mechanism-level evidence
+  (upstream nixpacks source and Docker semantics): nixpacks copies the app
+  source — including the repository `.dockerignore` — into a temporary build
+  directory and runs `docker build` with that directory as the context, and
+  Docker honors `.dockerignore` when assembling that context, so the narrow
+  rule is expected to exclude the masters there as well; this was not observed
+  in a real preview build log, and no additional exclusion was added.
+  Runtime probing of the preview confirms: master paths are never HTTP-served
+  (404 — the Next.js runtime serves only `public/`), all 25 committed
+  derivatives are served (200 `image/webp`), and masters are never imported by
+  application code.
 - `tests/unit/portrait-catalog.test.ts` proves: catalog/registry ID parity and
   unique identities and paths, exactly the ten approved starter identities in
   approved picker order, baker/milkman as the only npc-only portraits,

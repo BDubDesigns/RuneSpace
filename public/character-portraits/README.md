@@ -13,3 +13,9 @@ deterministic repository-side step `scripts/optimize-portraits.mjs`; they are
 never regenerated during `next build`, Docker build, application startup, or at
 request time. Do not place new portrait files here without adding them to the
 catalog, and do not commit unreferenced or rejected images to this directory.
+
+Application code references only these committed derivatives — never the
+high-resolution masters in `assets/character-portraits/`. Portrait UI (Issue
+#65) renders the committed derivative through the normal `next/image` boundary;
+Next may generate and cache responsive delivery variants from the committed
+derivative, which does not regenerate or replace the canonical derivative.
