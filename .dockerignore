@@ -9,3 +9,9 @@ test-results
 .env.local
 *.log
 .DS_Store
+# Canonical high-resolution portrait masters (issue #70): never required by the
+# application build — the committed optimized derivatives under public/ are the
+# only portrait assets the app consumes. Keeping this directory out of the
+# Docker build context keeps builder payloads small. Rejected/unreferenced
+# master copies must never be re-added here.
+assets/character-portraits
