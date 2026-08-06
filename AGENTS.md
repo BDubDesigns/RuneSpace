@@ -149,25 +149,38 @@ subagents or automation that may be unavailable.
   Verify the active version with `node --version` before running validation.
 
 ### Host-local PostgreSQL
-- On Brandon's managed RuneSpace host checkout, database-backed commands must first load
-  `/home/brandon/.config/runespace/dev.env` with `source /home/brandon/.config/runespace/dev.env`.
-  This private file exists outside the repository and supplies `DATABASE_URL`.
+- On Brandon's managed RuneSpace host checkout, run database-backed and Node-22-bound
+  commands through `./scripts/managed-host-run.sh`, which loads the private
+  `/home/brandon/.config/runespace/dev.env`, forces the system Node 22 (never the
+  user-local Node 24), and validates a localhost-only `DATABASE_URL` before executing
+  the command. Do not `source` or print the private file manually.
 - Never print, `cat`, `echo`, log, commit, or include the private file's contents in reports.
   Do not guess PostgreSQL credentials or substitute Docker Compose credentials from `.env.example`.
   Do not use `postgres://runespace:runespace@localhost:5432/runespace` on this managed host.
-- If the private file is missing or unreadable, stop and report the environment blocker rather
-  than inventing fallback credentials. Database-backed commands include `pnpm drizzle-kit migrate`,
-  `pnpm test:integration`, and `pnpm test:e2e:canonical`.
+- If the private file is missing or unreadable, `managed-host-run.sh` refuses to start; stop and
+  report the environment blocker rather than inventing fallback credentials. Database-backed
+  commands include `pnpm drizzle-kit migrate`, `pnpm test:integration`, and
+  `pnpm test:e2e:canonical`.
 - The canonical runner's localhost safety check remains authoritative. Never access the Coolify
   production database for local testing.
-- Managed-host command sequence (Node must report 22.x):
+- Managed-host command sequence (`managed-host-run.sh` verifies Node 22 and the localhost
+  database itself):
   ```bash
   cd /home/brandon/workspace/projects/runespace
-  source /home/brandon/.config/runespace/dev.env
-  export PATH="/usr/bin:$PATH"
-  node --version
-  pnpm test:integration
-  pnpm test:e2e:canonical
+  ./scripts/managed-host-run.sh pnpm install --frozen-lockfile
+  ./scripts/managed-host-run.sh pnpm typecheck
+  ./scripts/managed-host-run.sh pnpm lint
+  ./scripts/managed-host-run.sh pnpm format:check
+  ./scripts/managed-host-run.sh pnpm test
+  ./scripts/managed-host-run.sh pnpm drizzle-kit migrate
+  ./scripts/managed-host-run.sh pnpm test:integration
+  # Production build: `next build` runs as production, so server/env.ts requires a
+  # BETTER_AUTH_SECRET of at least 16 characters. Scope a clearly fake build-only
+  # placeholder to this one invocation only (matching .github/workflows/ci.yml).
+  ./scripts/managed-host-run.sh env \
+    BETTER_AUTH_SECRET="insecure-ci-build-only-secret-do-not-use-in-prod-0000000000" \
+    pnpm build
+  ./scripts/managed-host-run.sh pnpm test:e2e:canonical
   ```
 
 ### Managed-host ports and process cleanup
@@ -178,6 +191,9 @@ subagents or automation that may be unavailable.
 - An independent focused E2E run must use a separately confirmed-free high port,
   never `3000` or `3200`. `pnpm test:e2e:focused` defaults to `3310` and refuses
   to start unless that port is confirmed available.
+- Do not manually assemble `next build` + `next start` for browser validation on
+  the managed host. Use `pnpm test:e2e:focused <phase>`, `pnpm test:e2e:canonical`,
+  or the deployed PR preview unless diagnosing the runner itself.
 - Before cleaning up any listener, inspect the owning PID with `ss -tlnp` and
   kill only a positively identified RuneSpace-owned test-server PID with a
   targeted `kill <pid>`. Never use broad `pkill -f` or blanket Next.js
