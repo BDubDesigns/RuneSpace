@@ -20,6 +20,12 @@ import { fileURLToPath } from "node:url";
 export const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 export const PACKAGE_MANAGER = process.platform === "win32" ? "pnpm.cmd" : "pnpm";
 
+// The local-database safety rule lives in one authoritative place
+// (scripts/local-db-url.mjs) and is re-exported here so the canonical and
+// focused runners keep their existing import surface while always using the
+// strengthened validator.
+export { assertLocalDatabaseUrl } from "./local-db-url.mjs";
+
 export function readPositiveInteger(value, fallback, label) {
   if (value === undefined || value === null || value === "") return fallback;
   // The whole value must be an integer representation; parseInt would silently
@@ -113,18 +119,6 @@ export function assertPortAvailable(port) {
       settle(rejectPort, new Error(`could not verify that test port ${port} is available`)),
     );
   });
-}
-
-export function assertLocalDatabaseUrl(databaseUrl) {
-  if (!databaseUrl) throw new Error("DATABASE_URL is required");
-  let dbHost;
-  try {
-    dbHost = new URL(databaseUrl).hostname;
-  } catch {
-    throw new Error("DATABASE_URL is not a valid URL");
-  }
-  if (dbHost !== "localhost" && dbHost !== "127.0.0.1")
-    throw new Error(`DATABASE_URL host must be localhost or 127.0.0.1, got ${dbHost}`);
 }
 
 export function assertNode22(version = process.versions.node) {

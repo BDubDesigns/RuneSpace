@@ -59,12 +59,15 @@ if [[ -z "${DATABASE_URL:-}" ]]; then
   exit 1
 fi
 
-# Validate that the host is localhost/127.0.0.1 without printing the URL or its
-# credentials. Uses the same new URL().hostname semantics as scripts/e2e-shared.mjs.
-db_host="$(node -e 'const u = new URL(process.env.DATABASE_URL); process.stdout.write(u.hostname);' 2>/dev/null || true)"
-if [[ -z "$db_host" || ( "$db_host" != "localhost" && "$db_host" != "127.0.0.1" ) ]]; then
+# Validate the database URL through the shared dependency-free boundary
+# (scripts/local-db-url.mjs), which accepts only localhost/127.0.0.1 postgres
+# URLs and rejects any `host` query override. It never prints the URL,
+# credentials, or query parameters. The helper is resolved relative to this
+# script's directory so it works before `pnpm install` and regardless of the
+# caller's working directory.
+if ! node "$(dirname "${BASH_SOURCE[0]}")/local-db-url.mjs"; then
   printf '%s\n' \
-    "managed-host-run: DATABASE_URL must be a valid URL whose host is localhost or 127.0.0.1." >&2
+    "managed-host-run: DATABASE_URL is not a safe local postgres URL (see the error above)." >&2
   exit 1
 fi
 
