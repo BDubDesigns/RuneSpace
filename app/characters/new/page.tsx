@@ -12,7 +12,7 @@ export default function NewCharacterPage() {
   const portraitOptions = getSelectablePortraitOptions();
 
   return (
-    <ScaffoldScreen>
+    <ScaffoldScreen size="wide">
       <SectionHeader eyebrow="Character selection">New character</SectionHeader>
       <p className="mt-2 text-sm text-[color:var(--rs-text-secondary)]">
         Choose a name and a portrait. Names are unique after normalization; you get three slots.

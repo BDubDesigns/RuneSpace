@@ -13,7 +13,7 @@ import { PortraitPicker } from "@/components/portraits/PortraitPicker";
 function SubmitButton({ label, disabled }: { label: string; disabled?: boolean }) {
   const { pending } = useFormStatus();
   return (
-    <ActionButton type="submit" loading={pending} disabled={disabled} className="mt-4 w-full">
+    <ActionButton type="submit" loading={pending} disabled={disabled} className="w-full">
       {pending ? "Working…" : label}
     </ActionButton>
   );
@@ -22,9 +22,12 @@ function SubmitButton({ label, disabled }: { label: string; disabled?: boolean }
 /**
  * Character creation form (client, issue #65). Name validation/normalization
  * and portrait selectability live server-side; this form collects the
- * deliberate portrait choice and surfaces server errors. The final Create
- * action cannot succeed until both the name and one portrait selection are
- * valid — the browser never decides which portraits exist or are selectable.
+ * deliberate portrait choice through the shared chooser and surfaces server
+ * errors. The final Create action cannot succeed until both the name and one
+ * portrait selection are valid — the browser never decides which portraits
+ * exist or are selectable. There is no separate Save portrait step: Create
+ * Character is the confirmation and persists the portrait atomically with the
+ * new character.
  */
 export function CreateCharacterForm({
   options,
@@ -71,16 +74,15 @@ export function CreateCharacterForm({
         </p>
         <div className="mt-3">
           <PortraitPicker
+            action={<SubmitButton label="Create character" disabled={!canCreate} />}
             label="Character portrait"
             onSelect={setPortraitId}
-            optionSizes="(min-width: 640px) 96px, 33vw"
             options={options}
             selectedPortraitId={portraitId}
           />
         </div>
       </div>
       {error ? <Feedback tone="danger">{error}</Feedback> : null}
-      <SubmitButton label="Create character" disabled={!canCreate} />
     </form>
   );
 }

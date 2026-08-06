@@ -165,6 +165,28 @@ body {
   animation: rs-result-success 3.6s ease-out;
 }
 
+/* Brief emphasis on a character's portrait frame after a confirmed portrait
+   save (issue #65). Restrained, one-shot, and disabled for reduced-motion by
+   the global rule below. */
+@keyframes rs-portrait-saved {
+  0% {
+    box-shadow: none;
+  }
+  15%,
+  60% {
+    box-shadow:
+      0 0 0 2px var(--rs-accent-success),
+      var(--rs-glow-success);
+  }
+  100% {
+    box-shadow: none;
+  }
+}
+
+.rs-portrait-saved {
+  animation: rs-portrait-saved 1.2s ease-out;
+}
+
 .rs-result-feedback-danger {
   animation: rs-result-danger 3.6s ease-out;
 }

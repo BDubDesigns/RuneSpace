@@ -4,7 +4,6 @@ import { ScaffoldScreen } from "@/components/ScaffoldScreen";
 import { ActionLink } from "@/components/ui/ActionLink";
 import { Panel } from "@/components/ui/Panel";
 import { SectionHeader } from "@/components/ui/SectionHeader";
-import { CharacterPortrait } from "@/components/portraits/CharacterPortrait";
 import { SignOutButton } from "@/features/auth/SignOutButton";
 import { ManageCharacterPortrait } from "@/features/characters/ManageCharacterPortrait";
 import { auth } from "@/server/auth";
@@ -55,55 +54,52 @@ export default async function CharactersPage() {
       <p className="mt-2 text-sm text-[color:var(--rs-text-secondary)]">
         Signed in as <span className="text-[color:var(--rs-text-primary)]">{user.email}</span>.
       </p>
-
       <ul className="mt-6 space-y-3">
         {slots.map(({ slot, character }) => {
           const portrait =
             character === null ? null : resolveCharacterPortrait(character.portraitId);
           return (
             <Panel key={slot} as="li" className="p-4" tone="raised">
-              <div className="flex items-center gap-3">
-                {character && portrait ? (
-                  <CharacterPortrait
-                    className="h-12 w-12 shrink-0"
-                    presentation={portrait}
-                    sizes="48px"
-                  />
-                ) : null}
-                <div className="min-w-0 flex-1">
-                  <p className="font-display text-xs uppercase tracking-wide text-[color:var(--rs-text-muted)]">
-                    Slot {slot}
-                  </p>
-                  {character ? (
-                    <>
-                      <p className="truncate font-medium text-[color:var(--rs-text-primary)]">
-                        {character.displayName}
-                      </p>
-                      <p className="truncate text-xs text-[color:var(--rs-text-muted)]">
-                        {portrait?.kind === "selected" ? portrait.displayName : "No portrait yet"}
-                      </p>
-                    </>
-                  ) : (
-                    <p className="italic text-[color:var(--rs-text-muted)]">Empty</p>
-                  )}
-                </div>
-              </div>
-              {character ? (
-                <div className="mt-3 flex items-center justify-end gap-2">
+              {character && portrait ? (
+                <div className="flex items-center gap-4">
+                  {/* The portrait itself is the edit control: one accessible
+                      button (large portrait/placeholder + top-right pencil)
+                      opens the shared chooser. Play is the only large textual
+                      action on the card. */}
                   <ManageCharacterPortrait
                     characterId={character.id}
                     characterName={character.displayName}
                     currentPortraitId={character.portraitId}
                     options={portraitOptions}
+                    presentation={portrait}
                   />
-                  <ActionLink href={`/play/${character.id}`}>Play</ActionLink>
+                  <div className="min-w-0 flex-1">
+                    <p className="font-display text-xs uppercase tracking-wide text-[color:var(--rs-text-muted)]">
+                      Slot {slot}
+                    </p>
+                    <p className="truncate font-medium text-[color:var(--rs-text-primary)]">
+                      {character.displayName}
+                    </p>
+                    <p className="truncate text-xs text-[color:var(--rs-text-muted)]">
+                      {portrait.kind === "selected" ? portrait.displayName : "No portrait yet"}
+                    </p>
+                  </div>
+                  <ActionLink className="shrink-0" href={`/play/${character.id}`}>
+                    Play
+                  </ActionLink>
                 </div>
-              ) : null}
+              ) : (
+                <div className="min-w-0 flex-1">
+                  <p className="font-display text-xs uppercase tracking-wide text-[color:var(--rs-text-muted)]">
+                    Slot {slot}
+                  </p>
+                  <p className="italic text-[color:var(--rs-text-muted)]">Empty</p>
+                </div>
+              )}
             </Panel>
           );
         })}
       </ul>
-
       {hasFreeSlot ? (
         <ActionLink href="/characters/new" intent="secondary" className="mt-6 flex w-full">
           New character

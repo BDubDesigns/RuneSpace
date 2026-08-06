@@ -26,15 +26,19 @@ test.beforeAll(() => {
 });
 
 /**
- * Issue #65 mobile-first journeys:
+ * Issue #65 mobile-first journeys for the shared portrait chooser:
  * - character creation requires a deliberate portrait choice (exactly the ten
  *   player-starter options, no locked or non-selectable cards), works from the
- *   keyboard and by touch/click, and the choice survives navigation;
- * - a legacy null-portrait character shows the neutral placeholder and a
- *   Choose portrait action; the owner selects and saves; success feedback
- *   appears; the same-location public profile shows the chosen portrait;
- *   sibling characters on the same account keep their own selections; no
- *   horizontal overflow or private-data exposure occurs.
+ *   keyboard and by touch, uses the same in-page review state as management
+ *   (large preview, Previous/Next with wrap, Back to portraits preserving the
+ *   candidate and the typed name), and the choice survives navigation;
+ * - a legacy null-portrait character shows the neutral placeholder on a
+ *   portrait edit control; the owner reviews and saves; the chooser closes on
+ *   success, a transient "Portrait updated" status is announced, focus
+ *   returns to the edit control, and the same-location public profile shows
+ *   the chosen portrait; failures keep the chooser open and preserve the
+ *   candidate; sibling characters on the same account keep their own
+ *   selections; no horizontal overflow or private-data exposure occurs.
  *
  * Registrations are kept minimal (the fixture user for the creation journey,
  * one owner for the management journey) so the phase stays well under the
@@ -85,14 +89,14 @@ test.describe("character creation portrait journey", () => {
   test.use({ storageState: miningStorageStatePath, hasTouch: true });
   test.describe.configure({ mode: "serial" });
 
-  test("creation requires one deliberate portrait choice from exactly the ten starters", async ({
+  test("creation uses the shared chooser: ten starters, review state, and atomic persistence", async ({
     page,
   }) => {
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto("/characters/new");
 
-    // The picker exposes exactly the ten catalog player-starter options and
-    // nothing else: no npc-only, reserved, unknown, or locked cards.
+    // Browse state: exactly the ten catalog player-starter options and
+    // nothing else — no npc-only, reserved, unknown, or locked cards.
     const options = page.locator("[data-portrait-option]");
     await expect(options).toHaveCount(10);
     const starterIds = PLAYER_STARTER_PORTRAITS.map((portrait) => portrait.id);
@@ -102,51 +106,81 @@ test.describe("character creation portrait journey", () => {
     for (const forbidden of ["Baker", "Milkman", "Von Scavenger", "Unicorn Mechanic"]) {
       await expect(page.getByRole("button", { name: new RegExp(forbidden) })).toHaveCount(0);
     }
+    // Mobile-first: no horizontal overflow in browse state.
+    expect(await noHorizontalOverflow(page)).toBeLessThanOrEqual(0);
 
-    // The final action cannot succeed until BOTH the name and a portrait are
-    // valid: disabled with no input, still disabled with only a name.
-    const create = page.getByRole("button", { name: "Create character" });
-    await expect(create).toBeDisabled();
-    const createdName = `Fresh Star ${token()}`;
-    await page.getByLabel("Character name").fill(createdName);
-    await expect(create).toBeDisabled();
-
-    // Keyboard selection: focus an option and confirm with Enter.
-    const firstOption = page.locator(`[data-portrait-option][data-portrait-id="${starterIds[0]}"]`);
-    await firstOption.focus();
-    await expect(firstOption).toBeFocused();
-    await page.keyboard.press("Enter");
-    await expect(firstOption).toHaveAttribute("aria-pressed", "true");
-    await expect(firstOption).toHaveAttribute("data-portrait-selected", "true");
-    await expect(create).toBeEnabled();
-
-    // Touch selection (a real tap) transfers the clear selected state to
-    // another option and back to the first.
+    // Touch activation enters the in-page review state with a large preview;
+    // the final action cannot succeed until BOTH the name and a portrait are
+    // valid (disabled with an empty name).
     const grammaOption = page.locator(
       `[data-portrait-option][data-portrait-id="${PLAYER_STARTER_PORTRAITS[6]!.id}"]`,
     );
     await grammaOption.tap();
+    const review = page.locator('[data-portrait-review="true"]');
+    await expect(review).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Review portrait" })).toBeFocused();
+    await expect(review.locator("[data-portrait-preview-name]")).toHaveText("Gramma");
+    const create = page.getByRole("button", { name: "Create character" });
+    await expect(create).toBeVisible();
+    await expect(create).toBeDisabled();
+
+    // Previous/Next update the candidate and preview, wrapping at the ends.
+    await page.getByRole("button", { name: "Previous portrait" }).click();
+    await expect(review.locator("[data-portrait-preview-name]")).toHaveText("Zero-G Rock Star");
+    await expect(grammaOption).not.toHaveAttribute("data-portrait-selected", "true");
+    await page.getByRole("button", { name: "Next portrait" }).click();
+    await expect(review.locator("[data-portrait-preview-name]")).toHaveText("Gramma");
+
+    // Back to portraits restores the grid, the candidate, and focus.
+    await page.getByRole("button", { name: "Back to portraits" }).click();
+    await expect(review).toBeHidden();
+    await expect(grammaOption).toBeFocused();
     await expect(grammaOption).toHaveAttribute("aria-pressed", "true");
-    await expect(firstOption).not.toHaveAttribute("data-portrait-selected", "true");
-    await firstOption.tap();
+
+    // The typed name survives browsing/reviewing.
+    const createdName = `Fresh Star ${token()}`;
+    await page.getByLabel("Character name").fill(createdName);
+
+    // Keyboard selection: focus an option and confirm with Enter; the action
+    // becomes enabled only once both name and portrait are valid.
+    const firstOption = page.locator(`[data-portrait-option][data-portrait-id="${starterIds[0]}"]`);
+    await firstOption.focus();
+    await expect(firstOption).toBeFocused();
+    await page.keyboard.press("Enter");
+    await expect(review).toBeVisible();
+    await expect(review.locator("[data-portrait-preview-name]")).toHaveText("EVA Salvage Welder");
+    await expect(firstOption).toHaveAttribute("aria-pressed", "true");
+    await expect(firstOption).toHaveAttribute("data-portrait-selected", "true");
+    await expect(create).toBeEnabled();
+
+    // Previous wraps from the first option to the last; Next returns.
+    await page.getByRole("button", { name: "Previous portrait" }).click();
+    await expect(review.locator("[data-portrait-preview-name]")).toHaveText("Space Nerd");
+    await page.getByRole("button", { name: "Next portrait" }).click();
+    await expect(review.locator("[data-portrait-preview-name]")).toHaveText("EVA Salvage Welder");
+
+    // Returning to the grid preserves the typed name and the candidate.
+    await page.getByRole("button", { name: "Back to portraits" }).click();
+    await expect(firstOption).toBeFocused();
+    await expect(page.getByLabel("Character name")).toHaveValue(createdName);
     await expect(firstOption).toHaveAttribute("data-portrait-selected", "true");
 
-    // Mobile-first: the creation screen has no horizontal overflow.
-    expect(await noHorizontalOverflow(page)).toBeLessThanOrEqual(0);
-
-    // Creation succeeds with the selected portrait and persists across
-    // navigation.
+    // Re-enter review and create; the portrait persists atomically with the
+    // new character and survives navigation.
+    await firstOption.tap();
+    await expect(review).toBeVisible();
     await create.click();
     await page.waitForURL(/\/play\/[^/]+$/);
     await page.goto("/characters");
     const row = page.locator("li").filter({ hasText: createdName });
     await expect(row).toBeVisible();
     await expect(row.getByText("No portrait yet", { exact: true })).toHaveCount(0);
-    const rowPortrait = row.locator("[data-character-portrait] img");
-    await expect(rowPortrait).toBeVisible();
-    expect((await rowPortrait.getAttribute("alt"))?.length ?? 0).toBeGreaterThan(0);
+    const editControl = row.locator("[data-portrait-edit]");
+    await expect(editControl).toBeVisible();
+    await expect(editControl).toHaveAttribute("aria-label", `Change portrait for ${createdName}`);
+    await expect(row.locator("[data-character-portrait] img")).toBeVisible();
     await expect(row.getByText("EVA Salvage Welder", { exact: true })).toBeVisible();
-    await expect(row.getByRole("button", { name: "Change portrait" })).toBeVisible();
+    await expect(row.getByRole("link", { name: "Play" })).toBeVisible();
 
     // Leave the shared fixture account exactly as it was: remove the created
     // character (and its gameplay rows) so later phases that reuse the same
@@ -174,7 +208,7 @@ test.describe("existing character portrait management journey", () => {
     }
   });
 
-  test("a legacy null character gets a Choose/Change portrait flow; the public profile shows the choice", async ({
+  test("the portrait edit control drives Choose/Change, save closes with a transient status, and the public profile shows the choice", async ({
     page,
   }) => {
     test.setTimeout(120_000);
@@ -215,50 +249,85 @@ test.describe("existing character portrait management journey", () => {
     await createLegacyCharacterForUser(db, rune, ownership, ownerId, legacyName, 2);
     await page.goto("/characters");
 
-    // The legacy character displays the neutral placeholder and a Choose
-    // portrait action.
+    // The management card uses a portrait EDIT CONTROL (the portrait itself is
+    // the button), not a large textual Choose/Change button; Play is the only
+    // large textual action.
     const legacyRow = page.locator("li").filter({ hasText: legacyName });
     await expect(legacyRow).toBeVisible();
+    await expect(
+      legacyRow.getByRole("button", { name: "Choose portrait", exact: true }),
+    ).toHaveCount(0);
+    const legacyEdit = legacyRow.locator("[data-portrait-edit]");
+    await expect(legacyEdit).toHaveCount(1);
+    await expect(legacyEdit).toHaveAttribute("aria-label", `Choose portrait for ${legacyName}`);
+    await expect(legacyEdit.locator("[data-character-portrait] svg")).toBeVisible();
     await expect(legacyRow.getByText("No portrait yet", { exact: true })).toBeVisible();
-    await expect(legacyRow.locator("[data-character-portrait] svg")).toBeVisible();
-    const choose = legacyRow.getByRole("button", { name: "Choose portrait" });
-    await expect(choose).toBeVisible();
+    await expect(legacyRow.getByRole("link", { name: "Play" })).toBeVisible();
 
     // The sibling character on the same account keeps its own portrait
-    // selection (chosen at creation) and its Change action.
+    // selection and its Change edit control.
     const ownedRow = page.locator("li").filter({ hasText: ownedName });
-    await expect(ownedRow.getByRole("button", { name: "Change portrait" })).toBeVisible();
+    const ownedEdit = ownedRow.locator("[data-portrait-edit]");
+    await expect(ownedEdit).toHaveAttribute("aria-label", `Change portrait for ${ownedName}`);
     await expect(ownedRow.locator("[data-character-portrait] img")).toBeVisible();
     await expect(ownedRow.getByText("Gramma", { exact: true })).toBeVisible();
 
-    // Open the shared picker, choose a portrait, and save.
-    await choose.click();
+    // The owned character's chooser distinguishes the CURRENT portrait with a
+    // label (never color alone) and disables Save until the candidate differs.
+    await ownedEdit.click();
     const dialog = page.getByRole("dialog", { name: "Portrait" });
     await expect(dialog).toBeVisible();
     await expect(dialog.locator("[data-portrait-option]")).toHaveCount(10);
+    const grammaTile = dialog.locator(
+      `[data-portrait-option][data-portrait-id="${PORTRAIT_IDS.gramma}"]`,
+    );
+    await expect(grammaTile).toHaveAttribute("data-portrait-current", "true");
+    await expect(grammaTile.getByText("Current", { exact: true })).toBeVisible();
+    // Enter review with the current portrait as candidate: Save is disabled
+    // because candidate equals current; a different candidate enables it.
+    await grammaTile.click();
+    const ownedReview = dialog.locator('[data-portrait-review="true"]');
+    await expect(ownedReview).toBeVisible();
+    await expect(dialog.getByRole("button", { name: "Save portrait" })).toBeDisabled();
+    // Back to the grid, then choose a different candidate.
+    await dialog.getByRole("button", { name: "Back to portraits" }).click();
+    await dialog
+      .locator(`[data-portrait-option][data-portrait-id="${PORTRAIT_IDS.cargoPilot}"]`)
+      .click();
+    await expect(dialog.getByRole("button", { name: "Save portrait" })).toBeEnabled();
+    // Escape closes the drawer and returns focus to the edit control.
+    await page.keyboard.press("Escape");
+    await expect(dialog).toBeHidden();
+    await expect(ownedEdit).toBeFocused();
 
+    // Legacy flow: review a new candidate and save; the chooser closes on
+    // success, the transient status is announced, focus returns, and the
+    // card shows the updated portrait.
+    await legacyEdit.click();
+    await expect(dialog).toBeVisible();
     const grampaOption = dialog.locator(
       `[data-portrait-option][data-portrait-id="${PLAYER_STARTER_PORTRAITS[7]!.id}"]`,
     );
     await grampaOption.click();
-    await expect(grampaOption).toHaveAttribute("aria-pressed", "true");
+    const review = dialog.locator('[data-portrait-review="true"]');
+    await expect(review).toBeVisible();
+    await expect(review.locator("[data-portrait-preview-name]")).toHaveText("Grampa");
     await dialog.getByRole("button", { name: "Save portrait" }).click();
 
-    // Visible success feedback appears.
-    await expect(dialog.getByText("Portrait saved", { exact: true })).toBeVisible();
-
-    // Cancel path: Escape closes the dialog and returns focus to the trigger
-    // (which now reads "Change portrait" after the server refresh).
-    await page.keyboard.press("Escape");
+    // Success: drawer closes automatically, transient status appears on the
+    // management screen, focus returns to the edit control.
     await expect(dialog).toBeHidden();
-    await expect(legacyRow.getByRole("button", { name: /portrait/i })).toBeFocused();
+    const status = page.locator("[data-transient-status]");
+    await expect(status).toHaveText("Portrait updated");
+    await expect(status).toHaveAttribute("role", "status");
+    await expect(legacyEdit).toBeFocused();
 
-    // The row now shows the chosen portrait, its label, and the Change action;
-    // the placeholder is gone.
+    // The updated larger portrait and label appear on the card; the
+    // placeholder is gone.
     await expect(legacyRow.locator("[data-character-portrait] img")).toBeVisible();
     await expect(legacyRow.getByText("Grampa", { exact: true })).toBeVisible();
     await expect(legacyRow.getByText("No portrait yet", { exact: true })).toHaveCount(0);
-    await expect(legacyRow.getByRole("button", { name: "Change portrait" })).toBeVisible();
+    await expect(legacyEdit).toHaveAttribute("aria-label", `Change portrait for ${legacyName}`);
 
     // Only the requested character changed: the sibling keeps its own
     // selection in the database, and the legacy row stored only the stable
@@ -272,6 +341,32 @@ test.describe("existing character portrait management journey", () => {
       PORTRAIT_IDS.gramma,
       PORTRAIT_IDS.grampa,
     ]);
+
+    // Failure path: a transport failure keeps the chooser open in review
+    // state, preserves the candidate, restores the Save action, and shows a
+    // styled alert near the action.
+    await legacyEdit.click();
+    await expect(dialog).toBeVisible();
+    const cargoOption = dialog.locator(
+      `[data-portrait-option][data-portrait-id="${PORTRAIT_IDS.cargoPilot}"]`,
+    );
+    await cargoOption.click();
+    await expect(review).toBeVisible();
+    await page.route("**/characters", (route) => {
+      if (route.request().method() === "POST") return route.abort();
+      return route.continue();
+    });
+    await dialog.getByRole("button", { name: "Save portrait" }).click();
+    await expect(
+      dialog.getByText("Comms interruption. Portrait could not be saved."),
+    ).toBeVisible();
+    await expect(dialog).toBeVisible();
+    await expect(review).toBeVisible();
+    await expect(cargoOption).toHaveAttribute("data-portrait-selected", "true");
+    await expect(dialog.getByRole("button", { name: "Save portrait" })).toBeEnabled();
+    await page.unroute("**/characters");
+    await page.keyboard.press("Escape");
+    await expect(dialog).toBeHidden();
 
     // Mobile-first: no horizontal overflow on the management screen.
     expect(await noHorizontalOverflow(page)).toBeLessThanOrEqual(0);
