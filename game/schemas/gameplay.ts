@@ -52,6 +52,18 @@ export const LoadPowerCellRequestSchema = z.object({
 });
 
 /**
+ * A portrait-change command supplies only the owned character identity and the
+ * desired stable portrait ID (issue #65). The schema is deliberately
+ * structural: selectability (the `player-starter` subset) is authoritative
+ * catalog metadata enforced by the server command boundary, so this validation
+ * contract never lists `npc-only` or `reserved` IDs as accepted values.
+ */
+export const ChangeCharacterPortraitRequestSchema = z.object({
+  characterId: z.string().uuid(),
+  portraitId: ContentId,
+});
+
+/**
  * Discarding identifies only the operation: the authoritative stack row, the
  * narrow mode, and the expected selected-stack quantity as an optimistic
  * concurrency precondition. Item identity, mass, names, stack limits, and

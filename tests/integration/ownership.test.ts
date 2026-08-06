@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { eq } from "drizzle-orm";
 import { describe, it, expect, beforeAll } from "vitest";
+import { PORTRAIT_IDS } from "@/game/config/foundations";
 import { cleanupTestUser, createTestUser } from "./fixtures";
 
 /**
@@ -67,15 +68,23 @@ suite("ownership & character rules (real PostgreSQL)", () => {
     const base = `Slot ${short()}`;
     try {
       const account = await ownership.ensurePlayerAccount(userId);
-      const c1 = await characters.createCharacter(account.id, `${base} One`);
-      const c2 = await characters.createCharacter(account.id, `${base} Two`);
-      const c3 = await characters.createCharacter(account.id, `${base} Three`);
+      const c1 = await characters.createCharacter(account.id, `${base} One`, PORTRAIT_IDS.gramma);
+      const c2 = await characters.createCharacter(
+        account.id,
+        `${base} Two`,
+        PORTRAIT_IDS.cargoPilot,
+      );
+      const c3 = await characters.createCharacter(
+        account.id,
+        `${base} Three`,
+        PORTRAIT_IDS.spaceNerd,
+      );
       expect([c1.slot, c2.slot, c3.slot].sort()).toEqual([1, 2, 3]);
 
       // Fourth creation must be rejected (slots full).
-      await expect(characters.createCharacter(account.id, `${base} Four`)).rejects.toThrow(
-        /slots are full/i,
-      );
+      await expect(
+        characters.createCharacter(account.id, `${base} Four`, PORTRAIT_IDS.grampa),
+      ).rejects.toThrow(/slots are full/i);
 
       // displayName capitalization preserved; normalized stored for uniqueness.
       expect(c1.displayName).toBe(`${base} One`);
@@ -96,11 +105,11 @@ suite("ownership & character rules (real PostgreSQL)", () => {
       const a1 = await ownership.ensurePlayerAccount(u1);
       const a2 = await ownership.ensurePlayerAccount(u2);
 
-      await characters.createCharacter(a1.id, base);
+      await characters.createCharacter(a1.id, base, PORTRAIT_IDS.gramma);
       // Different account, differently-cased/whitespaced name must still collide.
-      await expect(characters.createCharacter(a2.id, `  ${base.toLowerCase()} `)).rejects.toThrow(
-        /already taken/i,
-      );
+      await expect(
+        characters.createCharacter(a2.id, `  ${base.toLowerCase()} `, PORTRAIT_IDS.gramma),
+      ).rejects.toThrow(/already taken/i);
     } finally {
       await cleanupTestUser(db, authSchema, rune, u1);
       await cleanupTestUser(db, authSchema, rune, u2);
@@ -113,7 +122,7 @@ suite("ownership & character rules (real PostgreSQL)", () => {
     const name = `Owned ${short()}`;
     try {
       const acc = await ownership.ensurePlayerAccount(owner);
-      const char = await characters.createCharacter(acc.id, name);
+      const char = await characters.createCharacter(acc.id, name, PORTRAIT_IDS.stationCaptain);
 
       // Owner can resolve their own character.
       const ok = await ownership.requireOwnedCharacter(owner, char.id);
@@ -132,7 +141,7 @@ suite("ownership & character rules (real PostgreSQL)", () => {
   it("restricts deletion: deleting the Better Auth user is blocked while characters exist", async () => {
     const userId = await makeUser(`restrict-${randomUUID()}@example.com`);
     const account = await ownership.ensurePlayerAccount(userId);
-    await characters.createCharacter(account.id, `Keep ${short()}`);
+    await characters.createCharacter(account.id, `Keep ${short()}`, PORTRAIT_IDS.frontierMedic);
     try {
       // The FK is RESTRICT, so removing the user while a character references its
       // account must fail. (Account deletion is out of scope; the point is we do

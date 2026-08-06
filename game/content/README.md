@@ -18,3 +18,13 @@ categories, master and derivative paths); `portrait-catalog.ts` exposes the
 typed validated API (`PORTRAITS`, `PLAYER_STARTER_PORTRAITS`, `getPortrait`).
 Stable IDs are registered in `game/config/foundations.ts` (`PORTRAIT_IDS`).
 Issue #65 consumes this catalog; it must not re-sort or re-classify the assets.
+
+### Selectable-category rule (issue #65)
+
+Exactly the ten `player-starter` entries are selectable by players. `npc-only`
+and `reserved` portraits remain valid production assets but never appear in
+the picker, selection payloads, or validation allowlists. Availability is this
+catalog's category metadata — never filenames or folder separation. Future
+approved selectable portraits are added by reclassifying or adding catalog
+entries, not by touching validation or UI code. The neutral system placeholder
+used for legacy/null characters is deliberately not a catalog portrait.

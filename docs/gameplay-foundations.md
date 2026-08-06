@@ -231,8 +231,8 @@ Every visible character name in the #62 same-location list is an accessible
 interactive control that opens one compact, mobile-first public profile panel:
 
 - **Public fields only:** character display name, the owner's public name
-  (`user.name`), a neutral placeholder portrait, the character's overall level,
-  and one generic skill row per published skill. Emails, account IDs,
+  (`user.name`), the character's portrait presentation, the character's overall
+  level, and one generic skill row per published skill. Emails, account IDs,
   character database IDs, skill IDs, inventory, equipment, charge, current
   action, and other private state are never exposed.
 - **Interaction:** selecting a name opens the panel; selecting another visible
@@ -268,10 +268,63 @@ interactive control that opens one compact, mobile-first public profile panel:
   row but no approved curve and is not presented. A future approved curve (one
   entry in the balance boundary) publishes that skill automatically — no
   Mining-specific component or projection branch exists.
-- **Portrait:** the panel renders a neutral, decorative placeholder portrait
-  with a stable aspect ratio and intrinsic dimensions behind one narrow
-  presentation boundary. Portrait assets, generation, and player portrait
-  selection are deferred to a separate issue.
+- **Portrait:** the panel renders the character's resolved portrait
+  presentation through the shared `components/portraits/CharacterPortrait`
+  boundary (see "Character portraits" below): the selected catalog portrait as
+  a normal `next/image` derivative, or the neutral system placeholder
+  silhouette when no valid selection exists.
+
+### Character portraits (issue #65)
+
+Every RuneSpace character has one deliberate, per-character portrait choice
+that is used wherever the character is publicly presented.
+
+- **Selectable set:** exactly the ten `player-starter` entries of the
+  authoritative Issue #70 portrait catalog
+  (`game/content/portrait-catalog.ts`, `PLAYER_STARTER_PORTRAITS`). `npc-only`
+  and `reserved` portraits are valid production assets but are never offered in
+  the picker, never accepted by creation or change commands, and never shown as
+  locked cards. Availability is catalog metadata only — a future approved
+  selectable portrait is added by reclassifying (or adding) a catalog entry,
+  never by moving an asset or touching validation code.
+- **No default portrait:** a human portrait is never assigned automatically.
+  New characters must deliberately choose one during creation; the stable
+  portrait ID is persisted atomically with the character row in the same
+  transaction. The neutral system placeholder is a separate, non-catalog
+  presentation — not selectable and never persisted as though the player chose
+  it.
+- **Nullable legacy persistence:** `characters.portrait_id` is nullable by
+  design (`portraitId: string | null`). Characters created before this feature
+  remain `null` and continue to work; no migration screen, random assignment,
+  or silent backfill exists. Rows store only the stable portrait ID — never
+  paths, URLs, labels, image blobs, or metadata.
+- **Ownership and validation boundary:** creation and portrait changes are
+  server-authoritative (`server/characters.ts`). The server authenticates the
+  request, validates the ID against the catalog-derived `player-starter`
+  subset, verifies ownership on every change, and updates only the requested
+  owned character with an atomic ownership-scoped statement. `npc-only`,
+  `reserved`, unknown, malformed, and retired values are refused; concurrent or
+  retried saves converge on one valid final selection without corrupting state.
+- **Resolution and public projection:** one narrow domain boundary
+  (`game/domain/character-portrait.ts`) resolves a stored value to either the
+  safe catalog presentation of a valid `player-starter` ID or the neutral
+  placeholder for null/unknown/malformed/retired/non-selectable values.
+  Resolution never rewrites the database row. Public projections expose only
+  the approved presentation fields (name, committed derivative path, intrinsic
+  dimensions, accessible description) — never categories, master paths,
+  concepts, or raw IDs.
+- **Image delivery:** application code references only the committed optimized
+  derivatives in `public/character-portraits/` through the normal `next/image`
+  boundary with the catalog's intrinsic dimensions and responsive `sizes`;
+  high-resolution masters in `assets/character-portraits/` are never consumed
+  by app code. Derivatives are committed assets — never generated at build,
+  startup, or request time.
+- **Management surface:** the character-selection screen shows each owned
+  character's portrait presentation and a Choose/Change portrait flow that
+  reuses the same catalog-derived picker used during creation. The shared
+  picker (`components/portraits/PortraitPicker.tsx`) is a responsive,
+  keyboard-and-touch-accessible grid with a programmatically exposed selected
+  state. Public profile panels remain read-only.
 
 ### Atomic Mining → Travel replacement
 

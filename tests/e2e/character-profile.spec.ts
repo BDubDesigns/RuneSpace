@@ -3,7 +3,7 @@ import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import * as authSchema from "@/db/auth-schema";
 import * as rune from "@/db/rune-space";
-import { LOCATION_IDS, SKILL_IDS } from "@/game/config/foundations";
+import { LOCATION_IDS, PORTRAIT_IDS, SKILL_IDS } from "@/game/config/foundations";
 import { normalizeCharacterName } from "@/game/domain/character-name";
 import { createCharacter } from "@/server/characters";
 import { ensurePlayerAccount } from "@/server/ownership";
@@ -37,11 +37,18 @@ const createdUsers: string[] = [];
 /**
  * Create one owner user with one character at the Crash Site and return the
  * user ID. Optionally persists Mining XP so the derived level is meaningful.
+ * Creation requires a portrait (issue #65); the caller can choose one or take
+ * the stable starter default.
  */
-async function seedCharacter(ownerName: string, characterName: string, miningXp?: number) {
+async function seedCharacter(
+  ownerName: string,
+  characterName: string,
+  miningXp?: number,
+  portraitId: string = PORTRAIT_IDS.evaSalvageWelder,
+) {
   const userId = await createTestUser(db, authSchema, ownerName);
   const account = await ensurePlayerAccount(userId);
-  const character = await createCharacter(account.id, characterName);
+  const character = await createCharacter(account.id, characterName, portraitId);
   createdUsers.push(userId);
   if (miningXp !== undefined) {
     await db.insert(rune.characterSkillXp).values({
@@ -154,10 +161,12 @@ test("selecting a same-location character opens its public profile panel", async
   await expect(radaTrigger.getByText("Viewing", { exact: true })).toBeVisible();
   await expect(radaTrigger.getByText("Lv 2", { exact: true })).toBeVisible();
 
-  // Portrait area is a neutral decorative placeholder (silhouette, no
-  // first-letter glyph that could read like a numeric stat).
-  await expect(panel.locator("[data-character-portrait] svg")).toBeVisible();
-  expect(await panel.locator("[data-character-portrait]").innerText()).toBe("");
+  // The selected portrait renders through the normal next/image boundary in
+  // the panel: the committed derivative with its accessible description as
+  // the alt text.
+  const panelPortrait = panel.locator("[data-character-portrait] img");
+  await expect(panelPortrait).toBeVisible();
+  expect((await panelPortrait.getAttribute("alt"))?.length ?? 0).toBeGreaterThan(0);
   await expect(panel.getByText(radaOne, { exact: true })).toBeVisible();
   await expect(panel.getByText("Player: Rada Stonehand")).toBeVisible();
   await expect(panel.getByText("Overall level 2")).toBeVisible();
@@ -205,7 +214,7 @@ test("selecting a same-location character opens its public profile panel", async
   await expect(panel.getByText(radaTwo, { exact: true })).toBeVisible();
   await expect(panel.getByText("Player: Rada Stonehand")).toBeVisible();
   await expect(panel.getByText("Overall level 1")).toBeVisible();
-  await expect(panel.locator("[data-character-portrait] svg")).toBeVisible();
+  await expect(panel.locator("[data-character-portrait] img")).toBeVisible();
   await expect(radaTwoTrigger).toHaveAttribute("aria-expanded", "true");
   await expect(kaelTrigger).toHaveAttribute("aria-expanded", "false");
   await expect(radaTwoTrigger.getByText("Viewing", { exact: true })).toBeVisible();

@@ -4,43 +4,8 @@ import { useEffect, useRef, useState, type RefObject } from "react";
 import { ActionButton } from "@/components/ui/ActionButton";
 import { Feedback } from "@/components/ui/Feedback";
 import { StatusMeter } from "@/components/ui/StatusMeter";
+import { CharacterPortrait } from "@/components/portraits/CharacterPortrait";
 import type { CharacterProfile } from "@/game/domain/character-profile";
-
-/**
- * Neutral temporary portrait (issue #64). Portrait asset generation and
- * player portrait selection are explicitly deferred to a later issue; this
- * narrow presentation boundary keeps a stable square aspect ratio and
- * intrinsic dimensions so a later issue can supply a selected asset here
- * without redesigning the profile panel.
- *
- * The placeholder is a simple decorative person silhouette drawn with the
- * repository's inline-SVG technique — deliberately NOT a first-letter glyph,
- * which read like a numeric stat. It is fully decorative (`aria-hidden`):
- * the adjacent identity text carries the accessible name.
- */
-function CharacterPortrait() {
-  return (
-    <div
-      aria-hidden="true"
-      className="grid h-20 w-20 shrink-0 place-items-center border border-[color:var(--rs-border-structural)] bg-[color:var(--rs-surface-raised)]"
-      data-character-portrait
-    >
-      <svg
-        aria-hidden="true"
-        className="h-10 w-10 text-[color:var(--rs-text-muted)]"
-        fill="none"
-        stroke="currentColor"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        strokeWidth="1.5"
-        viewBox="0 0 24 24"
-      >
-        <circle cx="12" cy="8" r="4" />
-        <path d="M4 20c0-3.5 3.6-6 8-6s8 2.5 8 6" />
-      </svg>
-    </div>
-  );
-}
 
 /**
  * One compact, mobile-first profile panel for a selected same-location
@@ -209,7 +174,11 @@ export function CharacterProfilePanel({
           {profile ? (
             <>
               <div className="mt-3 flex gap-3">
-                <CharacterPortrait />
+                <CharacterPortrait
+                  className="h-20 w-20"
+                  presentation={profile.portrait}
+                  sizes="80px"
+                />
                 <div className="min-w-0">
                   <p className="break-words font-display text-sm font-bold text-[color:var(--rs-text-primary)]">
                     {profile.displayName}

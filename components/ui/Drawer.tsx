@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, type ReactNode, type RefObject } from "react";
+import { createPortal } from "react-dom";
 import { ActionButton } from "./ActionButton";
 import { SectionHeader } from "./SectionHeader";
 
@@ -14,7 +15,22 @@ const REDUCED_MOTION_QUERY = "(prefers-reduced-motion: reduce)";
 // for what the player sees.
 const EXIT_FALLBACK_MS = 400;
 
-/** Shared modal overlay used by Inventory and Equipment. */
+/**
+ * Shared modal overlay used by Inventory, Equipment, and the character
+ * portrait chooser.
+ *
+ * The modal renders through a portal to `document.body` so it can never be
+ * trapped inside an ancestor that establishes a containing block or stacking
+ * context (for example the `clip-path` bevel on `components/ui/Panel`): a
+ * `position: fixed` dialog inside such an ancestor would be positioned and
+ * clipped relative to that ancestor, letting the page behind intercept
+ * pointer events. Portal rendering keeps the modal genuinely viewport-fixed
+ * and above everything, wherever the triggering surface is mounted.
+ *
+ * The `size` variant is narrow and explicit: `"wide"` exists only for the
+ * portrait chooser's desktop master-detail layout; every other surface keeps
+ * the default width.
+ */
 export function Drawer({
   children,
   label,
@@ -22,6 +38,7 @@ export function Drawer({
   eyebrow,
   onClose,
   triggerRef,
+  size = "default",
 }: {
   children: ReactNode;
   label: string;
@@ -29,6 +46,7 @@ export function Drawer({
   eyebrow: string;
   onClose: () => void;
   triggerRef: RefObject<HTMLButtonElement | null>;
+  size?: "default" | "wide";
 }) {
   const backdrop = useRef<HTMLDivElement>(null);
   const closeButton = useRef<HTMLButtonElement>(null);
@@ -182,7 +200,7 @@ export function Drawer({
   const backdropAnim = exiting ? "rs-overlay-backdrop-exit" : "rs-overlay-backdrop";
   const panelAnim = exiting ? "rs-overlay-panel-exit" : "rs-overlay-panel";
 
-  return (
+  return createPortal(
     <div
       ref={backdrop}
       className={`${backdropAnim} fixed inset-0 z-50 !mt-0 flex items-center justify-center bg-[color:var(--rs-overlay-scrim)] p-3 sm:p-4`}
@@ -192,7 +210,11 @@ export function Drawer({
       <section
         aria-label={label}
         aria-modal="true"
-        className={`${panelAnim} max-h-[min(78dvh,42rem)] w-full max-w-xl overflow-y-auto border border-[color:var(--rs-border-structural)] bg-[color:var(--rs-surface-raised)] p-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-[max(1rem,env(safe-area-inset-top))] [box-shadow:var(--rs-shadow-panel),0_0_28px_rgb(75_216_245_/_0.28)] sm:max-h-[calc(100dvh-2rem)] sm:w-[min(34rem,calc(100vw-2rem))]`}
+        className={`${panelAnim} max-h-[min(78dvh,42rem)] w-full overflow-y-auto border border-[color:var(--rs-border-structural)] bg-[color:var(--rs-surface-raised)] p-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-[max(1rem,env(safe-area-inset-top))] [box-shadow:var(--rs-shadow-panel),0_0_28px_rgb(75_216_245_/_0.28)] sm:max-h-[calc(100dvh-2rem)] ${
+          size === "wide"
+            ? "sm:w-[min(56rem,calc(100vw-2rem))] sm:max-w-4xl"
+            : "max-w-xl sm:w-[min(34rem,calc(100vw-2rem))]"
+        }`}
         onAnimationEnd={onPanelAnimationEnd}
         ref={panel}
         role="dialog"
@@ -211,6 +233,7 @@ export function Drawer({
         </div>
         {children}
       </section>
-    </div>
+    </div>,
+    document.body,
   );
 }

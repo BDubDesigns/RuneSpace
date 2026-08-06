@@ -135,6 +135,8 @@ const CHARACTER_PROFILE_REQUIRED = [
   "character-profile-mobile-rows.png",
 ];
 
+const PORTRAITS_REQUIRED = ["portraits-mobile-characters.png", "portraits-mobile-profile.png"];
+
 function verifyAndCopyScreenshots(required, destDir) {
   log("Verifying and preserving screenshots...");
   for (const filename of required) {
@@ -163,6 +165,7 @@ async function prepareState() {
     mkdirSync(resolve(ROOT, "artifacts/e2e-review/travel"), { recursive: true });
     mkdirSync(resolve(ROOT, "artifacts/e2e-review/location-population"), { recursive: true });
     mkdirSync(resolve(ROOT, "artifacts/e2e-review/character-profile"), { recursive: true });
+    mkdirSync(resolve(ROOT, "artifacts/e2e-review/character-portraits"), { recursive: true });
     log("Frozen review screenshots: ENABLED (manifest will be verified and uploaded).");
   } else {
     log(
@@ -210,6 +213,13 @@ async function runCanonical() {
     verifyAndCopyScreenshots(
       CHARACTER_PROFILE_REQUIRED,
       resolve(ROOT, "artifacts/e2e-review/character-profile"),
+    );
+
+  await runPlaywright(["character-portraits", "--project=chromium"], "Character portraits E2E");
+  if (captureScreenshots)
+    verifyAndCopyScreenshots(
+      PORTRAITS_REQUIRED,
+      resolve(ROOT, "artifacts/e2e-review/character-portraits"),
     );
 
   await runPlaywright(

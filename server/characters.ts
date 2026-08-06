@@ -10,6 +10,8 @@ import {
 } from "@/db/rune-space";
 import { validateCharacterName } from "@/game/domain/character-name";
 import { LOCATION_IDS } from "@/game/config/foundations";
+import { isPlayerStarterPortrait } from "@/game/content/portrait-catalog";
+import { requirePlayerAccount } from "@/server/ownership";
 
 /** Postgres unique-violation error code. */
 const UNIQUE_VIOLATION = "23505";
@@ -69,6 +71,11 @@ export async function occupiedSlots(playerAccountId: string): Promise<Set<number
 /**
  * Create a character in the lowest free slot for the given player account.
  *
+ * A valid selectable portrait is REQUIRED and is persisted atomically with the
+ * character in the same transaction: the browser never supplies paths, URLs,
+ * categories, or metadata — only the stable portrait ID, which is re-validated
+ * here against the catalog-derived `player-starter` subset (issue #65).
+ *
  * Concurrency-safe:
  * 1. Lock the player_accounts row with `FOR UPDATE` so concurrent creations
  *    serialize on the account.
@@ -79,10 +86,14 @@ export async function occupiedSlots(playerAccountId: string): Promise<Set<number
 export async function createCharacter(
   playerAccountId: string,
   rawName: string,
+  portraitId: string,
 ): Promise<Character> {
   const validation = validateCharacterName(rawName);
   if (!validation.ok) {
     throw new CharacterError(validation.error, 400);
+  }
+  if (!isPlayerStarterPortrait(portraitId)) {
+    throw new CharacterError("Please choose one of the available portraits", 400);
   }
 
   return db.transaction(async (tx) => {
@@ -137,6 +148,7 @@ export async function createCharacter(
         displayName: validation.display,
         normalizedName: normalized,
         currentLocationId: LOCATION_IDS.crashSite,
+        portraitId,
       });
     } catch (err) {
       // The normalized_name unique index can still reject a concurrent clash.
@@ -159,6 +171,47 @@ export async function createCharacter(
     }
     return row;
   });
+}
+
+/**
+ * Change an owned character's portrait (issue #65).
+ *
+ * Server-authoritative and ownership-scoped:
+ * - the authenticated user's player account is resolved first (ownership
+ *   verification), then a single UPDATE constrained by BOTH the character ID
+ *   and the owning account ID atomically applies the change — a forged or
+ *   foreign character ID can never update another player's character, and no
+ *   client-supplied owner ID or category value is trusted;
+ * - the target portrait ID must be a currently selectable `player-starter`
+ *   catalog ID; `npc-only`, `reserved`, unknown, and malformed values are
+ *   refused with no row change;
+ * - the statement is atomic and idempotent: concurrent or retried saves
+ *   converge on one valid final selection and can never corrupt another
+ *   character on the same account.
+ */
+export async function changeCharacterPortrait(
+  userId: string,
+  characterId: string,
+  portraitId: string,
+): Promise<Character> {
+  if (!isPlayerStarterPortrait(portraitId)) {
+    throw new CharacterError("That portrait is not available", 400);
+  }
+  const account = await requirePlayerAccount(userId);
+
+  const updated = await db
+    .update(characters)
+    .set({ portraitId })
+    .where(and(eq(characters.id, characterId), eq(characters.playerAccountId, account.id)))
+    .returning();
+
+  const row = updated[0];
+  if (!row) {
+    // Unknown or foreign character: same generic refusal as every other
+    // ownership boundary — nothing is revealed.
+    throw new CharacterError("Character not found", 404);
+  }
+  return row;
 }
 
 /** Remove any in-transit travel state for a character within a transaction. */
