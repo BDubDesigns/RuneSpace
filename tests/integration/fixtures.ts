@@ -1,5 +1,8 @@
 import { randomUUID } from "node:crypto";
 import { eq } from "drizzle-orm";
+import { LOCATION_IDS, PORTRAIT_IDS } from "@/game/config/foundations";
+import { normalizeCharacterName } from "@/game/domain/character-name";
+import { SLOT_MIN } from "@/db/rune-space";
 
 /**
  * Shared fixture lifecycle for the real-PostgreSQL integration suites.
@@ -37,7 +40,12 @@ export async function createTestUser(
   return userId;
 }
 
-/** Ensures the player account for a user and creates one character. */
+/**
+ * Ensures the player account for a user and creates one character through the
+ * authoritative command. Portraits are required at the creation boundary
+ * (issue #65), so suites that do not care about portraits get a stable default
+ * starter ID; suites that need a deliberately chosen portrait pass one.
+ */
 export async function createCharacterForUser(
   db: Db,
   rune: Rune,
@@ -45,9 +53,39 @@ export async function createCharacterForUser(
   characters: Characters,
   userId: string,
   characterName: string,
+  portraitId: string = PORTRAIT_IDS.evaSalvageWelder,
 ) {
   const account = await ownership.ensurePlayerAccount(userId);
-  return characters.createCharacter(account.id, characterName);
+  return characters.createCharacter(account.id, characterName, portraitId);
+}
+
+/**
+ * Seeds a legacy (pre-portrait) character row with a NULL portrait directly,
+ * bypassing the creation command — the way characters created before issue #65
+ * exist. Such characters must remain playable and resolve to the neutral
+ * placeholder until their owner chooses a portrait.
+ */
+export async function createLegacyCharacterForUser(
+  db: Db,
+  rune: Rune,
+  ownership: Ownership,
+  userId: string,
+  characterName: string,
+  slot: number = SLOT_MIN,
+) {
+  const account = await ownership.ensurePlayerAccount(userId);
+  const row = await db
+    .insert(rune.characters)
+    .values({
+      playerAccountId: account.id,
+      slot,
+      displayName: characterName,
+      normalizedName: normalizeCharacterName(characterName),
+      currentLocationId: LOCATION_IDS.crashSite,
+      portraitId: null,
+    })
+    .returning();
+  return row[0]!;
 }
 
 /**

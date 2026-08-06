@@ -3,7 +3,7 @@ import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import * as authSchema from "@/db/auth-schema";
 import * as rune from "@/db/rune-space";
-import { LOCATION_IDS, SKILL_IDS } from "@/game/config/foundations";
+import { LOCATION_IDS, PORTRAIT_IDS, SKILL_IDS } from "@/game/config/foundations";
 import { normalizeCharacterName } from "@/game/domain/character-name";
 import { createCharacter } from "@/server/characters";
 import { ensurePlayerAccount } from "@/server/ownership";
@@ -42,7 +42,7 @@ const createdUsers: string[] = [];
 async function seedCharacter(ownerName: string, characterName: string, miningXp?: number) {
   const userId = await createTestUser(db, authSchema, ownerName);
   const account = await ensurePlayerAccount(userId);
-  const character = await createCharacter(account.id, characterName);
+  const character = await createCharacter(account.id, characterName, PORTRAIT_IDS.evaSalvageWelder);
   createdUsers.push(userId);
   if (miningXp !== undefined) {
     await db.insert(rune.characterSkillXp).values({

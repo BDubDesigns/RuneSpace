@@ -2,7 +2,8 @@ import pg from "pg";
 import { eq } from "drizzle-orm";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { miningLevelThresholds } from "@/game/config/balance";
-import { LOCATION_IDS, SKILL_IDS } from "@/game/config/foundations";
+import { LOCATION_IDS, PORTRAIT_IDS, SKILL_IDS } from "@/game/config/foundations";
+import { getPortrait } from "@/game/content/portrait-catalog";
 import { cleanupTestUser, createCharacterForUser, createTestUser } from "./fixtures";
 
 const DATABASE_URL = process.env.DATABASE_URL;
@@ -55,8 +56,17 @@ suite("issue #64 character profile read boundary (real PostgreSQL)", () => {
     name: string,
     locationId: string,
     miningXp?: number,
+    portraitId?: string,
   ) {
-    const character = await createCharacterForUser(db, rune, ownership, characters, userId, name);
+    const character = await createCharacterForUser(
+      db,
+      rune,
+      ownership,
+      characters,
+      userId,
+      name,
+      portraitId,
+    );
     if (locationId !== LOCATION_IDS.crashSite) {
       await db
         .update(rune.characters)
@@ -145,8 +155,11 @@ suite("issue #64 character profile read boundary (real PostgreSQL)", () => {
     const activeName = `Narrow Active ${token()}`;
     const targetName = `Narrow Target ${token()}`;
     const active = await makeCharacterAt(owner, activeName, LOCATION_IDS.crashSite);
-    await makeCharacterAt(owner, targetName, LOCATION_IDS.crashSite, 500);
+    // The target deliberately chose Gramma; the read must return exactly that
+    // portrait's safe catalog presentation — not a default and not a raw ID.
+    await makeCharacterAt(owner, targetName, LOCATION_IDS.crashSite, 500, PORTRAIT_IDS.gramma);
 
+    const gramma = getPortrait(PORTRAIT_IDS.gramma)!;
     const result = await profile.getCharacterProfile(owner, active.id, targetName);
     expect(result).toEqual({
       displayName: targetName,
@@ -162,12 +175,24 @@ suite("issue #64 character profile read boundary (real PostgreSQL)", () => {
           atMaximumLevel: false,
         },
       ],
+      portrait: {
+        kind: "selected",
+        displayName: gramma.displayName,
+        derivativePath: gramma.derivativePath,
+        derivativeWidth: gramma.derivativeWidth,
+        derivativeHeight: gramma.derivativeHeight,
+        accessibleDescription: gramma.accessibleDescription,
+      },
     });
-    // No email, account ID, character database ID, skill ID, or timestamp.
+    // No email, account ID, character database ID, skill ID, category, master
+    // path, timestamp, or raw portrait ID may leave the server.
     const serialized = JSON.stringify(result);
     expect(serialized).not.toContain("@");
     expect(serialized).not.toContain("email");
     expect(serialized).not.toContain("skillId");
+    expect(serialized).not.toContain("portraitId");
+    expect(serialized).not.toContain("category");
+    expect(serialized).not.toContain("masterPath");
   });
 
   it("derives Mining level and next-level progress from persisted XP", async () => {

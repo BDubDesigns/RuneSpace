@@ -4,25 +4,40 @@ import { useState } from "react";
 import { useFormStatus } from "react-dom";
 import { createCharacterAction } from "@/server/actions";
 import { CHARACTER_NAME_MIN, CHARACTER_NAME_MAX } from "@/game/domain/character-name";
+import type { SelectablePortraitOption } from "@/game/domain/character-portrait";
 import { ActionButton } from "@/components/ui/ActionButton";
 import { Feedback } from "@/components/ui/Feedback";
 import { FormField } from "@/components/ui/FormField";
+import { PortraitPicker } from "@/components/portraits/PortraitPicker";
 
-function SubmitButton({ label }: { label: string }) {
+function SubmitButton({ label, disabled }: { label: string; disabled?: boolean }) {
   const { pending } = useFormStatus();
   return (
-    <ActionButton type="submit" loading={pending} className="mt-4 w-full">
+    <ActionButton type="submit" loading={pending} disabled={disabled} className="mt-4 w-full">
       {pending ? "Working…" : label}
     </ActionButton>
   );
 }
 
 /**
- * Character creation form (client). Name validation/normalization lives
- * server-side; this form only collects input and surfaces server errors.
+ * Character creation form (client, issue #65). Name validation/normalization
+ * and portrait selectability live server-side; this form collects the
+ * deliberate portrait choice and surfaces server errors. The final Create
+ * action cannot succeed until both the name and one portrait selection are
+ * valid — the browser never decides which portraits exist or are selectable.
  */
-export function CreateCharacterForm() {
+export function CreateCharacterForm({
+  options,
+}: {
+  /** Server-projected selectable portrait options (the ten player-starter entries). */
+  options: readonly SelectablePortraitOption[];
+}) {
   const [error, setError] = useState<string | null>(null);
+  const [name, setName] = useState("");
+  const [portraitId, setPortraitId] = useState<string | null>(null);
+
+  const nameValid = name.trim().length >= CHARACTER_NAME_MIN;
+  const canCreate = nameValid && portraitId !== null;
 
   return (
     <form
@@ -42,9 +57,30 @@ export function CreateCharacterForm() {
         maxLength={CHARACTER_NAME_MAX}
         placeholder="e.g. Star Drifter"
         label="Character name"
+        onChange={(event) => setName(event.target.value)}
       />
+      {/* The deliberate portrait choice is submitted as part of the
+          authoritative creation command; the server re-validates it. */}
+      <input name="portraitId" type="hidden" value={portraitId ?? ""} />
+      <div>
+        <p className="text-sm font-medium text-[color:var(--rs-text-secondary)]">
+          Choose a portrait
+        </p>
+        <p className="mt-1 text-xs text-[color:var(--rs-text-muted)]">
+          This portrait represents your character wherever they appear.
+        </p>
+        <div className="mt-3">
+          <PortraitPicker
+            label="Character portrait"
+            onSelect={setPortraitId}
+            optionSizes="(min-width: 640px) 96px, 33vw"
+            options={options}
+            selectedPortraitId={portraitId}
+          />
+        </div>
+      </div>
       {error ? <Feedback tone="danger">{error}</Feedback> : null}
-      <SubmitButton label="Create character" />
+      <SubmitButton label="Create character" disabled={!canCreate} />
     </form>
   );
 }

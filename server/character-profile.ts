@@ -72,6 +72,7 @@ export async function getCharacterProfile(
     .select({
       displayName: characters.displayName,
       ownerName: user.name,
+      portraitId: characters.portraitId,
       skillId: characterSkillXp.skillId,
       totalXp: characterSkillXp.totalXp,
     })
@@ -109,6 +110,7 @@ export async function getCharacterProfile(
   return projectCharacterProfile({
     displayName: rows[0]!.displayName,
     ownerName: rows[0]!.ownerName,
+    portraitId: rows[0]!.portraitId,
     skillProgress,
     levelThresholds: skillLevelThresholds,
     skillDisplayName: (skillId) => getSkillPresentation(skillId)?.displayName,

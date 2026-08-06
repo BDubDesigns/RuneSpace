@@ -152,6 +152,7 @@ describe("issue #64 character profile projection", () => {
       "displayName",
       "overallLevel",
       "ownerName",
+      "portrait",
       "skills",
     ]);
     for (const skill of profile.skills) {
@@ -174,5 +175,37 @@ describe("issue #64 character profile projection", () => {
       "totalXp",
       "xpIntoLevel",
     ]);
+  });
+
+  it("projects the resolved portrait presentation (issue #65)", () => {
+    // A legacy character (null stored value) projects the neutral placeholder;
+    // resolution itself is proven in character-portrait.test.ts.
+    expect(project([]).portrait).toEqual({ kind: "placeholder" });
+    expect(
+      projectCharacterProfile({
+        displayName: "Rada",
+        ownerName: "Rada Stonehand",
+        skillProgress: [],
+        levelThresholds: () => undefined,
+        skillDisplayName: () => undefined,
+        portraitId: "portrait_gramma_01",
+      }).portrait,
+    ).toMatchObject({
+      kind: "selected",
+      displayName: "Gramma",
+      derivativeWidth: 512,
+      derivativeHeight: 512,
+    });
+    // The public projection never exposes the raw stored portrait ID.
+    expect(
+      projectCharacterProfile({
+        displayName: "Rada",
+        ownerName: "Rada Stonehand",
+        skillProgress: [],
+        levelThresholds: () => undefined,
+        skillDisplayName: () => undefined,
+        portraitId: "portrait_gramma_01",
+      }).portrait,
+    ).not.toHaveProperty("portraitId");
   });
 });

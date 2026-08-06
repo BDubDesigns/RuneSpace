@@ -50,6 +50,13 @@
       "when": 1786000000000,
       "tag": "0006_salvage_cutter_power_cell_boost",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1786112345678,
+      "tag": "0007_character_portrait_selection",
+      "breakpoints": true
     }
   ]
 }

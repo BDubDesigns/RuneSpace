@@ -38,6 +38,8 @@ test("Sign out from the authenticated header returns to the signed-out landing",
   await page.getByRole("link", { name: "New character" }).click();
   const characterName = `Signout ${Date.now().toString(36)}${Math.floor(Math.random() * 36).toString(36)}`;
   await page.getByLabel("Character name").fill(characterName);
+  // Character creation requires a deliberate portrait choice (issue #65).
+  await page.getByRole("button", { name: "Cargo Pilot portrait" }).click();
   await page.getByRole("button", { name: "Create character" }).click();
   await expect(page.getByRole("img", { name: "RuneSpace" })).toBeVisible();
 

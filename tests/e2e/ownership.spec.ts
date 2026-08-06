@@ -49,6 +49,8 @@ test("register, create, and select a character; ownership boundary enforced", as
 
   const hero = uniqueName("Star Drifter");
   await page.getByLabel("Character name").fill(hero);
+  // Character creation requires a deliberate portrait choice (issue #65).
+  await page.getByRole("button", { name: "Station Captain portrait" }).click();
   await page.getByRole("button", { name: "Create character" }).click();
 
   // Lands on the protected placeholder for the created character.
@@ -85,6 +87,8 @@ test("character names are unique after normalization (case-insensitive collision
   await page.getByRole("link", { name: "New character" }).click();
   const hero = uniqueName("Nova Prime");
   await page.getByLabel("Character name").fill(hero);
+  // Character creation requires a deliberate portrait choice (issue #65).
+  await page.getByRole("button", { name: "Space Nerd portrait" }).click();
   await page.getByRole("button", { name: "Create character" }).click();
   await page.waitForURL("**/play/**");
 
@@ -92,6 +96,9 @@ test("character names are unique after normalization (case-insensitive collision
   // SAME per-run base — normalization must still detect the clash.
   await page.goto("/characters/new");
   await page.getByLabel("Character name").fill(`  ${hero.toLowerCase()} `);
+  // The deliberately chosen portrait is required to enable the action; the
+  // server still refuses the duplicate name (issue #65).
+  await page.getByRole("button", { name: "Orbital Botanist portrait" }).click();
   await page.getByRole("button", { name: "Create character" }).click();
 
   // Stays on the new-character page with a "already taken" error (no redirect).

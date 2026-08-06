@@ -1,4 +1,5 @@
 import { skillLevelProgress, type LevelThreshold } from "./progression";
+import { resolveCharacterPortrait, type CharacterPortraitPresentation } from "./character-portrait";
 
 /**
  * Public same-location character-profile projection (issue #64).
@@ -32,9 +33,12 @@ import { skillLevelProgress, type LevelThreshold } from "./progression";
  *
  * Stable skill IDs are used internally (curve lookup, deterministic ordering)
  * but are stripped from the public projection: only player-facing identity
- * and progression values leave the server. No emails, account IDs, character
- * database IDs, or private gameplay state are projected here or by the server
- * read boundary.
+ * and progression values leave the server. The portrait is resolved through
+ * the narrow character-portrait boundary (issue #65): a valid `player-starter`
+ * stored ID projects its safe presentation, and null/unknown/non-selectable
+ * values project the neutral placeholder — the database row is never
+ * rewritten. No emails, account IDs, character database IDs, or private
+ * gameplay state are projected here or by the server read boundary.
  */
 
 /** One public skill entry in the profile: level and truthful next-level progress. */
@@ -58,6 +62,8 @@ export type CharacterProfile = {
   overallLevel: number;
   /** Presented skills in deterministic stable-ID order. */
   skills: readonly CharacterProfileSkill[];
+  /** Safe portrait presentation: the selected catalog portrait or the neutral placeholder. */
+  portrait: CharacterPortraitPresentation;
 };
 
 export function projectCharacterProfile(input: {
@@ -67,6 +73,8 @@ export function projectCharacterProfile(input: {
   skillProgress: readonly { skillId: string; totalXp: number }[];
   levelThresholds: (skillId: string) => readonly LevelThreshold[] | undefined;
   skillDisplayName: (skillId: string) => string | undefined;
+  /** Persisted portrait ID (nullable for legacy characters). */
+  portraitId?: string | null;
 }): CharacterProfile {
   const presented = input.skillProgress
     .map(({ skillId, totalXp }) => {
@@ -97,5 +105,6 @@ export function projectCharacterProfile(input: {
       ...(skill.xpToNextLevel !== undefined ? { xpToNextLevel: skill.xpToNextLevel } : {}),
       atMaximumLevel: skill.atMaximumLevel,
     })),
+    portrait: resolveCharacterPortrait(input.portraitId),
   };
 }

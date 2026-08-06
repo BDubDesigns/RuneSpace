@@ -58,6 +58,21 @@ variants from the committed derivative. That request-time variant generation
 does not regenerate or replace the canonical derivative and is not a separate
 runtime image service.
 
+## Issue #65 consumption (per-character selection)
+
+Issue #65 consumes this catalog as the single source of truth:
+
+- **Selectable set:** exactly the ten `player-starter` entries, projected
+  server-side into the shared picker
+  (`game/domain/character-portrait.ts` `getSelectablePortraitOptions`).
+  `npc-only` and `reserved` entries never appear in the picker, selection
+  payloads, or validation allowlists.
+- **Persistence:** `characters.portrait_id` stores only stable portrait IDs;
+  legacy characters may remain `null` and resolve to the neutral placeholder.
+- **Resolution:** `resolveCharacterPortrait` maps a stored ID to the safe
+  catalog presentation or the placeholder (see `docs/gameplay-foundations.md`,
+  "Character portraits (issue #65)").
+
 ## Per-portrait inventory
 
 All masters are 1254×1254 PNG; all derivatives are 512×512 WebP quality 80.
@@ -114,14 +129,14 @@ Staging source names are the opaque root-level upload filenames.
 - No duplicate or superseded generations exist in the staging set; every staged
   file maps to one distinct accepted concept, so nothing was rejected.
 
-## Default-portrait candidates
+## Default-portrait candidates (superseded)
 
-The product owner will choose the single default portrait before Issue #65
-persists selections; this issue does not set a default. Viable candidates based
-on the inspected portraits: **Gramma** (friendly mechanic archetype matching the
-starter workshop theme), **Grampa** (same pairing), or **Station Captain**
-(neutral authority figure). These are suggestions for the owner's decision, not
-a selection.
+Issue #70 identified viable default-portrait candidates (Gramma, Grampa,
+Station Captain) pending a product-owner decision. **Issue #65 supersedes that
+plan: there is no default human portrait.** New characters must deliberately
+choose one `player-starter` portrait at creation, and legacy characters render
+the neutral system placeholder until their owner chooses one. No catalog entry
+is treated as a default, and the placeholder is not a catalog portrait.
 
 ## Tooling and regeneration
 

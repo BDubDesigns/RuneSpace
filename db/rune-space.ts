@@ -84,6 +84,14 @@ export const characters = pgTable(
     // the typed location registry; new characters default to the Crash Site
     // through the authoritative provisioning path and the migration backfill.
     currentLocationId: text("current_location_id").notNull().default("crash_site"),
+    // Deliberate player-selected portrait (issue #65). Stores only the stable
+    // catalog portrait ID (game/content/portrait-catalog); never paths, URLs,
+    // labels, or blobs. Nullable by design: legacy characters may remain null
+    // and resolve to the neutral system placeholder until their owner chooses
+    // one. Availability is catalog metadata (player-starter), validated
+    // server-side on every write; there is no database FK because portraits
+    // are content, not rows.
+    portraitId: text("portrait_id"),
   },
   (table) => [
     check(

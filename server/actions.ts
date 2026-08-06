@@ -3,7 +3,7 @@
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { ensurePlayerAccount, requireCurrentUser, OwnershipError } from "@/server/ownership";
-import { createCharacter, CharacterError } from "@/server/characters";
+import { createCharacter, changeCharacterPortrait, CharacterError } from "@/server/characters";
 import {
   beginTravel,
   getMiningGameplayState,
@@ -25,6 +25,7 @@ import {
   ClaimPowerCellsRequestSchema,
   LoadPowerCellRequestSchema,
   DiscardInventoryStackRequestSchema,
+  ChangeCharacterPortraitRequestSchema,
 } from "@/game/schemas/gameplay";
 
 /**
@@ -42,10 +43,14 @@ export type ActionResult = { error?: string };
 
 export async function createCharacterAction(formData: FormData): Promise<ActionResult> {
   const displayName = String(formData.get("name") ?? "");
+  // The deliberate portrait choice is part of the authoritative creation
+  // command (issue #65): the browser submits only the stable portrait ID, and
+  // the server re-validates selectability before anything is persisted.
+  const portraitId = String(formData.get("portraitId") ?? "");
   try {
     const user = await requireCurrentUser(await headers());
     const account = await ensurePlayerAccount(user.id);
-    const character = await createCharacter(account.id, displayName);
+    const character = await createCharacter(account.id, displayName, portraitId);
     // `redirect` throws NEXT_REDIRECT; let it propagate out of the action so
     // Next performs the navigation. Only domain errors are caught here.
     redirect(`/play/${character.id}`);
@@ -54,6 +59,28 @@ export async function createCharacterAction(formData: FormData): Promise<ActionR
     if (err instanceof OwnershipError) return { error: err.message };
     // Re-throw redirect navigation and any unexpected error.
     throw err;
+  }
+}
+
+export type ChangeCharacterPortraitActionResult = { characterId?: string; error?: string };
+
+export async function changeCharacterPortraitAction(
+  input: unknown,
+): Promise<ChangeCharacterPortraitActionResult> {
+  const request = ChangeCharacterPortraitRequestSchema.safeParse(input);
+  if (!request.success) return { error: "Invalid portrait command." };
+  try {
+    const user = await requireCurrentUser(await headers());
+    const character = await changeCharacterPortrait(
+      user.id,
+      request.data.characterId,
+      request.data.portraitId,
+    );
+    return { characterId: character.id };
+  } catch (error) {
+    if (error instanceof CharacterError) return { error: error.message };
+    if (error instanceof OwnershipError) return { error: error.message };
+    throw error;
   }
 }
 

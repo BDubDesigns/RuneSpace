@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, type ReactNode, type RefObject } from "react";
+import { createPortal } from "react-dom";
 import { ActionButton } from "./ActionButton";
 import { SectionHeader } from "./SectionHeader";
 
@@ -14,7 +15,17 @@ const REDUCED_MOTION_QUERY = "(prefers-reduced-motion: reduce)";
 // for what the player sees.
 const EXIT_FALLBACK_MS = 400;
 
-/** Shared modal overlay used by Inventory and Equipment. */
+/**
+ * Shared modal overlay used by Inventory and Equipment.
+ *
+ * The modal renders through a portal to `document.body` so it can never be
+ * trapped inside an ancestor that establishes a containing block or stacking
+ * context (for example the `clip-path` bevel on `components/ui/Panel`): a
+ * `position: fixed` dialog inside such an ancestor would be positioned and
+ * clipped relative to that ancestor, letting the page behind intercept
+ * pointer events. Portal rendering keeps the modal genuinely viewport-fixed
+ * and above everything, wherever the triggering surface is mounted.
+ */
 export function Drawer({
   children,
   label,
@@ -182,7 +193,7 @@ export function Drawer({
   const backdropAnim = exiting ? "rs-overlay-backdrop-exit" : "rs-overlay-backdrop";
   const panelAnim = exiting ? "rs-overlay-panel-exit" : "rs-overlay-panel";
 
-  return (
+  return createPortal(
     <div
       ref={backdrop}
       className={`${backdropAnim} fixed inset-0 z-50 !mt-0 flex items-center justify-center bg-[color:var(--rs-overlay-scrim)] p-3 sm:p-4`}
@@ -211,6 +222,7 @@ export function Drawer({
         </div>
         {children}
       </section>
-    </div>
+    </div>,
+    document.body,
   );
 }
