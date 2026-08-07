@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 1,
+  "projectSlug": "runespace",
+  "workState": "active",
+  "currentFocus": "Continue expanding RuneSpace through focused product slices after shipping deliberate per-character portrait selection.",
+  "latestCompleted": {
+    "summary": "Added deliberate per-character portrait selection across character creation, owned-character management, and public profiles.",
+    "date": "2026-08-06",
+    "url": "https://github.com/BDubDesigns/RuneSpace/pull/73"
+  },
+  "nextStep": "Choose the next approved RuneSpace product issue and run it through the normal one-issue, one-PR review loop.",
+  "lastMeaningfulUpdate": "2026-08-06",
+  "highlights": [
+    {
+      "summary": "Shipped a shared portrait picker, server-authoritative per-character selection, and public profile presentation.",
+      "date": "2026-08-06",
+      "url": "https://github.com/BDubDesigns/RuneSpace/pull/73"
+    },
+    {
+      "summary": "Published the canonical portrait catalog, protected source masters, and optimized production derivatives.",
+      "date": "2026-08-05",
+      "url": "https://github.com/BDubDesigns/RuneSpace/pull/71"
+    }
+  ]
+}
