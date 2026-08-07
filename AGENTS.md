@@ -132,6 +132,71 @@ subagents or automation that may be unavailable.
    regression. Treat optional improvements separately from blockers. Never begin
    another issue early.
 
+## QC Failed status manifest upkeep
+
+RuneSpace publishes a small, intentionally **public** status manifest at
+`.qcfailed/status.json` (schema version one) so the live "Current Build Floor /
+QC Operations Console" on qcfailed.com can show what RuneSpace is actively
+working on. Supporting procedure lives in `docs/development-workflow.md`; this
+section is the normative contract. The manifest must never contain secrets,
+credentials, private account information, internal corporate information,
+unpublished client work, or speculative claims.
+
+### Schema-one field meanings
+- `schemaVersion` — always `1`.
+- `projectSlug` — the stable public slug, `runespace`.
+- `workState` — `active`, `maintenance`, or `paused`; RuneSpace is `active`.
+- `currentFocus` / `latestCompleted.summary` / `nextStep` — concise public-safe
+  sentences, each no longer than 240 characters.
+- `latestCompleted` / `highlights` / dates — real, non-future `YYYY-MM-DD`
+  values; URLs are absolute public `https` URLs; `highlights` holds zero to
+  three entries.
+- `currentChange` — optional; only a meaningful product PR adds it.
+
+### Meaningful-status upkeep
+When a PR meaningfully changes RuneSpace's current focus, latest completed
+milestone, next meaningful step, work state, or portfolio-worthy public
+highlights, update `.qcfailed/status.json` in that same PR. Do not update it
+for every commit, dependency bump, typo fix, CI-only change, test-only
+correction, or other trivial maintenance. Keep status text public-safe,
+factual, concise, and reviewable beside the work that caused it.
+
+### Active-review upkeep
+After opening a meaningful product pull request, add or update `currentChange`
+on that PR branch with the actual PR number, and advance `stage` as work moves
+through `implementation`, `review`, `preview`, and `merge-ready`. Do not copy a
+preview URL into the manifest.
+
+### Rollover after merge
+When starting the next meaningful product PR, move the previously merged change
+into `latestCompleted` when appropriate, update `currentFocus`, `nextStep`,
+`lastMeaningfulUpdate`, and highlights truthfully, and replace `currentChange`
+with the new active change only after the new PR exists. Never present a
+closed-unmerged change as completed.
+
+### Why the PR number is stored but the preview URL is not
+`.qcfailed/status.json` stores only the PR number (via `currentChange`); it
+never stores a preview URL. qcfailed.com derives preview URLs locally from the
+PR number against its allowlisted template rather than trusting a remote URL.
+
+### Verified RuneSpace preview pattern
+RuneSpace's preview pattern is `https://pr-{pullRequestNumber}.runespace.qcfailed.com`.
+The qcfailed.com project catalog owns the allowlisted template; do not add this
+template to `.qcfailed/status.json`.
+
+### Infrastructure-only work must not displace product milestones
+Workflow hardening, dependency bumps, typo fixes, CI-only corrections,
+test-only flakes, and other infrastructure-only maintenance must not add or
+replace `currentChange`, and must not silently displace the latest public
+product milestone in `latestCompleted`/`highlights`, unless Brandon explicitly
+decides the work is portfolio-worthy.
+
+### qcfailed.com responsibilities
+qcfailed.com, not RuneSpace, remains responsible for remote validation, GitHub
+PR-state interpretation, preview probing, fallback snapshots, and public
+rendering. RuneSpace only keeps the committed manifest parseable and internally
+consistent (see `tests/unit/qcfailed-status.test.ts`).
+
 ## Tooling reference
 - pnpm is the package manager; the lockfile is committed and installs are frozen.
 - Node 22 and pnpm 9.15.4 are pinned (see `package.json` `engines`/`packageManager`).

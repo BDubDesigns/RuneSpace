@@ -118,6 +118,31 @@ full local parity when the purpose is real-device phone/desktop review. The
 Coolify branch preview deploys pushed checkpoints independently of this CI
 split; it is visual-review evidence, not the merge gate.
 
+### QC Failed status manifest upkeep
+
+`AGENTS.md` is the normative contract for the `.qcfailed/status.json` manifest
+and its schema-one fields, meaningful-status upkeep, `currentChange`
+active-review upkeep, rollover after merge, and infrastructure-only
+non-displacement rules. This subsection is narrow supporting procedure only and
+does not create competing instructions.
+
+- A meaningful product PR updates the manifest in the same PR and adds a
+  `currentChange` with the real PR number after the draft PR opens. The PR
+  number becomes known only after the draft PR exists, so the workflow may make
+  one narrow follow-up commit on the same branch that records it.
+- The verified RuneSpace preview pattern is
+  `https://pr-{pullRequestNumber}.runespace.qcfailed.com`. qcfailed.com derives
+  the preview URL locally from the PR number against its allowlisted template;
+  RuneSpace never writes a preview URL into `.qcfailed/status.json`.
+- When a PR is backend- or UI-relevant, probe the actual derived preview
+  hostname (for example `curl -sI https://pr-<n>.runespace.qcfailed.com`) and
+  report the real result in the PR body rather than treating a deployment
+  comment alone as reachability evidence.
+- qcfailed.com remains responsible for remote validation, GitHub PR-state
+  interpretation, preview probing, fallback snapshots, and public rendering.
+  RuneSpace only keeps the committed manifest parseable and internally
+  consistent; `pnpm test` covers that via `tests/unit/qcfailed-status.test.ts`.
+
 ### Ready-for-review and merge-gate validation
 
 The same workflow requests the full gate when `full-ci` is applied, when a draft
