@@ -13,23 +13,23 @@ contract. This document provides the supporting procedure.
 ## Validate locally and choose the confidence level
 
 ### Managed RuneSpace host
-On Brandon's managed RuneSpace host, load the private environment before every
-database-backed command. Do not print its contents. It supplies the host-local
-`DATABASE_URL`; do not replace it with Docker example credentials.
+On Brandon's managed RuneSpace host, run database-backed and Node-22-bound commands
+through `./scripts/managed-host-run.sh`. The wrapper loads the private
+`/home/brandon/.config/runespace/dev.env` (which supplies the host-local
+`DATABASE_URL`), forces the system Node 22, and validates that the database URL is
+localhost-only — all without printing the private file or any credentials. Do not
+`source` the private file manually, and do not replace its `DATABASE_URL` with
+Docker example credentials.
 
 ```bash
 cd /home/brandon/workspace/projects/runespace
-source /home/brandon/.config/runespace/dev.env
-export PATH="/usr/bin:$PATH"
-node --version # Must report 22.x
-
-pnpm install --frozen-lockfile
-pnpm typecheck
-pnpm lint
-pnpm format:check
-pnpm test
-pnpm drizzle-kit migrate
-pnpm test:integration
+./scripts/managed-host-run.sh pnpm install --frozen-lockfile
+./scripts/managed-host-run.sh pnpm typecheck
+./scripts/managed-host-run.sh pnpm lint
+./scripts/managed-host-run.sh pnpm format:check
+./scripts/managed-host-run.sh pnpm test
+./scripts/managed-host-run.sh pnpm drizzle-kit migrate
+./scripts/managed-host-run.sh pnpm test:integration
 
 # Production build: `next build` runs as production, so server/env.ts requires a
 # BETTER_AUTH_SECRET of at least 16 characters. Scope a clearly fake
@@ -37,16 +37,18 @@ pnpm test:integration
 # shell value is never overwritten or removed. The placeholder shape follows
 # .github/workflows/ci.yml — the source of truth for this shape. It is valid
 # for this local/CI build command only and must never be used in a deployment.
-BETTER_AUTH_SECRET="insecure-ci-build-only-secret-do-not-use-in-prod-0000000000" \
+./scripts/managed-host-run.sh env \
+  BETTER_AUTH_SECRET="insecure-ci-build-only-secret-do-not-use-in-prod-0000000000" \
   pnpm build
 
-pnpm test:e2e:canonical
+./scripts/managed-host-run.sh pnpm test:e2e:canonical
 ```
 
-If `/home/brandon/.config/runespace/dev.env` is missing or unreadable, stop and
-report the environment blocker. Never guess credentials, inspect or report the
-private file's contents, or use the Coolify production database for local testing.
-The canonical runner's localhost-only database safety check remains authoritative.
+If `/home/brandon/.config/runespace/dev.env` is missing or unreadable,
+`managed-host-run.sh` refuses to start; stop and report the environment blocker.
+Never guess credentials, inspect or report the private file's contents, or use the
+Coolify production database for local testing. The canonical runner's
+localhost-only database safety check remains authoritative.
 
 ### Managed-host ports, cleanup, and focused E2E
 - Port `3000` belongs to OpenChamber. Never use it for RuneSpace work and never
@@ -62,13 +64,14 @@ The canonical runner's localhost-only database safety check remains authoritativ
   `kill <pid>`. Never use broad `pkill -f` or blanket Next.js cleanup. If the
   focused port is occupied by an uncertain process, choose another inspected
   free high port instead of killing it.
+- Do not manually assemble `next build` + `next start` for browser validation on
+  the managed host. Use `pnpm test:e2e:focused <phase>`, `pnpm test:e2e:canonical`,
+  or the deployed PR preview unless diagnosing the runner itself.
 - One focused phase from a clean state:
 
 ```bash
-source /home/brandon/.config/runespace/dev.env
-export PATH="/usr/bin:$PATH"
-node --version # Must report 22.x
-pnpm test:e2e:focused mining
+cd /home/brandon/workspace/projects/runespace
+./scripts/managed-host-run.sh pnpm test:e2e:focused mining
 ```
 
 The focused runner (`scripts/run-focused-e2e.mjs`) reuses the canonical

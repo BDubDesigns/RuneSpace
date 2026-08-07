@@ -59,6 +59,15 @@ account; this confirms the Better Auth `user`, `session`, `account`, and
 `verification` tables exist. Creating a character also confirms the
 `player_accounts` and `characters` ownership tables exist.
 
+Drizzle applies only journal entries whose `folderMillis` is newer than the last
+recorded applied-migration timestamp. A non-monotonic or equal `when` value in
+`drizzle/meta/_journal.json` can therefore be silently skipped even though
+`drizzle-kit migrate` exits successfully. The committed unit test
+`tests/unit/drizzle-migration-journal.test.ts` enforces that journal `when`
+values strictly increase, that `idx` is contiguous from `0`, and that every
+journal tag has a matching `drizzle/<tag>.sql` file, so this invariant is
+protected generically rather than for any single migration.
+
 If a deployed application reports a missing relation or table, first confirm it
 was deployed from an image containing these migration assets, then run the
 command above once from that application's Coolify terminal. Do not alter the
