@@ -145,7 +145,8 @@ unpublished client work, or speculative claims.
 ### Schema-one field meanings
 - `schemaVersion` — always `1`.
 - `projectSlug` — the stable public slug, `runespace`.
-- `workState` — `active`, `maintenance`, or `paused`; RuneSpace is `active`.
+- `workState` — `active`, `maintenance`, or `paused`; the manifest carries the
+  current truthful value.
 - `currentFocus` / `latestCompleted.summary` / `nextStep` — concise public-safe
   sentences, each no longer than 240 characters.
 - `latestCompleted` / `highlights` / dates — real, non-future `YYYY-MM-DD`

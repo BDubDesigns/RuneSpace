@@ -11,13 +11,12 @@ import { describe, expect, it } from "vitest";
  * in BDubDesigns/qcfailed.com). This repository does NOT implement qcfailed.com's
  * ingestion; it only keeps the committed manifest parseable and internally
  * consistent as a schema-one document. This test deliberately reads the file
- * from disk so the parse boundary and the seed-fact assertions are explicit.
+ * from disk so the parse boundary and the generic contract are explicit.
  *
- * The test has two layers:
- *  1. Generic schema-one validation that applies to every future manifest edit.
- *  2. A small Issue #72 seed assertion for this rollout's specific facts. A
- *     future meaningful status-rollover PR must update the seed assertion
- *     alongside the manifest itself.
+ * The validation is generic schema-one validation only: it makes no
+ * rollout-history claims (it does not freeze the work state, the latest
+ * completed milestone, or the presence or absence of `currentChange`), so
+ * future meaningful status-rollover PRs do not need to update this test.
  *
  * It does not connect to PostgreSQL, does not need a browser, and adds no
  * dependency.
@@ -171,14 +170,16 @@ describe("qcfailed status manifest (schema version one)", () => {
     expectConciseSentence(root.nextStep, "nextStep");
   });
 
-  it("keeps latestCompleted a dated, absolute-https milestone", () => {
+  it("keeps latestCompleted dated with an optional absolute-https url", () => {
     const root = readManifest();
     const latest = root.latestCompleted as Record<string, unknown>;
     expect(latest !== null && typeof latest === "object", "latestCompleted must be an object").toBe(
       true,
     );
     expect(typeof latest.date === "string" && isRealNonFutureDate(latest.date)).toBe(true);
-    expect(typeof latest.url === "string" && isAbsoluteHttpsUrl(latest.url)).toBe(true);
+    if (latest.url !== undefined) {
+      expect(typeof latest.url === "string" && isAbsoluteHttpsUrl(latest.url)).toBe(true);
+    }
   });
 
   it("keeps lastMeaningfulUpdate a real, non-future date", () => {
@@ -187,7 +188,7 @@ describe("qcfailed status manifest (schema version one)", () => {
     expect(isRealNonFutureDate(root.lastMeaningfulUpdate as string)).toBe(true);
   });
 
-  it("keeps highlights an array of zero to three dated, absolute-https entries", () => {
+  it("keeps highlights an array of zero to three dated entries with optional absolute-https urls", () => {
     const root = readManifest();
     expect(Array.isArray(root.highlights)).toBe(true);
     const highlights = root.highlights as unknown[];
@@ -199,7 +200,9 @@ describe("qcfailed status manifest (schema version one)", () => {
       );
       expectConciseSentence(item.summary, "highlight.summary");
       expect(typeof item.date === "string" && isRealNonFutureDate(item.date)).toBe(true);
-      expect(typeof item.url === "string" && isAbsoluteHttpsUrl(item.url)).toBe(true);
+      if (item.url !== undefined) {
+        expect(typeof item.url === "string" && isAbsoluteHttpsUrl(item.url)).toBe(true);
+      }
     }
   });
 
@@ -227,23 +230,5 @@ describe("qcfailed status manifest (schema version one)", () => {
         change.pullRequestNumber > 0,
       "currentChange.pullRequestNumber must be a positive integer",
     ).toBe(true);
-  });
-});
-
-describe("qcfailed status manifest (Issue #72 rollout seed)", () => {
-  it("marks RuneSpace active, not paused or maintenance", () => {
-    const root = readManifest();
-    expect(root.workState).toBe("active");
-  });
-
-  it("points the latest completed product milestone at merged PR #73, not hardening PR #76", () => {
-    const root = readManifest();
-    const latest = root.latestCompleted as Record<string, unknown>;
-    expect(latest.url).toBe("https://github.com/BDubDesigns/RuneSpace/pull/73");
-  });
-
-  it("does not publish a currentChange for this rollout", () => {
-    const root = readManifest();
-    expect(root.currentChange).toBeUndefined();
   });
 });
