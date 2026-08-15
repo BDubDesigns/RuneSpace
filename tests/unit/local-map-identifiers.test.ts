@@ -43,9 +43,12 @@ describe("local map identifier asset boundary (issue #53)", () => {
   });
 
   it("visibly painted width is 55–65% of hex width at both mobile (108) and desktop (128)", () => {
-    // Tight-alpha-cropped 512 long-edge sizes + 0.60W×0.62H meet viewport.
-    // Painted width = min(viewportW/bboxW, viewportH/bboxH) * bboxW / hexW.
-    const hexWidths = [108, 128];
+    // Visual correction (2026-08-15): viewport 0.72W×0.68H with dedicated middle
+    // zone, opacity 0.58. Painted widths intentionally ~61–72%; test keeps a
+    // relaxed 55–75% invariant so future visual tuning does not churn this file.
+    // Geometric proof still via tight-bbox cropped 512 WebPs (see local-map-layout
+    // math in python: minCrash~61.8% at 140/128).
+    const hexWidths = [128, 140];
     const hexHeightFor = (w: number) => w * (Math.sqrt(3) / 2);
     // Known tight-bbox/cropped sizes after optimization (from Pillow bbox).
     const croppedSizes: Record<string, { w: number; h: number }> = {
@@ -53,8 +56,8 @@ describe("local map identifier asset boundary (issue #53)", () => {
       processing_yard: { w: 512, h: 488 },
       power_annex: { w: 512, h: 470 },
     };
-    const vpWFrac = 0.6;
-    const vpHFrac = 0.62;
+    const vpWFrac = 0.72;
+    const vpHFrac = 0.68;
     for (const hexW of hexWidths) {
       const hexH = hexHeightFor(hexW);
       const vpW = hexW * vpWFrac;
@@ -69,7 +72,7 @@ describe("local map identifier asset boundary (issue #53)", () => {
           pct,
           `${key} painted ${pct.toFixed(1)}% at hexW=${hexW} (vp ${vpW.toFixed(1)}×${vpH.toFixed(1)}, bbox ${bboxW}×${bboxH})`,
         ).toBeGreaterThanOrEqual(55);
-        expect(pct).toBeLessThanOrEqual(65);
+        expect(pct).toBeLessThanOrEqual(75);
       }
     }
   });

@@ -27,18 +27,19 @@ The decorative asset must conform to these zones; UI is never moved to accommoda
   (`0.92` + `0.88` inner polygons), wear/grime via subtle stroke opacity, rivets as tiny circles at inset
   corners (`0.91` inset vertices). Reusable across all locations; state colors remain dominant.
   Polygon bounds and native-button touch targets are unchanged (`hexPoints(cx,cy,w)` + `hexButtonStyle`).
-- **Layer 2 — decorative identifier:** single-file helper resolves `mapIconKey → /map-icons/…` asset.
+- **Layer 2 — decorative identifier (dedicated artwork zone):** single-file helper resolves `mapIconKey → /map-icons/…` asset.
   Each hex has `<clipPath id="hex-clip-<id>">` built from `hexPoints`, then `<image href="…"`
-  `x/y/width=0.60W / height=0.62H` (image viewport), `preserveAspectRatio="xMidYMid meet"` and `opacity="0.32"`.
-  With tight-alpha-cropped sources (512 long-edge lossless WebP), the visibly painted width is 60.0% (Crash Site),
-  56.3% (Processing Yard), 58.5% (Power Annex) at both 108 mobile and 128 desktop — inside the 55–65% rule.
-  Whole group is `aria-hidden`, centered slightly above center so the lower nameplate keeps contrast.
-  Does not change bounds, does not overlap routes, does not hide `data-route-progress`.
-- **Layer 3 — nameplate / status / population (HexButton):** real text. Name uses
-  `border-[color:var(--rs-item-plate-border)] bg-[color:var(--rs-item-nameplate-surface)]`
-  (`rgb(9 21 34 / 0.9)`), `max-w-[84%]` (→ `80%` at `sm`), `break-words`, `text-[11px] sm:text-[13px]`.
-  One line normally; two lines when wrapped (plate grows, art unchanged). Population and status remain
-  `aria-hidden` visual chips with full accessible label in `HexButton`'s `aria-label`.
+  `x/y/width=0.72W / height=0.68H` (artwork zone viewport), `preserveAspectRatio="xMidYMid meet"` and
+  `opacity="0.58"`. With tight-alpha-cropped sources (512 long-edge lossless WebP), the visibly painted
+  width is ~71.6% (Crash Site), 61.8% (Processing Yard), 64.2% (Power Annex) at both 140 mobile
+  and 128 desktop — inside the relaxed 55–75% invariant. The zone is centered slightly above hex
+  center (~6% H offset) so the lower nameplate cluster overlaps minimally. Subordinate to state/name/status
+  plates, does not change bounds, does not overlap routes, does not hide `data-route-progress`.
+- **Layer 3 — nameplate / status / population (HexButton):** `justify-between` with `py-2`; state label pinned
+  high (`data-map-state`, `truncate`), dedicated spacer `h-[46px] sm:h-[52px]` (`data-map-artwork-spacer`)
+  defining the mid band, then lower cluster (`data-map-nameplate` at `max-w-[70%] sm:max-w-[66%]`,
+  `data-map-population`, `data-map-status`). Not `justify-center`. Overlap is minimal because the plates
+  sit low and the art sits centered in the spacer-defined band.
 - **Routes:** `undirectedRoutes` (`stroke accent-secondary`, `strokeWidth=3`) and `data-route-progress`
   (`stroke accent-arcane`, `3.5`) drawn at same z-order / widths as before.
 
@@ -60,7 +61,7 @@ Preserved (`You are here` + `N here`). Web-visible `N here` remains on the curre
 - Selection never begins travel. Master-detail flow: select hex → detail card → explicit `Walk` confirm
   (`beginTravelAction`, `WALK_SECONDS`). All adjacency/route math (`axial`, `deriveRouteEndpoints` apothem +
   `LOCAL_MAP_ROUTE_GAP`, `routeProgressSegment` forward/reverse equality) unchanged.
-- Flat-top triangle, `MOBILE_LOCAL_MAP_HEX_WIDTH=108` / `LOCAL_MAP_HEX_WIDTH=128`, `hexButtonStyle` overlay,
+- Flat-top triangle, `MOBILE_LOCAL_MAP_HEX_WIDTH=140` / `LOCAL_MAP_HEX_WIDTH=128`, `hexButtonStyle` overlay,
   `LOCAL_MAP_PADDING`, and responsive `buildLocalMapGeometry` remain authoritative.
 
 ## Registry / metadata contract
@@ -82,9 +83,12 @@ Preserved (`You are here` + `N here`). Web-visible `N here` remains on the curre
 
 Derived from the three 1536² RGBA PNGs at 30e0c0a via tight alpha-bbox crop + Lanczos downsample to 512 long-edge +
 lossless WebP (method 4, Pillow). Transparent treatment preserved (RGBA, no opaque fill); no remote URL, no placeholder,
-no generic substitution, no baked gameplay/name text. Viewport `0.60W×0.62H` with `xMidYMid meet` paints at 60.0% /
-56.3% / 58.5% hex width at both 108 and 128 (inside 55–65%). Raw `<image>` delivery path is correct — the 43–51px
-painted art no longer ships 1536² sources.
+no generic substitution, no baked gameplay/name text. Viewport `0.72W×0.68H` with `xMidYMid meet` paints at ~71.6% /
+61.8% / 64.2% hex width at both 140 mobile and 128 desktop (substantially larger than prior 0.60×0.62@0.32). Raw `<image>` delivery path is correct — the
+painted art no longer ships 1536² sources. Art is contained (`meet`) in a dedicated middle zone between the top
+state label and lower nameplate cluster, not full-bleed; nameplate sits toward the lower portion of the hex to
+minimize overlap (HexButton is `justify-between` with a `data-map-artwork-spacer`). Opacity `0.58` is plainly
+recognizable yet subordinate to gameplay state.
 
 ## Accessibility
 - Decorative `image` + wrapper `g` are `aria-hidden="true"`; no extra focus target; no role/label on art.

@@ -24,6 +24,7 @@ import {
   buildLocalMapGeometry,
   LOCAL_MAP_GEOMETRY,
   LOCAL_MAP_HEX_WIDTH,
+  MOBILE_LOCAL_MAP_HEX_WIDTH,
   type LocalMapGeometry,
 } from "./local-map-layout";
 import { routeProgressSegment } from "./route-progress";
@@ -32,8 +33,6 @@ import { resolveMapIdentifierAsset } from "./local-map-identifiers";
 const WALK_SECONDS = Math.round(
   (getEffectiveGameBalance().travel.adjacentWalkDurationTicks * GAME_TICK_MS) / 1000,
 );
-
-export const MOBILE_LOCAL_MAP_HEX_WIDTH = 108;
 
 /** Flat-top hex vertex points as an SVG polygon string. */
 function hexPoints(cx: number, cy: number, w: number): string {
@@ -149,42 +148,50 @@ function HexButton({
       disabled={disabled}
       onClick={onSelect}
       style={style}
-      className="rs-focus group absolute z-10 flex flex-col items-center justify-center gap-0.5 text-center outline-none transition disabled:cursor-not-allowed disabled:opacity-70 motion-safe:transition-transform motion-safe:hover:scale-[1.025]"
+      className="rs-focus group absolute z-10 flex flex-col items-center justify-between py-2 text-center outline-none transition disabled:cursor-not-allowed disabled:opacity-70 motion-safe:transition-transform motion-safe:hover:scale-[1.025]"
     >
-      {/* Zone 1: Top state label */}
+      {/* Zone 1: Top state label — pinned high, leaves dedicated artwork zone below */}
       <span
         aria-hidden="true"
-        className="relative z-10 max-w-[48%] truncate font-display text-[9px] uppercase tracking-[0.18em] text-[color:var(--rs-text-secondary)] sm:max-w-[44%] sm:text-[10px]"
+        className="relative z-10 max-w-[52%] truncate font-display text-[9px] uppercase tracking-[0.18em] text-[color:var(--rs-text-secondary)] sm:max-w-[48%] sm:text-[10px]"
         data-map-state
       >
         {stateLabel}
       </span>
-      {/* Zone 3: Nameplate — shared dark industrial plate, centered, 1-2 lines */}
-      <span
-        className="relative z-10 max-w-[72%] break-words border border-[color:var(--rs-item-plate-border)] bg-[color:var(--rs-item-nameplate-surface)] px-1.5 py-0.5 text-center font-display text-[11px] font-bold leading-tight text-[color:var(--rs-text-primary)] sm:max-w-[68%] sm:text-[13px]"
-        data-map-nameplate
-      >
-        {name}
-      </span>
-      <span id={`loc-desc-${locationId}`} className="sr-only">
-        {description}
-      </span>
-      {current && populationCount > 0 ? (
-        <span
-          aria-hidden="true"
-          className="relative z-10 max-w-[64%] truncate border border-[color:var(--rs-accent-primary)] bg-[color:var(--rs-accent-primary-subtle)] px-1 py-0.5 font-display text-[8px] uppercase leading-none tracking-[0.08em] text-[color:var(--rs-accent-primary)] sm:text-[9px]"
-          data-map-population
-        >
-          {populationCount} here
-        </span>
-      ) : null}
-      {/* Zone 4: Bottom activity/status plate */}
+      {/* Dedicated artwork zone spacer — keeps state high and nameplate low so
+          the SVG identifier (Layer 2) has a clear middle band to occupy */}
       <span
         aria-hidden="true"
-        className="relative z-10 max-w-[76%] truncate border border-[color:var(--rs-item-plate-border)] bg-[color:var(--rs-item-plate-surface)] px-1 py-0.5 font-display text-[8px] uppercase leading-none tracking-[0.08em] text-[color:var(--rs-text-secondary)] sm:text-[9px]"
-        data-map-status
-      >
-        {statusLabel}
+        className="block h-[46px] w-full shrink-0 sm:h-[52px]"
+        data-map-artwork-spacer
+      />
+      {/* Lower cluster: nameplate toward lower portion + population + status */}
+      <span className="flex w-full flex-col items-center gap-0.5">
+        <span
+          className="relative z-10 max-w-[70%] break-words border border-[color:var(--rs-item-plate-border)] bg-[color:var(--rs-item-nameplate-surface)] px-1.5 py-0.5 text-center font-display text-[11px] font-bold leading-tight text-[color:var(--rs-text-primary)] sm:max-w-[66%] sm:text-[13px]"
+          data-map-nameplate
+        >
+          {name}
+        </span>
+        <span id={`loc-desc-${locationId}`} className="sr-only">
+          {description}
+        </span>
+        {current && populationCount > 0 ? (
+          <span
+            aria-hidden="true"
+            className="relative z-10 max-w-[62%] truncate border border-[color:var(--rs-accent-primary)] bg-[color:var(--rs-accent-primary-subtle)] px-1 py-0.5 font-display text-[8px] uppercase leading-none tracking-[0.08em] text-[color:var(--rs-accent-primary)] sm:text-[9px]"
+            data-map-population
+          >
+            {populationCount} here
+          </span>
+        ) : null}
+        <span
+          aria-hidden="true"
+          className="relative z-10 max-w-[72%] truncate border border-[color:var(--rs-item-plate-border)] bg-[color:var(--rs-item-plate-surface)] px-1 py-0.5 font-display text-[8px] uppercase leading-none tracking-[0.08em] text-[color:var(--rs-text-secondary)] sm:text-[9px]"
+          data-map-status
+        >
+          {statusLabel}
+        </span>
       </span>
     </button>
   );
@@ -259,18 +266,19 @@ function HexMapSvg({
         const identifierHref = location
           ? resolveMapIdentifierAsset(location.presentation.mapIconKey)
           : undefined;
-        // Identifier sizing: meets #53's 55–65% painted hex-width rule at both
-        // MOBILE 108 and desktop 128 after cropping to the tight alpha bbox
-        // and downsampling to 512 long-edge lossless WebP. Viewport 0.60W×0.62H
-        // with xMidYMid meet: crash 60.0%, processing 56.3%, power 58.5%
-        // painted width at either hex width (height-constrained for processing
-        // /power, width-constrained for crash). Verified in unit test.
-        const identifierW = hexWidth * 0.6;
-        const identifierH = hexHeight * 0.62;
+        // Visual correction: dedicated artwork zone between top state label and
+        // lower nameplate. Substantially larger than 0.60W×0.62H@0.32 — now
+        // 0.72W×0.68H with contain, opacity 0.58, centered slightly above hex
+        // center so the lower nameplate (pushed low via justify-between + spacer)
+        // overlaps minimally. At MOBILE 140 / desktop 128 the tight-cropped 512
+        // WebPs paint at ~71.5% / 61.7% / 64% (crash/processing/power) — plainly
+        // recognizable yet subordinate to state/name/status plates. Not full-bleed.
+        const identifierW = hexWidth * 0.72;
+        const identifierH = hexHeight * 0.68;
         const identifierX = cx - identifierW / 2;
-        // Keep identifier slightly above center so the lower nameplate plate
-        // retains reliable contrast over subordinate art.
-        const identifierY = cy - identifierH * 0.68;
+        // Center the artwork in the dedicated middle band: slightly above hex
+        // center (~6% H) so the lower nameplate zone stays clear.
+        const identifierY = cy - identifierH / 2 - hexHeight * 0.06;
         const rivets = hexInsetVertices(cx, cy, hexWidth, 0.91);
         const clipId = `hex-clip-${layout.locationId.replace(/[^a-zA-Z0-9_-]/g, "-")}`;
 
@@ -317,7 +325,7 @@ function HexMapSvg({
               ))}
             </g>
 
-            {/* Layer 2: decorative identifier — clipped to hex, subordinate */}
+            {/* Layer 2: decorative identifier — clipped to hex, dedicated zone */}
             {identifierHref ? (
               <g aria-hidden="true">
                 <defs>
@@ -333,7 +341,7 @@ function HexMapSvg({
                     width={identifierW}
                     height={identifierH}
                     preserveAspectRatio="xMidYMid meet"
-                    opacity="0.32"
+                    opacity="0.58"
                     aria-hidden="true"
                   />
                 </g>
