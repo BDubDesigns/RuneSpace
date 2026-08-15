@@ -155,11 +155,15 @@ function HexButton({
       <span
         aria-hidden="true"
         className="relative z-10 font-display text-[9px] uppercase tracking-[0.18em] text-[color:var(--rs-text-secondary)] sm:text-[10px]"
+        data-map-state
       >
         {stateLabel}
       </span>
       {/* Zone 3: Nameplate — shared dark industrial plate, centered, 1-2 lines */}
-      <span className="relative z-10 max-w-[84%] break-words border border-[color:var(--rs-item-plate-border)] bg-[color:var(--rs-item-nameplate-surface)] px-1.5 py-0.5 text-center font-display text-[11px] font-bold leading-tight text-[color:var(--rs-text-primary)] sm:max-w-[80%] sm:text-[13px]">
+      <span
+        className="relative z-10 max-w-[84%] break-words border border-[color:var(--rs-item-plate-border)] bg-[color:var(--rs-item-nameplate-surface)] px-1.5 py-0.5 text-center font-display text-[11px] font-bold leading-tight text-[color:var(--rs-text-primary)] sm:max-w-[80%] sm:text-[13px]"
+        data-map-nameplate
+      >
         {name}
       </span>
       <span id={`loc-desc-${locationId}`} className="sr-only">

@@ -56,6 +56,33 @@ async function expectMapStatusPlatesInsideHex(page: import("@playwright/test").P
   expect(geometry.routeOverlaps).toEqual([]);
 }
 
+async function expectMapNameplatesInsideHex(page: import("@playwright/test").Page) {
+  const geometry = await expectElementsInsideHexes(
+    page.locator('[aria-label="Local map"]'),
+    "data-map-nameplate",
+  );
+  expect(geometry.labels.sort()).toEqual(["Crash Site", "Power Annex", "Processing Yard"]);
+  expect(geometry.allInside).toBe(true);
+  expect(geometry.routeOverlaps).toEqual([]);
+}
+
+async function expectMapStateLabelsInsideHex(
+  page: import("@playwright/test").Page,
+  expectedLabels: readonly string[],
+) {
+  const geometry = await expectElementsInsideHexes(
+    page.locator('[aria-label="Local map"]'),
+    "data-map-state",
+  );
+  expect(geometry.labels.sort()).toEqual([...expectedLabels].sort());
+  expect(geometry.allInside).toBe(true);
+  expect(geometry.routeOverlaps).toEqual([]);
+}
+
+const STATIONARY_STATE_LABELS = ["You are here", "Reachable", "Reachable"] as const;
+const SELECTED_STATE_LABELS = ["You are here", "Selected", "Reachable"] as const;
+const IN_TRANSIT_STATE_LABELS = ["Origin", "Destination", "Reachable"] as const;
+
 async function expectPowerAnnexRewardLayout(
   page: import("@playwright/test").Page,
   { claimed }: { claimed: boolean },
@@ -216,11 +243,15 @@ test("selecting a destination does not begin travel; confirmation is required", 
   );
   await scrollMapIntoView(page);
   await expectMapStatusPlatesInsideHex(page);
+  await expectMapNameplatesInsideHex(page);
+  await expectMapStateLabelsInsideHex(page, STATIONARY_STATE_LABELS);
   await page.screenshot({ path: "test-results/travel-mobile-stationary.png" });
 
   await page.setViewportSize({ width: 1440, height: 900 });
   await scrollMapIntoView(page);
   await expectMapStatusPlatesInsideHex(page);
+  await expectMapNameplatesInsideHex(page);
+  await expectMapStateLabelsInsideHex(page, STATIONARY_STATE_LABELS);
   await page.screenshot({ path: "test-results/travel-desktop-stationary.png" });
 
   await page.setViewportSize({ width: 390, height: 844 });
@@ -239,9 +270,15 @@ test("selecting a destination does not begin travel; confirmation is required", 
   ).resolves.toEqual([]);
 
   await scrollMapIntoView(page);
+  await expectMapNameplatesInsideHex(page);
+  await expectMapStateLabelsInsideHex(page, SELECTED_STATE_LABELS);
+  await expectMapStatusPlatesInsideHex(page);
   await page.screenshot({ path: "test-results/travel-mobile-selected.png" });
   await page.setViewportSize({ width: 1440, height: 900 });
   await scrollMapIntoView(page);
+  await expectMapNameplatesInsideHex(page);
+  await expectMapStateLabelsInsideHex(page, SELECTED_STATE_LABELS);
+  await expectMapStatusPlatesInsideHex(page);
   await page.screenshot({ path: "test-results/travel-desktop-selected.png" });
 });
 
@@ -325,9 +362,15 @@ test("the full journey walks, arrives, and returns between the original location
   await expect(page.locator('[aria-label="Local map"] svg circle[data-map-rivet]')).toHaveCount(18);
 
   await scrollMapIntoView(page);
+  await expectMapNameplatesInsideHex(page);
+  await expectMapStateLabelsInsideHex(page, IN_TRANSIT_STATE_LABELS);
+  await expectMapStatusPlatesInsideHex(page);
   await page.screenshot({ path: "test-results/travel-mobile-in-transit.png" });
   await page.setViewportSize({ width: 1440, height: 900 });
   await scrollMapIntoView(page);
+  await expectMapNameplatesInsideHex(page);
+  await expectMapStateLabelsInsideHex(page, IN_TRANSIT_STATE_LABELS);
+  await expectMapStatusPlatesInsideHex(page);
   await page.screenshot({ path: "test-results/travel-desktop-in-transit.png" });
   await page.setViewportSize({ width: 390, height: 844 });
 
