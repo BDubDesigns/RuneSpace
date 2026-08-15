@@ -255,12 +255,18 @@ function HexMapSvg({
         const identifierHref = location
           ? resolveMapIdentifierAsset(location.presentation.mapIconKey)
           : undefined;
-        // Identifier sizing: ~60% hex width, centered in upper-middle/center zone.
-        const identifierW = hexWidth * 0.62;
-        const identifierH = hexHeight * 0.46;
+        // Identifier sizing: meets #53's 55–65% painted hex-width rule at both
+        // MOBILE 108 and desktop 128 after cropping to the tight alpha bbox
+        // and downsampling to 512 long-edge lossless WebP. Viewport 0.60W×0.62H
+        // with xMidYMid meet: crash 60.0%, processing 56.3%, power 58.5%
+        // painted width at either hex width (height-constrained for processing
+        // /power, width-constrained for crash). Verified in unit test.
+        const identifierW = hexWidth * 0.6;
+        const identifierH = hexHeight * 0.62;
         const identifierX = cx - identifierW / 2;
-        // Nudge identifier slightly upward so the lower nameplate plate has reliable contrast.
-        const identifierY = cy - identifierH * 0.72;
+        // Keep identifier slightly above center so the lower nameplate plate
+        // retains reliable contrast over subordinate art.
+        const identifierY = cy - identifierH * 0.68;
         const rivets = hexInsetVertices(cx, cy, hexWidth, 0.91);
         const clipId = `hex-clip-${layout.locationId.replace(/[^a-zA-Z0-9_-]/g, "-")}`;
 
@@ -295,6 +301,7 @@ function HexMapSvg({
               {rivets.map((pt, idx) => (
                 <circle
                   key={`${layout.locationId}-rivet-${idx}`}
+                  data-map-rivet
                   cx={pt.x}
                   cy={pt.y}
                   r={Math.max(1, hexWidth * 0.012)}

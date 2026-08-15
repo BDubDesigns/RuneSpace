@@ -318,7 +318,11 @@ test("the full journey walks, arrives, and returns between the original location
   await expect(page.getByText(/paused/i)).toHaveCount(0);
   await expectMiningDashboardsHidden(page);
   await expectRouteProgressStartsAt(page, LOCATION_IDS.crashSite);
-  await expect(page.locator('[aria-label="Local map"] svg circle')).toHaveCount(0);
+  // Hybrid chassis rivets (data-map-rivet) are intentional and exempt; no other circles must appear during transit.
+  await expect(
+    page.locator('[aria-label="Local map"] svg circle:not([data-map-rivet])'),
+  ).toHaveCount(0);
+  await expect(page.locator('[aria-label="Local map"] svg circle[data-map-rivet]')).toHaveCount(18);
 
   await scrollMapIntoView(page);
   await page.screenshot({ path: "test-results/travel-mobile-in-transit.png" });
@@ -367,7 +371,10 @@ test("the full journey walks, arrives, and returns between the original location
   await expect(page.getByText("Journey progress")).toBeVisible();
   await expectMiningDashboardsHidden(page);
   await expectRouteProgressStartsAt(page, LOCATION_IDS.abandonedProcessingYard);
-  await expect(page.locator('[aria-label="Local map"] svg circle')).toHaveCount(0);
+  await expect(
+    page.locator('[aria-label="Local map"] svg circle:not([data-map-rivet])'),
+  ).toHaveCount(0);
+  await expect(page.locator('[aria-label="Local map"] svg circle[data-map-rivet]')).toHaveCount(18);
 
   const returnPast = new Date(Date.now() - 25_000);
   await db
