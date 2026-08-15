@@ -154,7 +154,7 @@ function HexButton({
       {/* Zone 1: Top state label */}
       <span
         aria-hidden="true"
-        className="relative z-10 max-w-[64%] truncate font-display text-[9px] uppercase tracking-[0.18em] text-[color:var(--rs-text-secondary)] sm:max-w-[60%] sm:text-[10px]"
+        className="relative z-10 max-w-[48%] truncate font-display text-[9px] uppercase tracking-[0.18em] text-[color:var(--rs-text-secondary)] sm:max-w-[44%] sm:text-[10px]"
         data-map-state
       >
         {stateLabel}
