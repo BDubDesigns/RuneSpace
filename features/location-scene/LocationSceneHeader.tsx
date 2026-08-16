@@ -57,10 +57,12 @@ export function LocationSceneHeader({
           aria-hidden="true"
           className="pointer-events-none absolute inset-x-0 bottom-0 h-px bg-[linear-gradient(90deg,transparent,rgba(245,196,81,0.45),transparent)] opacity-60"
         />
-        {/* Upper plates: eyebrow left, resource/context plate right. Real UI over scene. */}
-        <div className="pointer-events-none absolute inset-x-0 top-0 flex items-start justify-between gap-2 p-2 sm:p-2.5">
+        {/* Upper plate: location eyebrow. Real UI over scene. Resource pill now lives
+            bottom-right so long names (e.g. DeWhat? Emergency Power Annex) never
+            get clipped by a top-row sibling. */}
+        <div className="pointer-events-none absolute inset-x-0 top-0 flex items-start justify-start p-2 sm:p-2.5">
           <span
-            className="rs-map-plate rs-map-plate--state inline-flex max-w-[58%] items-center whitespace-nowrap px-2 py-0.5 font-display text-xs font-bold uppercase tracking-[0.14em] sm:px-2.5 sm:text-sm"
+            className="rs-map-plate rs-map-plate--state inline-flex max-w-[92%] items-center whitespace-nowrap px-2 py-0.5 font-display text-[10px] font-bold uppercase tracking-[0.14em] sm:px-2.5 sm:text-[11px]"
             style={
               {
                 ["--rs-plate-surface-top" as unknown as string]: "rgb(18 32 46 / 0.5)",
@@ -71,23 +73,24 @@ export function LocationSceneHeader({
           >
             {location.displayName.toUpperCase()}
           </span>
-          {resourceLabel ? (
-            <span
-              className="inline-flex max-w-[42%] items-center justify-center whitespace-nowrap border border-[color:var(--rs-accent-mining)] bg-[rgba(245,196,81,0.12)] px-2 py-0.5 font-display text-[10px] font-bold uppercase tracking-wide text-[color:var(--rs-accent-mining)] sm:px-2.5 sm:text-[11px]"
-              data-scene-resource
-            >
-              {resourceLabel}
-            </span>
-          ) : null}
         </div>
         {/* Character name — opaque plate over the bottom-left of the image, right edge
-            angled to match concept art. Real UI, not baked pixels. */}
+            angled to match concept art. Truncates if the player chose an insanely
+            long name so it never collides with the bottom-right resource pill. */}
         <div
-          className="absolute bottom-0 left-0 max-w-[72%] border-y border-r border-[color:var(--rs-border-structural)] bg-[color:var(--rs-surface-panel)] px-3 py-1.5 pr-6 font-display text-sm font-semibold tracking-tight text-[color:var(--rs-text-primary)] [clip-path:polygon(0_0,calc(100%_-_14px)_0,100%_100%,0_100%)] sm:max-w-[62%] sm:px-4 sm:py-2 sm:pr-9 sm:text-[15px] sm:[clip-path:polygon(0_0,calc(100%_-_18px)_0,100%_100%,0_100%)]"
+          className="absolute bottom-0 left-0 max-w-[58%] truncate border-y border-r border-[color:var(--rs-border-structural)] bg-[color:var(--rs-surface-panel)] px-3 py-1.5 pr-6 font-display text-sm font-semibold tracking-tight text-[color:var(--rs-text-primary)] [clip-path:polygon(0_0,calc(100%_-_14px)_0,100%_100%,0_100%)] sm:max-w-[52%] sm:px-4 sm:py-2 sm:pr-9 sm:text-[15px] sm:[clip-path:polygon(0_0,calc(100%_-_18px)_0,100%_100%,0_100%)]"
           data-scene-character
         >
           {characterName}
         </div>
+        {resourceLabel ? (
+          <span
+            className="absolute bottom-2 right-2 inline-flex max-w-[40%] items-center justify-center whitespace-nowrap border border-[color:var(--rs-accent-mining)] bg-[linear-gradient(180deg,rgba(245,196,81,0.12),rgba(91,70,18,0.22))] px-2 py-0.5 font-display text-[10px] font-bold uppercase tracking-wide text-[color:var(--rs-accent-mining)] sm:bottom-2.5 sm:right-2.5 sm:max-w-[36%] sm:px-2.5 sm:text-[11px]"
+            data-scene-resource
+          >
+            {resourceLabel}
+          </span>
+        ) : null}
       </div>
     </div>
   );
