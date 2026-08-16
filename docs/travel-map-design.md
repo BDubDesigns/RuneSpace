@@ -31,14 +31,13 @@ The decorative asset must conform to these zones; UI is never moved to accommoda
   Each hex has `<clipPath id="hex-clip-<id>">` built from `hexPoints`, then `<image href="…"`
   `x/y/width=0.72W / height=0.68H` (artwork zone viewport), `preserveAspectRatio="xMidYMid meet"` and
   `opacity="0.58"`. With tight-alpha-cropped sources (512 long-edge lossless WebP), the visibly painted
-  width is ~71.6% (Crash Site), 61.8% (Processing Yard), 64.2% (Power Annex) at both 140 mobile
-  and 128 desktop — inside the relaxed 55–75% invariant. The zone is centered slightly above hex
+  width is ~71.6% (Crash Site), 61.8% (Processing Yard), 64.2% (Power Annex) at the unified 140 — inside the relaxed 55–75% invariant — inside the relaxed 55–75% invariant. The zone is centered slightly above hex
   center (~6% H offset) so the lower nameplate cluster overlaps minimally. Subordinate to state/name/status
   plates, does not change bounds, does not overlap routes, does not hide `data-route-progress`.
 - **Layer 3 — nameplate / status / population (HexButton):** `justify-between` with `py-1.5`; state **plate** pinned
   high as a fitted smoked plaque (`data-map-state`, `rs-map-plate rs-map-plate--state`, `inline-flex whitespace-nowrap`, always fits, may overhang),
-  dedicated spacer `h-[44px] sm:h-[50px]` (`data-map-artwork-spacer`) defining the mid band, then lower fitted
-  cluster (`data-map-nameplate` as `rs-map-plate rs-map-plate--nameplate` at `inline-flex max-w-[68%] sm:64%`, reduced `px-2` hugging),
+  dedicated spacer `h-[44px]` (`data-map-artwork-spacer`) defining the mid band, then lower fitted
+  cluster (`data-map-nameplate` as `rs-map-plate rs-map-plate--nameplate` at `inline-flex max-w-[66%]`, reduced `px-2` hugging),
   `data-map-population` and `data-map-status` as same-family smoked plaques. All plates share `rs-map-plate`:
   dark navy/charcoal `linear-gradient` (top→bottom `0.74→0.62`), `clip-path` chamfer (`var(--rs-bevel-small)`),
   outer + inner inset border, faint top highlight/bottom shadow. Not flat UI boxes. Overlap is minimal because the plates
@@ -48,7 +47,7 @@ The decorative asset must conform to these zones; UI is never moved to accommoda
 
 ## Nameplate behavior
 - `location.presentation.localMap.label` (`Crash Site` / `Processing Yard` / `Power Annex`) is rendered
-  as a **fitted plaque** (`inline-flex`, `px-2` hugging, `max-w-[68%] sm:max-w-[64%]`, `rs-map-plate--nameplate`),
+  as a **fitted plaque** (`inline-flex`, `px-2` hugging, `max-w-[66%]`, `rs-map-plate--nameplate`),
   not a full-width bar. If it wraps, plate height grows inside `HexButton` — artwork is never resized.
   Processing Yard no longer sits inside an oversized slab; plate surface is the shared smoked
   dark navy/charcoal (partially transparent, top→bottom gradient, chamfered + double border, highlight/shadow).
@@ -65,8 +64,8 @@ Preserved (`You are here` + `N here`). Web-visible `N here` remains on the curre
 - Selection never begins travel. Master-detail flow: select hex → detail card → explicit `Walk` confirm
   (`beginTravelAction`, `WALK_SECONDS`). All adjacency/route math (`axial`, `deriveRouteEndpoints` apothem +
   `LOCAL_MAP_ROUTE_GAP`, `routeProgressSegment` forward/reverse equality) unchanged.
-- Flat-top triangle, `MOBILE_LOCAL_MAP_HEX_WIDTH=140` / `LOCAL_MAP_HEX_WIDTH=128`, `hexButtonStyle` overlay,
-  `LOCAL_MAP_PADDING`, `LOCAL_MAP_ROUTE_GAP=30` (~30px edge-to-edge at desktop, proportional at mobile), and responsive `buildLocalMapGeometry` remain authoritative.
+- Flat-top triangle, `LOCAL_MAP_HEX_WIDTH=140` unified (no mobile/desktop branching, one `buildLocalMapGeometry` path), `hexButtonStyle` overlay,
+  `LOCAL_MAP_PADDING`, `LOCAL_MAP_ROUTE_GAP=30` (~30px edge-to-edge at the unified 140), and single-path `buildLocalMapGeometry` remain authoritative.
 
 ## Registry / metadata contract
 - `game/schemas/locations.ts: presentation.mapIconKey` is `z.enum(["crash_site_deposit","processing_yard","power_annex"])`.
@@ -75,7 +74,7 @@ Preserved (`You are here` + `N here`). Web-visible `N here` remains on the curre
 - New locations **must** provide a compact identifier through the same `mapIconKey → helper` boundary and a local
   `public/map-icons/<slug>.webp` asset (lossless transparent, tightly cropped, ≤512 long edge); no baked text/status
   in art; opaque background must be removed / made subordinate; respect hex zones and 55–65% painted width / ≤ `0.38`
-  opacity rules; report tight bbox + derived painted width at 108/128.
+  opacity rules; report tight bbox + derived painted width at 140.
 
 ## Assets (approved, local-only, optimized for raw <image> delivery)
 | File | Source (staging provenance) | BBox-cropped size | Delivered | Bytes | Saving |
@@ -88,7 +87,7 @@ Preserved (`You are here` + `N here`). Web-visible `N here` remains on the curre
 Derived from the three 1536² RGBA PNGs at 30e0c0a via tight alpha-bbox crop + Lanczos downsample to 512 long-edge +
 lossless WebP (method 4, Pillow). Transparent treatment preserved (RGBA, no opaque fill); no remote URL, no placeholder,
 no generic substitution, no baked gameplay/name text. Viewport `0.72W×0.68H` with `xMidYMid meet` paints at ~71.6% /
-61.8% / 64.2% hex width at both 140 mobile and 128 desktop (substantially larger than prior 0.60×0.62@0.32). Raw `<image>` delivery path is correct — the
+61.8% / 64.2% hex width at the unified 140 (substantially larger than prior 0.60×0.62@0.32). Raw `<image>` delivery path is correct — the
 painted art no longer ships 1536² sources. Art is contained (`meet`) in a dedicated middle zone between the top
 state label and lower nameplate cluster, not full-bleed; nameplate sits toward the lower portion of the hex to
 minimize overlap (HexButton is `justify-between` with a `data-map-artwork-spacer`). Opacity `0.58` is plainly
@@ -104,6 +103,6 @@ recognizable yet subordinate to gameplay state.
 
 ## Responsiveness
 - Primary constraint 390px mobile (compact `108` hexes where the current tile shows `YOU ARE HERE` + `N here` +
-  `Mining`/`Daily cells`/`Offline`). Also scaled at `sm` (`128` hexes, larger typography). Verified: no horizontal
+  `Mining`/`Daily cells`/`Offline`). Not scaled at breakpoints: `140` + `11px` + fitted `66%` are consistent at both breakpoints. Verified: no horizontal
   `overflow-x`, no collision with the fixed bottom nav (`--rs-bottom-nav-clearance`), and the map container is
   `mx-auto` centered with geometry-derived `width`/`height`.

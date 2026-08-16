@@ -3,12 +3,11 @@ import type { LocationDefinition } from "@/game/schemas/locations";
 import { routeSegmentKey, type RoutePoint, type RouteSegmentEndpoints } from "./route-progress";
 
 /** Rendering-only flat-top hex dimensions; these are not world coordinates. */
-export const LOCAL_MAP_HEX_WIDTH = 128;
+export const LOCAL_MAP_HEX_WIDTH = 140;
 export const LOCAL_MAP_HEX_RADIUS = LOCAL_MAP_HEX_WIDTH / 2;
 export const LOCAL_MAP_HEX_HEIGHT = Math.sqrt(3) * LOCAL_MAP_HEX_RADIUS;
 export const LOCAL_MAP_ROUTE_GAP = 30;
 export const LOCAL_MAP_PADDING = 16;
-export const MOBILE_LOCAL_MAP_HEX_WIDTH = 140;
 
 export type LocalMapAxialCoordinate = { q: number; r: number };
 

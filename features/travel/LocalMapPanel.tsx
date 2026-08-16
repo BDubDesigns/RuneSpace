@@ -24,7 +24,6 @@ import {
   buildLocalMapGeometry,
   LOCAL_MAP_GEOMETRY,
   LOCAL_MAP_HEX_WIDTH,
-  MOBILE_LOCAL_MAP_HEX_WIDTH,
   type LocalMapGeometry,
 } from "./local-map-layout";
 import { routeProgressSegment } from "./route-progress";
@@ -154,7 +153,7 @@ function HexButton({
           never truncates; may slightly overhang hex (inline-flex, no max). */}
       <span
         aria-hidden="true"
-        className="rs-map-plate rs-map-plate--state relative z-10 inline-flex max-w-none items-center justify-center whitespace-nowrap px-2 py-0.5 font-display text-[8px] font-bold uppercase tracking-[0.16em] sm:px-2.5 sm:text-[9px]"
+        className="rs-map-plate rs-map-plate--state relative z-10 inline-flex max-w-none items-center justify-center whitespace-nowrap px-2 py-0.5 font-display text-[8px] font-bold uppercase tracking-[0.16em]"
         data-map-state
       >
         {stateLabel}
@@ -163,13 +162,13 @@ function HexButton({
           the SVG identifier (Layer 2) has a clear middle band to occupy */}
       <span
         aria-hidden="true"
-        className="block h-[44px] w-full shrink-0 sm:h-[50px]"
+        className="block h-[44px] w-full shrink-0"
         data-map-artwork-spacer
       />
       {/* Lower cluster: nameplate toward lower portion + population + status */}
       <span className="flex w-full flex-col items-center gap-0.5">
         <span
-          className="rs-map-plate rs-map-plate--nameplate relative z-10 inline-flex max-w-[68%] items-center justify-center break-words px-2 py-0.5 text-center font-display text-[11px] font-bold leading-tight sm:max-w-[64%] sm:text-[13px]"
+          className="rs-map-plate rs-map-plate--nameplate relative z-10 inline-flex max-w-[66%] items-center justify-center break-words px-2 py-0.5 text-center font-display text-[11px] font-bold leading-tight"
           data-map-nameplate
         >
           {name}
@@ -180,7 +179,7 @@ function HexButton({
         {current && populationCount > 0 ? (
           <span
             aria-hidden="true"
-            className="rs-map-plate rs-map-plate--population relative z-10 inline-flex max-w-[58%] items-center justify-center truncate px-1.5 py-0.5 font-display text-[8px] uppercase leading-none tracking-[0.08em] sm:text-[9px]"
+            className="rs-map-plate rs-map-plate--population relative z-10 inline-flex max-w-[58%] items-center justify-center truncate px-1.5 py-0.5 font-display text-[8px] uppercase leading-none tracking-[0.08em]"
             data-map-population
           >
             {populationCount} here
@@ -188,7 +187,7 @@ function HexButton({
         ) : null}
         <span
           aria-hidden="true"
-          className="rs-map-plate rs-map-plate--status relative z-10 inline-flex max-w-[68%] items-center justify-center truncate px-1.5 py-0.5 font-display text-[8px] uppercase leading-none tracking-[0.08em] sm:text-[9px]"
+          className="rs-map-plate rs-map-plate--status relative z-10 inline-flex max-w-[68%] items-center justify-center truncate px-1.5 py-0.5 font-display text-[8px] uppercase leading-none tracking-[0.08em]"
           data-map-status
         >
           {statusLabel}
@@ -612,8 +611,7 @@ export function LocalMapPanel() {
 
   useEffect(() => {
     function updateMapGeometry() {
-      const hexWidth = window.innerWidth < 640 ? MOBILE_LOCAL_MAP_HEX_WIDTH : LOCAL_MAP_HEX_WIDTH;
-      setMapGeometry(buildLocalMapGeometry(undefined, hexWidth));
+      setMapGeometry(buildLocalMapGeometry(undefined, LOCAL_MAP_HEX_WIDTH));
     }
     updateMapGeometry();
     window.addEventListener("resize", updateMapGeometry);
