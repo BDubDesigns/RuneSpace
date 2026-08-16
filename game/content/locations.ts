@@ -30,6 +30,13 @@ const locationDefinitions = [
       mapIconKey: "crash_site_deposit" as const,
       layout: "crash_site" as const,
       localMap: { axial: { q: 0, r: 1 }, label: "Crash Site" },
+      scene: {
+        asset: "/location-scenes/crash-site.webp" as const,
+        width: 1920,
+        height: 480,
+        alt: "Fractured dark hull of a derelict craft resting on wet rocky ground at a sparse outpost, salvage crane nearby",
+        focal: { x: 50, y: 42 } as const,
+      },
     },
   },
   {
@@ -49,6 +56,13 @@ const locationDefinitions = [
       mapIconKey: "processing_yard" as const,
       layout: "processing_yard" as const,
       localMap: { axial: { q: 1, r: 0 }, label: "Processing Yard" },
+      scene: {
+        asset: "/location-scenes/processing-yard.webp" as const,
+        width: 1920,
+        height: 480,
+        alt: "Abandoned industrial yard with rusted conveyors, gantry and hopper on wet ground under overcast sky",
+        focal: { x: 50, y: 45 } as const,
+      },
     },
   },
   {
@@ -63,6 +77,13 @@ const locationDefinitions = [
       mapIconKey: "power_annex" as const,
       layout: "power_annex" as const,
       localMap: { axial: { q: 0, r: 0 }, label: "Power Annex" },
+      scene: {
+        asset: "/location-scenes/power-annex.webp" as const,
+        width: 1920,
+        height: 480,
+        alt: "Compact emergency power bunker with a lit dispenser capsule standing in shallow water, cyan arcane light",
+        focal: { x: 50, y: 46 } as const,
+      },
     },
   },
 ] as const satisfies readonly LocationDefinition[];

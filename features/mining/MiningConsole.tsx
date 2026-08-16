@@ -21,6 +21,7 @@ import { EquipmentPanel } from "./EquipmentPanel";
 import { InventoryPanel } from "./InventoryPanel";
 import { LocalMapPanel } from "@/features/travel/LocalMapPanel";
 import { PowerAnnexClaimPanel } from "@/features/power-annex/PowerAnnexClaimPanel";
+import { LocationSceneHeader } from "@/features/location-scene/LocationSceneHeader";
 
 const RESULT_FEEDBACK_DURATION_MS = 3_600;
 
@@ -261,128 +262,148 @@ export function MiningConsole({ characterName }: { characterName: string }) {
 
   return (
     <div className="space-y-4">
-      <Panel tone="raised">
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <SectionHeader
-            eyebrow={
-              inTransit ? "In transit" : (getLocation(currentLocationId)?.displayName ?? "Location")
-            }
-          >
-            {characterName}
-          </SectionHeader>
-          {atCrashSite && !inTransit ? (
-            <span className="border border-[color:var(--rs-accent-mining)] bg-[color:var(--rs-accent-mining-subtle)] px-2 py-1 font-display text-xs uppercase tracking-wide text-[color:var(--rs-accent-mining)]">
-              Ferrite Shale
-            </span>
+      <Panel tone="raised" className="overflow-hidden !p-0">
+        {/* Responsive industrial scene header integrated into the top of the existing
+            location/activity panel. Same asset on mobile + desktop; frame height
+            is responsive (shallow cinematic strip on mobile, taller on desktop).
+            Transit never shows the destination — location stays authoritative origin
+            until arrival commits. */}
+        {!inTransit
+          ? (() => {
+              const currentLocation = getLocation(currentLocationId);
+              if (!currentLocation) return null;
+              return (
+                <LocationSceneHeader
+                  location={currentLocation}
+                  characterName={characterName}
+                  resourceLabel={atCrashSite ? "Ferrite Shale" : undefined}
+                />
+              );
+            })()
+          : null}
+        <div className="p-5">
+          {/* Eyebrow + resource plate now live inside the scene header; keep only
+              a compact heading row here so the panel doesn't repeat the eyebrow.
+              During transit the location truth is the walk description below. */}
+          {!inTransit ? (
+            <div className="flex flex-wrap items-start justify-between gap-4">
+              <SectionHeader eyebrow={getLocation(currentLocationId)?.displayName ?? "Location"}>
+                Activity
+              </SectionHeader>
+            </div>
+          ) : (
+            <SectionHeader eyebrow="In transit">Journey</SectionHeader>
+          )}
+
+          {inTransit ? (
+            <p className="mt-4 max-w-2xl text-sm leading-relaxed text-[color:var(--rs-text-secondary)]">
+              You are walking between locations. Mining stopped before departure, and no new
+              activity can begin until you arrive. Use the world map below to follow your journey.
+            </p>
+          ) : atCrashSite ? (
+            <>
+              <p className="mt-4 max-w-2xl text-sm leading-relaxed text-[color:var(--rs-text-secondary)]">
+                The damaged ship needs raw material. Cut Ferrite Shale from the infinite crash-site
+                deposit to prepare for repairs.
+              </p>
+              <div className="mt-5 flex flex-wrap gap-3">
+                {active ? (
+                  <ActionButton
+                    intent="danger"
+                    loading={busy}
+                    onClick={() => command(stopMiningAction)}
+                  >
+                    Stop Mining
+                  </ActionButton>
+                ) : (
+                  <ActionButton
+                    intent="mining"
+                    loading={busy}
+                    onClick={() => command(startMiningAction)}
+                  >
+                    Start Mining
+                  </ActionButton>
+                )}
+                <ActionButton
+                  intent="secondary"
+                  disabled={busy}
+                  onClick={() => command(refreshMiningAction)}
+                >
+                  Refresh status
+                </ActionButton>
+              </div>
+              <p className="mt-3 font-display text-sm uppercase tracking-wide text-[color:var(--rs-accent-mining)]">
+                Success chance: {percentage(state.successChanceBps)}%
+              </p>
+              {active && !active.nextAttemptBoosted ? (
+                <p className="mt-3 font-display text-sm uppercase tracking-wide text-[color:var(--rs-text-secondary)]">
+                  NORMAL TIMING · Next attempt: {active.nextAttemptDurationTicks} ticks
+                </p>
+              ) : cutter && cutter.currentCharge > 0 ? (
+                <p className="mt-3 font-display text-sm uppercase tracking-wide text-[color:var(--rs-accent-mining)]">
+                  POWER CELL BOOST · {cutter.currentCharge} / {cutter.maximumCharge}
+                  <span className="ml-2 text-[color:var(--rs-text-secondary)]">
+                    Next attempt: {nextMiningDurationTicks} ticks
+                  </span>
+                </p>
+              ) : null}
+              {active ? (
+                <div className="mt-5">
+                  <StatusMeter
+                    label="Mining attempt"
+                    value={progress}
+                    detail={`${secondsRemaining.toFixed(1)}s to next attempt`}
+                  />
+                </div>
+              ) : (
+                <Feedback>
+                  Mining is idle. Normal attempts take {balance.mining.attemptDurationTicks} ticks /{" "}
+                  {secondsForTicks(balance.mining.attemptDurationTicks)} seconds and resolve on the
+                  server.
+                </Feedback>
+              )}
+            </>
+          ) : (
+            <div className="mt-4">
+              <p className="max-w-2xl text-sm leading-relaxed text-[color:var(--rs-text-secondary)]">
+                {getLocation(currentLocationId)?.description}
+              </p>
+              <Feedback tone="muted">
+                Mining is only available at the Crash Site. The processing equipment is offline and
+                refining is not available yet.
+              </Feedback>
+            </div>
+          )}
+          {showMiningActivity && latestAttempt ? (
+            <LatestAttemptResult
+              attempt={latestAttempt}
+              attemptsResolved={
+                feedback?.sequence === latestAttempt.sequence ? feedback.attempts : recentBatchCount
+              }
+              feedback={feedback?.sequence === latestAttempt.sequence}
+              maximumCharge={balance.items.salvageCutter.maximumCharge}
+            />
+          ) : null}
+          <p aria-live="polite" className="sr-only">
+            {feedback && latestAttempt && feedback.sequence === latestAttempt.sequence
+              ? latestAttemptAnnouncement(
+                  latestAttempt,
+                  feedback.attempts,
+                  balance.items.salvageCutter.maximumCharge,
+                )
+              : ""}
+          </p>
+          {showMiningActivity && message ? (
+            <Feedback tone={state.stoppingReason && !active ? "danger" : "muted"}>
+              {message}
+            </Feedback>
+          ) : null}
+          {showMiningActivity && recovery ? (
+            <ActionButton className="mt-3" disabled={busy} intent="secondary" onClick={recovery}>
+              Retry status check
+            </ActionButton>
           ) : null}
         </div>
-
-        {inTransit ? (
-          <p className="mt-4 max-w-2xl text-sm leading-relaxed text-[color:var(--rs-text-secondary)]">
-            You are walking between locations. Mining stopped before departure, and no new activity
-            can begin until you arrive. Use the world map below to follow your journey.
-          </p>
-        ) : atCrashSite ? (
-          <>
-            <p className="mt-4 max-w-2xl text-sm leading-relaxed text-[color:var(--rs-text-secondary)]">
-              The damaged ship needs raw material. Cut Ferrite Shale from the infinite crash-site
-              deposit to prepare for repairs.
-            </p>
-            <div className="mt-5 flex flex-wrap gap-3">
-              {active ? (
-                <ActionButton
-                  intent="danger"
-                  loading={busy}
-                  onClick={() => command(stopMiningAction)}
-                >
-                  Stop Mining
-                </ActionButton>
-              ) : (
-                <ActionButton
-                  intent="mining"
-                  loading={busy}
-                  onClick={() => command(startMiningAction)}
-                >
-                  Start Mining
-                </ActionButton>
-              )}
-              <ActionButton
-                intent="secondary"
-                disabled={busy}
-                onClick={() => command(refreshMiningAction)}
-              >
-                Refresh status
-              </ActionButton>
-            </div>
-            <p className="mt-3 font-display text-sm uppercase tracking-wide text-[color:var(--rs-accent-mining)]">
-              Success chance: {percentage(state.successChanceBps)}%
-            </p>
-            {active && !active.nextAttemptBoosted ? (
-              <p className="mt-3 font-display text-sm uppercase tracking-wide text-[color:var(--rs-text-secondary)]">
-                NORMAL TIMING · Next attempt: {active.nextAttemptDurationTicks} ticks
-              </p>
-            ) : cutter && cutter.currentCharge > 0 ? (
-              <p className="mt-3 font-display text-sm uppercase tracking-wide text-[color:var(--rs-accent-mining)]">
-                POWER CELL BOOST · {cutter.currentCharge} / {cutter.maximumCharge}
-                <span className="ml-2 text-[color:var(--rs-text-secondary)]">
-                  Next attempt: {nextMiningDurationTicks} ticks
-                </span>
-              </p>
-            ) : null}
-            {active ? (
-              <div className="mt-5">
-                <StatusMeter
-                  label="Mining attempt"
-                  value={progress}
-                  detail={`${secondsRemaining.toFixed(1)}s to next attempt`}
-                />
-              </div>
-            ) : (
-              <Feedback>
-                Mining is idle. Normal attempts take {balance.mining.attemptDurationTicks} ticks /{" "}
-                {secondsForTicks(balance.mining.attemptDurationTicks)} seconds and resolve on the
-                server.
-              </Feedback>
-            )}
-          </>
-        ) : (
-          <div className="mt-4">
-            <p className="max-w-2xl text-sm leading-relaxed text-[color:var(--rs-text-secondary)]">
-              {getLocation(currentLocationId)?.description}
-            </p>
-            <Feedback tone="muted">
-              Mining is only available at the Crash Site. The processing equipment is offline and
-              refining is not available yet.
-            </Feedback>
-          </div>
-        )}
-        {showMiningActivity && latestAttempt ? (
-          <LatestAttemptResult
-            attempt={latestAttempt}
-            attemptsResolved={
-              feedback?.sequence === latestAttempt.sequence ? feedback.attempts : recentBatchCount
-            }
-            feedback={feedback?.sequence === latestAttempt.sequence}
-            maximumCharge={balance.items.salvageCutter.maximumCharge}
-          />
-        ) : null}
-        <p aria-live="polite" className="sr-only">
-          {feedback && latestAttempt && feedback.sequence === latestAttempt.sequence
-            ? latestAttemptAnnouncement(
-                latestAttempt,
-                feedback.attempts,
-                balance.items.salvageCutter.maximumCharge,
-              )
-            : ""}
-        </p>
-        {showMiningActivity && message ? (
-          <Feedback tone={state.stoppingReason && !active ? "danger" : "muted"}>{message}</Feedback>
-        ) : null}
-        {showMiningActivity && recovery ? (
-          <ActionButton className="mt-3" disabled={busy} intent="secondary" onClick={recovery}>
-            Retry status check
-          </ActionButton>
-        ) : null}
       </Panel>
       <LocalMapPanel />
       <PowerAnnexClaimPanel />
