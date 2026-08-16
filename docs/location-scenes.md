@@ -42,24 +42,24 @@ Aspect is 4:1 panoramic (2508:627 → 1920:480). No baked UI, labels, flavor tex
 
 ## Responsive presentation
 
-One `LocationSceneHeader` renders the same asset at both breakpoints; only the viewport height changes:
+One `LocationSceneHeader` renders the same asset at both breakpoints; only the viewport height changes. Mobile stays visually unchanged per spec.
 
-- **Mobile** — `h-[126px]` (~31.5% of intrinsic height at 4:1). Wide, shallow scenic strip spanning the useful width of the location/activity panel. Vertical cost is restrained so primary gameplay stays near the top at the canonical 390px viewport.
+- **Mobile** — `h-[126px]` (~31.5% of intrinsic height at 4:1). Wide, shallow scenic strip spanning the useful width of the location/activity panel. Vertical cost is restrained so primary gameplay stays near the top at the canonical 390px viewport. At 390px the usable panel is ~366px, so ~366×126 is ~2.9:1 — `object-cover` crops sides but shows the full vertical extent.
 - **`sm` (≥640px)** — `h-[168px]` (~35%). Slightly taller so the wide composition breathes.
-- **Desktop / `lg` (≥1024px)** — `h-[196px]` (~40.8%). Somewhat taller scenic viewport revealing more top/bottom environmental context (more sky + foreground puddles/ground) while retaining the same wide composition. Not a wider crop of the mobile strip — more vertical scene, same horizontal framing, same asset, same `object-position` focal.
+- **Desktop / `lg` (≥1024px)** — `h-[252px]` (~52.5%) — noticeably taller to genuinely reveal more top/bottom environmental context on the wide desktop column. GameShell is `max-w-7xl` with a `20rem` aside (~890px usable column vs 4:1 source), so ~890×252 is ~3.5:1 and `object-cover` keeps sides while revealing sky + foreground rather than cropping them (the prior ~890×196 = ~4.5:1 cropped top/bottom; mobile already showed the full height). Same asset, same `object-position` focal, no per-location branches.
 
-Cropping is via `object-cover` + `object-position: focal.x% focal.y%`. The scene itself is not zoomed aggressively into its center; mobile preserves a strong horizontal sense of place. `sizes="(max-width:640px) 100vw, 640px"` keeps delivery efficient. No lazy/eager mis-wiring: the current-location scene loads immediately with its panel; the other two locations' scenes are not eagerly fetched on the current page.
+Cropping is via `object-cover` + `object-position: focal.x% focal.y%`. The scene itself is not zoomed aggressively into its center; mobile preserves a strong horizontal sense of place. `sizes="(max-width: 640px) 100vw, (max-width: 1024px) 92vw, 890px"` reflects the real desktop column (~890px usable, not a 640px guess) so `next/image` picks a correctly-sized derivative and does not stretch a 640w source on 1× desktop. The 1920 masters have headroom. No lazy/eager mis-wiring: the current-location scene loads immediately with its panel; the other two locations' scenes are not eagerly fetched on the current page.
 
 ## Scene-header composition (real UI, not baked pixels)
 
-All chrome is HTML/CSS rendered over/around the image:
+All chrome is HTML/CSS rendered over/around the image. All scrim/hairline/plate translucency values are owned by `app/globals.css` (`--rs-scene-*` / `--rs-plate-*` tokens — see `docs/design-system.md`'s ownership rule) and consumed by `features/location-scene/LocationSceneHeader.tsx`; the component holds no literal `rgb(...)` or `rgba(...)` color recipes.
 
-- **Upper-left** — current-location eyebrow (`CRASH SITE` / `ABANDONED PROCESSING YARD` / `DEWHAT? EMERGENCY POWER ANNEX`) as a `rs-map-plate--state` smoked plaque, fitted, never truncated or baked into art.
-- **Upper-right** — contextual plate only where meaningful (`FERRITE SHALE` at Crash Site, otherwise omitted). Mining's resource context stays visible over the scene rather than below it.
-- **Middle band** — the scene photograph itself (the main visual, with a from-top/to-bottom dark blend `0.22→0.72` so plates feel mounted and the image fades into the raised panel).
-- **Lower plate/band** — character name (`star drifter` etc.) in the dark integrated lower band at the scene boundary (`rs-location-scene-lower`), `border-t border-structural`, not raster text.
-- **Framing** — thin structural `border-b border-structural`, chamfer via inherited `rs-bevel` world, restrained cyan top hairline + faint amber bottom accent (token-driven, low-opacity). No full-bleed hero card, no landing-page treatment, no parallax/particles/video.
-- **Blend** — subtle vertical scrim + top/bottom hairlines tie the scene into the surrounding `bg-[var(--rs-surface-raised)]` panel.
+- **Upper-left** — current-location eyebrow (`CRASH SITE` / `ABANDONED PROCESSING YARD` / `DEWHAT? EMERGENCY POWER ANNEX`) as a `rs-map-plate--state` smoked plaque driven by `--rs-scene-plate-top` / `--rs-scene-plate-bottom` (50% translucency so scene shows through), fitted.
+- **Bottom-right** — contextual pill only where meaningful (`FERRITE SHALE` at Crash Site, `POWER CELL` at the Annex), `bg-[var(--rs-surface-panel)]` solid to match the character nameplate, yellow/orange `border-[var(--rs-accent-mining)]`, square, bottom-anchored so long eyebrows don't clip.
+- **Middle band** — the scene photograph itself with a vertical scrim `from-[var(--rs-scene-scrim-top)]` → `to-[var(--rs-scene-scrim-bottom)]` (`0.22→0.72`) and `aria-hidden` decorative layers.
+- **Lower-left over image** — character name (`star drifter` etc.) as an opaque `bg-[var(--rs-surface-panel)]` plate clipped with a tent angle (`clip-path: polygon(0 0, calc(100% - 14px) 0, 100% 100%, 0 100%)`), `truncate` on overflow.
+- **Framing** — thin structural `border-b border-[var(--rs-border-structural)]`, cyan top hairline `bg-[var(--rs-scene-hairline-cyan)]` + amber bottom `bg-[var(--rs-scene-hairline-amber)]` (each a `linear-gradient` token). No full-bleed hero card, no landing-page treatment, no parallax/particles/video.
+- **Blend** — vertical scrim + hairlines tie the scene into the surrounding `bg-[var(--rs-surface-raised)]` panel.
 
 ## Placement and gameplay hierarchy
 

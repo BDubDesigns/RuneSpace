@@ -42,6 +42,25 @@
   --rs-plate-border-inner: rgb(0 0 0 / 0.34);
   --rs-plate-highlight: rgb(255 255 255 / 0.07);
   --rs-plate-shadow: rgb(0 0 0 / 0.4);
+  /* Location scene header tokens (Issue #78). All literal rgba for scrim/hairlines
+     lives here so app/globals.css owns the theme and features consume tokens.
+     Values match the previously inlined literals exactly. */
+  --rs-scene-scrim-top: rgb(5 9 15 / 0.22);
+  --rs-scene-scrim-bottom: rgb(5 9 15 / 0.72);
+  --rs-scene-hairline-cyan: linear-gradient(
+    90deg,
+    transparent,
+    rgb(75 216 245 / 0.55),
+    transparent
+  );
+  --rs-scene-hairline-amber: linear-gradient(
+    90deg,
+    transparent,
+    rgb(245 196 81 / 0.45),
+    transparent
+  );
+  --rs-scene-plate-top: rgb(18 32 46 / 0.5);
+  --rs-scene-plate-bottom: rgb(10 22 34 / 0.5);
   --rs-space-1: 0.25rem;
   --rs-space-2: 0.5rem;
   --rs-space-3: 0.75rem;
