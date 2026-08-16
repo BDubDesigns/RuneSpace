@@ -101,7 +101,9 @@ export async function expectElementsInsideHexes(
         // the "YOU ARE HERE" treatment.
         const bottomInside = corners.slice(2).every((corner) => pointInPolygon(corner, polygon));
         const hexTopY = Math.min(...polygon.map((p) => p.y));
-        const topOk = corners.slice(0, 2).every((corner) => pointInPolygon(corner, polygon) || corner.y >= hexTopY - 8);
+        const topOk = corners
+          .slice(0, 2)
+          .every((corner) => pointInPolygon(corner, polygon) || corner.y >= hexTopY - 8);
         return {
           label: plate.textContent?.trim(),
           inside: bottomInside && topOk,

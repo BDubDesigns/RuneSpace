@@ -160,11 +160,7 @@ function HexButton({
       </span>
       {/* Dedicated artwork zone spacer — keeps state high and nameplate low so
           the SVG identifier (Layer 2) has a clear middle band to occupy */}
-      <span
-        aria-hidden="true"
-        className="block h-[44px] w-full shrink-0"
-        data-map-artwork-spacer
-      />
+      <span aria-hidden="true" className="block h-[44px] w-full shrink-0" data-map-artwork-spacer />
       {/* Lower cluster: nameplate toward lower portion + population + status */}
       <span className="flex w-full flex-col items-center gap-0.5">
         <span

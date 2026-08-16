@@ -31,7 +31,7 @@ The decorative asset must conform to these zones; UI is never moved to accommoda
   Each hex has `<clipPath id="hex-clip-<id>">` built from `hexPoints`, then `<image href="…"`
   `x/y/width=0.72W / height=0.68H` (artwork zone viewport), `preserveAspectRatio="xMidYMid meet"` and
   `opacity="0.58"`. With tight-alpha-cropped sources (512 long-edge lossless WebP), the visibly painted
-  width is ~71.6% (Crash Site), 61.8% (Processing Yard), 64.2% (Power Annex) at the unified 140 — inside the relaxed 55–75% invariant — inside the relaxed 55–75% invariant. The zone is centered slightly above hex
+  width is ~71.6% (Crash Site), 61.8% (Processing Yard), 64.2% (Power Annex) at the unified 140 — inside the relaxed 55–75% invariant. The zone is centered slightly above hex
   center (~6% H offset) so the lower nameplate cluster overlaps minimally. Subordinate to state/name/status
   plates, does not change bounds, does not overlap routes, does not hide `data-route-progress`.
 - **Layer 3 — nameplate / status / population (HexButton):** `justify-between` with `py-1.5`; state **plate** pinned
