@@ -60,40 +60,34 @@ export function LocationSceneHeader({
         {/* Upper plates: eyebrow left, resource/context plate right. Real UI over scene. */}
         <div className="pointer-events-none absolute inset-x-0 top-0 flex items-start justify-between gap-2 p-2 sm:p-2.5">
           <span
-            className="rs-map-plate rs-map-plate--state inline-flex max-w-[58%] items-center whitespace-nowrap px-2 py-0.5 font-display text-[10px] font-bold uppercase tracking-[0.14em] sm:px-2.5 sm:text-[11px]"
+            className="rs-map-plate rs-map-plate--state inline-flex max-w-[58%] items-center whitespace-nowrap px-2 py-0.5 font-display text-xs font-bold uppercase tracking-[0.14em] sm:px-2.5 sm:text-sm"
+            style={
+              {
+                ["--rs-plate-surface-top" as unknown as string]: "rgb(18 32 46 / 0.5)",
+                ["--rs-plate-surface-bottom" as unknown as string]: "rgb(10 22 34 / 0.5)",
+              } as React.CSSProperties
+            }
             data-scene-eyebrow
           >
             {location.displayName.toUpperCase()}
           </span>
           {resourceLabel ? (
             <span
-              className="rs-map-plate inline-flex max-w-[42%] items-center justify-center whitespace-nowrap border-[rgba(245,196,81,0.28)] bg-[linear-gradient(180deg,rgba(245,196,81,0.12),rgba(91,70,18,0.22))] px-2 py-0.5 font-display text-[10px] font-bold uppercase tracking-wide text-[color:var(--rs-accent-mining)] sm:px-2.5 sm:text-[11px]"
+              className="inline-flex max-w-[42%] items-center justify-center whitespace-nowrap border border-[color:var(--rs-accent-mining)] bg-[rgba(245,196,81,0.12)] px-2 py-0.5 font-display text-[10px] font-bold uppercase tracking-wide text-[color:var(--rs-accent-mining)] sm:px-2.5 sm:text-[11px]"
               data-scene-resource
             >
               {resourceLabel}
             </span>
           ) : null}
         </div>
-      </div>
-      {/* Lower integrated character band at scene boundary — dark plate, not baked pixels.
-          Sits flush to the viewport bottom edge and bleeds into the panel's raised surface. */}
-      <div
-        className="rs-location-scene-lower relative flex items-center border-t border-[color:var(--rs-border-structural)] bg-[linear-gradient(180deg,rgba(9,21,34,0.98),rgba(5,14,24,0.98))] px-3 py-2 sm:px-4 sm:py-2.5"
-        data-scene-lower
-      >
-        <span
-          className="pointer-events-none absolute inset-x-0 top-0 h-px bg-[linear-gradient(90deg,transparent,rgba(75,216,245,0.18),transparent)]"
-          aria-hidden="true"
-        />
-        <p
-          className="font-display text-sm font-semibold tracking-tight text-[color:var(--rs-text-primary)] sm:text-[15px]"
+        {/* Character name — opaque plate over the bottom-left of the image, right edge
+            angled to match concept art. Real UI, not baked pixels. */}
+        <div
+          className="absolute bottom-0 left-0 max-w-[72%] border-y border-r border-[color:var(--rs-border-structural)] bg-[color:var(--rs-surface-panel)] px-3 py-1.5 pr-6 font-display text-sm font-semibold tracking-tight text-[color:var(--rs-text-primary)] [clip-path:polygon(0_0,calc(100%_-_14px)_0,100%_100%,0_100%)] sm:max-w-[62%] sm:px-4 sm:py-2 sm:pr-9 sm:text-[15px] sm:[clip-path:polygon(0_0,calc(100%_-_18px)_0,100%_100%,0_100%)]"
           data-scene-character
         >
           {characterName}
-        </p>
-        <span className="ml-auto hidden font-display text-[10px] uppercase tracking-[0.16em] text-[color:var(--rs-text-muted)] sm:inline">
-          location
-        </span>
+        </div>
       </div>
     </div>
   );

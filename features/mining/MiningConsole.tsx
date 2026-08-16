@@ -272,11 +272,14 @@ export function MiningConsole({ characterName }: { characterName: string }) {
           ? (() => {
               const currentLocation = getLocation(currentLocationId);
               if (!currentLocation) return null;
+              const atPowerAnnex = currentLocationId === LOCATION_IDS.emergencyPowerAnnex;
               return (
                 <LocationSceneHeader
                   location={currentLocation}
                   characterName={characterName}
-                  resourceLabel={atCrashSite ? "Ferrite Shale" : undefined}
+                  resourceLabel={
+                    atCrashSite ? "Ferrite Shale" : atPowerAnnex ? "Power Cell" : undefined
+                  }
                 />
               );
             })()
