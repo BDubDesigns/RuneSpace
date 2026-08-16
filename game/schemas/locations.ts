@@ -35,6 +35,21 @@ export const LocationDefinitionSchema = z
           label: z.string().min(1),
         })
         .strict(),
+      scene: z
+        .object({
+          asset: z.string().regex(/^\/location-scenes\/.+\.webp$/),
+          width: z.number().int().positive(),
+          height: z.number().int().positive(),
+          alt: z.string().min(1),
+          focal: z
+            .object({
+              x: z.number().min(0).max(100),
+              y: z.number().min(0).max(100),
+            })
+            .strict()
+            .optional(),
+        })
+        .strict(),
     }),
   })
   .strict();

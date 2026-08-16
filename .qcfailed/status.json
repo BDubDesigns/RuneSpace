@@ -2,15 +2,20 @@
   "schemaVersion": 1,
   "projectSlug": "runespace",
   "workState": "active",
-  "currentFocus": "Continue expanding RuneSpace through focused product slices after shipping deliberate per-character portrait selection.",
+  "currentFocus": "Give each location a memorable environmental identity via a reusable, registry-backed scene header integrated into the current-location panel.",
   "latestCompleted": {
-    "summary": "Added deliberate per-character portrait selection across character creation, owned-character management, and public profiles.",
-    "date": "2026-08-06",
-    "url": "https://github.com/BDubDesigns/RuneSpace/pull/73"
+    "summary": "Refined LocalMapPanel with hybrid plated-signage location identity and tighter 390px presentation.",
+    "date": "2026-08-16",
+    "url": "https://github.com/BDubDesigns/RuneSpace/pull/79"
   },
-  "nextStep": "Choose the next approved RuneSpace product issue and run it through the normal one-issue, one-PR review loop.",
-  "lastMeaningfulUpdate": "2026-08-06",
+  "nextStep": "Land the reusable location scene header for Crash Site, Processing Yard, and Power Annex (#78) and verify the 390px and desktop presentation.",
+  "lastMeaningfulUpdate": "2026-08-16",
   "highlights": [
+    {
+      "summary": "Refined LocalMapPanel with hybrid plated-signage location identity and tighter 390px presentation.",
+      "date": "2026-08-16",
+      "url": "https://github.com/BDubDesigns/RuneSpace/pull/79"
+    },
     {
       "summary": "Shipped a shared portrait picker, server-authoritative per-character selection, and public profile presentation.",
       "date": "2026-08-06",
@@ -23,8 +28,8 @@
     }
   ],
   "currentChange": {
-    "summary": "Refine LocalMapPanel with hybrid plated-signage location identity (#53).",
-    "stage": "preview",
-    "pullRequestNumber": 79
+    "summary": "Add reusable active-location scene artwork for the three current locations (#78).",
+    "stage": "merge-ready",
+    "pullRequestNumber": 80
   }
 }
