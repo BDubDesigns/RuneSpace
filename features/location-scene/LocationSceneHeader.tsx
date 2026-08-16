@@ -85,7 +85,7 @@ export function LocationSceneHeader({
         </div>
         {resourceLabel ? (
           <span
-            className="absolute bottom-2 right-2 inline-flex max-w-[40%] items-center justify-center whitespace-nowrap border border-[color:var(--rs-accent-mining)] bg-[linear-gradient(180deg,rgba(245,196,81,0.12),rgba(91,70,18,0.22))] px-2 py-0.5 font-display text-[10px] font-bold uppercase tracking-wide text-[color:var(--rs-accent-mining)] sm:bottom-2.5 sm:right-2.5 sm:max-w-[36%] sm:px-2.5 sm:text-[11px]"
+            className="absolute bottom-2 right-2 inline-flex max-w-[40%] items-center justify-center whitespace-nowrap border border-[color:var(--rs-accent-mining)] bg-[color:var(--rs-surface-panel)] px-2 py-0.5 font-display text-[10px] font-bold uppercase tracking-wide text-[color:var(--rs-accent-mining)] sm:bottom-2.5 sm:right-2.5 sm:max-w-[36%] sm:px-2.5 sm:text-[11px]"
             data-scene-resource
           >
             {resourceLabel}
