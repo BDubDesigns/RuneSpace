@@ -27,12 +27,11 @@ import {
   type LocalMapGeometry,
 } from "./local-map-layout";
 import { routeProgressSegment } from "./route-progress";
+import { resolveMapIdentifierAsset } from "./local-map-identifiers";
 
 const WALK_SECONDS = Math.round(
   (getEffectiveGameBalance().travel.adjacentWalkDurationTicks * GAME_TICK_MS) / 1000,
 );
-
-const MOBILE_LOCAL_MAP_HEX_WIDTH = 108;
 
 /** Flat-top hex vertex points as an SVG polygon string. */
 function hexPoints(cx: number, cy: number, w: number): string {
@@ -47,6 +46,38 @@ function hexPoints(cx: number, cy: number, w: number): string {
   ]
     .map(([x, y]) => `${x},${y}`)
     .join(" ");
+}
+
+/** Inset hex points scaled toward the center — for plated seams and rivets. */
+function hexInsetPoints(cx: number, cy: number, w: number, scale: number): string {
+  const h = w * (Math.sqrt(3) / 2);
+  const verts: [number, number][] = [
+    [cx - w / 4, cy - h / 2],
+    [cx + w / 4, cy - h / 2],
+    [cx + w / 2, cy],
+    [cx + w / 4, cy + h / 2],
+    [cx - w / 4, cy + h / 2],
+    [cx - w / 2, cy],
+  ];
+  return verts.map(([x, y]) => `${cx + (x - cx) * scale},${cy + (y - cy) * scale}`).join(" ");
+}
+
+function hexInsetVertices(
+  cx: number,
+  cy: number,
+  w: number,
+  scale: number,
+): { x: number; y: number }[] {
+  const h = w * (Math.sqrt(3) / 2);
+  const verts: [number, number][] = [
+    [cx - w / 4, cy - h / 2],
+    [cx + w / 4, cy - h / 2],
+    [cx + w / 2, cy],
+    [cx + w / 4, cy + h / 2],
+    [cx - w / 4, cy + h / 2],
+    [cx - w / 2, cy],
+  ];
+  return verts.map(([x, y]) => ({ x: cx + (x - cx) * scale, y: cy + (y - cy) * scale }));
 }
 
 // ---------------------------------------------------------------------------
@@ -116,42 +147,55 @@ function HexButton({
       disabled={disabled}
       onClick={onSelect}
       style={style}
-      className="rs-focus group absolute z-10 flex flex-col items-center justify-center gap-0.5 text-center outline-none transition disabled:cursor-not-allowed disabled:opacity-70 motion-safe:transition-transform motion-safe:hover:scale-[1.025]"
+      className="rs-focus group absolute z-10 flex flex-col items-center justify-between py-1.5 text-center outline-none transition disabled:cursor-not-allowed disabled:opacity-70 motion-safe:transition-transform motion-safe:hover:scale-[1.025]"
     >
+      {/* Zone 1: Top state plate — mounted plaque, fitted. YOU ARE HERE
+          never truncates; may slightly overhang hex (inline-flex, no max). */}
       <span
         aria-hidden="true"
-        className="relative z-10 font-display text-[9px] uppercase tracking-[0.18em] text-[color:var(--rs-text-secondary)] sm:text-[10px]"
+        className="rs-map-plate rs-map-plate--state relative z-10 inline-flex max-w-none items-center justify-center whitespace-nowrap px-2 py-0.5 font-display text-[8px] font-bold uppercase tracking-[0.16em]"
+        data-map-state
       >
         {stateLabel}
       </span>
-      <span className="relative z-10 max-w-[80%] font-display text-[12px] font-bold leading-tight text-[color:var(--rs-text-primary)] sm:text-sm">
-        {name}
-      </span>
-      <span id={`loc-desc-${locationId}`} className="sr-only">
-        {description}
-      </span>
-      {current && populationCount > 0 ? (
+      {/* Dedicated artwork zone spacer — keeps state high and nameplate low so
+          the SVG identifier (Layer 2) has a clear middle band to occupy */}
+      <span aria-hidden="true" className="block h-[44px] w-full shrink-0" data-map-artwork-spacer />
+      {/* Lower cluster: nameplate toward lower portion + population + status */}
+      <span className="flex w-full flex-col items-center gap-0.5">
+        <span
+          className="rs-map-plate rs-map-plate--nameplate relative z-10 inline-flex max-w-[66%] items-center justify-center break-words px-2 py-0.5 text-center font-display text-[11px] font-bold leading-tight"
+          data-map-nameplate
+        >
+          {name}
+        </span>
+        <span id={`loc-desc-${locationId}`} className="sr-only">
+          {description}
+        </span>
+        {current && populationCount > 0 ? (
+          <span
+            aria-hidden="true"
+            className="rs-map-plate rs-map-plate--population relative z-10 inline-flex max-w-[58%] items-center justify-center truncate px-1.5 py-0.5 font-display text-[8px] uppercase leading-none tracking-[0.08em]"
+            data-map-population
+          >
+            {populationCount} here
+          </span>
+        ) : null}
         <span
           aria-hidden="true"
-          className="relative z-10 max-w-[64%] truncate border border-[color:var(--rs-accent-primary)] bg-[color:var(--rs-accent-primary-subtle)] px-1 py-0.5 font-display text-[8px] uppercase leading-none tracking-[0.08em] text-[color:var(--rs-accent-primary)] sm:text-[9px]"
-          data-map-population
+          className="rs-map-plate rs-map-plate--status relative z-10 inline-flex max-w-[68%] items-center justify-center truncate px-1.5 py-0.5 font-display text-[8px] uppercase leading-none tracking-[0.08em]"
+          data-map-status
         >
-          {populationCount} here
+          {statusLabel}
         </span>
-      ) : null}
-      <span
-        aria-hidden="true"
-        className="relative z-10 max-w-[76%] truncate border border-[color:var(--rs-item-plate-border)] bg-[color:var(--rs-item-plate-surface)] px-1 py-0.5 font-display text-[8px] uppercase leading-none tracking-[0.08em] text-[color:var(--rs-text-secondary)] sm:text-[9px]"
-        data-map-status
-      >
-        {statusLabel}
       </span>
     </button>
   );
 }
 
 // ---------------------------------------------------------------------------
-// SVG visual layer: hex outlines, state markers, and the three routes
+// SVG visual layer: hex chassis (Layer 1), decorative identifiers (Layer 2),
+// routes + progress — all without changing polygon bounds / touch targets
 // ---------------------------------------------------------------------------
 
 function HexMapSvg({
@@ -172,6 +216,7 @@ function HexMapSvg({
   travelDestinationLocationId?: (typeof LOCATION_IDS)[keyof typeof LOCATION_IDS];
 }) {
   const hexWidth = geometry.hexWidth;
+  const hexHeight = geometry.hexHeight;
   const hexFill = (current: boolean, selected: boolean) =>
     current
       ? "fill-[color:var(--rs-accent-primary-subtle)] stroke-[color:var(--rs-accent-primary)]"
@@ -207,19 +252,99 @@ function HexMapSvg({
       viewBox={`0 0 ${geometry.width} ${geometry.height}`}
       preserveAspectRatio="xMidYMid meet"
     >
-      {/* Hexes first (routes are drawn after for contrast). */}
+      {/* Hexes: Layer 1 (chassis) + Layer 2 (decorative identifier) */}
       {geometry.layouts.map((layout) => {
         const current = layout.locationId === currentLocationId;
         const selected = layout.locationId === selectedLocationId;
+        const cx = layout.center.x;
+        const cy = layout.center.y;
+        const location = getLocation(layout.locationId);
+        const identifierHref = location
+          ? resolveMapIdentifierAsset(location.presentation.mapIconKey)
+          : undefined;
+        // Visual correction: dedicated artwork zone between top state label and
+        // lower nameplate. Substantially larger than 0.60W×0.62H@0.32 — now
+        // 0.72W×0.68H with contain, opacity 0.58, centered slightly above hex
+        // center so the lower nameplate (pushed low via justify-between + spacer)
+        // overlaps minimally. At MOBILE 140 / desktop 128 the tight-cropped 512
+        // WebPs paint at ~71.5% / 61.7% / 64% (crash/processing/power) — plainly
+        // recognizable yet subordinate to state/name/status plates. Not full-bleed.
+        const identifierW = hexWidth * 0.72;
+        const identifierH = hexHeight * 0.68;
+        const identifierX = cx - identifierW / 2;
+        // Center the artwork in the dedicated middle band: slightly above hex
+        // center (~6% H) so the lower nameplate zone stays clear.
+        const identifierY = cy - identifierH / 2 - hexHeight * 0.06;
+        const rivets = hexInsetVertices(cx, cy, hexWidth, 0.91);
+        const clipId = `hex-clip-${layout.locationId.replace(/[^a-zA-Z0-9_-]/g, "-")}`;
+
         return (
           <g key={layout.locationId}>
+            {/* Layer 1: shared plated chassis — outer hex fill unchanged */}
             <polygon
               data-map-hex={layout.locationId}
-              points={hexPoints(layout.center.x, layout.center.y, hexWidth)}
+              points={hexPoints(cx, cy, hexWidth)}
               className={hexFill(current, selected)}
               strokeWidth="3"
             />
-            {selected && !current ? selectedMarker(layout.center.x, layout.center.y) : null}
+            {/* Inset panel seam — subtle inner border */}
+            <polygon
+              points={hexInsetPoints(cx, cy, hexWidth, 0.92)}
+              fill="none"
+              stroke="var(--rs-border-subtle)"
+              strokeWidth="1"
+              opacity="0.55"
+              strokeOpacity="0.7"
+            />
+            {/* Secondary inner line for worn plating depth */}
+            <polygon
+              points={hexInsetPoints(cx, cy, hexWidth, 0.88)}
+              fill="none"
+              stroke="var(--rs-border-structural)"
+              strokeWidth="0.7"
+              opacity="0.28"
+            />
+            {/* Rivets — tiny circles at inset corners, restrained */}
+            <g aria-hidden="true" opacity="0.42">
+              {rivets.map((pt, idx) => (
+                <circle
+                  key={`${layout.locationId}-rivet-${idx}`}
+                  data-map-rivet
+                  cx={pt.x}
+                  cy={pt.y}
+                  r={Math.max(1, hexWidth * 0.012)}
+                  fill="var(--rs-border-structural)"
+                  stroke="var(--rs-surface-raised)"
+                  strokeWidth="0.5"
+                  opacity="0.9"
+                />
+              ))}
+            </g>
+
+            {/* Layer 2: decorative identifier — clipped to hex, dedicated zone */}
+            {identifierHref ? (
+              <g aria-hidden="true">
+                <defs>
+                  <clipPath id={clipId}>
+                    <polygon points={hexPoints(cx, cy, hexWidth)} />
+                  </clipPath>
+                </defs>
+                <g clipPath={`url(#${clipId})`}>
+                  <image
+                    href={identifierHref}
+                    x={identifierX}
+                    y={identifierY}
+                    width={identifierW}
+                    height={identifierH}
+                    preserveAspectRatio="xMidYMid meet"
+                    opacity="0.58"
+                    aria-hidden="true"
+                  />
+                </g>
+              </g>
+            ) : null}
+
+            {selected && !current ? selectedMarker(cx, cy) : null}
           </g>
         );
       })}
@@ -285,13 +410,13 @@ function ChevronIcon({ className = "" }: { className?: string }) {
  * tile's hex button shows the aria-hidden count indicator; this header
  * control reveals the full public list (character name, derived level, owner
  * name) fetched from the server's narrow read boundary. The visible label is
- * "Characters here" — the entries are characters, not unique players, because
+ * \"Characters here\" — the entries are characters, not unique players, because
  * multiple listed characters may share one owner — with a compact count badge
  * and a disclosure chevron. The accessible label states the action truthfully
- * ("Show N characters here" / "Hide characters here").
+ * (\"Show N characters here\" / \"Hide characters here\").
  *
  * This is a deliberately compact control (not the ActionButton primitive,
- * whose fixed `px-4 gap-2` metrics would push the panel header's "World map"
+ * whose fixed `px-4 gap-2` metrics would push the panel header's \"World map\"
  * heading onto a second line and break the yard page's no-scroll layout
  * contract at the canonical viewport). It reuses the secondary intent tokens
  * and the shared rs-focus/rs-bevel treatments.
@@ -347,7 +472,7 @@ function LocationPopulationTrigger({
  * public owner name sits underneath, the derived overall level is a compact
  * badge, and a chevron communicates that the row opens a profile. The row of
  * the character whose profile is open stays visibly selected (gold accent
- * border, tinted background, and a "Viewing" indicator — never color alone),
+ * border, tinted background, and a \"Viewing\" indicator — never color alone),
  * transfers immediately when another row is selected, and unselects when the
  * panel closes or is invalidated.
  *
@@ -482,8 +607,7 @@ export function LocalMapPanel() {
 
   useEffect(() => {
     function updateMapGeometry() {
-      const hexWidth = window.innerWidth < 640 ? MOBILE_LOCAL_MAP_HEX_WIDTH : LOCAL_MAP_HEX_WIDTH;
-      setMapGeometry(buildLocalMapGeometry(undefined, hexWidth));
+      setMapGeometry(buildLocalMapGeometry(undefined, LOCAL_MAP_HEX_WIDTH));
     }
     updateMapGeometry();
     window.addEventListener("resize", updateMapGeometry);
@@ -692,9 +816,9 @@ export function LocalMapPanel() {
         to walk there.
       </p>
 
-      {/* Three flat-top hexes form a triangle. The SVG renders complete hex
-          outlines and all approved routes; native buttons overlay each hex for
-          semantics and text labels. */}
+      {/* Three flat-top hexes form a triangle. The SVG renders plated chassis,
+          decorative identifiers, and all approved routes; native buttons overlay
+          each hex for semantics and text labels. */}
       <div
         className="relative mx-auto mt-4"
         role="group"

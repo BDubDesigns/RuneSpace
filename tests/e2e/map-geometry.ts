@@ -83,12 +83,32 @@ export async function expectElementsInsideHexes(
       const polygon = Array.from(hex.points).map((point) => screenPoint(hex, point.x, point.y));
       const rect = plate.getBoundingClientRect();
       const inset = 0.5;
+      const isStatePlate = plate.hasAttribute("data-map-state");
+      // YOU ARE HERE is a mounted plate allowed to slightly overhang the hex top
+      // like a label; allow ~4px vertical overhang but still require horizontal
+      // containment and no route overlap. Other plates remain strictly inside.
+      const overhangAllowance = isStatePlate ? 4 : 0;
       const corners = [
-        { x: rect.left + inset, y: rect.top + inset },
-        { x: rect.right - inset, y: rect.top + inset },
+        { x: rect.left + inset, y: rect.top + inset + overhangAllowance },
+        { x: rect.right - inset, y: rect.top + inset + overhangAllowance },
         { x: rect.right - inset, y: rect.bottom - inset },
         { x: rect.left + inset, y: rect.bottom - inset },
       ];
+      if (isStatePlate) {
+        // Bottom edge must be inside hex so the plate isn't detached; top may
+        // overhang up to ~8px above the hex (small intentional mounted-plate
+        // overhang). This prevents clipping and route overlap while allowing
+        // the "YOU ARE HERE" treatment.
+        const bottomInside = corners.slice(2).every((corner) => pointInPolygon(corner, polygon));
+        const hexTopY = Math.min(...polygon.map((p) => p.y));
+        const topOk = corners
+          .slice(0, 2)
+          .every((corner) => pointInPolygon(corner, polygon) || corner.y >= hexTopY - 8);
+        return {
+          label: plate.textContent?.trim(),
+          inside: bottomInside && topOk,
+        };
+      }
       return {
         label: plate.textContent?.trim(),
         inside: corners.every((corner) => pointInPolygon(corner, polygon)),

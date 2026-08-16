@@ -21,5 +21,10 @@
       "date": "2026-08-05",
       "url": "https://github.com/BDubDesigns/RuneSpace/pull/71"
     }
-  ]
+  ],
+  "currentChange": {
+    "summary": "Refine LocalMapPanel with hybrid plated-signage location identity (#53).",
+    "stage": "preview",
+    "pullRequestNumber": 79
+  }
 }
