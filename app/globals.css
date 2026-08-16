@@ -33,8 +33,15 @@
   --rs-accent-danger-hover: rgb(241 108 117 / 0.17);
   --rs-focus-ring: #a5efff;
   --rs-item-plate-surface: rgb(9 21 34 / 0.42);
-  --rs-item-nameplate-surface: rgb(9 21 34 / 0.9);
+  --rs-item-nameplate-surface: rgb(14 26 38 / 0.68);
   --rs-item-plate-border: rgb(75 216 245 / 0.2);
+  /* Hybrid plated-signage: smoked industrial placard tokens (shared) */
+  --rs-plate-surface-top: rgb(18 32 46 / 0.74);
+  --rs-plate-surface-bottom: rgb(10 22 34 / 0.62);
+  --rs-plate-border: rgb(75 216 245 / 0.16);
+  --rs-plate-border-inner: rgb(0 0 0 / 0.34);
+  --rs-plate-highlight: rgb(255 255 255 / 0.07);
+  --rs-plate-shadow: rgb(0 0 0 / 0.4);
   --rs-space-1: 0.25rem;
   --rs-space-2: 0.5rem;
   --rs-space-3: 0.75rem;
@@ -121,6 +128,81 @@ body {
 .rs-focus:focus-visible {
   outline: 2px solid var(--rs-focus-ring);
   outline-offset: 3px;
+}
+
+/* Hybrid plated-signage: mounted industrial placards (shared).
+   Smoked dark navy/charcoal, partially transparent so art breathes through,
+   chamfered corners via var(--rs-bevel-small), double border (outer + inner
+   inset), faint top highlight and bottom shadow, subtle vertical gradient.
+   Keeps treatments restrained; no glossy ornamentation. Contained per layer:
+   --state (YOU ARE HERE) is allowed to slightly overhang via negative margins.
+   Individual variants add minor tint/weight tweaks; base stays reusable. */
+.rs-map-plate {
+  --rs-plate-bevel: var(--rs-bevel-small);
+  position: relative;
+  border: 1px solid var(--rs-plate-border);
+  background: linear-gradient(
+    180deg,
+    var(--rs-plate-surface-top) 0%,
+    var(--rs-plate-surface-bottom) 100%
+  );
+  box-shadow:
+    inset 0 1px 0 var(--rs-plate-highlight),
+    inset 0 -1px 0 var(--rs-plate-shadow),
+    0 1px 6px rgb(0 0 0 / 0.35);
+  clip-path: polygon(
+    0 var(--rs-plate-bevel),
+    var(--rs-plate-bevel) 0,
+    calc(100% - var(--rs-plate-bevel)) 0,
+    100% var(--rs-plate-bevel),
+    100% calc(100% - var(--rs-plate-bevel)),
+    calc(100% - var(--rs-plate-bevel)) 100%,
+    var(--rs-plate-bevel) 100%,
+    0 calc(100% - var(--rs-plate-bevel))
+  );
+}
+
+.rs-map-plate::after {
+  content: "";
+  position: absolute;
+  inset: 1px;
+  border: 1px solid var(--rs-plate-border-inner);
+  clip-path: polygon(
+    0 var(--rs-plate-bevel),
+    var(--rs-plate-bevel) 0,
+    calc(100% - var(--rs-plate-bevel)) 0,
+    100% var(--rs-plate-bevel),
+    100% calc(100% - var(--rs-plate-bevel)),
+    calc(100% - var(--rs-plate-bevel)) 100%,
+    var(--rs-plate-bevel) 100%,
+    0 calc(100% - var(--rs-plate-bevel))
+  );
+  pointer-events: none;
+  opacity: 0.65;
+}
+
+.rs-map-plate--state {
+  color: var(--rs-accent-primary);
+  letter-spacing: 0.16em;
+  /* Allow the YOU ARE HERE plate to overhang a few px like a mounted label */
+  margin-top: -2px;
+}
+
+.rs-map-plate--nameplate {
+  color: var(--rs-text-primary);
+}
+
+.rs-map-plate--status,
+.rs-map-plate--population {
+  border-color: rgb(75 216 245 / 0.14);
+}
+
+.rs-map-plate--population {
+  color: var(--rs-accent-primary);
+}
+
+.rs-map-plate--status {
+  color: var(--rs-text-secondary);
 }
 
 @keyframes rs-result-success {

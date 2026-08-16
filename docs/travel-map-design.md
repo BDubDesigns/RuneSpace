@@ -14,11 +14,11 @@ communication on a phone; hexes are **not** miniature scene paintings.
 - Schema: `game/schemas/locations.ts` (`presentation.mapIconKey`)
 
 ## Hex information zones (top → bottom, per hex)
-1. **Top** — state label (`YOU ARE HERE` / `REACHABLE` / `SELECTED` / `ORIGIN` / `DESTINATION`).
-2. **Upper-middle / center** — decorative location identifier (Layer 2, `aria-hidden`, clipped to hex).
-3. **Lower-middle** — location nameplate (Layer 3, real text, centered, 1–2 lines, max-width controlled).
-4. **Bottom** — activity/status plate (`Mining` / `Daily cells` / `Offline`, `data-map-status`).
-5. **Corner/secondary** — population chip (`N here`, `data-map-population`) on the current tile only.
+1. **Top** — state plate (`YOU ARE HERE` / `REACHABLE` / `SELECTED` / `ORIGIN` / `DESTINATION`) — fitted smoked plaque, never truncated, may slightly overhang.
+2. **Upper-middle / center** — decorative location identifier (Layer 2, `aria-hidden`, clipped to hex, `0.72W×0.68H@0.58`).
+3. **Lower-middle** — location nameplate (Layer 3, fitted smoked plaque, `inline-flex`, reduced padding, centered, 1–2 lines, max-width controlled).
+4. **Bottom** — activity/status plate (`Mining` / `Daily cells` / `Offline`, `data-map-status`, same smoked family).
+5. **Corner/secondary** — population chip (`N here`, `data-map-population`) on the current tile only, same family.
 
 The decorative asset must conform to these zones; UI is never moved to accommodate art.
 
@@ -35,19 +35,23 @@ The decorative asset must conform to these zones; UI is never moved to accommoda
   and 128 desktop — inside the relaxed 55–75% invariant. The zone is centered slightly above hex
   center (~6% H offset) so the lower nameplate cluster overlaps minimally. Subordinate to state/name/status
   plates, does not change bounds, does not overlap routes, does not hide `data-route-progress`.
-- **Layer 3 — nameplate / status / population (HexButton):** `justify-between` with `py-2`; state label pinned
-  high (`data-map-state`, `truncate`), dedicated spacer `h-[46px] sm:h-[52px]` (`data-map-artwork-spacer`)
-  defining the mid band, then lower cluster (`data-map-nameplate` at `max-w-[70%] sm:max-w-[66%]`,
-  `data-map-population`, `data-map-status`). Not `justify-center`. Overlap is minimal because the plates
-  sit low and the art sits centered in the spacer-defined band.
+- **Layer 3 — nameplate / status / population (HexButton):** `justify-between` with `py-1.5`; state **plate** pinned
+  high as a fitted smoked plaque (`data-map-state`, `rs-map-plate rs-map-plate--state`, `inline-flex whitespace-nowrap`, always fits, may overhang),
+  dedicated spacer `h-[44px] sm:h-[50px]` (`data-map-artwork-spacer`) defining the mid band, then lower fitted
+  cluster (`data-map-nameplate` as `rs-map-plate rs-map-plate--nameplate` at `inline-flex max-w-[68%] sm:64%`, reduced `px-2` hugging),
+  `data-map-population` and `data-map-status` as same-family smoked plaques. All plates share `rs-map-plate`:
+  dark navy/charcoal `linear-gradient` (top→bottom `0.74→0.62`), `clip-path` chamfer (`var(--rs-bevel-small)`),
+  outer + inner inset border, faint top highlight/bottom shadow. Not flat UI boxes. Overlap is minimal because the plates
+  sit low and the art sits centered in the spacer-defined band. The current Crash Site tile (YOU ARE HERE + N here + MINING) is the stress case.
 - **Routes:** `undirectedRoutes` (`stroke accent-secondary`, `strokeWidth=3`) and `data-route-progress`
   (`stroke accent-arcane`, `3.5`) drawn at same z-order / widths as before.
 
 ## Nameplate behavior
 - `location.presentation.localMap.label` (`Crash Site` / `Processing Yard` / `Power Annex`) is rendered
-  as plain centered text. Fixed `max-w` resolves crowding without rewording artwork; if it wraps, plate
-  height/typography grows inside `HexButton` — artwork is never resized.
-- Contrast is `var(--rs-item-nameplate-surface)` + `var(--rs-text-primary)` over the subordinate art.
+  as a **fitted plaque** (`inline-flex`, `px-2` hugging, `max-w-[68%] sm:max-w-[64%]`, `rs-map-plate--nameplate`),
+  not a full-width bar. If it wraps, plate height grows inside `HexButton` — artwork is never resized.
+  Processing Yard no longer sits inside an oversized slab; plate surface is the shared smoked
+  dark navy/charcoal (partially transparent, top→bottom gradient, chamfered + double border, highlight/shadow).
 
 ## Population treatment
 Preserved (`You are here` + `N here`). Web-visible `N here` remains on the current tile; accessible button

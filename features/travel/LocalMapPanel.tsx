@@ -148,12 +148,13 @@ function HexButton({
       disabled={disabled}
       onClick={onSelect}
       style={style}
-      className="rs-focus group absolute z-10 flex flex-col items-center justify-between py-2 text-center outline-none transition disabled:cursor-not-allowed disabled:opacity-70 motion-safe:transition-transform motion-safe:hover:scale-[1.025]"
+      className="rs-focus group absolute z-10 flex flex-col items-center justify-between py-1.5 text-center outline-none transition disabled:cursor-not-allowed disabled:opacity-70 motion-safe:transition-transform motion-safe:hover:scale-[1.025]"
     >
-      {/* Zone 1: Top state label — pinned high, leaves dedicated artwork zone below */}
+      {/* Zone 1: Top state plate — mounted plaque, fitted. YOU ARE HERE
+          never truncates; may slightly overhang hex (inline-flex, no max). */}
       <span
         aria-hidden="true"
-        className="relative z-10 max-w-[52%] truncate font-display text-[9px] uppercase tracking-[0.18em] text-[color:var(--rs-text-secondary)] sm:max-w-[48%] sm:text-[10px]"
+        className="rs-map-plate rs-map-plate--state relative z-10 inline-flex max-w-none items-center justify-center whitespace-nowrap px-2 py-0.5 font-display text-[8px] font-bold uppercase tracking-[0.16em] sm:px-2.5 sm:text-[9px]"
         data-map-state
       >
         {stateLabel}
@@ -162,13 +163,13 @@ function HexButton({
           the SVG identifier (Layer 2) has a clear middle band to occupy */}
       <span
         aria-hidden="true"
-        className="block h-[46px] w-full shrink-0 sm:h-[52px]"
+        className="block h-[44px] w-full shrink-0 sm:h-[50px]"
         data-map-artwork-spacer
       />
       {/* Lower cluster: nameplate toward lower portion + population + status */}
       <span className="flex w-full flex-col items-center gap-0.5">
         <span
-          className="relative z-10 max-w-[70%] break-words border border-[color:var(--rs-item-plate-border)] bg-[color:var(--rs-item-nameplate-surface)] px-1.5 py-0.5 text-center font-display text-[11px] font-bold leading-tight text-[color:var(--rs-text-primary)] sm:max-w-[66%] sm:text-[13px]"
+          className="rs-map-plate rs-map-plate--nameplate relative z-10 inline-flex max-w-[68%] items-center justify-center break-words px-2 py-0.5 text-center font-display text-[11px] font-bold leading-tight sm:max-w-[64%] sm:text-[13px]"
           data-map-nameplate
         >
           {name}
@@ -179,7 +180,7 @@ function HexButton({
         {current && populationCount > 0 ? (
           <span
             aria-hidden="true"
-            className="relative z-10 max-w-[62%] truncate border border-[color:var(--rs-accent-primary)] bg-[color:var(--rs-accent-primary-subtle)] px-1 py-0.5 font-display text-[8px] uppercase leading-none tracking-[0.08em] text-[color:var(--rs-accent-primary)] sm:text-[9px]"
+            className="rs-map-plate rs-map-plate--population relative z-10 inline-flex max-w-[58%] items-center justify-center truncate px-1.5 py-0.5 font-display text-[8px] uppercase leading-none tracking-[0.08em] sm:text-[9px]"
             data-map-population
           >
             {populationCount} here
@@ -187,7 +188,7 @@ function HexButton({
         ) : null}
         <span
           aria-hidden="true"
-          className="relative z-10 max-w-[72%] truncate border border-[color:var(--rs-item-plate-border)] bg-[color:var(--rs-item-plate-surface)] px-1 py-0.5 font-display text-[8px] uppercase leading-none tracking-[0.08em] text-[color:var(--rs-text-secondary)] sm:text-[9px]"
+          className="rs-map-plate rs-map-plate--status relative z-10 inline-flex max-w-[68%] items-center justify-center truncate px-1.5 py-0.5 font-display text-[8px] uppercase leading-none tracking-[0.08em] sm:text-[9px]"
           data-map-status
         >
           {statusLabel}
