@@ -66,7 +66,7 @@ Preserved (`You are here` + `N here`). Web-visible `N here` remains on the curre
   (`beginTravelAction`, `WALK_SECONDS`). All adjacency/route math (`axial`, `deriveRouteEndpoints` apothem +
   `LOCAL_MAP_ROUTE_GAP`, `routeProgressSegment` forward/reverse equality) unchanged.
 - Flat-top triangle, `MOBILE_LOCAL_MAP_HEX_WIDTH=140` / `LOCAL_MAP_HEX_WIDTH=128`, `hexButtonStyle` overlay,
-  `LOCAL_MAP_PADDING`, and responsive `buildLocalMapGeometry` remain authoritative.
+  `LOCAL_MAP_PADDING`, `LOCAL_MAP_ROUTE_GAP=30` (~30px edge-to-edge at desktop, proportional at mobile), and responsive `buildLocalMapGeometry` remain authoritative.
 
 ## Registry / metadata contract
 - `game/schemas/locations.ts: presentation.mapIconKey` is `z.enum(["crash_site_deposit","processing_yard","power_annex"])`.
