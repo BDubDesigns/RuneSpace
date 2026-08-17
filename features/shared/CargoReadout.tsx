@@ -13,6 +13,10 @@ export type CargoReadoutItem = {
   quantity: number;
 };
 
+function kilograms(grams: number) {
+  return `${(grams / 1_000).toLocaleString(undefined, { maximumFractionDigits: 1 })} kg`;
+}
+
 /**
  * Shared cargo readout used at every location with a resource output.
  *
@@ -78,7 +82,7 @@ export function CargoReadout({
             <StatusMeter
               label="Carried mass"
               value={(state.inventory.massGrams / state.inventory.capacityGrams) * 100}
-              detail={`${(state.inventory.massGrams / 1000).toFixed(1)} kg / ${(state.inventory.capacityGrams / 1000).toFixed(1)} kg`}
+              detail={`${kilograms(state.inventory.massGrams)} / ${kilograms(state.inventory.capacityGrams)}`}
             />
           </div>
         </>
