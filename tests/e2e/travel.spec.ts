@@ -332,7 +332,7 @@ test("the full journey walks, arrives, and returns between the original location
 
   // Select the destination and confirm departure.
   await page.getByRole("button", { name: /Abandoned Processing Yard/ }).click();
-  await expect(page.getByText(/Departing resolves your completed Mining work/)).toBeVisible();
+  await expect(page.getByText(/Departing resolves your completed work/)).toBeVisible();
   await page.getByRole("button", { name: /Walk to Abandoned Processing Yard/ }).click();
   // The authoritative state is applied immediately — verify the transit UI.
   await expect(page.getByText("Journey progress")).toBeVisible();
