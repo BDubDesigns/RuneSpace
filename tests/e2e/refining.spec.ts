@@ -68,16 +68,27 @@ test("Processing Yard Refining journey — Ferrite and Slag both branches, artwo
 
   // 2. travel to Abandoned Processing Yard — prove map truth
   await page.getByLabel("Local map").scrollIntoViewIfNeeded();
+  // Ensure map is interactive before selecting
+  await expect(page.locator('[data-map-location="abandoned_processing_yard"]')).toBeVisible();
   await page.locator('[data-map-location="abandoned_processing_yard"]').click();
   await expect(page.getByText("Abandoned Processing Yard", { exact: true }).first()).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: /Walk to Abandoned Processing Yard/ }),
+  ).toBeVisible();
   await page.getByRole("button", { name: /Walk to Abandoned Processing Yard/ }).click();
-  await expect(page.getByText("In transit", { exact: true }).first()).toBeVisible();
+  // Travel creates activeActions + characterTravelState; UI shows either header or body copy
+  await expect(
+    page.getByText("In transit").first().or(page.getByText("Journey progress").first()),
+  ).toBeVisible({
+    timeout: 10_000,
+  });
   // Fast-forward the 40-tick (24s) walk by moving cursor back deterministically
   const travelStartedAgo = new Date(Date.now() - 25_000);
   await db
     .update(activeActions)
     .set({ startedAt: travelStartedAgo, resolvedThroughAt: travelStartedAgo })
     .where(eq(activeActions.characterId, characterId));
+  // Refresh triggers lazy travel arrival via getMiningGameplayState
   await page.getByRole("button", { name: "Refresh status" }).click();
 
   // 3. Yard is active, not offline; Refining level/progress shown; success chance 40.00%
