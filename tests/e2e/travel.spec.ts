@@ -51,7 +51,7 @@ async function expectMapStatusPlatesInsideHex(page: import("@playwright/test").P
     page.locator('[aria-label="Local map"]'),
     "data-map-status",
   );
-  expect(geometry.labels.sort()).toEqual(["Daily cells", "Mining", "Offline"]);
+  expect(geometry.labels.sort()).toEqual(["Daily cells", "Mining", "Offline", "Refining"]);
   expect(geometry.allInside).toBe(true);
   expect(geometry.routeOverlaps).toEqual([]);
 }

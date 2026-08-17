@@ -788,6 +788,7 @@ export function LocalMapPanel() {
     const loc = getLocation(locationId);
     if (!loc) return "";
     if (locationId === LOCATION_IDS.emergencyPowerAnnex) return "Daily cells";
+    if (locationId === LOCATION_IDS.abandonedProcessingYard) return "Refining";
     return loc.availableActionIds.length > 0 ? "Mining" : "Offline";
   }
 
