@@ -78,6 +78,23 @@ function e2eMiningRandom(): MiningRandom {
   };
 }
 
+function e2eRefiningRandom(): MiningRandom {
+  let attemptIndex = 0;
+  return {
+    nextBasisPoints: () => [0, 9_000][attemptIndex++ % 2]!,
+    nextUnit: () => 0,
+  };
+}
+
+export function defaultRefiningRandom(): MiningRandom {
+  const databaseHost = process.env.DATABASE_URL ? new URL(process.env.DATABASE_URL).hostname : "";
+  return process.env.CI === "true" &&
+    process.env.RUNESPACE_E2E_MINING === "true" &&
+    (databaseHost === "localhost" || databaseHost === "127.0.0.1")
+    ? e2eRefiningRandom()
+    : systemRandom;
+}
+
 export function defaultMiningRandom(): MiningRandom {
   const databaseHost = process.env.DATABASE_URL ? new URL(process.env.DATABASE_URL).hostname : "";
   return process.env.CI === "true" &&
@@ -160,6 +177,10 @@ export type RefiningRunState = {
   recentAttempts: readonly RefiningRunAttempt[];
 };
 
+export type ActivityStop =
+  | { actionId: typeof ACTION_IDS.crashSiteMining; reason: MiningStopReason }
+  | { actionId: typeof ACTION_IDS.refining; reason: RefiningStopReason };
+
 export type MiningGameplayState = {
   characterId: string;
   activeAction?: {
@@ -222,8 +243,11 @@ export type MiningGameplayState = {
   refiningRun: RefiningRunState;
   recentResult: { successes: number; failures: number; awardedXp: number };
   refiningRecentResult: { successes: number; failures: number; awardedXp: number };
-  refiningStopReason?: RefiningStopReason;
-  stoppingReason?: MiningStopReason;
+  /**
+   * One current stop event — which action stopped, and why. Never two
+   * parallel channels; Mining-only reasons cannot leak into Refining UI.
+   */
+  stop?: ActivityStop;
   commandError?: "another_action_active";
   /** Authoritative persistent current location (stable ID from the registry). */
   location: { currentLocationId: string };
@@ -554,8 +578,18 @@ export function createPlayResolver(
   PersistedMiningOutcome | TravelResolution | PersistedRefiningOutcome
 > {
   const mining = createMiningResolver(random, onMiningOutcome);
+  // Refining needs a failing roll at L1 (threshold 4000) — mining E2E sequence [0,3500] both succeed.
+  // Use a separate CI RNG for refining so both branches are proven.
+  const refiningRandom =
+    process.env.CI === "true" &&
+    process.env.RUNESPACE_E2E_MINING === "true" &&
+    ["localhost", "127.0.0.1"].includes(
+      process.env.DATABASE_URL ? new URL(process.env.DATABASE_URL).hostname : "",
+    )
+      ? e2eRefiningRandom()
+      : random;
   const refining = createRefiningResolver(
-    random as unknown as import("@/game/domain/refining").RefiningRandom,
+    refiningRandom as unknown as import("@/game/domain/refining").RefiningRandom,
     onRefiningOutcome,
   );
   const travel = createTravelResolver();
@@ -606,7 +640,7 @@ export async function stateFromTransaction(
   transaction: DatabaseTransaction,
   characterId: string,
   recentResult: MiningGameplayState["recentResult"],
-  stoppingReason?: MiningStopReason,
+  miningStopReason?: MiningStopReason,
   commandError?: MiningGameplayState["commandError"],
   travelError?: MiningGameplayState["travelError"],
   characterRow?: { currentLocationId: string },
@@ -867,13 +901,24 @@ export async function stateFromTransaction(
     refiningRun,
     recentResult,
     refiningRecentResult,
-    refiningStopReason:
-      refiningStopReason ??
-      (refiningState?.lastStopReason as RefiningStopReason | null) ??
-      undefined,
-    stoppingReason: action
-      ? undefined
-      : (stoppingReason ?? (miningState?.lastStopReason as MiningStopReason | null) ?? undefined),
+    stop: (() => {
+      const miningStop =
+        miningStopReason ?? (miningState?.lastStopReason as MiningStopReason | null) ?? undefined;
+      const refiningStop =
+        refiningStopReason ??
+        (refiningState?.lastStopReason as RefiningStopReason | null) ??
+        undefined;
+      // Exactly one current stop event. Prefer an explicit argument over
+      // persisted history, and prefer the refining channel when both are
+      // somehow present (the one-active-action invariant guarantees at most
+      // one is authoritative at a time).
+      if (refiningStop)
+        return { actionId: ACTION_IDS.refining, reason: refiningStop } as ActivityStop;
+      if (action) return undefined; // active action suppresses stale persisted stop
+      if (miningStop)
+        return { actionId: ACTION_IDS.crashSiteMining, reason: miningStop } as ActivityStop;
+      return undefined;
+    })(),
     commandError,
     travelError,
     refiningError,
@@ -1194,7 +1239,7 @@ export async function startRefining(
                 awardedXp: miningOutcome.awardedXp,
               }
             : { successes: 0, failures: 0, awardedXp: 0 },
-          preflight as unknown as import("@/game/domain/mining").MiningStopReason,
+          miningOutcome?.stopReason,
           undefined,
           undefined,
           undefined,

@@ -7,7 +7,7 @@ import { VisualTile } from "@/components/items/VisualTile";
 import { Feedback } from "@/components/ui/Feedback";
 import { StatusMeter } from "@/components/ui/StatusMeter";
 import { getEffectiveGameBalance } from "@/game/config/balance";
-import { GAME_TICK_MS, ITEM_IDS } from "@/game/config/foundations";
+import { ACTION_IDS, GAME_TICK_MS, ITEM_IDS } from "@/game/config/foundations";
 import type { RefiningRunAttempt } from "@/server/mining";
 import { refreshMiningAction, startRefiningAction, stopRefiningAction } from "@/server/actions";
 import { reportClientDiagnostic } from "@/features/diagnostics/client";
@@ -19,7 +19,12 @@ function percentage(bps: number) {
   return (bps / 100).toFixed(2);
 }
 
-function refiningStopMessage(reason: string): string {
+function refiningStopMessage(
+  reason: Extract<
+    import("@/server/mining").ActivityStop,
+    { actionId: typeof ACTION_IDS.refining }
+  >["reason"],
+): string {
   return (
     (
       {
@@ -77,7 +82,9 @@ export function RefiningConsole() {
   const refining = state.refining;
   const refiningRun = state.refiningRun;
   const [message, setMessage] = useState<string | undefined>(
-    state.refiningStopReason ? refiningStopMessage(state.refiningStopReason) : undefined,
+    state.stop?.actionId === ACTION_IDS.refining
+      ? refiningStopMessage(state.stop.reason)
+      : undefined,
   );
   const [now, setNow] = useState(Date.now());
   const [, startTransition] = useTransition();
@@ -107,8 +114,8 @@ export function RefiningConsole() {
       const next = result.state;
       if (next.refiningError) setMessage(refiningErrorMessage(next.refiningError));
       else if (next.commandError) setMessage(refiningCommandErrorMessage(next.commandError));
-      else if (next.refiningStopReason) setMessage(refiningStopMessage(next.refiningStopReason));
-      else if (next.stoppingReason) setMessage(refiningStopMessage(next.stoppingReason));
+      else if (next.stop?.actionId === ACTION_IDS.refining)
+        setMessage(refiningStopMessage(next.stop.reason));
       else setMessage(undefined);
     }
   }
@@ -282,7 +289,9 @@ export function RefiningConsole() {
           : ""}
       </p>
       {message ? (
-        <Feedback tone={state.refiningStopReason && !active ? "danger" : "muted"}>
+        <Feedback
+          tone={state.stop?.actionId === ACTION_IDS.refining && !active ? "danger" : "muted"}
+        >
           {message}
         </Feedback>
       ) : null}

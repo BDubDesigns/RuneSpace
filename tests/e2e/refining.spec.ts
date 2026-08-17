@@ -12,30 +12,11 @@ import {
   itemInstances,
 } from "@/db/rune-space";
 import { ACTION_IDS, ITEM_IDS, LOCATION_IDS } from "@/game/config/foundations";
+import { GAME_TICK_MS } from "@/game/config/foundations";
 import { miningStorageStatePath } from "./mining.setup";
 
 const e2eDatabaseHost = process.env.DATABASE_URL ? new URL(process.env.DATABASE_URL).hostname : "";
 
-/**
- * One representative Refining browser journey — proves the feature works, not
- * merely that the controls render. Uses the CI deterministic RNG (RUNESPACE_E2E_MINING)
- * which alternates [0, 3500] — at Refining L1 threshold 4000 both rolls succeed,
- * so we force deterministic outcomes via DB-backed inventory/run assertions plus
- * the UI's Refined Ferrite vs Slag distinction.
- *
- * The journey:
- * 1. character carries Ferrite Shale
- * 2. travels to the Processing Yard
- * 3. sees Refining level/progress and success chance
- * 4. starts Refining
- * 5. observes a deterministic Refined Ferrite result and XP/inventory/run updates
- * 6. observes a deterministic Slag result and its 3 XP (via second attempt)
- * 7. verifies artwork through the normal presentation boundary
- * 8. refreshes while Refining without resetting authoritative run/progress
- * 9. begins Travel while Refining with a partial attempt present
- * 10. proves completed attempts resolve and the incomplete attempt consumes nothing
- * 11. arrives with Refining stopped
- */
 test.beforeAll(() => {
   if (e2eDatabaseHost !== "localhost" && e2eDatabaseHost !== "127.0.0.1") {
     throw new Error("Refining E2E fixtures require a disposable localhost PostgreSQL database");
@@ -72,48 +53,50 @@ test.beforeEach(async ({ page }) => {
   await page.reload();
 });
 
-test("Processing Yard Refining journey — deterministic Ferrite and Slag, artwork, refresh, and Travel replacement", async ({
+test("Processing Yard Refining journey — Ferrite and Slag both branches, artwork, refresh, Travel partial, refusals, no metallurgy", async ({
   page,
 }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   const characterId = page.url().split("/").at(-1)!;
 
-  // Seed shale before travel so the Yard has material to refine
+  // 1. character carries Ferrite Shale
   await db
     .insert(inventoryStacks)
     .values({ characterId, itemId: ITEM_IDS.ferriteShale, quantity: 10 });
   await page.getByRole("button", { name: "Refresh status" }).click();
   await expect(page.getByRole("button", { name: /Inventory/ })).toContainText("1/8");
 
-  // Travel to the Processing Yard via the map
+  // 2. travel to Abandoned Processing Yard — prove map truth
   await page.getByLabel("Local map").scrollIntoViewIfNeeded();
-  const yardButton = page.locator(`[data-map-location="${LOCATION_IDS.abandonedProcessingYard}"]`);
-  await yardButton.click();
+  await page.locator('[data-map-location="abandoned_processing_yard"]').click();
   await expect(page.getByText("Abandoned Processing Yard", { exact: true }).first()).toBeVisible();
   await page.getByRole("button", { name: /Walk to Abandoned Processing Yard/ }).click();
   await expect(page.getByText("In transit", { exact: true }).first()).toBeVisible();
-  // Fast-forward travel (24s walk) by moving the cursor back, then refresh
+  // Fast-forward the 40-tick (24s) walk by moving cursor back deterministically
   const travelStartedAgo = new Date(Date.now() - 25_000);
   await db
     .update(activeActions)
     .set({ startedAt: travelStartedAgo, resolvedThroughAt: travelStartedAgo })
     .where(eq(activeActions.characterId, characterId));
   await page.getByRole("button", { name: "Refresh status" }).click();
-  await expect(page.getByText("Refining", { exact: true }).first()).toBeVisible();
 
-  // Sees Refining level/progress and success chance at L1 = 40%
+  // 3. Yard is active, not offline; Refining level/progress shown; success chance 40.00%
+  await expect(page.getByText("Refining", { exact: true }).first()).toBeVisible();
   await expect(page.getByText("Refining progression")).toBeVisible();
   await expect(page.getByText(/Success chance: 40\.00%/)).toBeVisible();
+  await expect(page.getByText("offline", { exact: false })).toHaveCount(0);
+  await expect(page.getByText("Metallurgy", { exact: false })).toHaveCount(0);
 
-  // Start Refining
+  // 4. Start Refining works
   await page.getByRole("button", { name: "Start Refining" }).click();
   await expect(page.getByRole("button", { name: "Stop Refining" })).toBeVisible();
 
-  // Resolve one deterministic attempt (success: roll 0 < 4000)
-  const oneAgo = new Date(Date.now() - 4_300);
+  // 5. deterministic success: exactly 1 Refined Ferrite +15 XP (roll 0 < 4000)
+  // Use explicit tick math: set cursor to exactly 7 ticks ago, so one attempt is due
+  const oneAttemptAgo = new Date(Date.now() - 7 * GAME_TICK_MS - 100);
   await db
     .update(activeActions)
-    .set({ startedAt: oneAgo, resolvedThroughAt: oneAgo })
+    .set({ startedAt: oneAttemptAgo, resolvedThroughAt: oneAttemptAgo })
     .where(eq(activeActions.characterId, characterId));
   await page.getByRole("button", { name: "Refresh status" }).click();
   const latestRefining = page.getByRole("region", { name: "Latest refining attempt", exact: true });
@@ -121,26 +104,28 @@ test("Processing Yard Refining journey — deterministic Ferrite and Slag, artwo
   await expect(latestRefining.getByLabel("1 Refined Ferrite produced")).toBeVisible();
   await expect(latestRefining.getByLabel("15 Refining XP earned")).toBeVisible();
   await expect(page.getByText("1 attempts", { exact: true })).toBeVisible();
+  // Run totals: 1 Ferrite, 15 XP
   await expect(page.getByText("1 Refined Ferrite", { exact: true }).first()).toBeVisible();
-  await expect(page.getByText("15 Refining XP", { exact: true }).first()).toBeVisible();
 
-  // Second attempt — still success with deterministic RNG at L1 (both rolls 0 and 3500 < 4000)
-  // To prove the Slag branch, we verify via DB that the failure path is exercised separately
-  // in unit/integration coverage; the E2E proves the Refined Ferrite branch and artwork.
-  // Resolve a second attempt
-  const twoAgo = new Date(Date.now() - 8_600);
+  await page.screenshot({ path: "test-results/refining-mobile-active.png" });
+
+  // 6. deterministic failure: exactly 1 Slag +3 XP (second roll 9000 >= 4000)
+  // After first resolution, cursor advanced to ~now. Move it back 7 ticks for one more deterministic attempt.
+  const secondAttemptAgo = new Date(Date.now() - 7 * GAME_TICK_MS - 100);
   await db
     .update(activeActions)
-    .set({ startedAt: twoAgo, resolvedThroughAt: twoAgo })
+    .set({ resolvedThroughAt: secondAttemptAgo })
     .where(eq(activeActions.characterId, characterId));
   await page.getByRole("button", { name: "Refresh status" }).click();
+  await expect(latestRefining).toContainText("Latest attempt: Slag");
+  await expect(latestRefining.getByLabel("1 Slag produced")).toBeVisible();
+  await expect(latestRefining.getByLabel("3 Refining XP earned")).toBeVisible();
   await expect(page.getByText("2 attempts", { exact: true })).toBeVisible();
 
-  // Verify artwork through the normal presentation boundary (Inventory + result)
+  // 7. Refined Ferrite artwork loads
   await page.getByRole("button", { name: /Inventory/ }).click();
   const inventory = page.getByRole("dialog", { name: "Inventory" });
   await expect(inventory).toBeVisible();
-  // Ferrite Shale + Refined Ferrite stacks are illustrated; both must be visible
   const artwork = inventory.getByTestId("item-artwork");
   await expect(artwork.first()).toBeVisible();
   await expect
@@ -148,38 +133,38 @@ test("Processing Yard Refining journey — deterministic Ferrite and Slag, artwo
       artwork.first().evaluate((img: HTMLImageElement) => img.complete && img.naturalWidth > 0),
     )
     .toBe(true);
-  // At least one illustrated Refined Ferrite tile should be present
-  const refinedFermiteVisual = inventory.getByLabel(/Refined Ferrite/);
-  await expect(refinedFermiteVisual.first()).toBeVisible();
+  await expect(inventory.getByLabel(/Refined Ferrite/).first()).toBeVisible();
+  // 7b. Slag artwork loads (second illustrated stack)
+  await expect(inventory.getByLabel(/Slag/).first()).toBeVisible();
   await page.getByRole("button", { name: "Close inventory" }).click();
 
-  // Refresh while Refining without resetting run/progress
+  await page.screenshot({ path: "test-results/refining-mobile-result.png" });
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await page.screenshot({ path: "test-results/refining-desktop-active.png" });
+
+  // 8. refresh/reload while Refining retains authoritative run/progress state
   await page.reload();
   await expect(page.getByRole("button", { name: "Stop Refining" })).toBeVisible();
   await expect(page.getByText("2 attempts", { exact: true })).toBeVisible();
-  await expect(latestRefining).toBeVisible();
+  await expect(latestRefining).toContainText("Latest attempt: Slag");
 
-  // Begin Travel while Refining with a partial attempt present
-  // Rewind cursor so only 1 of 2 pending ticks would be a full attempt if we wait,
-  // then create a partial window (6 ticks < 7) and immediately travel
-  const partialWindow = new Date(Date.now() - 3_600); // 6 ticks = 3600ms, incomplete
+  // 9. Travel while Refining resolves only completed attempts; incomplete <7 tick discarded without shale/RNG
+  // Make cursor only 6 ticks ahead (incomplete), then travel
+  const incompleteCursor = new Date(Date.now() - 6 * GAME_TICK_MS);
   await db
     .update(activeActions)
-    .set({ resolvedThroughAt: partialWindow })
+    .set({ resolvedThroughAt: incompleteCursor })
     .where(eq(activeActions.characterId, characterId));
   const shaleBeforeTravel = (
     await db.select().from(inventoryStacks).where(eq(inventoryStacks.characterId, characterId))
   )
     .filter((s) => s.itemId === ITEM_IDS.ferriteShale)
     .reduce((t, s) => t + s.quantity, 0);
-
-  // Travel back to Crash Site
+  // Need 2 more shale? We had 10 - 2*2 = 6 left after 2 attempts
   await page.getByLabel("Local map").scrollIntoViewIfNeeded();
-  const crashSiteButton = page.locator(`[data-map-location="${LOCATION_IDS.crashSite}"]`);
-  await crashSiteButton.click();
+  await page.locator('[data-map-location="crash_site"]').click();
   await page.getByRole("button", { name: /Walk to Crash Site/ }).click();
   await expect(page.getByText("In transit", { exact: true }).first()).toBeVisible();
-
   // Fast-forward arrival
   const travelStarted = new Date(Date.now() - 25_000);
   await db
@@ -187,19 +172,61 @@ test("Processing Yard Refining journey — deterministic Ferrite and Slag, artwo
     .set({ startedAt: travelStarted, resolvedThroughAt: travelStarted })
     .where(eq(activeActions.characterId, characterId));
   await page.getByRole("button", { name: "Refresh status" }).click();
-
-  // Arrived with Refining stopped; completed attempt resolved, incomplete consumed nothing
+  // 10. arrival leaves Refining stopped; completed count unchanged (no extra for incomplete)
   await expect(page.getByText("Mining", { exact: true }).first()).toBeVisible();
   const shaleAfter = (
     await db.select().from(inventoryStacks).where(eq(inventoryStacks.characterId, characterId))
   )
     .filter((s) => s.itemId === ITEM_IDS.ferriteShale)
     .reduce((t, s) => t + s.quantity, 0);
-  // Shale must not have decreased for the partial attempt
-  expect(shaleAfter).toBe(shaleBeforeTravel);
-  const refiningAction = await db
-    .select()
-    .from(activeActions)
+  expect(shaleAfter).toBe(shaleBeforeTravel); // incomplete consumed nothing
+  expect(
+    await db
+      .select()
+      .from(activeActions)
+      .where(eq(activeActions.characterId, characterId))
+      .then((rows) => rows.find((a) => a.actionId === ACTION_IDS.refining)),
+  ).toBeUndefined();
+
+  // Return to Yard for refusal checks
+  await page.getByLabel("Local map").scrollIntoViewIfNeeded();
+  await page.locator('[data-map-location="abandoned_processing_yard"]').click();
+  await page.getByRole("button", { name: /Walk to Abandoned Processing Yard/ }).click();
+  await expect(page.getByText("In transit", { exact: true }).first()).toBeVisible();
+  await db
+    .update(activeActions)
+    .set({
+      startedAt: new Date(Date.now() - 25_000),
+      resolvedThroughAt: new Date(Date.now() - 25_000),
+    })
     .where(eq(activeActions.characterId, characterId));
-  expect(refiningAction.find((a) => a.actionId === ACTION_IDS.refining)).toBeUndefined();
+  await page.getByRole("button", { name: "Refresh status" }).click();
+  await expect(page.getByText("Refining", { exact: true }).first()).toBeVisible();
+
+  // 11. insufficient-shale refusal
+  await db.delete(inventoryStacks).where(eq(inventoryStacks.characterId, characterId));
+  await db
+    .insert(inventoryStacks)
+    .values({ characterId, itemId: ITEM_IDS.ferriteShale, quantity: 1 });
+  await page.getByRole("button", { name: "Start Refining" }).click();
+  await expect(page.getByText(/Not enough Ferrite Shale/)).toBeVisible();
+
+  // 12. inventory-fit refusal — fill slots so both branches cannot fit
+  await db.delete(inventoryStacks).where(eq(inventoryStacks.characterId, characterId));
+  // Fill to capacity 8: 1 shale (qty 3, so after removing 2 one remains -> no slot freed),
+  // 1 ferrite full (5/5), 1 slag full (10/10), plus 5 filler ferrite full stacks = 8 total.
+  for (let i = 0; i < 5; i++) {
+    await db
+      .insert(inventoryStacks)
+      .values({ characterId, itemId: ITEM_IDS.refinedFerrite, quantity: 5 });
+  }
+  await db
+    .insert(inventoryStacks)
+    .values({ characterId, itemId: ITEM_IDS.ferriteShale, quantity: 3 });
+  await db
+    .insert(inventoryStacks)
+    .values({ characterId, itemId: ITEM_IDS.refinedFerrite, quantity: 5 });
+  await db.insert(inventoryStacks).values({ characterId, itemId: ITEM_IDS.slag, quantity: 10 });
+  await page.getByRole("button", { name: "Start Refining" }).click();
+  await expect(page.getByText(/make room for the resulting material/)).toBeVisible();
 });

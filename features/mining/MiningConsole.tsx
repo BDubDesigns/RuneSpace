@@ -13,7 +13,7 @@ import { CargoReadout } from "@/features/shared/CargoReadout";
 import { RefiningRunPanel } from "@/features/refining/RefiningRunPanel";
 import { MiningRunPanel } from "@/features/mining/MiningRunPanel";
 import { getEffectiveGameBalance } from "@/game/config/balance";
-import { GAME_TICK_MS, ITEM_IDS, LOCATION_IDS } from "@/game/config/foundations";
+import { ACTION_IDS, GAME_TICK_MS, ITEM_IDS, LOCATION_IDS } from "@/game/config/foundations";
 import { getLocation } from "@/game/content/locations";
 import { boostedMiningAttemptDurationTicks, miningNearMissBasisPoints } from "@/game/domain/mining";
 import type { MiningGameplayState, MiningRunAttempt } from "@/server/mining";
@@ -38,7 +38,7 @@ function secondsForTicks(ticks: number) {
   return (ticks * GAME_TICK_MS) / 1_000;
 }
 
-function stopMessage(reason: NonNullable<MiningGameplayState["stoppingReason"]>) {
+function miningStopMessage(reason: import("@/game/domain/mining").MiningStopReason) {
   return {
     manually_stopped: "Mining stopped.",
     inventory_slots_full: "Mining stopped: inventory slots are full.",
@@ -171,7 +171,9 @@ export function MiningConsole({ characterName }: { characterName: string }) {
     state,
   } = useMiningPlay();
   const [message, setMessage] = useState<string | undefined>(
-    state.stoppingReason ? stopMessage(state.stoppingReason) : undefined,
+    state.stop?.actionId === ACTION_IDS.crashSiteMining
+      ? miningStopMessage(state.stop.reason as import("@/game/domain/mining").MiningStopReason)
+      : undefined,
   );
   const [now, setNow] = useState(Date.now());
   const [, startTransition] = useTransition();
@@ -210,7 +212,12 @@ export function MiningConsole({ characterName }: { characterName: string }) {
     if (result.state) {
       acceptState(result.state);
       if (result.state.commandError) setMessage(commandErrorMessage(result.state.commandError));
-      else if (result.state.stoppingReason) setMessage(stopMessage(result.state.stoppingReason));
+      else if (result.state.stop?.actionId === ACTION_IDS.crashSiteMining)
+        setMessage(
+          miningStopMessage(
+            result.state.stop.reason as import("@/game/domain/mining").MiningStopReason,
+          ),
+        );
       else setMessage(undefined);
     }
   }
@@ -421,7 +428,11 @@ export function MiningConsole({ characterName }: { characterName: string }) {
               : ""}
           </p>
           {showMiningActivity && message ? (
-            <Feedback tone={state.stoppingReason && !active ? "danger" : "muted"}>
+            <Feedback
+              tone={
+                state.stop?.actionId === ACTION_IDS.crashSiteMining && !active ? "danger" : "muted"
+              }
+            >
               {message}
             </Feedback>
           ) : null}
