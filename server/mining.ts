@@ -78,10 +78,11 @@ function e2eMiningRandom(): MiningRandom {
   };
 }
 
+let e2eRefiningGlobalIndex = 0;
+
 function e2eRefiningRandom(): MiningRandom {
-  let attemptIndex = 0;
   return {
-    nextBasisPoints: () => [0, 9_000][attemptIndex++ % 2]!,
+    nextBasisPoints: () => [0, 9_000][e2eRefiningGlobalIndex++ % 2]!,
     nextUnit: () => 0,
   };
 }
@@ -902,21 +903,34 @@ export async function stateFromTransaction(
     recentResult,
     refiningRecentResult,
     stop: (() => {
-      const miningStop =
-        miningStopReason ?? (miningState?.lastStopReason as MiningStopReason | null) ?? undefined;
-      const refiningStop =
-        refiningStopReason ??
-        (refiningState?.lastStopReason as RefiningStopReason | null) ??
-        undefined;
-      // Exactly one current stop event. Prefer an explicit argument over
-      // persisted history, and prefer the refining channel when both are
-      // somehow present (the one-active-action invariant guarantees at most
-      // one is authoritative at a time).
-      if (refiningStop)
-        return { actionId: ACTION_IDS.refining, reason: refiningStop } as ActivityStop;
-      if (action) return undefined; // active action suppresses stale persisted stop
-      if (miningStop)
-        return { actionId: ACTION_IDS.crashSiteMining, reason: miningStop } as ActivityStop;
+      if (refiningStopReason)
+        return { actionId: ACTION_IDS.refining, reason: refiningStopReason } as ActivityStop;
+      if (miningStopReason)
+        return { actionId: ACTION_IDS.crashSiteMining, reason: miningStopReason } as ActivityStop;
+      if (action) return undefined;
+      const miningPersisted = miningState?.lastStopReason as MiningStopReason | null | undefined;
+      const refiningPersisted = refiningState?.lastStopReason as
+        | RefiningStopReason
+        | null
+        | undefined;
+      if (miningPersisted && refiningPersisted) {
+        const miningUpdated = miningState?.updatedAt
+          ? new Date(miningState.updatedAt as unknown as string | Date).getTime()
+          : 0;
+        const refiningUpdated = refiningState?.updatedAt
+          ? new Date(refiningState.updatedAt as unknown as string | Date).getTime()
+          : 0;
+        if (refiningUpdated >= miningUpdated)
+          return { actionId: ACTION_IDS.refining, reason: refiningPersisted } as ActivityStop;
+        return {
+          actionId: ACTION_IDS.crashSiteMining,
+          reason: miningPersisted,
+        } as ActivityStop;
+      }
+      if (refiningPersisted)
+        return { actionId: ACTION_IDS.refining, reason: refiningPersisted } as ActivityStop;
+      if (miningPersisted)
+        return { actionId: ACTION_IDS.crashSiteMining, reason: miningPersisted } as ActivityStop;
       return undefined;
     })(),
     commandError,
