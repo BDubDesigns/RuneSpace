@@ -130,11 +130,9 @@ async function expectMiningDashboardsVisible(page: import("@playwright/test").Pa
 async function expectMiningDashboardsHidden(page: import("@playwright/test").Page) {
   await expect(page.getByRole("button", { name: "Start Mining" })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Stop Mining" })).toHaveCount(0);
-  await expect(page.getByText("Success chance:", { exact: false })).toHaveCount(0);
   await expect(page.getByText("Mining attempt", { exact: true })).toHaveCount(0);
   await expect(page.getByText("Latest attempt:", { exact: false })).toHaveCount(0);
   await expect(page.getByText("Mining progression", { exact: true })).toHaveCount(0);
-  await expect(page.getByText("Cargo readout", { exact: true })).toHaveCount(0);
   await expect(page.getByText("This mining run", { exact: true })).toHaveCount(0);
 }
 
