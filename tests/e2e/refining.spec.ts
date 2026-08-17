@@ -179,12 +179,14 @@ test("Processing Yard Refining journey — Ferrite and Slag both branches, artwo
   await expect(page.getByRole("button", { name: /Walk to Crash Site/ })).toBeVisible();
   await page.getByRole("button", { name: /Walk to Crash Site/ }).click();
   await expect(page.getByText("In transit", { exact: true }).first()).toBeVisible();
+  // Travel was just created at ~now; fast-forward 25s by moving cursor back so arrival is due on next load.
   const travelStarted = new Date(Date.now() - 25_000);
   await db
     .update(activeActions)
     .set({ startedAt: travelStarted, resolvedThroughAt: travelStarted })
     .where(eq(activeActions.characterId, characterId));
-  await page.getByRole("button", { name: "Refresh status" }).click();
+  // Reload forces getMiningGameplayState(now) to resolve travel arrival
+  await page.reload();
   await expect(page.getByText("Mining", { exact: true }).first()).toBeVisible();
   const shaleAfter = (
     await db.select().from(inventoryStacks).where(eq(inventoryStacks.characterId, characterId))
