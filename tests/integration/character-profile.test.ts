@@ -174,6 +174,14 @@ suite("issue #64 character profile read boundary (real PostgreSQL)", () => {
           xpToNextLevel: 550,
           atMaximumLevel: false,
         },
+        {
+          displayName: "Refining",
+          level: 1,
+          totalXp: 0,
+          xpIntoLevel: 0,
+          xpToNextLevel: 500,
+          atMaximumLevel: false,
+        },
       ],
       portrait: {
         kind: "selected",
@@ -243,10 +251,10 @@ suite("issue #64 character profile read boundary (real PostgreSQL)", () => {
     await makeCharacterAt(owner, freshName, LOCATION_IDS.crashSite);
 
     const playedProfile = await profile.getCharacterProfile(owner, active.id, playedName);
-    expect(playedProfile.skills.map((skill) => skill.displayName)).toEqual(["Mining"]);
+    expect(playedProfile.skills.map((skill) => skill.displayName)).toEqual(["Mining", "Refining"]);
     expect(playedProfile.skills[0]).toMatchObject({ level: 2, totalXp: 500 });
     const freshProfile = await profile.getCharacterProfile(owner, active.id, freshName);
-    expect(freshProfile.skills.map((skill) => skill.displayName)).toEqual(["Mining"]);
+    expect(freshProfile.skills.map((skill) => skill.displayName)).toEqual(["Mining", "Refining"]);
     expect(freshProfile.skills[0]).toMatchObject({ level: 1, totalXp: 0 });
     expect(freshProfile.overallLevel).toBe(1);
   });
@@ -278,7 +286,8 @@ suite("issue #64 character profile read boundary (real PostgreSQL)", () => {
 
     try {
       const result = await profile.getCharacterProfile(owner, active.id, targetName);
-      expect(result.skills).toHaveLength(1);
+      // Mining + Refining both have approved level curves and are published.
+      expect(result.skills).toHaveLength(2);
     } finally {
       spy.mockRestore();
     }
