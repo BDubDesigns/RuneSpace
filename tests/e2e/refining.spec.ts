@@ -7,6 +7,7 @@ import {
   characterMiningState,
   characterRefiningState,
   characterStarterProvisioning,
+  characterTravelState,
   equippedItems,
   inventoryStacks,
   itemInstances,
@@ -37,6 +38,7 @@ test.beforeEach(async ({ page }) => {
   const characterId = await openRefiningFixture(page);
   await Promise.all([
     db.delete(activeActions).where(eq(activeActions.characterId, characterId)),
+    db.delete(characterTravelState).where(eq(characterTravelState.characterId, characterId)),
     db.delete(characterMiningState).where(eq(characterMiningState.characterId, characterId)),
     db.delete(characterRefiningState).where(eq(characterRefiningState.characterId, characterId)),
     db.delete(inventoryStacks).where(eq(inventoryStacks.characterId, characterId)),
@@ -76,10 +78,8 @@ test("Processing Yard Refining journey — Ferrite and Slag both branches, artwo
     page.getByRole("button", { name: /Walk to Abandoned Processing Yard/ }),
   ).toBeVisible();
   await page.getByRole("button", { name: /Walk to Abandoned Processing Yard/ }).click();
-  // Travel creates activeActions + characterTravelState; UI shows either header or body copy
-  await expect(
-    page.getByText("In transit").first().or(page.getByText("Journey progress").first()),
-  ).toBeVisible({
+  // In transit shows as header + meter; accept either to avoid strict-mode double-match
+  await expect(page.getByText("In transit", { exact: true }).first()).toBeVisible({
     timeout: 10_000,
   });
   // Fast-forward the 40-tick (24s) walk by moving cursor back deterministically
