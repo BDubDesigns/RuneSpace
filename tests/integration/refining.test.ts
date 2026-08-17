@@ -419,14 +419,15 @@ suite("issue #81 Refining persistence and concurrency (real PostgreSQL)", () => 
     );
     expect(traveled.travelState?.destinationLocationId).toBe(LOCATION_IDS.crashSite);
     expect(traveled.activeAction).toBeUndefined();
-    // Trying to start refining while traveling must be refused
+    // Trying to start refining while traveling must be refused — travel is projected as travelState, not activeAction
     const refused = await mining.startRefining(
       userId,
       character.id,
       new Date("2026-01-01T00:00:04.200Z"),
     );
     expect(refused.commandError).toBe("another_action_active");
-    expect(refused.activeAction?.actionId).toBe(ACTION_IDS.travel);
+    expect(refused.travelState?.destinationLocationId).toBe(LOCATION_IDS.crashSite);
+    expect(refused.activeAction).toBeUndefined();
   });
 
   it("bounded run-history and new-run reset semantics remain consistent with Mining", async () => {
