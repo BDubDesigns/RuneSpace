@@ -260,7 +260,7 @@ suite("issue #64 character profile read boundary (real PostgreSQL)", () => {
     // Multiple skill rows (including an unpresented skill) must not add round
     // trips: the profile read is one set-based statement.
     await setSkillXp(target.id, SKILL_IDS.strength, 100);
-    await setSkillXp(target.id, SKILL_IDS.metallurgy, 100);
+    await setSkillXp(target.id, SKILL_IDS.welding, 100);
 
     // Count every query executed through the pg clients during the read. The
     // read itself must stay within: player account lookup (1) + owned

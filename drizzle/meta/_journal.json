@@ -57,6 +57,13 @@
       "when": 1786112345678,
       "tag": "0007_character_portrait_selection",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1786400000000,
+      "tag": "0008_refining_run_state",
+      "breakpoints": true
     }
   ]
 }

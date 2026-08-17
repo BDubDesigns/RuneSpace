@@ -13,7 +13,7 @@ export type SkillPresentation = {
 
 const skillPresentations = {
   [SKILL_IDS.mining]: { displayName: "Mining" },
-  [SKILL_IDS.metallurgy]: { displayName: "Metallurgy" },
+  [SKILL_IDS.refining]: { displayName: "Refining" },
   [SKILL_IDS.welding]: { displayName: "Welding" },
   [SKILL_IDS.strength]: { displayName: "Strength" },
 } as const satisfies Partial<Record<SkillId, SkillPresentation>>;

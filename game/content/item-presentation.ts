@@ -39,8 +39,15 @@ const itemPresentations = {
   },
   [ITEM_IDS.refinedFerrite]: {
     displayName: "Refined Ferrite",
-    accessibleDescription: "Purified Ferrite material refined from raw mineral shale",
+    accessibleDescription: "Stacked refined ingots of purified Ferrite metal",
     textFallback: "RF",
+    artworkSrc: "/item-art/refined-ferrite.webp",
+  },
+  [ITEM_IDS.slag]: {
+    displayName: "Slag",
+    accessibleDescription: "Vesicular slag byproduct from the refining process",
+    textFallback: "SL",
+    artworkSrc: "/item-art/slag.webp",
   },
 } as const satisfies Partial<Record<ItemId, ItemPresentation>>;
 

@@ -20,6 +20,7 @@ import { useMiningPlay } from "./MiningPlayContext";
 import { EquipmentPanel } from "./EquipmentPanel";
 import { InventoryPanel } from "./InventoryPanel";
 import { LocalMapPanel } from "@/features/travel/LocalMapPanel";
+import { RefiningConsole } from "@/features/refining/RefiningConsole";
 import { PowerAnnexClaimPanel } from "@/features/power-annex/PowerAnnexClaimPanel";
 import { LocationSceneHeader } from "@/features/location-scene/LocationSceneHeader";
 
@@ -179,7 +180,9 @@ export function MiningConsole({ characterName }: { characterName: string }) {
   const inTransit = Boolean(state.travelState);
   const currentLocationId = state.location.currentLocationId;
   const atCrashSite = currentLocationId === LOCATION_IDS.crashSite;
+  const atProcessingYard = currentLocationId === LOCATION_IDS.abandonedProcessingYard;
   const showMiningActivity = atCrashSite && !inTransit;
+  const showRefiningActivity = atProcessingYard && !inTransit;
   const durationTicks = active?.nextAttemptDurationTicks ?? balance.mining.attemptDurationTicks;
   const durationMs = durationTicks * GAME_TICK_MS;
   const elapsed = active ? Math.max(0, now - new Date(active.progressStartedAt).getTime()) : 0;
@@ -278,7 +281,13 @@ export function MiningConsole({ characterName }: { characterName: string }) {
                   location={currentLocation}
                   characterName={characterName}
                   resourceLabel={
-                    atCrashSite ? "Ferrite Shale" : atPowerAnnex ? "Power Cell" : undefined
+                    atCrashSite
+                      ? "Ferrite Shale"
+                      : atProcessingYard
+                        ? "Refining"
+                        : atPowerAnnex
+                          ? "Power Cell"
+                          : undefined
                   }
                 />
               );
@@ -303,6 +312,8 @@ export function MiningConsole({ characterName }: { characterName: string }) {
               You are walking between locations. Mining stopped before departure, and no new
               activity can begin until you arrive. Use the world map below to follow your journey.
             </p>
+          ) : atProcessingYard ? (
+            <RefiningConsole />
           ) : atCrashSite ? (
             <>
               <p className="mt-4 max-w-2xl text-sm leading-relaxed text-[color:var(--rs-text-secondary)]">

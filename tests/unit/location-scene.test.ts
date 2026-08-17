@@ -87,11 +87,13 @@ describe("location scene registry (issue #78)", () => {
   });
 
   it("no gameplay controls/state are gated by artwork (metadata-only, no behavior change)", () => {
-    // Scene metadata is presentation-only; location availability is unchanged by adding scenes.
+    // Scene metadata is presentation-only; Processing Yard now exposes Refining (issue #81).
     expect(getLocation(LOCATION_IDS.crashSite)?.availableActionIds).toContain(
       "crash_site_ferrite_shale_mining",
     );
-    expect(getLocation(LOCATION_IDS.abandonedProcessingYard)?.availableActionIds).toHaveLength(0);
+    expect(getLocation(LOCATION_IDS.abandonedProcessingYard)?.availableActionIds).toContain(
+      "processing_yard_refining",
+    );
     expect(getLocation(LOCATION_IDS.emergencyPowerAnnex)?.availableActionIds).toHaveLength(0);
   });
 

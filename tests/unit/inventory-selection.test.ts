@@ -28,8 +28,12 @@ function baseState(inventory: MiningGameplayState["inventory"]): MiningGameplayS
     characterId: "character-1",
     location: { currentLocationId: "crash_site" },
     mining: { totalXp: 0, level: 1, xpIntoLevel: 0 },
+    refining: { totalXp: 0, level: 1, xpIntoLevel: 0 },
     successChanceBps: 3_500,
+    refiningSuccessChanceBps: 4_000,
     ferriteShaleQuantity: 0,
+    refinedFerriteQuantity: 0,
+    slagQuantity: 0,
     inventory,
     equipment: {
       aggregateContainerSlots: 8,
@@ -44,7 +48,18 @@ function baseState(inventory: MiningGameplayState["inventory"]): MiningGameplayS
       xpGained: 0,
       recentAttempts: [],
     },
+    refiningRun: {
+      attempts: 0,
+      successes: 0,
+      failures: 0,
+      ferriteGained: 0,
+      slagGained: 0,
+      shaleConsumed: 0,
+      xpGained: 0,
+      recentAttempts: [],
+    },
     recentResult: { successes: 0, failures: 0, awardedXp: 0 },
+    refiningRecentResult: { successes: 0, failures: 0, awardedXp: 0 },
   };
 }
 

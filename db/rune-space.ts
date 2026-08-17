@@ -299,6 +299,23 @@ export const characterMiningState = pgTable("character_mining_state", {
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
+/** Issue #81 — bounded refining run state, mirroring mining (one row per character, latest ten attempts). */
+export const characterRefiningState = pgTable("character_refining_state", {
+  characterId: text("character_id")
+    .primaryKey()
+    .references(() => characters.id, { onDelete: "restrict" }),
+  lastStopReason: text("last_stop_reason"),
+  runAttempts: integer("run_attempts").notNull().default(0),
+  runSuccesses: integer("run_successes").notNull().default(0),
+  runFerriteGained: integer("run_ferrite_gained").notNull().default(0),
+  runSlagGained: integer("run_slag_gained").notNull().default(0),
+  runShaleConsumed: integer("run_shale_consumed").notNull().default(0),
+  runXpGained: integer("run_xp_gained").notNull().default(0),
+  /** Latest ten immutable server-resolved refining attempt summaries for the current run. */
+  recentAttempts: jsonb("recent_attempts").notNull().default([]),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
 /**
  * Immutable per-character Power Annex eligibility records. Eligibility is
  * derived by looking up the current Pacific calendar date; nothing is cleared

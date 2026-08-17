@@ -63,10 +63,10 @@ describe("issue #47 location content", () => {
       isActionAvailableAtLocation(LOCATION_IDS.abandonedProcessingYard, ACTION_IDS.crashSiteMining),
     ).toBe(false);
     expect(getLocation(LOCATION_IDS.emergencyPowerAnnex)?.availableActionIds).toHaveLength(0);
-    // The Processing Yard's Metallurgy is dormant, not an enabled action.
-    expect(getLocation(LOCATION_IDS.abandonedProcessingYard)?.availableActionIds).toHaveLength(0);
-    expect(getLocation(LOCATION_IDS.abandonedProcessingYard)?.dormantActivities[0]?.skillId).toBe(
-      "metallurgy",
+    // The Processing Yard now exposes Refining (issue #81) — dormant is empty there.
+    expect(getLocation(LOCATION_IDS.abandonedProcessingYard)?.availableActionIds).toContain(
+      ACTION_IDS.refining,
     );
+    expect(getLocation(LOCATION_IDS.abandonedProcessingYard)?.dormantActivities).toHaveLength(0);
   });
 });

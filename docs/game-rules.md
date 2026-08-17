@@ -23,7 +23,7 @@
 
 ## World & skills (directions, not implementations)
 - The opening direction is a **one-way crash-site tutorial planet**.
-- **Mining** is the first core skill direction; **Welding** follows.
+- **Mining** is the first core skill direction; **Refining** is the second (at the Abandoned Processing Yard); **Welding** follows.
 - Planetary maps use **hexes** with **local fog-of-war** exploration.
 - **Explore** consumes **limited fuel**.
 - **Speeder Piloting** and **Ship Piloting** are separate skill directions.

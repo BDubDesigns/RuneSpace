@@ -58,6 +58,30 @@ The current Mining run is bounded per-character state. Aggregate totals survive
 refreshes and stopping; only the latest ten immutable server-resolved attempt
 summaries are retained. Starting a genuinely new Mining action resets this run.
 
+## Refining slice (issue #81)
+
+Processing Yard Refining consumes exactly 2 Ferrite Shale per attempt and
+produces one server-authoritative result: 1 Refined Ferrite (150 g, stack limit
+5) plus 15 Refining XP on success, or 1 Slag (150 g, stack limit 10) plus 3
+Refining XP on failure. The success chance is 40% at Refining level 1,
+increasing linearly to 100% at level 20 and clamping thereafter
+(basis-point integer math, server-authoritative roll). One attempt takes
+exactly 7 ticks (4.2 seconds); there is no speed boost for Refining.
+
+Refining is available only while stationary at the Abandoned Processing
+Yard. Travel generalizes so that starting Travel while Mining or Refining is
+active resolves only already-completed work exactly once, persists it
+atomically, discards any partial attempt, stops the work action with
+`action_replaced`, and begins Travel. The preflight for each attempt
+simulates removal of the 2 shale and validates that the resulting inventory can
+accept either possible 1-item output (stack/mass/capacity); if only one branch
+would fit, no roll is made. All input removal, output addition, XP, run
+history, and cursor changes commit atomically.
+
+The refining run mirrors Mining: current Refining level/XP, success chance,
+bounded recent attempts (10), and current-run counters (attempts, Refined
+Ferrite, Slag, XP, shale consumed) — reset only on a genuinely new run.
+
 ## Inventory and equipment
 
 - Fungible items are carried as positive-quantity stacks. Unique items are
@@ -111,17 +135,21 @@ summaries are retained. Starting a genuinely new Mining action resets this run.
 
 ## Approved identities and boundaries
 
-Near-term stable skills are Mining, Metallurgy, Welding, and Strength. Stable
+Near-term stable skills are Mining, Refining, Welding, and Strength. Stable
 opening item identities are Ferrite Shale, Refined Ferrite, Slag, Crash-Grade
 Structural Alloy, Salvage Cutter, and Power Cell. These identities establish no
-weights, capacities, charge behavior, rewards, starter loadout, or action.
+weights, capacities, charge behavior, rewards, starter loadout, or action beyond
+their approved slice.
 
-Mining extracts raw material. Metallurgy refines material and forms alloys.
-Welding joins material and repairs structures. Salvage dismantles and recovers
-components. Fabrication assembles finished objects. Machining creates precise
-components. Salvage, Fabrication, Machining, Speeder Piloting, and Ship Piloting
-are documented future skill directions only; they have no persistence
-initialization or gameplay in this foundation.
+Mining extracts raw material from the infinite Crash Site deposit. Refining
+(issue #81) consumes 2 Ferrite Shale per 7-tick attempt at the Abandoned
+Processing Yard, producing 1 Refined Ferrite (150 g / stack 5, 15 XP) on
+success or 1 Slag (150 g / stack 10, 3 XP) otherwise, with a 40%→100% L1–20
+linear success curve. Welding joins material and repairs structures. Salvage
+dismantles and recovers components. Fabrication assembles finished objects.
+Machining creates precise components. Salvage, Fabrication, Machining, Speeder
+Piloting, and Ship Piloting are documented future skill directions only; they
+have no persistence initialization or gameplay in this foundation.
 
 ## World and Travel (issues #40 and #47)
 
@@ -148,9 +176,9 @@ of war, fuel, hauling, and transportation upgrades build.
 
 - **Crash Site** (`crash_site`): the existing infinite Ferrite Shale deposit.
   Mining is the only available activity.
-- **Abandoned Processing Yard** (`abandoned_processing_yard`): a dormant
-  industrial location. Its future Metallurgy activity is presented as dormant
-  only and performs no refining in this issue.
+- **Abandoned Processing Yard** (`abandoned_processing_yard`): the
+  Refining location (issue #81). Refining is available here while stationary;
+  the location advertises `processing_yard_refining` as its available action.
 - **DeWhat? Emergency Power Annex** (`dewhat_emergency_power_annex`): an
   adjacent emergency-supply depot. It is directly adjacent to both existing
   locations and is the authoritative renewable source for the daily Power Cell
@@ -326,18 +354,18 @@ that is used wherever the character is publicly presented.
   keyboard-and-touch-accessible grid with a programmatically exposed selected
   state. Public profile panels remain read-only.
 
-### Atomic Mining → Travel replacement
+### Atomic work-action → Travel replacement (issues #40 and #81)
 
-When Travel replaces an active Mining action:
+When Travel replaces an active travel-replaceable work action (Mining or Refining):
 
 1. The character and active-action state is locked.
-2. Only Mining attempts already completed before the command are resolved,
+2. Only attempts already completed before the command are resolved,
    exactly once, and persisted (XP, inventory, history, cursor).
-3. Mining stops.
+3. The work action stops (recorded as `action_replaced`).
 4. Travel begins from the still-current origin to the validated destination.
 5. The entire transition is committed atomically.
 
-Mining may never progress during Travel, and the server enforces this
+No work action may progress during Travel, and the server enforces this
 server-side even against a stale or manipulated client.
 
 ### Location/activity gating
@@ -397,7 +425,6 @@ server-side even against a stale or manipulated client.
 
 ### Deferred (not in this issue)
 
-  Metallurgy, refining, Slag/Refined Ferrite production,
   Welding, fuel, Speeders/ships, exploration XP, fog of war, undiscovered hexes,
 a large hex grid or full planet map, world coordinates, terrain simulation,
 pathfinding, multi-hop routing, route queues, random encounters, fast travel,
