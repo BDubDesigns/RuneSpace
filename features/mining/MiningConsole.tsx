@@ -315,8 +315,9 @@ export function MiningConsole({ characterName }: { characterName: string }) {
 
           {inTransit ? (
             <p className="mt-4 max-w-2xl text-sm leading-relaxed text-[color:var(--rs-text-secondary)]">
-              You are walking between locations. Mining stopped before departure, and no new
-              activity can begin until you arrive. Use the world map below to follow your journey.
+              You are walking between locations. The active work stopped before departure, and no
+              new activity can begin until you arrive. Use the world map below to follow your
+              journey.
             </p>
           ) : atProcessingYard ? (
             <RefiningConsole />
@@ -397,10 +398,7 @@ export function MiningConsole({ characterName }: { characterName: string }) {
               <p className="max-w-2xl text-sm leading-relaxed text-[color:var(--rs-text-secondary)]">
                 {getLocation(currentLocationId)?.description}
               </p>
-              <Feedback tone="muted">
-                Mining is only available at the Crash Site. The processing equipment is offline and
-                refining is not available yet.
-              </Feedback>
+              <Feedback tone="muted">No production activity is available here.</Feedback>
             </div>
           )}
           {showMiningActivity && latestAttempt ? (
@@ -443,6 +441,7 @@ export function MiningConsole({ characterName }: { characterName: string }) {
               <SkillProgressCard
                 level={state.mining.level}
                 title="Mining progression"
+                tone="mining"
                 totalXp={state.mining.totalXp}
                 xpIntoLevel={state.mining.xpIntoLevel}
                 xpToNextLevel={state.mining.xpToNextLevel}
@@ -451,6 +450,7 @@ export function MiningConsole({ characterName }: { characterName: string }) {
               <SkillProgressCard
                 level={state.refining.level}
                 title="Refining progression"
+                tone="refining"
                 totalXp={state.refining.totalXp}
                 xpIntoLevel={state.refining.xpIntoLevel}
                 xpToNextLevel={state.refining.xpToNextLevel}

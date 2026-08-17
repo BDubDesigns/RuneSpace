@@ -243,6 +243,8 @@ export type MiningGameplayState = {
     | "not_adjacent"
     | "already_traveling"
     | "mining_unavailable_here";
+  /** Set when a Start Refining command was refused outside the Processing Yard. */
+  refiningError?: "refining_unavailable_here";
 };
 
 export async function ensureStarterMiningState(
@@ -615,6 +617,7 @@ export async function stateFromTransaction(
     awardedXp: 0,
   },
   refiningStopReason?: RefiningStopReason | null,
+  refiningError?: MiningGameplayState["refiningError"],
 ): Promise<MiningGameplayState> {
   const balance = getEffectiveGameBalance();
   const snapshot = await loadMiningSnapshot(transaction, characterId);
@@ -873,6 +876,7 @@ export async function stateFromTransaction(
       : (stoppingReason ?? (miningState?.lastStopReason as MiningStopReason | null) ?? undefined),
     commandError,
     travelError,
+    refiningError,
   };
 }
 
@@ -1128,7 +1132,7 @@ export async function startRefining(
             : { successes: 0, failures: 0, awardedXp: 0 },
           miningOutcome?.stopReason,
           undefined,
-          "mining_unavailable_here",
+          undefined,
           undefined,
           now,
           refiningOutcome
@@ -1139,6 +1143,7 @@ export async function startRefining(
               }
             : { successes: 0, failures: 0, awardedXp: 0 },
           refiningOutcome?.stopReason,
+          "refining_unavailable_here",
         );
       }
       // Preflight: need at least 2 shale and room for either output

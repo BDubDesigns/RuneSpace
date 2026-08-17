@@ -20,6 +20,7 @@ import type { LocationPopulationEntry } from "@/game/domain/location-population"
 import { beginTravelAction } from "@/server/actions";
 import { useMiningPlay } from "@/features/mining/MiningPlayContext";
 import { COLLAPSE_KEYS, useSyncedCollapse } from "@/features/shared/use-synced-collapse";
+import { CollapseButton } from "@/features/shared/CollapseButton";
 import { CharacterProfilePanel } from "./CharacterProfilePanel";
 import {
   buildLocalMapGeometry,
@@ -607,7 +608,7 @@ export function LocalMapPanel() {
   const currentLocationId = state.location.currentLocationId;
   const travel = state.travelState;
   const inTransit = Boolean(travel);
-  const miningActive = state.activeAction?.actionId === ACTION_IDS.crashSiteMining;
+  const workActive = Boolean(state.activeAction);
 
   useEffect(() => {
     function updateMapGeometry() {
@@ -816,15 +817,11 @@ export function LocalMapPanel() {
             open={populationOpen}
             triggerRef={populationTriggerRef}
           />
-          <button
-            aria-expanded={!mapCollapsed}
-            aria-label={mapCollapsed ? "Expand world map" : "Collapse world map"}
-            className="rs-bevel rs-focus inline-flex min-h-[var(--rs-touch-target)] w-9 shrink-0 items-center justify-center border border-[color:var(--rs-border-structural)] bg-[color:var(--rs-surface-control)] text-lg font-bold text-[color:var(--rs-text-primary)] transition duration-[var(--rs-duration-fast)] hover:border-[color:var(--rs-accent-secondary)]"
-            onClick={toggleMapCollapsed}
-            type="button"
-          >
-            <span aria-hidden="true">{mapCollapsed ? "+" : "−"}</span>
-          </button>
+          <CollapseButton
+            collapsed={mapCollapsed}
+            label="world map"
+            onToggle={toggleMapCollapsed}
+          />
         </div>
       </div>
       {!mapCollapsed ? (
@@ -917,7 +914,8 @@ export function LocalMapPanel() {
                 />
               </div>
               <p className="mt-2 text-xs text-[color:var(--rs-text-muted)]">
-                Mining stopped before departure. No new activity can begin until you arrive.
+                The active work stopped before departure. No new activity can begin until you
+                arrive.
               </p>
             </div>
           ) : selectedLocation ? (
@@ -933,10 +931,10 @@ export function LocalMapPanel() {
                   <p className="text-xs uppercase tracking-wide text-[color:var(--rs-text-muted)]">
                     Walking time: {WALK_SECONDS} seconds
                   </p>
-                  {miningActive ? (
+                  {workActive ? (
                     <p className="mt-2 text-xs text-[color:var(--rs-text-secondary)]">
-                      Departing resolves your completed Mining work and stops Mining before the
-                      journey begins.
+                      Departing resolves your completed work and stops the active activity before
+                      the journey begins.
                     </p>
                   ) : null}
                   <ActionButton
@@ -950,11 +948,13 @@ export function LocalMapPanel() {
                 </div>
               ) : (
                 <p className="mt-2 text-xs text-[color:var(--rs-text-secondary)]">
-                  {selectedLocation.availableActionIds.length > 0
-                    ? "Mining is available here."
-                    : selectedLocation.id === LOCATION_IDS.emergencyPowerAnnex
-                      ? "Claim five Power Cells here once per Pacific reset day."
-                      : "The processing equipment is offline. Refining is not available yet."}
+                  {selectedLocation.availableActionIds.includes(ACTION_IDS.refining)
+                    ? "Refining is available here — feed Ferrite Shale to produce Refined Ferrite or Slag."
+                    : selectedLocation.availableActionIds.includes(ACTION_IDS.crashSiteMining)
+                      ? "Mining is available here."
+                      : selectedLocation.id === LOCATION_IDS.emergencyPowerAnnex
+                        ? "Claim five Power Cells here once per Pacific reset day."
+                        : "No production activity is available here."}
                 </p>
               )}
             </div>

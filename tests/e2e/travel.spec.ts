@@ -343,11 +343,13 @@ test("the full journey walks, arrives, and returns between the original location
     page.getByRole("main").getByText("In transit", { exact: true }).first(),
   ).toBeVisible();
   await expect(
-    page.getByText("Mining stopped before departure. No new activity can begin until you arrive."),
+    page.getByText(
+      "The active work stopped before departure. No new activity can begin until you arrive.",
+    ),
   ).toBeVisible();
   await expect(
     page.getByText(
-      "You are walking between locations. Mining stopped before departure, and no new activity can begin until you arrive. Use the world map below to follow your journey.",
+      "You are walking between locations. The active work stopped before departure, and no new activity can begin until you arrive. Use the world map below to follow your journey.",
     ),
   ).toBeVisible();
   await expect(page.getByText(/paused/i)).toHaveCount(0);

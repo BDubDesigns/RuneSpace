@@ -46,6 +46,17 @@ function refiningCommandErrorMessage(error: string): string {
   );
 }
 
+function refiningErrorMessage(error: string): string {
+  return (
+    (
+      {
+        refining_unavailable_here:
+          "Ferrite refining is only available at the Abandoned Processing Yard.",
+      } as Record<string, string>
+    )[error] ?? error
+  );
+}
+
 function latestRefiningAttempt(
   attempts: readonly RefiningRunAttempt[],
 ): RefiningRunAttempt | undefined {
@@ -94,7 +105,8 @@ export function RefiningConsole() {
     if (result.state) {
       acceptState(result.state);
       const next = result.state;
-      if (next.commandError) setMessage(refiningCommandErrorMessage(next.commandError));
+      if (next.refiningError) setMessage(refiningErrorMessage(next.refiningError));
+      else if (next.commandError) setMessage(refiningCommandErrorMessage(next.commandError));
       else if (next.refiningStopReason) setMessage(refiningStopMessage(next.refiningStopReason));
       else if (next.stoppingReason) setMessage(refiningStopMessage(next.stoppingReason));
       else setMessage(undefined);

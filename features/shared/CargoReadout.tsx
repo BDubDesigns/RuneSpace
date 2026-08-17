@@ -1,6 +1,5 @@
 "use client";
 
-import { useState } from "react";
 import { Panel } from "@/components/ui/Panel";
 import { StatusMeter } from "@/components/ui/StatusMeter";
 import { COLLAPSE_KEYS, useSyncedCollapse } from "./use-synced-collapse";
@@ -35,8 +34,6 @@ export function CargoReadout({
   items: readonly CargoReadoutItem[];
 }) {
   const { collapsed, toggle } = useSyncedCollapse(COLLAPSE_KEYS.cargoReadout);
-  const [now] = useState(() => Date.now());
-  void now;
 
   const twoColumns = items.length > 1;
 
