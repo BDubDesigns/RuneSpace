@@ -857,10 +857,10 @@ test("equipment and inventory rendering shows artwork for illustrated items and 
 
   await equipment.getByRole("button", { name: "Close equipment" }).click();
 
-  // Open inventory — should show one illustrated and one fallback stack
-  await footer.getByRole("button", { name: "Inventory 2/8" }).click();
+  // Open inventory — should show illustrated and fallback stacks
+  await footer.getByRole("button", { name: "Inventory 3/8" }).click();
   const inventory = page.getByRole("dialog", { name: "Inventory" });
-  await expect(inventory.getByText("2 occupied / 8 slots")).toBeVisible();
+  await expect(inventory.getByText("3 occupied / 8 slots")).toBeVisible();
 
   // Illustrated stack: Ferrite Shale
   const ferriteTile = inventory
