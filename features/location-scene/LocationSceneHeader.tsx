@@ -89,10 +89,10 @@ export function LocationSceneHeader({
           {characterName}
         </div>
         {resourceLabels && resourceLabels.length > 0 ? (
-          <div className="absolute bottom-2 right-2 flex flex-col items-end gap-1 sm:bottom-2.5 sm:right-2.5">
+          <div className="absolute bottom-2 right-2 flex max-w-[70%] flex-col items-end gap-1 sm:bottom-2.5 sm:right-2.5">
             {resourceLabels.map((label) => (
               <span
-                className="inline-flex max-w-[48%] items-center justify-center whitespace-nowrap border border-[color:var(--rs-accent-mining)] bg-[color:var(--rs-surface-panel)] px-2 py-0.5 font-display text-[10px] font-bold uppercase tracking-wide text-[color:var(--rs-accent-mining)] sm:px-2.5 sm:text-[11px]"
+                className="inline-flex items-center justify-center whitespace-nowrap border border-[color:var(--rs-accent-mining)] bg-[color:var(--rs-surface-panel)] px-2 py-0.5 font-display text-[10px] font-bold uppercase tracking-wide text-[color:var(--rs-accent-mining)] sm:px-2.5 sm:text-[11px]"
                 data-scene-resource
                 key={label}
               >

@@ -127,7 +127,7 @@ export type MiningRunAttempt = {
   remainingCharge: number;
 };
 
-type MiningRunState = {
+export type MiningRunState = {
   attempts: number;
   successes: number;
   failures: number;

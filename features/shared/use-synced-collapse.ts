@@ -44,4 +44,5 @@ export function useSyncedCollapse(key: string, defaultCollapsed = false) {
 export const COLLAPSE_KEYS = {
   cargoReadout: "runespace:collapse:cargo-readout",
   worldMap: "runespace:collapse:world-map",
+  runHistory: "runespace:collapse:run-history",
 } as const;
