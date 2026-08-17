@@ -69,13 +69,13 @@ async function travelTo(
   await expect(page.getByText("In transit", { exact: true }).first()).toBeVisible({
     timeout: 10_000,
   });
-  // Fast-forward the 40-tick (24s) walk
+  // Fast-forward the 40-tick (24s) walk — arrival resolves on next page load via server
   const ago = new Date(Date.now() - 25_000);
   await db
     .update(activeActions)
     .set({ startedAt: ago, resolvedThroughAt: ago })
     .where(eq(activeActions.characterId, characterId));
-  await page.getByRole("button", { name: "Refresh status" }).click();
+  await page.reload();
 }
 
 test("Processing Yard Refining journey — Ferrite and Slag both branches, artwork, refresh, Travel partial, refusals, no metallurgy", async ({
