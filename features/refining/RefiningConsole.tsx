@@ -5,9 +5,7 @@ import { ActionButton } from "@/components/ui/ActionButton";
 import { ItemVisual } from "@/components/items/ItemVisual";
 import { VisualTile } from "@/components/items/VisualTile";
 import { Feedback } from "@/components/ui/Feedback";
-import { SectionHeader } from "@/components/ui/SectionHeader";
 import { StatusMeter } from "@/components/ui/StatusMeter";
-import { SkillProgressCard } from "@/features/shared/run-presentation";
 import { getEffectiveGameBalance } from "@/game/config/balance";
 import { GAME_TICK_MS, ITEM_IDS } from "@/game/config/foundations";
 import type { RefiningRunAttempt } from "@/server/mining";
@@ -281,83 +279,6 @@ export function RefiningConsole() {
           Retry status check
         </ActionButton>
       ) : null}
-      {/* Refining skill progression mirrors Mining's card at the Crash Site. */}
-      <div className="mt-6">
-        <div className="grid gap-4 sm:grid-cols-2">
-          <SkillProgressCard
-            level={state.refining.level}
-            title="Refining progression"
-            totalXp={state.refining.totalXp}
-            xpIntoLevel={state.refining.xpIntoLevel}
-            xpToNextLevel={state.refining.xpToNextLevel}
-          />
-        </div>
-      </div>
-      {/* Progression + cargo readout lives in MiningConsole; for the Yard we show refining run history inline here */}
-      <div className="mt-6">
-        <SectionHeader eyebrow="Server-resolved">This refining run</SectionHeader>
-        <div className="mt-4 grid grid-cols-2 gap-3 text-sm sm:grid-cols-4">
-          <p>
-            <strong>{refiningRun.attempts}</strong> attempts
-          </p>
-          <p>
-            <strong>{refiningRun.successes}</strong> Refined Ferrite
-          </p>
-          <p>
-            <strong>{refiningRun.failures}</strong> Slag
-          </p>
-          <p>
-            <strong>{refiningRun.xpGained}</strong> Refining XP
-          </p>
-        </div>
-        <div className="mt-3 grid grid-cols-2 gap-3 text-sm sm:grid-cols-3">
-          <p>
-            <strong>{refiningRun.shaleConsumed}</strong> shale consumed
-          </p>
-          <p>
-            <strong>{state.refinedFerriteQuantity}</strong> Refined Ferrite carried
-          </p>
-          <p>
-            <strong>{state.slagQuantity}</strong> Slag carried
-          </p>
-        </div>
-        <div
-          className="mt-5 max-h-72 space-y-2 overflow-y-auto pr-1"
-          aria-label="Refining attempt history"
-        >
-          {[...refiningRun.recentAttempts].reverse().map((attempt) => (
-            <article
-              className="border-l-2 border-[color:var(--rs-border-structural)] bg-[color:var(--rs-surface-panel)] px-3 py-2 text-sm"
-              key={attempt.sequence}
-            >
-              <p className="font-display uppercase tracking-wide">
-                Attempt {attempt.sequence} — {attempt.success ? "Refined Ferrite" : "Slag"}
-              </p>
-              <p className="text-[color:var(--rs-text-secondary)]">
-                Roll {percentage(attempt.rolledBasisPoints)} | Needed below{" "}
-                {percentage(attempt.thresholdBasisPoints)}
-              </p>
-              <p className="text-xs uppercase tracking-wide text-[color:var(--rs-text-muted)]">
-                7 ticks &middot; 2 Ferrite Shale consumed
-              </p>
-              <p className="text-xs text-[color:var(--rs-text-muted)]">
-                Resolved {new Date(attempt.resolvedAt).toLocaleTimeString()}
-              </p>
-              <p>
-                {attempt.success
-                  ? `${attempt.ferriteAwarded} Refined Ferrite`
-                  : `${attempt.slagAwarded} Slag`}{" "}
-                | {attempt.xpAwarded} Refining XP
-              </p>
-            </article>
-          ))}
-          {refiningRun.recentAttempts.length === 0 ? (
-            <p className="text-sm text-[color:var(--rs-text-muted)]">
-              No resolved attempts in this run yet.
-            </p>
-          ) : null}
-        </div>
-      </div>
     </>
   );
 }

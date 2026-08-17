@@ -388,14 +388,14 @@ test("the full journey walks, arrives, and returns between the original location
   await expect(
     page.getByRole("button", { name: /Abandoned Processing Yard/ }).first(),
   ).toHaveAttribute("aria-current", "true");
-  await expect(
-    page
-      .getByRole("paragraph")
-      .filter({ hasText: "The processing equipment is offline. Refining is not available yet." }),
-  ).toBeVisible();
+  // Refining is available at the Yard (issue #81): the activity panel shows
+  // the Refining console, not the old "offline" message.
+  await expect(page.getByRole("button", { name: "Start Refining" })).toBeVisible();
+  await expect(page.getByText("Refining progression", { exact: true })).toBeVisible();
+  await expect(page.getByText("Cargo readout", { exact: true })).toBeVisible();
+  await expect(page.getByText("This refining run", { exact: true })).toBeVisible();
   await expectMiningDashboardsHidden(page);
   await expect(page.getByText(/Metallurgy progression/i)).toHaveCount(0);
-  await expect(page.getByRole("button", { name: /Refine/i })).toHaveCount(0);
 
   await scrollMapIntoView(page);
   await page.screenshot({ path: "test-results/travel-mobile-arrived.png" });

@@ -149,7 +149,7 @@ export type RefiningRunAttempt = {
   durationTicks: number;
 };
 
-type RefiningRunState = {
+export type RefiningRunState = {
   attempts: number;
   successes: number;
   failures: number;

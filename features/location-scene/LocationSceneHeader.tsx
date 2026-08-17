@@ -6,14 +6,15 @@ import type { LocationDefinition } from "@/game/schemas/locations";
 export type LocationSceneHeaderProps = {
   location: LocationDefinition;
   characterName: string;
-  /** Upper-right contextual plate (e.g. FERRITE SHALE at Crash Site). Omit to hide. */
-  resourceLabel?: string;
+  /** Contextual plates (e.g. FERRITE SHALE at Crash Site, REFINED FERRITE +
+      SLAG at the Processing Yard). Stacked bottom-right; omit to hide. */
+  resourceLabels?: readonly string[];
 };
 
 export function LocationSceneHeader({
   location,
   characterName,
-  resourceLabel,
+  resourceLabels,
 }: LocationSceneHeaderProps) {
   const scene = location.presentation.scene;
   // Defensive: schema guarantees scene, but keep truthful if registry is stale.
@@ -87,13 +88,18 @@ export function LocationSceneHeader({
         >
           {characterName}
         </div>
-        {resourceLabel ? (
-          <span
-            className="absolute bottom-2 right-2 inline-flex max-w-[40%] items-center justify-center whitespace-pre-line border border-[color:var(--rs-accent-mining)] bg-[color:var(--rs-surface-panel)] px-2 py-0.5 text-center font-display text-[10px] font-bold uppercase leading-tight tracking-wide text-[color:var(--rs-accent-mining)] sm:bottom-2.5 sm:right-2.5 sm:max-w-[36%] sm:px-2.5 sm:text-[11px]"
-            data-scene-resource
-          >
-            {resourceLabel}
-          </span>
+        {resourceLabels && resourceLabels.length > 0 ? (
+          <div className="absolute bottom-2 right-2 flex flex-col items-end gap-1 sm:bottom-2.5 sm:right-2.5">
+            {resourceLabels.map((label) => (
+              <span
+                className="inline-flex max-w-[48%] items-center justify-center whitespace-nowrap border border-[color:var(--rs-accent-mining)] bg-[color:var(--rs-surface-panel)] px-2 py-0.5 font-display text-[10px] font-bold uppercase tracking-wide text-[color:var(--rs-accent-mining)] sm:px-2.5 sm:text-[11px]"
+                data-scene-resource
+                key={label}
+              >
+                {label}
+              </span>
+            ))}
+          </div>
         ) : null}
       </div>
     </div>

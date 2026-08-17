@@ -19,6 +19,7 @@ import { getLocation } from "@/game/content/locations";
 import type { LocationPopulationEntry } from "@/game/domain/location-population";
 import { beginTravelAction } from "@/server/actions";
 import { useMiningPlay } from "@/features/mining/MiningPlayContext";
+import { COLLAPSE_KEYS, useSyncedCollapse } from "@/features/shared/use-synced-collapse";
 import { CharacterProfilePanel } from "./CharacterProfilePanel";
 import {
   buildLocalMapGeometry,
@@ -587,6 +588,9 @@ export function LocalMapPanel() {
   const [populationError, setPopulationError] = useState<string | undefined>();
   const [populationOpen, setPopulationOpen] = useState(false);
   const populationRequest = useRef(0);
+  const { collapsed: mapCollapsed, toggle: toggleMapCollapsed } = useSyncedCollapse(
+    COLLAPSE_KEYS.worldMap,
+  );
   // One shared profile panel (issue #64): only the selected target's display
   // name is state; the panel stays mounted so every entry's aria-controls
   // stays valid, and switching targets updates the same panel. The trigger
@@ -804,153 +808,168 @@ export function LocalMapPanel() {
     <Panel tone="raised">
       <div className="flex items-start justify-between gap-2">
         <SectionHeader eyebrow="Local area">World map</SectionHeader>
-        <LocationPopulationTrigger
-          count={populationMatchesLocation ? population.length : 0}
-          onToggle={() => setPopulationOpen((open) => !open)}
-          open={populationOpen}
-          triggerRef={populationTriggerRef}
-        />
+        <div className="flex shrink-0 items-center gap-2">
+          <LocationPopulationTrigger
+            count={populationMatchesLocation ? population.length : 0}
+            onToggle={() => setPopulationOpen((open) => !open)}
+            open={populationOpen}
+            triggerRef={populationTriggerRef}
+          />
+          <button
+            aria-expanded={!mapCollapsed}
+            aria-label={mapCollapsed ? "Expand world map" : "Collapse world map"}
+            className="rs-bevel rs-focus inline-flex min-h-[var(--rs-touch-target)] w-9 shrink-0 items-center justify-center border border-[color:var(--rs-border-structural)] bg-[color:var(--rs-surface-control)] text-lg font-bold text-[color:var(--rs-text-primary)] transition duration-[var(--rs-duration-fast)] hover:border-[color:var(--rs-accent-secondary)]"
+            onClick={toggleMapCollapsed}
+            type="button"
+          >
+            <span aria-hidden="true">{mapCollapsed ? "+" : "−"}</span>
+          </button>
+        </div>
       </div>
-      <p className="mt-2 text-sm text-[color:var(--rs-text-secondary)]">
-        Locations are hexes connected by routes. Select a reachable hex to inspect it, then confirm
-        to walk there.
-      </p>
+      {!mapCollapsed ? (
+        <>
+          <p className="mt-2 text-sm text-[color:var(--rs-text-secondary)]">
+            Locations are hexes connected by routes. Select a reachable hex to inspect it, then
+            confirm to walk there.
+          </p>
 
-      {/* Three flat-top hexes form a triangle. The SVG renders plated chassis,
+          {/* Three flat-top hexes form a triangle. The SVG renders plated chassis,
           decorative identifiers, and all approved routes; native buttons overlay
           each hex for semantics and text labels. */}
-      <div
-        className="relative mx-auto mt-4"
-        role="group"
-        aria-label="Local map"
-        style={{ width: `${mapGeometry.width}px`, height: `${mapGeometry.height}px` }}
-      >
-        <HexMapSvg
-          geometry={mapGeometry}
-          currentLocationId={currentLocationId}
-          selectedLocationId={selected}
-          inTransit={inTransit}
-          transitProgress={transitProgress}
-          travelOriginLocationId={travel?.originLocationId}
-          travelDestinationLocationId={travel?.destinationLocationId}
-        />
-        {mapGeometry.layouts.map((layout) => {
-          const location = getLocation(layout.locationId);
-          if (!location) return null;
-          const isCurrent = location.id === currentLocationId;
-          return (
-            <HexButton
-              key={location.id}
-              locationId={location.id}
-              name={location.presentation.localMap.label}
-              accessibleName={location.displayName}
-              statusLabel={tileStatusLabel(location.id)}
-              description={location.description}
-              selected={selected === location.id}
-              current={isCurrent}
-              populationCount={isCurrent && populationMatchesLocation ? population.length : 0}
-              transitRole={
-                inTransit && travel?.originLocationId === location.id
-                  ? "origin"
-                  : inTransit && travel?.destinationLocationId === location.id
-                    ? "destination"
-                    : undefined
-              }
-              disabled={inTransit}
-              onSelect={() => !inTransit && setSelected(location.id)}
-              style={hexButtonStyle(location.id)}
+          <div
+            className="relative mx-auto mt-4"
+            role="group"
+            aria-label="Local map"
+            style={{ width: `${mapGeometry.width}px`, height: `${mapGeometry.height}px` }}
+          >
+            <HexMapSvg
+              geometry={mapGeometry}
+              currentLocationId={currentLocationId}
+              selectedLocationId={selected}
+              inTransit={inTransit}
+              transitProgress={transitProgress}
+              travelOriginLocationId={travel?.originLocationId}
+              travelDestinationLocationId={travel?.destinationLocationId}
             />
-          );
-        })}
-      </div>
-
-      <LocationPopulationList
-        entries={population}
-        error={populationError}
-        matchesLocation={populationMatchesLocation}
-        onOpenProfile={openProfile}
-        open={populationOpen}
-        profileTarget={profileTarget}
-      />
-
-      <CharacterProfilePanel
-        activeCharacterId={state.characterId}
-        onClose={closeProfile}
-        openerRef={profileTriggerRef}
-        panelRef={profilePanelRef}
-        refreshKey={state}
-        targetName={profileTarget}
-      />
-
-      {inTransit ? (
-        <div className="mt-4 rounded-sm border border-[color:var(--rs-accent-arcane)] bg-[color:var(--rs-accent-arcane-subtle)] p-3">
-          <p className="font-display text-xs uppercase tracking-[0.16em] text-[color:var(--rs-accent-arcane)]">
-            In transit
-          </p>
-          <p className="mt-2 text-sm text-[color:var(--rs-text-primary)]">
-            Walking from <strong>{getLocation(travel!.originLocationId)?.displayName}</strong> to{" "}
-            <strong>{getLocation(travel!.destinationLocationId)?.displayName}</strong>.
-          </p>
-          <div className="mt-3">
-            <StatusMeter
-              label="Journey progress"
-              value={transitProgress}
-              detail={`${transitRemainingSeconds.toFixed(1)}s remaining`}
-            />
+            {mapGeometry.layouts.map((layout) => {
+              const location = getLocation(layout.locationId);
+              if (!location) return null;
+              const isCurrent = location.id === currentLocationId;
+              return (
+                <HexButton
+                  key={location.id}
+                  locationId={location.id}
+                  name={location.presentation.localMap.label}
+                  accessibleName={location.displayName}
+                  statusLabel={tileStatusLabel(location.id)}
+                  description={location.description}
+                  selected={selected === location.id}
+                  current={isCurrent}
+                  populationCount={isCurrent && populationMatchesLocation ? population.length : 0}
+                  transitRole={
+                    inTransit && travel?.originLocationId === location.id
+                      ? "origin"
+                      : inTransit && travel?.destinationLocationId === location.id
+                        ? "destination"
+                        : undefined
+                  }
+                  disabled={inTransit}
+                  onSelect={() => !inTransit && setSelected(location.id)}
+                  style={hexButtonStyle(location.id)}
+                />
+              );
+            })}
           </div>
-          <p className="mt-2 text-xs text-[color:var(--rs-text-muted)]">
-            Mining stopped before departure. No new activity can begin until you arrive.
-          </p>
-        </div>
-      ) : selectedLocation ? (
-        <div className="mt-4 border border-[color:var(--rs-border-structural)] bg-[color:var(--rs-surface-panel)] p-3">
-          <p className="font-display text-sm font-bold text-[color:var(--rs-text-primary)]">
-            {selectedLocation.displayName}
-          </p>
-          <p className="mt-1 text-sm text-[color:var(--rs-text-secondary)]">
-            {selectedLocation.description}
-          </p>
-          {selectedIsDestination ? (
-            <div className="mt-3">
-              <p className="text-xs uppercase tracking-wide text-[color:var(--rs-text-muted)]">
-                Walking time: {WALK_SECONDS} seconds
-              </p>
-              {miningActive ? (
-                <p className="mt-2 text-xs text-[color:var(--rs-text-secondary)]">
-                  Departing resolves your completed Mining work and stops Mining before the journey
-                  begins.
-                </p>
-              ) : null}
-              <ActionButton
-                className="mt-3"
-                disabled={busy || transitioning}
-                intent="primary"
-                onClick={() => travelTo(selectedLocation.id)}
-              >
-                Walk to {selectedLocation.displayName} — {WALK_SECONDS} sec
-              </ActionButton>
-            </div>
-          ) : (
-            <p className="mt-2 text-xs text-[color:var(--rs-text-secondary)]">
-              {selectedLocation.availableActionIds.length > 0
-                ? "Mining is available here."
-                : selectedLocation.id === LOCATION_IDS.emergencyPowerAnnex
-                  ? "Claim five Power Cells here once per Pacific reset day."
-                  : "The processing equipment is offline. Refining is not available yet."}
-            </p>
-          )}
-        </div>
-      ) : null}
 
-      <p aria-live="polite" className="sr-only">
-        {inTransit
-          ? `In transit to ${travel ? getLocation(travel.destinationLocationId)?.displayName : ""}. ${transitRemainingSeconds.toFixed(0)} seconds remaining.`
-          : message
-            ? message
-            : ""}
-      </p>
-      {message && !inTransit ? (
-        <Feedback tone={state.travelError ? "danger" : "muted"}>{message}</Feedback>
+          <LocationPopulationList
+            entries={population}
+            error={populationError}
+            matchesLocation={populationMatchesLocation}
+            onOpenProfile={openProfile}
+            open={populationOpen}
+            profileTarget={profileTarget}
+          />
+
+          <CharacterProfilePanel
+            activeCharacterId={state.characterId}
+            onClose={closeProfile}
+            openerRef={profileTriggerRef}
+            panelRef={profilePanelRef}
+            refreshKey={state}
+            targetName={profileTarget}
+          />
+
+          {inTransit ? (
+            <div className="mt-4 rounded-sm border border-[color:var(--rs-accent-arcane)] bg-[color:var(--rs-accent-arcane-subtle)] p-3">
+              <p className="font-display text-xs uppercase tracking-[0.16em] text-[color:var(--rs-accent-arcane)]">
+                In transit
+              </p>
+              <p className="mt-2 text-sm text-[color:var(--rs-text-primary)]">
+                Walking from <strong>{getLocation(travel!.originLocationId)?.displayName}</strong>{" "}
+                to <strong>{getLocation(travel!.destinationLocationId)?.displayName}</strong>.
+              </p>
+              <div className="mt-3">
+                <StatusMeter
+                  label="Journey progress"
+                  value={transitProgress}
+                  detail={`${transitRemainingSeconds.toFixed(1)}s remaining`}
+                />
+              </div>
+              <p className="mt-2 text-xs text-[color:var(--rs-text-muted)]">
+                Mining stopped before departure. No new activity can begin until you arrive.
+              </p>
+            </div>
+          ) : selectedLocation ? (
+            <div className="mt-4 border border-[color:var(--rs-border-structural)] bg-[color:var(--rs-surface-panel)] p-3">
+              <p className="font-display text-sm font-bold text-[color:var(--rs-text-primary)]">
+                {selectedLocation.displayName}
+              </p>
+              <p className="mt-1 text-sm text-[color:var(--rs-text-secondary)]">
+                {selectedLocation.description}
+              </p>
+              {selectedIsDestination ? (
+                <div className="mt-3">
+                  <p className="text-xs uppercase tracking-wide text-[color:var(--rs-text-muted)]">
+                    Walking time: {WALK_SECONDS} seconds
+                  </p>
+                  {miningActive ? (
+                    <p className="mt-2 text-xs text-[color:var(--rs-text-secondary)]">
+                      Departing resolves your completed Mining work and stops Mining before the
+                      journey begins.
+                    </p>
+                  ) : null}
+                  <ActionButton
+                    className="mt-3"
+                    disabled={busy || transitioning}
+                    intent="primary"
+                    onClick={() => travelTo(selectedLocation.id)}
+                  >
+                    Walk to {selectedLocation.displayName} — {WALK_SECONDS} sec
+                  </ActionButton>
+                </div>
+              ) : (
+                <p className="mt-2 text-xs text-[color:var(--rs-text-secondary)]">
+                  {selectedLocation.availableActionIds.length > 0
+                    ? "Mining is available here."
+                    : selectedLocation.id === LOCATION_IDS.emergencyPowerAnnex
+                      ? "Claim five Power Cells here once per Pacific reset day."
+                      : "The processing equipment is offline. Refining is not available yet."}
+                </p>
+              )}
+            </div>
+          ) : null}
+
+          <p aria-live="polite" className="sr-only">
+            {inTransit
+              ? `In transit to ${travel ? getLocation(travel.destinationLocationId)?.displayName : ""}. ${transitRemainingSeconds.toFixed(0)} seconds remaining.`
+              : message
+                ? message
+                : ""}
+          </p>
+          {message && !inTransit ? (
+            <Feedback tone={state.travelError ? "danger" : "muted"}>{message}</Feedback>
+          ) : null}
+        </>
       ) : null}
     </Panel>
   );
