@@ -793,14 +793,8 @@ suite("issue #81 Refining persistence and concurrency (real PostgreSQL)", () => 
     // The latest refining stop is action_replaced (from the Travel replacement).
     expect(atCrash.stop?.actionId).toBe(ACTION_IDS.refining);
     expect(atCrash.stop?.reason).toBe("action_replaced");
-    // Mining helper would not understand refining-specific reason
-    expect([
-      "manually_stopped",
-      "inventory_slots_full",
-      "carried_mass_capacity_reached",
-      "compatible_mining_tool_missing",
-      "mining_tool_replaced",
-      "action_replaced",
-    ]).not.toContain(atCrash.stop?.reason);
+    // Mining presentation must ignore refining-tagged stops — prove via actionId discrimination.
+    // (action_replaced is shared by both activities, so reason alone cannot prove non-leak.)
+    expect(atCrash.stop?.actionId).not.toBe(ACTION_IDS.crashSiteMining);
   });
 });
