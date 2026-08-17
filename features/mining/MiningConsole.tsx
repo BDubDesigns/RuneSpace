@@ -8,6 +8,7 @@ import { Feedback } from "@/components/ui/Feedback";
 import { Panel } from "@/components/ui/Panel";
 import { SectionHeader } from "@/components/ui/SectionHeader";
 import { StatusMeter } from "@/components/ui/StatusMeter";
+import { SkillProgressCard } from "@/features/shared/run-presentation";
 import { getEffectiveGameBalance } from "@/game/config/balance";
 import { GAME_TICK_MS, ITEM_IDS, LOCATION_IDS } from "@/game/config/foundations";
 import { getLocation } from "@/game/content/locations";
@@ -172,6 +173,7 @@ export function MiningConsole({ characterName }: { characterName: string }) {
   const [now, setNow] = useState(Date.now());
   const [, startTransition] = useTransition();
   const [recovery, setRecovery] = useState<(() => void) | undefined>();
+  const [pendingCommand, setPendingCommand] = useState<"start" | "stop" | "refresh">();
   const observedAttempts = useRef(state.run.attempts);
   const observedSequence = useRef(latestMiningAttempt(state.run.recentAttempts)?.sequence);
   const [feedback, setFeedback] = useState<{ sequence: number; attempts: number }>();
@@ -226,6 +228,7 @@ export function MiningConsole({ characterName }: { characterName: string }) {
         setRecovery(() => () => command(refreshMiningAction));
       } finally {
         releaseCommand();
+        setPendingCommand(undefined);
       }
     });
   }
@@ -284,7 +287,7 @@ export function MiningConsole({ characterName }: { characterName: string }) {
                     atCrashSite
                       ? "Ferrite Shale"
                       : atProcessingYard
-                        ? "Refining"
+                        ? "Refined Ferrite\nSlag"
                         : atPowerAnnex
                           ? "Power Cell"
                           : undefined
@@ -321,11 +324,14 @@ export function MiningConsole({ characterName }: { characterName: string }) {
                 deposit to prepare for repairs.
               </p>
               <div className="mt-5 flex flex-wrap gap-3">
-                {active ? (
+                {active || pendingCommand === "stop" ? (
                   <ActionButton
                     intent="danger"
                     loading={busy}
-                    onClick={() => command(stopMiningAction)}
+                    onClick={() => {
+                      setPendingCommand("stop");
+                      command(stopMiningAction);
+                    }}
                   >
                     Stop Mining
                   </ActionButton>
@@ -333,7 +339,10 @@ export function MiningConsole({ characterName }: { characterName: string }) {
                   <ActionButton
                     intent="mining"
                     loading={busy}
-                    onClick={() => command(startMiningAction)}
+                    onClick={() => {
+                      setPendingCommand("start");
+                      command(startMiningAction);
+                    }}
                   >
                     Start Mining
                   </ActionButton>
@@ -341,7 +350,10 @@ export function MiningConsole({ characterName }: { characterName: string }) {
                 <ActionButton
                   intent="secondary"
                   disabled={busy}
-                  onClick={() => command(refreshMiningAction)}
+                  onClick={() => {
+                    setPendingCommand("refresh");
+                    command(refreshMiningAction);
+                  }}
                 >
                   Refresh status
                 </ActionButton>
@@ -424,33 +436,13 @@ export function MiningConsole({ characterName }: { characterName: string }) {
       {showMiningActivity ? (
         <>
           <div className="grid gap-4 sm:grid-cols-2">
-            <Panel>
-              <p className="font-display text-xs uppercase tracking-[0.16em] text-[color:var(--rs-accent-mining)]">
-                Mining progression
-              </p>
-              <p className="mt-3 font-display text-3xl font-bold">Level {state.mining.level}</p>
-              <StatusMeter
-                label="Mining XP"
-                value={
-                  state.mining.xpToNextLevel
-                    ? Math.min(
-                        100,
-                        (state.mining.xpIntoLevel /
-                          (state.mining.xpIntoLevel + state.mining.xpToNextLevel)) *
-                          100,
-                      )
-                    : 100
-                }
-                detail={
-                  state.mining.xpToNextLevel
-                    ? `${state.mining.xpToNextLevel} XP to next level`
-                    : "Maximum level"
-                }
-              />
-              <p className="mt-3 text-sm text-[color:var(--rs-text-secondary)]">
-                {state.mining.totalXp.toLocaleString()} total XP
-              </p>
-            </Panel>
+            <SkillProgressCard
+              level={state.mining.level}
+              title="Mining progression"
+              totalXp={state.mining.totalXp}
+              xpIntoLevel={state.mining.xpIntoLevel}
+              xpToNextLevel={state.mining.xpToNextLevel}
+            />
             <Panel>
               <p className="font-display text-xs uppercase tracking-[0.16em] text-[color:var(--rs-accent-mining)]">
                 Cargo readout

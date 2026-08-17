@@ -7,14 +7,11 @@ import { VisualTile } from "@/components/items/VisualTile";
 import { Feedback } from "@/components/ui/Feedback";
 import { SectionHeader } from "@/components/ui/SectionHeader";
 import { StatusMeter } from "@/components/ui/StatusMeter";
+import { SkillProgressCard } from "@/features/shared/run-presentation";
 import { getEffectiveGameBalance } from "@/game/config/balance";
 import { GAME_TICK_MS, ITEM_IDS } from "@/game/config/foundations";
 import type { RefiningRunAttempt } from "@/server/mining";
-import {
-  refreshMiningAction,
-  startRefiningAction,
-  stopRefiningAction,
-} from "@/server/actions";
+import { refreshMiningAction, startRefiningAction, stopRefiningAction } from "@/server/actions";
 import { reportClientDiagnostic } from "@/features/diagnostics/client";
 import { useMiningPlay } from "@/features/mining/MiningPlayContext";
 
@@ -26,26 +23,34 @@ function percentage(bps: number) {
 
 function refiningStopMessage(reason: string): string {
   return (
-    {
-      manually_stopped: "Refining stopped.",
-      insufficient_ferrite_shale: "Not enough Ferrite Shale \u2014 refining requires 2 per attempt.",
-      inventory_slots_full: "Processing stopped \u2014 make room for the resulting material before refining more.",
-      carried_mass_capacity_reached:
-        "Processing stopped \u2014 make room for the resulting material before refining more.",
-      action_replaced: "Refining stopped when Travel began.",
-    } as Record<string, string>
-  )[reason] ?? `Refining stopped: ${reason}.`;
+    (
+      {
+        manually_stopped: "Refining stopped.",
+        insufficient_ferrite_shale:
+          "Not enough Ferrite Shale \u2014 refining requires 2 per attempt.",
+        inventory_slots_full:
+          "Processing stopped \u2014 make room for the resulting material before refining more.",
+        carried_mass_capacity_reached:
+          "Processing stopped \u2014 make room for the resulting material before refining more.",
+        action_replaced: "Refining stopped when Travel began.",
+      } as Record<string, string>
+    )[reason] ?? `Refining stopped: ${reason}.`
+  );
 }
 
 function refiningCommandErrorMessage(error: string): string {
   return (
-    {
-      another_action_active: "Another activity is active. Refining cannot change it.",
-    } as Record<string, string>
-  )[error] ?? error;
+    (
+      {
+        another_action_active: "Another activity is active. Refining cannot change it.",
+      } as Record<string, string>
+    )[error] ?? error
+  );
 }
 
-function latestRefiningAttempt(attempts: readonly RefiningRunAttempt[]): RefiningRunAttempt | undefined {
+function latestRefiningAttempt(
+  attempts: readonly RefiningRunAttempt[],
+): RefiningRunAttempt | undefined {
   return attempts.at(-1);
 }
 
@@ -68,11 +73,13 @@ export function RefiningConsole() {
   const [now, setNow] = useState(Date.now());
   const [, startTransition] = useTransition();
   const [recovery, setRecovery] = useState<(() => void) | undefined>();
+  const [pendingCommand, setPendingCommand] = useState<"start" | "stop" | "refresh">();
   const observedAttempts = useRef(refiningRun.attempts);
   const observedSequence = useRef(latestRefiningAttempt(refiningRun.recentAttempts)?.sequence);
   const [feedback, setFeedback] = useState<{ sequence: number; attempts: number }>();
   const balance = getEffectiveGameBalance();
-  const active = state.activeAction?.actionId === "processing_yard_refining" ? state.activeAction : undefined;
+  const active =
+    state.activeAction?.actionId === "processing_yard_refining" ? state.activeAction : undefined;
   const durationTicks = active?.nextAttemptDurationTicks ?? balance.refining.attemptDurationTicks;
   const durationMs = durationTicks * GAME_TICK_MS;
   const elapsed = active ? Math.max(0, now - new Date(active.progressStartedAt).getTime()) : 0;
@@ -108,6 +115,7 @@ export function RefiningConsole() {
         setRecovery(() => () => command(refreshMiningAction));
       } finally {
         releaseCommand();
+        setPendingCommand(undefined);
       }
     });
   }
@@ -123,14 +131,19 @@ export function RefiningConsole() {
   }, [Boolean(active)]);
 
   const latestAttempt = latestRefiningAttempt(refiningRun.recentAttempts);
-  const recentBatchCount = state.refiningRecentResult.successes + state.refiningRecentResult.failures;
+  const recentBatchCount =
+    state.refiningRecentResult.successes + state.refiningRecentResult.failures;
 
   useEffect(() => {
     const prevAttempts = observedAttempts.current;
     const prevSeq = observedSequence.current;
     observedAttempts.current = refiningRun.attempts;
     observedSequence.current = latestAttempt?.sequence;
-    if (!latestAttempt || refiningRun.attempts <= prevAttempts || latestAttempt.sequence === prevSeq)
+    if (
+      !latestAttempt ||
+      refiningRun.attempts <= prevAttempts ||
+      latestAttempt.sequence === prevSeq
+    )
       return;
     const nextFeedback = {
       sequence: latestAttempt.sequence,
@@ -150,16 +163,37 @@ export function RefiningConsole() {
         into Refined Ferrite or Slag.
       </p>
       <div className="mt-5 flex flex-wrap gap-3">
-        {isActive ? (
-          <ActionButton intent="danger" loading={busy} onClick={() => command(stopRefiningAction)}>
+        {isActive || pendingCommand === "stop" ? (
+          <ActionButton
+            intent="danger"
+            loading={busy}
+            onClick={() => {
+              setPendingCommand("stop");
+              command(stopRefiningAction);
+            }}
+          >
             Stop Refining
           </ActionButton>
         ) : (
-          <ActionButton intent="mining" loading={busy} onClick={() => command(startRefiningAction)}>
+          <ActionButton
+            intent="mining"
+            loading={busy}
+            onClick={() => {
+              setPendingCommand("start");
+              command(startRefiningAction);
+            }}
+          >
             Start Refining
           </ActionButton>
         )}
-        <ActionButton intent="secondary" disabled={busy} onClick={() => command(refreshMiningAction)}>
+        <ActionButton
+          intent="secondary"
+          disabled={busy}
+          onClick={() => {
+            setPendingCommand("refresh");
+            command(refreshMiningAction);
+          }}
+        >
           Refresh status
         </ActionButton>
       </div>
@@ -167,14 +201,22 @@ export function RefiningConsole() {
         Success chance: {percentage(state.refiningSuccessChanceBps)}%
       </p>
       <p className="mt-2 text-xs uppercase tracking-wide text-[color:var(--rs-text-muted)]">
-        {balance.refining.attemptDurationTicks} ticks / {(balance.refining.attemptDurationTicks * GAME_TICK_MS) / 1000}s per attempt &middot; 2 Ferrite Shale &rarr; 1 output
+        {balance.refining.attemptDurationTicks} ticks /{" "}
+        {(balance.refining.attemptDurationTicks * GAME_TICK_MS) / 1000}s per attempt &middot; 2
+        Ferrite Shale &rarr; 1 output
       </p>
       {isActive ? (
         <div className="mt-5">
-          <StatusMeter label="Refining attempt" value={progress} detail={`${secondsRemaining.toFixed(1)}s to next attempt`} />
+          <StatusMeter
+            label="Refining attempt"
+            value={progress}
+            detail={`${secondsRemaining.toFixed(1)}s to next attempt`}
+          />
         </div>
       ) : (
-        <Feedback>Refining is idle. Each attempt takes 7 ticks / 4.2 seconds and resolves on the server.</Feedback>
+        <Feedback>
+          Refining is idle. Each attempt takes 7 ticks / 4.2 seconds and resolves on the server.
+        </Feedback>
       )}
       {latestAttempt ? (
         <section
@@ -194,7 +236,8 @@ export function RefiningConsole() {
             ) : null}
           </div>
           <p className="mt-2 text-sm text-[color:var(--rs-text-secondary)]">
-            Roll {percentage(latestAttempt.rolledBasisPoints)} | Needed below {percentage(latestAttempt.thresholdBasisPoints)}
+            Roll {percentage(latestAttempt.rolledBasisPoints)} | Needed below{" "}
+            {percentage(latestAttempt.thresholdBasisPoints)}
           </p>
           <p className="mt-2 text-xs uppercase tracking-wide text-[color:var(--rs-text-muted)]">
             7 ticks &middot; 2 Ferrite Shale consumed
@@ -205,12 +248,18 @@ export function RefiningConsole() {
               className={feedback?.sequence === latestAttempt.sequence ? "rs-reward-feedback" : ""}
               itemId={latestAttempt.success ? ITEM_IDS.refinedFerrite : ITEM_IDS.slag}
               name={latestAttempt.success ? "Refined Ferrite" : "Slag"}
-              quantity={latestAttempt.success ? latestAttempt.ferriteAwarded : latestAttempt.slagAwarded}
+              quantity={
+                latestAttempt.success ? latestAttempt.ferriteAwarded : latestAttempt.slagAwarded
+              }
             />
             <VisualTile
               accessibleLabel={`${latestAttempt.xpAwarded} Refining XP earned`}
               badge={`+${latestAttempt.xpAwarded}`}
-              className={feedback?.sequence === latestAttempt.sequence ? "rs-reward-feedback [animation-delay:90ms]" : ""}
+              className={
+                feedback?.sequence === latestAttempt.sequence
+                  ? "rs-reward-feedback [animation-delay:90ms]"
+                  : ""
+              }
               fallbackText="XP"
               name="Refining"
             />
@@ -222,45 +271,90 @@ export function RefiningConsole() {
           ? latestAnnouncement(latestAttempt, feedback.attempts)
           : ""}
       </p>
-      {message ? <Feedback tone={state.refiningStopReason && !active ? "danger" : "muted"}>{message}</Feedback> : null}
+      {message ? (
+        <Feedback tone={state.refiningStopReason && !active ? "danger" : "muted"}>
+          {message}
+        </Feedback>
+      ) : null}
       {recovery ? (
         <ActionButton className="mt-3" disabled={busy} intent="secondary" onClick={recovery}>
           Retry status check
         </ActionButton>
       ) : null}
+      {/* Refining skill progression mirrors Mining's card at the Crash Site. */}
+      <div className="mt-6">
+        <div className="grid gap-4 sm:grid-cols-2">
+          <SkillProgressCard
+            level={state.refining.level}
+            title="Refining progression"
+            totalXp={state.refining.totalXp}
+            xpIntoLevel={state.refining.xpIntoLevel}
+            xpToNextLevel={state.refining.xpToNextLevel}
+          />
+        </div>
+      </div>
       {/* Progression + cargo readout lives in MiningConsole; for the Yard we show refining run history inline here */}
       <div className="mt-6">
         <SectionHeader eyebrow="Server-resolved">This refining run</SectionHeader>
         <div className="mt-4 grid grid-cols-2 gap-3 text-sm sm:grid-cols-4">
-          <p><strong>{refiningRun.attempts}</strong> attempts</p>
-          <p><strong>{refiningRun.successes}</strong> Refined Ferrite</p>
-          <p><strong>{refiningRun.failures}</strong> Slag</p>
-          <p><strong>{refiningRun.xpGained}</strong> Refining XP</p>
+          <p>
+            <strong>{refiningRun.attempts}</strong> attempts
+          </p>
+          <p>
+            <strong>{refiningRun.successes}</strong> Refined Ferrite
+          </p>
+          <p>
+            <strong>{refiningRun.failures}</strong> Slag
+          </p>
+          <p>
+            <strong>{refiningRun.xpGained}</strong> Refining XP
+          </p>
         </div>
         <div className="mt-3 grid grid-cols-2 gap-3 text-sm sm:grid-cols-3">
-          <p><strong>{refiningRun.shaleConsumed}</strong> shale consumed</p>
-          <p><strong>{state.refinedFerriteQuantity}</strong> Refined Ferrite carried</p>
-          <p><strong>{state.slagQuantity}</strong> Slag carried</p>
+          <p>
+            <strong>{refiningRun.shaleConsumed}</strong> shale consumed
+          </p>
+          <p>
+            <strong>{state.refinedFerriteQuantity}</strong> Refined Ferrite carried
+          </p>
+          <p>
+            <strong>{state.slagQuantity}</strong> Slag carried
+          </p>
         </div>
-        <div className="mt-5 max-h-72 space-y-2 overflow-y-auto pr-1" aria-label="Refining attempt history">
+        <div
+          className="mt-5 max-h-72 space-y-2 overflow-y-auto pr-1"
+          aria-label="Refining attempt history"
+        >
           {[...refiningRun.recentAttempts].reverse().map((attempt) => (
             <article
               className="border-l-2 border-[color:var(--rs-border-structural)] bg-[color:var(--rs-surface-panel)] px-3 py-2 text-sm"
               key={attempt.sequence}
             >
               <p className="font-display uppercase tracking-wide">
-                Attempt {attempt.sequence} \u2014 {attempt.success ? "Refined Ferrite" : "Slag"}
+                Attempt {attempt.sequence} — {attempt.success ? "Refined Ferrite" : "Slag"}
               </p>
               <p className="text-[color:var(--rs-text-secondary)]">
-                Roll {percentage(attempt.rolledBasisPoints)} | Needed below {percentage(attempt.thresholdBasisPoints)}
+                Roll {percentage(attempt.rolledBasisPoints)} | Needed below{" "}
+                {percentage(attempt.thresholdBasisPoints)}
               </p>
-              <p className="text-xs uppercase tracking-wide text-[color:var(--rs-text-muted)]">7 ticks &middot; 2 Ferrite Shale consumed</p>
-              <p className="text-xs text-[color:var(--rs-text-muted)]">Resolved {new Date(attempt.resolvedAt).toLocaleTimeString()}</p>
-              <p>{attempt.success ? `${attempt.ferriteAwarded} Refined Ferrite` : `${attempt.slagAwarded} Slag`} | {attempt.xpAwarded} Refining XP</p>
+              <p className="text-xs uppercase tracking-wide text-[color:var(--rs-text-muted)]">
+                7 ticks &middot; 2 Ferrite Shale consumed
+              </p>
+              <p className="text-xs text-[color:var(--rs-text-muted)]">
+                Resolved {new Date(attempt.resolvedAt).toLocaleTimeString()}
+              </p>
+              <p>
+                {attempt.success
+                  ? `${attempt.ferriteAwarded} Refined Ferrite`
+                  : `${attempt.slagAwarded} Slag`}{" "}
+                | {attempt.xpAwarded} Refining XP
+              </p>
             </article>
           ))}
           {refiningRun.recentAttempts.length === 0 ? (
-            <p className="text-sm text-[color:var(--rs-text-muted)]">No resolved attempts in this run yet.</p>
+            <p className="text-sm text-[color:var(--rs-text-muted)]">
+              No resolved attempts in this run yet.
+            </p>
           ) : null}
         </div>
       </div>

@@ -13,7 +13,8 @@ export type RefiningStopReason = (typeof REFINING_STOP_REASONS)[number];
 export type RefiningRandom = { nextBasisPoints(): number };
 
 export function refiningSuccessChanceBps(level: number, balance: EffectiveGameBalance): number {
-  if (!Number.isInteger(level) || level < 1) throw new RangeError("Refining level must be positive");
+  if (!Number.isInteger(level) || level < 1)
+    throw new RangeError("Refining level must be positive");
   const refining = balance.refining;
   return Math.min(
     10_000,
@@ -61,7 +62,10 @@ export type RefiningResolution<Id = string> = {
 };
 
 function totalQuantityForItem<Id>(stacks: readonly StackState<Id>[], itemId: string): number {
-  return stacks.reduce((total, stack) => (stack.itemId === itemId ? total + stack.quantity : total), 0);
+  return stacks.reduce(
+    (total, stack) => (stack.itemId === itemId ? total + stack.quantity : total),
+    0,
+  );
 }
 
 type SimulatedRemoval<Id> = {
@@ -96,7 +100,13 @@ function simulateRemoval<Id>(
       remaining = 0;
     }
   }
-  if (remaining > 0) return { stacksAfter: [...existingStacks.map((s) => ({ ...s }))], slotsAvailableAfter: slotsAvailable, massAvailableAfter: massAvailableGrams, canConsume: false };
+  if (remaining > 0)
+    return {
+      stacksAfter: [...existingStacks.map((s) => ({ ...s }))],
+      slotsAvailableAfter: slotsAvailable,
+      massAvailableAfter: massAvailableGrams,
+      canConsume: false,
+    };
   return {
     stacksAfter: next,
     slotsAvailableAfter: slotsAvailable + freedSlots,
@@ -226,7 +236,9 @@ export function resolveRefining<Id>(input: {
     };
     const stopReason = refiningPreflightStopReason(currentSnapshot, balance);
     if (stopReason) {
-      const persistedUpdates = stacks.filter((s) => s.persisted).map(({ id, quantity }) => ({ id, quantity }));
+      const persistedUpdates = stacks
+        .filter((s) => s.persisted)
+        .map(({ id, quantity }) => ({ id, quantity }));
       // Identify deleted persisted stacks: those that were in snapshot but no longer present.
       const snapshotIds = new Set(snapshot.existingStacks.map((s) => String(s.id)));
       const remainingIds = new Set(stacks.filter((s) => s.persisted).map((s) => String(s.id)));
@@ -249,7 +261,9 @@ export function resolveRefining<Id>(input: {
         awardedXp: successes * balance.refining.successXp + failures * balance.refining.failureXp,
         stackUpdates: persistedUpdates,
         deletedStackIds,
-        createdStacks: stacks.filter((s) => !s.persisted).map(({ itemId, quantity }) => ({ itemId, quantity })),
+        createdStacks: stacks
+          .filter((s) => !s.persisted)
+          .map(({ itemId, quantity }) => ({ itemId, quantity })),
         resolvedAttempts,
         stopReason,
       };
@@ -291,7 +305,8 @@ export function resolveRefining<Id>(input: {
       stacks = nextStacks;
       shaleConsumed += inputShale;
       // Remaining mass for partial-stack consume already handled; if remaining was >0 (should not happen due to preflight) it would be error.
-      if (remaining > 0) throw new Error("Refining consumed more shale than available after preflight");
+      if (remaining > 0)
+        throw new Error("Refining consumed more shale than available after preflight");
     }
 
     const rolledBasisPoints = random.nextBasisPoints();
@@ -306,7 +321,8 @@ export function resolveRefining<Id>(input: {
         massAvailableGrams,
         refinedMass,
       );
-      if (plan.remainingQuantity !== 0) throw new Error("Refined Ferrite plan failed after preflight");
+      if (plan.remainingQuantity !== 0)
+        throw new Error("Refined Ferrite plan failed after preflight");
       for (const update of plan.updatedStacks) {
         const stack = stacks.find((candidate) => String(candidate.id) === String(update.id));
         if (stack) stack.quantity = update.quantity;
@@ -371,7 +387,9 @@ export function resolveRefining<Id>(input: {
     }
   }
 
-  const persistedUpdates = stacks.filter((s) => s.persisted).map(({ id, quantity }) => ({ id, quantity }));
+  const persistedUpdates = stacks
+    .filter((s) => s.persisted)
+    .map(({ id, quantity }) => ({ id, quantity }));
   const deletedStackIds: Id[] = snapshot.existingStacks
     .filter((s) => !stacks.some((candidate) => String(candidate.id) === String(s.id)))
     .map((s) => s.id);
@@ -387,7 +405,9 @@ export function resolveRefining<Id>(input: {
     awardedXp: successes * balance.refining.successXp + failures * balance.refining.failureXp,
     stackUpdates: persistedUpdates,
     deletedStackIds,
-    createdStacks: stacks.filter((s) => !s.persisted).map(({ itemId, quantity }) => ({ itemId, quantity })),
+    createdStacks: stacks
+      .filter((s) => !s.persisted)
+      .map(({ itemId, quantity }) => ({ itemId, quantity })),
     resolvedAttempts,
   };
 }

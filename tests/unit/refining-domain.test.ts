@@ -1,7 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { getEffectiveGameBalance, standardSkillLevelThresholds } from "@/game/config/balance";
 import { ITEM_IDS, SKILL_IDS } from "@/game/config/foundations";
-import { refiningSuccessChanceBps, refiningPreflightStopReason, resolveRefining } from "@/game/domain/refining";
+import {
+  refiningSuccessChanceBps,
+  refiningPreflightStopReason,
+  resolveRefining,
+} from "@/game/domain/refining";
 import type { StackState } from "@/game/domain/inventory";
 
 describe("refining domain", () => {
@@ -28,11 +32,18 @@ describe("refining domain", () => {
   it("fewer than 7 ticks resolves nothing and consumes no shale", () => {
     const snapshot = {
       refiningLevel: 1,
-      existingStacks: [{ id: "s1", itemId: balance.items.ferriteShale.itemId, quantity: 10 }] as StackState<string>[],
+      existingStacks: [
+        { id: "s1", itemId: balance.items.ferriteShale.itemId, quantity: 10 },
+      ] as StackState<string>[],
       slotsAvailable: 5,
       massAvailableGrams: 50_000,
     };
-    const res = resolveRefining({ elapsedTicks: 6, snapshot, balance, random: { nextBasisPoints: () => 0 } });
+    const res = resolveRefining({
+      elapsedTicks: 6,
+      snapshot,
+      balance,
+      random: { nextBasisPoints: () => 0 },
+    });
     expect(res.attempts).toBe(0);
     expect(res.shaleConsumed).toBe(0);
     expect(res.consumedTicks).toBe(0);
@@ -41,11 +52,18 @@ describe("refining domain", () => {
   it("successful roll produces 1 Refined Ferrite + 15 XP", () => {
     const snapshot = {
       refiningLevel: 20,
-      existingStacks: [{ id: "s1", itemId: balance.items.ferriteShale.itemId, quantity: 2 }] as StackState<string>[],
+      existingStacks: [
+        { id: "s1", itemId: balance.items.ferriteShale.itemId, quantity: 2 },
+      ] as StackState<string>[],
       slotsAvailable: 5,
       massAvailableGrams: 50_000,
     };
-    const res = resolveRefining({ elapsedTicks: 7, snapshot, balance, random: { nextBasisPoints: () => 0 } });
+    const res = resolveRefining({
+      elapsedTicks: 7,
+      snapshot,
+      balance,
+      random: { nextBasisPoints: () => 0 },
+    });
     expect(res.successes).toBe(1);
     expect(res.ferriteGained).toBe(1);
     expect(res.slagGained).toBe(0);
@@ -56,11 +74,18 @@ describe("refining domain", () => {
   it("unsuccessful roll produces 1 Slag + 3 XP", () => {
     const snapshot = {
       refiningLevel: 1,
-      existingStacks: [{ id: "s1", itemId: balance.items.ferriteShale.itemId, quantity: 2 }] as StackState<string>[],
+      existingStacks: [
+        { id: "s1", itemId: balance.items.ferriteShale.itemId, quantity: 2 },
+      ] as StackState<string>[],
       slotsAvailable: 5,
       massAvailableGrams: 50_000,
     };
-    const res = resolveRefining({ elapsedTicks: 7, snapshot, balance, random: { nextBasisPoints: () => 9_999 } });
+    const res = resolveRefining({
+      elapsedTicks: 7,
+      snapshot,
+      balance,
+      random: { nextBasisPoints: () => 9_999 },
+    });
     expect(res.failures).toBe(1);
     expect(res.slagGained).toBe(1);
     expect(res.awardedXp).toBe(3);
@@ -76,7 +101,9 @@ describe("refining domain", () => {
   it("preflight rejects fewer than 2 shale", () => {
     const snapshot = {
       refiningLevel: 1,
-      existingStacks: [{ id: "s1", itemId: balance.items.ferriteShale.itemId, quantity: 1 }] as StackState<string>[],
+      existingStacks: [
+        { id: "s1", itemId: balance.items.ferriteShale.itemId, quantity: 1 },
+      ] as StackState<string>[],
       slotsAvailable: 5,
       massAvailableGrams: 50_000,
     };
@@ -87,7 +114,9 @@ describe("refining domain", () => {
     // No slots, no mass headroom after removing shale - neither branch fits
     const snapshot = {
       refiningLevel: 1,
-      existingStacks: [{ id: "s1", itemId: balance.items.ferriteShale.itemId, quantity: 2 }] as StackState<string>[],
+      existingStacks: [
+        { id: "s1", itemId: balance.items.ferriteShale.itemId, quantity: 2 },
+      ] as StackState<string>[],
       slotsAvailable: 0,
       massAvailableGrams: 0, // after removing 200g, would be 200g, enough for 150g - so need 0 slots to fail
     };
@@ -95,7 +124,9 @@ describe("refining domain", () => {
     // So this case should be OK. Instead test no mass.
     const noMass = {
       refiningLevel: 1,
-      existingStacks: [{ id: "s1", itemId: balance.items.ferriteShale.itemId, quantity: 2 }] as StackState<string>[],
+      existingStacks: [
+        { id: "s1", itemId: balance.items.ferriteShale.itemId, quantity: 2 },
+      ] as StackState<string>[],
       slotsAvailable: 5,
       massAvailableGrams: 0, // after removal massAvailable = 200, still enough for 150 -> would PASS
     };

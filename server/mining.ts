@@ -547,16 +547,26 @@ export function createPlayResolver(
   onMiningOutcome?: (outcome: PersistedMiningOutcome) => void,
   onTravelArrival?: (outcome: TravelResolution) => void,
   onRefiningOutcome?: (outcome: PersistedRefiningOutcome) => void,
-): ActionResolver<MiningSnapshot | TravelSnapshot, PersistedMiningOutcome | TravelResolution | PersistedRefiningOutcome> {
+): ActionResolver<
+  MiningSnapshot | TravelSnapshot,
+  PersistedMiningOutcome | TravelResolution | PersistedRefiningOutcome
+> {
   const mining = createMiningResolver(random, onMiningOutcome);
-  const refining = createRefiningResolver(random as unknown as import("@/game/domain/refining").RefiningRandom, onRefiningOutcome);
+  const refining = createRefiningResolver(
+    random as unknown as import("@/game/domain/refining").RefiningRandom,
+    onRefiningOutcome,
+  );
   const travel = createTravelResolver();
   return {
     supports: (action) =>
-      (mining.supports?.(action) ?? true) || (refining.supports?.(action) ?? true) || (travel.supports?.(action) ?? true),
+      (mining.supports?.(action) ?? true) ||
+      (refining.supports?.(action) ?? true) ||
+      (travel.supports?.(action) ?? true),
     load: (transaction, input) => {
       if (refining.supports?.(input.action)) {
-        return refining.load(transaction, input) as unknown as Promise<MiningSnapshot | TravelSnapshot>;
+        return refining.load(transaction, input) as unknown as Promise<
+          MiningSnapshot | TravelSnapshot
+        >;
       }
       if (travel.supports?.(input.action)) {
         return travel.load(transaction, input) as Promise<MiningSnapshot | TravelSnapshot>;
@@ -565,7 +575,9 @@ export function createPlayResolver(
     },
     resolve: (input) => {
       if (refining.supports?.(input.action)) {
-        return refining.resolve(input as unknown as Parameters<typeof refining.resolve>[0]) as unknown as ReturnType<typeof mining.resolve>;
+        return refining.resolve(
+          input as unknown as Parameters<typeof refining.resolve>[0],
+        ) as unknown as ReturnType<typeof mining.resolve>;
       }
       if (travel.supports?.(input.action)) {
         return travel.resolve(
@@ -597,50 +609,62 @@ export async function stateFromTransaction(
   travelError?: MiningGameplayState["travelError"],
   characterRow?: { currentLocationId: string },
   now = new Date(),
-  refiningRecentResult: MiningGameplayState["refiningRecentResult"] = { successes: 0, failures: 0, awardedXp: 0 },
+  refiningRecentResult: MiningGameplayState["refiningRecentResult"] = {
+    successes: 0,
+    failures: 0,
+    awardedXp: 0,
+  },
   refiningStopReason?: RefiningStopReason | null,
 ): Promise<MiningGameplayState> {
   const balance = getEffectiveGameBalance();
   const snapshot = await loadMiningSnapshot(transaction, characterId);
   const resetDate = pacificResetDate(powerAnnexNow(now));
-  const [xpRows, stacks, actionRows, miningStateRows, refiningStateRows, travelRows, claimRows, character] =
-    await Promise.all([
-      transaction
-        .select()
-        .from(characterSkillXp)
-        .where(eq(characterSkillXp.characterId, characterId)),
-      transaction
-        .select()
-        .from(inventoryStacks)
-        .where(eq(inventoryStacks.characterId, characterId))
-        .orderBy(asc(inventoryStacks.createdAt), asc(inventoryStacks.id)),
-      transaction.select().from(activeActions).where(eq(activeActions.characterId, characterId)),
-      transaction
-        .select()
-        .from(characterMiningState)
-        .where(eq(characterMiningState.characterId, characterId)),
-      transaction
-        .select()
-        .from(characterRefiningState)
-        .where(eq(characterRefiningState.characterId, characterId)),
-      transaction
-        .select()
-        .from(characterTravelState)
-        .where(eq(characterTravelState.characterId, characterId)),
-      transaction
-        .select({ characterId: characterPowerCellDailyClaims.characterId })
-        .from(characterPowerCellDailyClaims)
-        .where(
-          and(
-            eq(characterPowerCellDailyClaims.characterId, characterId),
-            eq(characterPowerCellDailyClaims.rewardSourceId, POWER_ANNEX_REWARD_SOURCE_ID),
-            eq(characterPowerCellDailyClaims.resetDate, resetDate),
-          ),
+  const [
+    xpRows,
+    stacks,
+    actionRows,
+    miningStateRows,
+    refiningStateRows,
+    travelRows,
+    claimRows,
+    character,
+  ] = await Promise.all([
+    transaction
+      .select()
+      .from(characterSkillXp)
+      .where(eq(characterSkillXp.characterId, characterId)),
+    transaction
+      .select()
+      .from(inventoryStacks)
+      .where(eq(inventoryStacks.characterId, characterId))
+      .orderBy(asc(inventoryStacks.createdAt), asc(inventoryStacks.id)),
+    transaction.select().from(activeActions).where(eq(activeActions.characterId, characterId)),
+    transaction
+      .select()
+      .from(characterMiningState)
+      .where(eq(characterMiningState.characterId, characterId)),
+    transaction
+      .select()
+      .from(characterRefiningState)
+      .where(eq(characterRefiningState.characterId, characterId)),
+    transaction
+      .select()
+      .from(characterTravelState)
+      .where(eq(characterTravelState.characterId, characterId)),
+    transaction
+      .select({ characterId: characterPowerCellDailyClaims.characterId })
+      .from(characterPowerCellDailyClaims)
+      .where(
+        and(
+          eq(characterPowerCellDailyClaims.characterId, characterId),
+          eq(characterPowerCellDailyClaims.rewardSourceId, POWER_ANNEX_REWARD_SOURCE_ID),
+          eq(characterPowerCellDailyClaims.resetDate, resetDate),
         ),
-      characterRow
-        ? Promise.resolve([characterRow])
-        : transaction.select().from(characters).where(eq(characters.id, characterId)).limit(1),
-    ]);
+      ),
+    characterRow
+      ? Promise.resolve([characterRow])
+      : transaction.select().from(characters).where(eq(characters.id, characterId)).limit(1),
+  ]);
   const totalXp = xpRows.find((row) => row.skillId === SKILL_IDS.mining)?.totalXp ?? 0;
   const refiningTotalXp = xpRows.find((row) => row.skillId === SKILL_IDS.refining)?.totalXp ?? 0;
   const thresholds = miningLevelThresholds(balance);
@@ -840,7 +864,10 @@ export async function stateFromTransaction(
     refiningRun,
     recentResult,
     refiningRecentResult,
-    refiningStopReason: (refiningStopReason ?? (refiningState?.lastStopReason as RefiningStopReason | null) ?? undefined),
+    refiningStopReason:
+      refiningStopReason ??
+      (refiningState?.lastStopReason as RefiningStopReason | null) ??
+      undefined,
     stoppingReason: action
       ? undefined
       : (stoppingReason ?? (miningState?.lastStopReason as MiningStopReason | null) ?? undefined),
@@ -860,11 +887,16 @@ export async function getMiningGameplayState(
   return withResolvedOwnedCharacter(
     userId,
     characterId,
-    createPlayResolver(random, (value) => {
-      miningOutcome = value;
-    }, undefined, (value) => {
-      refiningOutcome = value;
-    }),
+    createPlayResolver(
+      random,
+      (value) => {
+        miningOutcome = value;
+      },
+      undefined,
+      (value) => {
+        refiningOutcome = value;
+      },
+    ),
     async (transaction, context) => {
       await ensureStarterMiningState(transaction, context.character.id);
       return stateFromTransaction(
@@ -878,7 +910,9 @@ export async function getMiningGameplayState(
             }
           : { successes: 0, failures: 0, awardedXp: 0 },
         miningOutcome?.stopReason,
-        context.action && !isTravelReplaceableAction(context.action.actionId) && context.action.actionId !== ACTION_IDS.travel
+        context.action &&
+          !isTravelReplaceableAction(context.action.actionId) &&
+          context.action.actionId !== ACTION_IDS.travel
           ? "another_action_active"
           : undefined,
         undefined,
@@ -1006,30 +1040,131 @@ export async function startRefining(
   return withResolvedOwnedCharacter(
     userId,
     characterId,
-    createPlayResolver(random, (v) => { miningOutcome = v; }, undefined, (v) => { refiningOutcome = v; }),
+    createPlayResolver(
+      random,
+      (v) => {
+        miningOutcome = v;
+      },
+      undefined,
+      (v) => {
+        refiningOutcome = v;
+      },
+    ),
     async (transaction, context) => {
       await ensureStarterMiningState(transaction, context.character.id);
-      const [reloaded] = await transaction.select().from(characters).where(eq(characters.id, context.character.id)).limit(1);
+      const [reloaded] = await transaction
+        .select()
+        .from(characters)
+        .where(eq(characters.id, context.character.id))
+        .limit(1);
       const currentLocationId = reloaded?.currentLocationId ?? LOCATION_IDS.crashSite;
-      const refiningBlockedHere = !isActionAvailableAtLocation(currentLocationId, ACTION_IDS.refining);
+      const refiningBlockedHere = !isActionAvailableAtLocation(
+        currentLocationId,
+        ACTION_IDS.refining,
+      );
       // If already refining, idempotent
       if (context.action?.actionId === ACTION_IDS.refining) {
-        return stateFromTransaction(transaction, context.character.id, miningOutcome ? { successes: miningOutcome.successes, failures: miningOutcome.failures, awardedXp: miningOutcome.awardedXp } : { successes: 0, failures: 0, awardedXp: 0 }, miningOutcome?.stopReason, undefined, undefined, undefined, now, refiningOutcome ? { successes: refiningOutcome.successes, failures: refiningOutcome.failures, awardedXp: refiningOutcome.awardedXp } : { successes: 0, failures: 0, awardedXp: 0 }, refiningOutcome?.stopReason);
+        return stateFromTransaction(
+          transaction,
+          context.character.id,
+          miningOutcome
+            ? {
+                successes: miningOutcome.successes,
+                failures: miningOutcome.failures,
+                awardedXp: miningOutcome.awardedXp,
+              }
+            : { successes: 0, failures: 0, awardedXp: 0 },
+          miningOutcome?.stopReason,
+          undefined,
+          undefined,
+          undefined,
+          now,
+          refiningOutcome
+            ? {
+                successes: refiningOutcome.successes,
+                failures: refiningOutcome.failures,
+                awardedXp: refiningOutcome.awardedXp,
+              }
+            : { successes: 0, failures: 0, awardedXp: 0 },
+          refiningOutcome?.stopReason,
+        );
       }
       if (context.action) {
-        return stateFromTransaction(transaction, context.character.id, miningOutcome ? { successes: miningOutcome.successes, failures: miningOutcome.failures, awardedXp: miningOutcome.awardedXp } : { successes: 0, failures: 0, awardedXp: 0 }, miningOutcome?.stopReason, "another_action_active", undefined, undefined, now, refiningOutcome ? { successes: refiningOutcome.successes, failures: refiningOutcome.failures, awardedXp: refiningOutcome.awardedXp } : { successes: 0, failures: 0, awardedXp: 0 }, refiningOutcome?.stopReason);
+        return stateFromTransaction(
+          transaction,
+          context.character.id,
+          miningOutcome
+            ? {
+                successes: miningOutcome.successes,
+                failures: miningOutcome.failures,
+                awardedXp: miningOutcome.awardedXp,
+              }
+            : { successes: 0, failures: 0, awardedXp: 0 },
+          miningOutcome?.stopReason,
+          "another_action_active",
+          undefined,
+          undefined,
+          now,
+          refiningOutcome
+            ? {
+                successes: refiningOutcome.successes,
+                failures: refiningOutcome.failures,
+                awardedXp: refiningOutcome.awardedXp,
+              }
+            : { successes: 0, failures: 0, awardedXp: 0 },
+          refiningOutcome?.stopReason,
+        );
       }
       if (refiningBlockedHere) {
-        return stateFromTransaction(transaction, context.character.id, miningOutcome ? { successes: miningOutcome.successes, failures: miningOutcome.failures, awardedXp: miningOutcome.awardedXp } : { successes: 0, failures: 0, awardedXp: 0 }, miningOutcome?.stopReason, undefined, "mining_unavailable_here", undefined, now, refiningOutcome ? { successes: refiningOutcome.successes, failures: refiningOutcome.failures, awardedXp: refiningOutcome.awardedXp } : { successes: 0, failures: 0, awardedXp: 0 }, refiningOutcome?.stopReason);
+        return stateFromTransaction(
+          transaction,
+          context.character.id,
+          miningOutcome
+            ? {
+                successes: miningOutcome.successes,
+                failures: miningOutcome.failures,
+                awardedXp: miningOutcome.awardedXp,
+              }
+            : { successes: 0, failures: 0, awardedXp: 0 },
+          miningOutcome?.stopReason,
+          undefined,
+          "mining_unavailable_here",
+          undefined,
+          now,
+          refiningOutcome
+            ? {
+                successes: refiningOutcome.successes,
+                failures: refiningOutcome.failures,
+                awardedXp: refiningOutcome.awardedXp,
+              }
+            : { successes: 0, failures: 0, awardedXp: 0 },
+          refiningOutcome?.stopReason,
+        );
       }
       // Preflight: need at least 2 shale and room for either output
       const balance = getEffectiveGameBalance();
       // Build snapshot for preflight: same as refining resolver would
       const [xpRows, stacks, instances, assignments] = await Promise.all([
-        transaction.select().from(characterSkillXp).where(eq(characterSkillXp.characterId, context.character.id)).for("update"),
-        transaction.select().from(inventoryStacks).where(eq(inventoryStacks.characterId, context.character.id)).for("update"),
-        transaction.select().from(itemInstances).where(eq(itemInstances.characterId, context.character.id)).for("update"),
-        transaction.select().from(equippedItems).where(eq(equippedItems.characterId, context.character.id)).for("update"),
+        transaction
+          .select()
+          .from(characterSkillXp)
+          .where(eq(characterSkillXp.characterId, context.character.id))
+          .for("update"),
+        transaction
+          .select()
+          .from(inventoryStacks)
+          .where(eq(inventoryStacks.characterId, context.character.id))
+          .for("update"),
+        transaction
+          .select()
+          .from(itemInstances)
+          .where(eq(itemInstances.characterId, context.character.id))
+          .for("update"),
+        transaction
+          .select()
+          .from(equippedItems)
+          .where(eq(equippedItems.characterId, context.character.id))
+          .for("update"),
       ]);
       const refiningXp = xpRows.find((r) => r.skillId === SKILL_IDS.refining)?.totalXp ?? 0;
       const loadout = deriveEquipmentLoadout({ assignments, instances, stacks, balance });
@@ -1037,16 +1172,97 @@ export async function startRefining(
         refiningLevel: levelFromXp(refiningXp, standardSkillLevelThresholds(balance)),
         existingStacks: stacks,
         slotsAvailable: Math.max(0, loadout.containerSlotCapacity - loadout.inventorySlotsUsed),
-        massAvailableGrams: Math.max(0, loadout.maximumCarryCapacityGrams - loadout.carriedMassGrams),
+        massAvailableGrams: Math.max(
+          0,
+          loadout.maximumCarryCapacityGrams - loadout.carriedMassGrams,
+        ),
       };
       const preflight = refiningPreflightStopReason(snapshot, balance);
       if (preflight && preflight !== "action_replaced" && preflight !== "manually_stopped") {
-        return stateFromTransaction(transaction, context.character.id, miningOutcome ? { successes: miningOutcome.successes, failures: miningOutcome.failures, awardedXp: miningOutcome.awardedXp } : { successes: 0, failures: 0, awardedXp: 0 }, preflight as unknown as import("@/game/domain/mining").MiningStopReason, undefined, undefined, undefined, now, refiningOutcome ? { successes: refiningOutcome.successes, failures: refiningOutcome.failures, awardedXp: refiningOutcome.awardedXp } : { successes: 0, failures: 0, awardedXp: 0 }, preflight);
+        return stateFromTransaction(
+          transaction,
+          context.character.id,
+          miningOutcome
+            ? {
+                successes: miningOutcome.successes,
+                failures: miningOutcome.failures,
+                awardedXp: miningOutcome.awardedXp,
+              }
+            : { successes: 0, failures: 0, awardedXp: 0 },
+          preflight as unknown as import("@/game/domain/mining").MiningStopReason,
+          undefined,
+          undefined,
+          undefined,
+          now,
+          refiningOutcome
+            ? {
+                successes: refiningOutcome.successes,
+                failures: refiningOutcome.failures,
+                awardedXp: refiningOutcome.awardedXp,
+              }
+            : { successes: 0, failures: 0, awardedXp: 0 },
+          preflight,
+        );
       }
-      await transaction.insert(activeActions).values({ characterId: context.character.id, actionId: ACTION_IDS.refining, startedAt: now, resolvedThroughAt: now });
+      await transaction.insert(activeActions).values({
+        characterId: context.character.id,
+        actionId: ACTION_IDS.refining,
+        startedAt: now,
+        resolvedThroughAt: now,
+      });
       // Reset run counters for a genuinely new run
-      await transaction.insert(characterRefiningState).values({ characterId: context.character.id, runAttempts: 0, runSuccesses: 0, runFerriteGained: 0, runSlagGained: 0, runShaleConsumed: 0, runXpGained: 0, recentAttempts: [], lastStopReason: null, updatedAt: now }).onConflictDoUpdate({ target: characterRefiningState.characterId, set: { runAttempts: 0, runSuccesses: 0, runFerriteGained: 0, runSlagGained: 0, runShaleConsumed: 0, runXpGained: 0, recentAttempts: [], lastStopReason: null, updatedAt: now } });
-      return stateFromTransaction(transaction, context.character.id, miningOutcome ? { successes: miningOutcome.successes, failures: miningOutcome.failures, awardedXp: miningOutcome.awardedXp } : { successes: 0, failures: 0, awardedXp: 0 }, miningOutcome?.stopReason, undefined, undefined, undefined, now, refiningOutcome ? { successes: refiningOutcome.successes, failures: refiningOutcome.failures, awardedXp: refiningOutcome.awardedXp } : { successes: 0, failures: 0, awardedXp: 0 }, refiningOutcome?.stopReason);
+      await transaction
+        .insert(characterRefiningState)
+        .values({
+          characterId: context.character.id,
+          runAttempts: 0,
+          runSuccesses: 0,
+          runFerriteGained: 0,
+          runSlagGained: 0,
+          runShaleConsumed: 0,
+          runXpGained: 0,
+          recentAttempts: [],
+          lastStopReason: null,
+          updatedAt: now,
+        })
+        .onConflictDoUpdate({
+          target: characterRefiningState.characterId,
+          set: {
+            runAttempts: 0,
+            runSuccesses: 0,
+            runFerriteGained: 0,
+            runSlagGained: 0,
+            runShaleConsumed: 0,
+            runXpGained: 0,
+            recentAttempts: [],
+            lastStopReason: null,
+            updatedAt: now,
+          },
+        });
+      return stateFromTransaction(
+        transaction,
+        context.character.id,
+        miningOutcome
+          ? {
+              successes: miningOutcome.successes,
+              failures: miningOutcome.failures,
+              awardedXp: miningOutcome.awardedXp,
+            }
+          : { successes: 0, failures: 0, awardedXp: 0 },
+        miningOutcome?.stopReason,
+        undefined,
+        undefined,
+        undefined,
+        now,
+        refiningOutcome
+          ? {
+              successes: refiningOutcome.successes,
+              failures: refiningOutcome.failures,
+              awardedXp: refiningOutcome.awardedXp,
+            }
+          : { successes: 0, failures: 0, awardedXp: 0 },
+        refiningOutcome?.stopReason,
+      );
     },
     now,
   );
@@ -1060,15 +1276,66 @@ export async function stopRefining(
 ): Promise<MiningGameplayState> {
   let miningOutcome: PersistedMiningOutcome | undefined;
   let refiningOutcome: PersistedRefiningOutcome | undefined;
-  return withResolvedOwnedCharacter(userId, characterId, createPlayResolver(random, (v) => { miningOutcome = v; }, undefined, (v) => { refiningOutcome = v; }), async (transaction, context) => {
-    await ensureStarterMiningState(transaction, context.character.id);
-    const manuallyStopped = context.action?.actionId === ACTION_IDS.refining;
-    if (manuallyStopped) {
-      await transaction.delete(activeActions).where(eq(activeActions.characterId, context.character.id));
-      await transaction.insert(characterRefiningState).values({ characterId: context.character.id, lastStopReason: "manually_stopped" }).onConflictDoUpdate({ target: characterRefiningState.characterId, set: { lastStopReason: "manually_stopped", updatedAt: now } });
-    }
-    return stateFromTransaction(transaction, context.character.id, miningOutcome ? { successes: miningOutcome.successes, failures: miningOutcome.failures, awardedXp: miningOutcome.awardedXp } : { successes: 0, failures: 0, awardedXp: 0 }, miningOutcome?.stopReason, context.action && context.action.actionId !== ACTION_IDS.refining && context.action.actionId !== ACTION_IDS.crashSiteMining && context.action.actionId !== ACTION_IDS.travel ? "another_action_active" : undefined, undefined, context.character, now, refiningOutcome ? { successes: refiningOutcome.successes, failures: refiningOutcome.failures, awardedXp: refiningOutcome.awardedXp } : { successes: 0, failures: 0, awardedXp: 0 }, manuallyStopped ? "manually_stopped" : refiningOutcome?.stopReason);
-  }, now);
+  return withResolvedOwnedCharacter(
+    userId,
+    characterId,
+    createPlayResolver(
+      random,
+      (v) => {
+        miningOutcome = v;
+      },
+      undefined,
+      (v) => {
+        refiningOutcome = v;
+      },
+    ),
+    async (transaction, context) => {
+      await ensureStarterMiningState(transaction, context.character.id);
+      const manuallyStopped = context.action?.actionId === ACTION_IDS.refining;
+      if (manuallyStopped) {
+        await transaction
+          .delete(activeActions)
+          .where(eq(activeActions.characterId, context.character.id));
+        await transaction
+          .insert(characterRefiningState)
+          .values({ characterId: context.character.id, lastStopReason: "manually_stopped" })
+          .onConflictDoUpdate({
+            target: characterRefiningState.characterId,
+            set: { lastStopReason: "manually_stopped", updatedAt: now },
+          });
+      }
+      return stateFromTransaction(
+        transaction,
+        context.character.id,
+        miningOutcome
+          ? {
+              successes: miningOutcome.successes,
+              failures: miningOutcome.failures,
+              awardedXp: miningOutcome.awardedXp,
+            }
+          : { successes: 0, failures: 0, awardedXp: 0 },
+        miningOutcome?.stopReason,
+        context.action &&
+          context.action.actionId !== ACTION_IDS.refining &&
+          context.action.actionId !== ACTION_IDS.crashSiteMining &&
+          context.action.actionId !== ACTION_IDS.travel
+          ? "another_action_active"
+          : undefined,
+        undefined,
+        context.character,
+        now,
+        refiningOutcome
+          ? {
+              successes: refiningOutcome.successes,
+              failures: refiningOutcome.failures,
+              awardedXp: refiningOutcome.awardedXp,
+            }
+          : { successes: 0, failures: 0, awardedXp: 0 },
+        manuallyStopped ? "manually_stopped" : refiningOutcome?.stopReason,
+      );
+    },
+    now,
+  );
 }
 
 export async function stopMining(
@@ -1291,11 +1558,16 @@ export async function beginTravel(
   return withResolvedOwnedCharacter(
     userId,
     characterId,
-    createPlayResolver(random, (value) => {
-      miningOutcome = value;
-    }, undefined, (value) => {
-      refiningOutcome = value;
-    }),
+    createPlayResolver(
+      random,
+      (value) => {
+        miningOutcome = value;
+      },
+      undefined,
+      (value) => {
+        refiningOutcome = value;
+      },
+    ),
     async (transaction, context) => {
       await ensureStarterMiningState(transaction, context.character.id);
 

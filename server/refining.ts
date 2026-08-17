@@ -106,8 +106,14 @@ async function loadRefiningSnapshot(
   return {
     refiningLevel: levelFromXp(refiningXp, standardSkillLevelThresholds(balance)),
     existingStacks: stacks,
-    slotsAvailable: Math.max(0, equipmentLoadout.containerSlotCapacity - equipmentLoadout.inventorySlotsUsed),
-    massAvailableGrams: Math.max(0, equipmentLoadout.maximumCarryCapacityGrams - equipmentLoadout.carriedMassGrams),
+    slotsAvailable: Math.max(
+      0,
+      equipmentLoadout.containerSlotCapacity - equipmentLoadout.inventorySlotsUsed,
+    ),
+    massAvailableGrams: Math.max(
+      0,
+      equipmentLoadout.maximumCarryCapacityGrams - equipmentLoadout.carriedMassGrams,
+    ),
   };
 }
 
@@ -132,7 +138,9 @@ export function createRefiningResolver(
         attemptResolvedAt: resolved.resolvedAttempts.map((_, index) =>
           new Date(
             window.startsAt.getTime() +
-              ticksToMilliseconds((cumulativeAttemptTicks += resolved.resolvedAttempts[index]!.durationTicks)),
+              ticksToMilliseconds(
+                (cumulativeAttemptTicks += resolved.resolvedAttempts[index]!.durationTicks),
+              ),
           ).toISOString(),
         ),
       };

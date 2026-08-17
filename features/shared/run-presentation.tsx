@@ -22,10 +22,7 @@ export function SkillProgressCard({
     : "var(--rs-accent-mining)";
   return (
     <div className="rounded border border-[color:var(--rs-border-structural)] bg-[color:var(--rs-surface-panel)] p-4">
-      <p
-        className="font-display text-xs uppercase tracking-[0.16em]"
-        style={{ color: accent }}
-      >
+      <p className="font-display text-xs uppercase tracking-[0.16em]" style={{ color: accent }}>
         {title}
       </p>
       <p className="mt-3 font-display text-3xl font-bold">Level {level}</p>
@@ -33,9 +30,7 @@ export function SkillProgressCard({
         className="mt-3 h-1.5 overflow-hidden bg-[color:var(--rs-border-subtle)]"
         role="progressbar"
         aria-valuenow={
-          xpToNextLevel
-            ? Math.min(100, (xpIntoLevel / (xpIntoLevel + xpToNextLevel)) * 100)
-            : 100
+          xpToNextLevel ? Math.min(100, (xpIntoLevel / (xpIntoLevel + xpToNextLevel)) * 100) : 100
         }
         aria-valuemin={0}
         aria-valuemax={100}
@@ -52,7 +47,9 @@ export function SkillProgressCard({
       <p className="mt-2 text-sm text-[color:var(--rs-text-secondary)]">
         {xpToNextLevel ? `${xpToNextLevel} XP to next level` : "Maximum level"}
       </p>
-      <p className="mt-1 text-sm text-[color:var(--rs-text-muted)]">{totalXp.toLocaleString()} total XP</p>
+      <p className="mt-1 text-sm text-[color:var(--rs-text-muted)]">
+        {totalXp.toLocaleString()} total XP
+      </p>
     </div>
   );
 }
