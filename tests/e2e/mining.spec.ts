@@ -896,7 +896,9 @@ test("equipment and inventory rendering shows artwork for illustrated items and 
   // Accessible description from the presentation boundary
   const refinedDescId = await refinedTile.getAttribute("aria-describedby");
   expect(refinedDescId).toBeTruthy();
-  await expect(inventory.locator(`#${refinedDescId}`)).toContainText("Purified Ferrite material");
+  await expect(inventory.locator(`#${refinedDescId}`)).toContainText(
+    "Stacked refined ingots of purified Ferrite metal",
+  );
 
   // Fallback stack: unknown item id renders textFallback (the raw item id)
   const unknownTile = inventory
