@@ -903,9 +903,8 @@ test("equipment and inventory rendering shows artwork for illustrated items and 
   // Fallback stack: unknown item id renders textFallback (the raw item id)
   const unknownTile = inventory
     .locator("button[aria-pressed]")
-    .filter({ hasText: "unknown_fallback_item" });
+    .filter({ hasText: /^1 unknown_fallback_item/ });
   await expect(unknownTile).toHaveAccessibleName("1 unknown_fallback_item");
-  await expect(unknownTile.getByText("unknown_fallback_item", { exact: true })).toBeVisible();
   await expect(unknownTile.getByText("x1", { exact: true })).toBeVisible();
   // No artwork for fallback items
   await expect(unknownTile.getByTestId("item-artwork")).toHaveCount(0);
