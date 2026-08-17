@@ -137,19 +137,27 @@ test("Processing Yard Refining journey — Ferrite and Slag both branches, artwo
   await expect(latestRefining.getByLabel("3 Refining XP earned")).toBeVisible();
   await expect(page.getByText("2 attempts", { exact: true })).toBeVisible();
 
-  // 7. Artwork loads for both outputs
+  // 7. Artwork loads for both outputs — explicitly verify each image loads via naturalWidth
   await page.getByRole("button", { name: /Inventory/ }).click();
   const inventory = page.getByRole("dialog", { name: "Inventory" });
   await expect(inventory).toBeVisible();
-  const artwork = inventory.getByTestId("item-artwork");
-  await expect(artwork.first()).toBeVisible();
+  // Both Refined Ferrite and Slag tiles must be present and their <img> must have loaded
+  const refinedTile = inventory.getByLabel(/Refined Ferrite/).first();
+  await expect(refinedTile).toBeVisible();
+  const refinedImg = refinedTile.getByTestId("item-artwork");
+  await expect(refinedImg).toBeVisible();
   await expect
     .poll(() =>
-      artwork.first().evaluate((img: HTMLImageElement) => img.complete && img.naturalWidth > 0),
+      refinedImg.evaluate((img: HTMLImageElement) => img.complete && img.naturalWidth > 0),
     )
     .toBe(true);
-  await expect(inventory.getByLabel(/Refined Ferrite/).first()).toBeVisible();
-  await expect(inventory.getByLabel(/Slag/).first()).toBeVisible();
+  const slagTile = inventory.getByLabel(/Slag/).first();
+  await expect(slagTile).toBeVisible();
+  const slagImg = slagTile.getByTestId("item-artwork");
+  await expect(slagImg).toBeVisible();
+  await expect
+    .poll(() => slagImg.evaluate((img: HTMLImageElement) => img.complete && img.naturalWidth > 0))
+    .toBe(true);
   await page.getByRole("button", { name: "Close inventory" }).click();
   await page.screenshot({ path: "test-results/refining-mobile-result.png" });
   await page.setViewportSize({ width: 1280, height: 800 });

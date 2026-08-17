@@ -58,7 +58,6 @@ export async function ensureStarterRefiningState(
   transaction: DatabaseTransaction,
   characterId: string,
 ): Promise<void> {
-  // Ensure refining XP row exists (idempotent, handles legacy metallurgy already migrated via SQL)
   await transaction
     .insert(characterSkillXp)
     .values({ characterId, skillId: SKILL_IDS.refining, totalXp: 0 })

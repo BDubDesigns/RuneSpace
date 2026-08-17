@@ -89,11 +89,11 @@ suite("issue #81 Refining persistence and concurrency (real PostgreSQL)", () => 
     expect(stillRefused.refiningError).toBe("refining_unavailable_here");
   });
 
-  it("starts Refining at level 1 / 0 XP for new and existing characters without duplicating skill rows", async () => {
+  it("fresh character starts Refining at level 1 / 0 XP without duplicating rows", async () => {
     const { userId, character } = await makeCharacter();
     const now = new Date("2026-01-01T00:00:00.000Z");
     await provisionAtYard(userId, character.id, now);
-    let xpRows = await db
+    const xpRows = await db
       .select()
       .from(rune.characterSkillXp)
       .where(eq(rune.characterSkillXp.characterId, character.id));
@@ -102,19 +102,109 @@ suite("issue #81 Refining persistence and concurrency (real PostgreSQL)", () => 
     const state = await mining.getMiningGameplayState(userId, character.id, now);
     expect(state.refining.level).toBe(1);
     expect(state.refining.totalXp).toBe(0);
-
-    // Existing character with Mining XP does not duplicate refining row
-    await db
-      .insert(rune.characterSkillXp)
-      .values({ characterId: character.id, skillId: SKILL_IDS.mining, totalXp: 500 })
-      .onConflictDoNothing();
+    // Repeated reads do not duplicate
     const after = await mining.getMiningGameplayState(userId, character.id, now);
-    xpRows = await db
+    const xpRows2 = await db
       .select()
       .from(rune.characterSkillXp)
       .where(eq(rune.characterSkillXp.characterId, character.id));
-    expect(xpRows.filter((r) => r.skillId === SKILL_IDS.refining)).toHaveLength(1);
+    expect(xpRows2.filter((r) => r.skillId === SKILL_IDS.refining)).toHaveLength(1);
     expect(after.refining.level).toBe(1);
+  });
+
+  it("real pre-#81 existing character (no refining row/state) provisions Refining lazily at level 1 / 0 XP", async () => {
+    const { userId, character } = await makeCharacter();
+    const now = new Date("2026-01-01T00:00:00.000Z");
+    // Establish normal starter state then strip refining to simulate pre-#81
+    await mining.getMiningGameplayState(userId, character.id, now, {
+      nextBasisPoints: () => 0,
+      nextUnit: () => 0,
+    });
+    (await db
+      .delete(rune.characterSkillXp)
+      .where(
+        eq(rune.characterSkillXp.characterId, character.id) as unknown as never,
+      )) as unknown as never;
+    // Re-insert only mining + strength to simulate old starter (no refining)
+    await db.insert(rune.characterSkillXp).values([
+      { characterId: character.id, skillId: SKILL_IDS.mining, totalXp: 500 },
+      { characterId: character.id, skillId: SKILL_IDS.strength, totalXp: 0 },
+    ]);
+    await db
+      .delete(rune.characterRefiningState)
+      .where(eq(rune.characterRefiningState.characterId, character.id));
+    // Confirm pre-condition: no refining row/state
+    const beforeXp = await db
+      .select()
+      .from(rune.characterSkillXp)
+      .where(eq(rune.characterSkillXp.characterId, character.id));
+    expect(beforeXp.find((r) => r.skillId === SKILL_IDS.refining)).toBeUndefined();
+    const beforeState = await db
+      .select()
+      .from(rune.characterRefiningState)
+      .where(eq(rune.characterRefiningState.characterId, character.id));
+    expect(beforeState).toEqual([]);
+
+    // Move to Yard (provisionAtYard does getMiningGameplayState which would recreate refining; do it manually)
+    await db
+      .update(rune.characters)
+      .set({ currentLocationId: LOCATION_IDS.abandonedProcessingYard })
+      .where(eq(rune.characters.id, character.id));
+    // First gameplay read now lazily provisions refining
+    const state = await mining.getMiningGameplayState(userId, character.id, now, {
+      nextBasisPoints: () => 0,
+      nextUnit: () => 0,
+    });
+    expect(state.refining.level).toBe(1);
+    expect(state.refining.totalXp).toBe(0);
+    const afterXp = await db
+      .select()
+      .from(rune.characterSkillXp)
+      .where(eq(rune.characterSkillXp.characterId, character.id));
+    expect(afterXp.filter((r) => r.skillId === SKILL_IDS.refining)).toHaveLength(1);
+    expect(afterXp.find((r) => r.skillId === SKILL_IDS.refining)!.totalXp).toBe(0);
+
+    // Start Refining should work and create refining_state
+    await db
+      .insert(rune.inventoryStacks)
+      .values({ characterId: character.id, itemId: ITEM_IDS.ferriteShale, quantity: 5 });
+    await mining.startRefining(userId, character.id, now, {
+      nextBasisPoints: () => 0,
+      nextUnit: () => 0,
+    });
+    const started = await db
+      .select()
+      .from(rune.activeActions)
+      .where(eq(rune.activeActions.characterId, character.id));
+    expect(started[0]?.actionId).toBe(ACTION_IDS.refining);
+
+    // Resolving an attempt grants refining state normally
+    const resolved = await mining.getMiningGameplayState(
+      userId,
+      character.id,
+      new Date("2026-01-01T00:00:04.200Z"),
+      {
+        nextBasisPoints: () => 0,
+        nextUnit: () => 0,
+      },
+    );
+    expect(resolved.refiningRun.attempts).toBe(1);
+    expect(resolved.refiningRun.ferriteGained).toBe(1);
+    // Repeated reads do not duplicate refining row
+    await mining.getMiningGameplayState(
+      userId,
+      character.id,
+      new Date("2026-01-01T00:00:04.200Z"),
+      {
+        nextBasisPoints: () => 0,
+        nextUnit: () => 0,
+      },
+    );
+    const finalXp = await db
+      .select()
+      .from(rune.characterSkillXp)
+      .where(eq(rune.characterSkillXp.characterId, character.id));
+    expect(finalXp.filter((r) => r.skillId === SKILL_IDS.refining)).toHaveLength(1);
   });
 
   it("is idempotent while already Refining and does not reset cursor or run state", async () => {
@@ -246,7 +336,7 @@ suite("issue #81 Refining persistence and concurrency (real PostgreSQL)", () => 
     });
   });
 
-  it("rollback leaves shale/output/XP/run state/cursor unchanged", async () => {
+  it("rollback leaves shale/output/XP/run state/cursor unchanged (real refining persistence)", async () => {
     const { userId, character } = await makeCharacter();
     const startedAt = new Date("2026-01-01T00:00:00.000Z");
     await provisionAtYard(userId, character.id, startedAt);
@@ -256,21 +346,52 @@ suite("issue #81 Refining persistence and concurrency (real PostgreSQL)", () => 
       nextUnit: () => 0,
     });
 
-    // Force a persistence failure after the refining outcome would have been persisted
     const now = new Date("2026-01-01T00:00:04.200Z");
+    // Capture baseline before failure
+    const beforeStacks = await db
+      .select()
+      .from(rune.inventoryStacks)
+      .where(eq(rune.inventoryStacks.characterId, character.id));
+    const beforeShale = beforeStacks
+      .filter((s) => s.itemId === ITEM_IDS.ferriteShale)
+      .reduce((t, s) => t + s.quantity, 0);
+    const beforeFerrite = beforeStacks
+      .filter((s) => s.itemId === ITEM_IDS.refinedFerrite)
+      .reduce((t, s) => t + s.quantity, 0);
+    const beforeSlag = beforeStacks
+      .filter((s) => s.itemId === ITEM_IDS.slag)
+      .reduce((t, s) => t + s.quantity, 0);
+    const beforeXp =
+      (
+        await db
+          .select()
+          .from(rune.characterSkillXp)
+          .where(eq(rune.characterSkillXp.characterId, character.id))
+      ).find((r) => r.skillId === SKILL_IDS.refining)?.totalXp ?? 0;
+    const beforeAction = await db
+      .select()
+      .from(rune.activeActions)
+      .where(eq(rune.activeActions.characterId, character.id));
+    const beforeCursor = beforeAction[0]?.resolvedThroughAt.toISOString();
+    const beforeState = await db
+      .select()
+      .from(rune.characterRefiningState)
+      .where(eq(rune.characterRefiningState.characterId, character.id));
+
+    // Use real refining resolver but inject failure after its normal writes (before commit)
+    const refiningMod = await import("@/server/refining");
+    const realResolver = refiningMod.createRefiningResolver({ nextBasisPoints: () => 0 });
     const failingResolver = {
-      load: async () => ({}),
-      resolve: () => ({
-        outcome: undefined,
-        transition: { kind: "continue" as const, consumedTicks: 1 },
-      }),
-      persist: async (tx: DatabaseTransaction) => {
-        await tx
-          .insert(rune.inventoryStacks)
-          .values({ characterId: character.id, itemId: ITEM_IDS.ferriteShale, quantity: 1 });
+      ...realResolver,
+      persist: async (tx: DatabaseTransaction, outcome: unknown) => {
+        await (
+          realResolver as unknown as {
+            persist: (tx: DatabaseTransaction, o: unknown) => Promise<void>;
+          }
+        ).persist(tx, outcome as never);
         throw new Error("intentional refining rollback");
       },
-      supports: () => true,
+      supports: realResolver.supports!.bind(realResolver),
     };
     await expect(
       resolution.withResolvedOwnedCharacter(
@@ -282,22 +403,54 @@ suite("issue #81 Refining persistence and concurrency (real PostgreSQL)", () => 
       ),
     ).rejects.toThrow(/intentional/i);
 
-    const after = await mining.getMiningGameplayState(userId, character.id, now, {
-      nextBasisPoints: () => 0,
-      nextUnit: () => 0,
-    });
-    // The successful attempt is still resolvable and commits normally after rollback
-    expect(after.refiningRun.attempts).toBe(1);
-    // Verify the intentionally inserted stack did not survive the rollback
-    const stacks = await db
+    // Immediately after failure, before retry, prove nothing changed
+    const afterStacks = await db
       .select()
       .from(rune.inventoryStacks)
       .where(eq(rune.inventoryStacks.characterId, character.id));
-    // 5 shale minus 2 consumed plus 1 ferrite created = 1 ferrite + 3 shale remain (but our failing resolver's extra shale was rolled back, so the real refining outcome's shale consumption is what we see)
-    // After the successful real resolution, we expect 3 shale + 1 ferrite
     expect(
-      stacks.filter((s) => s.itemId === ITEM_IDS.ferriteShale).reduce((t, s) => t + s.quantity, 0),
-    ).toBe(3);
+      afterStacks
+        .filter((s) => s.itemId === ITEM_IDS.ferriteShale)
+        .reduce((t, s) => t + s.quantity, 0),
+    ).toBe(beforeShale);
+    expect(
+      afterStacks
+        .filter((s) => s.itemId === ITEM_IDS.refinedFerrite)
+        .reduce((t, s) => t + s.quantity, 0),
+    ).toBe(beforeFerrite);
+    expect(
+      afterStacks.filter((s) => s.itemId === ITEM_IDS.slag).reduce((t, s) => t + s.quantity, 0),
+    ).toBe(beforeSlag);
+    const afterXp =
+      (
+        await db
+          .select()
+          .from(rune.characterSkillXp)
+          .where(eq(rune.characterSkillXp.characterId, character.id))
+      ).find((r) => r.skillId === SKILL_IDS.refining)?.totalXp ?? 0;
+    expect(afterXp).toBe(beforeXp);
+    const afterState = await db
+      .select()
+      .from(rune.characterRefiningState)
+      .where(eq(rune.characterRefiningState.characterId, character.id));
+    expect(afterState[0]?.runAttempts).toBe(beforeState[0]?.runAttempts ?? 0);
+    expect(afterState[0]?.runFerriteGained).toBe(beforeState[0]?.runFerriteGained ?? 0);
+    expect(afterState[0]?.runSlagGained).toBe(beforeState[0]?.runSlagGained ?? 0);
+    expect(afterState[0]?.runXpGained).toBe(beforeState[0]?.runXpGained ?? 0);
+    expect(afterState[0]?.recentAttempts).toEqual(beforeState[0]?.recentAttempts ?? []);
+    const afterAction = await db
+      .select()
+      .from(rune.activeActions)
+      .where(eq(rune.activeActions.characterId, character.id));
+    expect(afterAction[0]?.resolvedThroughAt.toISOString()).toBe(beforeCursor);
+
+    // Retry normally proves exactly one attempt commits
+    const retried = await mining.getMiningGameplayState(userId, character.id, now, {
+      nextBasisPoints: () => 0,
+      nextUnit: () => 0,
+    });
+    expect(retried.refiningRun.attempts).toBe(1);
+    expect(retried.refinedFerriteQuantity).toBe(1);
   });
 
   it("retry/concurrent commands cannot duplicate output/XP or double-consume shale", async () => {
@@ -502,5 +655,120 @@ suite("issue #81 Refining persistence and concurrency (real PostgreSQL)", () => 
     }
     const elapsedMs = action[0]!.resolvedThroughAt.getTime() - startedAt.getTime();
     expect(elapsedMs).toBeLessThanOrEqual(60 * 60 * 1000 + 600); // cap + at most one tick rounding
+  });
+
+  it("Mining stop does not leak into Refining presentation after Travel to Yard", async () => {
+    const { userId, character } = await makeCharacter();
+    const atCrash = new Date("2026-01-01T00:00:00.000Z");
+    await mining.getMiningGameplayState(userId, character.id, atCrash, {
+      nextBasisPoints: () => 0,
+      nextUnit: () => 0,
+    });
+    await mining.startCrashSiteMining(userId, character.id, atCrash, {
+      nextBasisPoints: () => 0,
+      nextUnit: () => 0,
+    });
+    // Stop mining with a mining-specific reason by removing tool, then travel to Yard
+    await db.delete(rune.equippedItems).where(eq(rune.equippedItems.characterId, character.id));
+    const afterStop = await mining.getMiningGameplayState(
+      userId,
+      character.id,
+      new Date("2026-01-01T00:00:06.000Z"),
+      {
+        nextBasisPoints: () => 0,
+        nextUnit: () => 0,
+      },
+    );
+    expect(afterStop.stop?.actionId).toBe(ACTION_IDS.crashSiteMining);
+    // Travel to Processing Yard — mining stop should not be presented as refining stop
+    await mining.beginTravel(
+      userId,
+      character.id,
+      LOCATION_IDS.abandonedProcessingYard,
+      new Date("2026-01-01T00:00:06.000Z"),
+      {
+        nextBasisPoints: () => 0,
+        nextUnit: () => 0,
+      },
+    );
+    const arrived = await mining.getMiningGameplayState(
+      userId,
+      character.id,
+      new Date("2026-01-01T00:00:30.000Z"),
+      {
+        nextBasisPoints: () => 0,
+        nextUnit: () => 0,
+      },
+    );
+    expect(arrived.location.currentLocationId).toBe(LOCATION_IDS.abandonedProcessingYard);
+    // At Yard with no active refining, there is no refining stop — mining stop is not leaked
+    expect(arrived.stop).toBeUndefined();
+    // Starting refining at Yard should not surface the old mining stop
+    await db
+      .insert(rune.inventoryStacks)
+      .values({ characterId: character.id, itemId: ITEM_IDS.ferriteShale, quantity: 2 });
+    const atYard = await mining.getMiningGameplayState(
+      userId,
+      character.id,
+      new Date("2026-01-01T00:00:30.000Z"),
+      {
+        nextBasisPoints: () => 0,
+        nextUnit: () => 0,
+      },
+    );
+    // Refining stop helpers would map mining_tool_replaced to wrong message; ensure stop is still undefined or refining-specific
+    if (atYard.stop) {
+      expect(atYard.stop.actionId).not.toBe(ACTION_IDS.crashSiteMining);
+    }
+  });
+
+  it("Refining stop does not leak into Mining presentation", async () => {
+    const { userId, character } = await makeCharacter();
+    const atYard = new Date("2026-01-01T00:00:00.000Z");
+    await provisionAtYard(userId, character.id, atYard);
+    await db
+      .insert(rune.inventoryStacks)
+      .values({ characterId: character.id, itemId: ITEM_IDS.ferriteShale, quantity: 5 });
+    await mining.startRefining(userId, character.id, atYard, {
+      nextBasisPoints: () => 0,
+      nextUnit: () => 0,
+    });
+    // Drain shale to get a refining-specific stop
+    const atFail = await mining.getMiningGameplayState(
+      userId,
+      character.id,
+      new Date("2026-01-01T00:00:04.200Z"),
+      {
+        nextBasisPoints: () => 0,
+        nextUnit: () => 0,
+      },
+    );
+    expect(atFail.refiningRun.attempts).toBe(1);
+    // Travel away to Crash Site
+    const traveled = await mining.beginTravel(
+      userId,
+      character.id,
+      LOCATION_IDS.crashSite,
+      new Date("2026-01-01T00:00:04.200Z"),
+      {
+        nextBasisPoints: () => 0,
+        nextUnit: () => 0,
+      },
+    );
+    expect(traveled.travelState?.destinationLocationId).toBe(LOCATION_IDS.crashSite);
+    const atCrash = await mining.getMiningGameplayState(
+      userId,
+      character.id,
+      new Date("2026-01-01T00:00:30.000Z"),
+      {
+        nextBasisPoints: () => 0,
+        nextUnit: () => 0,
+      },
+    );
+    expect(atCrash.location.currentLocationId).toBe(LOCATION_IDS.crashSite);
+    // At Crash Site, any stop should not be refining-specific (e.g. insufficient_ferrite_shale)
+    if (atCrash.stop) {
+      expect(atCrash.stop.actionId).not.toBe(ACTION_IDS.refining);
+    }
   });
 });

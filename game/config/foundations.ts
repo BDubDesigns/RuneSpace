@@ -70,8 +70,6 @@ const portraitIds = {
 } as const satisfies Record<string, ContentId>;
 
 export const SKILL_IDS = skillIds;
-/** Legacy reserved identity — renamed to `refining` in issue #81, kept as a migration shim only. */
-export const METALLURGY_SKILL_ID_LEGACY = "metallurgy" as const;
 export const ITEM_IDS = itemIds;
 export const PORTRAIT_IDS = portraitIds;
 
