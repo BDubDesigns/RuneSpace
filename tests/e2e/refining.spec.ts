@@ -174,27 +174,16 @@ test("Processing Yard Refining journey — Ferrite and Slag both branches, artwo
   // Need 2 more shale? We had 10 - 2*2 = 6 left after 2 attempts
   await page.getByLabel("Local map").scrollIntoViewIfNeeded();
   await page.locator('[data-map-location="crash_site"]').click();
+  await expect(page.getByRole("button", { name: /Walk to Crash Site/ })).toBeVisible();
   await page.getByRole("button", { name: /Walk to Crash Site/ }).click();
-  // Don't assert In transit immediately — the stop model change can make the
-  // transition resolve synchronously and hide the button. Wait for either state.
-  await expect(
-    page.getByText("In transit").first().or(page.getByText("Mining").first()),
-  ).toBeVisible();
+  await expect(page.getByText("In transit", { exact: true }).first()).toBeVisible();
   // Fast-forward arrival: push cursor back so travel resolver sees arrival as due
   const travelStarted = new Date(Date.now() - 25_000);
   await db
     .update(activeActions)
     .set({ startedAt: travelStarted, resolvedThroughAt: travelStarted })
     .where(eq(activeActions.characterId, characterId));
-  // Arrival is resolved on next gameplay-state load; Refresh status triggers it.
-  // If already arrived, Refresh is still needed to pull the new location.
-  await page
-    .getByRole("button", { name: "Refresh status" })
-    .click()
-    .catch(async () => {
-      // If button hid during transit, a plain reload also resolves arrival via getMiningGameplayState
-      await page.reload();
-    });
+  await page.getByRole("button", { name: "Refresh status" }).click();
   // 10. arrival leaves Refining stopped; completed count unchanged (no extra for incomplete)
   await expect(page.getByText("Mining").first()).toBeVisible();
   const shaleAfter = (
