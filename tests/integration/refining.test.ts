@@ -754,7 +754,9 @@ suite("issue #81 Refining persistence and concurrency (real PostgreSQL)", () => 
       nextBasisPoints: () => 0,
       nextUnit: () => 0,
     });
-    // Drain shale to get a refining-specific stop
+    // Drain shale via the refining run — after one success with 5 shale,
+    // subsequent getMiningGameplayState calls will drain remaining shale
+    // and Travel then persists action_replaced as the latest refining stop.
     const atFail = await mining.getMiningGameplayState(
       userId,
       character.id,
@@ -765,7 +767,7 @@ suite("issue #81 Refining persistence and concurrency (real PostgreSQL)", () => 
       },
     );
     expect(atFail.refiningRun.attempts).toBe(1);
-    // Travel away to Crash Site
+    // Travel away to Crash Site — beginTravel while refining records action_replaced
     const traveled = await mining.beginTravel(
       userId,
       character.id,
@@ -787,9 +789,10 @@ suite("issue #81 Refining persistence and concurrency (real PostgreSQL)", () => 
       },
     );
     expect(atCrash.location.currentLocationId).toBe(LOCATION_IDS.crashSite);
-    // Refining stop remains tagged as refining — mining presentation must ignore it
+    // Refining stop remains tagged as refining — mining presentation must ignore it.
+    // The latest refining stop is action_replaced (from the Travel replacement).
     expect(atCrash.stop?.actionId).toBe(ACTION_IDS.refining);
-    expect(atCrash.stop?.reason).toBe("insufficient_ferrite_shale");
+    expect(atCrash.stop?.reason).toBe("action_replaced");
     // Mining helper would not understand refining-specific reason
     expect([
       "manually_stopped",
