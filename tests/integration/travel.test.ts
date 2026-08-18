@@ -103,13 +103,17 @@ suite("issue #40 persistent locations and timed travel (real PostgreSQL)", () =>
     const startedAt = new Date("2026-01-01T00:00:00.000Z");
     const random = { nextBasisPoints: () => 0, nextUnit: () => 0 };
     await mining.getMiningGameplayState(userId, character.id, startedAt, random);
+    await db
+      .update(rune.characters)
+      .set({ currentLocationId: LOCATION_IDS.theJag })
+      .where(eq(rune.characters.id, character.id));
     await mining.startCrashSiteMining(userId, character.id, startedAt, random);
 
     const completedAt = new Date("2026-01-01T00:00:06.600Z");
     const traveled = await mining.beginTravel(
       userId,
       character.id,
-      LOCATION_IDS.abandonedProcessingYard,
+      LOCATION_IDS.theLongScramble,
       completedAt,
       random,
     );
@@ -120,7 +124,7 @@ suite("issue #40 persistent locations and timed travel (real PostgreSQL)", () =>
       shaleGained: 1,
       xpGained: 15,
     });
-    expect(traveled.travelState?.destinationLocationId).toBe(LOCATION_IDS.abandonedProcessingYard);
+    expect(traveled.travelState?.destinationLocationId).toBe(LOCATION_IDS.theLongScramble);
     const actions = await db
       .select()
       .from(rune.activeActions)
@@ -222,7 +226,7 @@ suite("issue #40 persistent locations and timed travel (real PostgreSQL)", () =>
     ).toBe(LOCATION_IDS.crashSite);
   });
 
-  it("blocks Mining while in transit or away from the Crash Site", async () => {
+  it("blocks Mining while in transit or away from The Jag", async () => {
     const { userId, character } = await makeCharacter();
     const startedAt = new Date("2026-01-01T00:00:00.000Z");
     await mining.beginTravel(userId, character.id, LOCATION_IDS.abandonedProcessingYard, startedAt);
@@ -409,5 +413,153 @@ suite("issue #40 persistent locations and timed travel (real PostgreSQL)", () =>
       .from(rune.characters)
       .where(eq(rune.characters.id, character.id));
     expect(chars[0]?.currentLocationId).toBe(LOCATION_IDS.abandonedProcessingYard);
+  });
+
+  it("rejects a direct Crash Site to The Jag shortcut and enforces the two-leg route", async () => {
+    const { userId, character } = await makeCharacter();
+    const startedAt = new Date("2026-01-01T00:00:00.000Z");
+    const direct = await mining.beginTravel(userId, character.id, LOCATION_IDS.theJag, startedAt);
+    expect(direct.travelError).toBe("not_adjacent");
+    expect(direct.location.currentLocationId).toBe(LOCATION_IDS.crashSite);
+
+    const toScramble = await mining.beginTravel(
+      userId,
+      character.id,
+      LOCATION_IDS.theLongScramble,
+      startedAt,
+    );
+    expect(toScramble.travelState?.destinationLocationId).toBe(LOCATION_IDS.theLongScramble);
+    const atScramble = await mining.getMiningGameplayState(
+      userId,
+      character.id,
+      new Date("2026-01-01T00:00:24.600Z"),
+    );
+    expect(atScramble.location.currentLocationId).toBe(LOCATION_IDS.theLongScramble);
+
+    const toJag = await mining.beginTravel(
+      userId,
+      character.id,
+      LOCATION_IDS.theJag,
+      new Date("2026-01-01T00:00:24.600Z"),
+    );
+    expect(toJag.travelState?.destinationLocationId).toBe(LOCATION_IDS.theJag);
+    const atJag = await mining.getMiningGameplayState(
+      userId,
+      character.id,
+      new Date("2026-01-01T00:00:49.200Z"),
+    );
+    expect(atJag.location.currentLocationId).toBe(LOCATION_IDS.theJag);
+
+    const backToScramble = await mining.beginTravel(
+      userId,
+      character.id,
+      LOCATION_IDS.theLongScramble,
+      new Date("2026-01-01T00:00:49.200Z"),
+    );
+    expect(backToScramble.travelState?.destinationLocationId).toBe(LOCATION_IDS.theLongScramble);
+    const back = await mining.getMiningGameplayState(
+      userId,
+      character.id,
+      new Date("2026-01-01T00:01:13.800Z"),
+    );
+    expect(back.location.currentLocationId).toBe(LOCATION_IDS.theLongScramble);
+
+    const jagDirect = await mining.beginTravel(
+      userId,
+      character.id,
+      LOCATION_IDS.crashSite,
+      new Date("2026-01-01T00:01:13.800Z"),
+    );
+    expect(jagDirect.travelState?.destinationLocationId).toBe(LOCATION_IDS.crashSite);
+  });
+
+  it("rejects Mining at Crash Site and The Long Scramble, accepts only at The Jag", async () => {
+    const { userId, character } = await makeCharacter();
+    const now = new Date("2026-01-01T00:00:00.000Z");
+    await mining.getMiningGameplayState(userId, character.id, now);
+
+    const atCrash = await mining.startCrashSiteMining(userId, character.id, now);
+    expect(atCrash.travelError).toBe("mining_unavailable_here");
+
+    await mining.beginTravel(userId, character.id, LOCATION_IDS.theLongScramble, now);
+    const atScramble = await mining.getMiningGameplayState(
+      userId,
+      character.id,
+      new Date("2026-01-01T00:00:24.600Z"),
+    );
+    expect(atScramble.location.currentLocationId).toBe(LOCATION_IDS.theLongScramble);
+    const scrambleMining = await mining.startCrashSiteMining(
+      userId,
+      character.id,
+      new Date("2026-01-01T00:00:24.600Z"),
+    );
+    expect(scrambleMining.travelError).toBe("mining_unavailable_here");
+
+    await mining.beginTravel(
+      userId,
+      character.id,
+      LOCATION_IDS.theJag,
+      new Date("2026-01-01T00:00:24.600Z"),
+    );
+    const atJag = await mining.getMiningGameplayState(
+      userId,
+      character.id,
+      new Date("2026-01-01T00:00:49.200Z"),
+    );
+    expect(atJag.location.currentLocationId).toBe(LOCATION_IDS.theJag);
+    const jagMining = await mining.startCrashSiteMining(
+      userId,
+      character.id,
+      new Date("2026-01-01T00:00:49.200Z"),
+    );
+    expect(jagMining.activeAction?.actionId).toBe(ACTION_IDS.crashSiteMining);
+    expect(jagMining.travelError).toBeUndefined();
+  });
+
+  it("reaches The Jag from the Annex only via explicit legs through Crash Site and Long Scramble", async () => {
+    const { userId, character } = await makeCharacter();
+    const t0 = new Date("2026-01-01T00:00:00.000Z");
+    await db
+      .update(rune.characters)
+      .set({ currentLocationId: LOCATION_IDS.emergencyPowerAnnex })
+      .where(eq(rune.characters.id, character.id));
+
+    const direct = await mining.beginTravel(userId, character.id, LOCATION_IDS.theJag, t0);
+    expect(direct.travelError).toBe("not_adjacent");
+
+    const toCrash = await mining.beginTravel(userId, character.id, LOCATION_IDS.crashSite, t0);
+    expect(toCrash.travelState?.destinationLocationId).toBe(LOCATION_IDS.crashSite);
+    const atCrash = await mining.getMiningGameplayState(
+      userId,
+      character.id,
+      new Date("2026-01-01T00:00:24.600Z"),
+    );
+    expect(atCrash.location.currentLocationId).toBe(LOCATION_IDS.crashSite);
+
+    await mining.beginTravel(
+      userId,
+      character.id,
+      LOCATION_IDS.theLongScramble,
+      new Date("2026-01-01T00:00:24.600Z"),
+    );
+    const atScramble = await mining.getMiningGameplayState(
+      userId,
+      character.id,
+      new Date("2026-01-01T00:00:49.200Z"),
+    );
+    expect(atScramble.location.currentLocationId).toBe(LOCATION_IDS.theLongScramble);
+
+    await mining.beginTravel(
+      userId,
+      character.id,
+      LOCATION_IDS.theJag,
+      new Date("2026-01-01T00:00:49.200Z"),
+    );
+    const atJag = await mining.getMiningGameplayState(
+      userId,
+      character.id,
+      new Date("2026-01-01T00:01:13.800Z"),
+    );
+    expect(atJag.location.currentLocationId).toBe(LOCATION_IDS.theJag);
   });
 });

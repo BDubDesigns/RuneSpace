@@ -156,14 +156,20 @@ browser-journey job (Mining, Overlay, Travel, and the repeated Mining
 play-boundary check). A local skip or unavailable environment is not a pass:
 report it as unexecuted and wait for the corresponding canonical CI result.
 
-### Focused implementation checks
+### Focused implementation checks, then full canonical parity
 
 During implementation, run checks proportional to the touched boundary: unit
 tests for pure rules, the relevant integration test for a persistence boundary,
-or a focused Playwright spec for a browser change. Run typecheck, lint, and
-format checks early enough to avoid pushing an obviously broken checkpoint.
-Batch related local commits into a coherent state rather than pushing after
-every tiny edit.
+or a focused Playwright spec for a browser change. When a change adds or touches
+E2E specs, validate the new/targeted spec(s) first in isolation
+(`pnpm test:e2e:focused <phase>` or `pnpm test:e2e -- <spec> --project=chromium`)
+to catch fixture errors quickly, then run the **full** `pnpm test:e2e:canonical`
+suite — the exact command GitHub's Full gate runs — before assuming the work
+will pass. `fast-checks` (typecheck/lint/unit/build) intentionally skips
+PostgreSQL integration and canonical E2E; a green fast run is not evidence the
+merge gate will pass. Run typecheck, lint, and format checks early enough to
+avoid pushing an obviously broken checkpoint. Batch related local commits into a
+coherent state rather than pushing after every tiny edit.
 
 ### Draft preview checkpoint
 

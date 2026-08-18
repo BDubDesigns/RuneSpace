@@ -1,6 +1,6 @@
 import { eq } from "drizzle-orm";
 import { afterEach, beforeAll, describe, expect, it } from "vitest";
-import { ACTION_IDS, ITEM_IDS, SKILL_IDS } from "@/game/config/foundations";
+import { ACTION_IDS, ITEM_IDS, LOCATION_IDS, SKILL_IDS } from "@/game/config/foundations";
 import type { LevelThreshold } from "@/game/domain/progression";
 import type { DatabaseTransaction } from "@/server/action-resolution";
 import { grantCharacterSkillXp } from "@/server/progression";
@@ -52,6 +52,13 @@ suite("gameplay foundations (real PostgreSQL)", () => {
       `Game ${userId.slice(0, 6)}`,
     );
     return { userId, character };
+  }
+
+  async function moveToTheJag(characterId: string) {
+    await db
+      .update(rune.characters)
+      .set({ currentLocationId: LOCATION_IDS.theJag })
+      .where(eq(rune.characters.id, characterId));
   }
 
   it("enforces gameplay persistence constraints created by the migration", async () => {
@@ -391,6 +398,7 @@ suite("gameplay foundations (real PostgreSQL)", () => {
     const startedAt = new Date("2026-01-01T00:00:00.000Z");
     const random = { nextBasisPoints: () => 0, nextUnit: () => 0 };
     await mining.getMiningGameplayState(userId, character.id, startedAt, random);
+    await moveToTheJag(character.id);
     await Promise.all([
       mining.startCrashSiteMining(userId, character.id, startedAt, random),
       mining.startCrashSiteMining(userId, character.id, startedAt, random),
@@ -440,6 +448,7 @@ suite("gameplay foundations (real PostgreSQL)", () => {
     const startedAt = new Date("2026-01-01T00:00:00.000Z");
     const random = { nextBasisPoints: () => 9_999, nextUnit: () => 0 };
     await mining.getMiningGameplayState(userId, character.id, startedAt, random);
+    await moveToTheJag(character.id);
     await mining.startCrashSiteMining(userId, character.id, startedAt, random);
     const resolved = await mining.getMiningGameplayState(
       userId,
@@ -487,6 +496,7 @@ suite("gameplay foundations (real PostgreSQL)", () => {
     const startedAt = new Date("2026-01-01T00:00:00.000Z");
     const random = { nextBasisPoints: () => 0, nextUnit: () => 0 };
     await mining.getMiningGameplayState(userId, character.id, startedAt, random);
+    await moveToTheJag(character.id);
     await db.insert(rune.inventoryStacks).values({
       characterId: character.id,
       itemId: ITEM_IDS.ferriteShale,
@@ -618,6 +628,7 @@ suite("gameplay foundations (real PostgreSQL)", () => {
     const { userId, character } = await makeCharacter();
     const now = new Date("2026-01-01T00:00:00.000Z");
     await mining.getMiningGameplayState(userId, character.id, now);
+    await moveToTheJag(character.id);
     await db.delete(rune.equippedItems).where(eq(rune.equippedItems.characterId, character.id));
 
     const state = await mining.startCrashSiteMining(userId, character.id, now);
@@ -714,6 +725,7 @@ suite("gameplay foundations (real PostgreSQL)", () => {
     const completedAt = new Date("2026-01-01T00:00:06.000Z");
     const random = { nextBasisPoints: () => 0, nextUnit: () => 0 };
     await mining.getMiningGameplayState(userId, character.id, startedAt, random);
+    await moveToTheJag(character.id);
     await mining.startCrashSiteMining(userId, character.id, startedAt, random);
     const removed = await equipment.changeEquipment(
       userId,
@@ -745,6 +757,7 @@ suite("gameplay foundations (real PostgreSQL)", () => {
     const completedAt = new Date("2026-01-01T00:00:06.000Z");
     const random = { nextBasisPoints: () => 0, nextUnit: () => 0 };
     await mining.getMiningGameplayState(userId, character.id, startedAt, random);
+    await moveToTheJag(character.id);
     await mining.startCrashSiteMining(userId, character.id, startedAt, random);
     await expect(
       equipment.changeEquipment(
@@ -780,6 +793,7 @@ suite("gameplay foundations (real PostgreSQL)", () => {
     const completedAt = new Date("2026-01-01T00:00:06.000Z");
     const random = { nextBasisPoints: () => 0, nextUnit: () => 0 };
     await mining.getMiningGameplayState(userId, character.id, startedAt, random);
+    await moveToTheJag(character.id);
     await mining.startCrashSiteMining(userId, character.id, startedAt, random);
 
     const spareCutter = (

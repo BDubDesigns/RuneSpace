@@ -53,7 +53,7 @@ export default async function setupMiningFixture(config: FullConfig) {
     // Character creation requires a deliberate portrait choice (issue #65).
     await page.getByRole("button", { name: "Gramma portrait" }).click();
     await page.getByRole("button", { name: "Create character" }).click();
-    await expect(page.getByText("Ferrite Shale", { exact: true }).first()).toBeVisible();
+    await expect(page.getByText("World map", { exact: true })).toBeVisible();
     await context.storageState({ path: miningStorageStatePath });
   } finally {
     await browser.close();

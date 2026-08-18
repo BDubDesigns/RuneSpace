@@ -37,6 +37,35 @@ async function openMiningFixture(page: import("@playwright/test").Page) {
   return page.url().split("/").at(-1)!;
 }
 
+async function travelToJag(page: import("@playwright/test").Page, characterId: string) {
+  await page.getByRole("button", { name: /The Long Scramble/ }).click();
+  await page.getByRole("button", { name: /Walk to The Long Scramble/ }).click();
+  await expect(page.getByText("In transit", { exact: true }).first()).toBeVisible();
+  const atScramble = new Date(Date.now() - 25_000);
+  await db
+    .update(activeActions)
+    .set({ startedAt: atScramble, resolvedThroughAt: atScramble })
+    .where(eq(activeActions.characterId, characterId));
+  await page.reload();
+  await expect(page.getByRole("button", { name: /The Long Scramble/ }).first()).toHaveAttribute(
+    "aria-current",
+    "true",
+  );
+  await page.getByRole("button", { name: /The Jag/ }).click();
+  await page.getByRole("button", { name: /Walk to The Jag/ }).click();
+  await expect(page.getByText("In transit", { exact: true }).first()).toBeVisible();
+  const atJag = new Date(Date.now() - 25_000);
+  await db
+    .update(activeActions)
+    .set({ startedAt: atJag, resolvedThroughAt: atJag })
+    .where(eq(activeActions.characterId, characterId));
+  await page.reload();
+  await expect(page.getByRole("button", { name: /The Jag/ }).first()).toHaveAttribute(
+    "aria-current",
+    "true",
+  );
+}
+
 test.beforeEach(async ({ page }) => {
   const characterId = await openMiningFixture(page);
   await Promise.all([
@@ -54,9 +83,10 @@ test.beforeEach(async ({ page }) => {
   await db.delete(equippedItems).where(eq(equippedItems.characterId, characterId));
   await db.delete(itemInstances).where(eq(itemInstances.characterId, characterId));
   await page.reload();
+  await travelToJag(page, characterId);
 });
 
-test("owned character can start, observe, stop, and restore Crash Site Mining", async ({
+test("owned character can start, observe, stop, and restore Ferrite Mining at The Jag", async ({
   page,
 }) => {
   await page.setViewportSize({ width: 390, height: 844 });
@@ -519,7 +549,7 @@ test("shell reserves the fixed footer once and keeps the global background fixed
 
   await db
     .update(characters)
-    .set({ currentLocationId: LOCATION_IDS.crashSite })
+    .set({ currentLocationId: LOCATION_IDS.theJag })
     .where(eq(characters.id, characterId!));
   await page.reload();
   await expect(page.getByRole("button", { name: "Start Mining" })).toBeVisible();

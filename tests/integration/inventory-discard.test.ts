@@ -1,6 +1,6 @@
 import { and, eq } from "drizzle-orm";
 import { afterEach, beforeAll, describe, expect, it } from "vitest";
-import { ITEM_IDS } from "@/game/config/foundations";
+import { ITEM_IDS, LOCATION_IDS } from "@/game/config/foundations";
 import type { MiningRandom } from "@/game/domain/mining";
 import { withResolvedOwnedCharacter } from "@/server/action-resolution";
 import { discardInventoryStack, discardInventoryStackInTransaction } from "@/server/inventory";
@@ -53,6 +53,10 @@ suite("Issue #58 authoritative inventory stack discard (real PostgreSQL)", () =>
 
   async function provision(userId: string, characterId: string, now: Date) {
     await mining.getMiningGameplayState(userId, characterId, now, noYield);
+    await db
+      .update(rune.characters)
+      .set({ currentLocationId: LOCATION_IDS.theJag })
+      .where(eq(rune.characters.id, characterId));
   }
 
   async function addStack(characterId: string, itemId: string, quantity: number): Promise<string> {

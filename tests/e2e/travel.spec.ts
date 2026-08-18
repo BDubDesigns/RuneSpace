@@ -51,7 +51,7 @@ async function expectMapStatusPlatesInsideHex(page: import("@playwright/test").P
     page.locator('[aria-label="Local map"]'),
     "data-map-status",
   );
-  expect(geometry.labels.sort()).toEqual(["Daily cells", "Mining", "Refining"]);
+  expect(geometry.labels.sort()).toEqual(["", "Daily cells", "Mining", "Offline", "Refining"]);
   expect(geometry.allInside).toBe(true);
   expect(geometry.routeOverlaps).toEqual([]);
 }
@@ -61,7 +61,13 @@ async function expectMapNameplatesInsideHex(page: import("@playwright/test").Pag
     page.locator('[aria-label="Local map"]'),
     "data-map-nameplate",
   );
-  expect(geometry.labels.sort()).toEqual(["Crash Site", "Power Annex", "Processing Yard"]);
+  expect(geometry.labels.sort()).toEqual([
+    "Crash Site",
+    "Long Scramble",
+    "Power Annex",
+    "Processing Yard",
+    "The Jag",
+  ]);
   expect(geometry.allInside).toBe(true);
   expect(geometry.routeOverlaps).toEqual([]);
 }
@@ -79,9 +85,21 @@ async function expectMapStateLabelsInsideHex(
   expect(geometry.routeOverlaps).toEqual([]);
 }
 
-const STATIONARY_STATE_LABELS = ["You are here", "Reachable", "Reachable"] as const;
-const SELECTED_STATE_LABELS = ["You are here", "Selected", "Reachable"] as const;
-const IN_TRANSIT_STATE_LABELS = ["Origin", "Destination", "Reachable"] as const;
+const STATIONARY_STATE_LABELS = [
+  "You are here",
+  "Reachable",
+  "Reachable",
+  "Visible",
+  "Visible",
+] as const;
+const SELECTED_STATE_LABELS = [
+  "You are here",
+  "Selected",
+  "Reachable",
+  "Visible",
+  "Visible",
+] as const;
+const IN_TRANSIT_STATE_LABELS = ["Origin", "Destination", "Reachable", "Visible", "Visible"] as const;
 
 async function expectPowerAnnexRewardLayout(
   page: import("@playwright/test").Page,
@@ -117,6 +135,11 @@ async function expectPowerAnnexRewardLayout(
   const combinedCenter = ((tileBox?.y ?? 0) + combinedBottom) / 2;
   const infoCenter = (infoBox?.y ?? 0) + (infoBox?.height ?? 0) / 2;
   expect(Math.abs(combinedCenter - infoCenter)).toBeLessThanOrEqual(4);
+}
+
+async function expectNoMiningDashboards(page: import("@playwright/test").Page) {
+  await expect(page.getByRole("button", { name: "Start Mining" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Stop Mining" })).toHaveCount(0);
 }
 
 async function expectMiningDashboardsVisible(page: import("@playwright/test").Page) {
@@ -231,10 +254,10 @@ test("selecting a destination does not begin travel; confirmation is required", 
 }) => {
   const characterId = page.url().split("/").at(-1)!;
 
-  // Stationary at the Crash Site.
+  // Stationary at the Crash Site (no Mining here after issue #83 — Mining is at The Jag).
   await page.setViewportSize({ width: 390, height: 844 });
   await expect(page.getByText("You are here", { exact: false }).first()).toBeVisible();
-  await expectMiningDashboardsVisible(page);
+  await expectNoMiningDashboards(page);
   await expect(page.getByRole("button", { name: /Crash Site/ }).first()).toHaveAttribute(
     "aria-current",
     "true",
@@ -315,10 +338,38 @@ test("the full journey walks, arrives, and returns between the original location
 }) => {
   const characterId = page.url().split("/").at(-1)!;
 
-  // Stationary at the Crash Site — screenshot.
+  // Stationary at the Crash Site — screenshot. Mining is at The Jag after issue #83,
+  // so go via Long Scramble -> Jag, mine there, then return via Yard for the classic
+  // Crash <-> Yard journey proof.
   await page.setViewportSize({ width: 390, height: 844 });
 
-  // Start Mining and resolve one controlled attempt.
+  // Reach The Jag and mine once.
+  await page.getByRole("button", { name: /The Long Scramble/ }).click();
+  await page.getByRole("button", { name: /Walk to The Long Scramble/ }).click();
+  await expect(page.getByText("In transit", { exact: true }).first()).toBeVisible();
+  let departPast = new Date(Date.now() - 25_000);
+  await db
+    .update(activeActions)
+    .set({ startedAt: departPast, resolvedThroughAt: departPast })
+    .where(eq(activeActions.characterId, characterId));
+  await page.reload();
+  await expect(page.getByRole("button", { name: /The Long Scramble/ }).first()).toHaveAttribute(
+    "aria-current",
+    "true",
+  );
+  await page.getByRole("button", { name: /The Jag/ }).click();
+  await page.getByRole("button", { name: /Walk to The Jag/ }).click();
+  await expect(page.getByText("In transit", { exact: true }).first()).toBeVisible();
+  departPast = new Date(Date.now() - 25_000);
+  await db
+    .update(activeActions)
+    .set({ startedAt: departPast, resolvedThroughAt: departPast })
+    .where(eq(activeActions.characterId, characterId));
+  await page.reload();
+  await expect(page.getByRole("button", { name: /The Jag/ }).first()).toHaveAttribute(
+    "aria-current",
+    "true",
+  );
   await page.getByRole("button", { name: "Start Mining" }).click();
   await expect(page.getByRole("button", { name: "Stop Mining" })).toBeVisible();
   const twoAttemptsAgo = new Date(Date.now() - 12_100);
@@ -330,9 +381,38 @@ test("the full journey walks, arrives, and returns between the original location
   await expect(page.getByText("1 successful", { exact: true })).toBeVisible();
   await expect(page.getByText("Latest attempt:", { exact: false })).toBeVisible();
 
-  // Select the destination and confirm departure.
+  // Return to Crash Site via Long Scramble.
+  await page.getByRole("button", { name: /The Long Scramble/ }).click();
+  await page.getByRole("button", { name: /Walk to The Long Scramble/ }).click();
+  await expect(page.getByText("In transit", { exact: true }).first()).toBeVisible();
+  departPast = new Date(Date.now() - 25_000);
+  await db
+    .update(activeActions)
+    .set({ startedAt: departPast, resolvedThroughAt: departPast })
+    .where(eq(activeActions.characterId, characterId));
+  await page.reload();
+  await expect(page.getByRole("button", { name: /The Long Scramble/ }).first()).toHaveAttribute(
+    "aria-current",
+    "true",
+  );
+  await page.getByRole("button", { name: /Crash Site/ }).click();
+  await page.getByRole("button", { name: /Walk to Crash Site/ }).click();
+  await expect(page.getByText("In transit", { exact: true }).first()).toBeVisible();
+  departPast = new Date(Date.now() - 25_000);
+  await db
+    .update(activeActions)
+    .set({ startedAt: departPast, resolvedThroughAt: departPast })
+    .where(eq(activeActions.characterId, characterId));
+  await page.reload();
+  await expect(page.getByRole("button", { name: /Crash Site/ }).first()).toHaveAttribute(
+    "aria-current",
+    "true",
+  );
+
+  // From Crash Site, verify the walk to Yard still works (proving the
+  // original triangle remains intact after the Scramble/Jag branch).
   await page.getByRole("button", { name: /Abandoned Processing Yard/ }).click();
-  await expect(page.getByText(/Departing resolves your completed work/)).toBeVisible();
+  await expect(page.getByText(/Walking time: 24 seconds/)).toBeVisible();
   await page.getByRole("button", { name: /Walk to Abandoned Processing Yard/ }).click();
   // The authoritative state is applied immediately — verify the transit UI.
   await expect(page.getByText("Journey progress")).toBeVisible();
@@ -353,13 +433,13 @@ test("the full journey walks, arrives, and returns between the original location
     ),
   ).toBeVisible();
   await expect(page.getByText(/paused/i)).toHaveCount(0);
-  await expectMiningDashboardsHidden(page);
+  await expectNoMiningDashboards(page);
   await expectRouteProgressStartsAt(page, LOCATION_IDS.crashSite);
   // Hybrid chassis rivets (data-map-rivet) are intentional and exempt; no other circles must appear during transit.
   await expect(
     page.locator('[aria-label="Local map"] svg circle:not([data-map-rivet])'),
   ).toHaveCount(0);
-  await expect(page.locator('[aria-label="Local map"] svg circle[data-map-rivet]')).toHaveCount(18);
+  await expect(page.locator('[aria-label="Local map"] svg circle[data-map-rivet]')).toHaveCount(30);
 
   await scrollMapIntoView(page);
   await expectMapNameplatesInsideHex(page);
@@ -375,10 +455,10 @@ test("the full journey walks, arrives, and returns between the original location
   await page.setViewportSize({ width: 390, height: 844 });
 
   // Fast-forward the journey server-side, then refresh to resolve arrival.
-  const departPast = new Date(Date.now() - 25_000);
+  let yardDepartPast = new Date(Date.now() - 25_000);
   await db
     .update(activeActions)
-    .set({ startedAt: departPast, resolvedThroughAt: departPast })
+    .set({ startedAt: yardDepartPast, resolvedThroughAt: yardDepartPast })
     .where(eq(activeActions.characterId, characterId));
   await page.reload();
   await expect(page.getByText("World map")).toBeVisible();
@@ -417,7 +497,7 @@ test("the full journey walks, arrives, and returns between the original location
   await expect(
     page.locator('[aria-label="Local map"] svg circle:not([data-map-rivet])'),
   ).toHaveCount(0);
-  await expect(page.locator('[aria-label="Local map"] svg circle[data-map-rivet]')).toHaveCount(18);
+  await expect(page.locator('[aria-label="Local map"] svg circle[data-map-rivet]')).toHaveCount(30);
 
   const returnPast = new Date(Date.now() - 25_000);
   await db
@@ -427,14 +507,37 @@ test("the full journey walks, arrives, and returns between the original location
   await page.reload();
   await expect(page.getByText("World map")).toBeVisible();
 
-  // Back at the Crash Site, Mining is available again.
+  // Back at the Crash Site — Mining is at The Jag (issue #83), so verify no
+  // Mining dashboards here, then walk via Scramble -> Jag to prove Mining again.
   await expect(page.getByRole("button", { name: /Crash Site/ }).first()).toHaveAttribute(
+    "aria-current",
+    "true",
+  );
+  await expectNoMiningDashboards(page);
+  await page.getByRole("button", { name: /The Long Scramble/ }).click();
+  await page.getByRole("button", { name: /Walk to The Long Scramble/ }).click();
+  await expect(page.getByText("In transit", { exact: true }).first()).toBeVisible();
+  let jagDepartPast = new Date(Date.now() - 25_000);
+  await db
+    .update(activeActions)
+    .set({ startedAt: jagDepartPast, resolvedThroughAt: jagDepartPast })
+    .where(eq(activeActions.characterId, characterId));
+  await page.reload();
+  await page.getByRole("button", { name: /The Jag/ }).click();
+  await page.getByRole("button", { name: /Walk to The Jag/ }).click();
+  await expect(page.getByText("In transit", { exact: true }).first()).toBeVisible();
+  jagDepartPast = new Date(Date.now() - 25_000);
+  await db
+    .update(activeActions)
+    .set({ startedAt: jagDepartPast, resolvedThroughAt: jagDepartPast })
+    .where(eq(activeActions.characterId, characterId));
+  await page.reload();
+  await expect(page.getByRole("button", { name: /The Jag/ }).first()).toHaveAttribute(
     "aria-current",
     "true",
   );
   await expect(page.getByRole("button", { name: "Start Mining" })).toBeVisible();
   await expectMiningDashboardsVisible(page);
-  await expect(page.getByText("Latest attempt:", { exact: false })).toBeVisible();
   await page.getByRole("button", { name: "Start Mining" }).click();
   await expect(page.getByRole("button", { name: "Stop Mining" })).toBeVisible();
 });

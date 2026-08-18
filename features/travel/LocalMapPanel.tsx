@@ -856,12 +856,13 @@ export function LocalMapPanel() {
           {/* Three flat-top hexes form a triangle. The SVG renders plated chassis,
           decorative identifiers, and all approved routes; native buttons overlay
           each hex for semantics and text labels. */}
-          <div
-            className="relative mx-auto mt-4"
-            role="group"
-            aria-label="Local map"
-            style={{ width: `${mapGeometry.width}px`, height: `${mapGeometry.height}px` }}
-          >
+          <div className="-mx-1 overflow-auto px-1 pb-1">
+            <div
+              className="relative mx-auto"
+              role="group"
+              aria-label="Local map"
+              style={{ width: `${mapGeometry.width}px`, height: `${mapGeometry.height}px` }}
+            >
             <HexMapSvg
               geometry={mapGeometry}
               currentLocationId={currentLocationId}
@@ -902,6 +903,7 @@ export function LocalMapPanel() {
                 />
               );
             })}
+            </div>
           </div>
 
           <LocationPopulationList

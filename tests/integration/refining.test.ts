@@ -671,12 +671,16 @@ suite("issue #81 Refining persistence and concurrency (real PostgreSQL)", () => 
 
   it("Mining stop does not leak into Refining presentation after Travel to Yard", async () => {
     const { userId, character } = await makeCharacter();
-    const atCrash = new Date("2026-01-01T00:00:00.000Z");
-    await mining.getMiningGameplayState(userId, character.id, atCrash, {
+    const atJag = new Date("2026-01-01T00:00:00.000Z");
+    await mining.getMiningGameplayState(userId, character.id, atJag, {
       nextBasisPoints: () => 0,
       nextUnit: () => 0,
     });
-    await mining.startCrashSiteMining(userId, character.id, atCrash, {
+    await db
+      .update(rune.characters)
+      .set({ currentLocationId: LOCATION_IDS.theJag })
+      .where(eq(rune.characters.id, character.id));
+    await mining.startCrashSiteMining(userId, character.id, atJag, {
       nextBasisPoints: () => 0,
       nextUnit: () => 0,
     });
@@ -692,12 +696,50 @@ suite("issue #81 Refining persistence and concurrency (real PostgreSQL)", () => 
       },
     );
     expect(afterStop.stop?.actionId).toBe(ACTION_IDS.crashSiteMining);
-    // Travel to Processing Yard — mining stop should not be presented as refining stop
+    // Travel from The Jag to Processing Yard requires via Long Scramble -> Crash -> Yard
+    await mining.beginTravel(
+      userId,
+      character.id,
+      LOCATION_IDS.theLongScramble,
+      new Date("2026-01-01T00:00:06.000Z"),
+      {
+        nextBasisPoints: () => 0,
+        nextUnit: () => 0,
+      },
+    );
+    await mining.getMiningGameplayState(
+      userId,
+      character.id,
+      new Date("2026-01-01T00:00:30.000Z"),
+      {
+        nextBasisPoints: () => 0,
+        nextUnit: () => 0,
+      },
+    );
+    await mining.beginTravel(
+      userId,
+      character.id,
+      LOCATION_IDS.crashSite,
+      new Date("2026-01-01T00:00:30.000Z"),
+      {
+        nextBasisPoints: () => 0,
+        nextUnit: () => 0,
+      },
+    );
+    await mining.getMiningGameplayState(
+      userId,
+      character.id,
+      new Date("2026-01-01T00:00:54.000Z"),
+      {
+        nextBasisPoints: () => 0,
+        nextUnit: () => 0,
+      },
+    );
     await mining.beginTravel(
       userId,
       character.id,
       LOCATION_IDS.abandonedProcessingYard,
-      new Date("2026-01-01T00:00:06.000Z"),
+      new Date("2026-01-01T00:00:54.000Z"),
       {
         nextBasisPoints: () => 0,
         nextUnit: () => 0,
@@ -706,7 +748,7 @@ suite("issue #81 Refining persistence and concurrency (real PostgreSQL)", () => 
     const arrived = await mining.getMiningGameplayState(
       userId,
       character.id,
-      new Date("2026-01-01T00:00:30.000Z"),
+      new Date("2026-01-01T00:01:18.000Z"),
       {
         nextBasisPoints: () => 0,
         nextUnit: () => 0,
