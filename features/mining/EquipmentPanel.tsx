@@ -30,7 +30,8 @@ export function EquipmentPanel({
   onClose: () => void;
   triggerRef: RefObject<HTMLButtonElement | null>;
 }) {
-  const { acquireCommand, acceptState, foregroundBusy, releaseCommand } = useMiningPlay();
+  const { acquireCommand, acceptState, enqueueForeground, foregroundBusy, releaseCommand } =
+    useMiningPlay();
   const [, startTransition] = useTransition();
   const [message, setMessage] = useState<string>();
   const [messageTone, setMessageTone] = useState<"muted" | "danger">("muted");
@@ -53,17 +54,20 @@ export function EquipmentPanel({
   }
 
   function command(action: () => ReturnType<typeof equipEquipmentAction>) {
-    if (!acquireCommand()) return;
-    startTransition(async () => {
-      try {
-        apply(await action());
-      } catch {
-        setMessage("Comms interruption. Equipment could not be confirmed.");
-        setMessageTone("danger");
-      } finally {
-        releaseCommand();
-      }
-    });
+    const execute = () => {
+      if (!acquireCommand()) return;
+      startTransition(async () => {
+        try {
+          apply(await action());
+        } catch {
+          setMessage("Comms interruption. Equipment could not be confirmed.");
+          setMessageTone("danger");
+        } finally {
+          releaseCommand();
+        }
+      });
+    };
+    enqueueForeground(execute);
   }
 
   return (

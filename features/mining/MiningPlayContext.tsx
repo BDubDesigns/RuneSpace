@@ -25,6 +25,7 @@ type MiningPlayContextValue = {
   /** Presentation-only: true only while a player-initiated command is in flight. */
   foregroundBusy: boolean;
   acquireCommand: (opts?: { background?: boolean }) => boolean;
+  enqueueForeground: (fn: () => void) => void;
   releaseCommand: () => void;
   requestAutoRefresh: (schedulerToken?: number) => void;
   setRefreshCallback: (fn: (opts?: { background?: boolean }) => void) => void;
@@ -66,6 +67,7 @@ export function MiningPlayProvider({
     undefined,
   );
   const boundaryGeneration = useRef(0);
+  const foregroundQueue = useRef<(() => void) | null>(null);
   const stateRef = useRef(state);
   stateRef.current = state;
 
@@ -78,9 +80,35 @@ export function MiningPlayProvider({
     return ok;
   }, []);
 
+  const enqueueForeground = useCallback((fn: () => void) => {
+    if (!gateModel.current.locked) {
+      if (tryAcquire(gateModel.current)) {
+        setBusy(true);
+        setForegroundBusy(true);
+        fn();
+      }
+      return;
+    }
+    // Gate held by background reconciliation: queue exactly one foreground
+    // intent and run it right after background releases, without flashing.
+    // Latest intent wins; no background replay. fn assumes gate is already
+    // held when invoked from the queue.
+    foregroundQueue.current = fn;
+  }, []);
+
   const releaseCommand = useCallback(() => {
     setBusy(false);
     setForegroundBusy(false);
+    if (foregroundQueue.current) {
+      const queued = foregroundQueue.current;
+      foregroundQueue.current = null;
+      if (tryAcquire(gateModel.current)) {
+        setBusy(true);
+        setForegroundBusy(true);
+        queued();
+        return;
+      }
+    }
     const pendingToken = gateModel.current.pendingToken;
     if (release(gateModel.current)) {
       if (pendingToken !== undefined && pendingToken !== boundaryGeneration.current) return;
@@ -156,6 +184,7 @@ export function MiningPlayProvider({
         busy,
         foregroundBusy,
         acquireCommand,
+        enqueueForeground,
         releaseCommand,
         requestAutoRefresh,
         setRefreshCallback,

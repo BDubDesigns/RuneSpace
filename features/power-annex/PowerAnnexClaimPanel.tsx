@@ -15,6 +15,7 @@ export function PowerAnnexClaimPanel() {
   const {
     acquireCommand,
     acceptState,
+    enqueueForeground,
     foregroundBusy: busy,
     releaseCommand,
     requestAutoRefresh,
@@ -34,36 +35,39 @@ export function PowerAnnexClaimPanel() {
     : `${POWER_CELL_DAILY_ALLOTMENT} Power Cells available to claim`;
 
   function claim() {
-    if (!acquireCommand()) return;
-    startTransition(async () => {
-      try {
-        const result = await claimPowerCellsAction({ characterId: state.characterId });
-        if ("error" in result) {
-          setMessage(result.error);
-          setMessageTone("danger");
-        } else {
-          acceptState(result.state);
-          if (result.claim.status === "error") {
-            setMessage(result.claim.message);
+    const execute = () => {
+      if (!acquireCommand()) return;
+      startTransition(async () => {
+        try {
+          const result = await claimPowerCellsAction({ characterId: state.characterId });
+          if ("error" in result) {
+            setMessage(result.error);
             setMessageTone("danger");
-          } else if (result.claim.status === "claimed") {
-            setMessage(
-              `Today's emergency allotment claimed: ${POWER_CELL_DAILY_ALLOTMENT} Power Cells awarded.`,
-            );
-            setMessageTone("muted");
           } else {
-            setMessage("Today's emergency allotment has already been claimed.");
-            setMessageTone("muted");
+            acceptState(result.state);
+            if (result.claim.status === "error") {
+              setMessage(result.claim.message);
+              setMessageTone("danger");
+            } else if (result.claim.status === "claimed") {
+              setMessage(
+                `Today's emergency allotment claimed: ${POWER_CELL_DAILY_ALLOTMENT} Power Cells awarded.`,
+              );
+              setMessageTone("muted");
+            } else {
+              setMessage("Today's emergency allotment has already been claimed.");
+              setMessageTone("muted");
+            }
           }
+        } catch {
+          setMessage("Comms interruption. The Power Annex could not confirm your claim.");
+          setMessageTone("danger");
+          requestAutoRefresh();
+        } finally {
+          releaseCommand();
         }
-      } catch {
-        setMessage("Comms interruption. The Power Annex could not confirm your claim.");
-        setMessageTone("danger");
-        requestAutoRefresh();
-      } finally {
-        releaseCommand();
-      }
-    });
+      });
+    };
+    enqueueForeground(execute);
   }
 
   return (

@@ -20,6 +20,7 @@ export function useLoadPowerCell(onFeedback: (feedback: LoadPowerCellFeedback) =
   const {
     acquireCommand,
     acceptState,
+    enqueueForeground,
     foregroundBusy: busy,
     releaseCommand,
     state,
@@ -27,33 +28,43 @@ export function useLoadPowerCell(onFeedback: (feedback: LoadPowerCellFeedback) =
   const [, startTransition] = useTransition();
 
   const loadPowerCell = useCallback(() => {
-    if (!acquireCommand()) return;
-    startTransition(async () => {
-      try {
-        const result = await loadPowerCellAction({ characterId: state.characterId });
-        if ("error" in result) {
-          onFeedback({ tone: "danger", message: result.error });
-          return;
+    const execute = () => {
+      if (!acquireCommand()) return;
+      startTransition(async () => {
+        try {
+          const result = await loadPowerCellAction({ characterId: state.characterId });
+          if ("error" in result) {
+            onFeedback({ tone: "danger", message: result.error });
+            return;
+          }
+          acceptState(result.state);
+          onFeedback(
+            result.load.status === "loaded"
+              ? {
+                  tone: "muted",
+                  message: `Power Cell loaded · ${result.load.remainingCharge} boosted attempts ready.`,
+                }
+              : { tone: "danger", message: result.load.message },
+          );
+        } catch {
+          onFeedback({
+            tone: "danger",
+            message: "Comms interruption. Power Cell load could not be confirmed.",
+          });
+        } finally {
+          releaseCommand();
         }
-        acceptState(result.state);
-        onFeedback(
-          result.load.status === "loaded"
-            ? {
-                tone: "muted",
-                message: `Power Cell loaded · ${result.load.remainingCharge} boosted attempts ready.`,
-              }
-            : { tone: "danger", message: result.load.message },
-        );
-      } catch {
-        onFeedback({
-          tone: "danger",
-          message: "Comms interruption. Power Cell load could not be confirmed.",
-        });
-      } finally {
-        releaseCommand();
-      }
-    });
-  }, [acceptState, acquireCommand, onFeedback, releaseCommand, state.characterId]);
+      });
+    };
+    enqueueForeground(execute);
+  }, [
+    acceptState,
+    acquireCommand,
+    enqueueForeground,
+    onFeedback,
+    releaseCommand,
+    state.characterId,
+  ]);
 
   return { busy, loadPowerCell };
 }

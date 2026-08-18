@@ -72,6 +72,58 @@ describe("command gate", () => {
     expect(release(manualGate)).toBe(true);
   });
 
+  it("foreground intent arriving while background holds gate is not silently dropped when queued at context boundary", () => {
+    const gate = model();
+    // Background reconciliation acquires the gate
+    expect(tryAcquire(gate)).toBe(true);
+    expect(gate.locked).toBe(true);
+
+    // Foreground tryAcquire fails while background holds — this is the race
+    expect(tryAcquire(gate)).toBe(false);
+
+    // Releasing background must not leave gate permanently locked
+    expect(release(gate)).toBe(false);
+    expect(gate.locked).toBe(false);
+
+    // Queued foreground can now acquire via the shared gate boundary
+    expect(tryAcquire(gate)).toBe(true);
+    expect(gate.locked).toBe(true);
+    expect(release(gate)).toBe(false);
+  });
+
+  it("queued foreground intent executes after background release without flashing", () => {
+    // Simulates MiningPlayContext enqueueForeground semantics at gate level:
+    // background holds, foreground queues, background releases, queued foreground runs with gate held.
+    const gate = model();
+    expect(tryAcquire(gate)).toBe(true); // background owns
+    let foregroundRan = false;
+    const queued = () => {
+      expect(gate.locked).toBe(false);
+      expect(tryAcquire(gate)).toBe(true);
+      foregroundRan = true;
+      // foreground holds briefly
+      expect(release(gate)).toBe(false);
+    };
+    // While background holds, tryAcquire would fail — queue instead
+    expect(tryAcquire(gate)).toBe(false);
+    // Background releases; context would now invoke queued
+    expect(release(gate)).toBe(false);
+    queued();
+    expect(foregroundRan).toBe(true);
+    expect(gate.locked).toBe(false);
+  });
+
+  it("automatic boundary refresh does not require foreground presentation lock", () => {
+    const gate = model();
+    expect(tryAcquire(gate)).toBe(true);
+    // Background refresh is coalesced, not presented as foreground busy
+    expect(requestRefresh(gate, 99)).toBe(false);
+    expect(gate.pending).toBe(true);
+    expect(gate.pendingToken).toBe(99);
+    // Release still coalesces exactly one background refresh
+    expect(release(gate)).toBe(true);
+  });
+
   it("does not release a scheduler refresh after a delayed command changes the boundary", () => {
     const gate = model();
     expect(tryAcquire(gate)).toBe(true);

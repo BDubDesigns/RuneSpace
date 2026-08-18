@@ -55,7 +55,8 @@ export function InventoryPanel({
   onClose: () => void;
   triggerRef: RefObject<HTMLButtonElement | null>;
 }) {
-  const { acquireCommand, acceptState, foregroundBusy, releaseCommand } = useMiningPlay();
+  const { acquireCommand, acceptState, enqueueForeground, foregroundBusy, releaseCommand } =
+    useMiningPlay();
   const [, startTransition] = useTransition();
   const [selected, setSelected] = useState<InventorySelection | undefined>();
   const [confirming, setConfirming] = useState<DropConfirmation | undefined>();
@@ -174,41 +175,44 @@ export function InventoryPanel({
 
   function runDiscard() {
     if (!confirming) return;
-    if (!acquireCommand()) return;
     const request = {
       stackId: confirming.stackId,
       mode: confirming.mode,
       expectedQuantity: confirming.expectedQuantity,
     };
-    startTransition(async () => {
-      try {
-        const result = await discardInventoryStackAction({
-          characterId: state.characterId,
-          ...request,
-        });
-        if ("error" in result) {
-          setMessage({ tone: "danger", message: result.error });
-        } else {
-          acceptState(result.state);
-          setMessage(
-            result.discard.status === "discarded"
-              ? {
-                  tone: "muted",
-                  message: `Dropped ${result.discard.discardedQuantity} ${confirming.itemName}.`,
-                }
-              : { tone: "danger", message: result.discard.message },
-          );
+    const execute = () => {
+      if (!acquireCommand()) return;
+      startTransition(async () => {
+        try {
+          const result = await discardInventoryStackAction({
+            characterId: state.characterId,
+            ...request,
+          });
+          if ("error" in result) {
+            setMessage({ tone: "danger", message: result.error });
+          } else {
+            acceptState(result.state);
+            setMessage(
+              result.discard.status === "discarded"
+                ? {
+                    tone: "muted",
+                    message: `Dropped ${result.discard.discardedQuantity} ${confirming.itemName}.`,
+                  }
+                : { tone: "danger", message: result.discard.message },
+            );
+          }
+        } catch {
+          setMessage({
+            tone: "danger",
+            message: "Comms interruption. Inventory could not be confirmed.",
+          });
+        } finally {
+          releaseCommand();
+          setConfirming(undefined);
         }
-      } catch {
-        setMessage({
-          tone: "danger",
-          message: "Comms interruption. Inventory could not be confirmed.",
-        });
-      } finally {
-        releaseCommand();
-        setConfirming(undefined);
-      }
-    });
+      });
+    };
+    enqueueForeground(execute);
   }
 
   return (
