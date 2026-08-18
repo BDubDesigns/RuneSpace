@@ -151,7 +151,7 @@ Machining creates precise components. Salvage, Fabrication, Machining, Speeder
 Piloting, and Ship Piloting are documented future skill directions only; they
 have no persistence initialization or gameplay in this foundation.
 
-## World and Travel (issues #40 and #47)
+## World and Travel (issues #40, #47, and #83)
 
 RuneSpace's production stages require movement between distinct places. Travel is
 a real, server-authoritative, blocking character activity — not an instant tab
@@ -172,10 +172,10 @@ of war, fuel, hauling, and transportation upgrades build.
   dormant (future) activities. Adjacency is validated as bidirectional so a
   one-way edge can never silently ship.
 
-### The initial three-location world
+### The five-location local world (issue #83)
 
-- **Crash Site** (`crash_site`): the existing infinite Ferrite Shale deposit.
-  Mining is the only available activity.
+- **Crash Site** (`crash_site`): the wreck / starting location after issue #83.
+  No Mining is available here; it retains its existing ship scene image.
 - **Abandoned Processing Yard** (`abandoned_processing_yard`): the
   Refining location (issue #81). Refining is available here while stationary;
   the location advertises `processing_yard_refining` as its available action.
@@ -183,10 +183,23 @@ of war, fuel, hauling, and transportation upgrades build.
   adjacent emergency-supply depot. It is directly adjacent to both existing
   locations and is the authoritative renewable source for the daily Power Cell
   allotment below.
+- **The Long Scramble** (`the_long_scramble`, `{q:-1,r:2}`): intentionally barren
+  traversal tile southwest of Crash Site. No local activity or resource; its lack
+  of activity is intentional and it has no fake Offline status.
+- **The Jag** (`the_jag`, `{q:-2,r:3}`): Ferrite Shale Mining location (Mining moved
+  out of Crash Site). Mining is available only here while stationary.
 
-All three locations are connected by bidirectional routes. No further locations,
-content, or map systems (no world grid, coordinates, procedural generation, fog
-of war, or art generation) are introduced by this issue.
+Adjacency after issue #83 (bidirectional, no second graph): Crash Site ↔
+Processing Yard, Crash Site ↔ Power Annex, Processing Yard ↔ Power Annex,
+**Crash Site ↔ The Long Scramble**, **The Long Scramble ↔ The Jag**. No direct
+Crash Site ↔ Jag, Jag ↔ Yard/Annex, or Long Scramble ↔ Yard/Annex edge exists.
+Reaching The Jag from anywhere except The Long Scramble requires explicit
+completed legs (for example Annex → Crash Site → Long Scramble → Jag). No queued
+route, shortest-path, waypoint, or auto-continue behavior exists.
+
+Coordinates are presentation-only (flat-top axial); Travel legality is derived
+solely from registry adjacency, not from coordinates. The local map derives route
+lines from the same authoritative adjacency.
 
 ### Travel is a blocking one-active-action activity
 
@@ -368,11 +381,14 @@ When Travel replaces an active travel-replaceable work action (Mining or Refinin
 No work action may progress during Travel, and the server enforces this
 server-side even against a stale or manipulated client.
 
-### Location/activity gating
+### Location/activity gating (after issue #83)
 
-- Crash Site Mining may start only at the Crash Site while stationary.
-- Mining cannot start at the Processing Yard.
-- Mining cannot start while Travel is active.
+- Ferrite Shale Mining may start only at The Jag while stationary.
+- Mining cannot start at Crash Site, The Long Scramble, the Processing Yard, the
+  Power Annex, or while Travel is active. The server rejects those starts; hiding
+  UI is insufficient.
+- The Long Scramble has no local gameplay activity or resource; it is not shown
+  as Offline and has no filler controls.
 - Conflicting state-changing commands are rejected clearly and server-side.
 - Inventory and Equipment remain inspectable during Travel.
 

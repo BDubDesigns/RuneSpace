@@ -6,6 +6,8 @@ export const MAP_IDENTIFIER_ASSET_BY_KEY = {
   crash_site_deposit: "/map-icons/crash-site.webp",
   processing_yard: "/map-icons/processing-yard.webp",
   power_annex: "/map-icons/power-annex.webp",
+  the_long_scramble: "/map-icons/the-long-scramble.png",
+  the_jag: "/map-icons/the-jag.png",
 } as const satisfies Record<MapIconKey, string>;
 
 /**

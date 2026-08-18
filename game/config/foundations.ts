@@ -30,11 +30,13 @@ export const ACTION_IDS = {
   travel: asContentId("travel"),
 } as const satisfies Record<string, ContentId>;
 
-/** Stable identities for the approved local world (issues #40 and #47). */
+/** Stable identities for the approved local world (issues #40, #47, and #83). */
 export const LOCATION_IDS = {
   crashSite: asContentId("crash_site"),
   abandonedProcessingYard: asContentId("abandoned_processing_yard"),
   emergencyPowerAnnex: asContentId("dewhat_emergency_power_annex"),
+  theLongScramble: asContentId("the_long_scramble"),
+  theJag: asContentId("the_jag"),
 } as const satisfies Record<string, ContentId>;
 
 /**

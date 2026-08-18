@@ -15,7 +15,7 @@ import { SectionHeader } from "@/components/ui/SectionHeader";
 import { StatusMeter } from "@/components/ui/StatusMeter";
 import { ACTION_IDS, GAME_TICK_MS, LOCATION_IDS } from "@/game/config/foundations";
 import { getEffectiveGameBalance } from "@/game/config/balance";
-import { getLocation } from "@/game/content/locations";
+import { areLocationsAdjacent, getLocation } from "@/game/content/locations";
 import type { LocationPopulationEntry } from "@/game/domain/location-population";
 import { beginTravelAction } from "@/server/actions";
 import { useMiningPlay } from "@/features/mining/MiningPlayContext";
@@ -98,6 +98,8 @@ type HexButtonProps = {
   populationCount: number;
   transitRole?: "origin" | "destination";
   disabled: boolean;
+  /** Whether this tile is directly reachable from the current location (adjacent). */
+  directlyReachable: boolean;
   onSelect: () => void;
   style: CSSProperties;
 };
@@ -113,6 +115,7 @@ function HexButton({
   populationCount,
   transitRole,
   disabled,
+  directlyReachable,
   onSelect,
   style,
 }: HexButtonProps) {
@@ -125,10 +128,16 @@ function HexButton({
       ? "You are here"
       : selected
         ? "Selected"
-        : "Reachable";
+        : directlyReachable
+          ? "Reachable"
+          : "Visible";
   const accessibleLabel = [
     accessibleName,
-    youAreHere ? "You are here." : "Reachable destination.",
+    youAreHere
+      ? "You are here."
+      : directlyReachable
+        ? "Reachable destination."
+        : "Visible, not directly reachable.",
     youAreHere && populationCount > 0
       ? `${populationCount} other ${populationCount === 1 ? "character" : "characters"} here.`
       : "",
@@ -787,7 +796,9 @@ export function LocalMapPanel() {
       : 0;
 
   const selectedLocation = selected ? getLocation(selected) : undefined;
-  const selectedIsDestination = selectedLocation && !inTransit && selected !== currentLocationId;
+  const selectedIsDirectlyReachable =
+    selectedLocation && !inTransit && areLocationsAdjacent(currentLocationId, selectedLocation.id);
+  const selectedIsDestination = selectedIsDirectlyReachable && selected !== currentLocationId;
   // Entries are only shown for the location they were fetched for: after a
   // travel arrival the previous tile's population must never leak onto the
   // new tile while the replacement read is in flight.
@@ -799,6 +810,8 @@ export function LocalMapPanel() {
     if (!loc) return "";
     if (locationId === LOCATION_IDS.emergencyPowerAnnex) return "Daily cells";
     if (locationId === LOCATION_IDS.abandonedProcessingYard) return "Refining";
+    if (locationId === LOCATION_IDS.theJag) return "Mining";
+    if (locationId === LOCATION_IDS.theLongScramble) return "";
     return loc.availableActionIds.length > 0 ? "Mining" : "Offline";
   }
 
@@ -881,6 +894,9 @@ export function LocalMapPanel() {
                         : undefined
                   }
                   disabled={inTransit}
+                  directlyReachable={
+                    areLocationsAdjacent(currentLocationId, location.id) || isCurrent
+                  }
                   onSelect={() => !inTransit && setSelected(location.id)}
                   style={hexButtonStyle(location.id)}
                 />
@@ -955,15 +971,23 @@ export function LocalMapPanel() {
                     Walk to {selectedLocation.displayName} — {WALK_SECONDS} sec
                   </ActionButton>
                 </div>
+              ) : selectedLocation &&
+                !selectedIsDirectlyReachable &&
+                selected !== currentLocationId ? (
+                <p className="mt-2 text-xs text-[color:var(--rs-text-secondary)]">
+                  Not directly reachable from here.
+                </p>
               ) : (
                 <p className="mt-2 text-xs text-[color:var(--rs-text-secondary)]">
-                  {selectedLocation.availableActionIds.includes(ACTION_IDS.refining)
+                  {selectedLocation?.availableActionIds.includes(ACTION_IDS.refining)
                     ? "Refining is available here — feed Ferrite Shale to produce Refined Ferrite or Slag."
-                    : selectedLocation.availableActionIds.includes(ACTION_IDS.crashSiteMining)
+                    : selectedLocation?.availableActionIds.includes(ACTION_IDS.crashSiteMining)
                       ? "Mining is available here."
-                      : selectedLocation.id === LOCATION_IDS.emergencyPowerAnnex
+                      : selectedLocation?.id === LOCATION_IDS.emergencyPowerAnnex
                         ? "Claim five Power Cells here once per Pacific reset day."
-                        : "No production activity is available here."}
+                        : selectedLocation?.id === LOCATION_IDS.theLongScramble
+                          ? "No production activity — this is the barren traversal to The Jag."
+                          : "No production activity is available here."}
                 </p>
               )}
             </div>

@@ -15,12 +15,14 @@ describe("issue #47 location content", () => {
     expect(LOCATION_IDS.crashSite).toBe("crash_site");
   });
 
-  it("resolves exactly the three approved local locations", () => {
+  it("resolves exactly the five approved local locations (issue #83)", () => {
     expect(LOCATIONS.map((l) => l.id).sort()).toEqual(
       [
         LOCATION_IDS.crashSite,
         LOCATION_IDS.abandonedProcessingYard,
         LOCATION_IDS.emergencyPowerAnnex,
+        LOCATION_IDS.theLongScramble,
+        LOCATION_IDS.theJag,
       ].sort(),
     );
     expect(getLocation(LOCATION_IDS.crashSite)?.displayName).toBe("Crash Site");
@@ -30,6 +32,8 @@ describe("issue #47 location content", () => {
     expect(getLocation(LOCATION_IDS.emergencyPowerAnnex)?.displayName).toBe(
       "DeWhat? Emergency Power Annex",
     );
+    expect(getLocation(LOCATION_IDS.theLongScramble)?.displayName).toBe("The Long Scramble");
+    expect(getLocation(LOCATION_IDS.theJag)?.displayName).toBe("The Jag");
   });
 
   it("adjacency is authoritative and bidirectional", () => {
@@ -56,13 +60,16 @@ describe("issue #47 location content", () => {
   });
 
   it("derives activity availability from authoritative location content", () => {
+    // Issue #83: Mining moved from Crash Site to The Jag.
     expect(isActionAvailableAtLocation(LOCATION_IDS.crashSite, ACTION_IDS.crashSiteMining)).toBe(
-      true,
+      false,
     );
+    expect(isActionAvailableAtLocation(LOCATION_IDS.theJag, ACTION_IDS.crashSiteMining)).toBe(true);
     expect(
       isActionAvailableAtLocation(LOCATION_IDS.abandonedProcessingYard, ACTION_IDS.crashSiteMining),
     ).toBe(false);
     expect(getLocation(LOCATION_IDS.emergencyPowerAnnex)?.availableActionIds).toHaveLength(0);
+    expect(getLocation(LOCATION_IDS.theLongScramble)?.availableActionIds).toHaveLength(0);
     // The Processing Yard now exposes Refining (issue #81) — dormant is empty there.
     expect(getLocation(LOCATION_IDS.abandonedProcessingYard)?.availableActionIds).toContain(
       ACTION_IDS.refining,

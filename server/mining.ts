@@ -1021,7 +1021,7 @@ export async function startCrashSiteMining(
         .limit(1);
       const currentLocationId = reloaded?.currentLocationId ?? LOCATION_IDS.crashSite;
       const traveling = context.action?.actionId === ACTION_IDS.travel;
-      // Mining may only start at the Crash Site while stationary.
+      // Mining may only start at the authoritative Ferrite location (The Jag after issue #83).
       const miningBlockedHere = !isActionAvailableAtLocation(
         currentLocationId,
         ACTION_IDS.crashSiteMining,

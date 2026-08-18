@@ -189,7 +189,9 @@ export function MiningConsole({ characterName }: { characterName: string }) {
   const currentLocationId = state.location.currentLocationId;
   const atCrashSite = currentLocationId === LOCATION_IDS.crashSite;
   const atProcessingYard = currentLocationId === LOCATION_IDS.abandonedProcessingYard;
-  const showMiningActivity = atCrashSite && !inTransit;
+  const atTheJag = currentLocationId === LOCATION_IDS.theJag;
+  const atTheLongScramble = currentLocationId === LOCATION_IDS.theLongScramble;
+  const showMiningActivity = atTheJag && !inTransit;
   const showRefiningActivity = atProcessingYard && !inTransit;
   const durationTicks = active?.nextAttemptDurationTicks ?? balance.mining.attemptDurationTicks;
   const durationMs = durationTicks * GAME_TICK_MS;
@@ -312,7 +314,7 @@ export function MiningConsole({ characterName }: { characterName: string }) {
                   location={currentLocation}
                   characterName={characterName}
                   resourceLabels={
-                    atCrashSite
+                    atTheJag
                       ? ["Ferrite Shale"]
                       : atProcessingYard
                         ? ["Refined Ferrite", "Slag"]
@@ -346,11 +348,10 @@ export function MiningConsole({ characterName }: { characterName: string }) {
             </p>
           ) : atProcessingYard ? (
             <RefiningConsole />
-          ) : atCrashSite ? (
+          ) : atTheJag ? (
             <>
               <p className="mt-4 max-w-2xl text-sm leading-relaxed text-[color:var(--rs-text-secondary)]">
-                The damaged ship needs raw material. Cut Ferrite Shale from the infinite crash-site
-                deposit to prepare for repairs.
+                {getLocation(currentLocationId)?.description}
               </p>
               <div className="mt-5 flex flex-wrap gap-3">
                 {active || pendingCommand === "stop" ? (
@@ -410,6 +411,12 @@ export function MiningConsole({ characterName }: { characterName: string }) {
                 </Feedback>
               )}
             </>
+          ) : atTheLongScramble ? (
+            <div className="mt-4">
+              <p className="max-w-2xl text-sm leading-relaxed text-[color:var(--rs-text-secondary)]">
+                {getLocation(currentLocationId)?.description}
+              </p>
+            </div>
           ) : (
             <div className="mt-4">
               <p className="max-w-2xl text-sm leading-relaxed text-[color:var(--rs-text-secondary)]">

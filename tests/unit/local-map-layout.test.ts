@@ -22,11 +22,13 @@ function distance(first: { x: number; y: number }, second: { x: number; y: numbe
   return Math.hypot(second.x - first.x, second.y - first.y);
 }
 
-describe("three-cell flat-top local map layout", () => {
+describe("five-cell flat-top local map layout (issue #83)", () => {
   it("uses the approved local axial coordinates", () => {
     expect(layoutFor(LOCATION_IDS.emergencyPowerAnnex).coordinate).toEqual({ q: 0, r: 0 });
     expect(layoutFor(LOCATION_IDS.crashSite).coordinate).toEqual({ q: 0, r: 1 });
     expect(layoutFor(LOCATION_IDS.abandonedProcessingYard).coordinate).toEqual({ q: 1, r: 0 });
+    expect(layoutFor(LOCATION_IDS.theLongScramble).coordinate).toEqual({ q: -1, r: 2 });
+    expect(layoutFor(LOCATION_IDS.theJag).coordinate).toEqual({ q: -2, r: 3 });
   });
 
   it("converts every approved neighbor to one uniform flat-top center spacing", () => {
@@ -53,8 +55,8 @@ describe("three-cell flat-top local map layout", () => {
 
   it("derives one route per undirected registry edge and animates both directions", () => {
     const geometry = buildLocalMapGeometry();
-    expect(geometry.undirectedRoutes).toHaveLength(3);
-    expect(Object.keys(geometry.routeSegments)).toHaveLength(6);
+    expect(geometry.undirectedRoutes).toHaveLength(5);
+    expect(Object.keys(geometry.routeSegments)).toHaveLength(10);
     expect(
       geometry.undirectedRoutes.every(
         (route) =>
