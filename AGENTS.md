@@ -103,7 +103,13 @@ subagents or automation that may be unavailable.
    `pnpm test:e2e:canonical`. Resolve failures or document genuine external
    blockers. After a correction to a ready PR, focused local evidence plus the
    required remote gate rerun is sufficient; do not blindly repeat the entire
-   local suite after every small correction.
+   local suite after every small correction. On Hermes
+   (`/opt/data/workspace/RuneSpace`), every DB-backed command in that sequence
+   (`pnpm drizzle-kit migrate`, `pnpm test:integration`,
+   `pnpm test:e2e:canonical`, `pnpm test:e2e:focused`) MUST go through
+   `node scripts/runespace-db.mjs` after `create <key>` — never run them
+   directly through `managed-host-run.sh` alone. See the Hermes
+   disposable-database sequence below.
 7. **One draft PR.** Create or update exactly one draft pull request for the issue.
    Work stops at a draft PR for human review. Do not merge unless the product
    owner explicitly instructs it to merge after review. Include the exact branch,
@@ -236,8 +242,7 @@ consistent (see `tests/unit/qcfailed-status.test.ts`).
   other control databases, and unsafe names. `create` refuses existing databases;
   `drop` force-closes only the validated disposable target; `run` probes that target
   and executes an argument vector without a shell.
-- Managed-host command sequence (`managed-host-run.sh` verifies Node 22 and the localhost
-  database itself):
+- Brandon's home host ONLY — `managed-host-run.sh` directly (`/home/brandon/workspace/projects/runespace`) — DO NOT USE ON HERMES:
   ```bash
   cd /home/brandon/workspace/projects/runespace
   ./scripts/managed-host-run.sh pnpm install --frozen-lockfile
@@ -255,7 +260,7 @@ consistent (see `tests/unit/qcfailed-status.test.ts`).
     pnpm build
   ./scripts/managed-host-run.sh pnpm test:e2e:canonical
   ```
-- Hermes disposable-database sequence (replace `issue-84` with the assigned issue key):
+- Hermes host ONLY (`/opt/data/workspace/RuneSpace`) — MANDATORY for every DB-backed command (replace `issue-84` with the assigned issue key):
   ```bash
   cd /opt/data/workspace/RuneSpace
   ./scripts/managed-host-run.sh pnpm install --frozen-lockfile

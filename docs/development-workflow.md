@@ -22,6 +22,8 @@ requires Node 22 and validates that `DATABASE_URL` is localhost-only without
 printing the private file or any credentials. Do not `source` the file manually or
 replace its URL with Docker example credentials.
 
+#### Brandon's home host ONLY — DO NOT USE on Hermes (`/home/brandon/workspace/projects/runespace`)
+
 ```bash
 cd /home/brandon/workspace/projects/runespace
 ./scripts/managed-host-run.sh pnpm install --frozen-lockfile
@@ -51,7 +53,7 @@ Never guess credentials, inspect or report the private file's contents, or use t
 Coolify production database for local testing. The canonical runner's
 localhost-only database safety check remains authoritative.
 
-#### Hermes disposable databases
+#### Hermes host ONLY (`/opt/data/workspace/RuneSpace`) — MANDATORY for every DB-backed command
 
 The Hermes host supplies its private file through a read-only container mount and
 sets `RUNESPACE_PRIVATE_ENV` to that mounted path. The file selects the localhost
