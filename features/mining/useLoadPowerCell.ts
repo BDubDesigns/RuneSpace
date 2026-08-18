@@ -29,7 +29,6 @@ export function useLoadPowerCell(onFeedback: (feedback: LoadPowerCellFeedback) =
 
   const loadPowerCell = useCallback(() => {
     const execute = () => {
-      if (!acquireCommand()) return;
       startTransition(async () => {
         try {
           const result = await loadPowerCellAction({ characterId: state.characterId });

@@ -181,7 +181,6 @@ export function InventoryPanel({
       expectedQuantity: confirming.expectedQuantity,
     };
     const execute = () => {
-      if (!acquireCommand()) return;
       startTransition(async () => {
         try {
           const result = await discardInventoryStackAction({

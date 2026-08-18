@@ -36,7 +36,6 @@ export function PowerAnnexClaimPanel() {
 
   function claim() {
     const execute = () => {
-      if (!acquireCommand()) return;
       startTransition(async () => {
         try {
           const result = await claimPowerCellsAction({ characterId: state.characterId });

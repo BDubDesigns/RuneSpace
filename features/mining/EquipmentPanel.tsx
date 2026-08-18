@@ -55,7 +55,6 @@ export function EquipmentPanel({
 
   function command(action: () => ReturnType<typeof equipEquipmentAction>) {
     const execute = () => {
-      if (!acquireCommand()) return;
       startTransition(async () => {
         try {
           apply(await action());

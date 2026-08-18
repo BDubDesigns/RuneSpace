@@ -707,7 +707,6 @@ export function LocalMapPanel() {
 
   function travelTo(destinationId: string) {
     const execute = () => {
-      if (!acquireCommand()) return;
       setTransitioning(true);
       startTransition(() => {
         (async () => {
