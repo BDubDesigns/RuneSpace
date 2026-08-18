@@ -1,6 +1,6 @@
 import { eq } from "drizzle-orm";
 import { afterEach, beforeAll, describe, expect, it } from "vitest";
-import { ITEM_IDS, SKILL_IDS } from "@/game/config/foundations";
+import { ACTION_IDS, ITEM_IDS, SKILL_IDS } from "@/game/config/foundations";
 import type { LevelThreshold } from "@/game/domain/progression";
 import type { DatabaseTransaction } from "@/server/action-resolution";
 import { grantCharacterSkillXp } from "@/server/progression";
@@ -621,7 +621,10 @@ suite("gameplay foundations (real PostgreSQL)", () => {
     await db.delete(rune.equippedItems).where(eq(rune.equippedItems.characterId, character.id));
 
     const state = await mining.startCrashSiteMining(userId, character.id, now);
-    expect(state.stoppingReason).toBe("compatible_mining_tool_missing");
+    expect(state.stop).toEqual({
+      actionId: ACTION_IDS.crashSiteMining,
+      reason: "compatible_mining_tool_missing",
+    });
     await expect(
       db.select().from(rune.activeActions).where(eq(rune.activeActions.characterId, character.id)),
     ).resolves.toEqual([]);
@@ -723,7 +726,10 @@ suite("gameplay foundations (real PostgreSQL)", () => {
       random,
     );
     expect(removed.run).toMatchObject({ attempts: 1, successes: 1, shaleGained: 1, xpGained: 15 });
-    expect(removed.stoppingReason).toBe("compatible_mining_tool_missing");
+    expect(removed.stop).toEqual({
+      actionId: ACTION_IDS.crashSiteMining,
+      reason: "compatible_mining_tool_missing",
+    });
     expect(removed.activeAction).toBeUndefined();
     await expect(
       db.select().from(rune.activeActions).where(eq(rune.activeActions.characterId, character.id)),
@@ -805,7 +811,10 @@ suite("gameplay foundations (real PostgreSQL)", () => {
     // One attempt resolved before the tool replacement stopped Mining.
     expect(replaced.run).toMatchObject({ attempts: 1, successes: 1, shaleGained: 1, xpGained: 15 });
     expect(replaced.ferriteShaleQuantity).toBe(1);
-    expect(replaced.stoppingReason).toBe("mining_tool_replaced");
+    expect(replaced.stop).toEqual({
+      actionId: ACTION_IDS.crashSiteMining,
+      reason: "mining_tool_replaced",
+    });
     expect(replaced.activeAction).toBeUndefined();
 
     const assignments = await db

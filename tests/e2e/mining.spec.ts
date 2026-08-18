@@ -485,11 +485,11 @@ test("shell reserves the fixed footer once and keeps the global background fixed
       yardGeometry.expectedClearance - yardGeometry.expectedBoxHeight - yardGeometry.expectedGap,
     ),
   ).toBeLessThanOrEqual(2);
-  // Unified 140 hex + 30 gap grows the local map 266→303, and the responsive
-  // location scene header adds a shallow 126px strip on mobile. Together the
-  // yard's tallest element budget grows, so allow modest scroll in the
-  // otherwise-short yard while still catching real layout tails.
-  expect(yardGeometry.scrollHeight - yardGeometry.clientHeight).toBeLessThanOrEqual(260);
+  // The Yard now hosts the full Refining activity stack (activity + map +
+  // skill progress + cargo + run history), so it scrolls like the Crash
+  // Site. The real layout contract is enforced below: the bottom nav stays
+  // fixed with the shared space-3 gap, and the global background stays fixed.
+  expect(yardGeometry.scrollHeight - yardGeometry.clientHeight).toBeGreaterThan(10);
   await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
   const yardBottomGeometry = await page.evaluate(() => {
     const content = document.querySelector("main");
@@ -771,8 +771,9 @@ test("an interrupted equipment command is presented as an error after a muted su
 test("equipment and inventory rendering shows artwork for illustrated items and fallback for the rest", async ({
   page,
 }) => {
-  // Populate inventory with one illustrated stack (Ferrite Shale) and one
-  // deliberate text-fallback stack (Refined Ferrite) so both paths coexist.
+  // Populate inventory with one illustrated stack (Ferrite Shale), one newly
+  // illustrated stack (Refined Ferrite — issue #81), and one deliberate
+  // text-fallback stack (unknown item id) so both paths coexist.
   const characterId = page.url().split("/").at(-1)!;
   await db.insert(inventoryStacks).values([
     {
@@ -783,6 +784,11 @@ test("equipment and inventory rendering shows artwork for illustrated items and 
     {
       characterId,
       itemId: ITEM_IDS.refinedFerrite,
+      quantity: 1,
+    },
+    {
+      characterId,
+      itemId: "unknown_fallback_item",
       quantity: 1,
     },
   ]);
@@ -851,10 +857,10 @@ test("equipment and inventory rendering shows artwork for illustrated items and 
 
   await equipment.getByRole("button", { name: "Close equipment" }).click();
 
-  // Open inventory — should show one illustrated and one fallback stack
-  await footer.getByRole("button", { name: "Inventory 2/8" }).click();
+  // Open inventory — should show illustrated and fallback stacks
+  await footer.getByRole("button", { name: "Inventory 3/8" }).click();
   const inventory = page.getByRole("dialog", { name: "Inventory" });
-  await expect(inventory.getByText("2 occupied / 8 slots")).toBeVisible();
+  await expect(inventory.getByText("3 occupied / 8 slots")).toBeVisible();
 
   // Illustrated stack: Ferrite Shale
   const ferriteTile = inventory
@@ -874,21 +880,37 @@ test("equipment and inventory rendering shows artwork for illustrated items and 
     "Ferrite Shale mineral fragment",
   );
 
-  // Fallback stack: Refined Ferrite (no artwork, renders textFallback "RF")
+  // Illustrated stack: Refined Ferrite (now has artwork, issue #81)
   const refinedTile = inventory
     .locator("button[aria-pressed]")
     .filter({ hasText: "Refined Ferrite" });
   await expect(refinedTile).toHaveAccessibleName("1 Refined Ferrite");
   await expect(refinedTile.getByText("Refined Ferrite", { exact: true })).toBeVisible();
   await expect(refinedTile.getByText("x1", { exact: true })).toBeVisible();
-  // No artwork for fallback items
-  await expect(refinedTile.getByTestId("item-artwork")).toHaveCount(0);
-  // Fallback text renders
-  await expect(refinedTile.locator("[data-item-fallback]")).toHaveText("RF");
-  // Accessible description still works for fallback items
+  // Artwork renders for Refined Ferrite now
+  const refinedArt = refinedTile.getByTestId("item-artwork");
+  await expect(refinedArt).toHaveCount(1);
+  await expect
+    .poll(() => refinedArt.evaluate((image) => image.complete && image.naturalWidth > 0))
+    .toBe(true);
+  // Accessible description from the presentation boundary
   const refinedDescId = await refinedTile.getAttribute("aria-describedby");
   expect(refinedDescId).toBeTruthy();
-  await expect(inventory.locator(`#${refinedDescId}`)).toContainText("Purified Ferrite material");
+  await expect(inventory.locator(`#${refinedDescId}`)).toContainText(
+    "Stacked refined ingots of purified Ferrite metal",
+  );
+
+  // Fallback stack: unknown item id renders textFallback (the raw item id)
+  const unknownTile = inventory
+    .locator("button[aria-pressed]")
+    .filter({ hasText: "unknown_fallback_item" })
+    .first();
+  await expect(unknownTile).toHaveAccessibleName("1 unknown_fallback_item");
+  await expect(unknownTile.getByText("x1", { exact: true })).toBeVisible();
+  // No artwork for fallback items
+  await expect(unknownTile.getByTestId("item-artwork")).toHaveCount(0);
+  // Fallback text renders (deliberate name fallback)
+  await expect(unknownTile.locator("[data-item-fallback]")).toHaveText("unknown_fallback_item");
 
   // Every occupied tile is selectable: the generic stack exposes its details
   // and a working drop action surface without inventing approved item facts.
@@ -909,7 +931,7 @@ test("equipment and inventory rendering shows artwork for illustrated items and 
   // Cancel returns keyboard focus to the grid (the still-selected tile).
   await expect(refinedTile).toBeFocused();
 
-  await expect(inventory.getByLabel(/Empty inventory slot/)).toHaveCount(6);
+  await expect(inventory.getByLabel(/Empty inventory slot/)).toHaveCount(5);
 
   // Verify artwork sizing in inventory context
   const invArtState = await ferriteArt.evaluate((image) => ({

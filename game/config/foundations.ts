@@ -9,7 +9,7 @@ export type EquipmentAssignmentKind = (typeof EQUIPMENT_ASSIGNMENT_KINDS)[number
 
 const skillIds = {
   mining: asContentId("mining"),
-  metallurgy: asContentId("metallurgy"),
+  refining: asContentId("refining"),
   welding: asContentId("welding"),
   strength: asContentId("strength"),
 } as const satisfies Record<string, ContentId>;
@@ -26,6 +26,7 @@ const itemIds = {
 
 export const ACTION_IDS = {
   crashSiteMining: asContentId("crash_site_ferrite_shale_mining"),
+  refining: asContentId("processing_yard_refining"),
   travel: asContentId("travel"),
 } as const satisfies Record<string, ContentId>;
 

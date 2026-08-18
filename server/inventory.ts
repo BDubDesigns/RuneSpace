@@ -44,7 +44,7 @@ export async function discardInventoryStackInTransaction(
   request: DiscardInventoryStackRequest,
   now: Date,
   recentResult: MiningGameplayState["recentResult"],
-  stoppingReason: MiningGameplayState["stoppingReason"],
+  miningStopReason?: import("@/game/domain/mining").MiningStopReason,
 ): Promise<DiscardInventoryStackResult> {
   const refusalMessage = "Inventory changed. Review the stack and try again.";
   const refuse = async (): Promise<DiscardInventoryStackResult> => ({
@@ -52,7 +52,7 @@ export async function discardInventoryStackInTransaction(
       transaction,
       characterId,
       recentResult,
-      stoppingReason,
+      miningStopReason,
       undefined,
       undefined,
       undefined,
@@ -89,7 +89,7 @@ export async function discardInventoryStackInTransaction(
       transaction,
       characterId,
       recentResult,
-      stoppingReason,
+      miningStopReason,
       undefined,
       undefined,
       undefined,
@@ -116,7 +116,7 @@ export async function discardInventoryStack(
   random: MiningRandom = defaultMiningRandom(),
 ): Promise<DiscardInventoryStackResult> {
   let resolvedAttempts = { successes: 0, failures: 0, awardedXp: 0 };
-  let resolvedStopReason: MiningGameplayState["stoppingReason"];
+  let miningStopReason: import("@/game/domain/mining").MiningStopReason | undefined;
   return withResolvedOwnedCharacter(
     userId,
     characterId,
@@ -126,7 +126,7 @@ export async function discardInventoryStack(
         failures: outcome.failures,
         awardedXp: outcome.awardedXp,
       };
-      resolvedStopReason = outcome.stopReason;
+      miningStopReason = outcome.stopReason;
     }),
     async (transaction, context) => {
       await ensureStarterMiningState(transaction, context.character.id);
@@ -136,7 +136,7 @@ export async function discardInventoryStack(
         request,
         now,
         resolvedAttempts,
-        resolvedStopReason,
+        miningStopReason,
       );
     },
     now,

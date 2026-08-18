@@ -66,6 +66,9 @@ async function deleteCharacter(characterId: string) {
     .delete(rune.characterMiningState)
     .where(eq(rune.characterMiningState.characterId, characterId));
   await db
+    .delete(rune.characterRefiningState)
+    .where(eq(rune.characterRefiningState.characterId, characterId));
+  await db
     .delete(rune.characterStarterProvisioning)
     .where(eq(rune.characterStarterProvisioning.characterId, characterId));
   await db

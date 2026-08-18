@@ -8,7 +8,9 @@ import {
   beginTravel,
   getMiningGameplayState,
   startCrashSiteMining,
+  startRefining,
   stopMining,
+  stopRefining,
   loadSalvageCutterPowerCell,
   type LoadPowerCellResult,
   type MiningGameplayState,
@@ -110,6 +112,14 @@ export async function startMiningAction(characterId: string): Promise<MiningActi
 
 export async function stopMiningAction(characterId: string): Promise<MiningActionResult> {
   return runMiningAction(characterId, stopMining);
+}
+
+export async function startRefiningAction(characterId: string): Promise<MiningActionResult> {
+  return runMiningAction(characterId, startRefining);
+}
+
+export async function stopRefiningAction(characterId: string): Promise<MiningActionResult> {
+  return runMiningAction(characterId, stopRefining);
 }
 
 export type LoadPowerCellActionResult = LoadPowerCellResult | { error: string };

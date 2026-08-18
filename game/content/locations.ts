@@ -1,4 +1,4 @@
-import { ACTION_IDS, LOCATION_IDS, SKILL_IDS } from "@/game/config/foundations";
+import { ACTION_IDS, LOCATION_IDS } from "@/game/config/foundations";
 import {
   assertBidirectionalAdjacency,
   LocationDefinitionSchema,
@@ -6,15 +6,14 @@ import {
 } from "@/game/schemas/locations";
 
 /**
- * The authoritative local world for issues #40 and #47 (single source of truth).
+ * The authoritative local world for issues #40, #47, and #81 (single source of truth).
  *
  * Server validation, UI projection, and adjacency checks all read from this
  * registry. The product owner approved exactly three connected locations for
  * this slice; no further locations, content, or map systems are introduced here.
  *
  * - Crash Site: the existing Ferrite Shale deposit where Mining is available.
- * - Abandoned Processing Yard: a dormant industrial location whose future
- *   Metallurgy activity is shown as offline only — it performs no refining.
+ * - Abandoned Processing Yard: Ferrite Refining (issue #81).
  * - DeWhat? Emergency Power Annex: the daily Power Cell reward source.
  */
 const locationDefinitions = [
@@ -42,16 +41,11 @@ const locationDefinitions = [
   {
     id: LOCATION_IDS.abandonedProcessingYard,
     displayName: "Abandoned Processing Yard",
-    description: "The processing equipment is offline. Refining is not available yet.",
+    description:
+      "Rusted conveyors and a refurbished hopper stand ready — Ferrite Shale can be refined here into Refined Ferrite and Slag.",
     adjacentLocationIds: [LOCATION_IDS.crashSite, LOCATION_IDS.emergencyPowerAnnex],
-    availableActionIds: [],
-    dormantActivities: [
-      {
-        skillId: SKILL_IDS.metallurgy,
-        label: "Metallurgy",
-        status: "Offline — not yet operational",
-      },
-    ],
+    availableActionIds: [ACTION_IDS.refining],
+    dormantActivities: [],
     presentation: {
       mapIconKey: "processing_yard" as const,
       layout: "processing_yard" as const,

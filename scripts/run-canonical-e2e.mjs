@@ -137,6 +137,12 @@ const CHARACTER_PROFILE_REQUIRED = [
 
 const PORTRAITS_REQUIRED = ["portraits-mobile-characters.png", "portraits-mobile-profile.png"];
 
+const REFINING_REQUIRED = [
+  "refining-mobile-active.png",
+  "refining-desktop-active.png",
+  "refining-mobile-result.png",
+];
+
 function verifyAndCopyScreenshots(required, destDir) {
   log("Verifying and preserving screenshots...");
   for (const filename of required) {
@@ -166,6 +172,7 @@ async function prepareState() {
     mkdirSync(resolve(ROOT, "artifacts/e2e-review/location-population"), { recursive: true });
     mkdirSync(resolve(ROOT, "artifacts/e2e-review/character-profile"), { recursive: true });
     mkdirSync(resolve(ROOT, "artifacts/e2e-review/character-portraits"), { recursive: true });
+    mkdirSync(resolve(ROOT, "artifacts/e2e-review/refining"), { recursive: true });
     log("Frozen review screenshots: ENABLED (manifest will be verified and uploaded).");
   } else {
     log(
@@ -221,6 +228,10 @@ async function runCanonical() {
       PORTRAITS_REQUIRED,
       resolve(ROOT, "artifacts/e2e-review/character-portraits"),
     );
+
+  await runPlaywright(["refining", "--project=chromium"], "Refining E2E");
+  if (captureScreenshots)
+    verifyAndCopyScreenshots(REFINING_REQUIRED, resolve(ROOT, "artifacts/e2e-review/refining"));
 
   await runPlaywright(
     ["mining", "--project=chromium", "--grep", "Play boundary", "--repeat-each=3", "--workers=1"],

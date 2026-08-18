@@ -31,7 +31,7 @@ export async function changeEquipment(
   random: MiningRandom = defaultMiningRandom(),
 ): Promise<MiningGameplayState> {
   let resolvedAttempts = { successes: 0, failures: 0, awardedXp: 0 };
-  let resolvedStopReason: MiningGameplayState["stoppingReason"];
+  let miningStopReason: import("@/game/domain/mining").MiningStopReason | undefined;
   return withResolvedOwnedCharacter(
     userId,
     characterId,
@@ -41,7 +41,7 @@ export async function changeEquipment(
         failures: outcome.failures,
         awardedXp: outcome.awardedXp,
       };
-      resolvedStopReason = outcome.stopReason;
+      miningStopReason = outcome.stopReason;
     }),
     async (transaction, context) => {
       await ensureStarterMiningState(transaction, context.character.id);
@@ -95,9 +95,8 @@ export async function changeEquipment(
         context.action?.actionId === ACTION_IDS.crashSiteMining &&
         previousToolAssignment?.itemInstanceId !== currentToolAssignment?.itemInstanceId;
       if (miningToolChanged) {
-        const stopReason: MiningGameplayState["stoppingReason"] = currentToolAssignment
-          ? "mining_tool_replaced"
-          : "compatible_mining_tool_missing";
+        const miningStopReasonLocal: import("@/game/domain/mining").MiningStopReason =
+          currentToolAssignment ? "mining_tool_replaced" : "compatible_mining_tool_missing";
         await transaction
           .delete(activeActions)
           .where(eq(activeActions.characterId, context.character.id));
@@ -105,20 +104,20 @@ export async function changeEquipment(
           .insert(characterMiningState)
           .values({
             characterId: context.character.id,
-            lastStopReason: stopReason,
+            lastStopReason: miningStopReasonLocal,
             updatedAt: now,
           })
           .onConflictDoUpdate({
             target: characterMiningState.characterId,
-            set: { lastStopReason: stopReason, updatedAt: now },
+            set: { lastStopReason: miningStopReasonLocal, updatedAt: now },
           });
-        resolvedStopReason = stopReason;
+        miningStopReason = miningStopReasonLocal;
       }
       return stateFromTransaction(
         transaction,
         context.character.id,
         resolvedAttempts,
-        resolvedStopReason,
+        miningStopReason,
       );
     },
     now,

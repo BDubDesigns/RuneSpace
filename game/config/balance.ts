@@ -22,6 +22,17 @@ const balanceSchema = z.object({
     yieldMinimum: z.literal(1),
     yieldMaximum: z.literal(2),
   }),
+  refining: z.object({
+    actionId: z.literal(ACTION_IDS.refining),
+    skillId: z.literal(SKILL_IDS.refining),
+    attemptDurationTicks: z.literal(7),
+    successAtLevelOneBps: z.literal(4_000),
+    guaranteedSuccessLevel: z.literal(20),
+    successRangeBps: z.literal(6_000),
+    successXp: z.literal(15),
+    failureXp: z.literal(3),
+    inputFerriteShale: z.literal(2),
+  }),
   travel: z.object({
     actionId: z.literal(ACTION_IDS.travel),
     /** Approved initial adjacent walking duration (issue #40): 40 ticks / 24s. */
@@ -31,6 +42,16 @@ const balanceSchema = z.object({
     ferriteShale: z.object({
       itemId: z.literal(ITEM_IDS.ferriteShale),
       massGrams: z.literal(100),
+      stackLimit: z.literal(10),
+    }),
+    refinedFerrite: z.object({
+      itemId: z.literal(ITEM_IDS.refinedFerrite),
+      massGrams: z.literal(150),
+      stackLimit: z.literal(5),
+    }),
+    slag: z.object({
+      itemId: z.literal(ITEM_IDS.slag),
+      massGrams: z.literal(150),
       stackLimit: z.literal(10),
     }),
     salvageCutter: z.object({
@@ -75,12 +96,25 @@ const defaults = balanceSchema.parse({
     yieldMinimum: 1,
     yieldMaximum: 2,
   },
+  refining: {
+    actionId: ACTION_IDS.refining,
+    skillId: SKILL_IDS.refining,
+    attemptDurationTicks: 7,
+    successAtLevelOneBps: 4_000,
+    guaranteedSuccessLevel: 20,
+    successRangeBps: 6_000,
+    successXp: 15,
+    failureXp: 3,
+    inputFerriteShale: 2,
+  },
   travel: {
     actionId: ACTION_IDS.travel,
     adjacentWalkDurationTicks: 40,
   },
   items: {
     ferriteShale: { itemId: ITEM_IDS.ferriteShale, massGrams: 100, stackLimit: 10 },
+    refinedFerrite: { itemId: ITEM_IDS.refinedFerrite, massGrams: 150, stackLimit: 5 },
+    slag: { itemId: ITEM_IDS.slag, massGrams: 150, stackLimit: 10 },
     salvageCutter: {
       itemId: ITEM_IDS.salvageCutter,
       massGrams: 5_000,
@@ -105,7 +139,7 @@ export function getEffectiveGameBalance(): EffectiveGameBalance {
   return defaults;
 }
 
-export function miningLevelThresholds(
+export function standardSkillLevelThresholds(
   balance = getEffectiveGameBalance(),
 ): readonly LevelThreshold[] {
   const thresholds: LevelThreshold[] = [{ level: 1, totalXp: 0 }];
@@ -119,6 +153,9 @@ export function miningLevelThresholds(
   return thresholds;
 }
 
+/** @deprecated Use standardSkillLevelThresholds — retained as a shim for callers that referenced miningLevelThresholds directly. */
+export const miningLevelThresholds = standardSkillLevelThresholds;
+
 /**
  * Authoritative level-curve sources per stable skill ID — the single place
  * that decides which skills have an approved progression curve. A skill
@@ -129,7 +166,8 @@ export function miningLevelThresholds(
  * balance overrides (Issue #19) stay live.
  */
 const skillLevelCurves = {
-  [SKILL_IDS.mining]: miningLevelThresholds,
+  [SKILL_IDS.mining]: standardSkillLevelThresholds,
+  [SKILL_IDS.refining]: standardSkillLevelThresholds,
 } as const satisfies Partial<Record<SkillId, () => readonly LevelThreshold[]>>;
 
 /** The approved level-curve source for a skill, or undefined when none exists. */

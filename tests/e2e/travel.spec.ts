@@ -51,7 +51,7 @@ async function expectMapStatusPlatesInsideHex(page: import("@playwright/test").P
     page.locator('[aria-label="Local map"]'),
     "data-map-status",
   );
-  expect(geometry.labels.sort()).toEqual(["Daily cells", "Mining", "Offline"]);
+  expect(geometry.labels.sort()).toEqual(["Daily cells", "Mining", "Refining"]);
   expect(geometry.allInside).toBe(true);
   expect(geometry.routeOverlaps).toEqual([]);
 }
@@ -130,11 +130,9 @@ async function expectMiningDashboardsVisible(page: import("@playwright/test").Pa
 async function expectMiningDashboardsHidden(page: import("@playwright/test").Page) {
   await expect(page.getByRole("button", { name: "Start Mining" })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Stop Mining" })).toHaveCount(0);
-  await expect(page.getByText("Success chance:", { exact: false })).toHaveCount(0);
   await expect(page.getByText("Mining attempt", { exact: true })).toHaveCount(0);
   await expect(page.getByText("Latest attempt:", { exact: false })).toHaveCount(0);
   await expect(page.getByText("Mining progression", { exact: true })).toHaveCount(0);
-  await expect(page.getByText("Cargo readout", { exact: true })).toHaveCount(0);
   await expect(page.getByText("This mining run", { exact: true })).toHaveCount(0);
 }
 
@@ -334,7 +332,7 @@ test("the full journey walks, arrives, and returns between the original location
 
   // Select the destination and confirm departure.
   await page.getByRole("button", { name: /Abandoned Processing Yard/ }).click();
-  await expect(page.getByText(/Departing resolves your completed Mining work/)).toBeVisible();
+  await expect(page.getByText(/Departing resolves your completed work/)).toBeVisible();
   await page.getByRole("button", { name: /Walk to Abandoned Processing Yard/ }).click();
   // The authoritative state is applied immediately — verify the transit UI.
   await expect(page.getByText("Journey progress")).toBeVisible();
@@ -345,11 +343,13 @@ test("the full journey walks, arrives, and returns between the original location
     page.getByRole("main").getByText("In transit", { exact: true }).first(),
   ).toBeVisible();
   await expect(
-    page.getByText("Mining stopped before departure. No new activity can begin until you arrive."),
+    page.getByText(
+      "The active work stopped before departure. No new activity can begin until you arrive.",
+    ),
   ).toBeVisible();
   await expect(
     page.getByText(
-      "You are walking between locations. Mining stopped before departure, and no new activity can begin until you arrive. Use the world map below to follow your journey.",
+      "You are walking between locations. The active work stopped before departure, and no new activity can begin until you arrive. Use the world map below to follow your journey.",
     ),
   ).toBeVisible();
   await expect(page.getByText(/paused/i)).toHaveCount(0);
@@ -388,14 +388,14 @@ test("the full journey walks, arrives, and returns between the original location
   await expect(
     page.getByRole("button", { name: /Abandoned Processing Yard/ }).first(),
   ).toHaveAttribute("aria-current", "true");
-  await expect(
-    page
-      .getByRole("paragraph")
-      .filter({ hasText: "The processing equipment is offline. Refining is not available yet." }),
-  ).toBeVisible();
+  // Refining is available at the Yard (issue #81): the activity panel shows
+  // the Refining console, not the old "offline" message.
+  await expect(page.getByRole("button", { name: "Start Refining" })).toBeVisible();
+  await expect(page.getByText("Refining progression", { exact: true })).toBeVisible();
+  await expect(page.getByText("Cargo readout", { exact: true })).toBeVisible();
+  await expect(page.getByText("This refining run", { exact: true })).toBeVisible();
   await expectMiningDashboardsHidden(page);
   await expect(page.getByText(/Metallurgy progression/i)).toHaveCount(0);
-  await expect(page.getByRole("button", { name: /Refine/i })).toHaveCount(0);
 
   await scrollMapIntoView(page);
   await page.screenshot({ path: "test-results/travel-mobile-arrived.png" });
