@@ -12,14 +12,15 @@ contract. This document provides the supporting procedure.
 
 ## Validate locally and choose the confidence level
 
-### Managed RuneSpace host
-On Brandon's managed RuneSpace host, run database-backed and Node-22-bound commands
-through `./scripts/managed-host-run.sh`. The wrapper loads the private
-`/home/brandon/.config/runespace/dev.env` (which supplies the host-local
-`DATABASE_URL`), forces the system Node 22, and validates that the database URL is
-localhost-only — all without printing the private file or any credentials. Do not
-`source` the private file manually, and do not replace its `DATABASE_URL` with
-Docker example credentials.
+### Managed RuneSpace hosts
+On Brandon's managed RuneSpace hosts, run database-backed and Node-22-bound commands
+through `./scripts/managed-host-run.sh`. The wrapper defaults to the existing private
+`/home/brandon/.config/runespace/dev.env` and `/usr/bin` toolchain. A managed
+container may instead provide `RUNESPACE_PRIVATE_ENV` and set
+`RUNESPACE_NODE_BIN_DIR` in that private environment. In either shape, the wrapper
+requires Node 22 and validates that `DATABASE_URL` is localhost-only without
+printing the private file or any credentials. Do not `source` the file manually or
+replace its URL with Docker example credentials.
 
 ```bash
 cd /home/brandon/workspace/projects/runespace
@@ -49,6 +50,60 @@ If `/home/brandon/.config/runespace/dev.env` is missing or unreadable,
 Never guess credentials, inspect or report the private file's contents, or use the
 Coolify production database for local testing. The canonical runner's
 localhost-only database safety check remains authoritative.
+
+#### Hermes disposable databases
+
+The Hermes host supplies its private file through a read-only container mount and
+sets `RUNESPACE_PRIVATE_ENV` to that mounted path. The file selects the localhost
+`runespace_control` database as the dedicated `runespace_dev` role and configures
+the persistent Node 22 and Playwright paths. Repository code, issue reports, and
+command output must never include the file contents or complete connection string.
+
+`scripts/runespace-db.mjs` reuses the shared localhost URL validator and adds the
+RuneSpace control-role and disposable-name boundary:
+
+- `issue-84` selects `runespace_issue_84`;
+- `scratch` selects `runespace_scratch`;
+- `scratch-isolation` selects `runespace_scratch_isolation`;
+- every other key format is refused before a database operation.
+
+The helper refuses to overwrite an existing database. Its `drop` command uses
+PostgreSQL's force option only after validating the exact disposable name, so use a
+unique issue/scratch key for every concurrent worktree. `run` first proves that the
+selected database exists, then launches the requested argument vector without a
+shell and with only the child process's `DATABASE_URL` changed.
+
+```bash
+cd /opt/data/workspace/RuneSpace
+./scripts/managed-host-run.sh pnpm install --frozen-lockfile
+./scripts/managed-host-run.sh node scripts/runespace-db.mjs create issue-84
+
+./scripts/managed-host-run.sh node scripts/runespace-db.mjs run issue-84 -- pnpm typecheck
+./scripts/managed-host-run.sh node scripts/runespace-db.mjs run issue-84 -- pnpm lint
+./scripts/managed-host-run.sh node scripts/runespace-db.mjs run issue-84 -- pnpm format:check
+./scripts/managed-host-run.sh node scripts/runespace-db.mjs run issue-84 -- pnpm test
+./scripts/managed-host-run.sh node scripts/runespace-db.mjs run issue-84 -- pnpm drizzle-kit migrate
+./scripts/managed-host-run.sh node scripts/runespace-db.mjs run issue-84 -- pnpm test:integration
+./scripts/managed-host-run.sh node scripts/runespace-db.mjs run issue-84 -- env \
+  BETTER_AUTH_SECRET="insecure-ci-build-only-secret-do-not-use-in-prod-0000000000" \
+  pnpm build
+./scripts/managed-host-run.sh node scripts/runespace-db.mjs run issue-84 -- pnpm test:e2e:focused mining
+./scripts/managed-host-run.sh node scripts/runespace-db.mjs run issue-84 -- pnpm test:e2e:canonical
+
+./scripts/managed-host-run.sh node scripts/runespace-db.mjs drop issue-84
+```
+
+Run `pnpm exec playwright install --with-deps chromium` through the wrapper before
+the first browser test on a fresh Hermes image. The browser download uses the
+private environment's persistent `PLAYWRIGHT_BROWSERS_PATH`. Playwright 1.51 may
+identify the Debian 13 Hermes image as unsupported Ubuntu 20.04 ARM64 and fail its
+dependency step on obsolete font package names. When that exact compatibility
+failure occurs and the host's Chromium libraries have been verified, run
+`pnpm exec playwright install chromium` instead and require a passing focused and
+canonical run as the browser launch proof. Do not install guessed replacement
+packages. If the private mount, Node toolchain, PostgreSQL service, or selected
+database is unavailable, stop and report that exact blocker; do not inspect
+secrets, substitute another database, or silently fall back to GitHub Actions.
 
 ### Managed-host ports, cleanup, and focused E2E
 - Port `3000` belongs to OpenChamber. Never use it for RuneSpace work and never
