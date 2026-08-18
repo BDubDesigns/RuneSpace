@@ -158,7 +158,8 @@ function LatestAttemptResult({
 export function MiningConsole({ characterName }: { characterName: string }) {
   const {
     acquireCommand,
-    busy,
+    enqueueForeground,
+    foregroundBusy,
     equipmentOpen,
     equipmentTrigger,
     inventoryOpen,
@@ -221,8 +222,7 @@ export function MiningConsole({ characterName }: { characterName: string }) {
       else setMessage(undefined);
     }
   }
-  function command(action: (id: string) => ReturnType<typeof refreshMiningAction>) {
-    if (!acquireCommand()) return;
+  function executeCommand(action: (id: string) => ReturnType<typeof refreshMiningAction>) {
     setRecovery(undefined);
     startTransition(async () => {
       try {
@@ -242,8 +242,26 @@ export function MiningConsole({ characterName }: { characterName: string }) {
       }
     });
   }
+  function runForeground(
+    intent: "start" | "stop" | "refresh",
+    action: (id: string) => ReturnType<typeof refreshMiningAction>,
+  ) {
+    enqueueForeground(() => {
+      setPendingCommand(intent);
+      executeCommand(action);
+    });
+  }
+
+  function command(
+    action: (id: string) => ReturnType<typeof refreshMiningAction>,
+    opts?: { background?: boolean },
+  ) {
+    if (!acquireCommand(opts)) return;
+    executeCommand(action);
+  }
+
   useEffect(() => {
-    setRefreshCallback(() => command(refreshMiningAction));
+    setRefreshCallback((opts?: { background?: boolean }) => command(refreshMiningAction, opts));
   });
 
   useEffect(() => {
@@ -338,33 +356,25 @@ export function MiningConsole({ characterName }: { characterName: string }) {
                 {active || pendingCommand === "stop" ? (
                   <ActionButton
                     intent="danger"
-                    loading={busy}
-                    onClick={() => {
-                      setPendingCommand("stop");
-                      command(stopMiningAction);
-                    }}
+                    loading={foregroundBusy && pendingCommand === "stop"}
+                    onClick={() => runForeground("stop", stopMiningAction)}
                   >
                     Stop Mining
                   </ActionButton>
                 ) : (
                   <ActionButton
                     intent="mining"
-                    loading={busy}
-                    onClick={() => {
-                      setPendingCommand("start");
-                      command(startMiningAction);
-                    }}
+                    loading={foregroundBusy && pendingCommand === "start"}
+                    onClick={() => runForeground("start", startMiningAction)}
                   >
                     Start Mining
                   </ActionButton>
                 )}
                 <ActionButton
                   intent="secondary"
-                  disabled={busy}
-                  onClick={() => {
-                    setPendingCommand("refresh");
-                    command(refreshMiningAction);
-                  }}
+                  disabled={foregroundBusy}
+                  loading={foregroundBusy && pendingCommand === "refresh"}
+                  onClick={() => runForeground("refresh", refreshMiningAction)}
                 >
                   Refresh status
                 </ActionButton>
@@ -437,7 +447,12 @@ export function MiningConsole({ characterName }: { characterName: string }) {
             </Feedback>
           ) : null}
           {showMiningActivity && recovery ? (
-            <ActionButton className="mt-3" disabled={busy} intent="secondary" onClick={recovery}>
+            <ActionButton
+              className="mt-3"
+              disabled={foregroundBusy}
+              intent="secondary"
+              onClick={recovery}
+            >
               Retry status check
             </ActionButton>
           ) : null}

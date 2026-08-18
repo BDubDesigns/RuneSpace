@@ -306,6 +306,54 @@ describe("refining domain", () => {
     expect(random.nextBasisPoints).toHaveBeenCalledTimes(1);
   });
 
+  describe("fragmented shale deterministic removal (issue #85.2)", () => {
+    it("fragmented [10,1] and [1,10] with zero free slots produce the same legal result", () => {
+      const mk = (qs: number[]) =>
+        qs.map(
+          (q, i) =>
+            ({
+              id: "s" + i,
+              itemId: balance.items.ferriteShale.itemId,
+              quantity: q,
+            }) as StackState<string>,
+        );
+      const snapA = {
+        refiningLevel: 20,
+        existingStacks: mk([10, 1]),
+        slotsAvailable: 0,
+        massAvailableGrams: 50000,
+      };
+      const snapB = {
+        refiningLevel: 20,
+        existingStacks: mk([1, 10]),
+        slotsAvailable: 0,
+        massAvailableGrams: 50000,
+      };
+      expect(refiningPreflightStopReason(snapA, balance)).toBeUndefined();
+      expect(refiningPreflightStopReason(snapB, balance)).toBeUndefined();
+      const resA = resolveRefining({
+        elapsedTicks: 7,
+        snapshot: snapA,
+        balance,
+        random: { nextBasisPoints: () => 0 },
+      });
+      const resB = resolveRefining({
+        elapsedTicks: 7,
+        snapshot: snapB,
+        balance,
+        random: { nextBasisPoints: () => 0 },
+      });
+      // Both must be legal and consume via same deterministic plan; preflight proves deterministic feasibility
+      expect(resA.attempts).toBe(1);
+      expect(resB.attempts).toBe(1);
+      expect(resA.shaleConsumed).toBe(2);
+      expect(resB.shaleConsumed).toBe(2);
+      expect(resA.deletedStackIds.length).toBe(resB.deletedStackIds.length);
+      expect(resA.deletedStackIds.length).toBe(1);
+      expect(resA.stackUpdates.length).toBe(resB.stackUpdates.length);
+    });
+  });
+
   it("uses shared progression curve without cloning", () => {
     expect(standardSkillLevelThresholds(balance).length).toBeGreaterThan(20);
   });

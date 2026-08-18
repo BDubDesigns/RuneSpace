@@ -55,7 +55,8 @@ export function InventoryPanel({
   onClose: () => void;
   triggerRef: RefObject<HTMLButtonElement | null>;
 }) {
-  const { acquireCommand, acceptState, busy, releaseCommand } = useMiningPlay();
+  const { acquireCommand, acceptState, enqueueForeground, foregroundBusy, releaseCommand } =
+    useMiningPlay();
   const [, startTransition] = useTransition();
   const [selected, setSelected] = useState<InventorySelection | undefined>();
   const [confirming, setConfirming] = useState<DropConfirmation | undefined>();
@@ -71,7 +72,11 @@ export function InventoryPanel({
   const totalSlots = state.inventory.slotsUsed + state.inventory.slotsAvailable;
   const balance = getEffectiveGameBalance();
   const resolvedSelection = resolveInventorySelection(state.inventory, selected);
-  const loadAvailability = derivePowerCellLoadAvailability(state, resolvedSelection, busy);
+  const loadAvailability = derivePowerCellLoadAvailability(
+    state,
+    resolvedSelection,
+    foregroundBusy,
+  );
   const ferrite = balance.items.ferriteShale;
   const powerCell = balance.items.powerCell;
   const selectedIsPowerCell =
@@ -170,41 +175,43 @@ export function InventoryPanel({
 
   function runDiscard() {
     if (!confirming) return;
-    if (!acquireCommand()) return;
     const request = {
       stackId: confirming.stackId,
       mode: confirming.mode,
       expectedQuantity: confirming.expectedQuantity,
     };
-    startTransition(async () => {
-      try {
-        const result = await discardInventoryStackAction({
-          characterId: state.characterId,
-          ...request,
-        });
-        if ("error" in result) {
-          setMessage({ tone: "danger", message: result.error });
-        } else {
-          acceptState(result.state);
-          setMessage(
-            result.discard.status === "discarded"
-              ? {
-                  tone: "muted",
-                  message: `Dropped ${result.discard.discardedQuantity} ${confirming.itemName}.`,
-                }
-              : { tone: "danger", message: result.discard.message },
-          );
+    const execute = () => {
+      startTransition(async () => {
+        try {
+          const result = await discardInventoryStackAction({
+            characterId: state.characterId,
+            ...request,
+          });
+          if ("error" in result) {
+            setMessage({ tone: "danger", message: result.error });
+          } else {
+            acceptState(result.state);
+            setMessage(
+              result.discard.status === "discarded"
+                ? {
+                    tone: "muted",
+                    message: `Dropped ${result.discard.discardedQuantity} ${confirming.itemName}.`,
+                  }
+                : { tone: "danger", message: result.discard.message },
+            );
+          }
+        } catch {
+          setMessage({
+            tone: "danger",
+            message: "Comms interruption. Inventory could not be confirmed.",
+          });
+        } finally {
+          releaseCommand();
+          setConfirming(undefined);
         }
-      } catch {
-        setMessage({
-          tone: "danger",
-          message: "Comms interruption. Inventory could not be confirmed.",
-        });
-      } finally {
-        releaseCommand();
-        setConfirming(undefined);
-      }
-    });
+      });
+    };
+    enqueueForeground(execute);
   }
 
   return (
@@ -442,7 +449,7 @@ export function InventoryPanel({
                 <div className="mt-2 flex flex-wrap gap-2">
                   {stackDropActions(resolvedSelection.entry.quantity).map((action) => (
                     <ActionButton
-                      disabled={busy}
+                      disabled={foregroundBusy}
                       intent="danger"
                       key={action.mode}
                       onClick={(event) =>
@@ -475,7 +482,7 @@ export function InventoryPanel({
             </p>
             <div className="mt-3 flex flex-wrap gap-2">
               <ActionButton
-                disabled={busy}
+                disabled={foregroundBusy}
                 intent="secondary"
                 onClick={() => {
                   confirmTriggerRef.current?.focus();
@@ -485,7 +492,12 @@ export function InventoryPanel({
               >
                 Cancel
               </ActionButton>
-              <ActionButton disabled={busy} intent="danger" loading={busy} onClick={runDiscard}>
+              <ActionButton
+                disabled={foregroundBusy}
+                intent="danger"
+                loading={foregroundBusy}
+                onClick={runDiscard}
+              >
                 {confirming.confirmLabel}
               </ActionButton>
             </div>

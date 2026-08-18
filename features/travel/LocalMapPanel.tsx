@@ -575,8 +575,15 @@ function LocationPopulationList({
 // ---------------------------------------------------------------------------
 
 export function LocalMapPanel() {
-  const { state, acceptState, acquireCommand, releaseCommand, busy, requestAutoRefresh } =
-    useMiningPlay();
+  const {
+    state,
+    acceptState,
+    acquireCommand,
+    enqueueForeground,
+    releaseCommand,
+    foregroundBusy: busy,
+    requestAutoRefresh,
+  } = useMiningPlay();
   const [selected, setSelected] = useState<string | undefined>();
   const [message, setMessage] = useState<string | undefined>();
   const [now, setNow] = useState(Date.now());
@@ -699,35 +706,37 @@ export function LocalMapPanel() {
   }, [state.characterId, state.location.currentLocationId, state]);
 
   function travelTo(destinationId: string) {
-    if (!acquireCommand()) return;
-    setTransitioning(true);
-    startTransition(() => {
-      (async () => {
-        try {
-          const result = await beginTravelAction({
-            characterId: state.characterId,
-            destinationLocationId: destinationId,
-          });
-          if (result.error) {
-            setMessage(result.error);
-            return;
+    const execute = () => {
+      setTransitioning(true);
+      startTransition(() => {
+        (async () => {
+          try {
+            const result = await beginTravelAction({
+              characterId: state.characterId,
+              destinationLocationId: destinationId,
+            });
+            if (result.error) {
+              setMessage(result.error);
+              return;
+            }
+            if (result.state?.travelError) {
+              setMessage(travelErrorMessage(result.state.travelError));
+              return;
+            }
+            acceptState(result.state!);
+            setMessage(undefined);
+            setSelected(undefined);
+          } catch {
+            setMessage("Comms interruption. Travel could not be confirmed.");
+            requestAutoRefresh();
+          } finally {
+            setTransitioning(false);
+            releaseCommand();
           }
-          if (result.state?.travelError) {
-            setMessage(travelErrorMessage(result.state.travelError));
-            return;
-          }
-          acceptState(result.state!);
-          setMessage(undefined);
-          setSelected(undefined);
-        } catch {
-          setMessage("Comms interruption. Travel could not be confirmed.");
-          requestAutoRefresh();
-        } finally {
-          setTransitioning(false);
-          releaseCommand();
-        }
-      })();
-    });
+        })();
+      });
+    };
+    enqueueForeground(execute);
   }
 
   function travelErrorMessage(reason: NonNullable<typeof state.travelError>): string {

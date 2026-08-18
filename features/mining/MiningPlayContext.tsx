@@ -20,11 +20,15 @@ type MiningPlayContextValue = {
   inventoryTrigger: RefObject<HTMLButtonElement | null>;
   equipmentOpen: boolean;
   equipmentTrigger: RefObject<HTMLButtonElement | null>;
+  /** Internal gate: true while any command (foreground or background) holds the lock. */
   busy: boolean;
-  acquireCommand: () => boolean;
+  /** Presentation-only: true only while a player-initiated command is in flight. */
+  foregroundBusy: boolean;
+  acquireCommand: (opts?: { background?: boolean }) => boolean;
+  enqueueForeground: (fn: () => void) => void;
   releaseCommand: () => void;
   requestAutoRefresh: (schedulerToken?: number) => void;
-  setRefreshCallback: (fn: () => void) => void;
+  setRefreshCallback: (fn: (opts?: { background?: boolean }) => void) => void;
   setInventoryOpen: Dispatch<SetStateAction<boolean>>;
   setEquipmentOpen: Dispatch<SetStateAction<boolean>>;
   acceptState: (nextState: MiningGameplayState) => void;
@@ -55,37 +59,83 @@ export function MiningPlayProvider({
   const [inventoryOpen, setInventoryOpen] = useState(false);
   const [equipmentOpen, setEquipmentOpen] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [foregroundBusy, setForegroundBusy] = useState(false);
   const inventoryTrigger = useRef<HTMLButtonElement>(null);
   const equipmentTrigger = useRef<HTMLButtonElement>(null);
   const gateModel = useRef<GateModel>({ locked: false, pending: false });
-  const refreshCallback = useRef<() => void>(undefined);
+  const refreshCallback = useRef<((opts?: { background?: boolean }) => void) | undefined>(
+    undefined,
+  );
   const boundaryGeneration = useRef(0);
+  const foregroundQueue = useRef<(() => void) | null>(null);
   const stateRef = useRef(state);
   stateRef.current = state;
 
-  const acquireCommand = useCallback(() => {
+  const acquireCommand = useCallback((opts?: { background?: boolean }) => {
     const ok = tryAcquire(gateModel.current);
-    if (ok) setBusy(true);
+    if (ok) {
+      setBusy(true);
+      if (!opts?.background) setForegroundBusy(true);
+    }
     return ok;
+  }, []);
+
+  const enqueueForeground = useCallback((fn: () => void) => {
+    if (!gateModel.current.locked) {
+      if (tryAcquire(gateModel.current)) {
+        setBusy(true);
+        setForegroundBusy(true);
+        fn();
+      }
+      return;
+    }
+    // Gate held by background reconciliation: queue exactly one foreground
+    // intent and run it right after background releases, without flashing.
+    // Latest intent wins; no background replay. fn assumes gate is already
+    // held when invoked from the queue.
+    foregroundQueue.current = fn;
   }, []);
 
   const releaseCommand = useCallback(() => {
     setBusy(false);
+    setForegroundBusy(false);
+    // Capture whether a foreground intent was queued before we inspect or
+    // clear any coalesced background refresh. We must dequeue only after the
+    // current owner has actually released the lock — otherwise tryAcquire
+    // still sees locked=true and the intent is lost.
+    const queued = foregroundQueue.current;
+    foregroundQueue.current = null;
+
     const pendingToken = gateModel.current.pendingToken;
-    if (release(gateModel.current)) {
+    const hadPendingRefresh = release(gateModel.current);
+
+    if (queued) {
+      // Foreground wins over any coalesced background refresh that was
+      // coalesced while background held the gate.
+      if (tryAcquire(gateModel.current)) {
+        setBusy(true);
+        setForegroundBusy(true);
+        queued();
+        return;
+      }
+      // Should not happen — we just released — but if it does fall through
+      // to the background path rather than dropping work.
+    }
+
+    if (hadPendingRefresh) {
       if (pendingToken !== undefined && pendingToken !== boundaryGeneration.current) return;
-      refreshCallback.current?.();
+      refreshCallback.current?.({ background: true });
     }
   }, []);
 
   const requestAutoRefresh = useCallback((schedulerToken?: number) => {
     if (schedulerToken !== undefined && schedulerToken !== boundaryGeneration.current) return;
     if (requestRefresh(gateModel.current, schedulerToken)) {
-      refreshCallback.current?.();
+      refreshCallback.current?.({ background: true });
     }
   }, []);
 
-  const setRefreshCallback = useCallback((fn: () => void) => {
+  const setRefreshCallback = useCallback((fn: (opts?: { background?: boolean }) => void) => {
     refreshCallback.current = fn;
   }, []);
 
@@ -144,7 +194,9 @@ export function MiningPlayProvider({
         equipmentOpen,
         equipmentTrigger,
         busy,
+        foregroundBusy,
         acquireCommand,
+        enqueueForeground,
         releaseCommand,
         requestAutoRefresh,
         setRefreshCallback,
