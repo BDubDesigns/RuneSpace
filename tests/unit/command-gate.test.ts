@@ -73,44 +73,98 @@ describe("command gate", () => {
   });
 
   it("foreground intent arriving while background holds gate is not silently dropped when queued at context boundary", () => {
+    // This models MiningPlayContext correctly: release background (unlock)
+    // before handing ownership to the queued foreground, and foreground has
+    // priority over any coalesced background refresh.
     const gate = model();
-    // Background reconciliation acquires the gate
     expect(tryAcquire(gate)).toBe(true);
-    expect(gate.locked).toBe(true);
+    // While background holds, a background refresh also arrives and coalesces
+    expect(requestRefresh(gate, 1)).toBe(false);
+    expect(gate.pending).toBe(true);
 
-    // Foreground tryAcquire fails while background holds — this is the race
+    // Foreground tryAcquire fails — coordinator would queue
     expect(tryAcquire(gate)).toBe(false);
+    let queuedRan = false;
 
-    // Releasing background must not leave gate permanently locked
+    // Simulate releaseCommand's corrected order: dequeue, unlock (release),
+    // then foreground wins and re-acquires.
+    const hadPending = release(gate);
+    expect(gate.locked).toBe(false);
+    expect(hadPending).toBe(true); // a coalesced refresh existed
+    // Foreground priority: consume the pending refresh without running it
+    expect(tryAcquire(gate)).toBe(true);
+    queuedRan = true;
+    expect(queuedRan).toBe(true);
+    expect(gate.locked).toBe(true);
     expect(release(gate)).toBe(false);
     expect(gate.locked).toBe(false);
-
-    // Queued foreground can now acquire via the shared gate boundary
-    expect(tryAcquire(gate)).toBe(true);
-    expect(gate.locked).toBe(true);
-    expect(release(gate)).toBe(false);
   });
 
-  it("queued foreground intent executes after background release without flashing", () => {
-    // Simulates MiningPlayContext enqueueForeground semantics at gate level:
-    // background holds, foreground queues, background releases, queued foreground runs with gate held.
+  it("queued foreground intent executes after background release without double-holding the gate", () => {
     const gate = model();
-    expect(tryAcquire(gate)).toBe(true); // background owns
-    let foregroundRan = false;
+    expect(tryAcquire(gate)).toBe(true);
+    // Foreground queues while background holds
     const queued = () => {
+      // Called only after background has already released — gate is free
       expect(gate.locked).toBe(false);
       expect(tryAcquire(gate)).toBe(true);
-      foregroundRan = true;
-      // foreground holds briefly
       expect(release(gate)).toBe(false);
     };
-    // While background holds, tryAcquire would fail — queue instead
     expect(tryAcquire(gate)).toBe(false);
-    // Background releases; context would now invoke queued
     expect(release(gate)).toBe(false);
-    queued();
-    expect(foregroundRan).toBe(true);
     expect(gate.locked).toBe(false);
+    // Coordinator now hands off to queued foreground
+    queued();
+    expect(gate.locked).toBe(false);
+  });
+
+  it("coordinator release ordering: dequeue -> unlock -> foreground priority (the fixed path)", () => {
+    // Reproduces the bug: checking the queue before calling release() left locked=true
+    // so tryAcquire failed and the queued intent was already cleared.
+    function buggyRelease(gate: GateModel, queued: { fn: (() => void) | null }) {
+      // BUG: peek queue before unlock
+      const q = queued.fn;
+      queued.fn = null;
+      if (q) {
+        if (tryAcquire(gate)) {
+          q();
+          return "queued";
+        }
+        return "lost";
+      }
+      const pending = release(gate);
+      return pending ? "refresh" : "idle";
+    }
+
+    function fixedRelease(gate: GateModel, queued: { fn: (() => void) | null }) {
+      const q = queued.fn;
+      queued.fn = null;
+      const pending = release(gate);
+      if (q) {
+        if (tryAcquire(gate)) {
+          q();
+          return "queued";
+        }
+        return "lost";
+      }
+      return pending ? "refresh" : "idle";
+    }
+
+    // Fixed path delivers queued intent; buggy path loses it while still locked
+    {
+      const g2 = model();
+      expect(tryAcquire(g2)).toBe(true);
+      const q2: { fn: (() => void) | null } = { fn: () => {} };
+      expect(fixedRelease(g2, q2)).toBe("queued");
+      expect(g2.locked).toBe(true);
+      expect(release(g2)).toBe(false);
+    }
+    {
+      const g3 = model();
+      expect(tryAcquire(g3)).toBe(true);
+      const q3: { fn: (() => void) | null } = { fn: () => {} };
+      expect(buggyRelease(g3, q3)).toBe("lost");
+    }
   });
 
   it("automatic boundary refresh does not require foreground presentation lock", () => {

@@ -99,18 +99,30 @@ export function MiningPlayProvider({
   const releaseCommand = useCallback(() => {
     setBusy(false);
     setForegroundBusy(false);
-    if (foregroundQueue.current) {
-      const queued = foregroundQueue.current;
-      foregroundQueue.current = null;
+    // Capture whether a foreground intent was queued before we inspect or
+    // clear any coalesced background refresh. We must dequeue only after the
+    // current owner has actually released the lock — otherwise tryAcquire
+    // still sees locked=true and the intent is lost.
+    const queued = foregroundQueue.current;
+    foregroundQueue.current = null;
+
+    const pendingToken = gateModel.current.pendingToken;
+    const hadPendingRefresh = release(gateModel.current);
+
+    if (queued) {
+      // Foreground wins over any coalesced background refresh that was
+      // coalesced while background held the gate.
       if (tryAcquire(gateModel.current)) {
         setBusy(true);
         setForegroundBusy(true);
         queued();
         return;
       }
+      // Should not happen — we just released — but if it does fall through
+      // to the background path rather than dropping work.
     }
-    const pendingToken = gateModel.current.pendingToken;
-    if (release(gateModel.current)) {
+
+    if (hadPendingRefresh) {
       if (pendingToken !== undefined && pendingToken !== boundaryGeneration.current) return;
       refreshCallback.current?.({ background: true });
     }
