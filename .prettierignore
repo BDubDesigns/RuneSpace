@@ -10,3 +10,9 @@ pnpm-lock.yaml
 # Generated Drizzle migrations and snapshots (authoritative DB shape is committed,
 # but these files are produced by drizzle-kit and should not be reformatted by hand).
 drizzle
+.next.bak
+.next.bak.hidden
+.playwright.bak
+test-results.bak
+playwright-report
+playwright-report.bak

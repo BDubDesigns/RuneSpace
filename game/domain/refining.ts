@@ -75,6 +75,88 @@ type SimulatedRemoval<Id> = {
   canConsume: boolean;
 };
 
+type ShaleRemovalDetail<Id> = {
+  simulated: SimulatedRemoval<Id>;
+  consumedStackIds: Id[];
+  partiallyReducedStack?: { id: Id; remainingQuantity: number };
+};
+
+/**
+ * Deterministic shale removal plan reused by preflight and authoritative consumption.
+ * When a slot must be freed for the output, prefer exhausting the smallest shale
+ * stack so fragmentation order does not decide feasibility.
+ */
+function planShaleRemoval<Id>(
+  existingStacks: readonly StackState<Id>[],
+  slotsAvailable: number,
+  massAvailableGrams: number,
+  shaleItemId: string,
+  quantityToConsume: number,
+  massPerUnit: number,
+): ShaleRemovalDetail<Id> | undefined {
+  const shaleStacks = existingStacks.filter((s) => s.itemId === shaleItemId);
+  const total = shaleStacks.reduce((sum, s) => sum + s.quantity, 0);
+  if (total < quantityToConsume) return undefined;
+
+  const otherStacks = existingStacks.filter((s) => s.itemId !== shaleItemId);
+
+  // Two orderings: original input order, and capacity-aware (smallest first)
+  const orderings: Array<readonly StackState<Id>[]> = [
+    [...shaleStacks],
+    [...shaleStacks].sort(
+      (a, b) => a.quantity - b.quantity || String(a.id).localeCompare(String(b.id)),
+    ),
+  ];
+
+  const candidates: ShaleRemovalDetail<Id>[] = [];
+  for (const ordering of orderings) {
+    let remaining = quantityToConsume;
+    const kept: StackState<Id>[] = [];
+    const consumedIds: Id[] = [];
+    let partiallyReduced: { id: Id; remainingQuantity: number } | undefined;
+    let freedSlots = 0;
+    for (const stack of ordering) {
+      if (remaining === 0) {
+        kept.push({ ...stack });
+        continue;
+      }
+      if (stack.quantity <= remaining) {
+        remaining -= stack.quantity;
+        consumedIds.push(stack.id);
+        freedSlots += 1;
+      } else {
+        const remainingQty = stack.quantity - remaining;
+        kept.push({ ...stack, quantity: remainingQty });
+        partiallyReduced = { id: stack.id, remainingQuantity: remainingQty };
+        remaining = 0;
+      }
+    }
+    if (remaining !== 0) continue;
+    const stacksAfter: StackState<Id>[] = [...otherStacks.map((s) => ({ ...s })), ...kept];
+    candidates.push({
+      simulated: {
+        stacksAfter,
+        slotsAvailableAfter: slotsAvailable + freedSlots,
+        massAvailableAfter: massAvailableGrams + quantityToConsume * massPerUnit,
+        canConsume: true,
+      },
+      consumedStackIds: consumedIds,
+      partiallyReducedStack: partiallyReduced,
+    });
+  }
+
+  if (!candidates.length) return undefined;
+  // Prefer the plan that frees a slot; if both or neither do, prefer deterministic sorted order
+  const freeing = candidates.filter((c) => c.simulated.slotsAvailableAfter > slotsAvailable);
+  if (freeing.length === 1) return freeing[0];
+  if (freeing.length === 2) {
+    // Both free a slot — prefer the sorted (second) one for determinism
+    return candidates[1];
+  }
+  // Neither frees a slot — return the sorted plan for determinism
+  return candidates[1] ?? candidates[0];
+}
+
 function simulateRemoval<Id>(
   existingStacks: readonly StackState<Id>[],
   slotsAvailable: number,
@@ -128,7 +210,7 @@ export function refiningPreflightStopReason<Id>(
   const totalShale = totalQuantityForItem(snapshot.existingStacks, shaleItemId);
   if (totalShale < inputQty) return "insufficient_ferrite_shale";
 
-  const removal = simulateRemoval(
+  const plan = planShaleRemoval(
     snapshot.existingStacks,
     snapshot.slotsAvailable,
     snapshot.massAvailableGrams,
@@ -136,7 +218,8 @@ export function refiningPreflightStopReason<Id>(
     inputQty,
     balance.items.ferriteShale.massGrams,
   );
-  if (!removal.canConsume) return "insufficient_ferrite_shale";
+  if (!plan) return "insufficient_ferrite_shale";
+  const removal = plan.simulated;
 
   // After removing inputs, either output must fit. If either branch cannot fit, stop before rolling.
   const refinedPlan = planStackAddition(
@@ -272,41 +355,34 @@ export function resolveRefining<Id>(input: {
     remainingTicks -= durationTicks;
     consumedTicks += durationTicks;
 
-    // Consume 2 shale deterministically before rolling
+    // Consume 2 shale via deterministic plan (must match preflight's planShaleRemoval)
     {
-      let remaining: number = inputShale;
+      const detail = planShaleRemoval(
+        stacks,
+        slotsAvailable,
+        massAvailableGrams,
+        shaleItemId,
+        inputShale,
+        shaleMass,
+      );
+      if (!detail) throw new Error("Refining consumed more shale than available after preflight");
+      const { consumedStackIds, partiallyReducedStack } = detail;
       const nextStacks: WorkingStack[] = [];
+      const consumedSet = new Set(consumedStackIds.map(String));
       for (const stack of stacks) {
-        if (stack.itemId !== shaleItemId || remaining === 0) {
-          nextStacks.push(stack);
+        if (consumedSet.has(String(stack.id))) {
+          slotsAvailable += 1;
           continue;
         }
-        if (stack.quantity <= remaining) {
-          remaining -= stack.quantity;
-          // fully consumed: if persisted, it will be counted as deleted; otherwise drop the temporary stack
-          if (stack.persisted) {
-            // do not push — deletion
-            slotsAvailable += 1;
-          } else {
-            // temporary stack consumed — still frees a slot that was previously allocated as created
-            slotsAvailable += 1;
-          }
-          massAvailableGrams += stack.quantity * shaleMass;
-        } else {
-          const newQuantity = stack.quantity - remaining;
-          massAvailableGrams += remaining * shaleMass;
-          remaining = 0;
-          nextStacks.push({ ...stack, quantity: newQuantity });
+        if (partiallyReducedStack && String(stack.id) === String(partiallyReducedStack.id)) {
+          nextStacks.push({ ...stack, quantity: partiallyReducedStack.remainingQuantity });
+          continue;
         }
+        nextStacks.push(stack);
       }
-      // The above mass accounting already added for consumed quantities. For partial consume case, remaining is 0.
-      // For full consume case, we added per-stack mass. But for stacks where quantity <= remaining, we added correctly.
-      // However slotsAvailable already incremented for each fully consumed stack.
+      massAvailableGrams += inputShale * shaleMass;
       stacks = nextStacks;
       shaleConsumed += inputShale;
-      // Remaining mass for partial-stack consume already handled; if remaining was >0 (should not happen due to preflight) it would be error.
-      if (remaining > 0)
-        throw new Error("Refining consumed more shale than available after preflight");
     }
 
     const rolledBasisPoints = random.nextBasisPoints();

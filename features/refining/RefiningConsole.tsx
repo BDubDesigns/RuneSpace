@@ -77,7 +77,7 @@ function latestAnnouncement(attempt: RefiningRunAttempt, batch: number): string 
 }
 
 export function RefiningConsole() {
-  const { acquireCommand, busy, releaseCommand, setRefreshCallback, acceptState, state } =
+  const { acquireCommand, foregroundBusy, releaseCommand, setRefreshCallback, acceptState, state } =
     useMiningPlay();
   const refining = state.refining;
   const refiningRun = state.refiningRun;
@@ -120,8 +120,11 @@ export function RefiningConsole() {
     }
   }
 
-  function command(action: (id: string) => ReturnType<typeof refreshMiningAction>) {
-    if (!acquireCommand()) return;
+  function command(
+    action: (id: string) => ReturnType<typeof refreshMiningAction>,
+    opts?: { background?: boolean },
+  ) {
+    if (!acquireCommand(opts)) return;
     setRecovery(undefined);
     startTransition(async () => {
       try {
@@ -138,7 +141,7 @@ export function RefiningConsole() {
   }
 
   useEffect(() => {
-    setRefreshCallback(() => command(refreshMiningAction));
+    setRefreshCallback((opts?: { background?: boolean }) => command(refreshMiningAction, opts));
   });
 
   useEffect(() => {
@@ -183,7 +186,7 @@ export function RefiningConsole() {
         {isActive || pendingCommand === "stop" ? (
           <ActionButton
             intent="danger"
-            loading={busy}
+            loading={foregroundBusy && pendingCommand === "stop"}
             onClick={() => {
               setPendingCommand("stop");
               command(stopRefiningAction);
@@ -194,7 +197,7 @@ export function RefiningConsole() {
         ) : (
           <ActionButton
             intent="mining"
-            loading={busy}
+            loading={foregroundBusy && pendingCommand === "start"}
             onClick={() => {
               setPendingCommand("start");
               command(startRefiningAction);
@@ -205,7 +208,8 @@ export function RefiningConsole() {
         )}
         <ActionButton
           intent="secondary"
-          disabled={busy}
+          disabled={foregroundBusy}
+          loading={foregroundBusy && pendingCommand === "refresh"}
           onClick={() => {
             setPendingCommand("refresh");
             command(refreshMiningAction);
@@ -296,7 +300,12 @@ export function RefiningConsole() {
         </Feedback>
       ) : null}
       {recovery ? (
-        <ActionButton className="mt-3" disabled={busy} intent="secondary" onClick={recovery}>
+        <ActionButton
+          className="mt-3"
+          disabled={foregroundBusy}
+          intent="secondary"
+          onClick={recovery}
+        >
           Retry status check
         </ActionButton>
       ) : null}

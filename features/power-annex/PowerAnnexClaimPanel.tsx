@@ -12,8 +12,14 @@ import { claimPowerCellsAction } from "@/server/actions";
 import { useMiningPlay } from "@/features/mining/MiningPlayContext";
 
 export function PowerAnnexClaimPanel() {
-  const { acquireCommand, acceptState, busy, releaseCommand, requestAutoRefresh, state } =
-    useMiningPlay();
+  const {
+    acquireCommand,
+    acceptState,
+    foregroundBusy: busy,
+    releaseCommand,
+    requestAutoRefresh,
+    state,
+  } = useMiningPlay();
   const [, startTransition] = useTransition();
   const [message, setMessage] = useState<string>();
   const [messageTone, setMessageTone] = useState<"danger" | "muted">("muted");

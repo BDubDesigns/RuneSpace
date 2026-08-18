@@ -30,7 +30,7 @@ export function EquipmentPanel({
   onClose: () => void;
   triggerRef: RefObject<HTMLButtonElement | null>;
 }) {
-  const { acquireCommand, acceptState, busy, releaseCommand } = useMiningPlay();
+  const { acquireCommand, acceptState, foregroundBusy, releaseCommand } = useMiningPlay();
   const [, startTransition] = useTransition();
   const [message, setMessage] = useState<string>();
   const [messageTone, setMessageTone] = useState<"muted" | "danger">("muted");
@@ -160,7 +160,7 @@ export function EquipmentPanel({
                     ) : state.equipment.carriedPowerCellQuantity > 0 ? (
                       <ActionButton
                         className="mt-3"
-                        disabled={busy}
+                        disabled={foregroundBusy}
                         intent="mining"
                         loading={loadBusy}
                         onClick={loadPowerCell}
@@ -173,7 +173,7 @@ export function EquipmentPanel({
                   </div>
                 ) : null}
                 <ActionButton
-                  disabled={busy}
+                  disabled={foregroundBusy}
                   intent="secondary"
                   onClick={() =>
                     command(() =>
@@ -214,7 +214,7 @@ export function EquipmentPanel({
                       </p>
                     </div>
                     <ActionButton
-                      disabled={busy}
+                      disabled={foregroundBusy}
                       intent="mining"
                       onClick={() =>
                         command(() =>

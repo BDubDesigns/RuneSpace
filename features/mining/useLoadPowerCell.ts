@@ -17,7 +17,13 @@ export type LoadPowerCellFeedback = {
  * this hook only models submission and the last confirmed state.
  */
 export function useLoadPowerCell(onFeedback: (feedback: LoadPowerCellFeedback) => void) {
-  const { acquireCommand, acceptState, busy, releaseCommand, state } = useMiningPlay();
+  const {
+    acquireCommand,
+    acceptState,
+    foregroundBusy: busy,
+    releaseCommand,
+    state,
+  } = useMiningPlay();
   const [, startTransition] = useTransition();
 
   const loadPowerCell = useCallback(() => {

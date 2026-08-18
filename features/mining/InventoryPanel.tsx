@@ -55,7 +55,7 @@ export function InventoryPanel({
   onClose: () => void;
   triggerRef: RefObject<HTMLButtonElement | null>;
 }) {
-  const { acquireCommand, acceptState, busy, releaseCommand } = useMiningPlay();
+  const { acquireCommand, acceptState, foregroundBusy, releaseCommand } = useMiningPlay();
   const [, startTransition] = useTransition();
   const [selected, setSelected] = useState<InventorySelection | undefined>();
   const [confirming, setConfirming] = useState<DropConfirmation | undefined>();
@@ -71,7 +71,11 @@ export function InventoryPanel({
   const totalSlots = state.inventory.slotsUsed + state.inventory.slotsAvailable;
   const balance = getEffectiveGameBalance();
   const resolvedSelection = resolveInventorySelection(state.inventory, selected);
-  const loadAvailability = derivePowerCellLoadAvailability(state, resolvedSelection, busy);
+  const loadAvailability = derivePowerCellLoadAvailability(
+    state,
+    resolvedSelection,
+    foregroundBusy,
+  );
   const ferrite = balance.items.ferriteShale;
   const powerCell = balance.items.powerCell;
   const selectedIsPowerCell =
@@ -442,7 +446,7 @@ export function InventoryPanel({
                 <div className="mt-2 flex flex-wrap gap-2">
                   {stackDropActions(resolvedSelection.entry.quantity).map((action) => (
                     <ActionButton
-                      disabled={busy}
+                      disabled={foregroundBusy}
                       intent="danger"
                       key={action.mode}
                       onClick={(event) =>
@@ -475,7 +479,7 @@ export function InventoryPanel({
             </p>
             <div className="mt-3 flex flex-wrap gap-2">
               <ActionButton
-                disabled={busy}
+                disabled={foregroundBusy}
                 intent="secondary"
                 onClick={() => {
                   confirmTriggerRef.current?.focus();
@@ -485,7 +489,12 @@ export function InventoryPanel({
               >
                 Cancel
               </ActionButton>
-              <ActionButton disabled={busy} intent="danger" loading={busy} onClick={runDiscard}>
+              <ActionButton
+                disabled={foregroundBusy}
+                intent="danger"
+                loading={foregroundBusy}
+                onClick={runDiscard}
+              >
                 {confirming.confirmLabel}
               </ActionButton>
             </div>

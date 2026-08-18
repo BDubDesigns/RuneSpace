@@ -575,8 +575,14 @@ function LocationPopulationList({
 // ---------------------------------------------------------------------------
 
 export function LocalMapPanel() {
-  const { state, acceptState, acquireCommand, releaseCommand, busy, requestAutoRefresh } =
-    useMiningPlay();
+  const {
+    state,
+    acceptState,
+    acquireCommand,
+    releaseCommand,
+    foregroundBusy: busy,
+    requestAutoRefresh,
+  } = useMiningPlay();
   const [selected, setSelected] = useState<string | undefined>();
   const [message, setMessage] = useState<string | undefined>();
   const [now, setNow] = useState(Date.now());

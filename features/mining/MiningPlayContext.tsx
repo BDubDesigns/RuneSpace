@@ -20,11 +20,14 @@ type MiningPlayContextValue = {
   inventoryTrigger: RefObject<HTMLButtonElement | null>;
   equipmentOpen: boolean;
   equipmentTrigger: RefObject<HTMLButtonElement | null>;
+  /** Internal gate: true while any command (foreground or background) holds the lock. */
   busy: boolean;
-  acquireCommand: () => boolean;
+  /** Presentation-only: true only while a player-initiated command is in flight. */
+  foregroundBusy: boolean;
+  acquireCommand: (opts?: { background?: boolean }) => boolean;
   releaseCommand: () => void;
   requestAutoRefresh: (schedulerToken?: number) => void;
-  setRefreshCallback: (fn: () => void) => void;
+  setRefreshCallback: (fn: (opts?: { background?: boolean }) => void) => void;
   setInventoryOpen: Dispatch<SetStateAction<boolean>>;
   setEquipmentOpen: Dispatch<SetStateAction<boolean>>;
   acceptState: (nextState: MiningGameplayState) => void;
@@ -55,37 +58,44 @@ export function MiningPlayProvider({
   const [inventoryOpen, setInventoryOpen] = useState(false);
   const [equipmentOpen, setEquipmentOpen] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [foregroundBusy, setForegroundBusy] = useState(false);
   const inventoryTrigger = useRef<HTMLButtonElement>(null);
   const equipmentTrigger = useRef<HTMLButtonElement>(null);
   const gateModel = useRef<GateModel>({ locked: false, pending: false });
-  const refreshCallback = useRef<() => void>(undefined);
+  const refreshCallback = useRef<((opts?: { background?: boolean }) => void) | undefined>(
+    undefined,
+  );
   const boundaryGeneration = useRef(0);
   const stateRef = useRef(state);
   stateRef.current = state;
 
-  const acquireCommand = useCallback(() => {
+  const acquireCommand = useCallback((opts?: { background?: boolean }) => {
     const ok = tryAcquire(gateModel.current);
-    if (ok) setBusy(true);
+    if (ok) {
+      setBusy(true);
+      if (!opts?.background) setForegroundBusy(true);
+    }
     return ok;
   }, []);
 
   const releaseCommand = useCallback(() => {
     setBusy(false);
+    setForegroundBusy(false);
     const pendingToken = gateModel.current.pendingToken;
     if (release(gateModel.current)) {
       if (pendingToken !== undefined && pendingToken !== boundaryGeneration.current) return;
-      refreshCallback.current?.();
+      refreshCallback.current?.({ background: true });
     }
   }, []);
 
   const requestAutoRefresh = useCallback((schedulerToken?: number) => {
     if (schedulerToken !== undefined && schedulerToken !== boundaryGeneration.current) return;
     if (requestRefresh(gateModel.current, schedulerToken)) {
-      refreshCallback.current?.();
+      refreshCallback.current?.({ background: true });
     }
   }, []);
 
-  const setRefreshCallback = useCallback((fn: () => void) => {
+  const setRefreshCallback = useCallback((fn: (opts?: { background?: boolean }) => void) => {
     refreshCallback.current = fn;
   }, []);
 
@@ -144,6 +154,7 @@ export function MiningPlayProvider({
         equipmentOpen,
         equipmentTrigger,
         busy,
+        foregroundBusy,
         acquireCommand,
         releaseCommand,
         requestAutoRefresh,
