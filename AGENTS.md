@@ -215,20 +215,27 @@ consistent (see `tests/unit/qcfailed-status.test.ts`).
   Verify the active version with `node --version` before running validation.
 
 ### Host-local PostgreSQL
-- On Brandon's managed RuneSpace host checkout, run database-backed and Node-22-bound
-  commands through `./scripts/managed-host-run.sh`, which loads the private
-  `/home/brandon/.config/runespace/dev.env`, forces the system Node 22 (never the
-  user-local Node 24), and validates a localhost-only `DATABASE_URL` before executing
-  the command. Do not `source` or print the private file manually.
+- On Brandon's managed RuneSpace host checkouts, run database-backed and Node-22-bound
+  commands through `./scripts/managed-host-run.sh`. It defaults to the existing
+  `/home/brandon/.config/runespace/dev.env` and `/usr/bin` toolchain, while managed
+  containers may provide `RUNESPACE_PRIVATE_ENV` and `RUNESPACE_NODE_BIN_DIR`.
+  The wrapper always requires Node 22 and validates a localhost-only `DATABASE_URL`
+  before executing the command. Do not `source` or print the private file manually.
 - Never print, `cat`, `echo`, log, commit, or include the private file's contents in reports.
   Do not guess PostgreSQL credentials or substitute Docker Compose credentials from `.env.example`.
   Do not use `postgres://runespace:runespace@localhost:5432/runespace` on this managed host.
-- If the private file is missing or unreadable, `managed-host-run.sh` refuses to start; stop and
-  report the environment blocker rather than inventing fallback credentials. Database-backed
-  commands include `pnpm drizzle-kit migrate`, `pnpm test:integration`, and
-  `pnpm test:e2e:canonical`.
+- If the private file or configured Node binary is missing or unreadable,
+  `managed-host-run.sh` refuses to start; stop and report the environment blocker
+  rather than inventing fallback credentials or tool paths.
 - The canonical runner's localhost safety check remains authoritative. Never access the Coolify
   production database for local testing.
+- Managed hosts provisioned with the dedicated `runespace_dev` role and
+  `runespace_control` database use `scripts/runespace-db.mjs` for disposable
+  databases. It accepts only `issue-<positive-number>`, `scratch`, or
+  `scratch-<lowercase-hyphenated-slug>` keys and refuses remote URLs, other roles,
+  other control databases, and unsafe names. `create` refuses existing databases;
+  `drop` force-closes only the validated disposable target; `run` probes that target
+  and executes an argument vector without a shell.
 - Managed-host command sequence (`managed-host-run.sh` verifies Node 22 and the localhost
   database itself):
   ```bash
@@ -247,6 +254,16 @@ consistent (see `tests/unit/qcfailed-status.test.ts`).
     BETTER_AUTH_SECRET="insecure-ci-build-only-secret-do-not-use-in-prod-0000000000" \
     pnpm build
   ./scripts/managed-host-run.sh pnpm test:e2e:canonical
+  ```
+- Hermes disposable-database sequence (replace `issue-84` with the assigned issue key):
+  ```bash
+  cd /opt/data/workspace/RuneSpace
+  ./scripts/managed-host-run.sh pnpm install --frozen-lockfile
+  ./scripts/managed-host-run.sh node scripts/runespace-db.mjs create issue-84
+  ./scripts/managed-host-run.sh node scripts/runespace-db.mjs run issue-84 -- pnpm drizzle-kit migrate
+  ./scripts/managed-host-run.sh node scripts/runespace-db.mjs run issue-84 -- pnpm test:integration
+  ./scripts/managed-host-run.sh node scripts/runespace-db.mjs run issue-84 -- pnpm test:e2e:canonical
+  ./scripts/managed-host-run.sh node scripts/runespace-db.mjs drop issue-84
   ```
 
 ### Managed-host ports and process cleanup

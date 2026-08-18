@@ -2,12 +2,12 @@
 #
 # managed-host-run.sh — narrow managed-host command wrapper (Issue #74).
 #
-# Loads the managed host's private local environment, forces the system Node 22
-# (rather than a user-local Node 24), validates a localhost-only DATABASE_URL,
-# and replaces this process with the requested command so exit status and
-# signals propagate. This is a convenience/safety boundary for Brandon's managed
-# RuneSpace host only — not a universal task runner — and it never prints the
-# private environment or any credentials.
+# Loads a managed host's private local environment, selects its configured
+# Node 22 toolchain, validates a localhost-only DATABASE_URL, and replaces this
+# process with the requested command so exit status and signals propagate. This
+# is a convenience/safety boundary for Brandon's managed RuneSpace hosts — not a
+# universal task runner — and it never prints the private environment or any
+# credentials.
 #
 # It intentionally does NOT duplicate the focused/canonical E2E runners' server
 # lifecycle, port selection, process cleanup, or environment maps; those remain
@@ -21,7 +21,8 @@
 
 set -euo pipefail
 
-readonly PRIVATE_ENV="/home/brandon/.config/runespace/dev.env"
+readonly DEFAULT_PRIVATE_ENV="/home/brandon/.config/runespace/dev.env"
+readonly PRIVATE_ENV="${RUNESPACE_PRIVATE_ENV:-$DEFAULT_PRIVATE_ENV}"
 
 if [[ "$#" -eq 0 ]]; then
   printf '%s\n' \
@@ -42,9 +43,17 @@ set -a
 source "$PRIVATE_ENV"
 set +a
 
-# Prefer the managed host's system Node 22 over any user-local Node 24. The
+# Prefer the managed host's configured Node 22 directory. Existing hosts retain
+# the /usr/bin default; containerized hosts can supply a persistent toolchain
+# through RUNESPACE_NODE_BIN_DIR in the private environment. The
 # `${PATH:+:$PATH}` form avoids an empty trailing PATH element.
-export PATH="/usr/bin${PATH:+:$PATH}"
+readonly NODE_BIN_DIR="${RUNESPACE_NODE_BIN_DIR:-/usr/bin}"
+if [[ "$NODE_BIN_DIR" != /* || ! -x "$NODE_BIN_DIR/node" ]]; then
+  printf '%s\n' \
+    "managed-host-run: RUNESPACE_NODE_BIN_DIR must be an absolute directory containing an executable node binary." >&2
+  exit 1
+fi
+export PATH="$NODE_BIN_DIR${PATH:+:$PATH}"
 
 # process.versions.node reports "22.x.y" without the leading "v".
 node_version="$(node -p 'process.versions.node')"
