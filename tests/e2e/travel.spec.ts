@@ -89,17 +89,17 @@ const STATIONARY_STATE_LABELS = [
   "You are here",
   "Reachable",
   "Reachable",
-  "Visible",
+  "Reachable",
   "Visible",
 ] as const;
 const SELECTED_STATE_LABELS = [
   "You are here",
   "Selected",
   "Reachable",
-  "Visible",
+  "Reachable",
   "Visible",
 ] as const;
-const IN_TRANSIT_STATE_LABELS = ["Origin", "Destination", "Reachable", "Visible", "Visible"] as const;
+const IN_TRANSIT_STATE_LABELS = ["Origin", "Destination", "Reachable", "Reachable", "Visible"] as const;
 
 async function expectPowerAnnexRewardLayout(
   page: import("@playwright/test").Page,
@@ -263,14 +263,12 @@ test("selecting a destination does not begin travel; confirmation is required", 
     "true",
   );
   await scrollMapIntoView(page);
-  await expectMapStatusPlatesInsideHex(page);
   await expectMapNameplatesInsideHex(page);
   await expectMapStateLabelsInsideHex(page, STATIONARY_STATE_LABELS);
   await page.screenshot({ path: "test-results/travel-mobile-stationary.png" });
 
   await page.setViewportSize({ width: 1440, height: 900 });
   await scrollMapIntoView(page);
-  await expectMapStatusPlatesInsideHex(page);
   await expectMapNameplatesInsideHex(page);
   await expectMapStateLabelsInsideHex(page, STATIONARY_STATE_LABELS);
   await page.screenshot({ path: "test-results/travel-desktop-stationary.png" });

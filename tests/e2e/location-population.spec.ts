@@ -119,9 +119,12 @@ async function indicatorCount(page: import("@playwright/test").Page): Promise<nu
 
 test.beforeEach(async ({ page }) => {
   const characterId = await openPopulationFixture(page);
+  // Clear any active travel first so the location reset is authoritative
+  await db.delete(rune.activeActions).where(eq(rune.activeActions.characterId, characterId));
+  await db
+    .delete(rune.characterTravelState)
+    .where(eq(rune.characterTravelState.characterId, characterId));
   await db.transaction(async (transaction) => {
-    // Normalize the fixture character's gameplay state (the Travel phase can
-    // leave it mid-run or at another location).
     await transaction
       .delete(rune.activeActions)
       .where(eq(rune.activeActions.characterId, characterId));
@@ -207,14 +210,20 @@ test("the occupied tile shows other characters and owners, and re-scopes on trav
   await page.screenshot({ path: "test-results/location-population-mobile-list.png" });
 
   // Refreshed authoritative gameplay state revalidates the population: a
-  // character created after the page loaded appears without a page reload.
+  // character created after the page loaded appears. At Crash Site after
+  // issue #83 there is no Mining refresh button, so reload to trigger
+  // population revalidation (which collapses the disclosure).
   const radaThree = `Rada Three ${token()}`;
   await seedCharacter("Rada Stonehand", radaThree);
-  await page.getByRole("button", { name: "Refresh status" }).click();
+  await page.reload();
+  await expect(page.getByText("World map")).toBeVisible();
+  expect(await indicatorCount(page)).toBe(before + 1);
+  // Disclosure collapsed on reload — reopen to see the new entry
+  await expect(populationDisclosure(page)).toHaveAttribute("aria-expanded", "false");
+  await populationDisclosure(page).click();
   await expect(
     page.getByRole("button", { name: `${radaThree}, Level 1, player Rada Stonehand` }),
   ).toBeVisible();
-  expect(await indicatorCount(page)).toBe(before + 1);
 
   // Travel to the Processing Yard. The population read is delayed so the
   // arrival transition is observable: the previous tile's entries and count
