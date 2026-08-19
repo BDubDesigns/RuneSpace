@@ -51,14 +51,18 @@ async function expectMapScrollAffordances(
   directions: readonly string[],
 ) {
   const markers = page.locator("[data-map-scroll-affordance]");
-  await expect(markers).toHaveCount(directions.length);
-  expect(
-    (
-      await markers.evaluateAll((elements) =>
-        elements.map((element) => element.getAttribute("data-map-scroll-affordance")),
-      )
-    ).sort(),
-  ).toEqual([...directions].sort());
+  const expected = [...directions].sort();
+  await expect
+    .poll(
+      async () =>
+        (
+          await markers.evaluateAll((elements) =>
+            elements.map((element) => element.getAttribute("data-map-scroll-affordance")),
+          )
+        ).sort(),
+      { message: "map scroll affordances to reflect the latest native scroll metrics" },
+    )
+    .toEqual(expected);
 }
 
 async function expectMapStatusPlatesInsideHex(page: import("@playwright/test").Page) {
