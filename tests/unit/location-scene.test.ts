@@ -88,9 +88,7 @@ describe("location scene registry (issue #78)", () => {
 
   it("no gameplay controls/state are gated by artwork (metadata-only, no behavior change)", () => {
     // Scene metadata is presentation-only; The Jag now exposes Mining (issue #83), Yard exposes Refining.
-    expect(getLocation(LOCATION_IDS.theJag)?.availableActionIds).toContain(
-      "crash_site_ferrite_shale_mining",
-    );
+    expect(getLocation(LOCATION_IDS.theJag)?.availableActionIds).toContain("ferrite_shale_mining");
     expect(getLocation(LOCATION_IDS.crashSite)?.availableActionIds).toHaveLength(0);
     expect(getLocation(LOCATION_IDS.abandonedProcessingYard)?.availableActionIds).toContain(
       "processing_yard_refining",
