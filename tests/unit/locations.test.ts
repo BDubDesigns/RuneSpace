@@ -64,9 +64,14 @@ describe("issue #47 location content", () => {
     expect(isActionAvailableAtLocation(LOCATION_IDS.crashSite, ACTION_IDS.ferriteShaleMining)).toBe(
       false,
     );
-    expect(isActionAvailableAtLocation(LOCATION_IDS.theJag, ACTION_IDS.ferriteShaleMining)).toBe(true);
+    expect(isActionAvailableAtLocation(LOCATION_IDS.theJag, ACTION_IDS.ferriteShaleMining)).toBe(
+      true,
+    );
     expect(
-      isActionAvailableAtLocation(LOCATION_IDS.abandonedProcessingYard, ACTION_IDS.ferriteShaleMining),
+      isActionAvailableAtLocation(
+        LOCATION_IDS.abandonedProcessingYard,
+        ACTION_IDS.ferriteShaleMining,
+      ),
     ).toBe(false);
     expect(getLocation(LOCATION_IDS.emergencyPowerAnnex)?.availableActionIds).toHaveLength(0);
     expect(getLocation(LOCATION_IDS.theLongScramble)?.availableActionIds).toHaveLength(0);

@@ -2,9 +2,10 @@
 
 ## Scope
 Owns the compact `LocalMapPanel` treatment only. Full current-location scene artwork is #78.
-Three locations: Crash Site (`crash_site_deposit`), Abandoned Processing Yard (`processing_yard`),
-Emergency Power Annex (`power_annex`). The panel's job is fast readable navigation and gameplay-state
-communication on a phone; hexes are **not** miniature scene paintings.
+Five locations: Crash Site (`crash_site_deposit`), Abandoned Processing Yard (`processing_yard`),
+Emergency Power Annex (`power_annex`), The Long Scramble (`the_long_scramble`), and The Jag
+(`the_jag`). The panel's job is fast readable navigation and gameplay-state communication on a phone;
+hexes are **not** miniature scene paintings.
 
 ## Canonical paths
 - Panel: `features/travel/LocalMapPanel.tsx`
@@ -17,7 +18,7 @@ communication on a phone; hexes are **not** miniature scene paintings.
 1. **Top** — state plate (`YOU ARE HERE` / `REACHABLE` / `SELECTED` / `ORIGIN` / `DESTINATION`) — fitted smoked plaque, never truncated, may slightly overhang.
 2. **Upper-middle / center** — decorative location identifier (Layer 2, `aria-hidden`, clipped to hex, `0.72W×0.68H@0.58`).
 3. **Lower-middle** — location nameplate (Layer 3, fitted smoked plaque, `inline-flex`, reduced padding, centered, 1–2 lines, max-width controlled).
-4. **Bottom** — activity/status plate (`Mining` / `Daily cells` / `Offline`, `data-map-status`, same smoked family).
+4. **Bottom** — activity/status plate (`Mining` / `Daily cells` / `Refining`, `data-map-status`, same smoked family), rendered only where a production status is meaningful.
 5. **Corner/secondary** — population chip (`N here`, `data-map-population`) on the current tile only, same family.
 
 The decorative asset must conform to these zones; UI is never moved to accommodate art.
@@ -64,11 +65,11 @@ Preserved (`You are here` + `N here`). Web-visible `N here` remains on the curre
 - Selection never begins travel. Master-detail flow: select hex → detail card → explicit `Walk` confirm
   (`beginTravelAction`, `WALK_SECONDS`). All adjacency/route math (`axial`, `deriveRouteEndpoints` apothem +
   `LOCAL_MAP_ROUTE_GAP`, `routeProgressSegment` forward/reverse equality) unchanged.
-- Flat-top triangle, `LOCAL_MAP_HEX_WIDTH=140` unified (no mobile/desktop branching, one `buildLocalMapGeometry` path), `hexButtonStyle` overlay,
+- Flat-top five-hex local map, `LOCAL_MAP_HEX_WIDTH=140` unified (no mobile/desktop branching, one `buildLocalMapGeometry` path), `hexButtonStyle` overlay,
   `LOCAL_MAP_PADDING`, `LOCAL_MAP_ROUTE_GAP=30` (~30px edge-to-edge at the unified 140), and single-path `buildLocalMapGeometry` remain authoritative.
 
 ## Registry / metadata contract
-- `game/schemas/locations.ts: presentation.mapIconKey` is `z.enum(["crash_site_deposit","processing_yard","power_annex"])`.
+- `game/schemas/locations.ts: presentation.mapIconKey` is `z.enum(["crash_site_deposit","processing_yard","power_annex","the_long_scramble","the_jag"])`.
   No second identifier field was added. `features/travel/local-map-identifiers.ts` resolves local assets via
   `MAP_IDENTIFIER_ASSET_BY_KEY: Record<MapIconKey,string>` — one indirection, no scattered `if (id===…)` in panel code.
 - New locations **must** provide a compact identifier through the same `mapIconKey → helper` boundary and a local
@@ -103,6 +104,6 @@ recognizable yet subordinate to gameplay state.
 
 ## Responsiveness
 - Primary constraint 390px mobile (compact `108` hexes where the current tile shows `YOU ARE HERE` + `N here` +
-  `Mining`/`Daily cells`/`Offline`). Not scaled at breakpoints: `140` + `11px` + fitted `66%` are consistent at both breakpoints. Verified: no horizontal
+  a production status when present: `Mining`/`Daily cells`/`Refining`). Not scaled at breakpoints: `140` + `11px` + fitted `66%` are consistent at both breakpoints. Verified: no horizontal
   `overflow-x`, no collision with the fixed bottom nav (`--rs-bottom-nav-clearance`), and the map container is
   `mx-auto` centered with geometry-derived `width`/`height`.

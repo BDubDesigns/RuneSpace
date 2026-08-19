@@ -222,7 +222,7 @@ lines from the same authoritative adjacency.
 
 ### Selecting vs. confirming travel
 
-- Selecting a hex on the three-hex local map only inspects/selects it.
+- Selecting a hex on the five-location local map only inspects/selects it.
 - A separate explicit confirmation control ("Walk to … — 24 sec") invokes the
   server-authoritative begin-travel command. The same interaction works in
   reverse after arrival.

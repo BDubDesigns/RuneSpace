@@ -906,7 +906,10 @@ export async function stateFromTransaction(
       if (refiningStopReason)
         return { actionId: ACTION_IDS.refining, reason: refiningStopReason } as ActivityStop;
       if (miningStopReason)
-        return { actionId: ACTION_IDS.ferriteShaleMining, reason: miningStopReason } as ActivityStop;
+        return {
+          actionId: ACTION_IDS.ferriteShaleMining,
+          reason: miningStopReason,
+        } as ActivityStop;
       if (action) return undefined;
       const miningPersisted = miningState?.lastStopReason as MiningStopReason | null | undefined;
       const refiningPersisted = refiningState?.lastStopReason as

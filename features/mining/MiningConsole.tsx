@@ -446,7 +446,9 @@ export function MiningConsole({ characterName }: { characterName: string }) {
           {showMiningActivity && message ? (
             <Feedback
               tone={
-                state.stop?.actionId === ACTION_IDS.ferriteShaleMining && !active ? "danger" : "muted"
+                state.stop?.actionId === ACTION_IDS.ferriteShaleMining && !active
+                  ? "danger"
+                  : "muted"
               }
             >
               {message}
