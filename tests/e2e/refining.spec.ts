@@ -84,11 +84,11 @@ test("Processing Yard Refining journey — Ferrite and Slag both branches, artwo
   await page.setViewportSize({ width: 390, height: 844 });
   const characterId = page.url().split("/").at(-1)!;
 
-  // 1. character carries Ferrite Shale
+  // 1. character carries Ferrite Shale (no Refresh at Crash Site after #83 — reload to revalidate)
   await db
     .insert(inventoryStacks)
     .values({ characterId, itemId: ITEM_IDS.ferriteShale, quantity: 10 });
-  await page.getByRole("button", { name: "Refresh status" }).click();
+  await page.reload();
   await expect(page.getByRole("button", { name: /Inventory/ })).toContainText("1/8");
 
   // 2. travel to Abandoned Processing Yard
@@ -99,11 +99,15 @@ test("Processing Yard Refining journey — Ferrite and Slag both branches, artwo
     /Walk to Abandoned Processing Yard/,
   );
 
-  // 3. Yard is active, not offline; Refining level/progress shown; success chance 40.00%
+  // 3. Yard is active; Refining level/progress shown; success chance 40.00%
   await expect(page.getByText("Refining", { exact: true }).first()).toBeVisible();
   await expect(page.getByText("Refining progression")).toBeVisible();
   await expect(page.getByText(/Success chance: 40\.00%/)).toBeVisible();
-  await expect(page.getByText("offline", { exact: false })).toHaveCount(0);
+  // Crash Site has no production-status plate after Mining moved to The Jag, so
+  // check the activity panel rather than treating the whole page as inactive.
+  await expect(
+    page.getByRole("main").getByText("No production activity", { exact: false }),
+  ).toHaveCount(0);
   await expect(page.getByText("Metallurgy", { exact: false })).toHaveCount(0);
 
   // 4. Start Refining works

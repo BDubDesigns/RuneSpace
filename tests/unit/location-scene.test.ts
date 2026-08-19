@@ -8,7 +8,7 @@ describe("location scene registry (issue #78)", () => {
     for (const location of LOCATIONS) {
       const scene = location.presentation.scene;
       expect(scene, `${location.id} must have a scene`).toBeDefined();
-      expect(scene!.asset).toMatch(/^\/location-scenes\/.+\.webp$/);
+      expect(scene!.asset).toMatch(/^\/location-scenes\/.+\.(webp|png)$/);
       expect(scene!.asset).not.toContain("..");
       expect(scene!.width).toBeGreaterThan(0);
       expect(scene!.height).toBeGreaterThan(0);
@@ -81,16 +81,15 @@ describe("location scene registry (issue #78)", () => {
     const distinctAssets = new Set(LOCATIONS.map((l) => l.presentation.scene.asset));
     expect(distinctAssets.size).toBe(LOCATIONS.length);
     for (const asset of distinctAssets) {
-      expect(asset).toMatch(/^\/location-scenes\/[^/]+\.webp$/);
+      expect(asset).toMatch(/^\/location-scenes\/[^/]+\.(webp|png)$/);
       expect(asset).not.toMatch(/mobile|desktop|sm:|lg:/);
     }
   });
 
   it("no gameplay controls/state are gated by artwork (metadata-only, no behavior change)", () => {
-    // Scene metadata is presentation-only; Processing Yard now exposes Refining (issue #81).
-    expect(getLocation(LOCATION_IDS.crashSite)?.availableActionIds).toContain(
-      "crash_site_ferrite_shale_mining",
-    );
+    // Scene metadata is presentation-only; The Jag now exposes Mining (issue #83), Yard exposes Refining.
+    expect(getLocation(LOCATION_IDS.theJag)?.availableActionIds).toContain("ferrite_shale_mining");
+    expect(getLocation(LOCATION_IDS.crashSite)?.availableActionIds).toHaveLength(0);
     expect(getLocation(LOCATION_IDS.abandonedProcessingYard)?.availableActionIds).toContain(
       "processing_yard_refining",
     );
@@ -113,7 +112,7 @@ describe("location scene registry (issue #78)", () => {
       expect(asset.startsWith("/location-scenes/")).toBe(true);
       expect(asset).not.toMatch(/^https?:\/\//);
       expect(asset).not.toMatch(/\.\./);
-      expect(asset.endsWith(".webp")).toBe(true);
+      expect(asset.endsWith(".webp") || asset.endsWith(".png")).toBe(true);
     }
   });
 });

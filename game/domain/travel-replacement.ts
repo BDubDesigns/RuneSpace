@@ -6,7 +6,7 @@ import { ACTION_IDS } from "@/game/config/foundations";
  * registry or plugin system. Adding a future work action is one entry here.
  */
 const TRAVEL_REPLACEABLE_ACTION_IDS = new Set<string>([
-  ACTION_IDS.crashSiteMining,
+  ACTION_IDS.ferriteShaleMining,
   ACTION_IDS.refining,
 ]);
 

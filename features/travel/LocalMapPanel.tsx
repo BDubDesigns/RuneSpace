@@ -15,7 +15,7 @@ import { SectionHeader } from "@/components/ui/SectionHeader";
 import { StatusMeter } from "@/components/ui/StatusMeter";
 import { ACTION_IDS, GAME_TICK_MS, LOCATION_IDS } from "@/game/config/foundations";
 import { getEffectiveGameBalance } from "@/game/config/balance";
-import { getLocation } from "@/game/content/locations";
+import { areLocationsAdjacent, getLocation } from "@/game/content/locations";
 import type { LocationPopulationEntry } from "@/game/domain/location-population";
 import { beginTravelAction } from "@/server/actions";
 import { useMiningPlay } from "@/features/mining/MiningPlayContext";
@@ -34,6 +34,14 @@ import { resolveMapIdentifierAsset } from "./local-map-identifiers";
 const WALK_SECONDS = Math.round(
   (getEffectiveGameBalance().travel.adjacentWalkDurationTicks * GAME_TICK_MS) / 1000,
 );
+
+const MAP_STATUS_LABEL_BY_LOCATION: Partial<
+  Record<(typeof LOCATION_IDS)[keyof typeof LOCATION_IDS], string>
+> = {
+  [LOCATION_IDS.emergencyPowerAnnex]: "Daily cells",
+  [LOCATION_IDS.abandonedProcessingYard]: "Refining",
+  [LOCATION_IDS.theJag]: "Mining",
+};
 
 /** Flat-top hex vertex points as an SVG polygon string. */
 function hexPoints(cx: number, cy: number, w: number): string {
@@ -90,7 +98,7 @@ type HexButtonProps = {
   locationId: string;
   name: string;
   accessibleName: string;
-  statusLabel: string;
+  statusLabel?: string;
   description: string;
   selected: boolean;
   current: boolean;
@@ -98,6 +106,8 @@ type HexButtonProps = {
   populationCount: number;
   transitRole?: "origin" | "destination";
   disabled: boolean;
+  /** Whether this tile is directly reachable from the current location (adjacent). */
+  directlyReachable: boolean;
   onSelect: () => void;
   style: CSSProperties;
 };
@@ -113,6 +123,7 @@ function HexButton({
   populationCount,
   transitRole,
   disabled,
+  directlyReachable,
   onSelect,
   style,
 }: HexButtonProps) {
@@ -125,10 +136,16 @@ function HexButton({
       ? "You are here"
       : selected
         ? "Selected"
-        : "Reachable";
+        : directlyReachable
+          ? "Reachable"
+          : "Visible";
   const accessibleLabel = [
     accessibleName,
-    youAreHere ? "You are here." : "Reachable destination.",
+    youAreHere
+      ? "You are here."
+      : directlyReachable
+        ? "Reachable destination."
+        : "Visible, not directly reachable.",
     youAreHere && populationCount > 0
       ? `${populationCount} other ${populationCount === 1 ? "character" : "characters"} here.`
       : "",
@@ -183,13 +200,15 @@ function HexButton({
             {populationCount} here
           </span>
         ) : null}
-        <span
-          aria-hidden="true"
-          className="rs-map-plate rs-map-plate--status relative z-10 inline-flex max-w-[68%] items-center justify-center truncate px-1.5 py-0.5 font-display text-[8px] uppercase leading-none tracking-[0.08em]"
-          data-map-status
-        >
-          {statusLabel}
-        </span>
+        {statusLabel ? (
+          <span
+            aria-hidden="true"
+            className="rs-map-plate rs-map-plate--status relative z-10 inline-flex max-w-[68%] items-center justify-center truncate px-1.5 py-0.5 font-display text-[8px] uppercase leading-none tracking-[0.08em]"
+            data-map-status
+          >
+            {statusLabel}
+          </span>
+        ) : null}
       </span>
     </button>
   );
@@ -787,19 +806,18 @@ export function LocalMapPanel() {
       : 0;
 
   const selectedLocation = selected ? getLocation(selected) : undefined;
-  const selectedIsDestination = selectedLocation && !inTransit && selected !== currentLocationId;
+  const selectedIsDirectlyReachable =
+    selectedLocation && !inTransit && areLocationsAdjacent(currentLocationId, selectedLocation.id);
+  const selectedIsDestination = selectedIsDirectlyReachable && selected !== currentLocationId;
   // Entries are only shown for the location they were fetched for: after a
   // travel arrival the previous tile's population must never leak onto the
   // new tile while the replacement read is in flight.
   const populationMatchesLocation = populationLocationId === currentLocationId;
 
-  // Helper: determine the status label for a location tile.
-  function tileStatusLabel(locationId: string): string {
-    const loc = getLocation(locationId);
-    if (!loc) return "";
-    if (locationId === LOCATION_IDS.emergencyPowerAnnex) return "Daily cells";
-    if (locationId === LOCATION_IDS.abandonedProcessingYard) return "Refining";
-    return loc.availableActionIds.length > 0 ? "Mining" : "Offline";
+  function tileStatusLabel(
+    locationId: (typeof LOCATION_IDS)[keyof typeof LOCATION_IDS],
+  ): string | undefined {
+    return MAP_STATUS_LABEL_BY_LOCATION[locationId];
   }
 
   // Button positions: each button is positioned to overlay its hex in the SVG.
@@ -840,52 +858,57 @@ export function LocalMapPanel() {
             confirm to walk there.
           </p>
 
-          {/* Three flat-top hexes form a triangle. The SVG renders plated chassis,
+          {/* Five flat-top hexes form the local map. The SVG renders plated chassis,
           decorative identifiers, and all approved routes; native buttons overlay
           each hex for semantics and text labels. */}
-          <div
-            className="relative mx-auto mt-4"
-            role="group"
-            aria-label="Local map"
-            style={{ width: `${mapGeometry.width}px`, height: `${mapGeometry.height}px` }}
-          >
-            <HexMapSvg
-              geometry={mapGeometry}
-              currentLocationId={currentLocationId}
-              selectedLocationId={selected}
-              inTransit={inTransit}
-              transitProgress={transitProgress}
-              travelOriginLocationId={travel?.originLocationId}
-              travelDestinationLocationId={travel?.destinationLocationId}
-            />
-            {mapGeometry.layouts.map((layout) => {
-              const location = getLocation(layout.locationId);
-              if (!location) return null;
-              const isCurrent = location.id === currentLocationId;
-              return (
-                <HexButton
-                  key={location.id}
-                  locationId={location.id}
-                  name={location.presentation.localMap.label}
-                  accessibleName={location.displayName}
-                  statusLabel={tileStatusLabel(location.id)}
-                  description={location.description}
-                  selected={selected === location.id}
-                  current={isCurrent}
-                  populationCount={isCurrent && populationMatchesLocation ? population.length : 0}
-                  transitRole={
-                    inTransit && travel?.originLocationId === location.id
-                      ? "origin"
-                      : inTransit && travel?.destinationLocationId === location.id
-                        ? "destination"
-                        : undefined
-                  }
-                  disabled={inTransit}
-                  onSelect={() => !inTransit && setSelected(location.id)}
-                  style={hexButtonStyle(location.id)}
-                />
-              );
-            })}
+          <div className="-mx-1 overflow-auto px-1 pb-1">
+            <div
+              className="relative mx-auto"
+              role="group"
+              aria-label="Local map"
+              style={{ width: `${mapGeometry.width}px`, height: `${mapGeometry.height}px` }}
+            >
+              <HexMapSvg
+                geometry={mapGeometry}
+                currentLocationId={currentLocationId}
+                selectedLocationId={selected}
+                inTransit={inTransit}
+                transitProgress={transitProgress}
+                travelOriginLocationId={travel?.originLocationId}
+                travelDestinationLocationId={travel?.destinationLocationId}
+              />
+              {mapGeometry.layouts.map((layout) => {
+                const location = getLocation(layout.locationId);
+                if (!location) return null;
+                const isCurrent = location.id === currentLocationId;
+                return (
+                  <HexButton
+                    key={location.id}
+                    locationId={location.id}
+                    name={location.presentation.localMap.label}
+                    accessibleName={location.displayName}
+                    statusLabel={tileStatusLabel(location.id)}
+                    description={location.description}
+                    selected={selected === location.id}
+                    current={isCurrent}
+                    populationCount={isCurrent && populationMatchesLocation ? population.length : 0}
+                    transitRole={
+                      inTransit && travel?.originLocationId === location.id
+                        ? "origin"
+                        : inTransit && travel?.destinationLocationId === location.id
+                          ? "destination"
+                          : undefined
+                    }
+                    disabled={inTransit}
+                    directlyReachable={
+                      areLocationsAdjacent(currentLocationId, location.id) || isCurrent
+                    }
+                    onSelect={() => !inTransit && setSelected(location.id)}
+                    style={hexButtonStyle(location.id)}
+                  />
+                );
+              })}
+            </div>
           </div>
 
           <LocationPopulationList
@@ -955,15 +978,23 @@ export function LocalMapPanel() {
                     Walk to {selectedLocation.displayName} — {WALK_SECONDS} sec
                   </ActionButton>
                 </div>
+              ) : selectedLocation &&
+                !selectedIsDirectlyReachable &&
+                selected !== currentLocationId ? (
+                <p className="mt-2 text-xs text-[color:var(--rs-text-secondary)]">
+                  Not directly reachable from here.
+                </p>
               ) : (
                 <p className="mt-2 text-xs text-[color:var(--rs-text-secondary)]">
-                  {selectedLocation.availableActionIds.includes(ACTION_IDS.refining)
+                  {selectedLocation?.availableActionIds.includes(ACTION_IDS.refining)
                     ? "Refining is available here — feed Ferrite Shale to produce Refined Ferrite or Slag."
-                    : selectedLocation.availableActionIds.includes(ACTION_IDS.crashSiteMining)
+                    : selectedLocation?.availableActionIds.includes(ACTION_IDS.ferriteShaleMining)
                       ? "Mining is available here."
-                      : selectedLocation.id === LOCATION_IDS.emergencyPowerAnnex
+                      : selectedLocation?.id === LOCATION_IDS.emergencyPowerAnnex
                         ? "Claim five Power Cells here once per Pacific reset day."
-                        : "No production activity is available here."}
+                        : selectedLocation?.id === LOCATION_IDS.theLongScramble
+                          ? "No production activity — this is the barren traversal to The Jag."
+                          : "No production activity is available here."}
                 </p>
               )}
             </div>

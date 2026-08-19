@@ -27,8 +27,20 @@ export const LocationDefinitionSchema = z
     availableActionIds: z.array(z.string()),
     dormantActivities: z.array(LocationDormantActivitySchema),
     presentation: z.object({
-      mapIconKey: z.enum(["crash_site_deposit", "processing_yard", "power_annex"]),
-      layout: z.enum(["crash_site", "processing_yard", "power_annex"]),
+      mapIconKey: z.enum([
+        "crash_site_deposit",
+        "processing_yard",
+        "power_annex",
+        "the_long_scramble",
+        "the_jag",
+      ]),
+      layout: z.enum([
+        "crash_site",
+        "processing_yard",
+        "power_annex",
+        "the_long_scramble",
+        "the_jag",
+      ]),
       localMap: z
         .object({
           axial: z.object({ q: z.number().int(), r: z.number().int() }).strict(),
@@ -37,7 +49,7 @@ export const LocationDefinitionSchema = z
         .strict(),
       scene: z
         .object({
-          asset: z.string().regex(/^\/location-scenes\/.+\.webp$/),
+          asset: z.string().regex(/^\/location-scenes\/.+\.(webp|png)$/),
           width: z.number().int().positive(),
           height: z.number().int().positive(),
           alt: z.string().min(1),

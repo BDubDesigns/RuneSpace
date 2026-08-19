@@ -91,13 +91,20 @@ subagents or automation that may be unavailable.
    harness supports it. Automated delegation being unavailable must not block
    ordinary work; perform and document a careful self-review instead. OpenCode
    users may switch models manually for either pass.
-6. **Validate proportionally.** During implementation, run focused checks for
-   the touched boundary plus enough static validation to avoid pushing an
-   obviously broken checkpoint. A coherent draft preview push is allowed before
-   the complete local CI-parity sequence when real-device review is the goal;
-   Coolify preview deployment remains independent of the expensive gate. Before
-   marking a PR ready or requesting final review, run the complete local
-   CI-parity sequence when the environment is available:
+6. **Validate proportionally, then prove full parity.** During implementation,
+   run focused checks for the touched boundary plus enough static validation to
+   avoid pushing an obviously broken checkpoint. When a change adds or touches
+   E2E specs, run the new/targeted spec(s) first in isolation
+   (`pnpm test:e2e:focused <phase>` or `pnpm test:e2e -- <spec> --project=chromium`)
+   to catch fixture errors quickly, then run the *full* canonical suite
+   `pnpm test:e2e:canonical` — the exact job GitHub's Full gate runs — before
+   assuming the work will pass CI. `fast-checks` (typecheck/lint/unit/build)
+   intentionally skips PostgreSQL integration and canonical E2E; a green fast
+   run is not evidence the merge gate will pass. A coherent draft preview push
+   is allowed before the complete local CI-parity sequence when real-device
+   review is the goal; Coolify preview deployment remains independent of the
+   expensive gate. Before marking a PR ready or requesting final review, run
+   the complete local CI-parity sequence when the environment is available:
    `pnpm install --frozen-lockfile`, `pnpm typecheck`, `pnpm lint`,
    `pnpm format:check`, `pnpm test`, `pnpm build`, integration tests, and
    `pnpm test:e2e:canonical`. Resolve failures or document genuine external

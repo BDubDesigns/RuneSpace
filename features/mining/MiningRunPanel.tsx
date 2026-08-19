@@ -13,7 +13,7 @@ function percentage(bps: number) {
 }
 
 /**
- * Bounded Mining run history + summary, shown beneath the Crash Site activity.
+ * Bounded Mining run history + summary, shown beneath the Ferrite Shale Mining activity.
  * Collapse state is synced with the Refining run panel (and any future run
  * panels) via a single localStorage key — collapsing one collapses all.
  */

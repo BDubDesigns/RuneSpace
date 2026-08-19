@@ -1,7 +1,7 @@
 # RuneSpace
 
 > **Status: Active foundation.** The repository includes authentication,
-> character ownership, and a playable server-authoritative Crash Site Mining
+> character ownership, and a playable server-authoritative Ferrite Shale Mining
 > slice. Other gameplay systems remain intentionally scoped to approved issues.
 
 RuneSpace is a planned browser-first, mobile-friendly, low-fi sci-fi RPG inspired

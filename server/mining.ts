@@ -38,7 +38,7 @@ import {
   miningPreflightStopReason,
   normalizeCutterCharge,
   boostedMiningAttemptDurationTicks,
-  resolveCrashSiteMining,
+  resolveFerriteShaleMining,
   type MiningRandom,
   type MiningResolution,
   type MiningStopReason,
@@ -179,7 +179,7 @@ export type RefiningRunState = {
 };
 
 export type ActivityStop =
-  | { actionId: typeof ACTION_IDS.crashSiteMining; reason: MiningStopReason }
+  | { actionId: typeof ACTION_IDS.ferriteShaleMining; reason: MiningStopReason }
   | { actionId: typeof ACTION_IDS.refining; reason: RefiningStopReason };
 
 export type MiningGameplayState = {
@@ -459,10 +459,10 @@ export function createMiningResolver(
   onOutcome?: (outcome: PersistedMiningOutcome) => void,
 ): ActionResolver<MiningSnapshot, PersistedMiningOutcome> {
   return {
-    supports: (action) => action.actionId === ACTION_IDS.crashSiteMining,
+    supports: (action) => action.actionId === ACTION_IDS.ferriteShaleMining,
     load: async (transaction, { character }) => loadMiningSnapshot(transaction, character.id),
     resolve: ({ action, snapshot, window }) => {
-      const resolved = resolveCrashSiteMining({
+      const resolved = resolveFerriteShaleMining({
         elapsedTicks: window.elapsedTicks,
         snapshot,
         balance: getEffectiveGameBalance(),
@@ -744,7 +744,7 @@ export async function stateFromTransaction(
         }
       : undefined;
   const cutterCharge = snapshot.cutterCharge;
-  const isMiningAction = action?.actionId === ACTION_IDS.crashSiteMining;
+  const isMiningAction = action?.actionId === ACTION_IDS.ferriteShaleMining;
   const isRefiningAction = action?.actionId === ACTION_IDS.refining;
   const nextAttemptBoosted = isMiningAction && cutterCharge > 0;
   const nextAttemptDurationTicks = isRefiningAction
@@ -764,7 +764,7 @@ export async function stateFromTransaction(
         ? { resetDate, claimed: claimRows.length > 0 }
         : undefined,
     activeAction:
-      action?.actionId === ACTION_IDS.crashSiteMining || action?.actionId === ACTION_IDS.refining
+      action?.actionId === ACTION_IDS.ferriteShaleMining || action?.actionId === ACTION_IDS.refining
         ? {
             actionId: action.actionId,
             resolvedThroughAt: action.resolvedThroughAt.toISOString(),
@@ -906,7 +906,10 @@ export async function stateFromTransaction(
       if (refiningStopReason)
         return { actionId: ACTION_IDS.refining, reason: refiningStopReason } as ActivityStop;
       if (miningStopReason)
-        return { actionId: ACTION_IDS.crashSiteMining, reason: miningStopReason } as ActivityStop;
+        return {
+          actionId: ACTION_IDS.ferriteShaleMining,
+          reason: miningStopReason,
+        } as ActivityStop;
       if (action) return undefined;
       const miningPersisted = miningState?.lastStopReason as MiningStopReason | null | undefined;
       const refiningPersisted = refiningState?.lastStopReason as
@@ -923,14 +926,14 @@ export async function stateFromTransaction(
         if (refiningUpdated >= miningUpdated)
           return { actionId: ACTION_IDS.refining, reason: refiningPersisted } as ActivityStop;
         return {
-          actionId: ACTION_IDS.crashSiteMining,
+          actionId: ACTION_IDS.ferriteShaleMining,
           reason: miningPersisted,
         } as ActivityStop;
       }
       if (refiningPersisted)
         return { actionId: ACTION_IDS.refining, reason: refiningPersisted } as ActivityStop;
       if (miningPersisted)
-        return { actionId: ACTION_IDS.crashSiteMining, reason: miningPersisted } as ActivityStop;
+        return { actionId: ACTION_IDS.ferriteShaleMining, reason: miningPersisted } as ActivityStop;
       return undefined;
     })(),
     commandError,
@@ -995,7 +998,7 @@ export async function getMiningGameplayState(
   );
 }
 
-export async function startCrashSiteMining(
+export async function startFerriteShaleMining(
   userId: string,
   characterId: string,
   now = new Date(),
@@ -1011,7 +1014,7 @@ export async function startCrashSiteMining(
     async (transaction, context) => {
       await ensureStarterMiningState(transaction, context.character.id);
       const unsupportedAction =
-        context.action && context.action.actionId !== ACTION_IDS.crashSiteMining;
+        context.action && context.action.actionId !== ACTION_IDS.ferriteShaleMining;
       // Reload the character after lazy resolution so location reflects any
       // travel arrival that just committed in this same transaction.
       const [reloaded] = await transaction
@@ -1021,10 +1024,10 @@ export async function startCrashSiteMining(
         .limit(1);
       const currentLocationId = reloaded?.currentLocationId ?? LOCATION_IDS.crashSite;
       const traveling = context.action?.actionId === ACTION_IDS.travel;
-      // Mining may only start at the Crash Site while stationary.
+      // Mining may only start at the authoritative Ferrite location (The Jag after issue #83).
       const miningBlockedHere = !isActionAvailableAtLocation(
         currentLocationId,
-        ACTION_IDS.crashSiteMining,
+        ACTION_IDS.ferriteShaleMining,
       );
       const snapshot = await loadMiningSnapshot(transaction, context.character.id);
       const preflightStopReason =
@@ -1034,7 +1037,7 @@ export async function startCrashSiteMining(
       if (!context.action && !preflightStopReason && !miningBlockedHere) {
         await transaction.insert(activeActions).values({
           characterId: context.character.id,
-          actionId: ACTION_IDS.crashSiteMining,
+          actionId: ACTION_IDS.ferriteShaleMining,
           startedAt: now,
           resolvedThroughAt: now,
         });
@@ -1381,7 +1384,7 @@ export async function stopRefining(
         miningOutcome?.stopReason,
         context.action &&
           context.action.actionId !== ACTION_IDS.refining &&
-          context.action.actionId !== ACTION_IDS.crashSiteMining &&
+          context.action.actionId !== ACTION_IDS.ferriteShaleMining &&
           context.action.actionId !== ACTION_IDS.travel
           ? "another_action_active"
           : undefined,
@@ -1417,7 +1420,7 @@ export async function stopMining(
     }),
     async (transaction, context) => {
       await ensureStarterMiningState(transaction, context.character.id);
-      const manuallyStopped = context.action?.actionId === ACTION_IDS.crashSiteMining;
+      const manuallyStopped = context.action?.actionId === ACTION_IDS.ferriteShaleMining;
       if (manuallyStopped)
         await transaction
           .delete(activeActions)
@@ -1441,7 +1444,7 @@ export async function stopMining(
             }
           : { successes: 0, failures: 0, awardedXp: 0 },
         manuallyStopped ? "manually_stopped" : outcome?.stopReason,
-        context.action && context.action.actionId !== ACTION_IDS.crashSiteMining
+        context.action && context.action.actionId !== ACTION_IDS.ferriteShaleMining
           ? "another_action_active"
           : undefined,
         undefined,
@@ -1689,7 +1692,7 @@ export async function beginTravel(
           context.character.id,
           recentFrom(miningOutcome),
           miningOutcome?.stopReason,
-          context.action && context.action.actionId !== ACTION_IDS.crashSiteMining
+          context.action && context.action.actionId !== ACTION_IDS.ferriteShaleMining
             ? "another_action_active"
             : undefined,
           plan.reason,
@@ -1722,7 +1725,7 @@ export async function beginTravel(
         await transaction
           .delete(activeActions)
           .where(eq(activeActions.characterId, context.character.id));
-        if (context.action.actionId === ACTION_IDS.crashSiteMining) {
+        if (context.action.actionId === ACTION_IDS.ferriteShaleMining) {
           await transaction
             .insert(characterMiningState)
             .values({ characterId: context.character.id, lastStopReason: "action_replaced" })

@@ -1,6 +1,6 @@
 import { and, eq } from "drizzle-orm";
 import { afterEach, beforeAll, describe, expect, it } from "vitest";
-import { ITEM_IDS } from "@/game/config/foundations";
+import { ITEM_IDS, LOCATION_IDS } from "@/game/config/foundations";
 import type { MiningRandom } from "@/game/domain/mining";
 import { withResolvedOwnedCharacter } from "@/server/action-resolution";
 import { discardInventoryStack, discardInventoryStackInTransaction } from "@/server/inventory";
@@ -53,6 +53,10 @@ suite("Issue #58 authoritative inventory stack discard (real PostgreSQL)", () =>
 
   async function provision(userId: string, characterId: string, now: Date) {
     await mining.getMiningGameplayState(userId, characterId, now, noYield);
+    await db
+      .update(rune.characters)
+      .set({ currentLocationId: LOCATION_IDS.theJag })
+      .where(eq(rune.characters.id, characterId));
   }
 
   async function addStack(characterId: string, itemId: string, quantity: number): Promise<string> {
@@ -297,7 +301,7 @@ suite("Issue #58 authoritative inventory stack discard (real PostgreSQL)", () =>
     const startedAt = new Date("2026-07-02T00:00:00.000Z");
     const dueAt = new Date("2026-07-02T00:00:06.000Z");
     await provision(userId, character.id, startedAt);
-    await mining.startCrashSiteMining(userId, character.id, startedAt, successYield);
+    await mining.startFerriteShaleMining(userId, character.id, startedAt, successYield);
     // The selected stack holds the confirmed quantity; the due successful
     // attempt will add one more shale to the SAME stack.
     const stackId = await addStack(character.id, ITEM_IDS.ferriteShale, 5);
@@ -346,7 +350,7 @@ suite("Issue #58 authoritative inventory stack discard (real PostgreSQL)", () =>
     const startedAt = new Date("2026-07-03T00:00:00.000Z");
     const dueAt = new Date("2026-07-03T00:00:06.000Z");
     await provision(userId, character.id, startedAt);
-    await mining.startCrashSiteMining(userId, character.id, startedAt, successYield);
+    await mining.startFerriteShaleMining(userId, character.id, startedAt, successYield);
     // The discard target is a Power Cell stack: due Mining work never touches
     // it, so the discard inside the failing transaction genuinely succeeds
     // before the forced throw.

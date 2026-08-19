@@ -14,7 +14,7 @@ describe("local map identifier asset boundary (issue #53)", () => {
       MAP_IDENTIFIER_ASSET_BY_KEY,
     ) as (keyof typeof MAP_IDENTIFIER_ASSET_BY_KEY)[]) {
       const asset = resolveMapIdentifierAsset(key);
-      expect(asset).toMatch(/^\/map-icons\/.+\.webp$/);
+      expect(asset).toMatch(/^\/map-icons\/.+\.(webp|png)$/);
       expect(asset).not.toMatch(/^https?:\/\//);
       expect(asset).not.toContain("..");
     }

@@ -82,7 +82,13 @@ small number of critical mobile player journeys.
     it is never set for the ordinary CI build job, for previews, or for
     production.
 - Agents may not report browser or CI parity as passing unless the canonical
-  command actually passed.
+  command actually passed. When a change adds or touches E2E specs, run the
+  new/targeted spec(s) first in isolation and **then** the full
+  `pnpm test:e2e:canonical` suite — `fast-checks` (typecheck/lint/unit/build)
+  intentionally skips PostgreSQL integration and canonical E2E, so a green fast
+  run is not evidence the merge gate will pass. For details see
+  `AGENTS.md` §6 and `docs/development-workflow.md` (§Focused implementation
+  checks, then full canonical parity).
 - The canonical command is expensive by design: one invocation performs one
   full production `next build`, one `next start`, and all suites, so it spans
   several minutes. Multiple Playwright commands remain to preserve fixture and

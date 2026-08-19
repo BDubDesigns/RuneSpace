@@ -92,7 +92,7 @@ export async function changeEquipment(
         (a) => a.assignmentKind === "gear" && a.suitSlotId === miningToolSlotId,
       );
       const miningToolChanged =
-        context.action?.actionId === ACTION_IDS.crashSiteMining &&
+        context.action?.actionId === ACTION_IDS.ferriteShaleMining &&
         previousToolAssignment?.itemInstanceId !== currentToolAssignment?.itemInstanceId;
       if (miningToolChanged) {
         const miningStopReasonLocal: import("@/game/domain/mining").MiningStopReason =

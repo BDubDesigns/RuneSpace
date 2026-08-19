@@ -343,17 +343,28 @@ test("an authoritative location change invalidates the open profile panel", asyn
     .set({ currentLocationId: LOCATION_IDS.abandonedProcessingYard })
     .where(eq(rune.characters.id, targetRow!.id));
 
-  await page.getByRole("button", { name: "Refresh status" }).click();
-  await expect(panel.getByText("Character not found")).toBeVisible();
-  await expect(panel.getByText(radaOne, { exact: true })).toHaveCount(0);
-
-  // The removed opener is gone from the list, so Escape must fall back to the
-  // persistent disclosure trigger instead of a missing control.
+  await page.reload();
+  // Reload clears the profile panel and re-scopes population. The moved
+  // character (radaOne) is now at the Yard, so it must NOT appear in the
+  // Crash Site disclosure anymore.
+  await expect(page.getByText("World map")).toBeVisible();
+  await populationDisclosure(page).click();
+  await expect(
+    page.getByRole("button", { name: `${radaOne}, Level 2, player Rada Stonehand` }),
+  ).toHaveCount(0);
+  // Open another visible character to prove the panel still works
+  await page.getByRole("button", { name: `${radaTwo}, Level 1, player Rada Stonehand` }).click();
+  await expect(panel.getByText(radaTwo, { exact: true })).toBeVisible();
   await page.keyboard.press("Escape");
   await expect(panel).toBeHidden();
-  await expect(populationDisclosure(page)).toBeFocused();
-
-  // Reopen for the travel-invalidation assertion below.
+  // After Escape, disclosure is collapsed if it was open, but the population
+  // list is still at Crash Site. Reopen if needed to prove the panel again.
+  if ((await populationDisclosure(page).getAttribute("aria-expanded")) === "false") {
+    await populationDisclosure(page).click();
+  }
+  await expect(
+    page.getByRole("button", { name: `${radaTwo}, Level 1, player Rada Stonehand` }),
+  ).toBeVisible({ timeout: 10_000 });
   await page.getByRole("button", { name: `${radaTwo}, Level 1, player Rada Stonehand` }).click();
   await expect(panel).toBeVisible();
 

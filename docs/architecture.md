@@ -84,5 +84,5 @@ server-validated. They are not part of this foundation issue.
 
 The foundation implements authentication and character ownership alongside
 server-authoritative timing, progression, inventory, equipment, and lazy action
-resolution. Crash Site Mining is the current playable player-facing slice; other
+resolution. Ferrite Shale Mining at The Jag is the current playable player-facing slice; other
 activities and gameplay UI remain scoped to later approved issues.

@@ -1,7 +1,7 @@
 # Gameplay Foundations
 
 This is the authoritative design record for the server-authoritative foundations
-introduced in issue #16 and the approved Crash Site Mining slice. It defines
+introduced in issue #16 and the approved Ferrite Shale Mining slice. It defines
 contracts and approved values, not unfinished balance values or future activities.
 
 ## Time and actions
@@ -35,12 +35,12 @@ contracts and approved values, not unfinished balance values or future activitie
   derived from total XP and a supplied authoritative threshold source.
 - Every future award must use `grantSkillXp`; activities must not implement XP
   arithmetic or level checks themselves.
-- The initial Mining curve and Crash Site award are approved in the slice below;
+- The initial Mining curve and Ferrite Shale award are approved in the slice below;
   other skills and activities remain deliberately undecided.
 
-## Crash Site Mining slice
+## Ferrite Shale Mining slice
 
-The first playable action is infinite Crash Site Ferrite Shale Mining. Its concrete
+The first playable action is infinite Ferrite Shale Mining at The Jag. Its concrete
 values live only in `game/config/balance.ts` behind `getEffectiveGameBalance()`:
 10 ticks (six seconds) per normal attempt; 15 Mining XP on success; 1 or 2 shale per
 success; 100 g shale units with a 10-unit stack limit; and the approved level-1
@@ -141,7 +141,7 @@ Structural Alloy, Salvage Cutter, and Power Cell. These identities establish no
 weights, capacities, charge behavior, rewards, starter loadout, or action beyond
 their approved slice.
 
-Mining extracts raw material from the infinite Crash Site deposit. Refining
+Mining extracts raw material from the infinite Ferrite Shale seam at The Jag. Refining
 (issue #81) consumes 2 Ferrite Shale per 7-tick attempt at the Abandoned
 Processing Yard, producing 1 Refined Ferrite (150 g / stack 5, 15 XP) on
 success or 1 Slag (150 g / stack 10, 3 XP) otherwise, with a 40%→100% L1–20
@@ -151,7 +151,7 @@ Machining creates precise components. Salvage, Fabrication, Machining, Speeder
 Piloting, and Ship Piloting are documented future skill directions only; they
 have no persistence initialization or gameplay in this foundation.
 
-## World and Travel (issues #40 and #47)
+## World and Travel (issues #40, #47, and #83)
 
 RuneSpace's production stages require movement between distinct places. Travel is
 a real, server-authoritative, blocking character activity — not an instant tab
@@ -172,10 +172,10 @@ of war, fuel, hauling, and transportation upgrades build.
   dormant (future) activities. Adjacency is validated as bidirectional so a
   one-way edge can never silently ship.
 
-### The initial three-location world
+### The five-location local world (issue #83)
 
-- **Crash Site** (`crash_site`): the existing infinite Ferrite Shale deposit.
-  Mining is the only available activity.
+- **Crash Site** (`crash_site`): the wreck / starting location after issue #83.
+  No Mining is available here; it retains its existing ship scene image.
 - **Abandoned Processing Yard** (`abandoned_processing_yard`): the
   Refining location (issue #81). Refining is available here while stationary;
   the location advertises `processing_yard_refining` as its available action.
@@ -183,10 +183,23 @@ of war, fuel, hauling, and transportation upgrades build.
   adjacent emergency-supply depot. It is directly adjacent to both existing
   locations and is the authoritative renewable source for the daily Power Cell
   allotment below.
+- **The Long Scramble** (`the_long_scramble`, `{q:-1,r:2}`): intentionally barren
+  traversal tile southwest of Crash Site. No local activity or resource; its lack
+  of activity is intentional, as is Crash Site's, and neither has a fake Offline status.
+- **The Jag** (`the_jag`, `{q:-2,r:3}`): Ferrite Shale Mining location (Mining moved
+  out of Crash Site). Mining is available only here while stationary.
 
-All three locations are connected by bidirectional routes. No further locations,
-content, or map systems (no world grid, coordinates, procedural generation, fog
-of war, or art generation) are introduced by this issue.
+Adjacency after issue #83 (bidirectional, no second graph): Crash Site ↔
+Processing Yard, Crash Site ↔ Power Annex, Processing Yard ↔ Power Annex,
+**Crash Site ↔ The Long Scramble**, **The Long Scramble ↔ The Jag**. No direct
+Crash Site ↔ Jag, Jag ↔ Yard/Annex, or Long Scramble ↔ Yard/Annex edge exists.
+Reaching The Jag from anywhere except The Long Scramble requires explicit
+completed legs (for example Annex → Crash Site → Long Scramble → Jag). No queued
+route, shortest-path, waypoint, or auto-continue behavior exists.
+
+Coordinates are presentation-only (flat-top axial); Travel legality is derived
+solely from registry adjacency, not from coordinates. The local map derives route
+lines from the same authoritative adjacency.
 
 ### Travel is a blocking one-active-action activity
 
@@ -209,7 +222,7 @@ of war, or art generation) are introduced by this issue.
 
 ### Selecting vs. confirming travel
 
-- Selecting a hex on the three-hex local map only inspects/selects it.
+- Selecting a hex on the five-location local map only inspects/selects it.
 - A separate explicit confirmation control ("Walk to … — 24 sec") invokes the
   server-authoritative begin-travel command. The same interaction works in
   reverse after arrival.
@@ -368,11 +381,14 @@ When Travel replaces an active travel-replaceable work action (Mining or Refinin
 No work action may progress during Travel, and the server enforces this
 server-side even against a stale or manipulated client.
 
-### Location/activity gating
+### Location/activity gating (after issue #83)
 
-- Crash Site Mining may start only at the Crash Site while stationary.
-- Mining cannot start at the Processing Yard.
-- Mining cannot start while Travel is active.
+- Ferrite Shale Mining may start only at The Jag while stationary.
+- Mining cannot start at Crash Site, The Long Scramble, the Processing Yard, the
+  Power Annex, or while Travel is active. The server rejects those starts; hiding
+  UI is insufficient.
+- Crash Site and The Long Scramble have no local gameplay activity or resource;
+  neither is shown as Offline or given filler controls.
 - Conflicting state-changing commands are rejected clearly and server-side.
 - Inventory and Equipment remain inspectable during Travel.
 

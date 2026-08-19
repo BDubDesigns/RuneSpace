@@ -1,6 +1,6 @@
 import { and, eq } from "drizzle-orm";
 import { afterEach, beforeAll, describe, expect, it } from "vitest";
-import { ITEM_IDS } from "@/game/config/foundations";
+import { ITEM_IDS, LOCATION_IDS } from "@/game/config/foundations";
 import type { MiningRandom } from "@/game/domain/mining";
 import { cleanupTestUser, createCharacterForUser, createTestUser } from "./fixtures";
 
@@ -50,6 +50,10 @@ suite("Issue #57 carried unique items in Inventory (real PostgreSQL)", () => {
 
   async function provision(userId: string, characterId: string, now: Date) {
     await mining.getMiningGameplayState(userId, characterId, now, noYield);
+    await db
+      .update(rune.characters)
+      .set({ currentLocationId: LOCATION_IDS.theJag })
+      .where(eq(rune.characters.id, characterId));
   }
 
   async function cutterInstance(characterId: string) {
@@ -187,7 +191,7 @@ suite("Issue #57 carried unique items in Inventory (real PostgreSQL)", () => {
     const dueAt = new Date("2026-01-01T00:00:06.000Z");
     await provision(userId, character.id, startedAt);
     const successRandom: MiningRandom = { nextBasisPoints: () => 0, nextUnit: () => 0 };
-    await mining.startCrashSiteMining(userId, character.id, startedAt, successRandom);
+    await mining.startFerriteShaleMining(userId, character.id, startedAt, successRandom);
     const cutter = await cutterInstance(character.id);
     await db
       .update(rune.itemInstances)

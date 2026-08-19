@@ -671,12 +671,16 @@ suite("issue #81 Refining persistence and concurrency (real PostgreSQL)", () => 
 
   it("Mining stop does not leak into Refining presentation after Travel to Yard", async () => {
     const { userId, character } = await makeCharacter();
-    const atCrash = new Date("2026-01-01T00:00:00.000Z");
-    await mining.getMiningGameplayState(userId, character.id, atCrash, {
+    const atJag = new Date("2026-01-01T00:00:00.000Z");
+    await mining.getMiningGameplayState(userId, character.id, atJag, {
       nextBasisPoints: () => 0,
       nextUnit: () => 0,
     });
-    await mining.startCrashSiteMining(userId, character.id, atCrash, {
+    await db
+      .update(rune.characters)
+      .set({ currentLocationId: LOCATION_IDS.theJag })
+      .where(eq(rune.characters.id, character.id));
+    await mining.startFerriteShaleMining(userId, character.id, atJag, {
       nextBasisPoints: () => 0,
       nextUnit: () => 0,
     });
@@ -691,19 +695,19 @@ suite("issue #81 Refining persistence and concurrency (real PostgreSQL)", () => 
         nextUnit: () => 0,
       },
     );
-    expect(afterStop.stop?.actionId).toBe(ACTION_IDS.crashSiteMining);
-    // Travel to Processing Yard — mining stop should not be presented as refining stop
+    expect(afterStop.stop?.actionId).toBe(ACTION_IDS.ferriteShaleMining);
+    // Travel from The Jag to Processing Yard requires via Long Scramble -> Crash -> Yard
     await mining.beginTravel(
       userId,
       character.id,
-      LOCATION_IDS.abandonedProcessingYard,
+      LOCATION_IDS.theLongScramble,
       new Date("2026-01-01T00:00:06.000Z"),
       {
         nextBasisPoints: () => 0,
         nextUnit: () => 0,
       },
     );
-    const arrived = await mining.getMiningGameplayState(
+    await mining.getMiningGameplayState(
       userId,
       character.id,
       new Date("2026-01-01T00:00:30.000Z"),
@@ -712,9 +716,47 @@ suite("issue #81 Refining persistence and concurrency (real PostgreSQL)", () => 
         nextUnit: () => 0,
       },
     );
+    await mining.beginTravel(
+      userId,
+      character.id,
+      LOCATION_IDS.crashSite,
+      new Date("2026-01-01T00:00:30.000Z"),
+      {
+        nextBasisPoints: () => 0,
+        nextUnit: () => 0,
+      },
+    );
+    await mining.getMiningGameplayState(
+      userId,
+      character.id,
+      new Date("2026-01-01T00:00:54.000Z"),
+      {
+        nextBasisPoints: () => 0,
+        nextUnit: () => 0,
+      },
+    );
+    await mining.beginTravel(
+      userId,
+      character.id,
+      LOCATION_IDS.abandonedProcessingYard,
+      new Date("2026-01-01T00:00:54.000Z"),
+      {
+        nextBasisPoints: () => 0,
+        nextUnit: () => 0,
+      },
+    );
+    const arrived = await mining.getMiningGameplayState(
+      userId,
+      character.id,
+      new Date("2026-01-01T00:01:18.000Z"),
+      {
+        nextBasisPoints: () => 0,
+        nextUnit: () => 0,
+      },
+    );
     expect(arrived.location.currentLocationId).toBe(LOCATION_IDS.abandonedProcessingYard);
     // Mining stop remains tagged as a mining stop — refining presentation must ignore it
-    expect(arrived.stop?.actionId).toBe(ACTION_IDS.crashSiteMining);
+    expect(arrived.stop?.actionId).toBe(ACTION_IDS.ferriteShaleMining);
     expect(arrived.stop?.reason).not.toBe("insufficient_ferrite_shale");
     // Prove refining UI helper does not interpret it: map mining reason through mining helper, not refining
     const miningReason = arrived.stop?.reason;
@@ -740,7 +782,7 @@ suite("issue #81 Refining persistence and concurrency (real PostgreSQL)", () => 
       },
     );
     // Still the mining-tagged stop — refining ignore check
-    expect(atYard.stop?.actionId).toBe(ACTION_IDS.crashSiteMining);
+    expect(atYard.stop?.actionId).toBe(ACTION_IDS.ferriteShaleMining);
   });
 
   it("Refining stop does not leak into Mining presentation", async () => {
@@ -795,6 +837,6 @@ suite("issue #81 Refining persistence and concurrency (real PostgreSQL)", () => 
     expect(atCrash.stop?.reason).toBe("action_replaced");
     // Mining presentation must ignore refining-tagged stops — prove via actionId discrimination.
     // (action_replaced is shared by both activities, so reason alone cannot prove non-leak.)
-    expect(atCrash.stop?.actionId).not.toBe(ACTION_IDS.crashSiteMining);
+    expect(atCrash.stop?.actionId).not.toBe(ACTION_IDS.ferriteShaleMining);
   });
 });

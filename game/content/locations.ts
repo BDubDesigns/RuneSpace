@@ -6,24 +6,29 @@ import {
 } from "@/game/schemas/locations";
 
 /**
- * The authoritative local world for issues #40, #47, and #81 (single source of truth).
+ * The authoritative local world (single source of truth).
  *
  * Server validation, UI projection, and adjacency checks all read from this
- * registry. The product owner approved exactly three connected locations for
- * this slice; no further locations, content, or map systems are introduced here.
+ * registry.
  *
- * - Crash Site: the existing Ferrite Shale deposit where Mining is available.
+ * - Crash Site: wreck / start location (no mining after issue #83).
  * - Abandoned Processing Yard: Ferrite Refining (issue #81).
  * - DeWhat? Emergency Power Annex: the daily Power Cell reward source.
+ * - The Long Scramble (#83): intentionally barren traversal tile.
+ * - The Jag (#83): Ferrite Shale Mining.
  */
 const locationDefinitions = [
   {
     id: LOCATION_IDS.crashSite,
     displayName: "Crash Site",
     description:
-      "The damaged ship rests on broken ground. An infinite Ferrite Shale deposit is exposed at the impact scar, ready to be cut.",
-    adjacentLocationIds: [LOCATION_IDS.abandonedProcessingYard, LOCATION_IDS.emergencyPowerAnnex],
-    availableActionIds: [ACTION_IDS.crashSiteMining],
+      "The damaged ship rests on broken ground, its fractured hull and scattered salvage marking the impact site.",
+    adjacentLocationIds: [
+      LOCATION_IDS.abandonedProcessingYard,
+      LOCATION_IDS.emergencyPowerAnnex,
+      LOCATION_IDS.theLongScramble,
+    ],
+    availableActionIds: [],
     dormantActivities: [],
     presentation: {
       mapIconKey: "crash_site_deposit" as const,
@@ -80,6 +85,48 @@ const locationDefinitions = [
       },
     },
   },
+  {
+    id: LOCATION_IDS.theLongScramble,
+    displayName: "The Long Scramble",
+    description:
+      "A steep run of fractured stone and loose hardpan climbing toward the high ridge. Nothing worth stopping for, which is unfortunate given how long it takes to cross.",
+    adjacentLocationIds: [LOCATION_IDS.crashSite, LOCATION_IDS.theJag],
+    availableActionIds: [],
+    dormantActivities: [],
+    presentation: {
+      mapIconKey: "the_long_scramble" as const,
+      layout: "the_long_scramble" as const,
+      localMap: { axial: { q: -1, r: 2 }, label: "Long Scramble" },
+      scene: {
+        asset: "/location-scenes/the-long-scramble.png" as const,
+        width: 1920,
+        height: 480,
+        alt: "Steep fractured stone and loose hardpan climbing toward a high ridge, rough switchback route through barren mountain approach",
+        focal: { x: 50, y: 44 } as const,
+      },
+    },
+  },
+  {
+    id: LOCATION_IDS.theJag,
+    displayName: "The Jag",
+    description:
+      "An exposed ferrite seam carved into the hardpan by whoever got here first. Calling it a mine would be generous, but the shale cuts just fine.",
+    adjacentLocationIds: [LOCATION_IDS.theLongScramble],
+    availableActionIds: [ACTION_IDS.ferriteShaleMining],
+    dormantActivities: [],
+    presentation: {
+      mapIconKey: "the_jag" as const,
+      layout: "the_jag" as const,
+      localMap: { axial: { q: -2, r: 3 }, label: "The Jag" },
+      scene: {
+        asset: "/location-scenes/the-jag.png" as const,
+        width: 1920,
+        height: 480,
+        alt: "Exposed jagged Ferrite Shale outcrop with cut faces, rough improvised mine entrance and disturbed ground with loose shale",
+        focal: { x: 50, y: 43 } as const,
+      },
+    },
+  },
 ] as const satisfies readonly LocationDefinition[];
 
 export const LOCATIONS: readonly LocationDefinition[] = locationDefinitions.map((location) =>
@@ -107,9 +154,11 @@ export function areLocationsAdjacent(originId: string, destinationId: string): b
   return getLocation(originId)?.adjacentLocationIds.includes(destinationId as never) ?? false;
 }
 
-/** The ordered three-location local map for the issue #47 slice. */
+/** The ordered five-location local map (issue #83). */
 export const LOCAL_MAP_LOCATION_IDS: readonly LocationDefinition["id"][] = [
   LOCATION_IDS.crashSite,
   LOCATION_IDS.abandonedProcessingYard,
   LOCATION_IDS.emergencyPowerAnnex,
+  LOCATION_IDS.theLongScramble,
+  LOCATION_IDS.theJag,
 ];

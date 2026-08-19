@@ -172,7 +172,7 @@ export function MiningConsole({ characterName }: { characterName: string }) {
     state,
   } = useMiningPlay();
   const [message, setMessage] = useState<string | undefined>(
-    state.stop?.actionId === ACTION_IDS.crashSiteMining
+    state.stop?.actionId === ACTION_IDS.ferriteShaleMining
       ? miningStopMessage(state.stop.reason as import("@/game/domain/mining").MiningStopReason)
       : undefined,
   );
@@ -187,9 +187,10 @@ export function MiningConsole({ characterName }: { characterName: string }) {
   const active = state.activeAction;
   const inTransit = Boolean(state.travelState);
   const currentLocationId = state.location.currentLocationId;
-  const atCrashSite = currentLocationId === LOCATION_IDS.crashSite;
   const atProcessingYard = currentLocationId === LOCATION_IDS.abandonedProcessingYard;
-  const showMiningActivity = atCrashSite && !inTransit;
+  const atTheJag = currentLocationId === LOCATION_IDS.theJag;
+  const atTheLongScramble = currentLocationId === LOCATION_IDS.theLongScramble;
+  const showMiningActivity = atTheJag && !inTransit;
   const showRefiningActivity = atProcessingYard && !inTransit;
   const durationTicks = active?.nextAttemptDurationTicks ?? balance.mining.attemptDurationTicks;
   const durationMs = durationTicks * GAME_TICK_MS;
@@ -213,7 +214,7 @@ export function MiningConsole({ characterName }: { characterName: string }) {
     if (result.state) {
       acceptState(result.state);
       if (result.state.commandError) setMessage(commandErrorMessage(result.state.commandError));
-      else if (result.state.stop?.actionId === ACTION_IDS.crashSiteMining)
+      else if (result.state.stop?.actionId === ACTION_IDS.ferriteShaleMining)
         setMessage(
           miningStopMessage(
             result.state.stop.reason as import("@/game/domain/mining").MiningStopReason,
@@ -312,7 +313,7 @@ export function MiningConsole({ characterName }: { characterName: string }) {
                   location={currentLocation}
                   characterName={characterName}
                   resourceLabels={
-                    atCrashSite
+                    atTheJag
                       ? ["Ferrite Shale"]
                       : atProcessingYard
                         ? ["Refined Ferrite", "Slag"]
@@ -346,11 +347,10 @@ export function MiningConsole({ characterName }: { characterName: string }) {
             </p>
           ) : atProcessingYard ? (
             <RefiningConsole />
-          ) : atCrashSite ? (
+          ) : atTheJag ? (
             <>
               <p className="mt-4 max-w-2xl text-sm leading-relaxed text-[color:var(--rs-text-secondary)]">
-                The damaged ship needs raw material. Cut Ferrite Shale from the infinite crash-site
-                deposit to prepare for repairs.
+                {getLocation(currentLocationId)?.description}
               </p>
               <div className="mt-5 flex flex-wrap gap-3">
                 {active || pendingCommand === "stop" ? (
@@ -410,6 +410,12 @@ export function MiningConsole({ characterName }: { characterName: string }) {
                 </Feedback>
               )}
             </>
+          ) : atTheLongScramble ? (
+            <div className="mt-4">
+              <p className="max-w-2xl text-sm leading-relaxed text-[color:var(--rs-text-secondary)]">
+                {getLocation(currentLocationId)?.description}
+              </p>
+            </div>
           ) : (
             <div className="mt-4">
               <p className="max-w-2xl text-sm leading-relaxed text-[color:var(--rs-text-secondary)]">
@@ -440,7 +446,9 @@ export function MiningConsole({ characterName }: { characterName: string }) {
           {showMiningActivity && message ? (
             <Feedback
               tone={
-                state.stop?.actionId === ACTION_IDS.crashSiteMining && !active ? "danger" : "muted"
+                state.stop?.actionId === ACTION_IDS.ferriteShaleMining && !active
+                  ? "danger"
+                  : "muted"
               }
             >
               {message}
