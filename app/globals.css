@@ -87,11 +87,20 @@
   --rs-glow-success: 0 0 32px rgb(136 215 99 / 0.66);
   --rs-glow-danger: 0 0 32px rgb(241 108 117 / 0.58);
   /* Local-map scroll affordances (issue #92). Keep the mining/amber accent as
-     the single source of truth while deriving the translucent fill and static
+     the single source of truth while deriving the fill, border, and static
      halo used by the viewport edge markers. */
   --rs-map-scroll-affordance-fill: color-mix(in srgb, var(--rs-accent-mining) 82%, transparent);
-  --rs-map-scroll-affordance-glow: 0 0 10px
-    color-mix(in srgb, var(--rs-accent-mining) 34%, transparent);
+  --rs-map-scroll-affordance-border: color-mix(
+    in srgb,
+    var(--rs-accent-mining) 52%,
+    var(--rs-surface-page)
+  );
+  --rs-map-scroll-affordance-glow: color-mix(in srgb, var(--rs-accent-mining) 90%, transparent);
+  --rs-map-scroll-affordance-glow-outer: color-mix(
+    in srgb,
+    var(--rs-accent-mining) 56%,
+    transparent
+  );
   --rs-map-scroll-affordance-pulse-duration: 2.25s;
   --rs-duration-fast: 120ms;
   --rs-duration-standard: 180ms;
@@ -244,13 +253,22 @@ body {
   position: absolute;
   display: block;
   width: 1.5rem;
-  height: 2.25rem;
-  background: var(--rs-map-scroll-affordance-fill);
-  box-shadow: var(--rs-map-scroll-affordance-glow);
+  height: 3rem;
+  background: var(--rs-map-scroll-affordance-border);
   clip-path: polygon(0 50%, 100% 0, 100% 100%);
+  filter: drop-shadow(0 0 0.3rem var(--rs-map-scroll-affordance-glow))
+    drop-shadow(0 0 0.75rem var(--rs-map-scroll-affordance-glow-outer));
   transform-origin: center;
   animation: rs-map-scroll-affordance-breathe var(--rs-map-scroll-affordance-pulse-duration)
     ease-in-out infinite;
+}
+
+.rs-map-scroll-affordance::after {
+  position: absolute;
+  inset: 0.125rem;
+  content: "";
+  background: var(--rs-map-scroll-affordance-fill);
+  clip-path: inherit;
 }
 
 .rs-map-scroll-affordance--left {
@@ -269,7 +287,7 @@ body {
   top: 0.25rem;
   left: 50%;
   width: 2.25rem;
-  height: 1.5rem;
+  height: 2rem;
   transform: translateX(-50%) rotate(90deg);
 }
 
@@ -277,7 +295,7 @@ body {
   bottom: 0.25rem;
   left: 50%;
   width: 2.25rem;
-  height: 1.5rem;
+  height: 2rem;
   transform: translateX(-50%) rotate(270deg);
 }
 
@@ -287,7 +305,7 @@ body {
     scale: 1;
   }
   50% {
-    scale: 1.04;
+    scale: 1.15;
   }
 }
 

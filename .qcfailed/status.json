@@ -2,19 +2,19 @@
   "schemaVersion": 1,
   "projectSlug": "runespace",
   "workState": "active",
-  "currentFocus": "Give each location a memorable environmental identity via a reusable, registry-backed scene header integrated into the current-location panel.",
+  "currentFocus": "Make the expanded local map clearly communicate when more map exists beyond the visible viewport.",
   "latestCompleted": {
-    "summary": "Refined LocalMapPanel with hybrid plated-signage location identity and tighter 390px presentation.",
-    "date": "2026-08-16",
-    "url": "https://github.com/BDubDesigns/RuneSpace/pull/79"
+    "summary": "Expanded the local world to five locations with The Long Scramble and The Jag.",
+    "date": "2026-08-19",
+    "url": "https://github.com/BDubDesigns/RuneSpace/pull/90"
   },
-  "nextStep": "Land the reusable location scene header for Crash Site, Processing Yard, and Power Annex (#78) and verify the 390px and desktop presentation.",
-  "lastMeaningfulUpdate": "2026-08-16",
+  "nextStep": "Review directional local-map affordances at narrow mobile and desktop widths, then merge the approved draft PR.",
+  "lastMeaningfulUpdate": "2026-08-19",
   "highlights": [
     {
-      "summary": "Refined LocalMapPanel with hybrid plated-signage location identity and tighter 390px presentation.",
-      "date": "2026-08-16",
-      "url": "https://github.com/BDubDesigns/RuneSpace/pull/79"
+      "summary": "Expanded the local world to five locations with The Long Scramble and The Jag.",
+      "date": "2026-08-19",
+      "url": "https://github.com/BDubDesigns/RuneSpace/pull/90"
     },
     {
       "summary": "Shipped a shared portrait picker, server-authoritative per-character selection, and public profile presentation.",
@@ -28,8 +28,8 @@
     }
   ],
   "currentChange": {
-    "summary": "Add reusable active-location scene artwork for the three current locations (#78).",
-    "stage": "merge-ready",
-    "pullRequestNumber": 80
+    "summary": "Add directional scroll affordances to the expanded local map (#92).",
+    "stage": "review",
+    "pullRequestNumber": 93
   }
 }
