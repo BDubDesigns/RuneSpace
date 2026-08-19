@@ -28,6 +28,11 @@ import {
   LOCAL_MAP_HEX_WIDTH,
   type LocalMapGeometry,
 } from "./local-map-layout";
+import {
+  useLocalMapScrollAffordances,
+  type LocalMapScrollAffordances,
+  type LocalMapScrollDirection,
+} from "./local-map-scroll-affordances";
 import { routeProgressSegment } from "./route-progress";
 import { resolveMapIdentifierAsset } from "./local-map-identifiers";
 
@@ -589,6 +594,37 @@ function LocationPopulationList({
   );
 }
 
+const LOCAL_MAP_SCROLL_DIRECTIONS: readonly LocalMapScrollDirection[] = [
+  "left",
+  "right",
+  "top",
+  "bottom",
+];
+
+function LocalMapScrollAffordanceLayer({
+  affordances,
+}: {
+  affordances: LocalMapScrollAffordances;
+}) {
+  return (
+    <div
+      aria-hidden="true"
+      className="rs-map-scroll-affordance-layer"
+      data-map-scroll-affordance-layer
+    >
+      {LOCAL_MAP_SCROLL_DIRECTIONS.map((direction) =>
+        affordances[direction] ? (
+          <span
+            key={direction}
+            className={`rs-map-scroll-affordance rs-map-scroll-affordance--${direction}`}
+            data-map-scroll-affordance={direction}
+          />
+        ) : null,
+      )}
+    </div>
+  );
+}
+
 // ---------------------------------------------------------------------------
 // Main panel
 // ---------------------------------------------------------------------------
@@ -618,6 +654,8 @@ export function LocalMapPanel() {
   const { collapsed: mapCollapsed, toggle: toggleMapCollapsed } = useSyncedCollapse(
     COLLAPSE_KEYS.worldMap,
   );
+  const { viewportRef: localMapViewportRef, affordances: localMapAffordances } =
+    useLocalMapScrollAffordances(!mapCollapsed);
   // One shared profile panel (issue #64): only the selected target's display
   // name is state; the panel stays mounted so every entry's aria-controls
   // stays valid, and switching targets updates the same panel. The trigger
@@ -861,54 +899,63 @@ export function LocalMapPanel() {
           {/* Five flat-top hexes form the local map. The SVG renders plated chassis,
           decorative identifiers, and all approved routes; native buttons overlay
           each hex for semantics and text labels. */}
-          <div className="-mx-1 overflow-auto px-1 pb-1">
+          <div className="relative -mx-1">
             <div
-              className="relative mx-auto"
-              role="group"
-              aria-label="Local map"
-              style={{ width: `${mapGeometry.width}px`, height: `${mapGeometry.height}px` }}
+              ref={localMapViewportRef}
+              className="overflow-auto px-1 pb-1"
+              data-map-scroll-viewport
             >
-              <HexMapSvg
-                geometry={mapGeometry}
-                currentLocationId={currentLocationId}
-                selectedLocationId={selected}
-                inTransit={inTransit}
-                transitProgress={transitProgress}
-                travelOriginLocationId={travel?.originLocationId}
-                travelDestinationLocationId={travel?.destinationLocationId}
-              />
-              {mapGeometry.layouts.map((layout) => {
-                const location = getLocation(layout.locationId);
-                if (!location) return null;
-                const isCurrent = location.id === currentLocationId;
-                return (
-                  <HexButton
-                    key={location.id}
-                    locationId={location.id}
-                    name={location.presentation.localMap.label}
-                    accessibleName={location.displayName}
-                    statusLabel={tileStatusLabel(location.id)}
-                    description={location.description}
-                    selected={selected === location.id}
-                    current={isCurrent}
-                    populationCount={isCurrent && populationMatchesLocation ? population.length : 0}
-                    transitRole={
-                      inTransit && travel?.originLocationId === location.id
-                        ? "origin"
-                        : inTransit && travel?.destinationLocationId === location.id
-                          ? "destination"
-                          : undefined
-                    }
-                    disabled={inTransit}
-                    directlyReachable={
-                      areLocationsAdjacent(currentLocationId, location.id) || isCurrent
-                    }
-                    onSelect={() => !inTransit && setSelected(location.id)}
-                    style={hexButtonStyle(location.id)}
-                  />
-                );
-              })}
+              <div
+                className="relative mx-auto"
+                role="group"
+                aria-label="Local map"
+                style={{ width: `${mapGeometry.width}px`, height: `${mapGeometry.height}px` }}
+              >
+                <HexMapSvg
+                  geometry={mapGeometry}
+                  currentLocationId={currentLocationId}
+                  selectedLocationId={selected}
+                  inTransit={inTransit}
+                  transitProgress={transitProgress}
+                  travelOriginLocationId={travel?.originLocationId}
+                  travelDestinationLocationId={travel?.destinationLocationId}
+                />
+                {mapGeometry.layouts.map((layout) => {
+                  const location = getLocation(layout.locationId);
+                  if (!location) return null;
+                  const isCurrent = location.id === currentLocationId;
+                  return (
+                    <HexButton
+                      key={location.id}
+                      locationId={location.id}
+                      name={location.presentation.localMap.label}
+                      accessibleName={location.displayName}
+                      statusLabel={tileStatusLabel(location.id)}
+                      description={location.description}
+                      selected={selected === location.id}
+                      current={isCurrent}
+                      populationCount={
+                        isCurrent && populationMatchesLocation ? population.length : 0
+                      }
+                      transitRole={
+                        inTransit && travel?.originLocationId === location.id
+                          ? "origin"
+                          : inTransit && travel?.destinationLocationId === location.id
+                            ? "destination"
+                            : undefined
+                      }
+                      disabled={inTransit}
+                      directlyReachable={
+                        areLocationsAdjacent(currentLocationId, location.id) || isCurrent
+                      }
+                      onSelect={() => !inTransit && setSelected(location.id)}
+                      style={hexButtonStyle(location.id)}
+                    />
+                  );
+                })}
+              </div>
             </div>
+            <LocalMapScrollAffordanceLayer affordances={localMapAffordances} />
           </div>
 
           <LocationPopulationList

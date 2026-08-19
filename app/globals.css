@@ -86,6 +86,13 @@
   --rs-overlay-dur-box: 200ms;
   --rs-glow-success: 0 0 32px rgb(136 215 99 / 0.66);
   --rs-glow-danger: 0 0 32px rgb(241 108 117 / 0.58);
+  /* Local-map scroll affordances (issue #92). Keep the mining/amber accent as
+     the single source of truth while deriving the translucent fill and static
+     halo used by the viewport edge markers. */
+  --rs-map-scroll-affordance-fill: color-mix(in srgb, var(--rs-accent-mining) 82%, transparent);
+  --rs-map-scroll-affordance-glow: 0 0 10px
+    color-mix(in srgb, var(--rs-accent-mining) 34%, transparent);
+  --rs-map-scroll-affordance-pulse-duration: 2.25s;
   --rs-duration-fast: 120ms;
   --rs-duration-standard: 180ms;
   --rs-control-height: 2.75rem;
@@ -224,6 +231,66 @@ body {
   color: var(--rs-text-secondary);
 }
 
+/* The layer is a sibling of the native scroll container so its markers stay
+   anchored to the visible viewport while the map canvas moves underneath. */
+.rs-map-scroll-affordance-layer {
+  position: absolute;
+  z-index: 20;
+  inset: 0;
+  pointer-events: none;
+}
+
+.rs-map-scroll-affordance {
+  position: absolute;
+  display: block;
+  width: 1.5rem;
+  height: 2.25rem;
+  background: var(--rs-map-scroll-affordance-fill);
+  box-shadow: var(--rs-map-scroll-affordance-glow);
+  clip-path: polygon(0 50%, 100% 0, 100% 100%);
+  transform-origin: center;
+  animation: rs-map-scroll-affordance-breathe var(--rs-map-scroll-affordance-pulse-duration)
+    ease-in-out infinite;
+}
+
+.rs-map-scroll-affordance--left {
+  top: 50%;
+  left: 0.25rem;
+  transform: translateY(-50%);
+}
+
+.rs-map-scroll-affordance--right {
+  top: 50%;
+  right: 0.25rem;
+  transform: translateY(-50%) rotate(180deg);
+}
+
+.rs-map-scroll-affordance--top {
+  top: 0.25rem;
+  left: 50%;
+  width: 2.25rem;
+  height: 1.5rem;
+  transform: translateX(-50%) rotate(90deg);
+}
+
+.rs-map-scroll-affordance--bottom {
+  bottom: 0.25rem;
+  left: 50%;
+  width: 2.25rem;
+  height: 1.5rem;
+  transform: translateX(-50%) rotate(270deg);
+}
+
+@keyframes rs-map-scroll-affordance-breathe {
+  0%,
+  100% {
+    scale: 1;
+  }
+  50% {
+    scale: 1.04;
+  }
+}
+
 @keyframes rs-result-success {
   0% {
     box-shadow: none;
@@ -354,7 +421,8 @@ body {
   .rs-overlay-backdrop,
   .rs-overlay-panel,
   .rs-overlay-backdrop-exit,
-  .rs-overlay-panel-exit {
+  .rs-overlay-panel-exit,
+  .rs-map-scroll-affordance {
     animation: none;
   }
 
