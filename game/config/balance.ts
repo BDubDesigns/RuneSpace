@@ -9,7 +9,7 @@ const balanceSchema = z.object({
     perLevelGrowthBps: z.literal(11_000),
   }),
   mining: z.object({
-    actionId: z.literal(ACTION_IDS.crashSiteMining),
+    actionId: z.literal(ACTION_IDS.ferriteShaleMining),
     skillId: z.literal(SKILL_IDS.mining),
     attemptDurationTicks: z.literal(10),
     powerCellBoost: z.object({
@@ -85,7 +85,7 @@ export type EffectiveGameBalance = z.infer<typeof balanceSchema>;
 const defaults = balanceSchema.parse({
   progression: { maximumLevel: 99, levelOneToTwoXp: 500, perLevelGrowthBps: 11_000 },
   mining: {
-    actionId: ACTION_IDS.crashSiteMining,
+    actionId: ACTION_IDS.ferriteShaleMining,
     skillId: SKILL_IDS.mining,
     attemptDurationTicks: 10,
     powerCellBoost: { speedMultiplier: 2 },

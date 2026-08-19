@@ -1,7 +1,7 @@
 # Gameplay Foundations
 
 This is the authoritative design record for the server-authoritative foundations
-introduced in issue #16 and the approved Crash Site Mining slice. It defines
+introduced in issue #16 and the approved Ferrite Shale Mining slice. It defines
 contracts and approved values, not unfinished balance values or future activities.
 
 ## Time and actions
@@ -35,12 +35,12 @@ contracts and approved values, not unfinished balance values or future activitie
   derived from total XP and a supplied authoritative threshold source.
 - Every future award must use `grantSkillXp`; activities must not implement XP
   arithmetic or level checks themselves.
-- The initial Mining curve and Crash Site award are approved in the slice below;
+- The initial Mining curve and Ferrite Shale award are approved in the slice below;
   other skills and activities remain deliberately undecided.
 
-## Crash Site Mining slice
+## Ferrite Shale Mining slice
 
-The first playable action is infinite Crash Site Ferrite Shale Mining. Its concrete
+The first playable action is infinite Ferrite Shale Mining at The Jag. Its concrete
 values live only in `game/config/balance.ts` behind `getEffectiveGameBalance()`:
 10 ticks (six seconds) per normal attempt; 15 Mining XP on success; 1 or 2 shale per
 success; 100 g shale units with a 10-unit stack limit; and the approved level-1
@@ -141,7 +141,7 @@ Structural Alloy, Salvage Cutter, and Power Cell. These identities establish no
 weights, capacities, charge behavior, rewards, starter loadout, or action beyond
 their approved slice.
 
-Mining extracts raw material from the infinite Crash Site deposit. Refining
+Mining extracts raw material from the infinite Ferrite Shale seam at The Jag. Refining
 (issue #81) consumes 2 Ferrite Shale per 7-tick attempt at the Abandoned
 Processing Yard, producing 1 Refined Ferrite (150 g / stack 5, 15 XP) on
 success or 1 Slag (150 g / stack 10, 3 XP) otherwise, with a 40%→100% L1–20
@@ -185,7 +185,7 @@ of war, fuel, hauling, and transportation upgrades build.
   allotment below.
 - **The Long Scramble** (`the_long_scramble`, `{q:-1,r:2}`): intentionally barren
   traversal tile southwest of Crash Site. No local activity or resource; its lack
-  of activity is intentional and it has no fake Offline status.
+  of activity is intentional, as is Crash Site's, and neither has a fake Offline status.
 - **The Jag** (`the_jag`, `{q:-2,r:3}`): Ferrite Shale Mining location (Mining moved
   out of Crash Site). Mining is available only here while stationary.
 
@@ -387,8 +387,8 @@ server-side even against a stale or manipulated client.
 - Mining cannot start at Crash Site, The Long Scramble, the Processing Yard, the
   Power Annex, or while Travel is active. The server rejects those starts; hiding
   UI is insufficient.
-- The Long Scramble has no local gameplay activity or resource; it is not shown
-  as Offline and has no filler controls.
+- Crash Site and The Long Scramble have no local gameplay activity or resource;
+  neither is shown as Offline or given filler controls.
 - Conflicting state-changing commands are rejected clearly and server-side.
 - Inventory and Equipment remain inspectable during Travel.
 

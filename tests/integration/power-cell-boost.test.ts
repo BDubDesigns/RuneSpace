@@ -119,7 +119,7 @@ suite("Issue #24 Salvage Cutter Power Cell boosting (real PostgreSQL)", () => {
     const startedAt = new Date("2026-06-01T00:00:00.000Z");
     const dueAt = new Date("2026-06-01T00:00:06.000Z");
     await provision(userId, character.id, startedAt);
-    await mining.startCrashSiteMining(userId, character.id, startedAt, {
+    await mining.startFerriteShaleMining(userId, character.id, startedAt, {
       nextBasisPoints: () => 0,
       nextUnit: () => 0,
     });
@@ -140,7 +140,7 @@ suite("Issue #24 Salvage Cutter Power Cell boosting (real PostgreSQL)", () => {
     const startedAt = new Date("2026-06-01T01:00:00.000Z");
     const partialAt = new Date("2026-06-01T01:00:05.400Z");
     await provision(userId, character.id, startedAt);
-    await mining.startCrashSiteMining(userId, character.id, startedAt);
+    await mining.startFerriteShaleMining(userId, character.id, startedAt);
     await addCells(character.id);
 
     const loaded = await mining.loadSalvageCutterPowerCell(userId, character.id, partialAt);
@@ -187,7 +187,7 @@ suite("Issue #24 Salvage Cutter Power Cell boosting (real PostgreSQL)", () => {
     const startedAt = new Date("2026-06-03T00:00:00.000Z");
     const now = new Date("2026-06-03T00:00:36.000Z");
     await provision(userId, character.id, startedAt);
-    await mining.startCrashSiteMining(userId, character.id, startedAt);
+    await mining.startFerriteShaleMining(userId, character.id, startedAt);
     await addCells(character.id);
     await mining.loadSalvageCutterPowerCell(userId, character.id, startedAt);
     const cutterRow = await cutter(character.id);
@@ -253,7 +253,7 @@ suite("Issue #24 Salvage Cutter Power Cell boosting (real PostgreSQL)", () => {
     await provision(userId, character.id, startedAt, random);
     await addCells(character.id);
     await mining.loadSalvageCutterPowerCell(userId, character.id, startedAt, random);
-    await mining.startCrashSiteMining(userId, character.id, startedAt, random);
+    await mining.startFerriteShaleMining(userId, character.id, startedAt, random);
 
     const resolved = await mining.getMiningGameplayState(userId, character.id, resolvedAt, random);
     expect(resolved.run).toMatchObject({ attempts: 1, successes: 1, failures: 0 });
@@ -287,7 +287,7 @@ suite("Issue #24 Salvage Cutter Power Cell boosting (real PostgreSQL)", () => {
     await provision(userId, character.id, startedAt, alwaysFail);
     await addCells(character.id);
     await mining.loadSalvageCutterPowerCell(userId, character.id, startedAt, alwaysFail);
-    await mining.startCrashSiteMining(userId, character.id, startedAt, alwaysFail);
+    await mining.startFerriteShaleMining(userId, character.id, startedAt, alwaysFail);
 
     const resolved = await mining.getMiningGameplayState(
       userId,
@@ -323,7 +323,7 @@ suite("Issue #24 Salvage Cutter Power Cell boosting (real PostgreSQL)", () => {
     await provision(userId, character.id, startedAt, random);
     await addCells(character.id);
     await mining.loadSalvageCutterPowerCell(userId, character.id, startedAt, random);
-    await mining.startCrashSiteMining(userId, character.id, startedAt, random);
+    await mining.startFerriteShaleMining(userId, character.id, startedAt, random);
     const cutterId = (await cutter(character.id)).id;
 
     // Force a persistence failure after the resolver has already written the
@@ -431,10 +431,10 @@ suite("Issue #24 Salvage Cutter Power Cell boosting (real PostgreSQL)", () => {
     await addCells(character.id);
     await mining.loadSalvageCutterPowerCell(userId, character.id, startedAt, random);
 
-    await mining.startCrashSiteMining(userId, character.id, startedAt, random);
+    await mining.startFerriteShaleMining(userId, character.id, startedAt, random);
     expect((await cutter(character.id)).currentCharge).toBe(10);
     await mining.stopMining(userId, character.id, startedAt, random);
-    await mining.startCrashSiteMining(userId, character.id, startedAt, random);
+    await mining.startFerriteShaleMining(userId, character.id, startedAt, random);
     expect((await cutter(character.id)).currentCharge).toBe(10);
 
     // Round trip from The Jag via Long Scramble -> Crash -> Long Scramble -> Jag.

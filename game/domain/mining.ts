@@ -112,7 +112,7 @@ export function miningPreflightStopReason<Id>(
     : "inventory_slots_full";
 }
 
-export function resolveCrashSiteMining<Id>(input: {
+export function resolveFerriteShaleMining<Id>(input: {
   elapsedTicks: number;
   snapshot: MiningSnapshot<Id>;
   balance: EffectiveGameBalance;

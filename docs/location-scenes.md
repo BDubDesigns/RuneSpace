@@ -55,7 +55,7 @@ Cropping is via `object-cover` + `object-position: focal.x% focal.y%`. The scene
 All chrome is HTML/CSS rendered over/around the image. All scrim/hairline/plate translucency values are owned by `app/globals.css` (`--rs-scene-*` / `--rs-plate-*` tokens — see `docs/design-system.md`'s ownership rule) and consumed by `features/location-scene/LocationSceneHeader.tsx`; the component holds no literal `rgb(...)` or `rgba(...)` color recipes.
 
 - **Upper-left** — current-location eyebrow (`CRASH SITE` / `ABANDONED PROCESSING YARD` / `DEWHAT? EMERGENCY POWER ANNEX`) as a `rs-map-plate--state` smoked plaque driven by `--rs-scene-plate-top` / `--rs-scene-plate-bottom` (50% translucency so scene shows through), fitted.
-- **Bottom-right** — contextual pill only where meaningful (`FERRITE SHALE` at Crash Site, `POWER CELL` at the Annex), `bg-[var(--rs-surface-panel)]` solid to match the character nameplate, yellow/orange `border-[var(--rs-accent-mining)]`, square, bottom-anchored so long eyebrows don't clip.
+- **Bottom-right** — contextual pill only where meaningful (`FERRITE SHALE` at The Jag, `POWER CELL` at the Annex), `bg-[var(--rs-surface-panel)]` solid to match the character nameplate, yellow/orange `border-[var(--rs-accent-mining)]`, square, bottom-anchored so long eyebrows don't clip.
 - **Middle band** — the scene photograph itself with a vertical scrim `from-[var(--rs-scene-scrim-top)]` → `to-[var(--rs-scene-scrim-bottom)]` (`0.22→0.72`) and `aria-hidden` decorative layers.
 - **Lower-left over image** — character name (`star drifter` etc.) as an opaque `bg-[var(--rs-surface-panel)]` plate clipped with a tent angle (`clip-path: polygon(0 0, calc(100% - 14px) 0, 100% 100%, 0 100%)`), `truncate` on overflow.
 - **Framing** — thin structural `border-b border-[var(--rs-border-structural)]`, cyan top hairline `bg-[var(--rs-scene-hairline-cyan)]` + amber bottom `bg-[var(--rs-scene-hairline-amber)]` (each a `linear-gradient` token). No full-bleed hero card, no landing-page treatment, no parallax/particles/video.
@@ -66,7 +66,7 @@ All chrome is HTML/CSS rendered over/around the image. All scrim/hairline/plate 
 The header is inside the existing `MiningConsole` `Panel tone="raised"` (`!p-0 overflow-hidden` so the scene's top edge aligns with the panel's bevel). The rest of the panel is `p-5`:
 
 - During **stationary** play, the header is visible and the Activity/Mining controls flow directly below it. `MiningConsole` keeps `showMiningActivity` gating, success-chance display, start/stop/refresh, latest-attempt feedback, and recovery — none are removed or gated by artwork.
-- **Processing Yard** receives scene art while remaining clearly offline (`Mining is only available at the Crash Site…` feedback stays directly below the header).
+- **Processing Yard** receives scene art while exposing its stationary Refining console; Mining controls remain available only at The Jag.
 - The **Annex** scene coexists with the existing `PowerAnnexClaimPanel` (which is rendered below `MiningConsole`, not inside it — both are visible together at the Annex).
 - No horizontal `overflow-x`, no fixed-footer collision, no push of primary actions excessively below the fold at 390px.
 

@@ -41,7 +41,7 @@ The decorative asset must conform to these zones; UI is never moved to accommoda
   `data-map-population` and `data-map-status` as same-family smoked plaques. All plates share `rs-map-plate`:
   dark navy/charcoal `linear-gradient` (top→bottom `0.74→0.62`), `clip-path` chamfer (`var(--rs-bevel-small)`),
   outer + inner inset border, faint top highlight/bottom shadow. Not flat UI boxes. Overlap is minimal because the plates
-  sit low and the art sits centered in the spacer-defined band. The current Crash Site tile (YOU ARE HERE + N here + MINING) is the stress case.
+  sit low and the art sits centered in the spacer-defined band. The current The Jag tile (YOU ARE HERE + N here + MINING) is the stress case.
 - **Routes:** `undirectedRoutes` (`stroke accent-secondary`, `strokeWidth=3`) and `data-route-progress`
   (`stroke accent-arcane`, `3.5`) drawn at same z-order / widths as before.
 

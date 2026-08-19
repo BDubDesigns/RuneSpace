@@ -35,6 +35,14 @@ const WALK_SECONDS = Math.round(
   (getEffectiveGameBalance().travel.adjacentWalkDurationTicks * GAME_TICK_MS) / 1000,
 );
 
+const MAP_STATUS_LABEL_BY_LOCATION: Partial<
+  Record<(typeof LOCATION_IDS)[keyof typeof LOCATION_IDS], string>
+> = {
+  [LOCATION_IDS.emergencyPowerAnnex]: "Daily cells",
+  [LOCATION_IDS.abandonedProcessingYard]: "Refining",
+  [LOCATION_IDS.theJag]: "Mining",
+};
+
 /** Flat-top hex vertex points as an SVG polygon string. */
 function hexPoints(cx: number, cy: number, w: number): string {
   const h = w * (Math.sqrt(3) / 2);
@@ -90,7 +98,7 @@ type HexButtonProps = {
   locationId: string;
   name: string;
   accessibleName: string;
-  statusLabel: string;
+  statusLabel?: string;
   description: string;
   selected: boolean;
   current: boolean;
@@ -192,13 +200,15 @@ function HexButton({
             {populationCount} here
           </span>
         ) : null}
-        <span
-          aria-hidden="true"
-          className="rs-map-plate rs-map-plate--status relative z-10 inline-flex max-w-[68%] items-center justify-center truncate px-1.5 py-0.5 font-display text-[8px] uppercase leading-none tracking-[0.08em]"
-          data-map-status
-        >
-          {statusLabel}
-        </span>
+        {statusLabel ? (
+          <span
+            aria-hidden="true"
+            className="rs-map-plate rs-map-plate--status relative z-10 inline-flex max-w-[68%] items-center justify-center truncate px-1.5 py-0.5 font-display text-[8px] uppercase leading-none tracking-[0.08em]"
+            data-map-status
+          >
+            {statusLabel}
+          </span>
+        ) : null}
       </span>
     </button>
   );
@@ -804,15 +814,10 @@ export function LocalMapPanel() {
   // new tile while the replacement read is in flight.
   const populationMatchesLocation = populationLocationId === currentLocationId;
 
-  // Helper: determine the status label for a location tile.
-  function tileStatusLabel(locationId: string): string {
-    const loc = getLocation(locationId);
-    if (!loc) return "";
-    if (locationId === LOCATION_IDS.emergencyPowerAnnex) return "Daily cells";
-    if (locationId === LOCATION_IDS.abandonedProcessingYard) return "Refining";
-    if (locationId === LOCATION_IDS.theJag) return "Mining";
-    if (locationId === LOCATION_IDS.theLongScramble) return "";
-    return loc.availableActionIds.length > 0 ? "Mining" : "Offline";
+  function tileStatusLabel(
+    locationId: (typeof LOCATION_IDS)[keyof typeof LOCATION_IDS],
+  ): string | undefined {
+    return MAP_STATUS_LABEL_BY_LOCATION[locationId];
   }
 
   // Button positions: each button is positioned to overlay its hex in the SVG.
@@ -853,7 +858,7 @@ export function LocalMapPanel() {
             confirm to walk there.
           </p>
 
-          {/* Three flat-top hexes form a triangle. The SVG renders plated chassis,
+          {/* Five flat-top hexes form the local map. The SVG renders plated chassis,
           decorative identifiers, and all approved routes; native buttons overlay
           each hex for semantics and text labels. */}
           <div className="-mx-1 overflow-auto px-1 pb-1">
@@ -983,7 +988,7 @@ export function LocalMapPanel() {
                 <p className="mt-2 text-xs text-[color:var(--rs-text-secondary)]">
                   {selectedLocation?.availableActionIds.includes(ACTION_IDS.refining)
                     ? "Refining is available here — feed Ferrite Shale to produce Refined Ferrite or Slag."
-                    : selectedLocation?.availableActionIds.includes(ACTION_IDS.crashSiteMining)
+                    : selectedLocation?.availableActionIds.includes(ACTION_IDS.ferriteShaleMining)
                       ? "Mining is available here."
                       : selectedLocation?.id === LOCATION_IDS.emergencyPowerAnnex
                         ? "Claim five Power Cells here once per Pacific reset day."

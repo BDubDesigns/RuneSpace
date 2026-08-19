@@ -112,7 +112,7 @@ const locationDefinitions = [
     description:
       "An exposed ferrite seam carved into the hardpan by whoever got here first. Calling it a mine would be generous, but the shale cuts just fine.",
     adjacentLocationIds: [LOCATION_IDS.theLongScramble],
-    availableActionIds: [ACTION_IDS.crashSiteMining],
+    availableActionIds: [ACTION_IDS.ferriteShaleMining],
     dormantActivities: [],
     presentation: {
       mapIconKey: "the_jag" as const,

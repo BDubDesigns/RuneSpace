@@ -358,7 +358,7 @@ test("automatically resolves Mining and starts the next authoritative timer", as
   const boundaryStart = new Date(Date.now() - 4_500);
   await db.insert(activeActions).values({
     characterId,
-    actionId: ACTION_IDS.crashSiteMining,
+    actionId: ACTION_IDS.ferriteShaleMining,
     startedAt: boundaryStart,
     resolvedThroughAt: boundaryStart,
   });
@@ -394,7 +394,7 @@ test("automatically resolves a boosted Mining attempt and decrements charge once
   const boundaryStart = new Date(Date.now() - 2_400);
   await db.insert(activeActions).values({
     characterId,
-    actionId: ACTION_IDS.crashSiteMining,
+    actionId: ACTION_IDS.ferriteShaleMining,
     startedAt: boundaryStart,
     resolvedThroughAt: boundaryStart,
   });
@@ -433,7 +433,7 @@ test("retries an early unchanged Mining boundary without duplicating the attempt
   const boundaryStart = new Date(Date.now() - 4_500);
   await db.insert(activeActions).values({
     characterId,
-    actionId: ACTION_IDS.crashSiteMining,
+    actionId: ACTION_IDS.ferriteShaleMining,
     startedAt: boundaryStart,
     resolvedThroughAt: boundaryStart,
   });

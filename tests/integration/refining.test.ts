@@ -680,7 +680,7 @@ suite("issue #81 Refining persistence and concurrency (real PostgreSQL)", () => 
       .update(rune.characters)
       .set({ currentLocationId: LOCATION_IDS.theJag })
       .where(eq(rune.characters.id, character.id));
-    await mining.startCrashSiteMining(userId, character.id, atJag, {
+    await mining.startFerriteShaleMining(userId, character.id, atJag, {
       nextBasisPoints: () => 0,
       nextUnit: () => 0,
     });
@@ -695,7 +695,7 @@ suite("issue #81 Refining persistence and concurrency (real PostgreSQL)", () => 
         nextUnit: () => 0,
       },
     );
-    expect(afterStop.stop?.actionId).toBe(ACTION_IDS.crashSiteMining);
+    expect(afterStop.stop?.actionId).toBe(ACTION_IDS.ferriteShaleMining);
     // Travel from The Jag to Processing Yard requires via Long Scramble -> Crash -> Yard
     await mining.beginTravel(
       userId,
@@ -756,7 +756,7 @@ suite("issue #81 Refining persistence and concurrency (real PostgreSQL)", () => 
     );
     expect(arrived.location.currentLocationId).toBe(LOCATION_IDS.abandonedProcessingYard);
     // Mining stop remains tagged as a mining stop — refining presentation must ignore it
-    expect(arrived.stop?.actionId).toBe(ACTION_IDS.crashSiteMining);
+    expect(arrived.stop?.actionId).toBe(ACTION_IDS.ferriteShaleMining);
     expect(arrived.stop?.reason).not.toBe("insufficient_ferrite_shale");
     // Prove refining UI helper does not interpret it: map mining reason through mining helper, not refining
     const miningReason = arrived.stop?.reason;
@@ -782,7 +782,7 @@ suite("issue #81 Refining persistence and concurrency (real PostgreSQL)", () => 
       },
     );
     // Still the mining-tagged stop — refining ignore check
-    expect(atYard.stop?.actionId).toBe(ACTION_IDS.crashSiteMining);
+    expect(atYard.stop?.actionId).toBe(ACTION_IDS.ferriteShaleMining);
   });
 
   it("Refining stop does not leak into Mining presentation", async () => {
@@ -837,6 +837,6 @@ suite("issue #81 Refining persistence and concurrency (real PostgreSQL)", () => 
     expect(atCrash.stop?.reason).toBe("action_replaced");
     // Mining presentation must ignore refining-tagged stops — prove via actionId discrimination.
     // (action_replaced is shared by both activities, so reason alone cannot prove non-leak.)
-    expect(atCrash.stop?.actionId).not.toBe(ACTION_IDS.crashSiteMining);
+    expect(atCrash.stop?.actionId).not.toBe(ACTION_IDS.ferriteShaleMining);
   });
 });

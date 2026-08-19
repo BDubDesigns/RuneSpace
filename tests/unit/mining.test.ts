@@ -6,7 +6,7 @@ import {
   boostedMiningAttemptDurationTicks,
   miningSuccessChanceBps,
   miningNearMissBasisPoints,
-  resolveCrashSiteMining,
+  resolveFerriteShaleMining,
   type MiningRandom,
 } from "@/game/domain/mining";
 import { levelFromXp } from "@/game/domain/progression";
@@ -27,7 +27,7 @@ const ready = {
   massAvailableGrams: 35_000,
 };
 
-describe("approved Crash Site Mining balance", () => {
+describe("approved Ferrite Shale Mining balance", () => {
   it("derives recursive requirements and cumulative thresholds through level 99", () => {
     const thresholds = miningLevelThresholds();
     expect(thresholds).toHaveLength(99);
@@ -62,20 +62,20 @@ describe("inventory stack presentation", () => {
   });
 });
 
-describe("Crash Site Ferrite Shale resolution", () => {
+describe("Ferrite Shale Mining resolution", () => {
   it("takes ten ticks and preserves partial attempt progress", () => {
     expect(
-      resolveCrashSiteMining({ elapsedTicks: 9, snapshot: ready, balance, random: rolls([]) })
+      resolveFerriteShaleMining({ elapsedTicks: 9, snapshot: ready, balance, random: rolls([]) })
         .consumedTicks,
     ).toBe(0);
     expect(
-      resolveCrashSiteMining({ elapsedTicks: 11, snapshot: ready, balance, random: rolls([0]) })
+      resolveFerriteShaleMining({ elapsedTicks: 11, snapshot: ready, balance, random: rolls([0]) })
         .consumedTicks,
     ).toBe(10);
   });
 
   it("uses deterministic success and failure rolls", () => {
-    const success = resolveCrashSiteMining({
+    const success = resolveFerriteShaleMining({
       elapsedTicks: 10,
       snapshot: ready,
       balance,
@@ -83,7 +83,7 @@ describe("Crash Site Ferrite Shale resolution", () => {
     });
     expect(success).toMatchObject({ successes: 1, failures: 0, awardedXp: 15 });
     expect(success.createdStacks).toEqual([{ itemId: ITEM_IDS.ferriteShale, quantity: 1 }]);
-    const failure = resolveCrashSiteMining({
+    const failure = resolveFerriteShaleMining({
       elapsedTicks: 10,
       snapshot: ready,
       balance,
@@ -119,7 +119,7 @@ describe("Crash Site Ferrite Shale resolution", () => {
   });
 
   it("retains one immutable outcome per resolved attempt in chronological order", () => {
-    const outcome = resolveCrashSiteMining({
+    const outcome = resolveFerriteShaleMining({
       elapsedTicks: 30,
       snapshot: ready,
       balance,
@@ -170,13 +170,13 @@ describe("Crash Site Ferrite Shale resolution", () => {
   });
 
   it("rolls one or two shale equally and awards the same XP", () => {
-    const one = resolveCrashSiteMining({
+    const one = resolveFerriteShaleMining({
       elapsedTicks: 10,
       snapshot: ready,
       balance,
       random: rolls([0], [0.49]),
     });
-    const two = resolveCrashSiteMining({
+    const two = resolveFerriteShaleMining({
       elapsedTicks: 10,
       snapshot: ready,
       balance,
@@ -189,7 +189,7 @@ describe("Crash Site Ferrite Shale resolution", () => {
   });
 
   it("fills a partial stack before opening another slot", () => {
-    const outcome = resolveCrashSiteMining({
+    const outcome = resolveFerriteShaleMining({
       elapsedTicks: 10,
       snapshot: {
         ...ready,
@@ -204,7 +204,7 @@ describe("Crash Site Ferrite Shale resolution", () => {
   });
 
   it("keeps created stack output separate after a later capacity stop", () => {
-    const outcome = resolveCrashSiteMining({
+    const outcome = resolveFerriteShaleMining({
       elapsedTicks: 110,
       snapshot: {
         ...ready,
@@ -228,21 +228,21 @@ describe("Crash Site Ferrite Shale resolution", () => {
   });
 
   it("stops before rolling for full slots, mass, or missing tool", () => {
-    const noSlots = resolveCrashSiteMining({
+    const noSlots = resolveFerriteShaleMining({
       elapsedTicks: 10,
       snapshot: { ...ready, slotsAvailable: 0 },
       balance,
       random: rolls([0]),
     });
     expect(noSlots).toMatchObject({ consumedTicks: 0, stopReason: "inventory_slots_full" });
-    const noMass = resolveCrashSiteMining({
+    const noMass = resolveFerriteShaleMining({
       elapsedTicks: 10,
       snapshot: { ...ready, massAvailableGrams: 99 },
       balance,
       random: rolls([0]),
     });
     expect(noMass).toMatchObject({ consumedTicks: 0, stopReason: "carried_mass_capacity_reached" });
-    const noTool = resolveCrashSiteMining({
+    const noTool = resolveFerriteShaleMining({
       elapsedTicks: 10,
       snapshot: { ...ready, hasCompatibleTool: false },
       balance,
@@ -259,13 +259,13 @@ describe("Crash Site Ferrite Shale resolution", () => {
   });
 
   it("consumes one charge for both boosted success and boosted failure", () => {
-    const success = resolveCrashSiteMining({
+    const success = resolveFerriteShaleMining({
       elapsedTicks: 5,
       snapshot: { ...ready, cutterCharge: 2 },
       balance,
       random: rolls([0], [0]),
     });
-    const failure = resolveCrashSiteMining({
+    const failure = resolveFerriteShaleMining({
       elapsedTicks: 5,
       snapshot: { ...ready, cutterCharge: 2 },
       balance,
@@ -288,7 +288,7 @@ describe("Crash Site Ferrite Shale resolution", () => {
   });
 
   it("does not consume charge or cursor ticks when preflight stops resolution", () => {
-    const outcome = resolveCrashSiteMining({
+    const outcome = resolveFerriteShaleMining({
       elapsedTicks: 50,
       snapshot: { ...ready, cutterCharge: 4, slotsAvailable: 0 },
       balance,
@@ -303,7 +303,7 @@ describe("Crash Site Ferrite Shale resolution", () => {
   });
 
   it("crosses the charge depletion boundary using normal duration in one batch", () => {
-    const outcome = resolveCrashSiteMining({
+    const outcome = resolveFerriteShaleMining({
       elapsedTicks: 60,
       snapshot: { ...ready, cutterCharge: 2 },
       balance,
@@ -322,7 +322,7 @@ describe("Crash Site Ferrite Shale resolution", () => {
   });
 
   it("leaves insufficient partial progress for the next actual attempt", () => {
-    const outcome = resolveCrashSiteMining({
+    const outcome = resolveFerriteShaleMining({
       elapsedTicks: 9,
       snapshot: { ...ready, cutterCharge: 1 },
       balance,
@@ -334,13 +334,13 @@ describe("Crash Site Ferrite Shale resolution", () => {
   });
 
   it("keeps chance, yield, and XP unchanged between normal and boosted attempts", () => {
-    const normal = resolveCrashSiteMining({
+    const normal = resolveFerriteShaleMining({
       elapsedTicks: 10,
       snapshot: { ...ready, cutterCharge: 0 },
       balance,
       random: rolls([0], [0.5]),
     });
-    const boosted = resolveCrashSiteMining({
+    const boosted = resolveFerriteShaleMining({
       elapsedTicks: 5,
       snapshot: { ...ready, cutterCharge: 1 },
       balance,

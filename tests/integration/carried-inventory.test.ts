@@ -191,7 +191,7 @@ suite("Issue #57 carried unique items in Inventory (real PostgreSQL)", () => {
     const dueAt = new Date("2026-01-01T00:00:06.000Z");
     await provision(userId, character.id, startedAt);
     const successRandom: MiningRandom = { nextBasisPoints: () => 0, nextUnit: () => 0 };
-    await mining.startCrashSiteMining(userId, character.id, startedAt, successRandom);
+    await mining.startFerriteShaleMining(userId, character.id, startedAt, successRandom);
     const cutter = await cutterInstance(character.id);
     await db
       .update(rune.itemInstances)

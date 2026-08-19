@@ -103,8 +103,8 @@ test("Processing Yard Refining journey — Ferrite and Slag both branches, artwo
   await expect(page.getByText("Refining", { exact: true }).first()).toBeVisible();
   await expect(page.getByText("Refining progression")).toBeVisible();
   await expect(page.getByText(/Success chance: 40\.00%/)).toBeVisible();
-  // Crash Site now shows Offline on its map tile (Mining moved to The Jag), so
-  // check that the activity panel itself is not Offline, not the whole page.
+  // Crash Site has no production-status plate after Mining moved to The Jag, so
+  // check the activity panel rather than treating the whole page as inactive.
   await expect(
     page.getByRole("main").getByText("No production activity", { exact: false }),
   ).toHaveCount(0);

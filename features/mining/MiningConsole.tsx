@@ -172,7 +172,7 @@ export function MiningConsole({ characterName }: { characterName: string }) {
     state,
   } = useMiningPlay();
   const [message, setMessage] = useState<string | undefined>(
-    state.stop?.actionId === ACTION_IDS.crashSiteMining
+    state.stop?.actionId === ACTION_IDS.ferriteShaleMining
       ? miningStopMessage(state.stop.reason as import("@/game/domain/mining").MiningStopReason)
       : undefined,
   );
@@ -187,7 +187,6 @@ export function MiningConsole({ characterName }: { characterName: string }) {
   const active = state.activeAction;
   const inTransit = Boolean(state.travelState);
   const currentLocationId = state.location.currentLocationId;
-  const atCrashSite = currentLocationId === LOCATION_IDS.crashSite;
   const atProcessingYard = currentLocationId === LOCATION_IDS.abandonedProcessingYard;
   const atTheJag = currentLocationId === LOCATION_IDS.theJag;
   const atTheLongScramble = currentLocationId === LOCATION_IDS.theLongScramble;
@@ -215,7 +214,7 @@ export function MiningConsole({ characterName }: { characterName: string }) {
     if (result.state) {
       acceptState(result.state);
       if (result.state.commandError) setMessage(commandErrorMessage(result.state.commandError));
-      else if (result.state.stop?.actionId === ACTION_IDS.crashSiteMining)
+      else if (result.state.stop?.actionId === ACTION_IDS.ferriteShaleMining)
         setMessage(
           miningStopMessage(
             result.state.stop.reason as import("@/game/domain/mining").MiningStopReason,
@@ -447,7 +446,7 @@ export function MiningConsole({ characterName }: { characterName: string }) {
           {showMiningActivity && message ? (
             <Feedback
               tone={
-                state.stop?.actionId === ACTION_IDS.crashSiteMining && !active ? "danger" : "muted"
+                state.stop?.actionId === ACTION_IDS.ferriteShaleMining && !active ? "danger" : "muted"
               }
             >
               {message}

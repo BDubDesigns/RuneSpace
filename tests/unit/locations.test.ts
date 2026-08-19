@@ -61,12 +61,12 @@ describe("issue #47 location content", () => {
 
   it("derives activity availability from authoritative location content", () => {
     // Issue #83: Mining moved from Crash Site to The Jag.
-    expect(isActionAvailableAtLocation(LOCATION_IDS.crashSite, ACTION_IDS.crashSiteMining)).toBe(
+    expect(isActionAvailableAtLocation(LOCATION_IDS.crashSite, ACTION_IDS.ferriteShaleMining)).toBe(
       false,
     );
-    expect(isActionAvailableAtLocation(LOCATION_IDS.theJag, ACTION_IDS.crashSiteMining)).toBe(true);
+    expect(isActionAvailableAtLocation(LOCATION_IDS.theJag, ACTION_IDS.ferriteShaleMining)).toBe(true);
     expect(
-      isActionAvailableAtLocation(LOCATION_IDS.abandonedProcessingYard, ACTION_IDS.crashSiteMining),
+      isActionAvailableAtLocation(LOCATION_IDS.abandonedProcessingYard, ACTION_IDS.ferriteShaleMining),
     ).toBe(false);
     expect(getLocation(LOCATION_IDS.emergencyPowerAnnex)?.availableActionIds).toHaveLength(0);
     expect(getLocation(LOCATION_IDS.theLongScramble)?.availableActionIds).toHaveLength(0);

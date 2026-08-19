@@ -7,7 +7,7 @@ import { createCharacter, changeCharacterPortrait, CharacterError } from "@/serv
 import {
   beginTravel,
   getMiningGameplayState,
-  startCrashSiteMining,
+  startFerriteShaleMining,
   startRefining,
   stopMining,
   stopRefining,
@@ -107,7 +107,7 @@ export async function refreshMiningAction(characterId: string): Promise<MiningAc
 }
 
 export async function startMiningAction(characterId: string): Promise<MiningActionResult> {
-  return runMiningAction(characterId, startCrashSiteMining);
+  return runMiningAction(characterId, startFerriteShaleMining);
 }
 
 export async function stopMiningAction(characterId: string): Promise<MiningActionResult> {

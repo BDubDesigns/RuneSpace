@@ -25,7 +25,7 @@ const itemIds = {
 } as const satisfies Record<string, ContentId>;
 
 export const ACTION_IDS = {
-  crashSiteMining: asContentId("crash_site_ferrite_shale_mining"),
+  ferriteShaleMining: asContentId("crash_site_ferrite_shale_mining"),
   refining: asContentId("processing_yard_refining"),
   travel: asContentId("travel"),
 } as const satisfies Record<string, ContentId>;

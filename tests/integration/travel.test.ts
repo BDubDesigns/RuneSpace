@@ -107,7 +107,7 @@ suite("issue #40 persistent locations and timed travel (real PostgreSQL)", () =>
       .update(rune.characters)
       .set({ currentLocationId: LOCATION_IDS.theJag })
       .where(eq(rune.characters.id, character.id));
-    await mining.startCrashSiteMining(userId, character.id, startedAt, random);
+    await mining.startFerriteShaleMining(userId, character.id, startedAt, random);
 
     const completedAt = new Date("2026-01-01T00:00:06.600Z");
     const traveled = await mining.beginTravel(
@@ -231,7 +231,7 @@ suite("issue #40 persistent locations and timed travel (real PostgreSQL)", () =>
     const startedAt = new Date("2026-01-01T00:00:00.000Z");
     await mining.beginTravel(userId, character.id, LOCATION_IDS.abandonedProcessingYard, startedAt);
 
-    const transitMining = await mining.startCrashSiteMining(
+    const transitMining = await mining.startFerriteShaleMining(
       userId,
       character.id,
       new Date("2026-01-01T00:00:06.000Z"),
@@ -251,7 +251,7 @@ suite("issue #40 persistent locations and timed travel (real PostgreSQL)", () =>
 
     // After arrival at the Processing Yard, Mining still cannot start there.
     await mining.getMiningGameplayState(userId, character.id, new Date("2026-01-01T00:00:24.600Z"));
-    const yardMining = await mining.startCrashSiteMining(
+    const yardMining = await mining.startFerriteShaleMining(
       userId,
       character.id,
       new Date("2026-01-01T00:00:30.000Z"),
@@ -478,7 +478,7 @@ suite("issue #40 persistent locations and timed travel (real PostgreSQL)", () =>
     const now = new Date("2026-01-01T00:00:00.000Z");
     await mining.getMiningGameplayState(userId, character.id, now);
 
-    const atCrash = await mining.startCrashSiteMining(userId, character.id, now);
+    const atCrash = await mining.startFerriteShaleMining(userId, character.id, now);
     expect(atCrash.travelError).toBe("mining_unavailable_here");
 
     await mining.beginTravel(userId, character.id, LOCATION_IDS.theLongScramble, now);
@@ -488,7 +488,7 @@ suite("issue #40 persistent locations and timed travel (real PostgreSQL)", () =>
       new Date("2026-01-01T00:00:24.600Z"),
     );
     expect(atScramble.location.currentLocationId).toBe(LOCATION_IDS.theLongScramble);
-    const scrambleMining = await mining.startCrashSiteMining(
+    const scrambleMining = await mining.startFerriteShaleMining(
       userId,
       character.id,
       new Date("2026-01-01T00:00:24.600Z"),
@@ -507,12 +507,12 @@ suite("issue #40 persistent locations and timed travel (real PostgreSQL)", () =>
       new Date("2026-01-01T00:00:49.200Z"),
     );
     expect(atJag.location.currentLocationId).toBe(LOCATION_IDS.theJag);
-    const jagMining = await mining.startCrashSiteMining(
+    const jagMining = await mining.startFerriteShaleMining(
       userId,
       character.id,
       new Date("2026-01-01T00:00:49.200Z"),
     );
-    expect(jagMining.activeAction?.actionId).toBe(ACTION_IDS.crashSiteMining);
+    expect(jagMining.activeAction?.actionId).toBe(ACTION_IDS.ferriteShaleMining);
     expect(jagMining.travelError).toBeUndefined();
   });
 

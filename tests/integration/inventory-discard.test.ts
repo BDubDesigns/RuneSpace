@@ -301,7 +301,7 @@ suite("Issue #58 authoritative inventory stack discard (real PostgreSQL)", () =>
     const startedAt = new Date("2026-07-02T00:00:00.000Z");
     const dueAt = new Date("2026-07-02T00:00:06.000Z");
     await provision(userId, character.id, startedAt);
-    await mining.startCrashSiteMining(userId, character.id, startedAt, successYield);
+    await mining.startFerriteShaleMining(userId, character.id, startedAt, successYield);
     // The selected stack holds the confirmed quantity; the due successful
     // attempt will add one more shale to the SAME stack.
     const stackId = await addStack(character.id, ITEM_IDS.ferriteShale, 5);
@@ -350,7 +350,7 @@ suite("Issue #58 authoritative inventory stack discard (real PostgreSQL)", () =>
     const startedAt = new Date("2026-07-03T00:00:00.000Z");
     const dueAt = new Date("2026-07-03T00:00:06.000Z");
     await provision(userId, character.id, startedAt);
-    await mining.startCrashSiteMining(userId, character.id, startedAt, successYield);
+    await mining.startFerriteShaleMining(userId, character.id, startedAt, successYield);
     // The discard target is a Power Cell stack: due Mining work never touches
     // it, so the discard inside the failing transaction genuinely succeeds
     // before the forced throw.

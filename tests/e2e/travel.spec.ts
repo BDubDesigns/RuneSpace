@@ -51,7 +51,20 @@ async function expectMapStatusPlatesInsideHex(page: import("@playwright/test").P
     page.locator('[aria-label="Local map"]'),
     "data-map-status",
   );
-  expect(geometry.labels.sort()).toEqual(["", "Daily cells", "Mining", "Offline", "Refining"]);
+  expect(geometry.labels.sort()).toEqual(["Daily cells", "Mining", "Refining"]);
+  await expect(page.locator('[data-map-location="crash_site"] [data-map-status]')).toHaveCount(0);
+  await expect(
+    page.locator('[data-map-location="the_long_scramble"] [data-map-status]'),
+  ).toHaveCount(0);
+  await expect(page.locator('[data-map-location="the_jag"] [data-map-status]')).toHaveText(
+    "Mining",
+  );
+  await expect(
+    page.locator('[data-map-location="abandoned_processing_yard"] [data-map-status]'),
+  ).toHaveText("Refining");
+  await expect(
+    page.locator('[data-map-location="dewhat_emergency_power_annex"] [data-map-status]'),
+  ).toHaveText("Daily cells");
   expect(geometry.allInside).toBe(true);
   expect(geometry.routeOverlaps).toEqual([]);
 }
