@@ -438,13 +438,7 @@ suite("Issue #24 Salvage Cutter Power Cell boosting (real PostgreSQL)", () => {
     expect((await cutter(character.id)).currentCharge).toBe(10);
 
     // Round trip from The Jag via Long Scramble -> Crash -> Long Scramble -> Jag.
-    await mining.beginTravel(
-      userId,
-      character.id,
-      LOCATION_IDS.theLongScramble,
-      startedAt,
-      random,
-    );
+    await mining.beginTravel(userId, character.id, LOCATION_IDS.theLongScramble, startedAt, random);
     const atScramble = await mining.getMiningGameplayState(
       userId,
       character.id,

@@ -105,7 +105,9 @@ test("Processing Yard Refining journey — Ferrite and Slag both branches, artwo
   await expect(page.getByText(/Success chance: 40\.00%/)).toBeVisible();
   // Crash Site now shows Offline on its map tile (Mining moved to The Jag), so
   // check that the activity panel itself is not Offline, not the whole page.
-  await expect(page.getByRole("main").getByText("No production activity", { exact: false })).toHaveCount(0);
+  await expect(
+    page.getByRole("main").getByText("No production activity", { exact: false }),
+  ).toHaveCount(0);
   await expect(page.getByText("Metallurgy", { exact: false })).toHaveCount(0);
 
   // 4. Start Refining works

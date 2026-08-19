@@ -99,7 +99,13 @@ const SELECTED_STATE_LABELS = [
   "Reachable",
   "Visible",
 ] as const;
-const IN_TRANSIT_STATE_LABELS = ["Origin", "Destination", "Reachable", "Reachable", "Visible"] as const;
+const IN_TRANSIT_STATE_LABELS = [
+  "Origin",
+  "Destination",
+  "Reachable",
+  "Reachable",
+  "Visible",
+] as const;
 
 async function expectPowerAnnexRewardLayout(
   page: import("@playwright/test").Page,

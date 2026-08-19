@@ -863,46 +863,46 @@ export function LocalMapPanel() {
               aria-label="Local map"
               style={{ width: `${mapGeometry.width}px`, height: `${mapGeometry.height}px` }}
             >
-            <HexMapSvg
-              geometry={mapGeometry}
-              currentLocationId={currentLocationId}
-              selectedLocationId={selected}
-              inTransit={inTransit}
-              transitProgress={transitProgress}
-              travelOriginLocationId={travel?.originLocationId}
-              travelDestinationLocationId={travel?.destinationLocationId}
-            />
-            {mapGeometry.layouts.map((layout) => {
-              const location = getLocation(layout.locationId);
-              if (!location) return null;
-              const isCurrent = location.id === currentLocationId;
-              return (
-                <HexButton
-                  key={location.id}
-                  locationId={location.id}
-                  name={location.presentation.localMap.label}
-                  accessibleName={location.displayName}
-                  statusLabel={tileStatusLabel(location.id)}
-                  description={location.description}
-                  selected={selected === location.id}
-                  current={isCurrent}
-                  populationCount={isCurrent && populationMatchesLocation ? population.length : 0}
-                  transitRole={
-                    inTransit && travel?.originLocationId === location.id
-                      ? "origin"
-                      : inTransit && travel?.destinationLocationId === location.id
-                        ? "destination"
-                        : undefined
-                  }
-                  disabled={inTransit}
-                  directlyReachable={
-                    areLocationsAdjacent(currentLocationId, location.id) || isCurrent
-                  }
-                  onSelect={() => !inTransit && setSelected(location.id)}
-                  style={hexButtonStyle(location.id)}
-                />
-              );
-            })}
+              <HexMapSvg
+                geometry={mapGeometry}
+                currentLocationId={currentLocationId}
+                selectedLocationId={selected}
+                inTransit={inTransit}
+                transitProgress={transitProgress}
+                travelOriginLocationId={travel?.originLocationId}
+                travelDestinationLocationId={travel?.destinationLocationId}
+              />
+              {mapGeometry.layouts.map((layout) => {
+                const location = getLocation(layout.locationId);
+                if (!location) return null;
+                const isCurrent = location.id === currentLocationId;
+                return (
+                  <HexButton
+                    key={location.id}
+                    locationId={location.id}
+                    name={location.presentation.localMap.label}
+                    accessibleName={location.displayName}
+                    statusLabel={tileStatusLabel(location.id)}
+                    description={location.description}
+                    selected={selected === location.id}
+                    current={isCurrent}
+                    populationCount={isCurrent && populationMatchesLocation ? population.length : 0}
+                    transitRole={
+                      inTransit && travel?.originLocationId === location.id
+                        ? "origin"
+                        : inTransit && travel?.destinationLocationId === location.id
+                          ? "destination"
+                          : undefined
+                    }
+                    disabled={inTransit}
+                    directlyReachable={
+                      areLocationsAdjacent(currentLocationId, location.id) || isCurrent
+                    }
+                    onSelect={() => !inTransit && setSelected(location.id)}
+                    style={hexButtonStyle(location.id)}
+                  />
+                );
+              })}
             </div>
           </div>
 
