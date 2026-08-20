@@ -46,6 +46,25 @@ async function scrollMapIntoView(page: import("@playwright/test").Page) {
   });
 }
 
+async function expectMapScrollAffordances(
+  page: import("@playwright/test").Page,
+  directions: readonly string[],
+) {
+  const markers = page.locator("[data-map-scroll-affordance]");
+  const expected = [...directions].sort();
+  await expect
+    .poll(
+      async () =>
+        (
+          await markers.evaluateAll((elements) =>
+            elements.map((element) => element.getAttribute("data-map-scroll-affordance")),
+          )
+        ).sort(),
+      { message: "map scroll affordances to reflect the latest native scroll metrics" },
+    )
+    .toEqual(expected);
+}
+
 async function expectMapStatusPlatesInsideHex(page: import("@playwright/test").Page) {
   const geometry = await expectElementsInsideHexes(
     page.locator('[aria-label="Local map"]'),
@@ -318,6 +337,84 @@ test("selecting a destination does not begin travel; confirmation is required", 
   await expectMapStateLabelsInsideHex(page, SELECTED_STATE_LABELS);
   await expectMapStatusPlatesInsideHex(page);
   await page.screenshot({ path: "test-results/travel-desktop-selected.png" });
+});
+
+test("directional map affordances follow native scroll truth", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  const viewport = page.locator("[data-map-scroll-viewport]");
+  await expect(viewport).toBeVisible();
+
+  const initialMetrics = await viewport.evaluate((element) => ({
+    clientWidth: element.clientWidth,
+    scrollWidth: element.scrollWidth,
+  }));
+  expect(initialMetrics.scrollWidth).toBeGreaterThan(initialMetrics.clientWidth);
+  await expectMapScrollAffordances(page, ["right"]);
+  await expect(page.locator('[data-map-scroll-affordance="left"]')).toHaveCount(0);
+
+  // The edge layer is decorative only; native scrolling still changes the
+  // viewport and the opposite marker appears at the new edge.
+  await expect(page.locator("[data-map-scroll-affordance-layer]")).toHaveCSS(
+    "pointer-events",
+    "none",
+  );
+  await viewport.evaluate((element) => {
+    element.scrollLeft = element.scrollWidth;
+  });
+  await expectMapScrollAffordances(page, ["left"]);
+
+  // A wide viewport fits the current five-location map, so neither horizontal
+  // direction is advertised after the responsive resize.
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await expectMapScrollAffordances(page, []);
+
+  // Return to the narrow viewport and grow the map canvas. ResizeObserver must
+  // notice the content-size change even though no scroll event fires.
+  await page.setViewportSize({ width: 390, height: 844 });
+  await viewport.evaluate((element) => {
+    element.scrollLeft = element.scrollWidth;
+    const canvas = element.firstElementChild;
+    if (!(canvas instanceof HTMLElement)) throw new Error("Missing local map canvas");
+    canvas.style.width = "800px";
+  });
+  await expectMapScrollAffordances(page, ["left", "right"]);
+
+  // Exercise the same axis-agnostic layer with synthetic future vertical map
+  // growth, then confirm the top marker replaces the bottom marker at max scroll.
+  await viewport.evaluate((element) => {
+    element.style.height = "160px";
+    const canvas = element.firstElementChild;
+    if (!(canvas instanceof HTMLElement)) throw new Error("Missing local map canvas");
+    canvas.style.height = "500px";
+  });
+  await expectMapScrollAffordances(page, ["left", "right", "bottom"]);
+  await viewport.evaluate((element) => {
+    element.scrollTop = element.scrollHeight;
+  });
+  await expectMapScrollAffordances(page, ["left", "right", "top"]);
+
+  // Reduced motion changes only the decoration, not the truth of the visible
+  // directions, and removes the breathing animation entirely.
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await expectMapScrollAffordances(page, ["left", "right", "top"]);
+  await expect(page.locator('[data-map-scroll-affordance="top"]')).toHaveCSS(
+    "animation-name",
+    "none",
+  );
+
+  // A real hex remains activatable while the markers are present.
+  await viewport.evaluate((element) => {
+    element.scrollLeft = 0;
+    element.scrollTop = 0;
+  });
+  await page
+    .getByRole("button", { name: /Crash Site/ })
+    .first()
+    .click();
+  await expect(page.getByRole("button", { name: /Crash Site/ }).first()).toHaveAttribute(
+    "aria-current",
+    "true",
+  );
 });
 
 test("automatically reconciles arrival without refresh or reload", async ({ page }) => {
