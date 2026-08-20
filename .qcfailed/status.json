@@ -2,19 +2,19 @@
   "schemaVersion": 1,
   "projectSlug": "runespace",
   "workState": "active",
-  "currentFocus": "Make the expanded local map clearly communicate when more map exists beyond the visible viewport.",
+  "currentFocus": "Review the optional Travel Scavenge opportunity and weighted reveal reel on mobile and desktop.",
   "latestCompleted": {
-    "summary": "Expanded the local world to five locations with The Long Scramble and The Jag.",
-    "date": "2026-08-19",
-    "url": "https://github.com/BDubDesigns/RuneSpace/pull/90"
+    "summary": "Added directional local-map scroll affordances for narrow and desktop viewports.",
+    "date": "2026-08-20",
+    "url": "https://github.com/BDubDesigns/RuneSpace/pull/93"
   },
-  "nextStep": "Review directional local-map affordances at narrow mobile and desktop widths, then merge the approved draft PR.",
-  "lastMeaningfulUpdate": "2026-08-19",
+  "nextStep": "Review the Issue #88 Scavenge draft PR and its Travel/reveal preview.",
+  "lastMeaningfulUpdate": "2026-08-20",
   "highlights": [
     {
-      "summary": "Expanded the local world to five locations with The Long Scramble and The Jag.",
-      "date": "2026-08-19",
-      "url": "https://github.com/BDubDesigns/RuneSpace/pull/90"
+      "summary": "Added directional local-map scroll affordances for narrow and desktop viewports.",
+      "date": "2026-08-20",
+      "url": "https://github.com/BDubDesigns/RuneSpace/pull/93"
     },
     {
       "summary": "Shipped a shared portrait picker, server-authoritative per-character selection, and public profile presentation.",
@@ -28,8 +28,8 @@
     }
   ],
   "currentChange": {
-    "summary": "Add directional scroll affordances to the expanded local map (#92).",
+    "summary": "Add optional Travel Scavenge windows and a weighted reveal reel (#88).",
     "stage": "review",
-    "pullRequestNumber": 93
+    "pullRequestNumber": 95
   }
 }
