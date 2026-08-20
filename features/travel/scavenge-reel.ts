@@ -16,7 +16,7 @@ export const SCAVENGE_REEL_EXTRA_CYCLE_DURATION_MS = 1_000;
 export const SCAVENGE_REEL_DURATION_VARIATION_MS = 700;
 const SCAVENGE_REEL_MIN_LANDING_FRACTION = 0.05;
 const SCAVENGE_REEL_MAX_LANDING_FRACTION = 0.95;
-const SCAVENGE_REEL_TARGET_CYCLE_OFFSET = 1;
+export const SCAVENGE_REEL_TARGET_CYCLE_OFFSET = 1;
 const SCAVENGE_REEL_MAX_INITIAL_OFFSET_CYCLES = 1;
 
 export type ScavengeReelPanel = ScavengeOutcome & {
@@ -129,8 +129,7 @@ export function createScavengeReelAnimationPlan(input: {
     landingRandom * (SCAVENGE_REEL_MAX_LANDING_FRACTION - SCAVENGE_REEL_MIN_LANDING_FRACTION);
   const initialOffsetPx = Math.round(initialRandom * cycleHeightPx);
   const targetPanelTopPx =
-    initialOffsetPx +
-    completeCycles * cycleHeightPx +
+    (completeCycles + SCAVENGE_REEL_TARGET_CYCLE_OFFSET) * cycleHeightPx +
     targetPanel.topPx +
     targetPanel.heightPx * landingFraction -
     viewportHeightPx / 2;
