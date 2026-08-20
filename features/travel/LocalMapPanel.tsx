@@ -22,6 +22,7 @@ import { useMiningPlay } from "@/features/mining/MiningPlayContext";
 import { COLLAPSE_KEYS, useSyncedCollapse } from "@/features/shared/use-synced-collapse";
 import { CollapseButton } from "@/features/shared/CollapseButton";
 import { CharacterProfilePanel } from "./CharacterProfilePanel";
+import { ScavengeControl } from "./ScavengeControl";
 import {
   buildLocalMapGeometry,
   LOCAL_MAP_GEOMETRY,
@@ -977,26 +978,32 @@ export function LocalMapPanel() {
           />
 
           {inTransit ? (
-            <div className="mt-4 rounded-sm border border-[color:var(--rs-accent-arcane)] bg-[color:var(--rs-accent-arcane-subtle)] p-3">
-              <p className="font-display text-xs uppercase tracking-[0.16em] text-[color:var(--rs-accent-arcane)]">
-                In transit
-              </p>
-              <p className="mt-2 text-sm text-[color:var(--rs-text-primary)]">
-                Walking from <strong>{getLocation(travel!.originLocationId)?.displayName}</strong>{" "}
-                to <strong>{getLocation(travel!.destinationLocationId)?.displayName}</strong>.
-              </p>
-              <div className="mt-3">
-                <StatusMeter
-                  label="Journey progress"
-                  value={transitProgress}
-                  detail={`${transitRemainingSeconds.toFixed(1)}s remaining`}
-                />
+            <>
+              <ScavengeControl />
+              <div
+                className="mt-4 rounded-sm border border-[color:var(--rs-accent-arcane)] bg-[color:var(--rs-accent-arcane-subtle)] p-3"
+                data-travel-progress
+              >
+                <p className="font-display text-xs uppercase tracking-[0.16em] text-[color:var(--rs-accent-arcane)]">
+                  In transit
+                </p>
+                <p className="mt-2 text-sm text-[color:var(--rs-text-primary)]">
+                  Walking from <strong>{getLocation(travel!.originLocationId)?.displayName}</strong>{" "}
+                  to <strong>{getLocation(travel!.destinationLocationId)?.displayName}</strong>.
+                </p>
+                <div className="mt-3">
+                  <StatusMeter
+                    label="Journey progress"
+                    value={transitProgress}
+                    detail={`${transitRemainingSeconds.toFixed(1)}s remaining`}
+                  />
+                </div>
+                <p className="mt-2 text-xs text-[color:var(--rs-text-muted)]">
+                  The active work stopped before departure. No new activity can begin until you
+                  arrive.
+                </p>
               </div>
-              <p className="mt-2 text-xs text-[color:var(--rs-text-muted)]">
-                The active work stopped before departure. No new activity can begin until you
-                arrive.
-              </p>
-            </div>
+            </>
           ) : selectedLocation ? (
             <div className="mt-4 border border-[color:var(--rs-border-structural)] bg-[color:var(--rs-surface-panel)] p-3">
               <p className="font-display text-sm font-bold text-[color:var(--rs-text-primary)]">

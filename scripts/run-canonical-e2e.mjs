@@ -11,13 +11,17 @@ import {
 } from "node:fs";
 import { resolve } from "node:path";
 import {
-  assertLocalDatabaseUrl,
   assertNode22,
   assertPortAvailable,
   createE2eRuntime,
   readPositiveDuration,
   ROOT,
 } from "./e2e-shared.mjs";
+import {
+  createDisposableDatabase,
+  dropDisposableDatabase,
+  resolveDatabaseUrl,
+} from "./disposable-test-db.mjs";
 
 const PORT = 3200;
 const BASE_URL = `http://127.0.0.1:${PORT}`;
@@ -40,8 +44,12 @@ const OVERALL_TIMEOUT_MS = readPositiveDuration(
 const captureScreenshots = process.env.RUNESPACE_E2E_SCREENSHOTS === "true";
 
 // ---- Environment and process helpers ----
-assertLocalDatabaseUrl(process.env.DATABASE_URL);
-assertNode22();
+let runtime;
+let log;
+let fail;
+let disposableDatabase;
+let timeout;
+const signalHandlers = [];
 
 const cleanupPaths = [
   resolve(ROOT, ".playwright/mining-auth-state.json"),
@@ -49,29 +57,6 @@ const cleanupPaths = [
   resolve(ROOT, "playwright-report"),
   resolve(ROOT, "artifacts/e2e-review"),
 ];
-
-const env = {
-  ...process.env,
-  CI: "true",
-  RUNESPACE_E2E_MINING: "true",
-  RUNESPACE_E2E_PLAY_ERROR: "true",
-  RUNESPACE_E2E_TRAVEL: "true",
-  RUNESPACE_POWER_ANNEX_CLOCK_FILE: resolve(ROOT, ".playwright/power-annex-clock"),
-  RUNESPACE_E2E_CANONICAL_HTTP: "true",
-  RUNESPACE_E2E_EXTERNAL_SERVER: "true",
-  RUNESPACE_RELEASE_ID: "local-ci-parity",
-  BETTER_AUTH_SECRET: "canonical-e2e-local-test-secret-not-for-production",
-  PLAYWRIGHT_PORT: String(PORT),
-  PORT: String(PORT),
-};
-
-const runtime = createE2eRuntime({
-  label: "canonical-e2e",
-  port: PORT,
-  env,
-  readyTimeoutMs: READY_TIMEOUT_MS,
-});
-const { log, fail } = runtime;
 
 // ---- Helper: verify and preserve screenshots ----
 const BASE_RESULTS = resolve(ROOT, "test-results");
@@ -156,7 +141,7 @@ function verifyAndCopyScreenshots(required, destDir) {
 }
 
 async function runPlaywright(args, label) {
-  await runtime.runTimedCommand(["test:e2e", ...args], label);
+  await runtime.runTimedCommand(["run", "test:e2e:raw", ...args], label);
 }
 
 async function prepareState() {
@@ -242,29 +227,60 @@ async function runCanonical() {
 }
 
 function onSignal(signal) {
+  if (!runtime) return;
   runtime.abort(`Received ${signal}; canonical E2E teardown requested`);
   void runtime.terminateOwned();
 }
 
-process.once("SIGINT", () => onSignal("SIGINT"));
-process.once("SIGTERM", () => onSignal("SIGTERM"));
-
 async function main() {
-  const startedAt = Date.now();
-  const timeout = setTimeout(() => {
-    runtime.abort(`Canonical E2E exceeded ${OVERALL_TIMEOUT_MS} ms`);
-    void runtime.terminateOwned();
-  }, OVERALL_TIMEOUT_MS);
-
+  assertNode22();
+  const baseDatabaseUrl = resolveDatabaseUrl();
   try {
+    disposableDatabase = await createDisposableDatabase(baseDatabaseUrl, "canonical");
+    const env = {
+      ...process.env,
+      DATABASE_URL: disposableDatabase.databaseUrl,
+      RUNESPACE_DISPOSABLE_TEST_DB: disposableDatabase.databaseName,
+      CI: "true",
+      RUNESPACE_E2E_MINING: "true",
+      RUNESPACE_E2E_PLAY_ERROR: "true",
+      RUNESPACE_E2E_TRAVEL: "true",
+      RUNESPACE_POWER_ANNEX_CLOCK_FILE: resolve(ROOT, ".playwright/power-annex-clock"),
+      RUNESPACE_E2E_CANONICAL_HTTP: "true",
+      RUNESPACE_E2E_EXTERNAL_SERVER: "true",
+      RUNESPACE_RELEASE_ID: "local-ci-parity",
+      BETTER_AUTH_SECRET: "canonical-e2e-local-test-secret-not-for-production",
+      PLAYWRIGHT_PORT: String(PORT),
+      PORT: String(PORT),
+    };
+    runtime = createE2eRuntime({
+      label: "canonical-e2e",
+      port: PORT,
+      env,
+      readyTimeoutMs: READY_TIMEOUT_MS,
+    });
+    ({ log, fail } = runtime);
+    const onSigint = () => onSignal("SIGINT");
+    const onSigterm = () => onSignal("SIGTERM");
+    signalHandlers.push(["SIGINT", onSigint], ["SIGTERM", onSigterm]);
+    process.once("SIGINT", onSigint);
+    process.once("SIGTERM", onSigterm);
+    const startedAt = Date.now();
+    timeout = setTimeout(() => {
+      runtime.abort(`Canonical E2E exceeded ${OVERALL_TIMEOUT_MS} ms`);
+      void runtime.terminateOwned();
+    }, OVERALL_TIMEOUT_MS);
+
     await runCanonical();
     runtime.throwIfAborted();
     log(`All canonical E2E checks passed in ${Date.now() - startedAt} ms.`);
   } finally {
-    clearTimeout(timeout);
-    await runtime.terminateOwned();
-    process.removeAllListeners("SIGINT");
-    process.removeAllListeners("SIGTERM");
+    if (timeout) clearTimeout(timeout);
+    if (runtime) await runtime.terminateOwned();
+    for (const [signal, handler] of signalHandlers) process.removeListener(signal, handler);
+    if (disposableDatabase) {
+      await dropDisposableDatabase(baseDatabaseUrl, disposableDatabase.databaseName);
+    }
   }
 }
 

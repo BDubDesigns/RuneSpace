@@ -60,6 +60,7 @@ function baseState(inventory: MiningGameplayState["inventory"]): MiningGameplayS
     },
     recentResult: { successes: 0, failures: 0, awardedXp: 0 },
     refiningRecentResult: { successes: 0, failures: 0, awardedXp: 0 },
+    scavengeReveals: [],
   };
 }
 

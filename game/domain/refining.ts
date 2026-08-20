@@ -1,5 +1,9 @@
 import type { EffectiveGameBalance } from "@/game/config/balance";
-import { planStackAddition, type StackState } from "@/game/domain/inventory";
+import {
+  planPossibleAwardAdditions,
+  planStackAddition,
+  type StackState,
+} from "@/game/domain/inventory";
 
 export const REFINING_STOP_REASONS = [
   "manually_stopped",
@@ -221,40 +225,31 @@ export function refiningPreflightStopReason<Id>(
   if (!plan) return "insufficient_ferrite_shale";
   const removal = plan.simulated;
 
-  // After removing inputs, either output must fit. If either branch cannot fit, stop before rolling.
-  const refinedPlan = planStackAddition(
+  // After removing inputs, every mutually exclusive output branch must fit
+  // independently before the success roll is requested.
+  const possibleAwards = planPossibleAwardAdditions(
     removal.stacksAfter,
-    refinedItemId,
-    1,
-    balance.items.refinedFerrite.stackLimit,
+    [
+      {
+        itemId: refinedItemId,
+        quantity: 1,
+        stackLimit: balance.items.refinedFerrite.stackLimit,
+        itemWeight: balance.items.refinedFerrite.massGrams,
+      },
+      {
+        itemId: slagItemId,
+        quantity: 1,
+        stackLimit: balance.items.slag.stackLimit,
+        itemWeight: balance.items.slag.massGrams,
+      },
+    ],
     removal.slotsAvailableAfter,
     removal.massAvailableAfter,
-    balance.items.refinedFerrite.massGrams,
   );
-  const slagPlan = planStackAddition(
-    removal.stacksAfter,
-    slagItemId,
-    1,
-    balance.items.slag.stackLimit,
-    removal.slotsAvailableAfter,
-    removal.massAvailableAfter,
-    balance.items.slag.massGrams,
-  );
-  if (refinedPlan.remainingQuantity === 0 && slagPlan.remainingQuantity === 0) return undefined;
-  // Determine which constraint blocks — mass vs slots — for messaging.
-  const massWouldBlock =
-    removal.massAvailableAfter < balance.items.refinedFerrite.massGrams ||
-    removal.massAvailableAfter < balance.items.slag.massGrams;
-  // But more precise: if either plan fails due to mass, report mass.
-  // We infer by checking if mass is the tighter constraint than slots.
-  // If refinedPlan failed due to mass, refinedPlan.remainingQuantity tracks both; we approximate via mass check.
-  // Use planStackAddition weight-limited logic: if availableWeight insufficient.
-  if (massWouldBlock) {
-    // Only report mass if slots would otherwise be sufficient for at least one? Keep mass priority.
-    // Check if massAvailableAfter < min mass required (150). Already true.
-    return "carried_mass_capacity_reached";
-  }
-  return "inventory_slots_full";
+  if (possibleAwards.ok) return undefined;
+  return possibleAwards.reason === "mass"
+    ? "carried_mass_capacity_reached"
+    : "inventory_slots_full";
 }
 
 export function resolveRefining<Id>(input: {

@@ -41,6 +41,17 @@ export const BeginTravelRequestSchema = z.object({
   destinationLocationId: LocationIdSchema,
 });
 
+/** Scavenge supplies only the owned character identity; timing and reward are server-owned. */
+export const ScavengeClaimRequestSchema = z.object({
+  characterId: z.string().uuid(),
+});
+
+/** Acknowledgment is presentation-only and identifies one owned reveal row. */
+export const ScavengeRevealAcknowledgmentRequestSchema = z.object({
+  characterId: z.string().uuid(),
+  revealId: z.string().uuid(),
+});
+
 /** The Power Annex command supplies only the owned character identity. */
 export const ClaimPowerCellsRequestSchema = z.object({
   characterId: z.string().uuid(),

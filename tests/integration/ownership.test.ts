@@ -12,10 +12,9 @@ import { cleanupTestUser, createTestUser } from "./fixtures";
  * These exercise the actual Drizzle tables, the unique indexes, the FK
  * restriction behavior, and the three-slot rule — not mocks. They are skipped
  * automatically when DATABASE_URL is not set (e.g. in the lightweight CI fast
- * checks). Run locally with:
+ * checks). Run locally through the disposable wrapper:
  *
- *   DATABASE_URL=postgres://runespace:runespace@127.0.0.1:5432/runespace \
- *     pnpm test integration/ownership
+ *   pnpm test:integration
  */
 
 const DATABASE_URL = process.env.DATABASE_URL;

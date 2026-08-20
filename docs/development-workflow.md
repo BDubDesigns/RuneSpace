@@ -173,6 +173,14 @@ example Docker Compose credentials. Those credentials apply only to that Docker
 database after it has been created; they must not override a managed host's
 private environment.
 
+The supported local test commands are database-isolated: `pnpm test:integration`
+and `pnpm test:e2e` create a uniquely named disposable sibling database from
+the local `DATABASE_URL`, apply migrations, run the fixtures, and drop the
+database afterward. The canonical and focused E2E runners use the same
+lifecycle. Keep the normal `pnpm dev` server pointed at the persistent `.env`
+database; do not invoke the internal `test:integration:raw` or `test:e2e:raw`
+commands directly.
+
 Run affected focused checks when their required environment is available. For
 example, integration tests require PostgreSQL and browser tests require the
 Playwright browser dependencies and their database setup.

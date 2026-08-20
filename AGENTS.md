@@ -219,7 +219,10 @@ consistent (see `tests/unit/qcfailed-status.test.ts`).
 - Node 22 and pnpm 9.15.4 are pinned (see `package.json` `engines`/`packageManager`).
 - Key scripts: `dev`, `build`, `start`, `lint`, `format`, `format:check`,
   `typecheck`, `test`, `test:integration`, `test:e2e`, `test:e2e:canonical`.
-- `test:e2e` is a quick development command; `test:e2e:canonical` is the
+- `test:integration` and `test:e2e` create and clean up a uniquely named local
+  disposable database before running fixtures; their `*:raw` variants are
+  internal runner targets and must not be pointed at the development database.
+  `test:e2e` is a quick development command; `test:e2e:canonical` is the
   required CI-parity browser command that agents must use to validate E2E
   behavior (and frozen screenshots when requested via
   `RUNESPACE_E2E_SCREENSHOTS=true`).

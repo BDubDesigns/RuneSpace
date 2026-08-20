@@ -1,11 +1,12 @@
 import { randomInt } from "node:crypto";
-import { and, asc, eq } from "drizzle-orm";
+import { and, asc, eq, isNull } from "drizzle-orm";
 import { db } from "@/db";
 import {
   activeActions,
   characterMiningState,
   characterRefiningState,
   characterPowerCellDailyClaims,
+  characterScavengeReveals,
   characterSkillXp,
   characterStarterProvisioning,
   characters,
@@ -32,7 +33,12 @@ import {
   type EquipmentLoadout,
   type EquipmentTarget,
 } from "@/game/domain/equipment";
-import { type StackState, deriveCarriedUniqueItems } from "@/game/domain/inventory";
+import {
+  deriveCarriedUniqueItems,
+  planExactStackAddition,
+  planPossibleAwardAdditions,
+  type StackState,
+} from "@/game/domain/inventory";
 import {
   miningSuccessChanceBps,
   miningPreflightStopReason,
@@ -51,13 +57,27 @@ import {
 } from "@/game/domain/refining";
 import { levelFromXp, skillLevelProgress } from "@/game/domain/progression";
 import { adjacentWalkDurationTicks, planTravel } from "@/game/domain/travel";
+import {
+  resolveScavengeOutcome,
+  resolvedScavengeOutcome,
+  scavengeAwardCapacitySpec,
+  scavengeOpportunityStartTick,
+  scavengePossibleAwardSpecs,
+  scavengeWindowAt,
+} from "@/game/domain/scavenge";
 import { ticksToMilliseconds } from "@/game/domain/timing";
 import {
   type ActionResolver,
   type DatabaseTransaction,
+  withLockedOwnedCharacter,
   withResolvedOwnedCharacter,
 } from "@/server/action-resolution";
-import { createTravelResolver, type TravelResolution, type TravelSnapshot } from "@/server/travel";
+import {
+  createTravelResolver,
+  TravelRuleError,
+  type TravelResolution,
+  type TravelSnapshot,
+} from "@/server/travel";
 import { createRefiningResolver, type PersistedRefiningOutcome } from "@/server/refining";
 import { grantCharacterSkillXp } from "@/server/progression";
 
@@ -258,7 +278,15 @@ export type MiningGameplayState = {
     destinationLocationId: string;
     startedAt: string;
     arrivesAt: string;
+    scavenge: {
+      opportunityStartTick: number;
+      opensAt: string;
+      expiresAt: string;
+      outcome?: ScavengeResolvedOutcome;
+    };
   };
+  /** Committed Scavenge outcomes awaiting presentation acknowledgment. */
+  scavengeReveals: readonly ScavengeReveal[];
   /** Current Pacific-day claim state, only when the character is at the Annex. */
   powerAnnex?: { resetDate: string; claimed: boolean };
   /** Set when a begin-travel command was refused by the authoritative rules. */
@@ -270,6 +298,31 @@ export type MiningGameplayState = {
     | "mining_unavailable_here";
   /** Set when a Start Refining command was refused outside the Processing Yard. */
   refiningError?: "refining_unavailable_here";
+};
+
+export type ScavengeResolvedOutcome = {
+  outcomeId: import("@/game/content/scavenge").ScavengeOutcomeId;
+  label: string;
+  itemId?: string;
+  quantity: number;
+};
+
+export type ScavengeClaimStatus =
+  | { status: "claimed"; outcome: ScavengeResolvedOutcome }
+  | {
+      status: "refused";
+      reason: "no_travel" | "not_open" | "missed" | "already_claimed" | "capacity_blocked";
+      message: string;
+    };
+
+export type ScavengeClaimResult = {
+  state: MiningGameplayState;
+  scavenge: ScavengeClaimStatus;
+};
+
+export type ScavengeReveal = ScavengeResolvedOutcome & {
+  revealId: string;
+  claimedAt: string;
 };
 
 export async function ensureStarterMiningState(
@@ -664,6 +717,7 @@ export async function stateFromTransaction(
     miningStateRows,
     refiningStateRows,
     travelRows,
+    scavengeRevealRows,
     claimRows,
     character,
   ] = await Promise.all([
@@ -690,6 +744,11 @@ export async function stateFromTransaction(
       .from(characterTravelState)
       .where(eq(characterTravelState.characterId, characterId)),
     transaction
+      .select()
+      .from(characterScavengeReveals)
+      .where(eq(characterScavengeReveals.characterId, characterId))
+      .orderBy(asc(characterScavengeReveals.claimedAt), asc(characterScavengeReveals.id)),
+    transaction
       .select({ characterId: characterPowerCellDailyClaims.characterId })
       .from(characterPowerCellDailyClaims)
       .where(
@@ -712,6 +771,17 @@ export async function stateFromTransaction(
   const action = actionRows[0];
   const miningState = miningStateRows[0];
   const travel = travelRows[0];
+  const scavengeReveals: ScavengeReveal[] = scavengeRevealRows.map((row) => {
+    const outcome = resolvedScavengeOutcome({
+      outcomeId: row.outcomeId,
+      quantity: row.awardQuantity,
+    });
+    return {
+      revealId: row.id,
+      claimedAt: row.claimedAt.toISOString(),
+      ...serializeScavengeOutcome(outcome),
+    };
+  });
   const run: MiningRunState = {
     attempts: miningState?.runAttempts ?? 0,
     successes: miningState?.runSuccesses ?? 0,
@@ -741,6 +811,33 @@ export async function stateFromTransaction(
           arrivesAt: new Date(
             action.startedAt.getTime() + ticksToMilliseconds(adjacentWalkDurationTicks()),
           ).toISOString(),
+          scavenge: (() => {
+            const timing = scavengeWindowAt({
+              travelStartedAt: action.startedAt,
+              opportunityStartTick: travel.scavengeOpportunityStartTick,
+              now,
+              claimed: travel.scavengeOutcomeId !== null,
+            });
+            const outcome = travel.scavengeOutcomeId
+              ? resolvedScavengeOutcome({
+                  outcomeId: travel.scavengeOutcomeId,
+                  quantity: travel.scavengeAwardQuantity,
+                })
+              : undefined;
+            return {
+              opportunityStartTick: travel.scavengeOpportunityStartTick,
+              opensAt: timing.opensAt.toISOString(),
+              expiresAt: timing.expiresAt.toISOString(),
+              outcome: outcome
+                ? {
+                    outcomeId: outcome.outcomeId,
+                    label: outcome.label,
+                    itemId: outcome.itemId,
+                    quantity: outcome.quantity,
+                  }
+                : undefined,
+            };
+          })(),
         }
       : undefined;
   const cutterCharge = snapshot.cutterCharge;
@@ -758,6 +855,7 @@ export async function stateFromTransaction(
   return {
     characterId,
     location: { currentLocationId },
+    scavengeReveals,
     travelState,
     powerAnnex:
       currentLocationId === LOCATION_IDS.emergencyPowerAnnex
@@ -1753,6 +1851,7 @@ export async function beginTravel(
         characterId: context.character.id,
         originLocationId: currentLocationId,
         destinationLocationId,
+        scavengeOpportunityStartTick: scavengeOpportunityStartTick(random.nextBasisPoints()),
       });
 
       return stateFromTransaction(
@@ -1770,6 +1869,228 @@ export async function beginTravel(
     },
     now,
   );
+}
+
+function serializeScavengeOutcome(
+  outcome: ReturnType<typeof resolvedScavengeOutcome>,
+): ScavengeResolvedOutcome {
+  return {
+    outcomeId: outcome.outcomeId,
+    label: outcome.label,
+    itemId: outcome.itemId,
+    quantity: outcome.quantity,
+  };
+}
+
+/**
+ * Claim the single optional Scavenge window attached to the active Travel row.
+ * The shared character lock and the Travel row lock make this mutation exactly
+ * once; the client supplies no timing, roll, or presentation values.
+ */
+export async function claimScavenge(
+  userId: string,
+  characterId: string,
+  now = new Date(),
+  random = defaultMiningRandom(),
+): Promise<ScavengeClaimResult> {
+  let miningOutcome: PersistedMiningOutcome | undefined;
+  let refiningOutcome: PersistedRefiningOutcome | undefined;
+  return withResolvedOwnedCharacter(
+    userId,
+    characterId,
+    createPlayResolver(
+      random,
+      (value) => {
+        miningOutcome = value;
+      },
+      undefined,
+      (value) => {
+        refiningOutcome = value;
+      },
+    ),
+    async (transaction, context) => {
+      await ensureStarterMiningState(transaction, context.character.id);
+      const travelRows = await transaction
+        .select()
+        .from(characterTravelState)
+        .where(eq(characterTravelState.characterId, context.character.id))
+        .for("update");
+      const travel = travelRows[0];
+
+      const stateFor = async (scavenge: ScavengeClaimStatus): Promise<ScavengeClaimResult> => ({
+        state: await stateFromTransaction(
+          transaction,
+          context.character.id,
+          recentFrom(miningOutcome),
+          miningOutcome?.stopReason,
+          undefined,
+          undefined,
+          undefined,
+          now,
+          refiningRecentFrom(refiningOutcome),
+          refiningOutcome?.stopReason,
+        ),
+        scavenge,
+      });
+
+      if (context.action?.actionId !== ACTION_IDS.travel || !travel) {
+        return stateFor({
+          status: "refused",
+          reason: "no_travel",
+          message: "Scavenge is only available during an active walk.",
+        });
+      }
+
+      if (travel.scavengeOutcomeId !== null) {
+        return stateFor({
+          status: "refused",
+          reason: "already_claimed",
+          message: "This Travel leg's Scavenge opportunity has already been claimed.",
+        });
+      }
+
+      const balance = getEffectiveGameBalance();
+      const timing = scavengeWindowAt({
+        travelStartedAt: context.action.startedAt,
+        opportunityStartTick: travel.scavengeOpportunityStartTick,
+        now,
+        claimed: false,
+      });
+      if (timing.lifecycle === "waiting") {
+        return stateFor({
+          status: "refused",
+          reason: "not_open",
+          message: "There is nothing to Scavenge yet.",
+        });
+      }
+      const claimGraceExpiresAt = timing.expiresAt.getTime() + balance.travel.scavenge.claimGraceMs;
+      if (timing.lifecycle === "missed" && now.getTime() >= claimGraceExpiresAt) {
+        return stateFor({
+          status: "refused",
+          reason: "missed",
+          message: "The Scavenge window has expired for this Travel leg.",
+        });
+      }
+
+      const snapshot = await loadMiningSnapshot(transaction, context.character.id);
+      const capacity = planPossibleAwardAdditions(
+        snapshot.existingStacks,
+        scavengePossibleAwardSpecs(balance),
+        snapshot.slotsAvailable,
+        snapshot.massAvailableGrams,
+      );
+      if (!capacity.ok) {
+        return stateFor({
+          status: "refused",
+          reason: "capacity_blocked",
+          message:
+            capacity.reason === "mass"
+              ? "Scavenge needs more carried-mass capacity for every possible find."
+              : "Scavenge needs a free inventory slot for every possible find.",
+        });
+      }
+
+      // Capacity is proven for every mutually exclusive maximum branch before
+      // this single authoritative roll is requested.
+      const outcome = resolveScavengeOutcome(random.nextBasisPoints());
+      if (outcome.itemId) {
+        const item = scavengeAwardCapacitySpec(outcome.itemId, outcome.quantity, balance);
+        const plan = planExactStackAddition(
+          snapshot.existingStacks,
+          item.itemId,
+          item.quantity,
+          item.stackLimit,
+          snapshot.slotsAvailable,
+          snapshot.massAvailableGrams,
+          item.itemWeight,
+        );
+        if (!plan.ok) throw new Error("Scavenge award no longer fits after capacity preflight");
+        for (const update of plan.plan.updatedStacks) {
+          await transaction
+            .update(inventoryStacks)
+            .set({ quantity: update.quantity, updatedAt: now })
+            .where(
+              and(
+                eq(inventoryStacks.id, update.id as string),
+                eq(inventoryStacks.characterId, context.character.id),
+              ),
+            );
+        }
+        if (plan.plan.createdStacks.length) {
+          await transaction.insert(inventoryStacks).values(
+            plan.plan.createdStacks.map((created) => ({
+              characterId: context.character.id,
+              itemId: created.itemId,
+              quantity: created.quantity,
+              createdAt: now,
+              updatedAt: now,
+            })),
+          );
+        }
+      }
+
+      await transaction.insert(characterScavengeReveals).values({
+        characterId: context.character.id,
+        outcomeId: outcome.id,
+        awardQuantity: outcome.quantity,
+        claimedAt: now,
+      });
+
+      await transaction
+        .update(characterTravelState)
+        .set({ scavengeOutcomeId: outcome.id, scavengeAwardQuantity: outcome.quantity })
+        .where(
+          and(
+            eq(characterTravelState.characterId, context.character.id),
+            isNull(characterTravelState.scavengeOutcomeId),
+          ),
+        );
+
+      return stateFor({
+        status: "claimed",
+        outcome: serializeScavengeOutcome({ ...outcome, outcomeId: outcome.id }),
+      });
+    },
+    now,
+  );
+}
+
+export type ScavengeAcknowledgmentResult = {
+  state: MiningGameplayState;
+  acknowledged: boolean;
+};
+
+/** Presentation-only, idempotent dismissal of one committed Scavenge reveal. */
+export async function acknowledgeScavengeReveal(
+  userId: string,
+  characterId: string,
+  revealId: string,
+  now = new Date(),
+): Promise<ScavengeAcknowledgmentResult> {
+  return withLockedOwnedCharacter(userId, characterId, async (transaction, context) => {
+    const deleted = await transaction
+      .delete(characterScavengeReveals)
+      .where(
+        and(
+          eq(characterScavengeReveals.id, revealId),
+          eq(characterScavengeReveals.characterId, context.character.id),
+        ),
+      )
+      .returning({ id: characterScavengeReveals.id });
+    return {
+      state: await stateFromTransaction(
+        transaction,
+        context.character.id,
+        { successes: 0, failures: 0, awardedXp: 0 },
+        undefined,
+        undefined,
+        undefined,
+        context.character,
+        now,
+      ),
+      acknowledged: deleted.length > 0,
+    };
+  });
 }
 
 function refiningRecentFrom(

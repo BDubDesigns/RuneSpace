@@ -26,6 +26,22 @@ export type ExactStackAdditionPlan<Id> =
   | { ok: true; plan: StackAdditionPlan<Id> }
   | { ok: false; reason: "slots" | "mass"; missingQuantity: number };
 
+export type PossibleAward = {
+  itemId: ItemId;
+  quantity: number;
+  stackLimit: number;
+  itemWeight: number;
+};
+
+export type PossibleAwardAdditionPlan<Id> =
+  | { ok: true; plans: readonly StackAdditionPlan<Id>[] }
+  | {
+      ok: false;
+      reason: "slots" | "mass";
+      itemId: ItemId;
+      missingQuantity: number;
+    };
+
 export function planStackAddition<Id>(
   existingStacks: readonly StackState<Id>[],
   itemId: ItemId,
@@ -106,6 +122,50 @@ export function planExactStackAddition<Id>(
     ok: false,
     reason: weightLimitedQuantity < quantity ? "mass" : "slots",
     missingQuantity: plan.remainingQuantity,
+  };
+}
+
+/**
+ * Prove that every mutually exclusive exact award can fit independently from
+ * the same inventory snapshot. This deliberately does not apply one branch's
+ * hypothetical stack changes before planning the next branch.
+ */
+export function planPossibleAwardAdditions<Id>(
+  existingStacks: readonly StackState<Id>[],
+  awards: readonly PossibleAward[],
+  availableSlots: number,
+  availableWeight: number,
+): PossibleAwardAdditionPlan<Id> {
+  const plans: StackAdditionPlan<Id>[] = [];
+  const failures: Array<{
+    award: PossibleAward;
+    result: Extract<ExactStackAdditionPlan<Id>, { ok: false }>;
+  }> = [];
+
+  for (const award of awards) {
+    const result = planExactStackAddition(
+      existingStacks,
+      award.itemId,
+      award.quantity,
+      award.stackLimit,
+      availableSlots,
+      availableWeight,
+      award.itemWeight,
+    );
+    if (result.ok) plans.push(result.plan);
+    else failures.push({ award, result });
+  }
+
+  if (failures.length === 0) return { ok: true, plans };
+
+  // Preserve the most actionable capacity classification when different
+  // mutually exclusive branches fail for different reasons.
+  const failure = failures.find(({ result }) => result.reason === "mass") ?? failures[0]!;
+  return {
+    ok: false,
+    reason: failure.result.reason,
+    itemId: failure.award.itemId,
+    missingQuantity: failure.result.missingQuantity,
   };
 }
 

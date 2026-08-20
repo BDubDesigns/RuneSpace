@@ -81,6 +81,14 @@ small number of critical mobile player journeys.
     server those runners own, including canonical execution in GitHub Actions;
     it is never set for the ordinary CI build job, for previews, or for
     production.
+- Database isolation is automatic for the supported test entry points. The
+  `pnpm test:integration`, `pnpm test:e2e`, `pnpm test:e2e:focused`, and
+  `pnpm test:e2e:canonical` commands derive a uniquely named local disposable
+  database from the configured PostgreSQL server, apply migrations there, run
+  the command, and force-drop that database in cleanup. They never use the
+  persistent development database for fixtures. The `*:raw` scripts are
+  internal runner targets and refuse to run unless the disposable database
+  marker matches the selected database name.
 - Agents may not report browser or CI parity as passing unless the canonical
   command actually passed. When a change adds or touches E2E specs, run the
   new/targeted spec(s) first in isolation and **then** the full

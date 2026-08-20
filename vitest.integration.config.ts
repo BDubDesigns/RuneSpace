@@ -4,10 +4,9 @@ import { fileURLToPath } from "node:url";
 /**
  * Integration test config — runs real-PostgreSQL ownership and gameplay tests
  * in `tests/integration`. They run in the dedicated CI database job and can run
- * locally against a live database:
+ * locally through the disposable database wrapper:
  *
- *   DATABASE_URL=postgres://runespace:runespace@127.0.0.1:5432/runespace \
- *     pnpm test:integration
+ *   pnpm test:integration
  */
 
 export default defineConfig({
@@ -15,6 +14,7 @@ export default defineConfig({
     environment: "node",
     include: ["tests/integration/**/*.test.ts"],
     globals: true,
+    setupFiles: ["tests/integration/setup.ts"],
   },
   resolve: {
     alias: {

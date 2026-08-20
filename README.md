@@ -82,15 +82,16 @@ See `.env.example`. Validated at startup by `server/env.ts` (Zod).
 | `pnpm format:check`| Prettier check                       |
 | `pnpm typecheck`   | `tsc --noEmit` (strict)              |
 | `pnpm test`        | Vitest unit tests                    |
-| `pnpm test:integration` | Vitest PostgreSQL integration tests |
+| `pnpm test:integration` | Disposable PostgreSQL integration tests |
 | `pnpm test:e2e`    | Playwright browser tests (local)     |
 
 ## Testing
 
 - **Unit:** `pnpm test` (Vitest, pure domain/schema logic — fast, no DOM).
-- **Integration:** `pnpm test:integration` (Vitest against PostgreSQL; apply
-  committed migrations first).
-- **Browser:** `pnpm test:e2e` (Playwright, focused mobile journeys). CI runs the
+- **Integration:** `pnpm test:integration` (Vitest against a fresh disposable
+  PostgreSQL database; migrations and cleanup are automatic).
+- **Browser:** `pnpm test:e2e` (Playwright, focused mobile journeys, using a
+  disposable database). CI runs the
   canonical E2E browser-journey job (Mining, Overlay, Travel, and the repeated
   Mining play-boundary check) via `pnpm test:e2e:canonical`; see
   `docs/testing-strategy.md`.
