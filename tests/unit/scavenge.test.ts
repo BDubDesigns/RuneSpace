@@ -18,6 +18,7 @@ import {
   SCAVENGE_REEL_DURATION_VARIATION_MS,
   SCAVENGE_REEL_EXTRA_CYCLE_DURATION_MS,
   SCAVENGE_REEL_MIN_DURATION_MS,
+  SCAVENGE_REEL_TARGET_CYCLE_OFFSET,
   SCAVENGE_REEL_VIEWPORT_HEIGHT_PX,
   scavengeReelRenderedStripHeight,
   scavengeReelPanels,
@@ -106,12 +107,34 @@ describe("issue #88 weighted vertical reel", () => {
       expect(plan.landingFraction).toBeLessThanOrEqual(0.95);
       expect(plan.landingFraction).toBeGreaterThanOrEqual(0.05);
       expect(
-        plan.initialOffsetPx +
-          plan.completeCycles * SCAVENGE_REEL_CYCLE_HEIGHT_PX +
+        (plan.completeCycles + SCAVENGE_REEL_TARGET_CYCLE_OFFSET) * SCAVENGE_REEL_CYCLE_HEIGHT_PX +
           (panel?.topPx ?? 0) +
           (panel?.heightPx ?? 0) * plan.landingFraction -
           plan.destinationOffsetPx,
       ).toBeCloseTo(SCAVENGE_REEL_VIEWPORT_HEIGHT_PX / 2, 10);
+    }
+  });
+
+  it("keeps the panel under the pointer when the starting offset is randomized", () => {
+    const panels = scavengeReelPanels();
+    for (const outcome of SCAVENGE_OUTCOMES) {
+      for (const initialRandom of [0, 0.25, 0.5, 0.999_999]) {
+        const plan = createScavengeReelAnimationPlan({
+          outcomeId: outcome.id,
+          initialRandom,
+          landingRandom: 0.5,
+          cycleRandom: 0.67,
+          durationRandom: 0.5,
+        });
+        const pointerPositionPx = plan.destinationOffsetPx + SCAVENGE_REEL_VIEWPORT_HEIGHT_PX / 2;
+        const targetCycleTopPx =
+          (plan.completeCycles + SCAVENGE_REEL_TARGET_CYCLE_OFFSET) * SCAVENGE_REEL_CYCLE_HEIGHT_PX;
+        const landedPanel = panels.find((panel) => {
+          const panelTopPx = targetCycleTopPx + panel.topPx;
+          return pointerPositionPx >= panelTopPx && pointerPositionPx < panelTopPx + panel.heightPx;
+        });
+        expect(landedPanel?.id).toBe(outcome.id);
+      }
     }
   });
 
