@@ -256,8 +256,8 @@ export const activeActions = pgTable(
  *
  * `active_actions.started_at` is the sole authoritative Travel start time.
  * `active_actions.resolved_through_at` is the durable action cursor.
- * This table stores only route-specific durable state: character ID, origin
- * location ID, and destination location ID.
+ * This table stores route-specific durable state plus the one optional Scavenge
+ * window and its committed outcome for the active walking leg.
  */
 export const characterTravelState = pgTable(
   "character_travel_state",
@@ -267,11 +267,55 @@ export const characterTravelState = pgTable(
       .references(() => characters.id, { onDelete: "restrict" }),
     originLocationId: text("origin_location_id").notNull(),
     destinationLocationId: text("destination_location_id").notNull(),
+    // One stable optional Scavenge window belongs to this ordinary walking leg.
+    // The outcome fields stay null until an authoritative claim commits.
+    scavengeOpportunityStartTick: integer("scavenge_opportunity_start_tick").notNull().default(3),
+    scavengeOutcomeId: text("scavenge_outcome_id"),
+    scavengeAwardQuantity: integer("scavenge_award_quantity").notNull().default(0),
   },
   (table) => [
     check(
       "character_travel_state_distinct_ends",
       sql`${table.originLocationId} <> ${table.destinationLocationId}`,
+    ),
+    check(
+      "character_travel_state_scavenge_start_tick",
+      sql`${table.scavengeOpportunityStartTick} >= 3 AND ${table.scavengeOpportunityStartTick} <= 30`,
+    ),
+    check(
+      "character_travel_state_scavenge_award_quantity_non_negative",
+      sql`${table.scavengeAwardQuantity} >= 0`,
+    ),
+  ],
+);
+
+/**
+ * Narrow presentation state for committed Scavenge rewards that have not yet
+ * been acknowledged. This is intentionally not a generic reward queue:
+ * Scavenge owns the row shape and the player may dismiss it without changing
+ * gameplay state.
+ */
+export const characterScavengeReveals = pgTable(
+  "character_scavenge_reveals",
+  {
+    id: text("id")
+      .primaryKey()
+      .default(sql`gen_random_uuid()`),
+    characterId: text("character_id")
+      .notNull()
+      .references(() => characters.id, { onDelete: "restrict" }),
+    outcomeId: text("outcome_id").notNull(),
+    awardQuantity: integer("award_quantity").notNull().default(0),
+    claimedAt: timestamp("claimed_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    check(
+      "character_scavenge_reveals_award_quantity_non_negative",
+      sql`${table.awardQuantity} >= 0`,
+    ),
+    index("character_scavenge_reveals_character_id_claimed_at_idx").on(
+      table.characterId,
+      table.claimedAt,
     ),
   ],
 );
@@ -350,4 +394,5 @@ export type ItemInstance = typeof itemInstances.$inferSelect;
 export type EquippedItem = typeof equippedItems.$inferSelect;
 export type ActiveAction = typeof activeActions.$inferSelect;
 export type CharacterTravelState = typeof characterTravelState.$inferSelect;
+export type CharacterScavengeReveal = typeof characterScavengeReveals.$inferSelect;
 export type CharacterPowerCellDailyClaim = typeof characterPowerCellDailyClaims.$inferSelect;

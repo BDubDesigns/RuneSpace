@@ -24,6 +24,7 @@ import { useMiningPlay } from "./MiningPlayContext";
 import { EquipmentPanel } from "./EquipmentPanel";
 import { InventoryPanel } from "./InventoryPanel";
 import { LocalMapPanel } from "@/features/travel/LocalMapPanel";
+import { ScavengeRevealOverlay } from "@/features/travel/ScavengeRevealOverlay";
 import { RefiningConsole } from "@/features/refining/RefiningConsole";
 import { PowerAnnexClaimPanel } from "@/features/power-annex/PowerAnnexClaimPanel";
 import { LocationSceneHeader } from "@/features/location-scene/LocationSceneHeader";
@@ -466,6 +467,7 @@ export function MiningConsole({ characterName }: { characterName: string }) {
           ) : null}
         </div>
       </Panel>
+      <ScavengeRevealOverlay />
       <LocalMapPanel />
       <PowerAnnexClaimPanel />
       {showMiningActivity || showRefiningActivity ? (

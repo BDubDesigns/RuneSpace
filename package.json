@@ -18,8 +18,10 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:integration": "vitest run --config vitest.integration.config.ts",
-    "test:e2e": "playwright test",
+    "test:integration": "node scripts/disposable-test-db.mjs -- pnpm run test:integration:raw",
+    "test:integration:raw": "vitest run --config vitest.integration.config.ts",
+    "test:e2e": "node scripts/disposable-test-db.mjs -- pnpm run test:e2e:raw",
+    "test:e2e:raw": "playwright test",
     "test:e2e:canonical": "node scripts/run-canonical-e2e.mjs",
     "test:e2e:focused": "node scripts/run-focused-e2e.mjs"
   },

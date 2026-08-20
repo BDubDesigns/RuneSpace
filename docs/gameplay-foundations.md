@@ -205,9 +205,9 @@ lines from the same authoritative adjacency.
 
 - Travel reuses the existing one-active-action and lazy server-resolution model.
   It is an `active_actions` row (`travel`) owning a `character_travel_state` row
-  (origin, destination). The active action's `started_at` is the sole
-  authoritative travel start time; the travel row stores only route data. The
-  current location stays the authoritative origin until arrival commits.
+  (origin, destination, and the optional Scavenge state). The active action's
+  `started_at` is the sole authoritative travel start time; the current location
+  stays the authoritative origin until arrival commits.
 - The approved initial adjacent walking duration is **40 game ticks = 24
   seconds** (canonical 600 ms tick), sourced from the typed authoritative
   balance boundary (`game/config/balance.ts`), not from React or command code.
@@ -226,6 +226,38 @@ lines from the same authoritative adjacency.
 - A separate explicit confirmation control ("Walk to … — 24 sec") invokes the
   server-authoritative begin-travel command. The same interaction works in
   reverse after arrival.
+
+### Optional walking Scavenge window (issue #88)
+
+- Each ordinary 40-tick walking leg receives one server-chosen Scavenge start
+  tick in the inclusive range **3–30**. The opportunity is open for **5 ticks
+  = 3 seconds**, then is permanently missed; arrival, replacement, or any
+  future cancellation ends the leg and its opportunity. The server accepts a
+  claim for one additional second after the client-visible expiry to absorb
+  network delay; this grace does not extend the visible or clickable window.
+- Claiming is a server-authoritative transaction. Capacity is preflighted for
+  every mutually exclusive maximum branch before one weighted roll; the roll,
+  inventory award, and claim marker commit exactly once. The universal table is
+  fixed at 10,000 basis points: 750 each for Zilch, Nothing Burger, Nada, and
+  Whammy!; 2,000/1,250/750 for Ferrite Shale x1/x2/x3; 750/500 for Power Cell
+  x1/x2; and 1,000/750 for Refined Ferrite x1/x2. No-find outcomes award no
+  item, XP, or Slag.
+- The committed result and the presentation of it are separate. A narrow,
+  Scavenge-specific pending-reveal row keeps the committed outcome available
+  through refresh, reconnect, navigation, and Travel arrival. The reveal is a
+  stable gameplay-level overlay rather than content mounted only inside the
+  in-transit panel; Travel continues underneath on its normal schedule. If
+  arrival occurs while the reel is spinning, the presentation finishes without
+  extending or pausing Travel.
+- The vertical reel is presentation-only: each readable panel's height is
+  proportional to the authoritative weight, a fixed side pointer marks the
+  result, and a repeated weighted strip animates through 2–4 complete cycles
+  with cycle-count-scaled duration, bounded variation, and a landing point
+  inside the middle 90% of the winning panel. Skip reveal, the persisted
+  auto-skip reel-spin preference, and reduced-motion mode bypass animation but
+  never alter the committed outcome or disable the optional Scavenge control.
+  DONE only acknowledges the presentation; it cannot award, reroll, or change
+  Travel and is idempotent.
 
 ### Location population (issue #62)
 

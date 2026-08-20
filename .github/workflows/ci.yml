@@ -145,9 +145,6 @@ jobs:
       - name: Install (frozen lockfile)
         run: pnpm install --frozen-lockfile
 
-      - name: Apply migrations
-        run: pnpm drizzle-kit migrate
-
       - name: PostgreSQL integration tests
         run: pnpm test:integration
 

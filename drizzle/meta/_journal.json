@@ -64,6 +64,20 @@
       "when": 1786400000000,
       "tag": "0008_refining_run_state",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1787000000000,
+      "tag": "0009_travel_scavenge",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1787000001000,
+      "tag": "0010_scavenge_reveals",
+      "breakpoints": true
     }
   ]
 }

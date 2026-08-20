@@ -99,9 +99,12 @@ the RuneSpace application and confirm that data still exists. Remove the
 disposable records when practical. Do not report this check as complete without
 operator confirmation of the restart and application evidence afterward.
 
-## Future separation
+## Development and test separation
 
-Continue using the single persistent database until the initial gameplay loop
-exists or real external testers or data make development and production
-separation necessary. Revisit the policy then; do not create another database
-for the current phase.
+The normal development server continues to use the persistent local database
+configured in `.env`. Automated integration and browser-test entry points use a
+separately named disposable database on the same localhost PostgreSQL server:
+they create it, apply migrations, run fixtures, and force-drop it in cleanup.
+This keeps test data out of the development database without creating a second
+production or Coolify database. Do not bypass the supported test commands with
+the internal `*:raw` scripts.

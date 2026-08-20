@@ -57,7 +57,7 @@ export function createTravelResolver(): ActionResolver<TravelSnapshot, TravelRes
         );
       }
       // The active action's startedAt is the sole authoritative Travel start
-      // time; the travel row stores only route data (origin + destination).
+      // time; the travel row stores route data and the optional Scavenge state.
       const startedAt = new Date(action.startedAt.getTime());
       const travel: TravelState = {
         originLocationId: snapshot.travel.originLocationId as TravelState["originLocationId"],

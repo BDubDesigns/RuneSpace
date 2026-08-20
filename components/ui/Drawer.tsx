@@ -39,6 +39,8 @@ export function Drawer({
   onClose,
   triggerRef,
   size = "default",
+  dismissible = true,
+  initialFocusRef,
 }: {
   children: ReactNode;
   label: string;
@@ -47,6 +49,9 @@ export function Drawer({
   onClose: () => void;
   triggerRef: RefObject<HTMLButtonElement | null>;
   size?: "default" | "wide";
+  /** Some committed-result surfaces must be acknowledged before dismissal. */
+  dismissible?: boolean;
+  initialFocusRef?: RefObject<HTMLElement | null>;
 }) {
   const backdrop = useRef<HTMLDivElement>(null);
   const closeButton = useRef<HTMLButtonElement>(null);
@@ -73,6 +78,7 @@ export function Drawer({
   // Begin closing. Either unmounts instantly (reduced motion) or starts the
   // exit fade and defers the unmount until the animation finishes.
   function close() {
+    if (!dismissible) return;
     if (closingRef.current) return; // ignore repeated Escape/backdrop/Close
     closingRef.current = true;
 
@@ -93,13 +99,14 @@ export function Drawer({
 
   // Move focus into the modal on open.
   useEffect(() => {
-    closeButton.current?.focus();
-  }, []);
+    (initialFocusRef?.current ?? closeButton.current)?.focus();
+  }, [initialFocusRef]);
 
   // Keyboard: Escape dismisses, Tab cycles within the modal.
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
       if (event.key === "Escape") {
+        if (!dismissible) return;
         close();
         return;
       }
@@ -121,7 +128,7 @@ export function Drawer({
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [onClose, triggerRef]);
+  }, [dismissible, onClose, triggerRef]);
 
   // Focus containment while open AND during the fade-out. finishedRef lets the
   // final focus-return-to-trigger pass through without being trapped back into
@@ -192,7 +199,7 @@ export function Drawer({
 
   // Backdrop click dismisses.  Clicking inside the panel does not.
   function onBackdropClick(event: React.MouseEvent) {
-    if (event.target === backdrop.current) {
+    if (dismissible && event.target === backdrop.current) {
       close();
     }
   }
@@ -221,15 +228,17 @@ export function Drawer({
       >
         <div className="flex items-start justify-between gap-3">
           <SectionHeader eyebrow={eyebrow}>{title}</SectionHeader>
-          <ActionButton
-            ref={closeButton}
-            aria-label={`Close ${label.toLowerCase()}`}
-            className="shrink-0 px-3"
-            intent="secondary"
-            onClick={close}
-          >
-            Close
-          </ActionButton>
+          {dismissible ? (
+            <ActionButton
+              ref={closeButton}
+              aria-label={`Close ${label.toLowerCase()}`}
+              className="shrink-0 px-3"
+              intent="secondary"
+              onClick={close}
+            >
+              Close
+            </ActionButton>
+          ) : null}
         </div>
         {children}
       </section>

@@ -9,5 +9,6 @@ export function resolveFocusedPort(raw: string | undefined): number;
 
 export function buildFocusedEnv(input: {
   databaseUrl: string | undefined;
+  databaseName?: string;
   port: number;
 }): NodeJS.ProcessEnv;

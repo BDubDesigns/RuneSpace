@@ -37,6 +37,13 @@ const balanceSchema = z.object({
     actionId: z.literal(ACTION_IDS.travel),
     /** Approved initial adjacent walking duration (issue #40): 40 ticks / 24s. */
     adjacentWalkDurationTicks: z.literal(40),
+    scavenge: z.object({
+      opportunityStartMinTick: z.literal(3),
+      opportunityStartMaxTick: z.literal(30),
+      opportunityWindowTicks: z.literal(5),
+      /** Server-only network grace; the client-visible window stays unchanged. */
+      claimGraceMs: z.literal(1_000),
+    }),
   }),
   items: z.object({
     ferriteShale: z.object({
@@ -110,6 +117,12 @@ const defaults = balanceSchema.parse({
   travel: {
     actionId: ACTION_IDS.travel,
     adjacentWalkDurationTicks: 40,
+    scavenge: {
+      opportunityStartMinTick: 3,
+      opportunityStartMaxTick: 30,
+      opportunityWindowTicks: 5,
+      claimGraceMs: 1_000,
+    },
   },
   items: {
     ferriteShale: { itemId: ITEM_IDS.ferriteShale, massGrams: 100, stackLimit: 10 },

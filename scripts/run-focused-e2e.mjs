@@ -34,6 +34,11 @@ import {
   readPositiveInteger,
   ROOT,
 } from "./e2e-shared.mjs";
+import {
+  createDisposableDatabase,
+  dropDisposableDatabase,
+  resolveDatabaseUrl,
+} from "./disposable-test-db.mjs";
 
 export const DEFAULT_FOCUSED_PORT = 3310;
 export const RESERVED_FOCUSED_PORTS = [3000, 3200];
@@ -85,12 +90,13 @@ export function resolveFocusedPort(raw) {
   return port;
 }
 
-export function buildFocusedEnv({ databaseUrl, port }) {
+export function buildFocusedEnv({ databaseUrl, port, databaseName }) {
   assertLocalDatabaseUrl(databaseUrl);
   return {
     ...process.env,
     CI: "true",
     DATABASE_URL: databaseUrl,
+    ...(databaseName ? { RUNESPACE_DISPOSABLE_TEST_DB: databaseName } : {}),
     BETTER_AUTH_SECRET: FOCUSED_AUTH_SECRET,
     RUNESPACE_E2E_CANONICAL_HTTP: "true",
     RUNESPACE_E2E_EXTERNAL_SERVER: "true",
@@ -127,7 +133,7 @@ async function runFocused({ runtime, spec }) {
   runtime.startServer();
   await runtime.waitForServer();
   await runtime.runTimedCommand(
-    ["test:e2e", spec, "--project=chromium"],
+    ["run", "test:e2e:raw", spec, "--project=chromium"],
     `Focused E2E phase: ${spec}`,
   );
 }
@@ -135,46 +141,58 @@ async function runFocused({ runtime, spec }) {
 if (fileURLToPath(import.meta.url) === process.argv[1]) {
   const spec = requireFocusedSpec(process.argv.slice(2));
   assertNode22();
-  assertLocalDatabaseUrl(process.env.DATABASE_URL);
+  const baseDatabaseUrl = resolveDatabaseUrl();
   const port = resolveFocusedPort(process.env.RUNESPACE_FOCUSED_E2E_PORT);
   await assertPortAvailable(port);
-  const env = buildFocusedEnv({ databaseUrl: process.env.DATABASE_URL, port });
-  const runtime = createE2eRuntime({
-    label: "focused-e2e",
-    port,
-    env,
-    readyTimeoutMs: READY_TIMEOUT_MS,
-  });
-  runtime.log(
-    `Focused test port ${port} is available (OpenChamber port 3000 and canonical port 3200 are never used).`,
-  );
+  let disposableDatabase;
+  let runtime;
+  let timeout;
+  const signalHandlers = [];
 
-  const onSignal = (signal) => {
-    runtime.abort(`Received ${signal}; focused E2E teardown requested`);
-    void runtime.terminateOwned();
-  };
-  process.once("SIGINT", () => onSignal("SIGINT"));
-  process.once("SIGTERM", () => onSignal("SIGTERM"));
+  try {
+    disposableDatabase = await createDisposableDatabase(baseDatabaseUrl, `focused_${spec}`);
+    const env = buildFocusedEnv({
+      databaseUrl: disposableDatabase.databaseUrl,
+      databaseName: disposableDatabase.databaseName,
+      port,
+    });
+    runtime = createE2eRuntime({
+      label: "focused-e2e",
+      port,
+      env,
+      readyTimeoutMs: READY_TIMEOUT_MS,
+    });
+    runtime.log(
+      `Focused test port ${port} is available (OpenChamber port 3000 and canonical port 3200 are never used).`,
+    );
 
-  (async () => {
+    const onSignal = (signal) => {
+      runtime.abort(`Received ${signal}; focused E2E teardown requested`);
+      void runtime.terminateOwned();
+    };
+    const onSigint = () => onSignal("SIGINT");
+    const onSigterm = () => onSignal("SIGTERM");
+    signalHandlers.push(["SIGINT", onSigint], ["SIGTERM", onSigterm]);
+    process.once("SIGINT", onSigint);
+    process.once("SIGTERM", onSigterm);
     const startedAt = Date.now();
-    const timeout = setTimeout(() => {
+    timeout = setTimeout(() => {
       runtime.abort(`Focused E2E exceeded ${OVERALL_TIMEOUT_MS} ms`);
       void runtime.terminateOwned();
     }, OVERALL_TIMEOUT_MS);
 
-    try {
-      await runFocused({ runtime, spec });
-      runtime.throwIfAborted();
-      runtime.log(`Focused E2E phase passed in ${Date.now() - startedAt} ms.`);
-    } finally {
-      clearTimeout(timeout);
-      await runtime.terminateOwned();
-      process.removeAllListeners("SIGINT");
-      process.removeAllListeners("SIGTERM");
-    }
-  })().catch((error) => {
+    await runFocused({ runtime, spec });
+    runtime.throwIfAborted();
+    runtime.log(`Focused E2E phase passed in ${Date.now() - startedAt} ms.`);
+  } catch (error) {
     console.error(error instanceof Error ? error.message : error);
     process.exitCode = 1;
-  });
+  } finally {
+    if (timeout) clearTimeout(timeout);
+    if (runtime) await runtime.terminateOwned();
+    for (const [signal, handler] of signalHandlers) process.removeListener(signal, handler);
+    if (disposableDatabase) {
+      await dropDisposableDatabase(baseDatabaseUrl, disposableDatabase.databaseName);
+    }
+  }
 }

@@ -1,6 +1,7 @@
 import { chromium, expect, type FullConfig } from "@playwright/test";
 import { access, mkdir } from "node:fs/promises";
 import { dirname } from "node:path";
+import { assertDisposableE2EDatabase } from "./test-database";
 
 export const miningStorageStatePath = ".playwright/mining-auth-state.json";
 
@@ -14,11 +15,7 @@ function uniqueEmail() {
  * from the same CI address again.
  */
 export default async function setupMiningFixture(config: FullConfig) {
-  const databaseUrl = process.env.DATABASE_URL;
-  const databaseHost = databaseUrl ? new URL(databaseUrl).hostname : "";
-  if (databaseHost !== "localhost" && databaseHost !== "127.0.0.1") {
-    throw new Error("Mining E2E fixtures require a disposable localhost PostgreSQL database");
-  }
+  assertDisposableE2EDatabase();
 
   const baseURL = config.projects[0]?.use.baseURL;
   if (typeof baseURL !== "string") throw new Error("Playwright base URL is required");

@@ -6,6 +6,8 @@ import { ensurePlayerAccount, requireCurrentUser, OwnershipError } from "@/serve
 import { createCharacter, changeCharacterPortrait, CharacterError } from "@/server/characters";
 import {
   beginTravel,
+  claimScavenge,
+  acknowledgeScavengeReveal,
   getMiningGameplayState,
   startFerriteShaleMining,
   startRefining,
@@ -24,6 +26,8 @@ import {
   EquipEquipmentRequestSchema,
   UnequipEquipmentRequestSchema,
   BeginTravelRequestSchema,
+  ScavengeClaimRequestSchema,
+  ScavengeRevealAcknowledgmentRequestSchema,
   ClaimPowerCellsRequestSchema,
   LoadPowerCellRequestSchema,
   DiscardInventoryStackRequestSchema,
@@ -171,6 +175,45 @@ export async function beginTravelAction(input: unknown): Promise<MiningActionRes
   } catch (error) {
     if (error instanceof OwnershipError) return { error: error.message };
     if (error instanceof TravelRuleError) return { error: error.message };
+    throw error;
+  }
+}
+
+export type ScavengeClaimActionResult =
+  | Awaited<ReturnType<typeof claimScavenge>>
+  | { error: string };
+
+export async function claimScavengeAction(input: unknown): Promise<ScavengeClaimActionResult> {
+  const request = ScavengeClaimRequestSchema.safeParse(input);
+  if (!request.success) return { error: "Invalid Scavenge command." };
+  try {
+    const user = await requireCurrentUser(await headers());
+    return await claimScavenge(user.id, request.data.characterId);
+  } catch (error) {
+    if (error instanceof OwnershipError || error instanceof TravelRuleError)
+      return { error: error.message };
+    throw error;
+  }
+}
+
+export type ScavengeRevealAcknowledgmentActionResult =
+  | Awaited<ReturnType<typeof acknowledgeScavengeReveal>>
+  | { error: string };
+
+export async function acknowledgeScavengeRevealAction(
+  input: unknown,
+): Promise<ScavengeRevealAcknowledgmentActionResult> {
+  const request = ScavengeRevealAcknowledgmentRequestSchema.safeParse(input);
+  if (!request.success) return { error: "Invalid Scavenge reveal acknowledgment." };
+  try {
+    const user = await requireCurrentUser(await headers());
+    return await acknowledgeScavengeReveal(
+      user.id,
+      request.data.characterId,
+      request.data.revealId,
+    );
+  } catch (error) {
+    if (error instanceof OwnershipError) return { error: error.message };
     throw error;
   }
 }
