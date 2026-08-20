@@ -2,15 +2,20 @@
   "schemaVersion": 1,
   "projectSlug": "runespace",
   "workState": "active",
-  "currentFocus": "Review the optional Travel Scavenge opportunity and weighted reveal reel on mobile and desktop.",
+  "currentFocus": "Verify deployed source revisions and document host/database environment boundaries.",
   "latestCompleted": {
-    "summary": "Added directional local-map scroll affordances for narrow and desktop viewports.",
+    "summary": "Added authoritative Travel Scavenge windows and a weighted reveal reel.",
     "date": "2026-08-20",
-    "url": "https://github.com/BDubDesigns/RuneSpace/pull/93"
+    "url": "https://github.com/BDubDesigns/RuneSpace/pull/95"
   },
-  "nextStep": "Review the Issue #88 Scavenge draft PR and its Travel/reveal preview.",
+  "nextStep": "Apply the documented Coolify RUNESPACE_RELEASE_ID=$SOURCE_COMMIT operator step, then confirm the pr-97 preview build-info matches its exact head SHA.",
   "lastMeaningfulUpdate": "2026-08-20",
   "highlights": [
+    {
+      "summary": "Added authoritative Travel Scavenge windows and a weighted reveal reel.",
+      "date": "2026-08-20",
+      "url": "https://github.com/BDubDesigns/RuneSpace/pull/95"
+    },
     {
       "summary": "Added directional local-map scroll affordances for narrow and desktop viewports.",
       "date": "2026-08-20",
@@ -20,16 +25,11 @@
       "summary": "Shipped a shared portrait picker, server-authoritative per-character selection, and public profile presentation.",
       "date": "2026-08-06",
       "url": "https://github.com/BDubDesigns/RuneSpace/pull/73"
-    },
-    {
-      "summary": "Published the canonical portrait catalog, protected source masters, and optimized production derivatives.",
-      "date": "2026-08-05",
-      "url": "https://github.com/BDubDesigns/RuneSpace/pull/71"
     }
   ],
   "currentChange": {
-    "summary": "Add optional Travel Scavenge windows and a weighted reveal reel (#88).",
-    "stage": "review",
-    "pullRequestNumber": 95
+    "summary": "Document the real multi-host/database topology and add exact deployed-revision verification via /api/build-info plus a read-only DB fingerprint (#75).",
+    "stage": "implementation",
+    "pullRequestNumber": 97
   }
 }
