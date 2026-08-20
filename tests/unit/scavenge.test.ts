@@ -13,10 +13,13 @@ import {
 import {
   createScavengeReelAnimationPlan,
   SCAVENGE_REEL_CYCLE_HEIGHT_PX,
+  SCAVENGE_REEL_MAX_COMPLETE_CYCLES,
+  SCAVENGE_REEL_MIN_COMPLETE_CYCLES,
   SCAVENGE_REEL_DURATION_VARIATION_MS,
   SCAVENGE_REEL_EXTRA_CYCLE_DURATION_MS,
   SCAVENGE_REEL_MIN_DURATION_MS,
   SCAVENGE_REEL_VIEWPORT_HEIGHT_PX,
+  scavengeReelRenderedStripHeight,
   scavengeReelPanels,
 } from "@/features/travel/scavenge-reel";
 
@@ -103,11 +106,38 @@ describe("issue #88 weighted vertical reel", () => {
       expect(plan.landingFraction).toBeLessThanOrEqual(0.95);
       expect(plan.landingFraction).toBeGreaterThanOrEqual(0.05);
       expect(
-        plan.completeCycles * SCAVENGE_REEL_CYCLE_HEIGHT_PX +
+        plan.initialOffsetPx +
+          plan.completeCycles * SCAVENGE_REEL_CYCLE_HEIGHT_PX +
           (panel?.topPx ?? 0) +
           (panel?.heightPx ?? 0) * plan.landingFraction -
           plan.destinationOffsetPx,
       ).toBeCloseTo(SCAVENGE_REEL_VIEWPORT_HEIGHT_PX / 2, 10);
+    }
+  });
+
+  it("keeps every valid destination viewport inside the rendered strip", () => {
+    const renderedStripHeightPx = scavengeReelRenderedStripHeight();
+    for (const outcome of SCAVENGE_OUTCOMES) {
+      for (const initialRandom of [0, 0.5, 0.999_999]) {
+        for (const landingRandom of [0, 0.5, 1]) {
+          for (const cycleRandom of [0, 0.34, 0.67, 0.999_999]) {
+            const plan = createScavengeReelAnimationPlan({
+              outcomeId: outcome.id,
+              initialRandom,
+              landingRandom,
+              cycleRandom,
+              durationRandom: 0.5,
+            });
+            expect(plan.destinationOffsetPx).toBeGreaterThanOrEqual(0);
+            expect(plan.destinationOffsetPx + SCAVENGE_REEL_VIEWPORT_HEIGHT_PX).toBeLessThanOrEqual(
+              renderedStripHeightPx,
+            );
+            expect(plan.initialOffsetPx + SCAVENGE_REEL_VIEWPORT_HEIGHT_PX).toBeLessThanOrEqual(
+              renderedStripHeightPx,
+            );
+          }
+        }
+      }
     }
   });
 
@@ -121,8 +151,16 @@ describe("issue #88 weighted vertical reel", () => {
         durationRandom: index / 3,
       }),
     );
-    expect(plans.map((plan) => plan.completeCycles)).toEqual([2, 3, 4, 4]);
-    expect(plans.map((plan) => plan.initialOffsetPx)).toEqual([0, 40, 80, 120]);
+    expect(plans.map((plan) => plan.completeCycles)).toEqual([
+      SCAVENGE_REEL_MIN_COMPLETE_CYCLES,
+      SCAVENGE_REEL_MIN_COMPLETE_CYCLES + 1,
+      SCAVENGE_REEL_MAX_COMPLETE_CYCLES,
+      SCAVENGE_REEL_MAX_COMPLETE_CYCLES,
+    ]);
+    expect(plans.map((plan) => plan.initialOffsetPx)).toEqual([0, 440, 880, 1_320]);
+    expect(Math.max(...plans.map((plan) => plan.initialOffsetPx))).toBeGreaterThan(
+      SCAVENGE_REEL_CYCLE_HEIGHT_PX * 0.75,
+    );
     expect(plans[0]?.durationMs).toBe(SCAVENGE_REEL_MIN_DURATION_MS);
     expect(plans.at(-1)?.durationMs).toBe(
       SCAVENGE_REEL_MIN_DURATION_MS +
@@ -132,13 +170,14 @@ describe("issue #88 weighted vertical reel", () => {
     for (const plan of plans) {
       const cycleAdjustedMinimum =
         SCAVENGE_REEL_MIN_DURATION_MS +
-        (plan.completeCycles - 2) * SCAVENGE_REEL_EXTRA_CYCLE_DURATION_MS;
+        (plan.completeCycles - SCAVENGE_REEL_MIN_COMPLETE_CYCLES) *
+          SCAVENGE_REEL_EXTRA_CYCLE_DURATION_MS;
       expect(plan.durationMs).toBeGreaterThanOrEqual(cycleAdjustedMinimum);
       expect(plan.durationMs).toBeLessThanOrEqual(
         cycleAdjustedMinimum + SCAVENGE_REEL_DURATION_VARIATION_MS,
       );
       expect(plan.initialOffsetPx).toBeGreaterThanOrEqual(0);
-      expect(plan.initialOffsetPx).toBeLessThanOrEqual(120);
+      expect(plan.initialOffsetPx).toBeLessThanOrEqual(SCAVENGE_REEL_CYCLE_HEIGHT_PX);
     }
   });
 });

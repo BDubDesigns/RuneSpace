@@ -9,11 +9,15 @@ import {
 
 export const SCAVENGE_REEL_CYCLE_HEIGHT_PX = 1_320;
 export const SCAVENGE_REEL_VIEWPORT_HEIGHT_PX = 304;
-export const SCAVENGE_REEL_CYCLE_COUNT = 5;
+export const SCAVENGE_REEL_MIN_COMPLETE_CYCLES = 2;
+export const SCAVENGE_REEL_MAX_COMPLETE_CYCLES = 4;
 export const SCAVENGE_REEL_MIN_DURATION_MS = 3_000;
 export const SCAVENGE_REEL_EXTRA_CYCLE_DURATION_MS = 1_000;
 export const SCAVENGE_REEL_DURATION_VARIATION_MS = 700;
-const INITIAL_OFFSET_MAX_PX = 120;
+const SCAVENGE_REEL_MIN_LANDING_FRACTION = 0.05;
+const SCAVENGE_REEL_MAX_LANDING_FRACTION = 0.95;
+const SCAVENGE_REEL_TARGET_CYCLE_OFFSET = 1;
+const SCAVENGE_REEL_MAX_INITIAL_OFFSET_CYCLES = 1;
 
 export type ScavengeReelPanel = ScavengeOutcome & {
   topPx: number;
@@ -36,6 +40,40 @@ function unitRandom(value: number, label: string): number {
     throw new RangeError(`${label} must be between 0 and 1`);
   }
   return Math.min(value, 0.999_999);
+}
+
+/**
+ * The target can be in the cycle immediately after the completed cycles, the
+ * randomized start can consume one cycle, and the pointer is centered in a
+ * viewport rather than placed at its top edge. Deriving the count from those
+ * facts keeps the rendered strip large enough for the furthest valid target
+ * instead of relying on a hand-counted buffer.
+ */
+export function scavengeReelCycleCount(
+  cycleHeightPx = SCAVENGE_REEL_CYCLE_HEIGHT_PX,
+  viewportHeightPx = SCAVENGE_REEL_VIEWPORT_HEIGHT_PX,
+): number {
+  if (!Number.isFinite(cycleHeightPx) || cycleHeightPx <= 0) {
+    throw new RangeError("Scavenge reel cycle height must be positive");
+  }
+  if (!Number.isFinite(viewportHeightPx) || viewportHeightPx <= 0) {
+    throw new RangeError("Scavenge reel viewport height must be positive");
+  }
+  const maximumTargetOffsetPx =
+    (SCAVENGE_REEL_MAX_COMPLETE_CYCLES +
+      SCAVENGE_REEL_TARGET_CYCLE_OFFSET +
+      SCAVENGE_REEL_MAX_INITIAL_OFFSET_CYCLES) *
+    cycleHeightPx;
+  return Math.ceil((maximumTargetOffsetPx + viewportHeightPx / 2) / cycleHeightPx);
+}
+
+export const SCAVENGE_REEL_CYCLE_COUNT = scavengeReelCycleCount();
+
+export function scavengeReelRenderedStripHeight(
+  cycleHeightPx = SCAVENGE_REEL_CYCLE_HEIGHT_PX,
+  viewportHeightPx = SCAVENGE_REEL_VIEWPORT_HEIGHT_PX,
+): number {
+  return scavengeReelCycleCount(cycleHeightPx, viewportHeightPx) * cycleHeightPx;
 }
 
 export function scavengeReelPanels(
@@ -81,14 +119,30 @@ export function createScavengeReelAnimationPlan(input: {
   const landingRandom = unitRandom(input.landingRandom, "Reel landing position");
   const cycleRandom = unitRandom(input.cycleRandom, "Reel cycle count");
   const durationRandom = unitRandom(input.durationRandom, "Reel duration");
-  const completeCycles = 2 + Math.floor(cycleRandom * 3);
-  const landingFraction = 0.05 + landingRandom * 0.9;
-  const initialOffsetPx = Math.round(initialRandom * INITIAL_OFFSET_MAX_PX);
+  const completeCycles =
+    SCAVENGE_REEL_MIN_COMPLETE_CYCLES +
+    Math.floor(
+      cycleRandom * (SCAVENGE_REEL_MAX_COMPLETE_CYCLES - SCAVENGE_REEL_MIN_COMPLETE_CYCLES + 1),
+    );
+  const landingFraction =
+    SCAVENGE_REEL_MIN_LANDING_FRACTION +
+    landingRandom * (SCAVENGE_REEL_MAX_LANDING_FRACTION - SCAVENGE_REEL_MIN_LANDING_FRACTION);
+  const initialOffsetPx = Math.round(initialRandom * cycleHeightPx);
   const targetPanelTopPx =
+    initialOffsetPx +
     completeCycles * cycleHeightPx +
     targetPanel.topPx +
     targetPanel.heightPx * landingFraction -
     viewportHeightPx / 2;
+  const renderedStripHeightPx = scavengeReelRenderedStripHeight(cycleHeightPx, viewportHeightPx);
+  if (
+    initialOffsetPx < 0 ||
+    initialOffsetPx + viewportHeightPx > renderedStripHeightPx ||
+    targetPanelTopPx < 0 ||
+    targetPanelTopPx + viewportHeightPx > renderedStripHeightPx
+  ) {
+    throw new Error("Scavenge reel animation plan exceeds its rendered strip bounds");
+  }
 
   return {
     outcomeId: input.outcomeId,
@@ -96,7 +150,7 @@ export function createScavengeReelAnimationPlan(input: {
     destinationOffsetPx: targetPanelTopPx,
     durationMs:
       SCAVENGE_REEL_MIN_DURATION_MS +
-      (completeCycles - 2) * SCAVENGE_REEL_EXTRA_CYCLE_DURATION_MS +
+      (completeCycles - SCAVENGE_REEL_MIN_COMPLETE_CYCLES) * SCAVENGE_REEL_EXTRA_CYCLE_DURATION_MS +
       Math.round(durationRandom * SCAVENGE_REEL_DURATION_VARIATION_MS),
     completeCycles,
     landingFraction,

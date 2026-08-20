@@ -176,7 +176,7 @@ export function ScavengeControl() {
               : capacityMessage(capacity.reason)
             : lifecycle === "missed"
               ? "The three-second window came and went; Travel is unaffected."
-              : "The reward is committed. Complete its reveal to see it."}
+              : "Reward claimed for this Travel leg."}
       </p>
       <p aria-live="polite" className="sr-only">
         {announcement}

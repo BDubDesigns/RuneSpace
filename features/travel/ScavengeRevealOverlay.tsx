@@ -147,7 +147,6 @@ export function ScavengeRevealOverlay() {
   const reveal = state.scavengeReveals[0];
   const reducedMotion = useReducedMotion();
   const primaryButtonRef = useRef<HTMLButtonElement>(null);
-  const triggerRef = useRef<HTMLButtonElement>(null);
   const spinTimer = useRef<number | undefined>(undefined);
   const previousRevealId = useRef<string | undefined>(undefined);
   const [autoSkipReel, setAutoSkipReel] = useState(false);
@@ -204,6 +203,12 @@ export function ScavengeRevealOverlay() {
     },
     [],
   );
+
+  useEffect(() => {
+    if (stage !== "revealed") return;
+    const frame = window.requestAnimationFrame(() => primaryButtonRef.current?.focus());
+    return () => window.cancelAnimationFrame(frame);
+  }, [stage]);
 
   if (!reveal || !reelPlan || reelPlan.outcomeId !== reveal.outcomeId) return null;
 
@@ -266,10 +271,8 @@ export function ScavengeRevealOverlay() {
       eyebrow="Optional Travel bonus"
       initialFocusRef={primaryButtonRef}
       label="Scavenge reveal"
-      onClose={() => undefined}
       size="wide"
       title="Scavenge reveal"
-      triggerRef={triggerRef}
     >
       <div className="mt-4 space-y-4" data-scavenge-reveal={reveal.revealId}>
         <p className="text-sm leading-relaxed text-[color:var(--rs-text-secondary)]">

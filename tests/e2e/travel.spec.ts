@@ -256,21 +256,25 @@ async function arriveAtPowerAnnex(page: import("@playwright/test").Page, charact
   ).toHaveAttribute("aria-current", "true");
 }
 
-async function openScavengeOpportunity(page: import("@playwright/test").Page, characterId: string) {
+async function openScavengeOpportunity(
+  page: import("@playwright/test").Page,
+  characterId: string,
+  options: { opportunityStartTick?: number; travelAgeMs?: number } = {},
+) {
   await page.getByRole("button", { name: /Abandoned Processing Yard/ }).click();
   await page.getByRole("button", { name: /Walk to Abandoned Processing Yard/ }).click();
   await expect(page.getByText("Journey progress")).toBeVisible();
 
   // Put the authoritative travel clock just inside the approved tick-3 window
   // so the browser test does not wait on wall-clock travel.
-  const travelStartedAt = new Date(Date.now() - 1_850);
+  const travelStartedAt = new Date(Date.now() - (options.travelAgeMs ?? 1_850));
   await db
     .update(activeActions)
     .set({ startedAt: travelStartedAt, resolvedThroughAt: travelStartedAt })
     .where(eq(activeActions.characterId, characterId));
   await db
     .update(characterTravelState)
-    .set({ scavengeOpportunityStartTick: 3 })
+    .set({ scavengeOpportunityStartTick: options.opportunityStartTick ?? 3 })
     .where(eq(characterTravelState.characterId, characterId));
   await page.reload();
 
@@ -764,11 +768,22 @@ test("Scavenge presents the committed outcome on a readable weighted reel", asyn
   expect(scavengeBox!.y).toBeLessThan(journeyBox!.y);
   await opportunity.getByRole("button", { name: "SCAVENGE NOW" }).click();
   await expect(page.locator("[data-scavenge-reel]")).toBeVisible();
-  await expect(page.getByRole("button", { name: "START REEL" })).toBeVisible();
-  await expect(page.locator("[data-scavenge-reel-panel]")).toHaveCount(55);
+  const startReel = page.getByRole("button", { name: "START REEL" });
+  await expect(startReel).toBeVisible();
+  await expect(startReel).toBeFocused();
+  await expect(page.locator("[data-scavenge-reel-panel]")).toHaveCount(77);
   for (const label of labels) {
-    await expect(page.getByText(label, { exact: true })).toHaveCount(5);
+    await expect(page.getByText(label, { exact: true })).toHaveCount(7);
   }
+
+  await page.evaluate(() => {
+    const outside = document.querySelector<HTMLElement>(
+      '[aria-label="Primary"] a, [aria-label="Primary"] button',
+    );
+    if (!outside) throw new Error("Expected a focusable control outside the Scavenge Drawer");
+    outside.focus();
+  });
+  await expect(startReel).toBeFocused();
 
   const mobileReel = page.locator("[data-scavenge-reel]");
   const mobileLayout = await mobileReel.evaluate((element) => ({
@@ -789,7 +804,7 @@ test("Scavenge presents the committed outcome on a readable weighted reel", asyn
   await page.getByRole("button", { name: "START REEL" }).click();
   await expect(page.getByRole("button", { name: "Reeling…" })).toBeVisible();
   await expect(page.locator("[data-scavenge-result]")).toBeVisible({ timeout: 8_000 });
-  await expect(page.getByRole("button", { name: "DONE", exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "DONE", exact: true })).toBeFocused();
 });
 
 test("Scavenge explains when every possible reward needs an open inventory slot", async ({
@@ -829,6 +844,7 @@ test("Scavenge Skip reveal bypasses animation and the reel preference remains re
   await page.getByRole("button", { name: "Skip reveal" }).click();
   await expect(page.locator("[data-scavenge-result]")).toBeVisible();
   await expect(page.getByRole("button", { name: "START REEL" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "DONE", exact: true })).toBeFocused();
 
   const preference = page.getByRole("checkbox", {
     name: "Auto-skip reel spin next time (Scavenge stays available)",
@@ -838,6 +854,10 @@ test("Scavenge Skip reveal bypasses animation and the reel preference remains re
   await expect(preference).toBeChecked();
   await preference.uncheck();
   await expect(preference).not.toBeChecked();
+  await page.getByRole("button", { name: "DONE", exact: true }).click();
+  await expect(page.locator('[data-scavenge-state="claimed"]')).toContainText(
+    "Reward claimed for this Travel leg.",
+  );
 });
 
 test("reduced motion bypasses the Scavenge reel without changing the reveal", async ({ page }) => {
@@ -869,6 +889,42 @@ test("arrival does not destroy a committed Scavenge reveal", async ({ page }) =>
   await expect(page.locator("[data-scavenge-reel]")).toBeVisible();
   await page.getByRole("button", { name: "START REEL" }).click();
   await expect(page.locator("[data-scavenge-result]")).toBeVisible({ timeout: 8_000 });
+});
+
+test("Travel arrival reconciliation preserves a Scavenge reel already in motion", async ({
+  page,
+}) => {
+  const characterId = page.url().split("/").at(-1)!;
+  const opportunity = await openScavengeOpportunity(page, characterId, {
+    opportunityStartTick: 30,
+    travelAgeMs: 19_000,
+  });
+  await page.evaluate(() => {
+    Math.random = () => 0.999_999;
+  });
+  await opportunity.getByRole("button", { name: "SCAVENGE NOW" }).click();
+  await expect(page.locator("[data-scavenge-reel]")).toBeVisible();
+
+  const reveal = await db
+    .select({ outcomeId: characterScavengeReveals.outcomeId })
+    .from(characterScavengeReveals)
+    .where(eq(characterScavengeReveals.characterId, characterId))
+    .limit(1);
+  expect(reveal[0]?.outcomeId).toBeTruthy();
+
+  await page.getByRole("button", { name: "START REEL" }).click();
+  await expect(page.getByRole("button", { name: "Reeling…" })).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: /Abandoned Processing Yard/ }).first(),
+  ).toHaveAttribute("aria-current", "true", { timeout: 8_000 });
+  await expect(page.locator("[data-scavenge-reel]")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Reeling…" })).toBeVisible();
+  await expect(page.locator("[data-scavenge-result]")).toHaveAttribute(
+    "data-scavenge-result",
+    reveal[0]!.outcomeId,
+    { timeout: 8_000 },
+  );
+  await expect(page.getByRole("button", { name: "DONE", exact: true })).toBeFocused();
 });
 
 test("travels to the Power Annex and claims independently by Pacific reset date", async ({
