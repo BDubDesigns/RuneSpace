@@ -108,9 +108,12 @@ subagents or automation that may be unavailable.
    `pnpm install --frozen-lockfile`, `pnpm typecheck`, `pnpm lint`,
    `pnpm format:check`, `pnpm test`, `pnpm build`, integration tests, and
    `pnpm test:e2e:canonical`. Resolve failures or document genuine external
-   blockers. After a correction to a ready PR, focused local evidence plus the
-   required remote gate rerun is sufficient; do not blindly repeat the entire
-   local suite after every small correction. On Hermes
+   blockers. The managed focused runner does not currently include the Travel
+   phase; use the direct Travel-only command documented in
+   `docs/development-workflow.md` when that spec is the affected boundary.
+   After a correction to a ready PR, focused local evidence plus the required
+   remote gate rerun is sufficient; do not blindly repeat the entire local
+   suite after every small correction. On Hermes
    (`/opt/data/workspace/RuneSpace`), every DB-backed command in that sequence
    (`pnpm drizzle-kit migrate`, `pnpm test:integration`,
    `pnpm test:e2e:canonical`, `pnpm test:e2e:focused`) MUST go through
@@ -286,9 +289,16 @@ consistent (see `tests/unit/qcfailed-status.test.ts`).
 - An independent focused E2E run must use a separately confirmed-free high port,
   never `3000` or `3200`. `pnpm test:e2e:focused` defaults to `3310` and refuses
   to start unless that port is confirmed available.
+- `pnpm test:e2e:focused <phase>` currently supports `mining`,
+  `character-profile`, `location-population`, and `character-portraits`; it does
+  not support `travel`. Run one Travel test with the direct command in
+  `docs/development-workflow.md`, using a separately confirmed-free high port.
 - Do not manually assemble `next build` + `next start` for browser validation on
   the managed host. Use `pnpm test:e2e:focused <phase>`, `pnpm test:e2e:canonical`,
   or the deployed PR preview unless diagnosing the runner itself.
+- In a restricted coding harness, a `listen EPERM` error before Playwright
+  starts means the harness blocked the local test-server port; allow loopback
+  server binding and rerun the same command before diagnosing the test.
 - Before cleaning up any listener, inspect the owning PID with `ss -tlnp` and
   kill only a positively identified RuneSpace-owned test-server PID with a
   targeted `kill <pid>`. Never use broad `pkill -f` or blanket Next.js
