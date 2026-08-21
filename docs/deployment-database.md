@@ -79,16 +79,25 @@ service actually runs there. See `docs/development-workflow.md` →
 
 ### Source revision identity (production)
 
-The repository's single release-ID concept is `RUNESPACE_RELEASE_ID`: a
-server-side/runtime release identity, copied into `NEXT_PUBLIC_RUNESPACE_RELEASE_ID`
-(and Next's `deploymentId`) at build time. Production diagnostics and
-`GET /api/build-info` both report it. **The deployment does not invent a
-second release metadata system.** Whether Coolify currently supplies the exact
-deployed SHA into that variable is an operator wiring step covered in
-`docs/production-diagnostics.md`; a deployment that reports `unknown` should
-be treated as unverified, not current. `GET /api/build-info` is the
-public-safe way a reviewer asks a live deployment which source revision it was
-built from, and it never exposes database or environment details.
+The repository's single release-ID concept is `RUNESPACE_RELEASE_ID`. It can be
+carried two ways, answering different questions:
+
+- **Runtime identity** — `process.env.RUNESPACE_RELEASE_ID` read live by
+  `GET /api/build-info` and server diagnostics (`serverReleaseId`). In Coolify
+  this is configured as a **runtime-only** variable (`$SOURCE_COMMIT`, the
+  deployed commit hash). This is the identity Issue #75's exact-preview
+  verification relies on.
+- **Optional build-time identity** — only baked in when the variable is present
+  in the *build* environment, producing `NEXT_PUBLIC_RUNESPACE_RELEASE_ID`
+  (client `clientReleaseId`) and Next's `deploymentId`. It is **not** required
+  for #75 and is intentionally **not** configured as a build-time variable in
+  Coolify (that would invalidate the Docker build cache on every commit), so
+  the browser/build-time release ID is not populated in Coolify.
+
+**The deployment does not invent a second release metadata system.** Details of
+the operator wiring live in `docs/production-diagnostics.md`. `GET /api/build-info`
+is the public-safe way a reviewer asks a live deployment which source revision
+it is serving, and it never exposes database or environment details.
 
 ### Apply migrations in Coolify
 

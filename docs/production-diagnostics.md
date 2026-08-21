@@ -2,7 +2,25 @@
 
 RuneSpace writes structured `runespace.diagnostic` JSON records to application stderr. In Coolify, open the application logs and search the safe Next.js `digest` or the client `incidentId` displayed on the play-route fault screen. A client incident is shown only after the receiver accepts it. Browser reports use the same record and are posted only to the same-origin `/api/diagnostics` endpoint. A stale tab is visible as differing `clientReleaseId` and `serverReleaseId` fields.
 
-Set the same `RUNESPACE_RELEASE_ID` to the deployed commit SHA in Coolify for both the **production image build** and the **application runtime** so a live deployment can answer which source revision it was built from. The build-time value is exposed as `NEXT_PUBLIC_RUNESPACE_RELEASE_ID`; the runtime value becomes `serverReleaseId`, so stale tabs remain visible rather than overwriting one another. GitHub Actions sets it to `${{ github.sha }}` for production-like builds and Playwright. When present, it is used as Next's `deploymentId`, enabling its supported version-skew protection without generating process-local IDs. Local canonical E2E uses the synthetic value `local-ci-parity`.
+`RUNESPACE_RELEASE_ID` is RuneSpace's single release identity. A deployment can
+carry it in two independent ways that answer different questions:
+
+- **Runtime identity** — `process.env.RUNESPACE_RELEASE_ID`, read live by the
+  server as `serverReleaseId` and by `GET /api/build-info`. In Coolify this is
+  configured as a **runtime-only** variable set to `$SOURCE_COMMIT` (the
+  deployed commit hash). This is the identity Issue #75's exact-preview
+  verification relies on.
+- **Optional build-time identity** — only present when the variable is also set
+  in the *build* environment. It is baked into `NEXT_PUBLIC_RUNESPACE_RELEASE_ID`
+  (client `clientReleaseId`) and Next's `deploymentId`. It is **not** required
+  for #75 and is intentionally **not** configured as a build-time variable in
+  Coolify (setting it at build time would import the commit into the build
+  context and invalidate the Docker layer cache on every commit). The
+  browser/build-time release ID is therefore **not populated** in Coolify.
+
+GitHub Actions sets `RUNESPACE_RELEASE_ID` to `${{ github.sha }}` for
+production-like builds and Playwright (that is build-time); local canonical E2E
+uses the synthetic value `local-ci-parity`.
 
 ### Reading the deployed source revision
 
@@ -21,30 +39,34 @@ environment dump, private topology, container id, or user data, sets
 stale cached copy), and returns the explicit value `"unknown"` when no release
 metadata is present rather than manufacturing one.
 
-### Coolify source-revision wiring (operator step)
+### Coolify release-identity configuration (runtime)
 
-As of this issue, **`RUNESPACE_RELEASE_ID` is not present** in the production
-RuneSpace app's Coolify environment (verified 2026-08-20 via the Coolify API:
-the key does not appear among the app's build/runtime variables). Production
-currently ships with no build revision stamped, so `/api/build-info` returns
-`unknown`. Supplying the exact source revision is a **one-time operator step**
-on the Coolify/OpenChamber host — repository code cannot set it from here:
+For Issue #75, exact preview (and production) source-revision verification is a
+**runtime deployment-identity** concern. `GET /api/build-info` and server
+diagnostics read `process.env.RUNESPACE_RELEASE_ID` at runtime, so the operator
+configures it as a **runtime-only** Coolify variable — no per-commit build-cache
+penalty:
 
 1. In the Coolify RuneSpace application → **Environment Variables**, add
    ```text
    RUNESPACE_RELEASE_ID=$SOURCE_COMMIT
    ```
-   `$SOURCE_COMMIT` is Coolify's predefined build variable that carries the
-   commit hash of the source code for git-based resources
+   `$SOURCE_COMMIT` is Coolify's predefined variable carrying the deployed
+   commit hash for git-based resources
    (docs: `coolify.io/docs/knowledge-base/environment-variables#predefined-variables`).
-   Leave **Build Variable** enabled so the exact SHA is baked into the image at
-   build time (that is what stamps `NEXT_PUBLIC_RUNESPACE_RELEASE_ID` and Next's
-   `deploymentId`, and what the runtime reports).
-2. In the application's **General** settings, enable **"Include Source Commit
-   in Build"** — Coolify excludes `SOURCE_COMMIT` from builds by default to
-   preserve layer cache, so this toggle is required for the value to exist in
-   the build environment.
-3. Redeploy so the value is stamped into the artifact.
+   Configure it as a **Runtime Variable only** (`Build Variable` disabled).
+2. Redeploy the application/preview and confirm `/api/build-info` reports the
+   expected SHA.
+
+This deliberately does **not** set the build-time value:
+
+- Baking the SHA into the build (`NEXT_PUBLIC_RUNESPACE_RELEASE_ID` / Next
+  `deploymentId`) imports the commit into the build context and invalidates the
+  Docker layer cache on every commit; that is intentionally avoided.
+- The browser/build-time release ID is therefore **not populated** in Coolify.
+  Client-side stale-tab detection via `clientReleaseId` is unavailable in
+  Coolify deployments unless build-time identity is configured later; that is
+  optional work unrelated to #75.
 
 Caveats to verify on the Coolify host before treating a preview as verified:
 
@@ -58,9 +80,9 @@ Caveats to verify on the Coolify host before treating a preview as verified:
 - The exact preview PostgreSQL resource/logical-database name is not visible to
   repository code; confirm it from the Coolify host before relying on it.
 
-Until this step is completed, do **not** claim that a deployed preview or
-production revision has been operational verified — the endpoint must report
-the exact expected SHA (see `docs/development-workflow.md` →
+Because env values are masked via the API, the shipped wiring is validated
+behaviorally: after the operator redeploys, `/api/build-info` must report the
+exact expected SHA (see `docs/development-workflow.md` →
 "Exact-preview-revision verification").
 
 Reports deliberately contain only a coarse route (`/play/[characterId]`), error metadata, a truncated stack, release, browser-online state, platform, and whether Mining was active. Header values, labeled credentials or secrets, and JSON-like state fragments are redacted as whole values or lines. They never include cookies, auth/session data, email/name, character IDs, raw URLs, database rows, or game state.
