@@ -6,15 +6,18 @@ import {
   NPC_ONLY_PORTRAIT_IDS,
   PLAYER_STARTER_PORTRAITS,
   PLAYER_STARTER_SET_SIZE,
+  PLAYER_UNLOCKABLE_PORTRAITS,
   PORTRAITS,
   getPortrait,
   isPlayerStarterPortrait,
+  isPlayerUnlockablePortrait,
 } from "@/game/content/portrait-catalog";
 
 /**
  * The approved launch set in the issue's own order. This order is the
  * deterministic picker order for issue #65 and the only ordering the runtime
- * depends on; reserved entries keep no required internal ordering.
+ * depends on; unlockable and reserved entries keep no required internal
+ * ordering.
  */
 const EXPECTED_STARTER_IDS = [
   PORTRAIT_IDS.evaSalvageWelder,
@@ -67,7 +70,16 @@ describe("issue #70 portrait catalog content", () => {
     expect(getPortrait(PORTRAIT_IDS.milkman)?.category).toBe("npc-only");
   });
 
-  it("selection helpers expose starter-only selection", () => {
+  it("approves Von Scavenger as the only player-unlockable portrait", () => {
+    expect(PLAYER_UNLOCKABLE_PORTRAITS.map((portrait) => portrait.id)).toEqual([
+      PORTRAIT_IDS.vonScavenger,
+    ]);
+    expect(getPortrait(PORTRAIT_IDS.vonScavenger)?.category).toBe("player-unlockable");
+    expect(isPlayerUnlockablePortrait(PORTRAIT_IDS.vonScavenger)).toBe(true);
+    expect(isPlayerUnlockablePortrait(PORTRAIT_IDS.unicornMechanic)).toBe(false);
+  });
+
+  it("starter catalog helpers expose only player-starter entries", () => {
     for (const id of EXPECTED_STARTER_IDS) {
       expect(isPlayerStarterPortrait(id)).toBe(true);
     }

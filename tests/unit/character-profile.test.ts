@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { miningLevelThresholds } from "@/game/config/balance";
+import { PORTRAIT_IDS } from "@/game/config/foundations";
 import { projectCharacterProfile, type CharacterProfile } from "@/game/domain/character-profile";
 import type { LevelThreshold } from "@/game/domain/progression";
 
@@ -177,7 +178,7 @@ describe("issue #64 character profile projection", () => {
     ]);
   });
 
-  it("projects the resolved portrait presentation (issue #65)", () => {
+  it("projects the resolved portrait presentation (issues #65 and #98)", () => {
     // A legacy character (null stored value) projects the neutral placeholder;
     // resolution itself is proven in character-portrait.test.ts.
     expect(project([]).portrait).toEqual({ kind: "placeholder" });
@@ -207,5 +208,17 @@ describe("issue #64 character profile projection", () => {
         portraitId: "portrait_gramma_01",
       }).portrait,
     ).not.toHaveProperty("portraitId");
+
+    expect(
+      projectCharacterProfile({
+        displayName: "Rada",
+        ownerName: "Rada Stonehand",
+        skillProgress: [],
+        levelThresholds: () => undefined,
+        skillDisplayName: () => undefined,
+        portraitId: PORTRAIT_IDS.vonScavenger,
+        ownedPortraitIds: [PORTRAIT_IDS.vonScavenger],
+      }).portrait,
+    ).toMatchObject({ kind: "selected", displayName: "Von Scavenger" });
   });
 });

@@ -153,9 +153,10 @@ const sheetHeight = titleHeight + rows * tileHeight + padding * 2;
 
 const contactSheet = await withPage(async (page) => {
   const starterCount = catalog.filter((entry) => entry.category === "player-starter").length;
+  const unlockableCount = catalog.filter((entry) => entry.category === "player-unlockable").length;
   const npcCount = catalog.filter((entry) => entry.category === "npc-only").length;
   const reservedCount = catalog.filter((entry) => entry.category === "reserved").length;
-  const title = `RuneSpace character portraits — ${starterCount} player-starter · ${npcCount} npc-only · ${reservedCount} reserved (${catalog.length} accepted)`;
+  const title = `RuneSpace character portraits — ${starterCount} player-starter · ${unlockableCount} player-unlockable · ${npcCount} npc-only · ${reservedCount} reserved (${catalog.length} accepted)`;
   const labels = catalog.map((entry) => `${entry.displayName}\n${entry.id}\n[${entry.category}]`);
   const contactSheetBytes = await page.evaluate(
     async ({

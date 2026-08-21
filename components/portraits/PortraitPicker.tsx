@@ -38,9 +38,10 @@ function SelectedCheck() {
  * own business action (Create character / Save portrait) through the `action`
  * slot, which is placed beside the preview.
  *
- * The options are the server-projected selectable list — exactly the ten
- * `player-starter` catalog entries, never `npc-only` or `reserved` portraits —
- * so this client component never imports catalog content directly.
+ * The options are the server-projected selectable list — all `player-starter`
+ * entries plus any owned `player-unlockable` entries, never `npc-only` or
+ * `reserved` portraits — so this client component never imports catalog
+ * content directly.
  *
  * Responsive behavior:
  * - Wide layouts (`lg` and up): the portrait grid sits on the left and the

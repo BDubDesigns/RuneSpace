@@ -32,7 +32,7 @@ function SubmitButton({ label, disabled }: { label: string; disabled?: boolean }
 export function CreateCharacterForm({
   options,
 }: {
-  /** Server-projected selectable portrait options (the ten player-starter entries). */
+  /** Server-projected selectable portrait options for the authenticated account. */
   options: readonly SelectablePortraitOption[];
 }) {
   const [error, setError] = useState<string | null>(null);

@@ -1,15 +1,21 @@
+import { headers } from "next/headers";
+import { redirect } from "next/navigation";
 import { ScaffoldScreen } from "@/components/ScaffoldScreen";
 import { SectionHeader } from "@/components/ui/SectionHeader";
 import { TextLink } from "@/components/ui/TextLink";
 import { CreateCharacterForm } from "@/features/characters/CreateCharacterForm";
-import { getSelectablePortraitOptions } from "@/game/domain/character-portrait";
+import { auth } from "@/server/auth";
+import { ensurePlayerAccount, requireCurrentUser } from "@/server/ownership";
+import { getPlayerSelectablePortraitOptions } from "@/server/player-portrait-unlocks";
 
 export const metadata = { title: "New character — RuneSpace" };
 
-export default function NewCharacterPage() {
-  // Server-projected selectable portrait options: exactly the ten
-  // player-starter catalog entries (issue #65).
-  const portraitOptions = getSelectablePortraitOptions();
+export default async function NewCharacterPage() {
+  const session = await auth.api.getSession({ headers: await headers() });
+  if (!session?.user) redirect("/sign-in");
+  const user = await requireCurrentUser(await headers());
+  const account = await ensurePlayerAccount(user.id);
+  const portraitOptions = await getPlayerSelectablePortraitOptions(account.id);
 
   return (
     <ScaffoldScreen size="wide">

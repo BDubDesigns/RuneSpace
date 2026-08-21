@@ -67,7 +67,7 @@ export function ManageCharacterPortrait({
   currentPortraitId: string | null;
   /** Resolved presentation of the stored value (portrait or placeholder). */
   presentation: CharacterPortraitPresentation;
-  /** Server-projected selectable portrait options (the ten player-starter entries). */
+  /** Server-projected selectable portrait options for the authenticated account. */
   options: readonly SelectablePortraitOption[];
 }) {
   const router = useRouter();

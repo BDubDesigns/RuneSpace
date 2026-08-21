@@ -7,6 +7,7 @@ import { PORTRAIT_IDS } from "@/game/config/foundations";
 import { PLAYER_STARTER_PORTRAITS } from "@/game/content/portrait-catalog";
 import * as characters from "@/server/characters";
 import * as ownership from "@/server/ownership";
+import { grantPlayerPortraitUnlock } from "@/server/player-portrait-unlocks";
 import {
   cleanupTestUser,
   createCharacterForUser,
@@ -26,9 +27,11 @@ test.beforeAll(() => {
 });
 
 /**
- * Issue #65 mobile-first journeys for the shared portrait chooser:
- * - character creation requires a deliberate portrait choice (exactly the ten
- *   player-starter options, no locked or non-selectable cards), works from the
+ * Issues #65 and #98 mobile-first journeys for the shared portrait chooser:
+ * - an unentitled account sees exactly the ten player-starter options, while an
+ *   account with Von Scavenger sees the ten starters plus that unlock;
+ * - character creation requires a deliberate portrait choice (no locked or
+ *   non-selectable cards), works from the
  *   keyboard and by touch, uses the same in-page review state as management
  *   (large preview, Previous/Next with wrap, Back to portraits preserving the
  *   candidate and the typed name), and the choice survives navigation;
@@ -98,8 +101,8 @@ test.describe("character creation portrait journey", () => {
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto("/characters/new");
 
-    // Browse state: exactly the ten catalog player-starter options and
-    // nothing else — no npc-only, reserved, unknown, or locked cards.
+    // Browse state for an account without an entitlement: exactly the ten
+    // catalog player-starter options and nothing else.
     const options = page.locator("[data-portrait-option]");
     await expect(options).toHaveCount(10);
     const starterIds = PLAYER_STARTER_PORTRAITS.map((portrait) => portrait.id);
@@ -109,6 +112,31 @@ test.describe("character creation portrait journey", () => {
     for (const forbidden of ["Baker", "Milkman", "Von Scavenger", "Unicorn Mechanic"]) {
       await expect(page.getByRole("button", { name: new RegExp(forbidden) })).toHaveCount(0);
     }
+
+    // Hiding the option is not the security boundary: a forged server command
+    // from the same unentitled account is refused as well.
+    const fixtureUser = (
+      await db
+        .select({ id: authSchema.user.id })
+        .from(authSchema.user)
+        .where(eq(authSchema.user.name, "Mining Fixture"))
+    )[0];
+    if (!fixtureUser) throw new Error("Mining fixture user was not created");
+    const fixtureAccount = await ownership.ensurePlayerAccount(fixtureUser.id);
+    const fixtureCharacter = (
+      await db
+        .select({ id: rune.characters.id })
+        .from(rune.characters)
+        .where(eq(rune.characters.playerAccountId, fixtureAccount.id))
+    )[0];
+    if (!fixtureCharacter) throw new Error("Mining fixture character was not created");
+    await expect(
+      characters.changeCharacterPortrait(
+        fixtureUser.id,
+        fixtureCharacter.id,
+        PORTRAIT_IDS.vonScavenger,
+      ),
+    ).rejects.toThrow(/not available/i);
     // Mobile-first: no horizontal overflow in browse state.
     expect(await noHorizontalOverflow(page)).toBeLessThanOrEqual(0);
 
@@ -238,6 +266,8 @@ test.describe("existing character portrait management journey", () => {
     if (!owner) throw new Error("Portrait owner fixture user was not created");
     const ownerId = owner.id;
     createdUsers.push(ownerId);
+    const ownerAccount = await ownership.ensurePlayerAccount(ownerId);
+    await grantPlayerPortraitUnlock(ownerAccount.id, PORTRAIT_IDS.vonScavenger, "operator");
     const ownedName = `Owned Drifter ${token()}`;
     const legacyName = `Legacy Drifter ${token()}`;
     await createCharacterForUser(
@@ -280,7 +310,7 @@ test.describe("existing character portrait management journey", () => {
     await ownedEdit.click();
     const dialog = page.getByRole("dialog", { name: "Portrait" });
     await expect(dialog).toBeVisible();
-    await expect(dialog.locator("[data-portrait-option]")).toHaveCount(10);
+    await expect(dialog.locator("[data-portrait-option]")).toHaveCount(11);
     const grammaTile = dialog.locator(
       `[data-portrait-option][data-portrait-id="${PORTRAIT_IDS.gramma}"]`,
     );
@@ -332,6 +362,35 @@ test.describe("existing character portrait management journey", () => {
     await expect(legacyRow.getByText("No portrait yet", { exact: true })).toHaveCount(0);
     await expect(legacyEdit).toHaveAttribute("aria-label", `Change portrait for ${legacyName}`);
 
+    // An owned unlockable is available on the same existing character and
+    // renders through the normal presentation path.
+    await legacyEdit.click();
+    await expect(dialog).toBeVisible();
+    const vonOption = dialog.locator(
+      `[data-portrait-option][data-portrait-id="${PORTRAIT_IDS.vonScavenger}"]`,
+    );
+    await vonOption.click();
+    await expect(dialog.locator("[data-portrait-preview-name]")).toHaveText("Von Scavenger");
+    await dialog.getByRole("button", { name: "Save portrait" }).click();
+    await expect(dialog).toBeHidden();
+    await expect(legacyRow.getByText("Von Scavenger", { exact: true })).toBeVisible();
+
+    // The same account may choose the unlock again on a newly-created slot.
+    const createdWithUnlockName = `Unlocked Slot ${token()}`;
+    await page.goto("/characters/new");
+    const creationOptions = page.locator("[data-portrait-option]");
+    await expect(creationOptions).toHaveCount(11);
+    const creationVon = page.locator(
+      `[data-portrait-option][data-portrait-id="${PORTRAIT_IDS.vonScavenger}"]`,
+    );
+    await page.getByLabel("Character name").fill(createdWithUnlockName);
+    await creationVon.click();
+    await page.getByRole("button", { name: "Create character" }).click();
+    await page.waitForURL(/\/play\/[^/]+$/);
+    await page.goto("/characters");
+    const createdWithUnlockRow = page.locator("li").filter({ hasText: createdWithUnlockName });
+    await expect(createdWithUnlockRow.getByText("Von Scavenger", { exact: true })).toBeVisible();
+
     // Only the requested character changed: the sibling keeps its own
     // selection in the database, and the legacy row stored only the stable
     // portrait ID.
@@ -342,7 +401,8 @@ test.describe("existing character portrait management journey", () => {
       .orderBy(rune.characters.slot);
     expect(siblings.map((sibling) => sibling.portraitId)).toEqual([
       PORTRAIT_IDS.gramma,
-      PORTRAIT_IDS.grampa,
+      PORTRAIT_IDS.vonScavenger,
+      PORTRAIT_IDS.vonScavenger,
     ]);
 
     // Failure path: a transport failure keeps the chooser open in review
@@ -392,6 +452,10 @@ test.describe("existing character portrait management journey", () => {
     await expect(panel).toBeVisible();
     const portrait = panel.locator("[data-character-portrait] img");
     await expect(portrait).toBeVisible();
+    await expect(portrait).toHaveAttribute(
+      "alt",
+      "Eccentric salvager with a monocle eye device and tools in a salvage workshop",
+    );
     expect((await portrait.getAttribute("alt"))?.length ?? 0).toBeGreaterThan(0);
     // No private account data appears in the public profile.
     await expect(panel.getByText("@")).toHaveCount(0);

@@ -352,14 +352,15 @@ interactive control that opens one compact, mobile-first public profile panel:
 Every RuneSpace character has one deliberate, per-character portrait choice
 that is used wherever the character is publicly presented.
 
-- **Selectable set:** exactly the ten `player-starter` entries of the
-  authoritative Issue #70 portrait catalog
-  (`game/content/portrait-catalog.ts`, `PLAYER_STARTER_PORTRAITS`). `npc-only`
-  and `reserved` portraits are valid production assets but are never offered in
-  the picker, never accepted by creation or change commands, and never shown as
-  locked cards. Availability is catalog metadata only — a future approved
-  selectable portrait is added by reclassifying (or adding) a catalog entry,
-  never by moving an asset or touching validation code.
+- **Selectable set:** the ten `player-starter` entries of the authoritative
+  Issue #70 portrait catalog are always selectable. Issue #98's
+  `player-unlockable` entries are offered and accepted only when the
+  authenticated player account owns the corresponding permanent entitlement;
+  the same account-aware rule governs picker projection and safe presentation.
+  `npc-only` and `reserved` portraits are valid production assets but are never
+  offered or accepted, and an unowned unlockable resolves to the neutral
+  placeholder. Availability is catalog metadata plus the server-loaded
+  ownership set — never asset paths or client-provided categories.
 - **No default portrait:** a human portrait is never assigned automatically.
   New characters must deliberately choose one during creation; the stable
   portrait ID is persisted atomically with the character row in the same
@@ -373,10 +374,10 @@ that is used wherever the character is publicly presented.
   paths, URLs, labels, image blobs, or metadata.
 - **Ownership and validation boundary:** creation and portrait changes are
   server-authoritative (`server/characters.ts`). The server authenticates the
-  request, validates the ID against the catalog-derived `player-starter`
-  subset, verifies ownership on every change, and updates only the requested
-  owned character with an atomic ownership-scoped statement. `npc-only`,
-  `reserved`, unknown, malformed, and retired values are refused; concurrent or
+  request, validates the ID through the shared player-aware rule, verifies
+  ownership on every change, and updates only the requested owned character
+  with an atomic ownership-scoped statement. `npc-only`, `reserved`, unknown,
+  malformed, retired, and unowned unlockable values are refused; concurrent or
   retried saves converge on one valid final selection without corrupting state.
 - **Resolution and public projection:** one narrow domain boundary
   (`game/domain/character-portrait.ts`) resolves a stored value to either the
