@@ -108,14 +108,34 @@ database is unavailable, stop and report that exact blocker; do not inspect
 secrets, substitute another database, or silently fall back to GitHub Actions.
 
 ### Managed-host ports, cleanup, and focused E2E
-- Port `3000` belongs to OpenChamber. Never use it for RuneSpace work and never
-  kill its process.
+
+Port rules are **host-specific**. A service/port existing on one host (for
+example OpenChamber on the Coolify/OpenChamber deployment host) is **not** a
+RuneSpace fact on any other host. The machine you are on is the only machine
+whose listeners matter, and you must inspect them before assuming what is or
+is not free. The durable generic rule is:
+
+> Never assume an arbitrary port is free and never kill an unknown listener.
+> Inspect the current machine's listeners and ownership first. Use RuneSpace's
+> explicitly designated canonical/focused ports where the runner owns them;
+> otherwise select a confirmed-free appropriate port. Kill only a positively
+> identified RuneSpace-owned test process when cleanup is required.
+
+Confirmed on the Hermes Oracle VPS (2026-08): no RuneSpace system port is
+reserved host-wide. The only RuneSpace port usage is the `3200` canonical port
+and the `3310` focused default while the corresponding runner is running. Port
+`3000` is **not** reserved for RuneSpace or OpenChamber on Hermes; it is
+simply an unclaimed port here.
+
 - Port `3200` is the canonical runner's dedicated port
   (`scripts/run-canonical-e2e.mjs`).
-- A focused run must use a separately confirmed-free high port, never `3000` or
-  `3200`. `pnpm test:e2e:focused` defaults to `3310`, refuses to start unless
-  that port is confirmed available, and accepts an override through
-  `RUNESPACE_FOCUSED_E2E_PORT` (a validated high port in `1024..65535`).
+- A focused run must use a separately confirmed-free high port, never the
+  canonical runner port `3200`, and never `3000` unless the actual listener on
+  *this* host is confirmed free (on Hermes it currently is; on a host running
+  OpenChamber it is not). `pnpm test:e2e:focused` defaults to `3310`, refuses
+  to start unless that port is confirmed available, and accepts an override
+  through `RUNESPACE_FOCUSED_E2E_PORT` (a validated high port in
+  `1024..65535`).
 - The focused runner currently supports `mining`, `character-profile`,
   `location-population`, and `character-portraits`; it does not support the
   Travel phase. To run one Travel test in isolation, start from the repository
@@ -142,11 +162,28 @@ secrets, substitute another database, or silently fall back to GitHub Actions.
   starts means the harness blocked the local test-server port. Allow loopback
   server binding and rerun the same command; it is a startup-environment
   blocker, not evidence that the E2E assertion failed.
-- Cleanup: inspect listeners and owning PIDs with `ss -tlnp`, then kill only a
-  positively identified RuneSpace-owned test-server PID with a targeted
-  `kill <pid>`. Never use broad `pkill -f` or blanket Next.js cleanup. If the
-  focused port is occupied by an uncertain process, choose another inspected
-  free high port instead of killing it.
+- Cleanup: inspect listeners and owning PIDs, then kill only a positively
+  identified RuneSpace-owned test-server PID with a targeted `kill <pid>`.
+  Never use broad `pkill -f` or blanket Next.js cleanup. If the focused port is
+  occupied by an uncertain process, choose another inspected free high port
+  instead of killing it.
+
+### Inspecting unknown listeners safely
+
+Never guess what owns a port on a machine you have not inspected, and never
+kill an unidentified process to obtain a port. Prefer a listener tool on the
+current host:
+
+```bash
+# where ss or netstat is installed
+ss -tlnp        # listening TCP sockets + owning PIDs (may need privilege for PIDs)
+# where ss/netstat are absent (Hermes Oracle VPS is one such host), read the
+# kernel socket table directly; port is little-endian hex, st "0A" == LISTEN:
+node -e 'const {readFileSync}=require("fs");["tcp","tcp6"].forEach(f=>{try{const L=readFileSync("/proc/net/"+f,"utf8").trim().split("\n").slice(1);for(const r of L){const p=r.trim().split(/\s+/);if(p[3]==="0A"){const [a,h]=p[1].split(":");console.log(f,a,parseInt(h,16))}}}catch(e){}})'
+```
+
+Only after positively identifying the owning process may you kill a
+RuneSpace-owned test server for cleanup.
 - Do not manually assemble `next build` + `next start` for browser validation on
   the managed host. Use `pnpm test:e2e:focused <phase>`, `pnpm test:e2e:canonical`,
   or the deployed PR preview unless diagnosing the runner itself.
@@ -214,6 +251,64 @@ label. A coherent, focused-validated draft push is therefore allowed before
 full local parity when the purpose is real-device phone/desktop review. The
 Coolify branch preview deploys pushed checkpoints independently of this CI
 split; it is visual-review evidence, not the merge gate.
+
+### Exact-preview-revision verification
+
+An HTTP 200 from a preview only proves a deployment is alive; it does not prove
+the preview contains the latest PR head. Before beginning live UI/behavior
+review of a preview, verify the preview is serving the exact source revision
+you intend to review. The preview hostname is derived from the PR number:
+
+```text
+https://pr-{pullRequestNumber}.runespace.qcfailed.com
+```
+
+The deployment reports its source revision through the public build-info
+boundary, `GET /api/build-info`, which returns:
+
+```json
+{ "releaseId": "<exact deployed source revision or 'unknown'>" }
+```
+
+Short bounded procedure (ordinary GitHub tooling + curl; no long sleeps, no
+background daemon, and **never** a new GitHub CI network dependency):
+
+1. Obtain the current GitHub **PR head SHA**:
+   ```bash
+   gh pr view <N> --repo BDubDesigns/RuneSpace --json headRefOid --jq .headRefOid
+   ```
+2. Request the preview build-info endpoint:
+   ```bash
+   curl -s https://pr-<N>.runespace.qcfailed.com/api/build-info
+   ```
+3. Compare the reported `releaseId` to the expected PR head SHA, normalizing
+   only the representation needed for a legitimate exact comparison.
+4. Require an **exact/unambiguous match** before beginning live review.
+5. Reachable but older/different revision → call it a **stale deployment** and
+   wait for the redeploy (bounded, individually short polls) before reviewing.
+6. `releaseId` equal to `unknown` (or `HEAD` from a Coolify preview bug) →
+   call it **unverified**, not ready.
+
+If the deployment wiring prevents the match, that is the real remaining
+blocker for #75-style preview review — treat it as such rather than claiming
+success because a preview is reachable.
+
+### Preview test-data discipline
+
+For manual PR-preview review:
+
+- use clearly disposable test accounts/characters with recognizable unique
+  suffixes (for example a `review-<date>-<initials>` prefix);
+- never use production-like personal data;
+- assume preview-created data may survive application redeploys;
+- record temporary review identities when useful to later cleanup/debugging;
+- remove disposable data only through a known safe supported path when
+  practical;
+- never use broad SQL/delete/reset commands merely to make a preview "clean";
+- never run preview cleanup logic against production.
+
+This issue deliberately adds **no** reset-all/delete-all utility. Automated
+preview-data lifecycle is out of scope for #75.
 
 ### QC Failed status manifest upkeep
 
