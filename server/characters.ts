@@ -10,8 +10,8 @@ import {
 } from "@/db/rune-space";
 import { validateCharacterName } from "@/game/domain/character-name";
 import { LOCATION_IDS } from "@/game/config/foundations";
-import { isPlayerStarterPortrait } from "@/game/content/portrait-catalog";
 import { requirePlayerAccount } from "@/server/ownership";
+import { isPortraitSelectableForPlayer } from "@/server/player-portrait-unlocks";
 
 /** Postgres unique-violation error code. */
 const UNIQUE_VIOLATION = "23505";
@@ -74,7 +74,7 @@ export async function occupiedSlots(playerAccountId: string): Promise<Set<number
  * A valid selectable portrait is REQUIRED and is persisted atomically with the
  * character in the same transaction: the browser never supplies paths, URLs,
  * categories, or metadata — only the stable portrait ID, which is re-validated
- * here against the catalog-derived `player-starter` subset (issue #65).
+ * here against the account-aware portrait availability boundary (issue #98).
  *
  * Concurrency-safe:
  * 1. Lock the player_accounts row with `FOR UPDATE` so concurrent creations
@@ -92,7 +92,7 @@ export async function createCharacter(
   if (!validation.ok) {
     throw new CharacterError(validation.error, 400);
   }
-  if (!isPlayerStarterPortrait(portraitId)) {
+  if (!(await isPortraitSelectableForPlayer(playerAccountId, portraitId))) {
     throw new CharacterError("Please choose one of the available portraits", 400);
   }
 
@@ -182,9 +182,9 @@ export async function createCharacter(
  *   and the owning account ID atomically applies the change — a forged or
  *   foreign character ID can never update another player's character, and no
  *   client-supplied owner ID or category value is trusted;
- * - the target portrait ID must be a currently selectable `player-starter`
- *   catalog ID; `npc-only`, `reserved`, unknown, and malformed values are
- *   refused with no row change;
+ * - the target portrait ID must be a starter or owned `player-unlockable`
+ *   catalog ID; `npc-only`, `reserved`, unknown, malformed, and unowned
+ *   unlockable values are refused with no row change;
  * - the statement is atomic and idempotent: concurrent or retried saves
  *   converge on one valid final selection and can never corrupt another
  *   character on the same account.
@@ -194,10 +194,10 @@ export async function changeCharacterPortrait(
   characterId: string,
   portraitId: string,
 ): Promise<Character> {
-  if (!isPlayerStarterPortrait(portraitId)) {
+  const account = await requirePlayerAccount(userId);
+  if (!(await isPortraitSelectableForPlayer(account.id, portraitId))) {
     throw new CharacterError("That portrait is not available", 400);
   }
-  const account = await requirePlayerAccount(userId);
 
   const updated = await db
     .update(characters)

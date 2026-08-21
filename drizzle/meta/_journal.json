@@ -78,6 +78,13 @@
       "when": 1787000001000,
       "tag": "0010_scavenge_reveals",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1787331774971,
+      "tag": "0011_player_portrait_unlocks",
+      "breakpoints": true
     }
   ]
 }

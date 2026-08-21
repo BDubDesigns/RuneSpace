@@ -15,16 +15,21 @@ resources, or balance values. See `docs/gameplay-foundations.md`.
 `portrait-catalog.json` is the machine-readable single source of truth for the
 accepted character portrait library (stable IDs, display names, launch
 categories, master and derivative paths); `portrait-catalog.ts` exposes the
-typed validated API (`PORTRAITS`, `PLAYER_STARTER_PORTRAITS`, `getPortrait`).
+typed validated API (`PORTRAITS`, `PLAYER_STARTER_PORTRAITS`,
+`PLAYER_UNLOCKABLE_PORTRAITS`, `getPortrait`).
 Stable IDs are registered in `game/config/foundations.ts` (`PORTRAIT_IDS`).
 Issue #65 consumes this catalog; it must not re-sort or re-classify the assets.
 
 ### Selectable-category rule (issue #65)
 
-Exactly the ten `player-starter` entries are selectable by players. `npc-only`
-and `reserved` portraits remain valid production assets but never appear in
-the picker, selection payloads, or validation allowlists. Availability is this
-catalog's category metadata — never filenames or folder separation. Future
-approved selectable portraits are added by reclassifying or adding catalog
-entries, not by touching validation or UI code. The neutral system placeholder
-used for legacy/null characters is deliberately not a catalog portrait.
+The ten `player-starter` entries are always selectable. The
+`player-unlockable` entries are selectable only for accounts that own the
+corresponding permanent entitlement; the shared player-aware portrait domain
+rule projects that account context for the picker, creation, edits, and safe
+presentation. `npc-only` and `reserved` portraits remain valid production
+assets but never become selectable. Availability is this catalog's category
+metadata plus the server-loaded ownership set — never filenames or folder
+separation. Future approved unlockables are added by catalog metadata and the
+same entitlement boundary, not by duplicating validation or UI rules. The
+neutral system placeholder used for legacy/null/unavailable characters is
+deliberately not a catalog portrait.

@@ -62,11 +62,12 @@ runtime image service.
 
 Issue #65 consumes this catalog as the single source of truth:
 
-- **Selectable set:** exactly the ten `player-starter` entries, projected
-  server-side into the shared picker
-  (`game/domain/character-portrait.ts` `getSelectablePortraitOptions`).
-  `npc-only` and `reserved` entries never appear in the picker, selection
-  payloads, or validation allowlists.
+- **Selectable set:** the ten `player-starter` entries are always selectable;
+  `player-unlockable` entries are projected server-side into the shared picker
+  only when the authenticated account owns the corresponding entitlement
+  (`game/domain/character-portrait.ts` `getSelectablePortraitOptions` plus the
+  server entitlement boundary). `npc-only` and `reserved` entries never appear
+  in the picker, selection payloads, or validation allowlists.
 - **Persistence:** `characters.portrait_id` stores only stable portrait IDs;
   legacy characters may remain `null` and resolve to the neutral placeholder.
 - **Resolution:** `resolveCharacterPortrait` maps a stored ID to the safe
@@ -103,7 +104,7 @@ Staging source names are the opaque root-level upload filenames.
 | portrait_spaceport_courier_01 | Spaceport Courier | reserved | file_...c64c... | 2,549,979 | 45,346 |
 | portrait_tea_psychic_01 | Tea Psychic | reserved | file_...126c... | 2,467,552 | 45,716 |
 | portrait_unicorn_mechanic_01 | Unicorn Mechanic | reserved | file_...9af0... | 2,762,233 | 55,162 |
-| portrait_von_scavenger_01 | Von Scavenger | reserved | file_...8d44... | 2,654,446 | 43,512 |
+| portrait_von_scavenger_01 | Von Scavenger | player-unlockable | file_...8d44... | 2,654,446 | 43,512 |
 | portrait_zero_g_ballerina_01 | Zero-G Ballerina | reserved | file_...7c1c... | 2,444,652 | 43,434 |
 | **Totals** | | | | **64,334,950** | **1,118,340** |
 
@@ -124,8 +125,8 @@ Staging source names are the opaque root-level upload filenames.
   file_...f688... (white-and-blue milkman uniform, milk crates) intentionally
   resemble each other as the approved related NPC pair; this is not treated as a
   duplicate.
-- **Named-persona exception**: Von Scavenger (file_...8d44...) is classified
-  `reserved` under the issue's approved named-persona allowance.
+- **First player unlockable**: Von Scavenger (file_...8d44...) is classified
+  `player-unlockable` as the first approved account-owned portrait entitlement.
 - No duplicate or superseded generations exist in the staging set; every staged
   file maps to one distinct accepted concept, so nothing was rejected.
 
@@ -170,12 +171,14 @@ version and new byte sizes in the PR.
   application code.
 - `tests/unit/portrait-catalog.test.ts` proves: catalog/registry ID parity and
   unique identities and paths, exactly the ten approved starter identities in
-  approved picker order, baker/milkman as the only npc-only portraits,
-  starter-only selection helpers, the neutral canonical ID/filename format
+  approved picker order, Von Scavenger as the only player-unlockable portrait,
+  baker/milkman as the only npc-only portraits, starter catalog helpers, the
+  neutral canonical ID/filename format
   (concept-first naming itself is a documentation and human-review policy, not
   a regex), categories absent from asset paths, masters outside `public/` and
   derivatives under the canonical public path, expected derivative metadata and
   accessible descriptions, and exact catalog-to-filesystem parity with no
   missing or orphan assets.
-- No selection UI, persistence, NPC system, quest, unlock, purchase, or generic
-  cosmetics framework is added; Issue #65 consumes this catalog.
+- No reward integration, purchase flow, revocation flow, NPC system, quest, or
+  generic cosmetics framework is added; Issue #65 consumes this catalog and
+  Issue #98 adds only the narrow player-account portrait entitlement boundary.

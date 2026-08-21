@@ -3,14 +3,15 @@ import { PLAYER_STARTER_PORTRAITS, PORTRAITS } from "@/game/content/portrait-cat
 import { PORTRAIT_IDS } from "@/game/config/foundations";
 import {
   getSelectablePortraitOptions,
+  isSelectablePortrait,
   resolveCharacterPortrait,
 } from "@/game/domain/character-portrait";
 
 /**
  * Issue #65 domain coverage for the character-portrait boundary:
  * - the picker option set is derived from the authoritative catalog and
- *   contains exactly the ten player-starter entries — never npc-only,
- *   reserved, or unknown IDs;
+ *   contains exactly the ten player-starter entries until an account owns an
+ *   unlockable — never npc-only, reserved, or unknown IDs;
  * - the neutral placeholder is distinct from every selectable catalog portrait
  *   and is never a catalog entry;
  * - valid selected IDs resolve to the approved safe presentation;
@@ -49,6 +50,24 @@ describe("issue #65 selectable portrait options", () => {
     // the selectable option set.
     expect(resolveCharacterPortrait(null)).toEqual({ kind: "placeholder" });
   });
+
+  it("projects owned Von Scavenger once and ignores invalid or unapproved owned IDs", () => {
+    const options = getSelectablePortraitOptions([
+      PORTRAIT_IDS.vonScavenger,
+      PORTRAIT_IDS.vonScavenger,
+      PORTRAIT_IDS.baker,
+      PORTRAIT_IDS.unicornMechanic,
+      "portrait_unknown_01",
+    ]);
+    expect(options).toHaveLength(11);
+    expect(options.at(-1)?.portraitId).toBe(PORTRAIT_IDS.vonScavenger);
+    expect(
+      options.filter((option) => option.portraitId === PORTRAIT_IDS.vonScavenger),
+    ).toHaveLength(1);
+    expect(isSelectablePortrait(PORTRAIT_IDS.vonScavenger)).toBe(false);
+    expect(isSelectablePortrait(PORTRAIT_IDS.vonScavenger, [PORTRAIT_IDS.vonScavenger])).toBe(true);
+    expect(isSelectablePortrait(PORTRAIT_IDS.baker, [PORTRAIT_IDS.baker])).toBe(false);
+  });
 });
 
 describe("issue #65 portrait resolution", () => {
@@ -77,7 +96,7 @@ describe("issue #65 portrait resolution", () => {
       "portrait_retired_01",
       PORTRAIT_IDS.baker, // npc-only
       PORTRAIT_IDS.milkman, // npc-only
-      PORTRAIT_IDS.vonScavenger, // reserved
+      PORTRAIT_IDS.vonScavenger, // player-unlockable but unowned
       PORTRAIT_IDS.unicornMechanic, // reserved
     ]) {
       expect(resolveCharacterPortrait(value)).toEqual({ kind: "placeholder" });
@@ -90,6 +109,19 @@ describe("issue #65 portrait resolution", () => {
     expect(gramma).toMatchObject({ kind: "selected", displayName: "Gramma" });
     expect(rockStar).toMatchObject({ kind: "selected", displayName: "Zero-G Rock Star" });
     expect(gramma).not.toEqual(rockStar);
+  });
+
+  it("resolves an owned unlockable and rejects it without ownership", () => {
+    expect(resolveCharacterPortrait(PORTRAIT_IDS.vonScavenger)).toEqual({ kind: "placeholder" });
+    expect(
+      resolveCharacterPortrait(PORTRAIT_IDS.vonScavenger, [PORTRAIT_IDS.vonScavenger]),
+    ).toMatchObject({
+      kind: "selected",
+      displayName: "Von Scavenger",
+    });
+    expect(
+      resolveCharacterPortrait(PORTRAIT_IDS.unicornMechanic, [PORTRAIT_IDS.unicornMechanic]),
+    ).toEqual({ kind: "placeholder" });
   });
 });
 

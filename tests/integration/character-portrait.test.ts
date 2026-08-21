@@ -15,13 +15,13 @@ const suite = DATABASE_URL ? describe : describe.skip;
 const token = () => Math.random().toString(36).slice(2, 8);
 
 /**
- * Issue #65 acceptance, proven against real PostgreSQL: portrait selection is
- * required at creation and persisted atomically; only player-starter IDs are
- * accepted; legacy null characters stay playable and resolve to the neutral
- * placeholder; ownership scopes every change; selections are per character;
- * changes persist across fresh reads; the public profile projection is safe;
- * and concurrent/retried saves leave one valid final selection without
- * corrupting character state.
+ * Issues #65 and #98 acceptance, proven against real PostgreSQL: portrait
+ * selection is required at creation and persisted atomically; starters are
+ * globally available while player-unlockable IDs require account ownership;
+ * legacy null characters stay playable and resolve to the neutral placeholder;
+ * ownership scopes every change; selections are per character; changes persist
+ * across fresh reads; the public profile projection is safe; and concurrent or
+ * retried saves leave one valid final selection without corrupting state.
  */
 suite("issue #65 character portrait selection (real PostgreSQL)", () => {
   let db: (typeof import("@/db"))["db"];
@@ -29,6 +29,7 @@ suite("issue #65 character portrait selection (real PostgreSQL)", () => {
   let rune: typeof import("@/db/rune-space");
   let ownership: typeof import("@/server/ownership");
   let characters: typeof import("@/server/characters");
+  let portraitUnlocks: typeof import("@/server/player-portrait-unlocks");
   let profile: typeof import("@/server/character-profile");
   const createdUsers: string[] = [];
 
@@ -38,6 +39,7 @@ suite("issue #65 character portrait selection (real PostgreSQL)", () => {
     rune = await import("@/db/rune-space");
     ownership = await import("@/server/ownership");
     characters = await import("@/server/characters");
+    portraitUnlocks = await import("@/server/player-portrait-unlocks");
     profile = await import("@/server/character-profile");
   });
 
@@ -108,7 +110,6 @@ suite("issue #65 character portrait selection (real PostgreSQL)", () => {
       "portrait_unknown_01",
       PORTRAIT_IDS.baker, // npc-only
       PORTRAIT_IDS.milkman, // npc-only
-      PORTRAIT_IDS.vonScavenger, // reserved
       PORTRAIT_IDS.unicornMechanic, // reserved
       "!!!not-a-portrait!!!",
     ]) {
@@ -116,6 +117,126 @@ suite("issue #65 character portrait selection (real PostgreSQL)", () => {
         characters.createCharacter(account.id, `Refused ${token()}`, id),
       ).rejects.toThrow(/portrait/i);
     }
+  });
+
+  it("grants Von Scavenger idempotently and rejects non-unlockable portraits", async () => {
+    const userId = await makeUser("Unlock Operator Owner");
+    const account = await ownership.ensurePlayerAccount(userId);
+
+    const first = await portraitUnlocks.grantPlayerPortraitUnlock(
+      account.id,
+      PORTRAIT_IDS.vonScavenger,
+      "operator",
+    );
+    const replay = await portraitUnlocks.grantPlayerPortraitUnlock(
+      account.id,
+      PORTRAIT_IDS.vonScavenger,
+      "operator",
+    );
+    expect(first.created).toBe(true);
+    expect(replay.created).toBe(false);
+    expect(replay.unlock.unlockedAt).toEqual(first.unlock.unlockedAt);
+
+    const rows = await db
+      .select()
+      .from(rune.playerPortraitUnlocks)
+      .where(eq(rune.playerPortraitUnlocks.playerAccountId, account.id));
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({
+      portraitId: PORTRAIT_IDS.vonScavenger,
+      source: "operator",
+    });
+
+    for (const portraitId of [PORTRAIT_IDS.baker, PORTRAIT_IDS.unicornMechanic]) {
+      await expect(
+        portraitUnlocks.grantPlayerPortraitUnlock(account.id, portraitId, "operator"),
+      ).rejects.toThrow(/not approved/i);
+    }
+  });
+
+  it("shares an unlock across character slots while refusing an unentitled player's forged selection", async () => {
+    const owner = await makeUser("Shared Unlock Owner");
+    const ownerAccount = await ownership.ensurePlayerAccount(owner);
+    await portraitUnlocks.grantPlayerPortraitUnlock(
+      ownerAccount.id,
+      PORTRAIT_IDS.vonScavenger,
+      "operator",
+    );
+
+    const active = await makeCharacterAt(
+      owner,
+      `Shared Active ${token()}`,
+      LOCATION_IDS.crashSite,
+      PORTRAIT_IDS.gramma,
+    );
+    const ownedVon = await makeCharacterAt(
+      owner,
+      `Shared Von ${token()}`,
+      LOCATION_IDS.crashSite,
+      PORTRAIT_IDS.vonScavenger,
+    );
+    const sibling = await createLegacyCharacterForUser(
+      db,
+      rune,
+      ownership,
+      owner,
+      `Shared Sibling ${token()}`,
+      3,
+    );
+    await characters.changeCharacterPortrait(owner, sibling.id, PORTRAIT_IDS.vonScavenger);
+
+    const ownedProfile = await profile.getCharacterProfile(owner, active.id, ownedVon.displayName);
+    const siblingProfile = await profile.getCharacterProfile(owner, active.id, sibling.displayName);
+    expect(ownedProfile.portrait).toMatchObject({
+      kind: "selected",
+      displayName: "Von Scavenger",
+    });
+    expect(siblingProfile.portrait).toMatchObject({
+      kind: "selected",
+      displayName: "Von Scavenger",
+    });
+
+    const stranger = await makeUser("Unentitled Portrait Owner");
+    const strangerCharacter = await makeCharacterAt(
+      stranger,
+      `Unentitled ${token()}`,
+      LOCATION_IDS.crashSite,
+      PORTRAIT_IDS.gramma,
+    );
+    await expect(
+      characters.changeCharacterPortrait(stranger, strangerCharacter.id, PORTRAIT_IDS.vonScavenger),
+    ).rejects.toThrow(/not available/i);
+    await expect(
+      characters.createCharacter(
+        (await ownership.ensurePlayerAccount(stranger)).id,
+        `Forged Create ${token()}`,
+        PORTRAIT_IDS.vonScavenger,
+      ),
+    ).rejects.toThrow(/portrait/i);
+  });
+
+  it("keeps a forged stored unlockable portrait on an unentitled account at the placeholder", async () => {
+    const viewer = await makeUser("Presentation Viewer");
+    const active = await makeCharacterAt(
+      viewer,
+      `View Active ${token()}`,
+      LOCATION_IDS.crashSite,
+      PORTRAIT_IDS.gramma,
+    );
+    const unentitled = await makeUser("Presentation Unentitled");
+    const target = await makeCharacterAt(
+      unentitled,
+      `View Target ${token()}`,
+      LOCATION_IDS.crashSite,
+      PORTRAIT_IDS.gramma,
+    );
+    await db
+      .update(rune.characters)
+      .set({ portraitId: PORTRAIT_IDS.vonScavenger })
+      .where(eq(rune.characters.id, target.id));
+
+    const result = await profile.getCharacterProfile(viewer, active.id, target.displayName);
+    expect(result.portrait).toEqual({ kind: "placeholder" });
   });
 
   it("keeps a legacy null-portrait character readable, playable, and placeholder-resolved", async () => {

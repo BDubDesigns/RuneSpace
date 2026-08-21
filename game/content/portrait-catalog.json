@@ -256,7 +256,7 @@
     "id": "portrait_von_scavenger_01",
     "displayName": "Von Scavenger",
     "concept": "Von Scavenger",
-    "category": "reserved",
+    "category": "player-unlockable",
     "masterPath": "assets/character-portraits/portrait-von-scavenger-01.png",
     "derivativePath": "/character-portraits/portrait-von-scavenger-01.webp",
     "derivativeWidth": 512,

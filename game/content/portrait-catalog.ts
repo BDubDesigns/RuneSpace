@@ -16,8 +16,9 @@ import portraitCatalogData from "./portrait-catalog.json";
  *
  * All 25 staged portraits were visually inspected and accepted; none were
  * rejected or superseded. The catalog carries exactly the approved launch
- * set: ten player-starter entries, baker and milkman as npc-only, and the
- * remaining thirteen accepted portraits as reserved.
+ * set: ten player-starter entries, Von Scavenger as the first explicitly
+ * player-unlockable portrait, baker and milkman as npc-only, and the remaining
+ * twelve accepted portraits as reserved.
  */
 export const PLAYER_STARTER_SET_SIZE = 10;
 
@@ -71,10 +72,14 @@ assertPortraitCatalogIntegrity(portraitDefinitions);
 /** The full ordered portrait catalog (explicit deterministic ordering). */
 export const PORTRAITS: readonly PortraitDefinition[] = portraitDefinitions;
 
-/** The ordered selectable subset: player-starter entries only (issue #65). */
+/** The ordered starter subset; account-owned unlockables are projected separately. */
 export const PLAYER_STARTER_PORTRAITS: readonly PortraitDefinition[] = portraitDefinitions.filter(
   (portrait) => portrait.category === "player-starter",
 );
+
+/** Explicitly approved player-account unlockable portraits. */
+export const PLAYER_UNLOCKABLE_PORTRAITS: readonly PortraitDefinition[] =
+  portraitDefinitions.filter((portrait) => portrait.category === "player-unlockable");
 
 const portraitById = new Map<string, PortraitDefinition>(
   portraitDefinitions.map((portrait) => [portrait.id, portrait]),
@@ -88,6 +93,11 @@ export function getPortrait(portraitId: string): PortraitDefinition | undefined 
 /** Whether the supplied ID is selectable in the initial player portrait picker. */
 export function isPlayerStarterPortrait(portraitId: string): boolean {
   return getPortrait(portraitId)?.category === "player-starter";
+}
+
+/** Whether a portrait is explicitly approved for player-account ownership. */
+export function isPlayerUnlockablePortrait(portraitId: string): boolean {
+  return getPortrait(portraitId)?.category === "player-unlockable";
 }
 
 export type { PortraitDefinition, PortraitLaunchCategory } from "@/game/schemas/portraits";

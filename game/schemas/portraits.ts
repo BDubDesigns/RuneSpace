@@ -10,7 +10,12 @@ import { ContentId } from "./ids";
  * they are not encoded in filenames or directory names, so a later approved
  * availability change never requires moving an asset.
  */
-export const PORTRAIT_LAUNCH_CATEGORIES = ["player-starter", "npc-only", "reserved"] as const;
+export const PORTRAIT_LAUNCH_CATEGORIES = [
+  "player-starter",
+  "player-unlockable",
+  "npc-only",
+  "reserved",
+] as const;
 
 export type PortraitLaunchCategory = (typeof PORTRAIT_LAUNCH_CATEGORIES)[number];
 

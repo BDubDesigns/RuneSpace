@@ -58,6 +58,30 @@ export const playerAccounts = pgTable(
   (table) => [index("player_accounts_user_id_idx").on(table.userId)],
 );
 
+/** Permanent player-account ownership of explicitly unlockable portraits. */
+export const playerPortraitUnlocks = pgTable(
+  "player_portrait_unlocks",
+  {
+    playerAccountId: text("player_account_id")
+      .notNull()
+      .references(() => playerAccounts.id, { onDelete: "restrict" }),
+    // Stable catalog identity only: asset paths, labels, and blobs never enter
+    // persistence. Availability remains authoritative catalog metadata.
+    portraitId: text("portrait_id").notNull(),
+    unlockedAt: timestamp("unlocked_at", { withTimezone: true }).notNull().defaultNow(),
+    // Stable grant origin. The server boundary currently accepts only
+    // `operator`; future approved gameplay sources can reuse this relation.
+    source: text("source").notNull(),
+  },
+  (table) => [
+    primaryKey({
+      columns: [table.playerAccountId, table.portraitId],
+      name: "player_portrait_unlocks_account_portrait_pk",
+    }),
+    index("player_portrait_unlocks_account_idx").on(table.playerAccountId),
+  ],
+);
+
 export const characters = pgTable(
   "characters",
   {
@@ -88,9 +112,9 @@ export const characters = pgTable(
     // catalog portrait ID (game/content/portrait-catalog); never paths, URLs,
     // labels, or blobs. Nullable by design: legacy characters may remain null
     // and resolve to the neutral system placeholder until their owner chooses
-    // one. Availability is catalog metadata (player-starter), validated
-    // server-side on every write; there is no database FK because portraits
-    // are content, not rows.
+    // one. Availability is the shared catalog-plus-account-entitlement rule,
+    // validated server-side on every write; there is no database FK because
+    // portraits are content, not rows.
     portraitId: text("portrait_id"),
   },
   (table) => [
@@ -110,6 +134,14 @@ export const playerAccountsRelations = relations(playerAccounts, ({ one, many })
     references: [user.id],
   }),
   characters: many(characters),
+  portraitUnlocks: many(playerPortraitUnlocks),
+}));
+
+export const playerPortraitUnlocksRelations = relations(playerPortraitUnlocks, ({ one }) => ({
+  playerAccount: one(playerAccounts, {
+    fields: [playerPortraitUnlocks.playerAccountId],
+    references: [playerAccounts.id],
+  }),
 }));
 
 export const charactersRelations = relations(characters, ({ one }) => ({
@@ -386,6 +418,8 @@ export const characterPowerCellDailyClaims = pgTable(
 
 export type PlayerAccount = typeof playerAccounts.$inferSelect;
 export type NewPlayerAccount = typeof playerAccounts.$inferInsert;
+export type PlayerPortraitUnlock = typeof playerPortraitUnlocks.$inferSelect;
+export type NewPlayerPortraitUnlock = typeof playerPortraitUnlocks.$inferInsert;
 export type Character = typeof characters.$inferSelect;
 export type NewCharacter = typeof characters.$inferInsert;
 export type CharacterSkillXp = typeof characterSkillXp.$inferSelect;

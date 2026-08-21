@@ -14,6 +14,7 @@ import {
   getSelectablePortraitOptions,
   resolveCharacterPortrait,
 } from "@/game/domain/character-portrait";
+import { loadPlayerPortraitUnlockIds } from "@/server/player-portrait-unlocks";
 
 export const metadata = { title: "Characters — RuneSpace" };
 
@@ -25,9 +26,9 @@ export const metadata = { title: "Characters — RuneSpace" };
  * never appear because we only query through the authenticated account.
  *
  * Each owned character row shows its portrait presentation (the selected
- * catalog portrait or the neutral placeholder for legacy characters) and the
- * Choose/Change portrait flow; the picker options are the server-projected
- * selectable set — exactly the ten player-starter catalog entries.
+ * catalog portrait or the neutral placeholder for legacy/unowned characters)
+ * and the Choose/Change portrait flow; picker options and presentation are
+ * projected from the authenticated player's account unlocks.
  */
 export default async function CharactersPage() {
   const session = await auth.api.getSession({ headers: await headers() });
@@ -35,8 +36,12 @@ export default async function CharactersPage() {
 
   const user = await requireCurrentUser(await headers());
   const account = await ensurePlayerAccount(user.id);
-  const [chars, used] = await Promise.all([listCharacters(account.id), occupiedSlots(account.id)]);
-  const portraitOptions = getSelectablePortraitOptions();
+  const [chars, used, ownedPortraitIds] = await Promise.all([
+    listCharacters(account.id),
+    occupiedSlots(account.id),
+    loadPlayerPortraitUnlockIds(account.id),
+  ]);
+  const portraitOptions = getSelectablePortraitOptions(ownedPortraitIds);
 
   const slots = [];
   for (let slot = SLOT_MIN; slot <= SLOT_MAX; slot++) {
@@ -57,7 +62,9 @@ export default async function CharactersPage() {
       <ul className="mt-6 space-y-3">
         {slots.map(({ slot, character }) => {
           const portrait =
-            character === null ? null : resolveCharacterPortrait(character.portraitId);
+            character === null
+              ? null
+              : resolveCharacterPortrait(character.portraitId, ownedPortraitIds);
           return (
             <Panel key={slot} as="li" className="p-4" tone="raised">
               {character && portrait ? (

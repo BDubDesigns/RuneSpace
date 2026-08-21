@@ -1,7 +1,12 @@
 import { and, eq, ne } from "drizzle-orm";
 import { db } from "@/db";
 import { user } from "@/db/auth-schema";
-import { characterSkillXp, characters, playerAccounts } from "@/db/rune-space";
+import {
+  characterSkillXp,
+  characters,
+  playerAccounts,
+  playerPortraitUnlocks,
+} from "@/db/rune-space";
 import { SKILL_IDS } from "@/game/config/foundations";
 import { skillLevelThresholds } from "@/game/config/balance";
 import { getSkillPresentation } from "@/game/content/skill-presentation";
@@ -73,12 +78,20 @@ export async function getCharacterProfile(
       displayName: characters.displayName,
       ownerName: user.name,
       portraitId: characters.portraitId,
+      ownedPortraitId: playerPortraitUnlocks.portraitId,
       skillId: characterSkillXp.skillId,
       totalXp: characterSkillXp.totalXp,
     })
     .from(characters)
     .innerJoin(playerAccounts, eq(characters.playerAccountId, playerAccounts.id))
     .innerJoin(user, eq(playerAccounts.userId, user.id))
+    .leftJoin(
+      playerPortraitUnlocks,
+      and(
+        eq(playerPortraitUnlocks.playerAccountId, characters.playerAccountId),
+        eq(playerPortraitUnlocks.portraitId, characters.portraitId),
+      ),
+    )
     .leftJoin(characterSkillXp, eq(characterSkillXp.characterId, characters.id))
     .where(
       and(
@@ -107,10 +120,13 @@ export async function getCharacterProfile(
     .filter((skillId) => skillLevelThresholds(skillId) !== undefined)
     .map((skillId) => ({ skillId, totalXp: xpBySkill.get(skillId) ?? 0 }));
 
+  const ownedPortraitIds = rows[0]!.ownedPortraitId ? [rows[0]!.ownedPortraitId] : [];
+
   return projectCharacterProfile({
     displayName: rows[0]!.displayName,
     ownerName: rows[0]!.ownerName,
     portraitId: rows[0]!.portraitId,
+    ownedPortraitIds,
     skillProgress,
     levelThresholds: skillLevelThresholds,
     skillDisplayName: (skillId) => getSkillPresentation(skillId)?.displayName,
