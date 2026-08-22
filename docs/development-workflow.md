@@ -137,7 +137,7 @@ simply an unclaimed port here.
   through `RUNESPACE_FOCUSED_E2E_PORT` (a validated high port in
   `1024..65535`).
 - The focused runner currently supports `mining`, `character-profile`,
-  `location-population`, and `character-portraits`; it does not support the
+  `location-population`, `character-portraits`, and `cargo-hold`; it does not support the
   Travel phase. To run one Travel test in isolation, start from the repository
   root, choose a separately confirmed-free high port, and let Playwright own a
   production server with the managed local environment:

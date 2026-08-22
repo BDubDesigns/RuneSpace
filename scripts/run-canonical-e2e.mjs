@@ -128,6 +128,12 @@ const REFINING_REQUIRED = [
   "refining-mobile-result.png",
 ];
 
+const CARGO_HOLD_REQUIRED = [
+  "cargo-mobile-repair.png",
+  "cargo-mobile-restored.png",
+  "cargo-desktop-storage.png",
+];
+
 function verifyAndCopyScreenshots(required, destDir) {
   log("Verifying and preserving screenshots...");
   for (const filename of required) {
@@ -158,6 +164,7 @@ async function prepareState() {
     mkdirSync(resolve(ROOT, "artifacts/e2e-review/character-profile"), { recursive: true });
     mkdirSync(resolve(ROOT, "artifacts/e2e-review/character-portraits"), { recursive: true });
     mkdirSync(resolve(ROOT, "artifacts/e2e-review/refining"), { recursive: true });
+    mkdirSync(resolve(ROOT, "artifacts/e2e-review/cargo-hold"), { recursive: true });
     log("Frozen review screenshots: ENABLED (manifest will be verified and uploaded).");
   } else {
     log(
@@ -217,6 +224,10 @@ async function runCanonical() {
   await runPlaywright(["refining", "--project=chromium"], "Refining E2E");
   if (captureScreenshots)
     verifyAndCopyScreenshots(REFINING_REQUIRED, resolve(ROOT, "artifacts/e2e-review/refining"));
+
+  await runPlaywright(["cargo-hold", "--project=chromium"], "Cargo Hold E2E");
+  if (captureScreenshots)
+    verifyAndCopyScreenshots(CARGO_HOLD_REQUIRED, resolve(ROOT, "artifacts/e2e-review/cargo-hold"));
 
   await runPlaywright(
     ["mining", "--project=chromium", "--grep", "Play boundary", "--repeat-each=3", "--workers=1"],

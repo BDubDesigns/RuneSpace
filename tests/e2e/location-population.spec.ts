@@ -138,6 +138,15 @@ test.beforeEach(async ({ page }) => {
       .delete(rune.characterPowerCellDailyClaims)
       .where(eq(rune.characterPowerCellDailyClaims.characterId, characterId));
     await transaction
+      .delete(rune.cargoHoldItemInstances)
+      .where(eq(rune.cargoHoldItemInstances.characterId, characterId));
+    await transaction
+      .delete(rune.cargoHoldStacks)
+      .where(eq(rune.cargoHoldStacks.characterId, characterId));
+    await transaction
+      .delete(rune.characterCargoHoldRepair)
+      .where(eq(rune.characterCargoHoldRepair.characterId, characterId));
+    await transaction
       .delete(rune.inventoryStacks)
       .where(eq(rune.inventoryStacks.characterId, characterId));
     await transaction

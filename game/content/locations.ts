@@ -11,7 +11,8 @@ import {
  * Server validation, UI projection, and adjacency checks all read from this
  * registry.
  *
- * - Crash Site: wreck / start location (no mining after issue #83).
+ * - Crash Site: wreck / start location (Cargo Hold Welding after issue #89;
+ *   no mining after issue #83).
  * - Abandoned Processing Yard: Ferrite Refining (issue #81).
  * - DeWhat? Emergency Power Annex: the daily Power Cell reward source.
  * - The Long Scramble (#83): intentionally barren traversal tile.
@@ -28,7 +29,7 @@ const locationDefinitions = [
       LOCATION_IDS.emergencyPowerAnnex,
       LOCATION_IDS.theLongScramble,
     ],
-    availableActionIds: [],
+    availableActionIds: [ACTION_IDS.cargoHoldWelding],
     dormantActivities: [],
     presentation: {
       mapIconKey: "crash_site_deposit" as const,

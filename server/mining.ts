@@ -3,6 +3,9 @@ import { and, asc, eq, isNull } from "drizzle-orm";
 import { db } from "@/db";
 import {
   activeActions,
+  cargoHoldItemInstances,
+  cargoHoldStacks,
+  characterCargoHoldRepair,
   characterMiningState,
   characterRefiningState,
   characterPowerCellDailyClaims,
@@ -24,6 +27,11 @@ import { resolveItemPresentation } from "@/game/content/item-presentation";
 import { isActionAvailableAtLocation } from "@/game/content/locations";
 import { ACTION_IDS, ITEM_IDS, LOCATION_IDS, SKILL_IDS } from "@/game/config/foundations";
 import { isTravelReplaceableAction } from "@/game/domain/travel-replacement";
+import {
+  cargoHoldMaterialsComplete,
+  cargoHoldRepairComplete,
+  planCargoHoldMaterialContribution,
+} from "@/game/domain/cargo-hold";
 import { POWER_ANNEX_REWARD_SOURCE_ID, pacificResetDate } from "@/game/domain/power-annex";
 import { powerAnnexNow } from "@/server/power-annex-clock";
 import {
@@ -79,12 +87,27 @@ import {
   type TravelSnapshot,
 } from "@/server/travel";
 import { createRefiningResolver, type PersistedRefiningOutcome } from "@/server/refining";
+import {
+  createWeldingResolver,
+  ensureCargoHoldRepairState,
+  type PersistedWeldingOutcome,
+  type WeldingSnapshot,
+} from "@/server/welding";
 import { grantCharacterSkillXp } from "@/server/progression";
 
 const systemRandom: MiningRandom = {
   nextBasisPoints: () => randomInt(10_000),
   nextUnit: () => randomInt(2) / 2,
 };
+
+function itemStackLimit(itemId: string, balance = getEffectiveGameBalance()): number {
+  if (itemId === balance.items.ferriteShale.itemId) return balance.items.ferriteShale.stackLimit;
+  if (itemId === balance.items.refinedFerrite.itemId)
+    return balance.items.refinedFerrite.stackLimit;
+  if (itemId === balance.items.slag.itemId) return balance.items.slag.stackLimit;
+  if (itemId === balance.items.powerCell.itemId) return balance.items.powerCell.stackLimit;
+  return 1;
+}
 
 /**
  * CI-only deterministic source for the focused browser journey. It is selected
@@ -198,6 +221,41 @@ export type RefiningRunState = {
   recentAttempts: readonly RefiningRunAttempt[];
 };
 
+export type CargoHoldStackState = {
+  id: string;
+  itemId: string;
+  name: string;
+  quantity: number;
+  stackLimit: number;
+};
+
+export type CargoHoldUniqueItemState = {
+  id: string;
+  itemId: string;
+  name: string;
+  massGrams: number;
+  currentCharge?: number;
+};
+
+export type CargoHoldState = {
+  repair: {
+    refinedFerriteContributed: number;
+    refinedFerriteRequired: number;
+    slagContributed: number;
+    slagRequired: number;
+    weldingProgress: number;
+    weldingIncrements: number;
+    materialComplete: boolean;
+    complete: boolean;
+    completedAt?: string;
+    availableContribution: { refinedFerrite: number; slag: number };
+  };
+  stacks: readonly CargoHoldStackState[];
+  uniqueItems: readonly CargoHoldUniqueItemState[];
+  slotsUsed: number;
+  capacitySlots: number;
+};
+
 export type ActivityStop =
   | { actionId: typeof ACTION_IDS.ferriteShaleMining; reason: MiningStopReason }
   | { actionId: typeof ACTION_IDS.refining; reason: RefiningStopReason };
@@ -214,6 +272,7 @@ export type MiningGameplayState = {
   };
   mining: { totalXp: number; level: number; xpToNextLevel?: number; xpIntoLevel: number };
   refining: { totalXp: number; level: number; xpToNextLevel?: number; xpIntoLevel: number };
+  welding: { totalXp: number; level: number; xpToNextLevel?: number; xpIntoLevel: number };
   successChanceBps: number;
   refiningSuccessChanceBps: number;
   ferriteShaleQuantity: number;
@@ -262,6 +321,7 @@ export type MiningGameplayState = {
   };
   run: MiningRunState;
   refiningRun: RefiningRunState;
+  cargoHold: CargoHoldState;
   recentResult: { successes: number; failures: number; awardedXp: number };
   refiningRecentResult: { successes: number; failures: number; awardedXp: number };
   /**
@@ -298,6 +358,8 @@ export type MiningGameplayState = {
     | "mining_unavailable_here";
   /** Set when a Start Refining command was refused outside the Processing Yard. */
   refiningError?: "refining_unavailable_here";
+  /** Set when the finite Crash Site Welding command cannot begin. */
+  weldingError?: "welding_unavailable_here" | "welding_locked" | "repair_complete";
 };
 
 export type ScavengeResolvedOutcome = {
@@ -335,13 +397,26 @@ export async function ensureStarterMiningState(
     .values({ characterId })
     .onConflictDoNothing({ target: characterStarterProvisioning.characterId })
     .returning({ characterId: characterStarterProvisioning.characterId });
-  if (!marker[0]) return;
+
+  // Existing characters already have their original starter marker. Add only
+  // the issue #89 state that did not exist when that marker was created; do
+  // not re-create an older Refining row that the legacy migration contract
+  // deliberately provisions lazily when Refining is first used.
+  if (!marker[0]) {
+    await transaction
+      .insert(characterSkillXp)
+      .values({ characterId, skillId: SKILL_IDS.welding, totalXp: 0 })
+      .onConflictDoNothing();
+    await ensureCargoHoldRepairState(transaction, characterId);
+    return;
+  }
 
   await transaction
     .insert(characterSkillXp)
     .values([
       { characterId, skillId: SKILL_IDS.mining, totalXp: 0 },
       { characterId, skillId: SKILL_IDS.refining, totalXp: 0 },
+      { characterId, skillId: SKILL_IDS.welding, totalXp: 0 },
       { characterId, skillId: SKILL_IDS.strength, totalXp: 0 },
     ])
     .onConflictDoNothing();
@@ -349,6 +424,7 @@ export async function ensureStarterMiningState(
     .insert(characterRefiningState)
     .values({ characterId })
     .onConflictDoNothing({ target: characterRefiningState.characterId });
+  await ensureCargoHoldRepairState(transaction, characterId);
   await transaction
     .insert(characterMiningState)
     .values({ characterId })
@@ -445,7 +521,7 @@ async function loadMiningSnapshot(
   characterId: string,
 ): Promise<MiningSnapshot> {
   const balance = getEffectiveGameBalance();
-  const [xpRows, stacks, instances, assignments] = await Promise.all([
+  const [xpRows, stacks, instances, assignments, cargoAssignments] = await Promise.all([
     transaction
       .select()
       .from(characterSkillXp)
@@ -466,11 +542,18 @@ async function loadMiningSnapshot(
       .from(equippedItems)
       .where(eq(equippedItems.characterId, characterId))
       .for("update"),
+    transaction
+      .select()
+      .from(cargoHoldItemInstances)
+      .where(eq(cargoHoldItemInstances.characterId, characterId))
+      .for("update"),
   ]);
+  const cargoItemInstanceIds = new Set(cargoAssignments.map((row) => row.itemInstanceId));
+  const carriedInstances = instances.filter((instance) => !cargoItemInstanceIds.has(instance.id));
   const miningXp = xpRows.find((row) => row.skillId === SKILL_IDS.mining)?.totalXp ?? 0;
   const equipmentLoadout = deriveEquipmentLoadout({
     assignments,
-    instances,
+    instances: carriedInstances,
     stacks,
     balance,
   });
@@ -501,7 +584,7 @@ async function loadMiningSnapshot(
     slotsUsed: equipmentLoadout.inventorySlotsUsed,
     slotCapacity: equipmentLoadout.containerSlotCapacity,
     equipmentLoadout,
-    itemInstances: instances,
+    itemInstances: carriedInstances,
     equippedCutterInstanceId: cutter?.id,
     cutterCharge: normalizeCutterCharge(cutter?.currentCharge, balance),
   };
@@ -627,9 +710,10 @@ export function createPlayResolver(
   onMiningOutcome?: (outcome: PersistedMiningOutcome) => void,
   onTravelArrival?: (outcome: TravelResolution) => void,
   onRefiningOutcome?: (outcome: PersistedRefiningOutcome) => void,
+  onWeldingOutcome?: (outcome: PersistedWeldingOutcome) => void,
 ): ActionResolver<
-  MiningSnapshot | TravelSnapshot,
-  PersistedMiningOutcome | TravelResolution | PersistedRefiningOutcome
+  MiningSnapshot | TravelSnapshot | WeldingSnapshot,
+  PersistedMiningOutcome | TravelResolution | PersistedRefiningOutcome | PersistedWeldingOutcome
 > {
   const mining = createMiningResolver(random, onMiningOutcome);
   // Refining needs a failing roll at L1 (threshold 4000) — mining E2E sequence [0,3500] both succeed.
@@ -646,11 +730,13 @@ export function createPlayResolver(
     refiningRandom as unknown as import("@/game/domain/refining").RefiningRandom,
     onRefiningOutcome,
   );
+  const welding = createWeldingResolver(onWeldingOutcome);
   const travel = createTravelResolver();
   return {
     supports: (action) =>
       (mining.supports?.(action) ?? true) ||
       (refining.supports?.(action) ?? true) ||
+      (welding.supports?.(action) ?? true) ||
       (travel.supports?.(action) ?? true),
     load: (transaction, input) => {
       if (refining.supports?.(input.action)) {
@@ -658,8 +744,15 @@ export function createPlayResolver(
           MiningSnapshot | TravelSnapshot
         >;
       }
+      if (welding.supports?.(input.action)) {
+        return welding.load(transaction, input) as unknown as Promise<
+          MiningSnapshot | TravelSnapshot | WeldingSnapshot
+        >;
+      }
       if (travel.supports?.(input.action)) {
-        return travel.load(transaction, input) as Promise<MiningSnapshot | TravelSnapshot>;
+        return travel.load(transaction, input) as Promise<
+          MiningSnapshot | TravelSnapshot | WeldingSnapshot
+        >;
       }
       return mining.load(transaction, input) as Promise<MiningSnapshot | TravelSnapshot>;
     },
@@ -667,6 +760,11 @@ export function createPlayResolver(
       if (refining.supports?.(input.action)) {
         return refining.resolve(
           input as unknown as Parameters<typeof refining.resolve>[0],
+        ) as unknown as ReturnType<typeof mining.resolve>;
+      }
+      if (welding.supports?.(input.action)) {
+        return welding.resolve(
+          input as unknown as Parameters<typeof welding.resolve>[0],
         ) as unknown as ReturnType<typeof mining.resolve>;
       }
       if (travel.supports?.(input.action)) {
@@ -681,6 +779,9 @@ export function createPlayResolver(
     persist: (transaction, outcome, context) => {
       if ((outcome as PersistedRefiningOutcome).resolvedAttempts !== undefined) {
         return refining.persist(transaction, outcome as PersistedRefiningOutcome);
+      }
+      if ((outcome as PersistedWeldingOutcome).completedIncrements !== undefined) {
+        return welding.persist(transaction, outcome as PersistedWeldingOutcome);
       }
       if ((outcome as TravelResolution).arrived !== undefined) {
         return travel.persist(transaction, outcome as TravelResolution, context);
@@ -706,6 +807,7 @@ export async function stateFromTransaction(
   },
   refiningStopReason?: RefiningStopReason | null,
   refiningError?: MiningGameplayState["refiningError"],
+  weldingError?: MiningGameplayState["weldingError"],
 ): Promise<MiningGameplayState> {
   const balance = getEffectiveGameBalance();
   const snapshot = await loadMiningSnapshot(transaction, characterId);
@@ -716,6 +818,10 @@ export async function stateFromTransaction(
     actionRows,
     miningStateRows,
     refiningStateRows,
+    cargoRepairRows,
+    cargoStackRows,
+    cargoItemRows,
+    allItemInstanceRows,
     travelRows,
     scavengeRevealRows,
     claimRows,
@@ -741,6 +847,21 @@ export async function stateFromTransaction(
       .where(eq(characterRefiningState.characterId, characterId)),
     transaction
       .select()
+      .from(characterCargoHoldRepair)
+      .where(eq(characterCargoHoldRepair.characterId, characterId)),
+    transaction
+      .select()
+      .from(cargoHoldStacks)
+      .where(eq(cargoHoldStacks.characterId, characterId))
+      .orderBy(asc(cargoHoldStacks.createdAt), asc(cargoHoldStacks.id)),
+    transaction
+      .select()
+      .from(cargoHoldItemInstances)
+      .where(eq(cargoHoldItemInstances.characterId, characterId))
+      .orderBy(asc(cargoHoldItemInstances.storedAt), asc(cargoHoldItemInstances.itemInstanceId)),
+    transaction.select().from(itemInstances).where(eq(itemInstances.characterId, characterId)),
+    transaction
+      .select()
       .from(characterTravelState)
       .where(eq(characterTravelState.characterId, characterId)),
     transaction
@@ -764,10 +885,13 @@ export async function stateFromTransaction(
   ]);
   const totalXp = xpRows.find((row) => row.skillId === SKILL_IDS.mining)?.totalXp ?? 0;
   const refiningTotalXp = xpRows.find((row) => row.skillId === SKILL_IDS.refining)?.totalXp ?? 0;
+  const weldingTotalXp = xpRows.find((row) => row.skillId === SKILL_IDS.welding)?.totalXp ?? 0;
   const thresholds = miningLevelThresholds(balance);
   const refiningThresholds = standardSkillLevelThresholds(balance);
+  const weldingThresholds = standardSkillLevelThresholds(balance);
   const miningProgress = skillLevelProgress(totalXp, thresholds);
   const refiningProgress = skillLevelProgress(refiningTotalXp, refiningThresholds);
+  const weldingProgress = skillLevelProgress(weldingTotalXp, weldingThresholds);
   const action = actionRows[0];
   const miningState = miningStateRows[0];
   const travel = travelRows[0];
@@ -801,6 +925,40 @@ export async function stateFromTransaction(
     xpGained: refiningState?.runXpGained ?? 0,
     recentAttempts: (refiningState?.recentAttempts as RefiningRunAttempt[] | undefined) ?? [],
   };
+  const cargoRepair = cargoRepairRows[0];
+  const repairState = {
+    refinedFerriteContributed: cargoRepair?.refinedFerriteContributed ?? 0,
+    slagContributed: cargoRepair?.slagContributed ?? 0,
+    weldingProgress: cargoRepair?.weldingProgress ?? 0,
+    completedAt: cargoRepair?.completedAt ?? null,
+  };
+  const materialComplete = cargoHoldMaterialsComplete(repairState, balance);
+  const repairComplete = cargoHoldRepairComplete(repairState, balance);
+  const carriedRefinedFerrite = stacks
+    .filter((stack) => stack.itemId === ITEM_IDS.refinedFerrite)
+    .reduce((total, stack) => total + stack.quantity, 0);
+  const carriedSlag = stacks
+    .filter((stack) => stack.itemId === ITEM_IDS.slag)
+    .reduce((total, stack) => total + stack.quantity, 0);
+  const availableContribution = planCargoHoldMaterialContribution({
+    repair: repairState,
+    carriedRefinedFerrite,
+    carriedSlag,
+    balance,
+  });
+  const cargoUniqueItems = cargoItemRows
+    .map((row) => allItemInstanceRows.find((instance) => instance.id === row.itemInstanceId))
+    .filter((instance): instance is (typeof allItemInstanceRows)[number] => Boolean(instance))
+    .map((instance) => ({
+      id: instance.id,
+      itemId: instance.itemId,
+      name: resolveItemPresentation(instance.itemId, instance.itemId).displayName,
+      massGrams: carriedItemMassGrams(instance.itemId, balance),
+      currentCharge:
+        instance.itemId === balance.items.salvageCutter.itemId
+          ? normalizeCutterCharge(instance.currentCharge, balance)
+          : undefined,
+    }));
   const currentLocationId = character[0]?.currentLocationId ?? LOCATION_IDS.crashSite;
   const travelState =
     travel && action?.actionId === ACTION_IDS.travel
@@ -843,12 +1001,15 @@ export async function stateFromTransaction(
   const cutterCharge = snapshot.cutterCharge;
   const isMiningAction = action?.actionId === ACTION_IDS.ferriteShaleMining;
   const isRefiningAction = action?.actionId === ACTION_IDS.refining;
+  const isWeldingAction = action?.actionId === ACTION_IDS.cargoHoldWelding;
   const nextAttemptBoosted = isMiningAction && cutterCharge > 0;
-  const nextAttemptDurationTicks = isRefiningAction
-    ? balance.refining.attemptDurationTicks
-    : nextAttemptBoosted
-      ? boostedMiningAttemptDurationTicks(balance)
-      : balance.mining.attemptDurationTicks;
+  const nextAttemptDurationTicks = isWeldingAction
+    ? balance.welding.attemptDurationTicks
+    : isRefiningAction
+      ? balance.refining.attemptDurationTicks
+      : nextAttemptBoosted
+        ? boostedMiningAttemptDurationTicks(balance)
+        : balance.mining.attemptDurationTicks;
   const carriedPowerCellQuantity = stacks
     .filter((stack) => stack.itemId === ITEM_IDS.powerCell)
     .reduce((total, stack) => total + stack.quantity, 0);
@@ -862,7 +1023,9 @@ export async function stateFromTransaction(
         ? { resetDate, claimed: claimRows.length > 0 }
         : undefined,
     activeAction:
-      action?.actionId === ACTION_IDS.ferriteShaleMining || action?.actionId === ACTION_IDS.refining
+      action?.actionId === ACTION_IDS.ferriteShaleMining ||
+      action?.actionId === ACTION_IDS.refining ||
+      action?.actionId === ACTION_IDS.cargoHoldWelding
         ? {
             actionId: action.actionId,
             resolvedThroughAt: action.resolvedThroughAt.toISOString(),
@@ -886,6 +1049,12 @@ export async function stateFromTransaction(
       xpToNextLevel: refiningProgress.xpToNextLevel,
       xpIntoLevel: refiningProgress.xpIntoLevel,
     },
+    welding: {
+      totalXp: weldingTotalXp,
+      level: weldingProgress.level,
+      xpToNextLevel: weldingProgress.xpToNextLevel,
+      xpIntoLevel: weldingProgress.xpIntoLevel,
+    },
     successChanceBps: miningSuccessChanceBps(miningProgress.level, balance),
     refiningSuccessChanceBps: refiningSuccessChanceBps(refiningProgress.level, balance),
     ferriteShaleQuantity: stacks
@@ -907,16 +1076,7 @@ export async function stateFromTransaction(
         itemId: stack.itemId,
         name: resolveItemPresentation(stack.itemId, stack.itemId).displayName,
         quantity: stack.quantity,
-        stackLimit:
-          stack.itemId === balance.items.ferriteShale.itemId
-            ? balance.items.ferriteShale.stackLimit
-            : stack.itemId === balance.items.refinedFerrite.itemId
-              ? balance.items.refinedFerrite.stackLimit
-              : stack.itemId === balance.items.slag.itemId
-                ? balance.items.slag.stackLimit
-                : stack.itemId === balance.items.powerCell.itemId
-                  ? balance.items.powerCell.stackLimit
-                  : 1,
+        stackLimit: itemStackLimit(stack.itemId, balance),
       })),
       uniqueItems: deriveCarriedUniqueItems(
         snapshot.itemInstances.map((instance) => ({
@@ -998,6 +1158,30 @@ export async function stateFromTransaction(
     },
     run,
     refiningRun,
+    cargoHold: {
+      repair: {
+        refinedFerriteContributed: repairState.refinedFerriteContributed,
+        refinedFerriteRequired: balance.cargoHold.refinedFerriteRequired,
+        slagContributed: repairState.slagContributed,
+        slagRequired: balance.cargoHold.slagRequired,
+        weldingProgress: repairState.weldingProgress,
+        weldingIncrements: balance.welding.repairIncrements,
+        materialComplete,
+        complete: repairComplete,
+        completedAt: repairState.completedAt?.toISOString(),
+        availableContribution,
+      },
+      stacks: cargoStackRows.map((stack) => ({
+        id: stack.id,
+        itemId: stack.itemId,
+        name: resolveItemPresentation(stack.itemId, stack.itemId).displayName,
+        quantity: stack.quantity,
+        stackLimit: itemStackLimit(stack.itemId, balance),
+      })),
+      uniqueItems: cargoUniqueItems,
+      slotsUsed: cargoStackRows.length + cargoUniqueItems.length,
+      capacitySlots: balance.cargoHold.capacitySlots,
+    },
     recentResult,
     refiningRecentResult,
     stop: (() => {
@@ -1037,6 +1221,7 @@ export async function stateFromTransaction(
     commandError,
     travelError,
     refiningError,
+    weldingError,
   };
 }
 

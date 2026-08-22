@@ -28,6 +28,7 @@ import { ScavengeRevealOverlay } from "@/features/travel/ScavengeRevealOverlay";
 import { RefiningConsole } from "@/features/refining/RefiningConsole";
 import { PowerAnnexClaimPanel } from "@/features/power-annex/PowerAnnexClaimPanel";
 import { LocationSceneHeader } from "@/features/location-scene/LocationSceneHeader";
+import { CargoHoldPanel } from "@/features/cargo/CargoHoldPanel";
 
 const RESULT_FEEDBACK_DURATION_MS = 3_600;
 
@@ -411,6 +412,8 @@ export function MiningConsole({ characterName }: { characterName: string }) {
                 </Feedback>
               )}
             </>
+          ) : currentLocationId === LOCATION_IDS.crashSite ? (
+            <CargoHoldPanel />
           ) : atTheLongScramble ? (
             <div className="mt-4">
               <p className="max-w-2xl text-sm leading-relaxed text-[color:var(--rs-text-secondary)]">

@@ -33,6 +33,18 @@ const balanceSchema = z.object({
     failureXp: z.literal(3),
     inputFerriteShale: z.literal(2),
   }),
+  welding: z.object({
+    actionId: z.literal(ACTION_IDS.cargoHoldWelding),
+    skillId: z.literal(SKILL_IDS.welding),
+    attemptDurationTicks: z.literal(5),
+    repairIncrements: z.literal(12),
+    xpPerIncrement: z.literal(50),
+  }),
+  cargoHold: z.object({
+    refinedFerriteRequired: z.literal(15),
+    slagRequired: z.literal(6),
+    capacitySlots: z.literal(32),
+  }),
   travel: z.object({
     actionId: z.literal(ACTION_IDS.travel),
     /** Approved initial adjacent walking duration (issue #40): 40 ticks / 24s. */
@@ -114,6 +126,18 @@ const defaults = balanceSchema.parse({
     failureXp: 3,
     inputFerriteShale: 2,
   },
+  welding: {
+    actionId: ACTION_IDS.cargoHoldWelding,
+    skillId: SKILL_IDS.welding,
+    attemptDurationTicks: 5,
+    repairIncrements: 12,
+    xpPerIncrement: 50,
+  },
+  cargoHold: {
+    refinedFerriteRequired: 15,
+    slagRequired: 6,
+    capacitySlots: 32,
+  },
   travel: {
     actionId: ACTION_IDS.travel,
     adjacentWalkDurationTicks: 40,
@@ -181,6 +205,7 @@ export const miningLevelThresholds = standardSkillLevelThresholds;
 const skillLevelCurves = {
   [SKILL_IDS.mining]: standardSkillLevelThresholds,
   [SKILL_IDS.refining]: standardSkillLevelThresholds,
+  [SKILL_IDS.welding]: standardSkillLevelThresholds,
 } as const satisfies Partial<Record<SkillId, () => readonly LevelThreshold[]>>;
 
 /** The approved level-curve source for a skill, or undefined when none exists. */

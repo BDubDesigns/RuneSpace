@@ -1,0 +1,934 @@
+import { and, asc, eq } from "drizzle-orm";
+import {
+  activeActions,
+  cargoHoldItemInstances,
+  cargoHoldStacks,
+  characterCargoHoldRepair,
+  characters,
+  equippedItems,
+  inventoryStacks,
+  itemInstances,
+} from "@/db/rune-space";
+import { getEffectiveGameBalance } from "@/game/config/balance";
+import { ACTION_IDS, ITEM_IDS, LOCATION_IDS, type ItemId } from "@/game/config/foundations";
+import { isActionAvailableAtLocation } from "@/game/content/locations";
+import {
+  cargoHoldMaterialsComplete,
+  cargoHoldRepairComplete,
+  planCargoHoldMaterialContribution,
+  type CargoHoldRepairState,
+} from "@/game/domain/cargo-hold";
+import {
+  carriedItemMassGrams,
+  deriveEquipmentLoadout,
+  type EquipmentAssignmentState,
+  type EquipmentItemInstance,
+} from "@/game/domain/equipment";
+import {
+  planExactStackAddition,
+  planExactStackRemoval,
+  type ExactStackRemovalPlan,
+  type StackState,
+} from "@/game/domain/inventory";
+import type { MiningRandom } from "@/game/domain/mining";
+import { type DatabaseTransaction, withResolvedOwnedCharacter } from "@/server/action-resolution";
+import {
+  createPlayResolver,
+  ensureStarterMiningState,
+  stateFromTransaction,
+  type MiningGameplayState,
+} from "@/server/mining";
+
+export type CargoHoldMaterialContributionRequest = {
+  expectedRefinedFerrite: number;
+  expectedSlag: number;
+};
+
+export type CargoHoldStackTransferRequest = {
+  stackId: string;
+  mode: "one" | "stack";
+  expectedQuantity: number;
+};
+
+export type CargoHoldUniqueTransferRequest = {
+  itemInstanceId: string;
+};
+
+export type CargoHoldRefusalReason =
+  | "not_at_crash_site"
+  | "in_transit"
+  | "repair_incomplete"
+  | "materials_changed"
+  | "nothing_to_contribute"
+  | "stack_changed"
+  | "stack_not_found"
+  | "unsupported_stack"
+  | "cargo_capacity"
+  | "carried_capacity"
+  | "item_not_found"
+  | "equipped_item"
+  | "item_already_stored"
+  | "item_not_stored";
+
+export type CargoHoldRefusal = {
+  status: "refused";
+  reason: CargoHoldRefusalReason;
+  message: string;
+};
+
+export type CargoHoldContributionStatus =
+  | {
+      status: "committed";
+      refinedFerrite: number;
+      slag: number;
+    }
+  | CargoHoldRefusal;
+
+export type CargoHoldTransferStatus =
+  | {
+      status: "transferred";
+      quantity?: number;
+      itemInstanceId?: string;
+    }
+  | CargoHoldRefusal;
+
+export type CargoHoldStateResult<T> = {
+  state: MiningGameplayState;
+  cargo: T;
+};
+
+const EMPTY_RECENT_RESULT = { successes: 0, failures: 0, awardedXp: 0 } as const;
+
+function stackDefinition(
+  itemId: string,
+  balance = getEffectiveGameBalance(),
+):
+  | {
+      itemId: ItemId;
+      stackLimit: number;
+      massGrams: number;
+    }
+  | undefined {
+  if (itemId === balance.items.ferriteShale.itemId)
+    return {
+      itemId: ITEM_IDS.ferriteShale,
+      stackLimit: balance.items.ferriteShale.stackLimit,
+      massGrams: balance.items.ferriteShale.massGrams,
+    };
+  if (itemId === balance.items.refinedFerrite.itemId)
+    return {
+      itemId: ITEM_IDS.refinedFerrite,
+      stackLimit: balance.items.refinedFerrite.stackLimit,
+      massGrams: balance.items.refinedFerrite.massGrams,
+    };
+  if (itemId === balance.items.slag.itemId)
+    return {
+      itemId: ITEM_IDS.slag,
+      stackLimit: balance.items.slag.stackLimit,
+      massGrams: balance.items.slag.massGrams,
+    };
+  if (itemId === balance.items.powerCell.itemId)
+    return {
+      itemId: ITEM_IDS.powerCell,
+      stackLimit: balance.items.powerCell.stackLimit,
+      massGrams: balance.items.powerCell.massGrams,
+    };
+  return undefined;
+}
+
+function repairState(row: typeof characterCargoHoldRepair.$inferSelect): CargoHoldRepairState {
+  return {
+    refinedFerriteContributed: row.refinedFerriteContributed,
+    slagContributed: row.slagContributed,
+    weldingProgress: row.weldingProgress,
+    completedAt: row.completedAt,
+  };
+}
+
+async function loadRepair(
+  transaction: DatabaseTransaction,
+  characterId: string,
+): Promise<typeof characterCargoHoldRepair.$inferSelect> {
+  const rows = await transaction
+    .select()
+    .from(characterCargoHoldRepair)
+    .where(eq(characterCargoHoldRepair.characterId, characterId))
+    .for("update");
+  const row = rows[0];
+  if (!row) throw new Error("Cargo Hold repair state must exist before a Cargo command");
+  return row;
+}
+
+async function accessRefusal(
+  transaction: DatabaseTransaction,
+  characterId: string,
+  action: { actionId: string } | undefined,
+  repair: typeof characterCargoHoldRepair.$inferSelect,
+  requireRestoredHold = true,
+): Promise<CargoHoldRefusal | undefined> {
+  if (action?.actionId === ACTION_IDS.travel) {
+    return {
+      status: "refused",
+      reason: "in_transit",
+      message: "Cargo Hold access is unavailable while traveling.",
+    };
+  }
+  if (action) {
+    return {
+      status: "refused",
+      reason: "in_transit",
+      message: "Finish the active activity before accessing the Cargo Hold.",
+    };
+  }
+  const charactersAtLocation = await transaction
+    .select({ currentLocationId: characters.currentLocationId })
+    .from(characters)
+    .where(eq(characters.id, characterId))
+    .limit(1);
+  if (charactersAtLocation[0]?.currentLocationId !== LOCATION_IDS.crashSite) {
+    return {
+      status: "refused",
+      reason: "not_at_crash_site",
+      message: "Cargo Hold access is only available while stationary at Crash Site.",
+    };
+  }
+  if (
+    requireRestoredHold &&
+    !cargoHoldRepairComplete(repairState(repair), getEffectiveGameBalance())
+  ) {
+    return {
+      status: "refused",
+      reason: "repair_incomplete",
+      message: "Restore the Cargo Hold before using its storage.",
+    };
+  }
+  return undefined;
+}
+
+async function stateAfterCargoCommand(
+  transaction: DatabaseTransaction,
+  characterId: string,
+  now: Date,
+): Promise<MiningGameplayState> {
+  return stateFromTransaction(
+    transaction,
+    characterId,
+    EMPTY_RECENT_RESULT,
+    undefined,
+    undefined,
+    undefined,
+    undefined,
+    now,
+  );
+}
+
+function applyInventoryRemoval(
+  transaction: DatabaseTransaction,
+  characterId: string,
+  plan: Extract<ExactStackRemovalPlan<string>, { ok: true }>,
+  now: Date,
+) {
+  return Promise.all([
+    ...plan.deletedStackIds.map((id) =>
+      transaction
+        .delete(inventoryStacks)
+        .where(and(eq(inventoryStacks.id, id), eq(inventoryStacks.characterId, characterId))),
+    ),
+    ...plan.updatedStacks.map((update) =>
+      transaction
+        .update(inventoryStacks)
+        .set({ quantity: update.quantity, updatedAt: now })
+        .where(
+          and(eq(inventoryStacks.id, update.id), eq(inventoryStacks.characterId, characterId)),
+        ),
+    ),
+  ]);
+}
+
+async function loadCarriedCapacity(
+  transaction: DatabaseTransaction,
+  characterId: string,
+  now: Date,
+) {
+  const balance = getEffectiveGameBalance();
+  const [stacks, instances, assignments, cargoItems] = await Promise.all([
+    transaction
+      .select()
+      .from(inventoryStacks)
+      .where(eq(inventoryStacks.characterId, characterId))
+      .orderBy(asc(inventoryStacks.createdAt), asc(inventoryStacks.id))
+      .for("update"),
+    transaction
+      .select()
+      .from(itemInstances)
+      .where(eq(itemInstances.characterId, characterId))
+      .for("update"),
+    transaction
+      .select()
+      .from(equippedItems)
+      .where(eq(equippedItems.characterId, characterId))
+      .for("update"),
+    transaction
+      .select()
+      .from(cargoHoldItemInstances)
+      .where(eq(cargoHoldItemInstances.characterId, characterId))
+      .for("update"),
+  ]);
+  const cargoIds = new Set(cargoItems.map((row) => row.itemInstanceId));
+  const carriedInstances = instances.filter((instance) => !cargoIds.has(instance.id));
+  const loadout = deriveEquipmentLoadout({
+    assignments: assignments as EquipmentAssignmentState[],
+    instances: carriedInstances as EquipmentItemInstance[],
+    stacks,
+    balance,
+  });
+  void now;
+  return {
+    stacks,
+    availableSlots: Math.max(0, loadout.containerSlotCapacity - loadout.inventorySlotsUsed),
+    availableMassGrams: Math.max(0, loadout.maximumCarryCapacityGrams - loadout.carriedMassGrams),
+  };
+}
+
+export async function contributeCargoHoldMaterials(
+  userId: string,
+  characterId: string,
+  request: CargoHoldMaterialContributionRequest,
+  now = new Date(),
+  random: MiningRandom = {
+    nextBasisPoints: () => 0,
+    nextUnit: () => 0,
+  },
+): Promise<CargoHoldStateResult<CargoHoldContributionStatus>> {
+  return withResolvedOwnedCharacter(
+    userId,
+    characterId,
+    createPlayResolver(random),
+    async (transaction, context) => {
+      await ensureStarterMiningState(transaction, context.character.id);
+      const balance = getEffectiveGameBalance();
+      const repair = await loadRepair(transaction, context.character.id);
+      const access = await accessRefusal(
+        transaction,
+        context.character.id,
+        context.action,
+        repair,
+        false,
+      );
+      if (access) {
+        return {
+          state: await stateAfterCargoCommand(transaction, context.character.id, now),
+          cargo: access,
+        };
+      }
+      const stacks = await transaction
+        .select()
+        .from(inventoryStacks)
+        .where(eq(inventoryStacks.characterId, context.character.id))
+        .orderBy(asc(inventoryStacks.createdAt), asc(inventoryStacks.id))
+        .for("update");
+      const carriedRefinedFerrite = stacks
+        .filter((stack) => stack.itemId === balance.items.refinedFerrite.itemId)
+        .reduce((total, stack) => total + stack.quantity, 0);
+      const carriedSlag = stacks
+        .filter((stack) => stack.itemId === balance.items.slag.itemId)
+        .reduce((total, stack) => total + stack.quantity, 0);
+      const useful = planCargoHoldMaterialContribution({
+        repair: repairState(repair),
+        carriedRefinedFerrite,
+        carriedSlag,
+        balance,
+      });
+      if (
+        useful.refinedFerrite !== request.expectedRefinedFerrite ||
+        useful.slag !== request.expectedSlag
+      ) {
+        return {
+          state: await stateAfterCargoCommand(transaction, context.character.id, now),
+          cargo: {
+            status: "refused",
+            reason: "materials_changed",
+            message: "Repair materials changed. Review the useful quantities and try again.",
+          },
+        };
+      }
+      if (useful.refinedFerrite === 0 && useful.slag === 0) {
+        return {
+          state: await stateAfterCargoCommand(transaction, context.character.id, now),
+          cargo: {
+            status: "refused",
+            reason: "nothing_to_contribute",
+            message: "No carried Refined Ferrite or Slag is still needed for this repair.",
+          },
+        };
+      }
+
+      const refinedPlan = planExactStackRemoval(
+        stacks
+          .filter((stack) => stack.itemId === balance.items.refinedFerrite.itemId)
+          .map((stack) => ({
+            id: stack.id,
+            itemId: ITEM_IDS.refinedFerrite,
+            quantity: stack.quantity,
+          })),
+        ITEM_IDS.refinedFerrite,
+        useful.refinedFerrite,
+      );
+      const slagPlan = planExactStackRemoval(
+        stacks
+          .filter((stack) => stack.itemId === balance.items.slag.itemId)
+          .map((stack) => ({ id: stack.id, itemId: ITEM_IDS.slag, quantity: stack.quantity })),
+        ITEM_IDS.slag,
+        useful.slag,
+      );
+      if (!refinedPlan.ok || !slagPlan.ok)
+        throw new Error("Contribution removal plan became invalid");
+      await applyInventoryRemoval(transaction, context.character.id, refinedPlan, now);
+      await applyInventoryRemoval(transaction, context.character.id, slagPlan, now);
+      await transaction
+        .update(characterCargoHoldRepair)
+        .set({
+          refinedFerriteContributed: repair.refinedFerriteContributed + useful.refinedFerrite,
+          slagContributed: repair.slagContributed + useful.slag,
+          updatedAt: now,
+        })
+        .where(eq(characterCargoHoldRepair.characterId, context.character.id));
+      return {
+        state: await stateAfterCargoCommand(transaction, context.character.id, now),
+        cargo: { status: "committed", ...useful },
+      };
+    },
+    now,
+  );
+}
+
+async function cargoStackAccess(
+  transaction: DatabaseTransaction,
+  characterId: string,
+  action: { actionId: string } | undefined,
+) {
+  const repair = await loadRepair(transaction, characterId);
+  const access = await accessRefusal(transaction, characterId, action, repair);
+  return { repair, access };
+}
+
+export async function depositCargoStack(
+  userId: string,
+  characterId: string,
+  request: CargoHoldStackTransferRequest,
+  now = new Date(),
+  random: MiningRandom = {
+    nextBasisPoints: () => 0,
+    nextUnit: () => 0,
+  },
+): Promise<CargoHoldStateResult<CargoHoldTransferStatus>> {
+  return withResolvedOwnedCharacter(
+    userId,
+    characterId,
+    createPlayResolver(random),
+    async (transaction, context) => {
+      await ensureStarterMiningState(transaction, context.character.id);
+      const { access } = await cargoStackAccess(transaction, context.character.id, context.action);
+      if (access)
+        return {
+          state: await stateAfterCargoCommand(transaction, context.character.id, now),
+          cargo: access,
+        };
+      const [sourceRows, cargoRows, cargoItems] = await Promise.all([
+        transaction
+          .select()
+          .from(inventoryStacks)
+          .where(
+            and(
+              eq(inventoryStacks.characterId, context.character.id),
+              eq(inventoryStacks.id, request.stackId),
+            ),
+          )
+          .for("update"),
+        transaction
+          .select()
+          .from(cargoHoldStacks)
+          .where(eq(cargoHoldStacks.characterId, context.character.id))
+          .orderBy(asc(cargoHoldStacks.createdAt), asc(cargoHoldStacks.id))
+          .for("update"),
+        transaction
+          .select()
+          .from(cargoHoldItemInstances)
+          .where(eq(cargoHoldItemInstances.characterId, context.character.id))
+          .for("update"),
+      ]);
+      const source = sourceRows[0];
+      const refusal = async (reason: CargoHoldRefusalReason, message: string) => ({
+        state: await stateAfterCargoCommand(transaction, context.character.id, now),
+        cargo: { status: "refused" as const, reason, message },
+      });
+      if (!source) return refusal("stack_not_found", "That carried stack is no longer available.");
+      if (source.quantity !== request.expectedQuantity)
+        return refusal("stack_changed", "Inventory changed. Review the stack and try again.");
+      const definition = stackDefinition(source.itemId);
+      if (!definition)
+        return refusal("unsupported_stack", "That item cannot be stored as a Cargo stack.");
+      const quantity = request.mode === "one" ? 1 : source.quantity;
+      const availableSlots =
+        getEffectiveGameBalance().cargoHold.capacitySlots - cargoRows.length - cargoItems.length;
+      const additionResult = planExactStackAddition(
+        cargoRows as StackState<string>[],
+        definition.itemId,
+        quantity,
+        definition.stackLimit,
+        Math.max(0, availableSlots),
+        Number.POSITIVE_INFINITY,
+        0,
+      );
+      if (!additionResult.ok)
+        return refusal("cargo_capacity", "Cargo Hold has no room for that complete transfer.");
+      const addition = additionResult.plan;
+      const removal = planExactStackRemoval(
+        [{ id: source.id, itemId: definition.itemId, quantity: source.quantity }],
+        definition.itemId,
+        quantity,
+      );
+      if (!removal.ok) throw new Error("Cargo deposit removal plan became invalid");
+      await applyInventoryRemoval(transaction, context.character.id, removal, now);
+      await Promise.all(
+        addition.updatedStacks.map((update) =>
+          transaction
+            .update(cargoHoldStacks)
+            .set({ quantity: update.quantity, updatedAt: now })
+            .where(
+              and(
+                eq(cargoHoldStacks.id, update.id),
+                eq(cargoHoldStacks.characterId, context.character.id),
+              ),
+            ),
+        ),
+      );
+      if (addition.createdStacks.length)
+        await transaction.insert(cargoHoldStacks).values(
+          addition.createdStacks.map((stack) => ({
+            characterId: context.character.id,
+            itemId: stack.itemId,
+            quantity: stack.quantity,
+          })),
+        );
+      return {
+        state: await stateAfterCargoCommand(transaction, context.character.id, now),
+        cargo: { status: "transferred", quantity },
+      };
+    },
+    now,
+  );
+}
+
+export async function withdrawCargoStack(
+  userId: string,
+  characterId: string,
+  request: CargoHoldStackTransferRequest,
+  now = new Date(),
+  random: MiningRandom = {
+    nextBasisPoints: () => 0,
+    nextUnit: () => 0,
+  },
+): Promise<CargoHoldStateResult<CargoHoldTransferStatus>> {
+  return withResolvedOwnedCharacter(
+    userId,
+    characterId,
+    createPlayResolver(random),
+    async (transaction, context) => {
+      await ensureStarterMiningState(transaction, context.character.id);
+      const { access } = await cargoStackAccess(transaction, context.character.id, context.action);
+      if (access)
+        return {
+          state: await stateAfterCargoCommand(transaction, context.character.id, now),
+          cargo: access,
+        };
+      const sourceRows = await transaction
+        .select()
+        .from(cargoHoldStacks)
+        .where(
+          and(
+            eq(cargoHoldStacks.characterId, context.character.id),
+            eq(cargoHoldStacks.id, request.stackId),
+          ),
+        )
+        .for("update");
+      const source = sourceRows[0];
+      const refusal = async (reason: CargoHoldRefusalReason, message: string) => ({
+        state: await stateAfterCargoCommand(transaction, context.character.id, now),
+        cargo: { status: "refused" as const, reason, message },
+      });
+      if (!source) return refusal("stack_not_found", "That Cargo stack is no longer available.");
+      if (source.quantity !== request.expectedQuantity)
+        return refusal("stack_changed", "Cargo changed. Review the stack and try again.");
+      const definition = stackDefinition(source.itemId);
+      if (!definition)
+        return refusal("unsupported_stack", "That Cargo item cannot be withdrawn as a stack.");
+      const quantity = request.mode === "one" ? 1 : source.quantity;
+      const carry = await loadCarriedCapacity(transaction, context.character.id, now);
+      const additionResult = planExactStackAddition(
+        carry.stacks as StackState<string>[],
+        definition.itemId,
+        quantity,
+        definition.stackLimit,
+        carry.availableSlots,
+        carry.availableMassGrams,
+        definition.massGrams,
+      );
+      if (!additionResult.ok)
+        return refusal(
+          "carried_capacity",
+          "The requested transfer does not fit in carried Inventory.",
+        );
+      const addition = additionResult.plan;
+      if (source.quantity === quantity)
+        await transaction
+          .delete(cargoHoldStacks)
+          .where(
+            and(
+              eq(cargoHoldStacks.id, source.id),
+              eq(cargoHoldStacks.characterId, context.character.id),
+            ),
+          );
+      else
+        await transaction
+          .update(cargoHoldStacks)
+          .set({ quantity: source.quantity - quantity, updatedAt: now })
+          .where(
+            and(
+              eq(cargoHoldStacks.id, source.id),
+              eq(cargoHoldStacks.characterId, context.character.id),
+            ),
+          );
+      await Promise.all(
+        addition.updatedStacks.map((update) =>
+          transaction
+            .update(inventoryStacks)
+            .set({ quantity: update.quantity, updatedAt: now })
+            .where(
+              and(
+                eq(inventoryStacks.id, update.id),
+                eq(inventoryStacks.characterId, context.character.id),
+              ),
+            ),
+        ),
+      );
+      if (addition.createdStacks.length)
+        await transaction.insert(inventoryStacks).values(
+          addition.createdStacks.map((stack) => ({
+            characterId: context.character.id,
+            itemId: stack.itemId,
+            quantity: stack.quantity,
+          })),
+        );
+      return {
+        state: await stateAfterCargoCommand(transaction, context.character.id, now),
+        cargo: { status: "transferred", quantity },
+      };
+    },
+    now,
+  );
+}
+
+function uniqueItemIsApproved(itemId: string, balance = getEffectiveGameBalance()): boolean {
+  return (
+    itemId === balance.items.salvageCutter.itemId ||
+    itemId === balance.items.starterContainer.itemId
+  );
+}
+
+export async function depositCargoUniqueItem(
+  userId: string,
+  characterId: string,
+  request: CargoHoldUniqueTransferRequest,
+  now = new Date(),
+  random: MiningRandom = {
+    nextBasisPoints: () => 0,
+    nextUnit: () => 0,
+  },
+): Promise<CargoHoldStateResult<CargoHoldTransferStatus>> {
+  return withResolvedOwnedCharacter(
+    userId,
+    characterId,
+    createPlayResolver(random),
+    async (transaction, context) => {
+      await ensureStarterMiningState(transaction, context.character.id);
+      const { access } = await cargoStackAccess(transaction, context.character.id, context.action);
+      if (access)
+        return {
+          state: await stateAfterCargoCommand(transaction, context.character.id, now),
+          cargo: access,
+        };
+      const [instanceRows, assignmentRows, cargoRows, cargoStackRows] = await Promise.all([
+        transaction
+          .select()
+          .from(itemInstances)
+          .where(
+            and(
+              eq(itemInstances.characterId, context.character.id),
+              eq(itemInstances.id, request.itemInstanceId),
+            ),
+          )
+          .for("update"),
+        transaction
+          .select()
+          .from(equippedItems)
+          .where(eq(equippedItems.characterId, context.character.id))
+          .for("update"),
+        transaction
+          .select()
+          .from(cargoHoldItemInstances)
+          .where(eq(cargoHoldItemInstances.characterId, context.character.id))
+          .for("update"),
+        transaction
+          .select()
+          .from(cargoHoldStacks)
+          .where(eq(cargoHoldStacks.characterId, context.character.id))
+          .for("update"),
+      ]);
+      const instance = instanceRows[0];
+      const refusal = async (reason: CargoHoldRefusalReason, message: string) => ({
+        state: await stateAfterCargoCommand(transaction, context.character.id, now),
+        cargo: { status: "refused" as const, reason, message },
+      });
+      if (!instance) return refusal("item_not_found", "That carried item is no longer available.");
+      if (!uniqueItemIsApproved(instance.itemId))
+        return refusal("item_not_found", "That item is not a transferable unique item.");
+      if (assignmentRows.some((assignment) => assignment.itemInstanceId === instance.id))
+        return refusal("equipped_item", "Unequip that item before depositing it in Cargo Hold.");
+      if (cargoRows.some((row) => row.itemInstanceId === instance.id))
+        return refusal("item_already_stored", "That item is already in Cargo Hold.");
+      if (
+        cargoRows.length + cargoStackRows.length >=
+        getEffectiveGameBalance().cargoHold.capacitySlots
+      )
+        return refusal("cargo_capacity", "Cargo Hold has no free occupied-item slots.");
+      await transaction.insert(cargoHoldItemInstances).values({
+        characterId: context.character.id,
+        itemInstanceId: instance.id,
+        storedAt: now,
+      });
+      return {
+        state: await stateAfterCargoCommand(transaction, context.character.id, now),
+        cargo: { status: "transferred", itemInstanceId: instance.id },
+      };
+    },
+    now,
+  );
+}
+
+export async function withdrawCargoUniqueItem(
+  userId: string,
+  characterId: string,
+  request: CargoHoldUniqueTransferRequest,
+  now = new Date(),
+  random: MiningRandom = {
+    nextBasisPoints: () => 0,
+    nextUnit: () => 0,
+  },
+): Promise<CargoHoldStateResult<CargoHoldTransferStatus>> {
+  return withResolvedOwnedCharacter(
+    userId,
+    characterId,
+    createPlayResolver(random),
+    async (transaction, context) => {
+      await ensureStarterMiningState(transaction, context.character.id);
+      const { access } = await cargoStackAccess(transaction, context.character.id, context.action);
+      if (access)
+        return {
+          state: await stateAfterCargoCommand(transaction, context.character.id, now),
+          cargo: access,
+        };
+      const [cargoRows, instanceRows] = await Promise.all([
+        transaction
+          .select()
+          .from(cargoHoldItemInstances)
+          .where(
+            and(
+              eq(cargoHoldItemInstances.characterId, context.character.id),
+              eq(cargoHoldItemInstances.itemInstanceId, request.itemInstanceId),
+            ),
+          )
+          .for("update"),
+        transaction
+          .select()
+          .from(itemInstances)
+          .where(
+            and(
+              eq(itemInstances.characterId, context.character.id),
+              eq(itemInstances.id, request.itemInstanceId),
+            ),
+          )
+          .for("update"),
+      ]);
+      const cargoRow = cargoRows[0];
+      const instance = instanceRows[0];
+      const refusal = async (reason: CargoHoldRefusalReason, message: string) => ({
+        state: await stateAfterCargoCommand(transaction, context.character.id, now),
+        cargo: { status: "refused" as const, reason, message },
+      });
+      if (!cargoRow || !instance)
+        return refusal("item_not_stored", "That Cargo item is no longer available.");
+      if (!uniqueItemIsApproved(instance.itemId))
+        return refusal("item_not_stored", "That Cargo item is not transferable.");
+      const carry = await loadCarriedCapacity(transaction, context.character.id, now);
+      const balance = getEffectiveGameBalance();
+      const itemMass = carriedItemMassGrams(instance.itemId, balance);
+      if (carry.availableSlots < 1)
+        return refusal("carried_capacity", "Carried Inventory has no free occupied-item slot.");
+      if (carry.availableMassGrams < itemMass)
+        return refusal("carried_capacity", "That item would exceed carried mass capacity.");
+      await transaction
+        .delete(cargoHoldItemInstances)
+        .where(
+          and(
+            eq(cargoHoldItemInstances.characterId, context.character.id),
+            eq(cargoHoldItemInstances.itemInstanceId, instance.id),
+          ),
+        );
+      return {
+        state: await stateAfterCargoCommand(transaction, context.character.id, now),
+        cargo: { status: "transferred", itemInstanceId: instance.id },
+      };
+    },
+    now,
+  );
+}
+
+export async function startCargoHoldWelding(
+  userId: string,
+  characterId: string,
+  now = new Date(),
+  random: MiningRandom = {
+    nextBasisPoints: () => 0,
+    nextUnit: () => 0,
+  },
+): Promise<MiningGameplayState> {
+  return withResolvedOwnedCharacter(
+    userId,
+    characterId,
+    createPlayResolver(random),
+    async (transaction, context) => {
+      await ensureStarterMiningState(transaction, context.character.id);
+      const balance = getEffectiveGameBalance();
+      const repair = await loadRepair(transaction, context.character.id);
+      if (context.action?.actionId === ACTION_IDS.cargoHoldWelding) {
+        return stateAfterCargoCommand(transaction, context.character.id, now);
+      }
+      if (context.action) {
+        return stateFromTransaction(
+          transaction,
+          context.character.id,
+          EMPTY_RECENT_RESULT,
+          undefined,
+          "another_action_active",
+          undefined,
+          undefined,
+          now,
+        );
+      }
+      const characterRows = await transaction
+        .select({ currentLocationId: characters.currentLocationId })
+        .from(characters)
+        .where(eq(characters.id, context.character.id))
+        .limit(1);
+      if (
+        !isActionAvailableAtLocation(
+          characterRows[0]?.currentLocationId ?? "",
+          ACTION_IDS.cargoHoldWelding,
+        )
+      ) {
+        return stateFromTransaction(
+          transaction,
+          context.character.id,
+          EMPTY_RECENT_RESULT,
+          undefined,
+          undefined,
+          undefined,
+          undefined,
+          now,
+          EMPTY_RECENT_RESULT,
+          undefined,
+          undefined,
+          "welding_unavailable_here",
+        );
+      }
+      const repairProjection = repairState(repair);
+      if (cargoHoldRepairComplete(repairProjection, balance)) {
+        return stateFromTransaction(
+          transaction,
+          context.character.id,
+          EMPTY_RECENT_RESULT,
+          undefined,
+          undefined,
+          undefined,
+          undefined,
+          now,
+          EMPTY_RECENT_RESULT,
+          undefined,
+          undefined,
+          "repair_complete",
+        );
+      }
+      if (!cargoHoldMaterialsComplete(repairProjection, balance)) {
+        return stateFromTransaction(
+          transaction,
+          context.character.id,
+          EMPTY_RECENT_RESULT,
+          undefined,
+          undefined,
+          undefined,
+          undefined,
+          now,
+          EMPTY_RECENT_RESULT,
+          undefined,
+          undefined,
+          "welding_locked",
+        );
+      }
+      await transaction.insert(activeActions).values({
+        characterId: context.character.id,
+        actionId: ACTION_IDS.cargoHoldWelding,
+        startedAt: now,
+        resolvedThroughAt: now,
+      });
+      return stateAfterCargoCommand(transaction, context.character.id, now);
+    },
+    now,
+  );
+}
+
+export async function stopCargoHoldWelding(
+  userId: string,
+  characterId: string,
+  now = new Date(),
+  random: MiningRandom = {
+    nextBasisPoints: () => 0,
+    nextUnit: () => 0,
+  },
+): Promise<MiningGameplayState> {
+  return withResolvedOwnedCharacter(
+    userId,
+    characterId,
+    createPlayResolver(random),
+    async (transaction, context) => {
+      await ensureStarterMiningState(transaction, context.character.id);
+      if (context.action?.actionId === ACTION_IDS.cargoHoldWelding) {
+        await transaction
+          .delete(activeActions)
+          .where(eq(activeActions.characterId, context.character.id));
+        return stateAfterCargoCommand(transaction, context.character.id, now);
+      }
+      return stateFromTransaction(
+        transaction,
+        context.character.id,
+        EMPTY_RECENT_RESULT,
+        undefined,
+        context.action ? "another_action_active" : undefined,
+        undefined,
+        undefined,
+        now,
+      );
+    },
+    now,
+  );
+}

@@ -26,6 +26,50 @@ export type ExactStackAdditionPlan<Id> =
   | { ok: true; plan: StackAdditionPlan<Id> }
   | { ok: false; reason: "slots" | "mass"; missingQuantity: number };
 
+export type ExactStackRemovalPlan<Id> =
+  | {
+      ok: true;
+      updatedStacks: readonly StackUpdate<Id>[];
+      deletedStackIds: readonly Id[];
+    }
+  | { ok: false; missingQuantity: number };
+
+/**
+ * Plan an exact fungible-stack removal without mutating the caller's rows.
+ * Callers apply the returned diff inside their already-locked transaction.
+ */
+export function planExactStackRemoval<Id>(
+  existingStacks: readonly StackState<Id>[],
+  itemId: ItemId,
+  quantity: number,
+): ExactStackRemovalPlan<Id> {
+  if (!Number.isInteger(quantity) || quantity < 0) {
+    throw new RangeError("Quantity must be non-negative");
+  }
+  if (quantity === 0) return { ok: true, updatedStacks: [], deletedStackIds: [] };
+
+  let remainingQuantity = quantity;
+  const updatedStacks: StackUpdate<Id>[] = [];
+  const deletedStackIds: Id[] = [];
+  for (const stack of existingStacks) {
+    if (stack.itemId !== itemId || remainingQuantity === 0) continue;
+    if (!Number.isInteger(stack.quantity) || stack.quantity <= 0) {
+      throw new RangeError("Existing stack quantity is invalid");
+    }
+    if (stack.quantity <= remainingQuantity) {
+      remainingQuantity -= stack.quantity;
+      deletedStackIds.push(stack.id);
+    } else {
+      updatedStacks.push({ id: stack.id, quantity: stack.quantity - remainingQuantity });
+      remainingQuantity = 0;
+    }
+  }
+
+  return remainingQuantity === 0
+    ? { ok: true, updatedStacks, deletedStackIds }
+    : { ok: false, missingQuantity: remainingQuantity };
+}
+
 export type PossibleAward = {
   itemId: ItemId;
   quantity: number;

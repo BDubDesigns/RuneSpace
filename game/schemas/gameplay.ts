@@ -87,6 +87,32 @@ export const DiscardInventoryStackRequestSchema = z.object({
   expectedQuantity: z.number().int().positive(),
 });
 
+/** The confirmed, exact useful quantities for one irreversible Cargo repair commit. */
+export const CargoHoldMaterialContributionRequestSchema = z.object({
+  characterId: z.string().uuid(),
+  expectedRefinedFerrite: z.number().int().nonnegative(),
+  expectedSlag: z.number().int().nonnegative(),
+});
+
+const CargoHoldStackTransferFields = {
+  characterId: z.string().uuid(),
+  stackId: z.string().uuid(),
+  mode: z.enum(["one", "stack"]),
+  expectedQuantity: z.number().int().positive(),
+} as const;
+
+export const DepositCargoStackRequestSchema = z.object(CargoHoldStackTransferFields);
+export const WithdrawCargoStackRequestSchema = z.object(CargoHoldStackTransferFields);
+
+export const DepositCargoUniqueItemRequestSchema = z.object({
+  characterId: z.string().uuid(),
+  itemInstanceId: z.string().uuid(),
+});
+export const WithdrawCargoUniqueItemRequestSchema = z.object({
+  characterId: z.string().uuid(),
+  itemInstanceId: z.string().uuid(),
+});
+
 /** Containers can only hold non-container item definitions. */
 export const ContainerContentItemSchema = z.object({
   itemId: ItemIdSchema,

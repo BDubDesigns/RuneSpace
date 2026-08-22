@@ -19,6 +19,18 @@ import {
 } from "@/server/mining";
 import { changeEquipment } from "@/server/equipment";
 import { discardInventoryStack, type DiscardInventoryStackResult } from "@/server/inventory";
+import {
+  contributeCargoHoldMaterials,
+  depositCargoStack,
+  depositCargoUniqueItem,
+  startCargoHoldWelding,
+  stopCargoHoldWelding,
+  withdrawCargoStack,
+  withdrawCargoUniqueItem,
+  type CargoHoldContributionStatus,
+  type CargoHoldStateResult,
+  type CargoHoldTransferStatus,
+} from "@/server/cargo-hold";
 import { EquipmentRuleError } from "@/game/domain/equipment";
 import { TravelRuleError } from "@/server/travel";
 import { claimPowerCells, type PowerAnnexClaimResult } from "@/server/power-annex";
@@ -31,6 +43,11 @@ import {
   ClaimPowerCellsRequestSchema,
   LoadPowerCellRequestSchema,
   DiscardInventoryStackRequestSchema,
+  CargoHoldMaterialContributionRequestSchema,
+  DepositCargoStackRequestSchema,
+  WithdrawCargoStackRequestSchema,
+  DepositCargoUniqueItemRequestSchema,
+  WithdrawCargoUniqueItemRequestSchema,
   ChangeCharacterPortraitRequestSchema,
 } from "@/game/schemas/gameplay";
 
@@ -124,6 +141,95 @@ export async function startRefiningAction(characterId: string): Promise<MiningAc
 
 export async function stopRefiningAction(characterId: string): Promise<MiningActionResult> {
   return runMiningAction(characterId, stopRefining);
+}
+
+export async function startWeldingAction(characterId: string): Promise<MiningActionResult> {
+  return runMiningAction(characterId, startCargoHoldWelding);
+}
+
+export async function stopWeldingAction(characterId: string): Promise<MiningActionResult> {
+  return runMiningAction(characterId, stopCargoHoldWelding);
+}
+
+export type CargoHoldMaterialContributionActionResult =
+  | CargoHoldStateResult<CargoHoldContributionStatus>
+  | { error: string };
+
+export async function contributeCargoHoldMaterialsAction(
+  input: unknown,
+): Promise<CargoHoldMaterialContributionActionResult> {
+  const request = CargoHoldMaterialContributionRequestSchema.safeParse(input);
+  if (!request.success) return { error: "Invalid Cargo Hold contribution command." };
+  try {
+    const user = await requireCurrentUser(await headers());
+    return await contributeCargoHoldMaterials(user.id, request.data.characterId, {
+      expectedRefinedFerrite: request.data.expectedRefinedFerrite,
+      expectedSlag: request.data.expectedSlag,
+    });
+  } catch (error) {
+    if (error instanceof OwnershipError) return { error: error.message };
+    throw error;
+  }
+}
+
+export type CargoHoldTransferActionResult =
+  | CargoHoldStateResult<CargoHoldTransferStatus>
+  | { error: string };
+
+export async function depositCargoStackAction(
+  input: unknown,
+): Promise<CargoHoldTransferActionResult> {
+  const request = DepositCargoStackRequestSchema.safeParse(input);
+  if (!request.success) return { error: "Invalid Cargo Hold deposit command." };
+  try {
+    const user = await requireCurrentUser(await headers());
+    return await depositCargoStack(user.id, request.data.characterId, request.data);
+  } catch (error) {
+    if (error instanceof OwnershipError) return { error: error.message };
+    throw error;
+  }
+}
+
+export async function withdrawCargoStackAction(
+  input: unknown,
+): Promise<CargoHoldTransferActionResult> {
+  const request = WithdrawCargoStackRequestSchema.safeParse(input);
+  if (!request.success) return { error: "Invalid Cargo Hold withdrawal command." };
+  try {
+    const user = await requireCurrentUser(await headers());
+    return await withdrawCargoStack(user.id, request.data.characterId, request.data);
+  } catch (error) {
+    if (error instanceof OwnershipError) return { error: error.message };
+    throw error;
+  }
+}
+
+export async function depositCargoUniqueItemAction(
+  input: unknown,
+): Promise<CargoHoldTransferActionResult> {
+  const request = DepositCargoUniqueItemRequestSchema.safeParse(input);
+  if (!request.success) return { error: "Invalid Cargo Hold item deposit command." };
+  try {
+    const user = await requireCurrentUser(await headers());
+    return await depositCargoUniqueItem(user.id, request.data.characterId, request.data);
+  } catch (error) {
+    if (error instanceof OwnershipError) return { error: error.message };
+    throw error;
+  }
+}
+
+export async function withdrawCargoUniqueItemAction(
+  input: unknown,
+): Promise<CargoHoldTransferActionResult> {
+  const request = WithdrawCargoUniqueItemRequestSchema.safeParse(input);
+  if (!request.success) return { error: "Invalid Cargo Hold item withdrawal command." };
+  try {
+    const user = await requireCurrentUser(await headers());
+    return await withdrawCargoUniqueItem(user.id, request.data.characterId, request.data);
+  } catch (error) {
+    if (error instanceof OwnershipError) return { error: error.message };
+    throw error;
+  }
 }
 
 export type LoadPowerCellActionResult = LoadPowerCellResult | { error: string };

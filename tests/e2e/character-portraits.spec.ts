@@ -77,6 +77,13 @@ async function deleteCharacter(characterId: string) {
   await db
     .delete(rune.characterTravelState)
     .where(eq(rune.characterTravelState.characterId, characterId));
+  await db
+    .delete(rune.cargoHoldItemInstances)
+    .where(eq(rune.cargoHoldItemInstances.characterId, characterId));
+  await db.delete(rune.cargoHoldStacks).where(eq(rune.cargoHoldStacks.characterId, characterId));
+  await db
+    .delete(rune.characterCargoHoldRepair)
+    .where(eq(rune.characterCargoHoldRepair.characterId, characterId));
   await db.delete(rune.equippedItems).where(eq(rune.equippedItems.characterId, characterId));
   await db.delete(rune.activeActions).where(eq(rune.activeActions.characterId, characterId));
   await db.delete(rune.characterSkillXp).where(eq(rune.characterSkillXp.characterId, characterId));

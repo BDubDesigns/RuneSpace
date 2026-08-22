@@ -392,6 +392,91 @@ export const characterRefiningState = pgTable("character_refining_state", {
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
+/** Issue #89 — the character-scoped Crash Site Cargo Hold repair state. */
+export const characterCargoHoldRepair = pgTable(
+  "character_cargo_hold_repair",
+  {
+    characterId: text("character_id")
+      .primaryKey()
+      .references(() => characters.id, { onDelete: "restrict" }),
+    refinedFerriteContributed: integer("refined_ferrite_contributed").notNull().default(0),
+    slagContributed: integer("slag_contributed").notNull().default(0),
+    weldingProgress: integer("welding_progress").notNull().default(0),
+    completedAt: timestamp("completed_at", { withTimezone: true }),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    check(
+      "character_cargo_hold_repair_refined_ferrite_range",
+      sql`${table.refinedFerriteContributed} >= 0 AND ${table.refinedFerriteContributed} <= 15`,
+    ),
+    check(
+      "character_cargo_hold_repair_slag_range",
+      sql`${table.slagContributed} >= 0 AND ${table.slagContributed} <= 6`,
+    ),
+    check(
+      "character_cargo_hold_repair_welding_range",
+      sql`${table.weldingProgress} >= 0 AND ${table.weldingProgress} <= 12`,
+    ),
+    check(
+      "character_cargo_hold_repair_progress_requires_materials",
+      sql`${table.weldingProgress} = 0 OR (${table.refinedFerriteContributed} = 15 AND ${table.slagContributed} = 6)`,
+    ),
+    check(
+      "character_cargo_hold_repair_completion_requires_full_state",
+      sql`${table.completedAt} IS NULL OR (${table.refinedFerriteContributed} = 15 AND ${table.slagContributed} = 6 AND ${table.weldingProgress} = 12)`,
+    ),
+  ],
+);
+
+/** Fungible occupied Cargo Hold slots; stack limits remain content-owned. */
+export const cargoHoldStacks = pgTable(
+  "cargo_hold_stacks",
+  {
+    id: text("id")
+      .primaryKey()
+      .default(sql`gen_random_uuid()`),
+    characterId: text("character_id")
+      .notNull()
+      .references(() => characters.id, { onDelete: "restrict" }),
+    itemId: text("item_id").notNull(),
+    quantity: integer("quantity").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    check("cargo_hold_stacks_quantity_positive", sql`${table.quantity} > 0`),
+    index("cargo_hold_stacks_character_id_idx").on(table.characterId),
+  ],
+);
+
+/**
+ * A Cargo Hold unique item keeps its original item_instances row and mutable
+ * state. This relation is the storage assignment, not a copy of the item.
+ */
+export const cargoHoldItemInstances = pgTable(
+  "cargo_hold_item_instances",
+  {
+    characterId: text("character_id")
+      .notNull()
+      .references(() => characters.id, { onDelete: "restrict" }),
+    itemInstanceId: text("item_instance_id").notNull(),
+    storedAt: timestamp("stored_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    primaryKey({
+      columns: [table.characterId, table.itemInstanceId],
+      name: "cargo_hold_item_instances_pk",
+    }),
+    foreignKey({
+      columns: [table.characterId, table.itemInstanceId],
+      foreignColumns: [itemInstances.characterId, itemInstances.id],
+      name: "cargo_hold_item_instances_owned_instance_fk",
+    }).onDelete("restrict"),
+    index("cargo_hold_item_instances_character_id_idx").on(table.characterId),
+  ],
+);
+
 /**
  * Immutable per-character Power Annex eligibility records. Eligibility is
  * derived by looking up the current Pacific calendar date; nothing is cleared
@@ -430,3 +515,6 @@ export type ActiveAction = typeof activeActions.$inferSelect;
 export type CharacterTravelState = typeof characterTravelState.$inferSelect;
 export type CharacterScavengeReveal = typeof characterScavengeReveals.$inferSelect;
 export type CharacterPowerCellDailyClaim = typeof characterPowerCellDailyClaims.$inferSelect;
+export type CharacterCargoHoldRepair = typeof characterCargoHoldRepair.$inferSelect;
+export type CargoHoldStack = typeof cargoHoldStacks.$inferSelect;
+export type CargoHoldItemInstance = typeof cargoHoldItemInstances.$inferSelect;
