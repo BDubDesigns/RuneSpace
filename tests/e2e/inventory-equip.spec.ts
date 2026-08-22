@@ -14,6 +14,7 @@ import {
   itemInstances,
 } from "@/db/rune-space";
 import { ITEM_IDS, LOCATION_IDS } from "@/game/config/foundations";
+import { getEffectiveGameBalance } from "@/game/config/balance";
 import { miningStorageStatePath } from "./mining.setup";
 
 const e2eDatabaseHost = process.env.DATABASE_URL ? new URL(process.env.DATABASE_URL).hostname : "";
@@ -62,17 +63,38 @@ test.beforeEach(async ({ page }) => {
 });
 
 test.describe("Inventory equip and compact selected visual", () => {
-  test("equips an eligible carried Salvage Cutter from Inventory, reconciles state, and keeps focus in the drawer", async ({
+  test("falls back to the Inventory grid when equipping the only carried item leaves no occupied tile", async ({
     page,
   }) => {
     await page.setViewportSize({ width: 390, height: 844 });
+    const characterId = page.url().split("/").at(-1)!;
+    const balance = getEffectiveGameBalance();
 
-    // The server auto-provisions one equipped Salvage Cutter + a starter
-    // container on the first state read. Add a SECOND, unequipped carried
-    // Salvage Cutter so it appears in Inventory and is eligible for the
-    // Mining-tool slot (single source of truth is the server eligibleItems).
+    // before() auto-provisions an equipped Cutter + starter container and
+    // leaves the starter-provisioning marker present. To exercise the
+    // empty-carried-inventory fallback we need a carried Salvage Cutter with an
+    // EMPTY Mining-tool slot and no other carried items. Because the starter
+    // marker already exists, `getMiningGameplayState` will NOT auto-equip a new
+    // Cutter on reload, so the state we seed below is authoritative and stable:
+    //   - carried: exactly one Salvage Cutter (the only carried unique item),
+    //   - equipped: one MYKEA container (required by the loadout rule), tool slot EMPTY,
+    //   - no carried stacks, no other unique items.
+    await db.delete(equippedItems).where(eq(equippedItems.characterId, characterId));
+    await db.delete(itemInstances).where(eq(itemInstances.characterId, characterId));
+    const container = (
+      await db
+        .insert(itemInstances)
+        .values({ characterId, itemId: ITEM_IDS.mykeaSchleppraum8 })
+        .returning()
+    )[0]!;
+    await db.insert(equippedItems).values({
+      characterId,
+      assignmentKind: "container",
+      suitSlotId: balance.carrying.containerSuitSlotIds[0],
+      itemInstanceId: container.id,
+    });
     await db.insert(itemInstances).values({
-      characterId: page.url().split("/").at(-1)!,
+      characterId,
       itemId: ITEM_IDS.salvageCutter,
       currentCharge: 0,
     });
@@ -82,8 +104,7 @@ test.describe("Inventory equip and compact selected visual", () => {
     await page.getByRole("button", { name: /Inventory \d+\/\d+/ }).click();
     await expect(inventoryDrawer).toBeVisible();
 
-    // Exactly one carried unique Cutter tile (the spare) is present; no stacks
-    // were seeded.
+    // Exactly one carried unique Cutter tile; no stacks were seeded.
     await expect(inventoryDrawer.locator("button[aria-pressed]")).toHaveCount(1);
     const cutterTile = inventoryDrawer.locator("button[aria-pressed]").first();
     await cutterTile.click();
@@ -95,47 +116,46 @@ test.describe("Inventory equip and compact selected visual", () => {
 
     // Compact selected visual: at the 390px portrait viewport the selected
     // artwork tile stays ~7rem (112px) wide instead of stretching across the
-    // dossier. The nameplate/artwork tile box should be well under the dossier
-    // width and near the 7rem compact scale. The visual renders as the <article>
-    // root of ItemVisual / InventoryStackVisual inside the details panel.
+    // dossier. The visual renders as the <article> root of ItemVisual inside the
+    // details panel.
     const dossierBox = await detailsPanel.boundingBox();
     expect(dossierBox).not.toBeNull();
     const tileBox = await detailsPanel.locator("article").first().boundingBox();
     expect(tileBox).not.toBeNull();
     expect(tileBox!.width).toBeGreaterThanOrEqual(80);
     expect(tileBox!.width).toBeLessThanOrEqual(140);
-    // Compact relative to the dossier: the tile is not a full-width banner.
     expect(tileBox!.width).toBeLessThan(dossierBox!.width * 0.5);
 
     // Activate Equip. The command goes through the shared gate; the returned
-    // authoritative state must immediately remove the spare from carried
+    // authoritative state must immediately remove the Cutter from carried
     // Inventory.
     await detailsPanel.getByRole("button", { name: /Equip in Mining tool/ }).click();
     await expect(
       inventoryDrawer.getByText(/Equipped Salvage Cutter into Mining tool/),
     ).toBeVisible();
 
-    // The selected spare Cutter is no longer carried: the swapped-out loadout
-    // leaves either the other Cutter or an empty grid, but never the selected
-    // stale tile. Assert the stale selection/detail no longer shows an Equip
-    // action and the drawer stays open with a live focused element inside.
+    // The equipped Cutter is no longer carried and there are no other carried
+    // stacks or unique items, so NO occupied Inventory tile remains.
     await expect(detailsPanel.getByRole("button", { name: /Equip in/ })).toHaveCount(0);
+    await expect(inventoryDrawer.locator('button[aria-pressed="true"]')).toHaveCount(0);
+    await expect(inventoryDrawer.locator("button[aria-pressed]")).toHaveCount(0);
+    // The stale selected dossier is gone and the drawer stays open.
+    await expect(detailsPanel).toHaveCount(0);
     await expect(inventoryDrawer).toBeVisible();
 
-    // Focus remains inside the Inventory dialog (never a removed element or
-    // the page behind the modal).
+    // Focus lands on the Inventory grid container itself (the stable
+    // programmatic fallback), NOT merely somewhere inside the dialog and NOT on
+    // a removed element behind the modal.
+    const grid = inventoryDrawer.locator('[aria-label$=" inventory slots"]');
+    await expect(grid).toHaveAttribute("tabindex", "-1");
+    await expect
+      .poll(() => grid.evaluate((element) => document.activeElement === element))
+      .toBe(true);
+
+    // The drawer still contains the modal (focus was not lost to the page).
     await expect
       .poll(() => inventoryDrawer.evaluate((element) => element.contains(document.activeElement)))
       .toBe(true);
-
-    // Durable fallback assertion: when the equipped tile leaves and no other
-    // occupied tile is available, the Inventory grid container itself is the
-    // stable programmatic focus target (tabIndex=-1, focusable only via
-    // script), so post-equip focus can never be lost to a removed element.
-    await expect(inventoryDrawer.locator('[aria-label$=" inventory slots"]')).toHaveAttribute(
-      "tabindex",
-      "-1",
-    );
 
     // Equipment projection immediately shows a Salvage Cutter equipped without
     // a reload (the shared provider accepted the returned state). Close the
