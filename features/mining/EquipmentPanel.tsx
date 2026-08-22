@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition, type RefObject } from "react";
+import { useState, type RefObject } from "react";
 import { ItemVisual } from "@/components/items/ItemVisual";
 import { ActionButton } from "@/components/ui/ActionButton";
 import { Drawer } from "@/components/ui/Drawer";
@@ -8,8 +8,8 @@ import { Feedback } from "@/components/ui/Feedback";
 import { StatusMeter } from "@/components/ui/StatusMeter";
 import { getEffectiveGameBalance } from "@/game/config/balance";
 import { GAME_TICK_MS } from "@/game/config/foundations";
-import { equipEquipmentAction, unequipEquipmentAction } from "@/server/actions";
 import type { MiningGameplayState } from "@/server/mining";
+import { useEquipCommand } from "./useEquipCommand";
 import { useLoadPowerCell } from "./useLoadPowerCell";
 import { useMiningPlay } from "./MiningPlayContext";
 
@@ -30,44 +30,18 @@ export function EquipmentPanel({
   onClose: () => void;
   triggerRef: RefObject<HTMLButtonElement | null>;
 }) {
-  const { acquireCommand, acceptState, enqueueForeground, foregroundBusy, releaseCommand } =
-    useMiningPlay();
-  const [, startTransition] = useTransition();
+  const { foregroundBusy } = useMiningPlay();
   const [message, setMessage] = useState<string>();
   const [messageTone, setMessageTone] = useState<"muted" | "danger">("muted");
   const { busy: loadBusy, loadPowerCell } = useLoadPowerCell((feedback) => {
     setMessage(feedback.message);
     setMessageTone(feedback.tone);
   });
+  const { equip, unequip } = useEquipCommand((feedback) => {
+    setMessage(feedback.tone === "muted" ? undefined : feedback.message);
+    setMessageTone(feedback.tone);
+  });
   const miningToolSlotId = getEffectiveGameBalance().items.salvageCutter.suitSlotId;
-
-  function apply(result: Awaited<ReturnType<typeof equipEquipmentAction>>) {
-    if (result.error) {
-      setMessage(result.error);
-      setMessageTone("danger");
-      return;
-    }
-    if (result.state) {
-      acceptState(result.state);
-      setMessage(undefined);
-    }
-  }
-
-  function command(action: () => ReturnType<typeof equipEquipmentAction>) {
-    const execute = () => {
-      startTransition(async () => {
-        try {
-          apply(await action());
-        } catch {
-          setMessage("Comms interruption. Equipment could not be confirmed.");
-          setMessageTone("danger");
-        } finally {
-          releaseCommand();
-        }
-      });
-    };
-    enqueueForeground(execute);
-  }
 
   return (
     <Drawer
@@ -178,14 +152,7 @@ export function EquipmentPanel({
                 <ActionButton
                   disabled={foregroundBusy}
                   intent="secondary"
-                  onClick={() =>
-                    command(() =>
-                      unequipEquipmentAction({
-                        characterId: state.characterId,
-                        target: slot.target,
-                      }),
-                    )
-                  }
+                  onClick={() => unequip(slot.target, "")}
                 >
                   Unequip
                 </ActionButton>
@@ -219,15 +186,7 @@ export function EquipmentPanel({
                     <ActionButton
                       disabled={foregroundBusy}
                       intent="mining"
-                      onClick={() =>
-                        command(() =>
-                          equipEquipmentAction({
-                            characterId: state.characterId,
-                            itemInstanceId: item.itemInstanceId,
-                            target: slot.target,
-                          }),
-                        )
-                      }
+                      onClick={() => equip(item.itemInstanceId, slot.target, "")}
                     >
                       Equip in {slot.label}
                     </ActionButton>

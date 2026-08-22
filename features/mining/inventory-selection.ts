@@ -1,4 +1,5 @@
 import { ITEM_IDS } from "@/game/config/foundations";
+import type { EquipmentTarget } from "@/game/domain/equipment";
 import type { MiningGameplayState } from "@/server/mining";
 
 /**
@@ -95,4 +96,37 @@ export function derivePowerCellLoadAvailability(
     };
   if (state.equipment.carriedPowerCellQuantity <= 0) return { enabled: false, reason: "no_cells" };
   return { enabled: true };
+}
+
+export type InventoryEquipAvailability =
+  | { enabled: true; target: EquipmentTarget; itemInstanceId: string; slotLabel: string }
+  | { enabled: false; reason: "busy" };
+
+/**
+ * Client-advisory equip availability for a carried unique item selected in
+ * Inventory. Derives the target slot and eligibility ONLY from the server's
+ * authoritative equipment-slot `eligibleItems` projection — which already
+ * enforces slot compatibility, carry/equip state, and capacity before it
+ * reaches the client — rather than teaching the client a second compatibility
+ * rule. Returns `undefined` when the selected item is not eligible for any
+ * slot (for example an ineligible or cargo-held unique item), so no misleading
+ * Equip action is rendered. The equip command itself remains authoritative.
+ */
+export function deriveInventoryEquipAvailability(
+  state: MiningGameplayState,
+  selection: ResolvedInventorySelection | undefined,
+  busy: boolean,
+): InventoryEquipAvailability | undefined {
+  if (!selection || selection.kind !== "unique") return undefined;
+  if (busy) return { enabled: false, reason: "busy" };
+  const slot = state.equipment.slots.find((candidate) =>
+    candidate.eligibleItems.some((item) => item.itemInstanceId === selection.entry.id),
+  );
+  if (!slot) return undefined;
+  return {
+    enabled: true,
+    target: slot.target,
+    itemInstanceId: selection.entry.id,
+    slotLabel: slot.label,
+  };
 }

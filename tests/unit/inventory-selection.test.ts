@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
+import { getEffectiveGameBalance } from "@/game/config/balance";
 import { ITEM_IDS } from "@/game/config/foundations";
 import type { MiningGameplayState } from "@/server/mining";
 import {
+  deriveInventoryEquipAvailability,
   derivePowerCellLoadAvailability,
   resolveInventorySelection,
   stackDropActions,
@@ -347,5 +349,99 @@ describe("discard request boundary", () => {
     const forged = DiscardInventoryStackRequestSchema.safeParse({ ...base, itemId: "power_cell" });
     expect(forged.success).toBe(true);
     expect("itemId" in (forged.success ? forged.data : {})).toBe(false);
+  });
+});
+
+describe("inventory equip availability", () => {
+  const balance = getEffectiveGameBalance();
+  const toolSlotId = balance.items.salvageCutter.suitSlotId;
+  const toolTarget = { assignmentKind: "gear" as const, suitSlotId: toolSlotId };
+
+  /**
+   * Authoritative-shaped equipment projection: the Mining-tool slot lists the
+   * carried, non-equipped Salvage Cutter in `eligibleItems`, exactly as the
+   * server transaction does. This is the boundary the client must trust
+   * rather than re-deriving compatibility from the item id.
+   */
+  function stateWith(carriedCutterId: string, busy = false): MiningGameplayState {
+    const inventory = inventoryState([], [{ ...carriedCutter, id: carriedCutterId }]);
+    const state = baseState(inventory);
+    state.equipment.slots = [
+      {
+        target: toolTarget,
+        label: "Mining tool",
+        item: undefined,
+        eligibleItems: [
+          {
+            itemInstanceId: carriedCutterId,
+            itemId: ITEM_IDS.salvageCutter,
+            name: "Salvage Cutter",
+            massGrams: 5_000,
+          },
+        ],
+      },
+    ];
+    return state;
+  }
+
+  it("offers Equip when the selected carried Cutter is in the authoritative eligibleItems projection", () => {
+    const state = stateWith(carriedCutter.id);
+    const selection = resolveInventorySelection(state.inventory, {
+      kind: "unique",
+      id: carriedCutter.id,
+    });
+    expect(deriveInventoryEquipAvailability(state, selection, false)).toEqual({
+      enabled: true,
+      target: toolTarget,
+      itemInstanceId: carriedCutter.id,
+      slotLabel: "Mining tool",
+    });
+  });
+
+  it("disables Equip (with busy reason) while another command is in flight", () => {
+    const state = stateWith(carriedCutter.id);
+    const selection = resolveInventorySelection(state.inventory, {
+      kind: "unique",
+      id: carriedCutter.id,
+    });
+    expect(deriveInventoryEquipAvailability(state, selection, true)).toEqual({
+      enabled: false,
+      reason: "busy",
+    });
+  });
+
+  it("offers no Equip action for a carried item absent from every eligibleItems projection", () => {
+    const inventory = inventoryState([], [{ ...carriedCutter, id: "other-instance" }]);
+    const state = baseState(inventory);
+    state.equipment.slots = [
+      {
+        target: toolTarget,
+        label: "Mining tool",
+        item: undefined,
+        eligibleItems: [],
+      },
+    ];
+    const selection = resolveInventorySelection(state.inventory, {
+      kind: "unique",
+      id: "other-instance",
+    });
+    expect(deriveInventoryEquipAvailability(state, selection, false)).toBe(undefined);
+  });
+
+  it("offers no Equip surface for stack selections or a cleared selection", () => {
+    const state = stateWith(carriedCutter.id);
+    const stackSelection = resolveInventorySelection(state.inventory, {
+      kind: "stack",
+      id: "never-a-stack",
+    });
+    expect(deriveInventoryEquipAvailability(state, stackSelection, false)).toBe(undefined);
+    // A selection that no longer resolves against authoritative inventory is
+    // already undefined, so no Equip action is offered and it reconciles safe.
+    const staleSelection = resolveInventorySelection(state.inventory, {
+      kind: "unique",
+      id: "removed-instance",
+    });
+    expect(staleSelection).toBe(undefined);
+    expect(deriveInventoryEquipAvailability(state, staleSelection, false)).toBe(undefined);
   });
 });
