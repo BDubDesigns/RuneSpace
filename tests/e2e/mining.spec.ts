@@ -3,7 +3,10 @@ import { and, eq } from "drizzle-orm";
 import { db } from "@/db";
 import {
   activeActions,
+  cargoHoldItemInstances,
+  cargoHoldStacks,
   characters,
+  characterCargoHoldRepair,
   characterMiningState,
   characterStarterProvisioning,
   equippedItems,
@@ -70,6 +73,11 @@ test.beforeEach(async ({ page }) => {
   const characterId = await openMiningFixture(page);
   await Promise.all([
     db.delete(activeActions).where(eq(activeActions.characterId, characterId)),
+    db.delete(cargoHoldItemInstances).where(eq(cargoHoldItemInstances.characterId, characterId)),
+    db.delete(cargoHoldStacks).where(eq(cargoHoldStacks.characterId, characterId)),
+    db
+      .delete(characterCargoHoldRepair)
+      .where(eq(characterCargoHoldRepair.characterId, characterId)),
     db.delete(characterMiningState).where(eq(characterMiningState.characterId, characterId)),
     db.delete(inventoryStacks).where(eq(inventoryStacks.characterId, characterId)),
     db

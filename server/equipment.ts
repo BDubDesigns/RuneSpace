@@ -4,12 +4,12 @@ import {
   characterMiningState,
   equippedItems,
   inventoryStacks,
-  itemInstances,
 } from "@/db/rune-space";
 import { getEffectiveGameBalance } from "@/game/config/balance";
 import { planEquipmentChange, type EquipmentChange } from "@/game/domain/equipment";
 import { ACTION_IDS } from "@/game/config/foundations";
 import { withResolvedOwnedCharacter } from "@/server/action-resolution";
+import { loadOwnedItemInstances } from "@/server/carried-inventory";
 import {
   createPlayResolver,
   defaultMiningRandom,
@@ -45,12 +45,8 @@ export async function changeEquipment(
     }),
     async (transaction, context) => {
       await ensureStarterMiningState(transaction, context.character.id);
-      const [instances, assignments, stacks] = await Promise.all([
-        transaction
-          .select()
-          .from(itemInstances)
-          .where(eq(itemInstances.characterId, context.character.id))
-          .for("update"),
+      const [itemState, assignments, stacks] = await Promise.all([
+        loadOwnedItemInstances(transaction, context.character.id),
         transaction
           .select()
           .from(equippedItems)
@@ -70,7 +66,7 @@ export async function changeEquipment(
 
       const nextLoadout = planEquipmentChange({
         assignments,
-        instances,
+        instances: itemState.carriedInstances,
         stacks,
         balance,
         change,

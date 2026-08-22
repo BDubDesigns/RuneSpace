@@ -64,6 +64,9 @@ describe("issue #47 location content", () => {
     expect(isActionAvailableAtLocation(LOCATION_IDS.crashSite, ACTION_IDS.ferriteShaleMining)).toBe(
       false,
     );
+    expect(isActionAvailableAtLocation(LOCATION_IDS.crashSite, ACTION_IDS.cargoHoldWelding)).toBe(
+      true,
+    );
     expect(isActionAvailableAtLocation(LOCATION_IDS.theJag, ACTION_IDS.ferriteShaleMining)).toBe(
       true,
     );

@@ -89,6 +89,33 @@ suite("issue #81 Refining persistence and concurrency (real PostgreSQL)", () => 
     expect(stillRefused.refiningError).toBe("refining_unavailable_here");
   });
 
+  it("excludes Cargo-stored unique mass from Refining preflight capacity", async () => {
+    const { userId, character } = await makeCharacter();
+    const now = await provisionAtYard(userId, character.id);
+    await addShale(character.id, 2);
+    const extraCutters = await db
+      .insert(rune.itemInstances)
+      .values(
+        Array.from({ length: 7 }, () => ({
+          characterId: character.id,
+          itemId: ITEM_IDS.salvageCutter,
+          currentCharge: 0,
+        })),
+      )
+      .returning();
+    await db.insert(rune.cargoHoldItemInstances).values({
+      characterId: character.id,
+      itemInstanceId: extraCutters[0]!.id,
+      storedAt: now,
+    });
+
+    const started = await mining.startRefining(userId, character.id, now, {
+      nextBasisPoints: () => 0,
+      nextUnit: () => 0,
+    });
+    expect(started.activeAction?.actionId).toBe(ACTION_IDS.refining);
+  });
+
   it("fresh character starts Refining at level 1 / 0 XP without duplicating rows", async () => {
     const { userId, character } = await makeCharacter();
     const now = new Date("2026-01-01T00:00:00.000Z");

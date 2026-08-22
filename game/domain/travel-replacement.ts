@@ -8,6 +8,7 @@ import { ACTION_IDS } from "@/game/config/foundations";
 const TRAVEL_REPLACEABLE_ACTION_IDS = new Set<string>([
   ACTION_IDS.ferriteShaleMining,
   ACTION_IDS.refining,
+  ACTION_IDS.cargoHoldWelding,
 ]);
 
 export function isTravelReplaceableAction(actionId: string): boolean {

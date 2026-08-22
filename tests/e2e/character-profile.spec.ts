@@ -115,6 +115,15 @@ test.beforeEach(async ({ page }) => {
       .delete(rune.characterPowerCellDailyClaims)
       .where(eq(rune.characterPowerCellDailyClaims.characterId, characterId));
     await transaction
+      .delete(rune.cargoHoldItemInstances)
+      .where(eq(rune.cargoHoldItemInstances.characterId, characterId));
+    await transaction
+      .delete(rune.cargoHoldStacks)
+      .where(eq(rune.cargoHoldStacks.characterId, characterId));
+    await transaction
+      .delete(rune.characterCargoHoldRepair)
+      .where(eq(rune.characterCargoHoldRepair.characterId, characterId));
+    await transaction
       .delete(rune.inventoryStacks)
       .where(eq(rune.inventoryStacks.characterId, characterId));
     await transaction
@@ -171,8 +180,8 @@ test("selecting a same-location character opens its public profile panel", async
   await expect(panel.getByText("Player: Rada Stonehand")).toBeVisible();
   await expect(panel.getByText("Overall level 2")).toBeVisible();
   const skillRow = panel.locator("[data-character-skill]");
-  // Mining + Refining both have approved level curves, so both publish.
-  await expect(skillRow).toHaveCount(2);
+  // Mining, Refining, and the approved Welding skill all publish.
+  await expect(skillRow).toHaveCount(3);
   await expect(skillRow.getByText(/^Mining — Level 2$/)).toBeVisible();
   await expect(skillRow.getByText("500 total XP")).toBeVisible();
   await expect(skillRow.getByText("550 XP to next level")).toBeVisible();
@@ -180,6 +189,7 @@ test("selecting a same-location character opens its public profile panel", async
     skillRow.filter({ hasText: /^Mining — Level 2/ }).getByRole("progressbar"),
   ).toHaveAttribute("aria-valuenow", "0");
   await expect(skillRow.getByText(/^Refining — Level 1$/)).toBeVisible();
+  await expect(skillRow.getByText(/^Welding — Level 1$/)).toBeVisible();
 
   // No private account information appears anywhere in the panel.
   await expect(panel.getByText("@")).toHaveCount(0);

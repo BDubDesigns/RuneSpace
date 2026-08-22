@@ -4,8 +4,11 @@ import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import {
   activeActions,
+  cargoHoldItemInstances,
+  cargoHoldStacks,
   characters,
   characterMiningState,
+  characterCargoHoldRepair,
   characterPowerCellDailyClaims,
   characterScavengeReveals,
   characterSkillXp,
@@ -288,6 +291,13 @@ test.beforeEach(async ({ page }) => {
   await db.transaction(async (transaction) => {
     // Clear all mutable gameplay rows to ensure per-test isolation.
     await transaction.delete(activeActions).where(eq(activeActions.characterId, characterId));
+    await transaction
+      .delete(cargoHoldItemInstances)
+      .where(eq(cargoHoldItemInstances.characterId, characterId));
+    await transaction.delete(cargoHoldStacks).where(eq(cargoHoldStacks.characterId, characterId));
+    await transaction
+      .delete(characterCargoHoldRepair)
+      .where(eq(characterCargoHoldRepair.characterId, characterId));
     await transaction
       .delete(characterTravelState)
       .where(eq(characterTravelState.characterId, characterId));

@@ -205,6 +205,37 @@ suite("Issue #47 Power Annex claims (real PostgreSQL)", () => {
     ).toEqual([]);
   });
 
+  it("does not count a Cargo-stored unique toward Power Annex claim mass capacity", async () => {
+    const { userId, characters: owned } = await makeAccount();
+    const character = owned[0]!;
+    const now = new Date("2026-04-03T12:00:00.000Z");
+    await db
+      .update(rune.characters)
+      .set({ currentLocationId: LOCATION_IDS.emergencyPowerAnnex })
+      .where(eq(rune.characters.id, character.id));
+    await mining.getMiningGameplayState(userId, character.id, now);
+    const extraCutters = await db
+      .insert(rune.itemInstances)
+      .values(
+        Array.from({ length: 7 }, () => ({
+          characterId: character.id,
+          itemId: ITEM_IDS.salvageCutter,
+        })),
+      )
+      .returning();
+    await db.insert(rune.cargoHoldItemInstances).values({
+      characterId: character.id,
+      itemInstanceId: extraCutters[0]!.id,
+      storedAt: now,
+    });
+
+    const result = await annex.claimPowerCells(userId, character.id, now);
+    expect(result.claim).toMatchObject({ status: "claimed", quantity: 5 });
+    expect(
+      (await powerCellStacks(character.id)).reduce((total, stack) => total + stack.quantity, 0),
+    ).toBe(5);
+  });
+
   it("serializes concurrent claims and never resolves an active action", async () => {
     const { userId, characters: owned } = await makeAccount();
     const character = owned[0]!;

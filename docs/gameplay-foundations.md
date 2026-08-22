@@ -1,8 +1,9 @@
 # Gameplay Foundations
 
 This is the authoritative design record for the server-authoritative foundations
-introduced in issue #16 and the approved Ferrite Shale Mining slice. It defines
-contracts and approved values, not unfinished balance values or future activities.
+introduced in issue #16, the approved Ferrite Shale Mining slice, and the Cargo
+Hold repair slice in issue #89. It defines contracts and approved values, not
+unfinished balance values or future activities.
 
 ## Time and actions
 
@@ -35,8 +36,9 @@ contracts and approved values, not unfinished balance values or future activitie
   derived from total XP and a supplied authoritative threshold source.
 - Every future award must use `grantSkillXp`; activities must not implement XP
   arithmetic or level checks themselves.
-- The initial Mining curve and Ferrite Shale award are approved in the slice below;
-  other skills and activities remain deliberately undecided.
+- The initial Mining curve, Ferrite Shale award, and Welding curve/award are
+  approved in the slices below; other skills and activities remain deliberately
+  undecided.
 
 ## Ferrite Shale Mining slice
 
@@ -81,6 +83,38 @@ history, and cursor changes commit atomically.
 The refining run mirrors Mining: current Refining level/XP, success chance,
 bounded recent attempts (10), and current-run counters (attempts, Refined
 Ferrite, Slag, XP, shale consumed) — reset only on a genuinely new run.
+
+## Cargo Hold repair and Welding slice (issue #89)
+
+Crash Site exposes the damaged ship's Cargo Hold repair. The repair is
+character-scoped and persistent: it is not a generic construction system, a
+bank abstraction, or a reclaimable deposit.
+
+- The exact recipe is **15 Refined Ferrite and 6 Slag**. A contribution command
+  locks the character and carried stacks, caps each material to the useful
+  outstanding amount, removes only that exact amount, and commits the progress
+  atomically. Contributions may be partial across commands. The player must
+  confirm the exact quantities; installed materials cannot be recovered.
+- Welding is a standard server-authoritative skill and the only repair activity
+  in this slice. It is available only while stationary at Crash Site after both
+  material requirements are complete. Each increment is one whole **5-tick / 3
+  second** pass, grants **1 repair progress and 50 Welding XP**, and resolves
+  deterministically with no roll. Twelve increments complete the repair for
+  **600 total Welding XP**. A partial pass consumes no progress or XP.
+- Welding uses the normal one-active-action, lazy-resolution, stop, and Travel
+  replacement contracts. Completion is a hard stop at 12/12; no further action
+  or XP can be generated. Travel and other commands resolve only completed
+  passes before applying their own transition.
+- Once restored, Cargo Hold storage is available only while stationary at Crash
+  Site. It has **32 occupied slots** and no aggregate mass limit. Stack deposits
+  and withdrawals support one item or the full current stack, are exact and
+  all-or-nothing, and preserve stack identity/state. Unique items retain their
+  original item-instance identity and mutable state (such as Cutter charge).
+  Equipped items cannot be deposited. Withdrawals must fit the carried
+  Inventory's authoritative slot and mass limits.
+- The storage surface renders occupied entries only; it does not render a 32
+  tile empty grid. Cargo Hold has no generic transfer, bank, trading, or
+  multi-container abstraction in this issue.
 
 ## Inventory and equipment
 
@@ -145,7 +179,9 @@ Mining extracts raw material from the infinite Ferrite Shale seam at The Jag. Re
 (issue #81) consumes 2 Ferrite Shale per 7-tick attempt at the Abandoned
 Processing Yard, producing 1 Refined Ferrite (150 g / stack 5, 15 XP) on
 success or 1 Slag (150 g / stack 10, 3 XP) otherwise, with a 40%→100% L1–20
-linear success curve. Welding joins material and repairs structures. Salvage
+linear success curve. Welding (issue #89) repairs the Cargo Hold at Crash Site
+after its exact 15 Refined Ferrite + 6 Slag recipe is installed, using twelve
+deterministic 5-tick increments for 600 total XP. Salvage
 dismantles and recovers components. Fabrication assembles finished objects.
 Machining creates precise components. Salvage, Fabrication, Machining, Speeder
 Piloting, and Ship Piloting are documented future skill directions only; they
@@ -156,7 +192,7 @@ have no persistence initialization or gameplay in this foundation.
 RuneSpace's production stages require movement between distinct places. Travel is
 a real, server-authoritative, blocking character activity — not an instant tab
 switch or a client timer. Issue #40 establishes the smallest correct
-world-and-travel foundation on which later Metallurgy, Welding, exploration, fog
+world-and-travel foundation on which later Metallurgy, exploration, fog
 of war, fuel, hauling, and transportation upgrades build.
 
 ### Persistent location
@@ -175,7 +211,8 @@ of war, fuel, hauling, and transportation upgrades build.
 ### The five-location local world (issue #83)
 
 - **Crash Site** (`crash_site`): the wreck / starting location after issue #83.
-  No Mining is available here; it retains its existing ship scene image.
+  Cargo Hold Welding is available here after its material gate; no Mining is
+  available here, and the existing ship scene image remains unchanged.
 - **Abandoned Processing Yard** (`abandoned_processing_yard`): the
   Refining location (issue #81). Refining is available here while stationary;
   the location advertises `processing_yard_refining` as its available action.
@@ -402,7 +439,8 @@ that is used wherever the character is publicly presented.
 
 ### Atomic work-action → Travel replacement (issues #40 and #81)
 
-When Travel replaces an active travel-replaceable work action (Mining or Refining):
+When Travel replaces an active travel-replaceable work action (Mining, Refining,
+or Welding):
 
 1. The character and active-action state is locked.
 2. Only attempts already completed before the command are resolved,
@@ -420,8 +458,9 @@ server-side even against a stale or manipulated client.
 - Mining cannot start at Crash Site, The Long Scramble, the Processing Yard, the
   Power Annex, or while Travel is active. The server rejects those starts; hiding
   UI is insufficient.
-- Crash Site and The Long Scramble have no local gameplay activity or resource;
-  neither is shown as Offline or given filler controls.
+- The Long Scramble has no local gameplay activity or resource; it is not shown
+  as Offline or given filler controls. Crash Site exposes only the approved
+  Cargo Hold repair/storage surface and no Mining controls.
 - Conflicting state-changing commands are rejected clearly and server-side.
 - Inventory and Equipment remain inspectable during Travel.
 
@@ -474,7 +513,7 @@ server-side even against a stale or manipulated client.
 
 ### Deferred (not in this issue)
 
-  Welding, fuel, Speeders/ships, exploration XP, fog of war, undiscovered hexes,
+  fuel, Speeders/ships, exploration XP, fog of war, undiscovered hexes,
 a large hex grid or full planet map, world coordinates, terrain simulation,
 pathfinding, multi-hop routing, route queues, random encounters, fast travel,
 teleportation, recalls, Travel cancellation, background workers, WebSockets,

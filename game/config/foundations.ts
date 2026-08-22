@@ -27,6 +27,7 @@ const itemIds = {
 export const ACTION_IDS = {
   ferriteShaleMining: asContentId("ferrite_shale_mining"),
   refining: asContentId("processing_yard_refining"),
+  cargoHoldWelding: asContentId("cargo_hold_welding"),
   travel: asContentId("travel"),
 } as const satisfies Record<string, ContentId>;
 

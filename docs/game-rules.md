@@ -23,7 +23,7 @@
 
 ## World & skills (directions, not implementations)
 - The opening direction is a **one-way crash-site tutorial planet**.
-- **Mining** is the first core skill direction; **Refining** is the second (at the Abandoned Processing Yard); **Welding** follows.
+- **Mining** is the first core skill direction; **Refining** is the second (at the Abandoned Processing Yard); **Welding** repairs the crashed ship's Cargo Hold at Crash Site.
 - Planetary maps use **hexes** with **local fog-of-war** exploration.
 - **Explore** consumes **limited fuel**.
 - **Speeder Piloting** and **Ship Piloting** are separate skill directions.
@@ -35,7 +35,7 @@
   inline literals in UI code.
 
 ## Non-goals (currently)
-Tutorial gameplay, hex exploration, fuel consumption, playable Welding,
-quests, ships/speeders, combat, Phaser minigames, chat/clans/multiplayer/economy/
+Tutorial gameplay, hex exploration, fuel consumption beyond the approved Cargo
+Hold repair, quests, ships/speeders, combat, Phaser minigames, chat/clans/multiplayer/economy/
 trading, a CMS, background workers, and autonomous issue selection remain out of
 scope until later issues.

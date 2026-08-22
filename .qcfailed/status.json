@@ -2,13 +2,13 @@
   "schemaVersion": 1,
   "projectSlug": "runespace",
   "workState": "active",
-  "currentFocus": "Review Issue #98 player-level portrait unlocks across account ownership, selection, and safe presentation.",
+  "currentFocus": "Review Issue #89's repaired Cargo Hold, deterministic Welding, and stationary storage behavior.",
   "latestCompleted": {
     "summary": "Added authoritative Travel Scavenge windows and a weighted reveal reel.",
     "date": "2026-08-20",
     "url": "https://github.com/BDubDesigns/RuneSpace/pull/95"
   },
-  "nextStep": "Review the Issue #98 draft PR and its canonical portrait/account-ownership preview.",
+  "nextStep": "Review the Issue #89 draft PR and its Cargo Hold mobile/desktop preview.",
   "lastMeaningfulUpdate": "2026-08-21",
   "highlights": [
     {
@@ -28,8 +28,8 @@
     }
   ],
   "currentChange": {
-    "summary": "Add permanent player-level portrait unlocks with account-aware selection and safe presentation (#98).",
+    "summary": "Repair the crashed ship Cargo Hold and introduce deterministic Welding (#89).",
     "stage": "review",
-    "pullRequestNumber": 99
+    "pullRequestNumber": 100
   }
 }
