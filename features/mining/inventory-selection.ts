@@ -1,4 +1,6 @@
 import { ITEM_IDS } from "@/game/config/foundations";
+import { getEffectiveGameBalance } from "@/game/config/balance";
+import type { EquipmentTarget } from "@/game/domain/equipment";
 import type { MiningGameplayState } from "@/server/mining";
 
 /**
@@ -95,4 +97,51 @@ export function derivePowerCellLoadAvailability(
     };
   if (state.equipment.carriedPowerCellQuantity <= 0) return { enabled: false, reason: "no_cells" };
   return { enabled: true };
+}
+
+export type InventoryEquipAvailability =
+  | { enabled: true; target: EquipmentTarget; itemInstanceId: string; slotLabel: string }
+  | { enabled: false; reason: "busy" };
+
+/**
+ * Client-advisory equip availability for a carried unique item selected in
+ * Inventory.
+ *
+ * Issue #68 is specifically about equipping a carried Salvage Cutter into the
+ * authoritative Mining-tool slot. This helper therefore resolves the Mining-tool
+ * slot from the authoritative equipment projection (the `gear` slot whose
+ * `suitSlotId` matches the Salvage Cutter's approved slot) and requires the
+ * selected unique instance to appear in THAT slot's `eligibleItems`. It does not
+ * search other equipment slots (so a carried MYKEA or other listed container is
+ * never offered an Equip action via Inventory) and it never hard-codes
+ * compatibility from the item name or re-creates the server compatibility
+ * matrix — the server's `eligibleItems` projection stays the single source of
+ * truth.
+ *
+ * Eligibility is decided BEFORE the busy check: an otherwise ineligible unique
+ * item returns `undefined` and never gains a disabled Equip control merely
+ * because another command is in flight. The equip command itself remains
+ * authoritative.
+ */
+export function deriveInventoryEquipAvailability(
+  state: MiningGameplayState,
+  selection: ResolvedInventorySelection | undefined,
+  busy: boolean,
+): InventoryEquipAvailability | undefined {
+  if (!selection || selection.kind !== "unique") return undefined;
+  const toolSlotId = getEffectiveGameBalance().items.salvageCutter.suitSlotId;
+  const toolSlot = state.equipment.slots.find(
+    (slot) => slot.target.assignmentKind === "gear" && slot.target.suitSlotId === toolSlotId,
+  );
+  const eligible = toolSlot?.eligibleItems.some(
+    (item) => item.itemInstanceId === selection.entry.id,
+  );
+  if (!toolSlot || !eligible) return undefined;
+  if (busy) return { enabled: false, reason: "busy" };
+  return {
+    enabled: true,
+    target: toolSlot.target,
+    itemInstanceId: selection.entry.id,
+    slotLabel: toolSlot.label,
+  };
 }

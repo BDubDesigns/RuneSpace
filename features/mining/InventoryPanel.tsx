@@ -12,6 +12,7 @@ import { ITEM_IDS } from "@/game/config/foundations";
 import { discardInventoryStackAction } from "@/server/actions";
 import type { MiningGameplayState } from "@/server/mining";
 import {
+  deriveInventoryEquipAvailability,
   derivePowerCellLoadAvailability,
   resolveInventorySelection,
   stackDropActions,
@@ -19,6 +20,7 @@ import {
   type InventorySelection,
   type InventoryStackEntry,
 } from "./inventory-selection";
+import { useEquipCommand } from "./useEquipCommand";
 import { useLoadPowerCell, type LoadPowerCellFeedback } from "./useLoadPowerCell";
 import { useMiningPlay } from "./MiningPlayContext";
 
@@ -62,6 +64,24 @@ export function InventoryPanel({
   const [confirming, setConfirming] = useState<DropConfirmation | undefined>();
   const [message, setMessage] = useState<LoadPowerCellFeedback>();
   const { busy: loadBusy, loadPowerCell } = useLoadPowerCell(setMessage);
+  // Set when an Equip command succeeds so focus can return to the grid after
+  // the equipped tile disappears (its button would otherwise be removed). It is
+  // armed only from the hook's success callback, never before submission.
+  const equipReturnFocusRef = useRef(false);
+  const { equip } = useEquipCommand(
+    (feedback) => {
+      // Replacement-safe feedback mirror: the equipment command and the Power
+      // Cell load share one status line, so success/refusal both route here.
+      setMessage(feedback);
+    },
+    // Arm focus-return ONLY after the server confirms Equip and the returned
+    // authoritative state has been accepted. Arming earlier would let a
+    // refusal or uncertain transport leave the flag set and trigger equip
+    // focus behavior on some later, unrelated reconciliation.
+    () => {
+      equipReturnFocusRef.current = true;
+    },
+  );
   const gridRef = useRef<HTMLDivElement>(null);
   const cancelButtonRef = useRef<HTMLButtonElement>(null);
   const confirmTriggerRef = useRef<HTMLButtonElement>(null);
@@ -77,6 +97,11 @@ export function InventoryPanel({
     resolvedSelection,
     foregroundBusy,
   );
+  const equipAvailability = deriveInventoryEquipAvailability(
+    state,
+    resolvedSelection,
+    foregroundBusy,
+  );
   const ferrite = balance.items.ferriteShale;
   const powerCell = balance.items.powerCell;
   const selectedIsPowerCell =
@@ -88,6 +113,22 @@ export function InventoryPanel({
   useEffect(() => {
     if (selected && !resolvedSelection) setSelected(undefined);
   }, [selected, resolvedSelection]);
+
+  // After a successful Equip, the equipped tile disappears and the selection
+  // reconciles away. Return focus to an inventory element (prefer the former
+  // selected tile if it still exists, else any occupied tile); if no occupied
+  // tile remains (for example the Cutter was the only carried item), fall back
+  // to the grid container itself, which is programmatically focusable via
+  // tabIndex={-1}. Focus is never moved outside the drawer.
+  useEffect(() => {
+    if (!equipReturnFocusRef.current || resolvedSelection) return;
+    equipReturnFocusRef.current = false;
+    const grid = gridRef.current;
+    if (!grid) return;
+    const tile = grid.querySelector<HTMLButtonElement>('button[aria-pressed="true"]');
+    const target = tile ?? grid.querySelector<HTMLButtonElement>("button[aria-pressed]") ?? grid;
+    target.focus();
+  }, [resolvedSelection]);
 
   // Reconcile the pending confirmation: when the authoritative stack changed
   // or vanished since confirmation, clear it safely and explain why.
@@ -173,6 +214,20 @@ export function InventoryPanel({
     });
   }
 
+  function runEquip() {
+    if (!equipAvailability || !equipAvailability.enabled) return;
+    // Focus-return is armed by the hook's onSuccess callback only after the
+    // server confirms the Equip; a refusal or uncertain transport must not
+    // prime it. Here we only clear transient state before submission.
+    setMessage(undefined);
+    setConfirming(undefined);
+    equip(
+      equipAvailability.itemInstanceId,
+      equipAvailability.target,
+      `Equipped ${resolvedSelection?.entry.name} into ${equipAvailability.slotLabel}.`,
+    );
+  }
+
   function runDiscard() {
     if (!confirming) return;
     const request = {
@@ -235,6 +290,7 @@ export function InventoryPanel({
           ref={gridRef}
           className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4"
           aria-label={`${totalSlots} inventory slots`}
+          tabIndex={-1}
         >
           {state.inventory.stacks.map((stack) => (
             <InventoryStackVisual
@@ -305,7 +361,7 @@ export function InventoryPanel({
             <div className="mt-3 grid items-start gap-3 sm:grid-cols-[7rem_minmax(0,1fr)]">
               {resolvedSelection.kind === "stack" ? (
                 <InventoryStackVisual
-                  className="h-28 self-start"
+                  className="h-28 w-28 self-start"
                   itemId={resolvedSelection.entry.itemId}
                   name={resolvedSelection.entry.name}
                   quantity={resolvedSelection.entry.quantity}
@@ -319,7 +375,7 @@ export function InventoryPanel({
                       ? `${resolvedSelection.entry.currentCharge}/${balance.items.salvageCutter.maximumCharge}`
                       : undefined
                   }
-                  className="h-28 self-start"
+                  className="h-28 w-28 self-start"
                   itemId={resolvedSelection.entry.itemId}
                   name={resolvedSelection.entry.name}
                 />
@@ -413,6 +469,23 @@ export function InventoryPanel({
                 <p className="mt-3 text-xs uppercase tracking-wide text-[color:var(--rs-text-muted)]">
                   Unique item — cannot be dropped.
                 </p>
+                {equipAvailability ? (
+                  <div className="mt-3 border-t border-[color:var(--rs-border-subtle)] pt-3">
+                    <ActionButton
+                      disabled={!equipAvailability.enabled}
+                      intent="mining"
+                      loading={foregroundBusy}
+                      onClick={runEquip}
+                    >
+                      {equipAvailability.enabled
+                        ? `Equip in ${equipAvailability.slotLabel}`
+                        : "Equip Cutter"}
+                    </ActionButton>
+                    {!equipAvailability.enabled ? (
+                      <Feedback>Another command is in progress.</Feedback>
+                    ) : null}
+                  </div>
+                ) : null}
               </>
             ) : null}
             {selectedIsPowerCell ? (
