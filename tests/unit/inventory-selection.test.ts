@@ -356,6 +356,10 @@ describe("inventory equip availability", () => {
   const balance = getEffectiveGameBalance();
   const toolSlotId = balance.items.salvageCutter.suitSlotId;
   const toolTarget = { assignmentKind: "gear" as const, suitSlotId: toolSlotId };
+  const containerTarget = {
+    assignmentKind: "container" as const,
+    suitSlotId: balance.carrying.containerSuitSlotIds[0],
+  };
 
   /**
    * Authoritative-shaped equipment projection: the Mining-tool slot lists the
@@ -384,7 +388,7 @@ describe("inventory equip availability", () => {
     return state;
   }
 
-  it("offers Equip when the selected carried Cutter is in the authoritative eligibleItems projection", () => {
+  it("offers Equip when the selected carried Cutter is in the authoritative Mining-tool eligibleItems projection", () => {
     const state = stateWith(carriedCutter.id);
     const selection = resolveInventorySelection(state.inventory, {
       kind: "unique",
@@ -398,7 +402,7 @@ describe("inventory equip availability", () => {
     });
   });
 
-  it("disables Equip (with busy reason) while another command is in flight", () => {
+  it("disables Equip (with busy reason) only for an otherwise-eligible Cutter while another command is in flight", () => {
     const state = stateWith(carriedCutter.id);
     const selection = resolveInventorySelection(state.inventory, {
       kind: "unique",
@@ -410,20 +414,53 @@ describe("inventory equip availability", () => {
     });
   });
 
-  it("offers no Equip action for a carried item absent from every eligibleItems projection", () => {
+  it("offers no Equip action for a carried item absent from the Mining-tool slot's eligibleItems, even while busy", () => {
     const inventory = inventoryState([], [{ ...carriedCutter, id: "other-instance" }]);
     const state = baseState(inventory);
     state.equipment.slots = [
-      {
-        target: toolTarget,
-        label: "Mining tool",
-        item: undefined,
-        eligibleItems: [],
-      },
+      { target: toolTarget, label: "Mining tool", item: undefined, eligibleItems: [] },
     ];
     const selection = resolveInventorySelection(state.inventory, {
       kind: "unique",
       id: "other-instance",
+    });
+    // Not eligible -> no Equip action at all, regardless of foreground busy.
+    expect(deriveInventoryEquipAvailability(state, selection, false)).toBe(undefined);
+    expect(deriveInventoryEquipAvailability(state, selection, true)).toBe(undefined);
+  });
+
+  it("offers no Inventory Equip action for a spare carried container listed in a container slot", () => {
+    const inventory = inventoryState(
+      [],
+      [
+        {
+          id: "spare-container",
+          itemId: ITEM_IDS.mykeaSchleppraum8,
+          name: "MYKEA Schleppraum-8",
+          massGrams: 10_000,
+        },
+      ],
+    );
+    const state = baseState(inventory);
+    state.equipment.slots = [
+      { target: toolTarget, label: "Mining tool", item: undefined, eligibleItems: [] },
+      {
+        target: containerTarget,
+        label: "Container attachment 1",
+        item: undefined,
+        eligibleItems: [
+          {
+            itemInstanceId: "spare-container",
+            itemId: ITEM_IDS.mykeaSchleppraum8,
+            name: "MYKEA Schleppraum-8",
+            massGrams: 10_000,
+          },
+        ],
+      },
+    ];
+    const selection = resolveInventorySelection(state.inventory, {
+      kind: "unique",
+      id: "spare-container",
     });
     expect(deriveInventoryEquipAvailability(state, selection, false)).toBe(undefined);
   });

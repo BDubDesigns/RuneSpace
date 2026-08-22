@@ -1,4 +1,5 @@
 import { ITEM_IDS } from "@/game/config/foundations";
+import { getEffectiveGameBalance } from "@/game/config/balance";
 import type { EquipmentTarget } from "@/game/domain/equipment";
 import type { MiningGameplayState } from "@/server/mining";
 
@@ -104,13 +105,23 @@ export type InventoryEquipAvailability =
 
 /**
  * Client-advisory equip availability for a carried unique item selected in
- * Inventory. Derives the target slot and eligibility ONLY from the server's
- * authoritative equipment-slot `eligibleItems` projection — which already
- * enforces slot compatibility, carry/equip state, and capacity before it
- * reaches the client — rather than teaching the client a second compatibility
- * rule. Returns `undefined` when the selected item is not eligible for any
- * slot (for example an ineligible or cargo-held unique item), so no misleading
- * Equip action is rendered. The equip command itself remains authoritative.
+ * Inventory.
+ *
+ * Issue #68 is specifically about equipping a carried Salvage Cutter into the
+ * authoritative Mining-tool slot. This helper therefore resolves the Mining-tool
+ * slot from the authoritative equipment projection (the `gear` slot whose
+ * `suitSlotId` matches the Salvage Cutter's approved slot) and requires the
+ * selected unique instance to appear in THAT slot's `eligibleItems`. It does not
+ * search other equipment slots (so a carried MYKEA or other listed container is
+ * never offered an Equip action via Inventory) and it never hard-codes
+ * compatibility from the item name or re-creates the server compatibility
+ * matrix — the server's `eligibleItems` projection stays the single source of
+ * truth.
+ *
+ * Eligibility is decided BEFORE the busy check: an otherwise ineligible unique
+ * item returns `undefined` and never gains a disabled Equip control merely
+ * because another command is in flight. The equip command itself remains
+ * authoritative.
  */
 export function deriveInventoryEquipAvailability(
   state: MiningGameplayState,
@@ -118,15 +129,19 @@ export function deriveInventoryEquipAvailability(
   busy: boolean,
 ): InventoryEquipAvailability | undefined {
   if (!selection || selection.kind !== "unique") return undefined;
-  if (busy) return { enabled: false, reason: "busy" };
-  const slot = state.equipment.slots.find((candidate) =>
-    candidate.eligibleItems.some((item) => item.itemInstanceId === selection.entry.id),
+  const toolSlotId = getEffectiveGameBalance().items.salvageCutter.suitSlotId;
+  const toolSlot = state.equipment.slots.find(
+    (slot) => slot.target.assignmentKind === "gear" && slot.target.suitSlotId === toolSlotId,
   );
-  if (!slot) return undefined;
+  const eligible = toolSlot?.eligibleItems.some(
+    (item) => item.itemInstanceId === selection.entry.id,
+  );
+  if (!toolSlot || !eligible) return undefined;
+  if (busy) return { enabled: false, reason: "busy" };
   return {
     enabled: true,
-    target: slot.target,
+    target: toolSlot.target,
     itemInstanceId: selection.entry.id,
-    slotLabel: slot.label,
+    slotLabel: toolSlot.label,
   };
 }

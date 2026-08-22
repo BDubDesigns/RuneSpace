@@ -64,11 +64,24 @@ export function InventoryPanel({
   const [confirming, setConfirming] = useState<DropConfirmation | undefined>();
   const [message, setMessage] = useState<LoadPowerCellFeedback>();
   const { busy: loadBusy, loadPowerCell } = useLoadPowerCell(setMessage);
-  const { equip } = useEquipCommand((feedback) => {
-    // Replacement-safe feedback mirror: the equipment command and the Power
-    // Cell load share one status line, so success/refusal both route here.
-    setMessage(feedback);
-  });
+  // Set when an Equip command succeeds so focus can return to the grid after
+  // the equipped tile disappears (its button would otherwise be removed). It is
+  // armed only from the hook's success callback, never before submission.
+  const equipReturnFocusRef = useRef(false);
+  const { equip } = useEquipCommand(
+    (feedback) => {
+      // Replacement-safe feedback mirror: the equipment command and the Power
+      // Cell load share one status line, so success/refusal both route here.
+      setMessage(feedback);
+    },
+    // Arm focus-return ONLY after the server confirms Equip and the returned
+    // authoritative state has been accepted. Arming earlier would let a
+    // refusal or uncertain transport leave the flag set and trigger equip
+    // focus behavior on some later, unrelated reconciliation.
+    () => {
+      equipReturnFocusRef.current = true;
+    },
+  );
   const gridRef = useRef<HTMLDivElement>(null);
   const cancelButtonRef = useRef<HTMLButtonElement>(null);
   const confirmTriggerRef = useRef<HTMLButtonElement>(null);
@@ -76,9 +89,6 @@ export function InventoryPanel({
   const detailsRef = useRef<HTMLElement>(null);
   const detailsHeadingRef = useRef<HTMLHeadingElement>(null);
   const revealRequestedRef = useRef(false);
-  // Set when an Equip command succeeds so focus can return to the grid after
-  // the equipped tile disappears (its button would otherwise be removed).
-  const equipReturnFocusRef = useRef(false);
   const totalSlots = state.inventory.slotsUsed + state.inventory.slotsAvailable;
   const balance = getEffectiveGameBalance();
   const resolvedSelection = resolveInventorySelection(state.inventory, selected);
@@ -106,15 +116,18 @@ export function InventoryPanel({
 
   // After a successful Equip, the equipped tile disappears and the selection
   // reconciles away. Return focus to an inventory element (prefer the former
-  // selected tile if it still exists, else the grid) so it never falls onto a
-  // removed element or the drawer's backdrop.
+  // selected tile if it still exists, else any occupied tile); if no occupied
+  // tile remains (for example the Cutter was the only carried item), fall back
+  // to the grid container itself, which is programmatically focusable via
+  // tabIndex={-1}. Focus is never moved outside the drawer.
   useEffect(() => {
     if (!equipReturnFocusRef.current || resolvedSelection) return;
     equipReturnFocusRef.current = false;
     const grid = gridRef.current;
     if (!grid) return;
     const tile = grid.querySelector<HTMLButtonElement>('button[aria-pressed="true"]');
-    (tile ?? grid.querySelector<HTMLButtonElement>("button[aria-pressed]"))?.focus();
+    const target = tile ?? grid.querySelector<HTMLButtonElement>("button[aria-pressed]") ?? grid;
+    target.focus();
   }, [resolvedSelection]);
 
   // Reconcile the pending confirmation: when the authoritative stack changed
@@ -203,10 +216,9 @@ export function InventoryPanel({
 
   function runEquip() {
     if (!equipAvailability || !equipAvailability.enabled) return;
-    // Arm focus-return first: the equipped tile disappears from the next
-    // authoritative state, so the reconcile effect will bring focus back to
-    // the grid once the stale selection clears.
-    equipReturnFocusRef.current = true;
+    // Focus-return is armed by the hook's onSuccess callback only after the
+    // server confirms the Equip; a refusal or uncertain transport must not
+    // prime it. Here we only clear transient state before submission.
     setMessage(undefined);
     setConfirming(undefined);
     equip(
@@ -278,6 +290,7 @@ export function InventoryPanel({
           ref={gridRef}
           className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4"
           aria-label={`${totalSlots} inventory slots`}
+          tabIndex={-1}
         >
           {state.inventory.stacks.map((stack) => (
             <InventoryStackVisual

@@ -3,6 +3,7 @@
 import { useCallback, useTransition } from "react";
 import { equipEquipmentAction, unequipEquipmentAction } from "@/server/actions";
 import type { EquipmentTarget } from "@/game/domain/equipment";
+import type { MiningGameplayState } from "@/server/mining";
 import { useMiningPlay } from "./MiningPlayContext";
 
 export type EquipFeedback = {
@@ -21,8 +22,16 @@ export type EquipFeedback = {
  * and for a successfully accepted equip/unequip with a muted tone carrying the
  * caller-provided success message. Callers decide whether to surface or clear
  * their own status line from that callback.
+ *
+ * `onSuccess` is called ONLY after the server confirms the command and the
+ * returned authoritative state has been accepted — never on a refusal or
+ * uncertain transport. Success-only side effects (for example post-equip focus
+ * return) belong here rather than being armed before submission.
  */
-export function useEquipCommand(onFeedback: (feedback: EquipFeedback) => void) {
+export function useEquipCommand(
+  onFeedback: (feedback: EquipFeedback) => void,
+  onSuccess?: (state: MiningGameplayState) => void,
+) {
   const {
     acceptState,
     enqueueForeground,
@@ -48,6 +57,7 @@ export function useEquipCommand(onFeedback: (feedback: EquipFeedback) => void) {
             if (result.state) {
               acceptState(result.state);
               onFeedback({ tone: "muted", message: successMessage });
+              onSuccess?.(result.state);
             }
           } catch {
             onFeedback({
@@ -61,7 +71,7 @@ export function useEquipCommand(onFeedback: (feedback: EquipFeedback) => void) {
       };
       enqueueForeground(execute);
     },
-    [acceptState, enqueueForeground, onFeedback, releaseCommand, state.characterId],
+    [acceptState, enqueueForeground, onFeedback, onSuccess, releaseCommand, state.characterId],
   );
 
   const equip = useCallback(
