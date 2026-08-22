@@ -9,8 +9,8 @@ import {
   inventoryStacks,
   itemInstances,
 } from "@/db/rune-space";
-import { getEffectiveGameBalance } from "@/game/config/balance";
-import { ACTION_IDS, ITEM_IDS, LOCATION_IDS, type ItemId } from "@/game/config/foundations";
+import { getEffectiveGameBalance, getItemDefinition } from "@/game/config/balance";
+import { ACTION_IDS, LOCATION_IDS } from "@/game/config/foundations";
 import { isActionAvailableAtLocation } from "@/game/content/locations";
 import {
   cargoHoldMaterialsComplete,
@@ -19,7 +19,6 @@ import {
   type CargoHoldRepairState,
 } from "@/game/domain/cargo-hold";
 import {
-  carriedItemMassGrams,
   deriveEquipmentLoadout,
   type EquipmentAssignmentState,
   type EquipmentItemInstance,
@@ -32,6 +31,7 @@ import {
 } from "@/game/domain/inventory";
 import type { MiningRandom } from "@/game/domain/mining";
 import { type DatabaseTransaction, withResolvedOwnedCharacter } from "@/server/action-resolution";
+import { loadOwnedItemInstances } from "@/server/carried-inventory";
 import {
   createPlayResolver,
   ensureStarterMiningState,
@@ -98,43 +98,6 @@ export type CargoHoldStateResult<T> = {
 };
 
 const EMPTY_RECENT_RESULT = { successes: 0, failures: 0, awardedXp: 0 } as const;
-
-function stackDefinition(
-  itemId: string,
-  balance = getEffectiveGameBalance(),
-):
-  | {
-      itemId: ItemId;
-      stackLimit: number;
-      massGrams: number;
-    }
-  | undefined {
-  if (itemId === balance.items.ferriteShale.itemId)
-    return {
-      itemId: ITEM_IDS.ferriteShale,
-      stackLimit: balance.items.ferriteShale.stackLimit,
-      massGrams: balance.items.ferriteShale.massGrams,
-    };
-  if (itemId === balance.items.refinedFerrite.itemId)
-    return {
-      itemId: ITEM_IDS.refinedFerrite,
-      stackLimit: balance.items.refinedFerrite.stackLimit,
-      massGrams: balance.items.refinedFerrite.massGrams,
-    };
-  if (itemId === balance.items.slag.itemId)
-    return {
-      itemId: ITEM_IDS.slag,
-      stackLimit: balance.items.slag.stackLimit,
-      massGrams: balance.items.slag.massGrams,
-    };
-  if (itemId === balance.items.powerCell.itemId)
-    return {
-      itemId: ITEM_IDS.powerCell,
-      stackLimit: balance.items.powerCell.stackLimit,
-      massGrams: balance.items.powerCell.massGrams,
-    };
-  return undefined;
-}
 
 function repairState(row: typeof characterCargoHoldRepair.$inferSelect): CargoHoldRepairState {
   return {
@@ -251,34 +214,23 @@ async function loadCarriedCapacity(
   now: Date,
 ) {
   const balance = getEffectiveGameBalance();
-  const [stacks, instances, assignments, cargoItems] = await Promise.all([
+  const [stacks, itemState, assignments] = await Promise.all([
     transaction
       .select()
       .from(inventoryStacks)
       .where(eq(inventoryStacks.characterId, characterId))
       .orderBy(asc(inventoryStacks.createdAt), asc(inventoryStacks.id))
       .for("update"),
-    transaction
-      .select()
-      .from(itemInstances)
-      .where(eq(itemInstances.characterId, characterId))
-      .for("update"),
+    loadOwnedItemInstances(transaction, characterId),
     transaction
       .select()
       .from(equippedItems)
       .where(eq(equippedItems.characterId, characterId))
       .for("update"),
-    transaction
-      .select()
-      .from(cargoHoldItemInstances)
-      .where(eq(cargoHoldItemInstances.characterId, characterId))
-      .for("update"),
   ]);
-  const cargoIds = new Set(cargoItems.map((row) => row.itemInstanceId));
-  const carriedInstances = instances.filter((instance) => !cargoIds.has(instance.id));
   const loadout = deriveEquipmentLoadout({
     assignments: assignments as EquipmentAssignmentState[],
-    instances: carriedInstances as EquipmentItemInstance[],
+    instances: itemState.carriedInstances as EquipmentItemInstance[],
     stacks,
     balance,
   });
@@ -368,17 +320,21 @@ export async function contributeCargoHoldMaterials(
           .filter((stack) => stack.itemId === balance.items.refinedFerrite.itemId)
           .map((stack) => ({
             id: stack.id,
-            itemId: ITEM_IDS.refinedFerrite,
+            itemId: balance.items.refinedFerrite.itemId,
             quantity: stack.quantity,
           })),
-        ITEM_IDS.refinedFerrite,
+        balance.items.refinedFerrite.itemId,
         useful.refinedFerrite,
       );
       const slagPlan = planExactStackRemoval(
         stacks
           .filter((stack) => stack.itemId === balance.items.slag.itemId)
-          .map((stack) => ({ id: stack.id, itemId: ITEM_IDS.slag, quantity: stack.quantity })),
-        ITEM_IDS.slag,
+          .map((stack) => ({
+            id: stack.id,
+            itemId: balance.items.slag.itemId,
+            quantity: stack.quantity,
+          })),
+        balance.items.slag.itemId,
         useful.slag,
       );
       if (!refinedPlan.ok || !slagPlan.ok)
@@ -465,8 +421,8 @@ export async function depositCargoStack(
       if (!source) return refusal("stack_not_found", "That carried stack is no longer available.");
       if (source.quantity !== request.expectedQuantity)
         return refusal("stack_changed", "Inventory changed. Review the stack and try again.");
-      const definition = stackDefinition(source.itemId);
-      if (!definition)
+      const definition = getItemDefinition(source.itemId);
+      if (!definition || definition.kind !== "stack")
         return refusal("unsupported_stack", "That item cannot be stored as a Cargo stack.");
       const quantity = request.mode === "one" ? 1 : source.quantity;
       const availableSlots =
@@ -560,8 +516,8 @@ export async function withdrawCargoStack(
       if (!source) return refusal("stack_not_found", "That Cargo stack is no longer available.");
       if (source.quantity !== request.expectedQuantity)
         return refusal("stack_changed", "Cargo changed. Review the stack and try again.");
-      const definition = stackDefinition(source.itemId);
-      if (!definition)
+      const definition = getItemDefinition(source.itemId);
+      if (!definition || definition.kind !== "stack")
         return refusal("unsupported_stack", "That Cargo item cannot be withdrawn as a stack.");
       const quantity = request.mode === "one" ? 1 : source.quantity;
       const carry = await loadCarriedCapacity(transaction, context.character.id, now);
@@ -629,13 +585,6 @@ export async function withdrawCargoStack(
   );
 }
 
-function uniqueItemIsApproved(itemId: string, balance = getEffectiveGameBalance()): boolean {
-  return (
-    itemId === balance.items.salvageCutter.itemId ||
-    itemId === balance.items.starterContainer.itemId
-  );
-}
-
 export async function depositCargoUniqueItem(
   userId: string,
   characterId: string,
@@ -691,7 +640,8 @@ export async function depositCargoUniqueItem(
         cargo: { status: "refused" as const, reason, message },
       });
       if (!instance) return refusal("item_not_found", "That carried item is no longer available.");
-      if (!uniqueItemIsApproved(instance.itemId))
+      const definition = getItemDefinition(instance.itemId);
+      if (!definition || definition.kind !== "unique")
         return refusal("item_not_found", "That item is not a transferable unique item.");
       if (assignmentRows.some((assignment) => assignment.itemInstanceId === instance.id))
         return refusal("equipped_item", "Unequip that item before depositing it in Cargo Hold.");
@@ -768,14 +718,13 @@ export async function withdrawCargoUniqueItem(
       });
       if (!cargoRow || !instance)
         return refusal("item_not_stored", "That Cargo item is no longer available.");
-      if (!uniqueItemIsApproved(instance.itemId))
+      const definition = getItemDefinition(instance.itemId);
+      if (!definition || definition.kind !== "unique")
         return refusal("item_not_stored", "That Cargo item is not transferable.");
       const carry = await loadCarriedCapacity(transaction, context.character.id, now);
-      const balance = getEffectiveGameBalance();
-      const itemMass = carriedItemMassGrams(instance.itemId, balance);
       if (carry.availableSlots < 1)
         return refusal("carried_capacity", "Carried Inventory has no free occupied-item slot.");
-      if (carry.availableMassGrams < itemMass)
+      if (carry.availableMassGrams < definition.massGrams)
         return refusal("carried_capacity", "That item would exceed carried mass capacity.");
       await transaction
         .delete(cargoHoldItemInstances)

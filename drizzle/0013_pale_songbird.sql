@@ -1,0 +1,1 @@
+ALTER TABLE "character_cargo_hold_repair" ADD CONSTRAINT "character_cargo_hold_repair_progress_requires_completion_timestamp" CHECK ("character_cargo_hold_repair"."welding_progress" < 12 OR "character_cargo_hold_repair"."completed_at" IS NOT NULL);

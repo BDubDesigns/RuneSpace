@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { ActionButton } from "@/components/ui/ActionButton";
 import { Feedback } from "@/components/ui/Feedback";
 import { Panel } from "@/components/ui/Panel";
@@ -33,6 +33,8 @@ type Confirmation = {
 
 type StorageMode = "carried" | "cargo";
 
+const COMPLETION_FEEDBACK_DURATION_MS = 3_600;
+
 function transferMessage(result: CargoHoldTransferActionResult): string | undefined {
   if ("error" in result) return result.error;
   if (result.cargo.status === "transferred") return "Cargo Hold transfer complete.";
@@ -61,10 +63,12 @@ export function CargoHoldPanel() {
   const [storageMode, setStorageMode] = useState<StorageMode>("carried");
   const [message, setMessage] = useState<string>();
   const [pending, setPending] = useState<string>();
+  const [completionFeedbackVisible, setCompletionFeedbackVisible] = useState(false);
   const [now, setNow] = useState(Date.now());
   const [, startTransition] = useTransition();
   const balance = getEffectiveGameBalance();
   const repair = state.cargoHold.repair;
+  const previousCompletion = useRef(repair.complete);
   const activeWelding = state.activeAction?.actionId === ACTION_IDS.cargoHoldWelding;
   const weldingAttemptDurationMs = balance.welding.attemptDurationTicks * GAME_TICK_MS;
   const weldingElapsed = activeWelding
@@ -82,6 +86,19 @@ export function CargoHoldPanel() {
     const timer = window.setInterval(() => setNow(Date.now()), 250);
     return () => window.clearInterval(timer);
   }, [activeWelding]);
+
+  useEffect(() => {
+    const wasComplete = previousCompletion.current;
+    previousCompletion.current = repair.complete;
+    if (wasComplete || !repair.complete) return;
+
+    setCompletionFeedbackVisible(true);
+    const timer = window.setTimeout(
+      () => setCompletionFeedbackVisible(false),
+      COMPLETION_FEEDBACK_DURATION_MS,
+    );
+    return () => window.clearTimeout(timer);
+  }, [repair.complete]);
 
   function applyStateResult(result: MiningActionResult) {
     const error = resultError(result);
@@ -483,16 +500,31 @@ export function CargoHoldPanel() {
       ) : (
         <>
           <section
-            aria-live="polite"
-            className="rs-result-feedback-success mt-4 border border-[color:var(--rs-accent-mining)] bg-[color:var(--rs-surface-panel)] p-4"
-            data-cargo-hold-status="restored"
+            aria-live={completionFeedbackVisible ? "polite" : undefined}
+            className={
+              completionFeedbackVisible
+                ? "rs-result-feedback-success mt-4 border border-[color:var(--rs-accent-mining)] bg-[color:var(--rs-surface-panel)] p-4"
+                : "mt-4 border border-[color:var(--rs-border-structural)] bg-[color:var(--rs-surface-panel)] p-4"
+            }
+            data-cargo-hold-status={completionFeedbackVisible ? "restored" : "operational"}
           >
-            <p className="font-display text-lg font-bold uppercase tracking-wide">
-              CARGO HOLD RESTORED
-            </p>
-            <p className="mt-1 text-sm text-[color:var(--rs-text-secondary)]">
-              The stationary ship storage is online and ready for use at Crash Site.
-            </p>
+            {completionFeedbackVisible ? (
+              <>
+                <p className="font-display text-lg font-bold uppercase tracking-wide">
+                  CARGO HOLD RESTORED
+                </p>
+                <p className="mt-1 text-sm text-[color:var(--rs-text-secondary)]">
+                  The stationary ship storage is online and ready for use at Crash Site.
+                </p>
+              </>
+            ) : (
+              <>
+                <p className="font-display text-lg font-bold uppercase tracking-wide">CARGO HOLD</p>
+                <p className="mt-1 text-sm uppercase tracking-wide text-[color:var(--rs-accent-mining)]">
+                  OPERATIONAL
+                </p>
+              </>
+            )}
             <p className="mt-3 font-display text-sm uppercase tracking-wide">
               {state.cargoHold.slotsUsed} / {state.cargoHold.capacitySlots} slots occupied
             </p>

@@ -26,7 +26,8 @@ export function cargoHoldRepairComplete(
   repair: CargoHoldRepairState,
   balance: EffectiveGameBalance,
 ): boolean {
-  return repair.completedAt != null || repair.weldingProgress >= balance.welding.repairIncrements;
+  void balance;
+  return repair.completedAt != null;
 }
 
 /**
@@ -101,13 +102,26 @@ export function resolveCargoHoldWelding(input: {
     0,
     balance.welding.repairIncrements - snapshot.weldingProgress,
   );
-  if (remainingIncrements === 0 || snapshot.completedAt != null) {
+  if (snapshot.completedAt != null) {
     return {
       consumedTicks: 0,
       completedIncrements: 0,
       weldingProgress: Math.min(snapshot.weldingProgress, balance.welding.repairIncrements),
       awardedXp: 0,
       completed: true,
+      stopReason: "completed",
+    };
+  }
+
+  // A row at the progress ceiling without completedAt is malformed or from
+  // an interrupted legacy write. It must stop without becoming an unlock.
+  if (remainingIncrements === 0) {
+    return {
+      consumedTicks: 0,
+      completedIncrements: 0,
+      weldingProgress: snapshot.weldingProgress,
+      awardedXp: 0,
+      completed: false,
       stopReason: "completed",
     };
   }

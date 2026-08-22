@@ -101,6 +101,24 @@ const balanceSchema = z.object({
 
 export type EffectiveGameBalance = z.infer<typeof balanceSchema>;
 
+/**
+ * The authoritative storage facts for every valid inventory item. The item
+ * entries below are the single source of truth; callers must not reconstruct
+ * stack limits or mass from stable IDs.
+ */
+export type ItemDefinition =
+  | {
+      itemId: string;
+      kind: "stack";
+      stackLimit: number;
+      massGrams: number;
+    }
+  | {
+      itemId: string;
+      kind: "unique";
+      massGrams: number;
+    };
+
 const defaults = balanceSchema.parse({
   progression: { maximumLevel: 99, levelOneToTwoXp: 500, perLevelGrowthBps: 11_000 },
   mining: {
@@ -174,6 +192,24 @@ const defaults = balanceSchema.parse({
 /** The sole effective-balance boundary until Issue #19 introduces approved overrides. */
 export function getEffectiveGameBalance(): EffectiveGameBalance {
   return defaults;
+}
+
+/** Returns the authoritative inventory representation for a valid item ID. */
+export function getItemDefinition(
+  itemId: string,
+  balance = getEffectiveGameBalance(),
+): ItemDefinition | undefined {
+  const item = Object.values(balance.items).find((candidate) => candidate.itemId === itemId);
+  if (!item) return undefined;
+  if ("stackLimit" in item) {
+    return {
+      itemId: item.itemId,
+      kind: "stack",
+      stackLimit: item.stackLimit,
+      massGrams: item.massGrams,
+    };
+  }
+  return { itemId: item.itemId, kind: "unique", massGrams: item.massGrams };
 }
 
 export function standardSkillLevelThresholds(

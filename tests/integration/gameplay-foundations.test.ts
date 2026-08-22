@@ -78,6 +78,14 @@ suite("gameplay foundations (real PostgreSQL)", () => {
         quantity: 0,
       }),
     ).rejects.toThrow();
+    await expect(
+      db.insert(rune.characterCargoHoldRepair).values({
+        characterId: character.id,
+        refinedFerriteContributed: 15,
+        slagContributed: 6,
+        weldingProgress: 12,
+      }),
+    ).rejects.toThrow();
 
     const instance = await db
       .insert(rune.itemInstances)

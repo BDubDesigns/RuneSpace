@@ -426,6 +426,10 @@ export const characterCargoHoldRepair = pgTable(
       "character_cargo_hold_repair_completion_requires_full_state",
       sql`${table.completedAt} IS NULL OR (${table.refinedFerriteContributed} = 15 AND ${table.slagContributed} = 6 AND ${table.weldingProgress} = 12)`,
     ),
+    check(
+      "character_cargo_hold_repair_progress_requires_completion_timestamp",
+      sql`${table.weldingProgress} < 12 OR ${table.completedAt} IS NOT NULL`,
+    ),
   ],
 );
 

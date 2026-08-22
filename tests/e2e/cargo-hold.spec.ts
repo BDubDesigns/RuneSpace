@@ -161,6 +161,13 @@ test("repairs the Cargo Hold, hard-stops Welding, and transfers occupied storage
     .where(eq(characters.id, characterId));
   await page.reload();
   await expect(cargoPanel).toBeVisible();
+  await expect(cargoPanel.locator('[data-cargo-hold-status="restored"]')).toHaveCount(0);
+  await expect(cargoPanel.locator('[data-cargo-hold-status="operational"]')).toContainText(
+    "CARGO HOLD",
+  );
+  await expect(cargoPanel.locator('[data-cargo-hold-status="operational"]')).toContainText(
+    "OPERATIONAL",
+  );
   await cargoPanel.getByRole("button", { name: "OPEN CARGO HOLD" }).click();
   await expect(cargoPanel.locator("[data-cargo-mode='cargo']")).toContainText("Ferrite Shale");
   await cargoPanel.getByRole("button", { name: "WITHDRAW STACK" }).click();

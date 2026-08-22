@@ -6,7 +6,6 @@ import {
   characterSkillXp,
   inventoryStacks,
   equippedItems,
-  itemInstances,
 } from "@/db/rune-space";
 import { getEffectiveGameBalance, standardSkillLevelThresholds } from "@/game/config/balance";
 import { ACTION_IDS, SKILL_IDS } from "@/game/config/foundations";
@@ -24,6 +23,7 @@ import {
 import { levelFromXp } from "@/game/domain/progression";
 import { ticksToMilliseconds } from "@/game/domain/timing";
 import type { ActionResolver, DatabaseTransaction } from "@/server/action-resolution";
+import { loadOwnedItemInstances } from "@/server/carried-inventory";
 import { grantCharacterSkillXp } from "@/server/progression";
 
 export type RefiningSnapshot = {
@@ -73,7 +73,7 @@ async function loadRefiningSnapshot(
   characterId: string,
 ): Promise<RefiningSnapshot> {
   const balance = getEffectiveGameBalance();
-  const [xpRows, stacks, instances, assignments] = await Promise.all([
+  const [xpRows, stacks, itemState, assignments] = await Promise.all([
     transaction
       .select()
       .from(characterSkillXp)
@@ -84,11 +84,7 @@ async function loadRefiningSnapshot(
       .from(inventoryStacks)
       .where(eq(inventoryStacks.characterId, characterId))
       .for("update"),
-    transaction
-      .select()
-      .from(itemInstances)
-      .where(eq(itemInstances.characterId, characterId))
-      .for("update"),
+    loadOwnedItemInstances(transaction, characterId),
     transaction
       .select()
       .from(equippedItems)
@@ -98,7 +94,7 @@ async function loadRefiningSnapshot(
   const refiningXp = xpRows.find((row) => row.skillId === SKILL_IDS.refining)?.totalXp ?? 0;
   const equipmentLoadout = deriveEquipmentLoadout({
     assignments,
-    instances,
+    instances: itemState.carriedInstances,
     stacks,
     balance,
   });

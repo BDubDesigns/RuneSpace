@@ -20,6 +20,7 @@ import {
 } from "@/db/rune-space";
 import {
   getEffectiveGameBalance,
+  getItemDefinition,
   miningLevelThresholds,
   standardSkillLevelThresholds,
 } from "@/game/config/balance";
@@ -80,6 +81,7 @@ import {
   withLockedOwnedCharacter,
   withResolvedOwnedCharacter,
 } from "@/server/action-resolution";
+import { loadOwnedItemInstances } from "@/server/carried-inventory";
 import {
   createTravelResolver,
   TravelRuleError,
@@ -101,12 +103,8 @@ const systemRandom: MiningRandom = {
 };
 
 function itemStackLimit(itemId: string, balance = getEffectiveGameBalance()): number {
-  if (itemId === balance.items.ferriteShale.itemId) return balance.items.ferriteShale.stackLimit;
-  if (itemId === balance.items.refinedFerrite.itemId)
-    return balance.items.refinedFerrite.stackLimit;
-  if (itemId === balance.items.slag.itemId) return balance.items.slag.stackLimit;
-  if (itemId === balance.items.powerCell.itemId) return balance.items.powerCell.stackLimit;
-  return 1;
+  const definition = getItemDefinition(itemId, balance);
+  return definition?.kind === "stack" ? definition.stackLimit : 1;
 }
 
 /**
@@ -157,6 +155,12 @@ type MiningSnapshot = {
   slotsUsed: number;
   slotCapacity: number;
   equipmentLoadout: EquipmentLoadout;
+  allItemInstances: readonly {
+    id: string;
+    itemId: string;
+    currentCharge: number | null;
+    createdAt: Date;
+  }[];
   itemInstances: readonly {
     id: string;
     itemId: string;
@@ -429,11 +433,7 @@ export async function ensureStarterMiningState(
     .insert(characterMiningState)
     .values({ characterId })
     .onConflictDoNothing({ target: characterMiningState.characterId });
-  const instances = await transaction
-    .select()
-    .from(itemInstances)
-    .where(eq(itemInstances.characterId, characterId))
-    .for("update");
+  const { carriedInstances } = await loadOwnedItemInstances(transaction, characterId);
   const assignments = await transaction
     .select()
     .from(equippedItems)
@@ -443,7 +443,7 @@ export async function ensureStarterMiningState(
   const hasCutter = assignments.some(
     (assignment) =>
       assignment.assignmentKind === "gear" &&
-      instances.some(
+      carriedInstances.some(
         (instance) =>
           instance.id === assignment.itemInstanceId &&
           isCompatibleEquipmentAssignment(instance.itemId, assignment, balance),
@@ -457,7 +457,7 @@ export async function ensureStarterMiningState(
         assignment.suitSlotId === balance.items.salvageCutter.suitSlotId,
     )
   ) {
-    let cutter = instances.find(
+    let cutter = carriedInstances.find(
       (instance) =>
         instance.itemId === balance.items.salvageCutter.itemId && !equippedIds.has(instance.id),
     );
@@ -477,7 +477,7 @@ export async function ensureStarterMiningState(
     });
   }
   const hasContainer = assignments.some((assignment) =>
-    instances.some(
+    carriedInstances.some(
       (instance) =>
         instance.id === assignment.itemInstanceId &&
         isCompatibleEquipmentAssignment(instance.itemId, assignment, balance) &&
@@ -493,7 +493,7 @@ export async function ensureStarterMiningState(
         ),
     );
     if (availableSlot) {
-      let container = instances.find(
+      let container = carriedInstances.find(
         (instance) =>
           instance.itemId === balance.items.starterContainer.itemId &&
           !equippedIds.has(instance.id),
@@ -521,7 +521,7 @@ async function loadMiningSnapshot(
   characterId: string,
 ): Promise<MiningSnapshot> {
   const balance = getEffectiveGameBalance();
-  const [xpRows, stacks, instances, assignments, cargoAssignments] = await Promise.all([
+  const [xpRows, stacks, itemState, assignments] = await Promise.all([
     transaction
       .select()
       .from(characterSkillXp)
@@ -532,24 +532,14 @@ async function loadMiningSnapshot(
       .from(inventoryStacks)
       .where(eq(inventoryStacks.characterId, characterId))
       .for("update"),
-    transaction
-      .select()
-      .from(itemInstances)
-      .where(eq(itemInstances.characterId, characterId))
-      .for("update"),
+    loadOwnedItemInstances(transaction, characterId),
     transaction
       .select()
       .from(equippedItems)
       .where(eq(equippedItems.characterId, characterId))
       .for("update"),
-    transaction
-      .select()
-      .from(cargoHoldItemInstances)
-      .where(eq(cargoHoldItemInstances.characterId, characterId))
-      .for("update"),
   ]);
-  const cargoItemInstanceIds = new Set(cargoAssignments.map((row) => row.itemInstanceId));
-  const carriedInstances = instances.filter((instance) => !cargoItemInstanceIds.has(instance.id));
+  const { allInstances, carriedInstances } = itemState;
   const miningXp = xpRows.find((row) => row.skillId === SKILL_IDS.mining)?.totalXp ?? 0;
   const equipmentLoadout = deriveEquipmentLoadout({
     assignments,
@@ -563,7 +553,7 @@ async function loadMiningSnapshot(
       assignment.suitSlotId === balance.items.salvageCutter.suitSlotId,
   );
   const cutter = cutterAssignment
-    ? instances.find(
+    ? carriedInstances.find(
         (instance) =>
           instance.id === cutterAssignment.itemInstanceId &&
           instance.itemId === balance.items.salvageCutter.itemId,
@@ -584,6 +574,7 @@ async function loadMiningSnapshot(
     slotsUsed: equipmentLoadout.inventorySlotsUsed,
     slotCapacity: equipmentLoadout.containerSlotCapacity,
     equipmentLoadout,
+    allItemInstances: allInstances,
     itemInstances: carriedInstances,
     equippedCutterInstanceId: cutter?.id,
     cutterCharge: normalizeCutterCharge(cutter?.currentCharge, balance),
@@ -821,7 +812,6 @@ export async function stateFromTransaction(
     cargoRepairRows,
     cargoStackRows,
     cargoItemRows,
-    allItemInstanceRows,
     travelRows,
     scavengeRevealRows,
     claimRows,
@@ -859,7 +849,6 @@ export async function stateFromTransaction(
       .from(cargoHoldItemInstances)
       .where(eq(cargoHoldItemInstances.characterId, characterId))
       .orderBy(asc(cargoHoldItemInstances.storedAt), asc(cargoHoldItemInstances.itemInstanceId)),
-    transaction.select().from(itemInstances).where(eq(itemInstances.characterId, characterId)),
     transaction
       .select()
       .from(characterTravelState)
@@ -947,8 +936,8 @@ export async function stateFromTransaction(
     balance,
   });
   const cargoUniqueItems = cargoItemRows
-    .map((row) => allItemInstanceRows.find((instance) => instance.id === row.itemInstanceId))
-    .filter((instance): instance is (typeof allItemInstanceRows)[number] => Boolean(instance))
+    .map((row) => snapshot.allItemInstances.find((instance) => instance.id === row.itemInstanceId))
+    .filter((instance): instance is (typeof snapshot.allItemInstances)[number] => Boolean(instance))
     .map((instance) => ({
       id: instance.id,
       itemId: instance.itemId,
@@ -1494,7 +1483,7 @@ export async function startRefining(
       // Preflight: need at least 2 shale and room for either output
       const balance = getEffectiveGameBalance();
       // Build snapshot for preflight: same as refining resolver would
-      const [xpRows, stacks, instances, assignments] = await Promise.all([
+      const [xpRows, stacks, itemState, assignments] = await Promise.all([
         transaction
           .select()
           .from(characterSkillXp)
@@ -1505,11 +1494,7 @@ export async function startRefining(
           .from(inventoryStacks)
           .where(eq(inventoryStacks.characterId, context.character.id))
           .for("update"),
-        transaction
-          .select()
-          .from(itemInstances)
-          .where(eq(itemInstances.characterId, context.character.id))
-          .for("update"),
+        loadOwnedItemInstances(transaction, context.character.id),
         transaction
           .select()
           .from(equippedItems)
@@ -1517,7 +1502,12 @@ export async function startRefining(
           .for("update"),
       ]);
       const refiningXp = xpRows.find((r) => r.skillId === SKILL_IDS.refining)?.totalXp ?? 0;
-      const loadout = deriveEquipmentLoadout({ assignments, instances, stacks, balance });
+      const loadout = deriveEquipmentLoadout({
+        assignments,
+        instances: itemState.carriedInstances,
+        stacks,
+        balance,
+      });
       const snapshot = {
         refiningLevel: levelFromXp(refiningXp, standardSkillLevelThresholds(balance)),
         existingStacks: stacks,
@@ -1772,12 +1762,8 @@ export async function loadSalvageCutterPowerCell(
     async (transaction, context) => {
       await ensureStarterMiningState(transaction, context.character.id);
       const balance = getEffectiveGameBalance();
-      const [instances, assignments, stacks] = await Promise.all([
-        transaction
-          .select()
-          .from(itemInstances)
-          .where(eq(itemInstances.characterId, context.character.id))
-          .for("update"),
+      const [itemState, assignments, stacks] = await Promise.all([
+        loadOwnedItemInstances(transaction, context.character.id),
         transaction
           .select()
           .from(equippedItems)
@@ -1796,7 +1782,7 @@ export async function loadSalvageCutterPowerCell(
           assignment.suitSlotId === balance.items.salvageCutter.suitSlotId,
       );
       const cutter = cutterAssignment
-        ? instances.find(
+        ? itemState.carriedInstances.find(
             (instance) =>
               instance.id === cutterAssignment.itemInstanceId &&
               instance.itemId === balance.items.salvageCutter.itemId &&

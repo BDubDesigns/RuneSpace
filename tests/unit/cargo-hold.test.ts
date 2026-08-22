@@ -89,9 +89,25 @@ describe("Cargo Hold repair domain", () => {
       completed: true,
       stopReason: "completed",
     });
-    expect(cargoHoldRepairComplete(repair({ ...repair(), weldingProgress: 12 }), balance)).toBe(
-      true,
-    );
+    expect(
+      cargoHoldRepairComplete(
+        repair({ weldingProgress: 12, completedAt: new Date("2026-08-21T18:00:00.000Z") }),
+        balance,
+      ),
+    ).toBe(true);
+    expect(cargoHoldRepairComplete(repair({ weldingProgress: 12 }), balance)).toBe(false);
+
+    expect(
+      resolveCargoHoldWelding({
+        elapsedTicks: 100,
+        snapshot: repair({
+          refinedFerriteContributed: 15,
+          slagContributed: 6,
+          weldingProgress: 12,
+        }),
+        balance,
+      }),
+    ).toMatchObject({ completed: false, awardedXp: 0, completedIncrements: 0 });
 
     const grant = grantSkillXp(
       { skillId: SKILL_IDS.welding, totalXp: 0 },

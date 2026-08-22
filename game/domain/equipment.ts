@@ -1,4 +1,4 @@
-import type { EffectiveGameBalance } from "@/game/config/balance";
+import { getItemDefinition, type EffectiveGameBalance } from "@/game/config/balance";
 import {
   calculateCarriedWeight,
   inventorySlotCapacityFromContainers,
@@ -45,17 +45,18 @@ export type EquipmentLoadout = {
 };
 
 function itemEquipmentDefinition(itemId: string, balance: EffectiveGameBalance) {
+  const massGrams = getItemDefinition(itemId, balance)?.massGrams ?? 0;
   if (itemId === balance.items.salvageCutter.itemId)
     return {
       assignmentKind: "gear" as const,
       suitSlotIds: [balance.items.salvageCutter.suitSlotId],
-      massGrams: balance.items.salvageCutter.massGrams,
+      massGrams,
     };
   if (itemId === balance.items.starterContainer.itemId)
     return {
       assignmentKind: "container" as const,
       suitSlotIds: balance.carrying.containerSuitSlotIds,
-      massGrams: balance.items.starterContainer.massGrams,
+      massGrams,
       containerSlotCapacity: balance.items.starterContainer.slotCapacity,
     };
   return undefined;
@@ -91,11 +92,7 @@ export function isCompatibleEquipmentAssignment(
 }
 
 export function carriedItemMassGrams(itemId: string, balance: EffectiveGameBalance): number {
-  if (itemId === balance.items.ferriteShale.itemId) return balance.items.ferriteShale.massGrams;
-  if (itemId === balance.items.refinedFerrite.itemId) return balance.items.refinedFerrite.massGrams;
-  if (itemId === balance.items.slag.itemId) return balance.items.slag.massGrams;
-  if (itemId === balance.items.powerCell.itemId) return balance.items.powerCell.massGrams;
-  return itemEquipmentDefinition(itemId, balance)?.massGrams ?? 0;
+  return getItemDefinition(itemId, balance)?.massGrams ?? 0;
 }
 
 function assignmentKey(assignment: EquipmentTarget): string {
@@ -114,7 +111,7 @@ function assertValidAssignments(
     if (!isApprovedEquipmentTarget(assignment, balance))
       throw new EquipmentRuleError("Equipment assignment is not approved.");
     if (!instanceIds.has(assignment.itemInstanceId))
-      throw new EquipmentRuleError("Equipped item is not owned by this character.");
+      throw new EquipmentRuleError("Equipped item is not currently carried by this character.");
     if (assignmentKeys.has(assignmentKey(assignment)))
       throw new EquipmentRuleError("An item is already assigned to that equipment slot.");
     if (assignedItemIds.has(assignment.itemInstanceId))
@@ -202,7 +199,7 @@ export function planEquipmentChange(input: {
   let nextAssignments: EquipmentAssignmentState[];
   if (change.kind === "equip") {
     const item = instances.find((instance) => instance.id === change.itemInstanceId);
-    if (!item) throw new EquipmentRuleError("Item is not owned by this character.");
+    if (!item) throw new EquipmentRuleError("Item is not currently carried by this character.");
     if (!isCompatibleEquipmentAssignment(item.itemId, change.target, balance))
       throw new EquipmentRuleError("Item is not compatible with that equipment slot.");
     const source = assignments.find((assignment) => assignment.itemInstanceId === item.id);

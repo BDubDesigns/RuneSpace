@@ -15,6 +15,7 @@ suite("issue #89 Cargo Hold repair and Welding (real PostgreSQL)", () => {
   let characters: typeof import("@/server/characters");
   let mining: typeof import("@/server/mining");
   let cargo: typeof import("@/server/cargo-hold");
+  let equipment: typeof import("@/server/equipment");
   const createdUsers: string[] = [];
   const balance = getEffectiveGameBalance();
   const deterministicRandom = {
@@ -30,6 +31,7 @@ suite("issue #89 Cargo Hold repair and Welding (real PostgreSQL)", () => {
     characters = await import("@/server/characters");
     mining = await import("@/server/mining");
     cargo = await import("@/server/cargo-hold");
+    equipment = await import("@/server/equipment");
   });
 
   afterEach(async () => {
@@ -98,6 +100,25 @@ suite("issue #89 Cargo Hold repair and Welding (real PostgreSQL)", () => {
       ),
       deterministicRandom,
     );
+  }
+
+  async function inventoryAndCargoRows(characterId: string) {
+    const [stacks, instances, cargoStacks, cargoItems] = await Promise.all([
+      db
+        .select()
+        .from(rune.inventoryStacks)
+        .where(eq(rune.inventoryStacks.characterId, characterId)),
+      db.select().from(rune.itemInstances).where(eq(rune.itemInstances.characterId, characterId)),
+      db
+        .select()
+        .from(rune.cargoHoldStacks)
+        .where(eq(rune.cargoHoldStacks.characterId, characterId)),
+      db
+        .select()
+        .from(rune.cargoHoldItemInstances)
+        .where(eq(rune.cargoHoldItemInstances.characterId, characterId)),
+    ]);
+    return { stacks, instances, cargoStacks, cargoItems };
   }
 
   it("commits useful material exactly once under concurrent requests", async () => {
@@ -188,6 +209,7 @@ suite("issue #89 Cargo Hold repair and Welding (real PostgreSQL)", () => {
       weldingIncrements: 12,
       complete: true,
     });
+    expect(completed.cargoHold.repair.completedAt).toBeTruthy();
     expect(completed.welding).toMatchObject({ totalXp: 600, level: 2 });
     expect(
       (
@@ -249,7 +271,7 @@ suite("issue #89 Cargo Hold repair and Welding (real PostgreSQL)", () => {
 
   it("transfers stack and unique identities without bypassing carried capacity", async () => {
     const { userId, character, now } = await makeCharacter();
-    await restoreCargoHold(userId, character.id, now);
+    const restored = await restoreCargoHold(userId, character.id, now);
 
     const carriedStack = (
       await db
@@ -261,6 +283,12 @@ suite("issue #89 Cargo Hold repair and Welding (real PostgreSQL)", () => {
       await db
         .insert(rune.itemInstances)
         .values({ characterId: character.id, itemId: ITEM_IDS.salvageCutter, currentCharge: 7 })
+        .returning()
+    )[0]!;
+    const extraContainer = (
+      await db
+        .insert(rune.itemInstances)
+        .values({ characterId: character.id, itemId: ITEM_IDS.mykeaSchleppraum8 })
         .returning()
     )[0]!;
     const equippedCutter = (
@@ -344,6 +372,65 @@ suite("issue #89 Cargo Hold repair and Welding (real PostgreSQL)", () => {
     expect(storedUnique.state.cargoHold.uniqueItems).toMatchObject([
       { id: extraCutter.id, itemId: ITEM_IDS.salvageCutter, currentCharge: 7 },
     ]);
+    const storedContainer = await cargo.depositCargoUniqueItem(
+      userId,
+      character.id,
+      { itemInstanceId: extraContainer.id },
+      now,
+      deterministicRandom,
+    );
+    expect(storedContainer.cargo).toMatchObject({
+      status: "transferred",
+      itemInstanceId: extraContainer.id,
+    });
+    expect(storedContainer.state.cargoHold.uniqueItems).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: extraCutter.id,
+          itemId: ITEM_IDS.salvageCutter,
+          currentCharge: 7,
+          massGrams: 5_000,
+        }),
+        expect.objectContaining({
+          id: extraContainer.id,
+          itemId: ITEM_IDS.mykeaSchleppraum8,
+          massGrams: 10_000,
+        }),
+      ]),
+    );
+    expect(storedContainer.state.inventory.slotsUsed).toBe(restored.inventory.slotsUsed + 1);
+    expect(storedContainer.state.inventory.massGrams).toBe(
+      restored.inventory.massGrams + 3 * balance.items.ferriteShale.massGrams,
+    );
+    expect(storedContainer.state.inventory.uniqueItems.map((item) => item.id)).not.toContain(
+      extraCutter.id,
+    );
+    expect(storedContainer.state.inventory.uniqueItems.map((item) => item.id)).not.toContain(
+      extraContainer.id,
+    );
+
+    await expect(
+      equipment.changeEquipment(
+        userId,
+        character.id,
+        {
+          kind: "equip",
+          itemInstanceId: extraCutter.id,
+          target: {
+            assignmentKind: "gear",
+            suitSlotId: balance.items.salvageCutter.suitSlotId,
+          },
+        },
+        now,
+        deterministicRandom,
+      ),
+    ).rejects.toThrow(/currently carried/i);
+    expect(
+      await db
+        .select()
+        .from(rune.cargoHoldItemInstances)
+        .where(eq(rune.cargoHoldItemInstances.itemInstanceId, extraCutter.id)),
+    ).toHaveLength(1);
 
     const withdrawnUnique = await cargo.withdrawCargoUniqueItem(
       userId,
@@ -364,6 +451,154 @@ suite("issue #89 Cargo Hold repair and Welding (real PostgreSQL)", () => {
         await db.select().from(rune.itemInstances).where(eq(rune.itemInstances.id, extraCutter.id))
       )[0]?.currentCharge,
     ).toBe(7);
+  });
+
+  it("refuses a complete stack withdrawal when carried slots are full without partial transfer", async () => {
+    const { userId, character, now } = await makeCharacter();
+    await restoreCargoHold(userId, character.id, now);
+    await db.insert(rune.cargoHoldStacks).values({
+      characterId: character.id,
+      itemId: ITEM_IDS.ferriteShale,
+      quantity: 3,
+    });
+    await db.insert(rune.itemInstances).values(
+      Array.from({ length: 8 }, () => ({
+        characterId: character.id,
+        itemId: ITEM_IDS.salvageCutter,
+        currentCharge: 0,
+      })),
+    );
+    const before = await inventoryAndCargoRows(character.id);
+
+    const result = await cargo.withdrawCargoStack(
+      userId,
+      character.id,
+      {
+        stackId: before.cargoStacks[0]!.id,
+        mode: "stack",
+        expectedQuantity: 3,
+      },
+      now,
+      deterministicRandom,
+    );
+    expect(result.cargo).toMatchObject({ status: "refused", reason: "carried_capacity" });
+    expect(await inventoryAndCargoRows(character.id)).toEqual(before);
+  });
+
+  it("refuses a complete stack withdrawal when carried mass is insufficient, while WITHDRAW 1 remains explicit", async () => {
+    const { userId, character, now } = await makeCharacter();
+    await restoreCargoHold(userId, character.id, now);
+    await db.insert(rune.cargoHoldStacks).values({
+      characterId: character.id,
+      itemId: ITEM_IDS.powerCell,
+      quantity: 5,
+    });
+    await db.insert(rune.itemInstances).values(
+      Array.from({ length: 3 }, () => ({
+        characterId: character.id,
+        itemId: ITEM_IDS.mykeaSchleppraum8,
+      })),
+    );
+    await db.insert(rune.inventoryStacks).values([
+      { characterId: character.id, itemId: ITEM_IDS.powerCell, quantity: 5 },
+      { characterId: character.id, itemId: ITEM_IDS.ferriteShale, quantity: 5 },
+    ]);
+    const before = await inventoryAndCargoRows(character.id);
+
+    const result = await cargo.withdrawCargoStack(
+      userId,
+      character.id,
+      {
+        stackId: before.cargoStacks[0]!.id,
+        mode: "stack",
+        expectedQuantity: 5,
+      },
+      now,
+      deterministicRandom,
+    );
+    expect(result.cargo).toMatchObject({ status: "refused", reason: "carried_capacity" });
+    expect(await inventoryAndCargoRows(character.id)).toEqual(before);
+
+    const smaller = await cargo.withdrawCargoStack(
+      userId,
+      character.id,
+      {
+        stackId: before.cargoStacks[0]!.id,
+        mode: "one",
+        expectedQuantity: 5,
+      },
+      now,
+      deterministicRandom,
+    );
+    expect(smaller.cargo).toMatchObject({ status: "transferred", quantity: 1 });
+  });
+
+  it("refuses a unique withdrawal when no carried slot is available without changing either location", async () => {
+    const { userId, character, now } = await makeCharacter();
+    await restoreCargoHold(userId, character.id, now);
+    const stored = (
+      await db
+        .insert(rune.itemInstances)
+        .values({ characterId: character.id, itemId: ITEM_IDS.salvageCutter, currentCharge: 4 })
+        .returning()
+    )[0]!;
+    await db.insert(rune.cargoHoldItemInstances).values({
+      characterId: character.id,
+      itemInstanceId: stored.id,
+      storedAt: now,
+    });
+    await db.insert(rune.itemInstances).values(
+      Array.from({ length: 8 }, () => ({
+        characterId: character.id,
+        itemId: ITEM_IDS.salvageCutter,
+        currentCharge: 0,
+      })),
+    );
+    const before = await inventoryAndCargoRows(character.id);
+
+    const result = await cargo.withdrawCargoUniqueItem(
+      userId,
+      character.id,
+      { itemInstanceId: stored.id },
+      now,
+      deterministicRandom,
+    );
+    expect(result.cargo).toMatchObject({ status: "refused", reason: "carried_capacity" });
+    expect(await inventoryAndCargoRows(character.id)).toEqual(before);
+  });
+
+  it("refuses a unique withdrawal when carried mass is insufficient without changing either location", async () => {
+    const { userId, character, now } = await makeCharacter();
+    await restoreCargoHold(userId, character.id, now);
+    const stored = (
+      await db
+        .insert(rune.itemInstances)
+        .values({ characterId: character.id, itemId: ITEM_IDS.salvageCutter, currentCharge: 4 })
+        .returning()
+    )[0]!;
+    await db.insert(rune.cargoHoldItemInstances).values({
+      characterId: character.id,
+      itemInstanceId: stored.id,
+      storedAt: now,
+    });
+    await db.insert(rune.itemInstances).values(
+      Array.from({ length: 7 }, () => ({
+        characterId: character.id,
+        itemId: ITEM_IDS.salvageCutter,
+        currentCharge: 0,
+      })),
+    );
+    const before = await inventoryAndCargoRows(character.id);
+
+    const result = await cargo.withdrawCargoUniqueItem(
+      userId,
+      character.id,
+      { itemInstanceId: stored.id },
+      now,
+      deterministicRandom,
+    );
+    expect(result.cargo).toMatchObject({ status: "refused", reason: "carried_capacity" });
+    expect(await inventoryAndCargoRows(character.id)).toEqual(before);
   });
 
   it("refuses storage outside stationary Crash Site and rejects a full occupied hold", async () => {

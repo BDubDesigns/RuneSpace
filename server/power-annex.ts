@@ -5,7 +5,6 @@ import {
   characterTravelState,
   equippedItems,
   inventoryStacks,
-  itemInstances,
 } from "@/db/rune-space";
 import { getEffectiveGameBalance } from "@/game/config/balance";
 import { ACTION_IDS, ITEM_IDS, LOCATION_IDS } from "@/game/config/foundations";
@@ -17,6 +16,7 @@ import {
 import { deriveEquipmentLoadout } from "@/game/domain/equipment";
 import { planExactStackAddition } from "@/game/domain/inventory";
 import { withLockedOwnedCharacter, type DatabaseTransaction } from "@/server/action-resolution";
+import { loadOwnedItemInstances } from "@/server/carried-inventory";
 import {
   ensureStarterMiningState,
   stateFromTransaction,
@@ -132,24 +132,25 @@ export async function claimPowerCells(
       };
     }
 
-    const [stacks, instances, assignments] = await Promise.all([
+    const [stacks, itemState, assignments] = await Promise.all([
       transaction
         .select()
         .from(inventoryStacks)
         .where(eq(inventoryStacks.characterId, character.id))
         .for("update"),
-      transaction
-        .select()
-        .from(itemInstances)
-        .where(eq(itemInstances.characterId, character.id))
-        .for("update"),
+      loadOwnedItemInstances(transaction, character.id),
       transaction
         .select()
         .from(equippedItems)
         .where(eq(equippedItems.characterId, character.id))
         .for("update"),
     ]);
-    const loadout = deriveEquipmentLoadout({ assignments, instances, stacks, balance });
+    const loadout = deriveEquipmentLoadout({
+      assignments,
+      instances: itemState.carriedInstances,
+      stacks,
+      balance,
+    });
     const plan = planExactStackAddition(
       stacks,
       ITEM_IDS.powerCell,
