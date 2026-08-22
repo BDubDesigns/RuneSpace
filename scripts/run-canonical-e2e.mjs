@@ -134,6 +134,11 @@ const CARGO_HOLD_REQUIRED = [
   "cargo-desktop-storage.png",
 ];
 
+const INVENTORY_EQUIP_REQUIRED = [
+  "inventory-equip-mobile-selected-cutter.png",
+  "inventory-equip-mobile-equipped.png",
+];
+
 function verifyAndCopyScreenshots(required, destDir) {
   log("Verifying and preserving screenshots...");
   for (const filename of required) {
@@ -165,6 +170,7 @@ async function prepareState() {
     mkdirSync(resolve(ROOT, "artifacts/e2e-review/character-portraits"), { recursive: true });
     mkdirSync(resolve(ROOT, "artifacts/e2e-review/refining"), { recursive: true });
     mkdirSync(resolve(ROOT, "artifacts/e2e-review/cargo-hold"), { recursive: true });
+    mkdirSync(resolve(ROOT, "artifacts/e2e-review/inventory-equip"), { recursive: true });
     log("Frozen review screenshots: ENABLED (manifest will be verified and uploaded).");
   } else {
     log(
@@ -188,6 +194,13 @@ async function runCanonical() {
   await runPlaywright(["mining", "--project=chromium"], "Mining E2E");
   if (captureScreenshots)
     verifyAndCopyScreenshots(MINING_REQUIRED, resolve(ROOT, "artifacts/e2e-review/mining"));
+
+  await runPlaywright(["inventory-equip", "--project=chromium"], "Inventory equip E2E");
+  if (captureScreenshots)
+    verifyAndCopyScreenshots(
+      INVENTORY_EQUIP_REQUIRED,
+      resolve(ROOT, "artifacts/e2e-review/inventory-equip"),
+    );
 
   await runPlaywright(["overlay", "--project=chromium"], "Overlay E2E");
   if (captureScreenshots)

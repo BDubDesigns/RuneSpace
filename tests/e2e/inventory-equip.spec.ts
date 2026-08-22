@@ -114,6 +114,9 @@ test.describe("Inventory equip and compact selected visual", () => {
     await expect(detailsPanel).toBeVisible();
     await expect(detailsPanel.getByRole("button", { name: /Equip in Mining tool/ })).toBeVisible();
 
+    // Frozen review screenshot: narrow portrait selected-item details (Issue #68).
+    await page.screenshot({ path: "test-results/inventory-equip-mobile-selected-cutter.png" });
+
     // Compact selected visual: at the 390px portrait viewport the selected
     // artwork tile stays ~7rem (112px) wide instead of stretching across the
     // dossier. The visual renders as the <article> root of ItemVisual inside the
@@ -174,6 +177,10 @@ test.describe("Inventory equip and compact selected visual", () => {
     await expect(miningToolSection).toBeVisible();
     await expect(miningToolSection.getByText("Equipped", { exact: true })).toBeVisible();
     await expect(miningToolSection).toContainText("Salvage Cutter");
+
+    // Frozen review screenshot: the Salvage Cutter Equip state, shown equipped
+    // in the Mining-tool slot without a reload (Issue #68).
+    await page.screenshot({ path: "test-results/inventory-equip-mobile-equipped.png" });
   });
 
   test("keeps the selected-stack visual compact on narrow portrait and does not overflow", async ({
@@ -219,5 +226,52 @@ test.describe("Inventory equip and compact selected visual", () => {
     const desktopTileBox = await detailsPanel.locator("article").first().boundingBox();
     expect(desktopTileBox).not.toBeNull();
     expect(desktopTileBox!.width).toBeLessThanOrEqual(140);
+    // Explicitly assert there is no horizontal document overflow at the desktop
+    // viewport either.
+    const desktopOverflow = await page.evaluate(
+      () => document.documentElement.scrollWidth > document.documentElement.clientWidth,
+    );
+    expect(desktopOverflow).toBe(false);
+  });
+
+  test("exposes no Equip action in Inventory details for an ineligible carried unique item", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    const characterId = page.url().split("/").at(-1)!;
+
+    // before() auto-provisions an equipped Cutter + one container (marker
+    // present). Add a spare carried MYKEA container: it is a unique item that
+    // is eligible for a CONTAINER slot, but Issue #68 scopes Inventory Equip to
+    // the authoritative Mining-tool slot only, so its details must expose NO
+    // Equip action. Keep the marker present so the loadout is not re-provisioned.
+    await db.insert(itemInstances).values({
+      characterId,
+      itemId: ITEM_IDS.mykeaSchleppraum8,
+    });
+    await page.reload();
+
+    const inventoryDrawer = page.getByRole("dialog", { name: "Inventory" });
+    await page.getByRole("button", { name: /Inventory \d+\/\d+/ }).click();
+    await expect(inventoryDrawer).toBeVisible();
+
+    // Select the carried spare MYKEA (a unique item tile). The equipped Cutter
+    // is not carried; the spare MYKEA is the additional carried unique.
+    const spareTile = inventoryDrawer
+      .locator("button[aria-pressed]")
+      .filter({ hasText: "MYKEA SCHLEPPRAUM-8" })
+      .first();
+    await expect(spareTile).toBeVisible();
+    await spareTile.click();
+
+    const detailsPanel = inventoryDrawer.locator("[data-details-panel]");
+    await expect(detailsPanel).toBeVisible();
+    await expect(
+      detailsPanel.getByText("MYKEA SCHLEPPRAUM-8", { exact: true }).first(),
+    ).toBeVisible();
+
+    // A carried container is ineligible for the Mining-tool equip action this
+    // feature adds, so NO Equip control may appear in its Inventory details.
+    await expect(detailsPanel.getByRole("button", { name: /Equip in/ })).toHaveCount(0);
   });
 });
