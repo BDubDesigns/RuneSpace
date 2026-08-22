@@ -64,6 +64,7 @@ export function CargoHoldPanel() {
   const [message, setMessage] = useState<string>();
   const [pending, setPending] = useState<string>();
   const [completionFeedbackVisible, setCompletionFeedbackVisible] = useState(false);
+  const [completionAnnouncement, setCompletionAnnouncement] = useState("");
   const [now, setNow] = useState(Date.now());
   const [, startTransition] = useTransition();
   const balance = getEffectiveGameBalance();
@@ -93,10 +94,11 @@ export function CargoHoldPanel() {
     if (wasComplete || !repair.complete) return;
 
     setCompletionFeedbackVisible(true);
-    const timer = window.setTimeout(
-      () => setCompletionFeedbackVisible(false),
-      COMPLETION_FEEDBACK_DURATION_MS,
-    );
+    setCompletionAnnouncement("CARGO HOLD RESTORED");
+    const timer = window.setTimeout(() => {
+      setCompletionFeedbackVisible(false);
+      setCompletionAnnouncement("");
+    }, COMPLETION_FEEDBACK_DURATION_MS);
     return () => window.clearTimeout(timer);
   }, [repair.complete]);
 
@@ -377,7 +379,7 @@ export function CargoHoldPanel() {
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <p className="font-display text-xs uppercase tracking-[0.16em] text-[color:var(--rs-accent-mining)]">
-            Crash Site infrastructure
+            CRASH SITE INFRASTRUCTURE
           </p>
           <h2 className="mt-1 font-display text-xl font-bold uppercase tracking-wide">
             {repair.complete ? "CARGO HOLD" : "CARGO HOLD REPAIR"}
@@ -385,7 +387,7 @@ export function CargoHoldPanel() {
         </div>
         {repair.complete ? (
           <span className="border border-[color:var(--rs-accent-mining)] px-2 py-1 font-display text-xs uppercase tracking-wide">
-            Operational
+            OPERATIONAL
           </span>
         ) : null}
       </div>
@@ -499,43 +501,39 @@ export function CargoHoldPanel() {
         </>
       ) : (
         <>
-          <section
-            aria-live={completionFeedbackVisible ? "polite" : undefined}
-            className={
-              completionFeedbackVisible
-                ? "rs-result-feedback-success mt-4 border border-[color:var(--rs-accent-mining)] bg-[color:var(--rs-surface-panel)] p-4"
-                : "mt-4 border border-[color:var(--rs-border-structural)] bg-[color:var(--rs-surface-panel)] p-4"
-            }
-            data-cargo-hold-status={completionFeedbackVisible ? "restored" : "operational"}
-          >
-            {completionFeedbackVisible ? (
-              <>
-                <p className="font-display text-lg font-bold uppercase tracking-wide">
-                  CARGO HOLD RESTORED
-                </p>
-                <p className="mt-1 text-sm text-[color:var(--rs-text-secondary)]">
-                  The stationary ship storage is online and ready for use at Crash Site.
-                </p>
-              </>
-            ) : (
-              <>
-                <p className="font-display text-lg font-bold uppercase tracking-wide">CARGO HOLD</p>
-                <p className="mt-1 text-sm uppercase tracking-wide text-[color:var(--rs-accent-mining)]">
-                  OPERATIONAL
-                </p>
-              </>
-            )}
-            <p className="mt-3 font-display text-sm uppercase tracking-wide">
-              {state.cargoHold.slotsUsed} / {state.cargoHold.capacitySlots} slots occupied
-            </p>
-            <ActionButton
-              className="mt-3"
-              intent="mining"
-              onClick={() => setStorageOpen((open) => !open)}
+          {completionFeedbackVisible ? (
+            <section
+              className="rs-result-feedback-success mt-4 border border-[color:var(--rs-accent-mining)] bg-[color:var(--rs-surface-panel)] p-4"
+              data-cargo-hold-status="restored"
             >
-              {storageOpen ? "CLOSE CARGO HOLD" : "OPEN CARGO HOLD"}
-            </ActionButton>
-          </section>
+              <p className="font-display text-lg font-bold uppercase tracking-wide">
+                CARGO HOLD RESTORED
+              </p>
+              <p className="mt-1 text-sm text-[color:var(--rs-text-secondary)]">
+                The stationary ship storage is online and ready for use at Crash Site.
+              </p>
+              <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+                <p className="font-display text-sm uppercase tracking-wide">
+                  {state.cargoHold.slotsUsed} / {state.cargoHold.capacitySlots} SLOTS OCCUPIED
+                </p>
+                <ActionButton intent="mining" onClick={() => setStorageOpen((open) => !open)}>
+                  {storageOpen ? "CLOSE CARGO HOLD" : "OPEN CARGO HOLD"}
+                </ActionButton>
+              </div>
+            </section>
+          ) : (
+            <div
+              className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-[color:var(--rs-border-structural)] pt-4"
+              data-cargo-hold-status="operational"
+            >
+              <p className="font-display text-sm uppercase tracking-wide">
+                {state.cargoHold.slotsUsed} / {state.cargoHold.capacitySlots} SLOTS OCCUPIED
+              </p>
+              <ActionButton intent="mining" onClick={() => setStorageOpen((open) => !open)}>
+                {storageOpen ? "CLOSE CARGO HOLD" : "OPEN CARGO HOLD"}
+              </ActionButton>
+            </div>
+          )}
           {storageOpen ? (
             <section className="mt-4" data-cargo-storage>
               <div
@@ -575,6 +573,15 @@ export function CargoHoldPanel() {
           ) : null}
         </>
       )}
+      <p
+        aria-atomic="true"
+        aria-live="polite"
+        className="sr-only"
+        data-cargo-hold-announcement
+        role="status"
+      >
+        {completionAnnouncement}
+      </p>
       <p aria-live="polite" className="sr-only">
         {message ?? ""}
       </p>

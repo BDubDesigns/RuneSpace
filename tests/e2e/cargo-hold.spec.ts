@@ -85,6 +85,20 @@ test("repairs the Cargo Hold, hard-stops Welding, and transfers occupied storage
   await page.reload();
 
   const cargoPanel = page.locator("[data-cargo-hold]");
+  const restoredStatus = cargoPanel.locator('[data-cargo-hold-status="restored"]');
+  const operationalStatus = cargoPanel.locator('[data-cargo-hold-status="operational"]');
+  const completionAnnouncement = cargoPanel.locator("[data-cargo-hold-announcement]");
+  const expectSteadyState = async (occupancy = "0 / 32") => {
+    await expect(restoredStatus).toHaveCount(0);
+    await expect(operationalStatus).toBeVisible();
+    await expect(cargoPanel.getByRole("heading", { name: "CARGO HOLD", exact: true })).toHaveCount(
+      1,
+    );
+    await expect(cargoPanel.getByText("OPERATIONAL", { exact: true })).toHaveCount(1);
+    await expect(operationalStatus).toContainText(`${occupancy} SLOTS OCCUPIED`);
+    await expect(operationalStatus.getByRole("button", { name: "OPEN CARGO HOLD" })).toBeVisible();
+    await expect(completionAnnouncement).toHaveText("");
+  };
   await expect(cargoPanel).toBeVisible();
   await expect(cargoPanel.locator("[data-cargo-repair-materials]")).toContainText("0 / 15");
   await expect(cargoPanel.locator("[data-cargo-repair-materials]")).toContainText("0 / 6");
@@ -114,16 +128,18 @@ test("repairs the Cargo Hold, hard-stops Welding, and transfers occupied storage
   // The mounted play boundary reconciles due work without a reload. This
   // proves the completion transition is authoritative and immediate in the
   // existing action-state presentation.
-  await expect(cargoPanel.locator('[data-cargo-hold-status="restored"]')).toBeVisible({
-    timeout: 10_000,
-  });
-  await expect(cargoPanel).toContainText("CARGO HOLD RESTORED");
-  await expect(cargoPanel).toContainText("0 / 32 slots occupied");
+  await expect(restoredStatus).toBeVisible({ timeout: 10_000 });
+  await expect(restoredStatus).toContainText("CARGO HOLD RESTORED");
+  await expect(completionAnnouncement).toHaveText("CARGO HOLD RESTORED");
+  await expect(restoredStatus).toContainText("0 / 32 SLOTS OCCUPIED");
   await expect(cargoPanel.getByRole("button", { name: "OPEN CARGO HOLD" })).toBeVisible();
   await page.screenshot({ path: "test-results/cargo-mobile-restored.png" });
 
+  await expectSteadyState();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
   await cargoPanel.getByRole("button", { name: "OPEN CARGO HOLD" }).click();
   await expect(cargoPanel.locator("[data-cargo-storage]")).toBeVisible();
+  await expect(cargoPanel.getByRole("button", { name: "CLOSE CARGO HOLD" })).toBeVisible();
   await expect(cargoPanel.locator("[data-cargo-mode='cargo']")).toContainText(
     "No occupied Cargo Hold items",
   );
@@ -135,6 +151,7 @@ test("repairs the Cargo Hold, hard-stops Welding, and transfers occupied storage
       .returning()
   )[0]!;
   await page.reload();
+  await expectSteadyState();
   await cargoPanel.getByRole("button", { name: "OPEN CARGO HOLD" }).click();
   await cargoPanel.getByRole("button", { name: "DEPOSIT STACK" }).click();
   await expect(cargoPanel).toContainText("Cargo Hold transfer complete.");
@@ -161,13 +178,7 @@ test("repairs the Cargo Hold, hard-stops Welding, and transfers occupied storage
     .where(eq(characters.id, characterId));
   await page.reload();
   await expect(cargoPanel).toBeVisible();
-  await expect(cargoPanel.locator('[data-cargo-hold-status="restored"]')).toHaveCount(0);
-  await expect(cargoPanel.locator('[data-cargo-hold-status="operational"]')).toContainText(
-    "CARGO HOLD",
-  );
-  await expect(cargoPanel.locator('[data-cargo-hold-status="operational"]')).toContainText(
-    "OPERATIONAL",
-  );
+  await expectSteadyState("1 / 32");
   await cargoPanel.getByRole("button", { name: "OPEN CARGO HOLD" }).click();
   await expect(cargoPanel.locator("[data-cargo-mode='cargo']")).toContainText("Ferrite Shale");
   await cargoPanel.getByRole("button", { name: "WITHDRAW STACK" }).click();
