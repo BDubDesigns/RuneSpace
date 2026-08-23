@@ -360,6 +360,30 @@ export const characterStarterProvisioning = pgTable("character_starter_provision
   provisionedAt: timestamp("provisioned_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
+/** Character-scoped authored mission acceptance/completion timestamps. */
+export const characterMissions = pgTable(
+  "character_missions",
+  {
+    characterId: text("character_id")
+      .notNull()
+      .references(() => characters.id, { onDelete: "restrict" }),
+    missionId: text("mission_id").notNull(),
+    acceptedAt: timestamp("accepted_at", { withTimezone: true }).notNull(),
+    completedAt: timestamp("completed_at", { withTimezone: true }),
+  },
+  (table) => [
+    primaryKey({
+      columns: [table.characterId, table.missionId],
+      name: "character_missions_character_mission_pk",
+    }),
+    check(
+      "character_missions_completion_requires_acceptance",
+      sql`${table.completedAt} IS NULL OR ${table.acceptedAt} IS NOT NULL`,
+    ),
+    index("character_missions_character_id_idx").on(table.characterId),
+  ],
+);
+
 /** A bounded player-facing stop status, not an attempt history. */
 export const characterMiningState = pgTable("character_mining_state", {
   characterId: text("character_id")
@@ -518,6 +542,7 @@ export type EquippedItem = typeof equippedItems.$inferSelect;
 export type ActiveAction = typeof activeActions.$inferSelect;
 export type CharacterTravelState = typeof characterTravelState.$inferSelect;
 export type CharacterScavengeReveal = typeof characterScavengeReveals.$inferSelect;
+export type CharacterMission = typeof characterMissions.$inferSelect;
 export type CharacterPowerCellDailyClaim = typeof characterPowerCellDailyClaims.$inferSelect;
 export type CharacterCargoHoldRepair = typeof characterCargoHoldRepair.$inferSelect;
 export type CargoHoldStack = typeof cargoHoldStacks.$inferSelect;

@@ -15,6 +15,7 @@ import {
 } from "@/db/rune-space";
 import { ACTION_IDS, ITEM_IDS, LOCATION_IDS } from "@/game/config/foundations";
 import { miningStorageStatePath } from "./mining.setup";
+import { seedLegacyStarterCutter } from "./legacy-starter";
 
 const e2eDatabaseHost = process.env.DATABASE_URL ? new URL(process.env.DATABASE_URL).hostname : "";
 const RESULT_FEEDBACK_DURATION_MS = 3_600;
@@ -90,6 +91,7 @@ test.beforeEach(async ({ page }) => {
   ]);
   await db.delete(equippedItems).where(eq(equippedItems.characterId, characterId));
   await db.delete(itemInstances).where(eq(itemInstances.characterId, characterId));
+  await seedLegacyStarterCutter(characterId);
   await page.reload();
   await travelToJag(page, characterId);
 });

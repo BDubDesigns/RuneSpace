@@ -3,6 +3,7 @@ import { eq } from "drizzle-orm";
 import { LOCATION_IDS, PORTRAIT_IDS } from "@/game/config/foundations";
 import { normalizeCharacterName } from "@/game/domain/character-name";
 import { SLOT_MIN } from "@/db/rune-space";
+import { getEffectiveGameBalance } from "@/game/config/balance";
 
 /**
  * Shared fixture lifecycle for the real-PostgreSQL integration suites.
@@ -54,9 +55,31 @@ export async function createCharacterForUser(
   userId: string,
   characterName: string,
   portraitId: string = PORTRAIT_IDS.evaSalvageWelder,
+  options: { seedLegacyStarterCutter?: boolean } = { seedLegacyStarterCutter: true },
 ) {
   const account = await ownership.ensurePlayerAccount(userId);
-  return characters.createCharacter(account.id, characterName, portraitId);
+  const character = await characters.createCharacter(account.id, characterName, portraitId);
+  if (options.seedLegacyStarterCutter !== false) {
+    await seedLegacyStarterCutter(db, rune, character.id);
+  }
+  return character;
+}
+
+/** Explicit compatibility fixture for older gameplay suites; production provisioning no longer does this. */
+export async function seedLegacyStarterCutter(db: Db, rune: Rune, characterId: string) {
+  const balance = getEffectiveGameBalance();
+  const [instance] = await db
+    .insert(rune.itemInstances)
+    .values({ characterId, itemId: balance.items.salvageCutter.itemId })
+    .returning();
+  if (!instance) throw new Error("Legacy starter Cutter fixture was not created");
+  await db.insert(rune.equippedItems).values({
+    characterId,
+    assignmentKind: "gear",
+    suitSlotId: balance.items.salvageCutter.suitSlotId,
+    itemInstanceId: instance.id,
+  });
+  return instance;
 }
 
 /**
@@ -127,6 +150,9 @@ export async function cleanupTestUser(db: Db, authSchema: AuthSchema, rune: Rune
       await db
         .delete(rune.characterStarterProvisioning)
         .where(eq(rune.characterStarterProvisioning.characterId, character.id));
+      await db
+        .delete(rune.characterMissions)
+        .where(eq(rune.characterMissions.characterId, character.id));
       await db
         .delete(rune.characterScavengeReveals)
         .where(eq(rune.characterScavengeReveals.characterId, character.id));

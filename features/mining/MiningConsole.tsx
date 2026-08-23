@@ -29,6 +29,8 @@ import { RefiningConsole } from "@/features/refining/RefiningConsole";
 import { PowerAnnexClaimPanel } from "@/features/power-annex/PowerAnnexClaimPanel";
 import { LocationSceneHeader } from "@/features/location-scene/LocationSceneHeader";
 import { CargoHoldPanel } from "@/features/cargo/CargoHoldPanel";
+import { MissionObjectivePanel } from "@/features/missions/MissionObjectivePanel";
+import { NpcInteractionPanel } from "@/features/npc/NpcInteractionPanel";
 
 const RESULT_FEEDBACK_DURATION_MS = 3_600;
 
@@ -340,6 +342,13 @@ export function MiningConsole({ characterName }: { characterName: string }) {
           ) : (
             <SectionHeader eyebrow="In transit">Journey</SectionHeader>
           )}
+
+          {!inTransit ? <MissionObjectivePanel state={state} /> : null}
+          {!inTransit ? (
+            <div className="mt-4">
+              <NpcInteractionPanel />
+            </div>
+          ) : null}
 
           {inTransit ? (
             <p className="mt-4 max-w-2xl text-sm leading-relaxed text-[color:var(--rs-text-secondary)]">

@@ -113,6 +113,14 @@ export const WithdrawCargoUniqueItemRequestSchema = z.object({
   itemInstanceId: z.string().uuid(),
 });
 
+/** Mission commands identify only the owned character; authored mission IDs stay server-owned. */
+export const AcceptWalkItOffRequestSchema = z.object({
+  characterId: z.string().uuid(),
+});
+export const CompleteWalkItOffRequestSchema = z.object({
+  characterId: z.string().uuid(),
+});
+
 /** Containers can only hold non-container item definitions. */
 export const ContainerContentItemSchema = z.object({
   itemId: ItemIdSchema,

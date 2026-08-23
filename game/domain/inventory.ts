@@ -26,6 +26,47 @@ export type ExactStackAdditionPlan<Id> =
   | { ok: true; plan: StackAdditionPlan<Id> }
   | { ok: false; reason: "slots" | "mass"; missingQuantity: number };
 
+export type UniqueItemAdditionPlan = { ok: true } | { ok: false; reason: "slots" | "mass" };
+
+/**
+ * Preflight one unequipped unique item against the authoritative carried
+ * Inventory projection. Unique items consume exactly one carried slot and
+ * their content-owned mass, while equipped containers continue to supply the
+ * slot capacity used by the caller.
+ */
+export function planUniqueItemAddition(input: {
+  inventorySlotsUsed: number;
+  slotCapacity: number;
+  carriedMassGrams: number;
+  maximumCarryCapacityGrams: number;
+  itemMassGrams: number;
+}): UniqueItemAdditionPlan {
+  const values = [
+    input.inventorySlotsUsed,
+    input.slotCapacity,
+    input.carriedMassGrams,
+    input.maximumCarryCapacityGrams,
+    input.itemMassGrams,
+  ];
+  if (values.some((value) => !Number.isFinite(value) || value < 0)) {
+    throw new RangeError("Unique-item capacity values must be non-negative numbers");
+  }
+  if (
+    !Number.isInteger(input.inventorySlotsUsed) ||
+    !Number.isInteger(input.slotCapacity) ||
+    input.inventorySlotsUsed > input.slotCapacity
+  ) {
+    return { ok: false, reason: "slots" };
+  }
+  if (input.inventorySlotsUsed + 1 > input.slotCapacity) {
+    return { ok: false, reason: "slots" };
+  }
+  if (input.carriedMassGrams + input.itemMassGrams > input.maximumCarryCapacityGrams) {
+    return { ok: false, reason: "mass" };
+  }
+  return { ok: true };
+}
+
 export type ExactStackRemovalPlan<Id> =
   | {
       ok: true;
