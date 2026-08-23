@@ -422,7 +422,9 @@ export function MiningConsole({ characterName }: { characterName: string }) {
               )}
             </>
           ) : currentLocationId === LOCATION_IDS.crashSite ? (
-            <CargoHoldPanel />
+            <div className="mt-4">
+              <CargoHoldPanel />
+            </div>
           ) : atTheLongScramble ? (
             <div className="mt-4">
               <p className="max-w-2xl text-sm leading-relaxed text-[color:var(--rs-text-secondary)]">
