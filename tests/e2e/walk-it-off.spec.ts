@@ -82,6 +82,12 @@ test("walks from Wade to Tansy, presents the layered temporary dialogue, and cla
   await expect(dialogue.getByRole("button", { name: "Restart dialogue" })).toBeVisible();
   await dialogue.locator("[data-dialogue-text]").click();
   await dialogue.getByRole("button", { name: "Next" }).click();
+  const visibleDialogueText = dialogue.locator('[data-dialogue-text] [aria-hidden="true"]');
+  const secondBeatText = await dialogue.locator("[data-dialogue-text] .sr-only").textContent();
+  await expect
+    .poll(async () => (await visibleDialogueText.textContent()).replace("_", "").length)
+    .toBeLessThan(secondBeatText?.length ?? 0);
+  await visibleDialogueText.click();
   await expect(dialogue.getByRole("button", { name: "Accept mission" })).toBeVisible();
   await dialogue.getByRole("button", { name: "Accept mission" }).click();
   await expect(dialogue).toBeHidden();

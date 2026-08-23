@@ -9,7 +9,7 @@ import type { DialogueSequence } from "@/game/content/dialogue";
 import type { NpcDefinition } from "@/game/content/npcs";
 import { resolveDialogueSpeaker } from "@/game/content/dialogue";
 
-const CHARACTER_REVEAL_MS = 20;
+const CHARACTER_REVEAL_MS = 30;
 
 export function DialoguePlayer({
   background,
@@ -90,6 +90,7 @@ export function DialoguePlayer({
     }
     if (isLastBeat) return;
     viewedBeats.current.add(beatIndex);
+    setRevealedChars(0);
     setBeatIndex((index) => index + 1);
   }
 
