@@ -20,6 +20,13 @@
   --rs-accent-mining: #f5c451;
   --rs-accent-arcane: #c48cff;
   --rs-accent-danger: #f16c75;
+  /* Mission objective panels use a warm brass treatment so mission state is
+     distinct from the RuneSpace cyan navigation and interaction accents. */
+  --rs-mission-accent-strong: #f0d9a0;
+  --rs-mission-text: #d8cfb5;
+  --rs-mission-surface: rgb(50 39 27 / 0.94);
+  --rs-mission-surface-subtle: rgb(122 91 43 / 0.24);
+  --rs-mission-border: rgb(200 163 106 / 0.66);
   --rs-accent-primary-subtle: rgb(75 216 245 / 0.12);
   --rs-accent-primary-hover: rgb(75 216 245 / 0.2);
   --rs-accent-success-subtle: rgb(136 215 99 / 0.1);

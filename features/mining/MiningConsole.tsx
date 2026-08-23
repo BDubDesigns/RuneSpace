@@ -343,7 +343,6 @@ export function MiningConsole({ characterName }: { characterName: string }) {
             <SectionHeader eyebrow="In transit">Journey</SectionHeader>
           )}
 
-          {!inTransit ? <MissionObjectivePanel state={state} /> : null}
           {!inTransit ? (
             <div className="mt-4">
               <NpcInteractionPanel />
@@ -481,6 +480,7 @@ export function MiningConsole({ characterName }: { characterName: string }) {
           ) : null}
         </div>
       </Panel>
+      {!inTransit ? <MissionObjectivePanel state={state} /> : null}
       <ScavengeRevealOverlay />
       <LocalMapPanel />
       <PowerAnnexClaimPanel />

@@ -11,23 +11,33 @@ export function MissionObjectivePanel({ state }: { state: MiningGameplayState })
   return (
     <Panel
       aria-label="Mission objective"
-      className="border-[color:var(--rs-accent-primary)]/60 !p-4"
+      className="!p-4"
       data-mission-objective
+      style={{
+        backgroundColor: "var(--rs-mission-surface)",
+        borderColor: "var(--rs-mission-border)",
+      }}
     >
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <p className="font-display text-[11px] uppercase tracking-[0.18em] text-[color:var(--rs-accent-primary)]">
+          <p className="font-display text-[11px] uppercase tracking-[0.18em] text-[color:var(--rs-mission-accent-strong)]">
             Mission objective
           </p>
           <h2 className="mt-1 font-display text-lg font-bold uppercase tracking-wide">
             {mission.title}
           </h2>
         </div>
-        <span className="border border-[color:var(--rs-border-structural)] px-2 py-1 font-display text-[10px] uppercase tracking-[0.14em] text-[color:var(--rs-text-secondary)]">
+        <span
+          className="border px-2 py-1 font-display text-[10px] uppercase tracking-[0.14em] text-[color:var(--rs-mission-accent-strong)]"
+          style={{
+            backgroundColor: "var(--rs-mission-surface-subtle)",
+            borderColor: "var(--rs-mission-border)",
+          }}
+        >
           {completed ? "Completed" : "Active"}
         </span>
       </div>
-      <p className="mt-3 text-sm text-[color:var(--rs-text-secondary)]">
+      <p className="mt-3 text-sm text-[color:var(--rs-mission-text)]">
         {completed ? "Walk It Off complete." : mission.currentObjective}
       </p>
     </Panel>
