@@ -27,4 +27,5 @@ test-results
 *.log
 .idea
 .vscode
+.commandcode
 artifacts/e2e-review/
