@@ -98,6 +98,8 @@ test("walks from Wade to Tansy, presents the layered temporary dialogue, and cla
     .first()
     .click();
   await page.getByRole("button", { name: /Walk to The Long Scramble/ }).click();
+  await expect(page.locator("[data-mission-objective]")).toContainText("Travel to The Jag");
+  await expect(page.locator("[data-npc-interaction]")).toHaveCount(0);
   await fastForwardArrival(page, characterId);
   await page
     .getByRole("button", { name: /The Jag/ })
@@ -106,7 +108,11 @@ test("walks from Wade to Tansy, presents the layered temporary dialogue, and cla
   await page.getByRole("button", { name: /Walk to The Jag/ }).click();
   await fastForwardArrival(page, characterId);
 
-  await expect(page.locator("[data-mission-objective]")).toContainText("Talk to Tansy Rusk");
+  const missionObjective = page.locator("[data-mission-objective]");
+  await expect(missionObjective).toContainText("Talk to Tansy Rusk");
+  await expect(
+    missionObjective.locator('xpath=following-sibling::*[1][@data-npc-interaction="true"]'),
+  ).toHaveCount(1);
   await page.getByRole("button", { name: /Talk to Tansy Rusk/ }).click();
   const tansyDialogue = page.getByRole("dialog", { name: "Tansy Rusk dialogue" });
   await expect(tansyDialogue.getByRole("button", { name: "Claim Cutter" })).toBeVisible();

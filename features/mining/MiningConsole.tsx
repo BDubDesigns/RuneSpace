@@ -343,12 +343,6 @@ export function MiningConsole({ characterName }: { characterName: string }) {
             <SectionHeader eyebrow="In transit">Journey</SectionHeader>
           )}
 
-          {!inTransit ? (
-            <div className="mt-4">
-              <NpcInteractionPanel />
-            </div>
-          ) : null}
-
           {inTransit ? (
             <p className="mt-4 max-w-2xl text-sm leading-relaxed text-[color:var(--rs-text-secondary)]">
               You are walking between locations. The active work stopped before departure, and no
@@ -480,7 +474,8 @@ export function MiningConsole({ characterName }: { characterName: string }) {
           ) : null}
         </div>
       </Panel>
-      {!inTransit ? <MissionObjectivePanel state={state} /> : null}
+      <MissionObjectivePanel state={state} />
+      {!inTransit ? <NpcInteractionPanel /> : null}
       <ScavengeRevealOverlay />
       <LocalMapPanel />
       <PowerAnnexClaimPanel />
