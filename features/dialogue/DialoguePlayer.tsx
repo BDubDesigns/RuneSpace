@@ -121,7 +121,7 @@ export function DialoguePlayer({
             sizes="min(60vw, 24rem)"
             className="absolute inset-x-1/2 bottom-0 h-[92%] w-auto -translate-x-1/2 object-contain"
           />
-          <p className="bg-[color:var(--rs-surface-panel)]/90 absolute left-3 top-3 border border-[color:var(--rs-border-structural)] px-2 py-1 font-display text-xs uppercase tracking-[0.14em]">
+          <p className="rs-map-plate rs-map-plate--nameplate absolute left-3 top-3 z-10 max-w-[calc(100%-1.5rem)] px-2 py-1 font-display text-xs uppercase tracking-[0.14em]">
             {npc.role}
           </p>
         </div>
