@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   CONVERSATION_BACKGROUND_IDS,
+  DIALOGUE_IDS,
   LOCATION_IDS,
   MISSION_IDS,
   NPC_IDS,
@@ -22,28 +23,43 @@ describe("issue #102 authored NPC and mission boundaries", () => {
 
   it("keeps conversation backgrounds independently replaceable", () => {
     expect(getConversationBackground(CONVERSATION_BACKGROUND_IDS.crashSiteExterior)?.asset).toBe(
-      "/npc-bg.png",
+      "/location-scenes/crash-site.webp",
     );
     expect(getConversationBackground(CONVERSATION_BACKGROUND_IDS.theJagExterior)?.asset).toBe(
-      "/npc-bg.png",
+      "/location-scenes/the-jag.png",
     );
     expect(WALK_IT_OFF.id).toBe(MISSION_IDS.walkItOff);
   });
 
   it("uses typed beats and state-specific dialogue without player choices", () => {
     const offer = getWalkItOffDialogue(NPC_IDS.wadeRusk, "not_accepted");
+    const explorer = getWalkItOffDialogue(NPC_IDS.tansyRusk, "not_accepted");
     const completion = getWalkItOffDialogue(NPC_IDS.tansyRusk, "active");
     expect(offer?.action).toBe("accept_mission");
     expect(completion?.action).toBe("complete_mission");
+    expect(offer?.beats).toHaveLength(13);
+    expect(explorer?.beats).toHaveLength(16);
     expect(offer?.beats[0]).toMatchObject({
       speakerNpcId: NPC_IDS.wadeRusk,
-      expressionId: expect.any(String),
-      text: expect.stringContaining("TEMPORARY COPY"),
+      expressionId: "neutral",
+      backgroundId: CONVERSATION_BACKGROUND_IDS.crashSiteExterior,
+      presentationMode: "local",
+      text: "Huh.",
     });
     expect(resolveDialogueSpeaker(offer!.beats[0]!)).toMatchObject({
       npc: { id: NPC_IDS.wadeRusk },
-      expressionAsset: "/npc.png",
+      expressionAsset: "/npc-art/wade-neutral.png",
     });
+    expect(explorer?.beats[4]).toMatchObject({
+      speakerNpcId: NPC_IDS.wadeRusk,
+      backgroundId: CONVERSATION_BACKGROUND_IDS.crashSiteExterior,
+      presentationMode: "comms",
+      text: "What now.",
+    });
+    expect(getDialogue(DIALOGUE_IDS.tansyAfterRemoteAcceptance)?.action).toBe("complete_mission");
+    expect(getDialogue(DIALOGUE_IDS.tansyAfterClaim)?.beats).toHaveLength(2);
+    expect(getDialogue(DIALOGUE_IDS.tansyCapacitySlots)?.beats).toHaveLength(3);
+    expect(getDialogue(DIALOGUE_IDS.tansyCapacityMass)?.beats).toHaveLength(3);
     expect(getDialogue("unknown_dialogue")).toBeUndefined();
   });
 

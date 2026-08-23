@@ -37,7 +37,11 @@ const dialogueIds = {
   wadeOffer: asContentId("wade_rusk_walk_it_off_offer"),
   wadeFollowUp: asContentId("wade_rusk_walk_it_off_follow_up"),
   tansyBeforeMission: asContentId("tansy_rusk_walk_it_off_before_mission"),
+  tansyAfterRemoteAcceptance: asContentId("tansy_rusk_walk_it_off_after_remote_acceptance"),
   tansyCompletion: asContentId("tansy_rusk_walk_it_off_completion"),
+  tansyAfterClaim: asContentId("tansy_rusk_walk_it_off_after_claim"),
+  tansyCapacitySlots: asContentId("tansy_rusk_walk_it_off_capacity_slots"),
+  tansyCapacityMass: asContentId("tansy_rusk_walk_it_off_capacity_mass"),
   tansyAfterCompletion: asContentId("tansy_rusk_walk_it_off_after_completion"),
 } as const satisfies Record<string, ContentId>;
 

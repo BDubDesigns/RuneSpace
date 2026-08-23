@@ -33,7 +33,12 @@ export type MissionCompletion =
       status: "completed" | "already_completed";
       reward?: { itemId: typeof ITEM_IDS.salvageCutter; quantity: 1; itemInstanceId?: string };
     }
-  | { status: "refused"; reason: "not_accepted" | "not_stationary" | "capacity"; message: string };
+  | {
+      status: "refused";
+      reason: "not_accepted" | "not_stationary" | "capacity";
+      capacityReason?: "slots" | "mass";
+      message: string;
+    };
 
 export type MissionAcceptanceResult = {
   state: MiningGameplayState;
@@ -136,10 +141,14 @@ export async function acceptWalkItOff(
 
       const locationId = await currentLocation(transaction, context.character.id);
       const wade = getNpc(WALK_IT_OFF.offeringNpcId);
-      if (locationId !== wade?.homeLocationId || context.action) {
+      const tansy = getNpc(WALK_IT_OFF.completionNpcId);
+      const canAcceptAtLocation =
+        locationId === wade?.homeLocationId || locationId === tansy?.homeLocationId;
+      if (!canAcceptAtLocation || context.action) {
         return stateFor({
           status: "refused",
-          message: "Wade can only offer this mission while you are stationary at the Crash Site.",
+          message:
+            "Walk It Off can only be accepted while you are stationary at the Crash Site or The Jag.",
         });
       }
 
@@ -266,6 +275,7 @@ export async function completeWalkItOff(
         return stateFor({
           status: "refused",
           reason: "capacity",
+          capacityReason: capacity.reason,
           message: rewardRefusal(capacity.reason),
         });
       }

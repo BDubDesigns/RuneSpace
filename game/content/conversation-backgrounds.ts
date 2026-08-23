@@ -4,6 +4,7 @@ import {
   type ConversationBackgroundId,
   type LocationId,
 } from "@/game/config/foundations";
+import { getLocation } from "./locations";
 
 export type ConversationBackgroundDefinition = {
   id: ConversationBackgroundId;
@@ -12,23 +13,26 @@ export type ConversationBackgroundDefinition = {
   alt: string;
 };
 
-/**
- * People-free compositing surfaces. Both draft entries use the supplied
- * temporary background fixture; each has its own stable content identity so
- * final Crash Site and Jag artwork can be replaced independently.
- */
+const crashSiteScene = getLocation(LOCATION_IDS.crashSite)?.presentation.scene;
+const theJagScene = getLocation(LOCATION_IDS.theJag)?.presentation.scene;
+
+if (!crashSiteScene || !theJagScene) {
+  throw new Error("Walk It Off conversation backgrounds require Crash Site and The Jag scenes");
+}
+
+/** People-free conversation surfaces reuse the authoritative location scenes. */
 export const CONVERSATION_BACKGROUNDS = [
   {
     id: CONVERSATION_BACKGROUND_IDS.crashSiteExterior,
     locationId: LOCATION_IDS.crashSite,
-    asset: "/npc-bg.png",
-    alt: "Temporary people-free exterior background for a Crash Site conversation",
+    asset: crashSiteScene.asset,
+    alt: crashSiteScene.alt,
   },
   {
     id: CONVERSATION_BACKGROUND_IDS.theJagExterior,
     locationId: LOCATION_IDS.theJag,
-    asset: "/npc-bg.png",
-    alt: "Temporary people-free exterior background for a Jag conversation",
+    asset: theJagScene.asset,
+    alt: theJagScene.alt,
   },
 ] as const satisfies readonly ConversationBackgroundDefinition[];
 

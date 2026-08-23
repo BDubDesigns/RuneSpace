@@ -1,7 +1,6 @@
 import { eq, and } from "drizzle-orm";
 import { afterEach, beforeAll, describe, expect, it } from "vitest";
 import { ITEM_IDS, LOCATION_IDS } from "@/game/config/foundations";
-import { getEffectiveGameBalance } from "@/game/config/balance";
 import { cleanupTestUser, createCharacterForUser, createTestUser } from "./fixtures";
 
 const DATABASE_URL = process.env.DATABASE_URL;
@@ -92,7 +91,7 @@ suite("issue #102 Walk It Off persistence and reward boundary (real PostgreSQL)"
     expect(state.inventory.uniqueItems.map((item) => item.itemId)).toEqual([]);
   });
 
-  it("requires Wade at a stationary Crash Site and keeps NPCs independent of mission persistence", async () => {
+  it("accepts at the stationary Crash Site and keeps NPCs independent of mission persistence", async () => {
     const { userId, character } = await makeCharacter();
     const preMission = await missions.completeWalkItOff(
       userId,
@@ -109,6 +108,28 @@ suite("issue #102 Walk It Off persistence and reward boundary (real PostgreSQL)"
       .where(eq(rune.characterMissions.characterId, character.id));
     expect(rows).toHaveLength(1);
     expect(rows[0]?.completedAt).toBeNull();
+  });
+
+  it("supports the explorer-first route and remote acceptance at The Jag", async () => {
+    const { userId, character } = await makeCharacter();
+    await move(character.id, LOCATION_IDS.theJag);
+    const accepted = await missions.acceptWalkItOff(
+      userId,
+      character.id,
+      now,
+      deterministicRandom(),
+    );
+    expect(accepted.mission.status).toBe("accepted");
+    expect(accepted.state.missions[0]).toMatchObject({
+      state: "ready_for_completion",
+      currentObjective: "Talk to Tansy Rusk",
+    });
+    expect(
+      await db
+        .select()
+        .from(rune.characterMissions)
+        .where(eq(rune.characterMissions.characterId, character.id)),
+    ).toMatchObject([{ acceptedAt: now, completedAt: null }]);
   });
 
   it("enforces ownership and makes acceptance idempotent", async () => {
@@ -154,7 +175,11 @@ suite("issue #102 Walk It Off persistence and reward boundary (real PostgreSQL)"
       now,
       deterministicRandom(),
     );
-    expect(refused.mission).toMatchObject({ status: "refused", reason: "capacity" });
+    expect(refused.mission).toMatchObject({
+      status: "refused",
+      reason: "capacity",
+      capacityReason: "slots",
+    });
     expect(
       await db
         .select()
@@ -208,7 +233,11 @@ suite("issue #102 Walk It Off persistence and reward boundary (real PostgreSQL)"
       now,
       deterministicRandom(),
     );
-    expect(refused.mission).toMatchObject({ status: "refused", reason: "capacity" });
+    expect(refused.mission).toMatchObject({
+      status: "refused",
+      reason: "capacity",
+      capacityReason: "mass",
+    });
     if (refused.mission.status !== "refused") throw new Error("capacity fixture failed");
     expect(refused.mission.message).toMatch(/mass/i);
     expect(

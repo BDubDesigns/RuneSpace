@@ -20,6 +20,10 @@
   --rs-accent-mining: #f5c451;
   --rs-accent-arcane: #c48cff;
   --rs-accent-danger: #f16c75;
+  --rs-comms-tint: rgb(93 151 105 / 0.2);
+  --rs-comms-scanline: rgb(190 255 184 / 0.16);
+  --rs-comms-label: #b9e8aa;
+  --rs-comms-static-duration: 1.8s;
   /* Mission objective panels use a warm brass treatment so mission state is
      distinct from the RuneSpace cyan navigation and interaction accents. */
   --rs-mission-accent-strong: #f0d9a0;
@@ -247,6 +251,49 @@ body {
   color: var(--rs-text-secondary);
 }
 
+.rs-dialogue-scene[data-presentation-mode="comms"] .rs-dialogue-scene__comms-overlay {
+  background: repeating-linear-gradient(
+      0deg,
+      transparent 0,
+      transparent 3px,
+      var(--rs-comms-scanline) 4px,
+      transparent 5px
+    ),
+    var(--rs-comms-tint);
+  animation: rs-dialogue-comms-static var(--rs-comms-static-duration) steps(3, end) infinite;
+  mix-blend-mode: screen;
+}
+
+.rs-dialogue-scene[data-presentation-mode="comms"] .rs-dialogue-scene__npc {
+  filter: saturate(0.78) contrast(1.05);
+}
+
+.rs-dialogue-scene__comms-label {
+  color: var(--rs-comms-label);
+  background: var(--rs-item-nameplate-surface);
+  border-color: color-mix(in srgb, var(--rs-comms-label) 48%, transparent);
+}
+
+@keyframes rs-dialogue-comms-static {
+  0%,
+  100% {
+    opacity: 0.82;
+  }
+  50% {
+    opacity: 0.96;
+  }
+}
+
+.rs-dialogue-cursor {
+  animation: rs-dialogue-cursor-blink 0.95s steps(2, end) infinite;
+}
+
+@keyframes rs-dialogue-cursor-blink {
+  50% {
+    opacity: 0;
+  }
+}
+
 /* The layer is a sibling of the native scroll container so its markers stay
    anchored to the visible viewport while the map canvas moves underneath. */
 .rs-map-scroll-affordance-layer {
@@ -447,7 +494,9 @@ body {
   .rs-overlay-panel,
   .rs-overlay-backdrop-exit,
   .rs-overlay-panel-exit,
-  .rs-map-scroll-affordance {
+  .rs-map-scroll-affordance,
+  .rs-dialogue-scene[data-presentation-mode="comms"] .rs-dialogue-scene__comms-overlay,
+  .rs-dialogue-cursor {
     animation: none;
   }
 

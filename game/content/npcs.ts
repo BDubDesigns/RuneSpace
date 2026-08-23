@@ -19,27 +19,31 @@ export type NpcDefinition = {
   expressionAssets: Readonly<Partial<Record<ExpressionId, string>>>;
 };
 
-/**
- * The first two static NPCs. The art paths are deliberately temporary draft
- * fixtures and are isolated to this content boundary so production art can be
- * swapped without changing dialogue or presentation architecture.
- */
+/** The first two static NPCs for the Walk It Off story slice. */
 export const NPCS = [
   {
     id: NPC_IDS.wadeRusk,
     displayName: "Wade Rusk",
-    role: "Temporary NPC content pending approval",
+    role: "Local recovery & salvage operator",
     homeLocationId: LOCATION_IDS.crashSite,
     conversationBackgroundId: CONVERSATION_BACKGROUND_IDS.crashSiteExterior,
-    expressionAssets: { [EXPRESSION_IDS.neutral]: "/npc.png" },
+    expressionAssets: {
+      [EXPRESSION_IDS.neutral]: "/npc-art/wade-neutral.png",
+      [EXPRESSION_IDS.concerned]: "/npc-art/wade-concerned.png",
+      [EXPRESSION_IDS.scowl]: "/npc-art/wade-scowl.png",
+    },
   },
   {
     id: NPC_IDS.tansyRusk,
     displayName: "Tansy Rusk",
-    role: "Temporary NPC content pending approval",
+    role: "Field mechanic & miner",
     homeLocationId: LOCATION_IDS.theJag,
     conversationBackgroundId: CONVERSATION_BACKGROUND_IDS.theJagExterior,
-    expressionAssets: { [EXPRESSION_IDS.neutral]: "/npc.png" },
+    expressionAssets: {
+      [EXPRESSION_IDS.neutral]: "/npc-art/tansy-neutral.png",
+      [EXPRESSION_IDS.concerned]: "/npc-art/tansy-concerned.png",
+      [EXPRESSION_IDS.smile]: "/npc-art/tansy-smile.png",
+    },
   },
 ] as const satisfies readonly NpcDefinition[];
 

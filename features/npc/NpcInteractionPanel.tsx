@@ -2,15 +2,14 @@
 
 import { useRef, useState, useTransition } from "react";
 import { ActionButton } from "@/components/ui/ActionButton";
-import { Panel } from "@/components/ui/Panel";
 import { Feedback } from "@/components/ui/Feedback";
-import { DialoguePlayer } from "@/features/dialogue/DialoguePlayer";
-import { getConversationBackground } from "@/game/content/conversation-backgrounds";
-import { getWalkItOffDialogue } from "@/game/content/dialogue";
-import { getNpcAtLocation, getNpc } from "@/game/content/npcs";
-import { MISSION_IDS } from "@/game/config/foundations";
-import { acceptWalkItOffAction, completeWalkItOffAction } from "@/server/actions";
+import { Panel } from "@/components/ui/Panel";
 import { reportClientDiagnostic } from "@/features/diagnostics/client";
+import { DialoguePlayer } from "@/features/dialogue/DialoguePlayer";
+import { getDialogue, getWalkItOffDialogue } from "@/game/content/dialogue";
+import { getNpc, getNpcAtLocation } from "@/game/content/npcs";
+import { DIALOGUE_IDS, MISSION_IDS } from "@/game/config/foundations";
+import { acceptWalkItOffAction, completeWalkItOffAction } from "@/server/actions";
 import { useMiningPlay } from "@/features/mining/MiningPlayContext";
 
 export function NpcInteractionPanel() {
@@ -18,19 +17,30 @@ export function NpcInteractionPanel() {
   const [open, setOpen] = useState(false);
   const [message, setMessage] = useState<string>();
   const [pending, setPending] = useState(false);
+  const [sequenceOverride, setSequenceOverride] = useState<string>();
   const [, startTransition] = useTransition();
   const triggerRef = useRef<HTMLButtonElement>(null);
   const npc = getNpcAtLocation(state.location.currentLocationId);
   const mission = state.missions.find((entry) => entry.missionId === MISSION_IDS.walkItOff);
-  const sequence = npc && mission ? getWalkItOffDialogue(npc.id, mission.state) : undefined;
-  const background = npc ? getConversationBackground(npc.conversationBackgroundId) : undefined;
-  if (!npc || !mission || !sequence || !background) return null;
+  const baseSequence = npc
+    ? getWalkItOffDialogue(npc.id, mission?.state ?? "not_accepted")
+    : undefined;
+  const sequence = sequenceOverride ? getDialogue(sequenceOverride) : baseSequence;
+  const dialogueNpc = sequence ? getNpc(sequence.npcId) : npc;
+  if (!npc || !sequence || !dialogueNpc) return null;
   const dialogue = sequence;
   const stationary = !state.activeAction && !state.travelState;
 
   function openDialogue() {
     setMessage(undefined);
+    setSequenceOverride(undefined);
     setOpen(true);
+  }
+
+  function closeDialogue() {
+    setOpen(false);
+    setSequenceOverride(undefined);
+    setMessage(undefined);
   }
 
   function runDialogueAction() {
@@ -55,11 +65,38 @@ export function NpcInteractionPanel() {
         }
         acceptState(result.state);
         if (result.mission.status === "refused") {
-          setMessage(result.mission.message);
+          if (
+            "reason" in result.mission &&
+            result.mission.reason === "capacity" &&
+            result.mission.capacityReason
+          ) {
+            setSequenceOverride(
+              result.mission.capacityReason === "slots"
+                ? DIALOGUE_IDS.tansyCapacitySlots
+                : DIALOGUE_IDS.tansyCapacityMass,
+            );
+            setMessage(undefined);
+          } else {
+            setMessage(result.mission.message);
+          }
+          return;
+        }
+        if (
+          dialogue.id === DIALOGUE_IDS.tansyBeforeMission &&
+          result.mission.status === "accepted"
+        ) {
+          setSequenceOverride(DIALOGUE_IDS.tansyAfterRemoteAcceptance);
+          setMessage(undefined);
+          return;
+        }
+        if (dialogue.action === "complete_mission" && result.mission.status === "completed") {
+          setSequenceOverride(DIALOGUE_IDS.tansyAfterClaim);
+          setMessage(undefined);
           return;
         }
         setMessage(undefined);
         setOpen(false);
+        setSequenceOverride(undefined);
       } catch (error) {
         reportClientDiagnostic("mining-command", error, { miningActive: false });
         setMessage("Comms interruption. Mission status could not be confirmed.");
@@ -101,10 +138,9 @@ export function NpcInteractionPanel() {
         <DialoguePlayer
           actionBusy={pending}
           actionMessage={message}
-          background={background}
-          npc={getNpc(sequence.npcId) ?? npc}
+          npc={dialogueNpc}
           onAction={dialogue.action ? runDialogueAction : undefined}
-          onClose={() => setOpen(false)}
+          onClose={closeDialogue}
           sequence={dialogue}
           triggerRef={triggerRef}
         />
