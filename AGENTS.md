@@ -21,6 +21,8 @@ This is the repository's sole normative authority for agent behavior. See
   - Branch/PR procedure, validation, observing CI/deploys:
     `docs/development-workflow.md`.
   - Coolify/database operations: `docs/deployment-database.md`.
+  - QC Studio exports / applying creator-authored Studio content:
+    `docs/qc-studio.md`.
 - Inspect existing code first. Search for an existing component, domain rule,
   schema, or helper before creating a new one.
 
@@ -33,6 +35,11 @@ This is the repository's sole normative authority for agent behavior. See
   visual direction.
 - Implement only the acceptance criteria of the issue. Do not perform unrelated
   cleanup or scope expansion.
+- When a user supplies a QC Studio export targeting RuneSpace, read
+  `docs/qc-studio.md` before applying it. Treat the export as approved authoring
+  content, resolve it against the current authoritative repository state,
+  preserve native RuneSpace representation, and do not infer unrelated gameplay
+  changes.
 
 ## Architecture rules
 - Keep **server-authoritative rules outside React components**. Game logic,
