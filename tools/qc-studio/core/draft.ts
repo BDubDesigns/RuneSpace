@@ -49,11 +49,14 @@ export function createBlankDraft(adapter: DialogueAdapter, draftId: string): Dia
   const npc = adapter.npcs[0];
   const expression = npc?.expressions[0];
   const background = adapter.backgrounds[0];
+  const title = npc
+    ? `${npc.displayName} — ${background?.label ?? "New"} Dialogue`
+    : "New Dialogue";
   return {
     schemaVersion: QC_STUDIO_SCHEMA_VERSION,
     adapterId: adapter.adapterId,
     draftId,
-    title: npc ? `${npc.displayName} — Dialogue` : "New Dialogue",
+    title,
     ...(npc ? { npcId: npc.id } : { npcId: "" }),
     beats: [
       {

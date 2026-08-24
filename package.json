@@ -10,6 +10,7 @@
   "packageManager": "pnpm@9.15.4",
   "scripts": {
     "dev": "next dev",
+    "studio": "node scripts/run-studio.mjs",
     "build": "next build",
     "start": "next start",
     "lint": "next lint",

@@ -6,17 +6,27 @@ authoritative RuneSpace content, player functionality, or a publishing system.
 
 ## Run it
 
-QC Studio is available only in a non-production Next.js process when the
-explicit development flag is enabled:
+QC Studio is available only in a non-production Next.js process. The primary
+local launch command enables the development flag and uses the stable Studio
+port for you:
 
 ```bash
-QC_STUDIO_ENABLED=true pnpm dev
+pnpm studio
 ```
 
-Open [http://localhost:3000/qc-studio](http://localhost:3000/qc-studio). The
+Open [http://localhost:3301/qc-studio](http://localhost:3301/qc-studio). The
 route is not linked from player navigation. It returns not found when the flag
-is absent and remains unavailable in production even if an environment
-contains the flag.
+is absent and remains unavailable when `NODE_ENV=production`, even if an
+environment contains the flag. The normal Coolify PR preview is therefore not
+the QC Studio visual-review surface; product-owner Studio review is performed
+locally with `pnpm studio`. A PR preview may still verify that RuneSpace
+gameplay remains unaffected.
+
+For lower-level debugging, the equivalent command is:
+
+```bash
+QC_STUDIO_ENABLED=true pnpm dev -- --port 3301
+```
 
 Dedicated checks are separate from the expensive canonical gameplay browser
 suite:
@@ -39,12 +49,12 @@ editing; beat add, duplicate, delete, and keyboard-accessible up/down reorder;
 direct beat inspection and sequential preview; action-affordance preview;
 Undo/Redo; and Reset to Source.
 
-Drafts are stored in browser `localStorage` under a versioned V1 envelope. Text
-changes autosave after a short idle debounce and structural changes save
-immediately. The UI reports the save state. Session Undo/Redo is in memory, and
-the five newest durable complete snapshots can be inspected and restored.
-Unknown future schema versions are left untouched and fail safely to a fresh
-draft.
+Drafts are stored in browser `localStorage` under an adapter-scoped, versioned
+V1 envelope. Text changes autosave after a short idle debounce and structural
+changes save immediately. The UI reports the save state. Session Undo/Redo is
+in memory, and the five newest durable complete snapshots can be inspected and
+restored. Unknown future schema versions are left untouched and fail safely to
+a fresh draft; export is the safe way to preserve work made in that session.
 
 `Copy for RuneSpace` produces a structured export containing the adapter, source
 sequence identity or new-draft context, sequence metadata, action, and every

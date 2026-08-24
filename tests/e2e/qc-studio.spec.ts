@@ -33,6 +33,40 @@ test.describe("QC Studio development dialogue module", () => {
     await expect(page.getByText(/structured draft/)).toBeVisible();
   });
 
+  test("coalesces text edits into one undo and redo transaction", async ({ page }) => {
+    await page.goto("/qc-studio");
+    const text = page.getByLabel("Dialogue text");
+    const original = await text.inputValue();
+    const edited = `${original} Edited once.`;
+
+    await text.fill(edited);
+    await text.blur();
+    await page.getByRole("button", { name: "Undo" }).click();
+    await expect(text).toHaveValue(original);
+    await page.getByRole("button", { name: "Redo" }).click();
+    await expect(text).toHaveValue(edited);
+  });
+
+  test("preserves an unsupported future draft schema", async ({ page }) => {
+    const storageKey = "qc-studio:runespace:dialogue:v1";
+    const futureDraft = JSON.stringify({
+      schemaVersion: 99,
+      adapterId: "runespace",
+      sentinel: "do-not-overwrite",
+    });
+    await page.addInitScript(({ key, value }) => window.localStorage.setItem(key, value), {
+      key: storageKey,
+      value: futureDraft,
+    });
+
+    await page.goto("/qc-studio");
+    await expect(page.getByText(/newer saved draft format was found/i)).toBeVisible();
+    await page.waitForTimeout(1_100);
+    await expect
+      .poll(() => page.evaluate((key) => window.localStorage.getItem(key), storageKey))
+      .toBe(futureDraft);
+  });
+
   test("previews an action without invoking gameplay", async ({ page }) => {
     await page.goto("/qc-studio");
     await page.getByLabel("Load authoritative sequence").selectOption({

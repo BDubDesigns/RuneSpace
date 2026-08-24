@@ -16,8 +16,8 @@ import {
 } from "../../core/history";
 import {
   addDurableCheckpoint,
+  getDialogueStudioStorageKey,
   parsePersistedDialogueStudio,
-  QC_STUDIO_STORAGE_KEY,
   serializeDialogueStudio,
 } from "../../core/storage";
 import { validateDialogueDraft } from "../../core/validation";
@@ -87,10 +87,13 @@ export function DialogueStudio({
   const [exportText, setExportText] = useState<string>();
   const [copyMessage, setCopyMessage] = useState<string>();
   const historyRef = useRef(history);
+  const textHistoryBase = useRef<DialogueDraft | null>(null);
   const textHistoryTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const storageWriteBlocked = useRef(false);
   const changeKind = useRef<"text" | "structural" | "idle">("idle");
   const beatButtonRefs = useRef<Record<number, HTMLButtonElement | null>>({});
+  const storageKey = getDialogueStudioStorageKey(adapter.adapterId);
 
   const draft = history.present;
   const selectedBeat = draft.beats[selectedBeatIndex];
@@ -109,27 +112,34 @@ export function DialogueStudio({
 
   const writeState = useCallback(
     (nextDraft: DialogueDraft, nextCheckpoints: readonly DialogueCheckpoint[]) => {
+      if (storageWriteBlocked.current) {
+        setSaveState("unsaved");
+        return false;
+      }
       try {
         window.localStorage.setItem(
-          QC_STUDIO_STORAGE_KEY,
+          storageKey,
           serializeDialogueStudio(nextDraft, nextCheckpoints),
         );
         setSaveState("saved");
         const nextSavedAt = new Date().toISOString();
         setSavedAt(nextSavedAt);
         changeKind.current = "idle";
+        return true;
       } catch {
         setSaveState("unsaved");
         setStorageMessage("Local draft storage is unavailable; use Export to preserve this work.");
+        return false;
       }
     },
-    [],
+    [storageKey],
   );
 
   useEffect(() => {
+    storageWriteBlocked.current = false;
     let raw: string | null = null;
     try {
-      raw = window.localStorage.getItem(QC_STUDIO_STORAGE_KEY);
+      raw = window.localStorage.getItem(storageKey);
     } catch {
       setStorageMessage("Local draft storage is unavailable; use Export to preserve this work.");
     }
@@ -142,15 +152,22 @@ export function DialogueStudio({
       setSourceSelection(stored.state.draft.sourceSequenceId ?? "");
       setStorageMessage("Recovered the last local QC Studio draft.");
     } else if (stored.kind === "unsupported") {
-      setStorageMessage("A newer saved draft format was found; it was left untouched.");
+      storageWriteBlocked.current = true;
+      setStorageMessage(
+        "A newer saved draft format was found; it was left untouched. Export new work to preserve it.",
+      );
     } else if (stored.kind === "invalid") {
       setStorageMessage("The saved draft could not be read safely; a fresh draft is ready.");
     }
     setHydrated(true);
-  }, [adapter.adapterId]);
+  }, [adapter.adapterId, storageKey]);
 
   useEffect(() => {
     if (!hydrated) return;
+    if (storageWriteBlocked.current) {
+      setSaveState("unsaved");
+      return;
+    }
     if (saveTimer.current) clearTimeout(saveTimer.current);
     setSaveState("saving");
     const delay = changeKind.current === "structural" ? 0 : 900;
@@ -209,7 +226,13 @@ export function DialogueStudio({
     }
     if (changeKind.current !== "text") return historyRef.current;
     const current = historyRef.current;
-    const next = pushSnapshot(current, cloneDraft(current.present));
+    const baseline = textHistoryBase.current;
+    if (!baseline) return current;
+    const next = pushSnapshot(
+      { past: current.past, present: baseline, future: [] },
+      cloneDraft(current.present),
+    );
+    textHistoryBase.current = null;
     historyRef.current = next;
     setHistory(next);
     changeKind.current = "structural";
@@ -218,6 +241,9 @@ export function DialogueStudio({
 
   function updateTextDraft(mutator: (draft: DialogueDraft) => DialogueDraft) {
     const current = historyRef.current;
+    if (changeKind.current !== "text") {
+      textHistoryBase.current = cloneDraft(current.present);
+    }
     const next: SnapshotHistory<DialogueDraft> = {
       past: current.past,
       present: mutator(cloneDraft(current.present)),
@@ -241,6 +267,7 @@ export function DialogueStudio({
 
   function replaceDraft(nextDraft: DialogueDraft) {
     if (textHistoryTimer.current) clearTimeout(textHistoryTimer.current);
+    textHistoryBase.current = null;
     const next = createSnapshotHistory(cloneDraft(nextDraft));
     historyRef.current = next;
     setHistory(next);
@@ -261,7 +288,7 @@ export function DialogueStudio({
       createClientId("checkpoint"),
     );
     setCheckpoints(nextCheckpoints);
-    writeState(currentHistory.present, nextCheckpoints);
+    return writeState(currentHistory.present, nextCheckpoints);
   }
 
   function loadSelectedSource() {
@@ -278,8 +305,12 @@ export function DialogueStudio({
   }
 
   function saveCheckpoint() {
-    checkpointCurrent("Manual Save");
-    setCopyMessage("Saved a durable checkpoint locally.");
+    const saved = checkpointCurrent("Manual Save");
+    setCopyMessage(
+      saved
+        ? "Saved a durable checkpoint locally."
+        : "The checkpoint is available for this session only; the saved draft format was left untouched.",
+    );
   }
 
   function resetToSource() {
@@ -477,7 +508,7 @@ export function DialogueStudio({
               ? "Action previewed"
               : draft.action === "accept_mission"
                 ? "Accept mission"
-                : "Claim Cutter"}
+                : "Complete mission"}
           </ActionButton>
         ) : (
           <ActionButton data-dialogue-next intent="primary" onClick={previewNext}>

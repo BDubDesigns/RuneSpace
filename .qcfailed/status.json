@@ -2,13 +2,13 @@
   "schemaVersion": 1,
   "projectSlug": "runespace",
   "workState": "active",
-  "currentFocus": "Review the first QC Studio Dialogue module against authored Walk It Off sequences.",
+  "currentFocus": "Review the first QC Studio Dialogue module locally against authored Walk It Off sequences.",
   "latestCompleted": {
     "summary": "Added the Walk It Off NPC mission, dialogue presentation, and Cutter reward flow.",
     "date": "2026-08-24",
     "url": "https://github.com/BDubDesigns/RuneSpace/pull/103"
   },
-  "nextStep": "Product-owner preview of QC Studio with Walk It Off dialogue before merge.",
+  "nextStep": "Product-owner local review of QC Studio with Walk It Off dialogue before merge.",
   "lastMeaningfulUpdate": "2026-08-24",
   "highlights": [
     {
@@ -28,7 +28,7 @@
     }
   ],
   "currentChange": {
-    "summary": "Review QC Studio visual Dialogue authoring against Walk It Off content (#105).",
+    "summary": "Review QC Studio Dialogue authoring locally against Walk It Off content (#105).",
     "stage": "review",
     "pullRequestNumber": 105
   }

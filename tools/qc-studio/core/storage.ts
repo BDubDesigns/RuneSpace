@@ -8,8 +8,11 @@ import {
   type StudioDialoguePresentationMode,
 } from "./types";
 
-export const QC_STUDIO_STORAGE_KEY = "runespace.qc-studio.dialogue.v1";
 export const MAX_DURABLE_CHECKPOINTS = 5;
+
+export function getDialogueStudioStorageKey(adapterId: string): string {
+  return `qc-studio:${adapterId}:dialogue:v1`;
+}
 
 export type PersistedLoadResult =
   | { kind: "empty" }

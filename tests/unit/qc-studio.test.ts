@@ -8,10 +8,12 @@ import {
 } from "@/tools/qc-studio/core/history";
 import {
   addDurableCheckpoint,
+  getDialogueStudioStorageKey,
   parsePersistedDialogueStudio,
   serializeDialogueStudio,
 } from "@/tools/qc-studio/core/storage";
 import { validateDialogueDraft } from "@/tools/qc-studio/core/validation";
+import { createBlankDraft } from "@/tools/qc-studio/core/draft";
 import type {
   DialogueAdapter,
   DialogueCheckpoint,
@@ -108,6 +110,14 @@ describe("QC Studio core", () => {
         adapter.adapterId,
       ),
     ).toEqual({ kind: "unsupported" });
+  });
+
+  it("scopes the dialogue storage key to the adapter", () => {
+    expect(getDialogueStudioStorageKey(adapter.adapterId)).toBe("qc-studio:test-game:dialogue:v1");
+  });
+
+  it("names blank drafts from the default speaker and background context", () => {
+    expect(createBlankDraft(adapter, "blank-1").title).toBe("One — One Dialogue");
   });
 
   it("round-trips a versioned draft and its complete checkpoints", () => {
