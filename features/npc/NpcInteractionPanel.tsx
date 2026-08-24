@@ -141,7 +141,6 @@ export function NpcInteractionPanel() {
         <DialoguePlayer
           actionBusy={pending}
           actionMessage={message}
-          npc={dialogueNpc}
           onAction={dialogue.action ? runDialogueAction : undefined}
           onClose={closeDialogue}
           sequence={dialogue}

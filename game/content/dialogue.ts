@@ -224,6 +224,9 @@ const dialogue = {
   },
 } as const satisfies Record<DialogueId, DialogueSequence>;
 
+/** Ordered authoritative dialogue catalog consumed by the RuneSpace adapter. */
+export const DIALOGUE_SEQUENCES = Object.values(dialogue);
+
 export function getDialogue(dialogueId: string): DialogueSequence | undefined {
   return dialogue[dialogueId as DialogueId];
 }
