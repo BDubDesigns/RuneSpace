@@ -158,9 +158,9 @@ export function DialoguePlayer({
             <>
               <div
                 aria-hidden="true"
-                className="rs-dialogue-scene__comms-overlay pointer-events-none absolute inset-0 z-10"
+                className="rs-dialogue-scene__comms-overlay pointer-events-none absolute inset-0 z-30"
               />
-              <p className="rs-dialogue-scene__plate rs-dialogue-scene__comms-label rs-map-plate right-3 top-3 px-2 py-1 font-display text-xs uppercase tracking-[0.14em]">
+              <p className="rs-dialogue-scene__plate rs-dialogue-scene__comms-label rs-map-plate bottom-3 left-1/2 -translate-x-1/2 whitespace-nowrap px-2 py-1 font-display text-xs uppercase tracking-[0.14em]">
                 COMMS LINK
               </p>
             </>

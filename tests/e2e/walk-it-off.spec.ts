@@ -74,6 +74,10 @@ test("walks from Wade to Tansy, presents approved dialogue, and claims one carri
 
   await expect(page.getByRole("button", { name: "Inventory 0/8" })).toBeVisible();
   await expect(page.getByRole("button", { name: /Talk to Wade Rusk/ })).toBeVisible();
+  await expect(page.getByRole("button", { name: /Talk to Wade Rusk/ })).toHaveAttribute(
+    "data-npc-turn-in",
+    "false",
+  );
   await page.getByRole("button", { name: /Talk to Wade Rusk/ }).click();
   const dialogue = page.getByRole("dialog", { name: "Wade Rusk dialogue" });
   await expect(dialogue).toBeVisible();
@@ -123,6 +127,10 @@ test("walks from Wade to Tansy, presents approved dialogue, and claims one carri
   await expect(
     missionObjective.locator('xpath=following-sibling::*[1][@data-npc-interaction="true"]'),
   ).toHaveCount(1);
+  await expect(page.getByRole("button", { name: /Talk to Tansy Rusk/ })).toHaveAttribute(
+    "data-npc-turn-in",
+    "true",
+  );
   await page.emulateMedia({ reducedMotion: "reduce" });
   await page.getByRole("button", { name: /Talk to Tansy Rusk/ }).click();
   const tansyDialogue = page.getByRole("dialog", { name: "Tansy Rusk dialogue" });

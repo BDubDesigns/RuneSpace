@@ -30,6 +30,8 @@ export function NpcInteractionPanel() {
   if (!npc || !sequence || !dialogueNpc) return null;
   const dialogue = sequence;
   const stationary = !state.activeAction && !state.travelState;
+  const turnInAvailable =
+    stationary && mission?.state === "ready_for_completion" && mission.completionNpcId === npc.id;
 
   function openDialogue() {
     setMessage(undefined);
@@ -119,9 +121,10 @@ export function NpcInteractionPanel() {
             <p className="mt-1 text-sm text-[color:var(--rs-text-secondary)]">{npc.role}</p>
           </div>
           <ActionButton
+            data-npc-turn-in={turnInAvailable ? "true" : "false"}
             ref={triggerRef}
             disabled={foregroundBusy}
-            intent="secondary"
+            intent={turnInAvailable ? "mission" : "secondary"}
             onClick={openDialogue}
           >
             Talk to {npc.displayName}

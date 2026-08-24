@@ -1,4 +1,11 @@
-export type Intent = "primary" | "secondary" | "success" | "mining" | "arcane" | "danger";
+export type Intent =
+  | "primary"
+  | "secondary"
+  | "success"
+  | "mining"
+  | "arcane"
+  | "danger"
+  | "mission";
 
 export const intentClassNames: Record<Intent, string> = {
   primary:
@@ -13,4 +20,6 @@ export const intentClassNames: Record<Intent, string> = {
     "border-[color:var(--rs-accent-arcane)] bg-[color:var(--rs-accent-arcane-subtle)] text-[color:var(--rs-accent-arcane)] hover:bg-[color:var(--rs-accent-arcane-hover)]",
   danger:
     "border-[color:var(--rs-accent-danger)] bg-[color:var(--rs-accent-danger-subtle)] text-[color:var(--rs-accent-danger)] hover:bg-[color:var(--rs-accent-danger-hover)]",
+  mission:
+    "border-[color:var(--rs-mission-border)] bg-[color:var(--rs-mission-surface-subtle)] text-[color:var(--rs-mission-accent-strong)] hover:bg-[color:var(--rs-mission-surface)]",
 };
