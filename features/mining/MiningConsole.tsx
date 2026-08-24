@@ -29,6 +29,8 @@ import { RefiningConsole } from "@/features/refining/RefiningConsole";
 import { PowerAnnexClaimPanel } from "@/features/power-annex/PowerAnnexClaimPanel";
 import { LocationSceneHeader } from "@/features/location-scene/LocationSceneHeader";
 import { CargoHoldPanel } from "@/features/cargo/CargoHoldPanel";
+import { MissionObjectivePanel } from "@/features/missions/MissionObjectivePanel";
+import { NpcInteractionPanel } from "@/features/npc/NpcInteractionPanel";
 
 const RESULT_FEEDBACK_DURATION_MS = 3_600;
 
@@ -413,7 +415,9 @@ export function MiningConsole({ characterName }: { characterName: string }) {
               )}
             </>
           ) : currentLocationId === LOCATION_IDS.crashSite ? (
-            <CargoHoldPanel />
+            <div className="mt-4">
+              <CargoHoldPanel />
+            </div>
           ) : atTheLongScramble ? (
             <div className="mt-4">
               <p className="max-w-2xl text-sm leading-relaxed text-[color:var(--rs-text-secondary)]">
@@ -470,6 +474,8 @@ export function MiningConsole({ characterName }: { characterName: string }) {
           ) : null}
         </div>
       </Panel>
+      <MissionObjectivePanel state={state} />
+      {!inTransit ? <NpcInteractionPanel /> : null}
       <ScavengeRevealOverlay />
       <LocalMapPanel />
       <PowerAnnexClaimPanel />

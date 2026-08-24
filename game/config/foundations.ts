@@ -24,6 +24,39 @@ const itemIds = {
   mykeaSchleppraum8: asContentId("mykea_schleppraum_8"),
 } as const satisfies Record<string, ContentId>;
 
+const npcIds = {
+  wadeRusk: asContentId("wade_rusk"),
+  tansyRusk: asContentId("tansy_rusk"),
+} as const satisfies Record<string, ContentId>;
+
+const missionIds = {
+  walkItOff: asContentId("walk_it_off"),
+} as const satisfies Record<string, ContentId>;
+
+const dialogueIds = {
+  wadeOffer: asContentId("wade_rusk_walk_it_off_offer"),
+  wadeFollowUp: asContentId("wade_rusk_walk_it_off_follow_up"),
+  tansyBeforeMission: asContentId("tansy_rusk_walk_it_off_before_mission"),
+  tansyAfterRemoteAcceptance: asContentId("tansy_rusk_walk_it_off_after_remote_acceptance"),
+  tansyCompletion: asContentId("tansy_rusk_walk_it_off_completion"),
+  tansyAfterClaim: asContentId("tansy_rusk_walk_it_off_after_claim"),
+  tansyCapacitySlots: asContentId("tansy_rusk_walk_it_off_capacity_slots"),
+  tansyCapacityMass: asContentId("tansy_rusk_walk_it_off_capacity_mass"),
+  tansyAfterCompletion: asContentId("tansy_rusk_walk_it_off_after_completion"),
+} as const satisfies Record<string, ContentId>;
+
+const expressionIds = {
+  neutral: asContentId("neutral"),
+  smile: asContentId("smile"),
+  concerned: asContentId("concerned"),
+  scowl: asContentId("scowl"),
+} as const satisfies Record<string, ContentId>;
+
+const conversationBackgroundIds = {
+  crashSiteExterior: asContentId("crash_site_exterior"),
+  theJagExterior: asContentId("the_jag_exterior"),
+} as const satisfies Record<string, ContentId>;
+
 export const ACTION_IDS = {
   ferriteShaleMining: asContentId("ferrite_shale_mining"),
   refining: asContentId("processing_yard_refining"),
@@ -74,10 +107,21 @@ const portraitIds = {
 
 export const SKILL_IDS = skillIds;
 export const ITEM_IDS = itemIds;
+export const NPC_IDS = npcIds;
+export const MISSION_IDS = missionIds;
+export const DIALOGUE_IDS = dialogueIds;
+export const EXPRESSION_IDS = expressionIds;
+export const CONVERSATION_BACKGROUND_IDS = conversationBackgroundIds;
 export const PORTRAIT_IDS = portraitIds;
 
 export type SkillId = (typeof SKILL_IDS)[keyof typeof SKILL_IDS];
 export type ItemId = (typeof ITEM_IDS)[keyof typeof ITEM_IDS];
+export type NpcId = (typeof NPC_IDS)[keyof typeof NPC_IDS];
+export type MissionId = (typeof MISSION_IDS)[keyof typeof MISSION_IDS];
+export type DialogueId = (typeof DIALOGUE_IDS)[keyof typeof DIALOGUE_IDS];
+export type ExpressionId = (typeof EXPRESSION_IDS)[keyof typeof EXPRESSION_IDS];
+export type ConversationBackgroundId =
+  (typeof CONVERSATION_BACKGROUND_IDS)[keyof typeof CONVERSATION_BACKGROUND_IDS];
 export type LocationId = (typeof LOCATION_IDS)[keyof typeof LOCATION_IDS];
 export type ActionId = (typeof ACTION_IDS)[keyof typeof ACTION_IDS];
 export type PortraitId = (typeof PORTRAIT_IDS)[keyof typeof PORTRAIT_IDS];

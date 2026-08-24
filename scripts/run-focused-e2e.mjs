@@ -49,6 +49,7 @@ export const FOCUSED_PHASES = [
   "character-portraits",
   "cargo-hold",
   "inventory-equip",
+  "walk-it-off",
 ];
 // Local E2E build-and-runtime placeholder only: the production build and
 // `next start` both run as production, so server/env.ts requires a

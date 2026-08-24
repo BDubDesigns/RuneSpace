@@ -96,6 +96,8 @@ import {
   type WeldingSnapshot,
 } from "@/server/welding";
 import { grantCharacterSkillXp } from "@/server/progression";
+import { loadMissionProjections } from "@/server/mission-state";
+import type { MissionProjection } from "@/game/domain/missions";
 
 const systemRandom: MiningRandom = {
   nextBasisPoints: () => randomInt(10_000),
@@ -266,6 +268,7 @@ export type ActivityStop =
 
 export type MiningGameplayState = {
   characterId: string;
+  missions: readonly MissionProjection[];
   activeAction?: {
     actionId: string;
     resolvedThroughAt: string;
@@ -439,43 +442,11 @@ export async function ensureStarterMiningState(
     .from(equippedItems)
     .where(eq(equippedItems.characterId, characterId))
     .for("update");
+  // Issue #102 changes only the new-character starter rule: the first Cutter
+  // is now the authoritative Walk It Off reward. Existing item instances are
+  // never deleted or unequipped here; beta-character cleanup remains an
+  // external operator task.
   const equippedIds = new Set(assignments.map((assignment) => assignment.itemInstanceId));
-  const hasCutter = assignments.some(
-    (assignment) =>
-      assignment.assignmentKind === "gear" &&
-      carriedInstances.some(
-        (instance) =>
-          instance.id === assignment.itemInstanceId &&
-          isCompatibleEquipmentAssignment(instance.itemId, assignment, balance),
-      ),
-  );
-  if (
-    !hasCutter &&
-    !assignments.some(
-      (assignment) =>
-        assignment.assignmentKind === "gear" &&
-        assignment.suitSlotId === balance.items.salvageCutter.suitSlotId,
-    )
-  ) {
-    let cutter = carriedInstances.find(
-      (instance) =>
-        instance.itemId === balance.items.salvageCutter.itemId && !equippedIds.has(instance.id),
-    );
-    if (!cutter) {
-      cutter = (
-        await transaction
-          .insert(itemInstances)
-          .values({ characterId, itemId: balance.items.salvageCutter.itemId, currentCharge: 0 })
-          .returning()
-      )[0]!;
-    }
-    await transaction.insert(equippedItems).values({
-      characterId,
-      assignmentKind: "gear",
-      suitSlotId: balance.items.salvageCutter.suitSlotId,
-      itemInstanceId: cutter.id,
-    });
-  }
   const hasContainer = assignments.some((assignment) =>
     carriedInstances.some(
       (instance) =>
@@ -949,6 +920,10 @@ export async function stateFromTransaction(
           : undefined,
     }));
   const currentLocationId = character[0]?.currentLocationId ?? LOCATION_IDS.crashSite;
+  const missions = await loadMissionProjections(transaction, characterId, {
+    currentLocationId,
+    activeActionId: action?.actionId,
+  });
   const travelState =
     travel && action?.actionId === ACTION_IDS.travel
       ? {
@@ -1004,6 +979,7 @@ export async function stateFromTransaction(
     .reduce((total, stack) => total + stack.quantity, 0);
   return {
     characterId,
+    missions,
     location: { currentLocationId },
     scavengeReveals,
     travelState,

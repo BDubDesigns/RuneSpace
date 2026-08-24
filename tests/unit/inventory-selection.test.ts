@@ -28,6 +28,7 @@ function inventoryState(
 function baseState(inventory: MiningGameplayState["inventory"]): MiningGameplayState {
   return {
     characterId: "character-1",
+    missions: [],
     location: { currentLocationId: "crash_site" },
     mining: { totalXp: 0, level: 1, xpIntoLevel: 0 },
     refining: { totalXp: 0, level: 1, xpIntoLevel: 0 },

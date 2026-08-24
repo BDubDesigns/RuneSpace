@@ -35,6 +35,12 @@ import { EquipmentRuleError } from "@/game/domain/equipment";
 import { TravelRuleError } from "@/server/travel";
 import { claimPowerCells, type PowerAnnexClaimResult } from "@/server/power-annex";
 import {
+  acceptWalkItOff,
+  completeWalkItOff,
+  type MissionAcceptanceResult,
+  type MissionCompletionResult,
+} from "@/server/missions";
+import {
   EquipEquipmentRequestSchema,
   UnequipEquipmentRequestSchema,
   BeginTravelRequestSchema,
@@ -49,6 +55,8 @@ import {
   DepositCargoUniqueItemRequestSchema,
   WithdrawCargoUniqueItemRequestSchema,
   ChangeCharacterPortraitRequestSchema,
+  AcceptWalkItOffRequestSchema,
+  CompleteWalkItOffRequestSchema,
 } from "@/game/schemas/gameplay";
 
 /**
@@ -125,6 +133,35 @@ async function runMiningAction(
 
 export async function refreshMiningAction(characterId: string): Promise<MiningActionResult> {
   return runMiningAction(characterId, getMiningGameplayState);
+}
+
+export type MissionActionResult =
+  | MissionAcceptanceResult
+  | MissionCompletionResult
+  | { error: string };
+
+export async function acceptWalkItOffAction(input: unknown): Promise<MissionActionResult> {
+  const request = AcceptWalkItOffRequestSchema.safeParse(input);
+  if (!request.success) return { error: "Invalid Walk It Off acceptance command." };
+  try {
+    const user = await requireCurrentUser(await headers());
+    return await acceptWalkItOff(user.id, request.data.characterId);
+  } catch (error) {
+    if (error instanceof OwnershipError) return { error: error.message };
+    throw error;
+  }
+}
+
+export async function completeWalkItOffAction(input: unknown): Promise<MissionActionResult> {
+  const request = CompleteWalkItOffRequestSchema.safeParse(input);
+  if (!request.success) return { error: "Invalid Walk It Off completion command." };
+  try {
+    const user = await requireCurrentUser(await headers());
+    return await completeWalkItOff(user.id, request.data.characterId);
+  } catch (error) {
+    if (error instanceof OwnershipError) return { error: error.message };
+    throw error;
+  }
 }
 
 export async function startMiningAction(characterId: string): Promise<MiningActionResult> {

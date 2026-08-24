@@ -20,6 +20,7 @@ import {
 } from "@/db/rune-space";
 import { ACTION_IDS, ITEM_IDS, LOCATION_IDS } from "@/game/config/foundations";
 import { POWER_CELL_DAILY_ALLOTMENT } from "@/game/domain/power-annex";
+import { seedLegacyStarterCutter } from "./legacy-starter";
 import { expectElementsInsideHexes } from "./map-geometry";
 import { miningStorageStatePath } from "./mining.setup";
 
@@ -525,6 +526,8 @@ test("the full journey walks, arrives, and returns between the original location
     "aria-current",
     "true",
   );
+  await seedLegacyStarterCutter(characterId);
+  await page.reload();
   await page.getByRole("button", { name: "Start Mining" }).click();
   await expect(page.getByRole("button", { name: "Stop Mining" })).toBeVisible();
   const twoAttemptsAgo = new Date(Date.now() - 12_100);
