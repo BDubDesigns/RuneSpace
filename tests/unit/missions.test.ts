@@ -41,20 +41,20 @@ describe("issue #102 authored NPC and mission boundaries", () => {
     expect(explorer?.beats).toHaveLength(16);
     expect(offer?.beats[0]).toMatchObject({
       speakerNpcId: NPC_IDS.wadeRusk,
-      expressionId: "neutral",
+      expressionId: "concerned",
       backgroundId: CONVERSATION_BACKGROUND_IDS.crashSiteExterior,
       presentationMode: "local",
-      text: "Huh.",
+      text: "*Startled* Ahh!",
     });
     expect(resolveDialogueSpeaker(offer!.beats[0]!)).toMatchObject({
       npc: { id: NPC_IDS.wadeRusk },
-      expressionAsset: "/npc-art/wade-neutral.png",
+      expressionAsset: "/npc-art/wade-concerned.png",
     });
     expect(explorer?.beats[4]).toMatchObject({
       speakerNpcId: NPC_IDS.wadeRusk,
       backgroundId: CONVERSATION_BACKGROUND_IDS.crashSiteExterior,
       presentationMode: "comms",
-      text: "What now.",
+      text: "What now? You know I'm busy, Tansy.",
     });
     expect(getDialogue(DIALOGUE_IDS.tansyAfterRemoteAcceptance)?.action).toBe("complete_mission");
     expect(getDialogue(DIALOGUE_IDS.tansyAfterClaim)?.beats).toHaveLength(2);
