@@ -177,7 +177,7 @@ const dialogue = {
       tansyLocal(EXPRESSION_IDS.neutral, "I threw it together from parts I had lying around."),
       tansyLocal(
         EXPRESSION_IDS.smile,
-        "Nothing matches, it's not very fast, and half of it probably violates a regulation Wade already hates, but it'll cut shale. ",
+        "Nothing matches, it's not very fast, and half of it probably violates a regulation Wade already hates, but it'll cut shale.",
       ),
       tansyLocal(
         EXPRESSION_IDS.neutral,
@@ -230,7 +230,7 @@ const dialogue = {
     npcId: NPC_IDS.tansyRusk,
     beats: [
       tansyLocal(EXPRESSION_IDS.concerned, "Still have all your fingers?"),
-      tansyLocal(EXPRESSION_IDS.smile, "Good! We'll make a miner out of yet!"),
+      tansyLocal(EXPRESSION_IDS.smile, "Good! We'll make a miner out of you yet!"),
       tansyLocal(EXPRESSION_IDS.smile, "Come back once something interesting has happened."),
     ],
   },
