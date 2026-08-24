@@ -24,7 +24,7 @@ export const NPCS = [
   {
     id: NPC_IDS.wadeRusk,
     displayName: "Wade Rusk",
-    role: "Local recovery & salvage operator",
+    role: "Holo Hollow recovery & salvage operator",
     homeLocationId: LOCATION_IDS.crashSite,
     conversationBackgroundId: CONVERSATION_BACKGROUND_IDS.crashSiteExterior,
     expressionAssets: {

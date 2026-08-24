@@ -77,6 +77,11 @@ test("walks from Wade to Tansy, presents approved dialogue, and claims one carri
   await page.getByRole("button", { name: /Talk to Wade Rusk/ }).click();
   const dialogue = page.getByRole("dialog", { name: "Wade Rusk dialogue" });
   await expect(dialogue).toBeVisible();
+  await expect(dialogue.locator("[data-dialogue-scene-location]")).toHaveText("CRASH SITE");
+  await expect(dialogue.locator("[data-dialogue-speaker-name]")).toHaveText("Wade Rusk");
+  await expect(dialogue.locator("[data-dialogue-speaker-role]")).toHaveText(
+    "Holo Hollow recovery & salvage operator",
+  );
   await expect(dialogue.locator('img[alt*="Fractured dark hull"]')).toBeVisible();
   await expect(dialogue.locator('img[alt*="Wade Rusk"]')).toBeVisible();
   await expect(dialogue.getByRole("button", { name: "Restart dialogue" })).toBeVisible();
@@ -133,7 +138,8 @@ test("walks from Wade to Tansy, presents approved dialogue, and claims one carri
   await expect(tansyDialogue.locator('[data-dialogue-text] [aria-hidden="true"]')).toContainText(
     "For now, learn how to use the Cutter",
   );
-  await tansyDialogue.getByRole("button", { name: "Next" }).click();
+  await expect(tansyDialogue.getByRole("button", { name: "Finish" })).toBeVisible();
+  await tansyDialogue.getByRole("button", { name: "Finish" }).click();
   await expect(tansyDialogue).toBeHidden();
   await expect(page.getByRole("button", { name: "Inventory 1/8" })).toBeVisible();
   await expect(page.locator("[data-mission-objective]")).toContainText("Completed");
@@ -187,14 +193,24 @@ test("supports the explorer-first Jag conversation and remote mission acceptance
   await expect(page.getByRole("button", { name: /Talk to Tansy Rusk/ })).toBeVisible();
   await page.emulateMedia({ reducedMotion: "reduce" });
   await page.getByRole("button", { name: /Talk to Tansy Rusk/ }).click();
-  const dialogue = page.getByRole("dialog", { name: "Tansy Rusk dialogue" });
+  const dialogue = page.getByRole("dialog");
   await expect(dialogue.locator('img[alt*="Tansy Rusk"]')).toBeVisible();
   await expect(dialogue.locator('img[alt*="Exposed jagged Ferrite Shale"]')).toBeVisible();
+  await expect(dialogue.locator("[data-dialogue-scene-location]")).toHaveText("THE JAG");
+  await expect(dialogue.locator("[data-dialogue-speaker-name]")).toHaveText("Tansy Rusk");
+  await expect(dialogue.locator("[data-dialogue-speaker-role]")).toHaveText(
+    "Field mechanic & miner",
+  );
 
   for (let index = 0; index < 4; index += 1) {
     await dialogue.getByRole("button", { name: "Next" }).click();
   }
   await expect(dialogue.getByText("COMMS LINK", { exact: true })).toBeVisible();
+  await expect(dialogue.locator("[data-dialogue-scene-location]")).toHaveText("CRASH SITE");
+  await expect(dialogue.locator("[data-dialogue-speaker-name]")).toHaveText("Wade Rusk");
+  await expect(dialogue.locator("[data-dialogue-speaker-role]")).toHaveText(
+    "Holo Hollow recovery & salvage operator",
+  );
   await expect(dialogue.locator('img[alt*="Wade Rusk, scowl"]')).toBeVisible();
 
   for (let index = 4; index < 15; index += 1) {
@@ -214,7 +230,8 @@ test("supports the explorer-first Jag conversation and remote mission acceptance
     "When you get that ship flying again",
   );
   await dialogue.getByRole("button", { name: "Next" }).click();
-  await dialogue.getByRole("button", { name: "Next" }).click();
+  await expect(dialogue.getByRole("button", { name: "Finish" })).toBeVisible();
+  await dialogue.getByRole("button", { name: "Finish" }).click();
   await expect(dialogue).toBeHidden();
   await expect(page.locator("[data-mission-objective]")).toContainText("Completed");
 });
