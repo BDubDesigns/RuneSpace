@@ -136,7 +136,7 @@ async function main(argv) {
   }
 
   const baseDatabaseUrl = resolveDatabaseUrl();
-  const isE2E = argv.includes("test:e2e:raw");
+  const isE2E = argv.includes("test:e2e:raw") || argv.includes("test:e2e:studio:raw");
   let e2ePort;
   if (isE2E) {
     e2ePort = Number(process.env.PLAYWRIGHT_PORT || 3_400 + (process.pid % 1_000));
