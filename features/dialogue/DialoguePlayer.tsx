@@ -4,7 +4,8 @@ import { useEffect, useRef, useState, type RefObject } from "react";
 import { ActionButton } from "@/components/ui/ActionButton";
 import { Drawer } from "@/components/ui/Drawer";
 import type { DialogueSequence } from "@/game/content/dialogue";
-import { resolveDialogueSpeaker } from "@/game/content/dialogue";
+import { getNpc } from "@/game/content/npcs";
+import { resolveDialogueItem, resolveDialogueSpeaker } from "@/game/content/dialogue";
 import { DialogueScene } from "./DialogueScene";
 
 const CHARACTER_REVEAL_MS = 20;
@@ -72,7 +73,14 @@ export function DialoguePlayer({
 
   if (!beat) return null;
   const resolvedSpeaker = resolveDialogueSpeaker(beat);
-  if (!resolvedSpeaker) return null;
+  const resolvedItem = resolveDialogueItem(beat);
+  if (!resolvedSpeaker && !resolvedItem) return null;
+
+  // The drawer keeps the conversation's stable identity even when the current
+  // beat presents an item; the scene panel (not the drawer title) announces
+  // the reveal so the beat is never announced as an NPC speaking.
+  const drawerNpc = getNpc(sequence.npcId);
+  const drawerLabel = drawerNpc?.displayName ?? "Dialogue";
 
   const currentBeatTextLength = beatCharacters.length;
   const isComplete = reducedMotion || revealedChars >= currentBeatTextLength;
@@ -113,8 +121,8 @@ export function DialoguePlayer({
 
   return (
     <Drawer
-      label={`${resolvedSpeaker.npc.displayName} dialogue`}
-      title={resolvedSpeaker.npc.displayName}
+      label={`${drawerLabel} dialogue`}
+      title={drawerLabel}
       eyebrow="Story dialogue"
       onClose={onClose}
       triggerRef={triggerRef}

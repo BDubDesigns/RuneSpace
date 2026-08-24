@@ -1,16 +1,23 @@
 import { cloneDraft } from "./draft";
 import {
+  QC_STUDIO_MIGRATABLE_SCHEMA_VERSION,
   QC_STUDIO_SCHEMA_VERSION,
   type DialogueCheckpoint,
   type DialogueDraft,
   type PersistedDialogueStudio,
   type StudioDialogueAction,
+  type StudioDialogueBeat,
   type StudioDialoguePresentationMode,
 } from "./types";
 
 export const MAX_DURABLE_CHECKPOINTS = 5;
 
 export function getDialogueStudioStorageKey(adapterId: string): string {
+  return `qc-studio:${adapterId}:dialogue:v2`;
+}
+
+/** Legacy key from schema v1; checked so old drafts migrate instead of stranding. */
+export function getLegacyDialogueStudioStorageKey(adapterId: string): string {
   return `qc-studio:${adapterId}:dialogue:v1`;
 }
 
@@ -18,6 +25,7 @@ export type PersistedLoadResult =
   | { kind: "empty" }
   | { kind: "invalid" }
   | { kind: "unsupported" }
+  | { kind: "migrated"; state: PersistedDialogueStudio }
   | { kind: "loaded"; state: PersistedDialogueStudio };
 
 function isPresentationMode(value: unknown): value is StudioDialoguePresentationMode {
@@ -28,16 +36,43 @@ function isAction(value: unknown): value is StudioDialogueAction {
   return value === "accept_mission" || value === "complete_mission";
 }
 
-function isBeat(value: unknown): value is DialogueDraft["beats"][number] {
+function isItemBeat(beat: Record<string, unknown>): boolean {
+  return (
+    typeof beat.itemId === "string" &&
+    typeof beat.quantity === "number" &&
+    Number.isInteger(beat.quantity) &&
+    beat.quantity >= 1
+  );
+}
+
+/**
+ * Accepts either subject kind. NPC fields are required for npc beats only, so a
+ * stored item beat never needs fake speaker data. Structural validation of the
+ * item catalog/quantity range happens against the live adapter at load time.
+ */
+function isBeat(value: unknown): value is StudioDialogueBeat {
   if (!value || typeof value !== "object") return false;
   const beat = value as Record<string, unknown>;
-  return (
-    typeof beat.speakerNpcId === "string" &&
-    typeof beat.expressionId === "string" &&
-    typeof beat.backgroundId === "string" &&
-    isPresentationMode(beat.presentationMode) &&
-    typeof beat.text === "string"
-  );
+  if (typeof beat.backgroundId !== "string" || typeof beat.text !== "string") return false;
+  if (beat.kind === "npc") {
+    return (
+      typeof beat.speakerNpcId === "string" &&
+      typeof beat.expressionId === "string" &&
+      isPresentationMode(beat.presentationMode)
+    );
+  }
+  if (beat.kind === "item") {
+    return isItemBeat(beat);
+  }
+  // v1 beats had no kind discriminator; they were all NPC beats.
+  if (beat.kind === undefined) {
+    return (
+      typeof beat.speakerNpcId === "string" &&
+      typeof beat.expressionId === "string" &&
+      isPresentationMode(beat.presentationMode)
+    );
+  }
+  return false;
 }
 
 function isDraft(value: unknown, adapterId: string): value is DialogueDraft {
@@ -68,6 +103,55 @@ function isCheckpoint(value: unknown, adapterId: string): value is DialogueCheck
   );
 }
 
+/** Migrates a schema-v1 payload to the current version by tagging every beat as an NPC beat. */
+function migrateV1State(
+  state: Record<string, unknown>,
+  adapterId: string,
+): PersistedDialogueStudio | null {
+  let copied: Record<string, unknown>;
+  try {
+    copied = JSON.parse(JSON.stringify(state)) as Record<string, unknown>;
+  } catch {
+    return null;
+  }
+  const tagBeats = (draft: Record<string, unknown>) => {
+    if (Array.isArray(draft.beats)) {
+      draft.beats = (draft.beats as unknown[]).map((beat) => ({
+        ...(beat as Record<string, unknown>),
+        kind: "npc",
+      }));
+    }
+    draft.schemaVersion = QC_STUDIO_SCHEMA_VERSION;
+  };
+  const legacyDraft = copied.draft;
+  if (!legacyDraft || typeof legacyDraft !== "object") return null;
+  tagBeats(legacyDraft as Record<string, unknown>);
+  if (Array.isArray(copied.checkpoints)) {
+    for (const checkpoint of copied.checkpoints) {
+      if (!checkpoint || typeof checkpoint !== "object") continue;
+      const checkpointDraft = (checkpoint as Record<string, unknown>).draft;
+      if (checkpointDraft && typeof checkpointDraft === "object") {
+        tagBeats(checkpointDraft as Record<string, unknown>);
+      }
+    }
+  }
+  if (
+    !isDraft(copied.draft, adapterId) ||
+    !Array.isArray(copied.checkpoints) ||
+    !(copied.checkpoints as unknown[]).every((checkpoint) => isCheckpoint(checkpoint, adapterId))
+  ) {
+    return null;
+  }
+  return {
+    schemaVersion: QC_STUDIO_SCHEMA_VERSION,
+    adapterId,
+    draft: cloneDraft(copied.draft as DialogueDraft),
+    checkpoints: (copied.checkpoints as DialogueCheckpoint[])
+      .slice(-MAX_DURABLE_CHECKPOINTS)
+      .map((checkpoint) => ({ ...checkpoint, draft: cloneDraft(checkpoint.draft) })),
+  };
+}
+
 export function parsePersistedDialogueStudio(
   raw: string | null,
   adapterId: string,
@@ -81,9 +165,19 @@ export function parsePersistedDialogueStudio(
   }
   if (!value || typeof value !== "object") return { kind: "invalid" };
   const state = value as Record<string, unknown>;
-  if (state.schemaVersion !== QC_STUDIO_SCHEMA_VERSION) return { kind: "unsupported" };
   if (state.adapterId !== adapterId) return { kind: "invalid" };
-  if (!isDraft(state.draft, adapterId) || !Array.isArray(state.checkpoints)) {
+  if (
+    state.schemaVersion !== QC_STUDIO_SCHEMA_VERSION ||
+    !isDraft(state.draft, adapterId) ||
+    !Array.isArray(state.checkpoints)
+  ) {
+    if (state.schemaVersion === QC_STUDIO_MIGRATABLE_SCHEMA_VERSION) {
+      const migrated = migrateV1State(state, adapterId);
+      if (migrated) return { kind: "migrated", state: migrated };
+    }
+    if (state.schemaVersion !== QC_STUDIO_SCHEMA_VERSION) {
+      return { kind: "unsupported" };
+    }
     return { kind: "invalid" };
   }
   if (!state.checkpoints.every((checkpoint) => isCheckpoint(checkpoint, adapterId))) {

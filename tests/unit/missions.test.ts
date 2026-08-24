@@ -10,6 +10,7 @@ import { getConversationBackground } from "@/game/content/conversation-backgroun
 import { getDialogue, getWalkItOffDialogue, resolveDialogueSpeaker } from "@/game/content/dialogue";
 import { WALK_IT_OFF } from "@/game/content/missions";
 import { getNpcAtLocation } from "@/game/content/npcs";
+import { ITEM_IDS } from "@/game/config/foundations";
 import { deriveMissionState, projectMission } from "@/game/domain/missions";
 import { planUniqueItemAddition } from "@/game/domain/inventory";
 import { getLocation } from "@/game/content/locations";
@@ -57,7 +58,13 @@ describe("issue #102 authored NPC and mission boundaries", () => {
       text: "What now? You know I'm busy, Tansy.",
     });
     expect(getDialogue(DIALOGUE_IDS.tansyAfterRemoteAcceptance)?.action).toBe("complete_mission");
-    expect(getDialogue(DIALOGUE_IDS.tansyAfterClaim)?.beats).toHaveLength(2);
+    // Post-claim opens with the presentation-only Cutter item beat, then two Tansy beats.
+    expect(getDialogue(DIALOGUE_IDS.tansyAfterClaim)?.beats).toHaveLength(3);
+    expect(getDialogue(DIALOGUE_IDS.tansyAfterClaim)?.beats[0]).toMatchObject({
+      kind: "item",
+      itemId: ITEM_IDS.salvageCutter,
+      quantity: 1,
+    });
     expect(getDialogue(DIALOGUE_IDS.tansyCapacitySlots)?.beats).toHaveLength(3);
     expect(getDialogue(DIALOGUE_IDS.tansyCapacityMass)?.beats).toHaveLength(3);
     expect(getDialogue("unknown_dialogue")).toBeUndefined();

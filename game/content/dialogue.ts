@@ -2,25 +2,43 @@ import {
   CONVERSATION_BACKGROUND_IDS,
   DIALOGUE_IDS,
   EXPRESSION_IDS,
+  ITEM_IDS,
   MISSION_IDS,
   NPC_IDS,
   type ConversationBackgroundId,
   type DialogueId,
   type ExpressionId,
+  type ItemId,
   type NpcId,
 } from "@/game/config/foundations";
 import type { MissionState } from "@/game/domain/missions";
+import { getItemPresentation } from "./item-presentation";
 import { getNpc, resolveNpcExpression } from "./npcs";
 
 export type DialoguePresentationMode = "local" | "comms";
 
-export type DialogueBeat = {
-  speakerNpcId: NpcId;
-  expressionId: ExpressionId;
-  backgroundId: ConversationBackgroundId;
-  presentationMode: DialoguePresentationMode;
-  text: string;
-};
+/**
+ * A dialogue beat presents exactly one visual subject over a conversation
+ * background: an NPC portrait or an item reveal. Item beats are presentation
+ * only — they never grant, remove, or mutate inventory.
+ */
+export type DialogueBeat =
+  | {
+      kind: "npc";
+      speakerNpcId: NpcId;
+      expressionId: ExpressionId;
+      backgroundId: ConversationBackgroundId;
+      presentationMode: DialoguePresentationMode;
+      text: string;
+    }
+  | {
+      kind: "item";
+      itemId: ItemId;
+      /** Display quantity only; constrained by the item's authoritative definition. */
+      quantity: number;
+      backgroundId: ConversationBackgroundId;
+      text: string;
+    };
 
 export type DialogueSequence = {
   id: DialogueId;
@@ -34,6 +52,7 @@ const jag = CONVERSATION_BACKGROUND_IDS.theJagExterior;
 
 function wadeLocal(expressionId: ExpressionId, text: string): DialogueBeat {
   return {
+    kind: "npc",
     speakerNpcId: NPC_IDS.wadeRusk,
     expressionId,
     backgroundId: crash,
@@ -44,6 +63,7 @@ function wadeLocal(expressionId: ExpressionId, text: string): DialogueBeat {
 
 function wadeComms(expressionId: ExpressionId, text: string): DialogueBeat {
   return {
+    kind: "npc",
     speakerNpcId: NPC_IDS.wadeRusk,
     expressionId,
     backgroundId: crash,
@@ -54,12 +74,18 @@ function wadeComms(expressionId: ExpressionId, text: string): DialogueBeat {
 
 function tansyLocal(expressionId: ExpressionId, text: string): DialogueBeat {
   return {
+    kind: "npc",
     speakerNpcId: NPC_IDS.tansyRusk,
     expressionId,
     backgroundId: jag,
     presentationMode: "local",
     text,
   };
+}
+
+/** Item beats present an already-owned/already-granted item; they never mutate inventory. */
+function itemBeat(itemId: ItemId, quantity: number, text = ""): DialogueBeat {
+  return { kind: "item", itemId, quantity, backgroundId: jag, text };
 }
 
 const dialogue = {
@@ -191,6 +217,9 @@ const dialogue = {
     id: DIALOGUE_IDS.tansyAfterClaim,
     npcId: NPC_IDS.tansyRusk,
     beats: [
+      // Presentation only: the Cutter has already been granted by the
+      // authoritative completion transaction when this sequence becomes visible.
+      itemBeat(ITEM_IDS.salvageCutter, 1),
       tansyLocal(
         EXPRESSION_IDS.neutral,
         "When you get that ship flying again, you're going to have to tell me where you were headed.",
@@ -260,6 +289,7 @@ export function getWalkItOffDialogue(
 }
 
 export function resolveDialogueSpeaker(dialogueBeat: DialogueBeat) {
+  if (dialogueBeat.kind !== "npc") return undefined;
   const npc = getNpc(dialogueBeat.speakerNpcId);
   const expressionAsset = resolveNpcExpression(
     dialogueBeat.speakerNpcId,
@@ -267,6 +297,17 @@ export function resolveDialogueSpeaker(dialogueBeat: DialogueBeat) {
   );
   if (!npc || !expressionAsset) return undefined;
   return { npc, expressionAsset };
+}
+
+/**
+ * Resolves an item beat against the authoritative item presentation catalog.
+ * Returns undefined for NPC beats or unknown item IDs so callers fail safe.
+ */
+export function resolveDialogueItem(dialogueBeat: DialogueBeat) {
+  if (dialogueBeat.kind !== "item") return undefined;
+  const presentation = getItemPresentation(dialogueBeat.itemId);
+  if (!presentation) return undefined;
+  return { itemId: dialogueBeat.itemId, quantity: dialogueBeat.quantity, presentation };
 }
 
 export const WALK_IT_OFF_DIALOGUE_MISSION_ID = MISSION_IDS.walkItOff;

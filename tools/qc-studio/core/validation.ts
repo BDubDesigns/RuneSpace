@@ -1,9 +1,25 @@
-import type { DialogueAdapter, DialogueDraft, DialogueValidationResult, StudioNpc } from "./types";
+import type {
+  DialogueAdapter,
+  DialogueDraft,
+  DialogueValidationResult,
+  StudioDialogueBeat,
+  StudioItem,
+  StudioNpc,
+} from "./types";
 
 const FALLBACK_STABLE_ID_PATTERN = /^[a-z][a-z0-9_]*$/;
 
 function findNpc(adapter: DialogueAdapter, npcId: string): StudioNpc | undefined {
   return adapter.npcs.find((npc) => npc.id === npcId);
+}
+
+function findItem(adapter: DialogueAdapter, itemId: string): StudioItem | undefined {
+  return adapter.items?.find((item) => item.id === itemId);
+}
+
+/** The authoritative quantity range for an item beat, straight from the item definition. */
+export function getStudioItemQuantityRange(item: StudioItem): { min: number; max: number } {
+  return item.kind === "stack" ? { min: 1, max: item.stackLimit } : { min: 1, max: 1 };
 }
 
 export function validateDialogueDraft(
@@ -41,8 +57,37 @@ export function validateDialogueDraft(
     issues.push({ path: "beats", message: "A dialogue sequence needs at least one beat." });
   }
 
-  draft.beats.forEach((beat, index) => {
+  draft.beats.forEach((beat: StudioDialogueBeat, index: number) => {
     const path = `beats.${index}`;
+    if (beat.kind === "item") {
+      const item = findItem(adapter, beat.itemId);
+      if (!item) {
+        issues.push({
+          path: `${path}.itemId`,
+          message: "Choose an item from the adapter's canonical inventory definitions.",
+        });
+      } else {
+        const { min, max } = getStudioItemQuantityRange(item);
+        if (!Number.isInteger(beat.quantity) || beat.quantity < min || beat.quantity > max) {
+          issues.push({
+            path: `${path}.quantity`,
+            message:
+              max === min
+                ? "This item is unique; its quantity must be exactly 1."
+                : `Quantity must be a whole number between ${min} and ${max}.`,
+          });
+        }
+      }
+      if (!adapter.backgrounds.some((background) => background.id === beat.backgroundId)) {
+        issues.push({
+          path: `${path}.backgroundId`,
+          message: "Choose an authored conversation background.",
+        });
+      }
+      // Caption is optional for item beats; it never implies the item speaks.
+      return;
+    }
+
     const npc = findNpc(adapter, beat.speakerNpcId);
     if (!npc) {
       issues.push({

@@ -1,4 +1,5 @@
 import { ITEM_IDS, type ItemId } from "@/game/config/foundations";
+import { getItemDefinition } from "@/game/config/balance";
 
 /**
  * Player-facing item presentation is content, not a UI concern. UI consumers
@@ -54,6 +55,49 @@ const itemPresentations = {
 export function getItemPresentation(itemId: string): ItemPresentation | undefined {
   return itemPresentations[itemId as ItemId];
 }
+
+/**
+ * The authoritative quantity range for an item presentation beat, derived from
+ * the item's inventory definition (the single source of truth for stack
+ * limits). Stackable items allow 1..stackLimit; unique items are fixed at 1.
+ * Unknown items have no valid beat quantity.
+ */
+export function getItemBeatQuantityRange(itemId: string): { min: number; max: number } | undefined {
+  const definition = getItemDefinition(itemId);
+  if (!definition) return undefined;
+  if (definition.kind === "stack") {
+    return { min: 1, max: definition.stackLimit };
+  }
+  return { min: 1, max: 1 };
+}
+
+export type DialogueItemCatalogEntry =
+  | { id: ItemId; displayName: string; kind: "stack"; stackLimit: number }
+  | { id: ItemId; displayName: string; kind: "unique" };
+
+/**
+ * Canonical selectable items for authoring/preview surfaces. The intersection
+ * of authored item presentation and a current authoritative inventory
+ * definition — never a hand-maintained UI list.
+ */
+export const DIALOGUE_ITEM_CATALOG: readonly DialogueItemCatalogEntry[] = Object.entries(
+  itemPresentations,
+).flatMap(([rawId, presentation]): DialogueItemCatalogEntry[] => {
+  const itemId = rawId as ItemId;
+  const definition = getItemDefinition(itemId);
+  if (!definition) return [];
+  if (definition.kind === "stack") {
+    return [
+      {
+        id: itemId,
+        displayName: presentation.displayName,
+        kind: "stack",
+        stackLimit: definition.stackLimit,
+      },
+    ];
+  }
+  return [{ id: itemId, displayName: presentation.displayName, kind: "unique" }];
+});
 
 export function resolveItemPresentation(itemId: string, fallbackName: string): ItemPresentation {
   return (

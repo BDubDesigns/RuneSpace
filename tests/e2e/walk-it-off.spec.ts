@@ -139,9 +139,23 @@ test("walks from Wade to Tansy, presents approved dialogue, and claims one carri
   }
   await expect(tansyDialogue.getByRole("button", { name: "Claim Cutter" })).toBeVisible();
   await tansyDialogue.getByRole("button", { name: "Claim Cutter" }).click();
+  // The successful grant reveals the Cutter itself over The Jag before Tansy returns.
+  const cutterReveal = tansyDialogue.locator('[data-dialogue-subject="item"]');
+  await expect(cutterReveal).toBeVisible();
+  await expect(cutterReveal.locator("[data-dialogue-item-artwork] img")).toBeVisible();
+  await expect(
+    tansyDialogue.locator('[data-dialogue-subject="item"] img[alt*="Tansy"]'),
+  ).toHaveCount(0);
+  await expect(tansyDialogue.locator("[data-dialogue-speaker-name]")).toHaveText("Item acquired");
+  await expect(tansyDialogue.locator("[data-dialogue-speaker-role]")).toContainText(
+    "Salvage Cutter",
+  );
+  await expect(tansyDialogue.getByRole("button", { name: "Next" })).toBeVisible();
+  await tansyDialogue.getByRole("button", { name: "Next" }).click();
   await expect(tansyDialogue.locator('[data-dialogue-text] [aria-hidden="true"]')).toContainText(
     "When you get that ship flying again",
   );
+  await expect(tansyDialogue.locator('img[alt*="Tansy Rusk"]')).toBeVisible();
   await tansyDialogue.getByRole("button", { name: "Next" }).click();
   await expect(tansyDialogue.locator('[data-dialogue-text] [aria-hidden="true"]')).toContainText(
     "For now, learn how to use the Cutter",
@@ -234,6 +248,9 @@ test("supports the explorer-first Jag conversation and remote mission acceptance
   }
   await expect(dialogue.getByRole("button", { name: "Claim Cutter" })).toBeVisible();
   await dialogue.getByRole("button", { name: "Claim Cutter" }).click();
+  await expect(dialogue.locator('[data-dialogue-subject="item"]')).toBeVisible();
+  await expect(dialogue.locator("[data-dialogue-speaker-name]")).toHaveText("Item acquired");
+  await dialogue.getByRole("button", { name: "Next" }).click();
   await expect(dialogue.locator('[data-dialogue-text] [aria-hidden="true"]')).toContainText(
     "When you get that ship flying again",
   );

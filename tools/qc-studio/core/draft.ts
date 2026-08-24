@@ -60,6 +60,7 @@ export function createBlankDraft(adapter: DialogueAdapter, draftId: string): Dia
     ...(npc ? { npcId: npc.id } : { npcId: "" }),
     beats: [
       {
+        kind: "npc",
         speakerNpcId: npc?.id ?? "",
         expressionId: expression?.id ?? "",
         backgroundId: background?.id ?? "",

@@ -102,4 +102,50 @@ test.describe("QC Studio development dialogue module", () => {
       page.getByText(/No mission, item, character, or database state changed/),
     ).toBeVisible();
   });
+
+  test("authors and previews an item beat with authoritative quantity limits", async ({ page }) => {
+    await page.goto("/qc-studio");
+    await page.getByLabel("Load authoritative sequence").selectOption({
+      label: "Tansy Rusk Walk It Off After Claim",
+    });
+    await page.getByRole("button", { name: "Load source as draft" }).click();
+
+    // Beat 1 of the loaded source is the authored Cutter reveal.
+    const itemSelect = page.getByLabel("Presented item");
+    await expect(itemSelect).toHaveValue("salvage_cutter");
+    const quantity = page.getByLabel("Quantity");
+    await expect(quantity).toBeDisabled(); // unique items are locked to 1
+    await expect(page.locator('[data-qc-studio-beat="0"]')).toContainText("Salvage Cutter");
+
+    // Switching to a stackable item unlocks its authoritative quantity range.
+    await itemSelect.selectOption({ label: "Ferrite Shale (stack up to 10)" });
+    await expect(quantity).toBeEnabled();
+    await expect(quantity).toHaveValue("1");
+    await quantity.fill("3");
+    await quantity.blur();
+    await expect(quantity).toHaveValue("3");
+
+    // Over-filling clamps back into the definition-derived range.
+    await quantity.fill("99");
+    await quantity.blur();
+    await expect(quantity).toHaveValue("10");
+
+    // The preview renders the actual production scene with the selected item.
+    const previewScene = page.locator("[data-qc-studio-preview-panel]");
+    await expect(previewScene.locator('[data-dialogue-subject="item"]')).toBeVisible();
+    await expect(previewScene.locator("img[alt*='Tansy']")).toHaveCount(0);
+    await expect(previewScene.locator("[data-dialogue-speaker-role]")).toContainText(
+      "Ferrite Shale ×10",
+    );
+
+    // The structured export carries the item identity + quantity deterministically.
+    await page.getByRole("button", { name: "Copy for RuneSpace" }).click();
+    await expect(page.getByLabel("Structured export")).toContainText('"itemId": "ferrite_shale"');
+    await expect(page.getByLabel("Structured export")).toContainText('"quantity": 10');
+
+    // NPC beats keep their controls; switching subjects round-trips.
+    await page.locator('[data-qc-studio-beat="1"]').click();
+    await expect(page.locator("#qc-beat-speaker")).toBeVisible();
+    await expect(page.locator("#qc-beat-item")).toHaveCount(0);
+  });
 });
