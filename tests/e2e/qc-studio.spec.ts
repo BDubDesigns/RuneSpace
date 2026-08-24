@@ -6,6 +6,9 @@ test.describe("QC Studio development dialogue module", () => {
   test("loads, edits, previews, persists, and exports a local draft", async ({ page }) => {
     await page.goto("/qc-studio");
     await expect(page.getByRole("heading", { name: "Visual authoring environment" })).toBeVisible();
+    await expect(page.locator('[data-qc-studio-beat="0"] [data-qc-studio-beat-number]')).toHaveText(
+      "B1",
+    );
 
     const text = page.getByLabel("Dialogue text");
     await text.fill("Edited in QC Studio.");
@@ -90,7 +93,7 @@ test.describe("QC Studio development dialogue module", () => {
       label: "Tansy Rusk Walk It Off After Remote Acceptance",
     });
     await page.getByRole("button", { name: "Load source as draft" }).click();
-    await page.getByRole("button", { name: /Beat 4/ }).click();
+    await page.locator('[data-qc-studio-beat="3"]').click();
     await page.getByRole("button", { name: "Accept mission", exact: false }).count();
     const action = page.locator("[data-qc-studio-preview-action]");
     await expect(action).toBeVisible();

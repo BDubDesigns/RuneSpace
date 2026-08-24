@@ -610,7 +610,7 @@ export function DialogueStudio({
                         beatButtonRefs.current[index] = element;
                       }}
                       aria-current={isSelected ? "true" : undefined}
-                      className={`rs-focus w-full border p-3 text-left text-sm ${
+                      className={`rs-focus flex w-full items-start gap-2 border p-2 text-left text-sm ${
                         isSelected
                           ? "border-[color:var(--rs-accent-primary)] bg-[color:var(--rs-accent-primary-subtle)]"
                           : "border-[color:var(--rs-border-subtle)] bg-[color:var(--rs-surface-panel)]"
@@ -619,14 +619,19 @@ export function DialogueStudio({
                       onClick={() => inspectBeat(index)}
                       type="button"
                     >
-                      <span className="font-display text-xs uppercase tracking-[0.14em] text-[color:var(--rs-accent-primary)]">
-                        Beat {index + 1}
+                      <span
+                        className="w-7 shrink-0 pt-0.5 font-display text-xs uppercase tracking-[0.12em] text-[color:var(--rs-accent-primary)]"
+                        data-qc-studio-beat-number
+                      >
+                        B{index + 1}
                       </span>
-                      <span className="mt-1 block font-semibold">
-                        {npc?.displayName ?? "Unknown speaker"}
-                      </span>
-                      <span className="mt-1 block truncate text-xs text-[color:var(--rs-text-muted)]">
-                        {beat.text || "Empty text"}
+                      <span className="min-w-0">
+                        <span className="block truncate font-semibold">
+                          {npc?.displayName ?? "Unknown speaker"}
+                        </span>
+                        <span className="mt-0.5 block truncate text-xs text-[color:var(--rs-text-muted)]">
+                          {beat.text || "Empty text"}
+                        </span>
                       </span>
                     </button>
                   </li>
