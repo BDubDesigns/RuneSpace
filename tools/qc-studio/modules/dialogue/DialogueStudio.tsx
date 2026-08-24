@@ -555,8 +555,8 @@ export function DialogueStudio({
           </Feedback>
         ) : null}
 
-        <div className="mt-5 grid gap-5 lg:grid-cols-[minmax(14rem,0.8fr)_minmax(24rem,1.55fr)_minmax(19rem,1fr)]">
-          <Panel as="section" className="min-w-0 !p-4" data-qc-studio-sequence-panel>
+        <div className="mt-5 grid gap-5 lg:grid-cols-12">
+          <Panel as="section" className="min-w-0 !p-4 lg:col-span-3" data-qc-studio-sequence-panel>
             <p className="font-display text-xs uppercase tracking-[0.16em] text-[color:var(--rs-accent-primary)]">
               Sequence / beats
             </p>
@@ -635,302 +635,320 @@ export function DialogueStudio({
             </ol>
           </Panel>
 
-          <Panel as="section" className="min-w-0 !p-4 sm:!p-5" data-qc-studio-preview-panel>
-            <div className="flex flex-wrap items-start justify-between gap-3">
-              <div>
-                <p className="font-display text-xs uppercase tracking-[0.16em] text-[color:var(--rs-accent-primary)]">
-                  Actual rendered preview
-                </p>
-                <h2 className="mt-1 font-display text-lg font-bold">
-                  {previewBeat
-                    ? `Beat ${previewBeatIndex + 1} of ${draft.beats.length}`
-                    : "No preview"}
-                </h2>
-              </div>
-              <span className="border border-[color:var(--rs-border-subtle)] px-2 py-1 text-xs uppercase tracking-wide text-[color:var(--rs-text-muted)]">
-                {previewBeat?.presentationMode ?? "—"}
-              </span>
-            </div>
-            <div className="mt-4">
-              {previewBeat && previewIssues.length === 0 ? (
-                renderPreview({
-                  actionMessage: previewActioned
-                    ? "Preview only: this action was simulated visually. No mission, item, character, or database state changed."
-                    : undefined,
-                  beat: previewBeat,
-                  controls: previewControls,
-                  fullText: previewBeat.text,
-                  isComplete: reducedMotion || revealedChars >= Array.from(previewBeat.text).length,
-                  onTextClick: () => setRevealedChars(Array.from(previewBeat.text).length),
-                  portraitGeneration: previewBeatIndex,
-                  visibleText: reducedMotion
-                    ? previewBeat.text
-                    : Array.from(previewBeat.text).slice(0, revealedChars).join(""),
-                })
-              ) : (
-                <div
-                  className="border border-[color:var(--rs-accent-warning)] bg-[color:var(--rs-surface-panel)] p-4"
-                  role="alert"
-                >
-                  <p className="font-display text-sm uppercase tracking-[0.14em] text-[color:var(--rs-accent-warning)]">
-                    Preview blocked by validation
-                  </p>
-                  <ul className="mt-2 space-y-1 text-sm text-[color:var(--rs-text-secondary)]">
-                    {(previewIssues.length ? previewIssues : validation.issues)
-                      .slice(0, 6)
-                      .map((issue) => (
-                        <li key={`${issue.path}-${issue.message}`}>{issue.message}</li>
-                      ))}
-                  </ul>
-                </div>
-              )}
-            </div>
-          </Panel>
-
-          <Panel as="section" className="min-w-0 !p-4" data-qc-studio-editor-panel>
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <p className="font-display text-xs uppercase tracking-[0.16em] text-[color:var(--rs-accent-primary)]">
-                  Current beat / sequence editor
-                </p>
-                <h2 className="mt-1 font-display text-lg font-bold">
-                  {selectedBeat ? `Beat ${selectedBeatIndex + 1}` : "No beat"}
-                </h2>
-              </div>
-              <span className="text-xs uppercase tracking-wide text-[color:var(--rs-text-muted)]">
-                {validation.valid
-                  ? "Valid draft"
-                  : `${validation.issues.length} issue${validation.issues.length === 1 ? "" : "s"}`}
-              </span>
-            </div>
-            <div className="mt-4 grid gap-3 sm:grid-cols-2">
-              <ActionButton
-                data-qc-studio-add-beat
-                intent="secondary"
-                onClick={() => addBeat(false)}
-              >
-                Add beat
-              </ActionButton>
-              <ActionButton
-                data-qc-studio-duplicate-beat
-                intent="secondary"
-                onClick={() => addBeat(true)}
-              >
-                Duplicate beat
-              </ActionButton>
-              <ActionButton disabled={draft.beats.length <= 1} intent="danger" onClick={deleteBeat}>
-                Delete beat
-              </ActionButton>
-              <div className="grid grid-cols-2 gap-2">
-                <ActionButton
-                  aria-label="Move beat up"
-                  disabled={selectedBeatIndex === 0}
-                  intent="secondary"
-                  onClick={() => moveBeat(-1)}
-                >
-                  ↑ Up
-                </ActionButton>
-                <ActionButton
-                  aria-label="Move beat down"
-                  disabled={selectedBeatIndex === draft.beats.length - 1}
-                  intent="secondary"
-                  onClick={() => moveBeat(1)}
-                >
-                  ↓ Down
-                </ActionButton>
-              </div>
-            </div>
-
-            <label
-              className="mt-5 block text-sm text-[color:var(--rs-text-secondary)]"
-              htmlFor="qc-draft-title"
+          <div
+            className="grid min-w-0 gap-5 lg:col-span-9 xl:grid-cols-12 xl:items-start"
+            data-qc-studio-preview-layout
+          >
+            <Panel
+              as="section"
+              className="w-full min-w-0 max-w-4xl sm:!p-5 xl:col-span-8"
+              data-qc-studio-preview-panel
             >
-              Draft name
-              <input
-                className={`${CONTROL_CLASS} mt-2`}
-                id="qc-draft-title"
-                onBlur={flushTextHistory}
-                onChange={(event) =>
-                  updateTextDraft((current) => ({ ...current, title: event.target.value }))
-                }
-                value={draft.title}
-              />
-            </label>
-            {selectedBeat ? (
-              <>
-                <label
-                  className="mt-4 block text-sm text-[color:var(--rs-text-secondary)]"
-                  htmlFor="qc-beat-speaker"
-                >
-                  Speaker
-                  <select
-                    className={`${CONTROL_CLASS} mt-2`}
-                    id="qc-beat-speaker"
-                    onChange={(event) => updateSpeaker(selectedBeatIndex, event.target.value)}
-                    value={selectedBeat.speakerNpcId}
-                  >
-                    {adapter.npcs.map((npc) => (
-                      <option key={npc.id} value={npc.id}>
-                        {npc.displayName} — {npc.role}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                {selectedBeatIssue("speakerNpcId") ? (
-                  <Feedback tone="danger">{selectedBeatIssue("speakerNpcId")}</Feedback>
-                ) : null}
-
-                <label
-                  className="mt-4 block text-sm text-[color:var(--rs-text-secondary)]"
-                  htmlFor="qc-beat-expression"
-                >
-                  Expression
-                  <select
-                    className={`${CONTROL_CLASS} mt-2`}
-                    id="qc-beat-expression"
-                    onChange={(event) =>
-                      updateBeat(selectedBeatIndex, { expressionId: event.target.value })
-                    }
-                    value={selectedBeat.expressionId}
-                  >
-                    {(selectedNpc?.expressions ?? []).map((expression) => (
-                      <option key={expression.id} value={expression.id}>
-                        {expression.label}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                {selectedBeatIssue("expressionId") ? (
-                  <Feedback tone="danger">{selectedBeatIssue("expressionId")}</Feedback>
-                ) : null}
-
-                <label
-                  className="mt-4 block text-sm text-[color:var(--rs-text-secondary)]"
-                  htmlFor="qc-beat-background"
-                >
-                  Conversation background
-                  <select
-                    className={`${CONTROL_CLASS} mt-2`}
-                    id="qc-beat-background"
-                    onChange={(event) =>
-                      updateBeat(selectedBeatIndex, { backgroundId: event.target.value })
-                    }
-                    value={selectedBeat.backgroundId}
-                  >
-                    {adapter.backgrounds.map((background) => (
-                      <option key={background.id} value={background.id}>
-                        {background.label}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                {selectedBeatIssue("backgroundId") ? (
-                  <Feedback tone="danger">{selectedBeatIssue("backgroundId")}</Feedback>
-                ) : null}
-
-                <fieldset className="mt-4">
-                  <legend className="text-sm text-[color:var(--rs-text-secondary)]">
-                    Presentation mode
-                  </legend>
-                  <div className="mt-2 grid grid-cols-2 gap-2">
-                    {(
-                      [
-                        "local",
-                        "comms",
-                      ] as const satisfies readonly StudioDialoguePresentationMode[]
-                    ).map((mode) => (
-                      <label
-                        className={`rs-focus border p-3 text-center text-sm ${
-                          selectedBeat.presentationMode === mode
-                            ? "border-[color:var(--rs-accent-primary)] bg-[color:var(--rs-accent-primary-subtle)]"
-                            : "border-[color:var(--rs-border-subtle)] bg-[color:var(--rs-surface-panel)]"
-                        }`}
-                        key={mode}
-                      >
-                        <input
-                          checked={selectedBeat.presentationMode === mode}
-                          className="sr-only"
-                          name="qc-presentation-mode"
-                          onChange={() => updateBeat(selectedBeatIndex, { presentationMode: mode })}
-                          type="radio"
-                          value={mode}
-                        />
-                        {mode === "local" ? "Local" : "Comms"}
-                      </label>
-                    ))}
-                  </div>
-                </fieldset>
-
-                <label
-                  className="mt-4 block text-sm text-[color:var(--rs-text-secondary)]"
-                  htmlFor="qc-beat-text"
-                >
-                  Dialogue text
-                  <textarea
-                    aria-describedby={selectedBeatIssue("text") ? "qc-beat-text-error" : undefined}
-                    className={`${TEXTAREA_CLASS} mt-2`}
-                    id="qc-beat-text"
-                    onBlur={flushTextHistory}
-                    onChange={(event) => {
-                      const text = event.target.value;
-                      updateTextDraft((current) => ({
-                        ...current,
-                        beats: current.beats.map((beat, index) =>
-                          index === selectedBeatIndex ? { ...beat, text } : beat,
-                        ),
-                      }));
-                    }}
-                    placeholder="Write the dialogue beat…"
-                    value={selectedBeat.text}
-                  />
-                </label>
-                {selectedBeatIssue("text") ? (
-                  <p
-                    className="mt-2 text-sm text-[color:var(--rs-accent-danger)]"
-                    id="qc-beat-text-error"
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <p className="font-display text-xs uppercase tracking-[0.16em] text-[color:var(--rs-accent-primary)]">
+                    Actual rendered preview
+                  </p>
+                  <h2 className="mt-1 font-display text-lg font-bold">
+                    {previewBeat
+                      ? `Beat ${previewBeatIndex + 1} of ${draft.beats.length}`
+                      : "No preview"}
+                  </h2>
+                </div>
+                <span className="border border-[color:var(--rs-border-subtle)] px-2 py-1 text-xs uppercase tracking-wide text-[color:var(--rs-text-muted)]">
+                  {previewBeat?.presentationMode ?? "—"}
+                </span>
+              </div>
+              <div className="mt-4">
+                {previewBeat && previewIssues.length === 0 ? (
+                  renderPreview({
+                    actionMessage: previewActioned
+                      ? "Preview only: this action was simulated visually. No mission, item, character, or database state changed."
+                      : undefined,
+                    beat: previewBeat,
+                    controls: previewControls,
+                    fullText: previewBeat.text,
+                    isComplete:
+                      reducedMotion || revealedChars >= Array.from(previewBeat.text).length,
+                    onTextClick: () => setRevealedChars(Array.from(previewBeat.text).length),
+                    portraitGeneration: previewBeatIndex,
+                    visibleText: reducedMotion
+                      ? previewBeat.text
+                      : Array.from(previewBeat.text).slice(0, revealedChars).join(""),
+                  })
+                ) : (
+                  <div
+                    className="border border-[color:var(--rs-accent-warning)] bg-[color:var(--rs-surface-panel)] p-4"
                     role="alert"
                   >
-                    {selectedBeatIssue("text")}
-                  </p>
-                ) : null}
-              </>
-            ) : null}
+                    <p className="font-display text-sm uppercase tracking-[0.14em] text-[color:var(--rs-accent-warning)]">
+                      Preview blocked by validation
+                    </p>
+                    <ul className="mt-2 space-y-1 text-sm text-[color:var(--rs-text-secondary)]">
+                      {(previewIssues.length ? previewIssues : validation.issues)
+                        .slice(0, 6)
+                        .map((issue) => (
+                          <li key={`${issue.path}-${issue.message}`}>{issue.message}</li>
+                        ))}
+                    </ul>
+                  </div>
+                )}
+              </div>
+            </Panel>
 
-            <label
-              className="mt-4 block text-sm text-[color:var(--rs-text-secondary)]"
-              htmlFor="qc-proposed-id"
-            >
-              Proposed stable content ID{" "}
-              <span className="text-xs text-[color:var(--rs-text-muted)]">(optional)</span>
-              <input
-                aria-describedby="qc-proposed-id-help"
-                className={`${CONTROL_CLASS} mt-2`}
-                id="qc-proposed-id"
-                onBlur={flushTextHistory}
-                onChange={(event) =>
-                  updateTextDraft((current) => ({
-                    ...current,
-                    ...(event.target.value
-                      ? { proposedStableId: event.target.value }
-                      : { proposedStableId: undefined }),
-                  }))
-                }
-                placeholder="example_dialogue_id"
-                value={draft.proposedStableId ?? ""}
-              />
-              <span
-                className="mt-1 block text-xs text-[color:var(--rs-text-muted)]"
-                id="qc-proposed-id-help"
+            <Panel as="section" className="min-w-0 !p-4 xl:col-span-4" data-qc-studio-editor-panel>
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="font-display text-xs uppercase tracking-[0.16em] text-[color:var(--rs-accent-primary)]">
+                    Current beat / sequence editor
+                  </p>
+                  <h2 className="mt-1 font-display text-lg font-bold">
+                    {selectedBeat ? `Beat ${selectedBeatIndex + 1}` : "No beat"}
+                  </h2>
+                </div>
+                <span className="text-xs uppercase tracking-wide text-[color:var(--rs-text-muted)]">
+                  {validation.valid
+                    ? "Valid draft"
+                    : `${validation.issues.length} issue${validation.issues.length === 1 ? "" : "s"}`}
+                </span>
+              </div>
+              <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                <ActionButton
+                  data-qc-studio-add-beat
+                  intent="secondary"
+                  onClick={() => addBeat(false)}
+                >
+                  Add beat
+                </ActionButton>
+                <ActionButton
+                  data-qc-studio-duplicate-beat
+                  intent="secondary"
+                  onClick={() => addBeat(true)}
+                >
+                  Duplicate beat
+                </ActionButton>
+                <ActionButton
+                  disabled={draft.beats.length <= 1}
+                  intent="danger"
+                  onClick={deleteBeat}
+                >
+                  Delete beat
+                </ActionButton>
+                <div className="grid grid-cols-2 gap-2">
+                  <ActionButton
+                    aria-label="Move beat up"
+                    disabled={selectedBeatIndex === 0}
+                    intent="secondary"
+                    onClick={() => moveBeat(-1)}
+                  >
+                    ↑ Up
+                  </ActionButton>
+                  <ActionButton
+                    aria-label="Move beat down"
+                    disabled={selectedBeatIndex === draft.beats.length - 1}
+                    intent="secondary"
+                    onClick={() => moveBeat(1)}
+                  >
+                    ↓ Down
+                  </ActionButton>
+                </div>
+              </div>
+
+              <label
+                className="mt-5 block text-sm text-[color:var(--rs-text-secondary)]"
+                htmlFor="qc-draft-title"
               >
-                Proposal only. It does not register an identity in RuneSpace.
-              </span>
-            </label>
-            {validation.issues.find((issue) => issue.path === "proposedStableId") ? (
-              <Feedback tone="danger">
-                {validation.issues.find((issue) => issue.path === "proposedStableId")?.message}
-              </Feedback>
-            ) : null}
-          </Panel>
+                Draft name
+                <input
+                  className={`${CONTROL_CLASS} mt-2`}
+                  id="qc-draft-title"
+                  onBlur={flushTextHistory}
+                  onChange={(event) =>
+                    updateTextDraft((current) => ({ ...current, title: event.target.value }))
+                  }
+                  value={draft.title}
+                />
+              </label>
+              {selectedBeat ? (
+                <>
+                  <label
+                    className="mt-4 block text-sm text-[color:var(--rs-text-secondary)]"
+                    htmlFor="qc-beat-speaker"
+                  >
+                    Speaker
+                    <select
+                      className={`${CONTROL_CLASS} mt-2`}
+                      id="qc-beat-speaker"
+                      onChange={(event) => updateSpeaker(selectedBeatIndex, event.target.value)}
+                      value={selectedBeat.speakerNpcId}
+                    >
+                      {adapter.npcs.map((npc) => (
+                        <option key={npc.id} value={npc.id}>
+                          {npc.displayName} — {npc.role}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  {selectedBeatIssue("speakerNpcId") ? (
+                    <Feedback tone="danger">{selectedBeatIssue("speakerNpcId")}</Feedback>
+                  ) : null}
+
+                  <label
+                    className="mt-4 block text-sm text-[color:var(--rs-text-secondary)]"
+                    htmlFor="qc-beat-expression"
+                  >
+                    Expression
+                    <select
+                      className={`${CONTROL_CLASS} mt-2`}
+                      id="qc-beat-expression"
+                      onChange={(event) =>
+                        updateBeat(selectedBeatIndex, { expressionId: event.target.value })
+                      }
+                      value={selectedBeat.expressionId}
+                    >
+                      {(selectedNpc?.expressions ?? []).map((expression) => (
+                        <option key={expression.id} value={expression.id}>
+                          {expression.label}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  {selectedBeatIssue("expressionId") ? (
+                    <Feedback tone="danger">{selectedBeatIssue("expressionId")}</Feedback>
+                  ) : null}
+
+                  <label
+                    className="mt-4 block text-sm text-[color:var(--rs-text-secondary)]"
+                    htmlFor="qc-beat-background"
+                  >
+                    Conversation background
+                    <select
+                      className={`${CONTROL_CLASS} mt-2`}
+                      id="qc-beat-background"
+                      onChange={(event) =>
+                        updateBeat(selectedBeatIndex, { backgroundId: event.target.value })
+                      }
+                      value={selectedBeat.backgroundId}
+                    >
+                      {adapter.backgrounds.map((background) => (
+                        <option key={background.id} value={background.id}>
+                          {background.label}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  {selectedBeatIssue("backgroundId") ? (
+                    <Feedback tone="danger">{selectedBeatIssue("backgroundId")}</Feedback>
+                  ) : null}
+
+                  <fieldset className="mt-4">
+                    <legend className="text-sm text-[color:var(--rs-text-secondary)]">
+                      Presentation mode
+                    </legend>
+                    <div className="mt-2 grid grid-cols-2 gap-2">
+                      {(
+                        [
+                          "local",
+                          "comms",
+                        ] as const satisfies readonly StudioDialoguePresentationMode[]
+                      ).map((mode) => (
+                        <label
+                          className={`rs-focus border p-3 text-center text-sm ${
+                            selectedBeat.presentationMode === mode
+                              ? "border-[color:var(--rs-accent-primary)] bg-[color:var(--rs-accent-primary-subtle)]"
+                              : "border-[color:var(--rs-border-subtle)] bg-[color:var(--rs-surface-panel)]"
+                          }`}
+                          key={mode}
+                        >
+                          <input
+                            checked={selectedBeat.presentationMode === mode}
+                            className="sr-only"
+                            name="qc-presentation-mode"
+                            onChange={() =>
+                              updateBeat(selectedBeatIndex, { presentationMode: mode })
+                            }
+                            type="radio"
+                            value={mode}
+                          />
+                          {mode === "local" ? "Local" : "Comms"}
+                        </label>
+                      ))}
+                    </div>
+                  </fieldset>
+
+                  <label
+                    className="mt-4 block text-sm text-[color:var(--rs-text-secondary)]"
+                    htmlFor="qc-beat-text"
+                  >
+                    Dialogue text
+                    <textarea
+                      aria-describedby={
+                        selectedBeatIssue("text") ? "qc-beat-text-error" : undefined
+                      }
+                      className={`${TEXTAREA_CLASS} mt-2`}
+                      id="qc-beat-text"
+                      onBlur={flushTextHistory}
+                      onChange={(event) => {
+                        const text = event.target.value;
+                        updateTextDraft((current) => ({
+                          ...current,
+                          beats: current.beats.map((beat, index) =>
+                            index === selectedBeatIndex ? { ...beat, text } : beat,
+                          ),
+                        }));
+                      }}
+                      placeholder="Write the dialogue beat…"
+                      value={selectedBeat.text}
+                    />
+                  </label>
+                  {selectedBeatIssue("text") ? (
+                    <p
+                      className="mt-2 text-sm text-[color:var(--rs-accent-danger)]"
+                      id="qc-beat-text-error"
+                      role="alert"
+                    >
+                      {selectedBeatIssue("text")}
+                    </p>
+                  ) : null}
+                </>
+              ) : null}
+
+              <label
+                className="mt-4 block text-sm text-[color:var(--rs-text-secondary)]"
+                htmlFor="qc-proposed-id"
+              >
+                Proposed stable content ID{" "}
+                <span className="text-xs text-[color:var(--rs-text-muted)]">(optional)</span>
+                <input
+                  aria-describedby="qc-proposed-id-help"
+                  className={`${CONTROL_CLASS} mt-2`}
+                  id="qc-proposed-id"
+                  onBlur={flushTextHistory}
+                  onChange={(event) =>
+                    updateTextDraft((current) => ({
+                      ...current,
+                      ...(event.target.value
+                        ? { proposedStableId: event.target.value }
+                        : { proposedStableId: undefined }),
+                    }))
+                  }
+                  placeholder="example_dialogue_id"
+                  value={draft.proposedStableId ?? ""}
+                />
+                <span
+                  className="mt-1 block text-xs text-[color:var(--rs-text-muted)]"
+                  id="qc-proposed-id-help"
+                >
+                  Proposal only. It does not register an identity in RuneSpace.
+                </span>
+              </label>
+              {validation.issues.find((issue) => issue.path === "proposedStableId") ? (
+                <Feedback tone="danger">
+                  {validation.issues.find((issue) => issue.path === "proposedStableId")?.message}
+                </Feedback>
+              ) : null}
+            </Panel>
+          </div>
         </div>
 
         <Panel className="mt-5 !p-4" data-qc-studio-actions>

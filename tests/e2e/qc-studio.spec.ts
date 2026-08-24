@@ -47,6 +47,23 @@ test.describe("QC Studio development dialogue module", () => {
     await expect(text).toHaveValue(edited);
   });
 
+  test("keeps the desktop preview bounded beside the editor", async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 1000 });
+    await page.goto("/qc-studio");
+
+    const previewLayout = page.locator("[data-qc-studio-preview-layout]");
+    const preview = previewLayout.locator("[data-qc-studio-preview-panel]");
+    const editor = previewLayout.locator("[data-qc-studio-editor-panel]");
+    const previewBox = await preview.boundingBox();
+    const editorBox = await editor.boundingBox();
+
+    expect(previewBox).not.toBeNull();
+    expect(editorBox).not.toBeNull();
+    expect(previewBox?.width).toBeLessThanOrEqual(920);
+    expect(editorBox!.x).toBeGreaterThanOrEqual(previewBox!.x + previewBox!.width);
+    expect(editorBox!.x - (previewBox!.x + previewBox!.width)).toBeLessThanOrEqual(24);
+  });
+
   test("preserves an unsupported future draft schema", async ({ page }) => {
     const storageKey = "qc-studio:runespace:dialogue:v1";
     const futureDraft = JSON.stringify({
