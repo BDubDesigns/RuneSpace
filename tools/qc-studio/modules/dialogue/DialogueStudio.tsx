@@ -5,7 +5,12 @@ import { ActionButton } from "@/components/ui/ActionButton";
 import { Feedback } from "@/components/ui/Feedback";
 import { Panel } from "@/components/ui/Panel";
 import { SectionHeader } from "@/components/ui/SectionHeader";
-import { createBlankDraft, createDraftFromAdapterSequence, cloneDraft } from "../../core/draft";
+import {
+  createBlankDraft,
+  createBeatForSubject,
+  createDraftFromAdapterSequence,
+  cloneDraft,
+} from "../../core/draft";
 import { createDialogueExportPayload } from "../../core/export";
 import {
   createSnapshotHistory,
@@ -407,47 +412,46 @@ export function DialogueStudio({
 
   type NpcBeatPatch = Partial<Omit<Extract<StudioDialogueBeat, { kind: "npc" }>, "kind">>;
   type ItemBeatPatch = Partial<Omit<Extract<StudioDialogueBeat, { kind: "item" }>, "kind">>;
-  type BeatPatch = (NpcBeatPatch & { kind?: "npc" }) | (ItemBeatPatch & { kind?: "item" });
 
-  function updateBeat(index: number, update: BeatPatch) {
+  /**
+   * Patch only the fields of the beat's ACTIVE kind. The switch below keeps
+   * the two shapes disjoint, so a patch can never write an item field into an
+   * NPC beat or vice versa.
+   */
+  function updateBeat(index: number, update: NpcBeatPatch | ItemBeatPatch) {
     applyStructural((current) => ({
       ...current,
       npcId:
         index === 0 && "speakerNpcId" in update && update.speakerNpcId
           ? update.speakerNpcId
           : current.npcId,
-      beats: current.beats.map((beat, beatIndex) =>
-        beatIndex === index ? ({ ...beat, ...update } as StudioDialogueBeat) : beat,
-      ),
+      beats: current.beats.map((beat, beatIndex) => {
+        if (beatIndex !== index) return beat;
+        if (beat.kind === "npc") {
+          return { ...beat, ...(update as NpcBeatPatch), kind: "npc" as const };
+        }
+        return { ...beat, ...(update as ItemBeatPatch), kind: "item" as const };
+      }),
     }));
   }
 
+  /**
+   * Replaces the beat wholesale with the target subject's shape. Subject
+   * switching must never merge with the previous shape — stale NPC fields
+   * could otherwise survive on item beats and stale item fields on NPC beats.
+   */
   function switchSubject(index: number, kind: "npc" | "item") {
     const current = historyRef.current.present.beats[index];
     if (!current || current.kind === kind) return;
     flushTextHistory();
     const backgroundId = current.backgroundId || adapter.backgrounds[0]?.id || "";
-    if (kind === "item") {
-      const firstItem = adapter.items?.[0];
-      if (!firstItem) return;
-      updateBeat(index, {
-        itemId: firstItem.id,
-        quantity: 1,
-        backgroundId,
-        text: "",
-        kind,
-      });
-      return;
-    }
-    const npc = adapter.npcs[0];
-    updateBeat(index, {
-      speakerNpcId: npc?.id ?? "",
-      expressionId: npc?.expressions[0]?.id ?? "",
-      presentationMode: "local",
-      backgroundId,
-      text: "",
-      kind,
-    });
+    applyStructural((draftToUpdate) => ({
+      ...draftToUpdate,
+      beats: draftToUpdate.beats.map((beat, beatIndex) => {
+        if (beatIndex !== index) return beat;
+        return createBeatForSubject(adapter, kind, backgroundId);
+      }),
+    }));
   }
 
   function selectItem(index: number, itemId: string) {

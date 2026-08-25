@@ -69,7 +69,8 @@ conversation background:
 
 - **NPC beat** — speaker portrait + expression (existing behavior).
 - **Item beat** — item artwork presented prominently in the scene with no NPC
-  portrait. The panel shows an `Item acquired` eyebrow plus the authoritative
+  portrait. The panel shows a generic `Item` eyebrow (item beats are
+  presentation-only and do not imply acquisition) plus the authoritative
   display name and quantity (`×N` when greater than 1).
 
 Item beats are **presentation only**. Authoring, previewing, or exporting an

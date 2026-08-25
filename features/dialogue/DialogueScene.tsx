@@ -124,7 +124,7 @@ export function DialogueScene({
             data-dialogue-speaker-name
           >
             {resolvedItem && beat.kind === "item"
-              ? "Item acquired"
+              ? "Item"
               : (resolvedSpeaker?.npc.displayName ?? "")}
           </p>
           <p className="mt-1 text-sm text-[color:var(--rs-text-muted)]" data-dialogue-speaker-role>

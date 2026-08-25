@@ -17,7 +17,7 @@ import {
   getStudioItemQuantityRange,
   validateDialogueDraft,
 } from "@/tools/qc-studio/core/validation";
-import { createBlankDraft } from "@/tools/qc-studio/core/draft";
+import { createBlankDraft, createBeatForSubject } from "@/tools/qc-studio/core/draft";
 import type {
   DialogueAdapter,
   DialogueCheckpoint,
@@ -287,5 +287,102 @@ describe("QC Studio core", () => {
     });
     expect(payload.source).toEqual({ kind: "authoritative_sequence", sequenceId: "source_one" });
     expect(payload.sequence.beats[0]).toEqual(itemBeat());
+  });
+
+  it("replaces the whole beat shape on NPC → Item → NPC switches", () => {
+    // Start from an NPC beat carrying distinctive values that must NOT survive.
+    const npcStart = {
+      kind: "npc",
+      speakerNpcId: "npc_one",
+      expressionId: "neutral",
+      backgroundId: "background_one",
+      presentationMode: "comms" as const,
+      text: "Distinctive NPC line.",
+    };
+
+    // NPC → Item: the item beat must contain ONLY item-kind fields.
+    const asItem = createBeatForSubject(adapter, "item", npcStart.backgroundId);
+    expect(Object.keys(asItem).sort()).toEqual([
+      "backgroundId",
+      "itemId",
+      "kind",
+      "quantity",
+      "text",
+    ]);
+    expect(asItem).toEqual({
+      kind: "item",
+      itemId: "stack_thing",
+      quantity: 1,
+      backgroundId: "background_one",
+      text: "",
+    });
+    expect("speakerNpcId" in asItem).toBe(false);
+    expect("expressionId" in asItem).toBe(false);
+    expect("presentationMode" in asItem).toBe(false);
+
+    // Item → NPC: the npc beat must contain ONLY npc-kind fields.
+    const backToNpc = createBeatForSubject(adapter, "npc", npcStart.backgroundId);
+    expect(Object.keys(backToNpc).sort()).toEqual([
+      "backgroundId",
+      "expressionId",
+      "kind",
+      "presentationMode",
+      "speakerNpcId",
+      "text",
+    ]);
+    expect("itemId" in backToNpc).toBe(false);
+    expect("quantity" in backToNpc).toBe(false);
+
+    // Both directions gate through live-adapter validation. The fresh NPC
+    // beat carries no line yet, so its ONLY issue is empty text — proving the
+    // shape itself introduces no cross-kind problems.
+    expect(validateDialogueDraft(adapter, draft({ beats: [asItem] })).valid).toBe(true);
+    const npcValidation = validateDialogueDraft(adapter, draft({ beats: [backToNpc] }));
+    expect(npcValidation.issues.map((issue) => issue.path)).toEqual(["beats.0.text"]);
+  });
+
+  it("persists and exports only valid fields for the active kind after subject switching", () => {
+    const switchedDraft = draft({
+      title: "Switched subjects",
+      beats: [
+        // Simulates a UI NPC→Item switch: wholesale replacement, no merge.
+        { ...itemBeat() },
+        // Simulates a stale-field hazard: an item beat that previously was an
+        // NPC beat. The persisted/exported shape must not carry NPC fields.
+        { ...itemBeat(), itemId: "unique_thing", quantity: 1, text: "Look at this." },
+      ],
+    });
+
+    // Persisted round-trip: storage accepts both kinds and returns exactly the
+    // fields each kind defines — no cross-kind leakage in or out.
+    const stored = parsePersistedDialogueStudio(
+      serializeDialogueStudio(switchedDraft, []),
+      adapter.adapterId,
+    );
+    expect(stored.kind).toBe("loaded");
+    if (stored.kind !== "loaded") return;
+    const [persistedItem, persistedFormerNpc] = stored.state.draft.beats;
+    expect(Object.keys(persistedFormerNpc!).sort()).toEqual([
+      "backgroundId",
+      "itemId",
+      "kind",
+      "quantity",
+      "text",
+    ]);
+    expect(persistedItem).toEqual(itemBeat());
+
+    // Exported shape: same guarantee, deterministic itemId + quantity only.
+    const payload = createDialogueExportPayload(adapter.adapterId, stored.state.draft);
+    expect(payload.sequence.beats[0]).toEqual(itemBeat());
+    expect(payload.sequence.beats[1]).toEqual({
+      kind: "item",
+      itemId: "unique_thing",
+      quantity: 1,
+      backgroundId: "background_one",
+      text: "Look at this.",
+    });
+
+    // Validation still gates unknown/invalid shapes after the switch path.
+    expect(validateDialogueDraft(adapter, stored.state.draft).valid).toBe(true);
   });
 });

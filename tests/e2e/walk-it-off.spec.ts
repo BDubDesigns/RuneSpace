@@ -146,7 +146,7 @@ test("walks from Wade to Tansy, presents approved dialogue, and claims one carri
   await expect(
     tansyDialogue.locator('[data-dialogue-subject="item"] img[alt*="Tansy"]'),
   ).toHaveCount(0);
-  await expect(tansyDialogue.locator("[data-dialogue-speaker-name]")).toHaveText("Item acquired");
+  await expect(tansyDialogue.locator("[data-dialogue-speaker-name]")).toHaveText("Item");
   await expect(tansyDialogue.locator("[data-dialogue-speaker-role]")).toContainText(
     "Salvage Cutter",
   );
@@ -249,7 +249,7 @@ test("supports the explorer-first Jag conversation and remote mission acceptance
   await expect(dialogue.getByRole("button", { name: "Claim Cutter" })).toBeVisible();
   await dialogue.getByRole("button", { name: "Claim Cutter" }).click();
   await expect(dialogue.locator('[data-dialogue-subject="item"]')).toBeVisible();
-  await expect(dialogue.locator("[data-dialogue-speaker-name]")).toHaveText("Item acquired");
+  await expect(dialogue.locator("[data-dialogue-speaker-name]")).toHaveText("Item");
   await dialogue.getByRole("button", { name: "Next" }).click();
   await expect(dialogue.locator('[data-dialogue-text] [aria-hidden="true"]')).toContainText(
     "When you get that ship flying again",

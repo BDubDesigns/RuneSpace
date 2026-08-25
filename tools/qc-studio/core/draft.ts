@@ -47,7 +47,6 @@ export function createDraftFromAdapterSequence(
 
 export function createBlankDraft(adapter: DialogueAdapter, draftId: string): DialogueDraft {
   const npc = adapter.npcs[0];
-  const expression = npc?.expressions[0];
   const background = adapter.backgrounds[0];
   const title = npc
     ? `${npc.displayName} — ${background?.label ?? "New"} Dialogue`
@@ -58,16 +57,35 @@ export function createBlankDraft(adapter: DialogueAdapter, draftId: string): Dia
     draftId,
     title,
     ...(npc ? { npcId: npc.id } : { npcId: "" }),
-    beats: [
-      {
-        kind: "npc",
-        speakerNpcId: npc?.id ?? "",
-        expressionId: expression?.id ?? "",
-        backgroundId: background?.id ?? "",
-        presentationMode: "local",
-        text: "",
-      },
-    ],
+    beats: [createBeatForSubject(adapter, "npc", background?.id ?? "")],
+  };
+}
+
+/**
+ * Builds a complete beat of the requested subject kind. Used by subject
+ * switching so the new shape REPLACES the old one wholesale — stale fields
+ * from the previous kind can never survive a switch.
+ */
+export function createBeatForSubject(
+  adapter: DialogueAdapter,
+  kind: "npc" | "item",
+  backgroundId: string,
+): StudioDialogueBeat {
+  if (kind === "item") {
+    const item = adapter.items?.[0];
+    if (!item) {
+      throw new Error("This project adapter exposes no canonical items.");
+    }
+    return { kind: "item", itemId: item.id, quantity: 1, backgroundId, text: "" };
+  }
+  const npc = adapter.npcs[0];
+  return {
+    kind: "npc",
+    speakerNpcId: npc?.id ?? "",
+    expressionId: npc?.expressions[0]?.id ?? "",
+    backgroundId,
+    presentationMode: "local",
+    text: "",
   };
 }
 
