@@ -208,9 +208,16 @@ suite("issue #110 Cut Your Teeth persistence and XP boundary (real PostgreSQL)",
     await equipCutter(userId, character.id);
 
     // Dropping below one full stack falls back to refusal — inventory is the truth.
+    // Scope the destructive delete to THIS character's shale only; a concurrent
+    // test character's inventory must never be touched.
     await db
       .delete(rune.inventoryStacks)
-      .where(eq(rune.inventoryStacks.itemId, ITEM_IDS.ferriteShale));
+      .where(
+        and(
+          eq(rune.inventoryStacks.characterId, character.id),
+          eq(rune.inventoryStacks.itemId, ITEM_IDS.ferriteShale),
+        ),
+      );
     await addShale(character.id, 9);
     const nineOnly = await missions.completeCutYourTeeth(
       userId,
@@ -222,7 +229,12 @@ suite("issue #110 Cut Your Teeth persistence and XP boundary (real PostgreSQL)",
     expect(await miningXp(character.id)).toBe(beforeAnyXp);
     await db
       .delete(rune.inventoryStacks)
-      .where(eq(rune.inventoryStacks.itemId, ITEM_IDS.ferriteShale));
+      .where(
+        and(
+          eq(rune.inventoryStacks.characterId, character.id),
+          eq(rune.inventoryStacks.itemId, ITEM_IDS.ferriteShale),
+        ),
+      );
 
     await addShale(character.id, 10);
     const completed = await missions.completeCutYourTeeth(
@@ -333,7 +345,7 @@ suite("issue #110 Cut Your Teeth persistence and XP boundary (real PostgreSQL)",
     expect(cyt).toMatchObject({
       state: "ready_for_completion",
       currentObjective: "Show a full stack of Ferrite Shale to Tansy Rusk",
-      stage: { readyForCompletion: true, nextObjectiveKind: undefined },
+      stage: { requirementsSatisfied: true, turnInAvailable: true, nextObjectiveKind: undefined },
     });
 
     // Completion succeeds immediately and awards exactly +100 once.
@@ -345,6 +357,109 @@ suite("issue #110 Cut Your Teeth persistence and XP boundary (real PostgreSQL)",
     );
     expect(completed.mission.status).toBe("completed");
     expect(await miningXp(character.id)).toBe(100);
+  });
+
+  it("keeps requirements recognized while busy and never asks for more shale", async () => {
+    const { userId, character } = await makeCharacter();
+    await completeWalkItOffAtTheJag(userId, character.id);
+    await db
+      .insert(rune.characterMissions)
+      .values({ characterId: character.id, missionId: "cut_your_teeth", acceptedAt: now });
+    await equipCutter(userId, character.id);
+    await addShale(character.id, 10);
+    await db.insert(rune.activeActions).values({
+      characterId: character.id,
+      actionId: "ferrite_shale_mining",
+      startedAt: now,
+      resolvedThroughAt: now,
+    });
+
+    const state = await mining.getMiningGameplayState(
+      userId,
+      character.id,
+      now,
+      deterministicRandom(),
+    );
+    const cyt = state.missions.find((mission) => mission.missionId === "cut_your_teeth");
+    // Requirements ARE satisfied (Cutter equipped + full stack), but the
+    // character is mid-Mining so the turn-in is NOT available. The projection
+    // must expose both facts distinctly — never a false "need more shale".
+    expect(cyt).toMatchObject({
+      state: "active",
+      stage: { requirementsSatisfied: true, turnInAvailable: false, nextObjectiveKind: undefined },
+    });
+    expect(cyt?.currentObjective).toBe("Show a full stack of Ferrite Shale to Tansy Rusk");
+
+    // After the Mining action resolves, the SAME inventory/equipment state is
+    // immediately turn-in ready (SHOW SHALE) — no re-collection needed.
+    await db.delete(rune.activeActions).where(eq(rune.activeActions.characterId, character.id));
+    const afterStop = await mining.getMiningGameplayState(
+      userId,
+      character.id,
+      now,
+      deterministicRandom(),
+    );
+    const cytAfterStop = afterStop.missions.find(
+      (mission) => mission.missionId === "cut_your_teeth",
+    );
+    expect(cytAfterStop).toMatchObject({
+      state: "ready_for_completion",
+      currentObjective: "Show a full stack of Ferrite Shale to Tansy Rusk",
+      stage: { requirementsSatisfied: true, turnInAvailable: true },
+    });
+  });
+
+  it("awards exactly one completion and +100 XP under concurrent first-completion requests", async () => {
+    const { userId, character } = await makeCharacter();
+    await completeWalkItOffAtTheJag(userId, character.id);
+    await db
+      .insert(rune.characterMissions)
+      .values({ characterId: character.id, missionId: "cut_your_teeth", acceptedAt: now });
+    await equipCutter(userId, character.id);
+    await addShale(character.id, 10);
+
+    // Two FIRST completion requests race: the mission is accepted and
+    // incomplete with every requirement satisfied. Exactly one must win.
+    const [first, second] = await Promise.all([
+      missions.completeCutYourTeeth(
+        userId,
+        character.id,
+        new Date(now.getTime() + 1_000),
+        deterministicRandom(),
+      ),
+      missions.completeCutYourTeeth(
+        userId,
+        character.id,
+        new Date(now.getTime() + 2_000),
+        deterministicRandom(),
+      ),
+    ]);
+    const statuses = [first.mission.status, second.mission.status];
+    expect(statuses).toContain("completed");
+    expect(statuses).toContain("already_completed");
+
+    // Exactly +100 Mining XP total, once.
+    expect(await miningXp(character.id)).toBe(100);
+
+    // Shale unchanged — shown, never consumed.
+    const stacks = await db
+      .select()
+      .from(rune.inventoryStacks)
+      .where(eq(rune.inventoryStacks.characterId, character.id));
+    expect(stacks.filter((stack) => stack.itemId === ITEM_IDS.ferriteShale)[0]?.quantity).toBe(10);
+
+    // Persisted completion state is coherent: completedAt present, XP once.
+    const rows = await db
+      .select()
+      .from(rune.characterMissions)
+      .where(
+        and(
+          eq(rune.characterMissions.characterId, character.id),
+          eq(rune.characterMissions.missionId, "cut_your_teeth"),
+        ),
+      );
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.completedAt).not.toBeNull();
   });
 
   it("exposes the available Cut Your Teeth objective after Walk It Off completes but before acceptance", async () => {
@@ -366,5 +481,56 @@ suite("issue #110 Cut Your Teeth persistence and XP boundary (real PostgreSQL)",
     // Walk It Off is complete; the projection leads into the next story quest.
     const wio = state.missions.find((mission) => mission.missionId === "walk_it_off");
     expect(wio?.state).toBe("completed");
+  });
+
+  it("shows 0 / 10 (not 0 / 1) for zero shale through the real observation path", async () => {
+    const { userId, character } = await makeCharacter();
+    await completeWalkItOffAtTheJag(userId, character.id);
+    await db
+      .insert(rune.characterMissions)
+      .values({ characterId: character.id, missionId: "cut_your_teeth", acceptedAt: now });
+    // Cutter equipped, but ZERO Ferrite Shale carried. The full-stack
+    // requirement must resolve from the canonical item definition even though
+    // the character owns none — the objective must read 0 / 10, never 0 / 1.
+    await equipCutter(userId, character.id);
+
+    const state = await mining.getMiningGameplayState(
+      userId,
+      character.id,
+      now,
+      deterministicRandom(),
+    );
+    const cyt = state.missions.find((mission) => mission.missionId === "cut_your_teeth");
+    expect(cyt).toMatchObject({
+      state: "active",
+      currentObjective: "Get a full stack of Ferrite Shale — 0 / 10",
+    });
+    expect(cyt?.stage).toMatchObject({
+      requirementsSatisfied: false,
+      turnInAvailable: false,
+      nextObjectiveKind: "carry_stack",
+    });
+  });
+
+  it("reports accurate N / 10 for partial shale through the real observation path", async () => {
+    const { userId, character } = await makeCharacter();
+    await completeWalkItOffAtTheJag(userId, character.id);
+    await db
+      .insert(rune.characterMissions)
+      .values({ characterId: character.id, missionId: "cut_your_teeth", acceptedAt: now });
+    await equipCutter(userId, character.id);
+    await addShale(character.id, 4);
+
+    const state = await mining.getMiningGameplayState(
+      userId,
+      character.id,
+      now,
+      deterministicRandom(),
+    );
+    const cyt = state.missions.find((mission) => mission.missionId === "cut_your_teeth");
+    expect(cyt).toMatchObject({
+      state: "active",
+      currentObjective: "Get a full stack of Ferrite Shale — 4 / 10",
+    });
   });
 });

@@ -51,6 +51,7 @@ const dialogueIds = {
   tansyCutYourTeethEquipReminder: asContentId("tansy_rusk_cut_your_teeth_equip_reminder"),
   tansyCutYourTeethStackReminder: asContentId("tansy_rusk_cut_your_teeth_stack_reminder"),
   tansyCutYourTeethTurnIn: asContentId("tansy_rusk_cut_your_teeth_turn_in"),
+  tansyCutYourTeethBusy: asContentId("tansy_rusk_cut_your_teeth_busy"),
   tansyCutYourTeethCompletion: asContentId("tansy_rusk_cut_your_teeth_completion"),
 } as const satisfies Record<string, ContentId>;
 

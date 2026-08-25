@@ -10,6 +10,8 @@ import {
   addDurableCheckpoint,
   getDialogueStudioStorageKey,
   getLegacyDialogueStudioStorageKey,
+  getLegacyDialogueStudioStorageKeys,
+  getV1DialogueStudioStorageKey,
   parsePersistedDialogueStudio,
   serializeDialogueStudio,
 } from "@/tools/qc-studio/core/storage";
@@ -208,6 +210,15 @@ describe("QC Studio core", () => {
     expect(getLegacyDialogueStudioStorageKey(adapter.adapterId)).toBe(
       "qc-studio:test-game:dialogue:v2",
     );
+    expect(getV1DialogueStudioStorageKey(adapter.adapterId)).toBe(
+      "qc-studio:test-game:dialogue:v1",
+    );
+    // Discovery order is newest-to-oldest so a newer legacy draft wins over an
+    // older one without ever overwriting a newer valid draft.
+    expect(getLegacyDialogueStudioStorageKeys(adapter.adapterId)).toEqual([
+      "qc-studio:test-game:dialogue:v2",
+      "qc-studio:test-game:dialogue:v1",
+    ]);
   });
 
   it("names blank drafts from the default speaker and background context", () => {

@@ -52,7 +52,13 @@ export type MissionProjection = {
    */
   stage?: {
     /** All authored objective steps currently hold against authoritative state. */
-    readyForCompletion: boolean;
+    requirementsSatisfied: boolean;
+    /**
+     * True only when the character is stationary at the mission location AND
+     * requirements are satisfied — i.e. the turn-in is currently performable.
+     * A busy character can have requirementsSatisfied true while this is false.
+     */
+    turnInAvailable: boolean;
     /**
      * The first unsatisfied step kind, if any, in authored order. Used only
      * to choose contextual dialogue (equip vs stack vs turn-in), never to
@@ -160,7 +166,11 @@ function deriveCurrentObjective(
     const step = definition.objectiveSteps.find(
       (candidate) => !stepSatisfied(candidate, observation),
     );
+    // An unsatisfied step renders its own objective; when every step holds but
+    // the character is busy (not stationary), the completion objective is the
+    // accurate next instruction — they already have what the quest asked for.
     if (step) return renderObjectiveTemplate(step.template, step, observation);
+    return definition.completionObjective;
   }
   if (state === "ready_for_completion") {
     const step = definition.objectiveSteps.find(
@@ -191,6 +201,7 @@ export function projectMission(
   const firstUnsatisfied = definition.objectiveSteps?.find(
     (candidate) => !stepSatisfied(candidate, observation),
   );
+  const requirementsSatisfied = stepsSatisfied(definition, observation);
   const offeringNpc = getNpc(definition.offeringNpcId);
   return {
     missionId: definition.id,
@@ -208,8 +219,8 @@ export function projectMission(
     prerequisiteSatisfied: !definition.prerequisiteMissionId || prerequisiteCompleted,
     availableObjective: definition.availableObjective,
     stage: {
-      readyForCompletion:
-        state === "ready_for_completion" && stepsSatisfied(definition, observation),
+      requirementsSatisfied,
+      turnInAvailable: state === "ready_for_completion" && requirementsSatisfied,
       nextObjectiveKind: firstUnsatisfied?.kind,
     },
   };

@@ -22,7 +22,7 @@ import {
 import {
   addDurableCheckpoint,
   getDialogueStudioStorageKey,
-  getLegacyDialogueStudioStorageKey,
+  getLegacyDialogueStudioStorageKeys,
   parsePersistedDialogueStudio,
   serializeDialogueStudio,
 } from "../../core/storage";
@@ -99,10 +99,7 @@ export function DialogueStudio({
   const storageWriteBlocked = useRef(false);
   const changeKind = useRef<"text" | "structural" | "idle">("idle");
   const beatButtonRefs = useRef<Record<number, HTMLButtonElement | null>>({});
-  const [storageKey, legacyStorageKey] = [
-    getDialogueStudioStorageKey(adapter.adapterId),
-    getLegacyDialogueStudioStorageKey(adapter.adapterId),
-  ];
+  const storageKey = getDialogueStudioStorageKey(adapter.adapterId);
 
   const draft = history.present;
   const selectedBeat = draft.beats[selectedBeatIndex];
@@ -162,10 +159,16 @@ export function DialogueStudio({
     try {
       raw = window.localStorage.getItem(storageKey);
       if (!raw) {
-        // Schema v1 drafts lived under the legacy key; adopt and upgrade them
-        // in place so existing local work is not silently stranded.
-        const legacyRaw = window.localStorage.getItem(legacyStorageKey);
-        if (legacyRaw) raw = legacyRaw;
+        // Schema v1/v2 drafts lived under legacy keys; adopt and upgrade them
+        // in place so existing local work is not silently stranded. Discover
+        // every supported legacy key newest-to-oldest.
+        for (const legacyKey of getLegacyDialogueStudioStorageKeys(adapter.adapterId)) {
+          const legacyRaw = window.localStorage.getItem(legacyKey);
+          if (legacyRaw) {
+            raw = legacyRaw;
+            break;
+          }
+        }
       }
     } catch {
       setStorageMessage("Local draft storage is unavailable; use Export to preserve this work.");

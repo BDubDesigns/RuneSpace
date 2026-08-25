@@ -329,7 +329,36 @@ const dialogue = {
     id: DIALOGUE_IDS.tansyCutYourTeethStackReminder,
     npcId: NPC_IDS.tansyRusk,
     beats: [
-      tansyLocal(EXPRESSION_IDS.smile, "Full stack. Ten pieces. The Jag's not going anywhere."),
+      tansyLocal(
+        EXPRESSION_IDS.neutral,
+        "I need to see one full stack. Ten pieces of Ferrite Shale.",
+      ),
+      tansyLocal(
+        EXPRESSION_IDS.smile,
+        "Put that Salvage Cutter in your Mining Tool slot and work The Jag until you've got them.",
+      ),
+      tansyLocal(
+        EXPRESSION_IDS.neutral,
+        "You'll miss plenty at first. Keep at it. The better you get at Mining, the more often the Cutter bites.",
+      ),
+      tansyLocal(
+        EXPRESSION_IDS.smile,
+        "If you scavenge a few along the way, they still count. Won't teach you much about Mining, though.",
+      ),
+      tansyLocal(
+        EXPRESSION_IDS.neutral,
+        "Bring me ten. I only need to see them — you keep the shale.",
+      ),
+    ],
+  },
+  [DIALOGUE_IDS.tansyCutYourTeethBusy]: {
+    id: DIALOGUE_IDS.tansyCutYourTeethBusy,
+    npcId: NPC_IDS.tansyRusk,
+    beats: [
+      tansyLocal(
+        EXPRESSION_IDS.neutral,
+        "You've got the full stack on you already. Finish what you're doing and I'll take a look.",
+      ),
     ],
   },
   [DIALOGUE_IDS.tansyCutYourTeethTurnIn]: {
@@ -396,6 +425,7 @@ export const CUT_YOUR_TEETH_DIALOGUE = {
   offer: DIALOGUE_IDS.tansyCutYourTeethOffer,
   equipReminder: DIALOGUE_IDS.tansyCutYourTeethEquipReminder,
   stackReminder: DIALOGUE_IDS.tansyCutYourTeethStackReminder,
+  busy: DIALOGUE_IDS.tansyCutYourTeethBusy,
   turnIn: DIALOGUE_IDS.tansyCutYourTeethTurnIn,
   completion: DIALOGUE_IDS.tansyCutYourTeethCompletion,
 } as const;
@@ -404,14 +434,16 @@ export const CUT_YOUR_TEETH_DIALOGUE_MISSION_ID = MISSION_IDS.cutYourTeeth;
 
 /** Contextual active-mission sequence for the current objective boundary. */
 export function getCutYourTeethActiveDialogue(
-  objective: "equip" | "stack" | "ready",
+  objective: "equip" | "stack" | "ready" | "busy",
 ): DialogueSequence | undefined {
   return getDialogue(
     objective === "equip"
       ? DIALOGUE_IDS.tansyCutYourTeethEquipReminder
       : objective === "stack"
         ? DIALOGUE_IDS.tansyCutYourTeethStackReminder
-        : DIALOGUE_IDS.tansyCutYourTeethTurnIn,
+        : objective === "busy"
+          ? DIALOGUE_IDS.tansyCutYourTeethBusy
+          : DIALOGUE_IDS.tansyCutYourTeethTurnIn,
   );
 }
 

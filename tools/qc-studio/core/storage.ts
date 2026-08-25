@@ -16,9 +16,23 @@ export function getDialogueStudioStorageKey(adapterId: string): string {
   return `qc-studio:${adapterId}:dialogue:v3`;
 }
 
-/** Legacy key from schema v1/v2; checked so old drafts migrate instead of stranding. */
+/** Legacy key from schema v2; checked so old drafts migrate instead of stranding. */
 export function getLegacyDialogueStudioStorageKey(adapterId: string): string {
   return `qc-studio:${adapterId}:dialogue:v2`;
+}
+
+/** Original v1 key; also discovered so untouched v1 drafts can still migrate. */
+export function getV1DialogueStudioStorageKey(adapterId: string): string {
+  return `qc-studio:${adapterId}:dialogue:v1`;
+}
+
+/**
+ * All supported legacy storage keys, newest first. The UI discovers every key
+ * in this order and migrates through the existing validation path, so an
+ * untouched v1 draft is never stranded just because a v2 key was also checked.
+ */
+export function getLegacyDialogueStudioStorageKeys(adapterId: string): string[] {
+  return [getLegacyDialogueStudioStorageKey(adapterId), getV1DialogueStudioStorageKey(adapterId)];
 }
 
 export type PersistedLoadResult =

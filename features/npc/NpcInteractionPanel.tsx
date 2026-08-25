@@ -39,7 +39,11 @@ function resolveDialogueForNpc(
     missionId: string;
     state: string;
     prerequisiteSatisfied?: boolean;
-    stage?: { readyForCompletion: boolean; nextObjectiveKind?: "equip_item" | "carry_stack" };
+    stage?: {
+      requirementsSatisfied: boolean;
+      turnInAvailable: boolean;
+      nextObjectiveKind?: "equip_item" | "carry_stack";
+    };
   }[],
 ): { sequence: DialogueSequence; flow: ActiveMissionFlow | null } | undefined {
   const walkItOff = missions.find((entry) => entry.missionId === MISSION_IDS.walkItOff);
@@ -58,10 +62,20 @@ function resolveDialogueForNpc(
       return sequence ? { sequence, flow: null } : undefined;
     }
     // Active: contextual reminder vs turn-in from SEMANTIC stage data.
-    const ready = cutYourTeeth.stage?.readyForCompletion === true;
+    // Requirements can be satisfied while the character is busy (Mining still
+    // running): never tell them to gather MORE shale when they already have a
+    // full stack — route to the turn-in or a finish-your-action treatment.
+    const requirementsSatisfied = cutYourTeeth.stage?.requirementsSatisfied === true;
+    const turnInAvailable = cutYourTeeth.stage?.turnInAvailable === true;
     const nextKind = cutYourTeeth.stage?.nextObjectiveKind;
     const sequence = getCutYourTeethActiveDialogue(
-      ready ? "ready" : nextKind === "equip_item" ? "equip" : "stack",
+      turnInAvailable
+        ? "ready"
+        : requirementsSatisfied
+          ? "busy"
+          : nextKind === "equip_item"
+            ? "equip"
+            : "stack",
     );
     return sequence ? { sequence, flow: "cut_your_teeth" } : undefined;
   }
@@ -95,6 +109,7 @@ export function NpcInteractionPanel() {
   const [, startTransition] = useTransition();
   const triggerRef = useRef<HTMLButtonElement>(null);
   const npc = getNpcAtLocation(state.location.currentLocationId);
+  const stationary = !state.activeAction && !state.travelState;
   const resolved = npc ? resolveDialogueForNpc(npc.id, state.missions) : undefined;
   const baseFlow = resolved?.flow ?? null;
   const baseSequence = resolved?.sequence;
@@ -105,7 +120,6 @@ export function NpcInteractionPanel() {
   const dialogueNpc = sequence ? getNpc(sequence.npcId) : npc;
   if (!npc || !sequence || !dialogueNpc) return null;
   const dialogue = sequence;
-  const stationary = !state.activeAction && !state.travelState;
   const turnInAvailable =
     stationary &&
     ((baseFlow === "walk_it_off" &&

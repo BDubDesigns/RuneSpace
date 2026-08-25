@@ -75,6 +75,11 @@ function prerequisiteCompletedFor(
  * items this projection needs to describe — never a duplicated UI list.
  * Equipment counts only when the instance is genuinely carried (a stored
  * Cutter does not satisfy "equip the Cutter").
+ *
+ * Canonical items referenced by authored mission objective steps are ALWAYS
+ * included even when the character currently carries zero of them, so a
+ * mission requirement (e.g. the Ferrite Shale full-stack limit) never changes
+ * from 1 to 10 merely because the first item entered Inventory.
  */
 function buildObservation(
   assignments: readonly { itemInstanceId: string }[],
@@ -98,11 +103,14 @@ function buildObservation(
   const itemNames = new Map<string, string>();
   const stackLimits = new Map<string, number>();
   // Names must cover every observed item INCLUDING carried-but-unequipped
-  // unique items (an unequipped Cutter still appears in objective copy).
+  // unique items (an unequipped Cutter still appears in objective copy), plus
+  // every canonical item any authored mission step references (zero carried
+  // Ferrite Shale must still resolve its authoritative stack limit).
   const observedItemIds = new Set<string>([
     ...equippedCarriedIds,
     ...carriedInstances.map((instance) => instance.itemId),
     ...carriedQuantities.keys(),
+    ...MISSIONS.flatMap((mission) => (mission.objectiveSteps ?? []).map((step) => step.itemId)),
   ]);
   for (const itemId of observedItemIds) {
     const displayName = resolveItemPresentation(itemId, itemId).displayName;

@@ -16,9 +16,19 @@ export function MissionObjectivePanel({ state }: { state: MiningGameplayState })
   const active = [...state.missions]
     .reverse()
     .find((entry) => entry.state !== "not_accepted" && entry.state !== "completed");
+  // A mission is only presented as an available next story quest when it
+  // EXPLICITLY authors an available-story presentation (e.g. Cut Your Teeth's
+  // post-Walk-It-Off state). A prerequisite-free mission (Walk It Off) must
+  // NOT be flagged Available — that would undermine the explorer-first route
+  // where a fresh character can reach Tansy before ever talking to Wade.
   const available = [...state.missions]
     .reverse()
-    .find((entry) => entry.state === "not_accepted" && entry.prerequisiteSatisfied);
+    .find(
+      (entry) =>
+        entry.state === "not_accepted" &&
+        entry.prerequisiteSatisfied &&
+        entry.availableObjective !== undefined,
+    );
   const completedFallback = [...state.missions]
     .reverse()
     .find((entry) => entry.state === "completed");

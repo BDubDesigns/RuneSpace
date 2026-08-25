@@ -80,10 +80,11 @@ describe("issue #110 Cut Your Teeth authored boundaries", () => {
     expect(getDialogue(DIALOGUE_IDS.tansyCompletion)?.actionLabel).toBe("Claim reward");
   });
 
-  it("resolves contextual active sequences for equip, stack, and turn-in states", () => {
+  it("resolves contextual active sequences for equip, stack, ready, and busy states", () => {
     expect(getCutYourTeethActiveDialogue("equip")?.id).toBe(CUT_YOUR_TEETH_DIALOGUE.equipReminder);
     expect(getCutYourTeethActiveDialogue("stack")?.id).toBe(CUT_YOUR_TEETH_DIALOGUE.stackReminder);
     expect(getCutYourTeethActiveDialogue("ready")?.id).toBe(CUT_YOUR_TEETH_DIALOGUE.turnIn);
+    expect(getCutYourTeethActiveDialogue("busy")?.id).toBe(CUT_YOUR_TEETH_DIALOGUE.busy);
     expect(getCutYourTeethCompletion()?.beats.map((beat) => beat.kind)).toEqual([
       "item",
       "skill_xp",
@@ -91,6 +92,22 @@ describe("issue #110 Cut Your Teeth authored boundaries", () => {
       "npc",
       "npc",
     ]);
+  });
+
+  it("teaches the Mining loop in the incomplete-stack reminder and never lies about the busy state", () => {
+    const stackReminder = getDialogue(CUT_YOUR_TEETH_DIALOGUE.stackReminder);
+    expect(stackReminder?.beats.map((beat) => beat.text)).toEqual([
+      "I need to see one full stack. Ten pieces of Ferrite Shale.",
+      "Put that Salvage Cutter in your Mining Tool slot and work The Jag until you've got them.",
+      "You'll miss plenty at first. Keep at it. The better you get at Mining, the more often the Cutter bites.",
+      "If you scavenge a few along the way, they still count. Won't teach you much about Mining, though.",
+      "Bring me ten. I only need to see them — you keep the shale.",
+    ]);
+    // The busy sequence acknowledges the full stack is already carried and
+    // never claims more shale is needed.
+    const busy = getDialogue(CUT_YOUR_TEETH_DIALOGUE.busy);
+    expect(busy?.beats[0]?.text).toContain("full stack on you already");
+    expect(busy?.beats.some((beat) => /need (more|ten)|bring me ten/i.test(beat.text))).toBe(false);
   });
 
   it("resolves skill-XP presentation only against canonical skills", () => {
@@ -154,7 +171,11 @@ describe("issue #110 objective projection from authoritative observations", () =
     expect(projected).toMatchObject({
       state: "active",
       currentObjective: "Equip the Salvage Cutter from Inventory",
-      stage: { readyForCompletion: false, nextObjectiveKind: "equip_item" },
+      stage: {
+        requirementsSatisfied: false,
+        turnInAvailable: false,
+        nextObjectiveKind: "equip_item",
+      },
     });
   });
 
@@ -247,7 +268,8 @@ describe("issue #110 objective projection from authoritative observations", () =
       observation(),
     );
     expect(equip.stage).toMatchObject({
-      readyForCompletion: false,
+      requirementsSatisfied: false,
+      turnInAvailable: false,
       nextObjectiveKind: "equip_item",
     });
 
@@ -260,11 +282,13 @@ describe("issue #110 objective projection from authoritative observations", () =
       observation({ equippedItemIds: new Set([ITEM_IDS.salvageCutter]) }),
     );
     expect(stack.stage).toMatchObject({
-      readyForCompletion: false,
+      requirementsSatisfied: false,
+      turnInAvailable: false,
       nextObjectiveKind: "carry_stack",
     });
 
-    // All steps hold at The Jag → readyForCompletion true.
+    // All steps hold at The Jag + stationary → requirements satisfied AND
+    // turn-in available.
     const ready = projectMission(
       CUT_YOUR_TEETH,
       accepted(),
@@ -275,8 +299,32 @@ describe("issue #110 objective projection from authoritative observations", () =
         carriedQuantities: new Map([[ITEM_IDS.ferriteShale, 10]]),
       }),
     );
-    expect(ready.stage).toMatchObject({ readyForCompletion: true, nextObjectiveKind: undefined });
+    expect(ready.stage).toMatchObject({
+      requirementsSatisfied: true,
+      turnInAvailable: true,
+      nextObjectiveKind: undefined,
+    });
     expect(ready).toMatchObject({ state: "ready_for_completion" });
+
+    // Requirements satisfied but NOT stationary (busy Mining): the projection
+    // exposes requirementsSatisfied true + turnInAvailable false — never a
+    // false "need more shale".
+    const busy = projectMission(
+      CUT_YOUR_TEETH,
+      accepted(),
+      LOCATION().theJag,
+      false,
+      observation({
+        equippedItemIds: new Set([ITEM_IDS.salvageCutter]),
+        carriedQuantities: new Map([[ITEM_IDS.ferriteShale, 10]]),
+      }),
+    );
+    expect(busy.stage).toMatchObject({
+      requirementsSatisfied: true,
+      turnInAvailable: false,
+      nextObjectiveKind: undefined,
+    });
+    expect(busy).toMatchObject({ state: "active" });
   });
 });
 
