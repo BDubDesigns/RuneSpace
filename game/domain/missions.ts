@@ -1,4 +1,5 @@
 import type { MissionDefinition, MissionObjectiveStep } from "@/game/content/missions";
+import { getNpc } from "@/game/content/npcs";
 
 export type MissionState = "not_accepted" | "active" | "ready_for_completion" | "completed";
 
@@ -31,6 +32,34 @@ export type MissionProjection = {
   offeringNpcId: string;
   completionNpcId: string;
   rewardItemId?: string;
+  /**
+   * True only when this mission's authored prerequisite (if any) is currently
+   * completed for the character. Used to present a not-yet-accepted mission as
+   * available instead of hiding it.
+   */
+  prerequisiteSatisfied: boolean;
+  /** Authoritative display name for the offering NPC (for available copy). */
+  offeringNpcName?: string;
+  /**
+   * Player-facing copy shown while the mission is available but not yet
+   * accepted, pointing the player at the quest giver.
+   */
+  availableObjective?: string;
+  /**
+   * Semantic mission-stage data for routing, independent of player-facing
+   * copy. Objective copy is presentational and must never be parsed to drive
+   * quest/dialogue routing.
+   */
+  stage?: {
+    /** All authored objective steps currently hold against authoritative state. */
+    readyForCompletion: boolean;
+    /**
+     * The first unsatisfied step kind, if any, in authored order. Used only
+     * to choose contextual dialogue (equip vs stack vs turn-in), never to
+     * gate gameplay.
+     */
+    nextObjectiveKind?: "equip_item" | "carry_stack";
+  };
 };
 
 /** Renders authored copy with authoritative names/numbers; no other rewriting. */
@@ -61,23 +90,45 @@ function requiredQuantity(step: MissionObjectiveStep, observation: MissionObserv
   return observation.stackLimits.get(step.itemId) ?? 1;
 }
 
-function stepSatisfied(step: MissionObjectiveStep, observation: MissionObservation): boolean {
+function stepSatisfied(
+  step: MissionObjectiveStep,
+  observation: MissionObservation | undefined,
+): boolean {
+  if (!observation) return false;
   if (step.kind === "equip_item") return observation.equippedItemIds.has(step.itemId);
   const required = requiredQuantity(step, observation);
   return (observation.carriedQuantities.get(step.itemId) ?? 0) >= required;
 }
 
+/**
+ * True when the mission's authored objective steps ALL currently hold against
+ * authoritative state. Location/stationary alone never makes a mission
+ * completion-ready: the actual completion requirements (equipment, carried
+ * quantities) must be satisfied too.
+ */
+function stepsSatisfied(
+  definition: MissionDefinition,
+  observation: MissionObservation | undefined,
+): boolean {
+  if (!definition.objectiveSteps?.length) return true;
+  if (!observation) return false;
+  return definition.objectiveSteps.every((step) => stepSatisfied(step, observation));
+}
+
 export function deriveMissionState(input: {
   mission: MissionRecordState | undefined;
+  definition: MissionDefinition;
   relevantLocationId: string;
   currentLocationId: string;
   stationary: boolean;
+  observation?: MissionObservation | undefined;
 }): MissionState {
   if (!input.mission?.acceptedAt) return "not_accepted";
   if (input.mission.completedAt) return "completed";
-  if (input.currentLocationId === input.relevantLocationId && input.stationary) {
-    return "ready_for_completion";
-  }
+  const atRelevantLocation = input.currentLocationId === input.relevantLocationId;
+  const requirementsHold =
+    input.stationary && atRelevantLocation && stepsSatisfied(input.definition, input.observation);
+  if (requirementsHold) return "ready_for_completion";
   return "active";
 }
 
@@ -127,13 +178,20 @@ export function projectMission(
   currentLocationId: string,
   stationary: boolean,
   observation?: MissionObservation,
+  prerequisiteCompleted = false,
 ): MissionProjection {
   const state = deriveMissionState({
     mission,
+    definition,
     relevantLocationId: definition.relevantLocationId,
     currentLocationId,
     stationary,
+    observation,
   });
+  const firstUnsatisfied = definition.objectiveSteps?.find(
+    (candidate) => !stepSatisfied(candidate, observation),
+  );
+  const offeringNpc = getNpc(definition.offeringNpcId);
   return {
     missionId: definition.id,
     title: definition.title,
@@ -144,7 +202,15 @@ export function projectMission(
         ? undefined
         : deriveCurrentObjective(definition, state, currentLocationId, stationary, observation),
     offeringNpcId: definition.offeringNpcId,
+    offeringNpcName: offeringNpc?.displayName,
     completionNpcId: definition.completionNpcId,
     rewardItemId: definition.reward.kind === "item" ? definition.reward.itemId : undefined,
+    prerequisiteSatisfied: !definition.prerequisiteMissionId || prerequisiteCompleted,
+    availableObjective: definition.availableObjective,
+    stage: {
+      readyForCompletion:
+        state === "ready_for_completion" && stepsSatisfied(definition, observation),
+      nextObjectiveKind: firstUnsatisfied?.kind,
+    },
   };
 }

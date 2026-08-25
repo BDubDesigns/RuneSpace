@@ -67,6 +67,19 @@ describe("issue #110 Cut Your Teeth authored boundaries", () => {
     ).toBe(false);
   });
 
+  it("keeps the Cut Your Teeth offer owned by the CYT flow with SHOW SHALE action copy", () => {
+    // The offer is an accept_mission sequence; its Accept must map to the
+    // CYT acceptance (not Walk It Off's) and the turn-in uses SHOW SHALE.
+    const offer = getDialogue(CUT_YOUR_TEETH_DIALOGUE.offer);
+    expect(offer?.action).toBe("accept_mission");
+    expect(offer?.actionLabel).toBeUndefined();
+    const turnIn = getDialogue(CUT_YOUR_TEETH_DIALOGUE.turnIn);
+    expect(turnIn?.action).toBe("complete_mission");
+    expect(turnIn?.actionLabel).toBe("SHOW SHALE");
+    // Walk It Off's Cutter claim keeps its existing mission-specific copy.
+    expect(getDialogue(DIALOGUE_IDS.tansyCompletion)?.actionLabel).toBe("Claim reward");
+  });
+
   it("resolves contextual active sequences for equip, stack, and turn-in states", () => {
     expect(getCutYourTeethActiveDialogue("equip")?.id).toBe(CUT_YOUR_TEETH_DIALOGUE.equipReminder);
     expect(getCutYourTeethActiveDialogue("stack")?.id).toBe(CUT_YOUR_TEETH_DIALOGUE.stackReminder);
@@ -135,9 +148,13 @@ describe("issue #110 objective projection from authoritative observations", () =
       true,
       awayFromEquip,
     );
+    // Even at The Jag and stationary with a full stack, the Cutter not being
+    // equipped keeps the mission ACTIVE (not completion-ready): ready_for_completion
+    // requires every authored step to hold.
     expect(projected).toMatchObject({
-      state: "ready_for_completion",
+      state: "active",
       currentObjective: "Equip the Salvage Cutter from Inventory",
+      stage: { readyForCompletion: false, nextObjectiveKind: "equip_item" },
     });
   });
 
@@ -185,6 +202,81 @@ describe("issue #110 objective projection from authoritative observations", () =
       state: "ready_for_completion",
       currentObjective: "Talk to Tansy Rusk",
     });
+  });
+
+  it("exposes prerequisite-satisfied availability only when the prerequisite is complete", () => {
+    // Not yet accepted and its prerequisite (Walk It Off) NOT complete: the
+    // projection is not_accepted and NOT available to the player.
+    const locked = projectMission(
+      CUT_YOUR_TEETH,
+      undefined,
+      LOCATION().theJag,
+      true,
+      observation(),
+    );
+    expect(locked).toMatchObject({
+      state: "not_accepted",
+      prerequisiteSatisfied: false,
+    });
+
+    // Not yet accepted but its prerequisite IS complete (the post-Walk-It-Off
+    // boundary): the projection becomes available and leads the player in.
+    const available = projectMission(
+      CUT_YOUR_TEETH,
+      undefined,
+      LOCATION().theJag,
+      true,
+      observation(),
+      true,
+    );
+    expect(available).toMatchObject({
+      state: "not_accepted",
+      prerequisiteSatisfied: true,
+      availableObjective: "Speak with Tansy Rusk at The Jag to begin Cut Your Teeth.",
+      offeringNpcName: "Tansy Rusk",
+    });
+  });
+
+  it("emits semantic stage data for routing without parsing objective copy", () => {
+    // Equip unsatisfied → nextObjectiveKind equip_item, not ready.
+    const equip = projectMission(
+      CUT_YOUR_TEETH,
+      accepted(),
+      LOCATION().theJag,
+      true,
+      observation(),
+    );
+    expect(equip.stage).toMatchObject({
+      readyForCompletion: false,
+      nextObjectiveKind: "equip_item",
+    });
+
+    // Stack unsatisfied → nextObjectiveKind carry_stack.
+    const stack = projectMission(
+      CUT_YOUR_TEETH,
+      accepted(),
+      LOCATION().theJag,
+      true,
+      observation({ equippedItemIds: new Set([ITEM_IDS.salvageCutter]) }),
+    );
+    expect(stack.stage).toMatchObject({
+      readyForCompletion: false,
+      nextObjectiveKind: "carry_stack",
+    });
+
+    // All steps hold at The Jag → readyForCompletion true.
+    const ready = projectMission(
+      CUT_YOUR_TEETH,
+      accepted(),
+      LOCATION().theJag,
+      true,
+      observation({
+        equippedItemIds: new Set([ITEM_IDS.salvageCutter]),
+        carriedQuantities: new Map([[ITEM_IDS.ferriteShale, 10]]),
+      }),
+    );
+    expect(ready.stage).toMatchObject({ readyForCompletion: true, nextObjectiveKind: undefined });
+    expect(ready).toMatchObject({ state: "ready_for_completion" });
   });
 });
 

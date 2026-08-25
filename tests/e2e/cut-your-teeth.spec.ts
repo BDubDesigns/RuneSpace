@@ -141,7 +141,7 @@ test("equips the Cutter through Inventory, shows a full stack, and earns Mining 
   await page.getByRole("button", { name: /Talk to Tansy Rusk/ }).click();
   const tansy = page.getByRole("dialog", { name: "Tansy Rusk dialogue" });
   await expect(tansy).toBeVisible();
-  const showShale = tansy.getByRole("button", { name: "Claim reward" });
+  const showShale = tansy.getByRole("button", { name: "SHOW SHALE" });
   await expect(showShale).toBeVisible();
 
   await showShale.click();

@@ -29,10 +29,18 @@ type ActiveMissionFlow = "walk_it_off" | "cut_your_teeth";
  * Resolves the Tansy conversation for the Walk It Off → Cut Your Teeth chain
  * from the authoritative mission projections (issue #110). Wade keeps his
  * existing two-sequence flow.
+ *
+ * Routing uses SEMANTIC mission state only (state, stage.readyForCompletion,
+ * stage.nextObjectiveKind) — never regex-parses player-facing objective copy.
  */
 function resolveDialogueForNpc(
   npcId: string,
-  missions: readonly { missionId: string; state: string; currentObjective?: string }[],
+  missions: readonly {
+    missionId: string;
+    state: string;
+    prerequisiteSatisfied?: boolean;
+    stage?: { readyForCompletion: boolean; nextObjectiveKind?: "equip_item" | "carry_stack" };
+  }[],
 ): { sequence: DialogueSequence; flow: ActiveMissionFlow | null } | undefined {
   const walkItOff = missions.find((entry) => entry.missionId === MISSION_IDS.walkItOff);
   const cutYourTeeth = missions.find((entry) => entry.missionId === MISSION_IDS.cutYourTeeth);
@@ -49,12 +57,21 @@ function resolveDialogueForNpc(
       const sequence = getCutYourTeethCompletion();
       return sequence ? { sequence, flow: null } : undefined;
     }
-    // Active: contextual reminder vs turn-in from the authoritative objective.
-    const objective = cutYourTeeth.currentObjective ?? "";
-    const ready = /Show a full stack/i.test(objective);
-    const equip = /Equip the /i.test(objective);
-    const sequence = getCutYourTeethActiveDialogue(ready ? "ready" : equip ? "equip" : "stack");
+    // Active: contextual reminder vs turn-in from SEMANTIC stage data.
+    const ready = cutYourTeeth.stage?.readyForCompletion === true;
+    const nextKind = cutYourTeeth.stage?.nextObjectiveKind;
+    const sequence = getCutYourTeethActiveDialogue(
+      ready ? "ready" : nextKind === "equip_item" ? "equip" : "stack",
+    );
     return sequence ? { sequence, flow: "cut_your_teeth" } : undefined;
+  }
+
+  // Walk It Off complete + Cut Your Teeth not accepted → the CYT OFFER is
+  // owned by the cut_your_teeth flow so its Accept calls the CYT acceptance.
+  // Never show the offer before its prerequisite is satisfied.
+  if (cutYourTeeth && cutYourTeeth.state === "not_accepted" && cutYourTeeth.prerequisiteSatisfied) {
+    const sequence = getDialogue(DIALOGUE_IDS.tansyCutYourTeethOffer);
+    if (sequence) return { sequence, flow: "cut_your_teeth" };
   }
 
   const sequence = getWalkItOffDialogue(npcId, asMissionState(walkItOff?.state));

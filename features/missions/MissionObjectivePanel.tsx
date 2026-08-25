@@ -6,20 +6,28 @@ import type { MiningGameplayState } from "@/server/mining";
 /**
  * Displays the relevant active mission through the shared projection surface.
  * Completed missions never block later ones: the newest accepted, uncompleted
- * mission wins; otherwise the most recently completed mission shows its
- * completed state. There is deliberately no one-active-mission restriction
- * and no history/log redesign here.
+ * mission wins. When the newest mission is merely ELIGIBLE (its prerequisite
+ * is complete but the player has not yet accepted), that mission leads the
+ * panel as available; only when no next story mission is currently available
+ * does the most recently completed mission show its completed state. There is
+ * deliberately no one-active-mission restriction and no history/log redesign.
  */
 export function MissionObjectivePanel({ state }: { state: MiningGameplayState }) {
   const active = [...state.missions]
     .reverse()
     .find((entry) => entry.state !== "not_accepted" && entry.state !== "completed");
-  const mission =
-    active ??
-    [...state.missions].reverse().find((entry) => entry.state === "completed") ??
-    state.missions[0];
-  if (!mission || mission.state === "not_accepted") return null;
+  const available = [...state.missions]
+    .reverse()
+    .find((entry) => entry.state === "not_accepted" && entry.prerequisiteSatisfied);
+  const completedFallback = [...state.missions]
+    .reverse()
+    .find((entry) => entry.state === "completed");
+  const mission = active ?? available ?? completedFallback ?? state.missions[0];
+  // The available mission is not_accepted but MUST render (it leads the
+  // player into the next story quest). Only hide when nothing at all exists.
+  if (!mission || (!available && mission.state === "not_accepted")) return null;
   const completed = mission.state === "completed";
+  const isAvailable = mission === available;
   return (
     <Panel
       aria-label="Mission objective"
@@ -46,11 +54,16 @@ export function MissionObjectivePanel({ state }: { state: MiningGameplayState })
             borderColor: "var(--rs-mission-border)",
           }}
         >
-          {completed ? "Completed" : "Active"}
+          {completed ? "Completed" : isAvailable ? "Available" : "Active"}
         </span>
       </div>
       <p className="mt-3 text-sm text-[color:var(--rs-mission-text)]">
-        {completed ? `${mission.title} complete.` : mission.currentObjective}
+        {completed
+          ? `${mission.title} complete.`
+          : isAvailable
+            ? (mission.availableObjective ??
+              `Speak with ${mission.offeringNpcName ?? "the quest giver"}.`)
+            : mission.currentObjective}
       </p>
     </Panel>
   );

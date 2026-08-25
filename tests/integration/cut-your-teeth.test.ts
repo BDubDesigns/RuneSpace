@@ -302,4 +302,69 @@ suite("issue #110 Cut Your Teeth persistence and XP boundary (real PostgreSQL)",
     expect(busy.mission).toMatchObject({ status: "refused", reason: "not_stationary" });
     expect(await miningXp(character.id)).toBe(0);
   });
+
+  it("immediately reaches SHOW SHALE when accepting while already equipped with a full stack", async () => {
+    const { userId, character } = await makeCharacter();
+    await completeWalkItOffAtTheJag(userId, character.id);
+
+    // Pre-authoritative boundary: the Cutter is granted by mission one and the
+    // player already has a full stack before ever accepting Cut Your Teeth.
+    await equipCutter(userId, character.id);
+    await addShale(character.id, 10);
+
+    // Accepting at The Jag: the projection must immediately present the
+    // ready-for-completion turn-in objective (SHOW SHALE), not an intermediate
+    // equip/stack step, because the authoritative requirements already hold.
+    const accepted = await missions.acceptCutYourTeeth(
+      userId,
+      character.id,
+      now,
+      deterministicRandom(),
+    );
+    expect(accepted.mission.status).toBe("accepted");
+
+    const state = await mining.getMiningGameplayState(
+      userId,
+      character.id,
+      now,
+      deterministicRandom(),
+    );
+    const cyt = state.missions.find((mission) => mission.missionId === "cut_your_teeth");
+    expect(cyt).toMatchObject({
+      state: "ready_for_completion",
+      currentObjective: "Show a full stack of Ferrite Shale to Tansy Rusk",
+      stage: { readyForCompletion: true, nextObjectiveKind: undefined },
+    });
+
+    // Completion succeeds immediately and awards exactly +100 once.
+    const completed = await missions.completeCutYourTeeth(
+      userId,
+      character.id,
+      now,
+      deterministicRandom(),
+    );
+    expect(completed.mission.status).toBe("completed");
+    expect(await miningXp(character.id)).toBe(100);
+  });
+
+  it("exposes the available Cut Your Teeth objective after Walk It Off completes but before acceptance", async () => {
+    const { userId, character } = await makeCharacter();
+    await completeWalkItOffAtTheJag(userId, character.id);
+
+    const state = await mining.getMiningGameplayState(
+      userId,
+      character.id,
+      now,
+      deterministicRandom(),
+    );
+    const cyt = state.missions.find((mission) => mission.missionId === "cut_your_teeth");
+    expect(cyt).toMatchObject({
+      state: "not_accepted",
+      prerequisiteSatisfied: true,
+      availableObjective: "Speak with Tansy Rusk at The Jag to begin Cut Your Teeth.",
+    });
+    // Walk It Off is complete; the projection leads into the next story quest.
+    const wio = state.missions.find((mission) => mission.missionId === "walk_it_off");
+    expect(wio?.state).toBe("completed");
+  });
 });

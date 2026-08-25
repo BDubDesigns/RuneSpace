@@ -1,7 +1,7 @@
 import { eq } from "drizzle-orm";
 import { characterMissions, equippedItems, inventoryStacks } from "@/db/rune-space";
 import { getEffectiveGameBalance, getItemDefinition } from "@/game/config/balance";
-import { MISSIONS } from "@/game/content/missions";
+import { MISSIONS, type MissionDefinition } from "@/game/content/missions";
 import {
   projectMission,
   type MissionObservation,
@@ -49,8 +49,25 @@ export async function loadMissionProjections(
       input.currentLocationId,
       stationary,
       observation,
+      prerequisiteCompletedFor(mission, byMissionId),
     ),
   );
+}
+
+/**
+ * True when the mission's authored prerequisite (if any) is completed for the
+ * character. A mission with no prerequisite is always available.
+ */
+function prerequisiteCompletedFor(
+  mission: MissionDefinition,
+  byMissionId: ReadonlyMap<
+    string,
+    { missionId: string; acceptedAt: Date | null; completedAt: Date | null }
+  >,
+): boolean {
+  if (!mission.prerequisiteMissionId) return true;
+  const prerequisite = byMissionId.get(mission.prerequisiteMissionId);
+  return Boolean(prerequisite?.completedAt);
 }
 
 /**

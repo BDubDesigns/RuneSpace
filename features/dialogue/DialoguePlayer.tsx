@@ -86,10 +86,13 @@ export function DialoguePlayer({
   const isComplete = reducedMotion || revealedChars >= currentBeatTextLength;
   const isLastBeat = beatIndex === sequence.beats.length - 1;
   const nextLabel = isComplete && isLastBeat ? "Finish" : "Next";
-  // Authored action copy stays mission-specific; every completion control is
-  // the sequence's own explicit action, chosen by authored content — never a
-  // generic label guessed from the subject.
-  const actionLabel = sequence.action === "accept_mission" ? "Accept mission" : "Claim reward";
+  // Authored action copy stays mission-specific: every completion control is
+  // the sequence's own explicit label (e.g. "Claim reward" for Walk It Off's
+  // Cutter claim, "SHOW SHALE" for Cut Your Teeth's turn-in). Falls back to a
+  // generic label only when the sequence does not author one.
+  const actionLabel =
+    sequence.actionLabel ??
+    (sequence.action === "accept_mission" ? "Accept mission" : "Claim reward");
   const visibleText = reducedMotion ? beat.text : beatCharacters.slice(0, revealedChars).join("");
 
   function restart() {

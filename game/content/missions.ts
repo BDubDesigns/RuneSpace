@@ -65,6 +65,12 @@ export type MissionDefinition = {
   travelObjective?: string;
   /** Objective copy once every step is satisfied at the mission location. */
   completionObjective?: string;
+  /**
+   * Player-facing copy shown while the mission is available but not yet
+   * accepted, pointing the player at the quest giver. Mirrors how Walk It Off
+   * presents "Travel to The Jag" before acceptance.
+   */
+  availableObjective?: string;
   /** Ordered objective steps evaluated before the completion objective. */
   objectiveSteps?: readonly MissionObjectiveStep[];
 };
@@ -104,6 +110,7 @@ export const CUT_YOUR_TEETH: MissionDefinition = {
   reward: { kind: "skill_xp", skillId: SKILL_IDS.mining, amount: 100 },
   prerequisiteMissionId: MISSION_IDS.walkItOff,
   travelObjective: "Return to The Jag",
+  availableObjective: "Speak with Tansy Rusk at The Jag to begin Cut Your Teeth.",
   objectiveSteps: [
     {
       kind: "equip_item",
