@@ -13,12 +13,12 @@ import {
 export const MAX_DURABLE_CHECKPOINTS = 5;
 
 export function getDialogueStudioStorageKey(adapterId: string): string {
-  return `qc-studio:${adapterId}:dialogue:v2`;
+  return `qc-studio:${adapterId}:dialogue:v3`;
 }
 
-/** Legacy key from schema v1; checked so old drafts migrate instead of stranding. */
+/** Legacy key from schema v1/v2; checked so old drafts migrate instead of stranding. */
 export function getLegacyDialogueStudioStorageKey(adapterId: string): string {
-  return `qc-studio:${adapterId}:dialogue:v1`;
+  return `qc-studio:${adapterId}:dialogue:v2`;
 }
 
 export type PersistedLoadResult =
@@ -45,9 +45,18 @@ function isItemBeat(beat: Record<string, unknown>): boolean {
   );
 }
 
+function isSkillXpBeat(beat: Record<string, unknown>): boolean {
+  return (
+    typeof beat.skillId === "string" &&
+    typeof beat.amount === "number" &&
+    Number.isInteger(beat.amount) &&
+    beat.amount >= 1
+  );
+}
+
 /**
- * Accepts either subject kind and REJECTS mixed shapes: a stored beat carrying
- * fields that belong only to the other kind fails validation, so malformed
+ * Accepts every subject kind and REJECTS mixed shapes: a stored beat carrying
+ * fields that belong only to another kind fails validation, so malformed
  * persisted data can never load as if it were clean.
  */
 function isBeat(value: unknown): value is StudioDialogueBeat {
@@ -58,22 +67,41 @@ function isBeat(value: unknown): value is StudioDialogueBeat {
     typeof candidate.speakerNpcId === "string" &&
     typeof candidate.expressionId === "string" &&
     isPresentationMode(candidate.presentationMode);
+  const carriesItemOnlyFields = "itemId" in beat || "quantity" in beat;
+  const carriesSkillOnlyFields = "skillId" in beat || "amount" in beat;
   if (beat.kind === "npc") {
-    // Item-only fields must not survive on an NPC beat.
-    if ("itemId" in beat || "quantity" in beat) return false;
+    // Item-only and skill-only fields must not survive on an NPC beat.
+    if (carriesItemOnlyFields || carriesSkillOnlyFields) return false;
     return isNpcFields(beat);
   }
   if (beat.kind === "item") {
-    // NPC-only fields must not survive on an item beat.
-    if ("speakerNpcId" in beat || "expressionId" in beat || "presentationMode" in beat) {
+    // NPC-only and skill-only fields must not survive on an item beat.
+    if (
+      "speakerNpcId" in beat ||
+      "expressionId" in beat ||
+      "presentationMode" in beat ||
+      carriesSkillOnlyFields
+    ) {
       return false;
     }
     return isItemBeat(beat);
   }
-  // v1 beats had no kind discriminator; they were all NPC beats. A v1-shaped
-  // beat must not carry item-only fields either.
+  if (beat.kind === "skill_xp") {
+    // NPC-only and item-only fields must not survive on a skill-XP beat.
+    if (
+      "speakerNpcId" in beat ||
+      "expressionId" in beat ||
+      "presentationMode" in beat ||
+      carriesItemOnlyFields
+    ) {
+      return false;
+    }
+    return isSkillXpBeat(beat);
+  }
+  // v1/v2 beats had only NPC or item kinds; a legacy-shaped beat must not
+  // carry skill-only fields either. v1 beats without a kind are NPC beats.
   if (beat.kind === undefined) {
-    if ("itemId" in beat || "quantity" in beat) return false;
+    if (carriesItemOnlyFields || carriesSkillOnlyFields) return false;
     return isNpcFields(beat);
   }
   return false;
@@ -107,8 +135,12 @@ function isCheckpoint(value: unknown, adapterId: string): value is DialogueCheck
   );
 }
 
-/** Migrates a schema-v1 payload to the current version by tagging every beat as an NPC beat. */
-function migrateV1State(
+/**
+ * Migrates a schema-v1 or v2 payload to the current version. v1 beats (no
+ * kind discriminator) become NPC beats; v2 beats already carry their kind.
+ * Neither format has skill-XP beats, so nothing else is rewritten.
+ */
+function migrateLegacyState(
   state: Record<string, unknown>,
   adapterId: string,
 ): PersistedDialogueStudio | null {
@@ -118,11 +150,16 @@ function migrateV1State(
   } catch {
     return null;
   }
+  const legacyVersion = copied.schemaVersion;
+  void legacyVersion;
   const tagBeats = (draft: Record<string, unknown>) => {
     if (Array.isArray(draft.beats)) {
       draft.beats = (draft.beats as unknown[]).map((beat) => ({
         ...(beat as Record<string, unknown>),
-        kind: "npc",
+        kind:
+          beat && typeof beat === "object" && "kind" in (beat as Record<string, unknown>)
+            ? ((beat as Record<string, unknown>).kind as string)
+            : "npc",
       }));
     }
     draft.schemaVersion = QC_STUDIO_SCHEMA_VERSION;
@@ -175,8 +212,12 @@ export function parsePersistedDialogueStudio(
     !isDraft(state.draft, adapterId) ||
     !Array.isArray(state.checkpoints)
   ) {
-    if (state.schemaVersion === QC_STUDIO_MIGRATABLE_SCHEMA_VERSION) {
-      const migrated = migrateV1State(state, adapterId);
+    if (
+      state.schemaVersion === QC_STUDIO_MIGRATABLE_SCHEMA_VERSION ||
+      // v1 drafts migrated to v2 previously; keep adopting them too.
+      (state.schemaVersion === 1 && QC_STUDIO_MIGRATABLE_SCHEMA_VERSION >= 2)
+    ) {
+      const migrated = migrateLegacyState(state, adapterId);
       if (migrated) return { kind: "migrated", state: migrated };
     }
     // Only genuinely NEWER formats are "unsupported" (left untouched).

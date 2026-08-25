@@ -207,6 +207,7 @@ async function runCanonical() {
     verifyAndCopyScreenshots(OVERLAY_REQUIRED, resolve(ROOT, "artifacts/e2e-review/overlay"));
 
   await runPlaywright(["walk-it-off", "--project=chromium"], "Walk It Off E2E");
+  await runPlaywright(["cut-your-teeth", "--project=chromium"], "Cut Your Teeth E2E");
 
   const authFile = resolve(ROOT, ".playwright/mining-auth-state.json");
   if (existsSync(authFile)) unlinkSync(authFile);

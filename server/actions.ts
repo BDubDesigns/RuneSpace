@@ -37,6 +37,8 @@ import { claimPowerCells, type PowerAnnexClaimResult } from "@/server/power-anne
 import {
   acceptWalkItOff,
   completeWalkItOff,
+  acceptCutYourTeeth,
+  completeCutYourTeeth,
   type MissionAcceptanceResult,
   type MissionCompletionResult,
 } from "@/server/missions";
@@ -57,6 +59,8 @@ import {
   ChangeCharacterPortraitRequestSchema,
   AcceptWalkItOffRequestSchema,
   CompleteWalkItOffRequestSchema,
+  AcceptCutYourTeethRequestSchema,
+  CompleteCutYourTeethRequestSchema,
 } from "@/game/schemas/gameplay";
 
 /**
@@ -158,6 +162,32 @@ export async function completeWalkItOffAction(input: unknown): Promise<MissionAc
   try {
     const user = await requireCurrentUser(await headers());
     return await completeWalkItOff(user.id, request.data.characterId);
+  } catch (error) {
+    if (error instanceof OwnershipError) return { error: error.message };
+    throw error;
+  }
+}
+
+/** Issue #110 Cut Your Teeth acceptance — same trusted boundary as Walk It Off. */
+export async function acceptCutYourTeethAction(input: unknown): Promise<MissionActionResult> {
+  const request = AcceptCutYourTeethRequestSchema.safeParse(input);
+  if (!request.success) return { error: "Invalid Cut Your Teeth acceptance command." };
+  try {
+    const user = await requireCurrentUser(await headers());
+    return await acceptCutYourTeeth(user.id, request.data.characterId);
+  } catch (error) {
+    if (error instanceof OwnershipError) return { error: error.message };
+    throw error;
+  }
+}
+
+/** Issue #110 Cut Your Teeth completion — XP award stays server-authoritative. */
+export async function completeCutYourTeethAction(input: unknown): Promise<MissionActionResult> {
+  const request = CompleteCutYourTeethRequestSchema.safeParse(input);
+  if (!request.success) return { error: "Invalid Cut Your Teeth completion command." };
+  try {
+    const user = await requireCurrentUser(await headers());
+    return await completeCutYourTeeth(user.id, request.data.characterId);
   } catch (error) {
     if (error instanceof OwnershipError) return { error: error.message };
     throw error;

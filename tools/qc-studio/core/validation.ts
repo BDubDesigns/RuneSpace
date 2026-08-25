@@ -17,6 +17,10 @@ function findItem(adapter: DialogueAdapter, itemId: string): StudioItem | undefi
   return adapter.items?.find((item) => item.id === itemId);
 }
 
+function findSkill(adapter: DialogueAdapter, skillId: string) {
+  return adapter.skills?.find((skill) => skill.id === skillId);
+}
+
 /** The authoritative quantity range for an item beat, straight from the item definition. */
 export function getStudioItemQuantityRange(item: StudioItem): { min: number; max: number } {
   return item.kind === "stack" ? { min: 1, max: item.stackLimit } : { min: 1, max: 1 };
@@ -61,15 +65,19 @@ export function validateDialogueDraft(
     const path = `beats.${index}`;
     const record = beat as unknown as Record<string, unknown>;
     if (beat.kind === "item") {
-      // Reject mixed shapes outright: an item beat carrying NPC-only fields
-      // is malformed even if its own fields look valid.
-      const staleNpcFields = ["speakerNpcId", "expressionId", "presentationMode"].filter(
-        (field) => field in record,
-      );
-      if (staleNpcFields.length > 0) {
+      // Reject mixed shapes outright: an item beat carrying NPC-only or
+      // skill-only fields is malformed even if its own fields look valid.
+      const staleFields = [
+        "speakerNpcId",
+        "expressionId",
+        "presentationMode",
+        "skillId",
+        "amount",
+      ].filter((field) => field in record);
+      if (staleFields.length > 0) {
         issues.push({
           path: `${path}.subject`,
-          message: `Item beats cannot contain NPC-only fields (${staleNpcFields.join(", ")}).`,
+          message: `Item beats cannot contain foreign subject fields (${staleFields.join(", ")}).`,
         });
       }
       const item = findItem(adapter, beat.itemId);
@@ -100,14 +108,55 @@ export function validateDialogueDraft(
       return;
     }
 
+    if (beat.kind === "skill_xp") {
+      // Reject mixed shapes outright: a skill-XP beat carrying NPC-only or
+      // item-only fields is malformed even if its own fields look valid.
+      const staleFields = [
+        "speakerNpcId",
+        "expressionId",
+        "presentationMode",
+        "itemId",
+        "quantity",
+      ].filter((field) => field in record);
+      if (staleFields.length > 0) {
+        issues.push({
+          path: `${path}.subject`,
+          message: `Skill XP beats cannot contain foreign subject fields (${staleFields.join(", ")}).`,
+        });
+      }
+      const skill = findSkill(adapter, beat.skillId);
+      if (!skill) {
+        issues.push({
+          path: `${path}.skillId`,
+          message: "Choose a skill from the adapter's canonical skill registry.",
+        });
+      }
+      if (!Number.isInteger(beat.amount) || beat.amount < 1) {
+        issues.push({
+          path: `${path}.amount`,
+          message: "Amount must be a positive whole number of XP.",
+        });
+      }
+      if (!adapter.backgrounds.some((background) => background.id === beat.backgroundId)) {
+        issues.push({
+          path: `${path}.backgroundId`,
+          message: "Choose an authored conversation background.",
+        });
+      }
+      // Caption is optional for skill-XP beats; presentation never grants XP.
+      return;
+    }
+
     const npc = findNpc(adapter, beat.speakerNpcId);
-    // Reject mixed shapes outright: an NPC beat carrying item-only fields is
-    // malformed even if its own fields look valid.
-    const staleItemFields = ["itemId", "quantity"].filter((field) => field in record);
-    if (staleItemFields.length > 0) {
+    // Reject mixed shapes outright: an NPC beat carrying item-only or
+    // skill-only fields is malformed even if its own fields look valid.
+    const staleFields = ["itemId", "quantity", "skillId", "amount"].filter(
+      (field) => field in record,
+    );
+    if (staleFields.length > 0) {
       issues.push({
         path: `${path}.subject`,
-        message: `NPC beats cannot contain item-only fields (${staleItemFields.join(", ")}).`,
+        message: `NPC beats cannot contain foreign subject fields (${staleFields.join(", ")}).`,
       });
     }
     if (!npc) {

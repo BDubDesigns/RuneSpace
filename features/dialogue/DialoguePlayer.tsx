@@ -74,11 +74,11 @@ export function DialoguePlayer({
   if (!beat) return null;
   const resolvedSpeaker = resolveDialogueSpeaker(beat);
   const resolvedItem = resolveDialogueItem(beat);
-  if (!resolvedSpeaker && !resolvedItem) return null;
+  if (!resolvedSpeaker && !resolvedItem && beat.kind !== "skill_xp") return null;
 
   // The drawer keeps the conversation's stable identity even when the current
-  // beat presents an item; the scene panel (not the drawer title) announces
-  // the reveal so the beat is never announced as an NPC speaking.
+  // beat presents an item or XP tile; the scene panel (not the drawer title)
+  // announces the reveal so the beat is never announced as an NPC speaking.
   const drawerNpc = getNpc(sequence.npcId);
   const drawerLabel = drawerNpc?.displayName ?? "Dialogue";
 
@@ -86,7 +86,10 @@ export function DialoguePlayer({
   const isComplete = reducedMotion || revealedChars >= currentBeatTextLength;
   const isLastBeat = beatIndex === sequence.beats.length - 1;
   const nextLabel = isComplete && isLastBeat ? "Finish" : "Next";
-  const actionLabel = sequence.action === "accept_mission" ? "Accept mission" : "Claim Cutter";
+  // Authored action copy stays mission-specific; every completion control is
+  // the sequence's own explicit action, chosen by authored content — never a
+  // generic label guessed from the subject.
+  const actionLabel = sequence.action === "accept_mission" ? "Accept mission" : "Claim reward";
   const visibleText = reducedMotion ? beat.text : beatCharacters.slice(0, revealedChars).join("");
 
   function restart() {

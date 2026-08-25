@@ -1,11 +1,23 @@
 "use client";
 
 import { Panel } from "@/components/ui/Panel";
-import { MISSION_IDS } from "@/game/config/foundations";
 import type { MiningGameplayState } from "@/server/mining";
 
+/**
+ * Displays the relevant active mission through the shared projection surface.
+ * Completed missions never block later ones: the newest accepted, uncompleted
+ * mission wins; otherwise the most recently completed mission shows its
+ * completed state. There is deliberately no one-active-mission restriction
+ * and no history/log redesign here.
+ */
 export function MissionObjectivePanel({ state }: { state: MiningGameplayState }) {
-  const mission = state.missions.find((entry) => entry.missionId === MISSION_IDS.walkItOff);
+  const active = [...state.missions]
+    .reverse()
+    .find((entry) => entry.state !== "not_accepted" && entry.state !== "completed");
+  const mission =
+    active ??
+    [...state.missions].reverse().find((entry) => entry.state === "completed") ??
+    state.missions[0];
   if (!mission || mission.state === "not_accepted") return null;
   const completed = mission.state === "completed";
   return (
@@ -38,7 +50,7 @@ export function MissionObjectivePanel({ state }: { state: MiningGameplayState })
         </span>
       </div>
       <p className="mt-3 text-sm text-[color:var(--rs-mission-text)]">
-        {completed ? "Walk It Off complete." : mission.currentObjective}
+        {completed ? `${mission.title} complete.` : mission.currentObjective}
       </p>
     </Panel>
   );

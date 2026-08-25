@@ -137,8 +137,8 @@ test("walks from Wade to Tansy, presents approved dialogue, and claims one carri
   for (let index = 0; index < 8; index += 1) {
     await tansyDialogue.getByRole("button", { name: "Next" }).click();
   }
-  await expect(tansyDialogue.getByRole("button", { name: "Claim Cutter" })).toBeVisible();
-  await tansyDialogue.getByRole("button", { name: "Claim Cutter" }).click();
+  await expect(tansyDialogue.getByRole("button", { name: "Claim reward" })).toBeVisible();
+  await tansyDialogue.getByRole("button", { name: "Claim reward" }).click();
   // The successful grant reveals the Cutter itself over The Jag before Tansy returns.
   const cutterReveal = tansyDialogue.locator('[data-dialogue-subject="item"]');
   await expect(cutterReveal).toBeVisible();
@@ -186,6 +186,8 @@ test("walks from Wade to Tansy, presents approved dialogue, and claims one carri
   await page.reload();
   await expect(page.locator("[data-mission-objective]")).toContainText("Completed");
   await page.getByRole("button", { name: /Talk to Tansy Rusk/ }).click();
+  // Issue #110 amendment: Tansy's post-Walk-It-Off beats now open the
+  // Cut Your Teeth offer instead of a standalone dead-end idle chain.
   const postMissionDialogue = page.getByRole("dialog", { name: "Tansy Rusk dialogue" });
   await expect(
     postMissionDialogue.locator('[data-dialogue-text] [aria-hidden="true"]'),
@@ -246,8 +248,8 @@ test("supports the explorer-first Jag conversation and remote mission acceptance
   for (let index = 0; index < 3; index += 1) {
     await dialogue.getByRole("button", { name: "Next" }).click();
   }
-  await expect(dialogue.getByRole("button", { name: "Claim Cutter" })).toBeVisible();
-  await dialogue.getByRole("button", { name: "Claim Cutter" }).click();
+  await expect(dialogue.getByRole("button", { name: "Claim reward" })).toBeVisible();
+  await dialogue.getByRole("button", { name: "Claim reward" }).click();
   await expect(dialogue.locator('[data-dialogue-subject="item"]')).toBeVisible();
   await expect(dialogue.locator("[data-dialogue-speaker-name]")).toHaveText("Item");
   await dialogue.getByRole("button", { name: "Next" }).click();

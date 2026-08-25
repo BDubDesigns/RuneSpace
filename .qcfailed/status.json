@@ -2,34 +2,34 @@
   "schemaVersion": 1,
   "projectSlug": "runespace",
   "workState": "active",
-  "currentFocus": "Item-acquired presentation beats in dialogue and QC Studio (issue #108) awaiting product-owner preview review.",
+  "currentFocus": "Cut Your Teeth mission: equip the Salvage Cutter, collect a full stack of Ferrite Shale, and earn Mining XP through Tansy (issue #110) awaiting product-owner preview review.",
   "latestCompleted": {
-    "summary": "Polished the Walk It Off dialogue with creator-approved QC Studio content.",
+    "summary": "Added item-acquired presentation beats to dialogue plus QC Studio item authoring.",
     "date": "2026-08-24",
-    "url": "https://github.com/BDubDesigns/RuneSpace/pull/107"
+    "url": "https://github.com/BDubDesigns/RuneSpace/pull/109"
   },
-  "nextStep": "Product-owner visual review of the Cutter reveal and Studio item authoring on the deployed PR preview.",
-  "lastMeaningfulUpdate": "2026-08-24",
+  "nextStep": "Product-owner review of the Cut Your Teeth flow, the Mining +100 XP reward tile, and Skill XP authoring in QC Studio on the deployed PR preview.",
+  "lastMeaningfulUpdate": "2026-08-25",
   "highlights": [
     {
-      "summary": "Added QC Studio visual Dialogue authoring with local drafts and structured export.",
+      "summary": "Added the second authored story mission Cut Your Teeth with a reusable Skill XP dialogue presentation beat.",
+      "date": "2026-08-25",
+      "url": "https://github.com/BDubDesigns/RuneSpace/pull/110"
+    },
+    {
+      "summary": "Added item-acquired presentation beats to dialogue plus QC Studio item authoring.",
       "date": "2026-08-24",
-      "url": "https://github.com/BDubDesigns/RuneSpace/pull/105"
+      "url": "https://github.com/BDubDesigns/RuneSpace/pull/109"
     },
     {
       "summary": "Polished the Walk It Off dialogue with creator-approved QC Studio content.",
       "date": "2026-08-24",
       "url": "https://github.com/BDubDesigns/RuneSpace/pull/107"
-    },
-    {
-      "summary": "Added authoritative Travel Scavenge windows and a weighted reveal reel.",
-      "date": "2026-08-20",
-      "url": "https://github.com/BDubDesigns/RuneSpace/pull/95"
     }
   ],
   "currentChange": {
-    "summary": "Add item-acquired presentation beats to dialogue plus QC Studio item authoring (#108).",
-    "stage": "preview",
-    "pullRequestNumber": 109
+    "summary": "Add the Cut Your Teeth story mission with Skill XP presentation beats in dialogue and QC Studio (#110).",
+    "stage": "implementation",
+    "pullRequestNumber": 0
   }
 }

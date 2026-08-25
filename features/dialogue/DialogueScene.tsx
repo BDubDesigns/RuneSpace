@@ -2,8 +2,13 @@ import Image from "next/image";
 import type { ReactNode } from "react";
 import { getConversationBackground } from "@/game/content/conversation-backgrounds";
 import type { DialogueBeat } from "@/game/content/dialogue";
-import { resolveDialogueItem, resolveDialogueSpeaker } from "@/game/content/dialogue";
+import {
+  resolveDialogueItem,
+  resolveDialogueSkillXp,
+  resolveDialogueSpeaker,
+} from "@/game/content/dialogue";
 import { getLocation } from "@/game/content/locations";
+import { VisualTile } from "@/components/items/VisualTile";
 
 /**
  * Shared RuneSpace dialogue presentation. Gameplay/player state belongs to
@@ -11,8 +16,9 @@ import { getLocation } from "@/game/content/locations";
  * this same scene so the Studio preview cannot drift from production.
  *
  * A beat presents exactly one subject over the authored conversation
- * background: an NPC portrait or an item reveal. Item beats are presentation
- * only — this scene never grants, removes, or mutates inventory.
+ * background: an NPC portrait, an item reveal, or a skill-XP reward tile.
+ * Item and skill-XP beats are presentation only — this scene never grants,
+ * removes, or mutates inventory or progression.
  */
 export function DialogueScene({
   beat,
@@ -35,12 +41,14 @@ export function DialogueScene({
 }) {
   const resolvedSpeaker = resolveDialogueSpeaker(beat);
   const resolvedItem = resolveDialogueItem(beat);
+  const resolvedSkillXp = resolveDialogueSkillXp(beat);
   const background = getConversationBackground(beat.backgroundId);
   if (!background) return null;
   if (beat.kind === "npc" && !resolvedSpeaker) return null;
   if (beat.kind === "item" && !resolvedItem) return null;
+  if (beat.kind === "skill_xp" && !resolvedSkillXp) return null;
   const sceneLocation = getLocation(background.locationId);
-  // Item reveals are local-scene presentations; they have no comms variant.
+  // Item and XP reveals are local-scene presentations; they have no comms variant.
   const presentationMode = beat.kind === "npc" ? beat.presentationMode : "local";
 
   return (
@@ -116,6 +124,21 @@ export function DialogueScene({
             )}
           </span>
         ) : null}
+        {resolvedSkillXp && beat.kind === "skill_xp" ? (
+          <div
+            key={`${beat.skillId}:${portraitGeneration}`}
+            className="absolute bottom-[10%] left-1/2 z-20 w-44 max-w-[70%] -translate-x-1/2"
+            data-dialogue-skill-xp-tile
+            data-portrait-transition="fade-in"
+          >
+            <VisualTile
+              accessibleLabel={`${beat.amount} ${resolvedSkillXp.presentation.displayName} XP earned`}
+              badge={`+${beat.amount}`}
+              fallbackText="XP"
+              name={resolvedSkillXp.presentation.displayName}
+            />
+          </div>
+        ) : null}
       </div>
       <div className="border-t border-[color:var(--rs-border-structural)] bg-[color:var(--rs-surface-panel)] p-4 sm:p-5">
         <div>
@@ -125,12 +148,16 @@ export function DialogueScene({
           >
             {resolvedItem && beat.kind === "item"
               ? "Item"
-              : (resolvedSpeaker?.npc.displayName ?? "")}
+              : resolvedSkillXp && beat.kind === "skill_xp"
+                ? "Skill XP"
+                : (resolvedSpeaker?.npc.displayName ?? "")}
           </p>
           <p className="mt-1 text-sm text-[color:var(--rs-text-muted)]" data-dialogue-speaker-role>
             {resolvedItem && beat.kind === "item"
               ? `${resolvedItem.presentation.displayName}${resolvedItem.quantity > 1 ? ` ×${resolvedItem.quantity}` : ""}`
-              : (resolvedSpeaker?.npc.role ?? "")}
+              : resolvedSkillXp && beat.kind === "skill_xp"
+                ? `${resolvedSkillXp.presentation.displayName} +${resolvedSkillXp.amount} XP`
+                : (resolvedSpeaker?.npc.role ?? "")}
           </p>
         </div>
         <button
