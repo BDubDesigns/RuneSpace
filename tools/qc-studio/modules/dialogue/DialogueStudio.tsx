@@ -5,7 +5,12 @@ import { ActionButton } from "@/components/ui/ActionButton";
 import { Feedback } from "@/components/ui/Feedback";
 import { Panel } from "@/components/ui/Panel";
 import { SectionHeader } from "@/components/ui/SectionHeader";
-import { createBlankDraft, createDraftFromAdapterSequence, cloneDraft } from "../../core/draft";
+import {
+  createBlankDraft,
+  createBeatForSubject,
+  createDraftFromAdapterSequence,
+  cloneDraft,
+} from "../../core/draft";
 import { createDialogueExportPayload } from "../../core/export";
 import {
   createSnapshotHistory,
@@ -17,10 +22,11 @@ import {
 import {
   addDurableCheckpoint,
   getDialogueStudioStorageKey,
+  getLegacyDialogueStudioStorageKey,
   parsePersistedDialogueStudio,
   serializeDialogueStudio,
 } from "../../core/storage";
-import { validateDialogueDraft } from "../../core/validation";
+import { getStudioItemQuantityRange, validateDialogueDraft } from "../../core/validation";
 import type {
   DialogueAdapter,
   DialogueCheckpoint,
@@ -93,14 +99,29 @@ export function DialogueStudio({
   const storageWriteBlocked = useRef(false);
   const changeKind = useRef<"text" | "structural" | "idle">("idle");
   const beatButtonRefs = useRef<Record<number, HTMLButtonElement | null>>({});
-  const storageKey = getDialogueStudioStorageKey(adapter.adapterId);
+  const [storageKey, legacyStorageKey] = [
+    getDialogueStudioStorageKey(adapter.adapterId),
+    getLegacyDialogueStudioStorageKey(adapter.adapterId),
+  ];
 
   const draft = history.present;
   const selectedBeat = draft.beats[selectedBeatIndex];
   const previewBeat = draft.beats[previewBeatIndex];
   const previewIsLastBeat = previewBeatIndex === draft.beats.length - 1;
   const validation = useMemo(() => validateDialogueDraft(adapter, draft), [adapter, draft]);
-  const selectedNpc = adapter.npcs.find((npc) => npc.id === selectedBeat?.speakerNpcId);
+  const selectedNpc =
+    selectedBeat && selectedBeat.kind === "npc"
+      ? adapter.npcs.find((npc) => npc.id === selectedBeat.speakerNpcId)
+      : undefined;
+  const selectedBeatItem =
+    selectedBeat && selectedBeat.kind === "item"
+      ? adapter.items?.find((item) => item.id === selectedBeat.itemId)
+      : undefined;
+  // Falls back to a harmless 1..1 range when the item itself is invalid;
+  // the validation issue surfaces the real problem.
+  const selectedQuantityRange = selectedBeatItem
+    ? getStudioItemQuantityRange(selectedBeatItem)
+    : { min: 1, max: 1 };
   const sourceSequence = draft.sourceSequenceId
     ? adapter.sequences.find((sequence) => sequence.id === draft.sourceSequenceId)
     : undefined;
@@ -140,17 +161,39 @@ export function DialogueStudio({
     let raw: string | null = null;
     try {
       raw = window.localStorage.getItem(storageKey);
+      if (!raw) {
+        // Schema v1 drafts lived under the legacy key; adopt and upgrade them
+        // in place so existing local work is not silently stranded.
+        const legacyRaw = window.localStorage.getItem(legacyStorageKey);
+        if (legacyRaw) raw = legacyRaw;
+      }
     } catch {
       setStorageMessage("Local draft storage is unavailable; use Export to preserve this work.");
     }
     const stored = parsePersistedDialogueStudio(raw, adapter.adapterId);
-    if (stored.kind === "loaded") {
+    if (stored.kind === "loaded" || stored.kind === "migrated") {
       const nextHistory = createSnapshotHistory(stored.state.draft);
       historyRef.current = nextHistory;
       setHistory(nextHistory);
       setCheckpoints(stored.state.checkpoints);
       setSourceSelection(stored.state.draft.sourceSequenceId ?? "");
-      setStorageMessage("Recovered the last local QC Studio draft.");
+      setStorageMessage(
+        stored.kind === "migrated"
+          ? "Upgraded the saved v1 draft to the current format with item-beat support."
+          : "Recovered the last local QC Studio draft.",
+      );
+      if (stored.kind === "migrated") {
+        try {
+          // Persist the upgraded payload immediately; leave the legacy entry in
+          // place as a belt-and-braces backup until the next successful save.
+          window.localStorage.setItem(
+            storageKey,
+            serializeDialogueStudio(stored.state.draft, stored.state.checkpoints),
+          );
+        } catch {
+          /* keep the in-memory migrated state; autosave will retry */
+        }
+      }
     } else if (stored.kind === "unsupported") {
       storageWriteBlocked.current = true;
       setStorageMessage(
@@ -367,20 +410,69 @@ export function DialogueStudio({
     return () => window.removeEventListener("keydown", onKeyDown);
   });
 
-  function updateBeat(index: number, update: Partial<StudioDialogueBeat>) {
+  type NpcBeatPatch = Partial<Omit<Extract<StudioDialogueBeat, { kind: "npc" }>, "kind">>;
+  type ItemBeatPatch = Partial<Omit<Extract<StudioDialogueBeat, { kind: "item" }>, "kind">>;
+
+  /**
+   * Patch only the fields of the beat's ACTIVE kind. The switch below keeps
+   * the two shapes disjoint, so a patch can never write an item field into an
+   * NPC beat or vice versa.
+   */
+  function updateBeat(index: number, update: NpcBeatPatch | ItemBeatPatch) {
     applyStructural((current) => ({
       ...current,
-      npcId: index === 0 && update.speakerNpcId ? update.speakerNpcId : current.npcId,
-      beats: current.beats.map((beat, beatIndex) =>
-        beatIndex === index ? { ...beat, ...update } : beat,
-      ),
+      npcId:
+        index === 0 && "speakerNpcId" in update && update.speakerNpcId
+          ? update.speakerNpcId
+          : current.npcId,
+      beats: current.beats.map((beat, beatIndex) => {
+        if (beatIndex !== index) return beat;
+        if (beat.kind === "npc") {
+          return { ...beat, ...(update as NpcBeatPatch), kind: "npc" as const };
+        }
+        return { ...beat, ...(update as ItemBeatPatch), kind: "item" as const };
+      }),
     }));
   }
 
-  function updateSpeaker(index: number, speakerNpcId: string) {
-    const npc = adapter.npcs.find((candidate) => candidate.id === speakerNpcId);
-    const expressionId = npc?.expressions[0]?.id ?? "";
-    updateBeat(index, { speakerNpcId, expressionId });
+  /**
+   * Replaces the beat wholesale with the target subject's shape. Subject
+   * switching must never merge with the previous shape — stale NPC fields
+   * could otherwise survive on item beats and stale item fields on NPC beats.
+   */
+  function switchSubject(index: number, kind: "npc" | "item") {
+    const current = historyRef.current.present.beats[index];
+    if (!current || current.kind === kind) return;
+    flushTextHistory();
+    const backgroundId = current.backgroundId || adapter.backgrounds[0]?.id || "";
+    applyStructural((draftToUpdate) => ({
+      ...draftToUpdate,
+      beats: draftToUpdate.beats.map((beat, beatIndex) => {
+        if (beatIndex !== index) return beat;
+        return createBeatForSubject(adapter, kind, backgroundId);
+      }),
+    }));
+  }
+
+  function selectItem(index: number, itemId: string) {
+    const selected = adapter.items?.find((candidate) => candidate.id === itemId);
+    if (!selected) return;
+    // Re-clamp quantity into the newly selected item's authoritative range.
+    const { max } = getStudioItemQuantityRange(selected);
+    const previous = draft.beats[index];
+    const previousQuantity =
+      previous && previous.kind === "item" ? Math.min(previous.quantity, max) : 1;
+    updateBeat(index, { itemId, quantity: Math.max(1, previousQuantity) });
+  }
+
+  function setItemQuantity(index: number, rawValue: number) {
+    const beat = draft.beats[index];
+    if (!beat || beat.kind !== "item") return;
+    const selected = adapter.items?.find((candidate) => candidate.id === beat.itemId);
+    if (!selected) return;
+    const { min, max } = getStudioItemQuantityRange(selected);
+    if (!Number.isInteger(rawValue)) return;
+    updateBeat(index, { quantity: Math.max(min, Math.min(max, rawValue)) });
   }
 
   function addBeat(duplicate: boolean) {
@@ -601,10 +693,17 @@ export function DialogueStudio({
             </div>
             <ol className="mt-4 space-y-2" aria-label="Dialogue beats">
               {draft.beats.map((beat, index) => {
-                const npc = adapter.npcs.find((candidate) => candidate.id === beat.speakerNpcId);
                 const isSelected = index === selectedBeatIndex;
+                const beatLabel =
+                  beat.kind === "item"
+                    ? `${
+                        adapter.items?.find((candidate) => candidate.id === beat.itemId)
+                          ?.displayName ?? "Unknown item"
+                      }${beat.quantity > 1 ? ` ×${beat.quantity}` : ""}`
+                    : (adapter.npcs.find((candidate) => candidate.id === beat.speakerNpcId)
+                        ?.displayName ?? "Unknown speaker");
                 return (
-                  <li key={`${index}-${beat.speakerNpcId}`}>
+                  <li key={`${index}-${beat.kind}`}>
                     <button
                       ref={(element) => {
                         beatButtonRefs.current[index] = element;
@@ -626,11 +725,9 @@ export function DialogueStudio({
                         B{index + 1}
                       </span>
                       <span className="min-w-0">
-                        <span className="block truncate font-semibold">
-                          {npc?.displayName ?? "Unknown speaker"}
-                        </span>
+                        <span className="block truncate font-semibold">{beatLabel}</span>
                         <span className="mt-0.5 block truncate text-xs text-[color:var(--rs-text-muted)]">
-                          {beat.text || "Empty text"}
+                          {beat.text || (beat.kind === "item" ? "Item reveal" : "Empty text")}
                         </span>
                       </span>
                     </button>
@@ -661,7 +758,11 @@ export function DialogueStudio({
                   </h2>
                 </div>
                 <span className="border border-[color:var(--rs-border-subtle)] px-2 py-1 text-xs uppercase tracking-wide text-[color:var(--rs-text-muted)]">
-                  {previewBeat?.presentationMode ?? "—"}
+                  {previewBeat
+                    ? previewBeat.kind === "item"
+                      ? "item"
+                      : previewBeat.presentationMode
+                    : "—"}
                 </span>
               </div>
               <div className="mt-4">
@@ -776,51 +877,189 @@ export function DialogueStudio({
               </label>
               {selectedBeat ? (
                 <>
-                  <label
-                    className="mt-4 block text-sm text-[color:var(--rs-text-secondary)]"
-                    htmlFor="qc-beat-speaker"
-                  >
-                    Speaker
-                    <select
-                      className={`${CONTROL_CLASS} mt-2`}
-                      id="qc-beat-speaker"
-                      onChange={(event) => updateSpeaker(selectedBeatIndex, event.target.value)}
-                      value={selectedBeat.speakerNpcId}
-                    >
-                      {adapter.npcs.map((npc) => (
-                        <option key={npc.id} value={npc.id}>
-                          {npc.displayName} — {npc.role}
-                        </option>
+                  <fieldset className="mt-4">
+                    <legend className="text-sm text-[color:var(--rs-text-secondary)]">
+                      Beat subject
+                    </legend>
+                    <div className="mt-2 grid grid-cols-2 gap-2">
+                      {(
+                        [
+                          ["npc", "NPC"],
+                          ["item", "Item"],
+                        ] as const
+                      ).map(([value, label]) => (
+                        <label
+                          className={`rs-focus border p-3 text-center text-sm ${
+                            selectedBeat.kind === value
+                              ? "border-[color:var(--rs-accent-primary)] bg-[color:var(--rs-accent-primary-subtle)]"
+                              : "border-[color:var(--rs-border-subtle)] bg-[color:var(--rs-surface-panel)]"
+                          }`}
+                          key={value}
+                        >
+                          <input
+                            checked={selectedBeat.kind === value}
+                            className="sr-only"
+                            name="qc-beat-subject"
+                            onChange={() => switchSubject(selectedBeatIndex, value)}
+                            type="radio"
+                            value={value}
+                          />
+                          {label}
+                        </label>
                       ))}
-                    </select>
-                  </label>
-                  {selectedBeatIssue("speakerNpcId") ? (
-                    <Feedback tone="danger">{selectedBeatIssue("speakerNpcId")}</Feedback>
-                  ) : null}
+                    </div>
+                  </fieldset>
 
-                  <label
-                    className="mt-4 block text-sm text-[color:var(--rs-text-secondary)]"
-                    htmlFor="qc-beat-expression"
-                  >
-                    Expression
-                    <select
-                      className={`${CONTROL_CLASS} mt-2`}
-                      id="qc-beat-expression"
-                      onChange={(event) =>
-                        updateBeat(selectedBeatIndex, { expressionId: event.target.value })
-                      }
-                      value={selectedBeat.expressionId}
-                    >
-                      {(selectedNpc?.expressions ?? []).map((expression) => (
-                        <option key={expression.id} value={expression.id}>
-                          {expression.label}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                  {selectedBeatIssue("expressionId") ? (
-                    <Feedback tone="danger">{selectedBeatIssue("expressionId")}</Feedback>
-                  ) : null}
+                  {selectedBeat.kind === "npc" ? (
+                    <>
+                      <label
+                        className="mt-4 block text-sm text-[color:var(--rs-text-secondary)]"
+                        htmlFor="qc-beat-speaker"
+                      >
+                        Speaker
+                        <select
+                          className={`${CONTROL_CLASS} mt-2`}
+                          id="qc-beat-speaker"
+                          onChange={(event) => {
+                            const npc = adapter.npcs.find(
+                              (candidate) => candidate.id === event.target.value,
+                            );
+                            updateBeat(selectedBeatIndex, {
+                              speakerNpcId: event.target.value,
+                              expressionId: npc?.expressions[0]?.id ?? "",
+                            });
+                          }}
+                          value={selectedBeat.speakerNpcId}
+                        >
+                          {adapter.npcs.map((npc) => (
+                            <option key={npc.id} value={npc.id}>
+                              {npc.displayName} — {npc.role}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                      {selectedBeatIssue("speakerNpcId") ? (
+                        <Feedback tone="danger">{selectedBeatIssue("speakerNpcId")}</Feedback>
+                      ) : null}
+
+                      <label
+                        className="mt-4 block text-sm text-[color:var(--rs-text-secondary)]"
+                        htmlFor="qc-beat-expression"
+                      >
+                        Expression
+                        <select
+                          className={`${CONTROL_CLASS} mt-2`}
+                          id="qc-beat-expression"
+                          onChange={(event) =>
+                            updateBeat(selectedBeatIndex, { expressionId: event.target.value })
+                          }
+                          value={selectedBeat.expressionId}
+                        >
+                          {(selectedNpc?.expressions ?? []).map((expression) => (
+                            <option key={expression.id} value={expression.id}>
+                              {expression.label}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                      {selectedBeatIssue("expressionId") ? (
+                        <Feedback tone="danger">{selectedBeatIssue("expressionId")}</Feedback>
+                      ) : null}
+
+                      <fieldset className="mt-4">
+                        <legend className="text-sm text-[color:var(--rs-text-secondary)]">
+                          Presentation mode
+                        </legend>
+                        <div className="mt-2 grid grid-cols-2 gap-2">
+                          {(
+                            [
+                              "local",
+                              "comms",
+                            ] as const satisfies readonly StudioDialoguePresentationMode[]
+                          ).map((mode) => (
+                            <label
+                              className={`rs-focus border p-3 text-center text-sm ${
+                                selectedBeat.presentationMode === mode
+                                  ? "border-[color:var(--rs-accent-primary)] bg-[color:var(--rs-accent-primary-subtle)]"
+                                  : "border-[color:var(--rs-border-subtle)] bg-[color:var(--rs-surface-panel)]"
+                              }`}
+                              key={mode}
+                            >
+                              <input
+                                checked={selectedBeat.presentationMode === mode}
+                                className="sr-only"
+                                name="qc-presentation-mode"
+                                onChange={() =>
+                                  updateBeat(selectedBeatIndex, { presentationMode: mode })
+                                }
+                                type="radio"
+                                value={mode}
+                              />
+                              {mode === "local" ? "Local" : "Comms"}
+                            </label>
+                          ))}
+                        </div>
+                      </fieldset>
+                    </>
+                  ) : (
+                    <>
+                      <label
+                        className="mt-4 block text-sm text-[color:var(--rs-text-secondary)]"
+                        htmlFor="qc-beat-item"
+                      >
+                        Presented item
+                        <select
+                          className={`${CONTROL_CLASS} mt-2`}
+                          id="qc-beat-item"
+                          onChange={(event) => selectItem(selectedBeatIndex, event.target.value)}
+                          value={selectedBeat.itemId}
+                        >
+                          {(adapter.items ?? []).map((item) => (
+                            <option key={item.id} value={item.id}>
+                              {item.displayName}
+                              {item.kind === "stack"
+                                ? ` (stack up to ${item.stackLimit})`
+                                : " (unique)"}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                      {selectedBeatIssue("itemId") ? (
+                        <Feedback tone="danger">{selectedBeatIssue("itemId")}</Feedback>
+                      ) : null}
+
+                      <label
+                        className="mt-4 block text-sm text-[color:var(--rs-text-secondary)]"
+                        htmlFor="qc-beat-quantity"
+                      >
+                        Quantity
+                        <input
+                          className={`${CONTROL_CLASS} mt-2`}
+                          disabled={selectedQuantityRange.max === selectedQuantityRange.min}
+                          id="qc-beat-quantity"
+                          max={selectedQuantityRange.max}
+                          min={selectedQuantityRange.min}
+                          onBlur={(event) =>
+                            setItemQuantity(selectedBeatIndex, Number(event.target.value))
+                          }
+                          onChange={(event) =>
+                            setItemQuantity(selectedBeatIndex, Number(event.target.value))
+                          }
+                          step={1}
+                          type="number"
+                          value={selectedBeat.quantity}
+                        />
+                      </label>
+                      {selectedBeatIssue("quantity") ? (
+                        <Feedback tone="danger">{selectedBeatIssue("quantity")}</Feedback>
+                      ) : null}
+
+                      <p className="mt-3 border border-[color:var(--rs-border-subtle)] bg-[color:var(--rs-surface-panel)] p-3 text-xs text-[color:var(--rs-text-muted)]">
+                        Visual item presentation only. This beat does not grant, remove, or change
+                        any inventory; rewards stay server-authoritative.
+                      </p>
+                    </>
+                  )}
 
                   <label
                     className="mt-4 block text-sm text-[color:var(--rs-text-secondary)]"
@@ -846,46 +1085,20 @@ export function DialogueStudio({
                     <Feedback tone="danger">{selectedBeatIssue("backgroundId")}</Feedback>
                   ) : null}
 
-                  <fieldset className="mt-4">
-                    <legend className="text-sm text-[color:var(--rs-text-secondary)]">
-                      Presentation mode
-                    </legend>
-                    <div className="mt-2 grid grid-cols-2 gap-2">
-                      {(
-                        [
-                          "local",
-                          "comms",
-                        ] as const satisfies readonly StudioDialoguePresentationMode[]
-                      ).map((mode) => (
-                        <label
-                          className={`rs-focus border p-3 text-center text-sm ${
-                            selectedBeat.presentationMode === mode
-                              ? "border-[color:var(--rs-accent-primary)] bg-[color:var(--rs-accent-primary-subtle)]"
-                              : "border-[color:var(--rs-border-subtle)] bg-[color:var(--rs-surface-panel)]"
-                          }`}
-                          key={mode}
-                        >
-                          <input
-                            checked={selectedBeat.presentationMode === mode}
-                            className="sr-only"
-                            name="qc-presentation-mode"
-                            onChange={() =>
-                              updateBeat(selectedBeatIndex, { presentationMode: mode })
-                            }
-                            type="radio"
-                            value={mode}
-                          />
-                          {mode === "local" ? "Local" : "Comms"}
-                        </label>
-                      ))}
-                    </div>
-                  </fieldset>
-
                   <label
                     className="mt-4 block text-sm text-[color:var(--rs-text-secondary)]"
                     htmlFor="qc-beat-text"
                   >
-                    Dialogue text
+                    {selectedBeat.kind === "item" ? (
+                      <>
+                        Caption{" "}
+                        <span className="text-xs text-[color:var(--rs-text-muted)]">
+                          (optional — the item does not speak)
+                        </span>
+                      </>
+                    ) : (
+                      "Dialogue text"
+                    )}
                     <textarea
                       aria-describedby={
                         selectedBeatIssue("text") ? "qc-beat-text-error" : undefined
@@ -902,7 +1115,11 @@ export function DialogueStudio({
                           ),
                         }));
                       }}
-                      placeholder="Write the dialogue beat…"
+                      placeholder={
+                        selectedBeat.kind === "item"
+                          ? "Optional caption…"
+                          : "Write the dialogue beat…"
+                      }
                       value={selectedBeat.text}
                     />
                   </label>

@@ -6,21 +6,34 @@ authoritative RuneSpace content, player functionality, or a publishing system.
 
 ## Run it
 
-QC Studio is available only in a non-production Next.js process. The primary
-local launch command enables the development flag and uses the stable Studio
-port for you:
+The server-side `QC_STUDIO_ENABLED=true` flag is the single availability
+boundary for `/qc-studio`. When it is unset or false — in any environment,
+including production-mode builds — the route returns not found. There is no
+separate development-only prohibition anymore: a production-mode deployment
+(Coolify PR preview or live) that sets the flag serves the Studio.
+
+- Local launch (sets the flag and the stable Studio port for you):
 
 ```bash
 pnpm studio
 ```
 
-Open [http://localhost:3301/qc-studio](http://localhost:3301/qc-studio). The
-route is not linked from player navigation. It returns not found when the flag
-is absent and remains unavailable when `NODE_ENV=production`, even if an
-environment contains the flag. The normal Coolify PR preview is therefore not
-the QC Studio visual-review surface; product-owner Studio review is performed
-locally with `pnpm studio`. A PR preview may still verify that RuneSpace
-gameplay remains unaffected.
+Open [http://localhost:3301/qc-studio](http://localhost:3301/qc-studio).
+
+- Deployed review: Coolify preview apps inherit the parent application's
+  environment variables, so if `QC_STUDIO_ENABLED=true` is set on the RuneSpace
+  app, every `pr-<N>.runespace.qcfailed.com` preview and the live deployment
+  expose `/qc-studio` at `https://<host>/qc-studio`. If a deployment lacks the
+  flag, apply the one-time environment setting in Coolify and redeploy; no code
+  change is required.
+- The route is never linked from player navigation and is served with
+  `noindex, nofollow` metadata. Public access to this flagged, unlinked route
+  is acceptable because the Studio is browser-local authoring with no
+  source-writing, publishing, gameplay-mutation, or database-mutation
+  capability. Any future feature that changes that must design its
+  authorization model separately before exposure.
+- Where the deployed flag cannot be applied, `pnpm studio` remains the local
+  fallback visual-review path.
 
 For lower-level debugging, the equivalent command is:
 
@@ -49,18 +62,46 @@ editing; beat add, duplicate, delete, and keyboard-accessible up/down reorder;
 direct beat inspection and sequential preview; action-affordance preview;
 Undo/Redo; and Reset to Source.
 
-Drafts are stored in browser `localStorage` under an adapter-scoped, versioned
-V1 envelope. Text changes autosave after a short idle debounce and structural
-changes save immediately. The UI reports the save state. Session Undo/Redo is
-in memory, and the five newest durable complete snapshots can be inspected and
-restored. Unknown future schema versions are left untouched and fail safely to
-a fresh draft; export is the safe way to preserve work made in that session.
+### Item presentation beats (schema v2)
 
-`Copy for RuneSpace` produces a structured export containing the adapter, source
-sequence identity or new-draft context, sequence metadata, action, and every
-beat. It does not write source files, register stable IDs, create commits, or
-publish content. A developer or agent applies the reviewed export to typed
-RuneSpace content through the normal repository and PR workflow.
+A dialogue beat presents exactly one visual subject over the authored
+conversation background:
+
+- **NPC beat** — speaker portrait + expression (existing behavior).
+- **Item beat** — item artwork presented prominently in the scene with no NPC
+  portrait. The panel shows a generic `Item` eyebrow (item beats are
+  presentation-only and do not imply acquisition) plus the authoritative
+  display name and quantity (`×N` when greater than 1).
+
+Item beats are **presentation only**. Authoring, previewing, or exporting an
+item beat is never authorization to grant, remove, consume, or otherwise mutate
+inventory; RuneSpace's server-authoritative mission/reward code remains solely
+responsible for all item ownership changes. The Studio UI states this
+explicitly and offers no "give item" affordance.
+
+The item dropdown lists only items from the adapter's canonical inventory
+definitions — never a duplicated UI list. Quantity is constrained by the
+authoritative item definition: stackable items accept integers from `1`
+through their `stackLimit`; unique items are locked to `1`. Switching items
+re-clamps quantity into the newly selected item's range. Unknown IDs or
+out-of-range quantities fail validation and block preview/export.
+
+Existing NPC-only drafts keep working: schema v1 local drafts are migrated
+in place to v2 (every existing beat becomes an NPC beat), and unknown future
+versions still fail safely untouched.
+
+Drafts are stored in browser `localStorage` under an adapter-scoped,
+versioned envelope (`…:dialogue:v2`). Text changes autosave after a short idle
+debounce and structural changes save immediately. The UI reports the save state.
+Session Undo/Redo is in memory, and the five newest durable complete snapshots
+can be inspected and restored.
+
+`Copy for RuneSpace` produces a structured export containing the adapter,
+source sequence identity or new-draft context, sequence metadata, action, and
+every beat — including each item beat's deterministic `itemId` and `quantity`.
+It does not write source files, register stable IDs, create commits, or publish
+content. A developer or agent applies the reviewed export to typed RuneSpace
+content through the normal repository and PR workflow.
 
 ## Applying QC Studio exports
 
@@ -71,7 +112,7 @@ command. The current V1 shape is:
 ```json
 {
   "qcStudio": {
-    "schemaVersion": 1,
+    "schemaVersion": 2,
     "module": "dialogue",
     "adapterId": "runespace"
   },
@@ -130,12 +171,22 @@ For `source.kind: "new_draft"`:
 - `sequence.npcId` identifies the sequence's primary or context NPC. Validate it
   against the current RuneSpace NPC catalog; do not invent an NPC for an
   unknown ID.
-- `sequence.beats` is ordered approved authoring content. Each beat contains
-  the approved `speakerNpcId`, `expressionId`, `backgroundId`,
-  `presentationMode`, and `text`.
+- `sequence.beats` is ordered approved authoring content. Each beat carries a
+  `kind` discriminator:
+  - `kind: "npc"` — approved `speakerNpcId`, `expressionId`, `backgroundId`,
+    `presentationMode`, and `text`.
+  - `kind: "item"` — approved `itemId`, `quantity`, `backgroundId`, and an
+    optional caption `text`. The `itemId` must exist in the target
+    repository's canonical inventory definitions and the quantity must be
+    within that item's authoritative range (`1..stackLimit` for stacks, exactly
+    `1` for unique items).
+- An item beat's `itemId`/`quantity` describe **presentation only**. Applying
+  an export never authorizes item-granting gameplay code; reward/ownership
+  changes require a separate approved issue and stay in RuneSpace's
+  server-authoritative mission code.
 - Preserve beat order exactly unless the creator explicitly requests a reorder.
-  Validate every NPC, expression, and background ID against current authored
-  RuneSpace content.
+  Validate every NPC, expression, background, item ID, and quantity against
+  current authored RuneSpace content.
 - Do not rewrite approved dialogue copy for style, grammar, or preference
   unless the creator explicitly asks for that change.
 - Preserve `sequence.action` when supplied, including existing actions such as

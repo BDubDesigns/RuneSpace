@@ -1,15 +1,37 @@
-export const QC_STUDIO_SCHEMA_VERSION = 1 as const;
+export const QC_STUDIO_SCHEMA_VERSION = 2 as const;
+
+/** The last schema version this build can migrate from. */
+export const QC_STUDIO_MIGRATABLE_SCHEMA_VERSION = 1 as const;
 
 export type StudioDialoguePresentationMode = "local" | "comms";
 export type StudioDialogueAction = "accept_mission" | "complete_mission";
 
-export type StudioDialogueBeat = {
-  speakerNpcId: string;
-  expressionId: string;
-  backgroundId: string;
-  presentationMode: StudioDialoguePresentationMode;
-  text: string;
-};
+/**
+ * A beat presents exactly one visual subject: an NPC portrait or an item
+ * reveal. Item beats are presentation only — authoring or exporting one is
+ * never authorization to add item-granting gameplay behavior.
+ */
+export type StudioDialogueBeat =
+  | {
+      kind: "npc";
+      speakerNpcId: string;
+      expressionId: string;
+      backgroundId: string;
+      presentationMode: StudioDialoguePresentationMode;
+      text: string;
+    }
+  | {
+      kind: "item";
+      itemId: string;
+      /** Display quantity only; constrained by the adapter's authoritative definition. */
+      quantity: number;
+      backgroundId: string;
+      text: string;
+    };
+
+export type StudioItem =
+  | { id: string; displayName: string; kind: "stack"; stackLimit: number }
+  | { id: string; displayName: string; kind: "unique" };
 
 export type StudioDialogueSequence = {
   id: string;
@@ -49,6 +71,7 @@ export type DialogueAdapter = {
   displayName: string;
   npcs: readonly StudioNpc[];
   backgrounds: readonly StudioConversationBackground[];
+  items?: readonly StudioItem[];
   sequences: readonly StudioDialogueSequence[];
   isValidStableId?: (value: string) => boolean;
 };

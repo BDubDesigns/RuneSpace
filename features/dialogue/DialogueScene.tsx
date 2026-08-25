@@ -2,13 +2,17 @@ import Image from "next/image";
 import type { ReactNode } from "react";
 import { getConversationBackground } from "@/game/content/conversation-backgrounds";
 import type { DialogueBeat } from "@/game/content/dialogue";
-import { resolveDialogueSpeaker } from "@/game/content/dialogue";
+import { resolveDialogueItem, resolveDialogueSpeaker } from "@/game/content/dialogue";
 import { getLocation } from "@/game/content/locations";
 
 /**
  * Shared RuneSpace dialogue presentation. Gameplay/player state belongs to
  * DialoguePlayer; authoring state belongs to QC Studio. Both surfaces render
  * this same scene so the Studio preview cannot drift from production.
+ *
+ * A beat presents exactly one subject over the authored conversation
+ * background: an NPC portrait or an item reveal. Item beats are presentation
+ * only — this scene never grants, removes, or mutates inventory.
  */
 export function DialogueScene({
   beat,
@@ -30,16 +34,22 @@ export function DialogueScene({
   controls?: ReactNode;
 }) {
   const resolvedSpeaker = resolveDialogueSpeaker(beat);
+  const resolvedItem = resolveDialogueItem(beat);
   const background = getConversationBackground(beat.backgroundId);
-  if (!resolvedSpeaker || !background) return null;
+  if (!background) return null;
+  if (beat.kind === "npc" && !resolvedSpeaker) return null;
+  if (beat.kind === "item" && !resolvedItem) return null;
   const sceneLocation = getLocation(background.locationId);
+  // Item reveals are local-scene presentations; they have no comms variant.
+  const presentationMode = beat.kind === "npc" ? beat.presentationMode : "local";
 
   return (
     <div className="overflow-hidden border border-[color:var(--rs-border-structural)] bg-black">
       <div
         className="rs-dialogue-scene relative aspect-[15/8] min-h-56 w-full overflow-hidden sm:min-h-72"
-        data-dialogue-presentation={beat.presentationMode}
-        data-presentation-mode={beat.presentationMode}
+        data-dialogue-presentation={presentationMode}
+        data-presentation-mode={presentationMode}
+        data-dialogue-subject={beat.kind}
       >
         <Image
           src={background.asset}
@@ -58,7 +68,7 @@ export function DialogueScene({
             {sceneLocation.displayName.toUpperCase()}
           </p>
         ) : null}
-        {beat.presentationMode === "comms" ? (
+        {presentationMode === "comms" ? (
           <>
             <div
               aria-hidden="true"
@@ -69,16 +79,43 @@ export function DialogueScene({
             </p>
           </>
         ) : null}
-        <Image
-          key={`${beat.speakerNpcId}:${portraitGeneration}`}
-          src={resolvedSpeaker.expressionAsset}
-          alt={`${resolvedSpeaker.npc.displayName}, ${beat.expressionId} expression`}
-          width={400}
-          height={500}
-          sizes="min(60vw, 24rem)"
-          className="rs-dialogue-scene__npc absolute inset-x-1/2 bottom-0 z-20 h-[92%] w-auto -translate-x-1/2 object-contain"
-          data-portrait-transition="fade-in"
-        />
+        {resolvedSpeaker && beat.kind === "npc" ? (
+          <Image
+            key={`${beat.speakerNpcId}:${portraitGeneration}`}
+            src={resolvedSpeaker.expressionAsset}
+            alt={`${resolvedSpeaker.npc.displayName}, ${beat.expressionId} expression`}
+            width={400}
+            height={500}
+            sizes="min(60vw, 24rem)"
+            className="rs-dialogue-scene__npc absolute inset-x-1/2 bottom-0 z-20 h-[92%] w-auto -translate-x-1/2 object-contain"
+            data-portrait-transition="fade-in"
+          />
+        ) : null}
+        {resolvedItem && beat.kind === "item" ? (
+          <span
+            key={`${beat.itemId}:${portraitGeneration}`}
+            aria-hidden="true"
+            className="absolute bottom-[6%] left-1/2 z-20 flex h-[76%] max-w-[82%] -translate-x-1/2 items-center justify-center"
+            data-dialogue-item-artwork
+            data-portrait-transition="fade-in"
+          >
+            {resolvedItem.presentation.artworkSrc ? (
+              <Image
+                src={resolvedItem.presentation.artworkSrc}
+                alt=""
+                width={480}
+                height={480}
+                sizes="(max-width: 640px) 70vw, 24rem"
+                className="h-full w-auto max-w-full object-contain drop-shadow-[0_12px_24px_rgba(0,0,0,0.65)]"
+                priority
+              />
+            ) : (
+              <span className="rs-map-plate px-6 py-4 font-display text-4xl uppercase tracking-[0.14em]">
+                {resolvedItem.presentation.textFallback}
+              </span>
+            )}
+          </span>
+        ) : null}
       </div>
       <div className="border-t border-[color:var(--rs-border-structural)] bg-[color:var(--rs-surface-panel)] p-4 sm:p-5">
         <div>
@@ -86,10 +123,14 @@ export function DialogueScene({
             className="font-display text-xs uppercase tracking-[0.16em] text-[color:var(--rs-accent-primary)]"
             data-dialogue-speaker-name
           >
-            {resolvedSpeaker.npc.displayName}
+            {resolvedItem && beat.kind === "item"
+              ? "Item"
+              : (resolvedSpeaker?.npc.displayName ?? "")}
           </p>
           <p className="mt-1 text-sm text-[color:var(--rs-text-muted)]" data-dialogue-speaker-role>
-            {resolvedSpeaker.npc.role}
+            {resolvedItem && beat.kind === "item"
+              ? `${resolvedItem.presentation.displayName}${resolvedItem.quantity > 1 ? ` ×${resolvedItem.quantity}` : ""}`
+              : (resolvedSpeaker?.npc.role ?? "")}
           </p>
         </div>
         <button
@@ -105,6 +146,12 @@ export function DialogueScene({
           <span className="sr-only" aria-live="polite" aria-atomic="true">
             {fullText}
           </span>
+          {resolvedItem && beat.kind === "item" ? (
+            <span className="sr-only">
+              {resolvedItem.presentation.accessibleDescription}
+              {resolvedItem.quantity > 1 ? `, quantity ${resolvedItem.quantity}` : ""}
+            </span>
+          ) : null}
         </button>
         {actionMessage ? (
           <p

@@ -2,13 +2,13 @@
   "schemaVersion": 1,
   "projectSlug": "runespace",
   "workState": "active",
-  "currentFocus": "Review the creator-approved Walk It Off dialogue polish from QC Studio before merge.",
+  "currentFocus": "Item-acquired presentation beats in dialogue and QC Studio (issue #108) awaiting product-owner preview review.",
   "latestCompleted": {
-    "summary": "Added the Walk It Off NPC mission, dialogue presentation, and Cutter reward flow.",
+    "summary": "Polished the Walk It Off dialogue with creator-approved QC Studio content.",
     "date": "2026-08-24",
-    "url": "https://github.com/BDubDesigns/RuneSpace/pull/103"
+    "url": "https://github.com/BDubDesigns/RuneSpace/pull/107"
   },
-  "nextStep": "Product-owner review of the complete Walk It Off dialogue polish before merge.",
+  "nextStep": "Product-owner visual review of the Cutter reveal and Studio item authoring on the deployed PR preview.",
   "lastMeaningfulUpdate": "2026-08-24",
   "highlights": [
     {
@@ -17,9 +17,9 @@
       "url": "https://github.com/BDubDesigns/RuneSpace/pull/105"
     },
     {
-      "summary": "Added the Walk It Off NPC mission, dialogue presentation, and Cutter reward flow.",
+      "summary": "Polished the Walk It Off dialogue with creator-approved QC Studio content.",
       "date": "2026-08-24",
-      "url": "https://github.com/BDubDesigns/RuneSpace/pull/103"
+      "url": "https://github.com/BDubDesigns/RuneSpace/pull/107"
     },
     {
       "summary": "Added authoritative Travel Scavenge windows and a weighted reveal reel.",
@@ -28,8 +28,8 @@
     }
   ],
   "currentChange": {
-    "summary": "Review creator-approved Walk It Off dialogue polish (#107).",
-    "stage": "review",
-    "pullRequestNumber": 107
+    "summary": "Add item-acquired presentation beats to dialogue plus QC Studio item authoring (#108).",
+    "stage": "preview",
+    "pullRequestNumber": 109
   }
 }

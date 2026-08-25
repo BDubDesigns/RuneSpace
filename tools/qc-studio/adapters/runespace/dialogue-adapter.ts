@@ -8,6 +8,7 @@ import {
   type DialogueBeat,
   type DialogueSequence,
 } from "@/game/content/dialogue";
+import { DIALOGUE_ITEM_CATALOG } from "@/game/content/item-presentation";
 import { getLocation } from "@/game/content/locations";
 import { NPCS } from "@/game/content/npcs";
 import type {
@@ -15,6 +16,7 @@ import type {
   StudioConversationBackground,
   StudioDialogueBeat,
   StudioDialogueSequence,
+  StudioItem,
   StudioNpc,
 } from "../../core/types";
 
@@ -63,11 +65,19 @@ const studioBackgrounds: StudioConversationBackground[] = CONVERSATION_BACKGROUN
   },
 );
 
+/** Canonical inventory items only, sourced from the authoritative RuneSpace catalog. */
+const studioItems: StudioItem[] = DIALOGUE_ITEM_CATALOG.map((item) =>
+  item.kind === "stack"
+    ? { id: item.id, displayName: item.displayName, kind: "stack", stackLimit: item.stackLimit }
+    : { id: item.id, displayName: item.displayName, kind: "unique" },
+);
+
 export const runespaceDialogueAdapter: DialogueAdapter = {
   adapterId: "runespace",
   displayName: "RuneSpace",
   npcs: studioNpcs,
   backgrounds: studioBackgrounds,
+  items: studioItems,
   sequences: DIALOGUE_SEQUENCES.map(toStudioSequence),
   isValidStableId: (value) => ContentId.safeParse(value).success,
 };
