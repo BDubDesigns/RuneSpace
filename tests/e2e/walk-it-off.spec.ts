@@ -137,8 +137,8 @@ test("walks from Wade to Tansy, presents approved dialogue, and claims one carri
   for (let index = 0; index < 8; index += 1) {
     await tansyDialogue.getByRole("button", { name: "Next" }).click();
   }
-  await expect(tansyDialogue.getByRole("button", { name: "Claim reward" })).toBeVisible();
-  await tansyDialogue.getByRole("button", { name: "Claim reward" }).click();
+  await expect(tansyDialogue.getByRole("button", { name: "Claim Cutter" })).toBeVisible();
+  await tansyDialogue.getByRole("button", { name: "Claim Cutter" }).click();
   // The successful grant reveals the Cutter itself over The Jag before Tansy returns.
   const cutterReveal = tansyDialogue.locator('[data-dialogue-subject="item"]');
   await expect(cutterReveal).toBeVisible();
@@ -258,8 +258,8 @@ test("supports the explorer-first Jag conversation and remote mission acceptance
   for (let index = 0; index < 3; index += 1) {
     await dialogue.getByRole("button", { name: "Next" }).click();
   }
-  await expect(dialogue.getByRole("button", { name: "Claim reward" })).toBeVisible();
-  await dialogue.getByRole("button", { name: "Claim reward" }).click();
+  await expect(dialogue.getByRole("button", { name: "Claim Cutter" })).toBeVisible();
+  await dialogue.getByRole("button", { name: "Claim Cutter" }).click();
   await expect(dialogue.locator('[data-dialogue-subject="item"]')).toBeVisible();
   await expect(dialogue.locator("[data-dialogue-speaker-name]")).toHaveText("Item");
   await dialogue.getByRole("button", { name: "Next" }).click();

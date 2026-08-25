@@ -87,12 +87,13 @@ export function DialoguePlayer({
   const isLastBeat = beatIndex === sequence.beats.length - 1;
   const nextLabel = isComplete && isLastBeat ? "Finish" : "Next";
   // Authored action copy stays mission-specific: every completion control is
-  // the sequence's own explicit label (e.g. "Claim reward" for Walk It Off's
+  // the sequence's own explicit label (e.g. "Claim Cutter" for Walk It Off's
   // Cutter claim, "SHOW SHALE" for Cut Your Teeth's turn-in). Falls back to a
-  // generic label only when the sequence does not author one.
+  // generic label only when the sequence does not author one — matching main's
+  // established "Claim Cutter" default for completion controls.
   const actionLabel =
     sequence.actionLabel ??
-    (sequence.action === "accept_mission" ? "Accept mission" : "Claim reward");
+    (sequence.action === "accept_mission" ? "Accept mission" : "Claim Cutter");
   const visibleText = reducedMotion ? beat.text : beatCharacters.slice(0, revealedChars).join("");
 
   function restart() {

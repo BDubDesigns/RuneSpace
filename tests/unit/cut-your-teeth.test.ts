@@ -77,7 +77,7 @@ describe("issue #110 Cut Your Teeth authored boundaries", () => {
     expect(turnIn?.action).toBe("complete_mission");
     expect(turnIn?.actionLabel).toBe("SHOW SHALE");
     // Walk It Off's Cutter claim keeps its existing mission-specific copy.
-    expect(getDialogue(DIALOGUE_IDS.tansyCompletion)?.actionLabel).toBe("Claim reward");
+    expect(getDialogue(DIALOGUE_IDS.tansyCompletion)?.actionLabel).toBe("Claim Cutter");
   });
 
   it("resolves contextual active sequences for equip, stack, ready, and busy states", () => {

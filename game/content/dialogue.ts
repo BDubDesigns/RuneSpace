@@ -59,7 +59,7 @@ export type DialogueSequence = {
   action?: "accept_mission" | "complete_mission";
   /**
    * Mission-specific action copy shown on the terminal control when the
-   * sequence has an action. Authored per sequence (e.g. "Claim reward" for
+   * sequence has an action. Authored per sequence (e.g. "Claim Cutter" for
    * Walk It Off's Cutter claim, "SHOW SHALE" for Cut Your Teeth's turn-in).
    * Falls back to a generic label only when omitted.
    */
@@ -240,7 +240,7 @@ const dialogue = {
       tansyLocal(EXPRESSION_IDS.smile, "You'll figure it out."),
     ],
     action: "complete_mission",
-    actionLabel: "Claim reward",
+    actionLabel: "Claim Cutter",
   },
   [DIALOGUE_IDS.tansyAfterClaim]: {
     id: DIALOGUE_IDS.tansyAfterClaim,

@@ -120,10 +120,17 @@ test.describe("QC Studio development dialogue module", () => {
     // the current format; the draft content survives.
     await expect(page.getByText(/Upgraded the saved v1 draft/i)).toBeVisible();
     await expect(page.getByText("Untouched v1")).toBeVisible();
-    // The migrated payload is persisted to the v3 key.
+    // Migration persistence is proven by the v3 key holding a schema-v3 draft,
+    // not by the legacy v1 key (which is retained only as a backup).
+    const v3Key = "qc-studio:runespace:dialogue:v3";
     await expect
-      .poll(() => page.evaluate((key) => window.localStorage.getItem(key), v1Key))
+      .poll(() => page.evaluate((key) => window.localStorage.getItem(key), v3Key))
       .not.toBeNull();
+    const migratedRaw = await page.evaluate((key) => window.localStorage.getItem(key), v3Key);
+    const migrated = JSON.parse(migratedRaw ?? "null");
+    expect(migrated?.schemaVersion).toBe(3);
+    expect(migrated?.draft?.title).toBe("Untouched v1");
+    expect(migrated?.draft?.beats?.[0]?.kind).toBe("npc");
   });
 
   test("previews an action without invoking gameplay", async ({ page }) => {
