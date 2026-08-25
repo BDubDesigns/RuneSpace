@@ -22,6 +22,7 @@ import type {
   DialogueAdapter,
   DialogueCheckpoint,
   DialogueDraft,
+  StudioDialogueBeat,
 } from "@/tools/qc-studio/core/types";
 
 const adapter: DialogueAdapter = {
@@ -287,6 +288,141 @@ describe("QC Studio core", () => {
     });
     expect(payload.source).toEqual({ kind: "authoritative_sequence", sequenceId: "source_one" });
     expect(payload.sequence.beats[0]).toEqual(itemBeat());
+  });
+
+  it("rejects malformed mixed beat shapes in draft validation", () => {
+    // Item beat carrying NPC-only fields. Cast through unknown: the malformed
+    // shape is exactly what the validator must reject at runtime.
+    const itemWithNpcFields = validateDialogueDraft(
+      adapter,
+      draft({
+        beats: [
+          {
+            ...itemBeat(),
+            speakerNpcId: "npc_one",
+            expressionId: "neutral",
+            presentationMode: "local",
+          } as unknown as StudioDialogueBeat,
+        ],
+      }),
+    );
+    expect(itemWithNpcFields.valid).toBe(false);
+    expect(itemWithNpcFields.issues.map((issue) => issue.path)).toEqual(["beats.0.subject"]);
+    expect(itemWithNpcFields.issues[0]?.message).toContain("NPC-only fields");
+
+    // Item beat with just one stale NPC field is also rejected.
+    const itemWithOneStale = validateDialogueDraft(
+      adapter,
+      draft({
+        beats: [{ ...itemBeat(), presentationMode: "comms" } as unknown as StudioDialogueBeat],
+      }),
+    );
+    expect(itemWithOneStale.issues.map((issue) => issue.path)).toEqual(["beats.0.subject"]);
+
+    // NPC beat carrying item-only fields.
+    const npcWithItemFields = validateDialogueDraft(
+      adapter,
+      draft({
+        beats: [
+          {
+            kind: "npc",
+            speakerNpcId: "npc_one",
+            expressionId: "neutral",
+            backgroundId: "background_one",
+            presentationMode: "local",
+            text: "Hello.",
+            itemId: "stack_thing",
+            quantity: 2,
+          } as unknown as StudioDialogueBeat,
+        ],
+      }),
+    );
+    expect(npcWithItemFields.valid).toBe(false);
+    expect(npcWithItemFields.issues.map((issue) => issue.path)).toEqual(["beats.0.subject"]);
+    expect(npcWithItemFields.issues[0]?.message).toContain("item-only fields");
+
+    // Clean beats of each kind remain valid.
+    expect(validateDialogueDraft(adapter, draft({ beats: [itemBeat()] })).valid).toBe(true);
+    expect(validateDialogueDraft(adapter, draft()).valid).toBe(true);
+  });
+
+  it("fails safely when persisted state contains mixed beat shapes", () => {
+    // A v2 payload whose item beat secretly carries NPC-only fields must be
+    // treated as invalid, never loaded as if clean.
+    const mixedItemPayload = {
+      schemaVersion: 2,
+      adapterId: adapter.adapterId,
+      draft: {
+        schemaVersion: 2,
+        adapterId: adapter.adapterId,
+        draftId: "draft-mixed",
+        title: "Mixed item beat",
+        npcId: "npc_one",
+        beats: [{ ...itemBeat(), speakerNpcId: "npc_one" }],
+      },
+      checkpoints: [],
+    };
+    expect(
+      parsePersistedDialogueStudio(JSON.stringify(mixedItemPayload), adapter.adapterId),
+    ).toEqual({ kind: "invalid" });
+
+    // Same for an NPC beat carrying item-only fields.
+    const mixedNpcPayload = {
+      schemaVersion: 2,
+      adapterId: adapter.adapterId,
+      draft: {
+        schemaVersion: 2,
+        adapterId: adapter.adapterId,
+        draftId: "draft-mixed-npc",
+        title: "Mixed npc beat",
+        npcId: "npc_one",
+        beats: [
+          {
+            kind: "npc",
+            speakerNpcId: "npc_one",
+            expressionId: "neutral",
+            backgroundId: "background_one",
+            presentationMode: "local",
+            text: "Hello.",
+            itemId: "stack_thing",
+            quantity: 1,
+          },
+        ],
+      },
+      checkpoints: [],
+    };
+    expect(
+      parsePersistedDialogueStudio(JSON.stringify(mixedNpcPayload), adapter.adapterId),
+    ).toEqual({ kind: "invalid" });
+
+    // And a legacy v1-shaped beat with item fields fails migration instead of
+    // being adopted as a clean NPC beat.
+    const mixedV1Payload = {
+      schemaVersion: 1,
+      adapterId: adapter.adapterId,
+      draft: {
+        schemaVersion: 1,
+        adapterId: adapter.adapterId,
+        draftId: "draft-v1-mixed",
+        title: "Mixed v1 beat",
+        npcId: "npc_one",
+        beats: [
+          {
+            speakerNpcId: "npc_one",
+            expressionId: "neutral",
+            backgroundId: "background_one",
+            presentationMode: "local",
+            text: "Legacy.",
+            itemId: "stack_thing",
+            quantity: 1,
+          },
+        ],
+      },
+      checkpoints: [],
+    };
+    expect(parsePersistedDialogueStudio(JSON.stringify(mixedV1Payload), adapter.adapterId)).toEqual(
+      { kind: "invalid" },
+    );
   });
 
   it("replaces the whole beat shape on NPC → Item → NPC switches", () => {

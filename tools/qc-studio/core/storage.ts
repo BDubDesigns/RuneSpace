@@ -46,31 +46,35 @@ function isItemBeat(beat: Record<string, unknown>): boolean {
 }
 
 /**
- * Accepts either subject kind. NPC fields are required for npc beats only, so a
- * stored item beat never needs fake speaker data. Structural validation of the
- * item catalog/quantity range happens against the live adapter at load time.
+ * Accepts either subject kind and REJECTS mixed shapes: a stored beat carrying
+ * fields that belong only to the other kind fails validation, so malformed
+ * persisted data can never load as if it were clean.
  */
 function isBeat(value: unknown): value is StudioDialogueBeat {
   if (!value || typeof value !== "object") return false;
   const beat = value as Record<string, unknown>;
   if (typeof beat.backgroundId !== "string" || typeof beat.text !== "string") return false;
+  const isNpcFields = (candidate: Record<string, unknown>) =>
+    typeof candidate.speakerNpcId === "string" &&
+    typeof candidate.expressionId === "string" &&
+    isPresentationMode(candidate.presentationMode);
   if (beat.kind === "npc") {
-    return (
-      typeof beat.speakerNpcId === "string" &&
-      typeof beat.expressionId === "string" &&
-      isPresentationMode(beat.presentationMode)
-    );
+    // Item-only fields must not survive on an NPC beat.
+    if ("itemId" in beat || "quantity" in beat) return false;
+    return isNpcFields(beat);
   }
   if (beat.kind === "item") {
+    // NPC-only fields must not survive on an item beat.
+    if ("speakerNpcId" in beat || "expressionId" in beat || "presentationMode" in beat) {
+      return false;
+    }
     return isItemBeat(beat);
   }
-  // v1 beats had no kind discriminator; they were all NPC beats.
+  // v1 beats had no kind discriminator; they were all NPC beats. A v1-shaped
+  // beat must not carry item-only fields either.
   if (beat.kind === undefined) {
-    return (
-      typeof beat.speakerNpcId === "string" &&
-      typeof beat.expressionId === "string" &&
-      isPresentationMode(beat.presentationMode)
-    );
+    if ("itemId" in beat || "quantity" in beat) return false;
+    return isNpcFields(beat);
   }
   return false;
 }
@@ -175,7 +179,10 @@ export function parsePersistedDialogueStudio(
       const migrated = migrateV1State(state, adapterId);
       if (migrated) return { kind: "migrated", state: migrated };
     }
-    if (state.schemaVersion !== QC_STUDIO_SCHEMA_VERSION) {
+    // Only genuinely NEWER formats are "unsupported" (left untouched).
+    // A known-older or current-version payload that failed validation is
+    // malformed data, not a future format.
+    if (typeof state.schemaVersion === "number" && state.schemaVersion > QC_STUDIO_SCHEMA_VERSION) {
       return { kind: "unsupported" };
     }
     return { kind: "invalid" };

@@ -59,7 +59,19 @@ export function validateDialogueDraft(
 
   draft.beats.forEach((beat: StudioDialogueBeat, index: number) => {
     const path = `beats.${index}`;
+    const record = beat as unknown as Record<string, unknown>;
     if (beat.kind === "item") {
+      // Reject mixed shapes outright: an item beat carrying NPC-only fields
+      // is malformed even if its own fields look valid.
+      const staleNpcFields = ["speakerNpcId", "expressionId", "presentationMode"].filter(
+        (field) => field in record,
+      );
+      if (staleNpcFields.length > 0) {
+        issues.push({
+          path: `${path}.subject`,
+          message: `Item beats cannot contain NPC-only fields (${staleNpcFields.join(", ")}).`,
+        });
+      }
       const item = findItem(adapter, beat.itemId);
       if (!item) {
         issues.push({
@@ -89,6 +101,15 @@ export function validateDialogueDraft(
     }
 
     const npc = findNpc(adapter, beat.speakerNpcId);
+    // Reject mixed shapes outright: an NPC beat carrying item-only fields is
+    // malformed even if its own fields look valid.
+    const staleItemFields = ["itemId", "quantity"].filter((field) => field in record);
+    if (staleItemFields.length > 0) {
+      issues.push({
+        path: `${path}.subject`,
+        message: `NPC beats cannot contain item-only fields (${staleItemFields.join(", ")}).`,
+      });
+    }
     if (!npc) {
       issues.push({
         path: `${path}.speakerNpcId`,
