@@ -99,33 +99,111 @@ describe("inventory", () => {
     expect(plan.updatedStacks).toEqual([{ id: 42, quantity: 10 }]);
   });
 
-  it("fills partial stacks in stable creation order regardless of query order", () => {
+  it("fills a closest-to-full partial stack before opening a new stack", () => {
     const plan = planStackAddition(
+      [
+        {
+          id: "full",
+          itemId: ITEM_IDS.ferriteShale,
+          quantity: 5,
+          createdAt: "2026-01-01T00:00:00.000Z",
+        },
+        {
+          id: "partial",
+          itemId: ITEM_IDS.ferriteShale,
+          quantity: 2,
+          createdAt: "2026-01-02T00:00:00.000Z",
+        },
+      ],
+      ITEM_IDS.ferriteShale,
+      3,
+      5,
+      0,
+    );
+    expect(plan.updatedStacks).toEqual([{ id: "partial", quantity: 5 }]);
+    expect(plan.createdStacks).toEqual([]);
+    expect(plan.remainingQuantity).toBe(0);
+  });
+
+  it("fills [4, 2] as [5, 4] when three items are added", () => {
+    const plan = planStackAddition(
+      [
+        { id: "two", itemId: ITEM_IDS.ferriteShale, quantity: 2 },
+        { id: "four", itemId: ITEM_IDS.ferriteShale, quantity: 4 },
+      ],
+      ITEM_IDS.ferriteShale,
+      3,
+      5,
+      0,
+    );
+    expect(plan.updatedStacks).toEqual([
+      { id: "four", quantity: 5 },
+      { id: "two", quantity: 4 },
+    ]);
+    expect(plan.createdStacks).toEqual([]);
+    expect(plan.remainingQuantity).toBe(0);
+  });
+
+  it("fills the higher-quantity partial stack first when either can receive the award", () => {
+    const plan = planStackAddition(
+      [
+        { id: "lower", itemId: ITEM_IDS.ferriteShale, quantity: 1 },
+        { id: "higher", itemId: ITEM_IDS.ferriteShale, quantity: 3 },
+      ],
+      ITEM_IDS.ferriteShale,
+      1,
+      5,
+      0,
+    );
+    expect(plan.updatedStacks).toEqual([{ id: "higher", quantity: 4 }]);
+    expect(plan.createdStacks).toEqual([]);
+    expect(plan.remainingQuantity).toBe(0);
+  });
+
+  it("uses creation time, then ID, for equal-quantity addition ties", () => {
+    const byCreationTime = planStackAddition(
       [
         {
           id: "newer",
           itemId: ITEM_IDS.ferriteShale,
-          quantity: 8,
+          quantity: 2,
           createdAt: "2026-01-02T00:00:00.000Z",
         },
         {
           id: "older",
           itemId: ITEM_IDS.ferriteShale,
-          quantity: 7,
+          quantity: 2,
           createdAt: "2026-01-01T00:00:00.000Z",
         },
       ],
       ITEM_IDS.ferriteShale,
-      4,
-      10,
+      1,
+      5,
       0,
     );
-    expect(plan.updatedStacks).toEqual([
-      { id: "older", quantity: 10 },
-      { id: "newer", quantity: 9 },
-    ]);
-    expect(plan.createdStacks).toEqual([]);
-    expect(plan.remainingQuantity).toBe(0);
+    expect(byCreationTime.updatedStacks).toEqual([{ id: "older", quantity: 3 }]);
+
+    const byId = planStackAddition(
+      [
+        {
+          id: "stack-b",
+          itemId: ITEM_IDS.ferriteShale,
+          quantity: 2,
+          createdAt: "2026-01-01T00:00:00.000Z",
+        },
+        {
+          id: "stack-a",
+          itemId: ITEM_IDS.ferriteShale,
+          quantity: 2,
+          createdAt: "2026-01-01T00:00:00.000Z",
+        },
+      ],
+      ITEM_IDS.ferriteShale,
+      1,
+      5,
+      0,
+    );
+    expect(byId.updatedStacks).toEqual([{ id: "stack-a", quantity: 3 }]);
   });
 
   it("consumes the smallest stacks first, then creation order and ID", () => {

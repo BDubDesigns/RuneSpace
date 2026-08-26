@@ -36,6 +36,10 @@ function compareStackCreationOrder<Id>(a: StackState<Id>, b: StackState<Id>): nu
   return aCreatedAt.localeCompare(bCreatedAt) || String(a.id).localeCompare(String(b.id));
 }
 
+function compareStackAdditionOrder<Id>(a: StackState<Id>, b: StackState<Id>): number {
+  return b.quantity - a.quantity || compareStackCreationOrder(a, b);
+}
+
 /**
  * Preflight one unequipped unique item against the authoritative carried
  * Inventory projection. Unique items consume exactly one carried slot and
@@ -164,14 +168,17 @@ export function planStackAddition<Id>(
     itemWeight === 0 ? quantity : Math.min(quantity, Math.floor(availableWeight / itemWeight));
   let remainingQuantity = weightLimitedQuantity;
   const updatedStacks: StackUpdate<Id>[] = [];
-  const matchingStacks = existingStacks
-    .filter((stack) => stack.itemId === itemId)
-    .sort(compareStackCreationOrder);
+  const matchingStacks = existingStacks.filter((stack) => stack.itemId === itemId);
   for (const stack of matchingStacks) {
-    if (remainingQuantity === 0) continue;
     if (!Number.isInteger(stack.quantity) || stack.quantity <= 0 || stack.quantity > stackLimit) {
       throw new RangeError("Existing stack quantity is invalid");
     }
+  }
+  const partialStacks = matchingStacks
+    .filter((stack) => stack.quantity < stackLimit)
+    .sort(compareStackAdditionOrder);
+  for (const stack of partialStacks) {
+    if (remainingQuantity === 0) continue;
     const added = Math.min(stackLimit - stack.quantity, remainingQuantity);
     if (added > 0) updatedStacks.push({ id: stack.id, quantity: stack.quantity + added });
     remainingQuantity -= added;

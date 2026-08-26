@@ -2,13 +2,13 @@
   "schemaVersion": 1,
   "projectSlug": "runespace",
   "workState": "active",
-  "currentFocus": "Centralize RuneSpace carried-inventory stack mutations with deterministic automatic consumption and selected-stack Power Cell safety in Issue #112 draft review.",
+  "currentFocus": "Centralize RuneSpace carried-inventory stack mutations with deterministic automatic consumption and selected-stack Power Cell safety in Issue #112 review.",
   "latestCompleted": {
     "summary": "Added the Cut Your Teeth story mission with Skill XP dialogue beats.",
     "date": "2026-08-25",
     "url": "https://github.com/BDubDesigns/RuneSpace/pull/111"
   },
-  "nextStep": "Product-owner review of the Issue #112 draft PR, deterministic stack behavior, and the selected Power Cell stale-selection path on the deployed preview.",
+  "nextStep": "Product-owner review of Issue #112 PR #115, deterministic stack behavior, and the selected Power Cell stale-selection path on the deployed preview.",
   "lastMeaningfulUpdate": "2026-08-26",
   "highlights": [
     {
@@ -25,11 +25,6 @@
       "summary": "Added item-acquired presentation beats to dialogue plus QC Studio item authoring.",
       "date": "2026-08-24",
       "url": "https://github.com/BDubDesigns/RuneSpace/pull/109"
-    },
-    {
-      "summary": "Polished the Walk It Off dialogue with creator-approved QC Studio content.",
-      "date": "2026-08-24",
-      "url": "https://github.com/BDubDesigns/RuneSpace/pull/107"
     }
   ],
   "currentChange": {
