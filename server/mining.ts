@@ -301,6 +301,7 @@ export type MiningGameplayState = {
       name: string;
       quantity: number;
       stackLimit: number;
+      massGrams: number;
     }[];
     uniqueItems: readonly {
       id: string;
@@ -1043,6 +1044,7 @@ export async function stateFromTransaction(
         name: resolveItemPresentation(stack.itemId, stack.itemId).displayName,
         quantity: stack.quantity,
         stackLimit: itemStackLimit(stack.itemId, balance),
+        massGrams: carriedItemMassGrams(stack.itemId, balance),
       })),
       uniqueItems: deriveCarriedUniqueItems(
         snapshot.itemInstances.map((instance) => ({

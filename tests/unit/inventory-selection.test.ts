@@ -91,6 +91,7 @@ const ferriteStack = {
   name: "Ferrite Shale",
   quantity: 5,
   stackLimit: 10,
+  massGrams: 100,
 };
 
 const powerCellStack = {
@@ -99,6 +100,7 @@ const powerCellStack = {
   name: "Power Cell",
   quantity: 2,
   stackLimit: 5,
+  massGrams: 500,
 };
 
 const carriedCutter = {
