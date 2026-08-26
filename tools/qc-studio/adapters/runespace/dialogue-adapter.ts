@@ -11,6 +11,8 @@ import {
 import { DIALOGUE_ITEM_CATALOG } from "@/game/content/item-presentation";
 import { getLocation } from "@/game/content/locations";
 import { NPCS } from "@/game/content/npcs";
+import { SKILL_PRESENTATIONS } from "@/game/content/skill-presentation";
+import type { SkillId } from "@/game/config/foundations";
 import type {
   DialogueAdapter,
   StudioConversationBackground,
@@ -18,6 +20,7 @@ import type {
   StudioDialogueSequence,
   StudioItem,
   StudioNpc,
+  StudioSkill,
 } from "../../core/types";
 
 function formatStableId(value: string): string {
@@ -72,12 +75,19 @@ const studioItems: StudioItem[] = DIALOGUE_ITEM_CATALOG.map((item) =>
     : { id: item.id, displayName: item.displayName, kind: "unique" },
 );
 
+/** Canonical skills only, sourced from the authoritative skill presentation registry. */
+const studioSkills: StudioSkill[] = SKILL_PRESENTATIONS.map((skill) => ({
+  id: skill.id,
+  displayName: skill.displayName,
+}));
+
 export const runespaceDialogueAdapter: DialogueAdapter = {
   adapterId: "runespace",
   displayName: "RuneSpace",
   npcs: studioNpcs,
   backgrounds: studioBackgrounds,
   items: studioItems,
+  skills: studioSkills,
   sequences: DIALOGUE_SEQUENCES.map(toStudioSequence),
   isValidStableId: (value) => ContentId.safeParse(value).success,
 };

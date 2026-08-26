@@ -5,22 +5,26 @@ import {
   ITEM_IDS,
   MISSION_IDS,
   NPC_IDS,
+  SKILL_IDS,
   type ConversationBackgroundId,
   type DialogueId,
   type ExpressionId,
   type ItemId,
   type NpcId,
+  type SkillId,
 } from "@/game/config/foundations";
 import type { MissionState } from "@/game/domain/missions";
 import { getItemPresentation } from "./item-presentation";
+import { getSkillPresentation } from "./skill-presentation";
 import { getNpc, resolveNpcExpression } from "./npcs";
 
 export type DialoguePresentationMode = "local" | "comms";
 
 /**
  * A dialogue beat presents exactly one visual subject over a conversation
- * background: an NPC portrait or an item reveal. Item beats are presentation
- * only — they never grant, remove, or mutate inventory.
+ * background: an NPC portrait, an item reveal, or a skill-XP reward tile.
+ * Item and skill-XP beats are presentation only — they never grant, remove,
+ * or mutate inventory or progression.
  */
 export type DialogueBeat =
   | {
@@ -38,6 +42,14 @@ export type DialogueBeat =
       quantity: number;
       backgroundId: ConversationBackgroundId;
       text: string;
+    }
+  | {
+      kind: "skill_xp";
+      skillId: SkillId;
+      /** Display amount only; the authoritative command already granted it. */
+      amount: number;
+      backgroundId: ConversationBackgroundId;
+      text: string;
     };
 
 export type DialogueSequence = {
@@ -45,6 +57,13 @@ export type DialogueSequence = {
   npcId: NpcId;
   beats: readonly DialogueBeat[];
   action?: "accept_mission" | "complete_mission";
+  /**
+   * Mission-specific action copy shown on the terminal control when the
+   * sequence has an action. Authored per sequence (e.g. "Claim Cutter" for
+   * Walk It Off's Cutter claim, "SHOW SHALE" for Cut Your Teeth's turn-in).
+   * Falls back to a generic label only when omitted.
+   */
+  actionLabel?: string;
 };
 
 const crash = CONVERSATION_BACKGROUND_IDS.crashSiteExterior;
@@ -86,6 +105,15 @@ function tansyLocal(expressionId: ExpressionId, text: string): DialogueBeat {
 /** Item beats present an already-owned/already-granted item; they never mutate inventory. */
 function itemBeat(itemId: ItemId, quantity: number, text = ""): DialogueBeat {
   return { kind: "item", itemId, quantity, backgroundId: jag, text };
+}
+
+/**
+ * Skill-XP beats present an already-awarded XP amount; they never grant
+ * progression. The tile reuses the production Mining/Refining VisualTile
+ * presentation (XP fallback, skill nameplate, +N badge).
+ */
+function tansySkillXpBeat(skillId: SkillId, amount: number): DialogueBeat {
+  return { kind: "skill_xp", skillId, amount, backgroundId: jag, text: "" };
 }
 
 const dialogue = {
@@ -212,6 +240,7 @@ const dialogue = {
       tansyLocal(EXPRESSION_IDS.smile, "You'll figure it out."),
     ],
     action: "complete_mission",
+    actionLabel: "Claim Cutter",
   },
   [DIALOGUE_IDS.tansyAfterClaim]: {
     id: DIALOGUE_IDS.tansyAfterClaim,
@@ -254,13 +283,106 @@ const dialogue = {
       tansyLocal(EXPRESSION_IDS.smile, "Free up some weight and come back. I'll hold onto it."),
     ],
   },
-  [DIALOGUE_IDS.tansyAfterCompletion]: {
-    id: DIALOGUE_IDS.tansyAfterCompletion,
+  [DIALOGUE_IDS.tansyCutYourTeethOffer]: {
+    id: DIALOGUE_IDS.tansyCutYourTeethOffer,
     npcId: NPC_IDS.tansyRusk,
     beats: [
+      // Issue #110 amendment: Tansy's useful post-Walk-It-Off beats lead into
+      // this offer instead of surviving as a separate dead-end idle branch.
       tansyLocal(EXPRESSION_IDS.concerned, "Still have all your fingers?"),
       tansyLocal(EXPRESSION_IDS.smile, "Good! We'll make a miner out of you yet!"),
-      tansyLocal(EXPRESSION_IDS.smile, "Come back once something interesting has happened."),
+      tansyLocal(
+        EXPRESSION_IDS.neutral,
+        "All right. First lesson: that Cutter does more work equipped than it does sitting in your Inventory.",
+      ),
+      tansyLocal(
+        EXPRESSION_IDS.smile,
+        "Put it in your mining-tool slot, then bring me a full stack of Ferrite Shale.",
+      ),
+      tansyLocal(EXPRESSION_IDS.neutral, "Ten pieces, if you're counting."),
+      tansyLocal(
+        EXPRESSION_IDS.smile,
+        "Technically, you could scavenge the stuff while you're out walking around.",
+      ),
+      tansyLocal(
+        EXPRESSION_IDS.neutral,
+        "Wouldn't teach you anything about Mining, though. The Jag's right here if you want the practice.",
+      ),
+      tansyLocal(
+        EXPRESSION_IDS.smile,
+        "Bring me a full stack either way. Keep your fingers attached and I'll call it a pass.",
+      ),
+    ],
+    action: "accept_mission",
+  },
+  [DIALOGUE_IDS.tansyCutYourTeethEquipReminder]: {
+    id: DIALOGUE_IDS.tansyCutYourTeethEquipReminder,
+    npcId: NPC_IDS.tansyRusk,
+    beats: [
+      tansyLocal(
+        EXPRESSION_IDS.neutral,
+        "Cutter's still in your Inventory. Equip it first. Tools work better when they're not in a bag.",
+      ),
+    ],
+  },
+  [DIALOGUE_IDS.tansyCutYourTeethStackReminder]: {
+    id: DIALOGUE_IDS.tansyCutYourTeethStackReminder,
+    npcId: NPC_IDS.tansyRusk,
+    beats: [
+      tansyLocal(
+        EXPRESSION_IDS.neutral,
+        "I need to see one full stack. Ten pieces of Ferrite Shale.",
+      ),
+      tansyLocal(
+        EXPRESSION_IDS.smile,
+        "Put that Salvage Cutter in your Mining Tool slot and work The Jag until you've got them.",
+      ),
+      tansyLocal(
+        EXPRESSION_IDS.neutral,
+        "You'll miss plenty at first. Keep at it. The better you get at Mining, the more often the Cutter bites.",
+      ),
+      tansyLocal(
+        EXPRESSION_IDS.smile,
+        "If you scavenge a few along the way, they still count. Won't teach you much about Mining, though.",
+      ),
+      tansyLocal(
+        EXPRESSION_IDS.neutral,
+        "Bring me ten. I only need to see them — you keep the shale.",
+      ),
+    ],
+  },
+  [DIALOGUE_IDS.tansyCutYourTeethBusy]: {
+    id: DIALOGUE_IDS.tansyCutYourTeethBusy,
+    npcId: NPC_IDS.tansyRusk,
+    beats: [
+      tansyLocal(
+        EXPRESSION_IDS.neutral,
+        "You've got the full stack on you already. Finish what you're doing and I'll take a look.",
+      ),
+    ],
+  },
+  [DIALOGUE_IDS.tansyCutYourTeethTurnIn]: {
+    id: DIALOGUE_IDS.tansyCutYourTeethTurnIn,
+    npcId: NPC_IDS.tansyRusk,
+    beats: [tansyLocal(EXPRESSION_IDS.neutral, "Got the full stack? Let me see.")],
+    action: "complete_mission",
+    actionLabel: "SHOW SHALE",
+  },
+  [DIALOGUE_IDS.tansyCutYourTeethCompletion]: {
+    id: DIALOGUE_IDS.tansyCutYourTeethCompletion,
+    npcId: NPC_IDS.tansyRusk,
+    beats: [
+      // Presentation only: the authoritative completion transaction has
+      // already awarded the Mining XP when this sequence becomes visible.
+      // Neither beat consumes shale or grants XP.
+      itemBeat(ITEM_IDS.ferriteShale, 10),
+      tansySkillXpBeat(SKILL_IDS.mining, 100),
+      tansyLocal(EXPRESSION_IDS.smile, "Yep. That's shale."),
+      tansyLocal(EXPRESSION_IDS.neutral, "Keep it. You're going to need it."),
+      tansyLocal(
+        EXPRESSION_IDS.smile,
+        "You can run a Cutter. Next we'll teach you what to do with the stuff that comes out.",
+      ),
     ],
   },
 } as const satisfies Record<DialogueId, DialogueSequence>;
@@ -272,7 +394,16 @@ export function getDialogue(dialogueId: string): DialogueSequence | undefined {
   return dialogue[dialogueId as DialogueId];
 }
 
-/** Narrow authored relationship for the first real mission, not a condition DSL. */
+/**
+ * Narrow authored relationship for the first real missions, not a condition
+ * DSL. Tansy routes on the Walk It Off → Cut Your Teeth chain:
+ *
+ * - Walk It Off not complete → her existing Walk It Off flow;
+ * - Walk It Off complete, Cut Your Teeth not accepted → Cut Your Teeth offer
+ *   (the issue #110 amendment folds the old post-quest idle beats in here);
+ * - Cut Your Teeth active → contextual equip/stack reminder or turn-in;
+ * - both complete → post-completion dialogue.
+ */
 export function getWalkItOffDialogue(
   npcId: string,
   state: MissionState,
@@ -284,8 +415,40 @@ export function getWalkItOffDialogue(
   }
   if (npcId !== NPC_IDS.tansyRusk) return undefined;
   if (state === "not_accepted") return getDialogue(DIALOGUE_IDS.tansyBeforeMission);
-  if (state === "completed") return getDialogue(DIALOGUE_IDS.tansyAfterCompletion);
+  if (state === "completed") return getDialogue(DIALOGUE_IDS.tansyCutYourTeethOffer);
   return getDialogue(DIALOGUE_IDS.tansyCompletion);
+}
+
+export const WALK_IT_OFF_DIALOGUE_MISSION_ID = MISSION_IDS.walkItOff;
+
+export const CUT_YOUR_TEETH_DIALOGUE = {
+  offer: DIALOGUE_IDS.tansyCutYourTeethOffer,
+  equipReminder: DIALOGUE_IDS.tansyCutYourTeethEquipReminder,
+  stackReminder: DIALOGUE_IDS.tansyCutYourTeethStackReminder,
+  busy: DIALOGUE_IDS.tansyCutYourTeethBusy,
+  turnIn: DIALOGUE_IDS.tansyCutYourTeethTurnIn,
+  completion: DIALOGUE_IDS.tansyCutYourTeethCompletion,
+} as const;
+
+export const CUT_YOUR_TEETH_DIALOGUE_MISSION_ID = MISSION_IDS.cutYourTeeth;
+
+/** Contextual active-mission sequence for the current objective boundary. */
+export function getCutYourTeethActiveDialogue(
+  objective: "equip" | "stack" | "ready" | "busy",
+): DialogueSequence | undefined {
+  return getDialogue(
+    objective === "equip"
+      ? DIALOGUE_IDS.tansyCutYourTeethEquipReminder
+      : objective === "stack"
+        ? DIALOGUE_IDS.tansyCutYourTeethStackReminder
+        : objective === "busy"
+          ? DIALOGUE_IDS.tansyCutYourTeethBusy
+          : DIALOGUE_IDS.tansyCutYourTeethTurnIn,
+  );
+}
+
+export function getCutYourTeethCompletion(): DialogueSequence | undefined {
+  return getDialogue(DIALOGUE_IDS.tansyCutYourTeethCompletion);
 }
 
 export function resolveDialogueSpeaker(dialogueBeat: DialogueBeat) {
@@ -301,7 +464,8 @@ export function resolveDialogueSpeaker(dialogueBeat: DialogueBeat) {
 
 /**
  * Resolves an item beat against the authoritative item presentation catalog.
- * Returns undefined for NPC beats or unknown item IDs so callers fail safe.
+ * Returns undefined for other subject kinds or unknown item IDs so callers
+ * fail safe.
  */
 export function resolveDialogueItem(dialogueBeat: DialogueBeat) {
   if (dialogueBeat.kind !== "item") return undefined;
@@ -310,4 +474,14 @@ export function resolveDialogueItem(dialogueBeat: DialogueBeat) {
   return { itemId: dialogueBeat.itemId, quantity: dialogueBeat.quantity, presentation };
 }
 
-export const WALK_IT_OFF_DIALOGUE_MISSION_ID = MISSION_IDS.walkItOff;
+/**
+ * Resolves a skill-XP beat against the authoritative skill presentation
+ * registry. Returns undefined for other subject kinds or unknown skill IDs so
+ * callers fail safe.
+ */
+export function resolveDialogueSkillXp(dialogueBeat: DialogueBeat) {
+  if (dialogueBeat.kind !== "skill_xp") return undefined;
+  const presentation = getSkillPresentation(dialogueBeat.skillId);
+  if (!presentation) return undefined;
+  return { skillId: dialogueBeat.skillId, amount: dialogueBeat.amount, presentation };
+}

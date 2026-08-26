@@ -18,6 +18,14 @@ const skillPresentations = {
   [SKILL_IDS.strength]: { displayName: "Strength" },
 } as const satisfies Partial<Record<SkillId, SkillPresentation>>;
 
+/** Canonical selectable skill identities for skill-XP presentation beats. */
+export const SKILL_PRESENTATIONS: readonly (SkillPresentation & { id: SkillId })[] = Object.entries(
+  skillPresentations,
+).map(([id, presentation]) => ({
+  id: id as SkillId,
+  ...presentation,
+}));
+
 export function getSkillPresentation(skillId: string): SkillPresentation | undefined {
   return skillPresentations[skillId as SkillId];
 }

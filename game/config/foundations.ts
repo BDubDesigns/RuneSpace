@@ -31,6 +31,7 @@ const npcIds = {
 
 const missionIds = {
   walkItOff: asContentId("walk_it_off"),
+  cutYourTeeth: asContentId("cut_your_teeth"),
 } as const satisfies Record<string, ContentId>;
 
 const dialogueIds = {
@@ -42,7 +43,16 @@ const dialogueIds = {
   tansyAfterClaim: asContentId("tansy_rusk_walk_it_off_after_claim"),
   tansyCapacitySlots: asContentId("tansy_rusk_walk_it_off_capacity_slots"),
   tansyCapacityMass: asContentId("tansy_rusk_walk_it_off_capacity_mass"),
+  // Issue #110 folds Tansy's old standalone post-quest idle chain into the
+  // Cut Your Teeth offer, so the retired v1 idle sequence keeps its stable
+  // ID registered but no longer has an authored sequence.
   tansyAfterCompletion: asContentId("tansy_rusk_walk_it_off_after_completion"),
+  tansyCutYourTeethOffer: asContentId("tansy_rusk_cut_your_teeth_offer"),
+  tansyCutYourTeethEquipReminder: asContentId("tansy_rusk_cut_your_teeth_equip_reminder"),
+  tansyCutYourTeethStackReminder: asContentId("tansy_rusk_cut_your_teeth_stack_reminder"),
+  tansyCutYourTeethTurnIn: asContentId("tansy_rusk_cut_your_teeth_turn_in"),
+  tansyCutYourTeethBusy: asContentId("tansy_rusk_cut_your_teeth_busy"),
+  tansyCutYourTeethCompletion: asContentId("tansy_rusk_cut_your_teeth_completion"),
 } as const satisfies Record<string, ContentId>;
 
 const expressionIds = {

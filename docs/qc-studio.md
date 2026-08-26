@@ -79,6 +79,28 @@ inventory; RuneSpace's server-authoritative mission/reward code remains solely
 responsible for all item ownership changes. The Studio UI states this
 explicitly and offers no "give item" affordance.
 
+### Skill XP presentation beats (schema v3)
+
+- **Skill XP beat** — a shared `VisualTile` reward presentation in the scene
+  with no NPC portrait. The panel shows a `Skill XP` eyebrow plus the
+  authoritative skill display name and `+N XP` (`Mining +100 XP`).
+  Presentation reuses the exact `VisualTile` component the production Mining
+  and Refining results use (`XP` fallback, skill nameplate, `+N` badge), so a
+  quest reward reads as the same kind of tile players already see.
+
+Skill XP beats are **presentation only** — authoring, previewing, or exporting
+one never grants progression. RuneSpace's server-authoritative mission
+completion transaction owns every XP award; the Studio exposes no "grant XP"
+control.
+
+The skill dropdown lists only the adapter's canonical skill registry (from
+`game/content/skill-presentation.ts` — never a duplicated UI list). Amounts are
+positive integers; unknown skill IDs and non-positive/non-integer amounts fail
+validation and block preview/export.
+
+Schema v2 drafts (NPC + item beats) migrate in place to v3; v1 drafts migrate
+through the same path. Unknown future versions still fail safely untouched.
+
 The item dropdown lists only items from the adapter's canonical inventory
 definitions — never a duplicated UI list. Quantity is constrained by the
 authoritative item definition: stackable items accept integers from `1`

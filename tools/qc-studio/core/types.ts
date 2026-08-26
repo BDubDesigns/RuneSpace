@@ -1,15 +1,16 @@
-export const QC_STUDIO_SCHEMA_VERSION = 2 as const;
+export const QC_STUDIO_SCHEMA_VERSION = 3 as const;
 
 /** The last schema version this build can migrate from. */
-export const QC_STUDIO_MIGRATABLE_SCHEMA_VERSION = 1 as const;
+export const QC_STUDIO_MIGRATABLE_SCHEMA_VERSION = 2 as const;
 
 export type StudioDialoguePresentationMode = "local" | "comms";
 export type StudioDialogueAction = "accept_mission" | "complete_mission";
 
 /**
- * A beat presents exactly one visual subject: an NPC portrait or an item
- * reveal. Item beats are presentation only — authoring or exporting one is
- * never authorization to add item-granting gameplay behavior.
+ * A beat presents exactly one visual subject: an NPC portrait, an item
+ * reveal, or a skill-XP reward tile. Item and skill-XP beats are
+ * presentation only — authoring or exporting one is never authorization to
+ * grant items or progression.
  */
 export type StudioDialogueBeat =
   | {
@@ -27,11 +28,25 @@ export type StudioDialogueBeat =
       quantity: number;
       backgroundId: string;
       text: string;
+    }
+  | {
+      kind: "skill_xp";
+      skillId: string;
+      /** Display amount only; a positive integer authored against the adapter catalog. */
+      amount: number;
+      backgroundId: string;
+      text: string;
     };
 
 export type StudioItem =
   | { id: string; displayName: string; kind: "stack"; stackLimit: number }
   | { id: string; displayName: string; kind: "unique" };
+
+/** Canonical skill identity a game adapter can expose for skill-XP beats. */
+export type StudioSkill = {
+  id: string;
+  displayName: string;
+};
 
 export type StudioDialogueSequence = {
   id: string;
@@ -72,6 +87,7 @@ export type DialogueAdapter = {
   npcs: readonly StudioNpc[];
   backgrounds: readonly StudioConversationBackground[];
   items?: readonly StudioItem[];
+  skills?: readonly StudioSkill[];
   sequences: readonly StudioDialogueSequence[];
   isValidStableId?: (value: string) => boolean;
 };

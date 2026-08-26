@@ -68,7 +68,7 @@ export function createBlankDraft(adapter: DialogueAdapter, draftId: string): Dia
  */
 export function createBeatForSubject(
   adapter: DialogueAdapter,
-  kind: "npc" | "item",
+  kind: "npc" | "item" | "skill_xp",
   backgroundId: string,
 ): StudioDialogueBeat {
   if (kind === "item") {
@@ -77,6 +77,13 @@ export function createBeatForSubject(
       throw new Error("This project adapter exposes no canonical items.");
     }
     return { kind: "item", itemId: item.id, quantity: 1, backgroundId, text: "" };
+  }
+  if (kind === "skill_xp") {
+    const skill = adapter.skills?.[0];
+    if (!skill) {
+      throw new Error("This project adapter exposes no canonical skills.");
+    }
+    return { kind: "skill_xp", skillId: skill.id, amount: 100, backgroundId, text: "" };
   }
   const npc = adapter.npcs[0];
   return {

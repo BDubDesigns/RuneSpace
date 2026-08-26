@@ -87,6 +87,52 @@ test.describe("QC Studio development dialogue module", () => {
       .toBe(futureDraft);
   });
 
+  test("discovers and migrates an untouched v1 draft under the v1 legacy key", async ({ page }) => {
+    const v1Key = "qc-studio:runespace:dialogue:v1";
+    const v1Draft = JSON.stringify({
+      schemaVersion: 1,
+      adapterId: "runespace",
+      draft: {
+        schemaVersion: 1,
+        adapterId: "runespace",
+        draftId: "draft-v1-untouched",
+        title: "Untouched v1",
+        npcId: "tansy_rusk",
+        beats: [
+          {
+            speakerNpcId: "tansy_rusk",
+            expressionId: "neutral",
+            backgroundId: "the_jag_exterior",
+            presentationMode: "local",
+            text: "Legacy line.",
+          },
+        ],
+      },
+      checkpoints: [],
+    });
+    await page.addInitScript(({ key, value }) => window.localStorage.setItem(key, value), {
+      key: v1Key,
+      value: v1Draft,
+    });
+
+    await page.goto("/qc-studio");
+    // The v1 draft is discovered through the legacy-key loop and migrated to
+    // the current format; the draft content survives.
+    await expect(page.getByText(/Upgraded the saved v1 draft/i)).toBeVisible();
+    await expect(page.getByText("Untouched v1")).toBeVisible();
+    // Migration persistence is proven by the v3 key holding a schema-v3 draft,
+    // not by the legacy v1 key (which is retained only as a backup).
+    const v3Key = "qc-studio:runespace:dialogue:v3";
+    await expect
+      .poll(() => page.evaluate((key) => window.localStorage.getItem(key), v3Key))
+      .not.toBeNull();
+    const migratedRaw = await page.evaluate((key) => window.localStorage.getItem(key), v3Key);
+    const migrated = JSON.parse(migratedRaw ?? "null");
+    expect(migrated?.schemaVersion).toBe(3);
+    expect(migrated?.draft?.title).toBe("Untouched v1");
+    expect(migrated?.draft?.beats?.[0]?.kind).toBe("npc");
+  });
+
   test("previews an action without invoking gameplay", async ({ page }) => {
     await page.goto("/qc-studio");
     await page.getByLabel("Load authoritative sequence").selectOption({

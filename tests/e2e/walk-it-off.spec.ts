@@ -164,7 +164,14 @@ test("walks from Wade to Tansy, presents approved dialogue, and claims one carri
   await tansyDialogue.getByRole("button", { name: "Finish" }).click();
   await expect(tansyDialogue).toBeHidden();
   await expect(page.getByRole("button", { name: "Inventory 1/8" })).toBeVisible();
-  await expect(page.locator("[data-mission-objective]")).toContainText("Completed");
+  // After Walk It Off completes, the objective panel leads the player into the
+  // next available story quest (Cut Your Teeth) instead of showing the
+  // completed mission as the dead-end fallback.
+  await expect(page.locator("[data-mission-objective]")).toContainText("Cut Your Teeth");
+  await expect(page.locator("[data-mission-objective]")).toContainText("Available");
+  await expect(page.locator("[data-mission-objective]")).toContainText(
+    "Speak with Tansy Rusk at The Jag to begin Cut Your Teeth.",
+  );
 
   const cutter = await db
     .select()
@@ -184,8 +191,13 @@ test("walks from Wade to Tansy, presents approved dialogue, and claims one carri
   ).resolves.toHaveLength(0);
 
   await page.reload();
-  await expect(page.locator("[data-mission-objective]")).toContainText("Completed");
+  // After Walk It Off completes, the objective panel continues to lead the
+  // player into the next available story quest (Cut Your Teeth).
+  await expect(page.locator("[data-mission-objective]")).toContainText("Cut Your Teeth");
+  await expect(page.locator("[data-mission-objective]")).toContainText("Available");
   await page.getByRole("button", { name: /Talk to Tansy Rusk/ }).click();
+  // Issue #110 amendment: Tansy's post-Walk-It-Off beats now open the
+  // Cut Your Teeth offer instead of a standalone dead-end idle chain.
   const postMissionDialogue = page.getByRole("dialog", { name: "Tansy Rusk dialogue" });
   await expect(
     postMissionDialogue.locator('[data-dialogue-text] [aria-hidden="true"]'),
@@ -258,5 +270,8 @@ test("supports the explorer-first Jag conversation and remote mission acceptance
   await expect(dialogue.getByRole("button", { name: "Finish" })).toBeVisible();
   await dialogue.getByRole("button", { name: "Finish" }).click();
   await expect(dialogue).toBeHidden();
-  await expect(page.locator("[data-mission-objective]")).toContainText("Completed");
+  // Same boundary as test 1: after Walk It Off completes, the objective panel
+  // leads into the next available story quest rather than the completed one.
+  await expect(page.locator("[data-mission-objective]")).toContainText("Cut Your Teeth");
+  await expect(page.locator("[data-mission-objective]")).toContainText("Available");
 });

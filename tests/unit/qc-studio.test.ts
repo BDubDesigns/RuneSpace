@@ -10,6 +10,8 @@ import {
   addDurableCheckpoint,
   getDialogueStudioStorageKey,
   getLegacyDialogueStudioStorageKey,
+  getLegacyDialogueStudioStorageKeys,
+  getV1DialogueStudioStorageKey,
   parsePersistedDialogueStudio,
   serializeDialogueStudio,
 } from "@/tools/qc-studio/core/storage";
@@ -41,13 +43,14 @@ const adapter: DialogueAdapter = {
     { id: "stack_thing", displayName: "Stack Thing", kind: "stack", stackLimit: 4 },
     { id: "unique_thing", displayName: "Unique Thing", kind: "unique" },
   ],
+  skills: [{ id: "test_skill", displayName: "Test Skill" }],
   sequences: [],
   isValidStableId: (value) => /^[a-z][a-z0-9_]*$/.test(value),
 };
 
 function draft(overrides: Partial<DialogueDraft> = {}): DialogueDraft {
   return {
-    schemaVersion: 2,
+    schemaVersion: 3,
     adapterId: adapter.adapterId,
     draftId: "draft-1",
     title: "Test dialogue",
@@ -71,6 +74,16 @@ function itemBeat() {
     kind: "item",
     itemId: "stack_thing",
     quantity: 2,
+    backgroundId: "background_one",
+    text: "",
+  } as const;
+}
+
+function skillXpBeat() {
+  return {
+    kind: "skill_xp",
+    skillId: "test_skill",
+    amount: 100,
     backgroundId: "background_one",
     text: "",
   } as const;
@@ -186,17 +199,26 @@ describe("QC Studio core", () => {
   it("fails safely for unsupported persisted schema versions", () => {
     expect(
       parsePersistedDialogueStudio(
-        JSON.stringify({ schemaVersion: 3, adapterId: adapter.adapterId }),
+        JSON.stringify({ schemaVersion: 4, adapterId: adapter.adapterId }),
         adapter.adapterId,
       ),
     ).toEqual({ kind: "unsupported" });
   });
 
-  it("scopes the dialogue storage key to the adapter and bumps to v2", () => {
-    expect(getDialogueStudioStorageKey(adapter.adapterId)).toBe("qc-studio:test-game:dialogue:v2");
+  it("scopes the dialogue storage key to the adapter and bumps to v3", () => {
+    expect(getDialogueStudioStorageKey(adapter.adapterId)).toBe("qc-studio:test-game:dialogue:v3");
     expect(getLegacyDialogueStudioStorageKey(adapter.adapterId)).toBe(
+      "qc-studio:test-game:dialogue:v2",
+    );
+    expect(getV1DialogueStudioStorageKey(adapter.adapterId)).toBe(
       "qc-studio:test-game:dialogue:v1",
     );
+    // Discovery order is newest-to-oldest so a newer legacy draft wins over an
+    // older one without ever overwriting a newer valid draft.
+    expect(getLegacyDialogueStudioStorageKeys(adapter.adapterId)).toEqual([
+      "qc-studio:test-game:dialogue:v2",
+      "qc-studio:test-game:dialogue:v1",
+    ]);
   });
 
   it("names blank drafts from the default speaker and background context", () => {
@@ -270,9 +292,31 @@ describe("QC Studio core", () => {
     const result = parsePersistedDialogueStudio(JSON.stringify(v1Payload), adapter.adapterId);
     expect(result.kind).toBe("migrated");
     if (result.kind === "migrated") {
-      expect(result.state.draft.schemaVersion).toBe(2);
+      expect(result.state.draft.schemaVersion).toBe(3);
       expect(result.state.draft.beats[0]).toMatchObject({ kind: "npc", text: "Legacy line." });
       expect(result.state.checkpoints[0]?.draft.beats[0]?.kind).toBe("npc");
+    }
+  });
+
+  it("migrates v2 drafts (with item beats) forward without rewriting beat kinds", () => {
+    const v2Payload = {
+      schemaVersion: 2,
+      adapterId: adapter.adapterId,
+      draft: {
+        schemaVersion: 2,
+        adapterId: adapter.adapterId,
+        draftId: "draft-v2",
+        title: "V2 draft",
+        npcId: "npc_one",
+        beats: [itemBeat()],
+      },
+      checkpoints: [],
+    };
+    const result = parsePersistedDialogueStudio(JSON.stringify(v2Payload), adapter.adapterId);
+    expect(result.kind).toBe("migrated");
+    if (result.kind === "migrated") {
+      expect(result.state.draft.schemaVersion).toBe(3);
+      expect(result.state.draft.beats[0]).toEqual(itemBeat());
     }
   });
 
@@ -282,12 +326,69 @@ describe("QC Studio core", () => {
       draft({ sourceSequenceId: "source_one", beats: [itemBeat()] }),
     );
     expect(payload.qcStudio).toEqual({
-      schemaVersion: 2,
+      schemaVersion: 3,
       module: "dialogue",
       adapterId: "test-game",
     });
     expect(payload.source).toEqual({ kind: "authoritative_sequence", sequenceId: "source_one" });
     expect(payload.sequence.beats[0]).toEqual(itemBeat());
+  });
+
+  it("validates skill-XP beats against the canonical skill registry and positive amounts", () => {
+    const valid = validateDialogueDraft(adapter, draft({ beats: [skillXpBeat()] }));
+    expect(valid.valid).toBe(true);
+
+    const unknownSkill = validateDialogueDraft(
+      adapter,
+      draft({ beats: [{ ...skillXpBeat(), skillId: "not_real" }] }),
+    );
+    expect(unknownSkill.issues.map((issue) => issue.path)).toEqual(["beats.0.skillId"]);
+
+    for (const amount of [0, -5, 1.5, Number.NaN]) {
+      const invalidAmount = validateDialogueDraft(
+        adapter,
+        draft({
+          beats: [{ ...skillXpBeat(), amount }],
+        }),
+      );
+      expect(invalidAmount.issues.map((issue) => issue.path)).toEqual(["beats.0.amount"]);
+    }
+  });
+
+  it("rejects mixed skill-XP shapes in validation and persisted state", () => {
+    // Skill-XP beat carrying item-only fields.
+    const mixedValidation = validateDialogueDraft(
+      adapter,
+      draft({
+        beats: [
+          {
+            ...skillXpBeat(),
+            itemId: "stack_thing",
+            quantity: 2,
+          } as unknown as DialogueDraft["beats"][number],
+        ],
+      }),
+    );
+    expect(mixedValidation.valid).toBe(false);
+    expect(mixedValidation.issues.map((issue) => issue.path)).toContain("beats.0.subject");
+
+    const mixedPersisted = parsePersistedDialogueStudio(
+      JSON.stringify({
+        schemaVersion: 3,
+        adapterId: adapter.adapterId,
+        draft: {
+          schemaVersion: 3,
+          adapterId: adapter.adapterId,
+          draftId: "draft-mixed",
+          title: "Mixed",
+          npcId: "npc_one",
+          beats: [{ ...skillXpBeat(), quantity: 3 }],
+        },
+        checkpoints: [],
+      }),
+      adapter.adapterId,
+    );
+    expect(mixedPersisted.kind).toBe("invalid");
   });
 
   it("rejects malformed mixed beat shapes in draft validation", () => {
@@ -308,7 +409,7 @@ describe("QC Studio core", () => {
     );
     expect(itemWithNpcFields.valid).toBe(false);
     expect(itemWithNpcFields.issues.map((issue) => issue.path)).toEqual(["beats.0.subject"]);
-    expect(itemWithNpcFields.issues[0]?.message).toContain("NPC-only fields");
+    expect(itemWithNpcFields.issues[0]?.message).toContain("foreign subject fields");
 
     // Item beat with just one stale NPC field is also rejected.
     const itemWithOneStale = validateDialogueDraft(
@@ -339,7 +440,7 @@ describe("QC Studio core", () => {
     );
     expect(npcWithItemFields.valid).toBe(false);
     expect(npcWithItemFields.issues.map((issue) => issue.path)).toEqual(["beats.0.subject"]);
-    expect(npcWithItemFields.issues[0]?.message).toContain("item-only fields");
+    expect(npcWithItemFields.issues[0]?.message).toContain("foreign subject fields");
 
     // Clean beats of each kind remain valid.
     expect(validateDialogueDraft(adapter, draft({ beats: [itemBeat()] })).valid).toBe(true);

@@ -22,7 +22,7 @@ import {
 import {
   addDurableCheckpoint,
   getDialogueStudioStorageKey,
-  getLegacyDialogueStudioStorageKey,
+  getLegacyDialogueStudioStorageKeys,
   parsePersistedDialogueStudio,
   serializeDialogueStudio,
 } from "../../core/storage";
@@ -99,10 +99,7 @@ export function DialogueStudio({
   const storageWriteBlocked = useRef(false);
   const changeKind = useRef<"text" | "structural" | "idle">("idle");
   const beatButtonRefs = useRef<Record<number, HTMLButtonElement | null>>({});
-  const [storageKey, legacyStorageKey] = [
-    getDialogueStudioStorageKey(adapter.adapterId),
-    getLegacyDialogueStudioStorageKey(adapter.adapterId),
-  ];
+  const storageKey = getDialogueStudioStorageKey(adapter.adapterId);
 
   const draft = history.present;
   const selectedBeat = draft.beats[selectedBeatIndex];
@@ -162,10 +159,16 @@ export function DialogueStudio({
     try {
       raw = window.localStorage.getItem(storageKey);
       if (!raw) {
-        // Schema v1 drafts lived under the legacy key; adopt and upgrade them
-        // in place so existing local work is not silently stranded.
-        const legacyRaw = window.localStorage.getItem(legacyStorageKey);
-        if (legacyRaw) raw = legacyRaw;
+        // Schema v1/v2 drafts lived under legacy keys; adopt and upgrade them
+        // in place so existing local work is not silently stranded. Discover
+        // every supported legacy key newest-to-oldest.
+        for (const legacyKey of getLegacyDialogueStudioStorageKeys(adapter.adapterId)) {
+          const legacyRaw = window.localStorage.getItem(legacyKey);
+          if (legacyRaw) {
+            raw = legacyRaw;
+            break;
+          }
+        }
       }
     } catch {
       setStorageMessage("Local draft storage is unavailable; use Export to preserve this work.");
@@ -412,13 +415,14 @@ export function DialogueStudio({
 
   type NpcBeatPatch = Partial<Omit<Extract<StudioDialogueBeat, { kind: "npc" }>, "kind">>;
   type ItemBeatPatch = Partial<Omit<Extract<StudioDialogueBeat, { kind: "item" }>, "kind">>;
+  type SkillXpBeatPatch = Partial<Omit<Extract<StudioDialogueBeat, { kind: "skill_xp" }>, "kind">>;
 
   /**
    * Patch only the fields of the beat's ACTIVE kind. The switch below keeps
-   * the two shapes disjoint, so a patch can never write an item field into an
-   * NPC beat or vice versa.
+   * the three shapes disjoint, so a patch can never write one subject's
+   * field into a beat of another kind.
    */
-  function updateBeat(index: number, update: NpcBeatPatch | ItemBeatPatch) {
+  function updateBeat(index: number, update: NpcBeatPatch | ItemBeatPatch | SkillXpBeatPatch) {
     applyStructural((current) => ({
       ...current,
       npcId:
@@ -430,7 +434,10 @@ export function DialogueStudio({
         if (beat.kind === "npc") {
           return { ...beat, ...(update as NpcBeatPatch), kind: "npc" as const };
         }
-        return { ...beat, ...(update as ItemBeatPatch), kind: "item" as const };
+        if (beat.kind === "item") {
+          return { ...beat, ...(update as ItemBeatPatch), kind: "item" as const };
+        }
+        return { ...beat, ...(update as SkillXpBeatPatch), kind: "skill_xp" as const };
       }),
     }));
   }
@@ -438,9 +445,10 @@ export function DialogueStudio({
   /**
    * Replaces the beat wholesale with the target subject's shape. Subject
    * switching must never merge with the previous shape — stale NPC fields
-   * could otherwise survive on item beats and stale item fields on NPC beats.
+   * could otherwise survive on item beats, stale item fields on skill-XP
+   * beats, and so on.
    */
-  function switchSubject(index: number, kind: "npc" | "item") {
+  function switchSubject(index: number, kind: "npc" | "item" | "skill_xp") {
     const current = historyRef.current.present.beats[index];
     if (!current || current.kind === kind) return;
     flushTextHistory();
@@ -473,6 +481,14 @@ export function DialogueStudio({
     const { min, max } = getStudioItemQuantityRange(selected);
     if (!Number.isInteger(rawValue)) return;
     updateBeat(index, { quantity: Math.max(min, Math.min(max, rawValue)) });
+  }
+
+  /** Positive-integer XP amounts only; validation reports anything else. */
+  function setSkillXpAmount(index: number, rawValue: number) {
+    const beat = draft.beats[index];
+    if (!beat || beat.kind !== "skill_xp") return;
+    if (!Number.isInteger(rawValue)) return;
+    updateBeat(index, { amount: Math.max(1, rawValue) });
   }
 
   function addBeat(duplicate: boolean) {
@@ -700,8 +716,10 @@ export function DialogueStudio({
                         adapter.items?.find((candidate) => candidate.id === beat.itemId)
                           ?.displayName ?? "Unknown item"
                       }${beat.quantity > 1 ? ` ×${beat.quantity}` : ""}`
-                    : (adapter.npcs.find((candidate) => candidate.id === beat.speakerNpcId)
-                        ?.displayName ?? "Unknown speaker");
+                    : beat.kind === "skill_xp"
+                      ? `${adapter.skills?.find((candidate) => candidate.id === beat.skillId)?.displayName ?? "Unknown skill"} +${beat.amount} XP`
+                      : (adapter.npcs.find((candidate) => candidate.id === beat.speakerNpcId)
+                          ?.displayName ?? "Unknown speaker");
                 return (
                   <li key={`${index}-${beat.kind}`}>
                     <button
@@ -727,7 +745,12 @@ export function DialogueStudio({
                       <span className="min-w-0">
                         <span className="block truncate font-semibold">{beatLabel}</span>
                         <span className="mt-0.5 block truncate text-xs text-[color:var(--rs-text-muted)]">
-                          {beat.text || (beat.kind === "item" ? "Item reveal" : "Empty text")}
+                          {beat.text ||
+                            (beat.kind === "item"
+                              ? "Item reveal"
+                              : beat.kind === "skill_xp"
+                                ? "XP reward tile"
+                                : "Empty text")}
                         </span>
                       </span>
                     </button>
@@ -761,7 +784,9 @@ export function DialogueStudio({
                   {previewBeat
                     ? previewBeat.kind === "item"
                       ? "item"
-                      : previewBeat.presentationMode
+                      : previewBeat.kind === "skill_xp"
+                        ? "skill XP"
+                        : previewBeat.presentationMode
                     : "—"}
                 </span>
               </div>
@@ -881,11 +906,12 @@ export function DialogueStudio({
                     <legend className="text-sm text-[color:var(--rs-text-secondary)]">
                       Beat subject
                     </legend>
-                    <div className="mt-2 grid grid-cols-2 gap-2">
+                    <div className="mt-2 grid grid-cols-3 gap-2">
                       {(
                         [
                           ["npc", "NPC"],
                           ["item", "Item"],
+                          ["skill_xp", "Skill XP"],
                         ] as const
                       ).map(([value, label]) => (
                         <label
@@ -1001,7 +1027,7 @@ export function DialogueStudio({
                         </div>
                       </fieldset>
                     </>
-                  ) : (
+                  ) : selectedBeat.kind === "item" ? (
                     <>
                       <label
                         className="mt-4 block text-sm text-[color:var(--rs-text-secondary)]"
@@ -1059,7 +1085,62 @@ export function DialogueStudio({
                         any inventory; rewards stay server-authoritative.
                       </p>
                     </>
-                  )}
+                  ) : selectedBeat.kind === "skill_xp" ? (
+                    <>
+                      <label
+                        className="mt-4 block text-sm text-[color:var(--rs-text-secondary)]"
+                        htmlFor="qc-beat-skill"
+                      >
+                        Skill
+                        <select
+                          className={`${CONTROL_CLASS} mt-2`}
+                          id="qc-beat-skill"
+                          onChange={(event) =>
+                            updateBeat(selectedBeatIndex, { skillId: event.target.value })
+                          }
+                          value={selectedBeat.skillId}
+                        >
+                          {(adapter.skills ?? []).map((skill) => (
+                            <option key={skill.id} value={skill.id}>
+                              {skill.displayName}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                      {selectedBeatIssue("skillId") ? (
+                        <Feedback tone="danger">{selectedBeatIssue("skillId")}</Feedback>
+                      ) : null}
+
+                      <label
+                        className="mt-4 block text-sm text-[color:var(--rs-text-secondary)]"
+                        htmlFor="qc-beat-xp-amount"
+                      >
+                        XP amount
+                        <input
+                          className={`${CONTROL_CLASS} mt-2`}
+                          id="qc-beat-xp-amount"
+                          min={1}
+                          onBlur={(event) =>
+                            setSkillXpAmount(selectedBeatIndex, Number(event.target.value))
+                          }
+                          onChange={(event) =>
+                            setSkillXpAmount(selectedBeatIndex, Number(event.target.value))
+                          }
+                          step={1}
+                          type="number"
+                          value={selectedBeat.amount}
+                        />
+                      </label>
+                      {selectedBeatIssue("amount") ? (
+                        <Feedback tone="danger">{selectedBeatIssue("amount")}</Feedback>
+                      ) : null}
+
+                      <p className="mt-3 border border-[color:var(--rs-border-subtle)] bg-[color:var(--rs-surface-panel)] p-3 text-xs text-[color:var(--rs-text-muted)]">
+                        Visual XP presentation only. This beat does not grant progression; the tile
+                        reuses the production Mining/Refining reward presentation.
+                      </p>
+                    </>
+                  ) : null}
 
                   <label
                     className="mt-4 block text-sm text-[color:var(--rs-text-secondary)]"

@@ -120,6 +120,13 @@ export const AcceptWalkItOffRequestSchema = z.object({
 export const CompleteWalkItOffRequestSchema = z.object({
   characterId: z.string().uuid(),
 });
+/** Issue #110: same trusted shape as the Walk It Off mission commands. */
+export const AcceptCutYourTeethRequestSchema = z.object({
+  characterId: z.string().uuid(),
+});
+export const CompleteCutYourTeethRequestSchema = z.object({
+  characterId: z.string().uuid(),
+});
 
 /** Containers can only hold non-container item definitions. */
 export const ContainerContentItemSchema = z.object({

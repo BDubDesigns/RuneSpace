@@ -3,24 +3,30 @@ import {
   DIALOGUE_SEQUENCES,
   getDialogue,
   resolveDialogueItem,
+  resolveDialogueSkillXp,
   resolveDialogueSpeaker,
 } from "@/game/content/dialogue";
 import { DIALOGUE_ITEM_CATALOG, getItemBeatQuantityRange } from "@/game/content/item-presentation";
 import { DIALOGUE_IDS, ITEM_IDS, NPC_IDS } from "@/game/config/foundations";
 
 describe("dialogue item beats", () => {
-  it("keeps every authored beat a valid single-subject NPC or item beat", () => {
+  it("keeps every authored beat a valid single-subject NPC, item, or skill-XP beat", () => {
     for (const sequence of DIALOGUE_SEQUENCES) {
       for (const beat of sequence.beats) {
         if (beat.kind === "npc") {
           expect(resolveDialogueSpeaker(beat)).toBeDefined();
-        } else {
+        } else if (beat.kind === "item") {
           const resolved = resolveDialogueItem(beat);
           expect(resolved).toBeDefined();
           const range = getItemBeatQuantityRange(beat.itemId);
           expect(range).toBeDefined();
           expect(beat.quantity).toBeGreaterThanOrEqual(range!.min);
           expect(beat.quantity).toBeLessThanOrEqual(range!.max);
+        } else {
+          const resolved = resolveDialogueSkillXp(beat);
+          expect(resolved).toBeDefined();
+          expect(Number.isInteger(beat.amount)).toBe(true);
+          expect(beat.amount).toBeGreaterThanOrEqual(1);
         }
       }
     }

@@ -70,22 +70,34 @@ describe("issue #102 authored NPC and mission boundaries", () => {
     expect(getDialogue("unknown_dialogue")).toBeUndefined();
   });
 
-  it("derives the four mission states from timestamps, location, and stationary state", () => {
+  it("derives the four mission states from timestamps, location, stationary state, and step satisfaction", () => {
     const acceptedAt = new Date("2026-01-01T00:00:00.000Z");
     const completedAt = new Date("2026-01-01T00:01:00.000Z");
-    expect(deriveMissionState({ mission: undefined, ...locationInput() })).toBe("not_accepted");
-    expect(deriveMissionState({ mission: { acceptedAt }, ...locationInput() })).toBe("active");
+    expect(
+      deriveMissionState({ mission: undefined, definition: WALK_IT_OFF, ...locationInput() }),
+    ).toBe("not_accepted");
+    expect(
+      deriveMissionState({ mission: { acceptedAt }, definition: WALK_IT_OFF, ...locationInput() }),
+    ).toBe("active");
+    // At the relevant location but the mission's authored steps do NOT hold
+    // (WALK_IT_OFF has no objective steps, so location+stationary is enough
+    // for it; for step-bearing missions the steps must hold too).
     expect(
       deriveMissionState({
         mission: { acceptedAt },
+        definition: WALK_IT_OFF,
         relevantLocationId: LOCATION_IDS.theJag,
         currentLocationId: LOCATION_IDS.theJag,
         stationary: true,
       }),
     ).toBe("ready_for_completion");
-    expect(deriveMissionState({ mission: { acceptedAt, completedAt }, ...locationInput() })).toBe(
-      "completed",
-    );
+    expect(
+      deriveMissionState({
+        mission: { acceptedAt, completedAt },
+        definition: WALK_IT_OFF,
+        ...locationInput(),
+      }),
+    ).toBe("completed");
     expect(
       projectMission(WALK_IT_OFF, { acceptedAt }, LOCATION_IDS.crashSite, true).currentObjective,
     ).toBe("Travel to The Jag");
