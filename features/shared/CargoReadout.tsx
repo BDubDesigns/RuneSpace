@@ -4,6 +4,7 @@ import { Panel } from "@/components/ui/Panel";
 import { StatusMeter } from "@/components/ui/StatusMeter";
 import { COLLAPSE_KEYS, useSyncedCollapse } from "./use-synced-collapse";
 import { CollapseButton } from "./CollapseButton";
+import { formatMassGrams } from "@/game/domain/mass";
 import type { MiningGameplayState } from "@/server/mining";
 
 export type CargoReadoutItem = {
@@ -11,10 +12,6 @@ export type CargoReadoutItem = {
   label: string;
   quantity: number;
 };
-
-function kilograms(grams: number) {
-  return `${(grams / 1_000).toLocaleString(undefined, { maximumFractionDigits: 1 })} kg`;
-}
 
 /**
  * Shared cargo readout used at every location with a resource output.
@@ -79,7 +76,7 @@ export function CargoReadout({
             <StatusMeter
               label="Carried mass"
               value={(state.inventory.massGrams / state.inventory.capacityGrams) * 100}
-              detail={`${kilograms(state.inventory.massGrams)} / ${kilograms(state.inventory.capacityGrams)}`}
+              detail={`${formatMassGrams(state.inventory.massGrams)} / ${formatMassGrams(state.inventory.capacityGrams)}`}
             />
           </div>
         </>
