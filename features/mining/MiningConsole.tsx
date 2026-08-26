@@ -34,10 +34,6 @@ import { NpcInteractionPanel } from "@/features/npc/NpcInteractionPanel";
 
 const RESULT_FEEDBACK_DURATION_MS = 3_600;
 
-function kilograms(grams: number) {
-  return `${(grams / 1_000).toLocaleString(undefined, { maximumFractionDigits: 1 })} kg`;
-}
-
 function secondsForTicks(ticks: number) {
   return (ticks * GAME_TICK_MS) / 1_000;
 }

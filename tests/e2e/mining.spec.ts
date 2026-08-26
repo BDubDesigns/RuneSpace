@@ -1467,7 +1467,7 @@ test("a selected Power Cell loads the depleted equipped Cutter from Inventory", 
   await expect(details.locator('[data-stat="quantity"] dd')).toHaveText("1");
   await expect(details.locator('[data-stat="stack-limit"] dd')).toHaveText("5");
   await expect(details.locator('[data-stat="unit-mass"] dd')).toHaveText("500 g");
-  await expect(details.locator('[data-stat="total-mass"] dd')).toHaveText("0.5 kg");
+  await expect(details.locator('[data-stat="total-mass"] dd')).toHaveText("500 g");
   await expect(details.getByText("Load effect", { exact: true })).toBeVisible();
   await expect(details.getByText("10 boosted attempts", { exact: true })).toBeVisible();
   await expect(details.getByText("Speeds attempt timing only", { exact: true })).toBeVisible();

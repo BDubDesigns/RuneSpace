@@ -9,6 +9,7 @@ import { Feedback } from "@/components/ui/Feedback";
 import { StatusMeter } from "@/components/ui/StatusMeter";
 import { getEffectiveGameBalance } from "@/game/config/balance";
 import { ITEM_IDS } from "@/game/config/foundations";
+import { formatMassGrams } from "@/game/domain/mass";
 import { discardInventoryStackAction } from "@/server/actions";
 import type { MiningGameplayState } from "@/server/mining";
 import {
@@ -23,10 +24,6 @@ import {
 import { useEquipCommand } from "./useEquipCommand";
 import { useLoadPowerCell, type LoadPowerCellFeedback } from "./useLoadPowerCell";
 import { useMiningPlay } from "./MiningPlayContext";
-
-function kilograms(grams: number) {
-  return `${(grams / 1_000).toLocaleString(undefined, { maximumFractionDigits: 1 })} kg`;
-}
 
 function StatRow({ label, value, dataStat }: { label: string; value: string; dataStat: string }) {
   return (
@@ -405,12 +402,14 @@ export function InventoryPanel({
                         <StatRow
                           dataStat="unit-mass"
                           label="Unit mass"
-                          value={`${ferrite.massGrams} g`}
+                          value={formatMassGrams(ferrite.massGrams)}
                         />
                         <StatRow
                           dataStat="total-mass"
                           label="Total mass"
-                          value={kilograms(ferrite.massGrams * resolvedSelection.entry.quantity)}
+                          value={formatMassGrams(
+                            ferrite.massGrams * resolvedSelection.entry.quantity,
+                          )}
                         />
                       </>
                     ) : resolvedSelection.entry.itemId === ITEM_IDS.powerCell ? (
@@ -423,12 +422,14 @@ export function InventoryPanel({
                         <StatRow
                           dataStat="unit-mass"
                           label="Unit mass"
-                          value={`${powerCell.massGrams} g`}
+                          value={formatMassGrams(powerCell.massGrams)}
                         />
                         <StatRow
                           dataStat="total-mass"
                           label="Total mass"
-                          value={kilograms(powerCell.massGrams * resolvedSelection.entry.quantity)}
+                          value={formatMassGrams(
+                            powerCell.massGrams * resolvedSelection.entry.quantity,
+                          )}
                         />
                       </>
                     ) : null}
@@ -439,7 +440,7 @@ export function InventoryPanel({
                     <StatRow
                       dataStat="mass"
                       label="Mass"
-                      value={kilograms(resolvedSelection.entry.massGrams)}
+                      value={formatMassGrams(resolvedSelection.entry.massGrams)}
                     />
                   </>
                 )}

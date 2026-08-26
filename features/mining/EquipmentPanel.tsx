@@ -8,14 +8,11 @@ import { Feedback } from "@/components/ui/Feedback";
 import { StatusMeter } from "@/components/ui/StatusMeter";
 import { getEffectiveGameBalance } from "@/game/config/balance";
 import { GAME_TICK_MS } from "@/game/config/foundations";
+import { formatMassGrams } from "@/game/domain/mass";
 import type { MiningGameplayState } from "@/server/mining";
 import { useEquipCommand } from "./useEquipCommand";
 import { useLoadPowerCell } from "./useLoadPowerCell";
 import { useMiningPlay } from "./MiningPlayContext";
-
-function kilograms(grams: number) {
-  return `${(grams / 1_000).toLocaleString(undefined, { maximumFractionDigits: 1 })} kg`;
-}
 
 function secondsForTicks(ticks: number) {
   return (ticks * GAME_TICK_MS) / 1_000;
@@ -59,7 +56,8 @@ export function EquipmentPanel({
         <p>
           <span className="block text-[color:var(--rs-text-muted)]">Carried mass</span>
           <strong>
-            {kilograms(state.inventory.massGrams)} / {kilograms(state.inventory.capacityGrams)}
+            {formatMassGrams(state.inventory.massGrams)} /{" "}
+            {formatMassGrams(state.inventory.capacityGrams)}
           </strong>
         </p>
       </div>
@@ -90,7 +88,7 @@ export function EquipmentPanel({
                   <p className="self-end text-sm text-[color:var(--rs-text-secondary)]">
                     {slot.item.name}
                     <br />
-                    {kilograms(slot.item.massGrams)}
+                    {formatMassGrams(slot.item.massGrams)}
                   </p>
                 </div>
                 {slot.target.assignmentKind === "gear" &&
@@ -180,7 +178,7 @@ export function EquipmentPanel({
                       <p className="self-end text-sm text-[color:var(--rs-text-secondary)]">
                         {item.name}
                         <br />
-                        {kilograms(item.massGrams)}
+                        {formatMassGrams(item.massGrams)}
                       </p>
                     </div>
                     <ActionButton
