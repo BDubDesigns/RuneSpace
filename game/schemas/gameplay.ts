@@ -57,10 +57,22 @@ export const ClaimPowerCellsRequestSchema = z.object({
   characterId: z.string().uuid(),
 });
 
-/** Loading supplies only the owned character identity; all item state is server-resolved. */
-export const LoadPowerCellRequestSchema = z.object({
-  characterId: z.string().uuid(),
-});
+/**
+ * Loading from Equipment supplies only the owned character identity. Loading
+ * from Inventory additionally carries the selected stack identity and the
+ * quantity the player confirmed, so the server can reject stale selections
+ * without substituting another Power Cell stack.
+ */
+export const LoadPowerCellRequestSchema = z
+  .object({
+    characterId: z.string().uuid(),
+    stackId: z.string().uuid().optional(),
+    expectedQuantity: z.number().int().positive().optional(),
+  })
+  .refine(
+    ({ stackId, expectedQuantity }) => (stackId === undefined) === (expectedQuantity === undefined),
+    "Selected Power Cell identity and expected quantity must be supplied together.",
+  );
 
 /**
  * A portrait-change command supplies only the owned character identity and the

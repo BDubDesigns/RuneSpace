@@ -306,7 +306,20 @@ export async function loadPowerCellAction(input: unknown): Promise<LoadPowerCell
   if (!request.success) return { error: "Invalid Power Cell load command." };
   try {
     const user = await requireCurrentUser(await headers());
-    return await loadSalvageCutterPowerCell(user.id, request.data.characterId);
+    const selectedStack =
+      request.data.stackId && request.data.expectedQuantity !== undefined
+        ? {
+            stackId: request.data.stackId,
+            expectedQuantity: request.data.expectedQuantity,
+          }
+        : undefined;
+    return await loadSalvageCutterPowerCell(
+      user.id,
+      request.data.characterId,
+      undefined,
+      undefined,
+      selectedStack,
+    );
   } catch (error) {
     if (error instanceof OwnershipError) return { error: error.message };
     throw error;

@@ -69,6 +69,14 @@ suite("Issue #24 Salvage Cutter Power Cell boosting (real PostgreSQL)", () => {
     });
   }
 
+  async function addCellStack(characterId: string, quantity: number) {
+    const rows = await db
+      .insert(rune.inventoryStacks)
+      .values({ characterId, itemId: ITEM_IDS.powerCell, quantity })
+      .returning({ id: rune.inventoryStacks.id });
+    return rows[0]!.id;
+  }
+
   async function cutter(characterId: string) {
     const assignments = await db
       .select()
@@ -180,6 +188,38 @@ suite("Issue #24 Salvage Cutter Power Cell boosting (real PostgreSQL)", () => {
     expect(
       cells.filter((stack) => stack.itemId === ITEM_IDS.powerCell).map((stack) => stack.quantity),
     ).toEqual([1]);
+  });
+
+  it("refuses a stale Inventory-selected Power Cell without substituting another stack", async () => {
+    const { userId, character } = await makeCharacter();
+    const now = new Date("2026-06-02T01:00:00.000Z");
+    await provision(userId, character.id, now);
+    const selectedStackId = await addCellStack(character.id, 2);
+    const untouchedStackId = await addCellStack(character.id, 1);
+    await db
+      .update(rune.inventoryStacks)
+      .set({ quantity: 3 })
+      .where(eq(rune.inventoryStacks.id, selectedStackId));
+
+    const result = await mining.loadSalvageCutterPowerCell(userId, character.id, now, undefined, {
+      stackId: selectedStackId,
+      expectedQuantity: 2,
+    });
+
+    expect(result.load).toEqual({
+      status: "stale_selection",
+      message: "Inventory changed. Review the selected Power Cell and try again.",
+    });
+    expect((await cutter(character.id)).currentCharge).toBeNull();
+    await expect(
+      db
+        .select()
+        .from(rune.inventoryStacks)
+        .where(eq(rune.inventoryStacks.characterId, character.id)),
+    ).resolves.toMatchObject([
+      { id: selectedStackId, quantity: 3 },
+      { id: untouchedStackId, quantity: 1 },
+    ]);
   });
 
   it("switches a persisted active batch from boosted to normal timing", async () => {

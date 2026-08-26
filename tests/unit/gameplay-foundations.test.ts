@@ -6,6 +6,7 @@ import {
   deriveCarryingCapacity,
   inventorySlotCapacityFromContainers,
   inventorySlotsUsed,
+  planExactStackRemoval,
   planStackAddition,
 } from "@/game/domain/inventory";
 import { grantSkillXp, levelFromXp, type LevelThreshold } from "@/game/domain/progression";
@@ -96,6 +97,80 @@ describe("inventory", () => {
       0,
     );
     expect(plan.updatedStacks).toEqual([{ id: 42, quantity: 10 }]);
+  });
+
+  it("fills partial stacks in stable creation order regardless of query order", () => {
+    const plan = planStackAddition(
+      [
+        {
+          id: "newer",
+          itemId: ITEM_IDS.ferriteShale,
+          quantity: 8,
+          createdAt: "2026-01-02T00:00:00.000Z",
+        },
+        {
+          id: "older",
+          itemId: ITEM_IDS.ferriteShale,
+          quantity: 7,
+          createdAt: "2026-01-01T00:00:00.000Z",
+        },
+      ],
+      ITEM_IDS.ferriteShale,
+      4,
+      10,
+      0,
+    );
+    expect(plan.updatedStacks).toEqual([
+      { id: "older", quantity: 10 },
+      { id: "newer", quantity: 9 },
+    ]);
+    expect(plan.createdStacks).toEqual([]);
+    expect(plan.remainingQuantity).toBe(0);
+  });
+
+  it("consumes the smallest stacks first, then creation order and ID", () => {
+    const plan = planExactStackRemoval(
+      [
+        {
+          id: "newer-five",
+          itemId: ITEM_IDS.ferriteShale,
+          quantity: 5,
+          createdAt: "2026-01-02T00:00:00.000Z",
+        },
+        {
+          id: "one",
+          itemId: ITEM_IDS.ferriteShale,
+          quantity: 1,
+          createdAt: "2026-01-03T00:00:00.000Z",
+        },
+        {
+          id: "older-five",
+          itemId: ITEM_IDS.ferriteShale,
+          quantity: 5,
+          createdAt: "2026-01-01T00:00:00.000Z",
+        },
+      ],
+      ITEM_IDS.ferriteShale,
+      6,
+    );
+    expect(plan).toEqual({
+      ok: true,
+      updatedStacks: [],
+      deletedStackIds: ["one", "older-five"],
+    });
+  });
+
+  it("uses stack ID as the final consumption tie-breaker", () => {
+    const createdAt = "2026-01-01T00:00:00.000Z";
+    const plan = planExactStackRemoval(
+      [
+        { id: "stack-b", itemId: ITEM_IDS.ferriteShale, quantity: 2, createdAt },
+        { id: "stack-a", itemId: ITEM_IDS.ferriteShale, quantity: 2, createdAt },
+      ],
+      ITEM_IDS.ferriteShale,
+      2,
+    );
+    expect(plan).toEqual({ ok: true, updatedStacks: [], deletedStackIds: ["stack-a"] });
   });
 
   it("leaves overflow when inventory slots are exhausted", () => {
