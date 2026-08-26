@@ -81,7 +81,12 @@ import {
   withLockedOwnedCharacter,
   withResolvedOwnedCharacter,
 } from "@/server/action-resolution";
-import { loadOwnedItemInstances } from "@/server/carried-inventory";
+import {
+  addStackableItem,
+  consumeStackableItem,
+  loadOwnedItemInstances,
+  removeFromSelectedStack,
+} from "@/server/carried-inventory";
 import {
   createTravelResolver,
   TravelRuleError,
@@ -610,19 +615,15 @@ export function createMiningResolver(
           awardedXp: outcome.awardedXp,
           thresholds: miningLevelThresholds(),
         });
-      for (const update of outcome.stackUpdates)
-        await transaction
-          .update(inventoryStacks)
-          .set({ quantity: update.quantity, updatedAt: new Date() })
-          .where(eq(inventoryStacks.id, update.id));
-      if (outcome.createdStacks.length)
-        await transaction.insert(inventoryStacks).values(
-          outcome.createdStacks.map((stack) => ({
-            characterId: outcome.characterId,
-            itemId: stack.itemId,
-            quantity: stack.quantity,
-          })),
-        );
+      await addStackableItem(transaction, {
+        characterId: outcome.characterId,
+        plan: {
+          updatedStacks: outcome.stackUpdates,
+          createdStacks: outcome.createdStacks,
+          remainingQuantity: 0,
+        },
+        now: new Date(),
+      });
       if (outcome.attempts.length) {
         const state = (
           await transaction
@@ -1708,11 +1709,16 @@ export async function stopMining(
 export type LoadPowerCellStatus =
   | { status: "loaded"; remainingCharge: number }
   | { status: "already_loaded"; remainingCharge: number; message: string }
-  | { status: "no_cutter" | "no_cell"; message: string };
+  | { status: "no_cutter" | "no_cell" | "stale_selection"; message: string };
 
 export type LoadPowerCellResult = {
   state: MiningGameplayState;
   load: LoadPowerCellStatus;
+};
+
+export type LoadPowerCellSelection = {
+  stackId: string;
+  expectedQuantity: number;
 };
 
 /**
@@ -1727,6 +1733,7 @@ export async function loadSalvageCutterPowerCell(
   characterId: string,
   now = new Date(),
   random = defaultMiningRandom(),
+  selectedStack?: LoadPowerCellSelection,
 ): Promise<LoadPowerCellResult> {
   let outcome: PersistedMiningOutcome | undefined;
   return withResolvedOwnedCharacter(
@@ -1738,18 +1745,12 @@ export async function loadSalvageCutterPowerCell(
     async (transaction, context) => {
       await ensureStarterMiningState(transaction, context.character.id);
       const balance = getEffectiveGameBalance();
-      const [itemState, assignments, stacks] = await Promise.all([
+      const [itemState, assignments] = await Promise.all([
         loadOwnedItemInstances(transaction, context.character.id),
         transaction
           .select()
           .from(equippedItems)
           .where(eq(equippedItems.characterId, context.character.id))
-          .for("update"),
-        transaction
-          .select()
-          .from(inventoryStacks)
-          .where(eq(inventoryStacks.characterId, context.character.id))
-          .orderBy(asc(inventoryStacks.createdAt), asc(inventoryStacks.id))
           .for("update"),
       ]);
       const cutterAssignment = assignments.find(
@@ -1806,10 +1807,22 @@ export async function loadSalvageCutterPowerCell(
         };
       }
 
-      const cellStack = stacks.find(
-        (stack) => stack.itemId === balance.items.powerCell.itemId && stack.quantity > 0,
-      );
-      if (!cellStack) {
+      const consumption = selectedStack
+        ? await removeFromSelectedStack(transaction, {
+            characterId: context.character.id,
+            stackId: selectedStack.stackId,
+            expectedQuantity: selectedStack.expectedQuantity,
+            expectedItemId: balance.items.powerCell.itemId,
+            quantity: 1,
+            now,
+          })
+        : await consumeStackableItem(transaction, {
+            characterId: context.character.id,
+            itemId: balance.items.powerCell.itemId,
+            quantity: 1,
+            now,
+          });
+      if (!consumption.ok) {
         return {
           state: await stateFromTransaction(
             transaction,
@@ -1821,17 +1834,13 @@ export async function loadSalvageCutterPowerCell(
             undefined,
             now,
           ),
-          load: { status: "no_cell", message: "No loose Power Cells are carried." },
+          load: selectedStack
+            ? {
+                status: "stale_selection",
+                message: "Inventory changed. Review the selected Power Cell and try again.",
+              }
+            : { status: "no_cell", message: "No loose Power Cells are carried." },
         };
-      }
-
-      if (cellStack.quantity === 1) {
-        await transaction.delete(inventoryStacks).where(eq(inventoryStacks.id, cellStack.id));
-      } else {
-        await transaction
-          .update(inventoryStacks)
-          .set({ quantity: cellStack.quantity - 1, updatedAt: now })
-          .where(eq(inventoryStacks.id, cellStack.id));
       }
       await transaction
         .update(itemInstances)
@@ -2152,28 +2161,11 @@ export async function claimScavenge(
           item.itemWeight,
         );
         if (!plan.ok) throw new Error("Scavenge award no longer fits after capacity preflight");
-        for (const update of plan.plan.updatedStacks) {
-          await transaction
-            .update(inventoryStacks)
-            .set({ quantity: update.quantity, updatedAt: now })
-            .where(
-              and(
-                eq(inventoryStacks.id, update.id as string),
-                eq(inventoryStacks.characterId, context.character.id),
-              ),
-            );
-        }
-        if (plan.plan.createdStacks.length) {
-          await transaction.insert(inventoryStacks).values(
-            plan.plan.createdStacks.map((created) => ({
-              characterId: context.character.id,
-              itemId: created.itemId,
-              quantity: created.quantity,
-              createdAt: now,
-              updatedAt: now,
-            })),
-          );
-        }
+        await addStackableItem(transaction, {
+          characterId: context.character.id,
+          plan: plan.plan,
+          now,
+        });
       }
 
       await transaction.insert(characterScavengeReveals).values({

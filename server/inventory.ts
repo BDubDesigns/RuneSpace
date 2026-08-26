@@ -1,5 +1,4 @@
-import { and, eq } from "drizzle-orm";
-import { inventoryStacks } from "@/db/rune-space";
+import { removeFromSelectedStack } from "@/server/carried-inventory";
 import {
   createPlayResolver,
   defaultMiningRandom,
@@ -61,28 +60,14 @@ export async function discardInventoryStackInTransaction(
     discard: { status: "refused", message: refusalMessage },
   });
 
-  const stacks = await transaction
-    .select()
-    .from(inventoryStacks)
-    .where(
-      and(eq(inventoryStacks.characterId, characterId), eq(inventoryStacks.id, request.stackId)),
-    )
-    .for("update");
-  const stack = stacks[0];
-  if (!stack) return refuse();
-  if (stack.quantity !== request.expectedQuantity) return refuse();
-
-  const deleteWholeRow = request.mode === "stack" || stack.quantity === 1;
-  if (deleteWholeRow) {
-    await transaction
-      .delete(inventoryStacks)
-      .where(and(eq(inventoryStacks.id, stack.id), eq(inventoryStacks.characterId, characterId)));
-  } else {
-    await transaction
-      .update(inventoryStacks)
-      .set({ quantity: stack.quantity - 1, updatedAt: now })
-      .where(and(eq(inventoryStacks.id, stack.id), eq(inventoryStacks.characterId, characterId)));
-  }
+  const removal = await removeFromSelectedStack(transaction, {
+    characterId,
+    stackId: request.stackId,
+    expectedQuantity: request.expectedQuantity,
+    quantity: request.mode === "stack" ? request.expectedQuantity : 1,
+    now,
+  });
+  if (!removal.ok) return refuse();
 
   return {
     state: await stateFromTransaction(

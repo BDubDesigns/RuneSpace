@@ -14,9 +14,9 @@ import {
   pacificResetDate,
 } from "@/game/domain/power-annex";
 import { deriveEquipmentLoadout } from "@/game/domain/equipment";
-import { planExactStackAddition } from "@/game/domain/inventory";
 import { withLockedOwnedCharacter, type DatabaseTransaction } from "@/server/action-resolution";
-import { loadOwnedItemInstances } from "@/server/carried-inventory";
+import { addStackableItem, loadOwnedItemInstances } from "@/server/carried-inventory";
+import { planExactStackAddition } from "@/game/domain/inventory";
 import {
   ensureStarterMiningState,
   stateFromTransaction,
@@ -201,21 +201,7 @@ export async function claimPowerCells(
       };
     }
 
-    for (const update of plan.plan.updatedStacks) {
-      await transaction
-        .update(inventoryStacks)
-        .set({ quantity: update.quantity, updatedAt: now })
-        .where(eq(inventoryStacks.id, update.id));
-    }
-    if (plan.plan.createdStacks.length) {
-      await transaction.insert(inventoryStacks).values(
-        plan.plan.createdStacks.map((stack) => ({
-          characterId: character.id,
-          itemId: stack.itemId,
-          quantity: stack.quantity,
-        })),
-      );
-    }
+    await addStackableItem(transaction, { characterId: character.id, plan: plan.plan, now });
 
     return {
       state: await stateForClaim(transaction, character.id, now),

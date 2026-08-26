@@ -23,15 +23,15 @@ import {
   type EquipmentAssignmentState,
   type EquipmentItemInstance,
 } from "@/game/domain/equipment";
-import {
-  planExactStackAddition,
-  planExactStackRemoval,
-  type ExactStackRemovalPlan,
-  type StackState,
-} from "@/game/domain/inventory";
+import { planExactStackAddition, type StackState } from "@/game/domain/inventory";
 import type { MiningRandom } from "@/game/domain/mining";
 import { type DatabaseTransaction, withResolvedOwnedCharacter } from "@/server/action-resolution";
-import { loadOwnedItemInstances } from "@/server/carried-inventory";
+import {
+  addStackableItem,
+  consumeStackableItem,
+  loadOwnedItemInstances,
+  removeFromSelectedStack,
+} from "@/server/carried-inventory";
 import {
   createPlayResolver,
   ensureStarterMiningState,
@@ -185,29 +185,6 @@ async function stateAfterCargoCommand(
   );
 }
 
-function applyInventoryRemoval(
-  transaction: DatabaseTransaction,
-  characterId: string,
-  plan: Extract<ExactStackRemovalPlan<string>, { ok: true }>,
-  now: Date,
-) {
-  return Promise.all([
-    ...plan.deletedStackIds.map((id) =>
-      transaction
-        .delete(inventoryStacks)
-        .where(and(eq(inventoryStacks.id, id), eq(inventoryStacks.characterId, characterId))),
-    ),
-    ...plan.updatedStacks.map((update) =>
-      transaction
-        .update(inventoryStacks)
-        .set({ quantity: update.quantity, updatedAt: now })
-        .where(
-          and(eq(inventoryStacks.id, update.id), eq(inventoryStacks.characterId, characterId)),
-        ),
-    ),
-  ]);
-}
-
 async function loadCarriedCapacity(
   transaction: DatabaseTransaction,
   characterId: string,
@@ -315,32 +292,20 @@ export async function contributeCargoHoldMaterials(
         };
       }
 
-      const refinedPlan = planExactStackRemoval(
-        stacks
-          .filter((stack) => stack.itemId === balance.items.refinedFerrite.itemId)
-          .map((stack) => ({
-            id: stack.id,
-            itemId: balance.items.refinedFerrite.itemId,
-            quantity: stack.quantity,
-          })),
-        balance.items.refinedFerrite.itemId,
-        useful.refinedFerrite,
-      );
-      const slagPlan = planExactStackRemoval(
-        stacks
-          .filter((stack) => stack.itemId === balance.items.slag.itemId)
-          .map((stack) => ({
-            id: stack.id,
-            itemId: balance.items.slag.itemId,
-            quantity: stack.quantity,
-          })),
-        balance.items.slag.itemId,
-        useful.slag,
-      );
-      if (!refinedPlan.ok || !slagPlan.ok)
-        throw new Error("Contribution removal plan became invalid");
-      await applyInventoryRemoval(transaction, context.character.id, refinedPlan, now);
-      await applyInventoryRemoval(transaction, context.character.id, slagPlan, now);
+      const refinedResult = await consumeStackableItem(transaction, {
+        characterId: context.character.id,
+        itemId: balance.items.refinedFerrite.itemId,
+        quantity: useful.refinedFerrite,
+        now,
+      });
+      const slagResult = await consumeStackableItem(transaction, {
+        characterId: context.character.id,
+        itemId: balance.items.slag.itemId,
+        quantity: useful.slag,
+        now,
+      });
+      if (!refinedResult.ok || !slagResult.ok)
+        throw new Error("Contribution removal became invalid");
       await transaction
         .update(characterCargoHoldRepair)
         .set({
@@ -439,13 +404,16 @@ export async function depositCargoStack(
       if (!additionResult.ok)
         return refusal("cargo_capacity", "Cargo Hold has no room for that complete transfer.");
       const addition = additionResult.plan;
-      const removal = planExactStackRemoval(
-        [{ id: source.id, itemId: definition.itemId, quantity: source.quantity }],
-        definition.itemId,
+      const removal = await removeFromSelectedStack(transaction, {
+        characterId: context.character.id,
+        stackId: request.stackId,
+        expectedQuantity: request.expectedQuantity,
+        expectedItemId: definition.itemId,
         quantity,
-      );
-      if (!removal.ok) throw new Error("Cargo deposit removal plan became invalid");
-      await applyInventoryRemoval(transaction, context.character.id, removal, now);
+        now,
+      });
+      if (!removal.ok)
+        return refusal("stack_changed", "Inventory changed. Review the stack and try again.");
       await Promise.all(
         addition.updatedStacks.map((update) =>
           transaction
@@ -555,27 +523,11 @@ export async function withdrawCargoStack(
               eq(cargoHoldStacks.characterId, context.character.id),
             ),
           );
-      await Promise.all(
-        addition.updatedStacks.map((update) =>
-          transaction
-            .update(inventoryStacks)
-            .set({ quantity: update.quantity, updatedAt: now })
-            .where(
-              and(
-                eq(inventoryStacks.id, update.id),
-                eq(inventoryStacks.characterId, context.character.id),
-              ),
-            ),
-        ),
-      );
-      if (addition.createdStacks.length)
-        await transaction.insert(inventoryStacks).values(
-          addition.createdStacks.map((stack) => ({
-            characterId: context.character.id,
-            itemId: stack.itemId,
-            quantity: stack.quantity,
-          })),
-        );
+      await addStackableItem(transaction, {
+        characterId: context.character.id,
+        plan: addition,
+        now,
+      });
       return {
         state: await stateAfterCargoCommand(transaction, context.character.id, now),
         cargo: { status: "transferred", quantity },

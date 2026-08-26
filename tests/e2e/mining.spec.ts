@@ -1448,26 +1448,26 @@ test("a selected Power Cell loads the depleted equipped Cutter from Inventory", 
   await page.setViewportSize({ width: 390, height: 844 });
   const footer = page.getByRole("navigation", { name: "Primary" });
   const characterId = page.url().split("/").at(-1)!;
-  await db.insert(inventoryStacks).values({
-    characterId,
-    itemId: ITEM_IDS.powerCell,
-    quantity: 2,
-  });
+  await db.insert(inventoryStacks).values([
+    { characterId, itemId: ITEM_IDS.powerCell, quantity: 5 },
+    { characterId, itemId: ITEM_IDS.powerCell, quantity: 5 },
+    { characterId, itemId: ITEM_IDS.powerCell, quantity: 1 },
+  ]);
   await page.getByRole("button", { name: "Refresh status" }).click();
-  await expect(footer.getByRole("button", { name: "Inventory 1/8" })).toBeVisible();
+  await expect(footer.getByRole("button", { name: "Inventory 3/8" })).toBeVisible();
 
-  await footer.getByRole("button", { name: "Inventory 1/8" }).click();
+  await footer.getByRole("button", { name: "Inventory 3/8" }).click();
   const inventory = page.getByRole("dialog", { name: "Inventory" });
-  const powerCellTile = inventory.getByRole("button", { name: "2 Power Cell" });
+  const powerCellTile = inventory.getByRole("button", { name: "1 Power Cell" });
   await powerCellTile.click();
   await expect(powerCellTile).toHaveAttribute("aria-pressed", "true");
 
   // Authoritative Power Cell facts and timing-only boost language.
   const details = inventory.getByRole("region", { name: "Power Cell details" });
-  await expect(details.locator('[data-stat="quantity"] dd')).toHaveText("2");
+  await expect(details.locator('[data-stat="quantity"] dd')).toHaveText("1");
   await expect(details.locator('[data-stat="stack-limit"] dd')).toHaveText("5");
   await expect(details.locator('[data-stat="unit-mass"] dd')).toHaveText("500 g");
-  await expect(details.locator('[data-stat="total-mass"] dd')).toHaveText("1 kg");
+  await expect(details.locator('[data-stat="total-mass"] dd')).toHaveText("0.5 kg");
   await expect(details.getByText("Load effect", { exact: true })).toBeVisible();
   await expect(details.getByText("10 boosted attempts", { exact: true })).toBeVisible();
   await expect(details.getByText("Speeds attempt timing only", { exact: true })).toBeVisible();
@@ -1479,19 +1479,20 @@ test("a selected Power Cell loads the depleted equipped Cutter from Inventory", 
 
   // Convenience load without opening Equipment.
   await loadButton.click();
-  await expect(inventory.getByRole("button", { name: "1 Power Cell" })).toBeVisible();
+  await expect(inventory.getByRole("button", { name: "5 Power Cell" })).toHaveCount(2);
+  await expect(inventory.getByRole("button", { name: "1 Power Cell" })).toHaveCount(0);
+  await expect(inventory.getByText("2 occupied / 8 slots")).toBeVisible();
   const success = inventory.getByText("Power Cell loaded · 10 boosted attempts ready.", {
     exact: true,
   });
   await expect(success).toBeVisible();
   await expect(success).not.toHaveAttribute("role", "alert");
   await expect(inventory.getByRole("alert")).toHaveCount(0);
-  // Inventory stays open and the selected stack quantity updates in place.
-  await expect(details.locator('[data-stat="quantity"] dd')).toHaveText("1");
+  // The selected one-cell row is removed, and the two untouched full stacks remain.
+  await expect(inventory.getByRole("region", { name: "Power Cell details" })).toHaveCount(0);
 
   // The charged Cutter now refuses an immediate second load with the reason.
-  await expect(loadButton).toBeDisabled();
-  await expect(inventory.getByText(/already loaded — 10 boosted attempts remain/)).toBeVisible();
+  await expect(inventory.getByRole("button", { name: "5 Power Cell" }).first()).toBeVisible();
 
   await page.screenshot({ path: "test-results/mining-mobile-inventory-cell-loaded.png" });
 
@@ -1500,7 +1501,7 @@ test("a selected Power Cell loads the depleted equipped Cutter from Inventory", 
   await footer.getByRole("button", { name: "Equipment" }).click();
   const equipment = page.getByRole("dialog", { name: "Equipment" });
   await expect(equipment.getByText("Loaded · 10 / 10", { exact: true })).toBeVisible();
-  await expect(equipment.getByText("Carried Power Cells: 1", { exact: true })).toBeVisible();
+  await expect(equipment.getByText("Carried Power Cells: 10", { exact: true })).toBeVisible();
 });
 
 test("selected details stay open through actions and dismiss deliberately", async ({ page }) => {

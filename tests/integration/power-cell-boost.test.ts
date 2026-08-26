@@ -69,6 +69,27 @@ suite("Issue #24 Salvage Cutter Power Cell boosting (real PostgreSQL)", () => {
     });
   }
 
+  async function addCellStack(characterId: string, quantity: number) {
+    const rows = await db
+      .insert(rune.inventoryStacks)
+      .values({ characterId, itemId: ITEM_IDS.powerCell, quantity })
+      .returning({ id: rune.inventoryStacks.id });
+    return rows[0]!.id;
+  }
+
+  async function addCellStacks(characterId: string, quantities: readonly number[]) {
+    return db
+      .insert(rune.inventoryStacks)
+      .values(quantities.map((quantity) => ({ characterId, itemId: ITEM_IDS.powerCell, quantity })))
+      .returning();
+  }
+
+  function summarizeStacks(stacks: readonly { id: string; quantity: number }[]) {
+    return stacks
+      .map(({ id, quantity }) => ({ id, quantity }))
+      .sort((a, b) => a.id.localeCompare(b.id));
+  }
+
   async function cutter(characterId: string) {
     const assignments = await db
       .select()
@@ -90,28 +111,73 @@ suite("Issue #24 Salvage Cutter Power Cell boosting (real PostgreSQL)", () => {
     return rows.find((instance) => instance.id === tool?.itemInstanceId)!;
   }
 
-  it("loads one cell, persists ten charge, and deletes a one-cell stack", async () => {
+  it("selected x1 deletes only that row from 5, 5, 1 and loads the Cutter once", async () => {
     const { userId, character } = await makeCharacter();
     const now = new Date("2026-06-01T00:00:00.000Z");
     await provision(userId, character.id, now);
-    await addCells(character.id);
+    const rows = await addCellStacks(character.id, [5, 5, 1]);
+    const selected = rows.find((row) => row.quantity === 1)!;
+    const fullStacks = rows.filter((row) => row.quantity === 5);
 
-    const result = await mining.loadSalvageCutterPowerCell(userId, character.id, now);
+    const result = await mining.loadSalvageCutterPowerCell(userId, character.id, now, undefined, {
+      stackId: selected.id,
+      expectedQuantity: selected.quantity,
+    });
     expect(result.load).toEqual({ status: "loaded", remainingCharge: 10 });
     expect(result.state.equipment.salvageCutter).toMatchObject({ currentCharge: 10 });
-    await expect(
-      db
-        .select()
-        .from(rune.inventoryStacks)
-        .where(eq(rune.inventoryStacks.characterId, character.id)),
-    ).resolves.toEqual([]);
-    const cutterRows = await db
+    expect((await cutter(character.id)).currentCharge).toBe(10);
+    const after = await db
       .select()
-      .from(rune.itemInstances)
-      .where(eq(rune.itemInstances.characterId, character.id));
-    expect(
-      cutterRows.find((instance) => instance.itemId === ITEM_IDS.salvageCutter)?.currentCharge,
-    ).toBe(10);
+      .from(rune.inventoryStacks)
+      .where(eq(rune.inventoryStacks.characterId, character.id));
+    expect(summarizeStacks(after)).toEqual(summarizeStacks(fullStacks));
+  });
+
+  it("selected x5 decrements only that exact row from 5, 5, 1", async () => {
+    const { userId, character } = await makeCharacter();
+    const now = new Date("2026-06-01T01:00:00.000Z");
+    await provision(userId, character.id, now);
+    const rows = await addCellStacks(character.id, [5, 5, 1]);
+    const selected = rows.find((row) => row.quantity === 5)!;
+    const otherFive = rows.find((row) => row.quantity === 5 && row.id !== selected.id)!;
+    const one = rows.find((row) => row.quantity === 1)!;
+
+    const result = await mining.loadSalvageCutterPowerCell(userId, character.id, now, undefined, {
+      stackId: selected.id,
+      expectedQuantity: selected.quantity,
+    });
+
+    expect(result.load).toEqual({ status: "loaded", remainingCharge: 10 });
+    expect((await cutter(character.id)).currentCharge).toBe(10);
+    const after = await db
+      .select()
+      .from(rune.inventoryStacks)
+      .where(eq(rune.inventoryStacks.characterId, character.id));
+    expect(summarizeStacks(after)).toEqual(
+      summarizeStacks([
+        { id: selected.id, quantity: 4 },
+        { id: otherFive.id, quantity: 5 },
+        { id: one.id, quantity: 1 },
+      ]),
+    );
+  });
+
+  it("without a selected stack consumes x1 first from 5, 5, 1", async () => {
+    const { userId, character } = await makeCharacter();
+    const now = new Date("2026-06-01T02:00:00.000Z");
+    await provision(userId, character.id, now);
+    const rows = await addCellStacks(character.id, [5, 5, 1]);
+    const fullStacks = rows.filter((row) => row.quantity === 5);
+
+    const result = await mining.loadSalvageCutterPowerCell(userId, character.id, now);
+
+    expect(result.load).toEqual({ status: "loaded", remainingCharge: 10 });
+    expect((await cutter(character.id)).currentCharge).toBe(10);
+    const after = await db
+      .select()
+      .from(rune.inventoryStacks)
+      .where(eq(rune.inventoryStacks.characterId, character.id));
+    expect(summarizeStacks(after)).toEqual(summarizeStacks(fullStacks));
   });
 
   it("resolves due Mining before loading and preserves partial cursor progress", async () => {
@@ -180,6 +246,38 @@ suite("Issue #24 Salvage Cutter Power Cell boosting (real PostgreSQL)", () => {
     expect(
       cells.filter((stack) => stack.itemId === ITEM_IDS.powerCell).map((stack) => stack.quantity),
     ).toEqual([1]);
+  });
+
+  it("refuses a stale Inventory-selected Power Cell without substituting another stack", async () => {
+    const { userId, character } = await makeCharacter();
+    const now = new Date("2026-06-02T01:00:00.000Z");
+    await provision(userId, character.id, now);
+    const selectedStackId = await addCellStack(character.id, 2);
+    const untouchedStackId = await addCellStack(character.id, 1);
+    await db
+      .update(rune.inventoryStacks)
+      .set({ quantity: 3 })
+      .where(eq(rune.inventoryStacks.id, selectedStackId));
+
+    const result = await mining.loadSalvageCutterPowerCell(userId, character.id, now, undefined, {
+      stackId: selectedStackId,
+      expectedQuantity: 2,
+    });
+
+    expect(result.load).toEqual({
+      status: "stale_selection",
+      message: "Inventory changed. Review the selected Power Cell and try again.",
+    });
+    expect((await cutter(character.id)).currentCharge).toBeNull();
+    await expect(
+      db
+        .select()
+        .from(rune.inventoryStacks)
+        .where(eq(rune.inventoryStacks.characterId, character.id)),
+    ).resolves.toMatchObject([
+      { id: selectedStackId, quantity: 3 },
+      { id: untouchedStackId, quantity: 1 },
+    ]);
   });
 
   it("switches a persisted active batch from boosted to normal timing", async () => {

@@ -2,6 +2,7 @@
 
 import { useCallback, useTransition } from "react";
 import { loadPowerCellAction } from "@/server/actions";
+import type { LoadPowerCellSelection } from "@/server/mining";
 import { useMiningPlay } from "./MiningPlayContext";
 
 export type LoadPowerCellFeedback = {
@@ -16,7 +17,10 @@ export type LoadPowerCellFeedback = {
  * mapping stay in exactly one place. The server command remains authoritative;
  * this hook only models submission and the last confirmed state.
  */
-export function useLoadPowerCell(onFeedback: (feedback: LoadPowerCellFeedback) => void) {
+export function useLoadPowerCell(
+  onFeedback: (feedback: LoadPowerCellFeedback) => void,
+  selectedStack?: LoadPowerCellSelection,
+) {
   const {
     acquireCommand,
     acceptState,
@@ -31,7 +35,15 @@ export function useLoadPowerCell(onFeedback: (feedback: LoadPowerCellFeedback) =
     const execute = () => {
       startTransition(async () => {
         try {
-          const result = await loadPowerCellAction({ characterId: state.characterId });
+          const result = await loadPowerCellAction(
+            selectedStack
+              ? {
+                  characterId: state.characterId,
+                  stackId: selectedStack.stackId,
+                  expectedQuantity: selectedStack.expectedQuantity,
+                }
+              : { characterId: state.characterId },
+          );
           if ("error" in result) {
             onFeedback({ tone: "danger", message: result.error });
             return;
@@ -62,6 +74,8 @@ export function useLoadPowerCell(onFeedback: (feedback: LoadPowerCellFeedback) =
     enqueueForeground,
     onFeedback,
     releaseCommand,
+    selectedStack?.expectedQuantity,
+    selectedStack?.stackId,
     state.characterId,
   ]);
 

@@ -63,7 +63,6 @@ export function InventoryPanel({
   const [selected, setSelected] = useState<InventorySelection | undefined>();
   const [confirming, setConfirming] = useState<DropConfirmation | undefined>();
   const [message, setMessage] = useState<LoadPowerCellFeedback>();
-  const { busy: loadBusy, loadPowerCell } = useLoadPowerCell(setMessage);
   // Set when an Equip command succeeds so focus can return to the grid after
   // the equipped tile disappears (its button would otherwise be removed). It is
   // armed only from the hook's success callback, never before submission.
@@ -106,6 +105,13 @@ export function InventoryPanel({
   const powerCell = balance.items.powerCell;
   const selectedIsPowerCell =
     resolvedSelection?.kind === "stack" && resolvedSelection.entry.itemId === ITEM_IDS.powerCell;
+  const selectedPowerCell = selectedIsPowerCell
+    ? {
+        stackId: resolvedSelection.entry.id,
+        expectedQuantity: resolvedSelection.entry.quantity,
+      }
+    : undefined;
+  const { busy: loadBusy, loadPowerCell } = useLoadPowerCell(setMessage, selectedPowerCell);
 
   // Reconcile the selection with authoritative state: when the selected entry
   // no longer exists (stack consumed, dropped, or unique item re-equipped),

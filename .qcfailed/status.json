@@ -2,34 +2,34 @@
   "schemaVersion": 1,
   "projectSlug": "runespace",
   "workState": "active",
-  "currentFocus": "Cut Your Teeth mission: equip the Salvage Cutter, collect a full stack of Ferrite Shale, and earn Mining XP through Tansy (issue #110) awaiting product-owner preview review.",
+  "currentFocus": "Centralize RuneSpace carried-inventory stack mutations with deterministic automatic consumption and selected-stack Power Cell safety in Issue #112 review.",
   "latestCompleted": {
-    "summary": "Added item-acquired presentation beats to dialogue plus QC Studio item authoring.",
-    "date": "2026-08-24",
-    "url": "https://github.com/BDubDesigns/RuneSpace/pull/109"
+    "summary": "Added the Cut Your Teeth story mission with Skill XP dialogue beats.",
+    "date": "2026-08-25",
+    "url": "https://github.com/BDubDesigns/RuneSpace/pull/111"
   },
-  "nextStep": "Product-owner review of the Cut Your Teeth flow, the Mining +100 XP reward tile, and Skill XP authoring in QC Studio on the deployed PR preview.",
-  "lastMeaningfulUpdate": "2026-08-25",
+  "nextStep": "Product-owner review of Issue #112 PR #115, deterministic stack behavior, and the selected Power Cell stale-selection path on the deployed preview.",
+  "lastMeaningfulUpdate": "2026-08-26",
   "highlights": [
     {
-      "summary": "Added the second authored story mission Cut Your Teeth with a reusable Skill XP dialogue presentation beat.",
+      "summary": "Added one authoritative carried-inventory mutation boundary with deterministic stack consumption and selected Power Cell safety.",
+      "date": "2026-08-26",
+      "url": "https://github.com/BDubDesigns/RuneSpace/pull/115"
+    },
+    {
+      "summary": "Added the Cut Your Teeth story mission with Skill XP dialogue beats.",
       "date": "2026-08-25",
-      "url": "https://github.com/BDubDesigns/RuneSpace/pull/110"
+      "url": "https://github.com/BDubDesigns/RuneSpace/pull/111"
     },
     {
       "summary": "Added item-acquired presentation beats to dialogue plus QC Studio item authoring.",
       "date": "2026-08-24",
       "url": "https://github.com/BDubDesigns/RuneSpace/pull/109"
-    },
-    {
-      "summary": "Polished the Walk It Off dialogue with creator-approved QC Studio content.",
-      "date": "2026-08-24",
-      "url": "https://github.com/BDubDesigns/RuneSpace/pull/107"
     }
   ],
   "currentChange": {
-    "summary": "Add the Cut Your Teeth story mission with Skill XP presentation beats in dialogue and QC Studio (#110).",
-    "stage": "implementation",
-    "pullRequestNumber": 111
+    "summary": "Centralize carried-inventory stack mutations with deterministic consumption and selected Power Cell safety for Issue #112.",
+    "stage": "review",
+    "pullRequestNumber": 115
   }
 }

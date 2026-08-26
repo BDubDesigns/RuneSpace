@@ -4,6 +4,8 @@ export type StackState<Id = string> = {
   id: Id;
   itemId: ItemId;
   quantity: number;
+  /** Optional persistence metadata used to make stack selection deterministic. */
+  createdAt?: Date | string;
 };
 
 export type StackUpdate<Id> = {
@@ -27,6 +29,16 @@ export type ExactStackAdditionPlan<Id> =
   | { ok: false; reason: "slots" | "mass"; missingQuantity: number };
 
 export type UniqueItemAdditionPlan = { ok: true } | { ok: false; reason: "slots" | "mass" };
+
+function compareStackCreationOrder<Id>(a: StackState<Id>, b: StackState<Id>): number {
+  const aCreatedAt = a.createdAt instanceof Date ? a.createdAt.toISOString() : (a.createdAt ?? "");
+  const bCreatedAt = b.createdAt instanceof Date ? b.createdAt.toISOString() : (b.createdAt ?? "");
+  return aCreatedAt.localeCompare(bCreatedAt) || String(a.id).localeCompare(String(b.id));
+}
+
+function compareStackAdditionOrder<Id>(a: StackState<Id>, b: StackState<Id>): number {
+  return b.quantity - a.quantity || compareStackCreationOrder(a, b);
+}
 
 /**
  * Preflight one unequipped unique item against the authoritative carried
@@ -92,8 +104,11 @@ export function planExactStackRemoval<Id>(
   let remainingQuantity = quantity;
   const updatedStacks: StackUpdate<Id>[] = [];
   const deletedStackIds: Id[] = [];
-  for (const stack of existingStacks) {
-    if (stack.itemId !== itemId || remainingQuantity === 0) continue;
+  const matchingStacks = existingStacks
+    .filter((stack) => stack.itemId === itemId)
+    .sort((a, b) => a.quantity - b.quantity || compareStackCreationOrder(a, b));
+  for (const stack of matchingStacks) {
+    if (remainingQuantity === 0) continue;
     if (!Number.isInteger(stack.quantity) || stack.quantity <= 0) {
       throw new RangeError("Existing stack quantity is invalid");
     }
@@ -153,11 +168,17 @@ export function planStackAddition<Id>(
     itemWeight === 0 ? quantity : Math.min(quantity, Math.floor(availableWeight / itemWeight));
   let remainingQuantity = weightLimitedQuantity;
   const updatedStacks: StackUpdate<Id>[] = [];
-  for (const stack of existingStacks) {
-    if (stack.itemId !== itemId || remainingQuantity === 0) continue;
+  const matchingStacks = existingStacks.filter((stack) => stack.itemId === itemId);
+  for (const stack of matchingStacks) {
     if (!Number.isInteger(stack.quantity) || stack.quantity <= 0 || stack.quantity > stackLimit) {
       throw new RangeError("Existing stack quantity is invalid");
     }
+  }
+  const partialStacks = matchingStacks
+    .filter((stack) => stack.quantity < stackLimit)
+    .sort(compareStackAdditionOrder);
+  for (const stack of partialStacks) {
+    if (remainingQuantity === 0) continue;
     const added = Math.min(stackLimit - stack.quantity, remainingQuantity);
     if (added > 0) updatedStacks.push({ id: stack.id, quantity: stack.quantity + added });
     remainingQuantity -= added;

@@ -23,7 +23,11 @@ import {
 import { levelFromXp } from "@/game/domain/progression";
 import { ticksToMilliseconds } from "@/game/domain/timing";
 import type { ActionResolver, DatabaseTransaction } from "@/server/action-resolution";
-import { loadOwnedItemInstances } from "@/server/carried-inventory";
+import {
+  addStackableItem,
+  consumeStackableItem,
+  loadOwnedItemInstances,
+} from "@/server/carried-inventory";
 import { grantCharacterSkillXp } from "@/server/progression";
 
 export type RefiningSnapshot = {
@@ -147,26 +151,35 @@ export function createRefiningResolver(
       };
     },
     persist: async (transaction, outcome) => {
-      // Handle deleted empty shale stacks first
-      if (outcome.deletedStackIds.length) {
-        for (const id of outcome.deletedStackIds) {
-          await transaction.delete(inventoryStacks).where(eq(inventoryStacks.id, id as string));
-        }
-      }
-      for (const update of outcome.stackUpdates) {
-        await transaction
-          .update(inventoryStacks)
-          .set({ quantity: update.quantity, updatedAt: new Date() })
-          .where(eq(inventoryStacks.id, update.id as string));
-      }
-      if (outcome.createdStacks.length) {
-        await transaction.insert(inventoryStacks).values(
-          outcome.createdStacks.map((stack) => ({
-            characterId: outcome.characterId,
-            itemId: stack.itemId,
-            quantity: stack.quantity,
-          })),
-        );
+      const persistedStacks = await transaction
+        .select({ id: inventoryStacks.id, itemId: inventoryStacks.itemId })
+        .from(inventoryStacks)
+        .where(eq(inventoryStacks.characterId, outcome.characterId))
+        .for("update");
+      const itemIdByStackId = new Map(persistedStacks.map((stack) => [stack.id, stack.itemId]));
+      const now = new Date();
+      const shaleConsumption = await consumeStackableItem(transaction, {
+        characterId: outcome.characterId,
+        itemId: getEffectiveGameBalance().items.ferriteShale.itemId,
+        quantity: outcome.shaleConsumed,
+        now,
+      });
+      if (!shaleConsumption.ok)
+        throw new Error("Refining consumed more shale than available at persistence time");
+
+      const balance = getEffectiveGameBalance();
+      for (const itemId of [balance.items.refinedFerrite.itemId, balance.items.slag.itemId]) {
+        await addStackableItem(transaction, {
+          characterId: outcome.characterId,
+          plan: {
+            updatedStacks: outcome.stackUpdates.filter(
+              (update) => itemIdByStackId.get(String(update.id)) === itemId,
+            ),
+            createdStacks: outcome.createdStacks.filter((stack) => stack.itemId === itemId),
+            remainingQuantity: 0,
+          },
+          now,
+        });
       }
       if (outcome.awardedXp > 0) {
         await grantCharacterSkillXp(transaction, {

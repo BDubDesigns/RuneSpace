@@ -6,6 +6,7 @@ import {
   deriveCarryingCapacity,
   inventorySlotCapacityFromContainers,
   inventorySlotsUsed,
+  planExactStackRemoval,
   planStackAddition,
 } from "@/game/domain/inventory";
 import { grantSkillXp, levelFromXp, type LevelThreshold } from "@/game/domain/progression";
@@ -96,6 +97,158 @@ describe("inventory", () => {
       0,
     );
     expect(plan.updatedStacks).toEqual([{ id: 42, quantity: 10 }]);
+  });
+
+  it("fills a closest-to-full partial stack before opening a new stack", () => {
+    const plan = planStackAddition(
+      [
+        {
+          id: "full",
+          itemId: ITEM_IDS.ferriteShale,
+          quantity: 5,
+          createdAt: "2026-01-01T00:00:00.000Z",
+        },
+        {
+          id: "partial",
+          itemId: ITEM_IDS.ferriteShale,
+          quantity: 2,
+          createdAt: "2026-01-02T00:00:00.000Z",
+        },
+      ],
+      ITEM_IDS.ferriteShale,
+      3,
+      5,
+      0,
+    );
+    expect(plan.updatedStacks).toEqual([{ id: "partial", quantity: 5 }]);
+    expect(plan.createdStacks).toEqual([]);
+    expect(plan.remainingQuantity).toBe(0);
+  });
+
+  it("fills [4, 2] as [5, 4] when three items are added", () => {
+    const plan = planStackAddition(
+      [
+        { id: "two", itemId: ITEM_IDS.ferriteShale, quantity: 2 },
+        { id: "four", itemId: ITEM_IDS.ferriteShale, quantity: 4 },
+      ],
+      ITEM_IDS.ferriteShale,
+      3,
+      5,
+      0,
+    );
+    expect(plan.updatedStacks).toEqual([
+      { id: "four", quantity: 5 },
+      { id: "two", quantity: 4 },
+    ]);
+    expect(plan.createdStacks).toEqual([]);
+    expect(plan.remainingQuantity).toBe(0);
+  });
+
+  it("fills the higher-quantity partial stack first when either can receive the award", () => {
+    const plan = planStackAddition(
+      [
+        { id: "lower", itemId: ITEM_IDS.ferriteShale, quantity: 1 },
+        { id: "higher", itemId: ITEM_IDS.ferriteShale, quantity: 3 },
+      ],
+      ITEM_IDS.ferriteShale,
+      1,
+      5,
+      0,
+    );
+    expect(plan.updatedStacks).toEqual([{ id: "higher", quantity: 4 }]);
+    expect(plan.createdStacks).toEqual([]);
+    expect(plan.remainingQuantity).toBe(0);
+  });
+
+  it("uses creation time, then ID, for equal-quantity addition ties", () => {
+    const byCreationTime = planStackAddition(
+      [
+        {
+          id: "newer",
+          itemId: ITEM_IDS.ferriteShale,
+          quantity: 2,
+          createdAt: "2026-01-02T00:00:00.000Z",
+        },
+        {
+          id: "older",
+          itemId: ITEM_IDS.ferriteShale,
+          quantity: 2,
+          createdAt: "2026-01-01T00:00:00.000Z",
+        },
+      ],
+      ITEM_IDS.ferriteShale,
+      1,
+      5,
+      0,
+    );
+    expect(byCreationTime.updatedStacks).toEqual([{ id: "older", quantity: 3 }]);
+
+    const byId = planStackAddition(
+      [
+        {
+          id: "stack-b",
+          itemId: ITEM_IDS.ferriteShale,
+          quantity: 2,
+          createdAt: "2026-01-01T00:00:00.000Z",
+        },
+        {
+          id: "stack-a",
+          itemId: ITEM_IDS.ferriteShale,
+          quantity: 2,
+          createdAt: "2026-01-01T00:00:00.000Z",
+        },
+      ],
+      ITEM_IDS.ferriteShale,
+      1,
+      5,
+      0,
+    );
+    expect(byId.updatedStacks).toEqual([{ id: "stack-a", quantity: 3 }]);
+  });
+
+  it("consumes the smallest stacks first, then creation order and ID", () => {
+    const plan = planExactStackRemoval(
+      [
+        {
+          id: "newer-five",
+          itemId: ITEM_IDS.ferriteShale,
+          quantity: 5,
+          createdAt: "2026-01-02T00:00:00.000Z",
+        },
+        {
+          id: "one",
+          itemId: ITEM_IDS.ferriteShale,
+          quantity: 1,
+          createdAt: "2026-01-03T00:00:00.000Z",
+        },
+        {
+          id: "older-five",
+          itemId: ITEM_IDS.ferriteShale,
+          quantity: 5,
+          createdAt: "2026-01-01T00:00:00.000Z",
+        },
+      ],
+      ITEM_IDS.ferriteShale,
+      6,
+    );
+    expect(plan).toEqual({
+      ok: true,
+      updatedStacks: [],
+      deletedStackIds: ["one", "older-five"],
+    });
+  });
+
+  it("uses stack ID as the final consumption tie-breaker", () => {
+    const createdAt = "2026-01-01T00:00:00.000Z";
+    const plan = planExactStackRemoval(
+      [
+        { id: "stack-b", itemId: ITEM_IDS.ferriteShale, quantity: 2, createdAt },
+        { id: "stack-a", itemId: ITEM_IDS.ferriteShale, quantity: 2, createdAt },
+      ],
+      ITEM_IDS.ferriteShale,
+      2,
+    );
+    expect(plan).toEqual({ ok: true, updatedStacks: [], deletedStackIds: ["stack-a"] });
   });
 
   it("leaves overflow when inventory slots are exhausted", () => {
