@@ -159,14 +159,16 @@ suite("Issue #112 carried stack mutation adapter (real PostgreSQL)", () => {
     );
 
     expect(result).toEqual({ ok: false, reason: "changed" });
-    await expect(
-      db
-        .select()
-        .from(rune.inventoryStacks)
-        .where(eq(rune.inventoryStacks.characterId, character.id)),
-    ).resolves.toMatchObject([
-      { id: rows[0]!.id, quantity: 3 },
-      { id: rows[1]!.id, quantity: 1 },
-    ]);
+    const after = await db
+      .select()
+      .from(rune.inventoryStacks)
+      .where(eq(rune.inventoryStacks.characterId, character.id));
+    expect(after).toHaveLength(rows.length);
+    expect(after).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ id: rows[0]!.id, quantity: 3 }),
+        expect.objectContaining({ id: rows[1]!.id, quantity: 1 }),
+      ]),
+    );
   });
 });
