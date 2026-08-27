@@ -9,7 +9,6 @@ import { Feedback } from "@/components/ui/Feedback";
 import { StatusMeter } from "@/components/ui/StatusMeter";
 import { getEffectiveGameBalance } from "@/game/config/balance";
 import { ITEM_IDS } from "@/game/config/foundations";
-import { formatMassGrams } from "@/game/domain/mass";
 import { discardInventoryStackAction } from "@/server/actions";
 import type { MiningGameplayState } from "@/server/mining";
 import {
@@ -21,21 +20,10 @@ import {
   type InventorySelection,
   type InventoryStackEntry,
 } from "./inventory-selection";
+import { InventoryDetailsStats } from "./InventoryDetailsStats";
 import { useEquipCommand } from "./useEquipCommand";
 import { useLoadPowerCell, type LoadPowerCellFeedback } from "./useLoadPowerCell";
 import { useMiningPlay } from "./MiningPlayContext";
-
-function StatRow({ label, value, dataStat }: { label: string; value: string; dataStat: string }) {
-  return (
-    <div
-      className="flex items-baseline justify-between gap-3 border-b border-[color:var(--rs-border-subtle)] py-1.5 last:border-b-0"
-      data-stat={dataStat}
-    >
-      <dt className="text-xs uppercase tracking-wide text-[color:var(--rs-text-muted)]">{label}</dt>
-      <dd className="text-right font-medium text-[color:var(--rs-text-primary)]">{value}</dd>
-    </div>
-  );
-}
 
 type DropConfirmation = {
   stackId: string;
@@ -98,8 +86,6 @@ export function InventoryPanel({
     resolvedSelection,
     foregroundBusy,
   );
-  const ferrite = balance.items.ferriteShale;
-  const powerCell = balance.items.powerCell;
   const selectedIsPowerCell =
     resolvedSelection?.kind === "stack" && resolvedSelection.entry.itemId === ITEM_IDS.powerCell;
   const selectedPowerCell = selectedIsPowerCell
@@ -384,66 +370,7 @@ export function InventoryPanel({
                 />
               )}
               <dl className="min-w-0 text-sm text-[color:var(--rs-text-secondary)]">
-                <StatRow dataStat="item" label="Item" value={resolvedSelection.entry.name} />
-                {resolvedSelection.kind === "stack" ? (
-                  <>
-                    <StatRow
-                      dataStat="quantity"
-                      label="Quantity"
-                      value={String(resolvedSelection.entry.quantity)}
-                    />
-                    {resolvedSelection.entry.itemId === ITEM_IDS.ferriteShale ? (
-                      <>
-                        <StatRow
-                          dataStat="stack-limit"
-                          label="Stack limit"
-                          value={String(ferrite.stackLimit)}
-                        />
-                        <StatRow
-                          dataStat="unit-mass"
-                          label="Unit mass"
-                          value={formatMassGrams(ferrite.massGrams)}
-                        />
-                        <StatRow
-                          dataStat="total-mass"
-                          label="Total mass"
-                          value={formatMassGrams(
-                            ferrite.massGrams * resolvedSelection.entry.quantity,
-                          )}
-                        />
-                      </>
-                    ) : resolvedSelection.entry.itemId === ITEM_IDS.powerCell ? (
-                      <>
-                        <StatRow
-                          dataStat="stack-limit"
-                          label="Stack limit"
-                          value={String(powerCell.stackLimit)}
-                        />
-                        <StatRow
-                          dataStat="unit-mass"
-                          label="Unit mass"
-                          value={formatMassGrams(powerCell.massGrams)}
-                        />
-                        <StatRow
-                          dataStat="total-mass"
-                          label="Total mass"
-                          value={formatMassGrams(
-                            powerCell.massGrams * resolvedSelection.entry.quantity,
-                          )}
-                        />
-                      </>
-                    ) : null}
-                  </>
-                ) : (
-                  <>
-                    <StatRow dataStat="identity" label="Identity" value="Unique item" />
-                    <StatRow
-                      dataStat="mass"
-                      label="Mass"
-                      value={formatMassGrams(resolvedSelection.entry.massGrams)}
-                    />
-                  </>
-                )}
+                <InventoryDetailsStats selection={resolvedSelection} />
               </dl>
             </div>
             {selectedIsPowerCell ? (
