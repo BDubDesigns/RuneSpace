@@ -26,5 +26,10 @@
       "date": "2026-08-26",
       "url": "https://github.com/BDubDesigns/RuneSpace/pull/111"
     }
-  ]
+  ],
+  "currentChange": {
+    "summary": "Implement the authoritative declarative mission framework from Issue #124: generic accept/complete commands, semantic dialogue routing, and quest guidance.",
+    "stage": "implementation",
+    "pullRequestNumber": 125
+  }
 }
