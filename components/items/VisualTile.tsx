@@ -19,6 +19,12 @@ type VisualTileProps = {
   mutedArtwork?: boolean;
   name: string;
   onSelect?: () => void;
+  /**
+   * True when this tile is currently a semantic quest-guidance target. The
+   * caller derives that from the projected guidance contract — the tile never
+   * inspects missions itself. Marks the tile accessibly for E2E/AT.
+   */
+  questGuidance?: boolean;
   /** Exposed accessibly through `aria-pressed` and visually through a ring. */
   selected?: boolean;
 };
@@ -36,6 +42,7 @@ export function VisualTile({
   mutedArtwork = false,
   name,
   onSelect,
+  questGuidance = false,
   selected = false,
 }: VisualTileProps) {
   const descriptionId = useId();
@@ -43,6 +50,7 @@ export function VisualTile({
   const rootProps = {
     "aria-describedby": accessibleDescription ? descriptionId : undefined,
     "aria-label": accessibleLabel,
+    "data-quest-guidance": questGuidance ? "true" : undefined,
     className: rootClassName,
   };
   const content = (

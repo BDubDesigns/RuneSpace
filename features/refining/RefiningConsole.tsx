@@ -8,6 +8,7 @@ import { Feedback } from "@/components/ui/Feedback";
 import { StatusMeter } from "@/components/ui/StatusMeter";
 import { getEffectiveGameBalance } from "@/game/config/balance";
 import { ACTION_IDS, GAME_TICK_MS, ITEM_IDS } from "@/game/config/foundations";
+import { deriveQuestGuidanceTargets } from "@/game/domain/missions";
 import type { RefiningRunAttempt } from "@/server/mining";
 import { refreshMiningAction, startRefiningAction, stopRefiningAction } from "@/server/actions";
 import { reportClientDiagnostic } from "@/features/diagnostics/client";
@@ -103,6 +104,11 @@ export function RefiningConsole() {
   const balance = getEffectiveGameBalance();
   const active =
     state.activeAction?.actionId === "processing_yard_refining" ? state.activeAction : undefined;
+  // Quest guidance consumes the ONE derived target set: a future Refining
+  // mission authors `recommendedActionId: ACTION_IDS.refining` and Start
+  // Refining receives the treatment here without any mission-ID branching.
+  const questGuidanceTargets = deriveQuestGuidanceTargets(state.missions);
+  const startRefiningGuided = !active && questGuidanceTargets.actionIds.has(ACTION_IDS.refining);
   const durationTicks = active?.nextAttemptDurationTicks ?? balance.refining.attemptDurationTicks;
   const durationMs = durationTicks * GAME_TICK_MS;
   const elapsed = active ? Math.max(0, now - new Date(active.progressStartedAt).getTime()) : 0;
@@ -214,6 +220,8 @@ export function RefiningConsole() {
           </ActionButton>
         ) : (
           <ActionButton
+            className={startRefiningGuided ? "rs-quest-guidance" : undefined}
+            data-quest-guidance={startRefiningGuided ? "true" : undefined}
             intent="mining"
             loading={foregroundBusy && pendingCommand === "start"}
             onClick={() => runForeground("start", startRefiningAction)}

@@ -1,9 +1,13 @@
 import {
+  ACTION_IDS,
+  DIALOGUE_IDS,
   ITEM_IDS,
   LOCATION_IDS,
   MISSION_IDS,
   NPC_IDS,
   SKILL_IDS,
+  type ActionId,
+  type DialogueId,
   type ItemId,
   type LocationId,
   type MissionId,
@@ -22,20 +26,43 @@ export type MissionReward =
   | { kind: "skill_xp"; skillId: SkillId; amount: number };
 
 /**
- * One authored objective step observed against current authoritative state.
- * Steps never create progress tracking: satisfaction is recomputed from the
- * character's live equipment/inventory on every projection.
+ * Explicit turn-in disposition for a carried-stack requirement. Requirement
+ * satisfaction (does the character carry the quantity?) is deliberately kept
+ * separate from consumption (does the turn-in take the items?).
+ *
+ * - `"show"` — the stack is a condition only; the turn-in consumes zero
+ *   (Cut Your Teeth's "show the shale").
+ * - `"consume_required_quantity"` — the turn-in hands in exactly the required
+ *   quantity through the authoritative carried-stack boundary.
  */
-export type MissionObjectiveStep =
+export type CarriedStackTurnIn = "show" | "consume_required_quantity";
+
+/**
+ * One reusable live-state requirement evaluated against current authoritative
+ * character state on every projection. Requirements never create progress
+ * tracking: satisfaction is recomputed from live location/equipment/inventory.
+ *
+ * The closed union is justified by the two production missions and the known
+ * needs of the next ordinary missions. A future real mission earns any new
+ * kind deliberately rather than broadening this speculatively.
+ */
+export type MissionRequirement =
   | {
-      kind: "equip_item";
-      /** The item that must currently occupy its compatible equipment slot. */
-      itemId: ItemId;
-      /** Player-facing copy; `{item}` receives the authoritative display name. */
-      template: string;
+      kind: "at_location";
+      /** Canonical authored location. Current location alone satisfies this. */
+      locationId: LocationId;
+      /** Player-facing copy, e.g. "Travel to The Jag" / "Return to The Jag". */
+      objective: string;
     }
   | {
-      kind: "carry_stack";
+      kind: "equipped_item";
+      /** The item that must genuinely occupy its authoritative compatible slot. */
+      itemId: ItemId;
+      /** Player-facing copy; `{item}` receives the authoritative display name. */
+      objective: string;
+    }
+  | {
+      kind: "carried_stack";
       /** The item whose current carried quantity is observed. */
       itemId: ItemId;
       /**
@@ -44,96 +71,208 @@ export type MissionObjectiveStep =
        * duplicating balance values in quest content.
        */
       quantity?: number;
+      /** Explicit turn-in disposition: shown (consume zero) or handed in. */
+      turnIn: CarriedStackTurnIn;
       /** Player-facing copy; `{item}`, `{carried}`, `{required}` are substituted. */
-      template: string;
+      objective: string;
+      /**
+       * Optional authored recommendation of which gameplay interaction this
+       * mission is intentionally teaching/recommending for acquisition. Kept
+       * separate from requirement truth and validated against the action's
+       * authoritative outputs — never a duplicated drop table.
+       */
+      recommendedActionId?: ActionId;
     };
+
+/** The kinds a requirement may take, used for semantic stage routing. */
+export type MissionRequirementKind = MissionRequirement["kind"];
+
+/**
+ * One authored offer interaction. A mission may have several real offer routes
+ * (Walk It Off through Wade at the Crash Site, or Tansy at The Jag for the
+ * explorer-first remote acceptance). Offer location/dialogue semantics are
+ * authored explicitly so the UI never infers mission rules from NPC names.
+ */
+export type MissionOffer = {
+  npcId: NpcId;
+  locationId: LocationId;
+  /** The offer/acceptance dialogue sequence. */
+  dialogueId: DialogueId;
+  /**
+   * Optional authored continuation shown immediately after acceptance at this
+   * offer (e.g. Tansy's remote-acceptance follow-up that leads straight to the
+   * Cutter claim).
+   */
+  acceptedContinuationDialogueId?: DialogueId;
+  /**
+   * Optional authored idle/continuation shown when talking to this offer NPC
+   * while the mission is already active or completed (e.g. Wade's follow-up).
+   */
+  idleDialogueId?: DialogueId;
+};
+
+/**
+ * The authoritative turn-in interaction. The turn-in location is authored
+ * here — mission location semantics never derive from an NPC's home location,
+ * so a future NPC-movement/phase feature cannot accidentally depend on an
+ * "NPC home equals quest location" invariant.
+ */
+export type MissionTurnIn = {
+  npcId: NpcId;
+  locationId: LocationId;
+  requiresStationary: true;
+  /** Objective copy once every requirement holds. */
+  objective: string;
+  /** The turn-in dialogue sequence (carries the complete_mission action). */
+  dialogueId: DialogueId;
+};
+
+/**
+ * Authored semantic dialogue mappings. Stable semantic mission state selects
+ * the sequence; no boolean-expression language and no prose in server logic.
+ * All fields optional — a mission authors only the branches it needs.
+ */
+export type MissionDialogue = {
+  /** First unmet requirement is an equipped_item. */
+  equipmentReminderDialogueId?: DialogueId;
+  /** First unmet requirement is a carried_stack. */
+  carriedReminderDialogueId?: DialogueId;
+  /** Requirements satisfied but the turn-in is not performable (busy). */
+  busyDialogueId?: DialogueId;
+  /**
+   * Presentation-only completion beats revealed after the authoritative
+   * success (item / skill-XP beats). Never mutates state.
+   */
+  completionPresentationDialogueId?: DialogueId;
+  /** Item-reward capacity refusal branches. */
+  capacitySlotsDialogueId?: DialogueId;
+  capacityMassDialogueId?: DialogueId;
+};
 
 export type MissionDefinition = {
   id: MissionId;
   title: string;
   summary: string;
-  offeringNpcId: NpcId;
-  completionNpcId: NpcId;
-  relevantLocationId: LocationId;
-  reward: MissionReward;
   /**
    * Stable mission ID that must be completed before this one can be offered
    * or accepted. Absent for the first mission in the chain.
    */
   prerequisiteMissionId?: MissionId;
-  /** Objective copy while the mission points the player somewhere else. */
-  travelObjective?: string;
-  /** Objective copy once every step is satisfied at the mission location. */
-  completionObjective?: string;
+  /** One or more authored offer interactions (possibly several routes). */
+  offers: readonly MissionOffer[];
+  /** Ordered reusable live-state requirements. */
+  requirements: readonly MissionRequirement[];
+  turnIn: MissionTurnIn;
+  reward: MissionReward;
   /**
    * Player-facing copy shown while the mission is available but not yet
-   * accepted, pointing the player at the quest giver. Mirrors how Walk It Off
-   * presents "Travel to The Jag" before acceptance.
+   * accepted, pointing the player at the quest giver. Absent for missions
+   * (Walk It Off) that deliberately keep explorer-first discovery.
    */
   availableObjective?: string;
-  /** Ordered objective steps evaluated before the completion objective. */
-  objectiveSteps?: readonly MissionObjectiveStep[];
+  dialogue: MissionDialogue;
 };
 
 /**
- * Authored mission identity/content. Objective semantics remain deliberately
- * narrow to the real slices proved by production: travel-and-talk (Walk It
- * Off) and equip-and-collect (Cut Your Teeth).
+ * Walk It Off — travel-and-talk. Two offer routes (Wade at the Crash Site, or
+ * Tansy at The Jag for explorer-first remote acceptance), one location
+ * requirement, and a Cutter item reward claimed at The Jag.
  */
 export const WALK_IT_OFF: MissionDefinition = {
   id: MISSION_IDS.walkItOff,
   title: "Walk It Off",
   summary: "Reach The Jag and speak with Tansy Rusk.",
-  offeringNpcId: NPC_IDS.wadeRusk,
-  completionNpcId: NPC_IDS.tansyRusk,
-  relevantLocationId: LOCATION_IDS.theJag,
+  offers: [
+    {
+      npcId: NPC_IDS.wadeRusk,
+      locationId: LOCATION_IDS.crashSite,
+      dialogueId: DIALOGUE_IDS.wadeOffer,
+      idleDialogueId: DIALOGUE_IDS.wadeFollowUp,
+    },
+    {
+      npcId: NPC_IDS.tansyRusk,
+      locationId: LOCATION_IDS.theJag,
+      dialogueId: DIALOGUE_IDS.tansyBeforeMission,
+      acceptedContinuationDialogueId: DIALOGUE_IDS.tansyAfterRemoteAcceptance,
+    },
+  ],
+  requirements: [
+    { kind: "at_location", locationId: LOCATION_IDS.theJag, objective: "Travel to The Jag" },
+  ],
+  turnIn: {
+    npcId: NPC_IDS.tansyRusk,
+    locationId: LOCATION_IDS.theJag,
+    requiresStationary: true,
+    objective: "Talk to Tansy Rusk",
+    dialogueId: DIALOGUE_IDS.tansyCompletion,
+  },
   reward: { kind: "item", itemId: ITEM_IDS.salvageCutter },
-  travelObjective: "Travel to The Jag",
-  completionObjective: "Talk to Tansy Rusk",
+  dialogue: {
+    completionPresentationDialogueId: DIALOGUE_IDS.tansyAfterClaim,
+    capacitySlotsDialogueId: DIALOGUE_IDS.tansyCapacitySlots,
+    capacityMassDialogueId: DIALOGUE_IDS.tansyCapacityMass,
+  },
 };
 
 /**
- * Second story mission (issue #110). Teaches the real Inventory → Equip flow
- * and the Mining loop using the Salvage Cutter already granted by Walk It
- * Off. Collection observes the player's CURRENT carried Ferrite Shale — no
- * provenance, history, or mined-since-acceptance tracking — and scavenged
- * shale counts exactly like mined shale.
+ * Cut Your Teeth (issue #110) — equip-and-collect. Teaches the real Inventory
+ * → Equip flow and the Mining loop. Collection observes the player's CURRENT
+ * carried Ferrite Shale — no provenance, history, or mined-since-acceptance
+ * tracking — and scavenged shale counts exactly like mined shale. The shale is
+ * shown, never consumed.
  */
 export const CUT_YOUR_TEETH: MissionDefinition = {
   id: MISSION_IDS.cutYourTeeth,
   title: "Cut Your Teeth",
   summary:
     "Equip your Salvage Cutter, then show Tansy Rusk a full stack of Ferrite Shale at The Jag.",
-  offeringNpcId: NPC_IDS.tansyRusk,
-  completionNpcId: NPC_IDS.tansyRusk,
-  relevantLocationId: LOCATION_IDS.theJag,
-  reward: { kind: "skill_xp", skillId: SKILL_IDS.mining, amount: 100 },
   prerequisiteMissionId: MISSION_IDS.walkItOff,
-  travelObjective: "Return to The Jag",
-  availableObjective: "Speak with Tansy Rusk at The Jag to begin Cut Your Teeth.",
-  objectiveSteps: [
+  offers: [
     {
-      kind: "equip_item",
-      itemId: ITEM_IDS.salvageCutter,
-      template: "Equip the {item} from Inventory",
-    },
-    {
-      kind: "carry_stack",
-      itemId: ITEM_IDS.ferriteShale,
-      template: "Get a full stack of {item} — {carried} / {required}",
+      npcId: NPC_IDS.tansyRusk,
+      locationId: LOCATION_IDS.theJag,
+      dialogueId: DIALOGUE_IDS.tansyCutYourTeethOffer,
     },
   ],
-  completionObjective: "Show a full stack of Ferrite Shale to Tansy Rusk",
+  requirements: [
+    { kind: "at_location", locationId: LOCATION_IDS.theJag, objective: "Return to The Jag" },
+    {
+      kind: "equipped_item",
+      itemId: ITEM_IDS.salvageCutter,
+      objective: "Equip the {item} from Inventory",
+    },
+    {
+      kind: "carried_stack",
+      itemId: ITEM_IDS.ferriteShale,
+      turnIn: "show",
+      objective: "Get a full stack of {item} — {carried} / {required}",
+      recommendedActionId: ACTION_IDS.ferriteShaleMining,
+    },
+  ],
+  turnIn: {
+    npcId: NPC_IDS.tansyRusk,
+    locationId: LOCATION_IDS.theJag,
+    requiresStationary: true,
+    objective: "Show a full stack of Ferrite Shale to Tansy Rusk",
+    dialogueId: DIALOGUE_IDS.tansyCutYourTeethTurnIn,
+  },
+  reward: { kind: "skill_xp", skillId: SKILL_IDS.mining, amount: 100 },
+  availableObjective: "Speak with Tansy Rusk at The Jag to begin Cut Your Teeth.",
+  dialogue: {
+    equipmentReminderDialogueId: DIALOGUE_IDS.tansyCutYourTeethEquipReminder,
+    carriedReminderDialogueId: DIALOGUE_IDS.tansyCutYourTeethStackReminder,
+    busyDialogueId: DIALOGUE_IDS.tansyCutYourTeethBusy,
+    completionPresentationDialogueId: DIALOGUE_IDS.tansyCutYourTeethCompletion,
+  },
 };
 
-const missions = new Map<string, MissionDefinition>([
-  [WALK_IT_OFF.id, WALK_IT_OFF],
-  [CUT_YOUR_TEETH.id, CUT_YOUR_TEETH],
-]);
+/** Ordered chain of authored missions; later entries may require earlier ones. */
+export const MISSIONS: readonly MissionDefinition[] = [WALK_IT_OFF, CUT_YOUR_TEETH];
+
+const missions = new Map<string, MissionDefinition>(
+  MISSIONS.map((mission) => [mission.id, mission]),
+);
 
 export function getMission(missionId: string): MissionDefinition | undefined {
   return missions.get(missionId);
 }
-
-/** Ordered chain of authored missions; later entries may require earlier ones. */
-export const MISSIONS: readonly MissionDefinition[] = [WALK_IT_OFF, CUT_YOUR_TEETH];

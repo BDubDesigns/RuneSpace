@@ -7,11 +7,15 @@ import {
   NPC_IDS,
 } from "@/game/config/foundations";
 import { getConversationBackground } from "@/game/content/conversation-backgrounds";
-import { getDialogue, getWalkItOffDialogue, resolveDialogueSpeaker } from "@/game/content/dialogue";
+import {
+  getDialogue,
+  resolveDialogueSpeaker,
+  resolveNpcMissionDialogue,
+} from "@/game/content/dialogue";
 import { WALK_IT_OFF } from "@/game/content/missions";
 import { getNpcAtLocation } from "@/game/content/npcs";
 import { ITEM_IDS } from "@/game/config/foundations";
-import { deriveMissionState, projectMission } from "@/game/domain/missions";
+import { deriveMissionState, projectMission, type MissionProjection } from "@/game/domain/missions";
 import { planUniqueItemAddition } from "@/game/domain/inventory";
 import { getLocation } from "@/game/content/locations";
 
@@ -33,9 +37,17 @@ describe("issue #102 authored NPC and mission boundaries", () => {
   });
 
   it("uses typed beats and state-specific dialogue without player choices", () => {
-    const offer = getWalkItOffDialogue(NPC_IDS.wadeRusk, "not_accepted");
-    const explorer = getWalkItOffDialogue(NPC_IDS.tansyRusk, "not_accepted");
-    const completion = getWalkItOffDialogue(NPC_IDS.tansyRusk, "active");
+    // Walk It Off's two authored offer routes keep their original sequences,
+    // now resolved through the ONE generic semantic router.
+    const offer = resolveNpcMissionDialogue(NPC_IDS.wadeRusk, [
+      walkItOffProjection("not_accepted"),
+    ])?.sequence;
+    const explorer = resolveNpcMissionDialogue(NPC_IDS.tansyRusk, [
+      walkItOffProjection("not_accepted"),
+    ])?.sequence;
+    const completion = resolveNpcMissionDialogue(NPC_IDS.tansyRusk, [
+      walkItOffProjection("active"),
+    ])?.sequence;
     expect(offer?.action).toBe("accept_mission");
     expect(completion?.action).toBe("complete_mission");
     expect(offer?.beats).toHaveLength(13);
@@ -70,7 +82,7 @@ describe("issue #102 authored NPC and mission boundaries", () => {
     expect(getDialogue("unknown_dialogue")).toBeUndefined();
   });
 
-  it("derives the four mission states from timestamps, location, stationary state, and step satisfaction", () => {
+  it("derives the four mission states from timestamps, location, stationary state, and requirement satisfaction", () => {
     const acceptedAt = new Date("2026-01-01T00:00:00.000Z");
     const completedAt = new Date("2026-01-01T00:01:00.000Z");
     expect(
@@ -79,14 +91,13 @@ describe("issue #102 authored NPC and mission boundaries", () => {
     expect(
       deriveMissionState({ mission: { acceptedAt }, definition: WALK_IT_OFF, ...locationInput() }),
     ).toBe("active");
-    // At the relevant location but the mission's authored steps do NOT hold
-    // (WALK_IT_OFF has no objective steps, so location+stationary is enough
-    // for it; for step-bearing missions the steps must hold too).
+    // At the turn-in location with every authored requirement holding (Walk It
+    // Off's only requirement is the at_location step to The Jag), the mission
+    // is completion-ready while stationary.
     expect(
       deriveMissionState({
         mission: { acceptedAt },
         definition: WALK_IT_OFF,
-        relevantLocationId: LOCATION_IDS.theJag,
         currentLocationId: LOCATION_IDS.theJag,
         stationary: true,
       }),
@@ -136,9 +147,17 @@ describe("unique reward capacity planning", () => {
   });
 });
 
+function walkItOffProjection(state: MissionProjection["state"]): MissionProjection {
+  return {
+    missionId: MISSION_IDS.walkItOff,
+    state,
+    prerequisiteSatisfied: true,
+    stage: { requirementsSatisfied: false, turnInAvailable: false },
+  } as MissionProjection;
+}
+
 function locationInput() {
   return {
-    relevantLocationId: LOCATION_IDS.theJag,
     currentLocationId: LOCATION_IDS.crashSite,
     stationary: true,
   };

@@ -1,5 +1,5 @@
 import { and, eq, isNull } from "drizzle-orm";
-import type { DatabaseTransaction } from "@/server/action-resolution";
+import type { DatabaseTransaction, ResolvedCharacterContext } from "@/server/action-resolution";
 import {
   characterMissions,
   characters,
@@ -10,13 +10,25 @@ import {
 import {
   getEffectiveGameBalance,
   getItemDefinition,
-  miningLevelThresholds,
+  skillLevelThresholds,
 } from "@/game/config/balance";
-import { ITEM_IDS, LOCATION_IDS, SKILL_IDS } from "@/game/config/foundations";
+import { LOCATION_IDS } from "@/game/config/foundations";
+import { getLocation } from "@/game/content/locations";
+import {
+  getMission,
+  MISSIONS,
+  type MissionDefinition,
+  type MissionRequirement,
+} from "@/game/content/missions";
+import { resolveItemPresentation } from "@/game/content/item-presentation";
 import { getNpc } from "@/game/content/npcs";
-import { CUT_YOUR_TEETH, WALK_IT_OFF } from "@/game/content/missions";
-import { deriveEquipmentLoadout } from "@/game/domain/equipment";
-import { planUniqueItemAddition } from "@/game/domain/inventory";
+import { deriveEquipmentLoadout, isCompatibleEquipmentAssignment } from "@/game/domain/equipment";
+import {
+  planExactStackRemoval,
+  planUniqueItemAddition,
+  type ExactStackRemovalPlan,
+} from "@/game/domain/inventory";
+import type { MissionObservation } from "@/game/domain/missions";
 import type { MiningRandom } from "@/game/domain/mining";
 import { withResolvedOwnedCharacter } from "@/server/action-resolution";
 import {
@@ -27,7 +39,7 @@ import {
   type MiningGameplayState,
 } from "@/server/mining";
 import { grantCharacterSkillXp } from "@/server/progression";
-import { loadOwnedItemInstances } from "@/server/carried-inventory";
+import { applyStackRemovalPlan, loadOwnedItemInstances } from "@/server/carried-inventory";
 
 export type MissionAcceptance =
   | { status: "accepted" | "already_accepted" | "already_completed" }
@@ -36,17 +48,18 @@ export type MissionAcceptance =
 export type MissionCompletion =
   | {
       status: "completed" | "already_completed";
-      reward?: { itemId: typeof ITEM_IDS.salvageCutter; quantity: 1; itemInstanceId?: string };
+      reward?: { itemId: string; quantity: 1; itemInstanceId?: string };
     }
   | {
       status: "refused";
       reason:
         | "not_accepted"
         | "not_stationary"
-        | "capacity"
+        | "wrong_npc"
         | "prerequisite"
         | "equipment"
-        | "insufficient_items";
+        | "insufficient_items"
+        | "capacity";
       capacityReason?: "slots" | "mass";
       message: string;
     };
@@ -61,18 +74,10 @@ export type MissionCompletionResult = {
   mission: MissionCompletion;
 };
 
-const NO_RECENT_MINING_RESULT = { successes: 0, failures: 0, awardedXp: 0 } as const;
+type CommandOutcome = { successes: number; failures: number; awardedXp: number };
 
-function currentMissionRow(
-  rows: readonly (typeof characterMissions.$inferSelect)[],
-): typeof characterMissions.$inferSelect | undefined {
-  return rows.find((row) => row.missionId === WALK_IT_OFF.id);
-}
-
-function cutYourTeethRow(
-  rows: readonly (typeof characterMissions.$inferSelect)[],
-): typeof characterMissions.$inferSelect | undefined {
-  return rows.find((row) => row.missionId === CUT_YOUR_TEETH.id);
+function locationName(locationId: string): string {
+  return getLocation(locationId)?.displayName ?? "the required location";
 }
 
 async function currentLocation(
@@ -89,29 +94,31 @@ async function currentLocation(
   return row?.currentLocationId ?? LOCATION_IDS.crashSite;
 }
 
-function rewardRefusal(reason: "slots" | "mass"): string {
-  return reason === "slots"
-    ? "The Salvage Cutter needs one free carried Inventory slot. Free capacity and try again."
-    : "The Salvage Cutter is too heavy for your current carried-mass capacity. Free capacity and try again.";
-}
+type MissionRows = readonly (typeof characterMissions.$inferSelect)[];
 
-function recentFrom(value: { successes: number; failures: number; awardedXp: number } | undefined) {
-  return value ?? NO_RECENT_MINING_RESULT;
+function missionRow(rows: MissionRows, missionId: string) {
+  return rows.find((row) => row.missionId === missionId);
 }
 
 /**
- * Authenticated Walk It Off acceptance. The server action supplies the user
- * ID; this command then uses the same character lock/reconciliation boundary
- * as every other state-changing play command.
+ * Runs one mission command through the shared character lock/reconciliation
+ * boundary and hands the command a `stateFor` factory that projects the full
+ * play state from the transaction, including any Mining/Refining work that
+ * was resolved inside the same transaction.
  */
-export async function acceptWalkItOff(
+async function runMissionCommand<Mission extends MissionAcceptance | MissionCompletion>(
   userId: string,
   characterId: string,
-  now = new Date(),
-  random: MiningRandom = defaultMiningRandom(),
-): Promise<MissionAcceptanceResult> {
-  let miningOutcome: { successes: number; failures: number; awardedXp: number } | undefined;
-  let refiningOutcome: { successes: number; failures: number; awardedXp: number } | undefined;
+  now: Date,
+  random: MiningRandom,
+  command: (input: {
+    transaction: DatabaseTransaction;
+    context: ResolvedCharacterContext;
+    stateFor: (mission: Mission) => Promise<{ state: MiningGameplayState; mission: Mission }>;
+  }) => Promise<{ state: MiningGameplayState; mission: Mission }>,
+): Promise<{ state: MiningGameplayState; mission: Mission }> {
+  let miningOutcome: CommandOutcome | undefined;
+  let refiningOutcome: CommandOutcome | undefined;
   return withResolvedOwnedCharacter(
     userId,
     characterId,
@@ -125,279 +132,88 @@ export async function acceptWalkItOff(
         refiningOutcome = outcome;
       },
     ),
-    async (transaction, context) => {
-      await ensureStarterMiningState(transaction, context.character.id);
-      const rows = await transaction
-        .select()
-        .from(characterMissions)
-        .where(
-          and(
-            eq(characterMissions.characterId, context.character.id),
-            eq(characterMissions.missionId, WALK_IT_OFF.id),
+    async (transaction, context) =>
+      command({
+        transaction,
+        context,
+        stateFor: async (mission) => ({
+          state: await stateFromTransaction(
+            transaction,
+            context.character.id,
+            miningOutcome ?? { successes: 0, failures: 0, awardedXp: 0 },
+            undefined,
+            undefined,
+            undefined,
+            undefined,
+            now,
+            refiningOutcome ?? { successes: 0, failures: 0, awardedXp: 0 },
           ),
-        )
-        .for("update");
-      const existing = currentMissionRow(rows);
-      const stateFor = async (mission: MissionAcceptance): Promise<MissionAcceptanceResult> => ({
-        state: await stateFromTransaction(
-          transaction,
-          context.character.id,
-          recentFrom(miningOutcome),
-          undefined,
-          undefined,
-          undefined,
-          undefined,
-          now,
-          recentFrom(refiningOutcome),
-        ),
-        mission,
-      });
-
-      if (existing?.completedAt) return stateFor({ status: "already_completed" });
-      if (existing?.acceptedAt) return stateFor({ status: "already_accepted" });
-
-      const locationId = await currentLocation(transaction, context.character.id);
-      const wade = getNpc(WALK_IT_OFF.offeringNpcId);
-      const tansy = getNpc(WALK_IT_OFF.completionNpcId);
-      const canAcceptAtLocation =
-        locationId === wade?.homeLocationId || locationId === tansy?.homeLocationId;
-      if (!canAcceptAtLocation || context.action) {
-        return stateFor({
-          status: "refused",
-          message:
-            "Walk It Off can only be accepted while you are stationary at the Crash Site or The Jag.",
-        });
-      }
-
-      await transaction
-        .insert(characterMissions)
-        .values({
-          characterId: context.character.id,
-          missionId: WALK_IT_OFF.id,
-          acceptedAt: now,
-        })
-        .onConflictDoNothing();
-      return stateFor({ status: "accepted" });
-    },
+          mission,
+        }),
+      }),
     now,
   );
 }
 
 /**
- * Atomically claim the first Cutter reward. The character lock serializes
- * retries/concurrent clicks; the mission row and capacity snapshot are read
- * inside that transaction, and the new unique instance plus completion stamp
- * commit together or not at all.
+ * Generic mission acceptance. The browser supplies only narrow command
+ * identity/intent (character, mission, NPC); every rule is revalidated
+ * server-side inside the character lock from the authored definition:
+ * prerequisite, authored offer route, and stationary presence at that offer's
+ * location. Acceptance is idempotent.
  */
-export async function completeWalkItOff(
+export async function acceptMission(
   userId: string,
   characterId: string,
-  now = new Date(),
-  random: MiningRandom = defaultMiningRandom(),
-): Promise<MissionCompletionResult> {
-  let miningOutcome: { successes: number; failures: number; awardedXp: number } | undefined;
-  let refiningOutcome: { successes: number; failures: number; awardedXp: number } | undefined;
-  return withResolvedOwnedCharacter(
-    userId,
-    characterId,
-    createPlayResolver(
-      random,
-      (outcome) => {
-        miningOutcome = outcome;
-      },
-      undefined,
-      (outcome) => {
-        refiningOutcome = outcome;
-      },
-    ),
-    async (transaction, context) => {
-      await ensureStarterMiningState(transaction, context.character.id);
-      const rows = await transaction
-        .select()
-        .from(characterMissions)
-        .where(
-          and(
-            eq(characterMissions.characterId, context.character.id),
-            eq(characterMissions.missionId, WALK_IT_OFF.id),
-          ),
-        )
-        .for("update");
-      const existing = currentMissionRow(rows);
-      const stateFor = async (mission: MissionCompletion): Promise<MissionCompletionResult> => ({
-        state: await stateFromTransaction(
-          transaction,
-          context.character.id,
-          recentFrom(miningOutcome),
-          undefined,
-          undefined,
-          undefined,
-          undefined,
-          now,
-          recentFrom(refiningOutcome),
-        ),
-        mission,
-      });
-
-      if (!existing) {
-        return stateFor({
-          status: "refused",
-          reason: "not_accepted",
-          message: "Accept Walk It Off with Wade before claiming this reward.",
-        });
-      }
-      if (existing.completedAt) return stateFor({ status: "already_completed" });
-
-      const locationId = await currentLocation(transaction, context.character.id);
-      const tansy = getNpc(WALK_IT_OFF.completionNpcId);
-      if (locationId !== tansy?.homeLocationId || context.action) {
-        return stateFor({
-          status: "refused",
-          reason: "not_stationary",
-          message: "Tansy can complete Walk It Off only while you are stationary at The Jag.",
-        });
-      }
-
-      const balance = getEffectiveGameBalance();
-      const itemDefinition = getItemDefinition(
-        WALK_IT_OFF.reward.kind === "item" ? WALK_IT_OFF.reward.itemId : ("" as never),
-        balance,
-      );
-      if (!itemDefinition || itemDefinition.kind !== "unique") {
-        throw new Error("Walk It Off reward is not a unique item definition");
-      }
-      const [itemState, assignments, stacks] = await Promise.all([
-        loadOwnedItemInstances(transaction, context.character.id),
-        transaction
-          .select()
-          .from(equippedItems)
-          .where(eq(equippedItems.characterId, context.character.id))
-          .for("update"),
-        transaction
-          .select()
-          .from(inventoryStacks)
-          .where(eq(inventoryStacks.characterId, context.character.id))
-          .for("update"),
-      ]);
-      const loadout = deriveEquipmentLoadout({
-        assignments,
-        instances: itemState.carriedInstances,
-        stacks,
-        balance,
-      });
-      const capacity = planUniqueItemAddition({
-        inventorySlotsUsed: loadout.inventorySlotsUsed,
-        slotCapacity: loadout.containerSlotCapacity,
-        carriedMassGrams: loadout.carriedMassGrams,
-        maximumCarryCapacityGrams: loadout.maximumCarryCapacityGrams,
-        itemMassGrams: itemDefinition.massGrams,
-      });
-      if (!capacity.ok) {
-        return stateFor({
-          status: "refused",
-          reason: "capacity",
-          capacityReason: capacity.reason,
-          message: rewardRefusal(capacity.reason),
-        });
-      }
-
-      const created = await transaction
-        .insert(itemInstances)
-        .values({
-          characterId: context.character.id,
-          itemId: ITEM_IDS.salvageCutter,
-          currentCharge: 0,
-        })
-        .returning({ id: itemInstances.id });
-      const cutter = created[0];
-      if (!cutter) throw new Error("Walk It Off Cutter reward was not created");
-
-      await transaction
-        .update(characterMissions)
-        .set({ completedAt: now })
-        .where(
-          and(
-            eq(characterMissions.characterId, context.character.id),
-            eq(characterMissions.missionId, WALK_IT_OFF.id),
-            isNull(characterMissions.completedAt),
-          ),
-        );
-      return stateFor({
-        status: "completed",
-        reward: { itemId: ITEM_IDS.salvageCutter, quantity: 1, itemInstanceId: cutter.id },
-      });
-    },
-    now,
-  );
-}
-
-/**
- * Authenticated Cut Your Teeth acceptance (issue #110). Hard server-side
- * prerequisite: Walk It Off must already be completed for THIS character —
- * owning a Cutter or carrying shale never bypasses it. Tansy-only, stationary
- * at her home location. Character-scoped and idempotent like every mission
- * command.
- */
-export async function acceptCutYourTeeth(
-  userId: string,
-  characterId: string,
+  missionId: string,
+  npcId: string,
   now = new Date(),
   random: MiningRandom = defaultMiningRandom(),
 ): Promise<MissionAcceptanceResult> {
-  let miningOutcome: { successes: number; failures: number; awardedXp: number } | undefined;
-  let refiningOutcome: { successes: number; failures: number; awardedXp: number } | undefined;
-  return withResolvedOwnedCharacter(
+  return runMissionCommand<MissionAcceptance>(
     userId,
     characterId,
-    createPlayResolver(
-      random,
-      (outcome) => {
-        miningOutcome = outcome;
-      },
-      undefined,
-      (outcome) => {
-        refiningOutcome = outcome;
-      },
-    ),
-    async (transaction, context) => {
+    now,
+    random,
+    async ({ transaction, context, stateFor }) => {
       await ensureStarterMiningState(transaction, context.character.id);
+      const definition = getMission(missionId);
+      if (!definition) {
+        return stateFor({ status: "refused", message: "Unknown mission." });
+      }
       const rows = await transaction
         .select()
         .from(characterMissions)
         .where(eq(characterMissions.characterId, context.character.id))
         .for("update");
-      const existing = cutYourTeethRow(rows);
-      const walkItOff = currentMissionRow(rows);
-      const stateFor = async (mission: MissionAcceptance): Promise<MissionAcceptanceResult> => ({
-        state: await stateFromTransaction(
-          transaction,
-          context.character.id,
-          recentFrom(miningOutcome),
-          undefined,
-          undefined,
-          undefined,
-          undefined,
-          now,
-          recentFrom(refiningOutcome),
-        ),
-        mission,
-      });
-
+      const existing = missionRow(rows, definition.id);
       if (existing?.completedAt) return stateFor({ status: "already_completed" });
       if (existing?.acceptedAt) return stateFor({ status: "already_accepted" });
+
       // Hard prerequisite, rechecked inside the authoritative command.
-      if (!walkItOff?.acceptedAt || !walkItOff.completedAt) {
-        return stateFor({
-          status: "refused",
-          message: "Complete Walk It Off before Tansy can offer you more work.",
-        });
+      if (definition.prerequisiteMissionId) {
+        const prerequisite = missionRow(rows, definition.prerequisiteMissionId);
+        if (!prerequisite?.completedAt) {
+          const prerequisiteDefinition = getMission(definition.prerequisiteMissionId);
+          return stateFor({
+            status: "refused",
+            message: `Complete ${prerequisiteDefinition?.title ?? "the prerequisite mission"} before this mission can begin.`,
+          });
+        }
       }
 
-      const locationId = await currentLocation(transaction, context.character.id);
-      const tansy = getNpc(CUT_YOUR_TEETH.completionNpcId);
-      if (locationId !== tansy?.homeLocationId || context.action) {
+      const offer = definition.offers.find((candidate) => candidate.npcId === npcId);
+      if (!offer) {
         return stateFor({
           status: "refused",
-          message: "Cut Your Teeth can only be accepted while you are stationary at The Jag.",
+          message: `${definition.title} cannot be accepted from that person.`,
+        });
+      }
+      const locationId = await currentLocation(transaction, context.character.id);
+      if (context.action || locationId !== offer.locationId) {
+        return stateFor({
+          status: "refused",
+          message: `${definition.title} can only be accepted while you are stationary at ${locationName(offer.locationId)}.`,
         });
       }
 
@@ -405,170 +221,434 @@ export async function acceptCutYourTeeth(
         .insert(characterMissions)
         .values({
           characterId: context.character.id,
-          missionId: CUT_YOUR_TEETH.id,
+          missionId: definition.id,
           acceptedAt: now,
         })
         .onConflictDoNothing();
       return stateFor({ status: "accepted" });
     },
-    now,
   );
 }
 
 /**
- * Atomically complete Cut Your Teeth (issue #110). All requirements are
- * rechecked inside the authoritative transaction; completion and the 100
- * Mining XP award commit together or not at all. The Ferrite Shale stack is
- * inspected, never consumed — showing is not giving. The character lock
- * serializes retries/concurrent submissions so XP cannot double-award.
+ * Generic authoritative mission completion. Inside the established character
+ * transaction/lock boundary this command:
+ *
+ * 1. re-reads the mission record and validates acceptance/prerequisite;
+ * 2. validates the exact turn-in NPC, authored turn-in location, and stationary state;
+ * 3. re-reads equipment/inventory and re-evaluates EVERY authored requirement;
+ * 4. for each consume_required_quantity carried-stack requirement, builds an
+ *    exact pure removal plan through the inventory planner WITHOUT mutating rows;
+ * 5. applies those plans cumulatively to an in-memory candidate inventory and
+ *    preflights any item reward against the POST-consumPTION candidate
+ *    (consumption may legitimately free the slots or mass the reward needs);
+ * 6. only after the complete plan is valid, applies removals through the
+ *    authoritative carried-stack boundary and applies the single declared
+ *    reward and the guarded completion stamp in the same transaction.
+ *
+ * Shown items (turn-in "show") are inspected, never consumed. The character
+ * lock plus the completedAt guard make completion — and therefore consumption
+ * and reward — exactly-once under retries and concurrent first completions.
  */
-export async function completeCutYourTeeth(
+export async function completeMission(
   userId: string,
   characterId: string,
+  missionId: string,
+  npcId: string,
   now = new Date(),
   random: MiningRandom = defaultMiningRandom(),
 ): Promise<MissionCompletionResult> {
-  let miningOutcome: { successes: number; failures: number; awardedXp: number } | undefined;
-  let refiningOutcome: { successes: number; failures: number; awardedXp: number } | undefined;
-  return withResolvedOwnedCharacter(
+  return runMissionCommand<MissionCompletion>(
     userId,
     characterId,
-    createPlayResolver(
-      random,
-      (outcome) => {
-        miningOutcome = outcome;
-      },
-      undefined,
-      (outcome) => {
-        refiningOutcome = outcome;
-      },
-    ),
-    async (transaction, context) => {
+    now,
+    random,
+    async ({ transaction, context, stateFor }) => {
       await ensureStarterMiningState(transaction, context.character.id);
-      const rows = await transaction
-        .select()
-        .from(characterMissions)
-        .where(eq(characterMissions.characterId, context.character.id))
-        .for("update");
-      const existing = cutYourTeethRow(rows);
-      const walkItOff = currentMissionRow(rows);
-      const stateFor = async (mission: MissionCompletion): Promise<MissionCompletionResult> => ({
-        state: await stateFromTransaction(
-          transaction,
-          context.character.id,
-          recentFrom(miningOutcome),
-          undefined,
-          undefined,
-          undefined,
-          undefined,
-          now,
-          recentFrom(refiningOutcome),
-        ),
-        mission,
+      const definition = getMission(missionId);
+      if (!definition) {
+        return stateFor({ status: "refused", reason: "not_accepted", message: "Unknown mission." });
+      }
+      return completeMissionForDefinition({
+        transaction,
+        context,
+        stateFor,
+        definition,
+        npcId,
+        now,
       });
+    },
+  );
+}
 
-      if (!existing?.acceptedAt) {
-        return stateFor({
-          status: "refused",
-          reason: "not_accepted",
-          message: "Accept Cut Your Teeth from Tansy first.",
-        });
-      }
-      if (existing.completedAt) return stateFor({ status: "already_completed" });
-      if (!walkItOff?.acceptedAt || !walkItOff.completedAt) {
-        return stateFor({
-          status: "refused",
-          reason: "prerequisite",
-          message: "Complete Walk It Off before claiming this reward.",
-        });
-      }
+/**
+ * Framework-level test seam: runs the EXACT generic completion transaction for
+ * an injected definition. Production callers always resolve the definition
+ * from the canonical registry via `completeMission`; this entry exists only
+ * so integration tests can prove consumed-item semantics (show vs consume,
+ * post-consumption reward preflight, rollback) without adding a fake
+ * player-visible production quest.
+ */
+export async function completeMissionWithDefinition(
+  userId: string,
+  characterId: string,
+  definition: MissionDefinition,
+  npcId: string,
+  now = new Date(),
+  random: MiningRandom = defaultMiningRandom(),
+): Promise<MissionCompletionResult> {
+  return runMissionCommand<MissionCompletion>(
+    userId,
+    characterId,
+    now,
+    random,
+    async ({ transaction, context, stateFor }) => {
+      await ensureStarterMiningState(transaction, context.character.id);
+      return completeMissionForDefinition({
+        transaction,
+        context,
+        stateFor,
+        definition,
+        npcId,
+        now,
+      });
+    },
+  );
+}
 
-      const locationId = await currentLocation(transaction, context.character.id);
-      const tansy = getNpc(CUT_YOUR_TEETH.completionNpcId);
-      if (locationId !== tansy?.homeLocationId || context.action) {
+async function completeMissionForDefinition(input: {
+  transaction: DatabaseTransaction;
+  context: ResolvedCharacterContext;
+  stateFor: (mission: MissionCompletion) => Promise<MissionCompletionResult>;
+  definition: MissionDefinition;
+  npcId: string;
+  now: Date;
+}): Promise<MissionCompletionResult> {
+  const { transaction, context, stateFor, definition, npcId, now } = input;
+  const rows = await transaction
+    .select()
+    .from(characterMissions)
+    .where(eq(characterMissions.characterId, context.character.id))
+    .for("update");
+  const existing = missionRow(rows, definition.id);
+  if (!existing?.acceptedAt) {
+    return stateFor({
+      status: "refused",
+      reason: "not_accepted",
+      message: `Accept ${definition.title} first.`,
+    });
+  }
+  if (existing.completedAt) return stateFor({ status: "already_completed" });
+
+  if (definition.prerequisiteMissionId) {
+    const prerequisite = missionRow(rows, definition.prerequisiteMissionId);
+    if (!prerequisite?.acceptedAt || !prerequisite.completedAt) {
+      const prerequisiteDefinition = getMission(definition.prerequisiteMissionId);
+      return stateFor({
+        status: "refused",
+        reason: "prerequisite",
+        message: `Complete ${prerequisiteDefinition?.title ?? "the prerequisite mission"} before claiming this reward.`,
+      });
+    }
+  }
+
+  if (npcId !== definition.turnIn.npcId) {
+    return stateFor({
+      status: "refused",
+      reason: "wrong_npc",
+      message: `${definition.title} must be completed with ${getNpc(definition.turnIn.npcId)?.displayName ?? "its turn-in contact"}.`,
+    });
+  }
+  const locationId = await currentLocation(transaction, context.character.id);
+  if (context.action || locationId !== definition.turnIn.locationId) {
+    return stateFor({
+      status: "refused",
+      reason: "not_stationary",
+      message: `${definition.title} can only be completed while you are stationary at ${locationName(definition.turnIn.locationId)}.`,
+    });
+  }
+
+  const balance = getEffectiveGameBalance();
+  const [itemState, assignments, stacks] = await Promise.all([
+    loadOwnedItemInstances(transaction, context.character.id),
+    transaction
+      .select()
+      .from(equippedItems)
+      .where(eq(equippedItems.characterId, context.character.id))
+      .for("update"),
+    transaction
+      .select()
+      .from(inventoryStacks)
+      .where(eq(inventoryStacks.characterId, context.character.id))
+      .for("update"),
+  ]);
+  const carriedById = new Map(itemState.carriedInstances.map((i) => [i.id, i.itemId]));
+  const observation = buildCompletionObservation(
+    assignmentCarriedItemIds(assignments, carriedById),
+    stacks,
+  );
+
+  // Re-evaluate every authored requirement against live authoritative
+  // state, in authored order, so refusals follow objective precedence.
+  for (const requirement of definition.requirements) {
+    if (requirement.kind === "at_location") {
+      if (locationId !== requirement.locationId) {
         return stateFor({
           status: "refused",
           reason: "not_stationary",
-          message: "Tansy can inspect your stack only while you are stationary at The Jag.",
+          message: `Objective not met: ${requirement.objective}.`,
         });
       }
-
-      const balance = getEffectiveGameBalance();
-      const [itemState, assignments, stacks] = await Promise.all([
-        loadOwnedItemInstances(transaction, context.character.id),
-        transaction
-          .select()
-          .from(equippedItems)
-          .where(eq(equippedItems.characterId, context.character.id))
-          .for("update"),
-        transaction
-          .select()
-          .from(inventoryStacks)
-          .where(eq(inventoryStacks.characterId, context.character.id))
-          .for("update"),
-      ]);
-
-      // Requirement 1: the Salvage Cutter is currently equipped in its
-      // compatible gear slot on a genuinely carried instance.
-      const cutterDefinition = getItemDefinition(ITEM_IDS.salvageCutter, balance);
-      if (!cutterDefinition || cutterDefinition.kind !== "unique") {
-        throw new Error("Salvage Cutter must have an authoritative unique definition");
-      }
-      const cutterSuitSlotId = balance.items.salvageCutter.suitSlotId;
-      const carriedById = new Map(itemState.carriedInstances.map((i) => [i.id, i.itemId]));
-      const cutterEquipped = assignments.some(
-        (assignment) =>
-          assignment.assignmentKind === "gear" &&
-          assignment.suitSlotId === cutterSuitSlotId &&
-          carriedById.get(assignment.itemInstanceId) === ITEM_IDS.salvageCutter,
-      );
-      if (!cutterEquipped) {
+      continue;
+    }
+    if (requirement.kind === "equipped_item") {
+      if (!equipmentRequirementHolds(requirement, assignments, carriedById)) {
         return stateFor({
           status: "refused",
           reason: "equipment",
-          message: "Equip the Salvage Cutter before showing Tansy your work.",
+          message: `Objective not met: ${renderRequirementCopy(requirement, observation)}.`,
         });
       }
-
-      // Requirement 2: currently carrying one full authoritative stack of
-      // Ferrite Shale. Provenance does not matter; nothing is consumed.
-      const shaleDefinition = getItemDefinition(ITEM_IDS.ferriteShale, balance);
-      if (!shaleDefinition || shaleDefinition.kind !== "stack") {
-        throw new Error("Ferrite Shale must have an authoritative stack definition");
-      }
-      const requiredShale = shaleDefinition.stackLimit;
-      const carriedShale = stacks
-        .filter((stack) => stack.itemId === ITEM_IDS.ferriteShale)
-        .reduce((total, stack) => total + stack.quantity, 0);
-      if (carriedShale < requiredShale) {
-        return stateFor({
-          status: "refused",
-          reason: "insufficient_items",
-          message: `Bring a full stack of Ferrite Shale (${carriedShale} of ${requiredShale}) for Tansy to inspect.`,
-        });
-      }
-
-      // Atomically stamp completion AND award the quest XP through the sole
-      // progression boundary. Both succeed together or not at all; the
-      // completedAt guard above keeps retries from re-awarding.
-      await transaction
-        .update(characterMissions)
-        .set({ completedAt: now })
-        .where(
-          and(
-            eq(characterMissions.characterId, context.character.id),
-            eq(characterMissions.missionId, CUT_YOUR_TEETH.id),
-            isNull(characterMissions.completedAt),
-          ),
-        );
-      await grantCharacterSkillXp(transaction, {
-        characterId: context.character.id,
-        skillId: SKILL_IDS.mining,
-        awardedXp: CUT_YOUR_TEETH.reward.kind === "skill_xp" ? CUT_YOUR_TEETH.reward.amount : 0,
-        thresholds: miningLevelThresholds(balance),
+      continue;
+    }
+    const carried = observation.carriedQuantities.get(requirement.itemId) ?? 0;
+    if (carried < resolveRequiredQuantity(requirement, observation)) {
+      return stateFor({
+        status: "refused",
+        reason: "insufficient_items",
+        message: `Objective not met: ${renderRequirementCopy(requirement, observation)}.`,
       });
-      return stateFor({ status: "completed" });
-    },
-    now,
+    }
+  }
+
+  // Build exact pure removal plans for every consumed carried requirement
+  // BEFORE any mutation, applying them cumulatively to an in-memory
+  // candidate inventory so the reward preflight sees post-consumption
+  // capacity.
+  const consumptionPlans: Array<Extract<ExactStackRemovalPlan<string>, { ok: true }>> = [];
+  let candidateStacks: Array<{ id: string; itemId: string; quantity: number }> = stacks.map(
+    (stack) => ({ id: stack.id, itemId: stack.itemId, quantity: stack.quantity }),
   );
+  for (const requirement of definition.requirements) {
+    if (requirement.kind !== "carried_stack") continue;
+    if (requirement.turnIn !== "consume_required_quantity") continue;
+    const required = resolveRequiredQuantity(requirement, observation);
+    const plan = planExactStackRemoval(candidateStacks, requirement.itemId, required);
+    if (!plan.ok) {
+      return stateFor({
+        status: "refused",
+        reason: "insufficient_items",
+        message: `Objective not met: ${renderRequirementCopy(requirement, observation)}.`,
+      });
+    }
+    consumptionPlans.push(plan);
+    candidateStacks = applyRemovalPlanToCandidate(candidateStacks, plan);
+  }
+
+  // Preflight the declared reward against the post-consumption candidate
+  // inventory. Consumption may legitimately free the slot or mass the
+  // reward needs, so the original pre-consumption snapshot must not gate it.
+  if (definition.reward.kind === "item") {
+    const itemDefinition = getItemDefinition(definition.reward.itemId, balance);
+    if (!itemDefinition || itemDefinition.kind !== "unique") {
+      throw new Error(`${definition.id} reward is not a unique item definition`);
+    }
+    const loadout = deriveEquipmentLoadout({
+      assignments,
+      instances: itemState.carriedInstances,
+      stacks: candidateStacks,
+      balance,
+    });
+    const capacity = planUniqueItemAddition({
+      inventorySlotsUsed: loadout.inventorySlotsUsed,
+      slotCapacity: loadout.containerSlotCapacity,
+      carriedMassGrams: loadout.carriedMassGrams,
+      maximumCarryCapacityGrams: loadout.maximumCarryCapacityGrams,
+      itemMassGrams: itemDefinition.massGrams,
+    });
+    if (!capacity.ok) {
+      const rewardName =
+        resolveItemPresentation(definition.reward.itemId, definition.reward.itemId).displayName ??
+        definition.reward.itemId;
+      return stateFor({
+        status: "refused",
+        reason: "capacity",
+        capacityReason: capacity.reason,
+        message:
+          capacity.reason === "slots"
+            ? `${rewardName} needs one free carried Inventory slot. Free capacity and try again.`
+            : `${rewardName} is too heavy for your current carried-mass capacity. Free capacity and try again.`,
+      });
+    }
+  }
+
+  // The complete plan is valid — apply consumption through the
+  // authoritative carried-stack boundary, then the reward, then the
+  // guarded completion stamp, all inside this transaction. Any failure
+  // rolls the entire transaction back.
+  for (const plan of consumptionPlans) {
+    await applyStackRemovalPlan(transaction, {
+      characterId: context.character.id,
+      plan,
+      now,
+    });
+  }
+
+  let rewardInfo: { itemId: string; quantity: 1; itemInstanceId?: string } | undefined;
+  if (definition.reward.kind === "item") {
+    const created = await transaction
+      .insert(itemInstances)
+      .values({
+        characterId: context.character.id,
+        itemId: definition.reward.itemId,
+        currentCharge: 0,
+      })
+      .returning({ id: itemInstances.id });
+    const instance = created[0];
+    if (!instance) throw new Error(`${definition.id} item reward was not created`);
+    rewardInfo = { itemId: definition.reward.itemId, quantity: 1, itemInstanceId: instance.id };
+  } else {
+    const thresholds = skillLevelThresholds(definition.reward.skillId);
+    if (!thresholds) {
+      throw new Error(`${definition.id} reward skill has no approved progression curve`);
+    }
+    await grantCharacterSkillXp(transaction, {
+      characterId: context.character.id,
+      skillId: definition.reward.skillId,
+      awardedXp: definition.reward.amount,
+      thresholds,
+    });
+  }
+
+  await transaction
+    .update(characterMissions)
+    .set({ completedAt: now })
+    .where(
+      and(
+        eq(characterMissions.characterId, context.character.id),
+        eq(characterMissions.missionId, definition.id),
+        isNull(characterMissions.completedAt),
+      ),
+    );
+  return stateFor({ status: "completed", reward: rewardInfo });
+}
+
+/**
+ * Resolves the authoritative required quantity for a carried requirement:
+ * explicit authored quantity, or the canonical full-stack limit from the item
+ * definition (never quest-duplicated balance).
+ */
+function resolveRequiredQuantity(
+  requirement: Extract<MissionRequirement, { kind: "carried_stack" }>,
+  observation: MissionObservation,
+): number {
+  if (requirement.quantity !== undefined) return requirement.quantity;
+  return observation.stackLimits.get(requirement.itemId) ?? 1;
+}
+
+function renderRequirementCopy(
+  requirement: MissionRequirement,
+  observation: MissionObservation,
+): string {
+  if (requirement.kind === "at_location") return requirement.objective;
+  const itemName = observation.itemNames.get(requirement.itemId) ?? requirement.itemId;
+  if (requirement.kind === "equipped_item") {
+    return requirement.objective.replace("{item}", itemName);
+  }
+  const required = resolveRequiredQuantity(requirement, observation);
+  const carried = Math.min(observation.carriedQuantities.get(requirement.itemId) ?? 0, required);
+  return requirement.objective
+    .replace("{item}", itemName)
+    .replace("{carried}", String(carried))
+    .replace("{required}", String(required));
+}
+
+/**
+ * Authoritative equipment check through the equipment SSOT: the item must
+ * genuinely occupy an approved compatible assignment slot on a carried
+ * instance. Compatibility data is never duplicated in mission content.
+ */
+function equipmentRequirementHolds(
+  requirement: Extract<MissionRequirement, { kind: "equipped_item" }>,
+  assignments: readonly {
+    assignmentKind: string;
+    suitSlotId: string;
+    itemInstanceId: string;
+  }[],
+  carriedItemByInstanceId: ReadonlyMap<string, string>,
+): boolean {
+  const balance = getEffectiveGameBalance();
+  return assignments.some(
+    (assignment) =>
+      carriedItemByInstanceId.get(assignment.itemInstanceId) === requirement.itemId &&
+      isCompatibleEquipmentAssignment(
+        requirement.itemId,
+        {
+          assignmentKind: assignment.assignmentKind as "gear" | "container",
+          suitSlotId: assignment.suitSlotId,
+        },
+        balance,
+      ),
+  );
+}
+
+function assignmentCarriedItemIds(
+  assignments: readonly { itemInstanceId: string }[],
+  carriedById: ReadonlyMap<string, string>,
+): ReadonlySet<string> {
+  return new Set(
+    assignments
+      .map((assignment) => carriedById.get(assignment.itemInstanceId))
+      .filter((itemId): itemId is string => itemId !== undefined),
+  );
+}
+
+/** Completion-time observation built from the freshly locked inventory state. */
+function buildCompletionObservation(
+  equippedCarriedIds: ReadonlySet<string>,
+  stacks: readonly { itemId: string; quantity: number }[],
+): MissionObservation {
+  const balance = getEffectiveGameBalance();
+  const carriedQuantities = new Map<string, number>();
+  for (const stack of stacks) {
+    carriedQuantities.set(
+      stack.itemId,
+      (carriedQuantities.get(stack.itemId) ?? 0) + stack.quantity,
+    );
+  }
+  const stackLimits = new Map<string, number>();
+  const itemNames = new Map<string, string>();
+  const observedItemIds = new Set<string>([
+    ...equippedCarriedIds,
+    ...carriedQuantities.keys(),
+    ...MISSIONS.flatMap((mission) =>
+      mission.requirements
+        .filter(
+          (requirement): requirement is Extract<MissionRequirement, { itemId: string }> =>
+            requirement.kind !== "at_location",
+        )
+        .map((requirement) => requirement.itemId),
+    ),
+  ]);
+  for (const itemId of observedItemIds) {
+    const displayName = resolveItemPresentation(itemId, itemId).displayName;
+    if (displayName && displayName !== itemId) itemNames.set(itemId, displayName);
+    const definition = getItemDefinition(itemId, balance);
+    if (definition?.kind === "stack") stackLimits.set(itemId, definition.stackLimit);
+  }
+  return { equippedItemIds: equippedCarriedIds, carriedQuantities, stackLimits, itemNames };
+}
+
+/** Applies one pure removal plan to an in-memory candidate stack list. */
+function applyRemovalPlanToCandidate(
+  candidateStacks: Array<{ id: string; itemId: string; quantity: number }>,
+  plan: Extract<ExactStackRemovalPlan<string>, { ok: true }>,
+): Array<{ id: string; itemId: string; quantity: number }> {
+  const deleted = new Set(plan.deletedStackIds);
+  const updates = new Map(plan.updatedStacks.map((update) => [update.id, update.quantity]));
+  return candidateStacks
+    .filter((stack) => !deleted.has(stack.id))
+    .map((stack) =>
+      updates.has(stack.id) ? { ...stack, quantity: updates.get(stack.id)! } : stack,
+    );
 }

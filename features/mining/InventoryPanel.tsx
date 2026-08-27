@@ -9,6 +9,7 @@ import { Feedback } from "@/components/ui/Feedback";
 import { StatusMeter } from "@/components/ui/StatusMeter";
 import { getEffectiveGameBalance } from "@/game/config/balance";
 import { ITEM_IDS } from "@/game/config/foundations";
+import { deriveQuestGuidanceTargets } from "@/game/domain/missions";
 import { discardInventoryStackAction } from "@/server/actions";
 import type { MiningGameplayState } from "@/server/mining";
 import {
@@ -76,6 +77,11 @@ export function InventoryPanel({
   const totalSlots = state.inventory.slotsUsed + state.inventory.slotsAvailable;
   const balance = getEffectiveGameBalance();
   const resolvedSelection = resolveInventorySelection(state.inventory, selected);
+  // Quest guidance is consumed from the ONE derived target set: while an
+  // equipped-item requirement is the current unmet step, the matching carried
+  // item's tile receives the treatment so the player finds the equip path.
+  // No mission-ID branching here.
+  const questGuidanceTargets = deriveQuestGuidanceTargets(state.missions);
   const loadAvailability = derivePowerCellLoadAvailability(
     state,
     resolvedSelection,
@@ -306,11 +312,17 @@ export function InventoryPanel({
                   ? `${item.currentCharge}/${balance.items.salvageCutter.maximumCharge}`
                   : undefined
               }
+              className={
+                questGuidanceTargets.equipmentItemIds.has(item.itemId)
+                  ? "rs-quest-guidance"
+                  : undefined
+              }
               interactive
               itemId={item.itemId}
               key={item.id}
               name={item.name}
               onSelect={() => toggleSelect({ kind: "unique", id: item.id })}
+              questGuidance={questGuidanceTargets.equipmentItemIds.has(item.itemId)}
               selected={selected?.kind === "unique" && selected.id === item.id}
             />
           ))}

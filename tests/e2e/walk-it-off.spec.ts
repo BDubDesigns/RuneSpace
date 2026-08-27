@@ -107,6 +107,10 @@ test("walks from Wade to Tansy, presents approved dialogue, and claims one carri
   await expect(dialogue).toBeHidden();
   await expect(page.locator("[data-mission-objective]")).toContainText("Travel to The Jag");
 
+  // Quest guidance: Walk It Off is explorer-first (no authored availability
+  // glow) and Wade's offer NPC is not the current required interaction.
+  await expect(page.locator("[data-quest-guidance]")).toHaveCount(0);
+
   await page
     .getByRole("button", { name: /The Long Scramble/ })
     .first()
@@ -129,6 +133,11 @@ test("walks from Wade to Tansy, presents approved dialogue, and claims one carri
   ).toHaveCount(1);
   await expect(page.getByRole("button", { name: /Talk to Tansy Rusk/ })).toHaveAttribute(
     "data-npc-turn-in",
+    "true",
+  );
+  // Quest guidance: the required NPC interaction now receives the treatment.
+  await expect(page.getByRole("button", { name: /Talk to Tansy Rusk/ })).toHaveAttribute(
+    "data-quest-guidance",
     "true",
   );
   await page.emulateMedia({ reducedMotion: "reduce" });
@@ -171,6 +180,13 @@ test("walks from Wade to Tansy, presents approved dialogue, and claims one carri
   await expect(page.locator("[data-mission-objective]")).toContainText("Available");
   await expect(page.locator("[data-mission-objective]")).toContainText(
     "Speak with Tansy Rusk at The Jag to begin Cut Your Teeth.",
+  );
+  // Quest guidance: the AVAILABLE next mission authors an offer presentation,
+  // so the quest-giver Talk control glows — derived from projection, never
+  // from a mission-ID conditional.
+  await expect(page.getByRole("button", { name: /Talk to Tansy Rusk/ })).toHaveAttribute(
+    "data-quest-guidance",
+    "true",
   );
 
   const cutter = await db

@@ -1,6 +1,6 @@
 import { eq, and } from "drizzle-orm";
 import { afterEach, beforeAll, describe, expect, it } from "vitest";
-import { ITEM_IDS, LOCATION_IDS } from "@/game/config/foundations";
+import { ITEM_IDS, LOCATION_IDS, MISSION_IDS, NPC_IDS } from "@/game/config/foundations";
 import { cleanupTestUser, createCharacterForUser, createTestUser } from "./fixtures";
 
 const DATABASE_URL = process.env.DATABASE_URL;
@@ -56,13 +56,32 @@ suite("issue #102 Walk It Off persistence and reward boundary (real PostgreSQL)"
       .where(eq(rune.characters.id, characterId));
   }
 
+  function acceptWalkItOffAt(npcId: string) {
+    return (userId: string, characterId: string) =>
+      missions.acceptMission(
+        userId,
+        characterId,
+        MISSION_IDS.walkItOff,
+        npcId,
+        now,
+        deterministicRandom(),
+      );
+  }
+
+  function completeWalkItOffAt(npcId: string) {
+    return (userId: string, characterId: string) =>
+      missions.completeMission(
+        userId,
+        characterId,
+        MISSION_IDS.walkItOff,
+        npcId,
+        now,
+        deterministicRandom(),
+      );
+  }
+
   async function acceptAtCrash(userId: string, characterId: string) {
-    const accepted = await missions.acceptWalkItOff(
-      userId,
-      characterId,
-      now,
-      deterministicRandom(),
-    );
+    const accepted = await acceptWalkItOffAt(NPC_IDS.wadeRusk)(userId, characterId);
     expect(accepted.mission.status).toBe("accepted");
     return accepted;
   }
@@ -93,12 +112,7 @@ suite("issue #102 Walk It Off persistence and reward boundary (real PostgreSQL)"
 
   it("accepts at the stationary Crash Site and keeps NPCs independent of mission persistence", async () => {
     const { userId, character } = await makeCharacter();
-    const preMission = await missions.completeWalkItOff(
-      userId,
-      character.id,
-      now,
-      deterministicRandom(),
-    );
+    const preMission = await completeWalkItOffAt(NPC_IDS.tansyRusk)(userId, character.id);
     expect(preMission.mission).toMatchObject({ status: "refused", reason: "not_accepted" });
     const accepted = await acceptAtCrash(userId, character.id);
     expect(accepted.state.missions[0]).toMatchObject({ state: "active" });
@@ -113,12 +127,7 @@ suite("issue #102 Walk It Off persistence and reward boundary (real PostgreSQL)"
   it("supports the explorer-first route and remote acceptance at The Jag", async () => {
     const { userId, character } = await makeCharacter();
     await move(character.id, LOCATION_IDS.theJag);
-    const accepted = await missions.acceptWalkItOff(
-      userId,
-      character.id,
-      now,
-      deterministicRandom(),
-    );
+    const accepted = await acceptWalkItOffAt(NPC_IDS.tansyRusk)(userId, character.id);
     expect(accepted.mission.status).toBe("accepted");
     expect(accepted.state.missions[0]).toMatchObject({
       state: "ready_for_completion",
@@ -136,15 +145,10 @@ suite("issue #102 Walk It Off persistence and reward boundary (real PostgreSQL)"
     const owner = await makeCharacter();
     const outsider = await makeCharacter();
     await expect(
-      missions.acceptWalkItOff(outsider.userId, owner.character.id, now, deterministicRandom()),
+      acceptWalkItOffAt(NPC_IDS.wadeRusk)(outsider.userId, owner.character.id),
     ).rejects.toThrow(/not found/i);
     const first = await acceptAtCrash(owner.userId, owner.character.id);
-    const second = await missions.acceptWalkItOff(
-      owner.userId,
-      owner.character.id,
-      now,
-      deterministicRandom(),
-    );
+    const second = await acceptWalkItOffAt(NPC_IDS.wadeRusk)(owner.userId, owner.character.id);
     expect(first.mission.status).toBe("accepted");
     expect(second.mission.status).toBe("already_accepted");
   });
@@ -169,12 +173,7 @@ suite("issue #102 Walk It Off persistence and reward boundary (real PostgreSQL)"
       quantity: 1,
     }));
     await db.insert(rune.inventoryStacks).values(eightStacks);
-    const refused = await missions.completeWalkItOff(
-      userId,
-      character.id,
-      now,
-      deterministicRandom(),
-    );
+    const refused = await completeWalkItOffAt(NPC_IDS.tansyRusk)(userId, character.id);
     expect(refused.mission).toMatchObject({
       status: "refused",
       reason: "capacity",
@@ -203,9 +202,11 @@ suite("issue #102 Walk It Off persistence and reward boundary (real PostgreSQL)"
       .where(eq(rune.inventoryStacks.characterId, character.id))
       .limit(1);
     await db.delete(rune.inventoryStacks).where(eq(rune.inventoryStacks.id, oneStack[0]!.id));
-    const completed = await missions.completeWalkItOff(
+    const completed = await missions.completeMission(
       userId,
       character.id,
+      MISSION_IDS.walkItOff,
+      NPC_IDS.tansyRusk,
       new Date(now.getTime() + 1_000),
       deterministicRandom(),
     );
@@ -227,12 +228,7 @@ suite("issue #102 Walk It Off persistence and reward boundary (real PostgreSQL)"
         quantity: 55,
       })),
     );
-    const refused = await missions.completeWalkItOff(
-      userId,
-      character.id,
-      now,
-      deterministicRandom(),
-    );
+    const refused = await completeWalkItOffAt(NPC_IDS.tansyRusk)(userId, character.id);
     expect(refused.mission).toMatchObject({
       status: "refused",
       reason: "capacity",
@@ -259,8 +255,8 @@ suite("issue #102 Walk It Off persistence and reward boundary (real PostgreSQL)"
     await acceptAtCrash(userId, character.id);
     await move(character.id, LOCATION_IDS.theJag);
     const results = await Promise.all([
-      missions.completeWalkItOff(userId, character.id, now, deterministicRandom()),
-      missions.completeWalkItOff(userId, character.id, now, deterministicRandom()),
+      completeWalkItOffAt(NPC_IDS.tansyRusk)(userId, character.id),
+      completeWalkItOffAt(NPC_IDS.tansyRusk)(userId, character.id),
     ]);
     expect(results.map((result) => result.mission.status).sort()).toEqual([
       "already_completed",
@@ -288,8 +284,8 @@ suite("issue #102 Walk It Off persistence and reward boundary (real PostgreSQL)"
     const first = await makeCharacter();
     const second = await makeCharacter();
     const [acceptedFirst, acceptedSecond] = await Promise.all([
-      missions.acceptWalkItOff(first.userId, first.character.id, now, deterministicRandom()),
-      missions.acceptWalkItOff(second.userId, second.character.id, now, deterministicRandom()),
+      acceptWalkItOffAt(NPC_IDS.wadeRusk)(first.userId, first.character.id),
+      acceptWalkItOffAt(NPC_IDS.wadeRusk)(second.userId, second.character.id),
     ]);
     expect(acceptedFirst.mission.status).toBe("accepted");
     expect(acceptedSecond.mission.status).toBe("accepted");

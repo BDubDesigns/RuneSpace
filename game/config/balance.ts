@@ -1,5 +1,11 @@
 import { z } from "zod";
-import { ACTION_IDS, ITEM_IDS, SKILL_IDS, type SkillId } from "@/game/config/foundations";
+import {
+  ACTION_IDS,
+  ITEM_IDS,
+  SKILL_IDS,
+  type ItemId,
+  type SkillId,
+} from "@/game/config/foundations";
 import type { LevelThreshold } from "@/game/domain/progression";
 
 const balanceSchema = z.object({
@@ -247,4 +253,22 @@ const skillLevelCurves = {
 /** The approved level-curve source for a skill, or undefined when none exists. */
 export function skillLevelThresholds(skillId: string): readonly LevelThreshold[] | undefined {
   return skillLevelCurves[skillId as SkillId]?.();
+}
+
+/**
+ * Authoritative per-action output items derived from the effective balance —
+ * the single source of truth for "which gameplay action produces which item".
+ * Mining yields Ferrite Shale; Refining consumes it and yields Refined Ferrite
+ * and Slag. Consumers (mission guidance validation) must read this instead of
+ * duplicating drop/output tables. Actions with no material output have no
+ * entry and resolve to undefined.
+ */
+const actionOutputItemIds: Record<string, readonly ItemId[]> = {
+  [ACTION_IDS.ferriteShaleMining]: [defaults.items.ferriteShale.itemId],
+  [ACTION_IDS.refining]: [defaults.items.refinedFerrite.itemId, defaults.items.slag.itemId],
+};
+
+/** The items an action authoritatively produces, or undefined when it produces none. */
+export function getActionOutputItemIds(actionId: string): readonly ItemId[] | undefined {
+  return actionOutputItemIds[actionId];
 }
