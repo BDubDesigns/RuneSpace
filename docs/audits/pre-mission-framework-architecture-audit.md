@@ -12,11 +12,11 @@
 
 Fresh `main` is **safe to generalize into #114 without a prerequisite blocker issue**. The two production missions prove the same invariants #114 needs to reuse rather than replace: server-authoritative acceptance/completion guarded by a shared character-row lock, timestamp-only persistence with derived state, atomic exactly-once reward commits, deterministic objective projection from live equipment/inventory observations, and SG-ready separation of *requirements satisfied* from *turn-in performable*.
 
-No A-level (blocker) finding survived evidence checks. The most material risks are shaped as two B-level items that #114 should deliberately absorb into its design: making the generic completion transaction explicitly exercise show-vs-consume item semantics through the #112 adapter, and giving dialogue/guidance a single semantic projection contract instead of extending the two parallel routing helpers. Both are ordinary framework work, not reasons to stop and fix something first.
+No A-level (blocker) finding survived evidence checks. The most material risks are shaped as two B-level items — show-vs-consume semantics exercised atomically through the #112 adapter (B1), and a single semantic dialogue/guidance projection contract instead of extending the two parallel routing helpers (B2). Both are already explicitly required by #114 and are ordinary framework implementation work, not reasons to stop and fix something first; they are documented here as implementation risks and focus areas for #114 (see §6 and §8).
 
 The audit also confirms the three "do not rediscover" claims: carried-stack mutation is centralized and missions do not bypass it; mass formatting is canonical through `game/domain/mass.ts`; generic inventory details no longer branch on item IDs. Those slices are strengths to preserve, not debt to report.
 
-**Final recommendation — exactly one:** **(2) Proceed with #114 after specific amendments** (five narrow amendments listed in §8; no separate blocker issue required).
+**Final recommendation — exactly one:** **(1) Proceed with #114 unchanged** — no new amendments; B1 and B2 are documented as important implementation risks and focus areas already explicitly required by #114 (see §6 and §8). No separate blocker issue is required.
 
 ---
 
@@ -183,23 +183,23 @@ Because no finding meets the "demonstrated correctness / server-authority / data
 
 Two findings. Each lists exact files, current behavior, the concrete failure mode or future cost that motivated the severity, relevance to #114, confidence, and the smallest proportionate handling.
 
-### B1 — Consumed-item turn-in has no exercised generic transaction (show vs consume must be born inside #114)
+### B1 — Consumed-item turn-in has no exercised generic transaction (show vs consume must be implemented inside #114)
 
-- **Files:** `server/missions.ts:completeCutYourTeeth` (inspects but never deletes `inventoryStacks`), `server/carried-inventory.ts:consumeStackableItem / applyStackRemovalPlan`, `game/domain/inventory.ts:planExactStackRemoval`, `game/content/missions.ts:MissionReward` (narrow) and absent `MissionObjectiveStep` consumption flag, `game/schemas/gameplay.ts:Accept*/Complete*RequestSchema` (characterId only).
+- **Files:** `server/missions.ts:completeCutYourTeeth` (inspects but never deletes `inventoryStacks`), `server/carried-inventory.ts:consumeStackableItem / applyStackRemovalPlan`, `game/domain/inventory.ts:planExactStackRemoval`, `game/content/missions.ts:MissionReward` (narrow) and current `MissionObjectiveStep` shape, `game/schemas/gameplay.ts:Accept*/Complete*RequestSchema` (characterId only).
 - **What the architecture actually does:** Current authored missions exercise only two effect shapes: grant-one-unique-item (Walk It Off) and grant-Skill-XP-with-zero-consumption (Cut Your Teeth "show shale"). The carried-stack adapter (`consumeStackableItem` — lock `inventoryStacks` ordered `quantity asc, createdAt asc, id asc`, plan all-or-nothing via `planExactStackRemoval`, apply `deletedStackIds/updatedStacks`) is proven by non-mission callers (refining, cargo-hold) but has no mission completion path that consumes in the same transaction as `characterMissions.completedAt` + `grantCharacterSkillXp`.
 - **Concrete risk / future cost if left informal:** A future consumed-item mission that naively deletes `inventoryStacks` without ordering/pinning, without scoping to `characterId`, without planning before mutating, or without keeping the deletion inside the same exactly-once mission transaction could: double-consume under retry, consume the wrong stack kind (non-deterministic order), or partially commit consumption while the `completedAt` guard or XP write rolls back — permanently losing player inventory for no completion.
-- **Why it matters to #114:** The issue explicitly requires both `require N / consume 0` (Cut Your Teeth's current shape) and `require N / consume N` (future hand-in) **without requiring a bespoke mission transaction** (`#114 §Show vs consume`). The framework must declare the intended effect in data (`consumeQuantity`/`consume: true`), re-read and lock `inventoryStacks for update`, call `consumeStackableItem`/`applyStackRemovalPlan` inside the same `withResolvedOwnedCharacter` transaction that stamps completion and rewards, and refuse the whole completion when `missingQuantity > 0` without committing any effect.
+- **#114 status — already explicitly required:** Show vs consume with `require N / consume 0` and `require N / consume N`, atomic consumed-item turn-in through #112 with authoritative revalidation and rollback, and no bespoke mission transaction for ordinary semantics are all explicit requirements of #114 (see #114 §Show vs consume item requirements and acceptance criteria). The gap below is therefore already covered by #114 and is documented here as an implementation focus area, not as a new amendment.
 - **Confidence:** **Proven architectural gap** (current missions do not exercise a consumed path; adjacent systems do). Not speculative — the next ordinary mission would re-derive the same adapter call by hand.
-- **Smallest proportionate recommendation:** In #114 (amendment A3, §8) add a single declarative consumption signal to the carried-stack requirement (e.g. `consume: number` on `carry_stack`, where `0` preserves the current show behavior) and route consumed requirements through `server/carried-inventory.ts:consumeStackableItem` → `applyStackRemovalPlan` atomically with `characterMissions.completedAt` + `grantCharacterSkillXp`. Keep the request schema `characterId`-only; do not accept `consumeQuantity` from the client.
+- **Implementation focus for #114:** Implement the explicitly required declarative consumption signal, re-read and lock `inventoryStacks for update`, use `server/carried-inventory.ts:consumeStackableItem` / `applyStackRemovalPlan` inside the same `withResolvedOwnedCharacter` transaction that stamps completion and rewards, and refuse the whole completion when `missingQuantity > 0` without committing any effect. Keep the request schema `characterId`-only. Representation note — A1's `consume?: number` directly on `carry_stack` is one possible minimal representation; #114 explicitly leaves exact types/names implementation-owned and says not to conflate requirement satisfaction with item consumption. The audit does not lock that exact structure — a separate narrow turn-in/effect representation is equally valid if inspection shows it better preserves separation. Leave the final representation for #114 Checkpoint 0.
 
 ### B2 — Two parallel dialogue/mission-panel routers should become one semantic contract before a third mission is added
 
 - **Files:** `game/content/dialogue.ts:getWalkItOffDialogue / getCutYourTeethActiveDialogue / CUT_YOUR_TEETH_DIALOGUE` (authored sequences) and `features/npc/NpcInteractionPanel.tsx:resolveDialogueForNpc` (semantic routing with explicit `MissionState` + `stage` inputs) alongside `features/missions/MissionObjectivePanel.tsx` (reverse-scan over `state.missions` with `active || available || completedFallback`).
 - **What the architecture actually does:** Both missions' NPC conversations route correctly **without** parsing prose — `NpcInteractionPanel` maps `stage.requirementsSatisfied/turnInAvailable/nextObjectiveKind` to `CUT_YOUR_TEETH_DIALOGUE.equipReminder/stackReminder/busy/turnIn`, and `MissionObjectivePanel` picks `active → available → completedFallback` from the same `MissionProjection` array. The contract is sound, but the routing table is split: Walk It Off keeps its own `getWalkItOffDialogue(wade/tansy, state)` helper, Cut Your Teeth introduces a second `getCutYourTeethActiveDialogue(objective: "equip"|"stack"|"ready"|"busy")`, and the panel duplicates mission ordering. A third ordinary mission would add a third helper unless #114 introduces one generic mapping.
 - **Concrete risk / future cost:** Extending the current two-helper shape without a closed mapping reintroduces the bespoke-per-mission orchestration #114 exists to remove: each mission would invent its own panel-comparer and its own NPC router, string IDs (`walk_it_off`, `cut_your_teeth`) would leak into React, and the "mapping meaningful requirement states to authored dialogue sequences without building a generic boolean-expression language" requirement would be proven by two diverging examples rather than one shared table.
-- **Why it matters to #114:** The issue's dialogue-branching slice says the framework should support `offer → equipReminder → stackReminder → busy → turnIn → completion` as reusable semantic stages, not mission-specific chains (`#114 §Dialogue branching`). #114 also needs to expose guidance targets through the same semantic state (`#114 §Semantic quest guidance`). Unifying now costs one small table; unifying after the third mission costs a migration across three helpers.
-- **Confidence:** **Credible risk** — not a correctness bug today, but directly contradicted by the "migrate and preserve both existing missions away from unnecessary mission-specific orchestration" acceptance criterion.
-- **Smallest proportionate recommendation:** In #114 (amendments A1 and A4, §8) replace the two helpers with a single data-driven table `MissionDefinition.dialogue: { offer?, equipReminder?, stackReminder?, busy?, turnIn?, completion? }` keyed by semantic state, and let `MissionObjectivePanel` + `NpcInteractionPanel` consume `stage` generically (sorted insertion order of `MISSIONS` + `state !== completed` wins — keep the current `active → available` precedence and the explorer-first guard). Do not build a condition DSL; keep the closed `equip_item | carry_stack` next-kind vocabulary.
+- **#114 status — already explicitly required:** A reusable authoritative mission framework that removes shared orchestration and makes a third ordinary mission primarily declarative, semantic dialogue routing without prose parsing or mission-ID chains, and a generic `is this entity/control currently a quest-guidance target?` contract are all explicit requirements of #114. B2 is therefore already covered and is documented here as an implementation focus area, not as a new amendment.
+- **Confidence:** **Credible risk** — not a correctness bug today, but directly contradicted if #114 extended the two-helper shape instead of unifying it.
+- **Implementation focus for #114:** Replace the two helpers with a single data-driven mapping keyed by semantic state (existing `stage` shapes such as `requirementsSatisfied / turnInAvailable / nextObjectiveKind` — one possible minimal shape is a table like `MissionDefinition.dialogue: { offer?, equipReminder?, stackReminder?, busy?, turnIn?, completion? }` handled in §8), and let `MissionObjectivePanel` + `NpcInteractionPanel` consume `stage` generically. §8's prior A4 illustration preserves the closed `equip_item | carry_stack` vocabulary and the generic UI-consumer rule already required by #114; exact shape remains implementation-owned per #114 and is deferred to Checkpoint 0.
 
 ---
 
@@ -221,13 +221,29 @@ No open file handles, no stray network calls, and no repository-wide rename swee
 
 ---
 
-## 8. #114-specific implications / proposed amendments
+## 8. #114-specific implications — already required by #114 (no new amendments)
 
-The findings above do not require a separate issue, but #114 should **incorporate five narrow amendments** before implementation so the framework it ships is the smallest closed vocabulary that still covers both `require N / consume 0` and `require N / consume N` without duplicating authority.
+On re-read of current #114 against the audit evidence, the five items previously labeled "amendments A1-A5" are **already explicitly required by #114**. This section therefore does not propose amendments. It maps the audit's focus areas to the existing #114 requirements and clarifies the one representation choice that must remain implementation-owned.
 
-### Amendment A1 — Keep the declarative shape close to the proven content shape, with one consumption field
+**Correction from the previous draft:** calling an item an "amendment" merely because the audit confirms #114 should implement something #114 already requires was inaccurate. No amendment is proposed. The correct disposition is to document B1 and B2 as important implementation risks and focus areas already covered by #114 and to leave exact type shapes for #114 Checkpoint 0.
 
-Current proven definition (authoritative, do not re-derive — taken from `game/content/missions.ts`):
+The following requirements are already explicitly present in #114 and need no addition:
+
+- show-vs-consume semantics with `require N / consume 0` and `require N / consume N`;
+- atomic consumed-item turn-in through #112 with authoritative revalidation and rollback;
+- ordinary missions not requiring bespoke `acceptSpecificMission` / `completeSpecificMission` / projection / dialogue orchestration;
+- semantic dialogue routing without prose parsing or mission-ID chains;
+- optional authored recommended acquisition interactions separate from requirement truth;
+- validation against authoritative source/output SSOT where practical;
+- no Scavenge auto-highlight merely because it can yield Ferrite Shale;
+- a reusable neon-green quest-guidance visual treatment;
+- a common projected quest-guidance contract consumed generically by UI surfaces.
+
+The audit's contribution is to flag **where implementation risk concentrates** inside those already-required items (B1, B2) and to illustrate — without locking — one minimal shape consistent with current repository conventions. #114 explicitly states that exact types/names are implementation-owned after inspection and that requirement satisfaction must not be conflated with item consumption; the final representation is therefore deferred to #114 Checkpoint 0.
+
+### Focus area 1 — Declarative requirement/effect vocabulary (illustrative, not prescriptive)
+
+Current proven definition (authoritative, taken from `game/content/missions.ts`):
 
 ```ts
 MissionDefinition {
@@ -240,51 +256,52 @@ MissionDefinition {
 }
 ```
 
-Add exactly one field to the `carry_stack` step so the show/consume distinction is data, not branching code:
+Requirement satisfaction (does the character currently meet the objective?) and item consumption (does the turn-in hand items in?) must remain separable — #114 says not to conflate them. One possible minimal representation that preserves that separation is a `consume` signal alongside `carry_stack`:
 
 ```ts
+// One possible shape — not locked by this audit:
 carry_stack {
   itemId: ItemId
   quantity?: number        // undefined → canonical stackLimit from getItemDefinition
-  consume?: number         // ← amendment: 0 = show (default), N = consume N at turn-in
+  consume?: number         // illustration only: 0 = show (default), N = consume N at turn-in
   template: string
 }
 ```
 
-`consume: undefined` should default to `0` for current Cut Your Teeth (preserves "you keep the shale" presentation). A third mission's `consume: 10` then becomes the first exercised consumed path through B1.
+An equally valid alternative that repository evidence does not rule out is a separate narrow turn-in/effect representation (for example, a `turnIn: { consume?: { itemId, quantity }[] }` or similar small effect table) that keeps consumption out of the satisfaction predicate entirely. The audit does not have evidence that one is superior to the other in this codebase. #114 Checkpoint 0 should choose after inspecting current domain/transaction boundaries and naming the trade-off. Either way, `consume` defaults to show-only for Cut Your Teeth (preserves "you keep the shale" presentation) and a third mission's consumed path becomes the first exercised consumed turn-in through B1. Keep `reward` and `prerequisiteMissionId` as the narrow closed vocabulary — no generic effect script.
 
-Keep `reward` and `prerequisiteMissionId` exactly as they are — no generic effect script, credits, reputation, or random-reward vocabulary.
+### Focus area 2 — Preserve SSOT for stack quantity; keep recommendations separate and validated
 
-### Amendment A2 — Preserve SSOT for stack quantity and make the framework validate recommendations separately
-
-`quantity` omitted already means "canonical full stack via `getItemDefinition().stackLimit`" (`game/domain/missions.ts:requiredQuantity`). #114 should keep that as the single source for *what* the player needs. Separately introduce the guidance recommendation the issue describes:
+Already required by #114 and proven by current code: `quantity` omitted means "canonical full stack via `getItemDefinition().stackLimit`" (`game/domain/missions.ts:requiredQuantity`). That stays the single source for *what* the player needs. The recommended/intended acquisition path is the separate, already-required authored signal:
 
 ```ts
+// One possible shape — exact name remains implementation-owned:
 MissionDefinition {
   objectiveSteps: [...]
-  guidance?: { recommendedActionId?: ActionId }  // e.g. ferret_shale_mining, refining
+  guidance?: { recommendedActionId?: ActionId }  // e.g. ferrite_shale_mining, refining
 }
 ```
 
-Validate against the authoritative drop/output SSOT at startup (mining's output is `ferriteShale`; refining's inputs/outputs are `ferriteShale → refinedFerrite/slag`) — do not duplicate drop tables inside mission content, and do not auto-highlight every technically valid source (no highlighting Scavenge merely because it can yield shale).
+Where practical, validate the recommendation against the authoritative drop/output SSOT at startup (Mining outputs `ferriteShale`; Refining consumes `ferriteShale` → outputs `refinedFerrite`/`slag`) — already required by #114 — and do not duplicate drop tables inside mission content. Do not auto-highlight every technically valid source; Scavenge must not glow merely because it can yield shale (explicit #114 requirement).
 
-### Amendment A3 — One generic completion transaction that exercises show-vs-consume atomically (addresses B1)
+### Focus area 3 — One generic completion path that exercises show-vs-consume atomically (B1 — already required)
 
-Current code keeps two bespoke completions (`server/missions.ts:completeWalkItOff`, `completeCutYourTeeth`) each with their own prerequisite/location/equipment/capacity logic and bespoke reward write (unique item insert vs `grantCharacterSkillXp`). #114 should replace that duplication with one generic `completeMission(missionId, characterId)` that, inside the existing `withResolvedOwnedCharacter` character lock:
+Already required by #114: ordinary missions must not require a bespoke mission transaction; consumed stackables must use #112's authoritative inventory boundary and commit atomically with mission completion/rewards; concurrent first-completions must not duplicate completion, rewards, or consumed items. Current code keeps two bespoke completions (`server/missions.ts:completeWalkItOff`, `completeCutYourTeeth`) with their own prerequisite/location/equipment/capacity checks. #114's already-required generic path — illustrated here without prescribing names — should, inside the existing `withResolvedOwnedCharacter` character lock:
 
-1. Re-reads and re-locks `characterMissions`, `characters.currentLocationId`, `equippedItems`, `inventoryStacks for update`.
-2. Re-checks **prerequisite** (if any) + **stationary** (`context.action === undefined` + `currentLocationId === relevantLocationId`) + every `objectiveSteps` satisfaction against the live `MissionObservation`.
-3. For `carry_stack` steps where `consume > 0`, calls `server/carried-inventory.ts:consumeStackableItem` (or `planExactStackRemoval` + `applyStackRemovalPlan` if batching multiple consumes) — all inside the same transaction. On `ok:false` (insufficient quantity), refuse `insufficient_items` without committing any mutation — mission stays uncompleted and rewards are not granted.
-4. Stamps `characterMissions.completedAt where isNull(completedAt)` and applies every `MissionReward` through its proven single boundary (`grantCharacterSkillXp` for `skill_xp`; Cutter-style unique-item insertion through `planUniqueItemAddition` + `itemInstances insert` for `item` rewards) — both succeed together or both roll back.
-5. Serializes concurrent first-completions exactly as today: character-row lock + `isNull(completedAt)` guard → second request observes `already_completed` with exactly-once reward/consumption.
+1. Re-read and re-lock `characterMissions`, `characters.currentLocationId`, `equippedItems`, `inventoryStacks for update`.
+2. Re-check **prerequisite** (if any) + **stationary** (`context.action === undefined` + `currentLocationId === relevantLocationId`) + every `objectiveSteps` satisfaction against the live `MissionObservation`.
+3. For requirements whose authored effect is to consume, call `server/carried-inventory.ts:consumeStackableItem` (or `planExactStackRemoval` + `applyStackRemovalPlan` if batching) — all inside the same transaction. On `ok:false` (`missingQuantity > 0`), refuse `insufficient_items` without committing any mutation.
+4. Stamp `characterMissions.completedAt where isNull(completedAt)` and apply every `MissionReward` through its proven single boundary (`grantCharacterSkillXp` for `skill_xp`; Cutter-style unique-item insertion through `planUniqueItemAddition` + `itemInstances insert` for `item`) — both succeed together or both roll back.
+5. Serialize concurrent first-completions exactly as today: character-row lock + `isNull(completedAt)` guard → second request observes `already_completed` with exactly-once reward/consumption.
 
-No new idempotency table, no `completedAt` double-write, and no bypass of the #112 adapter. Synthetic/test missions may exercise `consume > 0` in integration tests; do not add a fake player-visible production quest solely for coverage.
+No new idempotency table and no bypass of the #112 adapter. Synthetic/test missions may exercise consumed-item semantics in integration tests; #114 already says not to add a fake player-visible production quest solely for coverage.
 
-### Amendment A4 — Unify dialogue routing and guidance projection behind the same semantic `stage` (addresses B2)
+### Focus area 4 — Unify dialogue routing and guidance projection behind the same semantic `stage` (B2 — already required)
 
-Replace `getWalkItOffDialogue` + `getCutYourTeethActiveDialogue` with one mapping that keeps authored sequences as content and uses `stage` as the router. Suggested minimal addition:
+Already required by #114: dialogue branching maps semantic mission state to authored sequences without widespread mission-ID/prose checks, and the framework projects reusable quest-guidance targets consumed through a common contract. Replace `getWalkItOffDialogue` + `getCutYourTeethActiveDialogue` with one mapping that keeps authored sequences as content and uses `stage` as the router. One possible minimal illustration (exact shape implementation-owned, deferred to Checkpoint 0):
 
 ```ts
+// Illustrative only — not locked:
 MissionDefinition {
   dialogue: {
     offer?: DialogueId                // prerequisite-satisfied + not_accepted at relevant NPC
@@ -295,29 +312,29 @@ MissionDefinition {
     completion?: DialogueId           // state === "completed" or turn-in success override
   }
   guidance?: { recommendedActionId?: ActionId }
-  // turnIn: actionLabel ("Claim Cutter" / "SHOW SHALE") stays on the authored sequence
 }
 ```
 
-Projection adds one stable semantic surface #114's UI surfaces consume instead of mission-ID checks:
+Projection adds one stable semantic surface #114 already requires UI to consume instead of mission-ID checks:
 
 ```ts
+// Illustrative only — not locked:
 MissionProjection {
   // existing: missionId, title, summary, state, currentObjective, offeringNpcId, completionNpcId,
   //           prerequisiteSatisfied, offeringNpcName, availableObjective, stage
   guidanceTargets?: {
-    npcId?: NpcId                              // Talk target while active
-    equipmentItemId?: ItemId                   // e.g. Salvage Cutter while equip_item unmet
-    actionId?: ActionId                        // recommended Mining/Refining while carry_stack unmet and matching
+    npcId?: NpcId
+    equipmentItemId?: ItemId
+    actionId?: ActionId
   }
 }
 ```
 
-`NpcInteractionPanel.resolveDialogueForNpc` then becomes `stage → dialogueId` generically, `MissionObjectivePanel` keeps its `active → available → completedFallback` precedence but derived from sorted `MISSIONS`, and each consumer (NPC Talk button, Equipment affordance, Mining/Refining Start controls) reads `isQuestGuidanceTarget(entityId)` as a common question — precisely the contract `#114 §UI consumer rule` asks for. Do not implement an arbitrary boolean-expression DSL; the closed `equip_item | carry_stack` next-kind already spans the proven branches.
+`NpcInteractionPanel.resolveDialogueForNpc` then becomes `stage → dialogueId` generically, `MissionObjectivePanel` keeps its `active → available → completedFallback` precedence but derived from sorted `MISSIONS`, and each consumer (NPC Talk button, Equipment affordance, Mining/Refining Start controls) reads `isQuestGuidanceTarget(entityId)` as a common question — the contract #114 §UI consumer rule already requires. No arbitrary boolean-expression DSL; the closed `equip_item | carry_stack` next-kind already spans the proven branches. Final names/shapes remain for #114 Checkpoint 0.
 
-### Amendment A5 — Adopt the closed guidance style token once, not per component
+### Focus area 5 — Reusable neon-green quest-guidance treatment (already required)
 
-Introduce one neon-green quest-guidance token (outline/border + text + restrained glow — custom property under `app/globals.css`, reusing the existing `--rs-*` convention from `docs/design-system.md`) and a shared `QuestGuidance` primitive. Let `InventoryPanel`, `EquipmentPanel`, `NpcInteractionPanel`, `MiningConsole`/`RefiningConsole` apply that primitive from projected `guidanceTargets` rather than hardcoding per-component green classes or mission-ID conditionals. Respect `prefers-reduced-motion`; do not animate the glow.
+Already required by #114: a distinct high-contrast neon-green treatment (outline/border, text where appropriate, restrained glow) that remains legible over dark/industrial backgrounds, with a shared token/component convention rather than ad-hoc green classes per component. One possible minimal placement is a custom property under `app/globals.css` (existing `--rs-*` convention from `docs/design-system.md`) and a shared `QuestGuidance` primitive consumed by `InventoryPanel`, `EquipmentPanel`, `NpcInteractionPanel`, `MiningConsole`/`RefiningConsole` from projected `guidanceTargets`. Respect `prefers-reduced-motion`; do not animate the glow. Exact token value remains implementation-owned.
 
 ---
 
@@ -358,17 +375,11 @@ These are framed as new tests #114 must add when its generic transaction ships, 
 
 ## 10. Final recommendation — exactly one
 
-### Proceed with #114 after specific amendments
+### (1) Proceed with #114 unchanged
 
-No separate A-level blocker issue is required. Incorporate the five amendments in §8 into #114 before implementation begins, then use Walk It Off and Cut Your Teeth as the migration proof cases for the resulting generic completion + guidance projection. The amendments are the minimum that give #114 the `require/consume` signal it explicitly needs, the single guidance contract it promises as a consumer rule, and the dialogue mapping that keeps its "small closed union" authentically small:
+No separate A-level blocker issue is required, and **no new amendment to #114 is proposed**. B1 (show-vs-consume atomically through #112) and B2 (single semantic dialogue/guidance contract) are documented as important implementation risks and focus areas already explicitly required by #114; §8 maps them to those existing requirements and clarifies that exact representation choices (including whether consumption lives on `carry_stack` or in a separate narrow turn-in/effect table) remain implementation-owned for #114 Checkpoint 0. Use Walk It Off and Cut Your Teeth as the migration proof cases for the resulting generic completion + guidance projection.
 
-1. **A1** — keep `MissionDefinition` close to today's proven shape with `consume?: number` on `carry_stack`.
-2. **A2** — keep `quantity` resolution from `getItemDefinition().stackLimit` and add `guidance.recommendedActionId` validated against the authoritative drop/output SSOT.
-3. **A3** — ship one generic `completeMission` transaction that atomically consumes via `server/carried-inventory.ts` together with completion + rewards (`characterId`-only schema; no client-supplied quantities).
-4. **A4** — unify dialogue routing and guidance projection behind the existing semantic `stage` + a small declarative table; remove the two-helper split.
-5. **A5** — introduce one reusable neon-green quest-guidance token/primitive consumed by NPC/equipment/action surfaces without mission-ID conditionals.
-
-Do not add a generic scripting language, event-bus, per-step ledger, or random-reward machinery to satisfy these — the closed set `location, npc, equip_item, carry_stack(require/consume), item-reward, skill_xp-reward, guidance(npc/equipment/action)` already spans the proven production behavior and the explicitly foreseen third-mission hand-in.
+**What §8 is now:** not an amendment list, but an illustration — without locking — of one minimal shape consistent with current repository conventions for each already-required requirement, including the trade-off note that requirement satisfaction vs consumption separation must be preserved. The closed set `location, npc, equip_item, carry_stack(require/consume), item-reward, skill_xp-reward, guidance(npc/equipment/action)` already spans the proven production behavior and the explicitly foreseen third-mission hand-in, and no generic scripting language, event-bus, per-step ledger, or random-reward machinery is proposed.
 
 ---
 
