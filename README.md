@@ -119,6 +119,8 @@ Read these before contributing:
 - [`docs/game-rules.md`](./docs/game-rules.md) — current design direction.
 - [`docs/gameplay-foundations.md`](./docs/gameplay-foundations.md) —
   server-authoritative timing, progression, inventory, and action contracts.
+- [`docs/missions.md`](./docs/missions.md) — declarative mission framework
+  and authoring contract (single-phase, server-authoritative).
 - [`docs/component-boundaries.md`](./docs/component-boundaries.md) — extraction
   rules.
 - [`docs/testing-strategy.md`](./docs/testing-strategy.md) — risk-based testing.
