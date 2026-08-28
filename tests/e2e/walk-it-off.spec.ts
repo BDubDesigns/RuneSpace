@@ -78,6 +78,12 @@ test("walks from Wade to Tansy, presents approved dialogue, and claims one carri
     "data-npc-turn-in",
     "false",
   );
+  // Quest guidance: brand-new character at Crash Site — Wade's Talk
+  // control receives the quest-available (blue) treatment.
+  await expect(page.getByRole("button", { name: /Talk to Wade Rusk/ })).toHaveAttribute(
+    "data-quest-guidance",
+    "available",
+  );
   await page.getByRole("button", { name: /Talk to Wade Rusk/ }).click();
   const dialogue = page.getByRole("dialog", { name: "Wade Rusk dialogue" });
   await expect(dialogue).toBeVisible();
@@ -106,14 +112,6 @@ test("walks from Wade to Tansy, presents approved dialogue, and claims one carri
   await dialogue.getByRole("button", { name: "Accept mission" }).click();
   await expect(dialogue).toBeHidden();
   await expect(page.locator("[data-mission-objective]")).toContainText("Travel to The Jag");
-
-  // Quest guidance: brand-new character at Crash Site — Wade's Talk
-  // control receives the quest-available (blue) treatment for the authored
-  // offer at this location.
-  await expect(page.getByRole("button", { name: /Talk to Wade Rusk/ })).toHaveAttribute(
-    "data-quest-guidance",
-    "available",
-  );
 
   await page
     .getByRole("button", { name: /The Long Scramble/ })

@@ -50,7 +50,7 @@ export function VisualTile({
   const rootProps = {
     "aria-describedby": accessibleDescription ? descriptionId : undefined,
     "aria-label": accessibleLabel,
-    "data-quest-guidance": questGuidance ? "true" : undefined,
+    "data-quest-guidance": questGuidance ? "active" : undefined,
     className: rootClassName,
   };
   const content = (

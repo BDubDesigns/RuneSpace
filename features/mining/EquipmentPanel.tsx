@@ -193,7 +193,9 @@ export function EquipmentPanel({
                           : undefined
                       }
                       data-quest-guidance={
-                        questGuidanceTargets.equipmentItemIds.has(item.itemId) ? "true" : undefined
+                        questGuidanceTargets.equipmentItemIds.has(item.itemId)
+                          ? "active"
+                          : undefined
                       }
                       disabled={foregroundBusy}
                       intent="mining"

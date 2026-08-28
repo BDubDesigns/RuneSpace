@@ -221,7 +221,7 @@ export function RefiningConsole() {
         ) : (
           <ActionButton
             className={startRefiningGuided ? "rs-quest-guidance" : undefined}
-            data-quest-guidance={startRefiningGuided ? "true" : undefined}
+            data-quest-guidance={startRefiningGuided ? "active" : undefined}
             intent="mining"
             loading={foregroundBusy && pendingCommand === "start"}
             onClick={() => runForeground("start", startRefiningAction)}

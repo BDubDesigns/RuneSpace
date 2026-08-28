@@ -373,7 +373,7 @@ export function MiningConsole({ characterName }: { characterName: string }) {
                 ) : (
                   <ActionButton
                     className={startMiningGuided ? "rs-quest-guidance" : undefined}
-                    data-quest-guidance={startMiningGuided ? "true" : undefined}
+                    data-quest-guidance={startMiningGuided ? "active" : undefined}
                     intent="mining"
                     loading={foregroundBusy && pendingCommand === "start"}
                     onClick={() => runForeground("start", startMiningAction)}
