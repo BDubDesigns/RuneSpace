@@ -94,6 +94,13 @@
   --rs-quest-guidance-color: #3dff9e;
   --rs-quest-guidance-glow: rgb(61 255 158 / 0.35);
   --rs-quest-guidance-inset-glow: rgb(61 255 158 / 0.18);
+  /* Quest-available: blue/cyan sibling to the neon-green active treatment.
+     Same shared-class approach — available guides "new quest here", active
+     guides "this advances the quest you accepted". Distinct hue, same
+     static treatment (no animation). */
+  --rs-quest-available-color: #4db8ff;
+  --rs-quest-available-glow: rgb(77 184 255 / 0.35);
+  --rs-quest-available-inset-glow: rgb(77 184 255 / 0.18);
   /* Translucent scrim behind the Inventory/Equipment modal. Derived from the
      page surface via color-mix so the page colour stays the single source of
      truth. The slash-opacity modifier cannot alpha a hex CSS variable, so the
@@ -202,6 +209,48 @@ body {
    shadows included), so their guidance switches to an inset ring + glow that
    survives clip-path. */
 .rs-bevel.rs-quest-guidance {
+  box-shadow:
+    inset 0 0 0 2px var(--rs-quest-guidance-color),
+    inset 0 0 16px var(--rs-quest-guidance-inset-glow);
+  outline: none;
+}
+
+/*
+ * Quest-available treatment. Blue/cyan sibling to the neon-green active
+ * treatment: "there is a new quest here" vs "this advances the quest you
+ * accepted". Same token/shared-class approach, same static treatment (no
+ * animation), clearly distinct hue. If an interaction ever qualifies for
+ * both, active green wins (see .rs-quest-available.rs-quest-guidance below
+ * and the React priority logic).
+ */
+.rs-quest-available {
+  border-color: var(--rs-quest-available-color);
+  box-shadow: 0 0 12px var(--rs-quest-available-glow);
+  color: var(--rs-quest-available-color);
+  outline: 2px solid var(--rs-quest-available-color);
+  outline-offset: 2px;
+}
+
+.rs-bevel.rs-quest-available {
+  box-shadow:
+    inset 0 0 0 2px var(--rs-quest-available-color),
+    inset 0 0 16px var(--rs-quest-available-inset-glow);
+  outline: none;
+}
+
+/* If both ever apply, active green wins visually. React also enforces this
+   so only one class is normally present, but CSS guarantees it too. */
+.rs-quest-available.rs-quest-guidance,
+.rs-quest-guidance.rs-quest-available {
+  border-color: var(--rs-quest-guidance-color);
+  box-shadow: 0 0 12px var(--rs-quest-guidance-glow);
+  color: var(--rs-quest-guidance-color);
+  outline: 2px solid var(--rs-quest-guidance-color);
+  outline-offset: 2px;
+}
+
+.rs-bevel.rs-quest-available.rs-quest-guidance,
+.rs-bevel.rs-quest-guidance.rs-quest-available {
   box-shadow:
     inset 0 0 0 2px var(--rs-quest-guidance-color),
     inset 0 0 16px var(--rs-quest-guidance-inset-glow);

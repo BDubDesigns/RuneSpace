@@ -107,9 +107,13 @@ test("walks from Wade to Tansy, presents approved dialogue, and claims one carri
   await expect(dialogue).toBeHidden();
   await expect(page.locator("[data-mission-objective]")).toContainText("Travel to The Jag");
 
-  // Quest guidance: Walk It Off is explorer-first (no authored availability
-  // glow) and Wade's offer NPC is not the current required interaction.
-  await expect(page.locator("[data-quest-guidance]")).toHaveCount(0);
+  // Quest guidance: brand-new character at Crash Site — Wade's Talk
+  // control receives the quest-available (blue) treatment for the authored
+  // offer at this location.
+  await expect(page.getByRole("button", { name: /Talk to Wade Rusk/ })).toHaveAttribute(
+    "data-quest-guidance",
+    "available",
+  );
 
   await page
     .getByRole("button", { name: /The Long Scramble/ })
@@ -135,10 +139,11 @@ test("walks from Wade to Tansy, presents approved dialogue, and claims one carri
     "data-npc-turn-in",
     "true",
   );
-  // Quest guidance: the required NPC interaction now receives the treatment.
+  // Quest guidance: the required NPC interaction now receives the active
+  // (green) treatment.
   await expect(page.getByRole("button", { name: /Talk to Tansy Rusk/ })).toHaveAttribute(
     "data-quest-guidance",
-    "true",
+    "active",
   );
   await page.emulateMedia({ reducedMotion: "reduce" });
   await page.getByRole("button", { name: /Talk to Tansy Rusk/ }).click();
@@ -182,11 +187,11 @@ test("walks from Wade to Tansy, presents approved dialogue, and claims one carri
     "Speak with Tansy Rusk at The Jag to begin Cut Your Teeth.",
   );
   // Quest guidance: the AVAILABLE next mission authors an offer presentation,
-  // so the quest-giver Talk control glows — derived from projection, never
-  // from a mission-ID conditional.
+  // so the quest-giver Talk control glows available (blue) — derived from
+  // projection, never from a mission-ID conditional.
   await expect(page.getByRole("button", { name: /Talk to Tansy Rusk/ })).toHaveAttribute(
     "data-quest-guidance",
-    "true",
+    "available",
   );
 
   const cutter = await db

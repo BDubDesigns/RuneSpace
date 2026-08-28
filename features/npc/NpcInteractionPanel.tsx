@@ -47,7 +47,21 @@ export function NpcInteractionPanel() {
   const sequence = sequenceOverride ? getDialogue(sequenceOverride) : baseSequence;
   const dialogueNpc = sequence ? getNpc(sequence.npcId) : npc;
   const guidance = deriveQuestGuidanceTargets(state.missions);
-  const questGuidance = npc ? guidance.npcIds.has(npc.id) : false;
+  // Available (blue) vs active (green) — distinct semantic sets. If the
+  // same NPC is ever in both (e.g. offers a new quest while also being the
+  // turn-in for an active one), active green wins.
+  const hasActiveGuidance = npc ? guidance.npcIds.has(npc.id) : false;
+  const hasAvailableGuidance = npc ? guidance.availableNpcIds.has(npc.id) : false;
+  const guidanceClass = hasActiveGuidance
+    ? "rs-quest-guidance"
+    : hasAvailableGuidance
+      ? "rs-quest-available"
+      : undefined;
+  const guidanceValue = hasActiveGuidance
+    ? "active"
+    : hasAvailableGuidance
+      ? "available"
+      : undefined;
   if (!npc || !sequence || !dialogueNpc) return null;
   const dialogue = sequence;
   const npcId = npc.id;
@@ -165,9 +179,9 @@ export function NpcInteractionPanel() {
             <p className="mt-1 text-sm text-[color:var(--rs-text-secondary)]">{npc.role}</p>
           </div>
           <ActionButton
-            className={questGuidance ? "rs-quest-guidance" : undefined}
+            className={guidanceClass}
             data-npc-turn-in={turnInAvailable ? "true" : "false"}
-            data-quest-guidance={questGuidance ? "true" : undefined}
+            data-quest-guidance={guidanceValue}
             ref={triggerRef}
             disabled={foregroundBusy}
             intent={turnInAvailable ? "mission" : "secondary"}

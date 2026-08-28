@@ -44,6 +44,15 @@ export type MissionGuidance = {
   equipmentItemId?: string;
   /** The authored recommended acquisition action for the first unmet carried requirement. */
   actionId?: string;
+  /**
+   * The NPC(s) whose authored offer interaction is currently a quest-
+   * availability target: every offer whose location matches the player's
+   * current location for a mission that is not yet accepted, its
+   * prerequisite satisfied, and not completed. Availability guides NPC
+   * interactions only; advancement after acceptance guides NPC/equipment/
+   * action progression.
+   */
+  availableNpcIds?: readonly string[];
 };
 
 export type MissionProjection = {
@@ -215,12 +224,12 @@ function deriveGuidance(
 ): MissionGuidance | undefined {
   if (state === "completed") return undefined;
   if (state === "not_accepted") {
-    // Only missions that deliberately author an available-state presentation
-    // guide the player toward their quest giver (explorer-first missions like
-    // Walk It Off author none).
-    if (!definition.availableObjective || !prerequisiteSatisfied) return undefined;
-    const offer = definition.offers[0];
-    return offer ? { npcId: offer.npcId } : undefined;
+    if (!prerequisiteSatisfied) return undefined;
+    const availableNpcIds = definition.offers
+      .filter((offer) => offer.locationId === currentLocationId)
+      .map((offer) => offer.npcId);
+    if (availableNpcIds.length === 0) return undefined;
+    return { availableNpcIds };
   }
   const firstUnsatisfied = firstUnsatisfiedRequirement(definition, currentLocationId, observation);
   if (!firstUnsatisfied) {
@@ -289,9 +298,15 @@ export function projectMission(
 /**
  * The union of currently projected quest-guidance targets across all missions.
  * UI surfaces consume this single derived set instead of inspecting mission
- * state themselves.
+ * state themselves. `availableNpcIds` (blue) and `npcIds` (green) are
+ * semantically distinct: a consumer can tell "new quest here" from "this
+ * interaction advances the quest you accepted" without inferring intent
+ * from mission state, dialogue IDs, or colours.
  */
 export type QuestGuidanceTargets = {
+  /** NPC(s) whose authored offer is currently a quest-availability target. */
+  availableNpcIds: ReadonlySet<string>;
+  /** NPC(s) whose interaction advances/completes an accepted quest. */
   npcIds: ReadonlySet<string>;
   equipmentItemIds: ReadonlySet<string>;
   actionIds: ReadonlySet<string>;
@@ -300,16 +315,20 @@ export type QuestGuidanceTargets = {
 export function deriveQuestGuidanceTargets(
   projections: readonly MissionProjection[],
 ): QuestGuidanceTargets {
+  const availableNpcIds = new Set<string>();
   const npcIds = new Set<string>();
   const equipmentItemIds = new Set<string>();
   const actionIds = new Set<string>();
   for (const projection of projections) {
+    if (projection.guidance?.availableNpcIds) {
+      for (const id of projection.guidance.availableNpcIds) availableNpcIds.add(id);
+    }
     if (projection.guidance?.npcId) npcIds.add(projection.guidance.npcId);
     if (projection.guidance?.equipmentItemId)
       equipmentItemIds.add(projection.guidance.equipmentItemId);
     if (projection.guidance?.actionId) actionIds.add(projection.guidance.actionId);
   }
-  return { npcIds, equipmentItemIds, actionIds };
+  return { availableNpcIds, npcIds, equipmentItemIds, actionIds };
 }
 
 /**

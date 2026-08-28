@@ -333,11 +333,11 @@ describe("issue #124 semantic quest guidance projection", () => {
     }
   });
 
-  it("does not guide toward an unmet mission that has not authored availability (explorer-first)", () => {
-    // Walk It Off authors no availableObjective: even when its prerequisite is
-    // trivially satisfied, it must not glow as an NPC guidance target before
-    // acceptance.
-    const projection = projectMission(
+  it("guides toward an available mission via its authored offers without requiring availableObjective", () => {
+    // Walk It Off has no availableObjective (explorer-first). Availability is
+    // still projected from every authored offer at the current location, not
+    // from objective copy.
+    const atCrashSite = projectMission(
       WALK_IT_OFF,
       undefined,
       CRASH_SITE,
@@ -345,8 +345,16 @@ describe("issue #124 semantic quest guidance projection", () => {
       observation(),
       true,
     );
-    const targets = deriveQuestGuidanceTargets([projection]);
-    expect([...targets.npcIds]).toEqual([]);
+    const atTheJag = projectMission(WALK_IT_OFF, undefined, THE_JAG, true, observation(), true);
+    expect([...deriveQuestGuidanceTargets([atCrashSite]).availableNpcIds]).toEqual([
+      NPC_IDS.wadeRusk,
+    ]);
+    expect([...deriveQuestGuidanceTargets([atTheJag]).availableNpcIds]).toEqual([
+      NPC_IDS.tansyRusk,
+    ]);
+    // No active NPC guidance before acceptance.
+    expect([...deriveQuestGuidanceTargets([atCrashSite]).npcIds]).toEqual([]);
+    expect(WALK_IT_OFF.availableObjective).toBeUndefined();
   });
 });
 

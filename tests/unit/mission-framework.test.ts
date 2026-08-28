@@ -16,8 +16,17 @@ import { getActionOutputItemIds } from "@/game/domain/action-outputs";
 import { miningAwardFacts } from "@/game/domain/mining";
 import { refiningAwardFacts } from "@/game/domain/refining";
 import { asContentId, type ContentId } from "@/game/schemas/ids";
-import { MISSIONS, WALK_IT_OFF, type MissionDefinition } from "@/game/content/missions";
-import { validateMissionDefinitions } from "@/game/domain/missions";
+import {
+  CUT_YOUR_TEETH,
+  MISSIONS,
+  WALK_IT_OFF,
+  type MissionDefinition,
+} from "@/game/content/missions";
+import {
+  deriveQuestGuidanceTargets,
+  projectMission,
+  validateMissionDefinitions,
+} from "@/game/domain/missions";
 import { AcceptMissionRequestSchema, CompleteMissionRequestSchema } from "@/game/schemas/gameplay";
 
 function definitionOf(overrides: Partial<MissionDefinition>): MissionDefinition {
@@ -252,5 +261,94 @@ describe("issue #124 generic UI consumers", () => {
     }
     scan(featuresRoot);
     expect(offenders).toEqual([]);
+  });
+});
+
+describe("quest-available vs quest-active guidance (preview correction)", () => {
+  it("projects every authored offer location for a brand-new character without requiring availableObjective", () => {
+    const atCrashSite = projectMission(WALK_IT_OFF, undefined, LOCATION_IDS.crashSite, true);
+    const atTheJag = projectMission(WALK_IT_OFF, undefined, LOCATION_IDS.theJag, true);
+    expect(atCrashSite.guidance?.availableNpcIds).toEqual([NPC_IDS.wadeRusk]);
+    expect(atTheJag.guidance?.availableNpcIds).toEqual([NPC_IDS.tansyRusk]);
+    expect(atCrashSite.guidance?.npcId).toBeUndefined();
+    expect(atTheJag.guidance?.npcId).toBeUndefined();
+    expect(WALK_IT_OFF.availableObjective).toBeUndefined();
+    expect(atCrashSite.availableObjective).toBeUndefined();
+  });
+
+  it("does not advertise a prerequisite-gated mission until the prerequisite is satisfied", () => {
+    const locked = projectMission(
+      CUT_YOUR_TEETH,
+      undefined,
+      LOCATION_IDS.theJag,
+      true,
+      undefined,
+      false,
+    );
+    expect(locked.guidance?.availableNpcIds).toBeUndefined();
+    const available = projectMission(
+      CUT_YOUR_TEETH,
+      undefined,
+      LOCATION_IDS.theJag,
+      true,
+      undefined,
+      true,
+    );
+    expect(available.guidance?.availableNpcIds).toEqual([NPC_IDS.tansyRusk]);
+  });
+
+  it("removes available guidance once the mission is accepted and shows active progression", () => {
+    const accepted = { acceptedAt: new Date("2026-01-01T00:00:00.000Z") };
+    const activeAtCrashSite = projectMission(WALK_IT_OFF, accepted, LOCATION_IDS.crashSite, true);
+    expect(activeAtCrashSite.guidance?.availableNpcIds).toBeUndefined();
+    const activeAtTheJag = projectMission(WALK_IT_OFF, accepted, LOCATION_IDS.theJag, true);
+    const targets = deriveQuestGuidanceTargets([activeAtTheJag]);
+    expect([...targets.npcIds]).toEqual([NPC_IDS.tansyRusk]);
+    expect([...targets.availableNpcIds]).toEqual([]);
+  });
+
+  it("keeps available and active guidance semantically distinct with active winning on overlap", () => {
+    const overlap = deriveQuestGuidanceTargets([
+      { guidance: { availableNpcIds: ["tansy_rusk"], npcId: "tansy_rusk" } } as any,
+    ]);
+    expect([...overlap.availableNpcIds]).toEqual(["tansy_rusk"]);
+    expect([...overlap.npcIds]).toEqual(["tansy_rusk"]);
+  });
+
+  it("derives available guidance from every matching offer, not just the first", () => {
+    const multiOffer: any = {
+      id: "synthetic_multi_offer" as ContentId,
+      title: "Synthetic",
+      summary: "Test",
+      offers: [
+        {
+          npcId: NPC_IDS.wadeRusk,
+          locationId: LOCATION_IDS.crashSite,
+          dialogueId: DIALOGUE_IDS.wadeOffer,
+        },
+        {
+          npcId: NPC_IDS.tansyRusk,
+          locationId: LOCATION_IDS.theJag,
+          dialogueId: DIALOGUE_IDS.tansyBeforeMission,
+        },
+      ],
+      requirements: [{ kind: "at_location", locationId: LOCATION_IDS.theJag, objective: "Go" }],
+      turnIn: {
+        npcId: NPC_IDS.tansyRusk,
+        locationId: LOCATION_IDS.theJag,
+        requiresStationary: true,
+        objective: "Talk",
+        dialogueId: DIALOGUE_IDS.tansyCompletion,
+      },
+      reward: { kind: "skill_xp", skillId: SKILL_IDS.mining, amount: 10 },
+      dialogue: {},
+    };
+    const atCrashSite = projectMission(multiOffer, undefined, LOCATION_IDS.crashSite, true);
+    const atTheJag = projectMission(multiOffer, undefined, LOCATION_IDS.theJag, true);
+    const elsewhere = projectMission(multiOffer, undefined, "nowhere_else" as any, true);
+    expect(atCrashSite.guidance?.availableNpcIds).toEqual([NPC_IDS.wadeRusk]);
+    expect(atTheJag.guidance?.availableNpcIds).toEqual([NPC_IDS.tansyRusk]);
+    expect(elsewhere.guidance?.availableNpcIds).toBeUndefined();
+    expect(atCrashSite.guidance?.availableNpcIds).not.toContain(NPC_IDS.tansyRusk);
   });
 });

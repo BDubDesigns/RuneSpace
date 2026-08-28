@@ -120,11 +120,10 @@ test("equips the Cutter through Inventory, shows a full stack, and earns Mining 
   const guidedInventoryDrawer = page.getByRole("dialog", { name: "Inventory" });
   await expect(
     guidedInventoryDrawer.getByRole("button", { name: "Salvage Cutter" }),
-  ).toHaveAttribute("data-quest-guidance", "true");
+  ).toHaveAttribute("data-quest-guidance", "active");
   await page.keyboard.press("Escape");
   await expect(page.getByRole("button", { name: "Start Mining" })).not.toHaveAttribute(
     "data-quest-guidance",
-    "true",
   );
 
   // Real Inventory → Equip flow (the same overlay Mining E2E exercises).
@@ -155,11 +154,10 @@ test("equips the Cutter through Inventory, shows a full stack, and earns Mining 
   );
   await expect(page.getByRole("button", { name: "Start Mining" })).toHaveAttribute(
     "data-quest-guidance",
-    "true",
+    "active",
   );
   await expect(page.getByRole("button", { name: /Talk to Tansy Rusk/ })).not.toHaveAttribute(
     "data-quest-guidance",
-    "true",
   );
 
   // Restore the full stack: every requirement holds and guidance moves to the
@@ -174,7 +172,7 @@ test("equips the Cutter through Inventory, shows a full stack, and earns Mining 
   );
   await expect(page.getByRole("button", { name: /Talk to Tansy Rusk/ })).toHaveAttribute(
     "data-quest-guidance",
-    "true",
+    "active",
   );
 
   // Talk to Tansy: active + ready routes to the turn-in with SHOW SHALE control.
