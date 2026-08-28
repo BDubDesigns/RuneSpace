@@ -20,6 +20,10 @@ import {
  * mission grants at most one reward: an inventory item (Walk It Off) or skill
  * XP through the authoritative progression boundary (Cut Your Teeth).
  * Deliberately narrow — no credits, reputation, bundles, or effect lists.
+ *
+ * Item rewards are granted as ONE new unique item instance (the generic
+ * completion boundary's sole item execution path); registry validation
+ * rejects stackable item rewards until a real mission earns that path.
  */
 export type MissionReward =
   | { kind: "item"; itemId: ItemId }

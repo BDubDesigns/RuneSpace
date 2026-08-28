@@ -14,6 +14,23 @@ export type MiningStopReason = (typeof MINING_STOP_REASONS)[number];
 
 export type MiningRandom = { nextBasisPoints(): number; nextUnit(): number };
 
+/**
+ * The authoritative award facts for one Mining attempt: which item Mining
+ * produces, its storage facts, and the per-success yield range. The resolver
+ * and quest-guidance recommendation validation both read THIS function, so
+ * what Mining authoritatively produces has exactly one home — changing the
+ * resolver's award cannot leave guidance validation stale.
+ */
+export function miningAwardFacts(balance: EffectiveGameBalance) {
+  return {
+    itemId: balance.items.ferriteShale.itemId,
+    stackLimit: balance.items.ferriteShale.stackLimit,
+    massGrams: balance.items.ferriteShale.massGrams,
+    yieldMinimum: balance.mining.yieldMinimum,
+    yieldMaximum: balance.mining.yieldMaximum,
+  };
+}
+
 export function miningSuccessChanceBps(level: number, balance: EffectiveGameBalance): number {
   if (!Number.isInteger(level) || level < 1) throw new RangeError("Mining level must be positive");
   const mining = balance.mining;
@@ -97,17 +114,18 @@ export function miningPreflightStopReason<Id>(
   balance: EffectiveGameBalance,
 ): MiningStopReason | undefined {
   if (!snapshot.hasCompatibleTool) return "compatible_mining_tool_missing";
+  const award = miningAwardFacts(balance);
   const plan = planStackAddition(
     snapshot.existingStacks,
-    balance.items.ferriteShale.itemId,
-    balance.mining.yieldMinimum,
-    balance.items.ferriteShale.stackLimit,
+    award.itemId,
+    award.yieldMinimum,
+    award.stackLimit,
     snapshot.slotsAvailable,
     snapshot.massAvailableGrams,
-    balance.items.ferriteShale.massGrams,
+    award.massGrams,
   );
   if (plan.remainingQuantity === 0) return undefined;
-  return snapshot.massAvailableGrams < balance.items.ferriteShale.massGrams
+  return snapshot.massAvailableGrams < award.massGrams
     ? "carried_mass_capacity_reached"
     : "inventory_slots_full";
 }
@@ -194,30 +212,30 @@ export function resolveFerriteShaleMining<Id>(input: {
       });
       continue;
     }
-    const rolledQuantity =
-      random.nextUnit() < 0.5 ? balance.mining.yieldMinimum : balance.mining.yieldMaximum;
+    const award = miningAwardFacts(balance);
+    const rolledQuantity = random.nextUnit() < 0.5 ? award.yieldMinimum : award.yieldMaximum;
     let quantity = rolledQuantity;
     let plan = planStackAddition(
       stacks,
-      balance.items.ferriteShale.itemId,
+      award.itemId,
       quantity,
-      balance.items.ferriteShale.stackLimit,
+      award.stackLimit,
       slotsAvailable,
       massAvailableGrams,
-      balance.items.ferriteShale.massGrams,
+      award.massGrams,
     );
     // The minimum-fit check authorizes this success. At a final partial stack or
     // mass boundary, retain a valid one-unit yield rather than partially adding a two-unit roll.
     if (plan.remainingQuantity > 0) {
-      quantity = balance.mining.yieldMinimum;
+      quantity = award.yieldMinimum;
       plan = planStackAddition(
         stacks,
-        balance.items.ferriteShale.itemId,
+        award.itemId,
         quantity,
-        balance.items.ferriteShale.stackLimit,
+        award.stackLimit,
         slotsAvailable,
         massAvailableGrams,
-        balance.items.ferriteShale.massGrams,
+        award.massGrams,
       );
     }
     for (const update of plan.updatedStacks) {
@@ -232,7 +250,7 @@ export function resolveFerriteShaleMining<Id>(input: {
         persisted: false,
       });
     slotsAvailable -= plan.createdStacks.length;
-    massAvailableGrams -= quantity * balance.items.ferriteShale.massGrams;
+    massAvailableGrams -= quantity * award.massGrams;
     successes += 1;
     if (boosted) remainingCutterCharge -= 1;
     resolvedAttempts.push({

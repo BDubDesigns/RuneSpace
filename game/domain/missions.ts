@@ -1,8 +1,5 @@
-import {
-  getItemDefinition,
-  getActionOutputItemIds,
-  skillLevelThresholds,
-} from "@/game/config/balance";
+import { getItemDefinition, skillLevelThresholds } from "@/game/config/balance";
+import { getActionOutputItemIds } from "@/game/domain/action-outputs";
 import { getDialogue } from "@/game/content/dialogue";
 import { getLocation } from "@/game/content/locations";
 import type {
@@ -175,8 +172,15 @@ export function deriveMissionState(input: {
 }): MissionState {
   if (!input.mission?.acceptedAt) return "not_accepted";
   if (input.mission.completedAt) return "completed";
+  // Turn-in eligibility requires stationary presence AT the authored turn-in
+  // location, independently of the requirement list: `at_location`
+  // requirements control objective progression, while `turnIn.locationId` is
+  // its own authoritative turn-in constraint. Authors never need to
+  // duplicate the turn-in location as a requirement to keep eligibility
+  // correct.
   const holds =
     input.stationary &&
+    input.currentLocationId === input.definition.turnIn.locationId &&
     requirementsHold(input.definition, input.currentLocationId, input.observation);
   if (holds) return "ready_for_completion";
   return "active";
@@ -410,8 +414,20 @@ export function validateMissionDefinitions(definitions: readonly MissionDefiniti
     if (dialogue.capacityMassDialogueId)
       assertDialogue(definition.id, dialogue.capacityMassDialogueId, "capacity mass");
     if (definition.reward.kind === "item") {
-      if (!getItemDefinition(definition.reward.itemId)) {
+      const rewardDefinition = getItemDefinition(definition.reward.itemId);
+      if (!rewardDefinition) {
         throw new Error(`${where} reward references unknown item "${definition.reward.itemId}".`);
+      }
+      // Definition validation and runtime capability must agree: the generic
+      // completion boundary grants item rewards by inserting ONE new unique
+      // instance (capacity-preflighted). A stackable item reward has no
+      // authorized execution path yet, so it fails fast here instead of
+      // passing validation and throwing at runtime. A real mission that needs
+      // one earns that path deliberately.
+      if (rewardDefinition.kind !== "unique") {
+        throw new Error(
+          `${where} reward item "${definition.reward.itemId}" must be a unique item; the generic completion boundary does not execute stackable item rewards.`,
+        );
       }
     } else {
       if (!Number.isInteger(definition.reward.amount) || definition.reward.amount <= 0) {

@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { CUT_YOUR_TEETH, WALK_IT_OFF, MISSIONS } from "@/game/content/missions";
+import {
+  CUT_YOUR_TEETH,
+  WALK_IT_OFF,
+  MISSIONS,
+  type MissionDefinition,
+} from "@/game/content/missions";
 import {
   getDialogue,
   getMissionCompletionPresentation,
@@ -14,6 +19,7 @@ import {
   NPC_IDS,
   SKILL_IDS,
 } from "@/game/config/foundations";
+import type { ContentId } from "@/game/schemas/ids";
 import {
   deriveQuestGuidanceTargets,
   projectMission,
@@ -341,6 +347,104 @@ describe("issue #124 semantic quest guidance projection", () => {
     );
     const targets = deriveQuestGuidanceTargets([projection]);
     expect([...targets.npcIds]).toEqual([]);
+  });
+});
+
+describe("issue #124 turn-in location is an independent eligibility constraint", () => {
+  // A mission whose requirements carry NO at_location step (equip + carry
+  // only), with its turn-in authored at The Jag. Proves the turn-in location
+  // gates eligibility without authors duplicating it as a requirement.
+  const turnInGated: MissionDefinition = {
+    id: "synthetic_turn_in_location" as ContentId,
+    title: "Synthetic Turn-In Location",
+    summary: "Equip and carry, then turn in at The Jag.",
+    offers: [
+      {
+        npcId: NPC_IDS.tansyRusk,
+        locationId: LOCATION_IDS.theJag,
+        dialogueId: DIALOGUE_IDS.tansyCutYourTeethOffer,
+      },
+    ],
+    requirements: [
+      {
+        kind: "equipped_item",
+        itemId: ITEM_IDS.salvageCutter,
+        objective: "Equip the {item} from Inventory",
+      },
+      {
+        kind: "carried_stack",
+        itemId: ITEM_IDS.ferriteShale,
+        turnIn: "show",
+        objective: "Get a full stack of {item} — {carried} / {required}",
+      },
+    ],
+    turnIn: {
+      npcId: NPC_IDS.tansyRusk,
+      locationId: LOCATION_IDS.theJag,
+      requiresStationary: true,
+      objective: "Show your work to Tansy Rusk",
+      dialogueId: DIALOGUE_IDS.tansyCutYourTeethTurnIn,
+    },
+    reward: { kind: "skill_xp", skillId: SKILL_IDS.mining, amount: 10 },
+    dialogue: {},
+  };
+
+  const satisfiedObservation = (): MissionObservation => ({
+    equippedItemIds: new Set([ITEM_IDS.salvageCutter]),
+    carriedQuantities: new Map([[ITEM_IDS.ferriteShale, 10]]),
+    stackLimits: new Map([[ITEM_IDS.ferriteShale, 10]]),
+    itemNames: new Map([
+      [ITEM_IDS.salvageCutter, "Salvage Cutter"],
+      [ITEM_IDS.ferriteShale, "Ferrite Shale"],
+    ]),
+  });
+
+  it("satisfies requirements away from the turn-in location without becoming completion-ready", () => {
+    const accepted = { acceptedAt: new Date("2026-01-01T00:00:00.000Z") };
+    const away = projectMission(
+      turnInGated,
+      accepted,
+      LOCATION_IDS.crashSite,
+      true,
+      satisfiedObservation(),
+    );
+    // Requirements hold even away from The Jag...
+    expect(away.stage).toMatchObject({
+      requirementsSatisfied: true,
+      turnInAvailable: false,
+      nextObjectiveKind: undefined,
+    });
+    // ...the objective correctly advances to the authored turn-in copy...
+    expect(away.currentObjective).toBe("Show your work to Tansy Rusk");
+    // ...but the mission is NOT completion-ready until the character is
+    // stationary at the authored turn-in location.
+    expect(away.state).toBe("active");
+  });
+
+  it("becomes ready_for_completion only stationary at the authored turn-in location", () => {
+    const accepted = { acceptedAt: new Date("2026-01-01T00:00:00.000Z") };
+    const there = projectMission(
+      turnInGated,
+      accepted,
+      LOCATION_IDS.theJag,
+      true,
+      satisfiedObservation(),
+    );
+    expect(there.state).toBe("ready_for_completion");
+    expect(there.stage).toMatchObject({ requirementsSatisfied: true, turnInAvailable: true });
+
+    const thereButBusy = projectMission(
+      turnInGated,
+      accepted,
+      LOCATION_IDS.theJag,
+      false,
+      satisfiedObservation(),
+    );
+    expect(thereButBusy.state).toBe("active");
+    expect(thereButBusy.stage).toMatchObject({
+      requirementsSatisfied: true,
+      turnInAvailable: false,
+    });
   });
 });
 

@@ -10,6 +10,7 @@ import {
 import {
   getEffectiveGameBalance,
   getItemDefinition,
+  getItemMaximumCharge,
   skillLevelThresholds,
 } from "@/game/config/balance";
 import { LOCATION_IDS } from "@/game/config/foundations";
@@ -424,11 +425,21 @@ async function completeMissionForDefinition(input: {
   // Build exact pure removal plans for every consumed carried requirement
   // BEFORE any mutation, applying them cumulatively to an in-memory
   // candidate inventory so the reward preflight sees post-consumption
-  // capacity.
+  // capacity. The candidate preserves stack creation metadata so planning
+  // keeps #112's deterministic ordering: quantity, then creation time, then
+  // ID.
   const consumptionPlans: Array<Extract<ExactStackRemovalPlan<string>, { ok: true }>> = [];
-  let candidateStacks: Array<{ id: string; itemId: string; quantity: number }> = stacks.map(
-    (stack) => ({ id: stack.id, itemId: stack.itemId, quantity: stack.quantity }),
-  );
+  let candidateStacks: Array<{
+    id: string;
+    itemId: string;
+    quantity: number;
+    createdAt: Date;
+  }> = stacks.map((stack) => ({
+    id: stack.id,
+    itemId: stack.itemId,
+    quantity: stack.quantity,
+    createdAt: stack.createdAt,
+  }));
   for (const requirement of definition.requirements) {
     if (requirement.kind !== "carried_stack") continue;
     if (requirement.turnIn !== "consume_required_quantity") continue;
@@ -496,12 +507,18 @@ async function completeMissionForDefinition(input: {
 
   let rewardInfo: { itemId: string; quantity: 1; itemInstanceId?: string } | undefined;
   if (definition.reward.kind === "item") {
+    // Initial charge derives from the item's authored charge capacity —
+    // chargeable items are granted depleted (charge is earned through the
+    // Power Cell gameplay), items without a charge state get the schema's
+    // null representation. The boundary never silently asserts charge
+    // semantics for a future unique item that authors none.
+    const maximumCharge = getItemMaximumCharge(definition.reward.itemId);
     const created = await transaction
       .insert(itemInstances)
       .values({
         characterId: context.character.id,
         itemId: definition.reward.itemId,
-        currentCharge: 0,
+        currentCharge: maximumCharge === undefined ? null : 0,
       })
       .returning({ id: itemInstances.id });
     const instance = created[0];
@@ -640,10 +657,9 @@ function buildCompletionObservation(
 }
 
 /** Applies one pure removal plan to an in-memory candidate stack list. */
-function applyRemovalPlanToCandidate(
-  candidateStacks: Array<{ id: string; itemId: string; quantity: number }>,
-  plan: Extract<ExactStackRemovalPlan<string>, { ok: true }>,
-): Array<{ id: string; itemId: string; quantity: number }> {
+function applyRemovalPlanToCandidate<
+  Stack extends { id: string; itemId: string; quantity: number },
+>(candidateStacks: Stack[], plan: Extract<ExactStackRemovalPlan<string>, { ok: true }>): Stack[] {
   const deleted = new Set(plan.deletedStackIds);
   const updates = new Map(plan.updatedStacks.map((update) => [update.id, update.quantity]));
   return candidateStacks

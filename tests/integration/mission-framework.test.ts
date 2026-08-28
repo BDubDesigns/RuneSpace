@@ -358,4 +358,63 @@ suite("issue #124 generic consume-item completion boundary (real PostgreSQL)", (
     // Shown, never consumed.
     expect(await shaleQuantities(character.id)).toEqual([10]);
   });
+
+  it("consumes equal-quantity stacks in #112 order: quantity, then creation time, then ID", async () => {
+    const { userId, character } = await makeAcceptedCharacterAtTheJag();
+    // Two equal-quantity matching stacks whose ID order is the REVERSE of
+    // their creation order: the older stack has the lexicographically larger
+    // ID. Mission candidate planning must preserve creation metadata so the
+    // OLDER stack is consumed first — a regression that drops createdAt would
+    // fall through to ID tie-breaking and consume the wrong stack.
+    const newerStackId = "00000000-0000-4000-8000-00000000000a";
+    const olderStackId = "00000000-0000-4000-8000-00000000000b";
+    await db.insert(rune.inventoryStacks).values([
+      {
+        id: newerStackId,
+        characterId: character.id,
+        itemId: ITEM_IDS.ferriteShale,
+        quantity: 5,
+        createdAt: new Date("2026-01-01T01:00:00.000Z"),
+      },
+      {
+        id: olderStackId,
+        characterId: character.id,
+        itemId: ITEM_IDS.ferriteShale,
+        quantity: 5,
+        createdAt: new Date("2026-01-01T00:00:00.000Z"),
+      },
+    ]);
+
+    const consumeFive = syntheticMission({
+      requirements: [
+        {
+          kind: "carried_stack",
+          itemId: ITEM_IDS.ferriteShale,
+          quantity: 5,
+          turnIn: "consume_required_quantity",
+          objective: "Bring {required} {item}",
+        },
+      ],
+      reward: { kind: "skill_xp", skillId: SKILL_IDS.mining, amount: 10 },
+    });
+    const completed = await missions.completeMissionWithDefinition(
+      userId,
+      character.id,
+      consumeFive,
+      NPC_IDS.tansyRusk,
+      now,
+      deterministicRandom(),
+    );
+    expect(completed.mission.status).toBe("completed");
+
+    // Exactly one stack remains, and it is the NEWER one: the older stack won
+    // consumption before ID tie-breaking could decide.
+    const remaining = await db
+      .select()
+      .from(rune.inventoryStacks)
+      .where(eq(rune.inventoryStacks.characterId, character.id));
+    expect(remaining).toHaveLength(1);
+    expect(remaining[0]?.id).toBe(newerStackId);
+    expect(remaining[0]?.quantity).toBe(5);
+  });
 });

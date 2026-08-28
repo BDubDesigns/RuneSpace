@@ -11,6 +11,10 @@ import {
   NPC_IDS,
   SKILL_IDS,
 } from "@/game/config/foundations";
+import { getEffectiveGameBalance } from "@/game/config/balance";
+import { getActionOutputItemIds } from "@/game/domain/action-outputs";
+import { miningAwardFacts } from "@/game/domain/mining";
+import { refiningAwardFacts } from "@/game/domain/refining";
 import { asContentId, type ContentId } from "@/game/schemas/ids";
 import { MISSIONS, WALK_IT_OFF, type MissionDefinition } from "@/game/content/missions";
 import { validateMissionDefinitions } from "@/game/domain/missions";
@@ -129,6 +133,41 @@ describe("issue #124 mission registry validation", () => {
         }),
       ]),
     ).toThrow(/progression curve/i);
+  });
+
+  it("rejects a stackable item reward: validation and runtime capability must agree", () => {
+    // Ferrite Shale is stackable; the generic completion boundary executes
+    // item rewards only as one new unique instance. A stackable reward would
+    // pass validation and throw at runtime — it must fail fast here.
+    expect(() =>
+      validateMissionDefinitions([
+        definitionOf({ reward: { kind: "item", itemId: ITEM_IDS.ferriteShale } }),
+      ]),
+    ).toThrow(/unique item/);
+    // The proven unique-item shape still validates.
+    expect(() =>
+      validateMissionDefinitions([
+        definitionOf({ reward: { kind: "item", itemId: ITEM_IDS.salvageCutter } }),
+      ]),
+    ).not.toThrow();
+  });
+});
+
+describe("issue #124 action-output capability check shares the gameplay truth", () => {
+  it("derives outputs from the resolvers' award facts, not a parallel table", () => {
+    const balance = getEffectiveGameBalance();
+    // The capability check reads exactly what the resolvers award: Mining's
+    // single output item and Refining's two output items. Changing an
+    // action's authoritative award changes this automatically — there is no
+    // hand-maintained drop table to go stale.
+    expect(getActionOutputItemIds(ACTION_IDS.ferriteShaleMining)).toEqual([
+      miningAwardFacts(balance).itemId,
+    ]);
+    expect(getActionOutputItemIds(ACTION_IDS.refining)).toEqual(
+      refiningAwardFacts(balance).outputs.map((output) => output.itemId),
+    );
+    // Actions with no material output resolve to undefined (e.g. Travel).
+    expect(getActionOutputItemIds(ACTION_IDS.travel)).toBeUndefined();
   });
 });
 

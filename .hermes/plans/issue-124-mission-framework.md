@@ -146,3 +146,51 @@ presentation behavior), capacity refusal + completion presentation dialogues
 Phases/moving NPCs (requirement vocabulary kept reusable for a future phase
 wrapper), reward bundles, scripting, per-step ledgers, Quest Log redesign,
 admin #113, mission #3.
+
+---
+
+## Review correction pass (post-first-draft, 2026-08-27)
+
+Independent product-owner review of the first draft found four issues; all
+four fixed in one focused pass without broadening scope:
+
+1. **Turn-in location is an independent eligibility constraint.**
+   `deriveMissionState` now requires stationary presence AT
+   `definition.turnIn.locationId` for `ready_for_completion`, independently of
+   the requirement list — `at_location` requirements control objective
+   progression only, so authors never duplicate the turn-in location as a
+   requirement to keep eligibility correct. Regression coverage: a synthetic
+   mission with no `at_location` requirement proves requirements can be
+   satisfied away from the turn-in location, the objective advances to the
+   turn-in copy, `requirementsSatisfied` stays true, but the mission is not
+   completion-ready until stationary at the authored turn-in location.
+
+2. **Candidate stack planning preserves `createdAt`.** The completion
+   candidate inventory now carries stack creation metadata through
+   `planExactStackRemoval` and cumulative removal planning, so #112's
+   deterministic ordering (quantity → creation time → ID) survives mission
+   hand-ins. Regression test: two equal-quantity stacks whose ID order is the
+   REVERSE of creation order prove the older stack is consumed before ID
+   tie-breaking. Player-selected-stack semantics were NOT introduced.
+
+3. **Item-reward authoring and runtime agree.** Registry validation now
+   rejects stackable item rewards (fail fast at definition time) because the
+   generic completion boundary executes item rewards only as one new unique
+   instance. No speculative stackable-reward path was added. Reward instance
+   initialization derives from `getItemMaximumCharge` (balance SSOT):
+   chargeable items are granted depleted (`currentCharge: 0`), items without a
+   charge state get the schema's `null` representation — the boundary no
+   longer silently asserts charge semantics for future unique items.
+
+4. **Action-output capability check shares the gameplay truth.** The manual
+   `actionOutputItemIds` map in balance.ts was removed. `miningAwardFacts` /
+   `refiningAwardFacts` (domain layer) are now the single home for what each
+   resolver awards; the gameplay resolvers consume them, and
+   `game/domain/action-outputs.ts:getActionOutputItemIds` derives the guidance
+   capability check from the SAME facts — changing an action's authoritative
+   output cannot leave quest-guidance validation stale. No generic action
+   registry was built; this stays a narrow capability check.
+
+Validation for the correction pass: typecheck/lint/format clean · 432 unit
+tests ✓ · full integration suite 162 ✓ (incl. the new ordering regression) ·
+production build ✓ · canonical E2E: see PR comment.
