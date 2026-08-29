@@ -144,6 +144,58 @@ describe("issue #124 mission registry validation", () => {
     ).toThrow(/progression curve/i);
   });
 
+  it("rejects an activeDialogueId whose dialogue belongs to a different NPC", () => {
+    expect(() =>
+      validateMissionDefinitions([
+        definitionOf({
+          offers: [
+            {
+              npcId: NPC_IDS.wadeRusk,
+              locationId: LOCATION_IDS.crashSite,
+              dialogueId: DIALOGUE_IDS.wadeOffer,
+              activeDialogueId: DIALOGUE_IDS.tansyCutYourTeethOffer,
+            },
+          ],
+        }),
+      ]),
+    ).toThrow(/belongs to NPC/i);
+    expect(() =>
+      validateMissionDefinitions([
+        definitionOf({
+          offers: [
+            {
+              npcId: NPC_IDS.wadeRusk,
+              locationId: LOCATION_IDS.crashSite,
+              dialogueId: DIALOGUE_IDS.wadeOffer,
+              activeDialogueId: DIALOGUE_IDS.wadeWalkItOffActiveFollowUp,
+            },
+          ],
+        }),
+      ]),
+    ).not.toThrow();
+  });
+
+  it("rejects a completedNpcDialogue whose dialogue belongs to a different NPC", () => {
+    expect(() =>
+      validateMissionDefinitions([
+        definitionOf({
+          completedNpcDialogue: [
+            { npcId: NPC_IDS.wadeRusk, dialogueId: DIALOGUE_IDS.tansyPostCutYourTeeth },
+          ],
+        }),
+      ]),
+    ).toThrow(/belongs to NPC/i);
+    expect(() =>
+      validateMissionDefinitions([
+        definitionOf({
+          completedNpcDialogue: [
+            { npcId: NPC_IDS.tansyRusk, dialogueId: DIALOGUE_IDS.tansyCutYourTeethCompletion },
+          ],
+        }),
+      ]),
+    ).not.toThrow();
+  });
+
   it("rejects a stackable item reward: validation and runtime capability must agree", () => {
     // Ferrite Shale is stackable; the generic completion boundary executes
     // item rewards only as one new unique instance. A stackable reward would

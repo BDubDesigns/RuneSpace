@@ -479,12 +479,11 @@ export type NpcDialogueResolution = {
  *    appears as soon as the previous one completes.
  * 2. ACTIVE (newest first): for the turn-in NPC, stage branches select the
  *    turn-in, busy, or requirement-reminder sequences; for other offer NPCs,
- *    their authored active follow-up is used (explicit activeDialogueId or
- *    legacy idleDialogueId fallback).
+ *    their authored activeDialogueId is used.
  * 3. COMPLETED (newest first): ordinary post-completion story dialogue wins
  *    over the one-shot completion presentation. The newest completed mission
- *    that authors dialogue for this NPC is selected; presentation is shown
- *    only via the transient override immediately after success.
+ *    that authors dialogue for this NPC via completedNpcDialogue is selected;
+ *    presentation is shown only via the transient override immediately after success.
  */
 export function resolveNpcMissionDialogue(
   npcId: string,
@@ -518,8 +517,8 @@ export function resolveNpcMissionDialogue(
       continue;
     }
     const offer = definition.offers.find((candidate) => candidate.npcId === npcId);
-    const idle = offer?.activeDialogueId ?? offer?.idleDialogueId;
-    const sequence = idle ? getDialogue(idle) : undefined;
+    const activeId = offer?.activeDialogueId;
+    const sequence = activeId ? getDialogue(activeId) : undefined;
     if (sequence) return { sequence, missionId: definition.id };
   }
 
@@ -534,10 +533,6 @@ export function resolveNpcMissionDialogue(
       if (sequence) return { sequence, missionId: definition.id };
       continue;
     }
-    const offer = definition.offers.find((candidate) => candidate.npcId === npcId);
-    const completed = offer?.completedDialogueId ?? offer?.idleDialogueId;
-    const sequence = completed ? getDialogue(completed) : undefined;
-    if (sequence) return { sequence, missionId: definition.id };
   }
 
   return undefined;

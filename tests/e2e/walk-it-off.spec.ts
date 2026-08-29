@@ -113,6 +113,34 @@ test("walks from Wade to Tansy, presents approved dialogue, and claims one carri
   await expect(dialogue).toBeHidden();
   await expect(page.locator("[data-mission-objective]")).toContainText("Travel to The Jag");
 
+  // Issue #129: after accepting Walk It Off from Wade but before leaving Crash
+  // Site, talking to Wade again must show the active follow-up, not the
+  // Cutter-aware completed dialogue. Assert behaviour, not just ID.
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.getByRole("button", { name: /Talk to Wade Rusk/ }).click();
+  const wadeActiveFollowUp = page.getByRole("dialog", { name: "Wade Rusk dialogue" });
+  await expect(wadeActiveFollowUp).toBeVisible();
+  await expect(
+    wadeActiveFollowUp.locator('[data-dialogue-text] [aria-hidden="true"]'),
+  ).toContainText("The Jag");
+  await expect(
+    wadeActiveFollowUp.locator('[data-dialogue-text] [aria-hidden="true"]'),
+  ).toContainText("The Long Scramble");
+  await wadeActiveFollowUp.getByRole("button", { name: "Next" }).click();
+  await expect(
+    wadeActiveFollowUp.locator('[data-dialogue-text] [aria-hidden="true"]'),
+  ).toContainText("Scavenging");
+  await wadeActiveFollowUp.getByRole("button", { name: "Next" }).click();
+  // Must not imply the Cutter has already been received — the active follow-up
+  // is pre-Cutter by design.
+  const wadeFollowUpVisible = await wadeActiveFollowUp
+    .locator('[data-dialogue-text] [aria-hidden="true"]')
+    .textContent();
+  expect(wadeFollowUpVisible?.toLowerCase()).not.toContain("cutter");
+  await expect(wadeActiveFollowUp.getByRole("button", { name: "Finish" })).toBeVisible();
+  await wadeActiveFollowUp.getByRole("button", { name: "Finish" }).click();
+  await expect(wadeActiveFollowUp).toBeHidden();
+
   await page
     .getByRole("button", { name: /The Long Scramble/ })
     .first()

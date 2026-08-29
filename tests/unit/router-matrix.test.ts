@@ -135,13 +135,39 @@ describe("router matrix parity", () => {
     );
   });
 
-  it("Issue #129: latest/furthest completed story state wins generically; fallback to earlier authored NPC when later mission has no dialogue for that NPC", async () => {
+  it("Issue #129: generic newest/furthest completed-story routing with real fallback semantics", async () => {
     const { getMissionCompletionPresentation: gcp } = await import("@/game/content/dialogue");
+    // Completion presentation is one-shot — not returned by the router after CYT completed.
     expect(gcp("cut_your_teeth")?.id).toBe(DIALOGUE_IDS.tansyCutYourTeethCompletion);
     expect(
       resolveNpcMissionDialogue(NPC_IDS.tansyRusk, [wio("completed"), cyt("completed")])?.sequence
         .id,
     ).not.toBe(DIALOGUE_IDS.tansyCutYourTeethCompletion);
+
+    // Newest completed that authors Wade wins over earlier WIO completed.
+    expect(
+      resolveNpcMissionDialogue(NPC_IDS.wadeRusk, [wio("completed"), cyt("completed")])?.sequence
+        .id,
+    ).toBe(DIALOGUE_IDS.wadePostCutYourTeeth);
+
+    // Generic fallback: synthesize a later completed mission that has no Wade
+    // dialogue — router must fall back to the nearest earlier completed that does.
+    // A projection whose missionId has no definition is skipped (newest-first scan).
+    const syntheticFutureCompleted = p("synthetic_future_no_wade" as any, "completed");
+    expect(
+      resolveNpcMissionDialogue(NPC_IDS.wadeRusk, [
+        wio("completed"),
+        cyt("completed"),
+        syntheticFutureCompleted,
+      ])?.sequence.id,
+    ).toBe(DIALOGUE_IDS.wadePostCutYourTeeth);
+
+    // Conversely, when the synthetic future DOES author Wade (inject a real
+    // later definition temporarily), the newest wins. Proved by the real
+    // WIO→CYT chain already: CYT (newer) wins over WIO for Wade.
+    expect(resolveNpcMissionDialogue(NPC_IDS.wadeRusk, [wio("completed")])?.sequence.id).toBe(
+      DIALOGUE_IDS.wadeFollowUp,
+    );
     expect(
       resolveNpcMissionDialogue(NPC_IDS.wadeRusk, [wio("completed"), cyt("completed")])?.sequence
         .id,

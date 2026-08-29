@@ -109,21 +109,11 @@ export type MissionOffer = {
    */
   acceptedContinuationDialogueId?: DialogueId;
   /**
-   * Deprecated ambiguous idle shown while the mission is active or completed.
-   * Prefer explicit activeDialogueId / completedDialogueId for new content;
-   * retained only as a fallback for existing authored data.
-   */
-  idleDialogueId?: DialogueId;
-  /**
    * Authored dialogue while this mission is active (e.g. Wade reminding the
-   * player to reach Tansy at The Jag). Distinct from completed follow-up.
+   * player to reach Tansy at The Jag). Distinct from ordinary completed-story
+   * dialogue authored via completedNpcDialogue.
    */
   activeDialogueId?: DialogueId;
-  /**
-   * Authored ordinary post-completion story dialogue for this offer NPC after
-   * the mission is completed (not the one-shot completion presentation).
-   */
-  completedDialogueId?: DialogueId;
 };
 
 /**
@@ -221,8 +211,6 @@ export const WALK_IT_OFF: MissionDefinition = {
       locationId: LOCATION_IDS.crashSite,
       dialogueId: DIALOGUE_IDS.wadeOffer,
       activeDialogueId: DIALOGUE_IDS.wadeWalkItOffActiveFollowUp,
-      completedDialogueId: DIALOGUE_IDS.wadeFollowUp,
-      idleDialogueId: DIALOGUE_IDS.wadeFollowUp,
     },
     {
       npcId: NPC_IDS.tansyRusk,
@@ -247,6 +235,7 @@ export const WALK_IT_OFF: MissionDefinition = {
     capacitySlotsDialogueId: DIALOGUE_IDS.tansyCapacitySlots,
     capacityMassDialogueId: DIALOGUE_IDS.tansyCapacityMass,
   },
+  completedNpcDialogue: [{ npcId: NPC_IDS.wadeRusk, dialogueId: DIALOGUE_IDS.wadeFollowUp }],
 };
 
 /**

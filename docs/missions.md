@@ -65,7 +65,7 @@ A mission may have **multiple authored offer routes**. Offer NPC / location / di
 
 **Useful example — Walk It Off** (`WALK_IT_OFF.offers`):
 
-- **Route A:** `Wade` at `Crash Site` — `dialogueId: wadeOffer`, `idleDialogueId: wadeFollowUp`.
+- **Route A:** `Wade` at `Crash Site` — `dialogueId: wadeOffer`, `activeDialogueId` while the mission is active; ordinary completed story via `completedNpcDialogue` (Wade) after completion.
 - **Route B:** `Tansy` at `The Jag` — `dialogueId: tansyBeforeMission`, `acceptedContinuationDialogueId: tansyAfterRemoteAcceptance`.
 
 Both routes are real. The second exists so a player who walks straight to The Jag can meet Tansy first and immediately receive the same mission — the framework calls this *explorer-first remote acceptance*. Offer location/dialogue semantics are authored explicitly in `MissionOffer`:
@@ -76,9 +76,16 @@ type MissionOffer = {
   locationId: LocationId;
   dialogueId: DialogueId;
   acceptedContinuationDialogueId?: DialogueId; // shown right after accept at this offer
-  idleDialogueId?: DialogueId;                 // shown at this offer while active/completed
+  activeDialogueId?: DialogueId;               // active follow-up at this offer NPC
 };
+
+// Ordinary post-completion story dialogue authored per completed mission, including
+// NPCs who were not that mission's offer/turn-in participant. Newest completed mission
+// that authors dialogue for the NPC wins — how story state advances globally.
+type MissionNpcDialogue = { npcId: NpcId; dialogueId: DialogueId };
 ```
+
+A mission may also author `completedNpcDialogue: readonly MissionNpcDialogue[]` on `MissionDefinition` so a later mission can advance story dialogue for NPCs outside its offer/turn-in set (e.g. Cut Your Teeth advancing Wade after Tansy's turn-in).
 
 Consumers never read `offers[0]` as "the" offer and never infer location from an NPC record.
 
@@ -171,7 +178,7 @@ Dialogue remains **authored content** while semantic mission state **selects** t
 ### Authored dialogue homes
 
 - **Sequences** — `game/content/dialogue.ts` (`DialogueSequence`, `DIALOGUE_SEQUENCES`, `getDialogue`). Beats are presentation only (`npc` / `item` / `skill_xp`); item and skill-XP beats never mutate state.
-- **Semantic mapping** — `MissionOffer` (`dialogueId`, `acceptedContinuationDialogueId`, `activeDialogueId` / `completedDialogueId` / legacy `idleDialogueId`) plus `MissionDefinition.completedNpcDialogue` (ordinary post-completion story dialogue per NPC) and `MissionDialogue` for turn-in-stage branches, capacity, and the one-shot completion presentation.
+- **Semantic mapping** — `MissionOffer` (`dialogueId`, `acceptedContinuationDialogueId`, `activeDialogueId`) plus `MissionDefinition.completedNpcDialogue` (ordinary post-completion story dialogue per NPC) and `MissionDialogue` for turn-in-stage branches, capacity, and the one-shot completion presentation.
 
 ### Currently supported semantic dialogue routing
 
@@ -185,17 +192,17 @@ All routed through the single generic router `resolveNpcMissionDialogue(npcId, p
 | Active (turn-in NPC) | **Requirements satisfied but busy** | `MissionDialogue.busyDialogueId` | requirements hold but `turnInAvailable` is false because the character is still busy |
 | Active (turn-in NPC) | **Equipment reminder** | `MissionDialogue.equipmentReminderDialogueId` | first unmet requirement `kind === "equipped_item"` |
 | Active (turn-in NPC) | **Carried-item reminder** | `MissionDialogue.carriedReminderDialogueId` | first unmet requirement `kind === "carried_stack"` |
-| Active (other offer NPC) | **Active follow-up** | `MissionOffer.activeDialogueId` (fallback `idleDialogueId`) | the offer NPC while the mission is active — e.g. Wade while Walk It Off is active |
+| Active (other offer NPC) | **Active follow-up** | `MissionOffer.activeDialogueId` | the offer NPC while the mission is active — e.g. Wade while Walk It Off is active |
 | Completion | **Capacity refusal — slots** | `MissionDialogue.capacitySlotsDialogueId` | item reward preflight failed on `slots` (selected generically from the mission's mapping after a `capacity` refusal) |
 | Completion | **Capacity refusal — mass** | `MissionDialogue.capacityMassDialogueId` | item reward preflight failed on `mass` |
-| Completed story | **Ordinary post-completion dialogue** | `MissionDefinition.completedNpcDialogue` or `MissionOffer.completedDialogueId` (fallback `idleDialogueId`) | newest completed mission that authors ordinary dialogue for this NPC; one-shot completion presentation is **not** reused here |
+| Completed story | **Ordinary post-completion dialogue** | `MissionDefinition.completedNpcDialogue` | newest completed mission that authors ordinary dialogue for this NPC; one-shot completion presentation is **not** reused here |
 | Completion presentation (one-shot) | **Completion presentation** | `MissionDialogue.completionPresentationDialogueId` (`getMissionCompletionPresentation`) | presentation-only beats (`item` / `skill_xp`) shown immediately after the authoritative success via the transient override in `NpcInteractionPanel`; subsequent conversations route to the completed-story dialogue above |
 
 Action labels on sequences (`actionLabel`, e.g. "Claim Cutter", "SHOW SHALE") are authored copy for the terminal control. Capacity and completion beats are presentation only — the authoritative completion stamp, consumption, and reward already committed when they become visible.
 
 ### 9.1 Completion presentation is one-shot, not persistent idle
 
-`MissionDialogue.completionPresentationDialogueId` is narrowly-scoped one-shot UI presentation shown immediately after the authoritative completion succeeds (via the transient `sequenceOverride` in `NpcInteractionPanel`). After that conversation closes, later talks route to ordinary completed-story dialogue (the newest authored `completedNpcDialogue` / `completedDialogueId`), not a replay of the reward beats. A refresh/reopen after completion likewise routes to ordinary story dialogue — no durable pending-presentation persistence is added in this issue. Ordinary future missions should author new post-completion dialogue instead of reusing the presentation as idle.
+`MissionDialogue.completionPresentationDialogueId` is narrowly-scoped one-shot UI presentation shown immediately after the authoritative completion succeeds (via the transient `sequenceOverride` in `NpcInteractionPanel`). After that conversation closes, later talks route to ordinary completed-story dialogue (the newest authored `completedNpcDialogue`), not a replay of the reward beats. A refresh/reopen after completion likewise routes to ordinary story dialogue — no durable pending-presentation persistence is added in this issue. Ordinary future missions should author new post-completion dialogue instead of reusing the presentation as idle.
 
 ## 10. Quest guidance
 
