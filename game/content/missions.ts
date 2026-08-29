@@ -109,10 +109,32 @@ export type MissionOffer = {
    */
   acceptedContinuationDialogueId?: DialogueId;
   /**
-   * Optional authored idle/continuation shown when talking to this offer NPC
-   * while the mission is already active or completed (e.g. Wade's follow-up).
+   * Deprecated ambiguous idle shown while the mission is active or completed.
+   * Prefer explicit activeDialogueId / completedDialogueId for new content;
+   * retained only as a fallback for existing authored data.
    */
   idleDialogueId?: DialogueId;
+  /**
+   * Authored dialogue while this mission is active (e.g. Wade reminding the
+   * player to reach Tansy at The Jag). Distinct from completed follow-up.
+   */
+  activeDialogueId?: DialogueId;
+  /**
+   * Authored ordinary post-completion story dialogue for this offer NPC after
+   * the mission is completed (not the one-shot completion presentation).
+   */
+  completedDialogueId?: DialogueId;
+};
+
+/**
+ * Ordinary post-completion story dialogue authored for an NPC after a
+ * particular mission completes, including NPCs who were not that mission's
+ * offer or turn-in participant. This is how a later mission can advance
+ * Wade's understanding even when Wade did not offer/turn in that mission.
+ */
+export type MissionNpcDialogue = {
+  npcId: NpcId;
+  dialogueId: DialogueId;
 };
 
 /**
@@ -175,6 +197,13 @@ export type MissionDefinition = {
    */
   availableObjective?: string;
   dialogue: MissionDialogue;
+  /**
+   * Ordinary post-completion story dialogue for one or more relevant NPCs
+   * after this mission completes, including NPCs who were not this mission's
+   * offer or turn-in participant. Selected by latest/furthest completed state
+   * in the router; never replays the one-shot completion presentation.
+   */
+  completedNpcDialogue?: readonly MissionNpcDialogue[];
 };
 
 /**
@@ -191,6 +220,8 @@ export const WALK_IT_OFF: MissionDefinition = {
       npcId: NPC_IDS.wadeRusk,
       locationId: LOCATION_IDS.crashSite,
       dialogueId: DIALOGUE_IDS.wadeOffer,
+      activeDialogueId: DIALOGUE_IDS.wadeWalkItOffActiveFollowUp,
+      completedDialogueId: DIALOGUE_IDS.wadeFollowUp,
       idleDialogueId: DIALOGUE_IDS.wadeFollowUp,
     },
     {
@@ -268,6 +299,10 @@ export const CUT_YOUR_TEETH: MissionDefinition = {
     busyDialogueId: DIALOGUE_IDS.tansyCutYourTeethBusy,
     completionPresentationDialogueId: DIALOGUE_IDS.tansyCutYourTeethCompletion,
   },
+  completedNpcDialogue: [
+    { npcId: NPC_IDS.tansyRusk, dialogueId: DIALOGUE_IDS.tansyPostCutYourTeeth },
+    { npcId: NPC_IDS.wadeRusk, dialogueId: DIALOGUE_IDS.wadePostCutYourTeeth },
+  ],
 };
 
 /** Ordered chain of authored missions; later entries may require earlier ones. */

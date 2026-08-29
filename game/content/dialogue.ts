@@ -164,6 +164,51 @@ const dialogue = {
       ),
     ],
   },
+  [DIALOGUE_IDS.wadeWalkItOffActiveFollowUp]: {
+    id: DIALOGUE_IDS.wadeWalkItOffActiveFollowUp,
+    npcId: NPC_IDS.wadeRusk,
+    beats: [
+      wadeLocal(
+        EXPRESSION_IDS.neutral,
+        "She's at The Jag. That's past The Long Scramble — it'll take you a bit to get there.",
+      ),
+      wadeLocal(
+        EXPRESSION_IDS.neutral,
+        "Keep an eye out while you walk. Scavenging turns up useful finds on the way, if you pay attention.",
+      ),
+      wadeLocal(
+        EXPRESSION_IDS.scowl,
+        "Don't get distracted. Tansy doesn't like waiting, and I'm not getting any younger.",
+      ),
+    ],
+  },
+  [DIALOGUE_IDS.wadePostCutYourTeeth]: {
+    id: DIALOGUE_IDS.wadePostCutYourTeeth,
+    npcId: NPC_IDS.wadeRusk,
+    beats: [
+      wadeLocal(EXPRESSION_IDS.neutral, "So Tansy taught you how to run the Cutter. Good."),
+      wadeLocal(
+        EXPRESSION_IDS.neutral,
+        "If you can pull Ferrite on your own, you're past the hardest part of the early work. The ship still needs a lot, but at least you're not starting from zero.",
+      ),
+      wadeLocal(
+        EXPRESSION_IDS.scowl,
+        "Don't get comfortable. There's more ahead — we'll get to it when you're ready.",
+      ),
+    ],
+  },
+  [DIALOGUE_IDS.tansyPostCutYourTeeth]: {
+    id: DIALOGUE_IDS.tansyPostCutYourTeeth,
+    npcId: NPC_IDS.tansyRusk,
+    beats: [
+      tansyLocal(EXPRESSION_IDS.smile, "You kept the shale? Good. You'll need it soon enough."),
+      tansyLocal(
+        EXPRESSION_IDS.neutral,
+        "You know how to handle the Cutter now — that's the basics sorted. The rest builds on that.",
+      ),
+      tansyLocal(EXPRESSION_IDS.smile, "Stick around. There'll be more work when you want it."),
+    ],
+  },
   [DIALOGUE_IDS.tansyBeforeMission]: {
     id: DIALOGUE_IDS.tansyBeforeMission,
     npcId: NPC_IDS.tansyRusk,
@@ -434,9 +479,12 @@ export type NpcDialogueResolution = {
  *    appears as soon as the previous one completes.
  * 2. ACTIVE (newest first): for the turn-in NPC, stage branches select the
  *    turn-in, busy, or requirement-reminder sequences; for other offer NPCs,
- *    their authored idle/continuation sequence is used.
- * 3. COMPLETED (newest first): the turn-in NPC shows the authored completion
- *    presentation; other offer NPCs show their authored idle sequence.
+ *    their authored active follow-up is used (explicit activeDialogueId or
+ *    legacy idleDialogueId fallback).
+ * 3. COMPLETED (newest first): ordinary post-completion story dialogue wins
+ *    over the one-shot completion presentation. The newest completed mission
+ *    that authors dialogue for this NPC is selected; presentation is shown
+ *    only via the transient override immediately after success.
  */
 export function resolveNpcMissionDialogue(
   npcId: string,
@@ -469,24 +517,26 @@ export function resolveNpcMissionDialogue(
       if (sequence) return { sequence, missionId: definition.id };
       continue;
     }
-    const idle = definition.offers.find((candidate) => candidate.npcId === npcId)?.idleDialogueId;
+    const offer = definition.offers.find((candidate) => candidate.npcId === npcId);
+    const idle = offer?.activeDialogueId ?? offer?.idleDialogueId;
     const sequence = idle ? getDialogue(idle) : undefined;
     if (sequence) return { sequence, missionId: definition.id };
   }
 
-  // 3. Completed missions.
+  // 3. Completed missions — ordinary story-state dialogue (newest authored win).
   for (const projection of newestFirst) {
     if (projection.state !== "completed") continue;
     const definition = getMission(projection.missionId);
     if (!definition) continue;
-    if (definition.turnIn.npcId === npcId) {
-      const presentation = definition.dialogue.completionPresentationDialogueId;
-      const sequence = presentation ? getDialogue(presentation) : undefined;
+    const entry = definition.completedNpcDialogue?.find((candidate) => candidate.npcId === npcId);
+    if (entry) {
+      const sequence = getDialogue(entry.dialogueId);
       if (sequence) return { sequence, missionId: definition.id };
       continue;
     }
-    const idle = definition.offers.find((candidate) => candidate.npcId === npcId)?.idleDialogueId;
-    const sequence = idle ? getDialogue(idle) : undefined;
+    const offer = definition.offers.find((candidate) => candidate.npcId === npcId);
+    const completed = offer?.completedDialogueId ?? offer?.idleDialogueId;
+    const sequence = completed ? getDialogue(completed) : undefined;
     if (sequence) return { sequence, missionId: definition.id };
   }
 

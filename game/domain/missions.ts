@@ -368,6 +368,20 @@ export function validateMissionDefinitions(definitions: readonly MissionDefiniti
         );
       }
       if (offer.idleDialogueId) assertDialogue(definition.id, offer.idleDialogueId, "idle");
+      if (offer.activeDialogueId) assertDialogue(definition.id, offer.activeDialogueId, "active");
+      if (offer.completedDialogueId)
+        assertDialogue(definition.id, offer.completedDialogueId, "completed");
+    }
+    if (definition.completedNpcDialogue) {
+      const seen = new Set<string>();
+      for (const entry of definition.completedNpcDialogue) {
+        if (!getNpc(entry.npcId))
+          throw new Error(`${where} completed dialogue references unknown NPC "${entry.npcId}".`);
+        assertDialogue(definition.id, entry.dialogueId, "completed NPC dialogue");
+        if (seen.has(entry.npcId))
+          throw new Error(`${where} duplicates completed dialogue for NPC "${entry.npcId}".`);
+        seen.add(entry.npcId);
+      }
     }
     for (const requirement of definition.requirements) {
       if (requirement.kind === "at_location") {

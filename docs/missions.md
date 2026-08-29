@@ -171,11 +171,11 @@ Dialogue remains **authored content** while semantic mission state **selects** t
 ### Authored dialogue homes
 
 - **Sequences** — `game/content/dialogue.ts` (`DialogueSequence`, `DIALOGUE_SEQUENCES`, `getDialogue`). Beats are presentation only (`npc` / `item` / `skill_xp`); item and skill-XP beats never mutate state.
-- **Semantic mapping** — `MissionOffer` (`dialogueId`, `acceptedContinuationDialogueId`, `idleDialogueId`) plus `MissionDialogue` for turn-in-stage branches and completion/capacity presentation.
+- **Semantic mapping** — `MissionOffer` (`dialogueId`, `acceptedContinuationDialogueId`, `activeDialogueId` / `completedDialogueId` / legacy `idleDialogueId`) plus `MissionDefinition.completedNpcDialogue` (ordinary post-completion story dialogue per NPC) and `MissionDialogue` for turn-in-stage branches, capacity, and the one-shot completion presentation.
 
 ### Currently supported semantic dialogue routing
 
-All routed through the single generic router `resolveNpcMissionDialogue(npcId, projections)` in `game/content/dialogue.ts`, which consumes `NpcDialogueProjection` (`missionId`, `state`, `prerequisiteSatisfied`, `stage`). Routing scans projections newest-first in three tiers: offers → active missions → completed missions, driven exclusively by semantic state, never by mission-ID chains in UI code.
+All routed through the single generic router `resolveNpcMissionDialogue(npcId, projections)` in `game/content/dialogue.ts`, which consumes `NpcDialogueProjection` (`missionId`, `state`, `prerequisiteSatisfied`, `stage`). Routing scans projections newest-first in three tiers: offers → active missions → completed missions, driven exclusively by semantic state, never by mission-ID chains in UI code. Completed-story routing prefers the newest/furthest authored mission state for each NPC; `completionPresentationDialogueId` is **not** persistent idle dialogue — it is immediate one-shot presentation after success (§9.1).
 
 | Routing tier | Kind | Source | When it is selected |
 | --- | --- | --- | --- |
@@ -185,12 +185,17 @@ All routed through the single generic router `resolveNpcMissionDialogue(npcId, p
 | Active (turn-in NPC) | **Requirements satisfied but busy** | `MissionDialogue.busyDialogueId` | requirements hold but `turnInAvailable` is false because the character is still busy |
 | Active (turn-in NPC) | **Equipment reminder** | `MissionDialogue.equipmentReminderDialogueId` | first unmet requirement `kind === "equipped_item"` |
 | Active (turn-in NPC) | **Carried-item reminder** | `MissionDialogue.carriedReminderDialogueId` | first unmet requirement `kind === "carried_stack"` |
-| Active (other offer NPC) | **Idle / follow-up** | `MissionOffer.idleDialogueId` | a different offer NPC while the mission is active |
+| Active (other offer NPC) | **Active follow-up** | `MissionOffer.activeDialogueId` (fallback `idleDialogueId`) | the offer NPC while the mission is active — e.g. Wade while Walk It Off is active |
 | Completion | **Capacity refusal — slots** | `MissionDialogue.capacitySlotsDialogueId` | item reward preflight failed on `slots` (selected generically from the mission's mapping after a `capacity` refusal) |
 | Completion | **Capacity refusal — mass** | `MissionDialogue.capacityMassDialogueId` | item reward preflight failed on `mass` |
-| Completion | **Completion presentation** | `MissionDialogue.completionPresentationDialogueId` | newest completed mission at its turn-in NPC (`getMissionCompletionPresentation`) — revealed after the authoritative success, including `item` / `skill_xp` beats for the already-granted reward |
+| Completed story | **Ordinary post-completion dialogue** | `MissionDefinition.completedNpcDialogue` or `MissionOffer.completedDialogueId` (fallback `idleDialogueId`) | newest completed mission that authors ordinary dialogue for this NPC; one-shot completion presentation is **not** reused here |
+| Completion presentation (one-shot) | **Completion presentation** | `MissionDialogue.completionPresentationDialogueId` (`getMissionCompletionPresentation`) | presentation-only beats (`item` / `skill_xp`) shown immediately after the authoritative success via the transient override in `NpcInteractionPanel`; subsequent conversations route to the completed-story dialogue above |
 
 Action labels on sequences (`actionLabel`, e.g. "Claim Cutter", "SHOW SHALE") are authored copy for the terminal control. Capacity and completion beats are presentation only — the authoritative completion stamp, consumption, and reward already committed when they become visible.
+
+### 9.1 Completion presentation is one-shot, not persistent idle
+
+`MissionDialogue.completionPresentationDialogueId` is narrowly-scoped one-shot UI presentation shown immediately after the authoritative completion succeeds (via the transient `sequenceOverride` in `NpcInteractionPanel`). After that conversation closes, later talks route to ordinary completed-story dialogue (the newest authored `completedNpcDialogue` / `completedDialogueId`), not a replay of the reward beats. A refresh/reopen after completion likewise routes to ordinary story dialogue — no durable pending-presentation persistence is added in this issue. Ordinary future missions should author new post-completion dialogue instead of reusing the presentation as idle.
 
 ## 10. Quest guidance
 
