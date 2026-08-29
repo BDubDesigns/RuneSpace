@@ -13,7 +13,12 @@ import {
   type SkillId,
 } from "@/game/config/foundations";
 import type { MissionState } from "@/game/domain/missions";
-import { getMission, type MissionRequirementKind } from "./missions";
+import {
+  MISSIONS,
+  getMission,
+  type MissionDefinition,
+  type MissionRequirementKind,
+} from "./missions";
 import { getItemPresentation } from "./item-presentation";
 import { getSkillPresentation } from "./skill-presentation";
 import { getNpc, resolveNpcExpression } from "./npcs";
@@ -489,12 +494,27 @@ export function resolveNpcMissionDialogue(
   npcId: string,
   projections: readonly NpcDialogueProjection[],
 ): NpcDialogueResolution | undefined {
+  return resolveNpcMissionDialogueWithDefinitions(npcId, projections, MISSIONS);
+}
+
+/**
+ * Pure routing helper that resolves against an explicit ordered definition
+ * list. Production callers use `resolveNpcMissionDialogue` (which injects
+ * `MISSIONS`); tests inject synthetic ordered definitions to prove generic
+ * fallback/win semantics without adding player-visible fake missions.
+ */
+export function resolveNpcMissionDialogueWithDefinitions(
+  npcId: string,
+  projections: readonly NpcDialogueProjection[],
+  definitions: readonly MissionDefinition[],
+): NpcDialogueResolution | undefined {
+  const byId = new Map(definitions.map((definition) => [definition.id, definition]));
   const newestFirst = [...projections].reverse();
 
   // 1. Offers.
   for (const projection of newestFirst) {
     if (projection.state !== "not_accepted" || !projection.prerequisiteSatisfied) continue;
-    const definition = getMission(projection.missionId);
+    const definition = byId.get(projection.missionId);
     const offer = definition?.offers.find((candidate) => candidate.npcId === npcId);
     if (!definition || !offer) continue;
     const sequence = getDialogue(offer.dialogueId);
@@ -509,7 +529,7 @@ export function resolveNpcMissionDialogue(
   // 2. Active missions.
   for (const projection of newestFirst) {
     if (projection.state !== "active" && projection.state !== "ready_for_completion") continue;
-    const definition = getMission(projection.missionId);
+    const definition = byId.get(projection.missionId);
     if (!definition) continue;
     if (definition.turnIn.npcId === npcId) {
       const sequence = turnInStageSequence(definition, projection.stage);
@@ -525,7 +545,7 @@ export function resolveNpcMissionDialogue(
   // 3. Completed missions — ordinary story-state dialogue (newest authored win).
   for (const projection of newestFirst) {
     if (projection.state !== "completed") continue;
-    const definition = getMission(projection.missionId);
+    const definition = byId.get(projection.missionId);
     if (!definition) continue;
     const entry = definition.completedNpcDialogue?.find((candidate) => candidate.npcId === npcId);
     if (entry) {
