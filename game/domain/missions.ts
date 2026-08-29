@@ -1,4 +1,12 @@
-import type { MissionDefinition, MissionObjectiveStep } from "@/game/content/missions";
+import { getItemDefinition, skillLevelThresholds } from "@/game/config/balance";
+import { getActionOutputItemIds } from "@/game/domain/action-outputs";
+import { getDialogue } from "@/game/content/dialogue";
+import { getLocation } from "@/game/content/locations";
+import type {
+  MissionDefinition,
+  MissionRequirement,
+  MissionRequirementKind,
+} from "@/game/content/missions";
 import { getNpc } from "@/game/content/npcs";
 
 export type MissionState = "not_accepted" | "active" | "ready_for_completion" | "completed";
@@ -23,6 +31,30 @@ export type MissionObservation = {
   itemNames: ReadonlyMap<string, string>;
 };
 
+/**
+ * Semantic quest-guidance targets projected from mission state. UI consumers
+ * answer one common question — "is this entity/control currently a
+ * quest-guidance target?" — without inspecting mission IDs, objective prose,
+ * or drop tables.
+ */
+export type MissionGuidance = {
+  /** The NPC whose interaction the current objective requires. */
+  npcId?: string;
+  /** The item whose equipped state is the first unmet requirement. */
+  equipmentItemId?: string;
+  /** The authored recommended acquisition action for the first unmet carried requirement. */
+  actionId?: string;
+  /**
+   * The NPC(s) whose authored offer interaction is currently a quest-
+   * availability target: every offer whose location matches the player's
+   * current location for a mission that is not yet accepted, its
+   * prerequisite satisfied, and not completed. Availability guides NPC
+   * interactions only; advancement after acceptance guides NPC/equipment/
+   * action progression.
+   */
+  availableNpcIds?: readonly string[];
+};
+
 export type MissionProjection = {
   missionId: string;
   title: string;
@@ -38,7 +70,7 @@ export type MissionProjection = {
    * available instead of hiding it.
    */
   prerequisiteSatisfied: boolean;
-  /** Authoritative display name for the offering NPC (for available copy). */
+  /** Authoritative display name for the primary offering NPC (for available copy). */
   offeringNpcName?: string;
   /**
    * Player-facing copy shown while the mission is available but not yet
@@ -51,133 +83,165 @@ export type MissionProjection = {
    * quest/dialogue routing.
    */
   stage?: {
-    /** All authored objective steps currently hold against authoritative state. */
+    /** All authored requirements currently hold against authoritative state. */
     requirementsSatisfied: boolean;
     /**
-     * True only when the character is stationary at the mission location AND
-     * requirements are satisfied — i.e. the turn-in is currently performable.
-     * A busy character can have requirementsSatisfied true while this is false.
+     * True only when the character is stationary at the turn-in location AND
+     * every requirement is satisfied — i.e. the turn-in is currently
+     * performable. A busy character can have requirementsSatisfied true while
+     * this is false.
      */
     turnInAvailable: boolean;
     /**
-     * The first unsatisfied step kind, if any, in authored order. Used only
-     * to choose contextual dialogue (equip vs stack vs turn-in), never to
-     * gate gameplay.
+     * The first unsatisfied requirement kind, if any, in authored order. Used
+     * only to choose contextual dialogue and guidance, never to gate gameplay.
      */
-    nextObjectiveKind?: "equip_item" | "carry_stack";
+    nextObjectiveKind?: MissionRequirementKind;
   };
+  /** Projected semantic guidance targets (empty when nothing needs guidance). */
+  guidance?: MissionGuidance;
 };
 
 /** Renders authored copy with authoritative names/numbers; no other rewriting. */
-function renderObjectiveTemplate(
-  template: string,
-  step: MissionObjectiveStep,
-  observation: MissionObservation,
+function renderRequirementObjective(
+  requirement: MissionRequirement,
+  observation: MissionObservation | undefined,
 ): string {
-  const itemName = observation.itemNames.get(step.itemId) ?? step.itemId;
-  return template
+  if (requirement.kind === "at_location") return requirement.objective;
+  const itemName = observation?.itemNames.get(requirement.itemId) ?? requirement.itemId;
+  if (requirement.kind === "equipped_item") {
+    return requirement.objective.replace("{item}", itemName);
+  }
+  const required = requiredCarriedQuantity(requirement, observation);
+  const carried = Math.min(observation?.carriedQuantities.get(requirement.itemId) ?? 0, required);
+  return requirement.objective
     .replace("{item}", itemName)
-    .replace(
-      "{carried}",
-      String(
-        Math.min(
-          observation.carriedQuantities.get(step.itemId) ?? 0,
-          requiredQuantity(step, observation),
-        ),
-      ),
-    )
-    .replace("{required}", String(requiredQuantity(step, observation)));
+    .replace("{carried}", String(carried))
+    .replace("{required}", String(required));
 }
 
 /** Full-stack requirement resolves from the authoritative stack limit, not quest data. */
-function requiredQuantity(step: MissionObjectiveStep, observation: MissionObservation): number {
-  if (step.kind !== "carry_stack") return 1;
-  if (step.quantity !== undefined) return step.quantity;
-  return observation.stackLimits.get(step.itemId) ?? 1;
+function requiredCarriedQuantity(
+  requirement: Extract<MissionRequirement, { kind: "carried_stack" }>,
+  observation: MissionObservation | undefined,
+): number {
+  if (requirement.quantity !== undefined) return requirement.quantity;
+  return observation?.stackLimits.get(requirement.itemId) ?? 1;
 }
 
-function stepSatisfied(
-  step: MissionObjectiveStep,
+function requirementSatisfied(
+  requirement: MissionRequirement,
+  currentLocationId: string,
   observation: MissionObservation | undefined,
 ): boolean {
-  if (!observation) return false;
-  if (step.kind === "equip_item") return observation.equippedItemIds.has(step.itemId);
-  const required = requiredQuantity(step, observation);
-  return (observation.carriedQuantities.get(step.itemId) ?? 0) >= required;
+  switch (requirement.kind) {
+    case "at_location":
+      return currentLocationId === requirement.locationId;
+    case "equipped_item":
+      return observation?.equippedItemIds.has(requirement.itemId) ?? false;
+    case "carried_stack": {
+      const carried = observation?.carriedQuantities.get(requirement.itemId) ?? 0;
+      return carried >= requiredCarriedQuantity(requirement, observation);
+    }
+  }
+}
+
+function firstUnsatisfiedRequirement(
+  definition: MissionDefinition,
+  currentLocationId: string,
+  observation: MissionObservation | undefined,
+): MissionRequirement | undefined {
+  return definition.requirements.find(
+    (requirement) => !requirementSatisfied(requirement, currentLocationId, observation),
+  );
 }
 
 /**
- * True when the mission's authored objective steps ALL currently hold against
- * authoritative state. Location/stationary alone never makes a mission
- * completion-ready: the actual completion requirements (equipment, carried
- * quantities) must be satisfied too.
+ * True when every authored requirement currently holds against authoritative
+ * state. Location/stationary alone never makes a mission completion-ready:
+ * the actual authored requirements (location, equipment, carried quantities)
+ * must all be satisfied too.
  */
-function stepsSatisfied(
+function requirementsHold(
   definition: MissionDefinition,
+  currentLocationId: string,
   observation: MissionObservation | undefined,
 ): boolean {
-  if (!definition.objectiveSteps?.length) return true;
-  if (!observation) return false;
-  return definition.objectiveSteps.every((step) => stepSatisfied(step, observation));
+  return definition.requirements.every((requirement) =>
+    requirementSatisfied(requirement, currentLocationId, observation),
+  );
 }
 
 export function deriveMissionState(input: {
   mission: MissionRecordState | undefined;
   definition: MissionDefinition;
-  relevantLocationId: string;
   currentLocationId: string;
   stationary: boolean;
   observation?: MissionObservation | undefined;
 }): MissionState {
   if (!input.mission?.acceptedAt) return "not_accepted";
   if (input.mission.completedAt) return "completed";
-  const atRelevantLocation = input.currentLocationId === input.relevantLocationId;
-  const requirementsHold =
-    input.stationary && atRelevantLocation && stepsSatisfied(input.definition, input.observation);
-  if (requirementsHold) return "ready_for_completion";
+  // Turn-in eligibility requires stationary presence AT the authored turn-in
+  // location, independently of the requirement list: `at_location`
+  // requirements control objective progression, while `turnIn.locationId` is
+  // its own authoritative turn-in constraint. Authors never need to
+  // duplicate the turn-in location as a requirement to keep eligibility
+  // correct.
+  const holds =
+    input.stationary &&
+    input.currentLocationId === input.definition.turnIn.locationId &&
+    requirementsHold(input.definition, input.currentLocationId, input.observation);
+  if (holds) return "ready_for_completion";
   return "active";
 }
 
 /**
- * The first unsatisfied authored step wins; once every step holds at the
- * mission location, the completion objective shows. Copy stays authored while
- * all conditions are computed from authoritative state.
+ * Ordered objective projection: the first unmet requirement in authored order
+ * owns the current objective copy; once every requirement holds, the authored
+ * turn-in objective shows. Every ordinary mission uses this same path.
  */
 function deriveCurrentObjective(
   definition: MissionDefinition,
-  state: MissionState,
   currentLocationId: string,
-  stationary: boolean,
   observation: MissionObservation | undefined,
-): string | undefined {
+): string {
+  const firstUnsatisfied = firstUnsatisfiedRequirement(definition, currentLocationId, observation);
+  if (firstUnsatisfied) return renderRequirementObjective(firstUnsatisfied, observation);
+  return definition.turnIn.objective;
+}
+
+/**
+ * Projects semantic guidance targets from mission state. Guidance answers
+ * "what should the player interact with next" without consumers inspecting
+ * mission definitions, objective prose, or drop tables.
+ */
+function deriveGuidance(
+  definition: MissionDefinition,
+  state: MissionState,
+  prerequisiteSatisfied: boolean,
+  currentLocationId: string,
+  observation: MissionObservation | undefined,
+): MissionGuidance | undefined {
   if (state === "completed") return undefined;
-  if (!definition.objectiveSteps?.length || !observation) {
-    // Walk It Off's proven shape: location-based travel/completion copy.
-    if (state === "active") {
-      return definition.relevantLocationId === currentLocationId
-        ? definition.completionObjective
-        : definition.travelObjective;
-    }
-    if (state === "ready_for_completion") return definition.completionObjective;
-    return undefined;
+  if (state === "not_accepted") {
+    if (!prerequisiteSatisfied) return undefined;
+    const availableNpcIds = definition.offers
+      .filter((offer) => offer.locationId === currentLocationId)
+      .map((offer) => offer.npcId);
+    if (availableNpcIds.length === 0) return undefined;
+    return { availableNpcIds };
   }
-  if (state === "active") {
-    if (definition.relevantLocationId !== currentLocationId) return definition.travelObjective;
-    const step = definition.objectiveSteps.find(
-      (candidate) => !stepSatisfied(candidate, observation),
-    );
-    // An unsatisfied step renders its own objective; when every step holds but
-    // the character is busy (not stationary), the completion objective is the
-    // accurate next instruction — they already have what the quest asked for.
-    if (step) return renderObjectiveTemplate(step.template, step, observation);
-    return definition.completionObjective;
+  const firstUnsatisfied = firstUnsatisfiedRequirement(definition, currentLocationId, observation);
+  if (!firstUnsatisfied) {
+    // Every requirement holds: the turn-in NPC is the interaction target even
+    // while the character is still busy (turn-in merely not performable yet).
+    return { npcId: definition.turnIn.npcId };
   }
-  if (state === "ready_for_completion") {
-    const step = definition.objectiveSteps.find(
-      (candidate) => !stepSatisfied(candidate, observation),
-    );
-    if (step) return renderObjectiveTemplate(step.template, step, observation);
-    return definition.completionObjective;
+  if (firstUnsatisfied.kind === "equipped_item") {
+    return { equipmentItemId: firstUnsatisfied.itemId };
+  }
+  if (firstUnsatisfied.kind === "carried_stack" && firstUnsatisfied.recommendedActionId) {
+    return { actionId: firstUnsatisfied.recommendedActionId };
   }
   return undefined;
 }
@@ -193,35 +257,212 @@ export function projectMission(
   const state = deriveMissionState({
     mission,
     definition,
-    relevantLocationId: definition.relevantLocationId,
     currentLocationId,
     stationary,
     observation,
   });
-  const firstUnsatisfied = definition.objectiveSteps?.find(
-    (candidate) => !stepSatisfied(candidate, observation),
-  );
-  const requirementsSatisfied = stepsSatisfied(definition, observation);
-  const offeringNpc = getNpc(definition.offeringNpcId);
+  const firstUnsatisfied = firstUnsatisfiedRequirement(definition, currentLocationId, observation);
+  const requirementsSatisfied = requirementsHold(definition, currentLocationId, observation);
+  const prerequisiteSatisfied = !definition.prerequisiteMissionId || prerequisiteCompleted;
+  const offeringNpc = getNpc(definition.offers[0]?.npcId ?? "");
   return {
     missionId: definition.id,
     title: definition.title,
     summary: definition.summary,
     state,
     currentObjective:
-      state === "not_accepted"
+      state === "not_accepted" || state === "completed"
         ? undefined
-        : deriveCurrentObjective(definition, state, currentLocationId, stationary, observation),
-    offeringNpcId: definition.offeringNpcId,
+        : deriveCurrentObjective(definition, currentLocationId, observation),
+    offeringNpcId: definition.offers[0]?.npcId ?? "",
     offeringNpcName: offeringNpc?.displayName,
-    completionNpcId: definition.completionNpcId,
+    completionNpcId: definition.turnIn.npcId,
     rewardItemId: definition.reward.kind === "item" ? definition.reward.itemId : undefined,
-    prerequisiteSatisfied: !definition.prerequisiteMissionId || prerequisiteCompleted,
+    prerequisiteSatisfied,
     availableObjective: definition.availableObjective,
     stage: {
       requirementsSatisfied,
       turnInAvailable: state === "ready_for_completion" && requirementsSatisfied,
       nextObjectiveKind: firstUnsatisfied?.kind,
     },
+    guidance: deriveGuidance(
+      definition,
+      state,
+      prerequisiteSatisfied,
+      currentLocationId,
+      observation,
+    ),
   };
+}
+
+/**
+ * The union of currently projected quest-guidance targets across all missions.
+ * UI surfaces consume this single derived set instead of inspecting mission
+ * state themselves. `availableNpcIds` (blue) and `npcIds` (green) are
+ * semantically distinct: a consumer can tell "new quest here" from "this
+ * interaction advances the quest you accepted" without inferring intent
+ * from mission state, dialogue IDs, or colours.
+ */
+export type QuestGuidanceTargets = {
+  /** NPC(s) whose authored offer is currently a quest-availability target. */
+  availableNpcIds: ReadonlySet<string>;
+  /** NPC(s) whose interaction advances/completes an accepted quest. */
+  npcIds: ReadonlySet<string>;
+  equipmentItemIds: ReadonlySet<string>;
+  actionIds: ReadonlySet<string>;
+};
+
+export function deriveQuestGuidanceTargets(
+  projections: readonly MissionProjection[],
+): QuestGuidanceTargets {
+  const availableNpcIds = new Set<string>();
+  const npcIds = new Set<string>();
+  const equipmentItemIds = new Set<string>();
+  const actionIds = new Set<string>();
+  for (const projection of projections) {
+    if (projection.guidance?.availableNpcIds) {
+      for (const id of projection.guidance.availableNpcIds) availableNpcIds.add(id);
+    }
+    if (projection.guidance?.npcId) npcIds.add(projection.guidance.npcId);
+    if (projection.guidance?.equipmentItemId)
+      equipmentItemIds.add(projection.guidance.equipmentItemId);
+    if (projection.guidance?.actionId) actionIds.add(projection.guidance.actionId);
+  }
+  return { availableNpcIds, npcIds, equipmentItemIds, actionIds };
+}
+
+/**
+ * Startup validation for authored mission content. Fails fast (module load)
+ * on any definition the framework cannot interpret safely, so an authoring
+ * mistake never reaches a player as a silent runtime refusal.
+ */
+export function validateMissionDefinitions(definitions: readonly MissionDefinition[]): void {
+  const knownIds = new Set(definitions.map((definition) => definition.id));
+  for (const definition of definitions) {
+    const where = `Mission "${definition.id}"`;
+    if (definition.offers.length === 0) {
+      throw new Error(`${where} must author at least one offer interaction.`);
+    }
+    if (definition.prerequisiteMissionId !== undefined) {
+      if (definition.prerequisiteMissionId === definition.id) {
+        throw new Error(`${where} cannot be its own prerequisite.`);
+      }
+      if (!knownIds.has(definition.prerequisiteMissionId)) {
+        throw new Error(
+          `${where} references unknown prerequisite "${definition.prerequisiteMissionId}".`,
+        );
+      }
+    }
+    for (const offer of definition.offers) {
+      if (!getNpc(offer.npcId))
+        throw new Error(`${where} offer references unknown NPC "${offer.npcId}".`);
+      if (!getLocation(offer.locationId)) {
+        throw new Error(`${where} offer references unknown location "${offer.locationId}".`);
+      }
+      assertDialogue(definition.id, offer.dialogueId, "offer");
+      if (offer.acceptedContinuationDialogueId) {
+        assertDialogue(
+          definition.id,
+          offer.acceptedContinuationDialogueId,
+          "accepted continuation",
+        );
+      }
+      if (offer.idleDialogueId) assertDialogue(definition.id, offer.idleDialogueId, "idle");
+    }
+    for (const requirement of definition.requirements) {
+      if (requirement.kind === "at_location") {
+        if (!getLocation(requirement.locationId)) {
+          throw new Error(
+            `${where} requirement references unknown location "${requirement.locationId}".`,
+          );
+        }
+        continue;
+      }
+      const itemDefinition = getItemDefinition(requirement.itemId);
+      if (!itemDefinition) {
+        throw new Error(`${where} requirement references unknown item "${requirement.itemId}".`);
+      }
+      if (requirement.kind === "carried_stack") {
+        if (itemDefinition.kind !== "stack") {
+          throw new Error(`${where} carried requirement must target a stackable item.`);
+        }
+        if (
+          requirement.quantity !== undefined &&
+          (!Number.isInteger(requirement.quantity) || requirement.quantity <= 0)
+        ) {
+          throw new Error(`${where} carried requirement quantity must be a positive integer.`);
+        }
+        const resolvedQuantity = requirement.quantity ?? itemDefinition.stackLimit;
+        if (resolvedQuantity > itemDefinition.stackLimit) {
+          throw new Error(`${where} carried requirement exceeds the authoritative stack limit.`);
+        }
+        if (requirement.recommendedActionId) {
+          const outputs = getActionOutputItemIds(requirement.recommendedActionId);
+          if (!outputs || !outputs.includes(requirement.itemId)) {
+            throw new Error(
+              `${where} recommends action "${requirement.recommendedActionId}" which does not authoritatively produce "${requirement.itemId}".`,
+            );
+          }
+        }
+      }
+    }
+    if (!getNpc(definition.turnIn.npcId)) {
+      throw new Error(`${where} turn-in references unknown NPC "${definition.turnIn.npcId}".`);
+    }
+    if (!getLocation(definition.turnIn.locationId)) {
+      throw new Error(
+        `${where} turn-in references unknown location "${definition.turnIn.locationId}".`,
+      );
+    }
+    assertDialogue(definition.id, definition.turnIn.dialogueId, "turn-in");
+    const dialogue = definition.dialogue;
+    if (dialogue.equipmentReminderDialogueId)
+      assertDialogue(definition.id, dialogue.equipmentReminderDialogueId, "equipment reminder");
+    if (dialogue.carriedReminderDialogueId)
+      assertDialogue(definition.id, dialogue.carriedReminderDialogueId, "carried reminder");
+    if (dialogue.busyDialogueId) assertDialogue(definition.id, dialogue.busyDialogueId, "busy");
+    if (dialogue.completionPresentationDialogueId) {
+      assertDialogue(
+        definition.id,
+        dialogue.completionPresentationDialogueId,
+        "completion presentation",
+      );
+    }
+    if (dialogue.capacitySlotsDialogueId)
+      assertDialogue(definition.id, dialogue.capacitySlotsDialogueId, "capacity slots");
+    if (dialogue.capacityMassDialogueId)
+      assertDialogue(definition.id, dialogue.capacityMassDialogueId, "capacity mass");
+    if (definition.reward.kind === "item") {
+      const rewardDefinition = getItemDefinition(definition.reward.itemId);
+      if (!rewardDefinition) {
+        throw new Error(`${where} reward references unknown item "${definition.reward.itemId}".`);
+      }
+      // Definition validation and runtime capability must agree: the generic
+      // completion boundary grants item rewards by inserting ONE new unique
+      // instance (capacity-preflighted). A stackable item reward has no
+      // authorized execution path yet, so it fails fast here instead of
+      // passing validation and throwing at runtime. A real mission that needs
+      // one earns that path deliberately.
+      if (rewardDefinition.kind !== "unique") {
+        throw new Error(
+          `${where} reward item "${definition.reward.itemId}" must be a unique item; the generic completion boundary does not execute stackable item rewards.`,
+        );
+      }
+    } else {
+      if (!Number.isInteger(definition.reward.amount) || definition.reward.amount <= 0) {
+        throw new Error(`${where} reward XP amount must be a positive integer.`);
+      }
+      if (!skillLevelThresholds(definition.reward.skillId)) {
+        throw new Error(
+          `${where} reward references skill "${definition.reward.skillId}" without an approved progression curve.`,
+        );
+      }
+    }
+  }
+}
+
+function assertDialogue(missionId: string, dialogueId: string, role: string): void {
+  if (!getDialogue(dialogueId)) {
+    throw new Error(`Mission "${missionId}" ${role} references unknown dialogue "${dialogueId}".`);
+  }
 }

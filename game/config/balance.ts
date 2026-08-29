@@ -248,3 +248,15 @@ const skillLevelCurves = {
 export function skillLevelThresholds(skillId: string): readonly LevelThreshold[] | undefined {
   return skillLevelCurves[skillId as SkillId]?.();
 }
+
+/**
+ * The charge capacity an item definition authors, or undefined when the item
+ * has no charge state at all. Charge is currently authored only on the
+ * Salvage Cutter; readers must consult this instead of assuming every unique
+ * item carries charge semantics.
+ */
+export function getItemMaximumCharge(itemId: string): number | undefined {
+  const item = Object.values(defaults.items).find((candidate) => candidate.itemId === itemId);
+  if (!item) return undefined;
+  return "maximumCharge" in item ? item.maximumCharge : undefined;
+}

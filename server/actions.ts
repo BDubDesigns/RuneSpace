@@ -35,10 +35,8 @@ import { EquipmentRuleError } from "@/game/domain/equipment";
 import { TravelRuleError } from "@/server/travel";
 import { claimPowerCells, type PowerAnnexClaimResult } from "@/server/power-annex";
 import {
-  acceptWalkItOff,
-  completeWalkItOff,
-  acceptCutYourTeeth,
-  completeCutYourTeeth,
+  acceptMission,
+  completeMission,
   type MissionAcceptanceResult,
   type MissionCompletionResult,
 } from "@/server/missions";
@@ -57,10 +55,8 @@ import {
   DepositCargoUniqueItemRequestSchema,
   WithdrawCargoUniqueItemRequestSchema,
   ChangeCharacterPortraitRequestSchema,
-  AcceptWalkItOffRequestSchema,
-  CompleteWalkItOffRequestSchema,
-  AcceptCutYourTeethRequestSchema,
-  CompleteCutYourTeethRequestSchema,
+  AcceptMissionRequestSchema,
+  CompleteMissionRequestSchema,
 } from "@/game/schemas/gameplay";
 
 /**
@@ -144,50 +140,44 @@ export type MissionActionResult =
   | MissionCompletionResult
   | { error: string };
 
-export async function acceptWalkItOffAction(input: unknown): Promise<MissionActionResult> {
-  const request = AcceptWalkItOffRequestSchema.safeParse(input);
-  if (!request.success) return { error: "Invalid Walk It Off acceptance command." };
+/**
+ * Generic mission acceptance command. The browser submits only narrow command
+ * identity/intent (owned character, authored mission, NPC); the server
+ * revalidates every rule from the mission definition inside the transaction.
+ */
+export async function acceptMissionAction(input: unknown): Promise<MissionActionResult> {
+  const request = AcceptMissionRequestSchema.safeParse(input);
+  if (!request.success) return { error: "Invalid mission acceptance command." };
   try {
     const user = await requireCurrentUser(await headers());
-    return await acceptWalkItOff(user.id, request.data.characterId);
+    return await acceptMission(
+      user.id,
+      request.data.characterId,
+      request.data.missionId,
+      request.data.npcId,
+    );
   } catch (error) {
     if (error instanceof OwnershipError) return { error: error.message };
     throw error;
   }
 }
 
-export async function completeWalkItOffAction(input: unknown): Promise<MissionActionResult> {
-  const request = CompleteWalkItOffRequestSchema.safeParse(input);
-  if (!request.success) return { error: "Invalid Walk It Off completion command." };
+/**
+ * Generic mission completion command. Requirements, consumption, rewards, and
+ * the completion stamp are all server-authoritative; nothing is trusted from
+ * the client beyond the narrow command identity/intent.
+ */
+export async function completeMissionAction(input: unknown): Promise<MissionActionResult> {
+  const request = CompleteMissionRequestSchema.safeParse(input);
+  if (!request.success) return { error: "Invalid mission completion command." };
   try {
     const user = await requireCurrentUser(await headers());
-    return await completeWalkItOff(user.id, request.data.characterId);
-  } catch (error) {
-    if (error instanceof OwnershipError) return { error: error.message };
-    throw error;
-  }
-}
-
-/** Issue #110 Cut Your Teeth acceptance — same trusted boundary as Walk It Off. */
-export async function acceptCutYourTeethAction(input: unknown): Promise<MissionActionResult> {
-  const request = AcceptCutYourTeethRequestSchema.safeParse(input);
-  if (!request.success) return { error: "Invalid Cut Your Teeth acceptance command." };
-  try {
-    const user = await requireCurrentUser(await headers());
-    return await acceptCutYourTeeth(user.id, request.data.characterId);
-  } catch (error) {
-    if (error instanceof OwnershipError) return { error: error.message };
-    throw error;
-  }
-}
-
-/** Issue #110 Cut Your Teeth completion — XP award stays server-authoritative. */
-export async function completeCutYourTeethAction(input: unknown): Promise<MissionActionResult> {
-  const request = CompleteCutYourTeethRequestSchema.safeParse(input);
-  if (!request.success) return { error: "Invalid Cut Your Teeth completion command." };
-  try {
-    const user = await requireCurrentUser(await headers());
-    return await completeCutYourTeeth(user.id, request.data.characterId);
+    return await completeMission(
+      user.id,
+      request.data.characterId,
+      request.data.missionId,
+      request.data.npcId,
+    );
   } catch (error) {
     if (error instanceof OwnershipError) return { error: error.message };
     throw error;

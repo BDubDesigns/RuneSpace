@@ -125,19 +125,23 @@ export const WithdrawCargoUniqueItemRequestSchema = z.object({
   itemInstanceId: z.string().uuid(),
 });
 
-/** Mission commands identify only the owned character; authored mission IDs stay server-owned. */
-export const AcceptWalkItOffRequestSchema = z.object({
+/**
+ * Generic mission commands identify only the owned character plus the narrow
+ * command intent: which authored mission and which NPC the player is acting
+ * with. Everything else — required items, quantities, requirement
+ * satisfaction, consumption, rewards, prerequisite status, completion
+ * eligibility — stays server-owned and is revalidated inside the transaction.
+ * No client-calculated state is ever accepted.
+ */
+export const AcceptMissionRequestSchema = z.object({
   characterId: z.string().uuid(),
+  missionId: ContentId,
+  npcId: ContentId,
 });
-export const CompleteWalkItOffRequestSchema = z.object({
+export const CompleteMissionRequestSchema = z.object({
   characterId: z.string().uuid(),
-});
-/** Issue #110: same trusted shape as the Walk It Off mission commands. */
-export const AcceptCutYourTeethRequestSchema = z.object({
-  characterId: z.string().uuid(),
-});
-export const CompleteCutYourTeethRequestSchema = z.object({
-  characterId: z.string().uuid(),
+  missionId: ContentId,
+  npcId: ContentId,
 });
 
 /** Containers can only hold non-container item definitions. */

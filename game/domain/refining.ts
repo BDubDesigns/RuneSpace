@@ -16,6 +16,34 @@ export type RefiningStopReason = (typeof REFINING_STOP_REASONS)[number];
 
 export type RefiningRandom = { nextBasisPoints(): number };
 
+/**
+ * The authoritative award facts for Refining: the input it consumes and the
+ * two possible outputs one attempt can produce, authored success-output-first
+ * (Refined Ferrite on success, Slag on failure). The resolver and quest-guidance
+ * recommendation validation both read THIS function, so what Refining
+ * authoritatively consumes/produces has exactly one home — changing the
+ * resolver's award cannot leave guidance validation stale.
+ */
+export function refiningAwardFacts(balance: EffectiveGameBalance) {
+  return {
+    inputItemId: balance.items.ferriteShale.itemId,
+    inputQuantity: balance.refining.inputFerriteShale,
+    inputMassGrams: balance.items.ferriteShale.massGrams,
+    outputs: [
+      {
+        itemId: balance.items.refinedFerrite.itemId,
+        stackLimit: balance.items.refinedFerrite.stackLimit,
+        massGrams: balance.items.refinedFerrite.massGrams,
+      },
+      {
+        itemId: balance.items.slag.itemId,
+        stackLimit: balance.items.slag.stackLimit,
+        massGrams: balance.items.slag.massGrams,
+      },
+    ],
+  } as const;
+}
+
 export function refiningSuccessChanceBps(level: number, balance: EffectiveGameBalance): number {
   if (!Number.isInteger(level) || level < 1)
     throw new RangeError("Refining level must be positive");
@@ -206,10 +234,9 @@ export function refiningPreflightStopReason<Id>(
   snapshot: RefiningSnapshot<Id>,
   balance: EffectiveGameBalance,
 ): RefiningStopReason | undefined {
-  const shaleItemId = balance.items.ferriteShale.itemId;
-  const refinedItemId = balance.items.refinedFerrite.itemId;
-  const slagItemId = balance.items.slag.itemId;
-  const inputQty = balance.refining.inputFerriteShale;
+  const award = refiningAwardFacts(balance);
+  const shaleItemId = award.inputItemId;
+  const inputQty = award.inputQuantity;
 
   const totalShale = totalQuantityForItem(snapshot.existingStacks, shaleItemId);
   if (totalShale < inputQty) return "insufficient_ferrite_shale";
@@ -220,7 +247,7 @@ export function refiningPreflightStopReason<Id>(
     snapshot.massAvailableGrams,
     shaleItemId,
     inputQty,
-    balance.items.ferriteShale.massGrams,
+    award.inputMassGrams,
   );
   if (!plan) return "insufficient_ferrite_shale";
   const removal = plan.simulated;
@@ -229,20 +256,12 @@ export function refiningPreflightStopReason<Id>(
   // independently before the success roll is requested.
   const possibleAwards = planPossibleAwardAdditions(
     removal.stacksAfter,
-    [
-      {
-        itemId: refinedItemId,
-        quantity: 1,
-        stackLimit: balance.items.refinedFerrite.stackLimit,
-        itemWeight: balance.items.refinedFerrite.massGrams,
-      },
-      {
-        itemId: slagItemId,
-        quantity: 1,
-        stackLimit: balance.items.slag.stackLimit,
-        itemWeight: balance.items.slag.massGrams,
-      },
-    ],
+    award.outputs.map((output) => ({
+      itemId: output.itemId,
+      quantity: 1,
+      stackLimit: output.stackLimit,
+      itemWeight: output.massGrams,
+    })),
     removal.slotsAvailableAfter,
     removal.massAvailableAfter,
   );
@@ -263,13 +282,18 @@ export function resolveRefining<Id>(input: {
     throw new RangeError("Elapsed ticks must be a non-negative integer");
 
   const durationTicks = balance.refining.attemptDurationTicks;
-  const shaleItemId = balance.items.ferriteShale.itemId;
-  const refinedItemId = balance.items.refinedFerrite.itemId;
-  const slagItemId = balance.items.slag.itemId;
-  const inputShale: number = balance.refining.inputFerriteShale;
-  const shaleMass = balance.items.ferriteShale.massGrams;
-  const refinedMass = balance.items.refinedFerrite.massGrams;
-  const slagMass = balance.items.slag.massGrams;
+  // Award facts live in refiningAwardFacts; the resolver consumes them. The
+  // outputs are authored success-output-first (Refined Ferrite on success,
+  // Slag on failure).
+  const award = refiningAwardFacts(balance);
+  const shaleItemId = award.inputItemId;
+  const inputShale: number = award.inputQuantity;
+  const shaleMass = award.inputMassGrams;
+  const [refinedOutput, slagOutput] = award.outputs;
+  const refinedItemId = refinedOutput.itemId;
+  const slagItemId = slagOutput.itemId;
+  const refinedMass = refinedOutput.massGrams;
+  const slagMass = slagOutput.massGrams;
 
   const initialStop = refiningPreflightStopReason(snapshot, balance);
   if (initialStop) {

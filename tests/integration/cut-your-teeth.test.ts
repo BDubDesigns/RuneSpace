@@ -1,6 +1,6 @@
 import { and, eq } from "drizzle-orm";
 import { afterEach, beforeAll, describe, expect, it } from "vitest";
-import { ITEM_IDS, LOCATION_IDS, SKILL_IDS } from "@/game/config/foundations";
+import { ITEM_IDS, LOCATION_IDS, MISSION_IDS, NPC_IDS, SKILL_IDS } from "@/game/config/foundations";
 import { cleanupTestUser, createCharacterForUser, createTestUser } from "./fixtures";
 
 const DATABASE_URL = process.env.DATABASE_URL;
@@ -67,9 +67,11 @@ suite("issue #110 Cut Your Teeth persistence and XP boundary (real PostgreSQL)",
       .insert(rune.characterMissions)
       .values({ characterId, missionId: "walk_it_off", acceptedAt: now });
     await move(characterId, LOCATION_IDS.theJag);
-    const completed = await missions.completeWalkItOff(
+    const completed = await missions.completeMission(
       userId,
       characterId,
+      MISSION_IDS.walkItOff,
+      NPC_IDS.tansyRusk,
       now,
       deterministicRandom(),
     );
@@ -122,9 +124,11 @@ suite("issue #110 Cut Your Teeth persistence and XP boundary (real PostgreSQL)",
     await move(character.id, LOCATION_IDS.theJag);
     // Even owning shale + having accepted nothing of Walk It Off must refuse.
     await addShale(character.id, 10);
-    const refused = await missions.acceptCutYourTeeth(
+    const refused = await missions.acceptMission(
       userId,
       character.id,
+      MISSION_IDS.cutYourTeeth,
+      NPC_IDS.tansyRusk,
       now,
       deterministicRandom(),
     );
@@ -134,9 +138,11 @@ suite("issue #110 Cut Your Teeth persistence and XP boundary (real PostgreSQL)",
     await db
       .insert(rune.characterMissions)
       .values({ characterId: character.id, missionId: "walk_it_off", acceptedAt: now });
-    const refusedActive = await missions.acceptCutYourTeeth(
+    const refusedActive = await missions.acceptMission(
       userId,
       character.id,
+      MISSION_IDS.cutYourTeeth,
+      NPC_IDS.tansyRusk,
       now,
       deterministicRandom(),
     );
@@ -160,25 +166,31 @@ suite("issue #110 Cut Your Teeth persistence and XP boundary (real PostgreSQL)",
 
     // Wrong-location acceptance refuses.
     await move(character.id, LOCATION_IDS.crashSite);
-    const wrongLocation = await missions.acceptCutYourTeeth(
+    const wrongLocation = await missions.acceptMission(
       userId,
       character.id,
+      MISSION_IDS.cutYourTeeth,
+      NPC_IDS.tansyRusk,
       now,
       deterministicRandom(),
     );
     expect(wrongLocation.mission.status).toBe("refused");
     await move(character.id, LOCATION_IDS.theJag);
 
-    const first = await missions.acceptCutYourTeeth(
+    const first = await missions.acceptMission(
       userId,
       character.id,
+      MISSION_IDS.cutYourTeeth,
+      NPC_IDS.tansyRusk,
       now,
       deterministicRandom(),
     );
     expect(first.mission.status).toBe("accepted");
-    const second = await missions.acceptCutYourTeeth(
+    const second = await missions.acceptMission(
       userId,
       character.id,
+      MISSION_IDS.cutYourTeeth,
+      NPC_IDS.tansyRusk,
       now,
       deterministicRandom(),
     );
@@ -186,9 +198,11 @@ suite("issue #110 Cut Your Teeth persistence and XP boundary (real PostgreSQL)",
 
     // Completion refusals follow objective precedence: equip first, then stack.
     const beforeAnyXp = await miningXp(character.id);
-    const unequipped = await missions.completeCutYourTeeth(
+    const unequipped = await missions.completeMission(
       userId,
       character.id,
+      MISSION_IDS.cutYourTeeth,
+      NPC_IDS.tansyRusk,
       now,
       deterministicRandom(),
     );
@@ -196,9 +210,11 @@ suite("issue #110 Cut Your Teeth persistence and XP boundary (real PostgreSQL)",
 
     // Full stack still refuses while the Cutter sits in Inventory.
     await addShale(character.id, 10);
-    const stillUnequipped = await missions.completeCutYourTeeth(
+    const stillUnequipped = await missions.completeMission(
       userId,
       character.id,
+      MISSION_IDS.cutYourTeeth,
+      NPC_IDS.tansyRusk,
       now,
       deterministicRandom(),
     );
@@ -219,9 +235,11 @@ suite("issue #110 Cut Your Teeth persistence and XP boundary (real PostgreSQL)",
         ),
       );
     await addShale(character.id, 9);
-    const nineOnly = await missions.completeCutYourTeeth(
+    const nineOnly = await missions.completeMission(
       userId,
       character.id,
+      MISSION_IDS.cutYourTeeth,
+      NPC_IDS.tansyRusk,
       now,
       deterministicRandom(),
     );
@@ -237,9 +255,11 @@ suite("issue #110 Cut Your Teeth persistence and XP boundary (real PostgreSQL)",
       );
 
     await addShale(character.id, 10);
-    const completed = await missions.completeCutYourTeeth(
+    const completed = await missions.completeMission(
       userId,
       character.id,
+      MISSION_IDS.cutYourTeeth,
+      NPC_IDS.tansyRusk,
       now,
       deterministicRandom(),
     );
@@ -254,23 +274,29 @@ suite("issue #110 Cut Your Teeth persistence and XP boundary (real PostgreSQL)",
     expect(stacks.filter((stack) => stack.itemId === ITEM_IDS.ferriteShale)[0]?.quantity).toBe(10);
 
     // Retry/concurrent submissions cannot re-award.
-    const retry = await missions.completeCutYourTeeth(
+    const retry = await missions.completeMission(
       userId,
       character.id,
+      MISSION_IDS.cutYourTeeth,
+      NPC_IDS.tansyRusk,
       now,
       deterministicRandom(),
     );
     expect(retry.mission.status).toBe("already_completed");
     const [again] = await Promise.all([
-      missions.completeCutYourTeeth(
+      missions.completeMission(
         userId,
         character.id,
+        MISSION_IDS.cutYourTeeth,
+        NPC_IDS.tansyRusk,
         new Date(now.getTime() + 1_000),
         deterministicRandom(),
       ),
-      missions.completeCutYourTeeth(
+      missions.completeMission(
         userId,
         character.id,
+        MISSION_IDS.cutYourTeeth,
+        NPC_IDS.tansyRusk,
         new Date(now.getTime() + 2_000),
         deterministicRandom(),
       ),
@@ -305,9 +331,11 @@ suite("issue #110 Cut Your Teeth persistence and XP boundary (real PostgreSQL)",
       startedAt: now,
       resolvedThroughAt: now,
     });
-    const busy = await missions.completeCutYourTeeth(
+    const busy = await missions.completeMission(
       userId,
       character.id,
+      MISSION_IDS.cutYourTeeth,
+      NPC_IDS.tansyRusk,
       now,
       deterministicRandom(),
     );
@@ -327,9 +355,11 @@ suite("issue #110 Cut Your Teeth persistence and XP boundary (real PostgreSQL)",
     // Accepting at The Jag: the projection must immediately present the
     // ready-for-completion turn-in objective (SHOW SHALE), not an intermediate
     // equip/stack step, because the authoritative requirements already hold.
-    const accepted = await missions.acceptCutYourTeeth(
+    const accepted = await missions.acceptMission(
       userId,
       character.id,
+      MISSION_IDS.cutYourTeeth,
+      NPC_IDS.tansyRusk,
       now,
       deterministicRandom(),
     );
@@ -349,9 +379,11 @@ suite("issue #110 Cut Your Teeth persistence and XP boundary (real PostgreSQL)",
     });
 
     // Completion succeeds immediately and awards exactly +100 once.
-    const completed = await missions.completeCutYourTeeth(
+    const completed = await missions.completeMission(
       userId,
       character.id,
+      MISSION_IDS.cutYourTeeth,
+      NPC_IDS.tansyRusk,
       now,
       deterministicRandom(),
     );
@@ -421,15 +453,19 @@ suite("issue #110 Cut Your Teeth persistence and XP boundary (real PostgreSQL)",
     // Two FIRST completion requests race: the mission is accepted and
     // incomplete with every requirement satisfied. Exactly one must win.
     const [first, second] = await Promise.all([
-      missions.completeCutYourTeeth(
+      missions.completeMission(
         userId,
         character.id,
+        MISSION_IDS.cutYourTeeth,
+        NPC_IDS.tansyRusk,
         new Date(now.getTime() + 1_000),
         deterministicRandom(),
       ),
-      missions.completeCutYourTeeth(
+      missions.completeMission(
         userId,
         character.id,
+        MISSION_IDS.cutYourTeeth,
+        NPC_IDS.tansyRusk,
         new Date(now.getTime() + 2_000),
         deterministicRandom(),
       ),
@@ -508,7 +544,7 @@ suite("issue #110 Cut Your Teeth persistence and XP boundary (real PostgreSQL)",
     expect(cyt?.stage).toMatchObject({
       requirementsSatisfied: false,
       turnInAvailable: false,
-      nextObjectiveKind: "carry_stack",
+      nextObjectiveKind: "carried_stack",
     });
   });
 

@@ -2,15 +2,20 @@
   "schemaVersion": 1,
   "projectSlug": "runespace",
   "workState": "active",
-  "currentFocus": "Centralize RuneSpace carried-inventory stack mutations with deterministic automatic consumption and selected-stack Power Cell safety in Issue #112 review.",
+  "currentFocus": "Implement the authoritative declarative mission framework from Issue #124: generic accept/complete commands, semantic dialogue routing, and quest guidance.",
   "latestCompleted": {
-    "summary": "Added the Cut Your Teeth story mission with Skill XP dialogue beats.",
-    "date": "2026-08-25",
-    "url": "https://github.com/BDubDesigns/RuneSpace/pull/111"
+    "summary": "Made Inventory item details generic and metadata-driven instead of per-item branches.",
+    "date": "2026-08-27",
+    "url": "https://github.com/BDubDesigns/RuneSpace/pull/120"
   },
-  "nextStep": "Product-owner review of Issue #112 PR #115, deterministic stack behavior, and the selected Power Cell stale-selection path on the deployed preview.",
-  "lastMeaningfulUpdate": "2026-08-26",
+  "nextStep": "Run the full canonical E2E gate, open the Issue #124 draft PR, and hand it to product-owner review.",
+  "lastMeaningfulUpdate": "2026-08-27",
   "highlights": [
+    {
+      "summary": "Made Inventory item details generic and metadata-driven instead of per-item branches.",
+      "date": "2026-08-27",
+      "url": "https://github.com/BDubDesigns/RuneSpace/pull/120"
+    },
     {
       "summary": "Added one authoritative carried-inventory mutation boundary with deterministic stack consumption and selected Power Cell safety.",
       "date": "2026-08-26",
@@ -18,18 +23,13 @@
     },
     {
       "summary": "Added the Cut Your Teeth story mission with Skill XP dialogue beats.",
-      "date": "2026-08-25",
+      "date": "2026-08-26",
       "url": "https://github.com/BDubDesigns/RuneSpace/pull/111"
-    },
-    {
-      "summary": "Added item-acquired presentation beats to dialogue plus QC Studio item authoring.",
-      "date": "2026-08-24",
-      "url": "https://github.com/BDubDesigns/RuneSpace/pull/109"
     }
   ],
   "currentChange": {
-    "summary": "Centralize carried-inventory stack mutations with deterministic consumption and selected Power Cell safety for Issue #112.",
-    "stage": "review",
-    "pullRequestNumber": 115
+    "summary": "Implement the authoritative declarative mission framework from Issue #124: generic accept/complete commands, semantic dialogue routing, and quest guidance.",
+    "stage": "implementation",
+    "pullRequestNumber": 125
   }
 }

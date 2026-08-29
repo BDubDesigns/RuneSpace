@@ -78,6 +78,12 @@ test("walks from Wade to Tansy, presents approved dialogue, and claims one carri
     "data-npc-turn-in",
     "false",
   );
+  // Quest guidance: brand-new character at Crash Site — Wade's Talk
+  // control receives the quest-available (blue) treatment.
+  await expect(page.getByRole("button", { name: /Talk to Wade Rusk/ })).toHaveAttribute(
+    "data-quest-guidance",
+    "available",
+  );
   await page.getByRole("button", { name: /Talk to Wade Rusk/ }).click();
   const dialogue = page.getByRole("dialog", { name: "Wade Rusk dialogue" });
   await expect(dialogue).toBeVisible();
@@ -131,6 +137,12 @@ test("walks from Wade to Tansy, presents approved dialogue, and claims one carri
     "data-npc-turn-in",
     "true",
   );
+  // Quest guidance: the required NPC interaction now receives the active
+  // (green) treatment.
+  await expect(page.getByRole("button", { name: /Talk to Tansy Rusk/ })).toHaveAttribute(
+    "data-quest-guidance",
+    "active",
+  );
   await page.emulateMedia({ reducedMotion: "reduce" });
   await page.getByRole("button", { name: /Talk to Tansy Rusk/ }).click();
   const tansyDialogue = page.getByRole("dialog", { name: "Tansy Rusk dialogue" });
@@ -171,6 +183,13 @@ test("walks from Wade to Tansy, presents approved dialogue, and claims one carri
   await expect(page.locator("[data-mission-objective]")).toContainText("Available");
   await expect(page.locator("[data-mission-objective]")).toContainText(
     "Speak with Tansy Rusk at The Jag to begin Cut Your Teeth.",
+  );
+  // Quest guidance: the AVAILABLE next mission authors an offer presentation,
+  // so the quest-giver Talk control glows available (blue) — derived from
+  // projection, never from a mission-ID conditional.
+  await expect(page.getByRole("button", { name: /Talk to Tansy Rusk/ })).toHaveAttribute(
+    "data-quest-guidance",
+    "available",
   );
 
   const cutter = await db

@@ -16,6 +16,7 @@ import { getEffectiveGameBalance } from "@/game/config/balance";
 import { ACTION_IDS, GAME_TICK_MS, ITEM_IDS, LOCATION_IDS } from "@/game/config/foundations";
 import { getLocation } from "@/game/content/locations";
 import { boostedMiningAttemptDurationTicks, miningNearMissBasisPoints } from "@/game/domain/mining";
+import { deriveQuestGuidanceTargets } from "@/game/domain/missions";
 import type { MiningGameplayState, MiningRunAttempt } from "@/server/mining";
 import { refreshMiningAction, startMiningAction, stopMiningAction } from "@/server/actions";
 import { reportClientDiagnostic } from "@/features/diagnostics/client";
@@ -191,6 +192,14 @@ export function MiningConsole({ characterName }: { characterName: string }) {
   const atTheJag = currentLocationId === LOCATION_IDS.theJag;
   const atTheLongScramble = currentLocationId === LOCATION_IDS.theLongScramble;
   const showMiningActivity = atTheJag && !inTransit;
+  // Quest guidance is consumed from the ONE derived target set — this console
+  // never inspects mission IDs, objective prose, or drop tables to decide
+  // whether Start Mining advances the active quest.
+  const questGuidanceTargets = deriveQuestGuidanceTargets(state.missions);
+  const startMiningGuided =
+    showMiningActivity &&
+    !active &&
+    questGuidanceTargets.actionIds.has(ACTION_IDS.ferriteShaleMining);
   const showRefiningActivity = atProcessingYard && !inTransit;
   const durationTicks = active?.nextAttemptDurationTicks ?? balance.mining.attemptDurationTicks;
   const durationMs = durationTicks * GAME_TICK_MS;
@@ -363,6 +372,8 @@ export function MiningConsole({ characterName }: { characterName: string }) {
                   </ActionButton>
                 ) : (
                   <ActionButton
+                    className={startMiningGuided ? "rs-quest-guidance" : undefined}
+                    data-quest-guidance={startMiningGuided ? "active" : undefined}
                     intent="mining"
                     loading={foregroundBusy && pendingCommand === "start"}
                     onClick={() => runForeground("start", startMiningAction)}

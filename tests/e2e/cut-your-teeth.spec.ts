@@ -113,6 +113,19 @@ test("equips the Cutter through Inventory, shows a full stack, and earns Mining 
     "Equip the Salvage Cutter from Inventory",
   );
 
+  // Quest guidance: the unmet equip requirement targets the Cutter affordance
+  // in Inventory, while Start Mining is NOT highlighted (equip comes first in
+  // authored order).
+  await page.getByRole("button", { name: /Inventory \d+\/\d+/ }).click();
+  const guidedInventoryDrawer = page.getByRole("dialog", { name: "Inventory" });
+  await expect(
+    guidedInventoryDrawer.getByRole("button", { name: "Salvage Cutter" }),
+  ).toHaveAttribute("data-quest-guidance", "active");
+  await page.keyboard.press("Escape");
+  await expect(page.getByRole("button", { name: "Start Mining" })).not.toHaveAttribute(
+    "data-quest-guidance",
+  );
+
   // Real Inventory → Equip flow (the same overlay Mining E2E exercises).
   await page.getByRole("button", { name: /Inventory \d+\/\d+/ }).click();
   const inventoryDrawer = page.getByRole("dialog", { name: "Inventory" });
@@ -131,10 +144,35 @@ test("equips the Cutter through Inventory, shows a full stack, and earns Mining 
   await page.keyboard.press("Escape");
   await page.reload();
 
+  // Quest guidance — action step: with the Cutter equipped but no shale, the
+  // authored recommended acquisition (Mining) guides Start Mining. Scavenge is
+  // never highlighted merely because it can also yield shale.
+  await db.delete(inventoryStacks).where(eq(inventoryStacks.characterId, characterId));
+  await page.reload();
+  await expect(page.locator("[data-mission-objective]")).toContainText(
+    "Get a full stack of Ferrite Shale — 0 / 10",
+  );
+  await expect(page.getByRole("button", { name: "Start Mining" })).toHaveAttribute(
+    "data-quest-guidance",
+    "active",
+  );
+  await expect(page.getByRole("button", { name: /Talk to Tansy Rusk/ })).not.toHaveAttribute(
+    "data-quest-guidance",
+  );
+
+  // Restore the full stack: every requirement holds and guidance moves to the
+  // turn-in NPC.
+  await addShale(characterId, 10);
+  await page.reload();
+
   // Objective advances past both steps: with a full stack already carried,
   // equip + collect satisfy instantly and the turn-in objective shows.
   await expect(page.locator("[data-mission-objective]")).toContainText(
     "Show a full stack of Ferrite Shale to Tansy Rusk",
+  );
+  await expect(page.getByRole("button", { name: /Talk to Tansy Rusk/ })).toHaveAttribute(
+    "data-quest-guidance",
+    "active",
   );
 
   // Talk to Tansy: active + ready routes to the turn-in with SHOW SHALE control.

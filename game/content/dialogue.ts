@@ -3,7 +3,6 @@ import {
   DIALOGUE_IDS,
   EXPRESSION_IDS,
   ITEM_IDS,
-  MISSION_IDS,
   NPC_IDS,
   SKILL_IDS,
   type ConversationBackgroundId,
@@ -14,6 +13,7 @@ import {
   type SkillId,
 } from "@/game/config/foundations";
 import type { MissionState } from "@/game/domain/missions";
+import { getMission, type MissionRequirementKind } from "./missions";
 import { getItemPresentation } from "./item-presentation";
 import { getSkillPresentation } from "./skill-presentation";
 import { getNpc, resolveNpcExpression } from "./npcs";
@@ -395,60 +395,146 @@ export function getDialogue(dialogueId: string): DialogueSequence | undefined {
 }
 
 /**
- * Narrow authored relationship for the first real missions, not a condition
- * DSL. Tansy routes on the Walk It Off → Cut Your Teeth chain:
- *
- * - Walk It Off not complete → her existing Walk It Off flow;
- * - Walk It Off complete, Cut Your Teeth not accepted → Cut Your Teeth offer
- *   (the issue #110 amendment folds the old post-quest idle beats in here);
- * - Cut Your Teeth active → contextual equip/stack reminder or turn-in;
- * - both complete → post-completion dialogue.
+ * The semantic mission-state surface the dialogue router consumes. Projections
+ * arrive in authored registry order; routing scans newest-first. Routing is
+ * driven exclusively by this semantic state — never by parsing objective copy
+ * and never by hard-coded mission-ID chains in UI code.
  */
-export function getWalkItOffDialogue(
+export type NpcDialogueProjection = {
+  missionId: string;
+  state: MissionState;
+  prerequisiteSatisfied: boolean;
+  stage?: {
+    requirementsSatisfied: boolean;
+    turnInAvailable: boolean;
+    nextObjectiveKind?: MissionRequirementKind;
+  };
+};
+
+export type NpcDialogueResolution = {
+  sequence: DialogueSequence;
+  /** The mission whose accept/complete command this conversation drives. */
+  missionId: string;
+  /**
+   * Offer-only: authored continuation shown immediately after acceptance at
+   * this offer (e.g. the remote-acceptance follow-up that leads straight to
+   * the Cutter claim).
+   */
+  acceptedContinuationDialogueId?: DialogueId;
+};
+
+/**
+ * One generic semantic router for every ordinary mission's NPC conversations.
+ * Authored sequences stay content; this mapping keys them off projected
+ * mission state:
+ *
+ * 1. OFFERS (newest mission first): a not-yet-accepted mission whose
+ *    prerequisite is satisfied and which authors an offer at this NPC offers
+ *    that sequence. This is how the chain advances — the next mission's offer
+ *    appears as soon as the previous one completes.
+ * 2. ACTIVE (newest first): for the turn-in NPC, stage branches select the
+ *    turn-in, busy, or requirement-reminder sequences; for other offer NPCs,
+ *    their authored idle/continuation sequence is used.
+ * 3. COMPLETED (newest first): the turn-in NPC shows the authored completion
+ *    presentation; other offer NPCs show their authored idle sequence.
+ */
+export function resolveNpcMissionDialogue(
   npcId: string,
-  state: MissionState,
-): DialogueSequence | undefined {
-  if (npcId === NPC_IDS.wadeRusk) {
-    return getDialogue(
-      state === "not_accepted" ? DIALOGUE_IDS.wadeOffer : DIALOGUE_IDS.wadeFollowUp,
-    );
+  projections: readonly NpcDialogueProjection[],
+): NpcDialogueResolution | undefined {
+  const newestFirst = [...projections].reverse();
+
+  // 1. Offers.
+  for (const projection of newestFirst) {
+    if (projection.state !== "not_accepted" || !projection.prerequisiteSatisfied) continue;
+    const definition = getMission(projection.missionId);
+    const offer = definition?.offers.find((candidate) => candidate.npcId === npcId);
+    if (!definition || !offer) continue;
+    const sequence = getDialogue(offer.dialogueId);
+    if (!sequence) continue;
+    return {
+      sequence,
+      missionId: definition.id,
+      acceptedContinuationDialogueId: offer.acceptedContinuationDialogueId,
+    };
   }
-  if (npcId !== NPC_IDS.tansyRusk) return undefined;
-  if (state === "not_accepted") return getDialogue(DIALOGUE_IDS.tansyBeforeMission);
-  if (state === "completed") return getDialogue(DIALOGUE_IDS.tansyCutYourTeethOffer);
-  return getDialogue(DIALOGUE_IDS.tansyCompletion);
+
+  // 2. Active missions.
+  for (const projection of newestFirst) {
+    if (projection.state !== "active" && projection.state !== "ready_for_completion") continue;
+    const definition = getMission(projection.missionId);
+    if (!definition) continue;
+    if (definition.turnIn.npcId === npcId) {
+      const sequence = turnInStageSequence(definition, projection.stage);
+      if (sequence) return { sequence, missionId: definition.id };
+      continue;
+    }
+    const idle = definition.offers.find((candidate) => candidate.npcId === npcId)?.idleDialogueId;
+    const sequence = idle ? getDialogue(idle) : undefined;
+    if (sequence) return { sequence, missionId: definition.id };
+  }
+
+  // 3. Completed missions.
+  for (const projection of newestFirst) {
+    if (projection.state !== "completed") continue;
+    const definition = getMission(projection.missionId);
+    if (!definition) continue;
+    if (definition.turnIn.npcId === npcId) {
+      const presentation = definition.dialogue.completionPresentationDialogueId;
+      const sequence = presentation ? getDialogue(presentation) : undefined;
+      if (sequence) return { sequence, missionId: definition.id };
+      continue;
+    }
+    const idle = definition.offers.find((candidate) => candidate.npcId === npcId)?.idleDialogueId;
+    const sequence = idle ? getDialogue(idle) : undefined;
+    if (sequence) return { sequence, missionId: definition.id };
+  }
+
+  return undefined;
 }
 
-export const WALK_IT_OFF_DIALOGUE_MISSION_ID = MISSION_IDS.walkItOff;
-
-export const CUT_YOUR_TEETH_DIALOGUE = {
-  offer: DIALOGUE_IDS.tansyCutYourTeethOffer,
-  equipReminder: DIALOGUE_IDS.tansyCutYourTeethEquipReminder,
-  stackReminder: DIALOGUE_IDS.tansyCutYourTeethStackReminder,
-  busy: DIALOGUE_IDS.tansyCutYourTeethBusy,
-  turnIn: DIALOGUE_IDS.tansyCutYourTeethTurnIn,
-  completion: DIALOGUE_IDS.tansyCutYourTeethCompletion,
-} as const;
-
-export const CUT_YOUR_TEETH_DIALOGUE_MISSION_ID = MISSION_IDS.cutYourTeeth;
-
-/** Contextual active-mission sequence for the current objective boundary. */
-export function getCutYourTeethActiveDialogue(
-  objective: "equip" | "stack" | "ready" | "busy",
+/** Selects the turn-in NPC's authored sequence from semantic stage data. */
+function turnInStageSequence(
+  definition: NonNullable<ReturnType<typeof getMission>>,
+  stage: NpcDialogueProjection["stage"],
 ): DialogueSequence | undefined {
-  return getDialogue(
-    objective === "equip"
-      ? DIALOGUE_IDS.tansyCutYourTeethEquipReminder
-      : objective === "stack"
-        ? DIALOGUE_IDS.tansyCutYourTeethStackReminder
-        : objective === "busy"
-          ? DIALOGUE_IDS.tansyCutYourTeethBusy
-          : DIALOGUE_IDS.tansyCutYourTeethTurnIn,
-  );
+  const turnIn = getDialogue(definition.turnIn.dialogueId);
+  if (!stage) return turnIn;
+  if (stage.turnInAvailable) return turnIn;
+  if (stage.requirementsSatisfied) {
+    return dialogueOr(definition.dialogue.busyDialogueId, turnIn);
+  }
+  if (stage.nextObjectiveKind === "equipped_item") {
+    return dialogueOr(definition.dialogue.equipmentReminderDialogueId, turnIn);
+  }
+  if (stage.nextObjectiveKind === "carried_stack") {
+    return dialogueOr(definition.dialogue.carriedReminderDialogueId, turnIn);
+  }
+  return turnIn;
 }
 
-export function getCutYourTeethCompletion(): DialogueSequence | undefined {
-  return getDialogue(DIALOGUE_IDS.tansyCutYourTeethCompletion);
+function dialogueOr(dialogueId: DialogueId | undefined, fallback?: DialogueSequence) {
+  return (dialogueId ? getDialogue(dialogueId) : undefined) ?? fallback;
+}
+
+/** Authored item-reward capacity refusal dialogue, if any. */
+export function getMissionCapacityRefusalDialogue(
+  missionId: string,
+  capacityReason: "slots" | "mass",
+): DialogueSequence | undefined {
+  const definition = getMission(missionId);
+  const dialogueId =
+    capacityReason === "slots"
+      ? definition?.dialogue.capacitySlotsDialogueId
+      : definition?.dialogue.capacityMassDialogueId;
+  return dialogueId ? getDialogue(dialogueId) : undefined;
+}
+
+/** Authored presentation-only completion beats revealed after authoritative success. */
+export function getMissionCompletionPresentation(missionId: string): DialogueSequence | undefined {
+  const definition = getMission(missionId);
+  const dialogueId = definition?.dialogue.completionPresentationDialogueId;
+  return dialogueId ? getDialogue(dialogueId) : undefined;
 }
 
 export function resolveDialogueSpeaker(dialogueBeat: DialogueBeat) {

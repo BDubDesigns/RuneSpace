@@ -4,12 +4,19 @@ import { getEffectiveGameBalance, getItemDefinition } from "@/game/config/balanc
 import { MISSIONS, type MissionDefinition } from "@/game/content/missions";
 import {
   projectMission,
+  validateMissionDefinitions,
   type MissionObservation,
   type MissionProjection,
 } from "@/game/domain/missions";
 import type { DatabaseTransaction } from "@/server/action-resolution";
 import { loadOwnedItemInstances } from "@/server/carried-inventory";
 import { resolveItemPresentation } from "@/game/content/item-presentation";
+
+// Authored mission content is validated once at module load: unknown NPCs,
+// locations, items, dialogues, prerequisites, reward skills, or a recommended
+// acquisition action that does not authoritatively produce the required item
+// all fail here, never at runtime inside a player transaction.
+validateMissionDefinitions(MISSIONS);
 
 /**
  * Authoritative mission projection for the play state. Persistence contains
@@ -70,16 +77,28 @@ function prerequisiteCompletedFor(
   return Boolean(prerequisite?.completedAt);
 }
 
+/** Every item an authored equipped/carried requirement observes. */
+function requirementItemIds(definitions: readonly MissionDefinition[]): readonly string[] {
+  return definitions.flatMap((mission) =>
+    mission.requirements
+      .filter(
+        (requirement): requirement is Extract<typeof requirement, { itemId: string }> =>
+          requirement.kind === "equipped_item" || requirement.kind === "carried_stack",
+      )
+      .map((requirement) => requirement.itemId),
+  );
+}
+
 /**
  * Resolves names and stack limits from authoritative content for exactly the
  * items this projection needs to describe — never a duplicated UI list.
  * Equipment counts only when the instance is genuinely carried (a stored
  * Cutter does not satisfy "equip the Cutter").
  *
- * Canonical items referenced by authored mission objective steps are ALWAYS
+ * Canonical items referenced by authored mission requirements are ALWAYS
  * included even when the character currently carries zero of them, so a
  * mission requirement (e.g. the Ferrite Shale full-stack limit) never changes
- * from 1 to 10 merely because the first item entered Inventory.
+ * from 10 to 1 merely because the first item entered Inventory.
  */
 function buildObservation(
   assignments: readonly { itemInstanceId: string }[],
@@ -104,13 +123,13 @@ function buildObservation(
   const stackLimits = new Map<string, number>();
   // Names must cover every observed item INCLUDING carried-but-unequipped
   // unique items (an unequipped Cutter still appears in objective copy), plus
-  // every canonical item any authored mission step references (zero carried
+  // every canonical item any authored requirement references (zero carried
   // Ferrite Shale must still resolve its authoritative stack limit).
   const observedItemIds = new Set<string>([
     ...equippedCarriedIds,
     ...carriedInstances.map((instance) => instance.itemId),
     ...carriedQuantities.keys(),
-    ...MISSIONS.flatMap((mission) => (mission.objectiveSteps ?? []).map((step) => step.itemId)),
+    ...requirementItemIds(MISSIONS),
   ]);
   for (const itemId of observedItemIds) {
     const displayName = resolveItemPresentation(itemId, itemId).displayName;
