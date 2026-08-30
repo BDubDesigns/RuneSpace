@@ -26,6 +26,8 @@
     "test:e2e:raw": "playwright test",
     "test:e2e:studio": "node scripts/disposable-test-db.mjs -- pnpm run test:e2e:studio:raw",
     "test:e2e:studio:raw": "playwright test --config=playwright.qc-studio.config.ts",
+    "maintenance:issue-126": "node --experimental-strip-types scripts/prealpha-mission-reset.mjs",
+    "test:integration:issue-126": "RUNESPACE_ISSUE_126_INTEGRATION=true node scripts/disposable-test-db.mjs -- pnpm run test:integration:raw tests/integration/prealpha-mission-reset.test.ts",
     "test:e2e:canonical": "node scripts/run-canonical-e2e.mjs",
     "test:e2e:focused": "node scripts/run-focused-e2e.mjs"
   },
