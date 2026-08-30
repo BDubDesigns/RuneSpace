@@ -367,7 +367,22 @@ export function validateMissionDefinitions(definitions: readonly MissionDefiniti
           "accepted continuation",
         );
       }
-      if (offer.idleDialogueId) assertDialogue(definition.id, offer.idleDialogueId, "idle");
+      if (offer.activeDialogueId) {
+        assertDialogue(definition.id, offer.activeDialogueId, "active");
+        assertDialogueNpc(definition.id, offer.activeDialogueId, offer.npcId, "active");
+      }
+    }
+    if (definition.completedNpcDialogue) {
+      const seen = new Set<string>();
+      for (const entry of definition.completedNpcDialogue) {
+        if (!getNpc(entry.npcId))
+          throw new Error(`${where} completed dialogue references unknown NPC "${entry.npcId}".`);
+        assertDialogue(definition.id, entry.dialogueId, "completed NPC dialogue");
+        assertDialogueNpc(definition.id, entry.dialogueId, entry.npcId, "completed NPC dialogue");
+        if (seen.has(entry.npcId))
+          throw new Error(`${where} duplicates completed dialogue for NPC "${entry.npcId}".`);
+        seen.add(entry.npcId);
+      }
     }
     for (const requirement of definition.requirements) {
       if (requirement.kind === "at_location") {
@@ -458,6 +473,21 @@ export function validateMissionDefinitions(definitions: readonly MissionDefiniti
         );
       }
     }
+  }
+}
+
+function assertDialogueNpc(
+  missionId: string,
+  dialogueId: string,
+  npcId: string,
+  role: string,
+): void {
+  const sequence = getDialogue(dialogueId);
+  if (!sequence) return;
+  if (sequence.npcId !== npcId) {
+    throw new Error(
+      `Mission "${missionId}" ${role} dialogue "${dialogueId}" belongs to NPC "${sequence.npcId}" but is mapped to NPC "${npcId}".`,
+    );
   }
 }
 

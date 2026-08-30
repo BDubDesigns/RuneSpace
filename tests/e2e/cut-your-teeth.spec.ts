@@ -229,4 +229,76 @@ test("equips the Cutter through Inventory, shows a full stack, and earns Mining 
     .from(equippedItems)
     .where(eq(equippedItems.itemInstanceId, cutterId));
   expect(assignments[0]?.assignmentKind).toBe("gear");
+
+  // Issue #129: after closing the completion presentation, subsequent talks
+  // resolve ordinary post-CYT dialogue — not a replay of the item/XP presentation.
+  await page.getByRole("button", { name: /Talk to Tansy Rusk/ }).click();
+  const tansyPost = page.getByRole("dialog", { name: "Tansy Rusk dialogue" });
+  await expect(tansyPost).toBeVisible();
+  await expect(tansyPost.locator('[data-dialogue-subject="item"]')).toHaveCount(0);
+  await expect(tansyPost.locator("[data-dialogue-skill-xp-tile]")).toHaveCount(0);
+  await expect(tansyPost.locator('[data-dialogue-text] [aria-hidden="true"]')).toContainText(
+    "You kept the shale?",
+  );
+  await tansyPost.getByRole("button", { name: "Next" }).click();
+  await expect(tansyPost.locator('[data-dialogue-text] [aria-hidden="true"]')).toContainText(
+    "You know how to handle the Cutter now",
+  );
+  await tansyPost.getByRole("button", { name: "Next" }).click();
+  await expect(tansyPost.getByRole("button", { name: "Finish" })).toBeVisible();
+  await tansyPost.getByRole("button", { name: "Finish" }).click();
+  await expect(tansyPost).toBeHidden();
+
+  // Reload also resolves ordinary post-CYT dialogue and does not replay the
+  // reward presentation. XP and shale remain intact.
+  await page.reload();
+  await expect(page.locator("[data-mission-objective]")).toContainText("Completed");
+  await page.getByRole("button", { name: /Talk to Tansy Rusk/ }).click();
+  const tansyPostReload = page.getByRole("dialog", { name: "Tansy Rusk dialogue" });
+  await expect(tansyPostReload).toBeVisible();
+  await expect(tansyPostReload.locator('[data-dialogue-subject="item"]')).toHaveCount(0);
+  await expect(tansyPostReload.locator("[data-dialogue-skill-xp-tile]")).toHaveCount(0);
+  await expect(tansyPostReload.locator('[data-dialogue-text] [aria-hidden="true"]')).toContainText(
+    "You kept the shale?",
+  );
+  await tansyPostReload.getByRole("button", { name: "Next" }).click();
+  await tansyPostReload.getByRole("button", { name: "Next" }).click();
+  await expect(tansyPostReload.getByRole("button", { name: "Finish" })).toBeVisible();
+  await tansyPostReload.getByRole("button", { name: "Finish" }).click();
+  await expect(tansyPostReload).toBeHidden();
+  expect(await miningXpTotal(characterId)).toBe(100);
+  const stacksAfterReload = await db
+    .select()
+    .from(inventoryStacks)
+    .where(eq(inventoryStacks.characterId, characterId));
+  expect(stacksAfterReload.find((s) => s.itemId === ITEM_IDS.ferriteShale)?.quantity).toBe(10);
+
+  // Issue #129: Wade resolves post-CYT story state rather than regressing to
+  // the completed-Walk-It-Off Cutter dialogue. Move to Crash Site and verify.
+  await db
+    .update(characters)
+    .set({ currentLocationId: LOCATION_IDS.crashSite })
+    .where(eq(characters.id, characterId));
+  await page.reload();
+  await expect(page.getByRole("button", { name: /Talk to Wade Rusk/ })).toBeVisible();
+  await page.getByRole("button", { name: /Talk to Wade Rusk/ }).click();
+  const wadePost = page.getByRole("dialog", { name: "Wade Rusk dialogue" });
+  await expect(wadePost).toBeVisible();
+  await expect(wadePost.locator('[data-dialogue-text] [aria-hidden="true"]')).toContainText(
+    "So Tansy taught you",
+  );
+  // Must not regress to Walk-It-Off-era completed dialogue.
+  const wadePostAllText = await wadePost.locator("[data-dialogue-text]").textContent();
+  expect(wadePostAllText).not.toContain("Tansy give you the Cutter?");
+  await wadePost.getByRole("button", { name: "Next" }).click();
+  await wadePost.getByRole("button", { name: "Next" }).click();
+  await expect(wadePost.getByRole("button", { name: "Finish" })).toBeVisible();
+  await wadePost.getByRole("button", { name: "Finish" }).click();
+  await expect(wadePost).toBeHidden();
+  expect(await miningXpTotal(characterId)).toBe(100);
+  const finalStacks = await db
+    .select()
+    .from(inventoryStacks)
+    .where(eq(inventoryStacks.characterId, characterId));
+  expect(finalStacks.find((s) => s.itemId === ITEM_IDS.ferriteShale)?.quantity).toBe(10);
 });

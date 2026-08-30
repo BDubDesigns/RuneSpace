@@ -13,7 +13,12 @@ import {
   type SkillId,
 } from "@/game/config/foundations";
 import type { MissionState } from "@/game/domain/missions";
-import { getMission, type MissionRequirementKind } from "./missions";
+import {
+  MISSIONS,
+  getMission,
+  type MissionDefinition,
+  type MissionRequirementKind,
+} from "./missions";
 import { getItemPresentation } from "./item-presentation";
 import { getSkillPresentation } from "./skill-presentation";
 import { getNpc, resolveNpcExpression } from "./npcs";
@@ -162,6 +167,51 @@ const dialogue = {
         EXPRESSION_IDS.scowl,
         "I suggest you put it to use. Mine some Ferrite Shale at The Jag and show it to Tansy. She will show you what to do next.",
       ),
+    ],
+  },
+  [DIALOGUE_IDS.wadeWalkItOffActiveFollowUp]: {
+    id: DIALOGUE_IDS.wadeWalkItOffActiveFollowUp,
+    npcId: NPC_IDS.wadeRusk,
+    beats: [
+      wadeLocal(
+        EXPRESSION_IDS.neutral,
+        "She's at The Jag. That's past The Long Scramble — it'll take you a bit to get there.",
+      ),
+      wadeLocal(
+        EXPRESSION_IDS.neutral,
+        "Keep an eye out while you walk. Scavenging turns up useful finds on the way, if you pay attention.",
+      ),
+      wadeLocal(
+        EXPRESSION_IDS.scowl,
+        "Don't get distracted. Tansy doesn't like waiting, and I'm not getting any younger.",
+      ),
+    ],
+  },
+  [DIALOGUE_IDS.wadePostCutYourTeeth]: {
+    id: DIALOGUE_IDS.wadePostCutYourTeeth,
+    npcId: NPC_IDS.wadeRusk,
+    beats: [
+      wadeLocal(EXPRESSION_IDS.neutral, "So Tansy taught you how to run the Cutter. Good."),
+      wadeLocal(
+        EXPRESSION_IDS.neutral,
+        "If you can pull Ferrite on your own, you're past the hardest part of the early work. The ship still needs a lot, but at least you're not starting from zero.",
+      ),
+      wadeLocal(
+        EXPRESSION_IDS.scowl,
+        "Don't get comfortable. There's more ahead — we'll get to it when you're ready.",
+      ),
+    ],
+  },
+  [DIALOGUE_IDS.tansyPostCutYourTeeth]: {
+    id: DIALOGUE_IDS.tansyPostCutYourTeeth,
+    npcId: NPC_IDS.tansyRusk,
+    beats: [
+      tansyLocal(EXPRESSION_IDS.smile, "You kept the shale? Good. You'll need it soon enough."),
+      tansyLocal(
+        EXPRESSION_IDS.neutral,
+        "You know how to handle the Cutter now — that's the basics sorted. The rest builds on that.",
+      ),
+      tansyLocal(EXPRESSION_IDS.smile, "Stick around. There'll be more work when you want it."),
     ],
   },
   [DIALOGUE_IDS.tansyBeforeMission]: {
@@ -434,20 +484,37 @@ export type NpcDialogueResolution = {
  *    appears as soon as the previous one completes.
  * 2. ACTIVE (newest first): for the turn-in NPC, stage branches select the
  *    turn-in, busy, or requirement-reminder sequences; for other offer NPCs,
- *    their authored idle/continuation sequence is used.
- * 3. COMPLETED (newest first): the turn-in NPC shows the authored completion
- *    presentation; other offer NPCs show their authored idle sequence.
+ *    their authored activeDialogueId is used.
+ * 3. COMPLETED (newest first): ordinary post-completion story dialogue wins
+ *    over the one-shot completion presentation. The newest completed mission
+ *    that authors dialogue for this NPC via completedNpcDialogue is selected;
+ *    presentation is shown only via the transient override immediately after success.
  */
 export function resolveNpcMissionDialogue(
   npcId: string,
   projections: readonly NpcDialogueProjection[],
 ): NpcDialogueResolution | undefined {
+  return resolveNpcMissionDialogueWithDefinitions(npcId, projections, MISSIONS);
+}
+
+/**
+ * Pure routing helper that resolves against an explicit ordered definition
+ * list. Production callers use `resolveNpcMissionDialogue` (which injects
+ * `MISSIONS`); tests inject synthetic ordered definitions to prove generic
+ * fallback/win semantics without adding player-visible fake missions.
+ */
+export function resolveNpcMissionDialogueWithDefinitions(
+  npcId: string,
+  projections: readonly NpcDialogueProjection[],
+  definitions: readonly MissionDefinition[],
+): NpcDialogueResolution | undefined {
+  const byId = new Map(definitions.map((definition) => [definition.id, definition]));
   const newestFirst = [...projections].reverse();
 
   // 1. Offers.
   for (const projection of newestFirst) {
     if (projection.state !== "not_accepted" || !projection.prerequisiteSatisfied) continue;
-    const definition = getMission(projection.missionId);
+    const definition = byId.get(projection.missionId);
     const offer = definition?.offers.find((candidate) => candidate.npcId === npcId);
     if (!definition || !offer) continue;
     const sequence = getDialogue(offer.dialogueId);
@@ -462,32 +529,30 @@ export function resolveNpcMissionDialogue(
   // 2. Active missions.
   for (const projection of newestFirst) {
     if (projection.state !== "active" && projection.state !== "ready_for_completion") continue;
-    const definition = getMission(projection.missionId);
+    const definition = byId.get(projection.missionId);
     if (!definition) continue;
     if (definition.turnIn.npcId === npcId) {
       const sequence = turnInStageSequence(definition, projection.stage);
       if (sequence) return { sequence, missionId: definition.id };
       continue;
     }
-    const idle = definition.offers.find((candidate) => candidate.npcId === npcId)?.idleDialogueId;
-    const sequence = idle ? getDialogue(idle) : undefined;
+    const offer = definition.offers.find((candidate) => candidate.npcId === npcId);
+    const activeId = offer?.activeDialogueId;
+    const sequence = activeId ? getDialogue(activeId) : undefined;
     if (sequence) return { sequence, missionId: definition.id };
   }
 
-  // 3. Completed missions.
+  // 3. Completed missions — ordinary story-state dialogue (newest authored win).
   for (const projection of newestFirst) {
     if (projection.state !== "completed") continue;
-    const definition = getMission(projection.missionId);
+    const definition = byId.get(projection.missionId);
     if (!definition) continue;
-    if (definition.turnIn.npcId === npcId) {
-      const presentation = definition.dialogue.completionPresentationDialogueId;
-      const sequence = presentation ? getDialogue(presentation) : undefined;
+    const entry = definition.completedNpcDialogue?.find((candidate) => candidate.npcId === npcId);
+    if (entry) {
+      const sequence = getDialogue(entry.dialogueId);
       if (sequence) return { sequence, missionId: definition.id };
       continue;
     }
-    const idle = definition.offers.find((candidate) => candidate.npcId === npcId)?.idleDialogueId;
-    const sequence = idle ? getDialogue(idle) : undefined;
-    if (sequence) return { sequence, missionId: definition.id };
   }
 
   return undefined;

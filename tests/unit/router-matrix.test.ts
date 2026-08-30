@@ -1,6 +1,17 @@
 import { describe, expect, it } from "vitest";
-import { MISSION_IDS, NPC_IDS, DIALOGUE_IDS } from "@/game/config/foundations";
-import { resolveNpcMissionDialogue, type NpcDialogueProjection } from "@/game/content/dialogue";
+import {
+  MISSION_IDS,
+  NPC_IDS,
+  DIALOGUE_IDS,
+  LOCATION_IDS,
+  SKILL_IDS,
+} from "@/game/config/foundations";
+import {
+  resolveNpcMissionDialogue,
+  resolveNpcMissionDialogueWithDefinitions,
+  type NpcDialogueProjection,
+} from "@/game/content/dialogue";
+import { CUT_YOUR_TEETH, WALK_IT_OFF, type MissionDefinition } from "@/game/content/missions";
 
 function p(
   missionId: string,
@@ -16,6 +27,63 @@ function p(
   };
 }
 
+// Minimal synthetic definitions for injected-definition fallback tests.
+// These are never added to the production MISSIONS list — they only exist
+// inside the pure helper's injected ordered array so no player-visible fake
+// mission is required.
+const SYNTH_FUTURE_NO_WADE: MissionDefinition = {
+  id: "synthetic_future_no_wade" as unknown as MissionDefinition["id"],
+  title: "Synthetic Future (no Wade dialogue)",
+  summary: "Test-only future mission that intentionally authors no Wade completed dialogue.",
+  offers: [
+    {
+      npcId: NPC_IDS.tansyRusk,
+      locationId: LOCATION_IDS.theJag,
+      dialogueId: DIALOGUE_IDS.tansyPostCutYourTeeth,
+    },
+  ],
+  requirements: [],
+  turnIn: {
+    npcId: NPC_IDS.tansyRusk,
+    locationId: LOCATION_IDS.theJag,
+    requiresStationary: true as const,
+    objective: "Test turn-in",
+    dialogueId: DIALOGUE_IDS.tansyPostCutYourTeeth,
+  },
+  reward: { kind: "skill_xp", skillId: SKILL_IDS.mining, amount: 1 },
+  dialogue: {},
+  completedNpcDialogue: [
+    { npcId: NPC_IDS.tansyRusk, dialogueId: DIALOGUE_IDS.tansyPostCutYourTeeth },
+  ],
+};
+
+const SYNTH_FUTURE_WITH_WADE: MissionDefinition = {
+  id: "synthetic_future_with_wade" as unknown as MissionDefinition["id"],
+  title: "Synthetic Future (with Wade dialogue)",
+  summary: "Test-only future mission that authors Wade completed dialogue, proving newest wins.",
+  offers: [
+    {
+      npcId: NPC_IDS.tansyRusk,
+      locationId: LOCATION_IDS.theJag,
+      dialogueId: DIALOGUE_IDS.tansyPostCutYourTeeth,
+    },
+  ],
+  requirements: [],
+  turnIn: {
+    npcId: NPC_IDS.tansyRusk,
+    locationId: LOCATION_IDS.theJag,
+    requiresStationary: true as const,
+    objective: "Test turn-in",
+    dialogueId: DIALOGUE_IDS.tansyPostCutYourTeeth,
+  },
+  reward: { kind: "skill_xp", skillId: SKILL_IDS.mining, amount: 1 },
+  dialogue: {},
+  completedNpcDialogue: [
+    { npcId: NPC_IDS.wadeRusk, dialogueId: DIALOGUE_IDS.wadeFollowUp },
+    { npcId: NPC_IDS.tansyRusk, dialogueId: DIALOGUE_IDS.tansyPostCutYourTeeth },
+  ],
+};
+
 describe("router matrix parity", () => {
   const wio = (state: NpcDialogueProjection["state"], stage?: NpcDialogueProjection["stage"]) =>
     p(MISSION_IDS.walkItOff, state, stage);
@@ -30,7 +98,7 @@ describe("router matrix parity", () => {
       DIALOGUE_IDS.wadeOffer,
     );
     expect(resolveNpcMissionDialogue(NPC_IDS.wadeRusk, [wio("active")])?.sequence.id).toBe(
-      DIALOGUE_IDS.wadeFollowUp,
+      DIALOGUE_IDS.wadeWalkItOffActiveFollowUp,
     );
     expect(
       resolveNpcMissionDialogue(NPC_IDS.wadeRusk, [wio("completed"), cyt("active")])?.sequence.id,
@@ -57,13 +125,15 @@ describe("router matrix parity", () => {
     ).toBe(DIALOGUE_IDS.tansyCutYourTeethOffer);
     // Availability derives from the PROJECTION, never hardcoded: when the
     // projection reports the prerequisite unsatisfied, the offer never
-    // appears (an unreachable-but-safe fallback shows the prior completion).
+    // appears. Completed presentation is one-shot and never reused as idle
+    // (issue #129), so the unreachable gated state yields no completed
+    // fallback — Tansy shows nothing until the CYT offer becomes available.
     expect(
       resolveNpcMissionDialogue(NPC_IDS.tansyRusk, [
         wio("completed"),
         cyt("not_accepted", undefined, false),
       ])?.sequence.id,
-    ).toBe(DIALOGUE_IDS.tansyAfterClaim);
+    ).toBeUndefined();
     expect(
       resolveNpcMissionDialogue(NPC_IDS.tansyRusk, [
         wio("completed"),
@@ -99,13 +169,119 @@ describe("router matrix parity", () => {
     expect(
       resolveNpcMissionDialogue(NPC_IDS.tansyRusk, [wio("completed"), cyt("completed")])?.sequence
         .id,
-    ).toBe(DIALOGUE_IDS.tansyCutYourTeethCompletion);
+    ).toBe(DIALOGUE_IDS.tansyPostCutYourTeeth);
   });
 
-  it("WIO completed + CYT completed: Tansy shows the newest completion presentation", () => {
+  it("Issue #129: Wade active WIO follow-up does not claim the Cutter was received", () => {
+    const active = resolveNpcMissionDialogue(NPC_IDS.wadeRusk, [wio("active")])?.sequence;
+    expect(active?.id).toBe(DIALOGUE_IDS.wadeWalkItOffActiveFollowUp);
+    const text = active?.beats.map((b) => b.text).join(" ") ?? "";
+    expect(text.toLowerCase()).not.toContain("cutter");
+    expect(text).toContain("The Jag");
+    expect(text).toContain("The Long Scramble");
+    expect(text.toLowerCase()).toContain("scaveng");
+  });
+
+  it("Issue #129: after WIO completed (no later superseding), Wade shows completed-WIO Cutter follow-up", () => {
+    expect(resolveNpcMissionDialogue(NPC_IDS.wadeRusk, [wio("completed")])?.sequence.id).toBe(
+      DIALOGUE_IDS.wadeFollowUp,
+    );
+  });
+
+  it("Issue #129: after CYT completed, Tansy and Wade resolve post-CYT story dialogue, not replayed presentation", async () => {
     expect(
       resolveNpcMissionDialogue(NPC_IDS.tansyRusk, [wio("completed"), cyt("completed")])?.sequence
         .id,
-    ).toBe(DIALOGUE_IDS.tansyCutYourTeethCompletion);
+    ).toBe(DIALOGUE_IDS.tansyPostCutYourTeeth);
+    expect(
+      resolveNpcMissionDialogue(NPC_IDS.wadeRusk, [wio("completed"), cyt("completed")])?.sequence
+        .id,
+    ).toBe(DIALOGUE_IDS.wadePostCutYourTeeth);
+    const { getMissionCompletionPresentation } = await import("@/game/content/dialogue");
+    expect(getMissionCompletionPresentation(MISSION_IDS.cutYourTeeth)?.id).toBe(
+      DIALOGUE_IDS.tansyCutYourTeethCompletion,
+    );
+  });
+
+  it("Issue #129: generic newest/furthest completed-story routing with genuine fallback semantics", async () => {
+    const { getMissionCompletionPresentation: gcp } = await import("@/game/content/dialogue");
+    // Completion presentation is one-shot — not returned by the router after CYT completed.
+    expect(gcp("cut_your_teeth")?.id).toBe(DIALOGUE_IDS.tansyCutYourTeethCompletion);
+    expect(
+      resolveNpcMissionDialogue(NPC_IDS.tansyRusk, [wio("completed"), cyt("completed")])?.sequence
+        .id,
+    ).not.toBe(DIALOGUE_IDS.tansyCutYourTeethCompletion);
+
+    // Newest completed that authors Wade wins over earlier WIO completed (real production chain).
+    expect(
+      resolveNpcMissionDialogue(NPC_IDS.wadeRusk, [wio("completed"), cyt("completed")])?.sequence
+        .id,
+    ).toBe(DIALOGUE_IDS.wadePostCutYourTeeth);
+
+    // Genuine fallback: a later VALID completed mission exists in the authored
+    // ordering but intentionally does NOT author completed dialogue for Wade.
+    // Wade must fall back to the nearest earlier completed that does (CYT post-CYT).
+    const definitionsNoWade: readonly MissionDefinition[] = [
+      WALK_IT_OFF,
+      CUT_YOUR_TEETH,
+      SYNTH_FUTURE_NO_WADE,
+    ];
+    const projectionsNoWade: readonly NpcDialogueProjection[] = [
+      wio("completed"),
+      cyt("completed"),
+      p(SYNTH_FUTURE_NO_WADE.id, "completed"),
+    ];
+    expect(
+      resolveNpcMissionDialogueWithDefinitions(
+        NPC_IDS.wadeRusk,
+        projectionsNoWade,
+        definitionsNoWade,
+      )?.sequence.id,
+    ).toBe(DIALOGUE_IDS.wadePostCutYourTeeth);
+    expect(
+      resolveNpcMissionDialogueWithDefinitions(
+        NPC_IDS.wadeRusk,
+        projectionsNoWade,
+        definitionsNoWade,
+      )?.missionId,
+    ).toBe(MISSION_IDS.cutYourTeeth);
+
+    // When that later valid mission DOES author Wade dialogue, the later dialogue wins.
+    const definitionsWithWade: readonly MissionDefinition[] = [
+      WALK_IT_OFF,
+      CUT_YOUR_TEETH,
+      SYNTH_FUTURE_WITH_WADE,
+    ];
+    const projectionsWithWade: readonly NpcDialogueProjection[] = [
+      wio("completed"),
+      cyt("completed"),
+      p(SYNTH_FUTURE_WITH_WADE.id, "completed"),
+    ];
+    expect(
+      resolveNpcMissionDialogueWithDefinitions(
+        NPC_IDS.wadeRusk,
+        projectionsWithWade,
+        definitionsWithWade,
+      )?.sequence.id,
+    ).toBe(DIALOGUE_IDS.wadeFollowUp);
+    expect(
+      resolveNpcMissionDialogueWithDefinitions(
+        NPC_IDS.wadeRusk,
+        projectionsWithWade,
+        definitionsWithWade,
+      )?.missionId,
+    ).toBe(SYNTH_FUTURE_WITH_WADE.id);
+
+    // Sanity: single-mission completed still resolves correctly.
+    expect(resolveNpcMissionDialogue(NPC_IDS.wadeRusk, [wio("completed")])?.sequence.id).toBe(
+      DIALOGUE_IDS.wadeFollowUp,
+    );
+  });
+
+  it("WIO completed + CYT completed: Tansy shows ordinary post-CYT story dialogue (presentation is one-shot)", () => {
+    expect(
+      resolveNpcMissionDialogue(NPC_IDS.tansyRusk, [wio("completed"), cyt("completed")])?.sequence
+        .id,
+    ).toBe(DIALOGUE_IDS.tansyPostCutYourTeeth);
   });
 });
