@@ -20,13 +20,23 @@ pnpm run test:integration:issue-126
 That command creates its own disposable test database, runs only the Issue #126
 integration file, and drops the database afterward.
 
+To check the documented capture and expected-report round trip without changing
+the development database:
+
+```bash
+node scripts/disposable-test-db.mjs -- sh -c 'pnpm --silent run maintenance:issue-126 > /tmp/issue-126-dry-run.json && node --experimental-strip-types scripts/prealpha-mission-reset.mjs --verify --expected-report /tmp/issue-126-dry-run.json'
+```
+
+This uses a fresh empty disposable database, so verification succeeds after
+consuming the captured JSON without exercising a destructive reset.
+
 ## Operator sequence
 
 Run the default command in the intended database terminal and save its JSON
 output somewhere protected for the operator review:
 
 ```bash
-pnpm run maintenance:issue-126 > /tmp/issue-126-dry-run.json
+pnpm --silent run maintenance:issue-126 > /tmp/issue-126-dry-run.json
 ```
 
 The default mode performs SELECTs only. Its report includes the affected
@@ -39,7 +49,7 @@ After the product owner has reviewed the counts, execute only with the exact
 reviewed report and confirmation token:
 
 ```bash
-pnpm run maintenance:issue-126 -- \
+node --experimental-strip-types scripts/prealpha-mission-reset.mjs \
   --execute \
   --confirm ISSUE-126-RESET \
   --expected-report /tmp/issue-126-dry-run.json
@@ -56,7 +66,7 @@ that same transaction.
 For a read-only verification retry using the saved reviewed report:
 
 ```bash
-pnpm run maintenance:issue-126 -- \
+node --experimental-strip-types scripts/prealpha-mission-reset.mjs \
   --verify \
   --expected-report /tmp/issue-126-dry-run.json
 ```

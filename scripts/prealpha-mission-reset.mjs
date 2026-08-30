@@ -40,9 +40,9 @@ const COUNT_KEYS = [
 ];
 
 const USAGE = `Usage:
-  pnpm run maintenance:issue-126
-  pnpm run maintenance:issue-126 -- --verify --expected-report <dry-run.json>
-  pnpm run maintenance:issue-126 -- --execute --confirm ${EXECUTION_CONFIRMATION} --expected-report <dry-run.json>
+  pnpm --silent run maintenance:issue-126
+  node --experimental-strip-types scripts/prealpha-mission-reset.mjs --verify --expected-report <dry-run.json>
+  node --experimental-strip-types scripts/prealpha-mission-reset.mjs --execute --confirm ${EXECUTION_CONFIRMATION} --expected-report <dry-run.json>
 
 The default mode is read-only dry run. The execution mode requires the exact
 confirmation token and an unchanged saved dry-run report.`;
@@ -764,8 +764,12 @@ export async function runWithDatabase(options, environment = process.env) {
   try {
     if (options.mode === "dry-run") return reportFromScan(await scanResetState(client));
     const expected = loadExpectedReport(options.expectedReportPath);
-    if (options.mode === "verify") return verifyReset(client, expected);
-    return executeReset(client, expected);
+    if (options.mode === "verify") {
+      const verification = await verifyReset(client, expected);
+      return verification;
+    }
+    const execution = await executeReset(client, expected);
+    return execution;
   } finally {
     await client.end().catch(() => {});
   }

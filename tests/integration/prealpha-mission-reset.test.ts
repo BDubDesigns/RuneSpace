@@ -95,7 +95,7 @@ suite("Issue #126 pre-alpha mission reset (real PostgreSQL)", () => {
       .update(rune.characters)
       .set({ currentLocationId: LOCATION_IDS.theJag })
       .where(eq(rune.characters.id, character.id));
-    return { userId, character };
+    return { userId, character, spareCutter };
   }
 
   it("reports a read-only dry run and removes only the requested state", async () => {
@@ -286,6 +286,64 @@ suite("Issue #126 pre-alpha mission reset (real PostgreSQL)", () => {
           .from(rune.characterMissions)
           .where(eq(rune.characterMissions.characterId, character.id)),
       ).toHaveLength(2);
+    } finally {
+      await client.end();
+    }
+  });
+
+  it("reports a Cargo Hold Cutter as unsafe and refuses execution", async () => {
+    const { character, spareCutter } = await createResetFixture();
+    await db.insert(rune.cargoHoldItemInstances).values({
+      characterId: character.id,
+      itemInstanceId: spareCutter!.id,
+      storedAt: now,
+    });
+    const client = new Client({ connectionString: DATABASE_URL });
+    await client.connect();
+    try {
+      const scan = await scanResetState(client);
+      expect(scan.unsafeStates).toContainEqual(
+        expect.objectContaining({ code: "salvage_cutter_in_cargo_hold", count: 1 }),
+      );
+      const report = {
+        kind: "runespace.issue-126.prealpha-mission-reset",
+        schemaVersion: 1,
+        mode: "dry-run",
+        authority: {
+          missionIds: { walkItOff: MISSION_IDS.walkItOff, cutYourTeeth: MISSION_IDS.cutYourTeeth },
+          itemIds: { salvageCutter: ITEM_IDS.salvageCutter },
+          skillIds: { mining: SKILL_IDS.mining },
+        },
+        generatedAt: now.toISOString(),
+        affectedCharacterIds: scan.characterIds,
+        counts: scan.counts,
+        unsafeStates: scan.unsafeStates,
+        baseline: scan.baseline,
+      };
+      await expect(executeReset(client, report)).rejects.toThrow("unsafe state");
+      expect(
+        await db
+          .select()
+          .from(rune.characterMissions)
+          .where(eq(rune.characterMissions.characterId, character.id)),
+      ).toHaveLength(2);
+      expect(
+        await db
+          .select()
+          .from(rune.itemInstances)
+          .where(
+            and(
+              eq(rune.itemInstances.characterId, character.id),
+              eq(rune.itemInstances.itemId, ITEM_IDS.salvageCutter),
+            ),
+          ),
+      ).toHaveLength(2);
+      expect(
+        await db
+          .select()
+          .from(rune.cargoHoldItemInstances)
+          .where(eq(rune.cargoHoldItemInstances.characterId, character.id)),
+      ).toHaveLength(1);
     } finally {
       await client.end();
     }
