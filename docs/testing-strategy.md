@@ -24,8 +24,8 @@ small number of critical mobile player journeys.
 ## 3. Browser tests (Playwright)
 - Target: a **small number** of important mobile player journeys (the smoke
   screen, then core loops as they ship). Avoid large suites of shallow UI tests.
-- The scaffold includes a minimal app-loading smoke test
-  (`tests/e2e/smoke.spec.ts`).
+- The landing page has a minimal app-loading smoke test
+  (`tests/e2e/smoke.spec.ts`) that protects durable landing identity and entry navigation.
 - Quick local development: `pnpm test:e2e`. It uses the production server by
   default and may reuse an existing server outside CI; set
   `PLAYWRIGHT_DEV_SERVER=true` for a development server. It does **not** count

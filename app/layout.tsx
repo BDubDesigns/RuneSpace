@@ -3,8 +3,9 @@ import type { ReactNode } from "react";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "RuneSpace — Development Build",
-  description: "RuneSpace foundation scaffold. Early development build; not a playable game.",
+  title: "RuneSpace — Pre-Alpha",
+  description:
+    "RuneSpace — playable pre-alpha browser RPG. Early development build with a real early-game loop.",
   icons: {
     icon: [
       { url: "/favicon.ico", sizes: "any" },
