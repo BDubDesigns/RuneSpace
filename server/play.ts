@@ -287,13 +287,11 @@ type PlayResolverEntry = {
 /**
  * Compose the activity resolvers into one owned-character play resolver.
  *
- * Primary dispatch is by the ORIGINAL action id supplied in the persist context
- * (`withResolvedOwnedCharacter` always passes it — action-resolution.ts). For
- * direct/synthetic persist calls that omit the context, fall back to the
- * activity outcome-shape discriminators the pre-#127 code used (stable fields
- * on each persisted outcome); this is the one documented boundary where the
- * play layer reasons about outcome shape. The only casts are the boundary
- * where each typed activity resolver enters this heterogeneous registry.
+ * Dispatch is always by the ORIGINAL action id supplied in the persist context
+ * (`withResolvedOwnedCharacter` always passes it — action-resolution.ts). The
+ * composed resolver refuses a persist call whose context is missing rather than
+ * discriminating outcomes by shape. The only casts are the boundary where each
+ * typed activity resolver enters this heterogeneous registry.
  */
 export function composePlayResolvers(entries: readonly PlayResolverEntry[]): PlayResolver {
   const byActionId = new Map(entries.map((entry) => [entry.actionId, entry]));
@@ -310,27 +308,12 @@ export function composePlayResolvers(entries: readonly PlayResolverEntry[]): Pla
       return entry.resolver.resolve(input);
     },
     persist: (transaction, outcome, context) => {
-      // withResolvedOwnedCharacter always supplies the original action.
-      if (context) {
-        const entry = byActionId.get(context.action.actionId);
-        if (!entry) throw new Error(`No resolver owns action ${context.action.actionId}`);
-        return entry.resolver.persist(transaction, outcome, context);
-      }
-      // Direct persist without context (synthetic/rollback tests): fall back to
-      // the stable outcome-shape discriminators, matching pre-#127 behavior.
-      const outcomeRecord = outcome as Record<string, unknown>;
-      const refining = byActionId.get(ACTION_IDS.refining);
-      const welding = byActionId.get(ACTION_IDS.cargoHoldWelding);
-      const travel = byActionId.get(ACTION_IDS.travel);
-      const mining = byActionId.get(ACTION_IDS.ferriteShaleMining);
-      if (refining && "resolvedAttempts" in outcomeRecord)
-        return refining.resolver.persist(transaction, outcome, context);
-      if (welding && "completedIncrements" in outcomeRecord)
-        return welding.resolver.persist(transaction, outcome, context);
-      if (travel && "arrived" in outcomeRecord)
-        return travel.resolver.persist(transaction, outcome, context);
-      if (mining) return mining.resolver.persist(transaction, outcome, context);
-      throw new Error("No resolver can persist this outcome");
+      // withResolvedOwnedCharacter always supplies the original action context;
+      // a persist without it cannot be dispatched by outcome shape.
+      if (!context) throw new Error("Cannot persist without the original action context");
+      const entry = byActionId.get(context.action.actionId);
+      if (!entry) throw new Error(`No resolver owns action ${context.action.actionId}`);
+      return entry.resolver.persist(transaction, outcome, context);
     },
   };
 }

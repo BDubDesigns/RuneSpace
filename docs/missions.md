@@ -2,7 +2,7 @@
 
 Authoritative authoring contract for the declarative single-phase mission system introduced by #124 / #125.
 
-The document describes the mission framework's own contracts. It is intentionally narrow: it does not document the temporary shared-play orchestration that currently hosts projection (the Mining-named play-state loader / context) as permanent architecture — see §2. That surrounding host is expected to move under #127 and this document must remain valid across it.
+The document describes the mission framework's own contracts. It is intentionally narrow: it does not document the shared play-state assembly that hosts projection as permanent framework architecture — see §2. Since #127 that host is the generic play boundary (`server/play.ts` / `PlayContext`), not a Mining concern; this document remains valid across it.
 
 Base your work on the current PR #125 implementation (`game/content/missions.ts`, `game/domain/missions.ts`, `game/domain/action-outputs.ts`, `game/content/dialogue.ts`, `server/missions.ts`, `server/mission-state.ts`, `game/schemas/gameplay.ts`, `server/actions.ts`, `app/globals.css`). The original #114 proposal is superseded where implementation refined details (most notably, availability guidance).
 
@@ -24,9 +24,9 @@ The framework deliberately does not attempt to support every future quest shape.
 | Generic mission projection | `game/domain/missions.ts` — `projectMission`, `deriveMissionState`, `deriveQuestGuidanceTargets`, `validateMissionDefinitions`; `server/mission-state.ts` — `loadMissionProjections` | Projection recomputes from live authoritative state; no quest progress is persisted beyond `acceptedAt` / `completedAt`. |
 | Generic acceptance / completion boundary | `server/missions.ts` — `acceptMission`, `completeMission` (+ `completeMissionWithDefinition` test seam); `server/actions.ts` — `acceptMissionAction` / `completeMissionAction`; `game/schemas/gameplay.ts` — `AcceptMissionRequestSchema` / `CompleteMissionRequestSchema` | Shared `runMissionCommand` character lock / reconciliation wrapper. See §12. |
 | Authored dialogue | `game/content/dialogue.ts` — `DIALOGUE_SEQUENCES` / `getDialogue`; `game/domain/missions.ts` stage types consumed by `resolveNpcMissionDialogue`, `getMissionCapacityRefusalDialogue`, `getMissionCompletionPresentation` | Sequences are content; routing is semantic state (§9). |
-| Semantic guidance projection | `game/domain/missions.ts` — `MissionGuidance`, `QuestGuidanceTargets`, `deriveQuestGuidanceTargets`; `app/globals.css` — `--rs-quest-guidance-*` / `--rs-quest-available-*` and `.rs-quest-guidance` / `.rs-quest-available` | Guidance is a derived set consumed by `NpcInteractionPanel`, `MiningConsole`, `RefiningConsole`, `EquipmentPanel`, `InventoryPanel`. |
+| Semantic guidance projection | `game/domain/missions.ts` — `MissionGuidance`, `QuestGuidanceTargets`, `deriveQuestGuidanceTargets`; `app/globals.css` — `--rs-quest-guidance-*` / `--rs-quest-available-*` and `.rs-quest-guidance` / `.rs-quest-available` | Guidance is a derived set consumed by `NpcInteractionPanel`, `MiningActivity`, `RefiningConsole`, `EquipmentPanel`, `InventoryPanel`. |
 
-The play-state loader that currently projects `state.missions` (today part of the Mining-named orchestration and `MiningPlayContext` / `useMiningPlay`) is intentionally **not** documented here as long-term architecture. Treat it as the current host for projection, not the framework's contract. Do not depend on its module name to reason about missions.
+The shared play-state assembly projects `state.missions` through the generic play boundary (`server/play.ts` `stateFromTransaction`, surfaced by `PlayContext` / `usePlay` via `features/play/PlayConsole.tsx`). That play layer is the current host for projection and is not a mission-framework contract; do not depend on its module name to reason about missions.
 
 ## 3. MissionDefinition
 

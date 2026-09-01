@@ -421,12 +421,20 @@ suite("issue #81 Refining persistence and concurrency (real PostgreSQL)", () => 
     const realResolver = refiningMod.createRefiningResolver({ nextBasisPoints: () => 0 });
     const failingResolver = {
       ...realResolver,
-      persist: async (tx: DatabaseTransaction, outcome: unknown) => {
+      persist: async (
+        tx: DatabaseTransaction,
+        outcome: unknown,
+        context?: { character: never; action: never },
+      ) => {
         await (
           realResolver as unknown as {
-            persist: (tx: DatabaseTransaction, o: unknown) => Promise<void>;
+            persist: (
+              tx: DatabaseTransaction,
+              o: unknown,
+              context?: { character: never; action: never },
+            ) => Promise<void>;
           }
-        ).persist(tx, outcome as never);
+        ).persist(tx, outcome as never, context);
         throw new Error("intentional refining rollback");
       },
       supports: realResolver.supports!.bind(realResolver),

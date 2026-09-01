@@ -16,7 +16,6 @@ import {
   stateFromTransaction,
   type PlayGameplayState,
 } from "@/server/play";
-import { defaultMiningRandom } from "@/server/mining";
 import type { MiningRandom } from "@/game/domain/mining";
 
 /**
@@ -28,7 +27,7 @@ export async function changeEquipment(
   characterId: string,
   change: EquipmentChange,
   now = new Date(),
-  random: MiningRandom = defaultMiningRandom(),
+  random?: MiningRandom,
 ): Promise<PlayGameplayState> {
   let resolvedAttempts = { successes: 0, failures: 0, awardedXp: 0 };
   let miningStopReason: import("@/game/domain/mining").MiningStopReason | undefined;

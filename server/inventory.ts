@@ -5,7 +5,6 @@ import {
   stateFromTransaction,
   type PlayGameplayState,
 } from "@/server/play";
-import { defaultMiningRandom } from "@/server/mining";
 import type { DatabaseTransaction } from "@/server/action-resolution";
 import { withResolvedOwnedCharacter } from "@/server/action-resolution";
 import type { MiningRandom } from "@/game/domain/mining";
@@ -98,7 +97,7 @@ export async function discardInventoryStack(
   characterId: string,
   request: DiscardInventoryStackRequest,
   now = new Date(),
-  random: MiningRandom = defaultMiningRandom(),
+  random?: MiningRandom,
 ): Promise<DiscardInventoryStackResult> {
   let resolvedAttempts = { successes: 0, failures: 0, awardedXp: 0 };
   let miningStopReason: import("@/game/domain/mining").MiningStopReason | undefined;

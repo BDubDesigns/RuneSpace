@@ -38,7 +38,6 @@ import {
   stateFromTransaction,
   type PlayGameplayState,
 } from "@/server/play";
-import { defaultMiningRandom } from "@/server/mining";
 import { grantCharacterSkillXp } from "@/server/progression";
 import { applyStackRemovalPlan, loadOwnedItemInstances } from "@/server/carried-inventory";
 
@@ -111,7 +110,7 @@ async function runMissionCommand<Mission extends MissionAcceptance | MissionComp
   userId: string,
   characterId: string,
   now: Date,
-  random: MiningRandom,
+  random: MiningRandom | undefined,
   command: (input: {
     transaction: DatabaseTransaction;
     context: ResolvedCharacterContext;
@@ -169,7 +168,7 @@ export async function acceptMission(
   missionId: string,
   npcId: string,
   now = new Date(),
-  random: MiningRandom = defaultMiningRandom(),
+  random?: MiningRandom,
 ): Promise<MissionAcceptanceResult> {
   return runMissionCommand<MissionAcceptance>(
     userId,
@@ -257,7 +256,7 @@ export async function completeMission(
   missionId: string,
   npcId: string,
   now = new Date(),
-  random: MiningRandom = defaultMiningRandom(),
+  random?: MiningRandom,
 ): Promise<MissionCompletionResult> {
   return runMissionCommand<MissionCompletion>(
     userId,
@@ -296,7 +295,7 @@ export async function completeMissionWithDefinition(
   definition: MissionDefinition,
   npcId: string,
   now = new Date(),
-  random: MiningRandom = defaultMiningRandom(),
+  random?: MiningRandom,
 ): Promise<MissionCompletionResult> {
   return runMissionCommand<MissionCompletion>(
     userId,

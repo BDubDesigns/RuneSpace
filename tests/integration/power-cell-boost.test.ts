@@ -448,9 +448,17 @@ suite("Issue #24 Salvage Cutter Power Cell boosting (real PostgreSQL)", () => {
     const resolver = createPlayResolver(random);
     const forcedFailure = {
       ...resolver,
-      persist: async (transaction: DatabaseTransaction, outcome: unknown) => {
+      persist: async (
+        transaction: DatabaseTransaction,
+        outcome: unknown,
+        context?: Parameters<(typeof resolver)["persist"]>[2],
+      ) => {
         mutationTransaction = transaction;
-        await resolver.persist(transaction, outcome as Parameters<typeof resolver.persist>[1]);
+        await resolver.persist(
+          transaction,
+          outcome as Parameters<typeof resolver.persist>[1],
+          context,
+        );
         const rows = await mutationTransaction
           .select()
           .from(rune.itemInstances)

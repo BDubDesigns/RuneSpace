@@ -2,6 +2,7 @@
 
 import { useEffect, useTransition } from "react";
 import { Panel } from "@/components/ui/Panel";
+import { Feedback } from "@/components/ui/Feedback";
 import { SectionHeader } from "@/components/ui/SectionHeader";
 import { SkillProgressCard } from "@/features/shared/run-presentation";
 import { CargoReadout } from "@/features/shared/CargoReadout";
@@ -20,8 +21,8 @@ import { LocationSceneHeader } from "@/features/location-scene/LocationSceneHead
 import { CargoHoldPanel } from "@/features/cargo/CargoHoldPanel";
 import { MissionObjectivePanel } from "@/features/missions/MissionObjectivePanel";
 import { NpcInteractionPanel } from "@/features/npc/NpcInteractionPanel";
-import { InventoryPanel } from "@/features/mining/InventoryPanel";
-import { EquipmentPanel } from "@/features/mining/EquipmentPanel";
+import { InventoryPanel } from "@/features/inventory/InventoryPanel";
+import { EquipmentPanel } from "@/features/inventory/EquipmentPanel";
 import { refreshPlayAction } from "@/server/actions";
 import { reportClientDiagnostic } from "@/features/diagnostics/client";
 
@@ -162,11 +163,7 @@ export function PlayConsole({ characterName }: { characterName: string }) {
               <p className="max-w-2xl text-sm leading-relaxed text-[color:var(--rs-text-secondary)]">
                 {getLocation(currentLocationId)?.description}
               </p>
-              <div className="mt-4">
-                <span className="text-sm text-[color:var(--rs-text-muted)]">
-                  No production activity is available here.
-                </span>
-              </div>
+              <Feedback tone="muted">No production activity is available here.</Feedback>
             </div>
           )}
         </div>

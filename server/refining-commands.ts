@@ -22,7 +22,7 @@ import {
   stateFromTransaction,
   type PlayGameplayState,
 } from "@/server/play";
-import { defaultMiningRandom, type PersistedMiningOutcome } from "@/server/mining";
+import type { PersistedMiningOutcome } from "@/server/mining";
 import type { MiningRandom } from "@/game/domain/mining";
 
 function miningRecentFrom(
@@ -51,7 +51,7 @@ export async function startRefining(
   userId: string,
   characterId: string,
   now = new Date(),
-  random: MiningRandom = defaultMiningRandom(),
+  random?: MiningRandom,
 ): Promise<PlayGameplayState> {
   let miningOutcome: PersistedMiningOutcome | undefined;
   let refiningOutcome: PersistedRefiningOutcome | undefined;
@@ -233,7 +233,7 @@ export async function stopRefining(
   userId: string,
   characterId: string,
   now = new Date(),
-  random: MiningRandom = defaultMiningRandom(),
+  random?: MiningRandom,
 ): Promise<PlayGameplayState> {
   let miningOutcome: PersistedMiningOutcome | undefined;
   let refiningOutcome: PersistedRefiningOutcome | undefined;

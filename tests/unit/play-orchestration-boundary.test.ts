@@ -178,4 +178,18 @@ describe("client play shell ownership (#127)", () => {
       expect(src).not.toContain("runMiningAction");
     }
   });
+
+  it("Inventory/Equipment global surfaces are owned by features/inventory, not features/mining", () => {
+    const inventorySrc = readFileSync("features/inventory/InventoryPanel.tsx", "utf8");
+    const equipmentSrc = readFileSync("features/inventory/EquipmentPanel.tsx", "utf8");
+    expect(inventorySrc).toContain("export function InventoryPanel");
+    expect(equipmentSrc).toContain("export function EquipmentPanel");
+    const { existsSync } = require("node:fs");
+    expect(existsSync("features/mining/InventoryPanel.tsx")).toBe(false);
+    expect(existsSync("features/mining/EquipmentPanel.tsx")).toBe(false);
+    // PlayConsole composes the generic Inventory/Equipment drawers, not Mining.
+    const playConsole = readFileSync("features/play/PlayConsole.tsx", "utf8");
+    expect(playConsole).toContain('from "@/features/inventory/InventoryPanel"');
+    expect(playConsole).toContain('from "@/features/inventory/EquipmentPanel"');
+  });
 });

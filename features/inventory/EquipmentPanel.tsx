@@ -12,7 +12,7 @@ import { formatMassGrams } from "@/game/domain/mass";
 import { deriveQuestGuidanceTargets } from "@/game/domain/missions";
 import type { PlayGameplayState } from "@/server/play";
 import { useEquipCommand } from "./useEquipCommand";
-import { useLoadPowerCell } from "./useLoadPowerCell";
+import { useLoadPowerCell } from "@/features/mining/useLoadPowerCell";
 import { usePlay } from "@/features/play/PlayContext";
 
 function secondsForTicks(ticks: number) {

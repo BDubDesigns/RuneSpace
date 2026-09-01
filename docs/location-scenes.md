@@ -8,7 +8,7 @@ Owns the responsive industrial scene header integrated into the top of the exist
 - Registry SSOT: `game/content/locations.ts` (`LOCATIONS`, `presentation.scene`)
 - Schema: `game/schemas/locations.ts` (`presentation.scene: { asset, width, height, alt, focal? }`)
 - Assets: `public/location-scenes/*.webp` — committed local WebP, no CDN, no runtime transform
-- Consumer: `features/mining/MiningConsole.tsx` (integrated into the existing `Panel tone="raised"`; header lives inside the panel's top edge so the scene feels built into RuneSpace, not inserted as a photo)
+- Consumer: `features/play/PlayConsole.tsx` (generic play composition; integrated into its `Panel tone="raised"`; header lives inside the panel's top edge so the scene feels built into RuneSpace, not inserted as a photo)
 
 ## Registry / schema contract
 
@@ -63,18 +63,18 @@ All chrome is HTML/CSS rendered over/around the image. All scrim/hairline/plate 
 
 ## Placement and gameplay hierarchy
 
-The header is inside the existing `MiningConsole` `Panel tone="raised"` (`!p-0 overflow-hidden` so the scene's top edge aligns with the panel's bevel). The rest of the panel is `p-5`:
+The header is inside the generic play console `Panel tone="raised"` (`!p-0 overflow-hidden` so the scene's top edge aligns with the panel's bevel). The rest of the panel is `p-5`:
 
-- During **stationary** play, the header is visible and the Activity/Mining controls flow directly below it. `MiningConsole` keeps `showMiningActivity` gating, success-chance display, start/stop/refresh, latest-attempt feedback, and recovery — none are removed or gated by artwork.
+- During **stationary** play, the header is visible and the location's activity controls flow directly below it. The generic `PlayConsole` keeps per-activity gating (e.g. `showMiningActivity` for Mining), success-chance display, start/stop/refresh, latest-attempt feedback, and recovery — none are removed or gated by artwork.
 - **Processing Yard** receives scene art while exposing its stationary Refining console; Mining controls remain available only at The Jag.
-- The **Annex** scene coexists with the existing `PowerAnnexClaimPanel` (which is rendered below `MiningConsole`, not inside it — both are visible together at the Annex).
+- The **Annex** scene coexists with the existing `PowerAnnexClaimPanel` (which is rendered below the play console, not inside it — both are visible together at the Annex).
 - No horizontal `overflow-x`, no fixed-footer collision, no push of primary actions excessively below the fold at 390px.
 
 ## Transit truthfulness
 
-While traveling, `state.travelState` is authoritative and the character's `currentLocationId` remains the origin until arrival commits (see `docs/gameplay-foundations.md` + `server/mining.ts` resolution). The header:
+While traveling, `state.travelState` is authoritative and the character's `currentLocationId` remains the origin until arrival commits (see `docs/gameplay-foundations.md` + `server/play.ts` resolution). The header:
 
-- **Omits the scene entirely during transit** (no destination preview). `MiningConsole` renders no `LocationSceneHeader` when `inTransit === true`.
+- **Omits the scene entirely during transit** (no destination preview). `PlayConsole` renders no `LocationSceneHeader` when `inTransit === true`.
 - Therefore the destination scene is never shown as though arrival already occurred. No travel cinematic, vehicle scene, or intermediate state is invented.
 
 ## Performance and accessibility

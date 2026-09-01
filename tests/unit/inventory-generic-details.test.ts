@@ -9,8 +9,8 @@ import type { PlayGameplayState } from "@/server/play";
 import {
   derivePowerCellLoadAvailability,
   resolveInventorySelection,
-} from "@/features/mining/inventory-selection";
-import { InventoryDetailsStats } from "@/features/mining/InventoryDetailsStats";
+} from "@/features/inventory/inventory-selection";
+import { InventoryDetailsStats } from "@/features/inventory/InventoryDetailsStats";
 
 const balance = getEffectiveGameBalance();
 

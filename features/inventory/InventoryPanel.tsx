@@ -23,7 +23,7 @@ import {
 } from "./inventory-selection";
 import { InventoryDetailsStats } from "./InventoryDetailsStats";
 import { useEquipCommand } from "./useEquipCommand";
-import { useLoadPowerCell, type LoadPowerCellFeedback } from "./useLoadPowerCell";
+import { useLoadPowerCell, type LoadPowerCellFeedback } from "@/features/mining/useLoadPowerCell";
 import { usePlay } from "@/features/play/PlayContext";
 
 type DropConfirmation = {

@@ -21,16 +21,16 @@ export default async function PlayPage({ params }: { params: Promise<{ character
   if (!session?.user) redirect("/sign-in");
 
   let displayName = "Character";
-  let miningState;
+  let playState;
   try {
     const user = await requireCurrentUser(await headers());
     const character = await requireOwnedCharacter(user.id, characterId);
     displayName = character.displayName;
-    miningState = await getPlayGameplayState(user.id, characterId);
+    playState = await getPlayGameplayState(user.id, characterId);
   } catch (err) {
     if (err instanceof OwnershipError) redirect("/characters");
     throw err;
   }
 
-  return <PlayScreen characterName={displayName} initialState={miningState!} />;
+  return <PlayScreen characterName={displayName} initialState={playState!} />;
 }

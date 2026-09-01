@@ -31,45 +31,47 @@ export function RefiningRunPanel({
         <SectionHeader eyebrow="Server-resolved">This refining run</SectionHeader>
         <CollapseButton collapsed={collapsed} label="refining run" onToggle={toggle} />
       </div>
-      <div className="mt-4 grid grid-cols-2 gap-3 text-sm sm:grid-cols-4">
-        <p>
-          <strong>{run.attempts}</strong> attempts
-        </p>
-        <p>
-          <strong>{run.successes}</strong> Refined Ferrite
-        </p>
-        <p>
-          <strong>{run.failures}</strong> Slag
-        </p>
-        <p>
-          <strong>{run.xpGained}</strong> Refining XP
-        </p>
-      </div>
-      <div className="mt-3 grid grid-cols-2 gap-3 text-sm sm:grid-cols-3">
-        <p>
-          <strong>{run.shaleConsumed}</strong> shale consumed
-        </p>
-        <p>
-          <strong>{ferriteQuantity}</strong> Refined Ferrite carried
-        </p>
-        <p>
-          <strong>{slagQuantity}</strong> Slag carried
-        </p>
-      </div>
       {!collapsed ? (
-        <div
-          className="mt-5 max-h-72 space-y-2 overflow-y-auto pr-1"
-          aria-label="Refining attempt history"
-        >
-          {[...run.recentAttempts].reverse().map((attempt) => (
-            <RefiningAttemptRow attempt={attempt} key={attempt.sequence} />
-          ))}
-          {run.recentAttempts.length === 0 ? (
-            <p className="text-sm text-[color:var(--rs-text-muted)]">
-              No resolved attempts in this run yet.
+        <>
+          <div className="mt-4 grid grid-cols-2 gap-3 text-sm sm:grid-cols-4">
+            <p>
+              <strong>{run.attempts}</strong> attempts
             </p>
-          ) : null}
-        </div>
+            <p>
+              <strong>{run.successes}</strong> Refined Ferrite
+            </p>
+            <p>
+              <strong>{run.failures}</strong> Slag
+            </p>
+            <p>
+              <strong>{run.xpGained}</strong> Refining XP
+            </p>
+          </div>
+          <div className="mt-3 grid grid-cols-2 gap-3 text-sm sm:grid-cols-3">
+            <p>
+              <strong>{run.shaleConsumed}</strong> shale consumed
+            </p>
+            <p>
+              <strong>{ferriteQuantity}</strong> Refined Ferrite carried
+            </p>
+            <p>
+              <strong>{slagQuantity}</strong> Slag carried
+            </p>
+          </div>
+          <div
+            className="mt-5 max-h-72 space-y-2 overflow-y-auto pr-1"
+            aria-label="Refining attempt history"
+          >
+            {[...run.recentAttempts].reverse().map((attempt) => (
+              <RefiningAttemptRow attempt={attempt} key={attempt.sequence} />
+            ))}
+            {run.recentAttempts.length === 0 ? (
+              <p className="text-sm text-[color:var(--rs-text-muted)]">
+                No resolved attempts in this run yet.
+              </p>
+            ) : null}
+          </div>
+        </>
       ) : null}
     </Panel>
   );

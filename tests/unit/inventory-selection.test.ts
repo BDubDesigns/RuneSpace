@@ -8,7 +8,7 @@ import {
   resolveInventorySelection,
   stackDropActions,
   toggleInventorySelection,
-} from "@/features/mining/inventory-selection";
+} from "@/features/inventory/inventory-selection";
 import { DiscardInventoryStackRequestSchema } from "@/game/schemas/gameplay";
 
 function inventoryState(
