@@ -102,6 +102,7 @@ Read these before contributing:
 - [`docs/component-boundaries.md`](./docs/component-boundaries.md) — extraction rules.
 - [`docs/testing-strategy.md`](./docs/testing-strategy.md) — risk-based testing.
 - [`docs/development-workflow.md`](./docs/development-workflow.md) — one issue/branch/draft-PR workflow.
+- [`docs/admin-console.md`](./docs/admin-console.md) — admin/operator console authorization, commands, and audit (issue #113).
 
 ## License
 
