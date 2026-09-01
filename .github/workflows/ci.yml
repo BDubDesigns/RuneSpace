@@ -148,6 +148,9 @@ jobs:
       - name: PostgreSQL integration tests
         run: pnpm test:integration
 
+      - name: Issue #126 PostgreSQL maintenance integration tests
+        run: pnpm test:integration:issue-126
+
   canonical-e2e:
     name: Canonical E2E browser journeys
     if: ${{ needs.gate-decision.outputs.full == 'true' }}

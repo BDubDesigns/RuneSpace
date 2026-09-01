@@ -1,4 +1,4 @@
-import { asContentId, type ContentId } from "@/game/schemas/ids";
+import { asContentId, type ContentId } from "../schemas/ids.ts";
 
 /** Foundational mechanical constants and approved stable identities. */
 export const GAME_TICK_MS = 600;
