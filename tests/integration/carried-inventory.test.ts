@@ -13,7 +13,8 @@ suite("Issue #57 carried unique items in Inventory (real PostgreSQL)", () => {
   let rune: typeof import("@/db/rune-space");
   let ownership: typeof import("@/server/ownership");
   let characters: typeof import("@/server/characters");
-  let mining: typeof import("@/server/mining");
+  let play: typeof import("@/server/play");
+  let miningCommands: typeof import("@/server/mining-commands");
   let equipment: typeof import("@/server/equipment");
   const createdUsers: string[] = [];
 
@@ -23,7 +24,8 @@ suite("Issue #57 carried unique items in Inventory (real PostgreSQL)", () => {
     rune = await import("@/db/rune-space");
     ownership = await import("@/server/ownership");
     characters = await import("@/server/characters");
-    mining = await import("@/server/mining");
+    play = await import("@/server/play");
+    miningCommands = await import("@/server/mining-commands");
     equipment = await import("@/server/equipment");
   });
 
@@ -49,7 +51,7 @@ suite("Issue #57 carried unique items in Inventory (real PostgreSQL)", () => {
   const noYield: MiningRandom = { nextBasisPoints: () => 9_999, nextUnit: () => 0 };
 
   async function provision(userId: string, characterId: string, now: Date) {
-    await mining.getMiningGameplayState(userId, characterId, now, noYield);
+    await play.getPlayGameplayState(userId, characterId, now, noYield);
     await db
       .update(rune.characters)
       .set({ currentLocationId: LOCATION_IDS.theJag })
@@ -191,7 +193,7 @@ suite("Issue #57 carried unique items in Inventory (real PostgreSQL)", () => {
     const dueAt = new Date("2026-01-01T00:00:06.000Z");
     await provision(userId, character.id, startedAt);
     const successRandom: MiningRandom = { nextBasisPoints: () => 0, nextUnit: () => 0 };
-    await mining.startFerriteShaleMining(userId, character.id, startedAt, successRandom);
+    await miningCommands.startFerriteShaleMining(userId, character.id, startedAt, successRandom);
     const cutter = await cutterInstance(character.id);
     await db
       .update(rune.itemInstances)
@@ -264,7 +266,7 @@ suite("Issue #57 carried unique items in Inventory (real PostgreSQL)", () => {
     // The rolled-back attempts are neither lost nor duplicated: the boosted
     // Cutter resolves both due attempts exactly once when retried at the same
     // due time, filling the eighth stack.
-    const retried = await mining.getMiningGameplayState(userId, character.id, dueAt, successRandom);
+    const retried = await play.getPlayGameplayState(userId, character.id, dueAt, successRandom);
     expect(retried.run).toMatchObject({ attempts: 2, successes: 2, shaleGained: 2, xpGained: 30 });
     expect(retried.inventory.stacks).toHaveLength(8);
     expect(retried.ferriteShaleQuantity).toBe(72);

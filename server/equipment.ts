@@ -12,11 +12,11 @@ import { withResolvedOwnedCharacter } from "@/server/action-resolution";
 import { loadOwnedItemInstances } from "@/server/carried-inventory";
 import {
   createPlayResolver,
-  defaultMiningRandom,
-  ensureStarterMiningState,
+  ensurePlayProvisioning,
   stateFromTransaction,
-  type MiningGameplayState,
-} from "@/server/mining";
+  type PlayGameplayState,
+} from "@/server/play";
+import { defaultMiningRandom } from "@/server/mining";
 import type { MiningRandom } from "@/game/domain/mining";
 
 /**
@@ -29,7 +29,7 @@ export async function changeEquipment(
   change: EquipmentChange,
   now = new Date(),
   random: MiningRandom = defaultMiningRandom(),
-): Promise<MiningGameplayState> {
+): Promise<PlayGameplayState> {
   let resolvedAttempts = { successes: 0, failures: 0, awardedXp: 0 };
   let miningStopReason: import("@/game/domain/mining").MiningStopReason | undefined;
   return withResolvedOwnedCharacter(
@@ -44,7 +44,7 @@ export async function changeEquipment(
       miningStopReason = outcome.stopReason;
     }),
     async (transaction, context) => {
-      await ensureStarterMiningState(transaction, context.character.id);
+      await ensurePlayProvisioning(transaction, context.character.id);
       const [itemState, assignments, stacks] = await Promise.all([
         loadOwnedItemInstances(transaction, context.character.id),
         transaction

@@ -19,7 +19,8 @@ suite("gameplay foundations (real PostgreSQL)", () => {
   let rune: typeof import("@/db/rune-space");
   let ownership: typeof import("@/server/ownership");
   let characters: typeof import("@/server/characters");
-  let mining: typeof import("@/server/mining");
+  let play: typeof import("@/server/play");
+  let miningCommands: typeof import("@/server/mining-commands");
   let equipment: typeof import("@/server/equipment");
   let resolution: typeof import("@/server/action-resolution");
   const createdUsers: string[] = [];
@@ -30,7 +31,8 @@ suite("gameplay foundations (real PostgreSQL)", () => {
     rune = await import("@/db/rune-space");
     ownership = await import("@/server/ownership");
     characters = await import("@/server/characters");
-    mining = await import("@/server/mining");
+    play = await import("@/server/play");
+    miningCommands = await import("@/server/mining-commands");
     equipment = await import("@/server/equipment");
     resolution = await import("@/server/action-resolution");
   });
@@ -405,13 +407,13 @@ suite("gameplay foundations (real PostgreSQL)", () => {
     const { userId, character } = await makeCharacter();
     const startedAt = new Date("2026-01-01T00:00:00.000Z");
     const random = { nextBasisPoints: () => 0, nextUnit: () => 0 };
-    await mining.getMiningGameplayState(userId, character.id, startedAt, random);
+    await play.getPlayGameplayState(userId, character.id, startedAt, random);
     await moveToTheJag(character.id);
     await Promise.all([
-      mining.startFerriteShaleMining(userId, character.id, startedAt, random),
-      mining.startFerriteShaleMining(userId, character.id, startedAt, random),
+      miningCommands.startFerriteShaleMining(userId, character.id, startedAt, random),
+      miningCommands.startFerriteShaleMining(userId, character.id, startedAt, random),
     ]);
-    const resolved = await mining.getMiningGameplayState(
+    const resolved = await play.getPlayGameplayState(
       userId,
       character.id,
       new Date("2026-01-01T00:00:06.000Z"),
@@ -436,7 +438,7 @@ suite("gameplay foundations (real PostgreSQL)", () => {
         xpAwarded: 15,
       },
     ]);
-    const repeat = await mining.getMiningGameplayState(
+    const repeat = await play.getPlayGameplayState(
       userId,
       character.id,
       new Date("2026-01-01T00:00:06.000Z"),
@@ -455,10 +457,10 @@ suite("gameplay foundations (real PostgreSQL)", () => {
     const { userId, character } = await makeCharacter();
     const startedAt = new Date("2026-01-01T00:00:00.000Z");
     const random = { nextBasisPoints: () => 9_999, nextUnit: () => 0 };
-    await mining.getMiningGameplayState(userId, character.id, startedAt, random);
+    await play.getPlayGameplayState(userId, character.id, startedAt, random);
     await moveToTheJag(character.id);
-    await mining.startFerriteShaleMining(userId, character.id, startedAt, random);
-    const resolved = await mining.getMiningGameplayState(
+    await miningCommands.startFerriteShaleMining(userId, character.id, startedAt, random);
+    const resolved = await play.getPlayGameplayState(
       userId,
       character.id,
       new Date("2026-01-01T00:01:12.000Z"),
@@ -475,15 +477,20 @@ suite("gameplay foundations (real PostgreSQL)", () => {
     expect(resolved.run.recentAttempts.map((attempt) => attempt.sequence)).toEqual([
       3, 4, 5, 6, 7, 8, 9, 10, 11, 12,
     ]);
-    await mining.stopMining(userId, character.id, new Date("2026-01-01T00:01:12.000Z"), random);
-    const stopped = await mining.getMiningGameplayState(
+    await miningCommands.stopMining(
+      userId,
+      character.id,
+      new Date("2026-01-01T00:01:12.000Z"),
+      random,
+    );
+    const stopped = await play.getPlayGameplayState(
       userId,
       character.id,
       new Date("2026-01-01T00:01:12.000Z"),
       random,
     );
     expect(stopped.run.attempts).toBe(12);
-    const restarted = await mining.startFerriteShaleMining(
+    const restarted = await miningCommands.startFerriteShaleMining(
       userId,
       character.id,
       new Date("2026-01-01T00:01:13.000Z"),
@@ -503,15 +510,15 @@ suite("gameplay foundations (real PostgreSQL)", () => {
     const { userId, character } = await makeCharacter();
     const startedAt = new Date("2026-01-01T00:00:00.000Z");
     const random = { nextBasisPoints: () => 0, nextUnit: () => 0 };
-    await mining.getMiningGameplayState(userId, character.id, startedAt, random);
+    await play.getPlayGameplayState(userId, character.id, startedAt, random);
     await moveToTheJag(character.id);
     await db.insert(rune.inventoryStacks).values({
       characterId: character.id,
       itemId: ITEM_IDS.ferriteShale,
       quantity: 10,
     });
-    await mining.startFerriteShaleMining(userId, character.id, startedAt, random);
-    const resolved = await mining.getMiningGameplayState(
+    await miningCommands.startFerriteShaleMining(userId, character.id, startedAt, random);
+    const resolved = await play.getPlayGameplayState(
       userId,
       character.id,
       new Date("2026-01-01T00:00:06.000Z"),
@@ -528,7 +535,7 @@ suite("gameplay foundations (real PostgreSQL)", () => {
       shaleGained: 1,
       xpGained: 15,
     });
-    const retry = await mining.getMiningGameplayState(
+    const retry = await play.getPlayGameplayState(
       userId,
       character.id,
       new Date("2026-01-01T00:00:06.000Z"),
@@ -548,7 +555,7 @@ suite("gameplay foundations (real PostgreSQL)", () => {
   it("returns inventory stacks in stable creation order with accurate totals", async () => {
     const { userId, character } = await makeCharacter();
     const now = new Date("2026-01-01T00:00:00.000Z");
-    await mining.getMiningGameplayState(userId, character.id, now);
+    await play.getPlayGameplayState(userId, character.id, now);
     await db.insert(rune.inventoryStacks).values([
       {
         id: "stack-later",
@@ -581,8 +588,8 @@ suite("gameplay foundations (real PostgreSQL)", () => {
     ]);
 
     const expectedStackIds = ["stack-earlier", "stack-tie-a", "stack-tie-b", "stack-later"];
-    const first = await mining.getMiningGameplayState(userId, character.id, now);
-    const repeat = await mining.getMiningGameplayState(userId, character.id, now);
+    const first = await play.getPlayGameplayState(userId, character.id, now);
+    const repeat = await play.getPlayGameplayState(userId, character.id, now);
     expect(first.inventory.stacks.map((stack) => stack.id)).toEqual(expectedStackIds);
     expect(repeat.inventory.stacks.map((stack) => stack.id)).toEqual(expectedStackIds);
     expect(first.inventory).toMatchObject({
@@ -597,7 +604,7 @@ suite("gameplay foundations (real PostgreSQL)", () => {
       .update(rune.inventoryStacks)
       .set({ quantity: 6, updatedAt: new Date("2026-01-01T00:00:03.000Z") })
       .where(eq(rune.inventoryStacks.id, "stack-earlier"));
-    const afterQuantityUpdate = await mining.getMiningGameplayState(userId, character.id, now);
+    const afterQuantityUpdate = await play.getPlayGameplayState(userId, character.id, now);
     expect(afterQuantityUpdate.inventory.stacks.map((stack) => stack.id)).toEqual(expectedStackIds);
     expect(afterQuantityUpdate.inventory).toMatchObject({
       slotsUsed: first.inventory.slotsUsed,
@@ -619,7 +626,7 @@ suite("gameplay foundations (real PostgreSQL)", () => {
       resolvedThroughAt,
     });
 
-    const state = await mining.startFerriteShaleMining(
+    const state = await miningCommands.startFerriteShaleMining(
       userId,
       character.id,
       new Date("2026-01-01T00:01:00.000Z"),
@@ -635,11 +642,11 @@ suite("gameplay foundations (real PostgreSQL)", () => {
   it("does not create a Mining action when the preflight has no compatible tool", async () => {
     const { userId, character } = await makeCharacter();
     const now = new Date("2026-01-01T00:00:00.000Z");
-    await mining.getMiningGameplayState(userId, character.id, now);
+    await play.getPlayGameplayState(userId, character.id, now);
     await moveToTheJag(character.id);
     await db.delete(rune.equippedItems).where(eq(rune.equippedItems.characterId, character.id));
 
-    const state = await mining.startFerriteShaleMining(userId, character.id, now);
+    const state = await miningCommands.startFerriteShaleMining(userId, character.id, now);
     expect(state.stop).toEqual({
       actionId: ACTION_IDS.ferriteShaleMining,
       reason: "compatible_mining_tool_missing",
@@ -653,7 +660,7 @@ suite("gameplay foundations (real PostgreSQL)", () => {
     const owner = await makeCharacter();
     const outsider = await makeCharacter();
     const now = new Date("2026-01-01T00:00:00.000Z");
-    await mining.getMiningGameplayState(owner.userId, owner.character.id, now);
+    await play.getPlayGameplayState(owner.userId, owner.character.id, now);
     await db.insert(rune.inventoryStacks).values({
       characterId: owner.character.id,
       itemId: ITEM_IDS.ferriteShale,
@@ -697,7 +704,7 @@ suite("gameplay foundations (real PostgreSQL)", () => {
   it("serializes concurrent commands so one unique container cannot occupy two assignments", async () => {
     const { userId, character } = await makeCharacter();
     const now = new Date("2026-01-01T00:00:00.000Z");
-    await mining.getMiningGameplayState(userId, character.id, now);
+    await play.getPlayGameplayState(userId, character.id, now);
     const extraContainer = (
       await db
         .insert(rune.itemInstances)
@@ -732,9 +739,9 @@ suite("gameplay foundations (real PostgreSQL)", () => {
     const startedAt = new Date("2026-01-01T00:00:00.000Z");
     const completedAt = new Date("2026-01-01T00:00:06.000Z");
     const random = { nextBasisPoints: () => 0, nextUnit: () => 0 };
-    await mining.getMiningGameplayState(userId, character.id, startedAt, random);
+    await play.getPlayGameplayState(userId, character.id, startedAt, random);
     await moveToTheJag(character.id);
-    await mining.startFerriteShaleMining(userId, character.id, startedAt, random);
+    await miningCommands.startFerriteShaleMining(userId, character.id, startedAt, random);
     const removed = await equipment.changeEquipment(
       userId,
       character.id,
@@ -754,7 +761,7 @@ suite("gameplay foundations (real PostgreSQL)", () => {
     await expect(
       db.select().from(rune.activeActions).where(eq(rune.activeActions.characterId, character.id)),
     ).resolves.toEqual([]);
-    const retry = await mining.getMiningGameplayState(userId, character.id, completedAt, random);
+    const retry = await play.getPlayGameplayState(userId, character.id, completedAt, random);
     expect(retry.run).toMatchObject({ attempts: 1, successes: 1, shaleGained: 1, xpGained: 15 });
     expect(retry.ferriteShaleQuantity).toBe(1);
   });
@@ -764,9 +771,9 @@ suite("gameplay foundations (real PostgreSQL)", () => {
     const startedAt = new Date("2026-01-01T00:00:00.000Z");
     const completedAt = new Date("2026-01-01T00:00:06.000Z");
     const random = { nextBasisPoints: () => 0, nextUnit: () => 0 };
-    await mining.getMiningGameplayState(userId, character.id, startedAt, random);
+    await play.getPlayGameplayState(userId, character.id, startedAt, random);
     await moveToTheJag(character.id);
-    await mining.startFerriteShaleMining(userId, character.id, startedAt, random);
+    await miningCommands.startFerriteShaleMining(userId, character.id, startedAt, random);
     await expect(
       equipment.changeEquipment(
         userId,
@@ -790,7 +797,7 @@ suite("gameplay foundations (real PostgreSQL)", () => {
         .from(rune.inventoryStacks)
         .where(eq(rune.inventoryStacks.characterId, character.id)),
     ).resolves.toEqual([]);
-    const resolved = await mining.getMiningGameplayState(userId, character.id, completedAt, random);
+    const resolved = await play.getPlayGameplayState(userId, character.id, completedAt, random);
     expect(resolved.run).toMatchObject({ attempts: 1, successes: 1, shaleGained: 1, xpGained: 15 });
     expect(resolved.ferriteShaleQuantity).toBe(1);
   });
@@ -800,9 +807,9 @@ suite("gameplay foundations (real PostgreSQL)", () => {
     const startedAt = new Date("2026-01-01T00:00:00.000Z");
     const completedAt = new Date("2026-01-01T00:00:06.000Z");
     const random = { nextBasisPoints: () => 0, nextUnit: () => 0 };
-    await mining.getMiningGameplayState(userId, character.id, startedAt, random);
+    await play.getPlayGameplayState(userId, character.id, startedAt, random);
     await moveToTheJag(character.id);
-    await mining.startFerriteShaleMining(userId, character.id, startedAt, random);
+    await miningCommands.startFerriteShaleMining(userId, character.id, startedAt, random);
 
     const spareCutter = (
       await db
@@ -855,7 +862,7 @@ suite("gameplay foundations (real PostgreSQL)", () => {
     expect(instanceIds).not.toContain(previousCutter);
 
     // A later refresh must not resolve the same attempt again.
-    const retry = await mining.getMiningGameplayState(userId, character.id, completedAt, random);
+    const retry = await play.getPlayGameplayState(userId, character.id, completedAt, random);
     expect(retry.run).toMatchObject({ attempts: 1, successes: 1, shaleGained: 1, xpGained: 15 });
     expect(retry.ferriteShaleQuantity).toBe(1);
     expect(retry.activeAction).toBeUndefined();
@@ -874,7 +881,7 @@ suite("gameplay foundations (real PostgreSQL)", () => {
         random,
       ),
     ).rejects.toThrow(/already equipped/i);
-    const later = await mining.getMiningGameplayState(
+    const later = await play.getPlayGameplayState(
       userId,
       character.id,
       new Date("2026-01-01T00:00:12.000Z"),

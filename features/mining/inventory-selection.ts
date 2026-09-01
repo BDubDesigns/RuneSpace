@@ -1,7 +1,7 @@
 import { ITEM_IDS } from "@/game/config/foundations";
 import { getEffectiveGameBalance } from "@/game/config/balance";
 import type { EquipmentTarget } from "@/game/domain/equipment";
-import type { MiningGameplayState } from "@/server/mining";
+import type { PlayGameplayState } from "@/server/play";
 
 /**
  * Pure inventory selection and action derivation for the Inventory drawer.
@@ -10,8 +10,8 @@ import type { MiningGameplayState } from "@/server/mining";
  * reconciled against returned state.
  */
 
-export type InventoryStackEntry = MiningGameplayState["inventory"]["stacks"][number];
-export type InventoryUniqueEntry = MiningGameplayState["inventory"]["uniqueItems"][number];
+export type InventoryStackEntry = PlayGameplayState["inventory"]["stacks"][number];
+export type InventoryUniqueEntry = PlayGameplayState["inventory"]["uniqueItems"][number];
 
 /**
  * Selected-entry identity. Stack rows and unique item instances live in two
@@ -26,7 +26,7 @@ export type ResolvedInventorySelection =
 
 /** Resolve the current selection against the authoritative inventory projection. */
 export function resolveInventorySelection(
-  inventory: MiningGameplayState["inventory"],
+  inventory: PlayGameplayState["inventory"],
   selection: InventorySelection | undefined,
 ): ResolvedInventorySelection | undefined {
   if (!selection) return undefined;
@@ -80,7 +80,7 @@ export type PowerCellLoadAvailability =
  * offered and which clear reason is shown when it is not.
  */
 export function derivePowerCellLoadAvailability(
-  state: MiningGameplayState,
+  state: PlayGameplayState,
   selection: ResolvedInventorySelection | undefined,
   busy: boolean,
 ): PowerCellLoadAvailability | undefined {
@@ -124,7 +124,7 @@ export type InventoryEquipAvailability =
  * authoritative.
  */
 export function deriveInventoryEquipAvailability(
-  state: MiningGameplayState,
+  state: PlayGameplayState,
   selection: ResolvedInventorySelection | undefined,
   busy: boolean,
 ): InventoryEquipAvailability | undefined {

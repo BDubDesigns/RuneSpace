@@ -12,7 +12,7 @@ import { ACTION_IDS, GAME_TICK_MS } from "@/game/config/foundations";
 import type {
   CargoHoldMaterialContributionActionResult,
   CargoHoldTransferActionResult,
-  MiningActionResult,
+  PlayActionResult,
 } from "@/server/actions";
 import {
   contributeCargoHoldMaterialsAction,
@@ -23,8 +23,8 @@ import {
   withdrawCargoStackAction,
   withdrawCargoUniqueItemAction,
 } from "@/server/actions";
-import type { CargoHoldStackState, MiningGameplayState } from "@/server/mining";
-import { useMiningPlay } from "@/features/mining/MiningPlayContext";
+import type { CargoHoldStackState, PlayGameplayState } from "@/server/play";
+import { usePlay } from "@/features/play/PlayContext";
 
 type Confirmation = {
   refinedFerrite: number;
@@ -41,7 +41,7 @@ function transferMessage(result: CargoHoldTransferActionResult): string | undefi
   return result.cargo.message;
 }
 
-function weldingMessage(state: MiningGameplayState): string | undefined {
+function weldingMessage(state: PlayGameplayState): string | undefined {
   if (state.weldingError === "welding_unavailable_here")
     return "Welding is available only while stationary at Crash Site.";
   if (state.weldingError === "welding_locked")
@@ -52,12 +52,12 @@ function weldingMessage(state: MiningGameplayState): string | undefined {
   return undefined;
 }
 
-function resultError(result: MiningActionResult | CargoHoldMaterialContributionActionResult) {
+function resultError(result: PlayActionResult | CargoHoldMaterialContributionActionResult) {
   return "error" in result ? result.error : undefined;
 }
 
 export function CargoHoldPanel() {
-  const { enqueueForeground, foregroundBusy, releaseCommand, acceptState, state } = useMiningPlay();
+  const { enqueueForeground, foregroundBusy, releaseCommand, acceptState, state } = usePlay();
   const [confirmation, setConfirmation] = useState<Confirmation>();
   const [storageOpen, setStorageOpen] = useState(false);
   const [storageMode, setStorageMode] = useState<StorageMode>("carried");
@@ -102,7 +102,7 @@ export function CargoHoldPanel() {
     return () => window.clearTimeout(timer);
   }, [repair.complete]);
 
-  function applyStateResult(result: MiningActionResult) {
+  function applyStateResult(result: PlayActionResult) {
     const error = resultError(result);
     if (error) {
       setMessage(error);

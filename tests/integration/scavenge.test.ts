@@ -14,7 +14,7 @@ suite("issue #88 authoritative Scavenge claims (real PostgreSQL)", () => {
   let rune: typeof import("@/db/rune-space");
   let ownership: typeof import("@/server/ownership");
   let characters: typeof import("@/server/characters");
-  let mining: typeof import("@/server/mining");
+  let play: typeof import("@/server/play");
   const createdUsers: string[] = [];
   const startedAt = new Date("2026-01-01T00:00:00.000Z");
   const travelRandom = { nextBasisPoints: () => 0, nextUnit: () => 0 };
@@ -26,7 +26,7 @@ suite("issue #88 authoritative Scavenge claims (real PostgreSQL)", () => {
     rune = await import("@/db/rune-space");
     ownership = await import("@/server/ownership");
     characters = await import("@/server/characters");
-    mining = await import("@/server/mining");
+    play = await import("@/server/play");
   });
 
   afterEach(async () => {
@@ -53,7 +53,7 @@ suite("issue #88 authoritative Scavenge claims (real PostgreSQL)", () => {
   }
 
   async function beginFixture(userId: string, characterId: string) {
-    await mining.beginTravel(
+    await play.beginTravel(
       userId,
       characterId,
       LOCATION_IDS.abandonedProcessingYard,
@@ -66,7 +66,7 @@ suite("issue #88 authoritative Scavenge claims (real PostgreSQL)", () => {
     const { userId, character } = await makeCharacter();
     await beginFixture(userId, character.id);
 
-    const claimed = await mining.claimScavenge(userId, character.id, atTick(4), rewardRandom);
+    const claimed = await play.claimScavenge(userId, character.id, atTick(4), rewardRandom);
     expect(claimed.scavenge).toMatchObject({
       status: "claimed",
       outcome: { outcomeId: "ferrite_shale_1", quantity: 1 },
@@ -81,7 +81,7 @@ suite("issue #88 authoritative Scavenge claims (real PostgreSQL)", () => {
     expect(revealRows).toHaveLength(1);
     expect(revealRows[0]?.outcomeId).toBe("ferrite_shale_1");
 
-    const repeat = await mining.claimScavenge(userId, character.id, atTick(5), rewardRandom);
+    const repeat = await play.claimScavenge(userId, character.id, atTick(5), rewardRandom);
     expect(repeat.scavenge).toMatchObject({ status: "refused", reason: "already_claimed" });
     expect(
       (
@@ -95,7 +95,7 @@ suite("issue #88 authoritative Scavenge claims (real PostgreSQL)", () => {
     await beginFixture(withinGraceFixture.userId, withinGraceFixture.character.id);
     const { claimGraceMs } = getEffectiveGameBalance().travel.scavenge;
     const withinGrace = new Date(atTick(8).getTime() + claimGraceMs - 1);
-    const withinGraceResult = await mining.claimScavenge(
+    const withinGraceResult = await play.claimScavenge(
       withinGraceFixture.userId,
       withinGraceFixture.character.id,
       withinGrace,
@@ -106,7 +106,7 @@ suite("issue #88 authoritative Scavenge claims (real PostgreSQL)", () => {
     const expiredFixture = await makeCharacter();
     await beginFixture(expiredFixture.userId, expiredFixture.character.id);
     const afterGrace = new Date(atTick(8).getTime() + claimGraceMs);
-    const afterGraceResult = await mining.claimScavenge(
+    const afterGraceResult = await play.claimScavenge(
       expiredFixture.userId,
       expiredFixture.character.id,
       afterGrace,
@@ -134,7 +134,7 @@ suite("issue #88 authoritative Scavenge claims (real PostgreSQL)", () => {
       nextUnit: () => 0,
     };
 
-    const result = await mining.claimScavenge(userId, character.id, atTick(4), shouldNotRoll);
+    const result = await play.claimScavenge(userId, character.id, atTick(4), shouldNotRoll);
     expect(result.scavenge).toMatchObject({
       status: "refused",
       reason: "capacity_blocked",
@@ -151,17 +151,17 @@ suite("issue #88 authoritative Scavenge claims (real PostgreSQL)", () => {
   it("keeps a committed reveal after arrival and acknowledges it idempotently", async () => {
     const { userId, character } = await makeCharacter();
     await beginFixture(userId, character.id);
-    const claimed = await mining.claimScavenge(userId, character.id, atTick(4), rewardRandom);
+    const claimed = await play.claimScavenge(userId, character.id, atTick(4), rewardRandom);
     const revealId = claimed.state.scavengeReveals[0]?.revealId;
     expect(revealId).toBeDefined();
 
-    const arrived = await mining.getMiningGameplayState(userId, character.id, atTick(41));
+    const arrived = await play.getPlayGameplayState(userId, character.id, atTick(41));
     expect(arrived.travelState).toBeUndefined();
     expect(arrived.location.currentLocationId).toBe(LOCATION_IDS.abandonedProcessingYard);
     expect(arrived.scavengeReveals).toHaveLength(1);
     expect(arrived.scavengeReveals[0]?.revealId).toBe(revealId);
 
-    const acknowledged = await mining.acknowledgeScavengeReveal(
+    const acknowledged = await play.acknowledgeScavengeReveal(
       userId,
       character.id,
       revealId!,
@@ -170,7 +170,7 @@ suite("issue #88 authoritative Scavenge claims (real PostgreSQL)", () => {
     expect(acknowledged.acknowledged).toBe(true);
     expect(acknowledged.state.scavengeReveals).toEqual([]);
 
-    const repeated = await mining.acknowledgeScavengeReveal(
+    const repeated = await play.acknowledgeScavengeReveal(
       userId,
       character.id,
       revealId!,

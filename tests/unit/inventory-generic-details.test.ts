@@ -5,7 +5,7 @@ import { getEffectiveGameBalance, getItemDefinition } from "@/game/config/balanc
 import { ITEM_IDS } from "@/game/config/foundations";
 import { formatMassGrams } from "@/game/domain/mass";
 import { carriedItemMassGrams } from "@/game/domain/equipment";
-import type { MiningGameplayState } from "@/server/mining";
+import type { PlayGameplayState } from "@/server/play";
 import {
   derivePowerCellLoadAvailability,
   resolveInventorySelection,
@@ -15,9 +15,9 @@ import { InventoryDetailsStats } from "@/features/mining/InventoryDetailsStats";
 const balance = getEffectiveGameBalance();
 
 function inventoryState(
-  stacks: MiningGameplayState["inventory"]["stacks"] = [],
-  uniqueItems: MiningGameplayState["inventory"]["uniqueItems"] = [],
-): MiningGameplayState["inventory"] {
+  stacks: PlayGameplayState["inventory"]["stacks"] = [],
+  uniqueItems: PlayGameplayState["inventory"]["uniqueItems"] = [],
+): PlayGameplayState["inventory"] {
   return {
     slotsUsed: stacks.length + uniqueItems.length,
     slotsAvailable: 8 - stacks.length - uniqueItems.length,
@@ -28,7 +28,7 @@ function inventoryState(
   };
 }
 
-function baseState(inventory: MiningGameplayState["inventory"]): MiningGameplayState {
+function baseState(inventory: PlayGameplayState["inventory"]): PlayGameplayState {
   return {
     characterId: "character-1",
     missions: [],
@@ -91,7 +91,7 @@ function baseState(inventory: MiningGameplayState["inventory"]): MiningGameplayS
  * documents the expected values; the regression below proves the *real*
  * component renders them.
  */
-function genericStackDetails(entry: MiningGameplayState["inventory"]["stacks"][number]) {
+function genericStackDetails(entry: PlayGameplayState["inventory"]["stacks"][number]) {
   return {
     quantity: String(entry.quantity),
     stackLimit: String(entry.stackLimit),
@@ -120,7 +120,7 @@ describe("inventory generic stack details — issue #119", () => {
   });
 
   it("regression: Refined Ferrite renders generic stack details without an item-ID branch", () => {
-    const refinedFerriteStack: MiningGameplayState["inventory"]["stacks"][number] = {
+    const refinedFerriteStack: PlayGameplayState["inventory"]["stacks"][number] = {
       id: "stack-refined",
       itemId: ITEM_IDS.refinedFerrite,
       name: "Refined Ferrite",
@@ -141,7 +141,7 @@ describe("inventory generic stack details — issue #119", () => {
   });
 
   it("regression: Slag renders the same generic stack details (second previously-unhandled stackable)", () => {
-    const slagStack: MiningGameplayState["inventory"]["stacks"][number] = {
+    const slagStack: PlayGameplayState["inventory"]["stacks"][number] = {
       id: "stack-slag",
       itemId: ITEM_IDS.slag,
       name: "Slag",
@@ -158,7 +158,7 @@ describe("inventory generic stack details — issue #119", () => {
   });
 
   it("total mass multiplies the selected stack quantity and formats canonically across the <1000 / >=1000 boundary", () => {
-    const shaleFull: MiningGameplayState["inventory"]["stacks"][number] = {
+    const shaleFull: PlayGameplayState["inventory"]["stacks"][number] = {
       id: "s",
       itemId: ITEM_IDS.ferriteShale,
       name: "Ferrite Shale",
@@ -168,7 +168,7 @@ describe("inventory generic stack details — issue #119", () => {
     };
     expect(genericStackDetails(shaleFull).totalMass).toBe("1 kg"); // 10 * 100 g
 
-    const shaleMid: MiningGameplayState["inventory"]["stacks"][number] = {
+    const shaleMid: PlayGameplayState["inventory"]["stacks"][number] = {
       id: "s2",
       itemId: ITEM_IDS.ferriteShale,
       name: "Ferrite Shale",
@@ -179,7 +179,7 @@ describe("inventory generic stack details — issue #119", () => {
     expect(genericStackDetails(shaleMid).totalMass).toBe("500 g");
     expect(genericStackDetails(shaleMid).unitMass).toBe("100 g");
 
-    const powerCellTriple: MiningGameplayState["inventory"]["stacks"][number] = {
+    const powerCellTriple: PlayGameplayState["inventory"]["stacks"][number] = {
       id: "p",
       itemId: ITEM_IDS.powerCell,
       name: "Power Cell",
@@ -195,7 +195,7 @@ describe("inventory generic stack details — issue #119", () => {
   });
 
   it("Power Cell still receives item-specific Load behavior while ordinary stackables do not", () => {
-    const powerCellStack: MiningGameplayState["inventory"]["stacks"][number] = {
+    const powerCellStack: PlayGameplayState["inventory"]["stacks"][number] = {
       id: "stack-cell",
       itemId: ITEM_IDS.powerCell,
       name: "Power Cell",
@@ -203,7 +203,7 @@ describe("inventory generic stack details — issue #119", () => {
       stackLimit: 5,
       massGrams: 500,
     };
-    const refinedFerriteStack: MiningGameplayState["inventory"]["stacks"][number] = {
+    const refinedFerriteStack: PlayGameplayState["inventory"]["stacks"][number] = {
       id: "stack-refined",
       itemId: ITEM_IDS.refinedFerrite,
       name: "Refined Ferrite",
@@ -264,7 +264,7 @@ describe("inventory generic stack details — issue #119", () => {
 
 describe("InventoryDetailsStats — real UI regression (issue #119)", () => {
   it("renders Refined Ferrite Quantity, Stack limit, Unit mass, and Total mass through the real panel component", () => {
-    const refinedFerriteStack: MiningGameplayState["inventory"]["stacks"][number] = {
+    const refinedFerriteStack: PlayGameplayState["inventory"]["stacks"][number] = {
       id: "stack-refined",
       itemId: ITEM_IDS.refinedFerrite,
       name: "Refined Ferrite",
@@ -293,7 +293,7 @@ describe("InventoryDetailsStats — real UI regression (issue #119)", () => {
   });
 
   it("renders the same generic stack details for Slag and for total-mass boundary cases through the real component", () => {
-    const slagStack: MiningGameplayState["inventory"]["stacks"][number] = {
+    const slagStack: PlayGameplayState["inventory"]["stacks"][number] = {
       id: "stack-slag",
       itemId: ITEM_IDS.slag,
       name: "Slag",

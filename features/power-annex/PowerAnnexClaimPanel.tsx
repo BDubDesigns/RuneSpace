@@ -9,7 +9,7 @@ import { SectionHeader } from "@/components/ui/SectionHeader";
 import { ITEM_IDS, LOCATION_IDS } from "@/game/config/foundations";
 import { POWER_ANNEX_RESET_TIME_ZONE, POWER_CELL_DAILY_ALLOTMENT } from "@/game/domain/power-annex";
 import { claimPowerCellsAction } from "@/server/actions";
-import { useMiningPlay } from "@/features/mining/MiningPlayContext";
+import { usePlay } from "@/features/play/PlayContext";
 
 export function PowerAnnexClaimPanel() {
   const {
@@ -20,7 +20,7 @@ export function PowerAnnexClaimPanel() {
     releaseCommand,
     requestAutoRefresh,
     state,
-  } = useMiningPlay();
+  } = usePlay();
   const [, startTransition] = useTransition();
   const [message, setMessage] = useState<string>();
   const [messageTone, setMessageTone] = useState<"danger" | "muted">("muted");

@@ -1,11 +1,11 @@
 import { removeFromSelectedStack } from "@/server/carried-inventory";
 import {
   createPlayResolver,
-  defaultMiningRandom,
-  ensureStarterMiningState,
+  ensurePlayProvisioning,
   stateFromTransaction,
-  type MiningGameplayState,
-} from "@/server/mining";
+  type PlayGameplayState,
+} from "@/server/play";
+import { defaultMiningRandom } from "@/server/mining";
 import type { DatabaseTransaction } from "@/server/action-resolution";
 import { withResolvedOwnedCharacter } from "@/server/action-resolution";
 import type { MiningRandom } from "@/game/domain/mining";
@@ -23,7 +23,7 @@ export type DiscardInventoryStackStatus =
   | { status: "refused"; message: string };
 
 export type DiscardInventoryStackResult = {
-  state: MiningGameplayState;
+  state: PlayGameplayState;
   discard: DiscardInventoryStackStatus;
 };
 
@@ -42,7 +42,7 @@ export async function discardInventoryStackInTransaction(
   characterId: string,
   request: DiscardInventoryStackRequest,
   now: Date,
-  recentResult: MiningGameplayState["recentResult"],
+  recentResult: PlayGameplayState["recentResult"],
   miningStopReason?: import("@/game/domain/mining").MiningStopReason,
 ): Promise<DiscardInventoryStackResult> {
   const refusalMessage = "Inventory changed. Review the stack and try again.";
@@ -114,7 +114,7 @@ export async function discardInventoryStack(
       miningStopReason = outcome.stopReason;
     }),
     async (transaction, context) => {
-      await ensureStarterMiningState(transaction, context.character.id);
+      await ensurePlayProvisioning(transaction, context.character.id);
       return discardInventoryStackInTransaction(
         transaction,
         context.character.id,

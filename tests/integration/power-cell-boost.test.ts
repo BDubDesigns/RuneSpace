@@ -4,7 +4,7 @@ import { ITEM_IDS, LOCATION_IDS, SKILL_IDS } from "@/game/config/foundations";
 import type { MiningRandom } from "@/game/domain/mining";
 import type { DatabaseTransaction } from "@/server/action-resolution";
 import { withResolvedOwnedCharacter } from "@/server/action-resolution";
-import { createPlayResolver } from "@/server/mining";
+import { createPlayResolver } from "@/server/play";
 import { cleanupTestUser, createCharacterForUser, createTestUser } from "./fixtures";
 
 const DATABASE_URL = process.env.DATABASE_URL;
@@ -16,7 +16,8 @@ suite("Issue #24 Salvage Cutter Power Cell boosting (real PostgreSQL)", () => {
   let rune: typeof import("@/db/rune-space");
   let ownership: typeof import("@/server/ownership");
   let characters: typeof import("@/server/characters");
-  let mining: typeof import("@/server/mining");
+  let play: typeof import("@/server/play");
+  let miningCommands: typeof import("@/server/mining-commands");
   let equipment: typeof import("@/server/equipment");
   const createdUsers: string[] = [];
 
@@ -26,7 +27,8 @@ suite("Issue #24 Salvage Cutter Power Cell boosting (real PostgreSQL)", () => {
     rune = await import("@/db/rune-space");
     ownership = await import("@/server/ownership");
     characters = await import("@/server/characters");
-    mining = await import("@/server/mining");
+    play = await import("@/server/play");
+    miningCommands = await import("@/server/mining-commands");
     equipment = await import("@/server/equipment");
   });
 
@@ -50,7 +52,7 @@ suite("Issue #24 Salvage Cutter Power Cell boosting (real PostgreSQL)", () => {
   }
 
   async function provision(userId: string, characterId: string, now: Date, random?: MiningRandom) {
-    await mining.getMiningGameplayState(userId, characterId, now, {
+    await play.getPlayGameplayState(userId, characterId, now, {
       nextBasisPoints: () => 9_999,
       nextUnit: () => 0,
       ...random,
@@ -119,10 +121,16 @@ suite("Issue #24 Salvage Cutter Power Cell boosting (real PostgreSQL)", () => {
     const selected = rows.find((row) => row.quantity === 1)!;
     const fullStacks = rows.filter((row) => row.quantity === 5);
 
-    const result = await mining.loadSalvageCutterPowerCell(userId, character.id, now, undefined, {
-      stackId: selected.id,
-      expectedQuantity: selected.quantity,
-    });
+    const result = await miningCommands.loadSalvageCutterPowerCell(
+      userId,
+      character.id,
+      now,
+      undefined,
+      {
+        stackId: selected.id,
+        expectedQuantity: selected.quantity,
+      },
+    );
     expect(result.load).toEqual({ status: "loaded", remainingCharge: 10 });
     expect(result.state.equipment.salvageCutter).toMatchObject({ currentCharge: 10 });
     expect((await cutter(character.id)).currentCharge).toBe(10);
@@ -142,10 +150,16 @@ suite("Issue #24 Salvage Cutter Power Cell boosting (real PostgreSQL)", () => {
     const otherFive = rows.find((row) => row.quantity === 5 && row.id !== selected.id)!;
     const one = rows.find((row) => row.quantity === 1)!;
 
-    const result = await mining.loadSalvageCutterPowerCell(userId, character.id, now, undefined, {
-      stackId: selected.id,
-      expectedQuantity: selected.quantity,
-    });
+    const result = await miningCommands.loadSalvageCutterPowerCell(
+      userId,
+      character.id,
+      now,
+      undefined,
+      {
+        stackId: selected.id,
+        expectedQuantity: selected.quantity,
+      },
+    );
 
     expect(result.load).toEqual({ status: "loaded", remainingCharge: 10 });
     expect((await cutter(character.id)).currentCharge).toBe(10);
@@ -169,7 +183,7 @@ suite("Issue #24 Salvage Cutter Power Cell boosting (real PostgreSQL)", () => {
     const rows = await addCellStacks(character.id, [5, 5, 1]);
     const fullStacks = rows.filter((row) => row.quantity === 5);
 
-    const result = await mining.loadSalvageCutterPowerCell(userId, character.id, now);
+    const result = await miningCommands.loadSalvageCutterPowerCell(userId, character.id, now);
 
     expect(result.load).toEqual({ status: "loaded", remainingCharge: 10 });
     expect((await cutter(character.id)).currentCharge).toBe(10);
@@ -185,13 +199,13 @@ suite("Issue #24 Salvage Cutter Power Cell boosting (real PostgreSQL)", () => {
     const startedAt = new Date("2026-06-01T00:00:00.000Z");
     const dueAt = new Date("2026-06-01T00:00:06.000Z");
     await provision(userId, character.id, startedAt);
-    await mining.startFerriteShaleMining(userId, character.id, startedAt, {
+    await miningCommands.startFerriteShaleMining(userId, character.id, startedAt, {
       nextBasisPoints: () => 0,
       nextUnit: () => 0,
     });
     await addCells(character.id);
 
-    const loaded = await mining.loadSalvageCutterPowerCell(userId, character.id, dueAt, {
+    const loaded = await miningCommands.loadSalvageCutterPowerCell(userId, character.id, dueAt, {
       nextBasisPoints: () => 0,
       nextUnit: () => 0,
     });
@@ -206,16 +220,16 @@ suite("Issue #24 Salvage Cutter Power Cell boosting (real PostgreSQL)", () => {
     const startedAt = new Date("2026-06-01T01:00:00.000Z");
     const partialAt = new Date("2026-06-01T01:00:05.400Z");
     await provision(userId, character.id, startedAt);
-    await mining.startFerriteShaleMining(userId, character.id, startedAt);
+    await miningCommands.startFerriteShaleMining(userId, character.id, startedAt);
     await addCells(character.id);
 
-    const loaded = await mining.loadSalvageCutterPowerCell(userId, character.id, partialAt);
+    const loaded = await miningCommands.loadSalvageCutterPowerCell(userId, character.id, partialAt);
     expect(loaded.load.status).toBe("loaded");
     expect(loaded.state.activeAction?.progressStartedAt).toBe(startedAt.toISOString());
     expect(loaded.state.activeAction?.nextAttemptDurationTicks).toBe(5);
     expect(loaded.state.run.attempts).toBe(0);
 
-    const resolved = await mining.getMiningGameplayState(userId, character.id, partialAt, {
+    const resolved = await play.getPlayGameplayState(userId, character.id, partialAt, {
       nextBasisPoints: () => 9_999,
       nextUnit: () => 0,
     });
@@ -232,8 +246,8 @@ suite("Issue #24 Salvage Cutter Power Cell boosting (real PostgreSQL)", () => {
     await addCells(character.id, 2);
 
     const results = await Promise.all([
-      mining.loadSalvageCutterPowerCell(userId, character.id, now),
-      mining.loadSalvageCutterPowerCell(userId, character.id, now),
+      miningCommands.loadSalvageCutterPowerCell(userId, character.id, now),
+      miningCommands.loadSalvageCutterPowerCell(userId, character.id, now),
     ]);
     expect(results.map((result) => result.load.status).sort()).toEqual([
       "already_loaded",
@@ -259,10 +273,16 @@ suite("Issue #24 Salvage Cutter Power Cell boosting (real PostgreSQL)", () => {
       .set({ quantity: 3 })
       .where(eq(rune.inventoryStacks.id, selectedStackId));
 
-    const result = await mining.loadSalvageCutterPowerCell(userId, character.id, now, undefined, {
-      stackId: selectedStackId,
-      expectedQuantity: 2,
-    });
+    const result = await miningCommands.loadSalvageCutterPowerCell(
+      userId,
+      character.id,
+      now,
+      undefined,
+      {
+        stackId: selectedStackId,
+        expectedQuantity: 2,
+      },
+    );
 
     expect(result.load).toEqual({
       status: "stale_selection",
@@ -285,16 +305,16 @@ suite("Issue #24 Salvage Cutter Power Cell boosting (real PostgreSQL)", () => {
     const startedAt = new Date("2026-06-03T00:00:00.000Z");
     const now = new Date("2026-06-03T00:00:36.000Z");
     await provision(userId, character.id, startedAt);
-    await mining.startFerriteShaleMining(userId, character.id, startedAt);
+    await miningCommands.startFerriteShaleMining(userId, character.id, startedAt);
     await addCells(character.id);
-    await mining.loadSalvageCutterPowerCell(userId, character.id, startedAt);
+    await miningCommands.loadSalvageCutterPowerCell(userId, character.id, startedAt);
     const cutterRow = await cutter(character.id);
     await db
       .update(rune.itemInstances)
       .set({ currentCharge: 2 })
       .where(eq(rune.itemInstances.id, cutterRow.id));
 
-    const resolved = await mining.getMiningGameplayState(userId, character.id, now, {
+    const resolved = await play.getPlayGameplayState(userId, character.id, now, {
       nextBasisPoints: () => 9_999,
       nextUnit: () => 0,
     });
@@ -322,7 +342,7 @@ suite("Issue #24 Salvage Cutter Power Cell boosting (real PostgreSQL)", () => {
     const now = new Date("2026-06-04T00:00:00.000Z");
     await provision(userId, character.id, now);
     await addCells(character.id);
-    await mining.loadSalvageCutterPowerCell(userId, character.id, now);
+    await miningCommands.loadSalvageCutterPowerCell(userId, character.id, now);
     const cutterId = (await cutter(character.id)).id;
     await equipment.changeEquipment(
       userId,
@@ -350,10 +370,10 @@ suite("Issue #24 Salvage Cutter Power Cell boosting (real PostgreSQL)", () => {
     const random = { nextBasisPoints: () => 0, nextUnit: () => 0 };
     await provision(userId, character.id, startedAt, random);
     await addCells(character.id);
-    await mining.loadSalvageCutterPowerCell(userId, character.id, startedAt, random);
-    await mining.startFerriteShaleMining(userId, character.id, startedAt, random);
+    await miningCommands.loadSalvageCutterPowerCell(userId, character.id, startedAt, random);
+    await miningCommands.startFerriteShaleMining(userId, character.id, startedAt, random);
 
-    const resolved = await mining.getMiningGameplayState(userId, character.id, resolvedAt, random);
+    const resolved = await play.getPlayGameplayState(userId, character.id, resolvedAt, random);
     expect(resolved.run).toMatchObject({ attempts: 1, successes: 1, failures: 0 });
     expect(resolved.run).toMatchObject({ shaleGained: 1, xpGained: 15 });
     expect(resolved.activeAction?.resolvedThroughAt).toBe(
@@ -384,15 +404,10 @@ suite("Issue #24 Salvage Cutter Power Cell boosting (real PostgreSQL)", () => {
     const alwaysFail = { nextBasisPoints: () => 9_999, nextUnit: () => 0 };
     await provision(userId, character.id, startedAt, alwaysFail);
     await addCells(character.id);
-    await mining.loadSalvageCutterPowerCell(userId, character.id, startedAt, alwaysFail);
-    await mining.startFerriteShaleMining(userId, character.id, startedAt, alwaysFail);
+    await miningCommands.loadSalvageCutterPowerCell(userId, character.id, startedAt, alwaysFail);
+    await miningCommands.startFerriteShaleMining(userId, character.id, startedAt, alwaysFail);
 
-    const resolved = await mining.getMiningGameplayState(
-      userId,
-      character.id,
-      resolvedAt,
-      alwaysFail,
-    );
+    const resolved = await play.getPlayGameplayState(userId, character.id, resolvedAt, alwaysFail);
     expect(resolved.run).toMatchObject({ attempts: 1, successes: 0, failures: 1 });
     expect(resolved.run).toMatchObject({ shaleGained: 0, xpGained: 0 });
     expect(resolved.run.recentAttempts).toMatchObject([
@@ -420,8 +435,8 @@ suite("Issue #24 Salvage Cutter Power Cell boosting (real PostgreSQL)", () => {
     const random = { nextBasisPoints: () => 0, nextUnit: () => 0 };
     await provision(userId, character.id, startedAt, random);
     await addCells(character.id);
-    await mining.loadSalvageCutterPowerCell(userId, character.id, startedAt, random);
-    await mining.startFerriteShaleMining(userId, character.id, startedAt, random);
+    await miningCommands.loadSalvageCutterPowerCell(userId, character.id, startedAt, random);
+    await miningCommands.startFerriteShaleMining(userId, character.id, startedAt, random);
     const cutterId = (await cutter(character.id)).id;
 
     // Force a persistence failure after the resolver has already written the
@@ -430,12 +445,12 @@ suite("Issue #24 Salvage Cutter Power Cell boosting (real PostgreSQL)", () => {
     // through the same transaction before throwing.
     let mutationTransaction: DatabaseTransaction | undefined;
     let chargeAtMutation: number | null = null;
-    const play = createPlayResolver(random);
+    const resolver = createPlayResolver(random);
     const forcedFailure = {
-      ...play,
+      ...resolver,
       persist: async (transaction: DatabaseTransaction, outcome: unknown) => {
         mutationTransaction = transaction;
-        await play.persist(transaction, outcome as Parameters<typeof play.persist>[1]);
+        await resolver.persist(transaction, outcome as Parameters<typeof resolver.persist>[1]);
         const rows = await mutationTransaction
           .select()
           .from(rune.itemInstances)
@@ -492,7 +507,7 @@ suite("Issue #24 Salvage Cutter Power Cell boosting (real PostgreSQL)", () => {
     expect(actionRows[0]?.resolvedThroughAt).toEqual(startedAt);
 
     // The same window can still be resolved once and commits normally.
-    const retried = await mining.getMiningGameplayState(userId, character.id, resolvedAt, random);
+    const retried = await play.getPlayGameplayState(userId, character.id, resolvedAt, random);
     expect(retried.run).toMatchObject({ attempts: 1, successes: 1, shaleGained: 1, xpGained: 15 });
     expect(retried.equipment.salvageCutter?.currentCharge).toBe(9);
   });
@@ -509,7 +524,7 @@ suite("Issue #24 Salvage Cutter Power Cell boosting (real PostgreSQL)", () => {
     )[0]!;
     await addCells(character.id);
 
-    const loaded = await mining.loadSalvageCutterPowerCell(userId, character.id, now);
+    const loaded = await miningCommands.loadSalvageCutterPowerCell(userId, character.id, now);
     expect(loaded.load.status).toBe("loaded");
     const equippedCutter = await cutter(character.id);
     expect(equippedCutter.id).not.toBe(spareCutter.id);
@@ -527,17 +542,17 @@ suite("Issue #24 Salvage Cutter Power Cell boosting (real PostgreSQL)", () => {
     const random = { nextBasisPoints: () => 0, nextUnit: () => 0 };
     await provision(userId, character.id, startedAt, random);
     await addCells(character.id);
-    await mining.loadSalvageCutterPowerCell(userId, character.id, startedAt, random);
+    await miningCommands.loadSalvageCutterPowerCell(userId, character.id, startedAt, random);
 
-    await mining.startFerriteShaleMining(userId, character.id, startedAt, random);
+    await miningCommands.startFerriteShaleMining(userId, character.id, startedAt, random);
     expect((await cutter(character.id)).currentCharge).toBe(10);
-    await mining.stopMining(userId, character.id, startedAt, random);
-    await mining.startFerriteShaleMining(userId, character.id, startedAt, random);
+    await miningCommands.stopMining(userId, character.id, startedAt, random);
+    await miningCommands.startFerriteShaleMining(userId, character.id, startedAt, random);
     expect((await cutter(character.id)).currentCharge).toBe(10);
 
     // Round trip from The Jag via Long Scramble -> Crash -> Long Scramble -> Jag.
-    await mining.beginTravel(userId, character.id, LOCATION_IDS.theLongScramble, startedAt, random);
-    const atScramble = await mining.getMiningGameplayState(
+    await play.beginTravel(userId, character.id, LOCATION_IDS.theLongScramble, startedAt, random);
+    const atScramble = await play.getPlayGameplayState(
       userId,
       character.id,
       new Date("2026-06-09T00:00:24.600Z"),
@@ -545,14 +560,14 @@ suite("Issue #24 Salvage Cutter Power Cell boosting (real PostgreSQL)", () => {
     );
     expect(atScramble.location.currentLocationId).toBe(LOCATION_IDS.theLongScramble);
     expect((await cutter(character.id)).currentCharge).toBe(10);
-    await mining.beginTravel(
+    await play.beginTravel(
       userId,
       character.id,
       LOCATION_IDS.crashSite,
       new Date("2026-06-09T00:00:24.600Z"),
       random,
     );
-    const atCrash = await mining.getMiningGameplayState(
+    const atCrash = await play.getPlayGameplayState(
       userId,
       character.id,
       new Date("2026-06-09T00:00:49.200Z"),
@@ -560,28 +575,28 @@ suite("Issue #24 Salvage Cutter Power Cell boosting (real PostgreSQL)", () => {
     );
     expect(atCrash.location.currentLocationId).toBe(LOCATION_IDS.crashSite);
     expect((await cutter(character.id)).currentCharge).toBe(10);
-    await mining.beginTravel(
+    await play.beginTravel(
       userId,
       character.id,
       LOCATION_IDS.theLongScramble,
       new Date("2026-06-09T00:00:49.200Z"),
       random,
     );
-    const backAtScramble = await mining.getMiningGameplayState(
+    const backAtScramble = await play.getPlayGameplayState(
       userId,
       character.id,
       new Date("2026-06-09T00:01:13.800Z"),
       random,
     );
     expect(backAtScramble.location.currentLocationId).toBe(LOCATION_IDS.theLongScramble);
-    await mining.beginTravel(
+    await play.beginTravel(
       userId,
       character.id,
       LOCATION_IDS.theJag,
       new Date("2026-06-09T00:01:13.800Z"),
       random,
     );
-    const backAtJag = await mining.getMiningGameplayState(
+    const backAtJag = await play.getPlayGameplayState(
       userId,
       character.id,
       new Date("2026-06-09T00:01:38.400Z"),

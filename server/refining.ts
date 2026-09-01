@@ -1,4 +1,5 @@
 import { and, asc, eq } from "drizzle-orm";
+import { randomInt } from "node:crypto";
 import { db } from "@/db";
 import {
   activeActions,
@@ -57,6 +58,39 @@ export type PersistedRefiningOutcome = RefiningResolution<string> & {
   characterId: string;
   attemptResolvedAt: readonly string[];
 };
+
+const systemRandom: RefiningRandom = {
+  nextBasisPoints: () => randomInt(10_000),
+};
+
+let e2eRefiningGlobalIndex = 0;
+
+/**
+ * CI-only deterministic Refining random source for the focused browser
+ * journey: `[0, 9000]` alternates so the first attempt succeeds at L1
+ * (threshold 4000) and the second fails, proving both branches. It is
+ * selected only by explicit CI configuration, never by a request or normal
+ * runtime user.
+ */
+export function e2eRefiningRandom(): RefiningRandom {
+  return {
+    nextBasisPoints: () => [0, 9_000][e2eRefiningGlobalIndex++ % 2]!,
+  };
+}
+
+/**
+ * The default Refining random source: the deterministic E2E sequence under the
+ * canonical-E2E override (`CI && RUNESPACE_E2E_MINING && localhost`), otherwise
+ * system entropy. Refining owns its RNG selection — this is not a Mining concern.
+ */
+export function defaultRefiningRandom(): RefiningRandom {
+  const databaseHost = process.env.DATABASE_URL ? new URL(process.env.DATABASE_URL).hostname : "";
+  return process.env.CI === "true" &&
+    process.env.RUNESPACE_E2E_MINING === "true" &&
+    (databaseHost === "localhost" || databaseHost === "127.0.0.1")
+    ? e2eRefiningRandom()
+    : systemRandom;
+}
 
 export async function ensureStarterRefiningState(
   transaction: DatabaseTransaction,

@@ -16,7 +16,7 @@ import { MISSIONS } from "@/game/content/missions";
 import { getNpc, getNpcAtLocation } from "@/game/content/npcs";
 import { acceptMissionAction, completeMissionAction } from "@/server/actions";
 import { deriveQuestGuidanceTargets } from "@/game/domain/missions";
-import { useMiningPlay } from "@/features/mining/MiningPlayContext";
+import { usePlay } from "@/features/play/PlayContext";
 
 /**
  * Resolves the conversation for the NPC at the player's current location from
@@ -27,7 +27,7 @@ import { useMiningPlay } from "@/features/mining/MiningPlayContext";
  * ordinary third mission converses through this panel without edits.
  */
 export function NpcInteractionPanel() {
-  const { acquireCommand, acceptState, foregroundBusy, releaseCommand, state } = useMiningPlay();
+  const { acquireCommand, acceptState, foregroundBusy, releaseCommand, state } = usePlay();
   const [open, setOpen] = useState(false);
   const [message, setMessage] = useState<string>();
   const [pending, setPending] = useState(false);

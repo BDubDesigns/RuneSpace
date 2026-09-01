@@ -5,7 +5,7 @@ import { StatusMeter } from "@/components/ui/StatusMeter";
 import { COLLAPSE_KEYS, useSyncedCollapse } from "./use-synced-collapse";
 import { CollapseButton } from "./CollapseButton";
 import { formatMassGrams } from "@/game/domain/mass";
-import type { MiningGameplayState } from "@/server/mining";
+import type { PlayGameplayState } from "@/server/play";
 
 export type CargoReadoutItem = {
   /** Item display name, e.g. "Ferrite Shale". */
@@ -27,7 +27,7 @@ export function CargoReadout({
   state,
   items,
 }: {
-  state: MiningGameplayState;
+  state: PlayGameplayState;
   items: readonly CargoReadoutItem[];
 }) {
   const { collapsed, toggle } = useSyncedCollapse(COLLAPSE_KEYS.cargoReadout);

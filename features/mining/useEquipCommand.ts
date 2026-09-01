@@ -3,8 +3,8 @@
 import { useCallback, useTransition } from "react";
 import { equipEquipmentAction, unequipEquipmentAction } from "@/server/actions";
 import type { EquipmentTarget } from "@/game/domain/equipment";
-import type { MiningGameplayState } from "@/server/mining";
-import { useMiningPlay } from "./MiningPlayContext";
+import type { PlayGameplayState } from "@/server/play";
+import { usePlay } from "@/features/play/PlayContext";
 
 export type EquipFeedback = {
   tone: "muted" | "danger";
@@ -30,15 +30,9 @@ export type EquipFeedback = {
  */
 export function useEquipCommand(
   onFeedback: (feedback: EquipFeedback) => void,
-  onSuccess?: (state: MiningGameplayState) => void,
+  onSuccess?: (state: PlayGameplayState) => void,
 ) {
-  const {
-    acceptState,
-    enqueueForeground,
-    foregroundBusy: busy,
-    releaseCommand,
-    state,
-  } = useMiningPlay();
+  const { acceptState, enqueueForeground, foregroundBusy: busy, releaseCommand, state } = usePlay();
   const [, startTransition] = useTransition();
 
   const submit = useCallback(

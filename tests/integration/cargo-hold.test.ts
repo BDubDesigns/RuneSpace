@@ -13,7 +13,7 @@ suite("issue #89 Cargo Hold repair and Welding (real PostgreSQL)", () => {
   let rune: typeof import("@/db/rune-space");
   let ownership: typeof import("@/server/ownership");
   let characters: typeof import("@/server/characters");
-  let mining: typeof import("@/server/mining");
+  let play: typeof import("@/server/play");
   let cargo: typeof import("@/server/cargo-hold");
   let equipment: typeof import("@/server/equipment");
   const createdUsers: string[] = [];
@@ -29,7 +29,7 @@ suite("issue #89 Cargo Hold repair and Welding (real PostgreSQL)", () => {
     rune = await import("@/db/rune-space");
     ownership = await import("@/server/ownership");
     characters = await import("@/server/characters");
-    mining = await import("@/server/mining");
+    play = await import("@/server/play");
     cargo = await import("@/server/cargo-hold");
     equipment = await import("@/server/equipment");
   });
@@ -51,7 +51,7 @@ suite("issue #89 Cargo Hold repair and Welding (real PostgreSQL)", () => {
       `Cargo ${userId.slice(0, 8)}`,
     );
     const now = new Date("2026-08-21T18:00:00.000Z");
-    await mining.getMiningGameplayState(userId, character.id, now, deterministicRandom);
+    await play.getPlayGameplayState(userId, character.id, now, deterministicRandom);
     return { userId, character, now };
   }
 
@@ -91,7 +91,7 @@ suite("issue #89 Cargo Hold repair and Welding (real PostgreSQL)", () => {
       deterministicRandom,
     );
     expect(started.activeAction?.actionId).toBe(ACTION_IDS.cargoHoldWelding);
-    return mining.getMiningGameplayState(
+    return play.getPlayGameplayState(
       userId,
       characterId,
       new Date(
@@ -176,7 +176,7 @@ suite("issue #89 Cargo Hold repair and Welding (real PostgreSQL)", () => {
     expect(started.welding.totalXp).toBe(0);
 
     const partialAt = new Date(now.getTime() + 4 * 600);
-    const partial = await mining.getMiningGameplayState(
+    const partial = await play.getPlayGameplayState(
       userId,
       character.id,
       partialAt,
@@ -197,7 +197,7 @@ suite("issue #89 Cargo Hold repair and Welding (real PostgreSQL)", () => {
 
     const restartAt = new Date(partialAt.getTime() + 600);
     await cargo.startCargoHoldWelding(userId, character.id, restartAt, deterministicRandom);
-    const completed = await mining.getMiningGameplayState(
+    const completed = await play.getPlayGameplayState(
       userId,
       character.id,
       new Date(restartAt.getTime() + 12 * 5 * 600),
@@ -225,7 +225,7 @@ suite("issue #89 Cargo Hold repair and Welding (real PostgreSQL)", () => {
       )[0]?.totalXp,
     ).toBe(600);
 
-    const repeated = await mining.getMiningGameplayState(
+    const repeated = await play.getPlayGameplayState(
       userId,
       character.id,
       new Date(restartAt.getTime() + 60 * 600),
@@ -248,7 +248,7 @@ suite("issue #89 Cargo Hold repair and Welding (real PostgreSQL)", () => {
     await cargo.startCargoHoldWelding(userId, character.id, now, deterministicRandom);
 
     const partialAt = new Date(now.getTime() + 4 * 600);
-    const travel = await mining.beginTravel(
+    const travel = await play.beginTravel(
       userId,
       character.id,
       LOCATION_IDS.abandonedProcessingYard,
@@ -645,7 +645,7 @@ suite("issue #89 Cargo Hold repair and Welding (real PostgreSQL)", () => {
     expect(full.cargo).toMatchObject({ status: "refused", reason: "cargo_capacity" });
 
     await db.delete(rune.cargoHoldStacks).where(eq(rune.cargoHoldStacks.characterId, character.id));
-    const travel = await mining.beginTravel(
+    const travel = await play.beginTravel(
       userId,
       character.id,
       LOCATION_IDS.abandonedProcessingYard,

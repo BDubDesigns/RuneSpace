@@ -5,7 +5,7 @@ import {
   requestRefresh,
   tryAcquire,
   type GateModel,
-} from "@/features/mining/command-gate";
+} from "@/features/play/command-gate";
 
 function model(): GateModel {
   return { locked: false, pending: false };
@@ -73,7 +73,7 @@ describe("command gate", () => {
   });
 
   it("foreground intent arriving while background holds gate is not silently dropped when queued at context boundary", () => {
-    // This models MiningPlayContext correctly: release background (unlock)
+    // This models the play context correctly: release background (unlock)
     // before handing ownership to the queued foreground, and foreground has
     // priority over any coalesced background refresh.
     const gate = model();

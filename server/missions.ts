@@ -34,11 +34,11 @@ import type { MiningRandom } from "@/game/domain/mining";
 import { withResolvedOwnedCharacter } from "@/server/action-resolution";
 import {
   createPlayResolver,
-  defaultMiningRandom,
-  ensureStarterMiningState,
+  ensurePlayProvisioning,
   stateFromTransaction,
-  type MiningGameplayState,
-} from "@/server/mining";
+  type PlayGameplayState,
+} from "@/server/play";
+import { defaultMiningRandom } from "@/server/mining";
 import { grantCharacterSkillXp } from "@/server/progression";
 import { applyStackRemovalPlan, loadOwnedItemInstances } from "@/server/carried-inventory";
 
@@ -66,12 +66,12 @@ export type MissionCompletion =
     };
 
 export type MissionAcceptanceResult = {
-  state: MiningGameplayState;
+  state: PlayGameplayState;
   mission: MissionAcceptance;
 };
 
 export type MissionCompletionResult = {
-  state: MiningGameplayState;
+  state: PlayGameplayState;
   mission: MissionCompletion;
 };
 
@@ -115,9 +115,9 @@ async function runMissionCommand<Mission extends MissionAcceptance | MissionComp
   command: (input: {
     transaction: DatabaseTransaction;
     context: ResolvedCharacterContext;
-    stateFor: (mission: Mission) => Promise<{ state: MiningGameplayState; mission: Mission }>;
-  }) => Promise<{ state: MiningGameplayState; mission: Mission }>,
-): Promise<{ state: MiningGameplayState; mission: Mission }> {
+    stateFor: (mission: Mission) => Promise<{ state: PlayGameplayState; mission: Mission }>;
+  }) => Promise<{ state: PlayGameplayState; mission: Mission }>,
+): Promise<{ state: PlayGameplayState; mission: Mission }> {
   let miningOutcome: CommandOutcome | undefined;
   let refiningOutcome: CommandOutcome | undefined;
   return withResolvedOwnedCharacter(
@@ -177,7 +177,7 @@ export async function acceptMission(
     now,
     random,
     async ({ transaction, context, stateFor }) => {
-      await ensureStarterMiningState(transaction, context.character.id);
+      await ensurePlayProvisioning(transaction, context.character.id);
       const definition = getMission(missionId);
       if (!definition) {
         return stateFor({ status: "refused", message: "Unknown mission." });
@@ -265,7 +265,7 @@ export async function completeMission(
     now,
     random,
     async ({ transaction, context, stateFor }) => {
-      await ensureStarterMiningState(transaction, context.character.id);
+      await ensurePlayProvisioning(transaction, context.character.id);
       const definition = getMission(missionId);
       if (!definition) {
         return stateFor({ status: "refused", reason: "not_accepted", message: "Unknown mission." });
@@ -304,7 +304,7 @@ export async function completeMissionWithDefinition(
     now,
     random,
     async ({ transaction, context, stateFor }) => {
-      await ensureStarterMiningState(transaction, context.character.id);
+      await ensurePlayProvisioning(transaction, context.character.id);
       return completeMissionForDefinition({
         transaction,
         context,

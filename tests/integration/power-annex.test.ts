@@ -13,7 +13,7 @@ suite("Issue #47 Power Annex claims (real PostgreSQL)", () => {
   let rune: typeof import("@/db/rune-space");
   let ownership: typeof import("@/server/ownership");
   let characters: typeof import("@/server/characters");
-  let mining: typeof import("@/server/mining");
+  let play: typeof import("@/server/play");
   let annex: typeof import("@/server/power-annex");
   const createdUsers: string[] = [];
 
@@ -23,7 +23,7 @@ suite("Issue #47 Power Annex claims (real PostgreSQL)", () => {
     rune = await import("@/db/rune-space");
     ownership = await import("@/server/ownership");
     characters = await import("@/server/characters");
-    mining = await import("@/server/mining");
+    play = await import("@/server/play");
     annex = await import("@/server/power-annex");
   });
 
@@ -147,7 +147,7 @@ suite("Issue #47 Power Annex claims (real PostgreSQL)", () => {
       .update(rune.characters)
       .set({ currentLocationId: LOCATION_IDS.emergencyPowerAnnex })
       .where(eq(rune.characters.id, slotCharacter.id));
-    await mining.getMiningGameplayState(
+    await play.getPlayGameplayState(
       slotsFixture.userId,
       slotCharacter.id,
       new Date("2026-04-02T12:00:00Z"),
@@ -179,7 +179,7 @@ suite("Issue #47 Power Annex claims (real PostgreSQL)", () => {
       .update(rune.characters)
       .set({ currentLocationId: LOCATION_IDS.emergencyPowerAnnex })
       .where(eq(rune.characters.id, massCharacter.id));
-    await mining.getMiningGameplayState(
+    await play.getPlayGameplayState(
       massFixture.userId,
       massCharacter.id,
       new Date("2026-04-02T12:00:00Z"),
@@ -213,7 +213,7 @@ suite("Issue #47 Power Annex claims (real PostgreSQL)", () => {
       .update(rune.characters)
       .set({ currentLocationId: LOCATION_IDS.emergencyPowerAnnex })
       .where(eq(rune.characters.id, character.id));
-    await mining.getMiningGameplayState(userId, character.id, now);
+    await play.getPlayGameplayState(userId, character.id, now);
     const extraCutters = await db
       .insert(rune.itemInstances)
       .values(

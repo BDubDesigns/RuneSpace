@@ -31,39 +31,37 @@ export function MiningRunPanel({
         <SectionHeader eyebrow="Server-resolved">This mining run</SectionHeader>
         <CollapseButton collapsed={collapsed} label="mining run" onToggle={toggle} />
       </div>
+      <div className="mt-4 grid grid-cols-2 gap-3 text-sm sm:grid-cols-5">
+        <p>
+          <strong>{run.attempts}</strong> attempts
+        </p>
+        <p>
+          <strong>{run.successes}</strong> successful
+        </p>
+        <p>
+          <strong>{run.failures}</strong> failed
+        </p>
+        <p>
+          <strong>{run.shaleGained}</strong> shale gained
+        </p>
+        <p>
+          <strong>{run.xpGained}</strong> Mining XP
+        </p>
+      </div>
       {!collapsed ? (
-        <>
-          <div className="mt-4 grid grid-cols-2 gap-3 text-sm sm:grid-cols-5">
-            <p>
-              <strong>{run.attempts}</strong> attempts
+        <div
+          className="mt-5 max-h-72 space-y-2 overflow-y-auto pr-1"
+          aria-label="Mining attempt history"
+        >
+          {[...run.recentAttempts].reverse().map((attempt) => (
+            <MiningAttemptRow attempt={attempt} balance={balance} key={attempt.sequence} />
+          ))}
+          {run.recentAttempts.length === 0 ? (
+            <p className="text-sm text-[color:var(--rs-text-muted)]">
+              No resolved attempts in this run yet.
             </p>
-            <p>
-              <strong>{run.successes}</strong> successful
-            </p>
-            <p>
-              <strong>{run.failures}</strong> failed
-            </p>
-            <p>
-              <strong>{run.shaleGained}</strong> shale gained
-            </p>
-            <p>
-              <strong>{run.xpGained}</strong> Mining XP
-            </p>
-          </div>
-          <div
-            className="mt-5 max-h-72 space-y-2 overflow-y-auto pr-1"
-            aria-label="Mining attempt history"
-          >
-            {[...run.recentAttempts].reverse().map((attempt) => (
-              <MiningAttemptRow attempt={attempt} balance={balance} key={attempt.sequence} />
-            ))}
-            {run.recentAttempts.length === 0 ? (
-              <p className="text-sm text-[color:var(--rs-text-muted)]">
-                No resolved attempts in this run yet.
-              </p>
-            ) : null}
-          </div>
-        </>
+          ) : null}
+        </div>
       ) : null}
     </Panel>
   );

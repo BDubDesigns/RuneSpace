@@ -11,7 +11,7 @@ import { getEffectiveGameBalance } from "@/game/config/balance";
 import { ITEM_IDS } from "@/game/config/foundations";
 import { deriveQuestGuidanceTargets } from "@/game/domain/missions";
 import { discardInventoryStackAction } from "@/server/actions";
-import type { MiningGameplayState } from "@/server/mining";
+import type { PlayGameplayState } from "@/server/play";
 import {
   deriveInventoryEquipAvailability,
   derivePowerCellLoadAvailability,
@@ -24,7 +24,7 @@ import {
 import { InventoryDetailsStats } from "./InventoryDetailsStats";
 import { useEquipCommand } from "./useEquipCommand";
 import { useLoadPowerCell, type LoadPowerCellFeedback } from "./useLoadPowerCell";
-import { useMiningPlay } from "./MiningPlayContext";
+import { usePlay } from "@/features/play/PlayContext";
 
 type DropConfirmation = {
   stackId: string;
@@ -39,12 +39,12 @@ export function InventoryPanel({
   onClose,
   triggerRef,
 }: {
-  state: MiningGameplayState;
+  state: PlayGameplayState;
   onClose: () => void;
   triggerRef: RefObject<HTMLButtonElement | null>;
 }) {
   const { acquireCommand, acceptState, enqueueForeground, foregroundBusy, releaseCommand } =
-    useMiningPlay();
+    usePlay();
   const [, startTransition] = useTransition();
   const [selected, setSelected] = useState<InventorySelection | undefined>();
   const [confirming, setConfirming] = useState<DropConfirmation | undefined>();

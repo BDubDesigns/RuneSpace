@@ -29,3 +29,8 @@ test-results
 .vscode
 .commandcode
 artifacts/e2e-review/
+
+# stale root-owned backup dirs (not source)
+.next.bak.hidden/
+.playwright.bak/
+test-results.bak/

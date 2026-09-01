@@ -18,10 +18,10 @@ import { withLockedOwnedCharacter, type DatabaseTransaction } from "@/server/act
 import { addStackableItem, loadOwnedItemInstances } from "@/server/carried-inventory";
 import { planExactStackAddition } from "@/game/domain/inventory";
 import {
-  ensureStarterMiningState,
+  ensurePlayProvisioning,
   stateFromTransaction,
-  type MiningGameplayState,
-} from "@/server/mining";
+  type PlayGameplayState,
+} from "@/server/play";
 import { powerAnnexNow } from "@/server/power-annex-clock";
 
 type ClaimStatus =
@@ -34,7 +34,7 @@ type ClaimStatus =
     };
 
 export type PowerAnnexClaimResult = {
-  state: MiningGameplayState;
+  state: PlayGameplayState;
   claim: ClaimStatus;
 };
 
@@ -42,7 +42,7 @@ async function stateForClaim(
   transaction: DatabaseTransaction,
   characterId: string,
   now: Date,
-): Promise<MiningGameplayState> {
+): Promise<PlayGameplayState> {
   return stateFromTransaction(
     transaction,
     characterId,
@@ -83,7 +83,7 @@ export async function claimPowerCells(
     ]);
     const action = actionRows[0];
 
-    await ensureStarterMiningState(transaction, character.id);
+    await ensurePlayProvisioning(transaction, character.id);
 
     if (action || travelRows[0]) {
       const inTransit = action?.actionId === ACTION_IDS.travel || Boolean(travelRows[0]);

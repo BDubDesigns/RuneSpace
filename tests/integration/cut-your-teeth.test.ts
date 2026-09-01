@@ -12,7 +12,7 @@ suite("issue #110 Cut Your Teeth persistence and XP boundary (real PostgreSQL)",
   let rune: typeof import("@/db/rune-space");
   let ownership: typeof import("@/server/ownership");
   let characters: typeof import("@/server/characters");
-  let mining: typeof import("@/server/mining");
+  let play: typeof import("@/server/play");
   let missions: typeof import("@/server/missions");
   let equipment: typeof import("@/server/equipment");
   const createdUsers: string[] = [];
@@ -24,7 +24,7 @@ suite("issue #110 Cut Your Teeth persistence and XP boundary (real PostgreSQL)",
     rune = await import("@/db/rune-space");
     ownership = await import("@/server/ownership");
     characters = await import("@/server/characters");
-    mining = await import("@/server/mining");
+    play = await import("@/server/play");
     missions = await import("@/server/missions");
     equipment = await import("@/server/equipment");
   });
@@ -51,7 +51,7 @@ suite("issue #110 Cut Your Teeth persistence and XP boundary (real PostgreSQL)",
       undefined,
       { seedLegacyStarterCutter: false },
     );
-    await mining.getMiningGameplayState(userId, character.id, now, deterministicRandom());
+    await play.getPlayGameplayState(userId, character.id, now, deterministicRandom());
     return { userId, character };
   }
 
@@ -305,12 +305,7 @@ suite("issue #110 Cut Your Teeth persistence and XP boundary (real PostgreSQL)",
     expect(await miningXp(character.id)).toBe(beforeAnyXp + 100);
 
     // Objective projection reflects the completed state through real state reads.
-    const state = await mining.getMiningGameplayState(
-      userId,
-      character.id,
-      now,
-      deterministicRandom(),
-    );
+    const state = await play.getPlayGameplayState(userId, character.id, now, deterministicRandom());
     const cyt = state.missions.find((mission) => mission.missionId === "cut_your_teeth");
     expect(cyt).toMatchObject({ state: "completed", title: "Cut Your Teeth" });
     const wio = state.missions.find((mission) => mission.missionId === "walk_it_off");
@@ -365,12 +360,7 @@ suite("issue #110 Cut Your Teeth persistence and XP boundary (real PostgreSQL)",
     );
     expect(accepted.mission.status).toBe("accepted");
 
-    const state = await mining.getMiningGameplayState(
-      userId,
-      character.id,
-      now,
-      deterministicRandom(),
-    );
+    const state = await play.getPlayGameplayState(userId, character.id, now, deterministicRandom());
     const cyt = state.missions.find((mission) => mission.missionId === "cut_your_teeth");
     expect(cyt).toMatchObject({
       state: "ready_for_completion",
@@ -406,12 +396,7 @@ suite("issue #110 Cut Your Teeth persistence and XP boundary (real PostgreSQL)",
       resolvedThroughAt: now,
     });
 
-    const state = await mining.getMiningGameplayState(
-      userId,
-      character.id,
-      now,
-      deterministicRandom(),
-    );
+    const state = await play.getPlayGameplayState(userId, character.id, now, deterministicRandom());
     const cyt = state.missions.find((mission) => mission.missionId === "cut_your_teeth");
     // Requirements ARE satisfied (Cutter equipped + full stack), but the
     // character is mid-Mining so the turn-in is NOT available. The projection
@@ -425,7 +410,7 @@ suite("issue #110 Cut Your Teeth persistence and XP boundary (real PostgreSQL)",
     // After the Mining action resolves, the SAME inventory/equipment state is
     // immediately turn-in ready (SHOW SHALE) — no re-collection needed.
     await db.delete(rune.activeActions).where(eq(rune.activeActions.characterId, character.id));
-    const afterStop = await mining.getMiningGameplayState(
+    const afterStop = await play.getPlayGameplayState(
       userId,
       character.id,
       now,
@@ -502,12 +487,7 @@ suite("issue #110 Cut Your Teeth persistence and XP boundary (real PostgreSQL)",
     const { userId, character } = await makeCharacter();
     await completeWalkItOffAtTheJag(userId, character.id);
 
-    const state = await mining.getMiningGameplayState(
-      userId,
-      character.id,
-      now,
-      deterministicRandom(),
-    );
+    const state = await play.getPlayGameplayState(userId, character.id, now, deterministicRandom());
     const cyt = state.missions.find((mission) => mission.missionId === "cut_your_teeth");
     expect(cyt).toMatchObject({
       state: "not_accepted",
@@ -530,12 +510,7 @@ suite("issue #110 Cut Your Teeth persistence and XP boundary (real PostgreSQL)",
     // the character owns none — the objective must read 0 / 10, never 0 / 1.
     await equipCutter(userId, character.id);
 
-    const state = await mining.getMiningGameplayState(
-      userId,
-      character.id,
-      now,
-      deterministicRandom(),
-    );
+    const state = await play.getPlayGameplayState(userId, character.id, now, deterministicRandom());
     const cyt = state.missions.find((mission) => mission.missionId === "cut_your_teeth");
     expect(cyt).toMatchObject({
       state: "active",
@@ -557,12 +532,7 @@ suite("issue #110 Cut Your Teeth persistence and XP boundary (real PostgreSQL)",
     await equipCutter(userId, character.id);
     await addShale(character.id, 4);
 
-    const state = await mining.getMiningGameplayState(
-      userId,
-      character.id,
-      now,
-      deterministicRandom(),
-    );
+    const state = await play.getPlayGameplayState(userId, character.id, now, deterministicRandom());
     const cyt = state.missions.find((mission) => mission.missionId === "cut_your_teeth");
     expect(cyt).toMatchObject({
       state: "active",

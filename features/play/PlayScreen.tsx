@@ -6,13 +6,13 @@ import { GameShell, TopBar } from "@/components/ui/GameShell";
 import { RuneSpaceBrand } from "@/components/branding/RuneSpaceBrand";
 import { SignOutButton } from "@/features/auth/SignOutButton";
 import { PlayBoundaryTestTrigger } from "@/features/diagnostics/PlayBoundaryTestTrigger";
-import type { MiningGameplayState } from "@/server/mining";
-import { MiningConsole } from "./MiningConsole";
-import { MiningPlayProvider, useMiningPlay } from "./MiningPlayContext";
+import type { PlayGameplayState } from "@/server/play";
+import { PlayConsole } from "./PlayConsole";
+import { PlayProvider, usePlay } from "./PlayContext";
 
-function MiningFooter() {
+function PlayFooter() {
   const { equipmentTrigger, inventoryTrigger, setEquipmentOpen, setInventoryOpen, state } =
-    useMiningPlay();
+    usePlay();
   const totalSlots = state.inventory.slotsUsed + state.inventory.slotsAvailable;
   return (
     <div className="mx-auto flex w-full max-w-xl gap-2 sm:max-w-7xl sm:justify-end">
@@ -54,19 +54,19 @@ function PlayTopBar() {
   return <TopBar title={<RuneSpaceBrand />} trailing={<SignOutButton />} />;
 }
 
-export function MiningPlayScreen({
+export function PlayScreen({
   characterName,
   initialState,
 }: {
   characterName: string;
-  initialState: MiningGameplayState;
+  initialState: PlayGameplayState;
 }) {
   return (
-    <MiningPlayProvider initialState={initialState}>
-      <GameShell bottomNav={<MiningFooter />} topBar={<PlayTopBar />}>
+    <PlayProvider initialState={initialState}>
+      <GameShell bottomNav={<PlayFooter />} topBar={<PlayTopBar />}>
         <PlayBoundaryTestTrigger />
-        <MiningConsole characterName={characterName} />
+        <PlayConsole characterName={characterName} />
       </GameShell>
-    </MiningPlayProvider>
+    </PlayProvider>
   );
 }

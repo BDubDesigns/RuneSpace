@@ -4,7 +4,7 @@ import { Panel } from "@/components/ui/Panel";
 import { SectionHeader } from "@/components/ui/SectionHeader";
 import { COLLAPSE_KEYS, useSyncedCollapse } from "@/features/shared/use-synced-collapse";
 import { CollapseButton } from "@/features/shared/CollapseButton";
-import type { RefiningRunAttempt, RefiningRunState } from "@/server/mining";
+import type { RefiningRunAttempt, RefiningRunState } from "@/server/refining";
 
 function percentage(bps: number) {
   return (bps / 100).toFixed(2);
@@ -31,47 +31,45 @@ export function RefiningRunPanel({
         <SectionHeader eyebrow="Server-resolved">This refining run</SectionHeader>
         <CollapseButton collapsed={collapsed} label="refining run" onToggle={toggle} />
       </div>
+      <div className="mt-4 grid grid-cols-2 gap-3 text-sm sm:grid-cols-4">
+        <p>
+          <strong>{run.attempts}</strong> attempts
+        </p>
+        <p>
+          <strong>{run.successes}</strong> Refined Ferrite
+        </p>
+        <p>
+          <strong>{run.failures}</strong> Slag
+        </p>
+        <p>
+          <strong>{run.xpGained}</strong> Refining XP
+        </p>
+      </div>
+      <div className="mt-3 grid grid-cols-2 gap-3 text-sm sm:grid-cols-3">
+        <p>
+          <strong>{run.shaleConsumed}</strong> shale consumed
+        </p>
+        <p>
+          <strong>{ferriteQuantity}</strong> Refined Ferrite carried
+        </p>
+        <p>
+          <strong>{slagQuantity}</strong> Slag carried
+        </p>
+      </div>
       {!collapsed ? (
-        <>
-          <div className="mt-4 grid grid-cols-2 gap-3 text-sm sm:grid-cols-4">
-            <p>
-              <strong>{run.attempts}</strong> attempts
+        <div
+          className="mt-5 max-h-72 space-y-2 overflow-y-auto pr-1"
+          aria-label="Refining attempt history"
+        >
+          {[...run.recentAttempts].reverse().map((attempt) => (
+            <RefiningAttemptRow attempt={attempt} key={attempt.sequence} />
+          ))}
+          {run.recentAttempts.length === 0 ? (
+            <p className="text-sm text-[color:var(--rs-text-muted)]">
+              No resolved attempts in this run yet.
             </p>
-            <p>
-              <strong>{run.successes}</strong> Refined Ferrite
-            </p>
-            <p>
-              <strong>{run.failures}</strong> Slag
-            </p>
-            <p>
-              <strong>{run.xpGained}</strong> Refining XP
-            </p>
-          </div>
-          <div className="mt-3 grid grid-cols-2 gap-3 text-sm sm:grid-cols-3">
-            <p>
-              <strong>{run.shaleConsumed}</strong> shale consumed
-            </p>
-            <p>
-              <strong>{ferriteQuantity}</strong> Refined Ferrite carried
-            </p>
-            <p>
-              <strong>{slagQuantity}</strong> Slag carried
-            </p>
-          </div>
-          <div
-            className="mt-5 max-h-72 space-y-2 overflow-y-auto pr-1"
-            aria-label="Refining attempt history"
-          >
-            {[...run.recentAttempts].reverse().map((attempt) => (
-              <RefiningAttemptRow attempt={attempt} key={attempt.sequence} />
-            ))}
-            {run.recentAttempts.length === 0 ? (
-              <p className="text-sm text-[color:var(--rs-text-muted)]">
-                No resolved attempts in this run yet.
-              </p>
-            ) : null}
-          </div>
-        </>
+          ) : null}
+        </div>
       ) : null}
     </Panel>
   );
