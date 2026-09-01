@@ -2,7 +2,7 @@
   "name": "runespace",
   "version": "0.1.0",
   "private": true,
-  "description": "RuneSpace — browser-first, mobile-friendly, low-fi sci-fi RPG (foundation scaffold).",
+  "description": "RuneSpace — browser-first, mobile-friendly, low-fi sci-fi RPG (playable pre-alpha).",
   "engines": {
     "node": ">=22.0.0 <23.0.0",
     "pnpm": ">=9.0.0 <10.0.0"
