@@ -22,11 +22,12 @@ test("smoke screen loads with pre-alpha identity and entry actions", async ({ pa
   expect(desktopBox!.x + desktopBox!.width).toBeLessThanOrEqual(
     await page.evaluate(() => window.innerWidth),
   );
-  await expect(page.getByText(/pre-alpha/i)).toBeVisible();
-  await expect(page.getByText(/active development/i)).toBeVisible();
-  // Entry navigation: signed-out visitors see Register + Sign in (or signed-in users see My characters).
-  const entry = page.getByRole("link", { name: /register|my characters/i });
-  await expect(entry).toBeVisible();
+  // One durable pre-alpha status surface (exact match avoids the ambiguous
+  // eyebrow/paragraph double-match of /pre-alpha/i).
+  await expect(page.getByText("Playable pre-alpha — active development.")).toBeVisible();
+  // Signed-out smoke: both entry actions are explicit (do not coalesce with My characters).
+  await expect(page.getByRole("link", { name: "Register" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Sign in" })).toBeVisible();
 });
 
 test("smoke screen is responsive on mobile width", async ({ page }) => {

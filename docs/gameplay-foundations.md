@@ -36,7 +36,7 @@ unfinished balance values or future activities.
   derived from total XP and a supplied authoritative threshold source.
 - Every future award must use `grantSkillXp`; activities must not implement XP
   arithmetic or level checks themselves.
-- The initial Mining curve, Ferrite Shale award, and Welding curve/award are
+- The initial Mining, Refining, and Welding curves and their awards are
   approved in the slices below; other skills and activities remain deliberately
   undecided.
 
@@ -51,10 +51,12 @@ shale nor XP. Server-generated randomness is resolved in the locked action
 transaction, so refreshes and retries cannot replay an outcome.
 
 Mining stops before a roll when the minimum yield cannot fit, when its equipped
-Salvage Cutter is missing, when manually stopped, or when replaced. The starter
-loadout is provisioned once transactionally: a 5 kg Salvage Cutter, one 10 kg
-MYKEA SCHLEPPRAUM-8 eight-slot container, and the approved 50 kg carry capacity.
-No quest state is associated with the damaged-ship guidance.
+Salvage Cutter is missing, when manually stopped, or when replaced. New
+characters are provisioned once transactionally with one 10 kg MYKEA
+SCHLEPPRAUM-8 eight-slot container and the approved 50 kg carry capacity; the
+first Salvage Cutter is the Walk It Off mission reward (see `docs/missions.md`).
+The equipped Cutter remains required for Mining, whether obtained through that
+mission or later means.
 
 The current Mining run is bounded per-character state. Aggregate totals survive
 refreshes and stopping; only the latest ten immutable server-resolved attempt
@@ -362,9 +364,9 @@ interactive control that opens one compact, mobile-first public profile panel:
   is invalidated immediately when the active location changes.
 - **Overall-level rule:** the overall level is the highest derived level across
   the character's published skills (skills with an approved level curve), with
-  level 1 as the baseline; with Mining as the only published skill it equals
-  the Mining level. No total-level field is persisted and no formula is
-  duplicated in the UI.
+  level 1 as the baseline; with Mining, Refining, and Welding published it
+  reflects the highest of those. No total-level field is persisted and no
+  formula is duplicated in the UI.
 - **Skill rows:** each published skill shows its player-facing name (from the
   authoritative skill-presentation content boundary), current derived level,
   total XP, XP earned within the current level, XP required for the next level,
@@ -373,11 +375,12 @@ interactive control that opens one compact, mobile-first public profile panel:
   the shared `skillLevelProgress` domain helper — the same helper the Mining
   state projection uses. At the maximum level the panel shows the level cap and
   total XP truthfully and fabricates no further requirement.
-- **Current scope:** Mining is the only skill with an approved level curve and
-  is therefore the only published skill. Strength has a persisted starter XP
-  row but no approved curve and is not presented. A future approved curve (one
+- **Current scope:** Mining, Refining, and Welding each have an approved level
+  curve (see `game/config/balance.ts` / `docs/gameplay-foundations.md`) and
+  are therefore the published skills. Strength has a persisted starter XP row
+  but no approved curve and is not presented. A future approved curve (one
   entry in the balance boundary) publishes that skill automatically — no
-  Mining-specific component or projection branch exists.
+  per-skill component or projection branch is needed.
 - **Portrait:** the panel renders the character's resolved portrait
   presentation through the shared `components/portraits/CharacterPortrait`
   boundary (see "Character portraits" below): the selected catalog portrait as

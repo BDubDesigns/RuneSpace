@@ -17,14 +17,14 @@
       "url": "https://github.com/BDubDesigns/RuneSpace/pull/132"
     },
     {
-      "summary": "Added a safe pre-alpha mission reset operation for early development.",
-      "date": "2026-09-01",
-      "url": "https://github.com/BDubDesigns/RuneSpace/pull/131"
-    },
-    {
       "summary": "Made dialogue lifecycle aware of active versus completed state and one-shot presentation.",
       "date": "2026-08-30",
       "url": "https://github.com/BDubDesigns/RuneSpace/pull/130"
+    },
+    {
+      "summary": "Added the authoritative declarative mission framework with semantic quest guidance.",
+      "date": "2026-08-29",
+      "url": "https://github.com/BDubDesigns/RuneSpace/pull/125"
     }
   ]
 }

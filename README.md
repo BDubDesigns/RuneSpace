@@ -4,7 +4,7 @@
 
 RuneSpace is a planned browser-first, mobile-friendly, low-fi sci-fi RPG inspired by the progression, quests, social texture, and long-term grind of old-school MMORPGs and action-point games. It is not a RuneScape clone.
 
-The architecture is a **modular monolith** with a **server-authoritative** game model: the browser is never the trusted source of progression. Gameplay outcomes are resolved by server-side domain logic and persisted server-side. The generic **Play** orchestration owns the transaction/action lifecycle and shared state assembly (`server/action-resolution.ts`, `server/play.ts`, `server/play-state.ts`, `features/play/`); activity resolvers (Mining, Refining, Travel, Welding) own only their activity; feature-specific UI stays feature-owned.
+The architecture is a **modular monolith** with a **server-authoritative** game model: the browser is never the trusted source of progression. Gameplay outcomes are resolved by server-side domain logic and persisted server-side. The generic transaction/locking/action-cursor/lazy-resolution lifecycle lives in `server/action-resolution.ts`; `server/play.ts` owns composed activity resolution and shared Play state assembly (`server/play-state.ts`) and the client shell (`features/play/`). Activity resolvers (Mining, Refining, Travel, Welding) own only their activity; feature-specific UI stays feature-owned.
 
 ## Stack
 
