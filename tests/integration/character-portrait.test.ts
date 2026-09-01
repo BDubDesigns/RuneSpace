@@ -252,8 +252,8 @@ suite("issue #65 character portrait selection (real PostgreSQL)", () => {
 
     // Playable: the same authoritative gameplay-state load the play screen
     // uses succeeds for a null-portrait character (no portrait gate exists).
-    const mining = await import("@/server/mining");
-    const gameplayState = await mining.getMiningGameplayState(owner, legacy.id);
+    const play = await import("@/server/play");
+    const gameplayState = await play.getPlayGameplayState(owner, legacy.id);
     expect(gameplayState.characterId).toBe(legacy.id);
 
     // The public profile projection resolves the null value to the neutral

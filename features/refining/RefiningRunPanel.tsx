@@ -4,7 +4,7 @@ import { Panel } from "@/components/ui/Panel";
 import { SectionHeader } from "@/components/ui/SectionHeader";
 import { COLLAPSE_KEYS, useSyncedCollapse } from "@/features/shared/use-synced-collapse";
 import { CollapseButton } from "@/features/shared/CollapseButton";
-import type { RefiningRunAttempt, RefiningRunState } from "@/server/mining";
+import type { RefiningRunAttempt, RefiningRunState } from "@/server/refining";
 
 function percentage(bps: number) {
   return (bps / 100).toFixed(2);

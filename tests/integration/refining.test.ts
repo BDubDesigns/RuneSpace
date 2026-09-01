@@ -14,7 +14,9 @@ suite("issue #81 Refining persistence and concurrency (real PostgreSQL)", () => 
   let rune: typeof import("@/db/rune-space");
   let ownership: typeof import("@/server/ownership");
   let characters: typeof import("@/server/characters");
-  let mining: typeof import("@/server/mining");
+  let play: typeof import("@/server/play");
+  let miningCommands: typeof import("@/server/mining-commands");
+  let refiningCommands: typeof import("@/server/refining-commands");
   let resolution: typeof import("@/server/action-resolution");
 
   const createdUsers: string[] = [];
@@ -25,7 +27,9 @@ suite("issue #81 Refining persistence and concurrency (real PostgreSQL)", () => 
     rune = await import("@/db/rune-space");
     ownership = await import("@/server/ownership");
     characters = await import("@/server/characters");
-    mining = await import("@/server/mining");
+    play = await import("@/server/play");
+    miningCommands = await import("@/server/mining-commands");
+    refiningCommands = await import("@/server/refining-commands");
     resolution = await import("@/server/action-resolution");
   });
 
@@ -54,7 +58,7 @@ suite("issue #81 Refining persistence and concurrency (real PostgreSQL)", () => 
     now = new Date("2026-01-01T00:00:00.000Z"),
   ) {
     // Ensure starter state then move to Processing Yard
-    await mining.getMiningGameplayState(userId, characterId, now, {
+    await play.getPlayGameplayState(userId, characterId, now, {
       nextBasisPoints: () => 0,
       nextUnit: () => 0,
     });
@@ -74,9 +78,9 @@ suite("issue #81 Refining persistence and concurrency (real PostgreSQL)", () => 
   it("enforces Processing Yard location for Refining", async () => {
     const { userId, character } = await makeCharacter();
     const now = new Date("2026-01-01T00:00:00.000Z");
-    await mining.getMiningGameplayState(userId, character.id, now);
+    await play.getPlayGameplayState(userId, character.id, now);
     // Still at Crash Site — starting Refining must be refused via refiningError, not travelError
-    const refused = await mining.startRefining(userId, character.id, now);
+    const refused = await refiningCommands.startRefining(userId, character.id, now);
     expect(refused.refiningError).toBe("refining_unavailable_here");
     expect(refused.travelError).toBeUndefined();
     expect(refused.activeAction).toBeUndefined();
@@ -85,7 +89,7 @@ suite("issue #81 Refining persistence and concurrency (real PostgreSQL)", () => 
     ).resolves.toEqual([]);
 
     // A manipulated direct call is still server-authoritative: no active action is created
-    const stillRefused = await mining.startRefining(userId, character.id, now);
+    const stillRefused = await refiningCommands.startRefining(userId, character.id, now);
     expect(stillRefused.refiningError).toBe("refining_unavailable_here");
   });
 
@@ -109,7 +113,7 @@ suite("issue #81 Refining persistence and concurrency (real PostgreSQL)", () => 
       storedAt: now,
     });
 
-    const started = await mining.startRefining(userId, character.id, now, {
+    const started = await refiningCommands.startRefining(userId, character.id, now, {
       nextBasisPoints: () => 0,
       nextUnit: () => 0,
     });
@@ -126,11 +130,11 @@ suite("issue #81 Refining persistence and concurrency (real PostgreSQL)", () => 
       .where(eq(rune.characterSkillXp.characterId, character.id));
     const refiningRow = xpRows.find((r) => r.skillId === SKILL_IDS.refining)!;
     expect(refiningRow.totalXp).toBe(0);
-    const state = await mining.getMiningGameplayState(userId, character.id, now);
+    const state = await play.getPlayGameplayState(userId, character.id, now);
     expect(state.refining.level).toBe(1);
     expect(state.refining.totalXp).toBe(0);
     // Repeated reads do not duplicate
-    const after = await mining.getMiningGameplayState(userId, character.id, now);
+    const after = await play.getPlayGameplayState(userId, character.id, now);
     const xpRows2 = await db
       .select()
       .from(rune.characterSkillXp)
@@ -143,7 +147,7 @@ suite("issue #81 Refining persistence and concurrency (real PostgreSQL)", () => 
     const { userId, character } = await makeCharacter();
     const now = new Date("2026-01-01T00:00:00.000Z");
     // Establish normal starter state then strip refining to simulate pre-#81
-    await mining.getMiningGameplayState(userId, character.id, now, {
+    await play.getPlayGameplayState(userId, character.id, now, {
       nextBasisPoints: () => 0,
       nextUnit: () => 0,
     });
@@ -178,7 +182,7 @@ suite("issue #81 Refining persistence and concurrency (real PostgreSQL)", () => 
       .set({ currentLocationId: LOCATION_IDS.abandonedProcessingYard })
       .where(eq(rune.characters.id, character.id));
     // First gameplay read — missing refining XP means 0 XP / level 1, without creating a zero row
-    const state = await mining.getMiningGameplayState(userId, character.id, now, {
+    const state = await play.getPlayGameplayState(userId, character.id, now, {
       nextBasisPoints: () => 0,
       nextUnit: () => 0,
     });
@@ -195,7 +199,7 @@ suite("issue #81 Refining persistence and concurrency (real PostgreSQL)", () => 
     await db
       .insert(rune.inventoryStacks)
       .values({ characterId: character.id, itemId: ITEM_IDS.ferriteShale, quantity: 5 });
-    await mining.startRefining(userId, character.id, now, {
+    await refiningCommands.startRefining(userId, character.id, now, {
       nextBasisPoints: () => 0,
       nextUnit: () => 0,
     });
@@ -206,7 +210,7 @@ suite("issue #81 Refining persistence and concurrency (real PostgreSQL)", () => 
     expect(started[0]?.actionId).toBe(ACTION_IDS.refining);
 
     // Resolving an attempt creates the refining XP/state and grants 15 XP
-    const resolved = await mining.getMiningGameplayState(
+    const resolved = await play.getPlayGameplayState(
       userId,
       character.id,
       new Date("2026-01-01T00:00:04.200Z"),
@@ -230,15 +234,10 @@ suite("issue #81 Refining persistence and concurrency (real PostgreSQL)", () => 
     expect(afterSuccessState).toHaveLength(1);
     expect(afterSuccessState[0]!.runAttempts).toBe(1);
     // Repeated reads do not duplicate either row
-    await mining.getMiningGameplayState(
-      userId,
-      character.id,
-      new Date("2026-01-01T00:00:04.200Z"),
-      {
-        nextBasisPoints: () => 0,
-        nextUnit: () => 0,
-      },
-    );
+    await play.getPlayGameplayState(userId, character.id, new Date("2026-01-01T00:00:04.200Z"), {
+      nextBasisPoints: () => 0,
+      nextUnit: () => 0,
+    });
     const finalXp = await db
       .select()
       .from(rune.characterSkillXp)
@@ -251,7 +250,7 @@ suite("issue #81 Refining persistence and concurrency (real PostgreSQL)", () => 
     const startedAt = new Date("2026-01-01T00:00:00.000Z");
     await provisionAtYard(userId, character.id, startedAt);
     await addShale(character.id, 10);
-    await mining.startRefining(userId, character.id, startedAt, {
+    await refiningCommands.startRefining(userId, character.id, startedAt, {
       nextBasisPoints: () => 0,
       nextUnit: () => 0,
     });
@@ -262,7 +261,7 @@ suite("issue #81 Refining persistence and concurrency (real PostgreSQL)", () => 
     expect(first[0]?.actionId).toBe(ACTION_IDS.refining);
 
     // Resolve one attempt (7 ticks)
-    const afterOne = await mining.getMiningGameplayState(
+    const afterOne = await play.getPlayGameplayState(
       userId,
       character.id,
       new Date("2026-01-01T00:00:04.200Z"),
@@ -274,7 +273,7 @@ suite("issue #81 Refining persistence and concurrency (real PostgreSQL)", () => 
     const runBefore = afterOne.refiningRun;
 
     // Repeating Start Refining while active must be idempotent
-    const idempotent = await mining.startRefining(
+    const idempotent = await refiningCommands.startRefining(
       userId,
       character.id,
       new Date("2026-01-01T00:00:04.200Z"),
@@ -298,13 +297,13 @@ suite("issue #81 Refining persistence and concurrency (real PostgreSQL)", () => 
     const startedAt = new Date("2026-01-01T00:00:00.000Z");
     await provisionAtYard(userId, character.id, startedAt);
     await addShale(character.id, 5);
-    await mining.startRefining(userId, character.id, startedAt, {
+    await refiningCommands.startRefining(userId, character.id, startedAt, {
       nextBasisPoints: () => 0,
       nextUnit: () => 0,
     });
 
     const successRandom = { nextBasisPoints: () => 0, nextUnit: () => 0 };
-    const resolved = await mining.getMiningGameplayState(
+    const resolved = await play.getPlayGameplayState(
       userId,
       character.id,
       new Date("2026-01-01T00:00:04.200Z"),
@@ -343,13 +342,13 @@ suite("issue #81 Refining persistence and concurrency (real PostgreSQL)", () => 
     const startedAt = new Date("2026-01-01T00:00:00.000Z");
     await provisionAtYard(userId, character.id, startedAt);
     await addShale(character.id, 5);
-    await mining.startRefining(userId, character.id, startedAt, {
+    await refiningCommands.startRefining(userId, character.id, startedAt, {
       nextBasisPoints: () => 9_999,
       nextUnit: () => 0,
     });
 
     const failRandom = { nextBasisPoints: () => 9_999, nextUnit: () => 0 };
-    const resolved = await mining.getMiningGameplayState(
+    const resolved = await play.getPlayGameplayState(
       userId,
       character.id,
       new Date("2026-01-01T00:00:04.200Z"),
@@ -380,7 +379,7 @@ suite("issue #81 Refining persistence and concurrency (real PostgreSQL)", () => 
     const startedAt = new Date("2026-01-01T00:00:00.000Z");
     await provisionAtYard(userId, character.id, startedAt);
     await addShale(character.id, 5);
-    await mining.startRefining(userId, character.id, startedAt, {
+    await refiningCommands.startRefining(userId, character.id, startedAt, {
       nextBasisPoints: () => 0,
       nextUnit: () => 0,
     });
@@ -422,12 +421,20 @@ suite("issue #81 Refining persistence and concurrency (real PostgreSQL)", () => 
     const realResolver = refiningMod.createRefiningResolver({ nextBasisPoints: () => 0 });
     const failingResolver = {
       ...realResolver,
-      persist: async (tx: DatabaseTransaction, outcome: unknown) => {
+      persist: async (
+        tx: DatabaseTransaction,
+        outcome: unknown,
+        context?: { character: never; action: never },
+      ) => {
         await (
           realResolver as unknown as {
-            persist: (tx: DatabaseTransaction, o: unknown) => Promise<void>;
+            persist: (
+              tx: DatabaseTransaction,
+              o: unknown,
+              context?: { character: never; action: never },
+            ) => Promise<void>;
           }
-        ).persist(tx, outcome as never);
+        ).persist(tx, outcome as never, context);
         throw new Error("intentional refining rollback");
       },
       supports: realResolver.supports!.bind(realResolver),
@@ -484,7 +491,7 @@ suite("issue #81 Refining persistence and concurrency (real PostgreSQL)", () => 
     expect(afterAction[0]?.resolvedThroughAt.toISOString()).toBe(beforeCursor);
 
     // Retry normally proves exactly one attempt commits
-    const retried = await mining.getMiningGameplayState(userId, character.id, now, {
+    const retried = await play.getPlayGameplayState(userId, character.id, now, {
       nextBasisPoints: () => 0,
       nextUnit: () => 0,
     });
@@ -497,7 +504,7 @@ suite("issue #81 Refining persistence and concurrency (real PostgreSQL)", () => 
     const startedAt = new Date("2026-01-01T00:00:00.000Z");
     await provisionAtYard(userId, character.id, startedAt);
     await addShale(character.id, 10);
-    await mining.startRefining(userId, character.id, startedAt, {
+    await refiningCommands.startRefining(userId, character.id, startedAt, {
       nextBasisPoints: () => 0,
       nextUnit: () => 0,
     });
@@ -505,8 +512,8 @@ suite("issue #81 Refining persistence and concurrency (real PostgreSQL)", () => 
     const at = new Date("2026-01-01T00:00:04.200Z");
     const random = { nextBasisPoints: () => 0, nextUnit: () => 0 };
     const [a, b] = await Promise.all([
-      mining.getMiningGameplayState(userId, character.id, at, random),
-      mining.getMiningGameplayState(userId, character.id, at, random),
+      play.getPlayGameplayState(userId, character.id, at, random),
+      play.getPlayGameplayState(userId, character.id, at, random),
     ]);
     expect(a.refiningRun.attempts).toBe(1);
     expect(b.refiningRun.attempts).toBe(1);
@@ -533,13 +540,13 @@ suite("issue #81 Refining persistence and concurrency (real PostgreSQL)", () => 
     const startedAt = new Date("2026-01-01T00:00:00.000Z");
     await provisionAtYard(userId, character.id, startedAt);
     await addShale(character.id, 10);
-    await mining.startRefining(userId, character.id, startedAt, {
+    await refiningCommands.startRefining(userId, character.id, startedAt, {
       nextBasisPoints: () => 0,
       nextUnit: () => 0,
     });
 
     const partialAt = new Date("2026-01-01T00:00:03.600Z"); // 6 ticks, <7
-    const first = await mining.getMiningGameplayState(userId, character.id, partialAt, {
+    const first = await play.getPlayGameplayState(userId, character.id, partialAt, {
       nextBasisPoints: () => 0,
       nextUnit: () => 0,
     });
@@ -551,7 +558,7 @@ suite("issue #81 Refining persistence and concurrency (real PostgreSQL)", () => 
       .where(eq(rune.activeActions.characterId, character.id));
     expect(actionAfterPartial[0]?.resolvedThroughAt.toISOString()).toBe(startedAt.toISOString());
 
-    const second = await mining.getMiningGameplayState(userId, character.id, partialAt, {
+    const second = await play.getPlayGameplayState(userId, character.id, partialAt, {
       nextBasisPoints: () => 0,
       nextUnit: () => 0,
     });
@@ -564,14 +571,14 @@ suite("issue #81 Refining persistence and concurrency (real PostgreSQL)", () => 
     const startedAt = new Date("2026-01-01T00:00:00.000Z");
     await provisionAtYard(userId, character.id, startedAt);
     await addShale(character.id, 10);
-    await mining.startRefining(userId, character.id, startedAt, {
+    await refiningCommands.startRefining(userId, character.id, startedAt, {
       nextBasisPoints: () => 0,
       nextUnit: () => 0,
     });
 
     // 13 ticks = 1 completed (7) + 6 partial
     const travelAt = new Date(startedAt.getTime() + 7 * 600 + 6 * 600);
-    const traveled = await mining.beginTravel(
+    const traveled = await play.beginTravel(
       userId,
       character.id,
       LOCATION_IDS.crashSite,
@@ -602,8 +609,8 @@ suite("issue #81 Refining persistence and concurrency (real PostgreSQL)", () => 
     const startedAt = new Date("2026-01-01T00:00:00.000Z");
     await provisionAtYard(userId, character.id, startedAt);
     await addShale(character.id, 5);
-    await mining.startRefining(userId, character.id, startedAt);
-    const traveled = await mining.beginTravel(
+    await refiningCommands.startRefining(userId, character.id, startedAt);
+    const traveled = await play.beginTravel(
       userId,
       character.id,
       LOCATION_IDS.crashSite,
@@ -612,7 +619,7 @@ suite("issue #81 Refining persistence and concurrency (real PostgreSQL)", () => 
     expect(traveled.travelState?.destinationLocationId).toBe(LOCATION_IDS.crashSite);
     expect(traveled.activeAction).toBeUndefined();
     // Trying to start refining while traveling must be refused — travel is projected as travelState, not activeAction
-    const refused = await mining.startRefining(
+    const refused = await refiningCommands.startRefining(
       userId,
       character.id,
       new Date("2026-01-01T00:00:04.200Z"),
@@ -627,13 +634,13 @@ suite("issue #81 Refining persistence and concurrency (real PostgreSQL)", () => 
     const startedAt = new Date("2026-01-01T00:00:00.000Z");
     await provisionAtYard(userId, character.id, startedAt);
     await addShale(character.id, 50);
-    await mining.startRefining(userId, character.id, startedAt, {
+    await refiningCommands.startRefining(userId, character.id, startedAt, {
       nextBasisPoints: () => 0,
       nextUnit: () => 0,
     });
 
     const far = new Date(startedAt.getTime() + 12 * 7 * 600);
-    const resolved = await mining.getMiningGameplayState(userId, character.id, far, {
+    const resolved = await play.getPlayGameplayState(userId, character.id, far, {
       nextBasisPoints: () => 0,
       nextUnit: () => 0,
     });
@@ -643,13 +650,13 @@ suite("issue #81 Refining persistence and concurrency (real PostgreSQL)", () => 
       3, 4, 5, 6, 7, 8, 9, 10, 11, 12,
     ]);
 
-    await mining.stopRefining(userId, character.id, far, {
+    await refiningCommands.stopRefining(userId, character.id, far, {
       nextBasisPoints: () => 0,
       nextUnit: () => 0,
     });
-    const stopped = await mining.getMiningGameplayState(userId, character.id, far);
+    const stopped = await play.getPlayGameplayState(userId, character.id, far);
     expect(stopped.refiningRun.attempts).toBe(12);
-    const restarted = await mining.startRefining(
+    const restarted = await refiningCommands.startRefining(
       userId,
       character.id,
       new Date(far.getTime() + 600),
@@ -664,14 +671,14 @@ suite("issue #81 Refining persistence and concurrency (real PostgreSQL)", () => 
     const startedAt = new Date("2026-01-01T00:00:00.000Z");
     await provisionAtYard(userId, character.id, startedAt);
     await addShale(character.id, 5000);
-    await mining.startRefining(userId, character.id, startedAt, {
+    await refiningCommands.startRefining(userId, character.id, startedAt, {
       nextBasisPoints: () => 0,
       nextUnit: () => 0,
     });
 
     // 2 hours later - but cap is 1 hour = 6000 ticks = floor(6000/7)=857 attempts max
     const farFuture = new Date(startedAt.getTime() + 2 * 60 * 60 * 1000);
-    const resolved = await mining.getMiningGameplayState(userId, character.id, farFuture, {
+    const resolved = await play.getPlayGameplayState(userId, character.id, farFuture, {
       nextBasisPoints: () => 0,
       nextUnit: () => 0,
     });
@@ -699,7 +706,7 @@ suite("issue #81 Refining persistence and concurrency (real PostgreSQL)", () => 
   it("Mining stop does not leak into Refining presentation after Travel to Yard", async () => {
     const { userId, character } = await makeCharacter();
     const atJag = new Date("2026-01-01T00:00:00.000Z");
-    await mining.getMiningGameplayState(userId, character.id, atJag, {
+    await play.getPlayGameplayState(userId, character.id, atJag, {
       nextBasisPoints: () => 0,
       nextUnit: () => 0,
     });
@@ -707,13 +714,13 @@ suite("issue #81 Refining persistence and concurrency (real PostgreSQL)", () => 
       .update(rune.characters)
       .set({ currentLocationId: LOCATION_IDS.theJag })
       .where(eq(rune.characters.id, character.id));
-    await mining.startFerriteShaleMining(userId, character.id, atJag, {
+    await miningCommands.startFerriteShaleMining(userId, character.id, atJag, {
       nextBasisPoints: () => 0,
       nextUnit: () => 0,
     });
     // Stop mining with a mining-specific reason by removing tool, then travel to Yard
     await db.delete(rune.equippedItems).where(eq(rune.equippedItems.characterId, character.id));
-    const afterStop = await mining.getMiningGameplayState(
+    const afterStop = await play.getPlayGameplayState(
       userId,
       character.id,
       new Date("2026-01-01T00:00:06.000Z"),
@@ -724,7 +731,7 @@ suite("issue #81 Refining persistence and concurrency (real PostgreSQL)", () => 
     );
     expect(afterStop.stop?.actionId).toBe(ACTION_IDS.ferriteShaleMining);
     // Travel from The Jag to Processing Yard requires via Long Scramble -> Crash -> Yard
-    await mining.beginTravel(
+    await play.beginTravel(
       userId,
       character.id,
       LOCATION_IDS.theLongScramble,
@@ -734,16 +741,11 @@ suite("issue #81 Refining persistence and concurrency (real PostgreSQL)", () => 
         nextUnit: () => 0,
       },
     );
-    await mining.getMiningGameplayState(
-      userId,
-      character.id,
-      new Date("2026-01-01T00:00:30.000Z"),
-      {
-        nextBasisPoints: () => 0,
-        nextUnit: () => 0,
-      },
-    );
-    await mining.beginTravel(
+    await play.getPlayGameplayState(userId, character.id, new Date("2026-01-01T00:00:30.000Z"), {
+      nextBasisPoints: () => 0,
+      nextUnit: () => 0,
+    });
+    await play.beginTravel(
       userId,
       character.id,
       LOCATION_IDS.crashSite,
@@ -753,16 +755,11 @@ suite("issue #81 Refining persistence and concurrency (real PostgreSQL)", () => 
         nextUnit: () => 0,
       },
     );
-    await mining.getMiningGameplayState(
-      userId,
-      character.id,
-      new Date("2026-01-01T00:00:54.000Z"),
-      {
-        nextBasisPoints: () => 0,
-        nextUnit: () => 0,
-      },
-    );
-    await mining.beginTravel(
+    await play.getPlayGameplayState(userId, character.id, new Date("2026-01-01T00:00:54.000Z"), {
+      nextBasisPoints: () => 0,
+      nextUnit: () => 0,
+    });
+    await play.beginTravel(
       userId,
       character.id,
       LOCATION_IDS.abandonedProcessingYard,
@@ -772,7 +769,7 @@ suite("issue #81 Refining persistence and concurrency (real PostgreSQL)", () => 
         nextUnit: () => 0,
       },
     );
-    const arrived = await mining.getMiningGameplayState(
+    const arrived = await play.getPlayGameplayState(
       userId,
       character.id,
       new Date("2026-01-01T00:01:18.000Z"),
@@ -799,7 +796,7 @@ suite("issue #81 Refining persistence and concurrency (real PostgreSQL)", () => 
     await db
       .insert(rune.inventoryStacks)
       .values({ characterId: character.id, itemId: ITEM_IDS.ferriteShale, quantity: 2 });
-    const atYard = await mining.getMiningGameplayState(
+    const atYard = await play.getPlayGameplayState(
       userId,
       character.id,
       new Date("2026-01-01T00:00:30.000Z"),
@@ -819,14 +816,14 @@ suite("issue #81 Refining persistence and concurrency (real PostgreSQL)", () => 
     await db
       .insert(rune.inventoryStacks)
       .values({ characterId: character.id, itemId: ITEM_IDS.ferriteShale, quantity: 5 });
-    await mining.startRefining(userId, character.id, atYard, {
+    await refiningCommands.startRefining(userId, character.id, atYard, {
       nextBasisPoints: () => 0,
       nextUnit: () => 0,
     });
     // Drain shale via the refining run — after one success with 5 shale,
     // subsequent getMiningGameplayState calls will drain remaining shale
     // and Travel then persists action_replaced as the latest refining stop.
-    const atFail = await mining.getMiningGameplayState(
+    const atFail = await play.getPlayGameplayState(
       userId,
       character.id,
       new Date("2026-01-01T00:00:04.200Z"),
@@ -837,7 +834,7 @@ suite("issue #81 Refining persistence and concurrency (real PostgreSQL)", () => 
     );
     expect(atFail.refiningRun.attempts).toBe(1);
     // Travel away to Crash Site — beginTravel while refining records action_replaced
-    const traveled = await mining.beginTravel(
+    const traveled = await play.beginTravel(
       userId,
       character.id,
       LOCATION_IDS.crashSite,
@@ -848,7 +845,7 @@ suite("issue #81 Refining persistence and concurrency (real PostgreSQL)", () => 
       },
     );
     expect(traveled.travelState?.destinationLocationId).toBe(LOCATION_IDS.crashSite);
-    const atCrash = await mining.getMiningGameplayState(
+    const atCrash = await play.getPlayGameplayState(
       userId,
       character.id,
       new Date("2026-01-01T00:00:30.000Z"),

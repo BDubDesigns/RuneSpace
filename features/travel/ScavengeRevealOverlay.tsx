@@ -8,8 +8,8 @@ import { Feedback } from "@/components/ui/Feedback";
 import { SectionHeader } from "@/components/ui/SectionHeader";
 import type { ScavengeOutcome } from "@/game/content/scavenge";
 import { acknowledgeScavengeRevealAction } from "@/server/actions";
-import type { ScavengeResolvedOutcome } from "@/server/mining";
-import { useMiningPlay } from "@/features/mining/MiningPlayContext";
+import type { ScavengeResolvedOutcome } from "@/server/play";
+import { usePlay } from "@/features/play/PlayContext";
 import {
   createScavengeReelAnimationPlan,
   SCAVENGE_REEL_CYCLE_COUNT,
@@ -143,7 +143,7 @@ export function ScavengeRevealOverlay() {
     releaseCommand,
     requestAutoRefresh,
     state,
-  } = useMiningPlay();
+  } = usePlay();
   const reveal = state.scavengeReveals[0];
   const reducedMotion = useReducedMotion();
   const primaryButtonRef = useRef<HTMLButtonElement>(null);

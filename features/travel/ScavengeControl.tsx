@@ -9,7 +9,7 @@ import { scavengePossibleAwardSpecs, scavengeWindowAt } from "@/game/domain/scav
 import { GAME_TICK_MS } from "@/game/config/foundations";
 import { claimScavengeAction } from "@/server/actions";
 import { reportClientDiagnostic } from "@/features/diagnostics/client";
-import { useMiningPlay } from "@/features/mining/MiningPlayContext";
+import { usePlay } from "@/features/play/PlayContext";
 
 function capacityMessage(reason: "slots" | "mass") {
   return reason === "mass"
@@ -25,7 +25,7 @@ export function ScavengeControl() {
     releaseCommand,
     requestAutoRefresh,
     state,
-  } = useMiningPlay();
+  } = usePlay();
   const [now, setNow] = useState(Date.now());
   const [claiming, setClaiming] = useState(false);
   const [message, setMessage] = useState<string>();

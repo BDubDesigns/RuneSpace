@@ -18,7 +18,7 @@ import { getEffectiveGameBalance } from "@/game/config/balance";
 import { areLocationsAdjacent, getLocation } from "@/game/content/locations";
 import type { LocationPopulationEntry } from "@/game/domain/location-population";
 import { beginTravelAction } from "@/server/actions";
-import { useMiningPlay } from "@/features/mining/MiningPlayContext";
+import { usePlay } from "@/features/play/PlayContext";
 import { COLLAPSE_KEYS, useSyncedCollapse } from "@/features/shared/use-synced-collapse";
 import { CollapseButton } from "@/features/shared/CollapseButton";
 import { CharacterProfilePanel } from "./CharacterProfilePanel";
@@ -639,7 +639,7 @@ export function LocalMapPanel() {
     releaseCommand,
     foregroundBusy: busy,
     requestAutoRefresh,
-  } = useMiningPlay();
+  } = usePlay();
   const [selected, setSelected] = useState<string | undefined>();
   const [message, setMessage] = useState<string | undefined>();
   const [now, setNow] = useState(Date.now());

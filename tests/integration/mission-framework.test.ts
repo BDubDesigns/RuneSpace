@@ -59,7 +59,7 @@ suite("issue #124 generic consume-item completion boundary (real PostgreSQL)", (
   let rune: typeof import("@/db/rune-space");
   let ownership: typeof import("@/server/ownership");
   let characters: typeof import("@/server/characters");
-  let mining: typeof import("@/server/mining");
+  let play: typeof import("@/server/play");
   let missions: typeof import("@/server/missions");
   const createdUsers: string[] = [];
   const now = new Date("2026-01-01T00:00:00.000Z");
@@ -70,7 +70,7 @@ suite("issue #124 generic consume-item completion boundary (real PostgreSQL)", (
     rune = await import("@/db/rune-space");
     ownership = await import("@/server/ownership");
     characters = await import("@/server/characters");
-    mining = await import("@/server/mining");
+    play = await import("@/server/play");
     missions = await import("@/server/missions");
   });
 
@@ -96,7 +96,7 @@ suite("issue #124 generic consume-item completion boundary (real PostgreSQL)", (
       undefined,
       { seedLegacyStarterCutter: false },
     );
-    await mining.getMiningGameplayState(userId, character.id, now, deterministicRandom());
+    await play.getPlayGameplayState(userId, character.id, now, deterministicRandom());
     await db.insert(rune.characterMissions).values({
       characterId: character.id,
       missionId: SYNTHETIC_ID,

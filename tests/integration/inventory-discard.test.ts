@@ -4,7 +4,7 @@ import { ITEM_IDS, LOCATION_IDS } from "@/game/config/foundations";
 import type { MiningRandom } from "@/game/domain/mining";
 import { withResolvedOwnedCharacter } from "@/server/action-resolution";
 import { discardInventoryStack, discardInventoryStackInTransaction } from "@/server/inventory";
-import { createPlayResolver, ensureStarterMiningState } from "@/server/mining";
+import { createPlayResolver, ensurePlayProvisioning } from "@/server/play";
 import { OwnershipError } from "@/server/ownership";
 import { cleanupTestUser, createCharacterForUser, createTestUser } from "./fixtures";
 
@@ -17,7 +17,8 @@ suite("Issue #58 authoritative inventory stack discard (real PostgreSQL)", () =>
   let rune: typeof import("@/db/rune-space");
   let ownership: typeof import("@/server/ownership");
   let characters: typeof import("@/server/characters");
-  let mining: typeof import("@/server/mining");
+  let play: typeof import("@/server/play");
+  let miningCommands: typeof import("@/server/mining-commands");
   const createdUsers: string[] = [];
 
   beforeAll(async () => {
@@ -26,7 +27,8 @@ suite("Issue #58 authoritative inventory stack discard (real PostgreSQL)", () =>
     rune = await import("@/db/rune-space");
     ownership = await import("@/server/ownership");
     characters = await import("@/server/characters");
-    mining = await import("@/server/mining");
+    play = await import("@/server/play");
+    miningCommands = await import("@/server/mining-commands");
   });
 
   afterEach(async () => {
@@ -52,7 +54,7 @@ suite("Issue #58 authoritative inventory stack discard (real PostgreSQL)", () =>
   const successYield: MiningRandom = { nextBasisPoints: () => 0, nextUnit: () => 0 };
 
   async function provision(userId: string, characterId: string, now: Date) {
-    await mining.getMiningGameplayState(userId, characterId, now, noYield);
+    await play.getPlayGameplayState(userId, characterId, now, noYield);
     await db
       .update(rune.characters)
       .set({ currentLocationId: LOCATION_IDS.theJag })
@@ -180,7 +182,7 @@ suite("Issue #58 authoritative inventory stack discard (real PostgreSQL)", () =>
     const stackIds: string[] = [];
     for (let index = 0; index < 8; index += 1)
       stackIds.push(await addStack(character.id, ITEM_IDS.ferriteShale, 2));
-    const full = await mining.getMiningGameplayState(userId, character.id, now, noYield);
+    const full = await play.getPlayGameplayState(userId, character.id, now, noYield);
     expect(full.inventory.slotsUsed).toBe(8);
     expect(full.inventory.slotsAvailable).toBe(0);
 
@@ -301,7 +303,7 @@ suite("Issue #58 authoritative inventory stack discard (real PostgreSQL)", () =>
     const startedAt = new Date("2026-07-02T00:00:00.000Z");
     const dueAt = new Date("2026-07-02T00:00:06.000Z");
     await provision(userId, character.id, startedAt);
-    await mining.startFerriteShaleMining(userId, character.id, startedAt, successYield);
+    await miningCommands.startFerriteShaleMining(userId, character.id, startedAt, successYield);
     // The selected stack holds the confirmed quantity; the due successful
     // attempt will add one more shale to the SAME stack.
     const stackId = await addStack(character.id, ITEM_IDS.ferriteShale, 5);
@@ -350,7 +352,7 @@ suite("Issue #58 authoritative inventory stack discard (real PostgreSQL)", () =>
     const startedAt = new Date("2026-07-03T00:00:00.000Z");
     const dueAt = new Date("2026-07-03T00:00:06.000Z");
     await provision(userId, character.id, startedAt);
-    await mining.startFerriteShaleMining(userId, character.id, startedAt, successYield);
+    await miningCommands.startFerriteShaleMining(userId, character.id, startedAt, successYield);
     // The discard target is a Power Cell stack: due Mining work never touches
     // it, so the discard inside the failing transaction genuinely succeeds
     // before the forced throw.
@@ -407,7 +409,7 @@ suite("Issue #58 authoritative inventory stack discard (real PostgreSQL)", () =>
         character.id,
         createPlayResolver(successYield),
         async (transaction, context) => {
-          await ensureStarterMiningState(transaction, context.character.id);
+          await ensurePlayProvisioning(transaction, context.character.id);
           const result = await discardInventoryStackInTransaction(
             transaction,
             context.character.id,
@@ -426,7 +428,7 @@ suite("Issue #58 authoritative inventory stack discard (real PostgreSQL)", () =>
 
     // The same window still resolves exactly once and commits normally: two
     // boosted attempts consume two of the seven charges.
-    const retried = await mining.getMiningGameplayState(userId, character.id, dueAt, successYield);
+    const retried = await play.getPlayGameplayState(userId, character.id, dueAt, successYield);
     expect(retried.run).toMatchObject({ attempts: 2, successes: 2, shaleGained: 2, xpGained: 30 });
     expect(retried.inventory.stacks).toMatchObject([
       { itemId: ITEM_IDS.powerCell, quantity: 2 },

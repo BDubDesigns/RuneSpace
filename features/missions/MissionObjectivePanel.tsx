@@ -1,7 +1,7 @@
 "use client";
 
 import { Panel } from "@/components/ui/Panel";
-import type { MiningGameplayState } from "@/server/mining";
+import type { PlayGameplayState } from "@/server/play";
 
 /**
  * Displays the relevant active mission through the shared projection surface.
@@ -12,7 +12,7 @@ import type { MiningGameplayState } from "@/server/mining";
  * does the most recently completed mission show its completed state. There is
  * deliberately no one-active-mission restriction and no history/log redesign.
  */
-export function MissionObjectivePanel({ state }: { state: MiningGameplayState }) {
+export function MissionObjectivePanel({ state }: { state: PlayGameplayState }) {
   const active = [...state.missions]
     .reverse()
     .find((entry) => entry.state !== "not_accepted" && entry.state !== "completed");

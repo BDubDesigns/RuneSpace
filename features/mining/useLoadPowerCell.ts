@@ -2,8 +2,8 @@
 
 import { useCallback, useTransition } from "react";
 import { loadPowerCellAction } from "@/server/actions";
-import type { LoadPowerCellSelection } from "@/server/mining";
-import { useMiningPlay } from "./MiningPlayContext";
+import type { LoadPowerCellSelection } from "@/server/mining-commands";
+import { usePlay } from "@/features/play/PlayContext";
 
 export type LoadPowerCellFeedback = {
   tone: "muted" | "danger";
@@ -28,7 +28,7 @@ export function useLoadPowerCell(
     foregroundBusy: busy,
     releaseCommand,
     state,
-  } = useMiningPlay();
+  } = usePlay();
   const [, startTransition] = useTransition();
 
   const loadPowerCell = useCallback(() => {

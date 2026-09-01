@@ -12,10 +12,10 @@ import {
   type RefObject,
   type SetStateAction,
 } from "react";
-import type { MiningGameplayState } from "@/server/mining";
+import type { PlayGameplayState } from "@/server/play";
 import { cancelRefresh, tryAcquire, release, requestRefresh, type GateModel } from "./command-gate";
 
-type MiningPlayContextValue = {
+type PlayContextValue = {
   inventoryOpen: boolean;
   inventoryTrigger: RefObject<HTMLButtonElement | null>;
   equipmentOpen: boolean;
@@ -31,16 +31,16 @@ type MiningPlayContextValue = {
   setRefreshCallback: (fn: (opts?: { background?: boolean }) => void) => void;
   setInventoryOpen: Dispatch<SetStateAction<boolean>>;
   setEquipmentOpen: Dispatch<SetStateAction<boolean>>;
-  acceptState: (nextState: MiningGameplayState) => void;
-  state: MiningGameplayState;
+  acceptState: (nextState: PlayGameplayState) => void;
+  state: PlayGameplayState;
 };
 
-const MiningPlayContext = createContext<MiningPlayContextValue | undefined>(undefined);
+const PlayContext = createContext<PlayContextValue | undefined>(undefined);
 
 const BOUNDARY_REFRESH_RETRY_DELAYS_MS = [250, 500, 1_000, 1_500, 2_000] as const;
 const BOUNDARY_REFRESH_GRACE_MS = 150;
 
-function boundaryKeyForState(state: MiningGameplayState): string | undefined {
+function boundaryKeyForState(state: PlayGameplayState): string | undefined {
   return state.travelState
     ? `travel:${state.travelState.originLocationId}:${state.travelState.destinationLocationId}:${state.travelState.arrivesAt}`
     : state.activeAction
@@ -48,12 +48,12 @@ function boundaryKeyForState(state: MiningGameplayState): string | undefined {
       : undefined;
 }
 
-export function MiningPlayProvider({
+export function PlayProvider({
   children,
   initialState,
 }: {
   children: ReactNode;
-  initialState: MiningGameplayState;
+  initialState: PlayGameplayState;
 }) {
   const [state, setState] = useState(initialState);
   const [inventoryOpen, setInventoryOpen] = useState(false);
@@ -139,7 +139,7 @@ export function MiningPlayProvider({
     refreshCallback.current = fn;
   }, []);
 
-  const acceptState = useCallback((nextState: MiningGameplayState) => {
+  const acceptState = useCallback((nextState: PlayGameplayState) => {
     if (boundaryKeyForState(stateRef.current) !== boundaryKeyForState(nextState)) {
       // Invalidate synchronously. React effect cleanup runs after this command's
       // promise continuation, so cleanup alone is too late to stop release()
@@ -187,7 +187,7 @@ export function MiningPlayProvider({
   }, [boundaryAt, boundaryKey, requestAutoRefresh]);
 
   return (
-    <MiningPlayContext.Provider
+    <PlayContext.Provider
       value={{
         inventoryOpen,
         inventoryTrigger,
@@ -207,12 +207,12 @@ export function MiningPlayProvider({
       }}
     >
       {children}
-    </MiningPlayContext.Provider>
+    </PlayContext.Provider>
   );
 }
 
-export function useMiningPlay() {
-  const context = useContext(MiningPlayContext);
-  if (!context) throw new Error("Mining play state is unavailable");
+export function usePlay() {
+  const context = useContext(PlayContext);
+  if (!context) throw new Error("Play state is unavailable");
   return context;
 }

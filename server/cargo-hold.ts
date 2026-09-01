@@ -34,10 +34,10 @@ import {
 } from "@/server/carried-inventory";
 import {
   createPlayResolver,
-  ensureStarterMiningState,
+  ensurePlayProvisioning,
   stateFromTransaction,
-  type MiningGameplayState,
-} from "@/server/mining";
+  type PlayGameplayState,
+} from "@/server/play";
 
 export type CargoHoldMaterialContributionRequest = {
   expectedRefinedFerrite: number;
@@ -93,7 +93,7 @@ export type CargoHoldTransferStatus =
   | CargoHoldRefusal;
 
 export type CargoHoldStateResult<T> = {
-  state: MiningGameplayState;
+  state: PlayGameplayState;
   cargo: T;
 };
 
@@ -172,7 +172,7 @@ async function stateAfterCargoCommand(
   transaction: DatabaseTransaction,
   characterId: string,
   now: Date,
-): Promise<MiningGameplayState> {
+): Promise<PlayGameplayState> {
   return stateFromTransaction(
     transaction,
     characterId,
@@ -234,7 +234,7 @@ export async function contributeCargoHoldMaterials(
     characterId,
     createPlayResolver(random),
     async (transaction, context) => {
-      await ensureStarterMiningState(transaction, context.character.id);
+      await ensurePlayProvisioning(transaction, context.character.id);
       const balance = getEffectiveGameBalance();
       const repair = await loadRepair(transaction, context.character.id);
       const access = await accessRefusal(
@@ -348,7 +348,7 @@ export async function depositCargoStack(
     characterId,
     createPlayResolver(random),
     async (transaction, context) => {
-      await ensureStarterMiningState(transaction, context.character.id);
+      await ensurePlayProvisioning(transaction, context.character.id);
       const { access } = await cargoStackAccess(transaction, context.character.id, context.action);
       if (access)
         return {
@@ -459,7 +459,7 @@ export async function withdrawCargoStack(
     characterId,
     createPlayResolver(random),
     async (transaction, context) => {
-      await ensureStarterMiningState(transaction, context.character.id);
+      await ensurePlayProvisioning(transaction, context.character.id);
       const { access } = await cargoStackAccess(transaction, context.character.id, context.action);
       if (access)
         return {
@@ -552,7 +552,7 @@ export async function depositCargoUniqueItem(
     characterId,
     createPlayResolver(random),
     async (transaction, context) => {
-      await ensureStarterMiningState(transaction, context.character.id);
+      await ensurePlayProvisioning(transaction, context.character.id);
       const { access } = await cargoStackAccess(transaction, context.character.id, context.action);
       if (access)
         return {
@@ -633,7 +633,7 @@ export async function withdrawCargoUniqueItem(
     characterId,
     createPlayResolver(random),
     async (transaction, context) => {
-      await ensureStarterMiningState(transaction, context.character.id);
+      await ensurePlayProvisioning(transaction, context.character.id);
       const { access } = await cargoStackAccess(transaction, context.character.id, context.action);
       if (access)
         return {
@@ -703,13 +703,13 @@ export async function startCargoHoldWelding(
     nextBasisPoints: () => 0,
     nextUnit: () => 0,
   },
-): Promise<MiningGameplayState> {
+): Promise<PlayGameplayState> {
   return withResolvedOwnedCharacter(
     userId,
     characterId,
     createPlayResolver(random),
     async (transaction, context) => {
-      await ensureStarterMiningState(transaction, context.character.id);
+      await ensurePlayProvisioning(transaction, context.character.id);
       const balance = getEffectiveGameBalance();
       const repair = await loadRepair(transaction, context.character.id);
       if (context.action?.actionId === ACTION_IDS.cargoHoldWelding) {
@@ -806,13 +806,13 @@ export async function stopCargoHoldWelding(
     nextBasisPoints: () => 0,
     nextUnit: () => 0,
   },
-): Promise<MiningGameplayState> {
+): Promise<PlayGameplayState> {
   return withResolvedOwnedCharacter(
     userId,
     characterId,
     createPlayResolver(random),
     async (transaction, context) => {
-      await ensureStarterMiningState(transaction, context.character.id);
+      await ensurePlayProvisioning(transaction, context.character.id);
       if (context.action?.actionId === ACTION_IDS.cargoHoldWelding) {
         await transaction
           .delete(activeActions)

@@ -9,10 +9,10 @@ import { StatusMeter } from "@/components/ui/StatusMeter";
 import { getEffectiveGameBalance } from "@/game/config/balance";
 import { ACTION_IDS, GAME_TICK_MS, ITEM_IDS } from "@/game/config/foundations";
 import { deriveQuestGuidanceTargets } from "@/game/domain/missions";
-import type { RefiningRunAttempt } from "@/server/mining";
-import { refreshMiningAction, startRefiningAction, stopRefiningAction } from "@/server/actions";
+import type { RefiningRunAttempt } from "@/server/refining";
+import { refreshPlayAction, startRefiningAction, stopRefiningAction } from "@/server/actions";
 import { reportClientDiagnostic } from "@/features/diagnostics/client";
-import { useMiningPlay } from "@/features/mining/MiningPlayContext";
+import { usePlay } from "@/features/play/PlayContext";
 
 const RESULT_FEEDBACK_DURATION_MS = 3_600;
 
@@ -22,7 +22,7 @@ function percentage(bps: number) {
 
 function refiningStopMessage(
   reason: Extract<
-    import("@/server/mining").ActivityStop,
+    import("@/server/play").ActivityStop,
     { actionId: typeof ACTION_IDS.refining }
   >["reason"],
 ): string {
@@ -86,7 +86,7 @@ export function RefiningConsole() {
     setRefreshCallback,
     acceptState,
     state,
-  } = useMiningPlay();
+  } = usePlay();
   const refining = state.refining;
   const refiningRun = state.refiningRun;
   const [message, setMessage] = useState<string | undefined>(
@@ -117,7 +117,7 @@ export function RefiningConsole() {
     ? Math.max(0, (new Date(active.nextAttemptAt).getTime() - now) / 1_000)
     : 0;
 
-  function apply(result: Awaited<ReturnType<typeof refreshMiningAction>>) {
+  function apply(result: Awaited<ReturnType<typeof refreshPlayAction>>) {
     if (result.error) {
       setMessage(result.error);
       return;
@@ -135,7 +135,7 @@ export function RefiningConsole() {
 
   function runForeground(
     intent: "start" | "stop" | "refresh",
-    action: (id: string) => ReturnType<typeof refreshMiningAction>,
+    action: (id: string) => ReturnType<typeof refreshPlayAction>,
   ) {
     enqueueForeground(() => {
       setPendingCommand(intent);
@@ -143,7 +143,7 @@ export function RefiningConsole() {
     });
   }
 
-  function executeCommand(action: (id: string) => ReturnType<typeof refreshMiningAction>) {
+  function executeCommand(action: (id: string) => ReturnType<typeof refreshPlayAction>) {
     setRecovery(undefined);
     startTransition(async () => {
       try {
@@ -151,7 +151,7 @@ export function RefiningConsole() {
       } catch (error) {
         reportClientDiagnostic("mining-command", error, { miningActive: Boolean(active) });
         setMessage("Comms interruption. Refining status could not be confirmed.");
-        setRecovery(() => () => command(refreshMiningAction));
+        setRecovery(() => () => command(refreshPlayAction));
       } finally {
         releaseCommand();
         setPendingCommand(undefined);
@@ -160,7 +160,7 @@ export function RefiningConsole() {
   }
 
   function command(
-    action: (id: string) => ReturnType<typeof refreshMiningAction>,
+    action: (id: string) => ReturnType<typeof refreshPlayAction>,
     opts?: { background?: boolean },
   ) {
     if (!acquireCommand(opts)) return;
@@ -168,7 +168,7 @@ export function RefiningConsole() {
   }
 
   useEffect(() => {
-    setRefreshCallback((opts?: { background?: boolean }) => command(refreshMiningAction, opts));
+    setRefreshCallback((opts?: { background?: boolean }) => command(refreshPlayAction, opts));
   });
 
   useEffect(() => {
@@ -233,7 +233,7 @@ export function RefiningConsole() {
           intent="secondary"
           disabled={foregroundBusy}
           loading={foregroundBusy && pendingCommand === "refresh"}
-          onClick={() => runForeground("refresh", refreshMiningAction)}
+          onClick={() => runForeground("refresh", refreshPlayAction)}
         >
           Refresh status
         </ActionButton>

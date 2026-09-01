@@ -12,7 +12,8 @@ suite("issue #40 persistent locations and timed travel (real PostgreSQL)", () =>
   let rune: typeof import("@/db/rune-space");
   let ownership: typeof import("@/server/ownership");
   let characters: typeof import("@/server/characters");
-  let mining: typeof import("@/server/mining");
+  let play: typeof import("@/server/play");
+  let miningCommands: typeof import("@/server/mining-commands");
   let resolution: typeof import("@/server/action-resolution");
   const createdUsers: string[] = [];
 
@@ -22,7 +23,8 @@ suite("issue #40 persistent locations and timed travel (real PostgreSQL)", () =>
     rune = await import("@/db/rune-space");
     ownership = await import("@/server/ownership");
     characters = await import("@/server/characters");
-    mining = await import("@/server/mining");
+    play = await import("@/server/play");
+    miningCommands = await import("@/server/mining-commands");
     resolution = await import("@/server/action-resolution");
   });
 
@@ -64,14 +66,14 @@ suite("issue #40 persistent locations and timed travel (real PostgreSQL)", () =>
     const { character } = await makeCharacter();
     const outsider = await makeCharacter();
     await expect(
-      mining.beginTravel(outsider.userId, character.id, LOCATION_IDS.abandonedProcessingYard),
+      play.beginTravel(outsider.userId, character.id, LOCATION_IDS.abandonedProcessingYard),
     ).rejects.toThrow(/not found/i);
   });
 
   it("begins travel from the Crash Site while idle and keeps the origin until arrival", async () => {
     const { userId, character } = await makeCharacter();
     const startedAt = new Date("2026-01-01T00:00:00.000Z");
-    const state = await mining.beginTravel(
+    const state = await play.beginTravel(
       userId,
       character.id,
       LOCATION_IDS.abandonedProcessingYard,
@@ -102,15 +104,15 @@ suite("issue #40 persistent locations and timed travel (real PostgreSQL)", () =>
     const { userId, character } = await makeCharacter();
     const startedAt = new Date("2026-01-01T00:00:00.000Z");
     const random = { nextBasisPoints: () => 0, nextUnit: () => 0 };
-    await mining.getMiningGameplayState(userId, character.id, startedAt, random);
+    await play.getPlayGameplayState(userId, character.id, startedAt, random);
     await db
       .update(rune.characters)
       .set({ currentLocationId: LOCATION_IDS.theJag })
       .where(eq(rune.characters.id, character.id));
-    await mining.startFerriteShaleMining(userId, character.id, startedAt, random);
+    await miningCommands.startFerriteShaleMining(userId, character.id, startedAt, random);
 
     const completedAt = new Date("2026-01-01T00:00:06.600Z");
-    const traveled = await mining.beginTravel(
+    const traveled = await play.beginTravel(
       userId,
       character.id,
       LOCATION_IDS.theLongScramble,
@@ -133,7 +135,7 @@ suite("issue #40 persistent locations and timed travel (real PostgreSQL)", () =>
 
     // No Mining reward is earned during the Travel interval.
     const arriveAt = new Date("2026-01-01T00:00:40.000Z");
-    const afterTravel = await mining.getMiningGameplayState(userId, character.id, arriveAt, random);
+    const afterTravel = await play.getPlayGameplayState(userId, character.id, arriveAt, random);
     expect(afterTravel.run).toMatchObject({
       attempts: 1,
       successes: 1,
@@ -146,10 +148,10 @@ suite("issue #40 persistent locations and timed travel (real PostgreSQL)", () =>
   it("survives partial travel progress across a refresh and arrives exactly once", async () => {
     const { userId, character } = await makeCharacter();
     const startedAt = new Date("2026-01-01T00:00:00.000Z");
-    await mining.beginTravel(userId, character.id, LOCATION_IDS.abandonedProcessingYard, startedAt);
+    await play.beginTravel(userId, character.id, LOCATION_IDS.abandonedProcessingYard, startedAt);
 
     // 12 seconds into a 24-second journey: not yet arrived.
-    const partial = await mining.getMiningGameplayState(
+    const partial = await play.getPlayGameplayState(
       userId,
       character.id,
       new Date("2026-01-01T00:00:12.000Z"),
@@ -158,7 +160,7 @@ suite("issue #40 persistent locations and timed travel (real PostgreSQL)", () =>
     expect(partial.location.currentLocationId).toBe(LOCATION_IDS.crashSite);
 
     // Resolve the full journey: location flips once, travel state cleared.
-    const arrived = await mining.getMiningGameplayState(
+    const arrived = await play.getPlayGameplayState(
       userId,
       character.id,
       new Date("2026-01-01T00:00:24.600Z"),
@@ -177,7 +179,7 @@ suite("issue #40 persistent locations and timed travel (real PostgreSQL)", () =>
     expect(actions).toHaveLength(0);
 
     // A repeat refresh must not move the character again or duplicate arrival.
-    const repeat = await mining.getMiningGameplayState(
+    const repeat = await play.getPlayGameplayState(
       userId,
       character.id,
       new Date("2026-01-01T01:00:00.000Z"),
@@ -188,12 +190,12 @@ suite("issue #40 persistent locations and timed travel (real PostgreSQL)", () =>
   it("refuses concurrent duplicate journeys and resolves arrival exactly once", async () => {
     const { userId, character } = await makeCharacter();
     const startedAt = new Date("2026-01-01T00:00:00.000Z");
-    await mining.beginTravel(userId, character.id, LOCATION_IDS.abandonedProcessingYard, startedAt);
+    await play.beginTravel(userId, character.id, LOCATION_IDS.abandonedProcessingYard, startedAt);
 
     const arriveAt = new Date("2026-01-01T00:00:24.600Z");
     const [first, second] = await Promise.all([
-      mining.getMiningGameplayState(userId, character.id, arriveAt),
-      mining.getMiningGameplayState(userId, character.id, arriveAt),
+      play.getPlayGameplayState(userId, character.id, arriveAt),
+      play.getPlayGameplayState(userId, character.id, arriveAt),
     ]);
     expect(first.location.currentLocationId).toBe(LOCATION_IDS.abandonedProcessingYard);
     expect(second.location.currentLocationId).toBe(LOCATION_IDS.abandonedProcessingYard);
@@ -207,7 +209,7 @@ suite("issue #40 persistent locations and timed travel (real PostgreSQL)", () =>
   it("rejects invalid destinations and failed transactions preserve prior state", async () => {
     const { userId, character } = await makeCharacter();
     const startedAt = new Date("2026-01-01T00:00:00.000Z");
-    const sameLocation = await mining.beginTravel(
+    const sameLocation = await play.beginTravel(
       userId,
       character.id,
       LOCATION_IDS.crashSite,
@@ -229,9 +231,9 @@ suite("issue #40 persistent locations and timed travel (real PostgreSQL)", () =>
   it("blocks Mining while in transit or away from The Jag", async () => {
     const { userId, character } = await makeCharacter();
     const startedAt = new Date("2026-01-01T00:00:00.000Z");
-    await mining.beginTravel(userId, character.id, LOCATION_IDS.abandonedProcessingYard, startedAt);
+    await play.beginTravel(userId, character.id, LOCATION_IDS.abandonedProcessingYard, startedAt);
 
-    const transitMining = await mining.startFerriteShaleMining(
+    const transitMining = await miningCommands.startFerriteShaleMining(
       userId,
       character.id,
       new Date("2026-01-01T00:00:06.000Z"),
@@ -239,7 +241,7 @@ suite("issue #40 persistent locations and timed travel (real PostgreSQL)", () =>
     // An active travel action blocks Mining server-side (no manipulated client can bypass).
     expect(transitMining.commandError).toBe("another_action_active");
     // The travel action remains authoritative; getMiningGameplayState reports it.
-    const transitView = await mining.getMiningGameplayState(
+    const transitView = await play.getPlayGameplayState(
       userId,
       character.id,
       new Date("2026-01-01T00:00:06.000Z"),
@@ -250,8 +252,8 @@ suite("issue #40 persistent locations and timed travel (real PostgreSQL)", () =>
     expect(transitView.activeAction).toBeUndefined();
 
     // After arrival at the Processing Yard, Mining still cannot start there.
-    await mining.getMiningGameplayState(userId, character.id, new Date("2026-01-01T00:00:24.600Z"));
-    const yardMining = await mining.startFerriteShaleMining(
+    await play.getPlayGameplayState(userId, character.id, new Date("2026-01-01T00:00:24.600Z"));
+    const yardMining = await miningCommands.startFerriteShaleMining(
       userId,
       character.id,
       new Date("2026-01-01T00:00:30.000Z"),
@@ -263,7 +265,7 @@ suite("issue #40 persistent locations and timed travel (real PostgreSQL)", () =>
   it("refuses a manipulated/stale destination that is not adjacent or unknown", async () => {
     const { userId, character } = await makeCharacter();
     const startedAt = new Date("2026-01-01T00:00:00.000Z");
-    const unknown = await mining.beginTravel(userId, character.id, "deep_void", startedAt);
+    const unknown = await play.beginTravel(userId, character.id, "deep_void", startedAt);
     expect(unknown.travelError).toBe("unknown_destination");
   });
 
@@ -277,7 +279,7 @@ suite("issue #40 persistent locations and timed travel (real PostgreSQL)", () =>
       startedAt,
       resolvedThroughAt: startedAt,
     });
-    const result = await mining.beginTravel(
+    const result = await play.beginTravel(
       userId,
       character.id,
       LOCATION_IDS.abandonedProcessingYard,
@@ -309,7 +311,7 @@ suite("issue #40 persistent locations and timed travel (real PostgreSQL)", () =>
   it("rejects arrival when the persisted travel row is missing", async () => {
     const { userId, character } = await makeCharacter();
     const startedAt = new Date("2026-01-01T00:00:00.000Z");
-    await mining.beginTravel(userId, character.id, LOCATION_IDS.abandonedProcessingYard, startedAt);
+    await play.beginTravel(userId, character.id, LOCATION_IDS.abandonedProcessingYard, startedAt);
     // Delete the travel row to simulate corrupted state.
     await db
       .delete(rune.characterTravelState)
@@ -317,7 +319,7 @@ suite("issue #40 persistent locations and timed travel (real PostgreSQL)", () =>
     // Resolving arrival must fail with an integrity error; the action and
     // location remain intact.
     await expect(
-      mining.getMiningGameplayState(userId, character.id, new Date("2026-01-01T00:00:24.600Z")),
+      play.getPlayGameplayState(userId, character.id, new Date("2026-01-01T00:00:24.600Z")),
     ).rejects.toThrow(/travel state row/);
     const actions = await db
       .select()
@@ -335,14 +337,14 @@ suite("issue #40 persistent locations and timed travel (real PostgreSQL)", () =>
   it("rejects arrival with an unknown persisted destination", async () => {
     const { userId, character } = await makeCharacter();
     const startedAt = new Date("2026-01-01T00:00:00.000Z");
-    await mining.beginTravel(userId, character.id, LOCATION_IDS.abandonedProcessingYard, startedAt);
+    await play.beginTravel(userId, character.id, LOCATION_IDS.abandonedProcessingYard, startedAt);
     // Corrupt the travel row with an unknown destination.
     await db
       .update(rune.characterTravelState)
       .set({ destinationLocationId: "deep_void" })
       .where(eq(rune.characterTravelState.characterId, character.id));
     await expect(
-      mining.getMiningGameplayState(userId, character.id, new Date("2026-01-01T00:00:24.600Z")),
+      play.getPlayGameplayState(userId, character.id, new Date("2026-01-01T00:00:24.600Z")),
     ).rejects.toThrow(/Unknown persisted destination/);
     const actions = await db
       .select()
@@ -360,7 +362,7 @@ suite("issue #40 persistent locations and timed travel (real PostgreSQL)", () =>
   it("rejects arrival when the stored origin differs from the character location", async () => {
     const { userId, character } = await makeCharacter();
     const startedAt = new Date("2026-01-01T00:00:00.000Z");
-    await mining.beginTravel(userId, character.id, LOCATION_IDS.abandonedProcessingYard, startedAt);
+    await play.beginTravel(userId, character.id, LOCATION_IDS.abandonedProcessingYard, startedAt);
     // Corrupt: set origin to a string that differs from the character's
     // authoritative current location (crash_site) but still satisfies the
     // DB CHECK (origin ≠ destination).
@@ -369,7 +371,7 @@ suite("issue #40 persistent locations and timed travel (real PostgreSQL)", () =>
       .set({ originLocationId: "alien_landing_zone" })
       .where(eq(rune.characterTravelState.characterId, character.id));
     await expect(
-      mining.getMiningGameplayState(userId, character.id, new Date("2026-01-01T00:00:24.600Z")),
+      play.getPlayGameplayState(userId, character.id, new Date("2026-01-01T00:00:24.600Z")),
     ).rejects.toThrow(/Unknown persisted origin/);
     const actions = await db
       .select()
@@ -387,7 +389,7 @@ suite("issue #40 persistent locations and timed travel (real PostgreSQL)", () =>
   it("rejects arrival when the stored origin is known but does not match the character location", async () => {
     const { userId, character } = await makeCharacter();
     const startedAt = new Date("2026-01-01T00:00:00.000Z");
-    await mining.beginTravel(userId, character.id, LOCATION_IDS.abandonedProcessingYard, startedAt);
+    await play.beginTravel(userId, character.id, LOCATION_IDS.abandonedProcessingYard, startedAt);
     // The travel row stores origin=crash_site, destination=abandoned_processing_yard.
     // Simulate corruption: directly set the character's current location to the
     // Processing Yard so it no longer matches the stored origin.
@@ -396,7 +398,7 @@ suite("issue #40 persistent locations and timed travel (real PostgreSQL)", () =>
       .set({ currentLocationId: LOCATION_IDS.abandonedProcessingYard })
       .where(eq(rune.characters.id, character.id));
     await expect(
-      mining.getMiningGameplayState(userId, character.id, new Date("2026-01-01T00:00:24.600Z")),
+      play.getPlayGameplayState(userId, character.id, new Date("2026-01-01T00:00:24.600Z")),
     ).rejects.toThrow(/does not match stored travel origin/);
     const actions = await db
       .select()
@@ -418,53 +420,53 @@ suite("issue #40 persistent locations and timed travel (real PostgreSQL)", () =>
   it("rejects a direct Crash Site to The Jag shortcut and enforces the two-leg route", async () => {
     const { userId, character } = await makeCharacter();
     const startedAt = new Date("2026-01-01T00:00:00.000Z");
-    const direct = await mining.beginTravel(userId, character.id, LOCATION_IDS.theJag, startedAt);
+    const direct = await play.beginTravel(userId, character.id, LOCATION_IDS.theJag, startedAt);
     expect(direct.travelError).toBe("not_adjacent");
     expect(direct.location.currentLocationId).toBe(LOCATION_IDS.crashSite);
 
-    const toScramble = await mining.beginTravel(
+    const toScramble = await play.beginTravel(
       userId,
       character.id,
       LOCATION_IDS.theLongScramble,
       startedAt,
     );
     expect(toScramble.travelState?.destinationLocationId).toBe(LOCATION_IDS.theLongScramble);
-    const atScramble = await mining.getMiningGameplayState(
+    const atScramble = await play.getPlayGameplayState(
       userId,
       character.id,
       new Date("2026-01-01T00:00:24.600Z"),
     );
     expect(atScramble.location.currentLocationId).toBe(LOCATION_IDS.theLongScramble);
 
-    const toJag = await mining.beginTravel(
+    const toJag = await play.beginTravel(
       userId,
       character.id,
       LOCATION_IDS.theJag,
       new Date("2026-01-01T00:00:24.600Z"),
     );
     expect(toJag.travelState?.destinationLocationId).toBe(LOCATION_IDS.theJag);
-    const atJag = await mining.getMiningGameplayState(
+    const atJag = await play.getPlayGameplayState(
       userId,
       character.id,
       new Date("2026-01-01T00:00:49.200Z"),
     );
     expect(atJag.location.currentLocationId).toBe(LOCATION_IDS.theJag);
 
-    const backToScramble = await mining.beginTravel(
+    const backToScramble = await play.beginTravel(
       userId,
       character.id,
       LOCATION_IDS.theLongScramble,
       new Date("2026-01-01T00:00:49.200Z"),
     );
     expect(backToScramble.travelState?.destinationLocationId).toBe(LOCATION_IDS.theLongScramble);
-    const back = await mining.getMiningGameplayState(
+    const back = await play.getPlayGameplayState(
       userId,
       character.id,
       new Date("2026-01-01T00:01:13.800Z"),
     );
     expect(back.location.currentLocationId).toBe(LOCATION_IDS.theLongScramble);
 
-    const jagDirect = await mining.beginTravel(
+    const jagDirect = await play.beginTravel(
       userId,
       character.id,
       LOCATION_IDS.crashSite,
@@ -476,38 +478,38 @@ suite("issue #40 persistent locations and timed travel (real PostgreSQL)", () =>
   it("rejects Mining at Crash Site and The Long Scramble, accepts only at The Jag", async () => {
     const { userId, character } = await makeCharacter();
     const now = new Date("2026-01-01T00:00:00.000Z");
-    await mining.getMiningGameplayState(userId, character.id, now);
+    await play.getPlayGameplayState(userId, character.id, now);
 
-    const atCrash = await mining.startFerriteShaleMining(userId, character.id, now);
+    const atCrash = await miningCommands.startFerriteShaleMining(userId, character.id, now);
     expect(atCrash.travelError).toBe("mining_unavailable_here");
 
-    await mining.beginTravel(userId, character.id, LOCATION_IDS.theLongScramble, now);
-    const atScramble = await mining.getMiningGameplayState(
+    await play.beginTravel(userId, character.id, LOCATION_IDS.theLongScramble, now);
+    const atScramble = await play.getPlayGameplayState(
       userId,
       character.id,
       new Date("2026-01-01T00:00:24.600Z"),
     );
     expect(atScramble.location.currentLocationId).toBe(LOCATION_IDS.theLongScramble);
-    const scrambleMining = await mining.startFerriteShaleMining(
+    const scrambleMining = await miningCommands.startFerriteShaleMining(
       userId,
       character.id,
       new Date("2026-01-01T00:00:24.600Z"),
     );
     expect(scrambleMining.travelError).toBe("mining_unavailable_here");
 
-    await mining.beginTravel(
+    await play.beginTravel(
       userId,
       character.id,
       LOCATION_IDS.theJag,
       new Date("2026-01-01T00:00:24.600Z"),
     );
-    const atJag = await mining.getMiningGameplayState(
+    const atJag = await play.getPlayGameplayState(
       userId,
       character.id,
       new Date("2026-01-01T00:00:49.200Z"),
     );
     expect(atJag.location.currentLocationId).toBe(LOCATION_IDS.theJag);
-    const jagMining = await mining.startFerriteShaleMining(
+    const jagMining = await miningCommands.startFerriteShaleMining(
       userId,
       character.id,
       new Date("2026-01-01T00:00:49.200Z"),
@@ -524,38 +526,38 @@ suite("issue #40 persistent locations and timed travel (real PostgreSQL)", () =>
       .set({ currentLocationId: LOCATION_IDS.emergencyPowerAnnex })
       .where(eq(rune.characters.id, character.id));
 
-    const direct = await mining.beginTravel(userId, character.id, LOCATION_IDS.theJag, t0);
+    const direct = await play.beginTravel(userId, character.id, LOCATION_IDS.theJag, t0);
     expect(direct.travelError).toBe("not_adjacent");
 
-    const toCrash = await mining.beginTravel(userId, character.id, LOCATION_IDS.crashSite, t0);
+    const toCrash = await play.beginTravel(userId, character.id, LOCATION_IDS.crashSite, t0);
     expect(toCrash.travelState?.destinationLocationId).toBe(LOCATION_IDS.crashSite);
-    const atCrash = await mining.getMiningGameplayState(
+    const atCrash = await play.getPlayGameplayState(
       userId,
       character.id,
       new Date("2026-01-01T00:00:24.600Z"),
     );
     expect(atCrash.location.currentLocationId).toBe(LOCATION_IDS.crashSite);
 
-    await mining.beginTravel(
+    await play.beginTravel(
       userId,
       character.id,
       LOCATION_IDS.theLongScramble,
       new Date("2026-01-01T00:00:24.600Z"),
     );
-    const atScramble = await mining.getMiningGameplayState(
+    const atScramble = await play.getPlayGameplayState(
       userId,
       character.id,
       new Date("2026-01-01T00:00:49.200Z"),
     );
     expect(atScramble.location.currentLocationId).toBe(LOCATION_IDS.theLongScramble);
 
-    await mining.beginTravel(
+    await play.beginTravel(
       userId,
       character.id,
       LOCATION_IDS.theJag,
       new Date("2026-01-01T00:00:49.200Z"),
     );
-    const atJag = await mining.getMiningGameplayState(
+    const atJag = await play.getPlayGameplayState(
       userId,
       character.id,
       new Date("2026-01-01T00:01:13.800Z"),

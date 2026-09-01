@@ -12,7 +12,7 @@ suite("issue #102 Walk It Off persistence and reward boundary (real PostgreSQL)"
   let rune: typeof import("@/db/rune-space");
   let ownership: typeof import("@/server/ownership");
   let characters: typeof import("@/server/characters");
-  let mining: typeof import("@/server/mining");
+  let play: typeof import("@/server/play");
   let missions: typeof import("@/server/missions");
   const createdUsers: string[] = [];
   const now = new Date("2026-01-01T00:00:00.000Z");
@@ -23,7 +23,7 @@ suite("issue #102 Walk It Off persistence and reward boundary (real PostgreSQL)"
     rune = await import("@/db/rune-space");
     ownership = await import("@/server/ownership");
     characters = await import("@/server/characters");
-    mining = await import("@/server/mining");
+    play = await import("@/server/play");
     missions = await import("@/server/missions");
   });
 
@@ -45,7 +45,7 @@ suite("issue #102 Walk It Off persistence and reward boundary (real PostgreSQL)"
       undefined,
       { seedLegacyStarterCutter: false },
     );
-    await mining.getMiningGameplayState(userId, character.id, now, deterministicRandom());
+    await play.getPlayGameplayState(userId, character.id, now, deterministicRandom());
     return { userId, character };
   }
 
@@ -100,12 +100,7 @@ suite("issue #102 Walk It Off persistence and reward boundary (real PostgreSQL)"
     expect(instances.filter((row) => row.itemId === ITEM_IDS.mykeaSchleppraum8)).toHaveLength(1);
     expect(assignments).toHaveLength(1);
     expect(assignments[0]?.assignmentKind).toBe("container");
-    const state = await mining.getMiningGameplayState(
-      userId,
-      character.id,
-      now,
-      deterministicRandom(),
-    );
+    const state = await play.getPlayGameplayState(userId, character.id, now, deterministicRandom());
     expect(state.equipment.salvageCutter).toBeUndefined();
     expect(state.inventory.uniqueItems.map((item) => item.itemId)).toEqual([]);
   });
@@ -157,7 +152,7 @@ suite("issue #102 Walk It Off persistence and reward boundary (real PostgreSQL)"
     const { userId, character } = await makeCharacter();
     await acceptAtCrash(userId, character.id);
     await move(character.id, LOCATION_IDS.theJag);
-    const arrived = await mining.getMiningGameplayState(
+    const arrived = await play.getPlayGameplayState(
       userId,
       character.id,
       now,

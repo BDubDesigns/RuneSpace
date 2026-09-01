@@ -1,20 +1,20 @@
 import { describe, expect, it } from "vitest";
 import { getEffectiveGameBalance } from "@/game/config/balance";
 import { ITEM_IDS } from "@/game/config/foundations";
-import type { MiningGameplayState } from "@/server/mining";
+import type { PlayGameplayState } from "@/server/play";
 import {
   deriveInventoryEquipAvailability,
   derivePowerCellLoadAvailability,
   resolveInventorySelection,
   stackDropActions,
   toggleInventorySelection,
-} from "@/features/mining/inventory-selection";
+} from "@/features/inventory/inventory-selection";
 import { DiscardInventoryStackRequestSchema } from "@/game/schemas/gameplay";
 
 function inventoryState(
-  stacks: MiningGameplayState["inventory"]["stacks"] = [],
-  uniqueItems: MiningGameplayState["inventory"]["uniqueItems"] = [],
-): MiningGameplayState["inventory"] {
+  stacks: PlayGameplayState["inventory"]["stacks"] = [],
+  uniqueItems: PlayGameplayState["inventory"]["uniqueItems"] = [],
+): PlayGameplayState["inventory"] {
   return {
     slotsUsed: stacks.length + uniqueItems.length,
     slotsAvailable: 8 - stacks.length - uniqueItems.length,
@@ -25,7 +25,7 @@ function inventoryState(
   };
 }
 
-function baseState(inventory: MiningGameplayState["inventory"]): MiningGameplayState {
+function baseState(inventory: PlayGameplayState["inventory"]): PlayGameplayState {
   return {
     characterId: "character-1",
     missions: [],
@@ -205,7 +205,7 @@ describe("selection toggling", () => {
 
 describe("Power Cell load availability", () => {
   function stateWith(overrides: {
-    cutter?: MiningGameplayState["equipment"]["salvageCutter"];
+    cutter?: PlayGameplayState["equipment"]["salvageCutter"];
     carriedPowerCellQuantity?: number;
   }) {
     const inventory = inventoryState([powerCellStack], []);
@@ -370,7 +370,7 @@ describe("inventory equip availability", () => {
    * server transaction does. This is the boundary the client must trust
    * rather than re-deriving compatibility from the item id.
    */
-  function stateWith(carriedCutterId: string, busy = false): MiningGameplayState {
+  function stateWith(carriedCutterId: string, busy = false): PlayGameplayState {
     const inventory = inventoryState([], [{ ...carriedCutter, id: carriedCutterId }]);
     const state = baseState(inventory);
     state.equipment.slots = [

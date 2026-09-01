@@ -10,10 +10,10 @@ import { getEffectiveGameBalance } from "@/game/config/balance";
 import { GAME_TICK_MS } from "@/game/config/foundations";
 import { formatMassGrams } from "@/game/domain/mass";
 import { deriveQuestGuidanceTargets } from "@/game/domain/missions";
-import type { MiningGameplayState } from "@/server/mining";
+import type { PlayGameplayState } from "@/server/play";
 import { useEquipCommand } from "./useEquipCommand";
-import { useLoadPowerCell } from "./useLoadPowerCell";
-import { useMiningPlay } from "./MiningPlayContext";
+import { useLoadPowerCell } from "@/features/mining/useLoadPowerCell";
+import { usePlay } from "@/features/play/PlayContext";
 
 function secondsForTicks(ticks: number) {
   return (ticks * GAME_TICK_MS) / 1_000;
@@ -24,11 +24,11 @@ export function EquipmentPanel({
   onClose,
   triggerRef,
 }: {
-  state: MiningGameplayState;
+  state: PlayGameplayState;
   onClose: () => void;
   triggerRef: RefObject<HTMLButtonElement | null>;
 }) {
-  const { foregroundBusy } = useMiningPlay();
+  const { foregroundBusy } = usePlay();
   const [message, setMessage] = useState<string>();
   const [messageTone, setMessageTone] = useState<"muted" | "danger">("muted");
   const { busy: loadBusy, loadPowerCell } = useLoadPowerCell((feedback) => {

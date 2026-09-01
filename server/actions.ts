@@ -5,18 +5,19 @@ import { redirect } from "next/navigation";
 import { ensurePlayerAccount, requireCurrentUser, OwnershipError } from "@/server/ownership";
 import { createCharacter, changeCharacterPortrait, CharacterError } from "@/server/characters";
 import {
+  getPlayGameplayState,
   beginTravel,
   claimScavenge,
   acknowledgeScavengeReveal,
-  getMiningGameplayState,
+  type PlayGameplayState,
+} from "@/server/play";
+import {
   startFerriteShaleMining,
-  startRefining,
   stopMining,
-  stopRefining,
   loadSalvageCutterPowerCell,
   type LoadPowerCellResult,
-  type MiningGameplayState,
-} from "@/server/mining";
+} from "@/server/mining-commands";
+import { startRefining, stopRefining } from "@/server/refining-commands";
 import { changeEquipment } from "@/server/equipment";
 import { discardInventoryStack, type DiscardInventoryStackResult } from "@/server/inventory";
 import {
@@ -115,12 +116,12 @@ export async function changeCharacterPortraitAction(
   }
 }
 
-export type MiningActionResult = { state?: MiningGameplayState; error?: string };
+export type PlayActionResult = { state?: PlayGameplayState; error?: string };
 
-async function runMiningAction(
+async function runPlayAction(
   characterId: string,
-  command: (userId: string, id: string) => Promise<MiningGameplayState>,
-): Promise<MiningActionResult> {
+  command: (userId: string, id: string) => Promise<PlayGameplayState>,
+): Promise<PlayActionResult> {
   try {
     const user = await requireCurrentUser(await headers());
     return { state: await command(user.id, characterId) };
@@ -131,8 +132,8 @@ async function runMiningAction(
   }
 }
 
-export async function refreshMiningAction(characterId: string): Promise<MiningActionResult> {
-  return runMiningAction(characterId, getMiningGameplayState);
+export async function refreshPlayAction(characterId: string): Promise<PlayActionResult> {
+  return runPlayAction(characterId, getPlayGameplayState);
 }
 
 export type MissionActionResult =
@@ -184,28 +185,28 @@ export async function completeMissionAction(input: unknown): Promise<MissionActi
   }
 }
 
-export async function startMiningAction(characterId: string): Promise<MiningActionResult> {
-  return runMiningAction(characterId, startFerriteShaleMining);
+export async function startMiningAction(characterId: string): Promise<PlayActionResult> {
+  return runPlayAction(characterId, startFerriteShaleMining);
 }
 
-export async function stopMiningAction(characterId: string): Promise<MiningActionResult> {
-  return runMiningAction(characterId, stopMining);
+export async function stopMiningAction(characterId: string): Promise<PlayActionResult> {
+  return runPlayAction(characterId, stopMining);
 }
 
-export async function startRefiningAction(characterId: string): Promise<MiningActionResult> {
-  return runMiningAction(characterId, startRefining);
+export async function startRefiningAction(characterId: string): Promise<PlayActionResult> {
+  return runPlayAction(characterId, startRefining);
 }
 
-export async function stopRefiningAction(characterId: string): Promise<MiningActionResult> {
-  return runMiningAction(characterId, stopRefining);
+export async function stopRefiningAction(characterId: string): Promise<PlayActionResult> {
+  return runPlayAction(characterId, stopRefining);
 }
 
-export async function startWeldingAction(characterId: string): Promise<MiningActionResult> {
-  return runMiningAction(characterId, startCargoHoldWelding);
+export async function startWeldingAction(characterId: string): Promise<PlayActionResult> {
+  return runPlayAction(characterId, startCargoHoldWelding);
 }
 
-export async function stopWeldingAction(characterId: string): Promise<MiningActionResult> {
-  return runMiningAction(characterId, stopCargoHoldWelding);
+export async function stopWeldingAction(characterId: string): Promise<PlayActionResult> {
+  return runPlayAction(characterId, stopCargoHoldWelding);
 }
 
 export type CargoHoldMaterialContributionActionResult =
@@ -336,7 +337,7 @@ export async function discardInventoryStackAction(
   }
 }
 
-export async function beginTravelAction(input: unknown): Promise<MiningActionResult> {
+export async function beginTravelAction(input: unknown): Promise<PlayActionResult> {
   const request = BeginTravelRequestSchema.safeParse(input);
   if (!request.success) return { error: "Invalid travel command." };
   try {
@@ -403,7 +404,7 @@ type EquipmentActionRequest = {
 async function runEquipmentAction(
   request: EquipmentActionRequest,
   change: (request: EquipmentActionRequest) => Parameters<typeof changeEquipment>[2],
-): Promise<MiningActionResult> {
+): Promise<PlayActionResult> {
   try {
     const user = await requireCurrentUser(await headers());
     return {
@@ -416,7 +417,7 @@ async function runEquipmentAction(
   }
 }
 
-export async function equipEquipmentAction(input: unknown): Promise<MiningActionResult> {
+export async function equipEquipmentAction(input: unknown): Promise<PlayActionResult> {
   const request = EquipEquipmentRequestSchema.safeParse(input);
   if (!request.success) return { error: "Invalid equipment command." };
   return runEquipmentAction(request.data, (request) => ({
@@ -426,7 +427,7 @@ export async function equipEquipmentAction(input: unknown): Promise<MiningAction
   }));
 }
 
-export async function unequipEquipmentAction(input: unknown): Promise<MiningActionResult> {
+export async function unequipEquipmentAction(input: unknown): Promise<PlayActionResult> {
   const request = UnequipEquipmentRequestSchema.safeParse(input);
   if (!request.success) return { error: "Invalid equipment command." };
   return runEquipmentAction(request.data, (request) => ({
