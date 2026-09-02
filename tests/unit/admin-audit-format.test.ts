@@ -14,8 +14,14 @@ import {
  * seams write in `server/admin-command-seams.ts`.
  */
 describe("formatAuditSummary", () => {
-  it("formats stop_current_action without a target", () => {
+  it("formats stop_current_action with the stored action id", () => {
     expect(formatAuditSummary("stop_current_action", { actionId: "mining" }, "mining")).toBe(
+      'Stopped the in-progress "mining" action.',
+    );
+  });
+
+  it("formats stop_current_action without inventing an action id", () => {
+    expect(formatAuditSummary("stop_current_action", {}, null)).toBe(
       "Stopped the in-progress action.",
     );
   });
@@ -27,7 +33,7 @@ describe("formatAuditSummary", () => {
         { fromLocationId: "the_jag", toLocationId: "crash_site", interruptedActionId: "mining" },
         "crash_site",
       ),
-    ).toBe("Teleported The Jag → Crash Site (interrupted an in-flight action).");
+    ).toBe('Teleported The Jag → Crash Site (interrupted "mining").');
   });
 
   it("formats teleport_character without an interruption", () => {
@@ -80,19 +86,37 @@ describe("formatAuditSummary", () => {
     ).toBe("Permanently deleted unique Salvage Cutter from carried inventory.");
   });
 
+  it("falls back honestly when a removed unique row lacks the item id", () => {
+    expect(formatAuditSummary("removed_unique_item", { source: "carried" }, "instance-9")).toBe(
+      "Permanently deleted unique item from carried inventory.",
+    );
+  });
+
   it("formats added stackable with human item label from target identity", () => {
     expect(formatAuditSummary("added_stackable_item", { quantity: 10 }, "ferrite_shale")).toBe(
       "Added 10 × Ferrite Shale to carried inventory.",
     );
   });
 
-  it("formats added unique with human item label from details", () => {
+  it("falls back honestly when an added stackable row lacks the target identity", () => {
+    expect(formatAuditSummary("added_stackable_item", { quantity: 3 }, null)).toBe(
+      "Added 3 item(s) to carried inventory.",
+    );
+  });
+
+  it("formats added unique with human item label and stored charge", () => {
     expect(
       formatAuditSummary(
         "added_unique_item",
-        { itemId: "mykea_schleppraum_8", currentCharge: 0 },
+        { itemId: "salvage_cutter", currentCharge: 87 },
         "instance-1",
       ),
+    ).toBe("Added unique Salvage Cutter to carried inventory (charge 87).");
+  });
+
+  it("formats added unique without a stored charge", () => {
+    expect(
+      formatAuditSummary("added_unique_item", { itemId: "mykea_schleppraum_8" }, "instance-1"),
     ).toBe("Added unique MYKEA SCHLEPPRAUM-8 to carried inventory.");
   });
 
@@ -107,6 +131,12 @@ describe("formatAuditSummary", () => {
         "walk_it_off",
       ),
     ).toBe("Reset the mission chain rooted at Walk It Off: cleared 2 row(s).");
+  });
+
+  it("falls back honestly when a chain reset row lacks the mission identity", () => {
+    expect(formatAuditSummary("reset_mission_chain", { deletedMissionIds: ["a"] }, null)).toBe(
+      "Reset the mission chain: cleared 1 row(s).",
+    );
   });
 
   it("formats reset_all_missions by row count", () => {

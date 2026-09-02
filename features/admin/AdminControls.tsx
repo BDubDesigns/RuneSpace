@@ -99,7 +99,11 @@ function ConfirmAction({
   }
   return (
     <div
-      className={`rounded border border-[color:var(--rs-border-danger,var(--rs-border-structural))] bg-[color:var(--rs-surface)] p-2 ${fullWidth ? "w-full" : "w-full sm:w-auto"}`}
+      className={`rounded border bg-[color:var(--rs-surface)] p-2 ${
+        intent === "danger"
+          ? "border-[color:var(--rs-border-danger,var(--rs-border-structural))]"
+          : "border-[color:var(--rs-border-structural)]"
+      } ${fullWidth ? "w-full" : "w-full sm:w-auto"}`}
     >
       {prompt ? <p className="mb-2 text-xs text-[color:var(--rs-text-primary)]">{prompt}</p> : null}
       <div className="flex flex-wrap items-center gap-2">
@@ -248,6 +252,7 @@ function StopAndLocationSection(props: AdminControlProps) {
         label={activeActionId ? "STOP current action" : "STOP current action (none in progress)"}
         confirmLabel="Confirm stop"
         intent="danger"
+        fullWidth
         disabled={!activeActionId}
         prompt={
           activeActionId
@@ -394,11 +399,11 @@ function InventorySection(props: AdminControlProps) {
               key={stack.id}
               className="border border-[color:var(--rs-border-structural)] bg-[color:var(--rs-surface)] px-3 py-2 text-sm"
             >
-              <div className="flex items-center justify-between gap-2">
+              <div className="flex flex-wrap items-center justify-between gap-2">
                 <span className="text-[color:var(--rs-text-primary)]">
                   {stack.name} · {stack.quantity}
                 </span>
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
                   <select
                     className="border border-[color:var(--rs-border-structural)] bg-[color:var(--rs-surface-control)] px-2 py-1 text-xs"
                     value={removeState[stack.id] ?? "one"}
@@ -438,7 +443,7 @@ function InventorySection(props: AdminControlProps) {
           {play.inventory.uniqueItems.map((item) => (
             <li
               key={item.id}
-              className="flex items-center justify-between gap-2 border border-[color:var(--rs-border-structural)] bg-[color:var(--rs-surface)] px-3 py-2 text-sm"
+              className="flex flex-wrap items-center justify-between gap-2 border border-[color:var(--rs-border-structural)] bg-[color:var(--rs-surface)] px-3 py-2 text-sm"
             >
               <span className="text-[color:var(--rs-text-primary)]">
                 {item.name}
@@ -540,7 +545,7 @@ function EquipmentSection(props: AdminControlProps) {
           {equipped.map((item) => (
             <li
               key={item.itemInstanceId}
-              className="flex items-center justify-between gap-2 border border-[color:var(--rs-border-structural)] bg-[color:var(--rs-surface)] px-3 py-2 text-sm"
+              className="flex flex-wrap items-center justify-between gap-2 border border-[color:var(--rs-border-structural)] bg-[color:var(--rs-surface)] px-3 py-2 text-sm"
             >
               <span className="text-[color:var(--rs-text-primary)]">
                 {item.name} <span className="text-[color:var(--rs-text-muted)]">({item.slot})</span>
@@ -616,11 +621,11 @@ function CargoSection(props: AdminControlProps) {
               key={stack.id}
               className="border border-[color:var(--rs-border-structural)] bg-[color:var(--rs-surface)] px-3 py-2 text-sm"
             >
-              <div className="flex items-center justify-between gap-2">
+              <div className="flex flex-wrap items-center justify-between gap-2">
                 <span className="text-[color:var(--rs-text-primary)]">
                   {stack.name} · {stack.quantity} ({stack.itemId})
                 </span>
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
                   <select
                     className="border border-[color:var(--rs-border-structural)] bg-[color:var(--rs-surface-control)] px-2 py-1 text-xs"
                     value={removeState[stack.id] ?? "one"}
@@ -662,7 +667,7 @@ function CargoSection(props: AdminControlProps) {
           {play.cargoHold.uniqueItems.map((item) => (
             <li
               key={item.id}
-              className="flex items-center justify-between gap-2 border border-[color:var(--rs-border-structural)] bg-[color:var(--rs-surface)] px-3 py-2 text-sm"
+              className="flex flex-wrap items-center justify-between gap-2 border border-[color:var(--rs-border-structural)] bg-[color:var(--rs-surface)] px-3 py-2 text-sm"
             >
               <span className="text-[color:var(--rs-text-primary)]">
                 {item.name}

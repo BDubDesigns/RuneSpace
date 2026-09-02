@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { ActionButton } from "@/components/ui/ActionButton";
 import { Feedback } from "@/components/ui/Feedback";
 import { Panel } from "@/components/ui/Panel";
@@ -32,21 +32,32 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 }
 
 function IsoTimestamp({ value }: { value?: string }) {
+  // Browser-local readable time is environment-dependent, so it is only
+  // rendered after mount: the server pass renders the deterministic ISO string
+  // (no hydration text mismatch), then hydration swaps in the operator's local
+  // time. The exact ISO remains visible as the authoritative secondary display.
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
   if (!value) return <span className="text-[color:var(--rs-text-muted)]">—</span>;
   // Authoritative timestamps are already ISO strings ending in "Z"; never
-  // append a second "Z". Show a readable browser-local date/time as the primary
-  // display, retaining the exact ISO in the tooltip/title for forensic precision.
+  // append a second "Z".
   const shown = value.endsWith("Z") ? value : `${value}Z`;
-  const readable = new Date(shown).toLocaleString(undefined, {
-    month: "short",
-    day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
+  const readable = mounted
+    ? new Date(shown).toLocaleString(undefined, {
+        month: "short",
+        day: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+      })
+    : shown;
   return (
     <span className="text-[color:var(--rs-text-primary)]" title={shown}>
       {readable}
-      <span className="block font-mono text-[10px] text-[color:var(--rs-text-muted)]">{shown}</span>
+      {mounted ? (
+        <span className="block font-mono text-[10px] text-[color:var(--rs-text-muted)]">
+          {shown}
+        </span>
+      ) : null}
     </span>
   );
 }
@@ -57,6 +68,14 @@ function EquipmentSlotRows({ play }: { play: PlayGameplayState }) {
     <>
       {play.equipment.slots.map((slot) => {
         const item = slot.item;
+        // Join explicitly: JSX strips whitespace between adjacent expressions
+        // across newlines, so string concatenation must own its separators.
+        const meta = [
+          item ? `${item.itemId} · instance ${item.itemInstanceId}` : "",
+          `${slot.target.assignmentKind}:${slot.target.suitSlotId}`,
+        ]
+          .filter(Boolean)
+          .join(" · ");
         return (
           <Field key={`${slot.target.assignmentKind}:${slot.target.suitSlotId}`} label={slot.label}>
             {item ? (
@@ -65,8 +84,7 @@ function EquipmentSlotRows({ play }: { play: PlayGameplayState }) {
               <span className="text-[color:var(--rs-text-muted)]">empty</span>
             )}
             <span className="block font-mono text-[10px] text-[color:var(--rs-text-muted)]">
-              {item ? `${item.itemId} · instance ${item.itemInstanceId}` : ""}
-              {slot.target.assignmentKind}:{slot.target.suitSlotId}
+              {meta}
             </span>
           </Field>
         );

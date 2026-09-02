@@ -123,7 +123,7 @@ entering a command is **not** an operator mutation and is never logged.
 | FORCE UNEQUIP | `force_unequipped_item` | Capacity-validated (`planEquipmentChange`); an equipped unique must be unequipped before deletion. |
 | Delete unique item | `removed_unique_item` | Exact instance deletion (carried or Cargo); equipped uniques are refused until force-unequipped. |
 | ADD ITEM | `added_stackable_item` / `added_unique_item` | Canonical item ids, capacity-preflighted, unique charge initialized canonically. v1 carries only. |
-| RESET FROM THIS MISSION | `reset_mission_chain` | Clears the selected mission and its transitive prerequisite descendants (`missionChainResetScope`). |
+| Reset from here (per mission) | `reset_mission_chain` | Console control shown on each authored-mission row; clears the selected mission and its transitive prerequisite descendants (`missionChainResetScope`). |
 | RESET ALL MISSIONS | `reset_all_missions` | Clears only the selected character's mission rows. |
 | SET TOTAL XP | `set_skill_xp` | Absolute value; only skills with an approved progression curve (`skillLevelThresholds`). |
 
@@ -146,7 +146,13 @@ An audit row is written **only for a genuine operator mutation** (correction D6)
 
 Operation kinds are enumerated in `server/admin-audit.ts`
 (`OPERATOR_OPERATIONS`) and include a `targetIdentity` and a structured
-`details` (never secrets, tokens, or session data).
+`details` (never secrets, tokens, or session data). The console renders each
+row's `details` as a concise human-readable summary (via
+`formatAuditSummary` in `features/admin/admin-format.ts`, which resolves
+canonical ids to display names and never invents data the row does not carry);
+the operation id, operator id, exact target identity, authoritative ISO
+timestamp, and raw structured details remain available as secondary forensic
+information.
 
 ## Enabling the console
 

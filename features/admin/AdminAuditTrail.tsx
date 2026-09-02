@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { Panel } from "@/components/ui/Panel";
 import { formatAuditSummary } from "./admin-format";
 
@@ -24,15 +25,35 @@ type AuditRow = {
  * disclosure rather than dominating the primary view.
  */
 
-function readableTimestamp(value: Date | string): string {
-  return new Date(value).toLocaleString(undefined, {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-  });
+/**
+ * Readable browser-local time. Local formatting is environment-dependent, so
+ * it renders only after mount — the server pass renders the deterministic ISO
+ * string, avoiding a hydration text mismatch. The exact ISO always stays in
+ * the title for forensic precision.
+ */
+function AuditTimestamp({ value }: { value: Date | string }) {
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+  const iso = new Date(value).toISOString();
+  const readable = mounted
+    ? new Date(value).toLocaleString(undefined, {
+        year: "numeric",
+        month: "short",
+        day: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+        second: "2-digit",
+      })
+    : iso;
+  return (
+    <span
+      className="shrink-0 text-left text-[color:var(--rs-text-muted)]"
+      title={iso}
+      data-testid="admin-audit-time"
+    >
+      {readable}
+    </span>
+  );
 }
 
 export function AdminAuditTrail({ rows }: { rows: readonly AuditRow[] }) {
@@ -60,13 +81,7 @@ export function AdminAuditTrail({ rows }: { rows: readonly AuditRow[] }) {
               >
                 <div className="flex items-start justify-between gap-3">
                   <span className="text-[color:var(--rs-text-primary)]">{summary}</span>
-                  <span
-                    className="shrink-0 text-left text-[color:var(--rs-text-muted)]"
-                    title={new Date(row.createdAt).toISOString()}
-                    data-testid="admin-audit-time"
-                  >
-                    {readableTimestamp(row.createdAt)}
-                  </span>
+                  <AuditTimestamp value={row.createdAt} />
                 </div>
                 <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-[color:var(--rs-text-muted)]">
                   <span data-testid="admin-audit-operation">op {row.operation}</span>

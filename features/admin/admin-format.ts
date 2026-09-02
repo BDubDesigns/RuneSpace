@@ -49,17 +49,6 @@ export function missionStateLabel(state: string): string {
  * It never invents data the row does not carry — values the row does not store
  * are omitted rather than guessed.
  */
-export type OperatorAuditView = {
-  /** Concise human-readable summary of what changed. */
-  summary: string;
-  /** Canonical operation id (forensic). */
-  operation: string;
-  /** Canonical target identity when present (e.g. itemId, stackId, instanceId). */
-  targetIdentity: string | null;
-  /** The exact structured JSON persisted for this row (forensic disclosure). */
-  details: unknown;
-};
-
 export function formatAuditSummary(
   operation: string,
   details: unknown,
@@ -73,12 +62,17 @@ export function formatAuditSummary(
     Array.isArray(value) ? value.map((v) => String(v)).filter(Boolean) : [];
 
   switch (operation) {
-    case "stop_current_action":
-      return "Stopped the in-progress action.";
+    case "stop_current_action": {
+      const action = str(d.actionId);
+      return action
+        ? `Stopped the in-progress "${action}" action.`
+        : "Stopped the in-progress action.";
+    }
     case "teleport_character": {
       const from = locationLabel(str(d.fromLocationId));
       const to = locationLabel(str(d.toLocationId));
-      const interrupted = d.interruptedActionId ? " (interrupted an in-flight action)" : "";
+      const interruptedAction = str(d.interruptedActionId);
+      const interrupted = interruptedAction ? ` (interrupted "${interruptedAction}")` : "";
       return `Teleported ${from || "unknown"} → ${to || "unknown"}${interrupted}.`;
     }
     case "removed_stack_quantity": {
@@ -95,21 +89,30 @@ export function formatAuditSummary(
     case "removed_unique_item": {
       const item = itemLabel(str(d.itemId));
       const from = d.source === "cargo" ? "the Cargo hold" : "carried inventory";
-      return `Permanently deleted unique ${item} from ${from}.`;
+      return `Permanently deleted unique ${item || "item"} from ${from}.`;
     }
     case "added_stackable_item": {
       const n = num(d.quantity);
       const item = itemLabel(targetIdentity ?? "");
-      return `Added ${n ?? 1} × ${item} to carried inventory.`;
+      // The seam always records the itemId as the target identity; the fallback
+      // keeps the summary honest if a row ever lacked it.
+      return item
+        ? `Added ${n ?? 1} × ${item} to carried inventory.`
+        : `Added ${n ?? 1} item(s) to carried inventory.`;
     }
     case "added_unique_item": {
       const item = itemLabel(str(d.itemId));
-      return `Added unique ${item} to carried inventory.`;
+      const charge = num(d.currentCharge);
+      return `Added unique ${item || "an item"} to carried inventory${
+        charge !== undefined ? ` (charge ${charge})` : ""
+      }.`;
     }
     case "reset_mission_chain": {
-      const root = missionLabel(targetIdentity ?? "");
       const n = ids(d.deletedMissionIds).length;
-      return `Reset the mission chain rooted at ${root}: cleared ${n} row(s).`;
+      const root = missionLabel(targetIdentity ?? "");
+      return root
+        ? `Reset the mission chain rooted at ${root}: cleared ${n} row(s).`
+        : `Reset the mission chain: cleared ${n} row(s).`;
     }
     case "reset_all_missions": {
       const n = ids(d.deletedMissionIds).length;
