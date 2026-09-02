@@ -281,6 +281,11 @@ function InventorySection(props: AdminControlProps) {
   const [adding, setAdding] = useState<string | null>(null);
   const [quantity, setQuantity] = useState("1");
 
+  // The currently-selected ADD ITEM option drives whether the Qty input is shown
+  // (uniques are added exactly one-per-command, so quantity is disabled).
+  const selectedItemId = adding ?? ADMIN_OFFERED_ITEMS[0]?.itemId;
+  const selectedOffered = ADMIN_OFFERED_ITEMS.find((option) => option.itemId === selectedItemId);
+
   async function removeCarried(stackId: string, mode: "one" | "stack", expectedQuantity: number) {
     const response = await adminRemoveCarriedStackQuantity({
       characterId,
@@ -316,15 +321,38 @@ function InventorySection(props: AdminControlProps) {
   }
 
   async function add(itemId: string) {
+    const offered = ADMIN_OFFERED_ITEMS.find((option) => option.itemId === itemId);
+    // Unique items are always added exactly one-per-command; the quantity
+    // control is disabled for them, so we never send a quantity.
+    if (offered?.kind === "unique") {
+      setAdding(itemId);
+      try {
+        const response = await adminAddItem({ characterId, itemId, quantity: undefined });
+        if ("error" in response) return bus(response.error, "danger");
+        if (response.outcome.kind === "added") {
+          applyState(response.state);
+          await refreshAll();
+          bus(`Added ${response.outcome.itemId}.`, "success");
+        } else {
+          applyState(response.state);
+          bus(response.outcome.message, "muted");
+        }
+      } finally {
+        setAdding(null);
+      }
+      return;
+    }
+
+    // Stackable item: refuse invalid input BEFORE calling the action. A non
+    // positive-integer quantity must never silently become "add one".
+    const parsedQuantity = Number(quantity);
+    if (!Number.isInteger(parsedQuantity) || parsedQuantity < 1) {
+      bus("Quantity must be a positive whole number before adding.", "danger");
+      return;
+    }
     setAdding(itemId);
     try {
-      const parsedQuantity = Number(quantity);
-      const response = await adminAddItem({
-        characterId,
-        itemId,
-        quantity:
-          Number.isInteger(parsedQuantity) && parsedQuantity >= 1 ? parsedQuantity : undefined,
-      });
+      const response = await adminAddItem({ characterId, itemId, quantity: parsedQuantity });
       if ("error" in response) return bus(response.error, "danger");
       if (response.outcome.kind === "added") {
         applyState(response.state);
@@ -426,6 +454,7 @@ function InventorySection(props: AdminControlProps) {
               {ADMIN_OFFERED_ITEMS.map((option) => (
                 <option key={option.itemId} value={option.itemId}>
                   {option.label}
+                  {option.kind === "unique" ? " (unique)" : ""}
                 </option>
               ))}
             </select>
@@ -433,10 +462,17 @@ function InventorySection(props: AdminControlProps) {
           <label className="w-20 text-xs text-[color:var(--rs-text-muted)]">
             <span className="block uppercase tracking-wide">Qty</span>
             <input
-              className="mt-1 block w-full border border-[color:var(--rs-border-structural)] bg-[color:var(--rs-surface-control)] px-3 py-2 text-sm text-[color:var(--rs-text-primary)]"
-              value={quantity}
+              className="mt-1 block w-full border border-[color:var(--rs-border-structural)] bg-[color:var(--rs-surface-control)] px-3 py-2 text-sm text-[color:var(--rs-text-primary)] disabled:cursor-not-allowed disabled:opacity-50"
+              value={selectedOffered?.kind === "unique" ? "1" : quantity}
               onChange={(event) => setQuantity(event.target.value)}
               inputMode="numeric"
+              disabled={selectedOffered?.kind === "unique"}
+              aria-disabled={selectedOffered?.kind === "unique"}
+              title={
+                selectedOffered?.kind === "unique"
+                  ? "Unique items are added exactly one per command."
+                  : "Positive whole number of stackable items to add."
+              }
             />
           </label>
           <ActionButton

@@ -658,6 +658,64 @@ suite("issue #113 admin operator console (real PostgreSQL)", () => {
     expect(audit.some((a) => a.operation === "added_unique_item")).toBe(true);
   });
 
+  it("ADD ITEM refuses a non-positive/invalid stack quantity and audits nothing", async () => {
+    const { character } = await makeCharacter();
+    const before = await db
+      .select()
+      .from(rune.inventoryStacks)
+      .where(eq(rune.inventoryStacks.characterId, character.id));
+    const beforeShale = before
+      .filter((s) => s.itemId === ITEM_IDS.ferriteShale)
+      .reduce((sum, s) => sum + s.quantity, 0);
+
+    // 0, negative, and non-integer inputs must be refused — never silently
+    // turned into "add one".
+    for (const badQuantity of [0, -1, 1.5, Number.NaN]) {
+      const result = await adminCommands.addItemAsAdmin(
+        ADMIN,
+        character.id,
+        ITEM_IDS.ferriteShale,
+        badQuantity,
+      );
+      expect(result.outcome.kind).toBe("refused");
+      if (result.outcome.kind !== "refused") return;
+      const after = await db
+        .select()
+        .from(rune.inventoryStacks)
+        .where(eq(rune.inventoryStacks.characterId, character.id));
+      const afterShale = after
+        .filter((s) => s.itemId === ITEM_IDS.ferriteShale)
+        .reduce((sum, s) => sum + s.quantity, 0);
+      expect(afterShale).toBe(beforeShale);
+    }
+    expect(await auditFor(character.id)).toHaveLength(0);
+  });
+
+  it("ADD ITEM refuses an explicit quantity for a unique item (fail-closed) and audits nothing", async () => {
+    const { character } = await makeCharacter();
+    // Uniques are added exactly one-per-command; an explicit quantity must be
+    // rejected rather than silently ignored.
+    const result = await adminCommands.addItemAsAdmin(
+      ADMIN,
+      character.id,
+      ITEM_IDS.salvageCutter,
+      3,
+    );
+    expect(result.outcome.kind).toBe("refused");
+    const created = await db
+      .select()
+      .from(rune.itemInstances)
+      .where(
+        and(
+          eq(rune.itemInstances.characterId, character.id),
+          eq(rune.itemInstances.itemId, ITEM_IDS.salvageCutter),
+        ),
+      );
+    // Only the legacy starter fixture cutter, no admin-added duplicate.
+    expect(created.length).toBe(1);
+    expect(await auditFor(character.id)).toHaveLength(0);
+  });
+
   // -------------------------------------------------------------------------
   // Mission resets (one character only)
   // -------------------------------------------------------------------------
@@ -1166,5 +1224,117 @@ suite("issue #113 admin operator console (real PostgreSQL)", () => {
       .from(rune.characterTravelState)
       .where(eq(rune.characterTravelState.characterId, character.id));
     expect(travelRows).toHaveLength(0);
+  });
+
+  it("concurrent STOP vs STOP on one character reconciles once and audits once (row lock serializes)", async () => {
+    const { userId, character } = await makeCharacter();
+    await moveToTheJag(character.id);
+    const startedAt = new Date("2026-01-01T00:00:00.000Z");
+    await miningCommands.startFerriteShaleMining(userId, character.id, startedAt, detRandom);
+    const stopAt = tick(startedAt, 10); // due exactly one unit, both commands contend for it
+
+    // Two concurrent admin STOPs against the SAME character must serialize on
+    // the shared character row lock: one banks the due Mining unit and
+    // force-idles, the other sees an already-idle action. Work/reward and
+    // `stop_current_action` audit must not be duplicated.
+    const [first, second] = await Promise.all([
+      adminCommands.stopCurrentActionAsAdmin(ADMIN, character.id, stopAt, detRandom),
+      adminCommands.stopCurrentActionAsAdmin(ADMIN, character.id, stopAt, detRandom),
+    ]);
+
+    const outcomes = [first.outcome.kind, second.outcome.kind];
+    expect(outcomes).toContain("interrupted");
+    // The later command observed the action already cleared, so it is never a
+    // second interrupted mutation on the same in-progress action.
+    expect(outcomes.filter((kind) => kind === "interrupted")).toHaveLength(1);
+
+    const activeRows = await db
+      .select()
+      .from(rune.activeActions)
+      .where(eq(rune.activeActions.characterId, character.id));
+    expect(activeRows).toHaveLength(0);
+
+    // Exactly one stack item banked, regardless of which command won the lock.
+    const persisted = await db
+      .select()
+      .from(rune.inventoryStacks)
+      .where(eq(rune.inventoryStacks.characterId, character.id));
+    const ferrite = persisted
+      .filter((s) => s.itemId === ITEM_IDS.ferriteShale)
+      .reduce((sum, s) => sum + s.quantity, 0);
+    expect(ferrite).toBe(1);
+
+    // Exactly one audit row: not two for the same single successful stop.
+    const audit = await auditFor(character.id);
+    expect(audit.filter((a) => a.operation === "stop_current_action")).toHaveLength(1);
+  });
+
+  it("concurrent STOP vs teleport on one character neither double-awards nor double-audits", async () => {
+    const { userId, character } = await makeCharacter();
+    await moveToTheJag(character.id);
+    const startedAt = new Date("2026-01-01T00:00:00.000Z");
+    await miningCommands.startFerriteShaleMining(userId, character.id, startedAt, detRandom);
+    const now = tick(startedAt, 10); // due exactly one unit; both commands contend
+
+    // One command interrupts (STOP) while the other relocates (teleport to a
+    // different canonical location). Whichever acquires the character row lock
+    // first reconciles the due Mining unit and clears it; the second sees the
+    // action already resolved. No double reward, no double audit per operation.
+    const [stop, teleport] = await Promise.all([
+      adminCommands.stopCurrentActionAsAdmin(ADMIN, character.id, now, detRandom),
+      adminCommands.teleportCharacterAsAdmin(
+        ADMIN,
+        character.id,
+        LOCATION_IDS.abandonedProcessingYard,
+        now,
+        detRandom,
+      ),
+    ]);
+
+    const stopOutcomes = [stop.outcome.kind];
+    const teleportOutcomes = [teleport.outcome.kind];
+    // The teleport destination differs from The Jag, so it always relocates.
+    expect(stopOutcomes[0]).toMatch(/interrupted|already_idle/);
+    expect(teleportOutcomes[0]).toBe("teleported");
+    // Whichever command acquired the row lock first interrupted the Mining;
+    // the other saw the action already resolved. Exactly one interruption total.
+    const interruptions = [
+      stop.outcome.kind === "interrupted" ? 1 : 0,
+      teleport.outcome.kind === "teleported" && teleport.outcome.interruptedActionId ? 1 : 0,
+    ].reduce((a, b) => a + b, 0);
+    expect(interruptions).toBe(1);
+
+    const activeRows = await db
+      .select()
+      .from(rune.activeActions)
+      .where(eq(rune.activeActions.characterId, character.id));
+    expect(activeRows).toHaveLength(0);
+
+    // Exactly one stack item banked (whichever command reconciled it first).
+    const persisted = await db
+      .select()
+      .from(rune.inventoryStacks)
+      .where(eq(rune.inventoryStacks.characterId, character.id));
+    const ferrite = persisted
+      .filter((s) => s.itemId === ITEM_IDS.ferriteShale)
+      .reduce((sum, s) => sum + s.quantity, 0);
+    expect(ferrite).toBe(1);
+
+    // Exactly one teleport is audited, and at most one stop is audited. The
+    // single interruption is audited either as `stop_current_action` (if STOP
+    // won the row lock) or folded into the teleport's details (if teleport won
+    // and force-idled the action itself). Either way exactly one interruption
+    // total happened and is recorded exactly once across the two commands.
+    const audit = await auditFor(character.id);
+    expect(audit.filter((a) => a.operation === "teleport_character")).toHaveLength(1);
+    const stopAudits = audit.filter((a) => a.operation === "stop_current_action");
+    expect(stopAudits.length).toBeLessThanOrEqual(1);
+    // One interruption total is captured either as the stop audit OR inside the
+    // teleport audit's interruptedActionId detail.
+    const teleportAudit = audit.find((a) => a.operation === "teleport_character");
+    const teleportInterrupted =
+      (teleportAudit?.details as { interruptedActionId?: string } | undefined)
+        ?.interruptedActionId != null;
+    expect(stopAudits.length + (teleportInterrupted ? 1 : 0)).toBe(1);
   });
 });

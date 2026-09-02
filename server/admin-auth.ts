@@ -1,5 +1,5 @@
 import { adminUserIdAllowlist } from "@/server/env";
-import { requireCurrentUser } from "@/server/ownership";
+import { requireCurrentUser, OwnershipError } from "@/server/ownership";
 
 /**
  * Server-only admin/operator authorization (Issue #113).
@@ -69,6 +69,12 @@ export async function authorizeAdminPage(headers: Headers): Promise<AdminPageAut
     return { authorized: true, admin };
   } catch (error) {
     if (error instanceof AdminError) return { authorized: false, reason: "forbidden" };
-    return { authorized: false, reason: "unauthenticated" };
+    if (error instanceof OwnershipError && error.status === 401) {
+      return { authorized: false, reason: "unauthenticated" };
+    }
+    // Any other failure (DB/auth outage, unexpected error) is a genuine server
+    // failure, not a logged-out state. Let it propagate so it is never disguised
+    // as a sign-in redirect.
+    throw error;
   }
 }

@@ -596,6 +596,18 @@ export async function addItemAsAdmin(
 
       if (definition.kind === "stack") {
         const amount = quantity ?? 1;
+        // Fail closed on a nonsensical stack quantity: an omitted quantity means
+        // "add one", but an explicit 0, negative, or non-integer must never
+        // silently become a different successful mutation.
+        if (!Number.isInteger(amount) || amount < 1) {
+          return {
+            state,
+            outcome: {
+              kind: "refused",
+              message: "Stackable quantity must be a positive whole number.",
+            },
+          };
+        }
         const planResult = planExactStackAddition(
           state.inventory.stacks as readonly StackState<string>[],
           definition.itemId,
@@ -634,6 +646,17 @@ export async function addItemAsAdmin(
       }
 
       // Unique item: capacity-preflight from the authoritative carried snapshot.
+      // Quantities do not apply to unique items; an EXPLICIT quantity is
+      // nonsensical and must fail closed rather than be silently ignored.
+      if (quantity !== undefined) {
+        return {
+          state,
+          outcome: {
+            kind: "refused",
+            message: "Unique items are added exactly one per command; a quantity is not valid.",
+          },
+        };
+      }
       const slotCapacity = state.inventory.slotsUsed + state.inventory.slotsAvailable;
       const addPlan = planUniqueItemAddition({
         inventorySlotsUsed: state.inventory.slotsUsed,
