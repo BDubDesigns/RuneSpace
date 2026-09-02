@@ -4,7 +4,7 @@ import { db } from "@/db";
 import { characters as charactersTable, playerAccounts } from "@/db/rune-space";
 import { PORTRAIT_IDS } from "@/game/config/foundations";
 import { normalizeCharacterName } from "@/game/domain/character-name";
-import { ADMIN_USER_ID, seedAdminOperator } from "./admin-session";
+import { ADMIN_USER_ID, seedAdminOperator, seedNonAdminUser } from "./admin-session";
 
 const FIXTURE_CHARACTER = "Operator Probe GADGET";
 
@@ -109,5 +109,32 @@ test.describe("admin operator console", () => {
     await expect(page.getByText(/teleported to/i).first()).toBeVisible({ timeout: 8000 });
 
     await expect(audit.locator("li")).toHaveCount(auditCount + 1, { timeout: 8000 });
+  });
+
+  test("an AUTHENTICATED NON-ADMIN is denied the console (safe 403, not sign-in, not console)", async ({
+    page,
+  }) => {
+    // Seed a real non-admin Better Auth user and sign in through the real
+    // /sign-in UI, so the browser holds a genuine, non-admin session cookie.
+    const seeded = await seedNonAdminUser();
+    await seedAdminOperator();
+    await page.goto("/sign-in");
+    await page.getByLabel("Email").fill(seeded.email);
+    await page.getByLabel("Password", { exact: true }).fill(seeded.password);
+    await page.getByRole("button", { name: "Sign in" }).click();
+    await page.waitForURL((url) => !url.pathname.startsWith("/sign-in"), {
+      timeout: 10000,
+    });
+
+    // Visiting /admin as an authenticated non-admin must render the safe 403
+    // Forbidden page — never the console, and never a redirect to /sign-in
+    // (which would silently appear to log the user out).
+    await page.goto("/admin");
+    await expect(page.getByText(/403 · Operator console/i)).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Admin console" })).toBeHidden();
+    await expect(page).not.toHaveURL(/\/sign-in/);
+    // The inspector route is equally denied for a non-admin.
+    await page.goto("/admin/characters/00000000-0000-0000-0000-000000000000");
+    await expect(page.getByText(/403 · Operator console/i)).toBeVisible();
   });
 });

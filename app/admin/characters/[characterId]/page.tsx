@@ -3,24 +3,46 @@ import { redirect } from "next/navigation";
 import { ActionLink } from "@/components/ui/ActionLink";
 import { GameShell, TopBar } from "@/components/ui/GameShell";
 import { AdminInspector } from "@/features/admin/AdminInspector";
-import { requireAdmin } from "@/server/admin-auth";
+import { authorizeAdminPage } from "@/server/admin-auth";
 import { loadAdminInspectorState } from "@/server/admin-state";
 
 export const metadata = { title: "Character Inspector — Operator Console" };
 
 /**
  * Operator inspector for one selected character (Issue #113). Server-side
- * `requireAdmin`, then loads the coherent post-reconciliation authoritative
- * snapshot plus the immutable operator audit history. The client console
- * updates the snapshot in place after each confirmed operator action.
+ * `authorizeAdminPage` (an authenticated non-admin gets a safe 403 page), then
+ * loads the coherent post-reconciliation authoritative snapshot plus the
+ * immutable operator audit history.
  */
 export default async function AdminCharacterInspectorPage({
   params,
 }: {
   params: Promise<{ characterId: string }>;
 }) {
-  const admin = await requireAdmin(await headers()).catch(() => null);
-  if (!admin) redirect("/sign-in");
+  const auth = await authorizeAdminPage(await headers());
+  if (!auth.authorized) {
+    if (auth.reason === "unauthenticated") redirect("/sign-in");
+    return (
+      <GameShell
+        topBar={
+          <TopBar
+            title="Forbidden"
+            detail="403 · Operator console"
+            trailing={
+              <ActionLink href="/" intent="secondary" className="px-3 py-1 text-xs">
+                Exit
+              </ActionLink>
+            }
+          />
+        }
+      >
+        <p className="text-sm text-[color:var(--rs-text-muted)]">
+          Your session is authenticated, but your account is not on the admin allowlist, so this
+          console is not available to you.
+        </p>
+      </GameShell>
+    );
+  }
   const { characterId } = await params;
   const inspector = await loadAdminInspectorState(await headers(), characterId).catch(() => null);
   if (!inspector) {
@@ -49,7 +71,7 @@ export default async function AdminCharacterInspectorPage({
       topBar={
         <TopBar
           title={inspector.characterId}
-          detail={`Operator ${admin.email} · owner ${inspector.owner.playerAccountId}${
+          detail={`Operator ${auth.admin.email} · owner ${inspector.owner.playerAccountId}${
             inspector.owner.maskedEmail ? ` (${inspector.owner.maskedEmail})` : ""
           }`}
           trailing={

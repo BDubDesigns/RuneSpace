@@ -2,6 +2,7 @@ import { and, eq } from "drizzle-orm";
 import { afterEach, beforeAll, describe, expect, it } from "vitest";
 import {
   ACTION_IDS,
+  GAME_TICK_MS,
   ITEM_IDS,
   LOCATION_IDS,
   MISSION_IDS,
@@ -32,6 +33,8 @@ suite("issue #113 admin operator console (real PostgreSQL)", () => {
   let characters: typeof import("@/server/characters");
   let play: typeof import("@/server/play");
   let miningCommands: typeof import("@/server/mining-commands");
+  let refiningCommands: typeof import("@/server/refining-commands");
+  let cargo: typeof import("@/server/cargo-hold");
   let adminCommands: typeof import("@/server/admin-command-seams");
   let playInterrupt: typeof import("@/server/play-interrupt");
   const createdUsers: string[] = [];
@@ -44,6 +47,8 @@ suite("issue #113 admin operator console (real PostgreSQL)", () => {
     characters = await import("@/server/characters");
     play = await import("@/server/play");
     miningCommands = await import("@/server/mining-commands");
+    refiningCommands = await import("@/server/refining-commands");
+    cargo = await import("@/server/cargo-hold");
     adminCommands = await import("@/server/admin-command-seams");
     playInterrupt = await import("@/server/play-interrupt");
   });
@@ -96,6 +101,47 @@ suite("issue #113 admin operator console (real PostgreSQL)", () => {
       .from(rune.operatorAuditLogs)
       .where(eq(rune.operatorAuditLogs.characterId, characterId))
       .orderBy(rune.operatorAuditLogs.createdAt, rune.operatorAuditLogs.id);
+  }
+
+  /** Advance a wall-clock point by `count` game ticks (600ms each). */
+  function tick(base: Date, count: number): Date {
+    return new Date(base.getTime() + count * GAME_TICK_MS);
+  }
+
+  /** Deterministic low-roll random: succeeds (0 < threshold) and yields the minimum output. */
+  const detRandom = { nextBasisPoints: () => 0, nextUnit: () => 0 };
+
+  /** Relocate to the Processing Yard (Refining / Welding host) directly. */
+  async function moveToProcessingYard(characterId: string) {
+    await db
+      .update(rune.characters)
+      .set({ currentLocationId: LOCATION_IDS.abandonedProcessingYard })
+      .where(eq(rune.characters.id, characterId));
+  }
+
+  /** Seed + install the Cargo-hold repair materials so Welding can actually run. */
+  async function installRepairMaterials(userId: string, characterId: string, at: Date) {
+    const { getEffectiveGameBalance } = await import("@/game/config/balance");
+    const balance = getEffectiveGameBalance();
+    await db.insert(rune.inventoryStacks).values([
+      {
+        characterId,
+        itemId: ITEM_IDS.refinedFerrite,
+        quantity: balance.cargoHold.refinedFerriteRequired,
+      },
+      { characterId, itemId: ITEM_IDS.slag, quantity: balance.cargoHold.slagRequired },
+    ]);
+    const contribution = await cargo.contributeCargoHoldMaterials(
+      userId,
+      characterId,
+      {
+        expectedRefinedFerrite: balance.cargoHold.refinedFerriteRequired,
+        expectedSlag: balance.cargoHold.slagRequired,
+      },
+      at,
+      detRandom,
+    );
+    expect(contribution.cargo.status).toBe("committed");
   }
 
   // -------------------------------------------------------------------------
@@ -816,5 +862,309 @@ suite("issue #113 admin operator console (real PostgreSQL)", () => {
       .where(eq(rune.activeActions.characterId, character.id));
     expect(actions).toHaveLength(1);
     expect(actions[0]?.actionId).toBe("future_unknown_activity");
+  });
+
+  // -------------------------------------------------------------------------
+  // Lock / reconcile / interruption matrix (finding #3)
+  // -------------------------------------------------------------------------
+  // Each admin command runs through `withResolvedCharacter` →
+  // `reconcileActiveAction`, which under the row lock resolves due work EXACTLY
+  // once (a single `resolver.persist`) before the command force-idles the
+  // action. These tests prove single-award + single-audit when the admin
+  // command is invoked directly (no prior player refresh), partial-but-unfinished
+  // work is not awarded, retried commands neither re-bank nor double-audit, and
+  // committed Scavenge reveals survive the interrupt.
+
+  it("STOP reconciles due Mining EXACTLY once when invoked directly and audits once", async () => {
+    const { userId, character } = await makeCharacter();
+    await moveToTheJag(character.id);
+    const startedAt = new Date("2026-01-01T00:00:00.000Z");
+    // Deliberately NO prior player refresh: the admin STOP itself is the first
+    // reconcile boundary the due Mining work hits.
+    await miningCommands.startFerriteShaleMining(userId, character.id, startedAt, detRandom);
+    const stopAt = tick(startedAt, 10); // exactly one 10-tick attempt
+    const result = await adminCommands.stopCurrentActionAsAdmin(
+      ADMIN,
+      character.id,
+      stopAt,
+      detRandom,
+    );
+    expect(result.outcome.kind).toBe("interrupted");
+    if (result.outcome.kind !== "interrupted") return;
+    expect(result.outcome.actionId).toBe(ACTION_IDS.ferriteShaleMining);
+    // Exactly one attempted unit was resolved (not zero, not two).
+    expect(result.state.run.attempts).toBe(1);
+    expect(result.state.run.successes).toBe(1);
+    expect(result.state.run.recentAttempts).toHaveLength(1);
+    // Deterministic minimum yield => exactly 1 ferrite shale in exactly one stack.
+    expect(result.state.ferriteShaleQuantity).toBe(1);
+    const ferriteStacks = result.state.inventory.stacks.filter(
+      (s) => s.itemId === ITEM_IDS.ferriteShale,
+    );
+    expect(ferriteStacks).toHaveLength(1);
+    expect(ferriteStacks[0]!.quantity).toBe(1);
+    // Persisted exactly once (single award row/quantity), action cleared, one audit row.
+    const persisted = await db
+      .select()
+      .from(rune.inventoryStacks)
+      .where(eq(rune.inventoryStacks.characterId, character.id));
+    const persistedFerrite = persisted
+      .filter((s) => s.itemId === ITEM_IDS.ferriteShale)
+      .reduce((sum, s) => sum + s.quantity, 0);
+    expect(persistedFerrite).toBe(1);
+    const activeRows = await db
+      .select()
+      .from(rune.activeActions)
+      .where(eq(rune.activeActions.characterId, character.id));
+    expect(activeRows).toHaveLength(0);
+    const audit = await auditFor(character.id);
+    expect(audit).toHaveLength(1);
+    expect(audit[0]?.operation).toBe("stop_current_action");
+    expect(audit[0]?.adminUserId).toBe(ADMIN);
+    expect(audit[0]?.targetIdentity).toBe(ACTION_IDS.ferriteShaleMining);
+  });
+
+  it("STOP reconciles due Refining EXACTLY once when invoked directly and audits once", async () => {
+    const { userId, character } = await makeCharacter();
+    const startedAt = new Date("2026-01-01T00:00:00.000Z");
+    // Provision state (does not resolve the not-yet-started run), then host + seed.
+    await play.getPlayGameplayState(userId, character.id, startedAt, detRandom);
+    await moveToProcessingYard(character.id);
+    await db.insert(rune.inventoryStacks).values({
+      characterId: character.id,
+      itemId: ITEM_IDS.ferriteShale,
+      quantity: 5,
+    });
+    await refiningCommands.startRefining(userId, character.id, startedAt, detRandom);
+    const stopAt = tick(startedAt, 7); // exactly one 7-tick attempt
+    const result = await adminCommands.stopCurrentActionAsAdmin(
+      ADMIN,
+      character.id,
+      stopAt,
+      detRandom,
+    );
+    expect(result.outcome.kind).toBe("interrupted");
+    if (result.outcome.kind !== "interrupted") return;
+    expect(result.outcome.actionId).toBe(ACTION_IDS.refining);
+    // Exactly one attempt consumed exactly 2 shale and produced 1 refined ferrite.
+    expect(result.state.refiningRun.attempts).toBe(1);
+    expect(result.state.refiningRun.successes).toBe(1);
+    expect(result.state.refiningRun.ferriteGained).toBe(1);
+    expect(result.state.refiningRun.shaleConsumed).toBe(2);
+    expect(result.state.refinedFerriteQuantity).toBe(1);
+    expect(result.state.ferriteShaleQuantity).toBe(3); // 5 seeded − 2 consumed
+    const refinedStacks = result.state.inventory.stacks.filter(
+      (s) => s.itemId === ITEM_IDS.refinedFerrite,
+    );
+    expect(refinedStacks).toHaveLength(1);
+    const activeRows = await db
+      .select()
+      .from(rune.activeActions)
+      .where(eq(rune.activeActions.characterId, character.id));
+    expect(activeRows).toHaveLength(0);
+    const audit = await auditFor(character.id);
+    expect(audit).toHaveLength(1);
+    expect(audit[0]?.operation).toBe("stop_current_action");
+    expect(audit[0]?.targetIdentity).toBe(ACTION_IDS.refining);
+  });
+
+  it("STOP reconciles due Welding EXACTLY once when invoked directly and audits once", async () => {
+    const { userId, character } = await makeCharacter();
+    const startedAt = new Date("2026-01-01T00:00:00.000Z");
+    await play.getPlayGameplayState(userId, character.id, startedAt, detRandom);
+    // Cargo Hold access requires being stationary at the Crash Site (default).
+    await installRepairMaterials(userId, character.id, startedAt);
+    await cargo.startCargoHoldWelding(userId, character.id, startedAt, detRandom);
+    const stopAt = tick(startedAt, 5); // exactly one 5-tick pass
+    const result = await adminCommands.stopCurrentActionAsAdmin(ADMIN, character.id, stopAt);
+    expect(result.outcome.kind).toBe("interrupted");
+    if (result.outcome.kind !== "interrupted") return;
+    expect(result.outcome.actionId).toBe(ACTION_IDS.cargoHoldWelding);
+    // Exactly one increment banked (1 of 12), 50 XP, not complete.
+    expect(result.state.cargoHold.repair.weldingProgress).toBe(1);
+    expect(result.state.cargoHold.repair.weldingIncrements).toBe(12);
+    expect(result.state.cargoHold.repair.complete).toBe(false);
+    expect(result.state.welding.totalXp).toBe(50);
+    const persistedRepair = (
+      await db
+        .select()
+        .from(rune.characterCargoHoldRepair)
+        .where(eq(rune.characterCargoHoldRepair.characterId, character.id))
+    )[0]!;
+    expect(persistedRepair.weldingProgress).toBe(1);
+    const weldingXp = (
+      await db
+        .select()
+        .from(rune.characterSkillXp)
+        .where(
+          and(
+            eq(rune.characterSkillXp.characterId, character.id),
+            eq(rune.characterSkillXp.skillId, SKILL_IDS.welding),
+          ),
+        )
+    )[0];
+    expect(weldingXp?.totalXp).toBe(50);
+    const audit = await auditFor(character.id);
+    expect(audit).toHaveLength(1);
+    expect(audit[0]?.operation).toBe("stop_current_action");
+    expect(audit[0]?.targetIdentity).toBe(ACTION_IDS.cargoHoldWelding);
+  });
+
+  it("STOP at a partial Mining window awards nothing (partial-but-unfinished not banked)", async () => {
+    const { userId, character } = await makeCharacter();
+    await moveToTheJag(character.id);
+    const startedAt = new Date("2026-01-01T00:00:00.000Z");
+    await miningCommands.startFerriteShaleMining(userId, character.id, startedAt, detRandom);
+    const partialAt = tick(startedAt, 5); // 5 ticks < 10-tick attempt
+    const result = await adminCommands.stopCurrentActionAsAdmin(ADMIN, character.id, partialAt);
+    expect(result.outcome.kind).toBe("interrupted");
+    if (result.outcome.kind !== "interrupted") return;
+    expect(result.state.ferriteShaleQuantity).toBe(0);
+    expect(result.state.run.attempts).toBe(0);
+    expect(result.state.run.recentAttempts).toHaveLength(0);
+    expect(result.state.activeAction).toBeUndefined();
+    const miningState = (
+      await db
+        .select()
+        .from(rune.characterMiningState)
+        .where(eq(rune.characterMiningState.characterId, character.id))
+    )[0]!;
+    expect(miningState.lastStopReason).toBe("manually_stopped");
+    expect(miningState.runAttempts).toBe(0);
+    const audit = await auditFor(character.id);
+    expect(audit).toHaveLength(1);
+  });
+
+  it("STOP at a partial Welding window awards nothing (progress stays 0, no XP)", async () => {
+    const { userId, character } = await makeCharacter();
+    const startedAt = new Date("2026-01-01T00:00:00.000Z");
+    await play.getPlayGameplayState(userId, character.id, startedAt, detRandom);
+    // Cargo Hold access requires being stationary at the Crash Site (default).
+    await installRepairMaterials(userId, character.id, startedAt);
+    await cargo.startCargoHoldWelding(userId, character.id, startedAt, detRandom);
+    const partialAt = tick(startedAt, 4); // 4 ticks < 5-tick pass
+    const result = await adminCommands.stopCurrentActionAsAdmin(ADMIN, character.id, partialAt);
+    expect(result.outcome.kind).toBe("interrupted");
+    if (result.outcome.kind !== "interrupted") return;
+    expect(result.state.cargoHold.repair.weldingProgress).toBe(0);
+    expect(result.state.cargoHold.repair.complete).toBe(false);
+    expect(result.state.welding.totalXp).toBe(0);
+    const weldingXp = (
+      await db
+        .select()
+        .from(rune.characterSkillXp)
+        .where(
+          and(
+            eq(rune.characterSkillXp.characterId, character.id),
+            eq(rune.characterSkillXp.skillId, SKILL_IDS.welding),
+          ),
+        )
+    )[0];
+    expect(weldingXp?.totalXp ?? 0).toBe(0);
+    const audit = await auditFor(character.id);
+    expect(audit).toHaveLength(1);
+  });
+
+  it("a retried STOP on the same already-reconciled action neither re-banks nor double-audits", async () => {
+    const { userId, character } = await makeCharacter();
+    await moveToTheJag(character.id);
+    const startedAt = new Date("2026-01-01T00:00:00.000Z");
+    await miningCommands.startFerriteShaleMining(userId, character.id, startedAt, detRandom);
+    const stopAt = tick(startedAt, 10); // due exactly one unit
+    const first = await adminCommands.stopCurrentActionAsAdmin(
+      ADMIN,
+      character.id,
+      stopAt,
+      detRandom,
+    );
+    expect(first.outcome.kind).toBe("interrupted");
+    if (first.outcome.kind !== "interrupted") return;
+    const banked = first.state.ferriteShaleQuantity;
+    const attempts = first.state.run.attempts;
+
+    const second = await adminCommands.stopCurrentActionAsAdmin(
+      ADMIN,
+      character.id,
+      stopAt,
+      detRandom,
+    );
+    expect(second.outcome.kind).toBe("already_idle");
+    expect(second.state.ferriteShaleQuantity).toBe(banked);
+    expect(second.state.run.attempts).toBe(attempts);
+    const audit = await auditFor(character.id);
+    expect(audit.filter((a) => a.operation === "stop_current_action")).toHaveLength(1);
+  });
+
+  it("a retried teleport to the interrupted destination neither re-awards nor double-audits", async () => {
+    const { userId, character } = await makeCharacter();
+    const startedAt = new Date("2026-01-01T00:00:00.000Z");
+    await play.beginTravel(
+      userId,
+      character.id,
+      LOCATION_IDS.abandonedProcessingYard,
+      startedAt,
+      detRandom,
+    );
+    const now = tick(startedAt, 5); // in-flight
+    const first = await adminCommands.teleportCharacterAsAdmin(
+      ADMIN,
+      character.id,
+      LOCATION_IDS.theJag,
+      now,
+      detRandom,
+    );
+    expect(first.outcome.kind).toBe("teleported");
+    if (first.outcome.kind !== "teleported") return;
+    const second = await adminCommands.teleportCharacterAsAdmin(
+      ADMIN,
+      character.id,
+      LOCATION_IDS.theJag,
+      now,
+      detRandom,
+    );
+    expect(second.outcome.kind).toBe("no_change");
+    const audit = await auditFor(character.id);
+    expect(audit.filter((a) => a.operation === "teleport_character")).toHaveLength(1);
+  });
+
+  it("admin STOP of an in-flight Travel preserves committed Scavenge reveals", async () => {
+    const { userId, character } = await makeCharacter();
+    const startedAt = new Date("2026-01-01T00:00:00.000Z");
+    await play.beginTravel(
+      userId,
+      character.id,
+      LOCATION_IDS.abandonedProcessingYard,
+      startedAt,
+      detRandom,
+    );
+    // Claim the Scavenge opportunity while the window is open during the walk.
+    const claimed = await play.claimScavenge(userId, character.id, tick(startedAt, 4), detRandom);
+    expect(claimed.scavenge.status).toBe("claimed");
+    const revealId = claimed.state.scavengeReveals[0]?.revealId;
+    expect(revealId).toBeTruthy();
+    if (!revealId) return;
+
+    // Admin STOP of the still-in-flight journey (tick 5 < 40-tick arrival).
+    const result = await adminCommands.stopCurrentActionAsAdmin(
+      ADMIN,
+      character.id,
+      tick(startedAt, 5),
+    );
+    expect(result.outcome.kind).toBe("interrupted");
+    if (result.outcome.kind !== "interrupted") return;
+    // The committed reveal is preserved, not wiped.
+    const reveals = await db
+      .select()
+      .from(rune.characterScavengeReveals)
+      .where(eq(rune.characterScavengeReveals.characterId, character.id));
+    expect(reveals).toHaveLength(1);
+    expect(reveals[0]?.id).toBe(revealId);
+    expect(result.state.scavengeReveals).toHaveLength(1);
+    // Travel cleaned up regardless.
+    const travelRows = await db
+      .select()
+      .from(rune.characterTravelState)
+      .where(eq(rune.characterTravelState.characterId, character.id));
+    expect(travelRows).toHaveLength(0);
   });
 });

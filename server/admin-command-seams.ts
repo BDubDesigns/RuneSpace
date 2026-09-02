@@ -31,6 +31,8 @@ import { recordOperatorAudit } from "@/server/admin-audit";
 import { forceIdleResolvedAction } from "@/server/play-interrupt";
 import { invalidateMiningActionForChangedTool } from "@/server/equipment";
 import { removeCargoStack } from "@/server/cargo-hold";
+import { defaultMiningRandom } from "@/server/mining";
+import type { MiningRandom } from "@/game/domain/mining";
 import {
   createPlayResolver,
   ensurePlayProvisioning,
@@ -119,11 +121,12 @@ export async function stopCurrentActionAsAdmin(
   adminUserId: string,
   characterId: string,
   now: Date = new Date(),
+  random: MiningRandom = defaultMiningRandom(),
 ): Promise<AdminStopResult> {
   return runAdminCharacterCommandAs(
     adminUserId,
     characterId,
-    createPlayResolver(),
+    createPlayResolver(random),
     async (transaction, { character, action, adminUserId: admin }) => {
       await ensurePlayProvisioning(transaction, character.id);
       const result = await forceIdleResolvedAction(transaction, { character, action, now });
@@ -179,6 +182,7 @@ export async function teleportCharacterAsAdmin(
   characterId: string,
   destinationLocationId: string,
   now: Date = new Date(),
+  random: MiningRandom = defaultMiningRandom(),
 ): Promise<AdminTeleportResult> {
   // Early canonical-location validation BEFORE any operator-specific
   // interruption: an invalid destination must not force-idle or relocate the
@@ -189,7 +193,7 @@ export async function teleportCharacterAsAdmin(
   return runAdminCharacterCommandAs(
     adminUserId,
     characterId,
-    createPlayResolver(),
+    createPlayResolver(random),
     async (transaction, { character, action, adminUserId: admin }) => {
       if (!getLocation(destinationLocationId)) {
         throw new AdminCommandError("Unknown destination location", 400);

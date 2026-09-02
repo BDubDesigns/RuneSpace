@@ -24,6 +24,46 @@ const ADMIN_EMAIL = `operator-${ADMIN_USER_ID}@example.com`;
 const ADMIN_PASSWORD = "sup3r-secret-admin-password";
 
 /**
+ * Ensure an arbitrary Better Auth user + credential account exist with a fixed
+ * id. Deterministic and idempotent. Used by the admin bootstrap, the
+ * authenticated non-admin denial proof, and the browser denial path.
+ */
+export async function seedAuthUser(input: {
+  id: string;
+  name: string;
+  email: string;
+  password: string;
+}): Promise<{ userId: string; email: string; password: string }> {
+  const existing = await db
+    .select({ id: authSchema.user.id })
+    .from(authSchema.user)
+    .where(eq(authSchema.user.id, input.id));
+  if (!existing.length) {
+    const passwordHash = await hashPassword(input.password);
+    await db.transaction(async (tx) => {
+      await tx.insert(authSchema.user).values({
+        id: input.id,
+        name: input.name,
+        email: input.email,
+        emailVerified: true,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      });
+      await tx.insert(authSchema.account).values({
+        id: `${input.id}-credential`,
+        accountId: input.id,
+        providerId: "credential",
+        userId: input.id,
+        password: passwordHash,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      });
+    });
+  }
+  return { userId: input.id, email: input.email, password: input.password };
+}
+
+/**
  * Ensure the fixed admin user + credential account exist. Returns the
  * credentials the browser spec uses to sign in through the running server.
  */
@@ -32,31 +72,29 @@ export async function seedAdminOperator(): Promise<{
   email: string;
   password: string;
 }> {
-  const existing = await db
-    .select({ id: authSchema.user.id })
-    .from(authSchema.user)
-    .where(eq(authSchema.user.id, ADMIN_USER_ID));
-  if (!existing.length) {
-    const passwordHash = await hashPassword(ADMIN_PASSWORD);
-    await db.transaction(async (tx) => {
-      await tx.insert(authSchema.user).values({
-        id: ADMIN_USER_ID,
-        name: "Operator Console",
-        email: ADMIN_EMAIL,
-        emailVerified: true,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      });
-      await tx.insert(authSchema.account).values({
-        id: `${ADMIN_USER_ID}-credential`,
-        accountId: ADMIN_USER_ID,
-        providerId: "credential",
-        userId: ADMIN_USER_ID,
-        password: passwordHash,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      });
-    });
-  }
-  return { adminUserId: ADMIN_USER_ID, email: ADMIN_EMAIL, password: ADMIN_PASSWORD };
+  const { userId, email, password } = await seedAuthUser({
+    id: ADMIN_USER_ID,
+    name: "Operator Console",
+    email: ADMIN_EMAIL,
+    password: ADMIN_PASSWORD,
+  });
+  return { adminUserId: userId, email, password };
+}
+
+/**
+ * A non-admin Better Auth user with a fixed id guaranteed NOT on the admin
+ * allowlist. Used to prove an authenticated ordinary user is denied admin
+ * access (403, never the console) and that admin identity cannot be forged.
+ */
+export const NON_ADMIN_USER_ID = "00000000-0000-0000-0000-0000000000ff";
+const NON_ADMIN_EMAIL = `player-${NON_ADMIN_USER_ID}@example.com`;
+const NON_ADMIN_PASSWORD = "sup3r-secret-player-password";
+
+export function seedNonAdminUser(): Promise<{ userId: string; email: string; password: string }> {
+  return seedAuthUser({
+    id: NON_ADMIN_USER_ID,
+    name: "Ordinary Player",
+    email: NON_ADMIN_EMAIL,
+    password: NON_ADMIN_PASSWORD,
+  });
 }

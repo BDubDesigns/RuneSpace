@@ -1,29 +1,48 @@
-import { beforeAll, describe, expect, it } from "vitest";
-import { seedAdminOperator, ADMIN_USER_ID } from "@/tests/e2e/admin-session";
+import { eq } from "drizzle-orm";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import {
+  seedAdminOperator,
+  seedNonAdminUser,
+  NON_ADMIN_USER_ID,
+  ADMIN_USER_ID,
+} from "@/tests/e2e/admin-session";
+
+/**
+ * Drive `requireCurrentUser` (the session-resolution seam in server/ownership)
+ * with a real authenticated NON-admin user so the whole downstream
+ * authorization decision exercises real production code: the allowlist check in
+ * `server/admin-auth.ts`, the 403 `AdminError`, `authorizeAdminPage`'s
+ * `forbidden` classification, and the guarded mutation surface. Everything else
+ * (error classes, allowlist membership, command guards) is untouched.
+ */
+vi.mock("@/server/ownership", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/server/ownership")>();
+  return {
+    ...actual,
+    requireCurrentUser: async () => ({
+      id: NON_ADMIN_USER_ID,
+      email: `player-${NON_ADMIN_USER_ID}@example.com`,
+      name: "Ordinary Player",
+    }),
+  };
+});
 
 const DATABASE_URL = process.env.DATABASE_URL;
 const suite = DATABASE_URL ? describe : describe.skip;
 
-/**
- * Guardrail-2 proof for the admin E2E fixture: a deterministic direct-seed +
- * Better Auth session bootstrap must produce a session Better Auth genuinely
- * accepts and issues, WITHOUT registering-then-mutating `user.id`. This proves
- * the seed (fixed admin user + credential account) is valid so the browser spec
- * can sign in through the running server and obtain a real signed session
- * cookie. If this cannot be proven cleanly, the admin browser console spec is
- * STOPPED and reported; it does not block the rest of issue #113.
- */
-suite("admin session bootstrap proof (real PostgreSQL)", () => {
+suite("admin session bootstrap + authorization-negative proof (real PostgreSQL)", () => {
+  afterEach(() => {
+    vi.resetModules();
+  });
+
   it("seeds the fixed admin user and Better Auth authenticates those credentials", async () => {
     const { email, password, adminUserId } = await seedAdminOperator();
     expect(adminUserId).toBe(ADMIN_USER_ID);
 
     const { auth } = await import("@/server/auth");
-    const { eq } = await import("drizzle-orm");
     const { db } = await import("@/db");
     const authSchema = await import("@/db/auth-schema");
 
-    // Deterministic/idempotent: the user row is fixed and created once.
     const users = await db
       .select()
       .from(authSchema.user)
@@ -35,9 +54,6 @@ suite("admin session bootstrap proof (real PostgreSQL)", () => {
       .where(eq(authSchema.account.userId, ADMIN_USER_ID));
     expect(accounts.length).toBeGreaterThanOrEqual(1);
 
-    // Better Auth itself accepts the seeded credentials and issues a real
-    // session for the FIXED admin id (the browser spec captures the signed
-    // cookie from the running server's HTTP sign-in).
     const session = await auth.api.signInEmail({
       headers: new Headers({ host: "127.0.0.1:3000" }),
       body: { email, password },
@@ -46,13 +62,64 @@ suite("admin session bootstrap proof (real PostgreSQL)", () => {
     expect(session.user?.id).toBe(ADMIN_USER_ID);
   });
 
-  it("the admin allowlist accepts the seeded id when RUNESPACE_ADMIN_USER_IDS is set", async () => {
-    const allowlist = process.env.RUNESPACE_ADMIN_USER_IDS ?? "";
-    // The allowlist is server-boot config; the canonical E2E env sets it.
-    // Under the plain integration runner it is absent, so this assertion only
-    // applies when an allowlist is actually configured.
-    if (!allowlist.split(",").includes(ADMIN_USER_ID)) return;
+  it("authorizes the allowlisted ADMIN user id when an allowlist is configured", async () => {
     const { isAdminUserId } = await import("@/server/admin-auth");
+    const allowlist = process.env.RUNESPACE_ADMIN_USER_IDS ?? "";
+    if (!allowlist.split(",").includes(ADMIN_USER_ID)) return;
     expect(isAdminUserId(ADMIN_USER_ID)).toBe(true);
+  });
+
+  it("denies an authenticated NON-admin at requireAdmin (403) and refutes forgery", async () => {
+    // The seeded non-admin is a REAL Better Auth user row (real signed-up id).
+    const { email, userId } = await seedNonAdminUser();
+    expect(userId).toBe(NON_ADMIN_USER_ID);
+    const { db } = await import("@/db");
+    const authSchema = await import("@/db/auth-schema");
+    const rows = await db.select().from(authSchema.user).where(eq(authSchema.user.email, email));
+    expect(rows[0]?.id).toBe(NON_ADMIN_USER_ID);
+
+    // Re-import auth modules fresh so they observe the mocked session seam.
+    vi.resetModules();
+    const { requireAdmin, authorizeAdminPage, AdminError } = await import("@/server/admin-auth");
+    const adminCommands = await import("@/server/admin-commands");
+
+    const headers = new Headers({ host: "127.0.0.1:3000" });
+
+    const page = await authorizeAdminPage(headers);
+    expect(page.authorized).toBe(false);
+    if (!page.authorized) expect(page.reason).toBe("forbidden");
+
+    await expect(requireAdmin(headers)).rejects.toBeInstanceOf(AdminError);
+
+    // A guarded mutation command is refused for the non-admin; nothing is
+    // mutated or audited.
+    const fixtures = await import("./fixtures");
+    const rune = await import("@/db/rune-space");
+    const ownership = await import("@/server/ownership");
+    const characters = await import("@/server/characters");
+    const character = await fixtures.createCharacterForUser(
+      db,
+      rune,
+      ownership,
+      characters,
+      NON_ADMIN_USER_ID,
+      `Denial ${NON_ADMIN_USER_ID.slice(0, 6)}`,
+    );
+    await expect(adminCommands.stopCurrentAction(headers, character.id)).rejects.toBeInstanceOf(
+      AdminError,
+    );
+    const audit = await db
+      .select()
+      .from(rune.operatorAuditLogs)
+      .where(eq(rune.operatorAuditLogs.characterId, character.id));
+    expect(audit).toHaveLength(0);
+
+    // No public command accepts a client-nominated admin user id.
+    const names = Object.keys(adminCommands);
+    for (const name of names) {
+      expect(name.includes("AsAdmin")).toBe(false);
+      expect(name.includes("ForAdmin")).toBe(false);
+      expect(name).not.toBe("runAdminCharacterCommandAs");
+    }
   });
 });

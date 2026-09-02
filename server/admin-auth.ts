@@ -46,3 +46,29 @@ export async function requireAdmin(
   }
   return user;
 }
+
+/**
+ * Page-routing variant of `requireAdmin` that distinguishes the two auth
+ * failure modes so a route can behave defensively:
+ *
+ * - `unauthenticated` (no valid Better Auth session): caller usually redirects
+ *   to `/sign-in`.
+ * - `forbidden` (authenticated but not on the admin allowlist): caller renders
+ *   the safe 403 Forbidden page — it must NOT redirect an already-authenticated
+ *   non-admin to `/sign-in`, which would silently discard their session UI. This
+ *   matches the documented "ordinary authenticated user gets a 403 `AdminError`"
+ *   contract.
+ */
+export type AdminPageAuth =
+  | { authorized: true; admin: { id: string; email: string; name: string } }
+  | { authorized: false; reason: "unauthenticated" | "forbidden" };
+
+export async function authorizeAdminPage(headers: Headers): Promise<AdminPageAuth> {
+  try {
+    const admin = await requireAdmin(headers);
+    return { authorized: true, admin };
+  } catch (error) {
+    if (error instanceof AdminError) return { authorized: false, reason: "forbidden" };
+    return { authorized: false, reason: "unauthenticated" };
+  }
+}

@@ -1,3 +1,5 @@
+import { readFileSync, readdirSync, statSync } from "node:fs";
+import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 /**
@@ -78,5 +80,74 @@ describe("admin production command surface (requireAdmin-only)", () => {
     const exportedNames = Object.keys(mod).filter((name) => name !== "default");
     expect(exportedNames.includes("runAdminCharacterCommandAs")).toBe(false);
     expect(exportedNames).toContain("runAdminCharacterCommand");
+  });
+});
+
+/**
+ * Structural containment guard (finding #2 hardening): `server/admin-command-seams.ts`
+ * is an INTERNAL admin module whose functions assume authorization was already
+ * established (they take an explicit admin user id). Only the single production
+ * forwarding module `server/admin-commands.ts` may import them. This filesystem
+ * scan keeps that convention durable: any future production caller that starts
+ * importing the raw seams bypassing `requireAdmin` fails this test.
+ */
+describe("admin-command-seams import containment", () => {
+  const ALLOWED_IMPORTER = "server/admin-commands.ts";
+
+  function sourceFilesUnder(root: string, out: string[] = []): string[] {
+    const abs = join(process.cwd(), root);
+    if (!statSync(abs, { throwIfNoEntry: false })) return out;
+    for (const entry of readdirSync(abs)) {
+      const full = join(abs, entry);
+      const rel = join(root, entry);
+      if (statSync(full).isDirectory()) {
+        sourceFilesUnder(rel, out);
+      } else if (rel.endsWith(".ts") || rel.endsWith(".tsx")) {
+        out.push(rel);
+      }
+    }
+    return out;
+  }
+
+  function seamImportKinds(src: string, importer: string): string[] {
+    const hits: string[] = [];
+    const seamBasename = "admin-command-seams";
+    // @/server/admin-command-seams
+    const reg = /(?:from\s+|import\(\s*)(["'])(@\/server\/admin-command-seams)\1/g;
+    let m: RegExpExecArray | null;
+    while ((m = reg.exec(src))) if (m[2]) hits.push(m[2]);
+    // Relative imports that resolve to the seams module within server/.
+    if (importer.startsWith("server/") || importer.startsWith("app/")) {
+      const relRe = new RegExp(
+        `(?:from\\s+|import\\(\\s*)(["'])([^"']*\\/?)${seamBasename}["']`,
+        "g",
+      );
+      let r: RegExpExecArray | null;
+      while ((r = relRe.exec(src))) if (r[2]) hits.push(r[2]);
+    }
+    return hits;
+  }
+
+  it("no production module imports the raw seams except server/admin-commands.ts", () => {
+    const violating: string[] = [];
+    for (const root of ["server", "features", "app", "components"]) {
+      for (const rel of sourceFilesUnder(root)) {
+        if (rel === ALLOWED_IMPORTER) continue;
+        const src = readFileSync(rel, "utf8");
+        if (seamImportKinds(src, rel).length > 0) {
+          violating.push(rel);
+        }
+      }
+    }
+    expect(violating).toEqual([]);
+  });
+
+  it("the ONE allowed production importer stays the requireAdmin forwarding module", () => {
+    const src = readFileSync(ALLOWED_IMPORTER, "utf8");
+    expect(seamImportKinds(src, ALLOWED_IMPORTER).length).toBeGreaterThan(0);
+    // ... and it only forwards through requireAdmin-guarded wrappers.
+    const body = readFileSync("server/admin-commands.ts", "utf8");
+    const requireAdminRefs = (body.match(/requireAdmin\(/g) ?? []).length;
+    expect(requireAdminRefs).toBeGreaterThan(0);
   });
 });

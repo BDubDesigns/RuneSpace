@@ -19,8 +19,15 @@ admin access.
 - Absent or empty allowlist ⇒ **no admins**, everything fails closed.
 - `requireAdmin(headers)` authenticates the request via Better Auth, then checks
   the allowlist. An ordinary authenticated user gets a `403` `AdminError`.
+- **Page-level 401-vs-403 behavior** (`authorizeAdminPage`):
+  - no valid Better Auth session ⇒ unauthenticated ⇒ the admin route redirects
+    to `/sign-in`;
+  - authenticated but not on the allowlist ⇒ `forbidden` ⇒ the admin route
+    renders a **safe 403 Forbidden page** (never the console, and never a
+    sign-in redirect that silently discards the already-authenticated session).
 - Every admin read and mutation calls `requireAdmin` server-side. The browser is
-  never trusted for authorization.
+  never trusted for authorization; admin identity always comes from the
+  server-side Better Auth session, never from client-supplied input.
 - There is intentionally **no admin link in ordinary player bottom navigation**;
   direct `/admin` access is acceptable for v1.
 
@@ -43,7 +50,8 @@ Examples (run against the environment's database):
 
 ```sql
 -- You are the operator; resolve your own stable user id by email address.
-SELECT id FROM user WHERE email = 'you@example.com';
+-- Quote the table name: "user" is a reserved word in most SQL dialects.
+SELECT id FROM "user" WHERE email = 'you@example.com';
 ```
 
 ```bash

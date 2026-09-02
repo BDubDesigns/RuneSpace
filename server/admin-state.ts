@@ -1,5 +1,12 @@
 import { asc, eq, or, sql } from "drizzle-orm";
-import { characters, playerAccounts, characterMissions } from "@/db/rune-space";
+import {
+  characters,
+  playerAccounts,
+  characterMissions,
+  cargoHoldItemInstances,
+  equippedItems,
+  itemInstances,
+} from "@/db/rune-space";
 import { user } from "@/db/auth-schema";
 import { requireAdmin } from "@/server/admin-auth";
 import { loadCharacterAuditLog } from "@/server/admin-audit";
@@ -95,17 +102,41 @@ export async function searchCharactersAdmin(
 
 /**
  * Authored mission detail surfaced to the operator console for one character.
- * `status` reflects the persisted record (accepted vs completed) and is
- * independent of the live `play.missions` projection so timestamps can be shown
- * alongside progression state.
+ * The list iterates the CANONICAL `MISSIONS` registry in authored order and
+ * joins any persisted `characterMissions` row: an authored mission with no
+ * persistence row appears as `not_accepted` with absent timestamps, regardless
+ * of its live `play.missions` projection. This satisfies the #113 contract that
+ * EVERY currently authored mission is listed. Stale rows whose mission id is no
+ * longer authored are presented separately (`stale` flag) and never substitute
+ * for the authored list.
  */
 export type AdminMissionDetail = {
   missionId: string;
   title: string;
   prerequisiteMissionId?: string;
-  status: "accepted" | "completed";
+  /** Authored missions are always listed; absent row ⇒ `not_accepted`. */
+  status: "not_accepted" | "accepted" | "completed";
   acceptedAt?: string;
   completedAt?: string;
+  /**
+   * True only for a persisted row whose mission id is NOT in the canonical
+   * `MISSIONS` registry (leftover from before removal).
+   */
+  stale?: boolean;
+};
+
+/**
+ * One canonical "occupied unique instance" for the operator console, unifying
+ * equipped / carried / Cargo instances so every unique item's item ID, instance
+ * ID, mutable state, and (when equipped) slot is visible together.
+ */
+export type AdminUniqueInstanceView = {
+  itemId: string;
+  instanceId: string;
+  /** Mutable persistent state (e.g. Cutter charge), when the item exposes one. */
+  currentCharge?: number;
+  /** "equipped:<assignmentKind>:<suitSlotId>" | "carried" | "cargo". */
+  location: string;
 };
 
 /** Complete authoritative inspector snapshot for one selected character. */
@@ -117,6 +148,8 @@ export type AdminInspectorState = {
   play: PlayGameplayState;
   /** Persisted authored-mission records (with timestamps + prerequisite). */
   missions: readonly AdminMissionDetail[];
+  /** Unified view of every occupied unique instance (equipped/carried/Cargo). */
+  uniqueInstances: readonly AdminUniqueInstanceView[];
   audit: readonly (typeof import("@/db/rune-space").operatorAuditLogs.$inferSelect)[];
 };
 
@@ -130,14 +163,27 @@ export async function loadAdminInspectorState(
     characterId,
     createPlayResolver(),
     async (transaction, context) => {
-      const [ownerRows, auditRows, missionRows] = await Promise.all([
-        ownerIdentity(transaction, context.character.id),
-        loadCharacterAuditLog(transaction, characterId),
-        transaction
-          .select()
-          .from(characterMissions)
-          .where(eq(characterMissions.characterId, context.character.id)),
-      ]);
+      const [ownerRows, auditRows, missionRows, instanceRows, equippedRows, cargoItemRows] =
+        await Promise.all([
+          ownerIdentity(transaction, context.character.id),
+          loadCharacterAuditLog(transaction, characterId),
+          transaction
+            .select()
+            .from(characterMissions)
+            .where(eq(characterMissions.characterId, context.character.id)),
+          transaction
+            .select()
+            .from(itemInstances)
+            .where(eq(itemInstances.characterId, context.character.id)),
+          transaction
+            .select()
+            .from(equippedItems)
+            .where(eq(equippedItems.characterId, context.character.id)),
+          transaction
+            .select()
+            .from(cargoHoldItemInstances)
+            .where(eq(cargoHoldItemInstances.characterId, context.character.id)),
+        ]);
       const state = await stateFromTransaction(
         transaction,
         characterId,
@@ -148,20 +194,66 @@ export async function loadAdminInspectorState(
         undefined,
         now,
       );
-      const missions: AdminMissionDetail[] = [];
-      const byAuthoredId = new Map(MISSIONS.map((m) => [m.id, m]));
-      for (const row of missionRows) {
-        const authored = getMission(row.missionId) ?? byAuthoredId.get(row.missionId);
-        missions.push({
+      // Iterate the CANONICAL authored missions and join any persisted row; an
+      // authored mission with no persistence row appears as `not_accepted`.
+      const byRowMissionId = new Map(missionRows.map((row) => [row.missionId, row]));
+      const authored = MISSIONS.map((definition) => {
+        const row = byRowMissionId.get(definition.id);
+        return {
+          missionId: definition.id,
+          title: definition.title,
+          prerequisiteMissionId: definition.prerequisiteMissionId,
+          status: (!row ? "not_accepted" : row.completedAt ? "completed" : "accepted") as
+            | "not_accepted"
+            | "accepted"
+            | "completed",
+          acceptedAt: row?.acceptedAt.toISOString(),
+          completedAt: row?.completedAt ? row.completedAt.toISOString() : undefined,
+        };
+      });
+      // Persisted rows whose id is not currently authored are preserved (never
+      // silently dropped from the DB) and surfaced as stale, but they do NOT
+      // substitute for or merge into the authored list.
+      const staleRows = missionRows
+        .filter((row) => !getMission(row.missionId))
+        .map((row) => ({
           missionId: row.missionId,
-          title: authored?.title ?? row.missionId,
-          prerequisiteMissionId: authored?.prerequisiteMissionId,
-          status: row.completedAt ? "completed" : "accepted",
+          title: row.missionId,
+          status: (row.completedAt ? "completed" : "accepted") as "accepted" | "completed",
           acceptedAt: row.acceptedAt.toISOString(),
           completedAt: row.completedAt ? row.completedAt.toISOString() : undefined,
-        });
-      }
+          stale: true,
+        }));
+      const missions: AdminMissionDetail[] = [...authored, ...staleRows];
       missions.sort((a, b) => a.missionId.localeCompare(b.missionId));
+
+      // Unified "occupied unique instance" view: every unique `itemInstances`
+      // row categorized as equipped (with its slot) / carried / Cargo, so the
+      // operator sees item ID + instance ID + mutable state + equipped slot
+      // together for each unique item.
+      const equippedSlotByInstance = new Map<string, string>();
+      for (const row of equippedRows) {
+        equippedSlotByInstance.set(row.itemInstanceId, `${row.assignmentKind}:${row.suitSlotId}`);
+      }
+      const cargoInstanceIds = new Set(cargoItemRows.map((row) => row.itemInstanceId));
+      const uniqueInstances: AdminUniqueInstanceView[] = instanceRows
+        .map((instance) => {
+          const slot = equippedSlotByInstance.get(instance.id);
+          const location = slot
+            ? `equipped:${slot}`
+            : cargoInstanceIds.has(instance.id)
+              ? "cargo"
+              : "carried";
+          return {
+            itemId: instance.itemId,
+            instanceId: instance.id,
+            currentCharge:
+              typeof instance.currentCharge === "number" ? instance.currentCharge : undefined,
+            location,
+          };
+        })
+        .sort((a, b) => a.instanceId.localeCompare(b.instanceId));
+
       return {
         characterId,
         displayName: context.character.displayName,
@@ -169,6 +261,7 @@ export async function loadAdminInspectorState(
         currentLocationId: state.location.currentLocationId,
         play: state,
         missions,
+        uniqueInstances,
         audit: auditRows,
       };
     },

@@ -33,27 +33,35 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 
 function IsoTimestamp({ value }: { value?: string }) {
   if (!value) return <span className="text-[color:var(--rs-text-muted)]">—</span>;
-  return <span className="text-xs text-[color:var(--rs-text-primary)]">{value}Z</span>;
+  // Authoritative timestamps are already ISO strings ending in "Z"; never
+  // append a second "Z".
+  const shown = value.endsWith("Z") ? value : `${value}Z`;
+  return <span className="text-xs text-[color:var(--rs-text-primary)]">{shown}</span>;
 }
 
+/** Renders every occupied equipment slot with canonical ID + instance ID. */
 function EquipmentSlotRows({ play }: { play: PlayGameplayState }) {
   return (
     <>
-      {play.equipment.slots.map((slot) => (
-        <Field key={`${slot.target.assignmentKind}:${slot.target.suitSlotId}`} label={slot.label}>
-          {slot.item ? `${slot.item.name} (instance ${slot.item.itemInstanceId})` : "empty"}
-          <span className="block text-xs text-[color:var(--rs-text-muted)]">
-            {slot.target.assignmentKind}:{slot.target.suitSlotId}
-          </span>
-        </Field>
-      ))}
+      {play.equipment.slots.map((slot) => {
+        const item = slot.item;
+        return (
+          <Field key={`${slot.target.assignmentKind}:${slot.target.suitSlotId}`} label={slot.label}>
+            {item ? `${item.name} · ${item.itemId}` : "empty"}
+            <span className="block text-xs text-[color:var(--rs-text-muted)]">
+              {slot.target.assignmentKind}:{slot.target.suitSlotId}
+              {item ? ` · instance ${item.itemInstanceId}` : ""}
+            </span>
+          </Field>
+        );
+      })}
     </>
   );
 }
 
 function MissionRows({ missions }: { missions: readonly AdminMissionDetail[] }) {
   if (missions.length === 0) {
-    return <div className="text-sm text-[color:var(--rs-text-muted)]">No accepted missions.</div>;
+    return <div className="text-sm text-[color:var(--rs-text-muted)]">No authored missions.</div>;
   }
   return (
     <ul className="space-y-2 text-sm">
@@ -71,15 +79,19 @@ function MissionRows({ missions }: { missions: readonly AdminMissionDetail[] }) 
               className={`rounded px-1.5 text-xs uppercase ${
                 mission.status === "completed"
                   ? "bg-green-900/30 text-green-300"
-                  : "bg-amber-900/30 text-amber-300"
-              }`}
+                  : mission.status === "accepted"
+                    ? "bg-amber-900/30 text-amber-300"
+                    : "bg-slate-800/40 text-[color:var(--rs-text-muted)]"
+              }${mission.stale ? "ring-1 ring-yellow-800/60" : ""}`}
             >
-              {mission.status}
+              {mission.stale ? "stale" : mission.status}
             </span>
           </div>
           <div className="mt-1 text-xs text-[color:var(--rs-text-muted)]">
             {mission.prerequisiteMissionId ? `Requires ${mission.prerequisiteMissionId} · ` : ""}
-            accepted {mission.acceptedAt}
+            {mission.status === "not_accepted"
+              ? "not accepted"
+              : `accepted ${mission.acceptedAt ?? "—"}`}
             {mission.completedAt ? ` · completed ${mission.completedAt}` : ""}
           </div>
         </li>
@@ -195,7 +207,7 @@ export function AdminInspector({ initial }: { initial: AdminInspectorState }) {
           Carried inventory
         </h2>
         <div className="mt-2 text-xs text-[color:var(--rs-text-muted)]">
-          {play.inventory.slotsUsed}/{play.inventory.slotsAvailable} slots ·{" "}
+          {play.inventory.slotsUsed} used · {play.inventory.slotsAvailable} available ·{" "}
           {play.inventory.massGrams}/{play.inventory.capacityGrams} g
         </div>
         {play.inventory.stacks.length === 0 && play.inventory.uniqueItems.length === 0 ? (
@@ -243,6 +255,37 @@ export function AdminInspector({ initial }: { initial: AdminInspectorState }) {
             {play.equipment.salvageCutter.maximumCharge}
           </div>
         ) : null}
+      </Panel>
+
+      <Panel className="p-4" tone="raised">
+        <h2 className="font-display text-sm uppercase tracking-wide text-[color:var(--rs-text-muted)]">
+          Unique item instances
+        </h2>
+        <div className="mt-2 text-xs text-[color:var(--rs-text-muted)]">
+          Every occupied unique instance with its canonical item ID, instance ID, mutable state, and
+          location (equipped slot / carried / Cargo).
+        </div>
+        {state.uniqueInstances.length === 0 ? (
+          <div className="mt-2 text-sm text-[color:var(--rs-text-muted)]">
+            No unique item instances.
+          </div>
+        ) : (
+          <ul className="mt-2 space-y-1 text-sm">
+            {state.uniqueInstances.map((instance) => (
+              <li key={instance.instanceId} className="flex justify-between">
+                <span>
+                  {instance.itemId} · instance {instance.instanceId}
+                </span>
+                <span className="text-[color:var(--rs-text-muted)]">
+                  {instance.location}
+                  {instance.currentCharge !== undefined
+                    ? ` · charge ${instance.currentCharge}`
+                    : ""}
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
       </Panel>
 
       <Panel className="p-4" tone="raised">
