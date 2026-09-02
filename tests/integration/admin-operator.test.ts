@@ -355,6 +355,12 @@ suite("issue #113 admin operator console (real PostgreSQL)", () => {
     expect(result.state.inventory.stacks.find((s) => s.id === stack.id)?.quantity).toBe(before - 1);
     const audit = await auditFor(character.id);
     expect(audit.some((a) => a.operation === "removed_stack_quantity")).toBe(true);
+    // Fifth-pass enrichment: the audit carries the removed stack's itemId so
+    // history renders the item by name.
+    const removalAudit = audit.find((a) => a.operation === "removed_stack_quantity");
+    expect((removalAudit?.details as { itemId?: string } | undefined)?.itemId).toBe(
+      ITEM_IDS.ferriteShale,
+    );
   });
 
   it("REMOVE with a stale expected quantity is refused and not audited", async () => {
@@ -417,6 +423,12 @@ suite("issue #113 admin operator console (real PostgreSQL)", () => {
     expect(persisted[0]?.quantity).toBe(3);
     const audit = await auditFor(character.id);
     expect(audit.some((a) => a.operation === "removed_stack_quantity")).toBe(true);
+    // Fifth-pass enrichment: the audit carries the removed stack's itemId so
+    // history renders the item by name.
+    const removalAudit = audit.find((a) => a.operation === "removed_stack_quantity");
+    expect((removalAudit?.details as { itemId?: string } | undefined)?.itemId).toBe(
+      ITEM_IDS.ferriteShale,
+    );
   });
 
   it("REMOVE STACK from Cargo deletes the whole stack and reloads state", async () => {
@@ -501,6 +513,12 @@ suite("issue #113 admin operator console (real PostgreSQL)", () => {
     expect(remaining).toHaveLength(0);
     const audit = await auditFor(character.id);
     expect(audit.some((a) => a.operation === "force_unequipped_item")).toBe(true);
+    // Fifth-pass enrichment: the audit carries the unequipped instance's itemId
+    // so history renders the item by name.
+    const unequipAudit = audit.find((a) => a.operation === "force_unequipped_item");
+    expect((unequipAudit?.details as { itemId?: string } | undefined)?.itemId).toBe(
+      ITEM_IDS.salvageCutter,
+    );
   });
 
   it("FORCE UNEQUIP refuses a non-equipped instance and is not audited", async () => {

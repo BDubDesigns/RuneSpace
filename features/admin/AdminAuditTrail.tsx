@@ -28,8 +28,8 @@ type AuditRow = {
 /**
  * Readable browser-local time. Local formatting is environment-dependent, so
  * it renders only after mount — the server pass renders the deterministic ISO
- * string, avoiding a hydration text mismatch. The exact ISO always stays in
- * the title for forensic precision.
+ * string, avoiding a hydration text mismatch. The exact ISO stays visible as a
+ * secondary mono line so it remains accessible on touch (never hover-only).
  */
 function AuditTimestamp({ value }: { value: Date | string }) {
   const [mounted, setMounted] = useState(false);
@@ -48,10 +48,12 @@ function AuditTimestamp({ value }: { value: Date | string }) {
   return (
     <span
       className="shrink-0 text-left text-[color:var(--rs-text-muted)]"
-      title={iso}
       data-testid="admin-audit-time"
     >
       {readable}
+      {mounted ? (
+        <span className="block font-mono text-[10px] text-[color:var(--rs-text-muted)]">{iso}</span>
+      ) : null}
     </span>
   );
 }
@@ -85,19 +87,13 @@ export function AdminAuditTrail({ rows }: { rows: readonly AuditRow[] }) {
                 </div>
                 <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-[color:var(--rs-text-muted)]">
                   <span data-testid="admin-audit-operation">op {row.operation}</span>
-                  <span>
-                    operator <span className="tabular-nums">{row.adminUserId.slice(0, 8)}</span>
-                    <span className="ml-1" title={row.adminUserId}>
-                      · {row.adminUserId.slice(-4)}
-                    </span>
+                  <span data-testid="admin-audit-operator">
+                    operator{" "}
+                    <span className="font-mono text-[10px] tabular-nums">{row.adminUserId}</span>
                   </span>
                   {row.targetIdentity ? (
-                    <span
-                      className="truncate"
-                      title={row.targetIdentity}
-                      data-testid="admin-audit-target"
-                    >
-                      target {row.targetIdentity}
+                    <span className="min-w-0 break-all" data-testid="admin-audit-target">
+                      target <span className="font-mono text-[10px]">{row.targetIdentity}</span>
                     </span>
                   ) : null}
                 </div>

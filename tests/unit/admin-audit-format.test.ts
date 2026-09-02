@@ -46,17 +46,45 @@ describe("formatAuditSummary", () => {
     ).toBe("Teleported The Jag → Crash Site.");
   });
 
-  it("formats carrying a whole stack removal", () => {
+  it("formats an enriched one-item removal with the item name (current rows carry itemId)", () => {
+    expect(
+      formatAuditSummary(
+        "removed_stack_quantity",
+        { source: "carried", mode: "one", removedQuantity: 1, itemId: "ferrite_shale" },
+        "stack-1",
+      ),
+    ).toBe("Removed 1 Ferrite Shale from carried inventory.");
+  });
+
+  it("formats an enriched whole-stack removal with the item name and count", () => {
+    expect(
+      formatAuditSummary(
+        "removed_stack_quantity",
+        { source: "cargo", mode: "stack", removedQuantity: 10, itemId: "ferrite_shale" },
+        "stack-2",
+      ),
+    ).toBe("Removed the whole Ferrite Shale stack from the Cargo hold (10 items).");
+  });
+
+  it("formats an enriched whole-stack removal with singular count", () => {
+    expect(
+      formatAuditSummary(
+        "removed_stack_quantity",
+        { source: "carried", mode: "stack", removedQuantity: 1, itemId: "refined_ferrite" },
+        "stack-3",
+      ),
+    ).toBe("Removed the whole Refined Ferrite stack from carried inventory (1 item).");
+  });
+
+  it("keeps the generic summaries for legacy rows without itemId", () => {
+    // Historical rows (pre-enrichment) carry no itemId and must still render.
     expect(
       formatAuditSummary(
         "removed_stack_quantity",
         { source: "carried", mode: "stack", removedQuantity: 4 },
         "stack-1",
       ),
-    ).toBe("Removed the whole stack from carried inventory (4 item(s)).");
-  });
-
-  it("formats removing a single item", () => {
+    ).toBe("Removed the whole stack from carried inventory (4 items).");
     expect(
       formatAuditSummary(
         "removed_stack_quantity",
@@ -66,7 +94,17 @@ describe("formatAuditSummary", () => {
     ).toBe("Removed 1 item from the Cargo hold.");
   });
 
-  it("formats force_unequipped_item with a human slot", () => {
+  it("formats an enriched force unequip with the item name (current rows carry itemId)", () => {
+    expect(
+      formatAuditSummary(
+        "force_unequipped_item",
+        { assignmentKind: "gear", suitSlotId: "mining_tool", itemId: "salvage_cutter" },
+        "instance-9",
+      ),
+    ).toBe("Force-unequipped Salvage Cutter from Mining Tool.");
+  });
+
+  it("keeps the generic force-unequip summary for legacy rows without itemId", () => {
     expect(
       formatAuditSummary(
         "force_unequipped_item",

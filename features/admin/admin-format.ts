@@ -78,13 +78,24 @@ export function formatAuditSummary(
     case "removed_stack_quantity": {
       const n = num(d.removedQuantity);
       const from = d.source === "cargo" ? "the Cargo hold" : "carried inventory";
-      if (d.mode === "stack")
-        return `Removed the whole stack from ${from}${n ? ` (${n} item(s))` : ""}.`;
-      return `Removed 1 item from ${from}.`;
+      // New rows carry the removed stack's itemId; legacy rows without it keep
+      // the generic summary.
+      const item = itemLabel(str(d.itemId));
+      if (d.mode === "stack") {
+        const count = n !== undefined ? ` (${n} ${n === 1 ? "item" : "items"})` : "";
+        return item
+          ? `Removed the whole ${item} stack from ${from}${count}.`
+          : `Removed the whole stack from ${from}${count}.`;
+      }
+      return item ? `Removed 1 ${item} from ${from}.` : `Removed 1 item from ${from}.`;
     }
     case "force_unequipped_item": {
       const slot = suitSlotLabel(str(d.suitSlotId));
-      return `Force-unequipped an item${slot ? ` from ${slot}` : ""}.`;
+      const where = slot ? ` from ${slot}` : "";
+      // New rows carry the unequipped instance's itemId; legacy rows without
+      // it keep the generic summary.
+      const item = itemLabel(str(d.itemId));
+      return item ? `Force-unequipped ${item}${where}.` : `Force-unequipped an item${where}.`;
     }
     case "removed_unique_item": {
       const item = itemLabel(str(d.itemId));

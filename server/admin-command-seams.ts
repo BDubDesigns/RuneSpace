@@ -284,7 +284,10 @@ export async function removeCarriedStackQuantityAsAdmin(
         characterId: character.id,
         operation: "removed_stack_quantity",
         targetIdentity: stackId,
-        details: { source: "carried", mode, removedQuantity },
+        // `removal.itemId` is the locked stack's canonical item id; the audit
+        // records it so history renders "Removed 1 Ferrite Shale…" instead of
+        // a generic summary. Legacy rows without it fall back generically.
+        details: { source: "carried", mode, removedQuantity, itemId: removal.itemId },
       });
       return { state, outcome: { kind: "removed", source: "carried", removedQuantity } };
     },
@@ -328,7 +331,15 @@ export async function removeCargoStackQuantityAsAdmin(
         characterId: character.id,
         operation: "removed_stack_quantity",
         targetIdentity: stackId,
-        details: { source: "cargo", mode, removedQuantity: removal.removedQuantity },
+        // `removal.itemId` is returned by `removeCargoStack` from the locked
+        // source row; the audit records it so history renders the removed item
+        // by name. Legacy rows without it fall back generically.
+        details: {
+          source: "cargo",
+          mode,
+          removedQuantity: removal.removedQuantity,
+          itemId: removal.itemId,
+        },
       });
       return {
         state,
@@ -445,9 +456,14 @@ export async function forceUnequipItemAsAdmin(
         characterId: character.id,
         operation: "force_unequipped_item",
         targetIdentity: itemInstanceId,
+        // `instance.itemId` is the loaded instance's canonical item id (the
+        // instance was loaded under the same lock above); the audit records it
+        // so history renders "Force-unequipped Salvage Cutter from Mining Tool."
+        // Legacy rows without it fall back to the generic summary.
         details: {
           assignmentKind: assignment.assignmentKind,
           suitSlotId: assignment.suitSlotId,
+          itemId: instance.itemId,
         },
       });
       return {

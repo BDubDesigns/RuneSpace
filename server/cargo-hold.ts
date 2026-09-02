@@ -559,7 +559,7 @@ export async function removeCargoStack(
     now: Date;
   },
 ): Promise<
-  | { status: "removed"; removedQuantity: number }
+  | { status: "removed"; removedQuantity: number; itemId: string }
   | { status: "refused"; reason: CargoHoldRefusalReason; message: string }
 > {
   const sourceRows = await transaction
@@ -607,7 +607,10 @@ export async function removeCargoStack(
         and(eq(cargoHoldStacks.id, source.id), eq(cargoHoldStacks.characterId, input.characterId)),
       );
   }
-  return { status: "removed", removedQuantity: quantity };
+  // The removed stack's canonical item id travels with the result so callers
+  // (the operator audit seam) can record exactly what was removed without a
+  // second read; the row is deleted or decremented above under its lock.
+  return { status: "removed", removedQuantity: quantity, itemId: source.itemId };
 }
 
 export async function depositCargoUniqueItem(
