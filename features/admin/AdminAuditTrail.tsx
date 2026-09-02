@@ -1,6 +1,7 @@
 "use client";
 
 import { Panel } from "@/components/ui/Panel";
+import { formatAuditSummary } from "./admin-format";
 
 type AuditRow = {
   id: string;
@@ -14,7 +15,26 @@ type AuditRow = {
 /**
  * Immutable operator audit history for the selected character (Issue #113).
  * Read-only display; operators cannot modify or delete history.
+ *
+ * Each row leads with a concise, human-readable mutation summary derived from
+ * the structured `details` the command boundaries persist (see
+ * `formatAuditSummary`). The canonical operation id, operator id, exact target
+ * identity, and authoritative timestamp remain available as secondary
+ * forensic information, and the raw structured details sit behind a compact
+ * disclosure rather than dominating the primary view.
  */
+
+function readableTimestamp(value: Date | string): string {
+  return new Date(value).toLocaleString(undefined, {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+  });
+}
+
 export function AdminAuditTrail({ rows }: { rows: readonly AuditRow[] }) {
   return (
     <Panel className="p-4" tone="raised">
@@ -27,23 +47,58 @@ export function AdminAuditTrail({ rows }: { rows: readonly AuditRow[] }) {
         </p>
       ) : (
         <ol className="mt-3 space-y-2" data-testid="admin-audit-list">
-          {rows.map((row) => (
-            <li
-              key={row.id}
-              className="border border-[color:var(--rs-border-structural)] bg-[color:var(--rs-surface)] px-3 py-2 text-xs"
-            >
-              <div className="flex justify-between gap-2 text-[color:var(--rs-text-primary)]">
-                <span className="font-medium">{row.operation}</span>
-                <span className="shrink-0 text-[color:var(--rs-text-muted)]">
-                  {new Date(row.createdAt).toISOString()}
-                </span>
-              </div>
-              <div className="mt-1 truncate text-[color:var(--rs-text-muted)]">
-                operator {row.adminUserId.slice(0, 8)}
-                {row.targetIdentity ? ` · ${row.targetIdentity}` : ""}
-              </div>
-            </li>
-          ))}
+          {rows.map((row) => {
+            const summary = formatAuditSummary(row.operation, row.details, row.targetIdentity);
+            const hasDetails =
+              row.details != null &&
+              typeof row.details === "object" &&
+              Object.keys(row.details).length > 0;
+            return (
+              <li
+                key={row.id}
+                className="border border-[color:var(--rs-border-structural)] bg-[color:var(--rs-surface)] px-3 py-2 text-xs"
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <span className="text-[color:var(--rs-text-primary)]">{summary}</span>
+                  <span
+                    className="shrink-0 text-left text-[color:var(--rs-text-muted)]"
+                    title={new Date(row.createdAt).toISOString()}
+                    data-testid="admin-audit-time"
+                  >
+                    {readableTimestamp(row.createdAt)}
+                  </span>
+                </div>
+                <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-[color:var(--rs-text-muted)]">
+                  <span data-testid="admin-audit-operation">op {row.operation}</span>
+                  <span>
+                    operator <span className="tabular-nums">{row.adminUserId.slice(0, 8)}</span>
+                    <span className="ml-1" title={row.adminUserId}>
+                      · {row.adminUserId.slice(-4)}
+                    </span>
+                  </span>
+                  {row.targetIdentity ? (
+                    <span
+                      className="truncate"
+                      title={row.targetIdentity}
+                      data-testid="admin-audit-target"
+                    >
+                      target {row.targetIdentity}
+                    </span>
+                  ) : null}
+                </div>
+                {hasDetails ? (
+                  <details className="mt-1 text-[color:var(--rs-text-muted)]">
+                    <summary className="cursor-pointer underline decoration-dotted">
+                      details
+                    </summary>
+                    <pre className="mt-1 overflow-x-auto whitespace-pre-wrap rounded border border-[color:var(--rs-border-structural)] p-2 font-mono text-[10px]">
+                      {JSON.stringify(row.details, null, 2)}
+                    </pre>
+                  </details>
+                ) : null}
+              </li>
+            );
+          })}
         </ol>
       )}
     </Panel>

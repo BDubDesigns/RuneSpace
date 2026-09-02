@@ -22,6 +22,7 @@ import {
   ADMIN_OFFERED_ITEMS,
   XP_SHAPED_SKILLS,
   locationLabel,
+  missionStateLabel,
   skillLabel,
 } from "./admin-format";
 
@@ -53,23 +54,33 @@ function Section({ title, children }: { title: string; children: React.ReactNode
   );
 }
 
-/** A confirm-before-commit destructive operator action. */
+/** A confirm-before-commit operator action (Issue #113). */
 function ConfirmAction({
   label,
   confirmLabel,
+  intent = "danger",
   prompt,
   disabled,
+  fullWidth,
   onConfirm,
 }: {
   label: string;
   confirmLabel: string;
+  /** Visual weight. Defer to `danger` for destructive, `secondary` for regular. */
+  intent?: "danger" | "secondary";
   /**
    * A concrete, operator-facing description of what WILL change on the target
-   * character (names the affected entity/value). Shown only in the armed state
-   * so the operator confirms the actual consequence, not a generic prompt.
+   * (names the affected entity/value). Shown only in the armed state so the
+   * operator confirms the actual consequence, not a generic prompt.
    */
   prompt?: string;
   disabled?: boolean;
+  /**
+   * Callers opt into a full-width button for genuinely section-level controls
+   * (e.g. RESET ALL). Compact row actions (Unequip, Remove, Set, …) default to
+   * sizing to their content so they never crush a row-mate.
+   */
+  fullWidth?: boolean;
   onConfirm: () => Promise<void>;
 }) {
   const [arming, setArming] = useState(false);
@@ -77,21 +88,23 @@ function ConfirmAction({
   if (!arming) {
     return (
       <ActionButton
-        intent="danger"
+        intent={intent}
         disabled={disabled}
         onClick={() => setArming(true)}
-        className="w-full"
+        className={fullWidth ? "w-full" : ""}
       >
         {label}
       </ActionButton>
     );
   }
   return (
-    <div className="rounded border border-[color:var(--rs-border-danger,var(--rs-border-structural))] bg-[color:var(--rs-surface)] p-2">
+    <div
+      className={`rounded border border-[color:var(--rs-border-danger,var(--rs-border-structural))] bg-[color:var(--rs-surface)] p-2 ${fullWidth ? "w-full" : "w-full sm:w-auto"}`}
+    >
       {prompt ? <p className="mb-2 text-xs text-[color:var(--rs-text-primary)]">{prompt}</p> : null}
-      <div className="flex items-center gap-2">
+      <div className="flex flex-wrap items-center gap-2">
         <ActionButton
-          intent="danger"
+          intent={intent}
           loading={pending}
           disabled={disabled}
           onClick={async () => {
@@ -232,8 +245,10 @@ function StopAndLocationSection(props: AdminControlProps) {
   return (
     <Section title="Stop & location">
       <ConfirmAction
-        label="STOP current action"
+        label={activeActionId ? "STOP current action" : "STOP current action (none in progress)"}
         confirmLabel="Confirm stop"
+        intent="danger"
+        disabled={!activeActionId}
         prompt={
           activeActionId
             ? `Stop the in-progress "${activeActionId}" action on "${characterName}".`
@@ -241,8 +256,8 @@ function StopAndLocationSection(props: AdminControlProps) {
         }
         onConfirm={stop}
       />
-      <div className="flex flex-col gap-2">
-        <label className="text-xs uppercase tracking-wide text-[color:var(--rs-text-muted)]">
+      <div className="flex flex-wrap items-end gap-2">
+        <label className="min-w-0 flex-1 text-xs uppercase tracking-wide text-[color:var(--rs-text-muted)]">
           <span className="block">TELEPORT / SET LOCATION</span>
           <select
             className="mt-1 block w-full border border-[color:var(--rs-border-structural)] bg-[color:var(--rs-surface-control)] px-3 py-2 text-sm text-[color:var(--rs-text-primary)]"
@@ -258,13 +273,14 @@ function StopAndLocationSection(props: AdminControlProps) {
         </label>
         {activeActionId ? (
           <ConfirmAction
-            label={`Teleport here${activeActionId ? ` (stops ${activeActionId})` : ""}`}
+            label={`Teleport here (stops ${activeActionId})`}
             confirmLabel={`Move ${characterName} & stop ${activeActionId}`}
+            intent="secondary"
             prompt={`Teleport "${characterName}" to ${locationLabel(destination)} and interrupt the in-flight "${activeActionId}" action.`}
             onConfirm={teleport}
           />
         ) : (
-          <ActionButton intent="danger" loading={pending} onClick={teleport} className="w-full">
+          <ActionButton intent="secondary" loading={pending} onClick={teleport}>
             Teleport here
           </ActionButton>
         )}
@@ -532,6 +548,7 @@ function EquipmentSection(props: AdminControlProps) {
               <ConfirmAction
                 label="Unequip"
                 confirmLabel="Force unequip"
+                intent="secondary"
                 prompt={`Force-unequip "${item.name}" (instance ${item.itemInstanceId}) from "${characterName}"'s ${item.slot} slot. If this is the Mining tool and a Mining action is live, that action will be stopped.`}
                 onConfirm={() => unequip(item.itemInstanceId)}
               />
@@ -706,6 +723,7 @@ function MissionSection(props: AdminControlProps) {
       <ConfirmAction
         label="RESET ALL missions (this character)"
         confirmLabel="Confirm reset all"
+        fullWidth
         prompt={`Reset ALL currently-authored mission records for "${characterName}" (they will need to be re-accepted).`}
         onConfirm={resetAll}
       />
@@ -719,9 +737,18 @@ function MissionSection(props: AdminControlProps) {
       ) : (
         <ul className="space-y-2">
           {play.missions.map((mission) => (
-            <li key={mission.missionId}>
+            <li
+              key={mission.missionId}
+              className="flex flex-wrap items-center justify-between gap-2 border border-[color:var(--rs-border-structural)] bg-[color:var(--rs-surface)] px-3 py-2 text-sm"
+            >
+              <span className="min-w-0 flex-1">
+                <span className="text-[color:var(--rs-text-primary)]">{mission.title}</span>
+                <span className="ml-2 text-xs uppercase tracking-wide text-[color:var(--rs-text-muted)]">
+                  {missionStateLabel(mission.state)}
+                </span>
+              </span>
               <ConfirmAction
-                label={`RESET FROM THIS MISSION (${mission.title})`}
+                label="Reset from here"
                 confirmLabel="Confirm reset chain"
                 prompt={`Reset the mission chain rooted at "${mission.title}" (${mission.missionId}) for "${characterName}".`}
                 onConfirm={() => resetChain(mission.missionId)}
@@ -787,8 +814,8 @@ function XpSection(props: AdminControlProps) {
           </li>
         ))}
       </ul>
-      <div className="mt-2 flex items-end gap-2">
-        <label className="min-w-0 flex-1 text-xs text-[color:var(--rs-text-muted)]">
+      <div className="mt-2 flex flex-wrap items-end gap-2">
+        <label className="min-w-0 flex-1 basis-40 text-xs text-[color:var(--rs-text-muted)]">
           <span className="block uppercase tracking-wide">Skill</span>
           <select
             className="mt-1 block w-full border border-[color:var(--rs-border-structural)] bg-[color:var(--rs-surface-control)] px-3 py-2 text-sm text-[color:var(--rs-text-primary)]"
@@ -802,7 +829,7 @@ function XpSection(props: AdminControlProps) {
             ))}
           </select>
         </label>
-        <label className="w-28 text-xs text-[color:var(--rs-text-muted)]">
+        <label className="w-full text-xs text-[color:var(--rs-text-muted)] sm:w-32">
           <span className="block uppercase tracking-wide">Total XP</span>
           <input
             className="mt-1 block w-full border border-[color:var(--rs-border-structural)] bg-[color:var(--rs-surface-control)] px-3 py-2 text-sm text-[color:var(--rs-text-primary)]"
@@ -815,6 +842,7 @@ function XpSection(props: AdminControlProps) {
           <ConfirmAction
             label="Set"
             confirmLabel="Confirm set"
+            intent="secondary"
             prompt={`Set ${skillLabel(skillId)} total XP for "${characterName}" from ${currentInSkill} to ${parsedForConfirm}.`}
             onConfirm={setXp}
           />

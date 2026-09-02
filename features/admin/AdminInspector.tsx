@@ -9,7 +9,7 @@ import type { PlayGameplayState } from "@/server/play";
 import { adminLoadInspector } from "@/server/admin-actions";
 import { AdminControls } from "./AdminControls";
 import { AdminAuditTrail } from "./AdminAuditTrail";
-import { locationLabel, skillLabel } from "./admin-format";
+import { itemLabel, locationLabel, skillLabel } from "./admin-format";
 
 /**
  * Operator inspector for one character (Issue #113). Holds the authoritative
@@ -34,12 +34,24 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 function IsoTimestamp({ value }: { value?: string }) {
   if (!value) return <span className="text-[color:var(--rs-text-muted)]">—</span>;
   // Authoritative timestamps are already ISO strings ending in "Z"; never
-  // append a second "Z".
+  // append a second "Z". Show a readable browser-local date/time as the primary
+  // display, retaining the exact ISO in the tooltip/title for forensic precision.
   const shown = value.endsWith("Z") ? value : `${value}Z`;
-  return <span className="text-xs text-[color:var(--rs-text-primary)]">{shown}</span>;
+  const readable = new Date(shown).toLocaleString(undefined, {
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+  return (
+    <span className="text-[color:var(--rs-text-primary)]" title={shown}>
+      {readable}
+      <span className="block font-mono text-[10px] text-[color:var(--rs-text-muted)]">{shown}</span>
+    </span>
+  );
 }
 
-/** Renders every occupied equipment slot with canonical ID + instance ID. */
+/** Renders every occupied equipment slot with human name primary + canonical IDs muted. */
 function EquipmentSlotRows({ play }: { play: PlayGameplayState }) {
   return (
     <>
@@ -47,10 +59,14 @@ function EquipmentSlotRows({ play }: { play: PlayGameplayState }) {
         const item = slot.item;
         return (
           <Field key={`${slot.target.assignmentKind}:${slot.target.suitSlotId}`} label={slot.label}>
-            {item ? `${item.name} · ${item.itemId}` : "empty"}
-            <span className="block text-xs text-[color:var(--rs-text-muted)]">
+            {item ? (
+              <span className="text-[color:var(--rs-text-primary)]">{item.name}</span>
+            ) : (
+              <span className="text-[color:var(--rs-text-muted)]">empty</span>
+            )}
+            <span className="block font-mono text-[10px] text-[color:var(--rs-text-muted)]">
+              {item ? `${item.itemId} · instance ${item.itemInstanceId}` : ""}
               {slot.target.assignmentKind}:{slot.target.suitSlotId}
-              {item ? ` · instance ${item.itemInstanceId}` : ""}
             </span>
           </Field>
         );
@@ -215,23 +231,30 @@ export function AdminInspector({ initial }: { initial: AdminInspectorState }) {
         ) : (
           <ul className="mt-2 space-y-1 text-sm">
             {play.inventory.stacks.map((stack) => (
-              <li key={stack.id} className="flex justify-between">
-                <span>
-                  {stack.name} (stack {stack.id})
-                </span>
-                <span className="text-[color:var(--rs-text-muted)]">
-                  {stack.quantity} · {stack.itemId}
+              <li
+                key={stack.id}
+                className="flex items-center justify-between gap-2"
+                data-testid="admin-carried-stack"
+              >
+                <span className="text-[color:var(--rs-text-primary)]">
+                  {stack.name} × {stack.quantity}
+                  <span className="block font-mono text-[10px] text-[color:var(--rs-text-muted)]">
+                    {stack.itemId} · stack {stack.id}
+                  </span>
                 </span>
               </li>
             ))}
             {play.inventory.uniqueItems.map((item) => (
-              <li key={item.id} className="flex justify-between">
-                <span>
-                  {item.name} (instance {item.id})
-                </span>
-                <span className="text-[color:var(--rs-text-muted)]">
+              <li
+                key={item.id}
+                className="flex items-center justify-between gap-2"
+                data-testid="admin-carried-unique"
+              >
+                <span className="text-[color:var(--rs-text-primary)]">{item.name}</span>
+                <span className="text-right font-mono text-[10px] text-[color:var(--rs-text-muted)]">
                   {item.itemId}
                   {item.currentCharge !== undefined ? ` · charge ${item.currentCharge}` : ""}
+                  <span className="block">instance {item.id}</span>
                 </span>
               </li>
             ))}
@@ -272,11 +295,18 @@ export function AdminInspector({ initial }: { initial: AdminInspectorState }) {
         ) : (
           <ul className="mt-2 space-y-1 text-sm">
             {state.uniqueInstances.map((instance) => (
-              <li key={instance.instanceId} className="flex justify-between">
-                <span>
-                  {instance.itemId} · instance {instance.instanceId}
+              <li
+                key={instance.instanceId}
+                className="flex items-center justify-between gap-2"
+                data-testid="admin-unique-instance"
+              >
+                <span className="text-[color:var(--rs-text-primary)]">
+                  {itemLabel(instance.itemId)}
+                  <span className="block font-mono text-[10px] text-[color:var(--rs-text-muted)]">
+                    {instance.itemId} · instance {instance.instanceId}
+                  </span>
                 </span>
-                <span className="text-[color:var(--rs-text-muted)]">
+                <span className="text-right text-[color:var(--rs-text-muted)]">
                   {instance.location}
                   {instance.currentCharge !== undefined
                     ? ` · charge ${instance.currentCharge}`
@@ -310,23 +340,30 @@ export function AdminInspector({ initial }: { initial: AdminInspectorState }) {
         ) : (
           <ul className="mt-2 space-y-1 text-sm">
             {play.cargoHold.stacks.map((stack) => (
-              <li key={stack.id} className="flex justify-between">
-                <span>
-                  {stack.name} (stack {stack.id})
-                </span>
-                <span className="text-[color:var(--rs-text-muted)]">
-                  {stack.quantity} · {stack.itemId}
+              <li
+                key={stack.id}
+                className="flex items-center justify-between gap-2"
+                data-testid="admin-cargo-stack"
+              >
+                <span className="text-[color:var(--rs-text-primary)]">
+                  {stack.name} × {stack.quantity}
+                  <span className="block font-mono text-[10px] text-[color:var(--rs-text-muted)]">
+                    {stack.itemId} · stack {stack.id}
+                  </span>
                 </span>
               </li>
             ))}
             {play.cargoHold.uniqueItems.map((item) => (
-              <li key={item.id} className="flex justify-between">
-                <span>
-                  {item.name} (instance {item.id})
-                </span>
-                <span className="text-[color:var(--rs-text-muted)]">
+              <li
+                key={item.id}
+                className="flex items-center justify-between gap-2"
+                data-testid="admin-cargo-unique"
+              >
+                <span className="text-[color:var(--rs-text-primary)]">{item.name}</span>
+                <span className="text-right font-mono text-[10px] text-[color:var(--rs-text-muted)]">
                   {item.itemId}
                   {item.currentCharge !== undefined ? ` · charge ${item.currentCharge}` : ""}
+                  <span className="block">instance {item.id}</span>
                 </span>
               </li>
             ))}
