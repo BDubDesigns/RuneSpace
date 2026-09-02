@@ -496,3 +496,38 @@ function assertDialogue(missionId: string, dialogueId: string, role: string): vo
     throw new Error(`Mission "${missionId}" ${role} references unknown dialogue "${dialogueId}".`);
   }
 }
+
+/**
+ * The reset scope for "RESET FROM THIS MISSION": the selected mission plus every
+ * authored descendant that (directly or transitively) requires it as a
+ * prerequisite. Derived purely from the authored `prerequisiteMissionId` edges,
+ * never hardcoded to a two-mission list, so a future authored chain is handled
+ * automatically.
+ *
+ * Returns an insertion-ordered list of mission ids to reset, always including
+ * the selected mission. A mission that is not in the supplied definitions
+ * yields only itself (an unknown id cannot be expanded into a chain).
+ */
+export function missionChainResetScope(
+  missionId: string,
+  definitions: readonly { id: string; prerequisiteMissionId?: string }[],
+): readonly string[] {
+  const children = new Map<string, string[]>();
+  for (const definition of definitions) {
+    if (definition.prerequisiteMissionId) {
+      const list = children.get(definition.prerequisiteMissionId) ?? [];
+      list.push(definition.id);
+      children.set(definition.prerequisiteMissionId, list);
+    }
+  }
+  const scope: string[] = [];
+  const visited = new Set<string>();
+  const add = (id: string) => {
+    if (visited.has(id)) return;
+    visited.add(id);
+    scope.push(id);
+    for (const child of children.get(id) ?? []) add(child);
+  };
+  add(missionId);
+  return scope;
+}

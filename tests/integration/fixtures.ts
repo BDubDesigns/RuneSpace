@@ -167,6 +167,9 @@ export async function cleanupTestUser(db: Db, authSchema: AuthSchema, rune: Rune
       await db
         .delete(rune.inventoryStacks)
         .where(eq(rune.inventoryStacks.characterId, character.id));
+      await db
+        .delete(rune.operatorAuditLogs)
+        .where(eq(rune.operatorAuditLogs.characterId, character.id));
       await db.delete(rune.itemInstances).where(eq(rune.itemInstances.characterId, character.id));
     }
     await db.delete(rune.characters).where(eq(rune.characters.playerAccountId, account.id));

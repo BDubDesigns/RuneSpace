@@ -250,6 +250,8 @@ async function runCanonical() {
     "Mining play-boundary check",
   );
 
+  await runPlaywright(["admin", "--project=chromium"], "Admin operator console E2E");
+
   await runPlaywright(["signout", "--project=chromium"], "Sign-out E2E");
 }
 
@@ -277,6 +279,8 @@ async function main() {
       RUNESPACE_E2E_EXTERNAL_SERVER: "true",
       RUNESPACE_RELEASE_ID: "local-ci-parity",
       BETTER_AUTH_SECRET: "canonical-e2e-local-test-secret-not-for-production",
+      // The admin operator console E2E seeds a fixed-allowlisted admin session.
+      RUNESPACE_ADMIN_USER_IDS: "00000000-0000-0000-0000-0000000000a1",
       PLAYWRIGHT_PORT: String(PORT),
       PORT: String(PORT),
     };

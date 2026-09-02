@@ -529,6 +529,45 @@ export const characterPowerCellDailyClaims = pgTable(
   ],
 );
 
+/**
+ * Append-only operator audit log (Issue #113). One immutable row records a
+ * SUCCESSFUL operator mutation, atomically committed with that mutation inside
+ * the same transaction. Refused/failed commands, no-op/idempotent commands,
+ * and normal lazy gameplay reconciliation are never logged here (the explicit
+ * operator action is).
+ *
+ * This is deliberately NOT an event-sourcing or observability store:
+ * - `admin_user_id` is the authenticated Better Auth admin user id (opaque
+ *   text; no FK so the log is decoupled and can never be orphaned by a user).
+ * - `character_id` is the target character (FK RESTRICT for referential safety).
+ * - `operation` is a stable op-kind, e.g. `stop_current_action`.
+ * - `target_identity` is the affected stack/instance/mission/skill/location/
+ *   action id where applicable.
+ * - `details` is concise structured before/after or operation JSON (never
+ *   secrets, tokens, or session data).
+ * Writes happen only through application code; there is intentionally no
+ * `updatedAt` and no update/delete path.
+ */
+export const operatorAuditLogs = pgTable(
+  "operator_audit_logs",
+  {
+    id: text("id")
+      .primaryKey()
+      .default(sql`gen_random_uuid()`),
+    adminUserId: text("admin_user_id").notNull(),
+    characterId: text("character_id")
+      .notNull()
+      .references(() => characters.id, { onDelete: "restrict" }),
+    operation: text("operation").notNull(),
+    targetIdentity: text("target_identity"),
+    details: jsonb("details").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    index("operator_audit_logs_character_created_idx").on(table.characterId, table.createdAt),
+  ],
+);
+
 export type PlayerAccount = typeof playerAccounts.$inferSelect;
 export type NewPlayerAccount = typeof playerAccounts.$inferInsert;
 export type PlayerPortraitUnlock = typeof playerPortraitUnlocks.$inferSelect;
@@ -547,3 +586,5 @@ export type CharacterPowerCellDailyClaim = typeof characterPowerCellDailyClaims.
 export type CharacterCargoHoldRepair = typeof characterCargoHoldRepair.$inferSelect;
 export type CargoHoldStack = typeof cargoHoldStacks.$inferSelect;
 export type CargoHoldItemInstance = typeof cargoHoldItemInstances.$inferSelect;
+export type OperatorAuditLog = typeof operatorAuditLogs.$inferSelect;
+export type NewOperatorAuditLog = typeof operatorAuditLogs.$inferInsert;

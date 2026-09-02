@@ -1,0 +1,184 @@
+import { getLocation, LOCATIONS } from "@/game/content/locations";
+import { getSkillPresentation } from "@/game/content/skill-presentation";
+import { getItemPresentation } from "@/game/content/item-presentation";
+import { getMission } from "@/game/content/missions";
+import { SKILL_IDS } from "@/game/config/foundations";
+
+/** Human label for a canonical location id, falling back to the raw id. */
+export function locationLabel(locationId: string): string {
+  return getLocation(locationId)?.displayName ?? locationId;
+}
+
+/** Human label for a canonical skill id, falling back to the raw id. */
+export function skillLabel(skillId: string): string {
+  return getSkillPresentation(skillId)?.displayName ?? skillId;
+}
+
+/** Human label for a canonical item id, falling back to the raw id. */
+export function itemLabel(itemId: string): string {
+  return getItemPresentation(itemId)?.displayName ?? itemId;
+}
+
+/** Human label for a canonical mission id, falling back to the raw id. */
+export function missionLabel(missionId: string): string {
+  return getMission(missionId)?.title ?? missionId;
+}
+
+/** Human label for a mission state token, falling back to the raw token. */
+export function missionStateLabel(state: string): string {
+  switch (state) {
+    case "not_accepted":
+      return "not accepted";
+    case "ready_for_completion":
+      return "ready to complete";
+    case "active":
+      return "active";
+    case "completed":
+      return "completed";
+    default:
+      return state;
+  }
+}
+
+/**
+ * Operator audit history is persisted as structured JSON (`details`) by the
+ * command boundaries. This formatter renders a concise, human-readable
+ * mutation summary from those stored details, resolving canonical ids to
+ * display names through the authoritative content modules. It is a pure
+ * function so it can be unit-tested against every operation the seams write.
+ * It never invents data the row does not carry — values the row does not store
+ * are omitted rather than guessed.
+ */
+export function formatAuditSummary(
+  operation: string,
+  details: unknown,
+  targetIdentity: string | null,
+): string {
+  const d = (details ?? {}) as Record<string, unknown>;
+  const num = (value: unknown): number | undefined =>
+    typeof value === "number" ? value : undefined;
+  const str = (value: unknown): string => (typeof value === "string" ? value : "");
+  const ids = (value: unknown): string[] =>
+    Array.isArray(value) ? value.map((v) => String(v)).filter(Boolean) : [];
+
+  switch (operation) {
+    case "stop_current_action": {
+      const action = str(d.actionId);
+      return action
+        ? `Stopped the in-progress "${action}" action.`
+        : "Stopped the in-progress action.";
+    }
+    case "teleport_character": {
+      const from = locationLabel(str(d.fromLocationId));
+      const to = locationLabel(str(d.toLocationId));
+      const interruptedAction = str(d.interruptedActionId);
+      const interrupted = interruptedAction ? ` (interrupted "${interruptedAction}")` : "";
+      return `Teleported ${from || "unknown"} → ${to || "unknown"}${interrupted}.`;
+    }
+    case "removed_stack_quantity": {
+      const n = num(d.removedQuantity);
+      const from = d.source === "cargo" ? "the Cargo hold" : "carried inventory";
+      // New rows carry the removed stack's itemId; legacy rows without it keep
+      // the generic summary.
+      const item = itemLabel(str(d.itemId));
+      if (d.mode === "stack") {
+        const count = n !== undefined ? ` (${n} ${n === 1 ? "item" : "items"})` : "";
+        return item
+          ? `Removed the whole ${item} stack from ${from}${count}.`
+          : `Removed the whole stack from ${from}${count}.`;
+      }
+      return item ? `Removed 1 ${item} from ${from}.` : `Removed 1 item from ${from}.`;
+    }
+    case "force_unequipped_item": {
+      const slot = suitSlotLabel(str(d.suitSlotId));
+      const where = slot ? ` from ${slot}` : "";
+      // New rows carry the unequipped instance's itemId; legacy rows without
+      // it keep the generic summary.
+      const item = itemLabel(str(d.itemId));
+      return item ? `Force-unequipped ${item}${where}.` : `Force-unequipped an item${where}.`;
+    }
+    case "removed_unique_item": {
+      const item = itemLabel(str(d.itemId));
+      const from = d.source === "cargo" ? "the Cargo hold" : "carried inventory";
+      return `Permanently deleted unique ${item || "item"} from ${from}.`;
+    }
+    case "added_stackable_item": {
+      const n = num(d.quantity);
+      const item = itemLabel(targetIdentity ?? "");
+      // The seam always records the itemId as the target identity; the fallback
+      // keeps the summary honest if a row ever lacked it.
+      return item
+        ? `Added ${n ?? 1} × ${item} to carried inventory.`
+        : `Added ${n ?? 1} item(s) to carried inventory.`;
+    }
+    case "added_unique_item": {
+      const item = itemLabel(str(d.itemId));
+      const charge = num(d.currentCharge);
+      return `Added unique ${item || "an item"} to carried inventory${
+        charge !== undefined ? ` (charge ${charge})` : ""
+      }.`;
+    }
+    case "reset_mission_chain": {
+      const n = ids(d.deletedMissionIds).length;
+      const root = missionLabel(targetIdentity ?? "");
+      return root
+        ? `Reset the mission chain rooted at ${root}: cleared ${n} row(s).`
+        : `Reset the mission chain: cleared ${n} row(s).`;
+    }
+    case "reset_all_missions": {
+      const n = ids(d.deletedMissionIds).length;
+      return `Reset ALL missions for this character: cleared ${n} row(s).`;
+    }
+    case "set_skill_xp": {
+      const skill = skillLabel(str(d.skillId));
+      const before = num(d.before);
+      const after = num(d.after);
+      if (before !== undefined && after !== undefined)
+        return `Set ${skill} total XP ${before} → ${after}.`;
+      return `Set ${skill} total XP.`;
+    }
+    default:
+      return `${operation}${targetIdentity ? ` (${targetIdentity})` : ""}.`;
+  }
+}
+
+/** Suit-slot ids are canonical tokens; humanize the token for presentation. */
+function suitSlotLabel(suitSlotId: string): string {
+  if (!suitSlotId) return "";
+  return suitSlotId.replace(/[_-]+/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+/**
+ * The rewritten skills the operator console can SET TOTAL XP on (commands
+ * reject anything without an approved progression curve).
+ */
+export const XP_SHAPED_SKILLS = [SKILL_IDS.mining, SKILL_IDS.refining, SKILL_IDS.welding] as const;
+
+/**
+ * Canonical items the ADD ITEM control offers, with human labels for the
+ * operator. Stackables and uniques are both offered; ADD ITEM validates against
+ * the authoritative item definition at the command boundary. `kind` drives
+ * operator UX: uniques are added exactly one-per-command (no quantity input),
+ * stackables take a positive whole quantity.
+ */
+export const ADMIN_OFFERED_ITEMS = [
+  { itemId: "ferrite_shale", label: "Ferrite Shale", kind: "stack" },
+  { itemId: "refined_ferrite", label: "Refined Ferrite", kind: "stack" },
+  { itemId: "slag", label: "Slag", kind: "stack" },
+  { itemId: "power_cell", label: "Power Cell", kind: "stack" },
+  { itemId: "salvage_cutter", label: "Salvage Cutter", kind: "unique" },
+  { itemId: "mykea_schleppraum_8", label: "Mykea Schleppraum 8", kind: "unique" },
+] as const;
+
+export type AdminOfferedItem = (typeof ADMIN_OFFERED_ITEMS)[number];
+
+/**
+ * The canonical locations offered as teleport destinations. Derived directly
+ * from the authoritative location registry (`LOCATIONS`), never hand-maintained
+ * in this feature, so an operator can only ever be offered a location that
+ * resolves canonically. The server command re-validates each destination via
+ * `getLocation` under the transaction lock regardless.
+ */
+export const ADMIN_DESTINATIONS: readonly { locationId: string; label: string }[] = LOCATIONS.map(
+  (location) => ({ locationId: location.id, label: location.displayName }),
+);

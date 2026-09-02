@@ -19,6 +19,45 @@ import {
 import type { MiningRandom } from "@/game/domain/mining";
 
 /**
+ * Songle authoritative "the Mining tool loadout changed while a Mining action is
+ * live" invalidation. The player `changeEquipment` path and the admin
+ * FORCE UNEQUIP path share this EXACT rule so an active
+ * `ferrite_shale_mining` action can never be committed with no compatible tool.
+ *
+ * It deletes the active action and writes the authoritative `characterMiningState`
+ * stop reason (the same persisted value a player loadout swap produces). This is
+ * deliberately NOT a parallel rule: callers detect a mining-tool change and call
+ * this shared primitive. It is a no-op when the Mining tool did not change.
+ */
+export async function invalidateMiningActionForChangedTool(
+  transaction: import("@/server/action-resolution").DatabaseTransaction,
+  input: {
+    characterId: string;
+    /** The authoritative post-reconciliation active action, or undefined when idle. */
+    action: { actionId: string } | undefined;
+    previousToolItemInstanceId?: string;
+    currentToolItemInstanceId?: string;
+    now: Date;
+  },
+): Promise<void> {
+  const miningToolChanged =
+    input.action?.actionId === ACTION_IDS.ferriteShaleMining &&
+    input.previousToolItemInstanceId !== input.currentToolItemInstanceId;
+  if (!miningToolChanged) return;
+  const reason: import("@/game/domain/mining").MiningStopReason = input.currentToolItemInstanceId
+    ? "mining_tool_replaced"
+    : "compatible_mining_tool_missing";
+  await transaction.delete(activeActions).where(eq(activeActions.characterId, input.characterId));
+  await transaction
+    .insert(characterMiningState)
+    .values({ characterId: input.characterId, lastStopReason: reason, updatedAt: input.now })
+    .onConflictDoUpdate({
+      target: characterMiningState.characterId,
+      set: { lastStopReason: reason, updatedAt: input.now },
+    });
+}
+
+/**
  * Applies a current approved loadout change under the same character lock and
  * lazy Mining-resolution transaction as every other state-changing command.
  */
@@ -86,27 +125,22 @@ export async function changeEquipment(
       const currentToolAssignment = nextLoadout.assignments.find(
         (a) => a.assignmentKind === "gear" && a.suitSlotId === miningToolSlotId,
       );
-      const miningToolChanged =
+      // Shared authoritative Mining-loadout invalidation (also used by the admin
+      // FORCE UNEQUIP path).
+      await invalidateMiningActionForChangedTool(transaction, {
+        characterId: context.character.id,
+        action: context.action,
+        previousToolItemInstanceId: previousToolAssignment?.itemInstanceId,
+        currentToolItemInstanceId: currentToolAssignment?.itemInstanceId,
+        now,
+      });
+      if (
         context.action?.actionId === ACTION_IDS.ferriteShaleMining &&
-        previousToolAssignment?.itemInstanceId !== currentToolAssignment?.itemInstanceId;
-      if (miningToolChanged) {
-        const miningStopReasonLocal: import("@/game/domain/mining").MiningStopReason =
-          currentToolAssignment ? "mining_tool_replaced" : "compatible_mining_tool_missing";
-        await transaction
-          .delete(activeActions)
-          .where(eq(activeActions.characterId, context.character.id));
-        await transaction
-          .insert(characterMiningState)
-          .values({
-            characterId: context.character.id,
-            lastStopReason: miningStopReasonLocal,
-            updatedAt: now,
-          })
-          .onConflictDoUpdate({
-            target: characterMiningState.characterId,
-            set: { lastStopReason: miningStopReasonLocal, updatedAt: now },
-          });
-        miningStopReason = miningStopReasonLocal;
+        previousToolAssignment?.itemInstanceId !== currentToolAssignment?.itemInstanceId
+      ) {
+        miningStopReason = currentToolAssignment
+          ? "mining_tool_replaced"
+          : "compatible_mining_tool_missing";
       }
       return stateFromTransaction(
         transaction,

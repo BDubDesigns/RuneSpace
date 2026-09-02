@@ -537,6 +537,82 @@ export async function withdrawCargoStack(
   );
 }
 
+/**
+ * Authoritative Cargo-hold stack removal (operator console, Issue #113).
+ *
+ * This is the Cargo-owned mutation boundary for removing quantity from a
+ * carried-adjacent Cargo stack: the exact `cargoHoldStacks` row (by
+ * characterId + stackId) is locked, the caller's `expectedQuantity` is verified
+ * (mismatch ⇒ `stack_changed` refusal, so a reported stack identity can never
+ * mutate a changed stack), and exactly `mode === "one" ? 1 : source.quantity`
+ * is removed. It operates inside an already-authorised transaction (the shared
+ * lock + reconcile boundary); it intentionally performs no player-ownership and
+ * no carry/deposit transfer — it only removes Cargo quantity.
+ */
+export async function removeCargoStack(
+  transaction: import("@/server/action-resolution").DatabaseTransaction,
+  input: {
+    characterId: string;
+    stackId: string;
+    mode: "one" | "stack";
+    expectedQuantity: number;
+    now: Date;
+  },
+): Promise<
+  | { status: "removed"; removedQuantity: number; itemId: string }
+  | { status: "refused"; reason: CargoHoldRefusalReason; message: string }
+> {
+  const sourceRows = await transaction
+    .select()
+    .from(cargoHoldStacks)
+    .where(
+      and(
+        eq(cargoHoldStacks.characterId, input.characterId),
+        eq(cargoHoldStacks.id, input.stackId),
+      ),
+    )
+    .for("update");
+  const source = sourceRows[0];
+  if (!source)
+    return {
+      status: "refused",
+      reason: "stack_not_found",
+      message: "That Cargo stack is no longer available.",
+    };
+  if (source.quantity !== input.expectedQuantity)
+    return {
+      status: "refused",
+      reason: "stack_changed",
+      message: "Cargo changed. Review the stack and try again.",
+    };
+  const definition = getItemDefinition(source.itemId);
+  if (!definition || definition.kind !== "stack")
+    return {
+      status: "refused",
+      reason: "unsupported_stack",
+      message: "That Cargo item is not a removable stack.",
+    };
+  const quantity = input.mode === "one" ? 1 : source.quantity;
+  if (source.quantity === quantity) {
+    await transaction
+      .delete(cargoHoldStacks)
+      .where(
+        and(eq(cargoHoldStacks.id, source.id), eq(cargoHoldStacks.characterId, input.characterId)),
+      );
+  } else {
+    await transaction
+      .update(cargoHoldStacks)
+      .set({ quantity: source.quantity - quantity, updatedAt: input.now })
+      .where(
+        and(eq(cargoHoldStacks.id, source.id), eq(cargoHoldStacks.characterId, input.characterId)),
+      );
+  }
+  // The removed stack's canonical item id travels with the result so callers
+  // (the operator audit seam) can record exactly what was removed without a
+  // second read; the row is deleted or decremented above under its lock.
+  return { status: "removed", removedQuantity: quantity, itemId: source.itemId };
+}
+
 export async function depositCargoUniqueItem(
   userId: string,
   characterId: string,

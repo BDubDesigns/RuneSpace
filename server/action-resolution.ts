@@ -78,11 +78,11 @@ export type ResolvedCharacterContext = {
   action: ActiveAction | undefined;
 };
 
-async function lockOwnedCharacter(
+/** Resolve the owning player account id for a Better Auth user inside a transaction. */
+async function resolvePlayerAccountId(
   transaction: DatabaseTransaction,
   userId: string,
-  characterId: string,
-): Promise<Character> {
+): Promise<string> {
   const accounts = await transaction
     .select({ id: playerAccounts.id })
     .from(playerAccounts)
@@ -90,11 +90,38 @@ async function lockOwnedCharacter(
     .limit(1);
   const account = accounts[0];
   if (!account) throw new OwnershipError("Player account not found", 404);
+  return account.id;
+}
 
+/**
+ * The single shared character-row lock implementation.
+ *
+ * - `expectedPlayerAccountId` when supplied (player path): the character is
+ *   locked only when it matches BOTH `id` and `player_account_id`, so a forged
+ *   or foreign character id matches nothing → no row is locked and the caller
+ *   observes the safe `404` without ever revealing or locking another player's
+ *   row.
+ * - when omitted (admin path): the caller has already satisfied `requireAdmin`;
+ *   the character is locked by id alone with no ownership scope.
+ *
+ * Both player and admin paths share this exact `FOR UPDATE` lock statement.
+ */
+async function lockCharacterRow(
+  transaction: DatabaseTransaction,
+  characterId: string,
+  expectedPlayerAccountId?: string,
+): Promise<Character> {
   const characterRows = await transaction
     .select()
     .from(characters)
-    .where(and(eq(characters.id, characterId), eq(characters.playerAccountId, account.id)))
+    .where(
+      expectedPlayerAccountId === undefined
+        ? eq(characters.id, characterId)
+        : and(
+            eq(characters.id, characterId),
+            eq(characters.playerAccountId, expectedPlayerAccountId),
+          ),
+    )
     .for("update");
   const character = characterRows[0];
   if (!character) throw new OwnershipError("Character not found", 404);
@@ -102,9 +129,75 @@ async function lockOwnedCharacter(
 }
 
 /**
- * Lock an owned character without resolving its active action. Instantaneous
- * location interactions use this boundary so an expired Mining or Travel row
- * cannot be implicitly progressed as a side effect of the interaction.
+ * Run exactly one lazy reconciliation of the character's active action and
+ * return the authoritative post-reconciliation action (undefined when idle).
+ *
+ * This is the shared reconcile implementation used by both the owned-player
+ * path (`withResolvedOwnedCharacter`) and the admin path
+ * (`withResolvedCharacter`). It must never be called twice for the same
+ * command: a caller invokes it once and then handles the returned action.
+ */
+async function reconcileActiveAction<Snapshot, Outcome>(
+  transaction: DatabaseTransaction,
+  character: Character,
+  resolver: ActionResolver<Snapshot, Outcome>,
+  now: Date,
+): Promise<ActiveAction | undefined> {
+  const actionRows = await transaction
+    .select()
+    .from(activeActions)
+    .where(eq(activeActions.characterId, character.id))
+    .for("update");
+  const action = actionRows[0];
+
+  if (action && (resolver.supports?.(action) ?? true)) {
+    const window = calculateResolutionWindow(action.resolvedThroughAt, now);
+    if (window.elapsedTicks > 0) {
+      const snapshot = asReadonlySnapshot(await resolver.load(transaction, { character, action }));
+      const resolution = await resolver.resolve({ action, snapshot, window });
+      const resolvedThroughAt = cursorAfterConsumedTicks(
+        window,
+        resolution.transition.consumedTicks,
+      );
+      // Persist the authoritative outcome (e.g. Mining rewards, or a Travel
+      // arrival committing the destination location and clearing travel state)
+      // before the transition mutates the action row. For a stop this runs
+      // before the action is deleted; for a continue/replace it runs before the
+      // cursor is advanced.
+      await resolver.persist(transaction, resolution.outcome, { character, action });
+
+      if (resolution.transition.kind === "continue") {
+        await transaction
+          .update(activeActions)
+          .set({ resolvedThroughAt })
+          .where(eq(activeActions.characterId, character.id));
+      } else if (resolution.transition.kind === "stop") {
+        await transaction.delete(activeActions).where(eq(activeActions.characterId, character.id));
+      } else {
+        await transaction
+          .update(activeActions)
+          .set({
+            actionId: resolution.transition.action.actionId,
+            startedAt: resolution.transition.action.startedAt,
+            resolvedThroughAt,
+          })
+          .where(eq(activeActions.characterId, character.id));
+      }
+    }
+  }
+
+  const finalActionRows = await transaction
+    .select()
+    .from(activeActions)
+    .where(eq(activeActions.characterId, character.id))
+    .for("update");
+  return finalActionRows[0];
+}
+
+/**
+ * Authorize an owned character without resolving its active action.
+ * Instantaneous location interactions use this boundary so an expired Mining or
+ * Travel row cannot be implicitly progressed as a side effect of the interaction.
  */
 export async function withLockedOwnedCharacter<Result>(
   userId: string,
@@ -112,7 +205,8 @@ export async function withLockedOwnedCharacter<Result>(
   command: (transaction: DatabaseTransaction, context: { character: Character }) => Promise<Result>,
 ): Promise<Result> {
   return db.transaction(async (transaction) => {
-    const character = await lockOwnedCharacter(transaction, userId, characterId);
+    const playerAccountId = await resolvePlayerAccountId(transaction, userId);
+    const character = await lockCharacterRow(transaction, characterId, playerAccountId);
     return command(transaction, { character });
   });
 }
@@ -121,6 +215,11 @@ export async function withLockedOwnedCharacter<Result>(
  * Authorize, lock, lazily resolve, and then run one state-changing character
  * command in the same transaction. Locking the character serializes concurrent
  * commands, while the durable action cursor makes retries observe prior work.
+ *
+ * Ownership is verified against the locked character inside the same
+ * transaction through the shared `lockCharacterRow` (scoped by the player's
+ * account id), so a forged or foreign character id matches nothing and yields
+ * the existing safe `404` semantics without locking another player's row.
  */
 export async function withResolvedOwnedCharacter<Snapshot, Outcome, Result>(
   userId: string,
@@ -130,63 +229,44 @@ export async function withResolvedOwnedCharacter<Snapshot, Outcome, Result>(
   now: Date = new Date(),
 ): Promise<Result> {
   return db.transaction(async (transaction) => {
-    // All state-changing character commands use this row lock as their shared
-    // concurrency boundary, including future action start/stop commands.
-    const character = await lockOwnedCharacter(transaction, userId, characterId);
+    const playerAccountId = await resolvePlayerAccountId(transaction, userId);
+    const character = await lockCharacterRow(transaction, characterId, playerAccountId);
+    const action = await reconcileActiveAction(transaction, character, resolver, now);
+    return command(transaction, { character, action });
+  });
+}
 
-    const actionRows = await transaction
-      .select()
-      .from(activeActions)
-      .where(eq(activeActions.characterId, character.id))
-      .for("update");
-    const action = actionRows[0];
+/**
+ * Lock a character by id WITHOUT an ownership scope. Callers (the admin path)
+ * must already have satisfied `requireAdmin` before entering this boundary;
+ * it never substitutes for authorization.
+ */
+export async function withLockedCharacter<Result>(
+  characterId: string,
+  command: (transaction: DatabaseTransaction, context: { character: Character }) => Promise<Result>,
+): Promise<Result> {
+  return db.transaction(async (transaction) => {
+    const character = await lockCharacterRow(transaction, characterId);
+    return command(transaction, { character });
+  });
+}
 
-    if (action && (resolver.supports?.(action) ?? true)) {
-      const window = calculateResolutionWindow(action.resolvedThroughAt, now);
-      if (window.elapsedTicks > 0) {
-        const snapshot = asReadonlySnapshot(
-          await resolver.load(transaction, { character, action }),
-        );
-        const resolution = await resolver.resolve({ action, snapshot, window });
-        const resolvedThroughAt = cursorAfterConsumedTicks(
-          window,
-          resolution.transition.consumedTicks,
-        );
-        // Persist the authoritative outcome (e.g. Mining rewards, or a Travel
-        // arrival committing the destination location and clearing travel state)
-        // before the transition mutates the action row. For a stop this runs
-        // before the action is deleted; for a continue/replace it runs before the
-        // cursor is advanced.
-        await resolver.persist(transaction, resolution.outcome, { character, action });
-
-        if (resolution.transition.kind === "continue") {
-          await transaction
-            .update(activeActions)
-            .set({ resolvedThroughAt })
-            .where(eq(activeActions.characterId, character.id));
-        } else if (resolution.transition.kind === "stop") {
-          await transaction
-            .delete(activeActions)
-            .where(eq(activeActions.characterId, character.id));
-        } else {
-          await transaction
-            .update(activeActions)
-            .set({
-              actionId: resolution.transition.action.actionId,
-              startedAt: resolution.transition.action.startedAt,
-              resolvedThroughAt,
-            })
-            .where(eq(activeActions.characterId, character.id));
-        }
-      }
-    }
-
-    const finalActionRows = await transaction
-      .select()
-      .from(activeActions)
-      .where(eq(activeActions.characterId, character.id))
-      .for("update");
-    return command(transaction, { character, action: finalActionRows[0] });
+/**
+ * Lock a character by id and lazily reconcile its active action exactly once,
+ * WITHOUT an ownership scope. Callers (the admin path) must already have
+ * satisfied `requireAdmin`; this boundary shares the exact lock + reconcile
+ * implementation used by `withResolvedOwnedCharacter`.
+ */
+export async function withResolvedCharacter<Snapshot, Outcome, Result>(
+  characterId: string,
+  resolver: ActionResolver<Snapshot, Outcome>,
+  command: (transaction: DatabaseTransaction, context: ResolvedCharacterContext) => Promise<Result>,
+  now: Date = new Date(),
+): Promise<Result> {
+  return db.transaction(async (transaction) => {
+    const character = await lockCharacterRow(transaction, characterId);
+    const action = await reconcileActiveAction(transaction, character, resolver, now);
+    return command(transaction, { character, action });
   });
 }
 
