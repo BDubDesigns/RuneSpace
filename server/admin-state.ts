@@ -1,10 +1,11 @@
 import { asc, eq, or, sql } from "drizzle-orm";
-import { characters, playerAccounts } from "@/db/rune-space";
+import { characters, playerAccounts, characterMissions } from "@/db/rune-space";
 import { user } from "@/db/auth-schema";
 import { requireAdmin } from "@/server/admin-auth";
 import { loadCharacterAuditLog } from "@/server/admin-audit";
 import { withResolvedCharacter } from "@/server/action-resolution";
 import { createPlayResolver, stateFromTransaction, type PlayGameplayState } from "@/server/play";
+import { getMission, MISSIONS } from "@/game/content/missions";
 import { db } from "@/db";
 import type { DatabaseTransaction } from "@/server/action-resolution";
 
@@ -92,12 +93,30 @@ export async function searchCharactersAdmin(
   );
 }
 
+/**
+ * Authored mission detail surfaced to the operator console for one character.
+ * `status` reflects the persisted record (accepted vs completed) and is
+ * independent of the live `play.missions` projection so timestamps can be shown
+ * alongside progression state.
+ */
+export type AdminMissionDetail = {
+  missionId: string;
+  title: string;
+  prerequisiteMissionId?: string;
+  status: "accepted" | "completed";
+  acceptedAt?: string;
+  completedAt?: string;
+};
+
 /** Complete authoritative inspector snapshot for one selected character. */
 export type AdminInspectorState = {
   characterId: string;
+  displayName: string;
   owner: AdminOwnerIdentity;
   currentLocationId: string;
   play: PlayGameplayState;
+  /** Persisted authored-mission records (with timestamps + prerequisite). */
+  missions: readonly AdminMissionDetail[];
   audit: readonly (typeof import("@/db/rune-space").operatorAuditLogs.$inferSelect)[];
 };
 
@@ -111,9 +130,13 @@ export async function loadAdminInspectorState(
     characterId,
     createPlayResolver(),
     async (transaction, context) => {
-      const [ownerRows, auditRows] = await Promise.all([
+      const [ownerRows, auditRows, missionRows] = await Promise.all([
         ownerIdentity(transaction, context.character.id),
         loadCharacterAuditLog(transaction, characterId),
+        transaction
+          .select()
+          .from(characterMissions)
+          .where(eq(characterMissions.characterId, context.character.id)),
       ]);
       const state = await stateFromTransaction(
         transaction,
@@ -125,11 +148,27 @@ export async function loadAdminInspectorState(
         undefined,
         now,
       );
+      const missions: AdminMissionDetail[] = [];
+      const byAuthoredId = new Map(MISSIONS.map((m) => [m.id, m]));
+      for (const row of missionRows) {
+        const authored = getMission(row.missionId) ?? byAuthoredId.get(row.missionId);
+        missions.push({
+          missionId: row.missionId,
+          title: authored?.title ?? row.missionId,
+          prerequisiteMissionId: authored?.prerequisiteMissionId,
+          status: row.completedAt ? "completed" : "accepted",
+          acceptedAt: row.acceptedAt.toISOString(),
+          completedAt: row.completedAt ? row.completedAt.toISOString() : undefined,
+        });
+      }
+      missions.sort((a, b) => a.missionId.localeCompare(b.missionId));
       return {
         characterId,
+        displayName: context.character.displayName,
         owner: ownerRows,
         currentLocationId: state.location.currentLocationId,
         play: state,
+        missions,
         audit: auditRows,
       };
     },

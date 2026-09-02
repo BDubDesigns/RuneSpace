@@ -28,8 +28,9 @@ import type { DatabaseTransaction } from "@/server/action-resolution";
  * - Travel:   delete the remaining active action + `characterTravelState` only;
  *             committed `characterScavengeReveals` are preserved untouched, and
  *             the character's authoritative origin row is not relocated here.
- * - idle / unknown: unknown action rows are deleted so the character is
- *             guaranteed idle; no auxiliary activity rows are invented.
+ * - idle: returns `interrupted: false` (nothing to clean).
+ * - unsupported/unknown action: THROWS and fails closed so a future activity's
+ *   auxiliary persistence cannot be orphaned by deleting only the active row.
  *
  * Operator identity belongs in the audit log, never in a new in-world gameplay
  * stop reason (`operator_interrupted` is deliberately not introduced).
@@ -86,8 +87,10 @@ export async function forceIdleResolvedAction(
     return { interrupted: true, interruptedActionId: actionId };
   }
 
-  // Unknown/stale action id: guarantee the character is idle by clearing the
-  // active action row without inventing activity-specific state.
-  await transaction.delete(activeActions).where(eq(activeActions.characterId, character.id));
-  return { interrupted: true, interruptedActionId: actionId };
+  // Unsupported/unknown action id: FAIL CLOSED. #113 only knows how to clean
+  // Mining / Refining / Welding / Travel safely. A future activity could add
+  // activity-specific auxiliary persistence that this switch does not know how
+  // to remove; deleting the active_actions row blindly could orphan that state,
+  // so we refuse to interrupt rather than leave the character inconsistent.
+  throw new Error(`Cannot interrupt unsupported activity action "${actionId}".`);
 }

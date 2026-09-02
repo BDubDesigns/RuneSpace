@@ -1,4 +1,4 @@
-import { getLocation } from "@/game/content/locations";
+import { getLocation, LOCATIONS } from "@/game/content/locations";
 import { getSkillPresentation } from "@/game/content/skill-presentation";
 import { SKILL_IDS } from "@/game/config/foundations";
 
@@ -32,11 +32,13 @@ export const ADMIN_OFFERED_ITEMS = [
   { itemId: "mykea_schleppraum_8", label: "Mykea Schleppraum 8 (unique)" },
 ] as const;
 
-/** The canonical locations offered as teleport destinations. */
-export const ADMIN_DESTINATIONS = [
-  { locationId: "crash_site", label: "Crash Site" },
-  { locationId: "abandoned_processing_yard", label: "Abandoned Processing Yard" },
-  { locationId: "dwhat_emergency_power_annex", label: "DeWhat? Emergency Power Annex" },
-  { locationId: "the_long_scramble", label: "The Long Scramble" },
-  { locationId: "the_jag", label: "The Jag" },
-] as const;
+/**
+ * The canonical locations offered as teleport destinations. Derived directly
+ * from the authoritative location registry (`LOCATIONS`), never hand-maintained
+ * in this feature, so an operator can only ever be offered a location that
+ * resolves canonically. The server command re-validates each destination via
+ * `getLocation` under the transaction lock regardless.
+ */
+export const ADMIN_DESTINATIONS: readonly { locationId: string; label: string }[] = LOCATIONS.map(
+  (location) => ({ locationId: location.id, label: location.displayName }),
+);

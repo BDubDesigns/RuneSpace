@@ -24,9 +24,36 @@ admin access.
 - There is intentionally **no admin link in ordinary player bottom navigation**;
   direct `/admin` access is acceptable for v1.
 
-To enable an operator locally, put their Better Auth user id (a stable UUID) in
+To enable an operator locally, put their Better Auth user id in
 `RUNESPACE_ADMIN_USER_IDS`. Never commit real production IDs to `.env.example`
 or docs.
+
+### How to obtain a user id safely
+
+Better Auth user ids are **opaque stable text** — they are *not* guaranteed to be
+UUIDs, so do not assume a 36-char `xxxxxxxx-xxxx-…` shape or a UUID library
+format. The allowlist accepts whatever opaque string Better Auth uses for the
+`user.id` column.
+
+The safe, secrets-free way to obtain your own user id is to read the **public
+`id` column** of the `user` table for your authenticated account — it is an
+identifier, not a credential. Do *not* print or share the session token, the
+`session.token` column, password hashes, or any `*_secret`/`*_token` env value.
+Examples (run against the environment's database):
+
+```sql
+-- You are the operator; resolve your own stable user id by email address.
+SELECT id FROM user WHERE email = 'you@example.com';
+```
+
+```bash
+# Or use Better Auth tooling/your own dashboard that shows the signed-in
+# account's id — again, the id is not a secret.
+```
+
+Then put that exact id into `RUNESPACE_ADMIN_USER_IDS`. Because the id is opaque
+text, treat it as an opaque string throughout; never generate it with a UUID
+helper on the assumption it must match a UUID format.
 
 ## Scope and single-character discipline
 
@@ -38,8 +65,14 @@ search (`/admin/characters`) and resolve to a per-character inspector
 
 ## Command layer and the shared lock
 
-`server/admin-commands.ts` implements each operator command over the **shared
-character lock + lazy-reconcile boundary** (`withResolvedCharacter` in
+`server/admin-commands.ts` is the **production admin command surface**: every
+exported command is safe-by-construction through `requireAdmin(headers)` and then
+delegates to the matching internal command body in `server/admin-command-seams.ts`
+(an INTERNAL module, not a production entrypoint). The raw `*AsAdmin` seams and
+the `runAdminCharacterCommandAs` runner live only in that internal module / the
+internal runner, so a server caller cannot reach a skip-authorization command
+through the production surface. Each command runs over the **shared character
+lock + lazy-reconcile boundary** (`withResolvedCharacter` in
 `server/action-resolution.ts`) — the exact `FOR UPDATE` row lock and
 `reconcileActiveAction` used by player commands. The player path scopes the same
 lock by the player's account id inside one transaction; the admin path enters it
@@ -58,6 +91,16 @@ action using Play's own activity persistence:
 - Welding → delete active action only (no `lastStopReason` field)
 - Travel → delete active action + `characterTravelState` only (preserves `characterScavengeReveals`)
 - idle → no-op
+- **unsupported/unknown action id → throws (fails closed)**: #113 only knows how
+  to safely clean Mining / Refining / Welding / Travel. A future activity could
+  add activity-specific auxiliary persistence, so an unknown active action is
+  **never** deleted blindly — the command refuses rather than orphan state.
+
+FORCE UNEQUIP of the Mining tool while an active Mining action is live reuses
+the **authoritative Mining-loadout invalidation** (`invalidateMiningActionForChangedTool`,
+shared with the player `changeEquipment` path): the active action is cleared and
+`characterMiningState.lastStopReason` is set to `compatible_mining_tool_missing`
+instead of committing an active Mining action against an invalid loadout.
 
 Normal lazy gameplay reconciliation performed while loading the inspector or
 entering a command is **not** an operator mutation and is never logged.
@@ -100,16 +143,36 @@ Operation kinds are enumerated in `server/admin-audit.ts`
 ## Enabling the console
 
 1. Set `RUNESPACE_ADMIN_USER_IDS` to the comma-separated Better Auth user IDs of
-   the operators.
+   the operators, obtained safely (see "How to obtain a user id safely"). The
+   ids are opaque text, not necessarily UUIDs.
 2. Navigate directly to `/admin` while signed in as one of those users.
 3. Find a character, open its inspector, and use the confirmed operator controls.
+
+Every destructive operator control is **confirm-before-commit** and its
+confirmation names the target character plus the concrete affected entity/value
+(e.g. the exact stack + quantity, the unique instance id, the mission chain, or
+the skill XP change), so the operator confirms the actual consequence.
+
+The inspector surfaces the full #113 read model for a selected character: display
+name + stable character id, current location/action, Travel origin/destination/
+start/arrival timing, carried stack ids/quantities and unique instance ids with
+mutable state and equipped slot, equipment slots + capacity-relevant data, Cargo
+repair/stacks/unique instances, authored-mission records (title/id/
+prerequisite/status/acceptedAt/completedAt), skills XP with derived level/
+progress, and the recent operator history.
 
 ## Tests
 
 - Unit: `tests/unit/admin-auth.test.ts`, `tests/unit/admin-schema.test.ts`,
-  `tests/unit/mission-reset-scope.test.ts`.
+  `tests/unit/mission-reset-scope.test.ts`,
+  `tests/unit/admin-surface.test.ts` (production surface exposes no bypass seam),
+  `tests/unit/admin-destinations.test.ts` (every offered teleport destination
+  resolves canonically).
 - PostgreSQL integration: `tests/integration/admin-operator.test.ts` exercises
-  reconcile/interrupt/audit/command-layer rejection against a real database.
+  reconcile/interrupt/audit/command-layer rejection, Mining-tool FORCE UNEQUIP
+  invalidation, Cargo stack removal reloading post-mutation state, authored-only
+  mission reset, and fail-closed unsupported-action interruption, against a real
+  database.
 - Browser: the admin console has an E2E spec whose deterministic admin-session
   bootstrap is gated on a proof (see the PR notes); the rest of #113 is not
   gated on that fixture.

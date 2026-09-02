@@ -14,10 +14,13 @@ const suite = DATABASE_URL ? describe : describe.skip;
 
 /**
  * Issue #113 admin operator console: command semantics against a real
- * PostgreSQL database. The `*ForAdmin` command seams take an explicit admin
- * user id so the full shared lock + lazy-reconcile + force-interrupt + atomic
- * audit logic is exercised exactly as a browser-issued command would be; the
- * HTTP `requireAdmin` boundary is covered separately in the unit suite.
+ * PostgreSQL database. The `*AsAdmin` command seams (imported directly from
+ * `server/admin-command-seams.ts`, an INTERNAL non-production module) take an
+ * explicit admin user id so the full shared lock + lazy-reconcile +
+ * force-interrupt + atomic-audit logic is exercised exactly as a browser-issued
+ * command would be; the HTTP `requireAdmin` boundary is covered separately in
+ * the unit suite, and the production surface in `server/admin-commands.ts`
+ * safely wraps these seams behind `requireAdmin`.
  */
 suite("issue #113 admin operator console (real PostgreSQL)", () => {
   const ADMIN = "admin-operator-test";
@@ -29,7 +32,8 @@ suite("issue #113 admin operator console (real PostgreSQL)", () => {
   let characters: typeof import("@/server/characters");
   let play: typeof import("@/server/play");
   let miningCommands: typeof import("@/server/mining-commands");
-  let adminCommands: typeof import("@/server/admin-commands");
+  let adminCommands: typeof import("@/server/admin-command-seams");
+  let playInterrupt: typeof import("@/server/play-interrupt");
   const createdUsers: string[] = [];
 
   beforeAll(async () => {
@@ -40,7 +44,8 @@ suite("issue #113 admin operator console (real PostgreSQL)", () => {
     characters = await import("@/server/characters");
     play = await import("@/server/play");
     miningCommands = await import("@/server/mining-commands");
-    adminCommands = await import("@/server/admin-commands");
+    adminCommands = await import("@/server/admin-command-seams");
+    playInterrupt = await import("@/server/play-interrupt");
   });
 
   afterEach(async () => {
@@ -99,7 +104,7 @@ suite("issue #113 admin operator console (real PostgreSQL)", () => {
 
   it("STOP is a no-op on an already-idle character and writes no audit", async () => {
     const { character } = await makeCharacter();
-    const result = await adminCommands.stopCurrentActionForAdmin(ADMIN, character.id);
+    const result = await adminCommands.stopCurrentActionAsAdmin(ADMIN, character.id);
     expect(result.outcome.kind).toBe("already_idle");
     expect(await auditFor(character.id)).toHaveLength(0);
   });
@@ -109,7 +114,7 @@ suite("issue #113 admin operator console (real PostgreSQL)", () => {
     await moveToTheJag(character.id);
     const startedAt = new Date("2026-01-01T00:00:00.000Z");
     await miningCommands.startFerriteShaleMining(userId, character.id, startedAt);
-    const form = await adminCommands.stopCurrentActionForAdmin(
+    const form = await adminCommands.stopCurrentActionAsAdmin(
       ADMIN,
       character.id,
       new Date("2026-01-01T00:00:02.000Z"),
@@ -151,7 +156,7 @@ suite("issue #113 admin operator console (real PostgreSQL)", () => {
     expect(banked.ferriteShaleQuantity).toBeGreaterThan(0);
     // Admin STOP at the same timestamp reconciles nothing new but must NOT
     // discard the already-earned balance.
-    const result = await adminCommands.stopCurrentActionForAdmin(
+    const result = await adminCommands.stopCurrentActionAsAdmin(
       ADMIN,
       character.id,
       new Date("2026-01-01T00:01:00.000Z"),
@@ -164,7 +169,7 @@ suite("issue #113 admin operator console (real PostgreSQL)", () => {
     const { userId, character } = await makeCharacter();
     const startedAt = new Date("2026-01-01T00:00:00.000Z");
     await play.beginTravel(userId, character.id, LOCATION_IDS.abandonedProcessingYard, startedAt);
-    const result = await adminCommands.stopCurrentActionForAdmin(
+    const result = await adminCommands.stopCurrentActionAsAdmin(
       ADMIN,
       character.id,
       new Date("2026-01-01T00:00:05.000Z"),
@@ -191,7 +196,7 @@ suite("issue #113 admin operator console (real PostgreSQL)", () => {
   it("rejects a non-canonical destination before any mutation or audit", async () => {
     const { character } = await makeCharacter();
     await expect(
-      adminCommands.teleportCharacterForAdmin(ADMIN, character.id, "not_a_canonical_location"),
+      adminCommands.teleportCharacterAsAdmin(ADMIN, character.id, "not_a_canonical_location"),
     ).rejects.toThrow(/unknown destination/i);
     const rows = await db
       .select()
@@ -203,7 +208,7 @@ suite("issue #113 admin operator console (real PostgreSQL)", () => {
 
   it("teleports an idle character, updates location, and audits it", async () => {
     const { character } = await makeCharacter();
-    const result = await adminCommands.teleportCharacterForAdmin(
+    const result = await adminCommands.teleportCharacterAsAdmin(
       ADMIN,
       character.id,
       LOCATION_IDS.theJag,
@@ -221,7 +226,7 @@ suite("issue #113 admin operator console (real PostgreSQL)", () => {
 
   it("teleport to the current location while idle is a no-change with no audit", async () => {
     const { character } = await makeCharacter();
-    const result = await adminCommands.teleportCharacterForAdmin(
+    const result = await adminCommands.teleportCharacterAsAdmin(
       ADMIN,
       character.id,
       LOCATION_IDS.crashSite,
@@ -234,7 +239,7 @@ suite("issue #113 admin operator console (real PostgreSQL)", () => {
     const { userId, character } = await makeCharacter();
     const startedAt = new Date("2026-01-01T00:00:00.000Z");
     await play.beginTravel(userId, character.id, LOCATION_IDS.abandonedProcessingYard, startedAt);
-    const result = await adminCommands.teleportCharacterForAdmin(
+    const result = await adminCommands.teleportCharacterAsAdmin(
       ADMIN,
       character.id,
       LOCATION_IDS.theJag,
@@ -261,7 +266,7 @@ suite("issue #113 admin operator console (real PostgreSQL)", () => {
     const startedAt = new Date("2026-01-01T00:00:00.000Z");
     await play.beginTravel(userId, character.id, LOCATION_IDS.abandonedProcessingYard, startedAt);
     // Arrive at the Processing Yard first, then teleport back to it.
-    const result = await adminCommands.teleportCharacterForAdmin(
+    const result = await adminCommands.teleportCharacterAsAdmin(
       ADMIN,
       character.id,
       LOCATION_IDS.abandonedProcessingYard,
@@ -289,7 +294,7 @@ suite("issue #113 admin operator console (real PostgreSQL)", () => {
     expect(stack).toBeDefined();
     if (!stack) return;
     const before = stack.quantity;
-    const result = await adminCommands.removeCarriedStackQuantityForAdmin(
+    const result = await adminCommands.removeCarriedStackQuantityAsAdmin(
       ADMIN,
       character.id,
       stack.id,
@@ -317,7 +322,7 @@ suite("issue #113 admin operator console (real PostgreSQL)", () => {
     const stack = ready.inventory.stacks.find((s) => s.itemId === ITEM_IDS.ferriteShale);
     expect(stack).toBeDefined();
     if (!stack) return;
-    const result = await adminCommands.removeCarriedStackQuantityForAdmin(
+    const result = await adminCommands.removeCarriedStackQuantityAsAdmin(
       ADMIN,
       character.id,
       stack.id,
@@ -330,6 +335,104 @@ suite("issue #113 admin operator console (real PostgreSQL)", () => {
   });
 
   // -------------------------------------------------------------------------
+  // Cargo stack removal (finding #2/#3)
+  // -------------------------------------------------------------------------
+
+  it("REMOVE from a Cargo stack reloads the POST-mutation state and audits it", async () => {
+    const { character } = await makeCharacter();
+    const [inserted] = await db
+      .insert(rune.cargoHoldStacks)
+      .values({
+        characterId: character.id,
+        itemId: ITEM_IDS.ferriteShale,
+        quantity: 4,
+      })
+      .returning({ id: rune.cargoHoldStacks.id });
+    expect(inserted?.id).toBeTruthy();
+    if (!inserted?.id) return;
+
+    const result = await adminCommands.removeCargoStackQuantityAsAdmin(
+      ADMIN,
+      character.id,
+      inserted.id,
+      "one",
+      4,
+    );
+    expect(result.outcome.kind).toBe("removed");
+    if (result.outcome.kind !== "removed") return;
+    expect(result.outcome.removedQuantity).toBe(1);
+    // The returned state reflects the mutation (not the pre-mutation snapshot).
+    const cargoStack = result.state.cargoHold.stacks.find((s) => s.id === inserted.id);
+    expect(cargoStack?.quantity).toBe(3);
+    const persisted = await db
+      .select()
+      .from(rune.cargoHoldStacks)
+      .where(eq(rune.cargoHoldStacks.id, inserted.id));
+    expect(persisted[0]?.quantity).toBe(3);
+    const audit = await auditFor(character.id);
+    expect(audit.some((a) => a.operation === "removed_stack_quantity")).toBe(true);
+  });
+
+  it("REMOVE STACK from Cargo deletes the whole stack and reloads state", async () => {
+    const { character } = await makeCharacter();
+    const [inserted] = await db
+      .insert(rune.cargoHoldStacks)
+      .values({
+        characterId: character.id,
+        itemId: ITEM_IDS.ferriteShale,
+        quantity: 4,
+      })
+      .returning({ id: rune.cargoHoldStacks.id });
+    expect(inserted?.id).toBeTruthy();
+    if (!inserted?.id) return;
+
+    const result = await adminCommands.removeCargoStackQuantityAsAdmin(
+      ADMIN,
+      character.id,
+      inserted.id,
+      "stack",
+      4,
+    );
+    expect(result.outcome.kind).toBe("removed");
+    if (result.outcome.kind !== "removed") return;
+    expect(result.outcome.removedQuantity).toBe(4);
+    expect(result.state.cargoHold.stacks.find((s) => s.id === inserted.id)).toBeUndefined();
+    const persisted = await db
+      .select()
+      .from(rune.cargoHoldStacks)
+      .where(eq(rune.cargoHoldStacks.id, inserted.id));
+    expect(persisted).toHaveLength(0);
+  });
+
+  it("REMOVE from Cargo against a stale expected quantity is refused and not audited", async () => {
+    const { character } = await makeCharacter();
+    const [inserted] = await db
+      .insert(rune.cargoHoldStacks)
+      .values({
+        characterId: character.id,
+        itemId: ITEM_IDS.ferriteShale,
+        quantity: 4,
+      })
+      .returning({ id: rune.cargoHoldStacks.id });
+    expect(inserted?.id).toBeTruthy();
+    if (!inserted?.id) return;
+    const result = await adminCommands.removeCargoStackQuantityAsAdmin(
+      ADMIN,
+      character.id,
+      inserted.id,
+      "one",
+      999,
+    );
+    expect(result.outcome.kind).toBe("stale");
+    expect(await auditFor(character.id)).toHaveLength(0);
+    const persisted = await db
+      .select()
+      .from(rune.cargoHoldStacks)
+      .where(eq(rune.cargoHoldStacks.id, inserted.id));
+    expect(persisted[0]?.quantity).toBe(4);
+  });
+
+  // -------------------------------------------------------------------------
   // Force Unequip
   // -------------------------------------------------------------------------
 
@@ -338,11 +441,7 @@ suite("issue #113 admin operator console (real PostgreSQL)", () => {
     const itemInstanceId = await equippedCutterId(character.id);
     expect(itemInstanceId).toBeTruthy();
     if (!itemInstanceId) return;
-    const result = await adminCommands.forceUnequipItemForAdmin(
-      ADMIN,
-      character.id,
-      itemInstanceId,
-    );
+    const result = await adminCommands.forceUnequipItemAsAdmin(ADMIN, character.id, itemInstanceId);
     expect(result.outcome.kind).toBe("unequipped");
     const remaining = await db
       .select()
@@ -360,13 +459,52 @@ suite("issue #113 admin operator console (real PostgreSQL)", () => {
 
   it("FORCE UNEQUIP refuses a non-equipped instance and is not audited", async () => {
     const { character } = await makeCharacter();
-    const result = await adminCommands.forceUnequipItemForAdmin(
+    const result = await adminCommands.forceUnequipItemAsAdmin(
       ADMIN,
       character.id,
       "00000000-0000-0000-0000-000000000000",
     );
     expect(result.outcome.kind).toBe("refused");
     expect(await auditFor(character.id)).toHaveLength(0);
+  });
+
+  // -------------------------------------------------------------------------
+  // FORCE UNEQUIP Mining-tool invalidation (finding #1)
+  // -------------------------------------------------------------------------
+
+  it("FORCE UNEQUIP of the active Mining tool clears the live Mining action and reports the authoritative stop reason", async () => {
+    const { userId, character } = await makeCharacter();
+    await moveToTheJag(character.id);
+    const startedAt = new Date("2026-01-01T00:00:00.000Z");
+    await miningCommands.startFerriteShaleMining(userId, character.id, startedAt);
+    const toolId = await equippedCutterId(character.id);
+    expect(toolId).toBeTruthy();
+    if (!toolId) return;
+
+    const result = await adminCommands.forceUnequipItemAsAdmin(
+      ADMIN,
+      character.id,
+      toolId,
+      new Date("2026-01-01T00:00:01.000Z"),
+    );
+    expect(result.outcome.kind).toBe("unequipped");
+    // The RETURNED state must be reloaded AFTER the mutation: the character is
+    // idle (no active Mining action committed with an invalid loadout).
+    expect(result.state.activeAction).toBeUndefined();
+
+    const actions = await db
+      .select()
+      .from(rune.activeActions)
+      .where(eq(rune.activeActions.characterId, character.id));
+    expect(actions).toHaveLength(0);
+    const miningState = await db
+      .select()
+      .from(rune.characterMiningState)
+      .where(eq(rune.characterMiningState.characterId, character.id));
+    // Reuses the authoritative loadout-invalidation stop reason.
+    expect(miningState[0]?.lastStopReason).toBe("compatible_mining_tool_missing");
+    const audit = await auditFor(character.id);
+    expect(audit.some((a) => a.operation === "force_unequipped_item")).toBe(true);
   });
 
   // -------------------------------------------------------------------------
@@ -378,11 +516,7 @@ suite("issue #113 admin operator console (real PostgreSQL)", () => {
     const itemInstanceId = await equippedCutterId(character.id);
     expect(itemInstanceId).toBeTruthy();
     if (!itemInstanceId) return;
-    const result = await adminCommands.deleteUniqueItemForAdmin(
-      ADMIN,
-      character.id,
-      itemInstanceId,
-    );
+    const result = await adminCommands.deleteUniqueItemAsAdmin(ADMIN, character.id, itemInstanceId);
     expect(result.outcome.kind).toBe("refused");
     expect(await auditFor(character.id)).toHaveLength(0);
   });
@@ -393,12 +527,8 @@ suite("issue #113 admin operator console (real PostgreSQL)", () => {
     const itemInstanceId = await equippedCutterId(character.id);
     expect(itemInstanceId).toBeTruthy();
     if (!itemInstanceId) return;
-    await adminCommands.forceUnequipItemForAdmin(ADMIN, character.id, itemInstanceId);
-    const result = await adminCommands.deleteUniqueItemForAdmin(
-      ADMIN,
-      character.id,
-      itemInstanceId,
-    );
+    await adminCommands.forceUnequipItemAsAdmin(ADMIN, character.id, itemInstanceId);
+    const result = await adminCommands.deleteUniqueItemAsAdmin(ADMIN, character.id, itemInstanceId);
     expect(result.outcome.kind).toBe("deleted");
     if (result.outcome.kind !== "deleted") return;
     expect(result.outcome.source).toBe("carried");
@@ -417,7 +547,7 @@ suite("issue #113 admin operator console (real PostgreSQL)", () => {
 
   it("refuses an unknown item without mutation or audit", async () => {
     const { character } = await makeCharacter();
-    const result = await adminCommands.addItemForAdmin(
+    const result = await adminCommands.addItemAsAdmin(
       ADMIN,
       character.id,
       "not_an_item",
@@ -433,7 +563,7 @@ suite("issue #113 admin operator console (real PostgreSQL)", () => {
       .select()
       .from(rune.inventoryStacks)
       .where(eq(rune.inventoryStacks.characterId, character.id));
-    const result = await adminCommands.addItemForAdmin(
+    const result = await adminCommands.addItemAsAdmin(
       ADMIN,
       character.id,
       ITEM_IDS.ferriteShale,
@@ -460,7 +590,7 @@ suite("issue #113 admin operator console (real PostgreSQL)", () => {
 
   it("ADD ITEM adds a unique item with canonical charge init and audits it", async () => {
     const { character } = await makeCharacter();
-    const result = await adminCommands.addItemForAdmin(
+    const result = await adminCommands.addItemAsAdmin(
       ADMIN,
       character.id,
       ITEM_IDS.salvageCutter,
@@ -500,7 +630,7 @@ suite("issue #113 admin operator console (real PostgreSQL)", () => {
   it("RESET FROM THIS MISSION clears the whole transitive chain and audits it", async () => {
     const { character } = await makeCharacter();
     await acceptMissions(character.id, [MISSION_IDS.walkItOff, MISSION_IDS.cutYourTeeth]);
-    const result = await adminCommands.resetMissionChainForAdmin(
+    const result = await adminCommands.resetMissionChainAsAdmin(
       ADMIN,
       character.id,
       MISSION_IDS.walkItOff,
@@ -518,12 +648,49 @@ suite("issue #113 admin operator console (real PostgreSQL)", () => {
     expect(audit.some((a) => a.operation === "reset_mission_chain")).toBe(true);
   });
 
+  it("RESET FROM rejects an unknown/non-authored mission id server-side (finding #4)", async () => {
+    const { character } = await makeCharacter();
+    await acceptMissions(character.id, [MISSION_IDS.walkItOff, MISSION_IDS.cutYourTeeth]);
+    await expect(
+      adminCommands.resetMissionChainAsAdmin(ADMIN, character.id, "not_an_authored_mission"),
+    ).rejects.toThrow(/no authored mission/i);
+    // Nothing was cleared and nothing was audited on the rejected command.
+    const rows = await db
+      .select()
+      .from(rune.characterMissions)
+      .where(eq(rune.characterMissions.characterId, character.id));
+    expect(rows).toHaveLength(2);
+    expect(await auditFor(character.id)).toHaveLength(0);
+  });
+
+  it("RESET ALL deletes only currently-authored mission ids (finding #4)", async () => {
+    const { character } = await makeCharacter();
+    await acceptMissions(character.id, [MISSION_IDS.walkItOff, MISSION_IDS.cutYourTeeth]);
+    // A stale/non-authored persisted row (fictional mission from before removal)
+    // must NOT be cleared by RESET ALL.
+    await db.insert(rune.characterMissions).values({
+      characterId: character.id,
+      missionId: "retired_mission_removed_from_authored",
+      acceptedAt: new Date("2026-01-01T00:00:00.000Z"),
+      completedAt: null,
+    });
+    const result = await adminCommands.resetAllMissionsAsAdmin(ADMIN, character.id);
+    expect(result.outcome.kind).toBe("reset");
+    if (result.outcome.kind !== "reset") return;
+    expect(result.outcome.deleted).toBe(2);
+    const remaining = await db
+      .select()
+      .from(rune.characterMissions)
+      .where(eq(rune.characterMissions.characterId, character.id));
+    expect(remaining.map((r) => r.missionId)).toEqual(["retired_mission_removed_from_authored"]);
+  });
+
   it("RESET ALL MISSIONS clears only the selected character", async () => {
     const { character } = await makeCharacter();
     const { character: other } = await makeCharacter();
     await acceptMissions(character.id, [MISSION_IDS.walkItOff, MISSION_IDS.cutYourTeeth]);
     await acceptMissions(other.id, [MISSION_IDS.walkItOff, MISSION_IDS.cutYourTeeth]);
-    const result = await adminCommands.resetAllMissionsForAdmin(ADMIN, character.id);
+    const result = await adminCommands.resetAllMissionsAsAdmin(ADMIN, character.id);
     expect(result.outcome.kind).toBe("reset");
     const targetRows = await db
       .select()
@@ -539,7 +706,7 @@ suite("issue #113 admin operator console (real PostgreSQL)", () => {
 
   it("mission reset with no rows to clear is a no-op with no audit", async () => {
     const { character } = await makeCharacter();
-    const result = await adminCommands.resetAllMissionsForAdmin(ADMIN, character.id);
+    const result = await adminCommands.resetAllMissionsAsAdmin(ADMIN, character.id);
     expect(result.outcome.kind).toBe("nothing_to_reset");
     expect(await auditFor(character.id)).toHaveLength(0);
   });
@@ -551,7 +718,7 @@ suite("issue #113 admin operator console (real PostgreSQL)", () => {
   it("rejects a skill with no approved progression curve", async () => {
     const { character } = await makeCharacter();
     await expect(
-      adminCommands.setSkillTotalXpForAdmin(ADMIN, character.id, SKILL_IDS.strength, 1000),
+      adminCommands.setSkillTotalXpAsAdmin(ADMIN, character.id, SKILL_IDS.strength, 1000),
     ).rejects.toThrow(/no approved progression curve/i);
     expect(rune.characterSkillXp).toBeDefined();
     const rows = await db
@@ -569,7 +736,7 @@ suite("issue #113 admin operator console (real PostgreSQL)", () => {
 
   it("SET TOTAL XP writes the absolute value and audits it", async () => {
     const { character } = await makeCharacter();
-    const result = await adminCommands.setSkillTotalXpForAdmin(
+    const result = await adminCommands.setSkillTotalXpAsAdmin(
       ADMIN,
       character.id,
       SKILL_IDS.mining,
@@ -597,8 +764,8 @@ suite("issue #113 admin operator console (real PostgreSQL)", () => {
 
   it("SET TOTAL XP to the same value is a no-op with no audit", async () => {
     const { character } = await makeCharacter();
-    await adminCommands.setSkillTotalXpForAdmin(ADMIN, character.id, SKILL_IDS.mining, 5000);
-    const result = await adminCommands.setSkillTotalXpForAdmin(
+    await adminCommands.setSkillTotalXpAsAdmin(ADMIN, character.id, SKILL_IDS.mining, 5000);
+    const result = await adminCommands.setSkillTotalXpAsAdmin(
       ADMIN,
       character.id,
       SKILL_IDS.mining,
@@ -607,5 +774,47 @@ suite("issue #113 admin operator console (real PostgreSQL)", () => {
     expect(result.outcome.kind).toBe("no_change");
     const audits = await auditFor(character.id);
     expect(audits.filter((a) => a.operation === "set_skill_xp")).toHaveLength(1);
+  });
+
+  // -------------------------------------------------------------------------
+  // forceIdleResolvedAction fails closed on an unsupported action (finding #9)
+  // -------------------------------------------------------------------------
+
+  it("never deletes an active action for an unknown/unsupported action id", async () => {
+    const { character } = await makeCharacter();
+    await db.insert(rune.activeActions).values({
+      characterId: character.id,
+      actionId: "future_unknown_activity",
+      startedAt: new Date("2026-01-01T00:00:00.000Z"),
+      resolvedThroughAt: new Date("2026-01-01T00:00:00.000Z"),
+    });
+
+    await db.transaction(async (tx) => {
+      const characterRow = await tx
+        .select()
+        .from(rune.characters)
+        .where(eq(rune.characters.id, character.id))
+        .limit(1);
+      const actionRow = await tx
+        .select()
+        .from(rune.activeActions)
+        .where(eq(rune.activeActions.characterId, character.id))
+        .limit(1);
+      await expect(
+        playInterrupt.forceIdleResolvedAction(tx, {
+          character: characterRow[0]!,
+          action: actionRow[0]!,
+          now: new Date("2026-01-01T00:00:00.000Z"),
+        }),
+      ).rejects.toThrow(/cannot interrupt unsupported activity action/i);
+    });
+
+    // The unknown active row must still be present (fail-closed, not deleted).
+    const actions = await db
+      .select()
+      .from(rune.activeActions)
+      .where(eq(rune.activeActions.characterId, character.id));
+    expect(actions).toHaveLength(1);
+    expect(actions[0]?.actionId).toBe("future_unknown_activity");
   });
 });
