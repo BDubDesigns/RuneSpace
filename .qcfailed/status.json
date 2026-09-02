@@ -3,6 +3,11 @@
   "projectSlug": "runespace",
   "workState": "active",
   "currentFocus": "Refresh current-state docs and landing copy to match the live Play orchestration and connected early-game systems.",
+  "currentChange": {
+    "summary": "Authenticated admin/operator console for character inspection, state repair, and test-state controls.",
+    "stage": "implementation",
+    "pullRequestNumber": 136
+  },
   "latestCompleted": {
     "summary": "Extracted generic Play orchestration from the Mining feature into its own server and client boundary.",
     "date": "2026-09-01",
