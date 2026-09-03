@@ -97,7 +97,10 @@ test("Processing Yard Refining journey — Ferrite and Slag both branches, artwo
     .insert(inventoryStacks)
     .values({ characterId, itemId: ITEM_IDS.ferriteShale, quantity: 10 });
   await page.reload();
-  await expect(page.getByRole("button", { name: /Inventory/ })).toContainText("1/8");
+  await expect(page.getByRole("button", { name: "Inventory" })).toHaveAttribute(
+    "aria-label",
+    "Inventory, 1 of 8 slots used",
+  );
 
   // 2. travel to Abandoned Processing Yard
   await travelTo(

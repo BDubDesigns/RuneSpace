@@ -6,7 +6,6 @@ import type { ComponentProps, ReactNode, Ref } from "react";
 type FooterDestinationProps = {
   icon: ReactNode;
   label: string;
-  compactLabel?: string;
   badgeCount?: number;
   active?: boolean;
 };
@@ -19,21 +18,14 @@ function destinationClassName(active: boolean): string {
   }`;
 }
 
-function DestinationContent({
-  icon,
-  label,
-  compactLabel,
-  badgeCount,
-}: Omit<FooterDestinationProps, "active">) {
+function DestinationContent({ icon, label, badgeCount }: Omit<FooterDestinationProps, "active">) {
   return (
     <>
       <span aria-hidden="true" className="[&>svg]:h-5 [&>svg]:w-5">
         {icon}
       </span>
       <span className="font-display text-[10px] uppercase leading-none tracking-[0.08em]">
-        <span className="hidden min-[380px]:inline">{label}</span>
-        <span className="min-[380px]:hidden">{compactLabel ?? label}</span>
-        <span className="sr-only">{` ${label}`}</span>
+        {label}
       </span>
       {badgeCount !== undefined && badgeCount > 0 ? (
         <span
@@ -51,19 +43,13 @@ function DestinationContent({
 export function FooterNavLink({
   icon,
   label,
-  compactLabel,
   badgeCount,
   active,
   ...props
 }: FooterDestinationProps & ComponentProps<typeof Link>) {
   return (
     <Link {...props} aria-label={label} className={destinationClassName(active ?? false)}>
-      <DestinationContent
-        badgeCount={badgeCount}
-        compactLabel={compactLabel}
-        icon={icon}
-        label={label}
-      />
+      <DestinationContent badgeCount={badgeCount} icon={icon} label={label} />
     </Link>
   );
 }
@@ -76,7 +62,6 @@ type FooterNavButtonProps = FooterDestinationProps &
 export function FooterNavButton({
   icon,
   label,
-  compactLabel,
   badgeCount,
   active,
   ref,
@@ -90,12 +75,7 @@ export function FooterNavButton({
       ref={ref}
       type="button"
     >
-      <DestinationContent
-        badgeCount={badgeCount}
-        compactLabel={compactLabel}
-        icon={icon}
-        label={label}
-      />
+      <DestinationContent badgeCount={badgeCount} icon={icon} label={label} />
     </button>
   );
 }

@@ -36,14 +36,12 @@ function PlayFooter() {
         href="/characters"
         icon={<Users />}
         label="Characters"
-        compactLabel="Chars"
       />
       <FooterNavButton
         active={inventoryOpen}
         aria-label={`Inventory, ${state.inventory.slotsUsed} of ${totalSlots} slots used`}
         icon={<Backpack />}
         label="Inventory"
-        compactLabel="Inv."
         onClick={() => {
           setEquipmentOpen(false);
           setMissionsOpen(false);
@@ -56,7 +54,6 @@ function PlayFooter() {
         aria-label="Equipment"
         icon={<Shield />}
         label="Equipment"
-        compactLabel="Equip"
         onClick={() => {
           setInventoryOpen(false);
           setMissionsOpen(false);
@@ -70,7 +67,6 @@ function PlayFooter() {
         badgeCount={readyCount}
         icon={<ScrollText />}
         label="Missions"
-        compactLabel="Miss."
         onClick={() => {
           setInventoryOpen(false);
           setEquipmentOpen(false);
