@@ -11,7 +11,7 @@ type FooterDestinationProps = {
 };
 
 function destinationClassName(active: boolean): string {
-  return `rs-bevel rs-focus relative flex min-h-[var(--rs-touch-target)] flex-1 flex-col items-center justify-center gap-0.5 border px-1 py-1.5 text-center transition duration-[var(--rs-duration-fast)] ${
+  return `rs-bevel rs-focus relative flex min-h-[var(--rs-touch-target)] flex-1 flex-col items-center justify-center gap-0.5 border px-1 py-1 text-center transition duration-[var(--rs-duration-fast)] ${
     active
       ? "border-[color:var(--rs-accent-primary)] bg-[color:var(--rs-accent-primary-subtle)] text-[color:var(--rs-accent-primary)]"
       : "border-[color:var(--rs-border-structural)] bg-[color:var(--rs-surface-control)] text-[color:var(--rs-text-primary)] hover:border-[color:var(--rs-accent-secondary)]"
