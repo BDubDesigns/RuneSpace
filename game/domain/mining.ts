@@ -17,7 +17,7 @@ export type MiningRandom = { nextBasisPoints(): number; nextUnit(): number };
 /**
  * The authoritative award facts for one Mining attempt: which item Mining
  * produces, its storage facts, and the per-success yield range. The resolver
- * and quest-guidance recommendation validation both read THIS function, so
+ * and mission-guidance recommendation validation both read THIS function, so
  * what Mining authoritatively produces has exactly one home — changing the
  * resolver's award cannot leave guidance validation stale.
  */

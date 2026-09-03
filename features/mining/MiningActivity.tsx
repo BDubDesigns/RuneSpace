@@ -13,7 +13,7 @@ import {
   miningNearMissBasisPoints,
   type MiningStopReason,
 } from "@/game/domain/mining";
-import { deriveQuestGuidanceTargets } from "@/game/domain/missions";
+import { deriveMissionGuidanceTargets } from "@/game/domain/missions";
 import type { MiningRunAttempt } from "@/server/mining";
 import type { PlayGameplayState } from "@/server/play";
 import { refreshPlayAction, startMiningAction, stopMiningAction } from "@/server/actions";
@@ -176,14 +176,14 @@ export function MiningActivity({ characterName }: { characterName: string }) {
   const active = state.activeAction;
   const showMiningActivity =
     state.location.currentLocationId === LOCATION_IDS.theJag && !state.travelState;
-  // Quest guidance is consumed from the ONE derived target set — this activity
+  // Mission guidance is consumed from the ONE derived target set — this activity
   // never inspects mission IDs, objective prose, or drop tables to decide
-  // whether Start Mining advances the active quest.
-  const questGuidanceTargets = deriveQuestGuidanceTargets(state.missions);
+  // whether Start Mining advances the active mission.
+  const missionGuidanceTargets = deriveMissionGuidanceTargets(state.missions);
   const startMiningGuided =
     showMiningActivity &&
     !active &&
-    questGuidanceTargets.actionIds.has(ACTION_IDS.ferriteShaleMining);
+    missionGuidanceTargets.actionIds.has(ACTION_IDS.ferriteShaleMining);
   const durationTicks = active?.nextAttemptDurationTicks ?? balance.mining.attemptDurationTicks;
   const durationMs = durationTicks * GAME_TICK_MS;
   const elapsed = active ? Math.max(0, now - new Date(active.progressStartedAt).getTime()) : 0;
@@ -298,8 +298,8 @@ export function MiningActivity({ characterName }: { characterName: string }) {
           </ActionButton>
         ) : (
           <ActionButton
-            className={startMiningGuided ? "rs-quest-guidance" : undefined}
-            data-quest-guidance={startMiningGuided ? "active" : undefined}
+            className={startMiningGuided ? "rs-mission-guidance" : undefined}
+            data-mission-guidance={startMiningGuided ? "active" : undefined}
             intent="mining"
             loading={foregroundBusy && pendingCommand === "start"}
             onClick={() => runForeground("start", startMiningAction)}

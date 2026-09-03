@@ -2,12 +2,14 @@ import { getItemDefinition, skillLevelThresholds } from "@/game/config/balance";
 import { getActionOutputItemIds } from "@/game/domain/action-outputs";
 import { getDialogue } from "@/game/content/dialogue";
 import { getLocation } from "@/game/content/locations";
+import { getNpc } from "@/game/content/npcs";
+import { resolveItemPresentation } from "@/game/content/item-presentation";
+import { getSkillPresentation } from "@/game/content/skill-presentation";
 import type {
   MissionDefinition,
   MissionRequirement,
   MissionRequirementKind,
 } from "@/game/content/missions";
-import { getNpc } from "@/game/content/npcs";
 
 export type MissionState = "not_accepted" | "active" | "ready_for_completion" | "completed";
 
@@ -32,9 +34,9 @@ export type MissionObservation = {
 };
 
 /**
- * Semantic quest-guidance targets projected from mission state. UI consumers
+ * Semantic mission-guidance targets projected from mission state. UI consumers
  * answer one common question — "is this entity/control currently a
- * quest-guidance target?" — without inspecting mission IDs, objective prose,
+ * mission-guidance target?" — without inspecting mission IDs, objective prose,
  * or drop tables.
  */
 export type MissionGuidance = {
@@ -45,15 +47,48 @@ export type MissionGuidance = {
   /** The authored recommended acquisition action for the first unmet carried requirement. */
   actionId?: string;
   /**
-   * The NPC(s) whose authored offer interaction is currently a quest-
-   * availability target: every offer whose location matches the player's
-   * current location for a mission that is not yet accepted, its
-   * prerequisite satisfied, and not completed. Availability guides NPC
+   * The NPC(s) whose authored offer interaction is currently a
+   * mission-availability target. Only missions with NO prerequisite author
+   * open discovery: every offer whose location matches the player's current
+   * location for a mission that is not yet accepted and not completed.
+   * Prerequisite-gated missions never advertise — a prerequisite is an
+   * eligibility rule, not a reveal mechanism. Availability guides NPC
    * interactions only; advancement after acceptance guides NPC/equipment/
    * action progression.
    */
   availableNpcIds?: readonly string[];
 };
+
+/**
+ * One player-facing current-stage requirement with live satisfaction and
+ * progress. UI surfaces render this generically — they never parse mission
+ * definitions or objective prose themselves, and balance values stay
+ * authoritative (names/stack limits resolve through the observation).
+ */
+export type MissionRequirementStatus = {
+  kind: MissionRequirementKind;
+  /** Rendered objective copy with authoritative names/numbers substituted. */
+  objective: string;
+  /** Whether this requirement currently holds against authoritative state. */
+  satisfied: boolean;
+  /**
+   * Live quantity progress for carried-stack requirements
+   * (`carried` clamps at `required`); absent for other kinds.
+   */
+  progress?: { carried: number; required: number };
+  /** The item this requirement observes, when it observes one. */
+  itemId?: string;
+  /** The location this requirement observes, when it observes one. */
+  locationId?: string;
+};
+
+/**
+ * The reward that was actually earned by a completed mission. Projected only
+ * for completed missions — active missions never preview rewards.
+ */
+export type MissionEarnedReward =
+  | { kind: "item"; itemId: string; itemName: string }
+  | { kind: "skill_xp"; skillId: string; skillName: string; amount: number };
 
 export type MissionProjection = {
   missionId: string;
@@ -61,26 +96,29 @@ export type MissionProjection = {
   summary: string;
   state: MissionState;
   currentObjective?: string;
-  offeringNpcId: string;
-  completionNpcId: string;
-  rewardItemId?: string;
+  /**
+   * The simultaneous current-stage requirement set: every authored
+   * requirement with live satisfaction/progress. Present for accepted,
+   * incomplete missions; absent otherwise.
+   */
+  requirements?: readonly MissionRequirementStatus[];
+  /**
+   * Completion timestamp for completed missions, when the record supplies
+   * one. Never fabricated — absent when unrecorded.
+   */
+  completedAt?: Date | null;
+  /** The reward actually earned; projected only for completed missions. */
+  earnedReward?: MissionEarnedReward;
   /**
    * True only when this mission's authored prerequisite (if any) is currently
-   * completed for the character. Used to present a not-yet-accepted mission as
-   * available instead of hiding it.
+   * completed for the character. An eligibility rule for acceptance — never
+   * a discovery/reveal mechanism.
    */
   prerequisiteSatisfied: boolean;
-  /** Authoritative display name for the primary offering NPC (for available copy). */
-  offeringNpcName?: string;
-  /**
-   * Player-facing copy shown while the mission is available but not yet
-   * accepted, pointing the player at the quest giver.
-   */
-  availableObjective?: string;
   /**
    * Semantic mission-stage data for routing, independent of player-facing
    * copy. Objective copy is presentational and must never be parsed to drive
-   * quest/dialogue routing.
+   * mission/dialogue routing.
    */
   stage?: {
     /** All authored requirements currently hold against authoritative state. */
@@ -120,7 +158,7 @@ function renderRequirementObjective(
     .replace("{required}", String(required));
 }
 
-/** Full-stack requirement resolves from the authoritative stack limit, not quest data. */
+/** Full-stack requirement resolves from the authoritative stack limit, not mission data. */
 function requiredCarriedQuantity(
   requirement: Extract<MissionRequirement, { kind: "carried_stack" }>,
   observation: MissionObservation | undefined,
@@ -214,17 +252,21 @@ function deriveCurrentObjective(
  * Projects semantic guidance targets from mission state. Guidance answers
  * "what should the player interact with next" without consumers inspecting
  * mission definitions, objective prose, or drop tables.
+ *
+ * Availability is intentionally narrow: only prerequisite-free missions
+ * advertise open discovery. Prerequisite-gated missions never appear merely
+ * because their prerequisite is satisfied — the continuation mechanism (or
+ * world discovery) owns that transition.
  */
 function deriveGuidance(
   definition: MissionDefinition,
   state: MissionState,
-  prerequisiteSatisfied: boolean,
   currentLocationId: string,
   observation: MissionObservation | undefined,
 ): MissionGuidance | undefined {
   if (state === "completed") return undefined;
   if (state === "not_accepted") {
-    if (!prerequisiteSatisfied) return undefined;
+    if (definition.prerequisiteMissionId) return undefined;
     const availableNpcIds = definition.offers
       .filter((offer) => offer.locationId === currentLocationId)
       .map((offer) => offer.npcId);
@@ -264,57 +306,106 @@ export function projectMission(
   const firstUnsatisfied = firstUnsatisfiedRequirement(definition, currentLocationId, observation);
   const requirementsSatisfied = requirementsHold(definition, currentLocationId, observation);
   const prerequisiteSatisfied = !definition.prerequisiteMissionId || prerequisiteCompleted;
-  const offeringNpc = getNpc(definition.offers[0]?.npcId ?? "");
+  const active = state === "active" || state === "ready_for_completion";
   return {
     missionId: definition.id,
     title: definition.title,
     summary: definition.summary,
     state,
-    currentObjective:
-      state === "not_accepted" || state === "completed"
-        ? undefined
-        : deriveCurrentObjective(definition, currentLocationId, observation),
-    offeringNpcId: definition.offers[0]?.npcId ?? "",
-    offeringNpcName: offeringNpc?.displayName,
-    completionNpcId: definition.turnIn.npcId,
-    rewardItemId: definition.reward.kind === "item" ? definition.reward.itemId : undefined,
+    currentObjective: active
+      ? deriveCurrentObjective(definition, currentLocationId, observation)
+      : undefined,
+    requirements: active
+      ? definition.requirements.map((requirement) =>
+          projectRequirement(requirement, currentLocationId, observation),
+        )
+      : undefined,
+    completedAt: state === "completed" ? (mission?.completedAt ?? null) : undefined,
+    earnedReward: state === "completed" ? projectEarnedReward(definition) : undefined,
     prerequisiteSatisfied,
-    availableObjective: definition.availableObjective,
     stage: {
       requirementsSatisfied,
       turnInAvailable: state === "ready_for_completion" && requirementsSatisfied,
       nextObjectiveKind: firstUnsatisfied?.kind,
     },
-    guidance: deriveGuidance(
-      definition,
-      state,
-      prerequisiteSatisfied,
-      currentLocationId,
-      observation,
-    ),
+    guidance: deriveGuidance(definition, state, currentLocationId, observation),
+  };
+}
+
+/** Projects one authored requirement with live satisfaction/progress. */
+function projectRequirement(
+  requirement: MissionRequirement,
+  currentLocationId: string,
+  observation: MissionObservation | undefined,
+): MissionRequirementStatus {
+  const satisfied = requirementSatisfied(requirement, currentLocationId, observation);
+  if (requirement.kind === "at_location") {
+    return {
+      kind: requirement.kind,
+      objective: requirement.objective,
+      satisfied,
+      locationId: requirement.locationId,
+    };
+  }
+  const itemName = observation?.itemNames.get(requirement.itemId) ?? requirement.itemId;
+  if (requirement.kind === "equipped_item") {
+    return {
+      kind: requirement.kind,
+      objective: requirement.objective.replace("{item}", itemName),
+      satisfied,
+      itemId: requirement.itemId,
+    };
+  }
+  const required = requiredCarriedQuantity(requirement, observation);
+  const rawCarried = observation?.carriedQuantities.get(requirement.itemId) ?? 0;
+  return {
+    kind: requirement.kind,
+    objective: renderRequirementObjective(requirement, observation),
+    satisfied,
+    progress: { carried: Math.min(rawCarried, required), required },
+    itemId: requirement.itemId,
+  };
+}
+
+/** Projects the actually-earned reward for a completed mission. */
+function projectEarnedReward(definition: MissionDefinition): MissionEarnedReward {
+  if (definition.reward.kind === "item") {
+    return {
+      kind: "item",
+      itemId: definition.reward.itemId,
+      itemName: resolveItemPresentation(definition.reward.itemId, definition.reward.itemId)
+        .displayName,
+    };
+  }
+  return {
+    kind: "skill_xp",
+    skillId: definition.reward.skillId,
+    skillName:
+      getSkillPresentation(definition.reward.skillId)?.displayName ?? definition.reward.skillId,
+    amount: definition.reward.amount,
   };
 }
 
 /**
- * The union of currently projected quest-guidance targets across all missions.
+ * The union of currently projected mission-guidance targets across all missions.
  * UI surfaces consume this single derived set instead of inspecting mission
  * state themselves. `availableNpcIds` (blue) and `npcIds` (green) are
- * semantically distinct: a consumer can tell "new quest here" from "this
- * interaction advances the quest you accepted" without inferring intent
+ * semantically distinct: a consumer can tell "new mission here" from "this
+ * interaction advances the mission you accepted" without inferring intent
  * from mission state, dialogue IDs, or colours.
  */
-export type QuestGuidanceTargets = {
-  /** NPC(s) whose authored offer is currently a quest-availability target. */
+export type MissionGuidanceTargets = {
+  /** NPC(s) whose authored offer is currently a mission-availability target. */
   availableNpcIds: ReadonlySet<string>;
-  /** NPC(s) whose interaction advances/completes an accepted quest. */
+  /** NPC(s) whose interaction advances/completes an accepted mission. */
   npcIds: ReadonlySet<string>;
   equipmentItemIds: ReadonlySet<string>;
   actionIds: ReadonlySet<string>;
 };
 
-export function deriveQuestGuidanceTargets(
+export function deriveMissionGuidanceTargets(
   projections: readonly MissionProjection[],
-): QuestGuidanceTargets {
+): MissionGuidanceTargets {
   const availableNpcIds = new Set<string>();
   const npcIds = new Set<string>();
   const equipmentItemIds = new Set<string>();
@@ -350,6 +441,16 @@ export function validateMissionDefinitions(definitions: readonly MissionDefiniti
       if (!knownIds.has(definition.prerequisiteMissionId)) {
         throw new Error(
           `${where} references unknown prerequisite "${definition.prerequisiteMissionId}".`,
+        );
+      }
+    }
+    if (definition.continuationMissionId !== undefined) {
+      if (definition.continuationMissionId === definition.id) {
+        throw new Error(`${where} cannot continue into itself.`);
+      }
+      if (!knownIds.has(definition.continuationMissionId)) {
+        throw new Error(
+          `${where} references unknown continuation mission "${definition.continuationMissionId}".`,
         );
       }
     }
@@ -472,6 +573,43 @@ export function validateMissionDefinitions(definitions: readonly MissionDefiniti
           `${where} reward references skill "${definition.reward.skillId}" without an approved progression curve.`,
         );
       }
+    }
+  }
+  assertContinuationGraph(definitions);
+}
+
+/**
+ * Validates the authored continuation graph across all definitions: no
+ * cycles, and no continuation that contradicts the target's prerequisite
+ * semantics. A continuation auto-accepts its target, so the target must be
+ * acceptable immediately after the predecessor completes — either it has no
+ * prerequisite, or its prerequisite IS the predecessor.
+ */
+function assertContinuationGraph(definitions: readonly MissionDefinition[]): void {
+  const byId = new Map(definitions.map((definition) => [definition.id, definition]));
+  for (const definition of definitions) {
+    if (!definition.continuationMissionId) continue;
+    const where = `Mission "${definition.id}"`;
+    const target = byId.get(definition.continuationMissionId);
+    if (
+      target?.prerequisiteMissionId !== undefined &&
+      target.prerequisiteMissionId !== definition.id
+    ) {
+      throw new Error(
+        `${where} continues into "${target.id}" but that mission requires prerequisite "${target.prerequisiteMissionId}"; a continuation must target a mission with no prerequisite or one requiring this mission.`,
+      );
+    }
+    const chain = [definition.id];
+    let current = target;
+    while (current?.continuationMissionId !== undefined) {
+      chain.push(current.id);
+      if (chain.includes(current.continuationMissionId)) {
+        throw new Error(
+          `${where} continuation forms a cycle: ${[...chain, current.continuationMissionId].join(" -> ")}.`,
+        );
+      }
+      current = byId.get(current.continuationMissionId);
+      if (!current) break;
     }
   }
 }

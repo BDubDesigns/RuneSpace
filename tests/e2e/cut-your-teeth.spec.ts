@@ -113,21 +113,21 @@ test("equips the Cutter through Inventory, shows a full stack, and earns Mining 
     "Equip the Salvage Cutter from Inventory",
   );
 
-  // Quest guidance: the unmet equip requirement targets the Cutter affordance
+  // Mission guidance: the unmet equip requirement targets the Cutter affordance
   // in Inventory, while Start Mining is NOT highlighted (equip comes first in
   // authored order).
-  await page.getByRole("button", { name: /Inventory \d+\/\d+/ }).click();
+  await page.getByRole("button", { name: "Inventory" }).click();
   const guidedInventoryDrawer = page.getByRole("dialog", { name: "Inventory" });
   await expect(
     guidedInventoryDrawer.getByRole("button", { name: "Salvage Cutter" }),
-  ).toHaveAttribute("data-quest-guidance", "active");
+  ).toHaveAttribute("data-mission-guidance", "active");
   await page.keyboard.press("Escape");
   await expect(page.getByRole("button", { name: "Start Mining" })).not.toHaveAttribute(
-    "data-quest-guidance",
+    "data-mission-guidance",
   );
 
   // Real Inventory → Equip flow (the same overlay Mining E2E exercises).
-  await page.getByRole("button", { name: /Inventory \d+\/\d+/ }).click();
+  await page.getByRole("button", { name: "Inventory" }).click();
   const inventoryDrawer = page.getByRole("dialog", { name: "Inventory" });
   await expect(inventoryDrawer).toBeVisible();
   // Select the CUTTER by name — the seeded stack tiles are selectable too,
@@ -144,7 +144,7 @@ test("equips the Cutter through Inventory, shows a full stack, and earns Mining 
   await page.keyboard.press("Escape");
   await page.reload();
 
-  // Quest guidance — action step: with the Cutter equipped but no shale, the
+  // Mission guidance — action step: with the Cutter equipped but no shale, the
   // authored recommended acquisition (Mining) guides Start Mining. Scavenge is
   // never highlighted merely because it can also yield shale.
   await db.delete(inventoryStacks).where(eq(inventoryStacks.characterId, characterId));
@@ -153,17 +153,21 @@ test("equips the Cutter through Inventory, shows a full stack, and earns Mining 
     "Get a full stack of Ferrite Shale — 0 / 10",
   );
   await expect(page.getByRole("button", { name: "Start Mining" })).toHaveAttribute(
-    "data-quest-guidance",
+    "data-mission-guidance",
     "active",
   );
   await expect(page.getByRole("button", { name: /Talk to Tansy Rusk/ })).not.toHaveAttribute(
-    "data-quest-guidance",
+    "data-mission-guidance",
   );
 
   // Restore the full stack: every requirement holds and guidance moves to the
-  // turn-in NPC.
+  // turn-in NPC. The HUD shows all three simultaneous requirements together
+  // plus the turn-in objective.
   await addShale(characterId, 10);
   await page.reload();
+  await expect(page.locator("[data-mission-objective-requirements]")).toContainText(
+    "Get a full stack of Ferrite Shale — 10 / 10",
+  );
 
   // Objective advances past both steps: with a full stack already carried,
   // equip + collect satisfy instantly and the turn-in objective shows.
@@ -171,9 +175,11 @@ test("equips the Cutter through Inventory, shows a full stack, and earns Mining 
     "Show a full stack of Ferrite Shale to Tansy Rusk",
   );
   await expect(page.getByRole("button", { name: /Talk to Tansy Rusk/ })).toHaveAttribute(
-    "data-quest-guidance",
+    "data-mission-guidance",
     "active",
   );
+  // The Missions footer badge counts ready-to-turn-in missions only: exactly 1.
+  await expect(page.locator("[data-missions-badge]")).toHaveText("1");
 
   // Talk to Tansy: active + ready routes to the turn-in with SHOW SHALE control.
   await page.getByRole("button", { name: /Talk to Tansy Rusk/ }).click();
@@ -219,9 +225,21 @@ test("equips the Cutter through Inventory, shows a full stack, and earns Mining 
   // Exactly +100 Mining XP, awarded once.
   expect(await miningXpTotal(characterId)).toBe(100);
 
-  // The objective panel reflects completion; shale remains in Inventory.
-  await expect(page.locator("[data-mission-objective]")).toContainText("Completed");
-  await expect(page.getByRole("button", { name: /Inventory 1\/8|Inventory 0\/8/ })).toBeVisible();
+  // The HUD tracks accepted missions only, so Cut Your Teeth leaves it;
+  // the Mission Log carries the completed history with the earned reward.
+  // The Missions badge clears (nothing is ready to turn in anymore).
+  await expect(page.locator("[data-mission-objective]")).toHaveCount(0);
+  await expect(page.locator("[data-missions-badge]")).toHaveCount(0);
+  await page.getByRole("button", { name: "Missions" }).click();
+  const log = page.getByRole("dialog", { name: "Mission Log" });
+  await expect(log).toBeVisible();
+  await log.getByRole("button", { name: /Completed/ }).click();
+  await log.getByRole("button", { name: /Cut Your Teeth/ }).click();
+  await expect(log.locator("[data-mission-log-reward]")).toContainText(
+    "Reward earned: +100 Mining XP",
+  );
+  await page.keyboard.press("Escape");
+  await expect(page.getByRole("button", { name: "Inventory" })).toBeVisible();
 
   // The equipped Cutter assignment is real.
   const assignments = await db
@@ -250,9 +268,10 @@ test("equips the Cutter through Inventory, shows a full stack, and earns Mining 
   await expect(tansyPost).toBeHidden();
 
   // Reload also resolves ordinary post-CYT dialogue and does not replay the
-  // reward presentation. XP and shale remain intact.
+  // reward presentation. XP and shale remain intact. The HUD stays hidden
+  // (no accepted missions remain) while history lives in the log.
   await page.reload();
-  await expect(page.locator("[data-mission-objective]")).toContainText("Completed");
+  await expect(page.locator("[data-mission-objective]")).toHaveCount(0);
   await page.getByRole("button", { name: /Talk to Tansy Rusk/ }).click();
   const tansyPostReload = page.getByRole("dialog", { name: "Tansy Rusk dialogue" });
   await expect(tansyPostReload).toBeVisible();

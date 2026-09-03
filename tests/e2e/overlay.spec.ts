@@ -73,7 +73,7 @@ test.beforeEach(async ({ page }) => {
 test("Inventory opens as a centered modal with a dimmed backdrop", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   const nav = page.getByRole("navigation", { name: "Primary" });
-  await nav.getByRole("button", { name: /Inventory/ }).click();
+  await nav.getByRole("button", { name: "Inventory" }).click();
   const dialog = page.getByRole("dialog", { name: "Inventory" });
   await expect(dialog).toBeVisible();
   await expect(dialog).toHaveAttribute("aria-modal", "true");
@@ -115,26 +115,63 @@ test("only one overlay can be open at a time", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   const nav = page.getByRole("navigation", { name: "Primary" });
   // Open inventory
-  await nav.getByRole("button", { name: /Inventory/ }).click();
+  await nav.getByRole("button", { name: "Inventory" }).click();
   await expect(page.getByRole("dialog", { name: "Inventory" })).toBeVisible();
   // Close inventory, then open equipment — the normal user flow.
   await page.keyboard.press("Escape");
   await expect(page.getByRole("dialog", { name: "Inventory" })).toHaveCount(0);
   await nav.getByRole("button", { name: "Equipment" }).click();
   await expect(page.getByRole("dialog", { name: "Equipment" })).toBeVisible();
+  // Close and open missions — the third overlay joins the same single-open rule.
+  await page.keyboard.press("Escape");
+  await nav.getByRole("button", { name: "Missions" }).click();
+  await expect(page.getByRole("dialog", { name: "Mission Log" })).toBeVisible();
   // Close and reopen inventory.
   await page.keyboard.press("Escape");
-  await nav.getByRole("button", { name: /Inventory/ }).click();
+  await nav.getByRole("button", { name: "Inventory" }).click();
   await expect(page.getByRole("dialog", { name: "Inventory" })).toBeVisible();
   // Defensively verify only one dialog exists at a time.
   await expect(page.getByRole("dialog")).toHaveCount(1);
   await expect(page.getByRole("dialog", { name: "Inventory" })).toBeVisible();
 });
 
+test("footer has four equal destinations and the Mission Log opens through the shared modal pattern", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  const nav = page.getByRole("navigation", { name: "Primary" });
+  await expect(nav.getByRole("link", { name: "Characters" })).toBeVisible();
+  await expect(nav.getByRole("button", { name: "Inventory" })).toBeVisible();
+  await expect(nav.getByRole("button", { name: "Equipment" })).toBeVisible();
+  await expect(nav.getByRole("button", { name: "Missions" })).toBeVisible();
+  // No horizontal overflow at the narrow mobile width.
+  const overflow = await page.evaluate(() => {
+    const el = document.querySelector('nav[aria-label="Primary"]');
+    if (!el) return { scrollWidth: 0, clientWidth: 0 };
+    return { scrollWidth: el.scrollWidth, clientWidth: el.clientWidth };
+  });
+  expect(overflow.scrollWidth).toBeLessThanOrEqual(overflow.clientWidth + 1);
+
+  await nav.getByRole("button", { name: "Missions" }).click();
+  const dialog = page.getByRole("dialog", { name: "Mission Log" });
+  await expect(dialog).toBeVisible();
+  await expect(dialog).toHaveAttribute("aria-modal", "true");
+  await expectBackdropCoversViewport(page, dialog);
+  // Fresh mission state is hidden, not advertised: the empty state directs
+  // the player to talk/explore without naming hidden content.
+  await expect(dialog.locator("[data-mission-log-empty]")).toContainText(
+    "No active missions. Talk to people you meet and explore the world.",
+  );
+  await expect(dialog.locator("[data-mission-log-entry]")).toHaveCount(0);
+  await page.keyboard.press("Escape");
+  await expect(dialog).toHaveCount(0);
+  await expect(nav.getByRole("button", { name: "Missions" })).toBeFocused();
+});
+
 test("backdrop click closes the overlay", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   const nav = page.getByRole("navigation", { name: "Primary" });
-  await nav.getByRole("button", { name: /Inventory/ }).click();
+  await nav.getByRole("button", { name: "Inventory" }).click();
   const dialog = page.getByRole("dialog", { name: "Inventory" });
   await expect(dialog).toBeVisible();
   // Click the backdrop area outside the centered panel.
@@ -160,7 +197,7 @@ test("clicking inside the panel does not close the overlay", async ({ page }) =>
 test("Close and Escape close the overlay and restore focus", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   const nav = page.getByRole("navigation", { name: "Primary" });
-  const inventoryTrigger = nav.getByRole("button", { name: /Inventory/ });
+  const inventoryTrigger = nav.getByRole("button", { name: "Inventory" });
 
   // Close control.
   await inventoryTrigger.click();
@@ -181,7 +218,7 @@ test("Close and Escape close the overlay and restore focus", async ({ page }) =>
 test("focus moves into the overlay and is contained within it", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   const nav = page.getByRole("navigation", { name: "Primary" });
-  await nav.getByRole("button", { name: /Inventory/ }).click();
+  await nav.getByRole("button", { name: "Inventory" }).click();
   const dialog = page.getByRole("dialog", { name: "Inventory" });
   await expect(dialog).toBeVisible();
   // Focus should be on the Close button initially.
@@ -206,7 +243,7 @@ test("focus returns to the trigger after Escape, Close, and backdrop dismissal",
 }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   const nav = page.getByRole("navigation", { name: "Primary" });
-  const inventoryTrigger = nav.getByRole("button", { name: /Inventory/ });
+  const inventoryTrigger = nav.getByRole("button", { name: "Inventory" });
   // Escape
   await inventoryTrigger.click();
   const dialog1 = page.getByRole("dialog", { name: "Inventory" });
@@ -237,7 +274,7 @@ test("document scroll is locked while overlay is open and restored on close", as
   // Open overlay.
   await page.evaluate(() => window.scrollTo(0, 200));
   const scrollBefore = await page.evaluate(() => window.scrollY);
-  await nav.getByRole("button", { name: /Inventory/ }).click();
+  await nav.getByRole("button", { name: "Inventory" }).click();
   const dialog = page.getByRole("dialog", { name: "Inventory" });
   await expect(dialog).toBeVisible();
   await expectBackdropCoversViewport(page, dialog);
@@ -278,7 +315,7 @@ test("internal modal content scrolls when it overflows", async ({ page }) => {
     });
   }
   await page.reload();
-  await nav.getByRole("button", { name: /Inventory/ }).click();
+  await nav.getByRole("button", { name: "Inventory" }).click();
   const dialog = page.getByRole("dialog", { name: "Inventory" });
   await expect(dialog).toBeVisible();
   await expectBackdropCoversViewport(page, dialog);
@@ -297,7 +334,7 @@ test("internal modal content scrolls when it overflows", async ({ page }) => {
 test("mobile narrow-width layout remains usable from 320 px upward", async ({ page }) => {
   await page.setViewportSize({ width: 320, height: 568 });
   const nav = page.getByRole("navigation", { name: "Primary" });
-  await nav.getByRole("button", { name: /Inventory/ }).click();
+  await nav.getByRole("button", { name: "Inventory" }).click();
   const dialog = page.getByRole("dialog", { name: "Inventory" });
   await expect(dialog).toBeVisible();
   // Dialog should not overflow the viewport horizontally.
@@ -316,7 +353,7 @@ test("mobile narrow-width layout remains usable from 320 px upward", async ({ pa
 test("desktop modal is centered with backdropped play screen", async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   const nav = page.getByRole("navigation", { name: "Primary" });
-  await nav.getByRole("button", { name: /Inventory/ }).click();
+  await nav.getByRole("button", { name: "Inventory" }).click();
   const dialog = page.getByRole("dialog", { name: "Inventory" });
   await expect(dialog).toBeVisible();
   await page.screenshot({ path: "test-results/overlay-desktop-inventory.png" });
@@ -331,7 +368,7 @@ test("reduced-motion disables overlay animations", async ({ page }) => {
   await page.emulateMedia({ reducedMotion: "reduce" });
   await page.setViewportSize({ width: 390, height: 844 });
   const nav = page.getByRole("navigation", { name: "Primary" });
-  await nav.getByRole("button", { name: /Inventory/ }).click();
+  await nav.getByRole("button", { name: "Inventory" }).click();
   const dialog = page.getByRole("dialog", { name: "Inventory" });
   await expect(dialog).toBeVisible();
   // Check that animation duration is effectively zero.
@@ -388,7 +425,7 @@ test("closing plays an exit fade and only unmounts after it finishes", async ({ 
   await page.emulateMedia({ reducedMotion: "no-preference" });
   await page.setViewportSize({ width: 390, height: 844 });
   const nav = page.getByRole("navigation", { name: "Primary" });
-  await nav.getByRole("button", { name: /Inventory/ }).click();
+  await nav.getByRole("button", { name: "Inventory" }).click();
   const dialog = page.getByRole("dialog", { name: "Inventory" });
   await expect(dialog).toBeVisible();
   await trackOverlayExitClass(page);
@@ -405,7 +442,7 @@ test("reduced motion closes immediately without an exit fade", async ({ page }) 
   await page.emulateMedia({ reducedMotion: "reduce" });
   await page.setViewportSize({ width: 390, height: 844 });
   const nav = page.getByRole("navigation", { name: "Primary" });
-  await nav.getByRole("button", { name: /Inventory/ }).click();
+  await nav.getByRole("button", { name: "Inventory" }).click();
   const dialog = page.getByRole("dialog", { name: "Inventory" });
   await expect(dialog).toBeVisible();
   await trackOverlayExitClass(page);

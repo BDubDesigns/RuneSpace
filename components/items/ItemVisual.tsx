@@ -18,8 +18,8 @@ type ItemVisualProps = {
   className?: string;
   /** Render as a selectable native button (occupied Inventory tiles). */
   interactive?: boolean;
-  /** Marks the tile as a current semantic quest-guidance target. */
-  questGuidance?: boolean;
+  /** Marks the tile as a current semantic mission-guidance target. */
+  missionGuidance?: boolean;
   selected?: boolean;
   onSelect?: () => void;
 };
@@ -36,7 +36,7 @@ export function ItemVisual({
   background,
   className,
   interactive,
-  questGuidance,
+  missionGuidance,
   selected,
   onSelect,
 }: ItemVisualProps) {
@@ -63,7 +63,7 @@ export function ItemVisual({
       mutedArtwork={mutedArtwork}
       name={presentation.displayName}
       onSelect={onSelect}
-      questGuidance={questGuidance}
+      missionGuidance={missionGuidance}
       selected={selected}
     />
   );

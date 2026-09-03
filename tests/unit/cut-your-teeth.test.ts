@@ -21,7 +21,7 @@ import {
 } from "@/game/config/foundations";
 import type { ContentId } from "@/game/schemas/ids";
 import {
-  deriveQuestGuidanceTargets,
+  deriveMissionGuidanceTargets,
   projectMission,
   type MissionObservation,
   type MissionProjection,
@@ -211,16 +211,23 @@ describe("issue #124 ordered requirement projection", () => {
     });
   });
 
-  it("exposes prerequisite-satisfied availability only when the prerequisite is complete", () => {
+  it("exposes the prerequisite gate without advertising the mission", () => {
     const locked = projectMission(CUT_YOUR_TEETH, undefined, THE_JAG, true, observation());
     expect(locked).toMatchObject({ state: "not_accepted", prerequisiteSatisfied: false });
-    const available = projectMission(CUT_YOUR_TEETH, undefined, THE_JAG, true, observation(), true);
-    expect(available).toMatchObject({
+    expect(locked.guidance?.availableNpcIds).toBeUndefined();
+    const prerequisiteSatisfied = projectMission(
+      CUT_YOUR_TEETH,
+      undefined,
+      THE_JAG,
+      true,
+      observation(),
+      true,
+    );
+    expect(prerequisiteSatisfied).toMatchObject({
       state: "not_accepted",
       prerequisiteSatisfied: true,
-      availableObjective: "Speak with Tansy Rusk at The Jag to begin Cut Your Teeth.",
-      offeringNpcName: "Tansy Rusk",
     });
+    expect(prerequisiteSatisfied.guidance?.availableNpcIds).toBeUndefined();
   });
 
   it("emits semantic stage data for routing without parsing objective copy", () => {
@@ -286,7 +293,7 @@ describe("issue #124 ordered requirement projection", () => {
   });
 });
 
-describe("issue #124 semantic quest guidance projection", () => {
+describe("issue #124 semantic mission guidance projection", () => {
   it("targets the turn-in NPC once requirements are satisfied", () => {
     const projection = projectMission(
       CUT_YOUR_TEETH,
@@ -298,13 +305,13 @@ describe("issue #124 semantic quest guidance projection", () => {
         carriedQuantities: new Map([[ITEM_IDS.ferriteShale, 10]]),
       }),
     );
-    const targets = deriveQuestGuidanceTargets([projection]);
+    const targets = deriveMissionGuidanceTargets([projection]);
     expect([...targets.npcIds]).toEqual([NPC_IDS.tansyRusk]);
   });
 
   it("targets the Cutter equipment affordance while the equip requirement is unmet", () => {
     const projection = projectMission(CUT_YOUR_TEETH, accepted(), THE_JAG, true, observation());
-    const targets = deriveQuestGuidanceTargets([projection]);
+    const targets = deriveMissionGuidanceTargets([projection]);
     expect([...targets.equipmentItemIds]).toEqual([ITEM_IDS.salvageCutter]);
     expect([...targets.actionIds]).toEqual([]);
   });
@@ -317,7 +324,7 @@ describe("issue #124 semantic quest guidance projection", () => {
       true,
       observation({ equippedItemIds: new Set([ITEM_IDS.salvageCutter]) }),
     );
-    const targets = deriveQuestGuidanceTargets([projection]);
+    const targets = deriveMissionGuidanceTargets([projection]);
     expect([...targets.actionIds]).toEqual(["ferrite_shale_mining"]);
     expect([...targets.equipmentItemIds]).toEqual([]);
   });
@@ -326,15 +333,15 @@ describe("issue #124 semantic quest guidance projection", () => {
     const projections = MISSIONS.map((definition) =>
       projectMission(definition, undefined, THE_JAG, true, observation()),
     );
-    const targets = deriveQuestGuidanceTargets(projections);
+    const targets = deriveMissionGuidanceTargets(projections);
     expect(targets.actionIds.has("travel")).toBe(false);
     for (const actionId of targets.actionIds) {
       expect(actionId).toBe("ferrite_shale_mining");
     }
   });
 
-  it("guides toward an available mission via its authored offers without requiring availableObjective", () => {
-    // Walk It Off has no availableObjective (explorer-first). Availability is
+  it("guides toward a prerequisite-free mission via its authored offers", () => {
+    // Walk It Off authors no prerequisite (explorer-first). Availability is
     // still projected from every authored offer at the current location, not
     // from objective copy.
     const atCrashSite = projectMission(
@@ -346,15 +353,14 @@ describe("issue #124 semantic quest guidance projection", () => {
       true,
     );
     const atTheJag = projectMission(WALK_IT_OFF, undefined, THE_JAG, true, observation(), true);
-    expect([...deriveQuestGuidanceTargets([atCrashSite]).availableNpcIds]).toEqual([
+    expect([...deriveMissionGuidanceTargets([atCrashSite]).availableNpcIds]).toEqual([
       NPC_IDS.wadeRusk,
     ]);
-    expect([...deriveQuestGuidanceTargets([atTheJag]).availableNpcIds]).toEqual([
+    expect([...deriveMissionGuidanceTargets([atTheJag]).availableNpcIds]).toEqual([
       NPC_IDS.tansyRusk,
     ]);
     // No active NPC guidance before acceptance.
-    expect([...deriveQuestGuidanceTargets([atCrashSite]).npcIds]).toEqual([]);
-    expect(WALK_IT_OFF.availableObjective).toBeUndefined();
+    expect([...deriveMissionGuidanceTargets([atCrashSite]).npcIds]).toEqual([]);
   });
 });
 

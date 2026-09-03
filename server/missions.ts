@@ -244,11 +244,15 @@ export async function acceptMission(
  *    (consumption may legitimately free the slots or mass the reward needs);
  * 6. only after the complete plan is valid, applies removals through the
  *    authoritative carried-stack boundary and applies the single declared
- *    reward and the guarded completion stamp in the same transaction.
+ *    reward and the guarded completion stamp in the same transaction;
+ * 7. accepts the authored continuation mission (if any) exactly once in that
+ *    same transaction, idempotently: already-accepted/completed continuation
+ *    rows are left untouched.
  *
  * Shown items (turn-in "show") are inspected, never consumed. The character
- * lock plus the completedAt guard make completion — and therefore consumption
- * and reward — exactly-once under retries and concurrent first completions.
+ * lock plus the completedAt guard make completion — and therefore consumption,
+ * reward, and continuation — exactly-once under retries and concurrent first
+ * completions.
  */
 export async function completeMission(
   userId: string,
@@ -287,7 +291,7 @@ export async function completeMission(
  * from the canonical registry via `completeMission`; this entry exists only
  * so integration tests can prove consumed-item semantics (show vs consume,
  * post-consumption reward preflight, rollback) without adding a fake
- * player-visible production quest.
+ * player-visible production mission.
  */
 export async function completeMissionWithDefinition(
   userId: string,
@@ -546,6 +550,16 @@ async function completeMissionForDefinition(input: {
         isNull(characterMissions.completedAt),
       ),
     );
+  if (definition.continuationMissionId) {
+    await transaction
+      .insert(characterMissions)
+      .values({
+        characterId: context.character.id,
+        missionId: definition.continuationMissionId,
+        acceptedAt: now,
+      })
+      .onConflictDoNothing();
+  }
   return stateFor({ status: "completed", reward: rewardInfo });
 }
 

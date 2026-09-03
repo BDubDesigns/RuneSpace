@@ -160,13 +160,13 @@ suite("issue #110 Cut Your Teeth persistence and XP boundary (real PostgreSQL)",
     ).toHaveLength(0);
   });
 
-  it("accepts after completion, is Tansy-only/idempotent, and completes once with exactly +100 Mining XP without consuming shale", async () => {
+  it("arrives already accepted via continuation, is Tansy-only/idempotent, and completes once with exactly +100 Mining XP without consuming shale", async () => {
     const { userId, character } = await makeCharacter();
     await completeWalkItOffAtTheJag(userId, character.id);
 
-    // Wrong-location acceptance refuses.
-    await move(character.id, LOCATION_IDS.crashSite);
-    const wrongLocation = await missions.acceptMission(
+    // The continuation already accepted Cut Your Teeth: explicit acceptance
+    // is idempotent for any NPC once accepted.
+    const already = await missions.acceptMission(
       userId,
       character.id,
       MISSION_IDS.cutYourTeeth,
@@ -174,27 +174,16 @@ suite("issue #110 Cut Your Teeth persistence and XP boundary (real PostgreSQL)",
       now,
       deterministicRandom(),
     );
-    expect(wrongLocation.mission.status).toBe("refused");
-    await move(character.id, LOCATION_IDS.theJag);
-
-    const first = await missions.acceptMission(
+    expect(already.mission.status).toBe("already_accepted");
+    const wrongNpc = await missions.acceptMission(
       userId,
       character.id,
       MISSION_IDS.cutYourTeeth,
-      NPC_IDS.tansyRusk,
+      NPC_IDS.wadeRusk,
       now,
       deterministicRandom(),
     );
-    expect(first.mission.status).toBe("accepted");
-    const second = await missions.acceptMission(
-      userId,
-      character.id,
-      MISSION_IDS.cutYourTeeth,
-      NPC_IDS.tansyRusk,
-      now,
-      deterministicRandom(),
-    );
-    expect(second.mission.status).toBe("already_accepted");
+    expect(wrongNpc.mission.status).toBe("already_accepted");
 
     // Completion refusals follow objective precedence: equip first, then stack.
     const beforeAnyXp = await miningXp(character.id);
@@ -317,7 +306,8 @@ suite("issue #110 Cut Your Teeth persistence and XP boundary (real PostgreSQL)",
     await completeWalkItOffAtTheJag(userId, character.id);
     await db
       .insert(rune.characterMissions)
-      .values({ characterId: character.id, missionId: "cut_your_teeth", acceptedAt: now });
+      .values({ characterId: character.id, missionId: "cut_your_teeth", acceptedAt: now })
+      .onConflictDoNothing(); // continuation already accepted; idempotent safeguard
     await equipCutter(userId, character.id);
     await addShale(character.id, 10);
     await db.insert(rune.activeActions).values({
@@ -338,27 +328,17 @@ suite("issue #110 Cut Your Teeth persistence and XP boundary (real PostgreSQL)",
     expect(await miningXp(character.id)).toBe(0);
   });
 
-  it("immediately reaches SHOW SHALE when accepting while already equipped with a full stack", async () => {
+  it("immediately reaches SHOW SHALE when already equipped with a full stack", async () => {
     const { userId, character } = await makeCharacter();
     await completeWalkItOffAtTheJag(userId, character.id);
 
     // Pre-authoritative boundary: the Cutter is granted by mission one and the
-    // player already has a full stack before ever accepting Cut Your Teeth.
-    await equipCutter(userId, character.id);
-    await addShale(character.id, 10);
-
-    // Accepting at The Jag: the projection must immediately present the
+    // player already has a full stack. Cut Your Teeth arrives already accepted
+    // via the continuation, so the projection must immediately present the
     // ready-for-completion turn-in objective (SHOW SHALE), not an intermediate
     // equip/stack step, because the authoritative requirements already hold.
-    const accepted = await missions.acceptMission(
-      userId,
-      character.id,
-      MISSION_IDS.cutYourTeeth,
-      NPC_IDS.tansyRusk,
-      now,
-      deterministicRandom(),
-    );
-    expect(accepted.mission.status).toBe("accepted");
+    await equipCutter(userId, character.id);
+    await addShale(character.id, 10);
 
     const state = await play.getPlayGameplayState(userId, character.id, now, deterministicRandom());
     const cyt = state.missions.find((mission) => mission.missionId === "cut_your_teeth");
@@ -386,7 +366,8 @@ suite("issue #110 Cut Your Teeth persistence and XP boundary (real PostgreSQL)",
     await completeWalkItOffAtTheJag(userId, character.id);
     await db
       .insert(rune.characterMissions)
-      .values({ characterId: character.id, missionId: "cut_your_teeth", acceptedAt: now });
+      .values({ characterId: character.id, missionId: "cut_your_teeth", acceptedAt: now })
+      .onConflictDoNothing(); // continuation already accepted; idempotent safeguard
     await equipCutter(userId, character.id);
     await addShale(character.id, 10);
     await db.insert(rune.activeActions).values({
@@ -431,7 +412,8 @@ suite("issue #110 Cut Your Teeth persistence and XP boundary (real PostgreSQL)",
     await completeWalkItOffAtTheJag(userId, character.id);
     await db
       .insert(rune.characterMissions)
-      .values({ characterId: character.id, missionId: "cut_your_teeth", acceptedAt: now });
+      .values({ characterId: character.id, missionId: "cut_your_teeth", acceptedAt: now })
+      .onConflictDoNothing(); // continuation already accepted; idempotent safeguard
     await equipCutter(userId, character.id);
     await addShale(character.id, 10);
 
@@ -483,20 +465,60 @@ suite("issue #110 Cut Your Teeth persistence and XP boundary (real PostgreSQL)",
     expect(rows[0]?.completedAt).not.toBeNull();
   });
 
-  it("exposes the available Cut Your Teeth objective after Walk It Off completes but before acceptance", async () => {
+  it("accepts Cut Your Teeth atomically when Walk It Off completes (authored continuation)", async () => {
     const { userId, character } = await makeCharacter();
     await completeWalkItOffAtTheJag(userId, character.id);
 
     const state = await play.getPlayGameplayState(userId, character.id, now, deterministicRandom());
     const cyt = state.missions.find((mission) => mission.missionId === "cut_your_teeth");
     expect(cyt).toMatchObject({
-      state: "not_accepted",
+      state: "active",
       prerequisiteSatisfied: true,
-      availableObjective: "Speak with Tansy Rusk at The Jag to begin Cut Your Teeth.",
+      currentObjective: "Equip the Salvage Cutter from Inventory",
     });
-    // Walk It Off is complete; the projection leads into the next story quest.
+    const rows = await db
+      .select()
+      .from(rune.characterMissions)
+      .where(
+        and(
+          eq(rune.characterMissions.characterId, character.id),
+          eq(rune.characterMissions.missionId, "cut_your_teeth"),
+        ),
+      );
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.acceptedAt).toEqual(now);
+    expect(rows[0]?.completedAt).toBeNull();
+    // Walk It Off is complete; Cut Your Teeth is already the tracked mission.
     const wio = state.missions.find((mission) => mission.missionId === "walk_it_off");
     expect(wio?.state).toBe("completed");
+  });
+
+  it("never auto-accepts a mission merely because its prerequisite is satisfied", async () => {
+    const { userId, character } = await makeCharacter();
+    await db
+      .update(rune.characters)
+      .set({ currentLocationId: LOCATION_IDS.theJag })
+      .where(eq(rune.characters.id, character.id));
+    await db.insert(rune.characterMissions).values({
+      characterId: character.id,
+      missionId: "walk_it_off",
+      acceptedAt: now,
+      completedAt: now,
+    });
+
+    const state = await play.getPlayGameplayState(userId, character.id, now, deterministicRandom());
+    const cyt = state.missions.find((mission) => mission.missionId === "cut_your_teeth");
+    expect(cyt).toMatchObject({ state: "not_accepted", prerequisiteSatisfied: true });
+    const rows = await db
+      .select()
+      .from(rune.characterMissions)
+      .where(
+        and(
+          eq(rune.characterMissions.characterId, character.id),
+          eq(rune.characterMissions.missionId, "cut_your_teeth"),
+        ),
+      );
+    expect(rows).toHaveLength(0);
   });
 
   it("shows 0 / 10 (not 0 / 1) for zero shale through the real observation path", async () => {
@@ -504,7 +526,8 @@ suite("issue #110 Cut Your Teeth persistence and XP boundary (real PostgreSQL)",
     await completeWalkItOffAtTheJag(userId, character.id);
     await db
       .insert(rune.characterMissions)
-      .values({ characterId: character.id, missionId: "cut_your_teeth", acceptedAt: now });
+      .values({ characterId: character.id, missionId: "cut_your_teeth", acceptedAt: now })
+      .onConflictDoNothing(); // continuation already accepted; idempotent safeguard
     // Cutter equipped, but ZERO Ferrite Shale carried. The full-stack
     // requirement must resolve from the canonical item definition even though
     // the character owns none — the objective must read 0 / 10, never 0 / 1.
@@ -528,7 +551,8 @@ suite("issue #110 Cut Your Teeth persistence and XP boundary (real PostgreSQL)",
     await completeWalkItOffAtTheJag(userId, character.id);
     await db
       .insert(rune.characterMissions)
-      .values({ characterId: character.id, missionId: "cut_your_teeth", acceptedAt: now });
+      .values({ characterId: character.id, missionId: "cut_your_teeth", acceptedAt: now })
+      .onConflictDoNothing(); // continuation already accepted; idempotent safeguard
     await equipCutter(userId, character.id);
     await addShale(character.id, 4);
 

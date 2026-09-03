@@ -72,7 +72,7 @@ export type MissionRequirement =
       /**
        * Omitted quantity means "one authoritative full stack": the projection
        * resolves the number from the item definition's stack limit rather than
-       * duplicating balance values in quest content.
+       * duplicating balance values in mission content.
        */
       quantity?: number;
       /** Explicit turn-in disposition: shown (consume zero) or handed in. */
@@ -131,7 +131,7 @@ export type MissionNpcDialogue = {
  * The authoritative turn-in interaction. The turn-in location is authored
  * here — mission location semantics never derive from an NPC's home location,
  * so a future NPC-movement/phase feature cannot accidentally depend on an
- * "NPC home equals quest location" invariant.
+ * "NPC home equals mission location" invariant.
  */
 export type MissionTurnIn = {
   npcId: NpcId;
@@ -174,18 +174,21 @@ export type MissionDefinition = {
    * or accepted. Absent for the first mission in the chain.
    */
   prerequisiteMissionId?: MissionId;
+  /**
+   * Explicitly authored automatic continuation: when this mission
+   * successfully completes, the generic completion boundary atomically
+   * accepts this mission. Zero or one per mission — no fan-out or
+   * branching. Never inferred from prerequisites: a prerequisite only says
+   * the later mission cannot begin first, not that it directly continues
+   * the story.
+   */
+  continuationMissionId?: MissionId;
   /** One or more authored offer interactions (possibly several routes). */
   offers: readonly MissionOffer[];
   /** Ordered reusable live-state requirements. */
   requirements: readonly MissionRequirement[];
   turnIn: MissionTurnIn;
   reward: MissionReward;
-  /**
-   * Player-facing copy shown while the mission is available but not yet
-   * accepted, pointing the player at the quest giver. Absent for missions
-   * (Walk It Off) that deliberately keep explorer-first discovery.
-   */
-  availableObjective?: string;
   dialogue: MissionDialogue;
   /**
    * Ordinary post-completion story dialogue for one or more relevant NPCs
@@ -205,6 +208,7 @@ export const WALK_IT_OFF: MissionDefinition = {
   id: MISSION_IDS.walkItOff,
   title: "Walk It Off",
   summary: "Reach The Jag and speak with Tansy Rusk.",
+  continuationMissionId: MISSION_IDS.cutYourTeeth,
   offers: [
     {
       npcId: NPC_IDS.wadeRusk,
@@ -281,7 +285,6 @@ export const CUT_YOUR_TEETH: MissionDefinition = {
     dialogueId: DIALOGUE_IDS.tansyCutYourTeethTurnIn,
   },
   reward: { kind: "skill_xp", skillId: SKILL_IDS.mining, amount: 100 },
-  availableObjective: "Speak with Tansy Rusk at The Jag to begin Cut Your Teeth.",
   dialogue: {
     equipmentReminderDialogueId: DIALOGUE_IDS.tansyCutYourTeethEquipReminder,
     carriedReminderDialogueId: DIALOGUE_IDS.tansyCutYourTeethStackReminder,

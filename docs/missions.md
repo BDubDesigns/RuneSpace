@@ -14,17 +14,17 @@ RuneSpace currently supports **ordinary single-phase, server-authoritative missi
 - Generic projection derives live state (`not_accepted` / `active` / `ready_for_completion` / `completed`), objective copy, and semantic guidance from authoritative character state on every command.
 - Generic server commands handle acceptance and completion for all missions.
 
-The framework deliberately does not attempt to support every future quest shape. If a real new mission needs a novel requirement kind, reward shape, or persistent phase history, extend the framework deliberately (§13–§14) rather than adding a mission-specific transaction or UI branch.
+The framework deliberately does not attempt to support every future mission shape. If a real new mission needs a novel requirement kind, reward shape, or persistent phase history, extend the framework deliberately (§13–§14) rather than adding a mission-specific transaction or UI branch.
 
 ## 2. Authoritative homes
 
 | Concern | Current home(s) | Notes |
 | --- | --- | --- |
 | Mission definitions / content | `game/content/missions.ts` — `MissionDefinition`, `MissionOffer`, `MissionRequirement`, `MissionTurnIn`, `MissionDialogue`, `MissionReward`, `MISSIONS` registry, `WALK_IT_OFF` / `CUT_YOUR_TEETH` | `getMission(id)` is the content accessor. |
-| Generic mission projection | `game/domain/missions.ts` — `projectMission`, `deriveMissionState`, `deriveQuestGuidanceTargets`, `validateMissionDefinitions`; `server/mission-state.ts` — `loadMissionProjections` | Projection recomputes from live authoritative state; no quest progress is persisted beyond `acceptedAt` / `completedAt`. |
+| Generic mission projection | `game/domain/missions.ts` — `projectMission`, `deriveMissionState`, `deriveMissionGuidanceTargets`, `validateMissionDefinitions`; `server/mission-state.ts` — `loadMissionProjections` | Projection recomputes from live authoritative state; no mission progress is persisted beyond `acceptedAt` / `completedAt`. |
 | Generic acceptance / completion boundary | `server/missions.ts` — `acceptMission`, `completeMission` (+ `completeMissionWithDefinition` test seam); `server/actions.ts` — `acceptMissionAction` / `completeMissionAction`; `game/schemas/gameplay.ts` — `AcceptMissionRequestSchema` / `CompleteMissionRequestSchema` | Shared `runMissionCommand` character lock / reconciliation wrapper. See §12. |
 | Authored dialogue | `game/content/dialogue.ts` — `DIALOGUE_SEQUENCES` / `getDialogue`; `game/domain/missions.ts` stage types consumed by `resolveNpcMissionDialogue`, `getMissionCapacityRefusalDialogue`, `getMissionCompletionPresentation` | Sequences are content; routing is semantic state (§9). |
-| Semantic guidance projection | `game/domain/missions.ts` — `MissionGuidance`, `QuestGuidanceTargets`, `deriveQuestGuidanceTargets`; `app/globals.css` — `--rs-quest-guidance-*` / `--rs-quest-available-*` and `.rs-quest-guidance` / `.rs-quest-available` | Guidance is a derived set consumed by `NpcInteractionPanel`, `MiningActivity`, `RefiningConsole`, `EquipmentPanel`, `InventoryPanel`. |
+| Semantic guidance projection | `game/domain/missions.ts` — `MissionGuidance`, `MissionGuidanceTargets`, `deriveMissionGuidanceTargets`; `app/globals.css` — `--rs-mission-guidance-*` / `--rs-mission-available-*` and `.rs-mission-guidance` / `.rs-mission-available` | Guidance is a derived set consumed by `NpcInteractionPanel`, `MiningActivity`, `RefiningConsole`, `EquipmentPanel`, `InventoryPanel`. |
 
 The shared play-state assembly projects `state.missions` through the generic play boundary (`server/play.ts` `stateFromTransaction`, surfaced by `PlayContext` / `usePlay` via `features/play/PlayConsole.tsx`). That play layer is the current host for projection and is not a mission-framework contract; do not depend on its module name to reason about missions.
 
@@ -38,26 +38,37 @@ type MissionDefinition = {
   title: string;
   summary: string;
   prerequisiteMissionId?: MissionId;     // absent for the first mission
+  continuationMissionId?: MissionId;     // zero-or-one authored continuation, see §3.1
   offers: readonly MissionOffer[];       // ≥1 authored offer interactions
   requirements: readonly MissionRequirement[]; // ordered live-state checks
   turnIn: MissionTurnIn;                 // authoritative completion interaction
   reward: MissionReward;                 // exactly one, see §8
-  availableObjective?: string;           // presentation copy only, see §10–§11
   dialogue: MissionDialogue;             // semantic dialogue mapping
 };
 ```
 
 - **Stable ID** — `MISSION_IDS` in `game/config/foundations.ts`. Referenced by persistence (`characterMissions`), projection, and dialogue routing. Never rename without a migration.
 - **`title` / `summary`** — player-facing names on the mission.
-- **`prerequisiteMissionId`** — when present, the referenced mission must be `completed` before this one is offered or accepted. Validated at module load (unknown ID or self-cycle fails fast).
+- **`prerequisiteMissionId`** — when present, the referenced mission must be `completed` before this one is offered or accepted. An eligibility rule only — never a reveal mechanism (see §10–§11). Validated at module load (unknown ID or self-cycle fails fast).
+- **`continuationMissionId`** — zero-or-one explicitly authored automatic continuation (§3.1).
 - **`offers[]`** — one or more authored offer routes (§4).
 - **`requirements[]`** — ordered requirements (§5) evaluated against live authoritative state on every projection.
 - **`turnIn`** — `npcId` + `locationId` + `requiresStationary: true` + objective copy + `dialogueId` (§7). Mission location semantics are authored here and **never** derived from an NPC's `homeLocationId`.
 - **`reward`** — exactly one narrow reward (§8).
 - **`dialogue`** — optional semantic mappings (§9).
-- **`availableObjective`** — optional pre-acceptance copy (§10). Not a capability signal.
 
-Registry validation (`validateMissionDefinitions`) runs at module load against content + authoritative balance (NPC/location/item/dialogue existence, prerequisite shape, stackable checks, stack limits, reward skill curve, and `recommendedActionId` capability). An authoring mistake never reaches a player as a silent runtime refusal.
+Registry validation (`validateMissionDefinitions`) runs at module load against content + authoritative balance (NPC/location/item/dialogue existence, prerequisite shape, continuation shape/cycles, stackable checks, stack limits, reward skill curve, and `recommendedActionId` capability). An authoring mistake never reaches a player as a silent runtime refusal.
+
+### 3.1 Authored mission continuation
+
+A mission may declare **zero or one** automatic continuation via `continuationMissionId`. When the mission successfully completes, the generic completion boundary atomically accepts the continuation in the same transaction (reward + completion stamp + continuation acceptance commit together; retries stay exactly-once).
+
+Rules:
+
+- **Explicit authoring, never prerequisite inference.** A prerequisite only says the later mission cannot begin first — it does not imply discovery or a direct narrative continuation. The predecessor must name its continuation.
+- **Singular only.** No arrays, fan-out, or branching continuation choices.
+- **Validated narrowly:** unknown continuation IDs, self-continuations, and cycles fail fast. The target must have no prerequisite or require the predecessor — otherwise the auto-accept would contradict the target's own eligibility rule.
+- **First production use:** Walk It Off continues into Cut Your Teeth. Completing Walk It Off at The Jag accepts Cut Your Teeth immediately; the completion presentation flows into the next assignment with no second acceptance click.
 
 ## 4. Mission offers
 
@@ -204,32 +215,28 @@ Action labels on sequences (`actionLabel`, e.g. "Claim Cutter", "SHOW SHALE") ar
 
 `MissionDialogue.completionPresentationDialogueId` is narrowly-scoped one-shot UI presentation shown immediately after the authoritative completion succeeds (via the transient `sequenceOverride` in `NpcInteractionPanel`). After that conversation closes, later talks route to ordinary completed-story dialogue (the newest authored `completedNpcDialogue`), not a replay of the reward beats. A refresh/reopen after completion likewise routes to ordinary story dialogue — no durable pending-presentation persistence is added in this issue. Ordinary future missions should author new post-completion dialogue instead of reusing the presentation as idle.
 
-## 10. Quest guidance
+## 10. Mission guidance
 
-Quest guidance answers one question for UI consumers — *"is this entity / control currently a quest-guidance target?"* — without consumers inspecting mission IDs, objective prose, or drop tables. Every guidance consumer reads the same derived set via `deriveQuestGuidanceTargets(state.missions)`.
+Mission guidance answers one question for UI consumers — *"is this entity / control currently a mission-guidance target?"* — without consumers inspecting mission IDs, objective prose, or drop tables. Every guidance consumer reads the same derived set via `deriveMissionGuidanceTargets(state.missions)`.
 
 ### Two semantic meanings
 
 | Meaning | CSS treatment | What it signals |
 | --- | --- | --- |
-| **Quest available** | `.rs-quest-available` — blue/cyan (`--rs-quest-available-*`) | "There is a new quest here." An NPC's authored offer is currently available. |
-| **Accepted quest progression** | `.rs-quest-guidance` — neon green (`--rs-quest-guidance-*`) | "This interaction advances the quest you accepted." The active objective's target (NPC, equipment affordance, or authored recommended action). |
+| **Mission available** | `.rs-mission-available` — blue/cyan (`--rs-mission-available-*`) | "There is a new mission here." An NPC's authored offer is currently available. |
+| **Accepted mission progression** | `.rs-mission-guidance` — neon green (`--rs-mission-guidance-*`) | "This interaction advances the mission you accepted." The active objective's target (NPC, equipment affordance, or authored recommended action). |
 
-Both are static treatments (no animation) and use a shared-class approach — no per-component green/blue classes. Tokens and classes live in `app/globals.css`. Consumers set `data-quest-guidance="available" | "active"`.
+Both are static treatments (no animation) and use a shared-class approach — no per-component green/blue classes. Tokens and classes live in `app/globals.css`. Consumers set `data-mission-guidance="available" | "active"`.
 
-**Active green wins if something ever qualifies for both.** React priority (`hasActiveGuidance` over `hasAvailableGuidance`) ensures only one class is normally present; CSS also guarantees green wins when both classes coincide (`.rs-quest-available.rs-quest-guidance`).
+**Active green wins if something ever qualifies for both.** React priority (`hasActiveGuidance` over `hasAvailableGuidance`) ensures only one class is normally present; CSS also guarantees green wins when both classes coincide (`.rs-mission-available.rs-mission-guidance`).
 
 ### Available guidance (blue)
 
 Derived in `game/domain/missions.ts` as `MissionGuidance.availableNpcIds`:
 
-- For every mission where `state === "not_accepted"` and its prerequisite is satisfied and it is not completed, **every** offer whose `locationId` matches the player's current location contributes its `npcId`. No `offers[0]` shortcut — all authored offer locations are covered.
+- Only missions with **no prerequisite** advertise open discovery: for every such mission where `state === "not_accepted"` and it is not completed, **every** offer whose `locationId` matches the player's current location contributes its `npcId`. No `offers[0]` shortcut — all authored offer locations are covered.
+- Prerequisite-gated missions never advertise merely because their prerequisite is satisfied. A prerequisite is an eligibility rule, not a reveal mechanism. A directly continuing mission arrives via its predecessor's authored `continuationMissionId` (§3.1); ordinary world-discovered missions are accepted when the player encounters them.
 - Available guidance guides **NPC interactions only** (Talk affordances in `NpcInteractionPanel`).
-- It does **not** depend on `availableObjective`. A mission may have offers in the world and still have `availableObjective === undefined` (§11).
-
-### `availableObjective` is presentation copy only
-
-`MissionDefinition.availableObjective` is optional copy shown while a mission is available but not yet accepted (e.g. Cut Your Teeth's "Speak with Tansy Rusk at The Jag to begin…"). It has no effect on availability itself, guidance derivation, or acceptance eligibility. Producers and consumers must not gate or infer guidance from it.
 
 ### Active guidance (green)
 
@@ -249,19 +256,19 @@ Each consumer answers "am I that target?":
 
 ### Teaching intent (`recommendedActionId`)
 
-`recommendedActionId` on a `carried_stack` requirement expresses **teaching / recommendation intent** — which gameplay interaction this mission is intentionally guiding the player toward for acquisition. It is distinct from requirement truth (which observes carried quantity regardless of provenance) and is **validated against the action's authoritative output facts** (`getActionOutputItemIds` in `game/domain/action-outputs.ts`, which derives directly from the gameplay resolvers' award facts `miningAwardFacts` / `refiningAwardFacts`). Changing what an action authoritatively produces cannot leave quest-guidance validation stale, and the generic action registry is intentionally not widened beyond this narrow capability check.
+`recommendedActionId` on a `carried_stack` requirement expresses **teaching / recommendation intent** — which gameplay interaction this mission is intentionally guiding the player toward for acquisition. It is distinct from requirement truth (which observes carried quantity regardless of provenance) and is **validated against the action's authoritative output facts** (`getActionOutputItemIds` in `game/domain/action-outputs.ts`, which derives directly from the gameplay resolvers' award facts `miningAwardFacts` / `refiningAwardFacts`). Changing what an action authoritatively produces cannot leave mission-guidance validation stale, and the generic action registry is intentionally not widened beyond this narrow capability check.
 
 Not every technically possible acquisition path should be highlighted. Only the authored `recommendedActionId` on the current unmet carried requirement is highlighted. Cut Your Teeth recommends `ferrite_shale_mining` — Scavenge also yields Ferrite Shale, but has no `ActionId` to author there and is never highlighted merely because it can produce the same item.
 
-`QuestGuidanceTargets` is the union across all missions: `availableNpcIds`, `npcIds`, `equipmentItemIds`, `actionIds`.
+`MissionGuidanceTargets` is the union across all missions: `availableNpcIds`, `npcIds`, `equipmentItemIds`, `actionIds`.
 
 ## 11. Explorer-first behavior
 
-**Walk It Off can simultaneously advertise both Wade (Crash Site) and Tansy (The Jag) as available quest interactions while still having `availableObjective === undefined`.**
+**Walk It Off can simultaneously advertise both Wade (Crash Site) and Tansy (The Jag) as available mission interactions.**
 
-This is intentional. The mission has two real offer routes (Wade at the Crash Site and Tansy at The Jag) so a player who walks straight to The Jag meets Tansy first without missing the starter quest. Availability guidance is derived from every currently relevant authored offer at the player's current location (§10) and does not depend on objective copy. Walk It Off deliberately omits `availableObjective` to keep explorer discovery — the player is not pointed at the quest giver by mission copy before they have found it.
+This is intentional. The mission authors no prerequisite and two real offer routes (Wade at the Crash Site and Tansy at The Jag) so a player who walks straight to The Jag meets Tansy first without missing the starter mission. Availability guidance is derived from every currently relevant authored offer at the player's current location (§10).
 
-Future authors must not re-couple availability highlighting to objective copy. Adding `availableObjective` to Walk It Off (or checking it in guidance consumers) would be a regression, not an improvement.
+Cut Your Teeth authors a prerequisite and is never advertised — it arrives as Walk It Off's authored continuation (§3.1), already accepted, with its live objectives projected immediately.
 
 ## 12. Server authority / generic commands
 
@@ -285,8 +292,8 @@ Every other rule is **re-read and revalidated server-side inside the character t
 - every authored requirement against live equipment/inventory (`at_location`, `equipped_item`, `carried_stack` with the authoritative carried quantity);
 - for consumed carried requirements, an exact pure removal plan via the inventory planner without mutating rows (§6);
 - for item rewards, a **post-consumption preflight**: plans are applied cumulatively to an in-memory candidate inventory and the reward's capacity is checked against that post-consumption candidate — consumption may legitimately free the slot or mass the reward needs;
-- only after the complete plan is valid, consumption through the authoritative carried-stack boundary and the single declared reward and the guarded `completedAt` stamp commit in the same transaction; any failure (insufficient quantity, capacity still blocked, reward application error) leaves the whole transaction uncommitted;
-- the character lock (`withResolvedOwnedCharacter` / `runMissionCommand`) plus the `completedAt` `isNull` guard make acceptance and completion — and therefore consumption and reward — exactly-once under retries and concurrent first completions.
+- only after the complete plan is valid, consumption through the authoritative carried-stack boundary, the single declared reward, the guarded `completedAt` stamp, and the authored continuation acceptance (if any, idempotent via `onConflictDoNothing`) commit in the same transaction; any failure (insufficient quantity, capacity still blocked, reward application error) leaves the whole transaction uncommitted;
+- the character lock (`withResolvedOwnedCharacter` / `runMissionCommand`) plus the `completedAt` `isNull` guard make acceptance and completion — and therefore consumption, reward, and continuation — exactly-once under retries and concurrent first completions.
 
 Do not document or introduce client-authoritative shortcuts. The client never supplies required items, quantities, `consume` behavior, rewards, prerequisite status, or completion eligibility.
 
@@ -310,13 +317,13 @@ An ordinary mission using existing semantics should generally require:
 - edits to generic mission projection (`game/domain/missions.ts`) or the dialogue router (`game/content/dialogue.ts`),
 - mission-ID branches in React (`features/…`),
 - parsing objective or dialogue prose to determine gameplay rules,
-- new quest-specific guidance CSS.
+- new mission-specific guidance CSS.
 
 ### Warning
 
 > If an ordinary mission using already-supported semantics seems to require mission-ID checks in UI, a bespoke accept/complete transaction, or prose parsing, stop and inspect whether the framework is being bypassed.
 
-That pattern is a signal that authored content (offers, requirements, turn-in, dialogue mapping, guidance targets) is not carrying the semantics it should, or that guidance/dialogue routing is being special-cased instead of consumed through `deriveQuestGuidanceTargets` / `resolveNpcMissionDialogue` / `MissionProjection.stage`.
+That pattern is a signal that authored content (offers, requirements, turn-in, dialogue mapping, guidance targets) is not carrying the semantics it should, or that guidance/dialogue routing is being special-cased instead of consumed through `deriveMissionGuidanceTargets` / `resolveNpcMissionDialogue` / `MissionProjection.stage`.
 
 When in doubt, favour adding or correcting authored mission content and reusing the existing semantic paths over introducing mission-specific code.
 
@@ -326,9 +333,10 @@ The framework currently models **one live-state phase** per mission. Requirement
 
 - **Multi-location history** such as "visit A → visit B → return to A" when the visits leave no durable evidence in current state (e.g. two `at_location` steps that would both already be satisfied by the current location).
 - **Remembered conversation steps** or arbitrary dialogue memory beyond the single generic accept/complete actions.
-- **NPC relocation based on quest progression** — mission location semantics are intentionally authored on the definition, not derived from `npc.homeLocationId`, so a future NPC-movement feature does not inherit an accidental invariant, but movement itself is not yet implemented.
+- **NPC relocation based on mission progression** — mission location semantics are intentionally authored on the definition, not derived from `npc.homeLocationId`, so a future NPC-movement feature does not inherit an accidental invariant, but movement itself is not yet implemented.
 - **Arbitrary persistent per-step ledgers** (counts, flags, or provenance tracking like "shale mined since acceptance" — current carried-stack requirements intentionally count any carried quantity (§5–§6)).
-- **Branching, repeatable, or timed quest systems.**
+- **Branching, repeatable, or timed mission systems.**
+- **Persistent multi-stage missions.** A mission surface shows all requirements of the **current stage/leg** but never future-stage objectives. The current production framework is one stage, so authored requirements form the current simultaneous requirement set. A future mission with genuinely sequential legs (e.g. deliver one material set, then receive a new objective elsewhere) earns a deliberate multi-stage extension then — not speculatively now.
 
 The current requirement/projection vocabulary was kept reusable so a future narrow phase wrapper (`mission → phase → same requirements / dialogue / guidance vocabulary`) can layer on top without rewriting the existing missions, and mission location semantics already avoid the `homeLocationId` derivation trap.
 
@@ -344,14 +352,15 @@ Short concrete examples that demonstrate the framework vocabulary. Do not copy m
 - **Requirements:** one `at_location: The Jag`. Walk away and the objective regresses — projection is live.
 - **Turn-in:** `Tansy` at `The Jag`, stationary only. No duplicated `at_location: The Jag` requirement needed for eligibility (§7). `turnIn.objective: "Talk to Tansy Rusk"`.
 - **Reward:** one `item` — the Salvage Cutter. Registry validates it is a unique item because the generic completion path executes only that shape (§8).
+- **Continuation:** `continuationMissionId: cutYourTeeth` (§3.1). Completing Walk It Off atomically accepts Cut Your Teeth — no second acceptance click.
 - **Dialogue:** offer sequences plus `completionPresentation` (`tansyAfterClaim`, which presents the already-granted Cutter via an `item` beat) and `capacitySlots` / `capacityMass` refusal branches that the server selects generically after a `capacity` refusal.
-- **Guidance + explorer-first:** no `availableObjective` (§11). At Crash Site, blue targets Wade; at The Jag, blue targets Tansy — each derived from the matching authored offer at the current location, prerequisite-satisfied and not yet accepted.
+- **Guidance + explorer-first:** no prerequisite, so at Crash Site blue targets Wade and at The Jag blue targets Tansy — each derived from the matching authored offer at the current location while not yet accepted.
 
 ### Cut Your Teeth — equip-and-collect
 
-- **Prerequisite:** `walkItOff` must be `completed` before it can be offered or accepted.
-- **Offer:** single `Tansy` at `The Jag` (`tansyCutYourTeethOffer`). Availability guidance stays dark until `walkItOff` completes, then blue on Tansy (§10).
-- **Requirements (ordered):** `at_location: The Jag` → `equipped_item: salvageCutter` → `carried_stack: ferriteShale` with omitted `quantity` (full authoritative stack, currently `10`), `turnIn: "show"`, `recommendedActionId: ferrite_shale_mining`. The ordered progression is: return → equip → carry. Prior steps remain satisfied checks, and the carried objective renders as "Get a full stack of Ferrite Shale — 3 / 10" via `{carried} / {required}` substitution against live inventory. The stack is shown, never consumed (§6).
+- **Prerequisite:** `walkItOff` must be `completed` before it can be accepted. Never advertised: it arrives already accepted via Walk It Off's continuation (§3.1).
+- **Offer:** single `Tansy` at `The Jag` (`tansyCutYourTeethOffer`) remains for eligibility/acceptance validation, but no Available presentation exists — unaccepted Cut Your Teeth never appears in the Mission Log or HUD.
+- **Requirements (ordered, shown simultaneously):** `at_location: The Jag` → `equipped_item: salvageCutter` → `carried_stack: ferriteShale` with omitted `quantity` (full authoritative stack, currently `10`), `turnIn: "show"`, `recommendedActionId: ferrite_shale_mining`. Player-facing surfaces render all three together with live satisfaction/progress (e.g. "✓ At The Jag / ✓ Equip Salvage Cutter / Ferrite Shale — 4 / 10"), while `stage.nextObjectiveKind` keeps the first-unmet ordering for dialogue/guidance precedence. The stack is shown, never consumed (§6).
 - **Teaching intent:** `recommendedActionId` highlights `Start Mining` while the carried step is the current objective (§10) — validated against `miningAwardFacts`. Scavenged shale still satisfies the requirement (§5).
 - **Turn-in:** `Tansy` at `The Jag`, stationary only; `stage.turnInAvailable` distinguishes "I carry 10 but I'm still mining" (busy) from "ready to show" (§7). The turn-in dialogue (`SHOW SHALE`) carries `complete_mission`; the `skill_xp` reward (+100 Mining) and `item` beat are presentation only after the authoritative success.
 - **Dialogue stage routing:** `equipmentReminder` vs `carriedReminder` vs `busy` vs `completionPresentation` vs `turnIn` selected semantically from `stage.nextObjectiveKind` / `requirementsSatisfied` / `turnInAvailable` — never from prose.

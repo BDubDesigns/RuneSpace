@@ -19,7 +19,7 @@ export type RefiningRandom = { nextBasisPoints(): number };
 /**
  * The authoritative award facts for Refining: the input it consumes and the
  * two possible outputs one attempt can produce, authored success-output-first
- * (Refined Ferrite on success, Slag on failure). The resolver and quest-guidance
+ * (Refined Ferrite on success, Slag on failure). The resolver and mission-guidance
  * recommendation validation both read THIS function, so what Refining
  * authoritatively consumes/produces has exactly one home — changing the
  * resolver's award cannot leave guidance validation stale.

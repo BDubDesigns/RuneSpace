@@ -23,14 +23,14 @@ import {
   type MissionDefinition,
 } from "@/game/content/missions";
 import {
-  deriveQuestGuidanceTargets,
+  deriveMissionGuidanceTargets,
   projectMission,
   validateMissionDefinitions,
 } from "@/game/domain/missions";
 import { AcceptMissionRequestSchema, CompleteMissionRequestSchema } from "@/game/schemas/gameplay";
 
 function definitionOf(overrides: Partial<MissionDefinition>): MissionDefinition {
-  return { ...WALK_IT_OFF, ...overrides } as MissionDefinition;
+  return { ...WALK_IT_OFF, continuationMissionId: undefined, ...overrides } as MissionDefinition;
 }
 
 describe("issue #124 mission registry validation", () => {
@@ -316,19 +316,17 @@ describe("issue #124 generic UI consumers", () => {
   });
 });
 
-describe("quest-available vs quest-active guidance (preview correction)", () => {
-  it("projects every authored offer location for a brand-new character without requiring availableObjective", () => {
+describe("mission-available vs mission-active guidance (issue #137: prerequisites never reveal)", () => {
+  it("projects every authored offer location for a prerequisite-free mission", () => {
     const atCrashSite = projectMission(WALK_IT_OFF, undefined, LOCATION_IDS.crashSite, true);
     const atTheJag = projectMission(WALK_IT_OFF, undefined, LOCATION_IDS.theJag, true);
     expect(atCrashSite.guidance?.availableNpcIds).toEqual([NPC_IDS.wadeRusk]);
     expect(atTheJag.guidance?.availableNpcIds).toEqual([NPC_IDS.tansyRusk]);
     expect(atCrashSite.guidance?.npcId).toBeUndefined();
     expect(atTheJag.guidance?.npcId).toBeUndefined();
-    expect(WALK_IT_OFF.availableObjective).toBeUndefined();
-    expect(atCrashSite.availableObjective).toBeUndefined();
   });
 
-  it("does not advertise a prerequisite-gated mission until the prerequisite is satisfied", () => {
+  it("never advertises a prerequisite-gated mission, even when the prerequisite is satisfied", () => {
     const locked = projectMission(
       CUT_YOUR_TEETH,
       undefined,
@@ -338,7 +336,7 @@ describe("quest-available vs quest-active guidance (preview correction)", () => 
       false,
     );
     expect(locked.guidance?.availableNpcIds).toBeUndefined();
-    const available = projectMission(
+    const prerequisiteSatisfied = projectMission(
       CUT_YOUR_TEETH,
       undefined,
       LOCATION_IDS.theJag,
@@ -346,7 +344,8 @@ describe("quest-available vs quest-active guidance (preview correction)", () => 
       undefined,
       true,
     );
-    expect(available.guidance?.availableNpcIds).toEqual([NPC_IDS.tansyRusk]);
+    expect(prerequisiteSatisfied.guidance?.availableNpcIds).toBeUndefined();
+    expect(prerequisiteSatisfied.prerequisiteSatisfied).toBe(true);
   });
 
   it("removes available guidance once the mission is accepted and shows active progression", () => {
@@ -354,13 +353,13 @@ describe("quest-available vs quest-active guidance (preview correction)", () => 
     const activeAtCrashSite = projectMission(WALK_IT_OFF, accepted, LOCATION_IDS.crashSite, true);
     expect(activeAtCrashSite.guidance?.availableNpcIds).toBeUndefined();
     const activeAtTheJag = projectMission(WALK_IT_OFF, accepted, LOCATION_IDS.theJag, true);
-    const targets = deriveQuestGuidanceTargets([activeAtTheJag]);
+    const targets = deriveMissionGuidanceTargets([activeAtTheJag]);
     expect([...targets.npcIds]).toEqual([NPC_IDS.tansyRusk]);
     expect([...targets.availableNpcIds]).toEqual([]);
   });
 
   it("keeps available and active guidance semantically distinct with active winning on overlap", () => {
-    const overlap = deriveQuestGuidanceTargets([
+    const overlap = deriveMissionGuidanceTargets([
       { guidance: { availableNpcIds: ["tansy_rusk"], npcId: "tansy_rusk" } } as any,
     ]);
     expect([...overlap.availableNpcIds]).toEqual(["tansy_rusk"]);
@@ -402,5 +401,243 @@ describe("quest-available vs quest-active guidance (preview correction)", () => 
     expect(atTheJag.guidance?.availableNpcIds).toEqual([NPC_IDS.tansyRusk]);
     expect(elsewhere.guidance?.availableNpcIds).toBeUndefined();
     expect(atCrashSite.guidance?.availableNpcIds).not.toContain(NPC_IDS.tansyRusk);
+  });
+});
+
+describe("issue #137 authored mission continuation validation", () => {
+  function basePair(): [MissionDefinition, MissionDefinition] {
+    const first = definitionOf({ id: "synthetic_first" as ContentId });
+    const second = definitionOf({
+      id: "synthetic_second" as ContentId,
+      prerequisiteMissionId: "synthetic_first" as ContentId,
+    });
+    return [first, second];
+  }
+
+  it("accepts an explicitly authored continuation into the prerequisite-gated next mission", () => {
+    const [first, second] = basePair();
+    expect(() =>
+      validateMissionDefinitions([{ ...first, continuationMissionId: second.id }, second]),
+    ).not.toThrow();
+  });
+
+  it("accepts the production Walk It Off → Cut Your Teeth continuation", () => {
+    expect(WALK_IT_OFF.continuationMissionId).toBe(MISSION_IDS.cutYourTeeth);
+    expect(() => validateMissionDefinitions(MISSIONS)).not.toThrow();
+  });
+
+  it("rejects unknown and self continuations", () => {
+    const [first, second] = basePair();
+    expect(() =>
+      validateMissionDefinitions([
+        { ...first, continuationMissionId: "no_such_mission" as ContentId },
+        second,
+      ]),
+    ).toThrow(/continuation/i);
+    expect(() =>
+      validateMissionDefinitions([{ ...first, continuationMissionId: first.id }, second]),
+    ).toThrow(/itself/i);
+  });
+
+  it("rejects continuation cycles", () => {
+    const [first, second] = basePair();
+    expect(() =>
+      validateMissionDefinitions([
+        { ...first, continuationMissionId: second.id },
+        {
+          ...second,
+          prerequisiteMissionId: undefined,
+          continuationMissionId: first.id,
+        },
+      ]),
+    ).toThrow(/cycle/i);
+  });
+
+  it("rejects a continuation that contradicts the target prerequisite", () => {
+    const [first, second] = basePair();
+    const third = definitionOf({
+      id: "synthetic_third" as ContentId,
+      prerequisiteMissionId: second.id,
+    });
+    expect(() =>
+      validateMissionDefinitions([{ ...first, continuationMissionId: third.id }, second, third]),
+    ).toThrow(/prerequisite/i);
+  });
+});
+
+describe("issue #137 simultaneous current-stage requirement projection", () => {
+  function cutYourTeethObservation(
+    overrides: Partial<import("@/game/domain/missions").MissionObservation> = {},
+  ): import("@/game/domain/missions").MissionObservation {
+    return {
+      equippedItemIds: new Set<string>(),
+      carriedQuantities: new Map<string, number>(),
+      stackLimits: new Map<string, number>([[ITEM_IDS.ferriteShale, 10]]),
+      itemNames: new Map<string, string>([
+        [ITEM_IDS.salvageCutter, "Salvage Cutter"],
+        [ITEM_IDS.ferriteShale, "Ferrite Shale"],
+      ]),
+      ...overrides,
+    };
+  }
+
+  const accepted = { acceptedAt: new Date("2026-01-01T00:00:00.000Z") };
+
+  it("exposes all three Cut Your Teeth requirements with live satisfaction", () => {
+    const projected = projectMission(
+      CUT_YOUR_TEETH,
+      accepted,
+      LOCATION_IDS.theJag,
+      true,
+      cutYourTeethObservation({
+        carriedQuantities: new Map([[ITEM_IDS.ferriteShale, 4]]),
+      }),
+    );
+    expect(projected.requirements).toHaveLength(3);
+    expect(projected.requirements?.map((requirement) => requirement.kind)).toEqual([
+      "at_location",
+      "equipped_item",
+      "carried_stack",
+    ]);
+    expect(projected.requirements?.map((requirement) => requirement.satisfied)).toEqual([
+      true,
+      false,
+      false,
+    ]);
+    expect(projected.requirements?.[2]?.progress).toEqual({ carried: 4, required: 10 });
+    expect(projected.requirements?.[2]?.objective).toBe(
+      "Get a full stack of Ferrite Shale — 4 / 10",
+    );
+    expect(projected.stage?.nextObjectiveKind).toBe("equipped_item");
+  });
+
+  it("updates satisfaction and quantity when authoritative state changes", () => {
+    const unequipped = projectMission(
+      CUT_YOUR_TEETH,
+      accepted,
+      LOCATION_IDS.theJag,
+      true,
+      cutYourTeethObservation({
+        equippedItemIds: new Set([ITEM_IDS.salvageCutter]),
+        carriedQuantities: new Map([[ITEM_IDS.ferriteShale, 4]]),
+      }),
+    );
+    expect(unequipped.requirements?.[1]?.satisfied).toBe(true);
+    expect(unequipped.requirements?.[2]?.progress).toEqual({ carried: 4, required: 10 });
+
+    const regressed = projectMission(
+      CUT_YOUR_TEETH,
+      accepted,
+      LOCATION_IDS.theJag,
+      true,
+      cutYourTeethObservation({
+        carriedQuantities: new Map([[ITEM_IDS.ferriteShale, 2]]),
+      }),
+    );
+    expect(regressed.requirements?.[1]?.satisfied).toBe(false);
+    expect(regressed.requirements?.[2]?.progress).toEqual({ carried: 2, required: 10 });
+  });
+
+  it("shows the turn-in objective when every requirement holds", () => {
+    const projected = projectMission(
+      CUT_YOUR_TEETH,
+      accepted,
+      LOCATION_IDS.theJag,
+      true,
+      cutYourTeethObservation({
+        equippedItemIds: new Set([ITEM_IDS.salvageCutter]),
+        carriedQuantities: new Map([[ITEM_IDS.ferriteShale, 10]]),
+      }),
+    );
+    expect(projected.state).toBe("ready_for_completion");
+    expect(projected.currentObjective).toBe("Show a full stack of Ferrite Shale to Tansy Rusk");
+    expect(projected.requirements?.every((requirement) => requirement.satisfied)).toBe(true);
+  });
+
+  it("projects earned rewards and completion state only for completed missions", () => {
+    const now = new Date("2026-01-01T00:00:00.000Z");
+    const activeProjection = projectMission(
+      CUT_YOUR_TEETH,
+      accepted,
+      LOCATION_IDS.theJag,
+      true,
+      cutYourTeethObservation(),
+    );
+    expect(activeProjection.earnedReward).toBeUndefined();
+
+    const completedProjection = projectMission(
+      CUT_YOUR_TEETH,
+      { acceptedAt: now, completedAt: now },
+      LOCATION_IDS.theJag,
+      true,
+      cutYourTeethObservation(),
+    );
+    expect(completedProjection.earnedReward).toEqual({
+      kind: "skill_xp",
+      skillId: SKILL_IDS.mining,
+      skillName: "Mining",
+      amount: 100,
+    });
+    expect(completedProjection.completedAt).toEqual(now);
+
+    const completedItem = projectMission(
+      WALK_IT_OFF,
+      { acceptedAt: now, completedAt: now },
+      LOCATION_IDS.theJag,
+      true,
+    );
+    expect(completedItem.earnedReward).toEqual({
+      kind: "item",
+      itemId: ITEM_IDS.salvageCutter,
+      itemName: "Salvage Cutter",
+    });
+  });
+});
+
+describe("issue #137 mission terminology guard", () => {
+  it("keeps Quest* mission-system names out of the live domain/UI/CSS/tests touched by this work", () => {
+    const touched = [
+      "game/domain/missions.ts",
+      "game/content/missions.ts",
+      "server/missions.ts",
+      "server/mission-state.ts",
+      "features/missions/MissionObjectivePanel.tsx",
+      "features/missions/MissionLogPanel.tsx",
+      "features/play/PlayScreen.tsx",
+      "features/play/PlayConsole.tsx",
+      "features/play/PlayContext.tsx",
+      "features/play/PlayFooterNav.tsx",
+      "features/npc/NpcInteractionPanel.tsx",
+      "features/inventory/InventoryPanel.tsx",
+      "features/inventory/EquipmentPanel.tsx",
+      "features/mining/MiningActivity.tsx",
+      "features/refining/RefiningConsole.tsx",
+      "components/items/VisualTile.tsx",
+      "components/items/ItemVisual.tsx",
+      "app/globals.css",
+      "docs/missions.md",
+      "tests/unit/mission-framework.test.ts",
+      "tests/unit/cut-your-teeth.test.ts",
+      "tests/unit/missions.test.ts",
+      "tests/e2e/walk-it-off.spec.ts",
+      "tests/e2e/cut-your-teeth.spec.ts",
+      "tests/e2e/overlay.spec.ts",
+    ];
+    const offenders: string[] = [];
+    const missionSystemPattern =
+      /QuestGuidanceTargets|deriveQuestGuidanceTargets|quest-guidance|rs-quest|--rs-quest|quest giver|questGuidance/;
+    // The guard's own pattern literals would self-match: strip this guard
+    // block before scanning so the test proves the touched files, not itself.
+    const guardStart = 'describe("issue #137 mission terminology guard"';
+    for (const relative of touched) {
+      const full = resolve(dirname(fileURLToPath(import.meta.url)), "../../", relative);
+      const text = readFileSync(full, "utf8");
+      const scannable =
+        relative === "tests/unit/mission-framework.test.ts"
+          ? text.slice(0, text.indexOf(guardStart))
+          : text;
+      if (missionSystemPattern.test(scannable)) offenders.push(relative);
+    }
+    expect(offenders).toEqual([]);
   });
 });
