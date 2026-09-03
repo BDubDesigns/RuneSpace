@@ -308,7 +308,7 @@ test("owned character can start, observe, stop, and restore Ferrite Mining at Th
   await expect(inventory.getByLabel(/Empty inventory slot/)).toHaveCount(6);
   await page.screenshot({ path: "test-results/mining-mobile-inventory-10-plus-1.png" });
   await page.getByRole("button", { name: "Close inventory" }).click();
-  await expect(page.getByRole("button", { name: "Inventory" })).toBeFocused();
+  await expect(footer.getByRole("button", { name: "Inventory" })).toBeFocused();
   await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
   await expect(history).toBeVisible();
   await expect(footer).toBeVisible();
@@ -324,7 +324,7 @@ test("owned character can start, observe, stop, and restore Ferrite Mining at Th
   await expect(inventory.getByText("x10", { exact: true })).toBeVisible();
   await page.screenshot({ path: "test-results/mining-desktop-inventory-10-plus-1.png" });
   await page.keyboard.press("Escape");
-  await expect(page.getByRole("button", { name: "Inventory" })).toBeFocused();
+  await expect(footer.getByRole("button", { name: "Inventory" })).toBeFocused();
   await page.getByRole("button", { name: "Stop Mining" }).click();
   await expect(page.getByRole("button", { name: "Start Mining" })).toBeVisible();
   await expect(page.getByText("Mining stopped.")).toBeVisible();
