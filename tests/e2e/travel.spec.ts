@@ -1,46 +1,18 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, openTestCharacter } from "./fixtures";
 import { writeFile } from "node:fs/promises";
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import {
   activeActions,
-  cargoHoldItemInstances,
-  cargoHoldStacks,
-  characters,
-  characterMiningState,
-  characterCargoHoldRepair,
-  characterPowerCellDailyClaims,
   characterScavengeReveals,
-  characterSkillXp,
-  characterStarterProvisioning,
   characterTravelState,
-  equippedItems,
   inventoryStacks,
-  itemInstances,
 } from "@/db/rune-space";
 import { ACTION_IDS, ITEM_IDS, LOCATION_IDS } from "@/game/config/foundations";
 import { POWER_CELL_DAILY_ALLOTMENT } from "@/game/domain/power-annex";
 import { seedLegacyStarterCutter } from "./legacy-starter";
 import { expectElementsInsideHexes } from "./map-geometry";
-import { miningStorageStatePath } from "./mining.setup";
-
-const e2eDatabaseHost = process.env.DATABASE_URL ? new URL(process.env.DATABASE_URL).hostname : "";
-
-test.beforeAll(() => {
-  if (e2eDatabaseHost !== "localhost" && e2eDatabaseHost !== "127.0.0.1") {
-    throw new Error("Travel E2E fixtures require a disposable localhost PostgreSQL database");
-  }
-});
-
-test.use({ storageState: miningStorageStatePath });
-test.describe.configure({ mode: "serial" });
-
-async function openTravelFixture(page: import("@playwright/test").Page) {
-  await page.goto("/characters");
-  await page.getByRole("link", { name: "Play" }).click();
-  await page.waitForURL(/\/play\/[^/]+$/);
-  return page.url().split("/").at(-1)!;
-}
+import { captureReviewScreenshot } from "./review-screenshot";
 
 /** Scroll the local map into the center of the viewport so neither hex is
  * hidden by the fixed bottom navigation. */
@@ -287,45 +259,8 @@ async function openScavengeOpportunity(
   return opportunity;
 }
 
-test.beforeEach(async ({ page }) => {
-  const characterId = await openTravelFixture(page);
-  await db.transaction(async (transaction) => {
-    // Clear all mutable gameplay rows to ensure per-test isolation.
-    await transaction.delete(activeActions).where(eq(activeActions.characterId, characterId));
-    await transaction
-      .delete(cargoHoldItemInstances)
-      .where(eq(cargoHoldItemInstances.characterId, characterId));
-    await transaction.delete(cargoHoldStacks).where(eq(cargoHoldStacks.characterId, characterId));
-    await transaction
-      .delete(characterCargoHoldRepair)
-      .where(eq(characterCargoHoldRepair.characterId, characterId));
-    await transaction
-      .delete(characterTravelState)
-      .where(eq(characterTravelState.characterId, characterId));
-    await transaction
-      .delete(characterScavengeReveals)
-      .where(eq(characterScavengeReveals.characterId, characterId));
-    await transaction
-      .delete(characterMiningState)
-      .where(eq(characterMiningState.characterId, characterId));
-    await transaction
-      .delete(characterPowerCellDailyClaims)
-      .where(eq(characterPowerCellDailyClaims.characterId, characterId));
-    await transaction.delete(inventoryStacks).where(eq(inventoryStacks.characterId, characterId));
-    // `equipped_items` has a composite foreign key to item instances.
-    await transaction.delete(equippedItems).where(eq(equippedItems.characterId, characterId));
-    await transaction.delete(itemInstances).where(eq(itemInstances.characterId, characterId));
-    await transaction.delete(characterSkillXp).where(eq(characterSkillXp.characterId, characterId));
-    await transaction
-      .delete(characterStarterProvisioning)
-      .where(eq(characterStarterProvisioning.characterId, characterId));
-    // Reset character location to the authoritative start.
-    await transaction
-      .update(characters)
-      .set({ currentLocationId: LOCATION_IDS.crashSite })
-      .where(eq(characters.id, characterId));
-  });
-  await page.reload();
+test.beforeEach(async ({ page, testCharacter }) => {
+  await openTestCharacter(page, testCharacter.id);
   await expect(page.getByText("World map")).toBeVisible();
 });
 
@@ -345,13 +280,13 @@ test("selecting a destination does not begin travel; confirmation is required", 
   await scrollMapIntoView(page);
   await expectMapNameplatesInsideHex(page);
   await expectMapStateLabelsInsideHex(page, STATIONARY_STATE_LABELS);
-  await page.screenshot({ path: "test-results/travel-mobile-stationary.png" });
+  await captureReviewScreenshot(page, "travel-mobile-stationary.png");
 
   await page.setViewportSize({ width: 1440, height: 900 });
   await scrollMapIntoView(page);
   await expectMapNameplatesInsideHex(page);
   await expectMapStateLabelsInsideHex(page, STATIONARY_STATE_LABELS);
-  await page.screenshot({ path: "test-results/travel-desktop-stationary.png" });
+  await captureReviewScreenshot(page, "travel-desktop-stationary.png");
 
   await page.setViewportSize({ width: 390, height: 844 });
 
@@ -372,13 +307,13 @@ test("selecting a destination does not begin travel; confirmation is required", 
   await expectMapNameplatesInsideHex(page);
   await expectMapStateLabelsInsideHex(page, SELECTED_STATE_LABELS);
   await expectMapStatusPlatesInsideHex(page);
-  await page.screenshot({ path: "test-results/travel-mobile-selected.png" });
+  await captureReviewScreenshot(page, "travel-mobile-selected.png");
   await page.setViewportSize({ width: 1440, height: 900 });
   await scrollMapIntoView(page);
   await expectMapNameplatesInsideHex(page);
   await expectMapStateLabelsInsideHex(page, SELECTED_STATE_LABELS);
   await expectMapStatusPlatesInsideHex(page);
-  await page.screenshot({ path: "test-results/travel-desktop-selected.png" });
+  await captureReviewScreenshot(page, "travel-desktop-selected.png");
 });
 
 test("directional map affordances follow native scroll truth", async ({ page }) => {
@@ -459,9 +394,11 @@ test("directional map affordances follow native scroll truth", async ({ page }) 
   );
 });
 
-test("automatically reconciles arrival without refresh or reload", async ({ page }) => {
-  const characterId = page.url().split("/").at(-1)!;
-  await page.goto("/characters");
+test("automatically reconciles arrival without refresh or reload", async ({
+  page,
+  testCharacter,
+}) => {
+  const characterId = testCharacter.id;
   const boundaryStart = new Date(Date.now() - 23_400);
   await db.insert(activeActions).values({
     characterId,
@@ -474,7 +411,7 @@ test("automatically reconciles arrival without refresh or reload", async ({ page
     originLocationId: LOCATION_IDS.crashSite,
     destinationLocationId: LOCATION_IDS.abandonedProcessingYard,
   });
-  await page.getByRole("link", { name: "Play" }).click();
+  await page.goto(`/play/${characterId}`);
   await page.waitForURL(/\/play\/[^/]+$/);
 
   await expect(page.getByText("Journey progress")).toBeVisible();
@@ -603,13 +540,13 @@ test("the full journey walks, arrives, and returns between the original location
   await expectMapNameplatesInsideHex(page);
   await expectMapStateLabelsInsideHex(page, IN_TRANSIT_STATE_LABELS);
   await expectMapStatusPlatesInsideHex(page);
-  await page.screenshot({ path: "test-results/travel-mobile-in-transit.png" });
+  await captureReviewScreenshot(page, "travel-mobile-in-transit.png");
   await page.setViewportSize({ width: 1440, height: 900 });
   await scrollMapIntoView(page);
   await expectMapNameplatesInsideHex(page);
   await expectMapStateLabelsInsideHex(page, IN_TRANSIT_STATE_LABELS);
   await expectMapStatusPlatesInsideHex(page);
-  await page.screenshot({ path: "test-results/travel-desktop-in-transit.png" });
+  await captureReviewScreenshot(page, "travel-desktop-in-transit.png");
   await page.setViewportSize({ width: 390, height: 844 });
 
   // Fast-forward the journey server-side, then refresh to resolve arrival.
@@ -636,10 +573,10 @@ test("the full journey walks, arrives, and returns between the original location
   await expect(page.getByText(/Metallurgy progression/i)).toHaveCount(0);
 
   await scrollMapIntoView(page);
-  await page.screenshot({ path: "test-results/travel-mobile-arrived.png" });
+  await captureReviewScreenshot(page, "travel-mobile-arrived.png");
   await page.setViewportSize({ width: 1440, height: 900 });
   await scrollMapIntoView(page);
-  await page.screenshot({ path: "test-results/travel-desktop-arrived.png" });
+  await captureReviewScreenshot(page, "travel-desktop-arrived.png");
   await page.setViewportSize({ width: 390, height: 844 });
 
   // Return journey: select the Crash Site and walk back.
@@ -806,13 +743,13 @@ test("Scavenge presents the committed outcome on a readable weighted reel", asyn
   }));
   expect(mobileLayout.scrollWidth).toBeLessThanOrEqual(mobileLayout.clientWidth);
   expect(mobileLayout.clientHeight).toBeGreaterThanOrEqual(300);
-  await page.screenshot({ path: "test-results/scavenge-reel-mobile.png" });
+  await captureReviewScreenshot(page, "scavenge-reel-mobile.png");
 
   await page.setViewportSize({ width: 1440, height: 900 });
   await expect(page.locator("[data-scavenge-reel]")).toBeVisible();
   const desktopReel = await page.locator("[data-scavenge-reel]").boundingBox();
   expect(desktopReel?.width ?? 0).toBeLessThanOrEqual(352);
-  await page.screenshot({ path: "test-results/scavenge-reel-desktop.png" });
+  await captureReviewScreenshot(page, "scavenge-reel-desktop.png");
 
   await page.getByRole("button", { name: "START REEL" }).click();
   await expect(page.getByRole("button", { name: "Reeling…" })).toBeVisible();
@@ -950,8 +887,9 @@ test("Travel arrival reconciliation preserves a Scavenge reel already in motion"
 
 test("travels to the Power Annex and claims independently by Pacific reset date", async ({
   page,
+  testCharacter,
 }) => {
-  const characterId = await openTravelFixture(page);
+  const characterId = testCharacter.id;
   const controlledClock = Boolean(process.env.RUNESPACE_POWER_ANNEX_CLOCK_FILE);
   await page.setViewportSize({ width: 390, height: 844 });
   await arriveAtPowerAnnex(page, characterId);
@@ -966,7 +904,7 @@ test("travels to the Power Annex and claims independently by Pacific reset date"
   expect(availableTileBox?.width ?? 0).toBeLessThan(200);
   await expectPowerAnnexRewardLayout(page, { claimed: false });
   await expectMapStatusPlatesInsideHex(page);
-  await page.screenshot({ path: "test-results/power-annex-mobile-available.png" });
+  await captureReviewScreenshot(page, "power-annex-mobile-available.png");
   await page.getByRole("button", { name: "Claim Power Cells" }).click();
   await expect(
     page.getByText(/Today's emergency allotment claimed: 5 Power Cells awarded/),
@@ -984,7 +922,7 @@ test("travels to the Power Annex and claims independently by Pacific reset date"
   ).toBeVisible();
   await expectPowerAnnexRewardLayout(page, { claimed: true });
   await expectMapStatusPlatesInsideHex(page);
-  await page.screenshot({ path: "test-results/power-annex-mobile-claimed.png" });
+  await captureReviewScreenshot(page, "power-annex-mobile-claimed.png");
 
   await page.getByRole("button", { name: /Inventory/ }).click();
   const claimedCell = page.getByLabel("5 Power Cell", { exact: true });
@@ -999,7 +937,7 @@ test("travels to the Power Annex and claims independently by Pacific reset date"
     await page.setViewportSize({ width: 1440, height: 900 });
     await expectPowerAnnexRewardLayout(page, { claimed: true });
     await expectMapStatusPlatesInsideHex(page);
-    await page.screenshot({ path: "test-results/power-annex-desktop-available.png" });
+    await captureReviewScreenshot(page, "power-annex-desktop-available.png");
     return;
   }
 
@@ -1014,7 +952,7 @@ test("travels to the Power Annex and claims independently by Pacific reset date"
   await page.setViewportSize({ width: 1440, height: 900 });
   await expectPowerAnnexRewardLayout(page, { claimed: false });
   await expectMapStatusPlatesInsideHex(page);
-  await page.screenshot({ path: "test-results/power-annex-desktop-available.png" });
+  await captureReviewScreenshot(page, "power-annex-desktop-available.png");
   await page.getByRole("button", { name: "Claim Power Cells" }).click();
   await expect(
     page.getByText(/Today's emergency allotment claimed: 5 Power Cells awarded/),
@@ -1026,13 +964,16 @@ test("travels to the Power Annex and claims independently by Pacific reset date"
   await expect(desktopClaimedTile.locator("img")).toHaveClass(/grayscale/);
   await expectPowerAnnexRewardLayout(page, { claimed: true });
   await expectMapStatusPlatesInsideHex(page);
-  await page.screenshot({ path: "test-results/power-annex-desktop-claimed.png" });
+  await captureReviewScreenshot(page, "power-annex-desktop-claimed.png");
   await page.getByRole("button", { name: /Inventory/ }).click();
   await expect(page.getByLabel("5 Power Cell", { exact: true })).toHaveCount(2);
 });
 
-test("a capacity refusal keeps the Power Annex allotment available", async ({ page }) => {
-  const characterId = await openTravelFixture(page);
+test("a capacity refusal keeps the Power Annex allotment available", async ({
+  page,
+  testCharacter,
+}) => {
+  const characterId = testCharacter.id;
   await page.setViewportSize({ width: 390, height: 844 });
   await arriveAtPowerAnnex(page, characterId);
 

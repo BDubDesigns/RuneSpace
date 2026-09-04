@@ -1,62 +1,15 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, openTestCharacter } from "./fixtures";
 import { and, eq } from "drizzle-orm";
 import { db } from "@/db";
 import {
-  activeActions,
   characterMissions,
   characterSkillXp,
-  characterStarterProvisioning,
-  characterTravelState,
   characters,
   equippedItems,
   inventoryStacks,
   itemInstances,
 } from "@/db/rune-space";
 import { ITEM_IDS, LOCATION_IDS, SKILL_IDS } from "@/game/config/foundations";
-import { miningStorageStatePath } from "./mining.setup";
-
-const e2eDatabaseHost = process.env.DATABASE_URL ? new URL(process.env.DATABASE_URL).hostname : "";
-
-test.beforeAll(() => {
-  if (e2eDatabaseHost !== "localhost" && e2eDatabaseHost !== "127.0.0.1") {
-    throw new Error(
-      "Cut Your Teeth E2E fixtures require a disposable localhost PostgreSQL database",
-    );
-  }
-});
-
-test.use({ storageState: miningStorageStatePath });
-test.describe.configure({ mode: "serial" });
-
-async function openPlayPage(page: import("@playwright/test").Page) {
-  await page.goto("/characters");
-  await page.getByRole("link", { name: "Play" }).click();
-  await page.waitForURL(/\/play\/[^/]+$/);
-  return page.url().split("/").at(-1)!;
-}
-
-async function clearCharacterState(characterId: string) {
-  await db.transaction(async (transaction) => {
-    await transaction.delete(activeActions).where(eq(activeActions.characterId, characterId));
-    await transaction
-      .delete(characterTravelState)
-      .where(eq(characterTravelState.characterId, characterId));
-    await transaction
-      .delete(characterMissions)
-      .where(eq(characterMissions.characterId, characterId));
-    await transaction.delete(inventoryStacks).where(eq(inventoryStacks.characterId, characterId));
-    await transaction.delete(equippedItems).where(eq(equippedItems.characterId, characterId));
-    await transaction.delete(itemInstances).where(eq(itemInstances.characterId, characterId));
-    await transaction.delete(characterSkillXp).where(eq(characterSkillXp.characterId, characterId));
-    await transaction
-      .delete(characterStarterProvisioning)
-      .where(eq(characterStarterProvisioning.characterId, characterId));
-    await transaction
-      .update(characters)
-      .set({ currentLocationId: LOCATION_IDS.theJag })
-      .where(eq(characters.id, characterId));
-  });
-}
 
 /**
  * Seeds the exact post-Walk-It-Off boundary through authoritative rows:
@@ -98,12 +51,17 @@ async function miningXpTotal(characterId: string) {
 
 test("equips the Cutter through Inventory, shows a full stack, and earns Mining +100 once", async ({
   page,
+  testCharacter,
 }) => {
   test.setTimeout(90_000);
-  const characterId = await openPlayPage(page);
-  await clearCharacterState(characterId);
+  const characterId = testCharacter.id;
+  await db
+    .update(characters)
+    .set({ currentLocationId: LOCATION_IDS.theJag })
+    .where(eq(characters.id, characterId));
   const cutterId = await seedPostWalkItOffBoundary(characterId);
   await addShale(characterId, 10);
+  await openTestCharacter(page, characterId);
   await page.reload();
   await page.emulateMedia({ reducedMotion: "reduce" });
 

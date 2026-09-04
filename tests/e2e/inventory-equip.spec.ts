@@ -1,65 +1,15 @@
-import { expect, test } from "@playwright/test";
+import { test, expect, openTestCharacter } from "./fixtures";
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
-import {
-  activeActions,
-  cargoHoldItemInstances,
-  cargoHoldStacks,
-  characters,
-  characterCargoHoldRepair,
-  characterMiningState,
-  characterStarterProvisioning,
-  equippedItems,
-  inventoryStacks,
-  itemInstances,
-} from "@/db/rune-space";
-import { ITEM_IDS, LOCATION_IDS } from "@/game/config/foundations";
+import { equippedItems, itemInstances, inventoryStacks } from "@/db/rune-space";
+import { ITEM_IDS } from "@/game/config/foundations";
 import { getEffectiveGameBalance } from "@/game/config/balance";
-import { miningStorageStatePath } from "./mining.setup";
-
-const e2eDatabaseHost = process.env.DATABASE_URL ? new URL(process.env.DATABASE_URL).hostname : "";
-
-test.beforeAll(() => {
-  if (e2eDatabaseHost !== "localhost" && e2eDatabaseHost !== "127.0.0.1") {
-    throw new Error(
-      "Inventory equip E2E fixtures require a disposable localhost PostgreSQL database",
-    );
-  }
-});
-
-test.use({ storageState: miningStorageStatePath });
+import { captureReviewScreenshot } from "./review-screenshot";
 
 // The Inventory/Equipment surface is exercised on the primary Mining page at
 // the same canonical portrait viewport used across the browser suite.
-async function openPlayPage(page: import("@playwright/test").Page) {
-  await page.goto("/characters");
-  await page.getByRole("link", { name: "Play" }).click();
-  await page.waitForURL(/\/play\/[^/]+$/);
-  return page.url().split("/").at(-1)!;
-}
-
-test.beforeEach(async ({ page }) => {
-  const characterId = await openPlayPage(page);
-  await Promise.all([
-    db.delete(activeActions).where(eq(activeActions.characterId, characterId)),
-    db.delete(cargoHoldItemInstances).where(eq(cargoHoldItemInstances.characterId, characterId)),
-    db.delete(cargoHoldStacks).where(eq(cargoHoldStacks.characterId, characterId)),
-    db
-      .delete(characterCargoHoldRepair)
-      .where(eq(characterCargoHoldRepair.characterId, characterId)),
-    db.delete(characterMiningState).where(eq(characterMiningState.characterId, characterId)),
-    db.delete(inventoryStacks).where(eq(inventoryStacks.characterId, characterId)),
-    db
-      .update(characters)
-      .set({ currentLocationId: LOCATION_IDS.crashSite })
-      .where(eq(characters.id, characterId)),
-    db
-      .delete(characterStarterProvisioning)
-      .where(eq(characterStarterProvisioning.characterId, characterId)),
-  ]);
-  await db.delete(equippedItems).where(eq(equippedItems.characterId, characterId));
-  await db.delete(itemInstances).where(eq(itemInstances.characterId, characterId));
-  await page.reload();
+test.beforeEach(async ({ page, testCharacter }) => {
+  await openTestCharacter(page, testCharacter.id);
 });
 
 test.describe("Inventory equip and compact selected visual", () => {
@@ -115,7 +65,7 @@ test.describe("Inventory equip and compact selected visual", () => {
     await expect(detailsPanel.getByRole("button", { name: /Equip in Mining tool/ })).toBeVisible();
 
     // Frozen review screenshot: narrow portrait selected-item details (Issue #68).
-    await page.screenshot({ path: "test-results/inventory-equip-mobile-selected-cutter.png" });
+    await captureReviewScreenshot(page, "inventory-equip-mobile-selected-cutter.png");
 
     // Compact selected visual: at the 390px portrait viewport the selected
     // artwork tile stays ~7rem (112px) wide instead of stretching across the
@@ -180,7 +130,7 @@ test.describe("Inventory equip and compact selected visual", () => {
 
     // Frozen review screenshot: the Salvage Cutter Equip state, shown equipped
     // in the Mining-tool slot without a reload (Issue #68).
-    await page.screenshot({ path: "test-results/inventory-equip-mobile-equipped.png" });
+    await captureReviewScreenshot(page, "inventory-equip-mobile-equipped.png");
   });
 
   test("keeps the selected-stack visual compact on narrow portrait and does not overflow", async ({

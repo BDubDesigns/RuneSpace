@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, openTestCharacter } from "./fixtures";
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import * as authSchema from "@/db/auth-schema";
@@ -8,35 +8,23 @@ import { normalizeCharacterName } from "@/game/domain/character-name";
 import { createCharacter } from "@/server/characters";
 import { ensurePlayerAccount } from "@/server/ownership";
 import { cleanupTestUser, createTestUser } from "../integration/fixtures";
-import { miningStorageStatePath } from "./mining.setup";
 import { populationDisclosure } from "./population-disclosure";
-
-const e2eDatabaseHost = process.env.DATABASE_URL ? new URL(process.env.DATABASE_URL).hostname : "";
-
-test.beforeAll(() => {
-  if (e2eDatabaseHost !== "localhost" && e2eDatabaseHost !== "127.0.0.1") {
-    throw new Error(
-      "Character profile E2E fixtures require a disposable localhost PostgreSQL database",
-    );
-  }
-});
-
-test.use({ storageState: miningStorageStatePath });
-test.describe.configure({ mode: "serial" });
+import { captureReviewScreenshot } from "./review-screenshot";
 
 /** Short unique token so seeded names never collide with leftovers. */
 const token = () => Math.random().toString(36).slice(2, 8);
 
-// Seeded fixtures, populated in beforeAll and referenced by name in tests.
-let radaOne = "";
-let radaTwo = "";
-let kaelCutter = "";
-let yardGhost = "";
-const createdUsers: string[] = [];
+type ProfileFixture = {
+  radaOne: string;
+  radaTwo: string;
+  kaelCutter: string;
+  yardGhost: string;
+  userIds: string[];
+};
 
 /**
  * Create one owner user with one character at the Crash Site and return the
- * user ID. Optionally persists Mining XP so the derived level is meaningful.
+ * character. Optionally persists Mining XP so the derived level is meaningful.
  * Creation requires a portrait (issue #65); the caller can choose one or take
  * the stable starter default.
  */
@@ -49,7 +37,6 @@ async function seedCharacter(
   const userId = await createTestUser(db, authSchema, ownerName);
   const account = await ensurePlayerAccount(userId);
   const character = await createCharacter(account.id, characterName, portraitId);
-  createdUsers.push(userId);
   if (miningXp !== undefined) {
     await db.insert(rune.characterSkillXp).values({
       characterId: character.id,
@@ -57,339 +44,314 @@ async function seedCharacter(
       totalXp: miningXp,
     });
   }
-  return userId;
+  return { userId, characterId: character.id };
 }
 
-test.beforeAll(async () => {
-  radaOne = `Rada One ${token()}`;
-  radaTwo = `Rada Two ${token()}`;
-  kaelCutter = `Kael Cutter ${token()}`;
-  yardGhost = `Yard Ghost ${token()}`;
+async function seedProfileFixture(): Promise<ProfileFixture> {
+  const radaOne = `Rada One ${token()}`;
+  const radaTwo = `Rada Two ${token()}`;
+  const kaelCutter = `Kael Cutter ${token()}`;
+  const yardGhost = `Yard Ghost ${token()}`;
   // Two characters owned by one player, plus another player's character, all
   // at the Crash Site; one character at the Processing Yard to prove the
   // location scope.
-  await seedCharacter("Rada Stonehand", radaOne, 500);
-  await seedCharacter("Rada Stonehand", radaTwo);
-  await seedCharacter("Kael Brighthome", kaelCutter, 500);
-  const kaelUserId = await seedCharacter("Kael Brighthome", yardGhost);
-  const yardRow = (
-    await db
-      .select({ id: rune.characters.id })
-      .from(rune.characters)
-      .where(eq(rune.characters.normalizedName, normalizeCharacterName(yardGhost)))
-  )[0];
+  const radaOneOwner = await seedCharacter("Profile Rada Stonehand", radaOne, 500);
+  const radaTwoOwner = await seedCharacter("Profile Rada Stonehand", radaTwo);
+  const kaelCutterOwner = await seedCharacter("Profile Kael Brighthome", kaelCutter, 500);
+  const yard = await seedCharacter("Profile Kael Brighthome", yardGhost);
   await db
     .update(rune.characters)
     .set({ currentLocationId: LOCATION_IDS.abandonedProcessingYard })
-    .where(eq(rune.characters.id, yardRow!.id));
-});
-
-test.afterAll(async () => {
-  for (const userId of createdUsers.splice(0)) {
-    await cleanupTestUser(db, authSchema, rune, userId);
-  }
-});
-
-async function openPopulationFixture(page: import("@playwright/test").Page) {
-  await page.goto("/characters");
-  await page.getByRole("link", { name: "Play" }).click();
-  await page.waitForURL(/\/play\/[^/]+$/);
-  return page.url().split("/").at(-1)!;
+    .where(eq(rune.characters.id, yard.characterId));
+  return {
+    radaOne,
+    radaTwo,
+    kaelCutter,
+    yardGhost,
+    userIds: [radaOneOwner.userId, radaTwoOwner.userId, kaelCutterOwner.userId, yard.userId],
+  };
 }
 
-test.beforeEach(async ({ page }) => {
-  const characterId = await openPopulationFixture(page);
-  await db.transaction(async (transaction) => {
-    // Normalize the fixture character's gameplay state (the Travel phase can
-    // leave it mid-run or at another location).
-    await transaction
-      .delete(rune.activeActions)
-      .where(eq(rune.activeActions.characterId, characterId));
-    await transaction
-      .delete(rune.characterTravelState)
-      .where(eq(rune.characterTravelState.characterId, characterId));
-    await transaction
-      .delete(rune.characterMiningState)
-      .where(eq(rune.characterMiningState.characterId, characterId));
-    await transaction
-      .delete(rune.characterPowerCellDailyClaims)
-      .where(eq(rune.characterPowerCellDailyClaims.characterId, characterId));
-    await transaction
-      .delete(rune.cargoHoldItemInstances)
-      .where(eq(rune.cargoHoldItemInstances.characterId, characterId));
-    await transaction
-      .delete(rune.cargoHoldStacks)
-      .where(eq(rune.cargoHoldStacks.characterId, characterId));
-    await transaction
-      .delete(rune.characterCargoHoldRepair)
-      .where(eq(rune.characterCargoHoldRepair.characterId, characterId));
-    await transaction
-      .delete(rune.inventoryStacks)
-      .where(eq(rune.inventoryStacks.characterId, characterId));
-    await transaction
-      .delete(rune.equippedItems)
-      .where(eq(rune.equippedItems.characterId, characterId));
-    await transaction
-      .delete(rune.itemInstances)
-      .where(eq(rune.itemInstances.characterId, characterId));
-    await transaction
-      .delete(rune.characterSkillXp)
-      .where(eq(rune.characterSkillXp.characterId, characterId));
-    await transaction
-      .delete(rune.characterStarterProvisioning)
-      .where(eq(rune.characterStarterProvisioning.characterId, characterId));
-    await transaction
-      .update(rune.characters)
-      .set({ currentLocationId: LOCATION_IDS.crashSite })
-      .where(eq(rune.characters.id, characterId));
-  });
-  await page.reload();
-  await expect(page.getByText("World map")).toBeVisible();
+const profileTest = test.extend<{ profile: ProfileFixture }>({
+  profile: async ({}, use) => {
+    const fixture = await seedProfileFixture();
+    try {
+      await use(fixture);
+    } finally {
+      for (const userId of fixture.userIds) {
+        await cleanupTestUser(db, authSchema, rune, userId);
+      }
+    }
+  },
 });
 
-test("selecting a same-location character opens its public profile panel", async ({ page }) => {
-  await page.setViewportSize({ width: 390, height: 844 });
-  const disclosure = populationDisclosure(page);
-  // The disclosure label is "Characters here" with a compact count badge and
-  // a truthful show/hide accessible label.
-  await expect(disclosure).toHaveAttribute("aria-label", /^Show \d+ characters here$/);
-  const badge = page.locator("[data-population-count]");
-  await expect(badge).toBeVisible();
-  expect(Number((await badge.textContent())?.trim())).toBeGreaterThanOrEqual(3);
-  await disclosure.click();
+profileTest(
+  "selecting a same-location character opens its public profile panel",
+  async ({ page, testCharacter, profile }) => {
+    const { radaOne, radaTwo, kaelCutter } = profile;
+    await openTestCharacter(page, testCharacter.id);
+    await page.setViewportSize({ width: 390, height: 844 });
+    const disclosure = populationDisclosure(page);
+    // The disclosure label is "Characters here" with a compact count badge and
+    // a truthful show/hide accessible label.
+    await expect(disclosure).toHaveAttribute("aria-label", /^Show \d+ characters here$/);
+    const badge = page.locator("[data-population-count]");
+    await expect(badge).toBeVisible();
+    expect(Number((await badge.textContent())?.trim())).toBeGreaterThanOrEqual(3);
+    await disclosure.click();
 
-  const radaTrigger = page.getByRole("button", {
-    name: `${radaOne}, Level 2, player Rada Stonehand`,
-  });
-  await radaTrigger.click();
-  const panel = page.locator("[data-character-profile-panel]");
-  await expect(panel).toBeVisible();
-  await expect(radaTrigger).toHaveAttribute("aria-expanded", "true");
-  // The opened character's row stays visibly selected (Viewing indicator,
-  // never color alone) and transfers only to the newly selected row.
-  await expect(radaTrigger.getByText("Viewing", { exact: true })).toBeVisible();
-  await expect(radaTrigger.getByText("Lv 2", { exact: true })).toBeVisible();
+    const radaTrigger = page.getByRole("button", {
+      name: `${radaOne}, Level 2, player Profile Rada Stonehand`,
+    });
+    await radaTrigger.click();
+    const panel = page.locator("[data-character-profile-panel]");
+    await expect(panel).toBeVisible();
+    await expect(radaTrigger).toHaveAttribute("aria-expanded", "true");
+    // The opened character's row stays visibly selected (Viewing indicator,
+    // never color alone) and transfers only to the newly selected row.
+    await expect(radaTrigger.getByText("Viewing", { exact: true })).toBeVisible();
+    await expect(radaTrigger.getByText("Lv 2", { exact: true })).toBeVisible();
 
-  // The selected portrait renders through the normal next/image boundary in
-  // the panel: the committed derivative with its accessible description as
-  // the alt text.
-  const panelPortrait = panel.locator("[data-character-portrait] img");
-  await expect(panelPortrait).toBeVisible();
-  expect((await panelPortrait.getAttribute("alt"))?.length ?? 0).toBeGreaterThan(0);
-  await expect(panel.getByText(radaOne, { exact: true })).toBeVisible();
-  await expect(panel.getByText("Player: Rada Stonehand")).toBeVisible();
-  await expect(panel.getByText("Overall level 2")).toBeVisible();
-  const skillRow = panel.locator("[data-character-skill]");
-  // Mining, Refining, and the approved Welding skill all publish.
-  await expect(skillRow).toHaveCount(3);
-  await expect(skillRow.getByText(/^Mining — Level 2$/)).toBeVisible();
-  await expect(skillRow.getByText("500 total XP")).toBeVisible();
-  await expect(skillRow.getByText("550 XP to next level")).toBeVisible();
-  await expect(
-    skillRow.filter({ hasText: /^Mining — Level 2/ }).getByRole("progressbar"),
-  ).toHaveAttribute("aria-valuenow", "0");
-  await expect(skillRow.getByText(/^Refining — Level 1$/)).toBeVisible();
-  await expect(skillRow.getByText(/^Welding — Level 1$/)).toBeVisible();
+    // The selected portrait renders through the normal next/image boundary in
+    // the panel: the committed derivative with its accessible description as
+    // the alt text.
+    const panelPortrait = panel.locator("[data-character-portrait] img");
+    await expect(panelPortrait).toBeVisible();
+    expect((await panelPortrait.getAttribute("alt"))?.length ?? 0).toBeGreaterThan(0);
+    await expect(panel.getByText(radaOne, { exact: true })).toBeVisible();
+    await expect(panel.getByText("Player: Profile Rada Stonehand")).toBeVisible();
+    await expect(panel.getByText("Overall level 2")).toBeVisible();
+    const skillRow = panel.locator("[data-character-skill]");
+    // Mining, Refining, and the approved Welding skill all publish.
+    await expect(skillRow).toHaveCount(3);
+    await expect(skillRow.getByText(/^Mining — Level 2$/)).toBeVisible();
+    await expect(skillRow.getByText("500 total XP")).toBeVisible();
+    await expect(skillRow.getByText("550 XP to next level")).toBeVisible();
+    await expect(
+      skillRow.filter({ hasText: /^Mining — Level 2/ }).getByRole("progressbar"),
+    ).toHaveAttribute("aria-valuenow", "0");
+    await expect(skillRow.getByText(/^Refining — Level 1$/)).toBeVisible();
+    await expect(skillRow.getByText(/^Welding — Level 1$/)).toBeVisible();
 
-  // No private account information appears anywhere in the panel.
-  await expect(panel.getByText("@")).toHaveCount(0);
-  await expect(panel.getByText(/email/i)).toHaveCount(0);
+    // No private account information appears anywhere in the panel.
+    await expect(panel.getByText("@")).toHaveCount(0);
+    await expect(panel.getByText(/email/i)).toHaveCount(0);
 
-  // Selecting a second character updates the SAME panel rather than stacking,
-  // and the selected treatment transfers immediately to the new row. The
-  // selected row's gold left rail comes from the button's own border (never
-  // the inter-row separator), so it is visible in any list position; the
-  // unselected non-first row must show no stray left rail.
-  const kaelTrigger = page.getByRole("button", {
-    name: `${kaelCutter}, Level 2, player Kael Brighthome`,
-  });
-  const radaTwoTrigger = page.getByRole("button", {
-    name: `${radaTwo}, Level 1, player Rada Stonehand`,
-  });
-  await kaelTrigger.click();
-  await expect(panel).toHaveCount(1);
-  await expect(panel.getByText(kaelCutter, { exact: true })).toBeVisible();
-  await expect(panel.getByText("Player: Kael Brighthome")).toBeVisible();
-  await expect(panel.getByText(radaOne, { exact: true })).toHaveCount(0);
-  await expect(kaelTrigger).toHaveAttribute("aria-expanded", "true");
-  await expect(radaTrigger).toHaveAttribute("aria-expanded", "false");
-  await expect(kaelTrigger.getByText("Viewing", { exact: true })).toBeVisible();
-  await expect(radaTrigger.getByText("Viewing", { exact: true })).toHaveCount(0);
-  await expect(kaelTrigger).toHaveCSS("border-left-color", "rgb(245, 196, 81)");
-  await expect(kaelTrigger).toHaveCSS("border-left-width", "2px");
-  await expect(radaTwoTrigger).toHaveCSS("border-left-color", "rgba(0, 0, 0, 0)");
-  await expect(radaTwoTrigger).toHaveCSS("border-left-width", "2px");
+    // Selecting a second character updates the SAME panel rather than stacking,
+    // and the selected treatment transfers immediately to the new row. The
+    // selected row's gold left rail comes from the button's own border (never
+    // the inter-row separator), so it is visible in any list position; the
+    // unselected non-first row must show no stray left rail.
+    const kaelTrigger = page.getByRole("button", {
+      name: `${kaelCutter}, Level 2, player Profile Kael Brighthome`,
+    });
+    const radaTwoTrigger = page.getByRole("button", {
+      name: `${radaTwo}, Level 1, player Profile Rada Stonehand`,
+    });
+    await kaelTrigger.click();
+    await expect(panel).toHaveCount(1);
+    await expect(panel.getByText(kaelCutter, { exact: true })).toBeVisible();
+    await expect(panel.getByText("Player: Profile Kael Brighthome")).toBeVisible();
+    await expect(panel.getByText(radaOne, { exact: true })).toHaveCount(0);
+    await expect(kaelTrigger).toHaveAttribute("aria-expanded", "true");
+    await expect(radaTrigger).toHaveAttribute("aria-expanded", "false");
+    await expect(kaelTrigger.getByText("Viewing", { exact: true })).toBeVisible();
+    await expect(radaTrigger.getByText("Viewing", { exact: true })).toHaveCount(0);
+    await expect(kaelTrigger).toHaveCSS("border-left-color", "rgb(245, 196, 81)");
+    await expect(kaelTrigger).toHaveCSS("border-left-width", "2px");
+    await expect(radaTwoTrigger).toHaveCSS("border-left-color", "rgba(0, 0, 0, 0)");
+    await expect(radaTwoTrigger).toHaveCSS("border-left-width", "2px");
 
-  // Selecting a later row (Rada Two is never the first row of the sorted
-  // fixture list) must show the SAME gold rail: the inter-row separator can
-  // never recolor the selection rail.
-  await radaTwoTrigger.click();
-  await expect(panel).toHaveCount(1);
-  await expect(panel.getByText(radaTwo, { exact: true })).toBeVisible();
-  await expect(panel.getByText("Player: Rada Stonehand")).toBeVisible();
-  await expect(panel.getByText("Overall level 1")).toBeVisible();
-  await expect(panel.locator("[data-character-portrait] img")).toBeVisible();
-  await expect(radaTwoTrigger).toHaveAttribute("aria-expanded", "true");
-  await expect(kaelTrigger).toHaveAttribute("aria-expanded", "false");
-  await expect(radaTwoTrigger.getByText("Viewing", { exact: true })).toBeVisible();
-  await expect(kaelTrigger.getByText("Viewing", { exact: true })).toHaveCount(0);
-  await expect(radaTwoTrigger).toHaveCSS("border-left-color", "rgb(245, 196, 81)");
-  await expect(radaTwoTrigger).toHaveCSS("border-left-width", "2px");
-  await expect(kaelTrigger).toHaveCSS("border-left-color", "rgba(0, 0, 0, 0)");
-  await expect(kaelTrigger).toHaveCSS("border-left-width", "2px");
-  // Exactly one row is selected at any time.
-  await expect(page.getByText("Viewing", { exact: true })).toHaveCount(1);
+    // Selecting a later row (Rada Two is never the first row of the sorted
+    // fixture list) must show the SAME gold rail: the inter-row separator can
+    // never recolor the selection rail.
+    await radaTwoTrigger.click();
+    await expect(panel).toHaveCount(1);
+    await expect(panel.getByText(radaTwo, { exact: true })).toBeVisible();
+    await expect(panel.getByText("Player: Profile Rada Stonehand")).toBeVisible();
+    await expect(panel.getByText("Overall level 1")).toBeVisible();
+    await expect(panel.locator("[data-character-portrait] img")).toBeVisible();
+    await expect(radaTwoTrigger).toHaveAttribute("aria-expanded", "true");
+    await expect(kaelTrigger).toHaveAttribute("aria-expanded", "false");
+    await expect(radaTwoTrigger.getByText("Viewing", { exact: true })).toBeVisible();
+    await expect(kaelTrigger.getByText("Viewing", { exact: true })).toHaveCount(0);
+    await expect(radaTwoTrigger).toHaveCSS("border-left-color", "rgb(245, 196, 81)");
+    await expect(radaTwoTrigger).toHaveCSS("border-left-width", "2px");
+    await expect(kaelTrigger).toHaveCSS("border-left-color", "rgba(0, 0, 0, 0)");
+    await expect(kaelTrigger).toHaveCSS("border-left-width", "2px");
+    // Exactly one row is selected at any time.
+    await expect(page.getByText("Viewing", { exact: true })).toHaveCount(1);
 
-  // Mobile-first: no horizontal overflow at the canonical phone viewport.
-  const overflow = await page.evaluate(
-    () => document.documentElement.scrollWidth - window.innerWidth,
-  );
-  expect(overflow).toBeLessThanOrEqual(0);
+    // Mobile-first: no horizontal overflow at the canonical phone viewport.
+    const overflow = await page.evaluate(
+      () => document.documentElement.scrollWidth - window.innerWidth,
+    );
+    expect(overflow).toBeLessThanOrEqual(0);
 
-  // Review evidence: a LATER row selected (the gold rail regression case) and
-  // the profile panel (neutral silhouette portrait, identity, overall level,
-  // skill progress).
-  await radaTwoTrigger.scrollIntoViewIfNeeded();
-  await page.screenshot({ path: "test-results/character-profile-mobile-rows.png" });
-  await panel.scrollIntoViewIfNeeded();
-  await page.screenshot({ path: "test-results/character-profile-mobile-panel.png" });
+    // Review evidence: a LATER row selected (the gold rail regression case) and
+    // the profile panel (neutral silhouette portrait, identity, overall level,
+    // skill progress).
+    await radaTwoTrigger.scrollIntoViewIfNeeded();
+    await captureReviewScreenshot(page, "character-profile-mobile-rows.png");
+    await panel.scrollIntoViewIfNeeded();
+    await captureReviewScreenshot(page, "character-profile-mobile-panel.png");
 
-  // Closing returns focus predictably to the name that opened the view and
-  // removes the selected treatment from every row.
-  await panel.getByRole("button", { name: "Close character profile" }).click();
-  await expect(panel).toBeHidden();
-  await expect(radaTwoTrigger).toBeFocused();
-  await expect(radaTwoTrigger).toHaveAttribute("aria-expanded", "false");
-  await expect(page.getByText("Viewing", { exact: true })).toHaveCount(0);
-});
+    // Closing returns focus predictably to the name that opened the view and
+    // removes the selected treatment from every row.
+    await panel.getByRole("button", { name: "Close character profile" }).click();
+    await expect(panel).toBeHidden();
+    await expect(radaTwoTrigger).toBeFocused();
+    await expect(radaTwoTrigger).toHaveAttribute("aria-expanded", "false");
+    await expect(page.getByText("Viewing", { exact: true })).toHaveCount(0);
+  },
+);
 
-test("the profile panel works from the keyboard with predictable focus return", async ({
-  page,
-}) => {
-  await page.setViewportSize({ width: 390, height: 844 });
-  await populationDisclosure(page).click();
-
-  const opener = page.getByRole("button", {
-    name: `${radaOne}, Level 2, player Rada Stonehand`,
-  });
-  const panel = page.locator("[data-character-profile-panel]");
-  await opener.focus();
-  await expect(opener).toBeFocused();
-  await page.keyboard.press("Enter");
-  await expect(panel).toBeVisible();
-
-  // Escape closes and focus returns to the opener.
-  await page.keyboard.press("Escape");
-  await expect(panel).toBeHidden();
-  await expect(opener).toBeFocused();
-
-  // Enter reopens; the explicit Close control closes and returns focus.
-  await page.keyboard.press("Enter");
-  await expect(panel).toBeVisible();
-  await panel.getByRole("button", { name: "Close character profile" }).click();
-  await expect(panel).toBeHidden();
-  await expect(opener).toBeFocused();
-
-  // Switching targets from the keyboard updates the same panel.
-  await page.keyboard.press("Enter");
-  await expect(panel).toBeVisible();
-  const second = page.getByRole("button", {
-    name: `${radaTwo}, Level 1, player Rada Stonehand`,
-  });
-  await second.focus();
-  await page.keyboard.press("Enter");
-  await expect(panel).toHaveCount(1);
-  await expect(panel.getByText(radaTwo, { exact: true })).toBeVisible();
-  await expect(panel.getByText("Overall level 1")).toBeVisible();
-
-  // Closing with the disclosure collapsed must not strand focus on the hidden
-  // list button: Escape falls back to the persistent disclosure trigger.
-  const disclosure = populationDisclosure(page);
-  await disclosure.click();
-  await expect(page.locator("#location-population-list")).toBeHidden();
-  await page.keyboard.press("Escape");
-  await expect(panel).toBeHidden();
-  await expect(disclosure).toBeFocused();
-});
-
-test("a failed profile read shows visible accessible feedback", async ({ page }) => {
-  await page.setViewportSize({ width: 390, height: 844 });
-  await populationDisclosure(page).click();
-  await page.route("**/api/character-profile?*", (route) => route.abort());
-  await page.getByRole("button", { name: `${radaOne}, Level 2, player Rada Stonehand` }).click();
-  const panel = page.locator("[data-character-profile-panel]");
-  await expect(panel).toBeVisible();
-  await expect(panel.getByText("The profile could not be loaded.")).toBeVisible();
-  await page.unroute("**/api/character-profile?*");
-});
-
-test("an authoritative location change invalidates the open profile panel", async ({ page }) => {
-  // Seed an extra same-location character AFTER the page loaded, then refresh:
-  // the accepted authoritative revision revalidates the population, and a
-  // target that is no longer visible must never keep showing stale data.
-  test.setTimeout(120_000);
-  await page.setViewportSize({ width: 390, height: 844 });
-  const characterId = page.url().split("/").at(-1)!;
-  await populationDisclosure(page).click();
-  const trigger = page.getByRole("button", {
-    name: `${radaOne}, Level 2, player Rada Stonehand`,
-  });
-  await trigger.click();
-  const panel = page.locator("[data-character-profile-panel]");
-  await expect(panel).toBeVisible();
-  await expect(panel.getByText(radaOne, { exact: true })).toBeVisible();
-
-  // Move the target character to another location server-side, then refresh:
-  // the server revalidates same-location visibility on the re-read, and the
-  // panel must show the safe unavailable state instead of stale data.
-  const targetRow = (
-    await db
-      .select({ id: rune.characters.id })
-      .from(rune.characters)
-      .where(eq(rune.characters.normalizedName, normalizeCharacterName(radaOne)))
-  )[0];
-  await db
-    .update(rune.characters)
-    .set({ currentLocationId: LOCATION_IDS.abandonedProcessingYard })
-    .where(eq(rune.characters.id, targetRow!.id));
-
-  await page.reload();
-  // Reload clears the profile panel and re-scopes population. The moved
-  // character (radaOne) is now at the Yard, so it must NOT appear in the
-  // Crash Site disclosure anymore.
-  await expect(page.getByText("World map")).toBeVisible();
-  await populationDisclosure(page).click();
-  await expect(
-    page.getByRole("button", { name: `${radaOne}, Level 2, player Rada Stonehand` }),
-  ).toHaveCount(0);
-  // Open another visible character to prove the panel still works
-  await page.getByRole("button", { name: `${radaTwo}, Level 1, player Rada Stonehand` }).click();
-  await expect(panel.getByText(radaTwo, { exact: true })).toBeVisible();
-  await page.keyboard.press("Escape");
-  await expect(panel).toBeHidden();
-  // After Escape, disclosure is collapsed if it was open, but the population
-  // list is still at Crash Site. Reopen if needed to prove the panel again.
-  if ((await populationDisclosure(page).getAttribute("aria-expanded")) === "false") {
+profileTest(
+  "the profile panel works from the keyboard with predictable focus return",
+  async ({ page, testCharacter, profile }) => {
+    const { radaOne, radaTwo } = profile;
+    await openTestCharacter(page, testCharacter.id);
+    await page.setViewportSize({ width: 390, height: 844 });
     await populationDisclosure(page).click();
-  }
-  await expect(
-    page.getByRole("button", { name: `${radaTwo}, Level 1, player Rada Stonehand` }),
-  ).toBeVisible({ timeout: 10_000 });
-  await page.getByRole("button", { name: `${radaTwo}, Level 1, player Rada Stonehand` }).click();
-  await expect(panel).toBeVisible();
 
-  // Travel away: the open profile panel must be invalidated immediately on the
-  // authoritative location change (no stale crash-site content at the yard).
-  await page.getByRole("button", { name: /Abandoned Processing Yard/ }).click();
-  await page.getByRole("button", { name: /Walk to Abandoned Processing Yard/ }).click();
-  await expect(page.getByText("Journey progress")).toBeVisible();
-  const departPast = new Date(Date.now() - 25_000);
-  await db
-    .update(rune.activeActions)
-    .set({ startedAt: departPast, resolvedThroughAt: departPast })
-    .where(eq(rune.activeActions.characterId, characterId));
-  await expect(
-    page.getByRole("button", { name: /Abandoned Processing Yard/ }).first(),
-  ).toHaveAttribute("aria-current", "true", { timeout: 45_000 });
-  await expect(panel).toBeHidden();
-});
+    const opener = page.getByRole("button", {
+      name: `${radaOne}, Level 2, player Profile Rada Stonehand`,
+    });
+    const panel = page.locator("[data-character-profile-panel]");
+    await opener.focus();
+    await expect(opener).toBeFocused();
+    await page.keyboard.press("Enter");
+    await expect(panel).toBeVisible();
+
+    // Escape closes and focus returns to the opener.
+    await page.keyboard.press("Escape");
+    await expect(panel).toBeHidden();
+    await expect(opener).toBeFocused();
+
+    // Enter reopens; the explicit Close control closes and returns focus.
+    await page.keyboard.press("Enter");
+    await expect(panel).toBeVisible();
+    await panel.getByRole("button", { name: "Close character profile" }).click();
+    await expect(panel).toBeHidden();
+    await expect(opener).toBeFocused();
+
+    // Switching targets from the keyboard updates the same panel.
+    await page.keyboard.press("Enter");
+    await expect(panel).toBeVisible();
+    const second = page.getByRole("button", {
+      name: `${radaTwo}, Level 1, player Profile Rada Stonehand`,
+    });
+    await second.focus();
+    await page.keyboard.press("Enter");
+    await expect(panel).toHaveCount(1);
+    await expect(panel.getByText(radaTwo, { exact: true })).toBeVisible();
+    await expect(panel.getByText("Overall level 1")).toBeVisible();
+
+    // Closing with the disclosure collapsed must not strand focus on the hidden
+    // list button: Escape falls back to the persistent disclosure trigger.
+    const disclosure = populationDisclosure(page);
+    await disclosure.click();
+    await expect(page.locator("#location-population-list")).toBeHidden();
+    await page.keyboard.press("Escape");
+    await expect(panel).toBeHidden();
+    await expect(disclosure).toBeFocused();
+  },
+);
+
+profileTest(
+  "a failed profile read shows visible accessible feedback",
+  async ({ page, testCharacter, profile }) => {
+    const { radaOne } = profile;
+    await openTestCharacter(page, testCharacter.id);
+    await page.setViewportSize({ width: 390, height: 844 });
+    await populationDisclosure(page).click();
+    await page.route("**/api/character-profile?*", (route) => route.abort());
+    await page
+      .getByRole("button", { name: `${radaOne}, Level 2, player Profile Rada Stonehand` })
+      .click();
+    const panel = page.locator("[data-character-profile-panel]");
+    await expect(panel).toBeVisible();
+    await expect(panel.getByText("The profile could not be loaded.")).toBeVisible();
+    await page.unroute("**/api/character-profile?*");
+  },
+);
+
+profileTest(
+  "an authoritative location change invalidates the open profile panel",
+  async ({ page, testCharacter, profile }) => {
+    // Seed an extra same-location character AFTER the page loaded, then refresh:
+    // the accepted authoritative revision revalidates the population, and a
+    // target that is no longer visible must never keep showing stale data.
+    test.setTimeout(120_000);
+    const { radaOne, radaTwo } = profile;
+    await openTestCharacter(page, testCharacter.id);
+    await page.setViewportSize({ width: 390, height: 844 });
+    const characterId = page.url().split("/").at(-1)!;
+    await populationDisclosure(page).click();
+    const trigger = page.getByRole("button", {
+      name: `${radaOne}, Level 2, player Profile Rada Stonehand`,
+    });
+    await trigger.click();
+    const panel = page.locator("[data-character-profile-panel]");
+    await expect(panel).toBeVisible();
+    await expect(panel.getByText(radaOne, { exact: true })).toBeVisible();
+
+    // Move the target character to another location server-side, then refresh:
+    // the server revalidates same-location visibility on the re-read, and the
+    // panel must show the safe unavailable state instead of stale data.
+    const targetRow = (
+      await db
+        .select({ id: rune.characters.id })
+        .from(rune.characters)
+        .where(eq(rune.characters.normalizedName, normalizeCharacterName(radaOne)))
+    )[0];
+    await db
+      .update(rune.characters)
+      .set({ currentLocationId: LOCATION_IDS.abandonedProcessingYard })
+      .where(eq(rune.characters.id, targetRow!.id));
+
+    await page.reload();
+    // Reload clears the profile panel and re-scopes population. The moved
+    // character (radaOne) is now at the Yard, so it must NOT appear in the
+    // Crash Site disclosure anymore.
+    await expect(page.getByText("World map")).toBeVisible();
+    await populationDisclosure(page).click();
+    await expect(
+      page.getByRole("button", { name: `${radaOne}, Level 2, player Profile Rada Stonehand` }),
+    ).toHaveCount(0);
+    // Open another visible character to prove the panel still works
+    await page
+      .getByRole("button", { name: `${radaTwo}, Level 1, player Profile Rada Stonehand` })
+      .click();
+    await expect(panel.getByText(radaTwo, { exact: true })).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(panel).toBeHidden();
+    // After Escape, disclosure is collapsed if it was open, but the population
+    // list is still at Crash Site. Reopen if needed to prove the panel again.
+    if ((await populationDisclosure(page).getAttribute("aria-expanded")) === "false") {
+      await populationDisclosure(page).click();
+    }
+    await expect(
+      page.getByRole("button", { name: `${radaTwo}, Level 1, player Profile Rada Stonehand` }),
+    ).toBeVisible({ timeout: 10_000 });
+    await page
+      .getByRole("button", { name: `${radaTwo}, Level 1, player Profile Rada Stonehand` })
+      .click();
+    await expect(panel).toBeVisible();
+
+    // Travel away: the open profile panel must be invalidated immediately on the
+    // authoritative location change (no stale crash-site content at the yard).
+    await page.getByRole("button", { name: /Abandoned Processing Yard/ }).click();
+    await page.getByRole("button", { name: /Walk to Abandoned Processing Yard/ }).click();
+    await expect(page.getByText("Journey progress")).toBeVisible();
+    const departPast = new Date(Date.now() - 25_000);
+    await db
+      .update(rune.activeActions)
+      .set({ startedAt: departPast, resolvedThroughAt: departPast })
+      .where(eq(rune.activeActions.characterId, characterId));
+    await expect(
+      page.getByRole("button", { name: /Abandoned Processing Yard/ }).first(),
+    ).toHaveAttribute("aria-current", "true", { timeout: 45_000 });
+    await expect(panel).toBeHidden();
+  },
+);

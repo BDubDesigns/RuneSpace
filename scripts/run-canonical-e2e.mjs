@@ -1,19 +1,12 @@
 #!/usr/bin/env node
 
-import {
-  copyFileSync,
-  existsSync,
-  mkdirSync,
-  rmSync,
-  statSync,
-  unlinkSync,
-  writeFileSync,
-} from "node:fs";
+import { copyFileSync, existsSync, mkdirSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import {
   assertNode22,
   assertPortAvailable,
   createE2eRuntime,
+  readPositiveInteger,
   readPositiveDuration,
   ROOT,
 } from "./e2e-shared.mjs";
@@ -49,10 +42,11 @@ let log;
 let fail;
 let disposableDatabase;
 let timeout;
+let powerAnnexClockPath;
+let runId;
 const signalHandlers = [];
 
 const cleanupPaths = [
-  resolve(ROOT, ".playwright/mining-auth-state.json"),
   resolve(ROOT, "test-results"),
   resolve(ROOT, "playwright-report"),
   resolve(ROOT, "artifacts/e2e-review"),
@@ -141,6 +135,7 @@ const INVENTORY_EQUIP_REQUIRED = [
 
 function verifyAndCopyScreenshots(required, destDir) {
   log("Verifying and preserving screenshots...");
+  mkdirSync(destDir, { recursive: true });
   for (const filename of required) {
     const source = resolve(BASE_RESULTS, filename);
     if (!existsSync(source)) fail(`Missing screenshot: ${filename}`);
@@ -155,22 +150,25 @@ async function runPlaywright(args, label) {
   await runtime.runTimedCommand(["run", "test:e2e:raw", ...args], label);
 }
 
+function canonicalShardArgs() {
+  const indexValue = process.env.RUNESPACE_E2E_SHARD_INDEX;
+  const totalValue = process.env.RUNESPACE_E2E_SHARD_TOTAL;
+  if (!indexValue && !totalValue) return [];
+  if (!indexValue || !totalValue) fail("canonical shard index and total must be provided together");
+  const index = readPositiveInteger(indexValue, 0, "Canonical shard index");
+  const total = readPositiveInteger(totalValue, 0, "Canonical shard total");
+  if (index > total) fail(`canonical shard index ${index} exceeds total ${total}`);
+  return [`--shard=${index}/${total}`];
+}
+
 async function prepareState() {
   for (const path of cleanupPaths) {
     if (existsSync(path)) rmSync(path, { force: true, recursive: true });
   }
   mkdirSync(resolve(ROOT, ".playwright"), { recursive: true });
-  writeFileSync(resolve(ROOT, ".playwright/power-annex-clock"), "", "utf8");
+  powerAnnexClockPath = resolve(ROOT, ".playwright", `power-annex-clock-${runId}`);
+  writeFileSync(powerAnnexClockPath, "", "utf8");
   if (captureScreenshots) {
-    mkdirSync(resolve(ROOT, "artifacts/e2e-review/mining"), { recursive: true });
-    mkdirSync(resolve(ROOT, "artifacts/e2e-review/overlay"), { recursive: true });
-    mkdirSync(resolve(ROOT, "artifacts/e2e-review/travel"), { recursive: true });
-    mkdirSync(resolve(ROOT, "artifacts/e2e-review/location-population"), { recursive: true });
-    mkdirSync(resolve(ROOT, "artifacts/e2e-review/character-profile"), { recursive: true });
-    mkdirSync(resolve(ROOT, "artifacts/e2e-review/character-portraits"), { recursive: true });
-    mkdirSync(resolve(ROOT, "artifacts/e2e-review/refining"), { recursive: true });
-    mkdirSync(resolve(ROOT, "artifacts/e2e-review/cargo-hold"), { recursive: true });
-    mkdirSync(resolve(ROOT, "artifacts/e2e-review/inventory-equip"), { recursive: true });
     log("Frozen review screenshots: ENABLED (manifest will be verified and uploaded).");
   } else {
     log(
@@ -191,68 +189,23 @@ async function runCanonical() {
   runtime.startServer();
   await runtime.waitForServer();
 
-  await runPlaywright(["mining", "--project=chromium"], "Mining E2E");
-  if (captureScreenshots)
-    verifyAndCopyScreenshots(MINING_REQUIRED, resolve(ROOT, "artifacts/e2e-review/mining"));
-
-  await runPlaywright(["inventory-equip", "--project=chromium"], "Inventory equip E2E");
-  if (captureScreenshots)
+  await runPlaywright(["--project=chromium", ...canonicalShardArgs()], "Canonical behavioral E2E");
+  if (captureScreenshots) {
     verifyAndCopyScreenshots(
-      INVENTORY_EQUIP_REQUIRED,
-      resolve(ROOT, "artifacts/e2e-review/inventory-equip"),
+      [
+        ...MINING_REQUIRED,
+        ...INVENTORY_EQUIP_REQUIRED,
+        ...OVERLAY_REQUIRED,
+        ...TRAVEL_REQUIRED,
+        ...LOCATION_POPULATION_REQUIRED,
+        ...CHARACTER_PROFILE_REQUIRED,
+        ...PORTRAITS_REQUIRED,
+        ...REFINING_REQUIRED,
+        ...CARGO_HOLD_REQUIRED,
+      ],
+      resolve(ROOT, "artifacts/e2e-review"),
     );
-
-  await runPlaywright(["overlay", "--project=chromium"], "Overlay E2E");
-  if (captureScreenshots)
-    verifyAndCopyScreenshots(OVERLAY_REQUIRED, resolve(ROOT, "artifacts/e2e-review/overlay"));
-
-  await runPlaywright(["walk-it-off", "--project=chromium"], "Walk It Off E2E");
-  await runPlaywright(["cut-your-teeth", "--project=chromium"], "Cut Your Teeth E2E");
-
-  const authFile = resolve(ROOT, ".playwright/mining-auth-state.json");
-  if (existsSync(authFile)) unlinkSync(authFile);
-
-  await runPlaywright(["travel", "--project=chromium"], "Travel E2E");
-  if (captureScreenshots)
-    verifyAndCopyScreenshots(TRAVEL_REQUIRED, resolve(ROOT, "artifacts/e2e-review/travel"));
-
-  await runPlaywright(["location-population", "--project=chromium"], "Location population E2E");
-  if (captureScreenshots)
-    verifyAndCopyScreenshots(
-      LOCATION_POPULATION_REQUIRED,
-      resolve(ROOT, "artifacts/e2e-review/location-population"),
-    );
-
-  await runPlaywright(["character-profile", "--project=chromium"], "Character profile E2E");
-  if (captureScreenshots)
-    verifyAndCopyScreenshots(
-      CHARACTER_PROFILE_REQUIRED,
-      resolve(ROOT, "artifacts/e2e-review/character-profile"),
-    );
-
-  await runPlaywright(["character-portraits", "--project=chromium"], "Character portraits E2E");
-  if (captureScreenshots)
-    verifyAndCopyScreenshots(
-      PORTRAITS_REQUIRED,
-      resolve(ROOT, "artifacts/e2e-review/character-portraits"),
-    );
-
-  await runPlaywright(["refining", "--project=chromium"], "Refining E2E");
-  if (captureScreenshots)
-    verifyAndCopyScreenshots(REFINING_REQUIRED, resolve(ROOT, "artifacts/e2e-review/refining"));
-
-  await runPlaywright(["cargo-hold", "--project=chromium"], "Cargo Hold E2E");
-  if (captureScreenshots)
-    verifyAndCopyScreenshots(CARGO_HOLD_REQUIRED, resolve(ROOT, "artifacts/e2e-review/cargo-hold"));
-
-  await runPlaywright(
-    ["mining", "--project=chromium", "--grep", "Play boundary", "--repeat-each=3", "--workers=1"],
-    "Mining play-boundary check",
-  );
-
-  await runPlaywright(["admin", "--project=chromium"], "Admin operator console E2E");
-
-  await runPlaywright(["signout", "--project=chromium"], "Sign-out E2E");
+  }
 }
 
 function onSignal(signal) {
@@ -266,6 +219,8 @@ async function main() {
   const baseDatabaseUrl = resolveDatabaseUrl();
   try {
     disposableDatabase = await createDisposableDatabase(baseDatabaseUrl, "canonical");
+    runId = disposableDatabase.databaseName;
+    const screenshotLane = captureScreenshots;
     const env = {
       ...process.env,
       DATABASE_URL: disposableDatabase.databaseUrl,
@@ -274,9 +229,14 @@ async function main() {
       RUNESPACE_E2E_MINING: "true",
       RUNESPACE_E2E_PLAY_ERROR: "true",
       RUNESPACE_E2E_TRAVEL: "true",
-      RUNESPACE_POWER_ANNEX_CLOCK_FILE: resolve(ROOT, ".playwright/power-annex-clock"),
+      RUNESPACE_POWER_ANNEX_CLOCK_FILE: resolve(ROOT, ".playwright", `power-annex-clock-${runId}`),
       RUNESPACE_E2E_CANONICAL_HTTP: "true",
       RUNESPACE_E2E_EXTERNAL_SERVER: "true",
+      RUNESPACE_E2E_CANONICAL: "true",
+      RUNESPACE_E2E_RUN_ID: runId,
+      RUNESPACE_E2E_WORKERS: process.env.RUNESPACE_E2E_WORKERS ?? (screenshotLane ? "1" : "2"),
+      RUNESPACE_E2E_TIMING_OUTPUT: resolve(ROOT, ".playwright", `canonical-timing-${runId}.json`),
+      RUNESPACE_E2E_SCREENSHOT_DIR: "test-results",
       RUNESPACE_RELEASE_ID: "local-ci-parity",
       BETTER_AUTH_SECRET: "canonical-e2e-local-test-secret-not-for-production",
       // The admin operator console E2E seeds a fixed-allowlisted admin session.
@@ -285,7 +245,7 @@ async function main() {
       PORT: String(PORT),
     };
     runtime = createE2eRuntime({
-      label: "canonical-e2e",
+      label: screenshotLane ? "canonical-e2e-screenshots" : "canonical-e2e",
       port: PORT,
       env,
       readyTimeoutMs: READY_TIMEOUT_MS,

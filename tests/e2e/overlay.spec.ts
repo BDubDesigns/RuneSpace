@@ -1,27 +1,9 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, openTestCharacter } from "./fixtures";
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { inventoryStacks } from "@/db/rune-space";
 import { ITEM_IDS } from "@/game/config/foundations";
-import { miningStorageStatePath } from "./mining.setup";
-
-const e2eDatabaseHost = process.env.DATABASE_URL ? new URL(process.env.DATABASE_URL).hostname : "";
-
-test.beforeAll(() => {
-  if (e2eDatabaseHost !== "localhost" && e2eDatabaseHost !== "127.0.0.1") {
-    throw new Error("Overlay E2E fixtures require a disposable localhost PostgreSQL database");
-  }
-});
-
-test.use({ storageState: miningStorageStatePath });
-test.describe.configure({ mode: "serial" });
-
-async function openMiningPage(page: import("@playwright/test").Page) {
-  await page.goto("/characters");
-  await page.getByRole("link", { name: "Play" }).click();
-  await page.waitForURL(/\/play\/[^/]+$/);
-  return page.url().split("/").at(-1)!;
-}
+import { captureReviewScreenshot } from "./review-screenshot";
 
 async function expectBackdropCoversViewport(
   page: import("@playwright/test").Page,
@@ -59,10 +41,9 @@ async function expectBackdropCoversViewport(
   expect(geometry.backgroundColor).not.toBe("transparent");
 }
 
-test.beforeEach(async ({ page }) => {
-  const characterId = await openMiningPage(page);
+test.beforeEach(async ({ page, testCharacter }) => {
+  const characterId = await openTestCharacter(page, testCharacter.id);
   // Seed two stacks so inventory has content to render.
-  await db.delete(inventoryStacks).where(eq(inventoryStacks.characterId, characterId));
   await db.insert(inventoryStacks).values([
     { characterId, itemId: ITEM_IDS.ferriteShale, quantity: 5 },
     { characterId, itemId: ITEM_IDS.ferriteShale, quantity: 3 },
@@ -90,7 +71,7 @@ test("Inventory opens as a centered modal with a dimmed backdrop", async ({ page
   // Verify body scroll is locked.
   const bodyOverflow = await page.evaluate(() => document.body.style.overflow);
   expect(bodyOverflow).toBe("hidden");
-  await page.screenshot({ path: "test-results/overlay-mobile-inventory.png" });
+  await captureReviewScreenshot(page, "overlay-mobile-inventory.png");
 });
 
 test("Equipment opens through the same shared modal pattern", async ({ page }) => {
@@ -108,7 +89,7 @@ test("Equipment opens through the same shared modal pattern", async ({ page }) =
   const boxShadow = await dialog.evaluate((el) => getComputedStyle(el).boxShadow);
   expect(boxShadow).not.toBe("none");
   expect(boxShadow).not.toBe("");
-  await page.screenshot({ path: "test-results/overlay-mobile-equipment.png" });
+  await captureReviewScreenshot(page, "overlay-mobile-equipment.png");
 });
 
 test("only one overlay can be open at a time", async ({ page }) => {
@@ -396,12 +377,12 @@ test("desktop modal is centered with backdropped play screen", async ({ page }) 
   await nav.getByRole("button", { name: "Inventory" }).click();
   const dialog = page.getByRole("dialog", { name: "Inventory" });
   await expect(dialog).toBeVisible();
-  await page.screenshot({ path: "test-results/overlay-desktop-inventory.png" });
+  await captureReviewScreenshot(page, "overlay-desktop-inventory.png");
   await dialog.getByRole("button", { name: "Close inventory" }).click();
   await nav.getByRole("button", { name: "Equipment" }).click();
   const equipDialog = page.getByRole("dialog", { name: "Equipment" });
   await expect(equipDialog).toBeVisible();
-  await page.screenshot({ path: "test-results/overlay-desktop-equipment.png" });
+  await captureReviewScreenshot(page, "overlay-desktop-equipment.png");
 });
 
 test("reduced-motion disables overlay animations", async ({ page }) => {

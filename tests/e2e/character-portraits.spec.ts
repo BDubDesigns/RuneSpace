@@ -13,18 +13,8 @@ import {
   createCharacterForUser,
   createLegacyCharacterForUser,
 } from "../integration/fixtures";
-import { miningStorageStatePath } from "./mining.setup";
 import { populationDisclosure } from "./population-disclosure";
-
-const e2eDatabaseHost = process.env.DATABASE_URL ? new URL(process.env.DATABASE_URL).hostname : "";
-
-test.beforeAll(() => {
-  if (e2eDatabaseHost !== "localhost" && e2eDatabaseHost !== "127.0.0.1") {
-    throw new Error(
-      "Character portrait E2E fixtures require a disposable localhost PostgreSQL database",
-    );
-  }
-});
+import { captureReviewScreenshot } from "./review-screenshot";
 
 /**
  * Issues #65 and #98 mobile-first journeys for the shared portrait chooser:
@@ -43,8 +33,7 @@ test.beforeAll(() => {
  *   candidate; sibling characters on the same account keep their own
  *   selections; no horizontal overflow or private-data exposure occurs.
  *
- * Registrations are kept minimal (the fixture user for the creation journey,
- * one owner for the management journey) so the phase stays well under the
+ * Registrations are kept minimal (one fixture user per journey) so the phase stays well under the
  * Better Auth sign-up rate limit.
  */
 
@@ -55,43 +44,6 @@ function noHorizontalOverflow(page: Page) {
   return page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
 }
 
-/**
- * FK-safe removal of one character and all of its gameplay rows. The creation
- * journey borrows the shared mining-fixture account, so the character it
- * creates is removed afterwards to leave that account exactly as it was for
- * the later play-boundary check.
- */
-async function deleteCharacter(characterId: string) {
-  await db
-    .delete(rune.characterPowerCellDailyClaims)
-    .where(eq(rune.characterPowerCellDailyClaims.characterId, characterId));
-  await db
-    .delete(rune.characterMiningState)
-    .where(eq(rune.characterMiningState.characterId, characterId));
-  await db
-    .delete(rune.characterRefiningState)
-    .where(eq(rune.characterRefiningState.characterId, characterId));
-  await db
-    .delete(rune.characterStarterProvisioning)
-    .where(eq(rune.characterStarterProvisioning.characterId, characterId));
-  await db
-    .delete(rune.characterTravelState)
-    .where(eq(rune.characterTravelState.characterId, characterId));
-  await db
-    .delete(rune.cargoHoldItemInstances)
-    .where(eq(rune.cargoHoldItemInstances.characterId, characterId));
-  await db.delete(rune.cargoHoldStacks).where(eq(rune.cargoHoldStacks.characterId, characterId));
-  await db
-    .delete(rune.characterCargoHoldRepair)
-    .where(eq(rune.characterCargoHoldRepair.characterId, characterId));
-  await db.delete(rune.equippedItems).where(eq(rune.equippedItems.characterId, characterId));
-  await db.delete(rune.activeActions).where(eq(rune.activeActions.characterId, characterId));
-  await db.delete(rune.characterSkillXp).where(eq(rune.characterSkillXp.characterId, characterId));
-  await db.delete(rune.inventoryStacks).where(eq(rune.inventoryStacks.characterId, characterId));
-  await db.delete(rune.itemInstances).where(eq(rune.itemInstances.characterId, characterId));
-  await db.delete(rune.characters).where(eq(rune.characters.id, characterId));
-}
-
 // ---------------------------------------------------------------------------
 // New-character journey (authenticated fixture user with free slots)
 // ---------------------------------------------------------------------------
@@ -99,13 +51,44 @@ async function deleteCharacter(characterId: string) {
 test.describe("character creation portrait journey", () => {
   // Real touch input: the journey proves both keyboard and touch selection
   // (hasTouch enables a genuine tap, not a mouse click at a mobile viewport).
-  test.use({ storageState: miningStorageStatePath, hasTouch: true });
-  test.describe.configure({ mode: "serial" });
+  test.use({ hasTouch: true });
+  let creationUserId: string | undefined;
+
+  test.afterEach(async () => {
+    if (creationUserId) {
+      await cleanupTestUser(db, authSchema, rune, creationUserId);
+      creationUserId = undefined;
+    }
+  });
 
   test("creation uses the shared chooser: ten starters, review state, and atomic persistence", async ({
     page,
   }) => {
     await page.setViewportSize({ width: 390, height: 844 });
+    const creationEmail = `portrait-creation-${Date.now()}-${Math.floor(Math.random() * 1e6)}@example.com`;
+    await page.goto("/register");
+    await page.getByLabel("Display name").fill("Portrait Creation");
+    await page.getByLabel("Email").fill(creationEmail);
+    await page.getByLabel("Password", { exact: true }).fill("sup3r-secret-password");
+    await page.getByRole("button", { name: "Create account" }).click();
+    await expect(page.getByRole("link", { name: "New character" })).toBeVisible();
+    const fixtureUser = (
+      await db
+        .select({ id: authSchema.user.id })
+        .from(authSchema.user)
+        .where(eq(authSchema.user.email, creationEmail))
+    )[0];
+    if (!fixtureUser) throw new Error("Portrait creation fixture user was not created");
+    creationUserId = fixtureUser.id;
+    const fixtureCharacter = await createCharacterForUser(
+      db,
+      rune,
+      ownership,
+      characters,
+      fixtureUser.id,
+      `Existing ${token()}`,
+      PORTRAIT_IDS.evaSalvageWelder,
+    );
     await page.goto("/characters/new");
 
     // Browse state for an account without an entitlement: exactly the ten
@@ -122,21 +105,6 @@ test.describe("character creation portrait journey", () => {
 
     // Hiding the option is not the security boundary: a forged server command
     // from the same unentitled account is refused as well.
-    const fixtureUser = (
-      await db
-        .select({ id: authSchema.user.id })
-        .from(authSchema.user)
-        .where(eq(authSchema.user.name, "Mining Fixture"))
-    )[0];
-    if (!fixtureUser) throw new Error("Mining fixture user was not created");
-    const fixtureAccount = await ownership.ensurePlayerAccount(fixtureUser.id);
-    const fixtureCharacter = (
-      await db
-        .select({ id: rune.characters.id })
-        .from(rune.characters)
-        .where(eq(rune.characters.playerAccountId, fixtureAccount.id))
-    )[0];
-    if (!fixtureCharacter) throw new Error("Mining fixture character was not created");
     await expect(
       characters.changeCharacterPortrait(
         fixtureUser.id,
@@ -219,17 +187,6 @@ test.describe("character creation portrait journey", () => {
     await expect(row.locator("[data-character-portrait] img")).toBeVisible();
     await expect(row.getByText("EVA Salvage Welder", { exact: true })).toBeVisible();
     await expect(row.getByRole("link", { name: "Play" })).toBeVisible();
-
-    // Leave the shared fixture account exactly as it was: remove the created
-    // character (and its gameplay rows) so later phases that reuse the same
-    // account see a single unambiguous character.
-    const created = (
-      await db
-        .select({ id: rune.characters.id })
-        .from(rune.characters)
-        .where(eq(rune.characters.displayName, createdName))
-    )[0];
-    if (created) await deleteCharacter(created.id);
   });
 });
 
@@ -238,11 +195,12 @@ test.describe("character creation portrait journey", () => {
 // ---------------------------------------------------------------------------
 
 test.describe("existing character portrait management journey", () => {
-  const createdUsers: string[] = [];
+  let managementUserId: string | undefined;
 
-  test.afterAll(async () => {
-    for (const userId of createdUsers.splice(0)) {
-      await cleanupTestUser(db, authSchema, rune, userId);
+  test.afterEach(async () => {
+    if (managementUserId) {
+      await cleanupTestUser(db, authSchema, rune, managementUserId);
+      managementUserId = undefined;
     }
   });
 
@@ -272,7 +230,7 @@ test.describe("existing character portrait management journey", () => {
     )[0];
     if (!owner) throw new Error("Portrait owner fixture user was not created");
     const ownerId = owner.id;
-    createdUsers.push(ownerId);
+    managementUserId = ownerId;
     const ownerAccount = await ownership.ensurePlayerAccount(ownerId);
     await grantPlayerPortraitUnlock(ownerAccount.id, PORTRAIT_IDS.vonScavenger, "operator");
     const ownedName = `Owned Drifter ${token()}`;
@@ -440,7 +398,7 @@ test.describe("existing character portrait management journey", () => {
 
     // Mobile-first: no horizontal overflow on the management screen.
     expect(await noHorizontalOverflow(page)).toBeLessThanOrEqual(0);
-    await page.screenshot({ path: "test-results/portraits-mobile-characters.png" });
+    await captureReviewScreenshot(page, "portraits-mobile-characters.png");
 
     // The same-location public profile shows the chosen portrait without
     // private data: play the sibling character so the legacy character is a
@@ -469,6 +427,6 @@ test.describe("existing character portrait management journey", () => {
     await expect(panel.getByText(/email/i)).toHaveCount(0);
 
     expect(await noHorizontalOverflow(page)).toBeLessThanOrEqual(0);
-    await page.screenshot({ path: "test-results/portraits-mobile-profile.png" });
+    await captureReviewScreenshot(page, "portraits-mobile-profile.png");
   });
 });

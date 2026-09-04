@@ -34,44 +34,49 @@ small number of critical mobile player journeys.
   without a different `PLAYWRIGHT_PORT` — use `pnpm test:e2e:focused <phase>`
   for managed-host iteration instead.
 - The canonical CI-parity command: `pnpm test:e2e:canonical`. This is the single
-  source of truth for local and CI behavioral verification, and for
-  frozen-screenshot verification when screenshots are requested. It:
+  source of truth for local and CI behavioral verification. Its canonical
+  selection is an explicit allowlist of the existing 70 behavioral tests in 13
+  specs: Mining, Inventory Equip, Overlay, Walk It Off, Cut Your Teeth, Travel,
+  Location Population, Character Profile, Character Portraits, Refining, Cargo
+  Hold, Admin Operator, and Sign-out. It intentionally excludes noncanonical
+  `smoke`, `ownership`, `design-system`, and QC Studio specs. It:
   - requires Node 22.x
   - requires a localhost-only disposable PostgreSQL database (refuses remote)
   - selects a dedicated test port
-  - removes stale authentication and test state
+  - removes stale Playwright output and creates run-scoped worker state paths
   - runs committed migrations
-  - runs one production build and starts one long-lived production server; all
-    canonical phases reuse that server and teardown is deterministic on success,
-    failure, timeout, or signal
-  - runs the Mining Chromium journey
-  - runs the Overlay Chromium journey (modal-overlay behavior shared by Inventory/Equipment)
-  - runs the Travel Chromium journey
-  - runs the Character Profile Chromium journey (same-location public profile
-    panel: open, switch target in place, close/focus return, keyboard,
-    mobile viewport, no private data, location-change invalidation)
+  - runs one production build and starts one long-lived production server, then
+    invokes Playwright once with the canonical allowlist and Chromium project
+  - authenticates once per Playwright worker and creates a fresh authoritative
+    test character for each test; special registration, character-creation,
+    portrait, ownership, admin, and sign-out journeys keep their own contracts
   - the Power Annex journey uses a disposable runner-only clock file, gated to
     CI against localhost PostgreSQL, to cross a Pacific reset boundary without
     depending on the host wall clock
-  - runs the repeated Mining play-boundary check
-  - captures frozen review screenshots into `artifacts/e2e-review/` **only when
-    requested** via `RUNESPACE_E2E_SCREENSHOTS=true` (the CI workflow sets this
-    from the `e2e-screenshots` PR label); in that mode it verifies the complete
-    manifest (exists, nonempty, correct names) and fails if any are missing
-  - when screenshots are not requested (the default), runs the same behavioral
-    assertions but produces and verifies no frozen package — a successful run is
-    green on behavior alone, and CI uploads no screenshot artifact for it
+  - runs with zero retries, `trace: "retain-on-failure"`, and a timing reporter
+    that prints total wall-clock time and the ten slowest tests; the admin
+    operator suite is the intentional serial exception for its fixed allowlist
+    and identity
   - on failure, Playwright's `screenshot: "only-on-failure"` and
-    `trace: "on-first-retry"` write per-test screenshots and traces into
+    `trace: "retain-on-failure"` write per-test screenshots and traces into
     `test-results/`; CI uploads those as a bounded failure-diagnostics artifact
-    regardless of the screenshot opt-in
+    regardless of screenshot review
+  - runs as three independent GitHub Actions shards, each with its own
+    PostgreSQL service, disposable database, migrations, production server, and
+    shard-named diagnostics/timing artifacts; all three are required by Full
+    and Merge gates
+  - captures the curated review manifest only in a separate deterministic,
+    unsharded one-worker job when `RUNESPACE_E2E_SCREENSHOTS=true` is explicitly
+    requested through the `e2e-screenshots` label. The ordinary behavioral
+    shards perform no curated screenshot I/O. The screenshot lane uses the same
+    canonical selection and fixture contracts, verifies every expected file,
+    and uploads `artifacts/e2e-review/`.
   - `test-results/` belongs to an individual Playwright invocation and may be
     cleaned or replaced by a later invocation (the focused runner does exactly
     that). Failure diagnostics are bounded to failing tests. Curated screenshots
-    survive the complete canonical sequence only when
-    `RUNESPACE_E2E_SCREENSHOTS=true` causes the canonical runner to copy and
-    verify them under `artifacts/e2e-review/`; expected per-invocation cleanup
-    is not lost output.
+    are produced only by the separate screenshot lane, which copies and
+    verifies them under `artifacts/e2e-review/`; expected behavioral-shard
+    cleanup is not lost output.
   - sets `RUNESPACE_E2E_CANONICAL_HTTP=true`, which disables Better Auth `Secure`
     cookies for the local production E2E runners (canonical and focused) only.
     Production-mode Better Auth issues `Secure`
@@ -98,22 +103,22 @@ small number of critical mobile player journeys.
   `AGENTS.md` §6 and `docs/development-workflow.md` (§Focused implementation
   checks, then full canonical parity).
 - The canonical command is expensive by design: one invocation performs one
-  full production `next build`, one `next start`, and all suites, so it spans
-  several minutes. Multiple Playwright commands remain to preserve fixture and
-  auth-state isolation, but the runner's explicit external-server boundary
-  prevents another build or server restart for each phase. For focused local
-  iteration, run the affected spec (`pnpm test:e2e <spec> --project=chromium`).
+  full production `next build`, one `next start`, and the complete allowlisted
+  selection, so it spans several minutes. For focused local iteration, run the
+  affected spec (`pnpm test:e2e <spec> --project=chromium`).
   Ordinary `pnpm test:e2e` owns its server: it uses production build/start by
   default, or a development server when `PLAYWRIGHT_DEV_SERVER=true` is set.
   Focused evidence is never a substitute for the canonical command — only
   `pnpm test:e2e:canonical` and the matching CI job establish CI parity.
 - Managed-host focused iteration uses `pnpm test:e2e:focused <phase>` (currently
-  `mining`, `character-profile`, and `location-population`; recipe in `docs/development-workflow.md`). The focused runner
+  `mining`, `character-profile`, `location-population`, `character-portraits`,
+  `cargo-hold`, `inventory-equip`, `walk-it-off`, and `cut-your-teeth`; recipe
+  in `docs/development-workflow.md`). The focused runner
   reuses the canonical primitives from `scripts/e2e-shared.mjs` (localhost-only
   database safety, Node 22 validation, port availability, targeted process
   termination) and owns a separate high port (default `3310`, never `3000` or
   `3200`), a local build-and-runtime auth placeholder, and a small lifecycle:
-  stale auth-state cleanup, migrations, one production build and server, the
+  per-invocation output cleanup, migrations, one production build and server, the
   selected phase, then deterministic teardown of only its own processes.
   Focused results are iteration evidence only; only `pnpm test:e2e:canonical`
   and the matching CI job establish CI parity.
@@ -203,10 +208,10 @@ full-gate policy:
 | Push to `main` | Yes | Yes | Required |
 | Manual `workflow_dispatch` with an explicit ref/SHA | Yes | Yes | Required |
 
-Labels on ready PRs request the full gate so adding `e2e-screenshots` captures
-the requested manifest without invalidating an otherwise ready head. PR runs use
-a per-PR concurrency group so obsolete work is canceled only for that PR; main
-and manual runs use unique groups. The static `Merge gate` is required and
+Labels on ready PRs request the full gate; adding `e2e-screenshots` also runs the
+separate deterministic screenshot lane without adding its output to behavioral
+shards. PR runs use a per-PR concurrency group so obsolete work is canceled only
+for that PR; main and manual runs use unique groups. The static `Merge gate` is required and
 intentionally fails on draft checkpoints. This is necessary because GitHub
 marks a skipped required job successful; a green draft decision would otherwise
 be reusable when the PR becomes ready without a new commit. Require only the
@@ -217,8 +222,9 @@ Issue #61 on 2026-08-03 (the GitHub REST branch-protection endpoint returns
 maintainer must verify those settings separately. Treat that snapshot as dated
 repository state and re-verify before acting on it.
 
-CI retains a separate PostgreSQL integration job and canonical E2E job. The
-canonical runner is the single source of truth for E2E behavioral verification
-in both local development and GitHub Actions; frozen review screenshots are
-produced and uploaded only when explicitly requested (see §3), and per-failure
-diagnostics are always retained.
+CI retains a separate PostgreSQL integration job, a three-shard canonical E2E
+matrix, and an opt-in unsharded screenshot lane. The canonical runner is the
+single source of truth for E2E behavioral verification in both local development
+and GitHub Actions; curated screenshots are produced and uploaded only in the
+explicit screenshot lane (see §3), and per-failure diagnostics are always
+retained with shard-specific artifact names.

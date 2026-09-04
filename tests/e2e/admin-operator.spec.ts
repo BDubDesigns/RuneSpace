@@ -22,6 +22,9 @@ const FIXTURE_CHARACTER = "Operator Probe GADGET";
  * `RUNESPACE_ADMIN_USER_IDS`); the quick `test:e2e` command skips it.
  */
 test.describe("admin operator console", () => {
+  // This is the one intentional canonical serial exception: every test uses
+  // the same fixed admin identity and the process-global allowlist, so the
+  // session/bootstrap contract must not overlap within a shard.
   test.describe.configure({ mode: "serial" });
   test.skip(!process.env.RUNESPACE_ADMIN_USER_IDS, "requires RUNESPACE_ADMIN_USER_IDS allowlist");
 

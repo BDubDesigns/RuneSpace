@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { shouldRequireMergeGate, shouldRunFullGate } from "@/scripts/select-ci-gate.mjs";
+import {
+  shouldRequireMergeGate,
+  shouldRunFullGate,
+  shouldRunScreenshotLane,
+} from "@/scripts/select-ci-gate.mjs";
 
 function pullRequestEvent(
   action: string,
@@ -68,6 +72,22 @@ describe("full CI gate selection", () => {
         event: pullRequestEvent("labeled", { labels: ["e2e-screenshots"] }),
       }),
     ).toBe(false);
+  });
+
+  it("runs screenshots only when the explicit label accompanies full validation", () => {
+    expect(
+      shouldRunScreenshotLane({
+        eventName: "pull_request",
+        event: pullRequestEvent("labeled", { labels: ["e2e-screenshots"] }),
+      }),
+    ).toBe(false);
+    expect(
+      shouldRunScreenshotLane({
+        eventName: "pull_request",
+        event: pullRequestEvent("synchronize", { labels: ["full-ci", "e2e-screenshots"] }),
+      }),
+    ).toBe(true);
+    expect(shouldRunScreenshotLane({ eventName: "push", event: {} })).toBe(false);
   });
 
   it("runs the full gate on main pushes and manual dispatch", () => {

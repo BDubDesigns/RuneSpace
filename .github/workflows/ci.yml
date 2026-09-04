@@ -89,6 +89,7 @@ jobs:
     outputs:
       full: ${{ steps.select.outputs.full }}
       merge_required: ${{ steps.select.outputs.merge_required }}
+      screenshots: ${{ steps.select.outputs.screenshots }}
     env:
       CI_CHECKOUT_REF: ${{ github.event_name == 'workflow_dispatch' && inputs.ref || github.sha }}
     steps:
@@ -152,10 +153,14 @@ jobs:
         run: pnpm test:integration:issue-126
 
   canonical-e2e:
-    name: Canonical E2E browser journeys
+    name: Canonical E2E shard ${{ matrix.shard }}/3
     if: ${{ needs.gate-decision.outputs.full == 'true' }}
     needs: gate-decision
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3]
     services:
       postgres:
         image: postgres:16-alpine
@@ -169,11 +174,9 @@ jobs:
           --health-interval 5s --health-timeout 5s --health-retries 5
     env:
       DATABASE_URL: postgres://runespace:runespace@localhost:5432/runespace
-      # Opt-in frozen review screenshots. Off by default (the live PR preview is
-      # the normal visual-review evidence); add the `e2e-screenshots` label to a
-      # PR to capture and verify the curated screenshot package on the next run.
-      # push-to-main has no PR/label context, so it stays off there too.
-      RUNESPACE_E2E_SCREENSHOTS: ${{ github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'e2e-screenshots') }}
+      RUNESPACE_E2E_SHARD_INDEX: ${{ matrix.shard }}
+      RUNESPACE_E2E_SHARD_TOTAL: 3
+      RUNESPACE_E2E_WORKERS: 2
       CI_CHECKOUT_REF: ${{ github.event_name == 'workflow_dispatch' && inputs.ref || github.sha }}
     steps:
       - uses: actions/checkout@v4
@@ -189,40 +192,93 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm exec playwright install --with-deps chromium
       - run: pnpm test:e2e:canonical
-      # Frozen review package: only when explicitly requested, and then mandatory
-      # (error if the runner did not produce it). Skipped entirely on a default
-      # run, so a successful default run uploads nothing here.
-      - name: Upload frozen review screenshots (opt-in)
+      - name: Upload canonical timing
         uses: actions/upload-artifact@v4
-        if: success() && env.RUNESPACE_E2E_SCREENSHOTS == 'true'
+        if: always()
         with:
-          name: e2e-review-screenshots
-          path: artifacts/e2e-review/
-          if-no-files-found: error
+          name: e2e-timing-shard-${{ matrix.shard }}
+          path: .playwright/canonical-timing-*.json
+          if-no-files-found: ignore
       # Failure diagnostics: always retained on a failed run, bounded to Playwright
       # output (screenshots, traces, report) — never unrelated build output.
       - name: Upload failure diagnostics
         uses: actions/upload-artifact@v4
         if: failure()
         with:
-          name: e2e-failure-diagnostics
+          name: e2e-failure-diagnostics-shard-${{ matrix.shard }}
           path: |
             test-results/
             playwright-report/
+            .playwright/canonical-timing-*.json
+          if-no-files-found: ignore
+
+  canonical-screenshots:
+    name: Canonical E2E review screenshots
+    if: ${{ needs.gate-decision.outputs.screenshots == 'true' }}
+    needs: gate-decision
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: runespace
+          POSTGRES_PASSWORD: runespace
+          POSTGRES_DB: runespace
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U runespace -d runespace"
+          --health-interval 5s --health-timeout 5s --health-retries 5
+    env:
+      DATABASE_URL: postgres://runespace:runespace@localhost:5432/runespace
+      RUNESPACE_E2E_SCREENSHOTS: "true"
+      RUNESPACE_E2E_WORKERS: 1
+      CI_CHECKOUT_REF: ${{ github.event_name == 'workflow_dispatch' && inputs.ref || github.sha }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.CI_CHECKOUT_REF }}
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec playwright install --with-deps chromium
+      - run: pnpm test:e2e:canonical
+      - name: Upload frozen review screenshots
+        uses: actions/upload-artifact@v4
+        if: success()
+        with:
+          name: e2e-review-screenshots
+          path: artifacts/e2e-review/
+          if-no-files-found: error
+      - name: Upload screenshot failure diagnostics
+        uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: e2e-screenshot-failure-diagnostics
+          path: |
+            test-results/
+            playwright-report/
+            .playwright/canonical-timing-*.json
           if-no-files-found: ignore
 
   full-gate:
     name: Full gate
     if: ${{ always() }}
-    needs: [gate-decision, integration, canonical-e2e]
+    needs: [gate-decision, integration, canonical-e2e, canonical-screenshots]
     runs-on: ubuntu-latest
     steps:
       - name: Verify full validation result
         env:
           DECISION_RESULT: ${{ needs.gate-decision.result }}
           FULL: ${{ needs.gate-decision.outputs.full }}
+          SCREENSHOTS_REQUIRED: ${{ needs.gate-decision.outputs.screenshots }}
           INTEGRATION_RESULT: ${{ needs.integration.result }}
           E2E_RESULT: ${{ needs.canonical-e2e.result }}
+          SCREENSHOTS_RESULT: ${{ needs.canonical-screenshots.result }}
         run: |
           set -euo pipefail
           if [[ "$DECISION_RESULT" != "success" ]]; then
@@ -234,7 +290,11 @@ jobs:
             exit 0
           fi
           if [[ "$INTEGRATION_RESULT" != "success" || "$E2E_RESULT" != "success" ]]; then
-            echo "Full validation requires successful integration and canonical E2E jobs."
+            echo "Full validation requires successful integration and all canonical E2E shards."
+            exit 1
+          fi
+          if [[ "$SCREENSHOTS_REQUIRED" == "true" && "$SCREENSHOTS_RESULT" != "success" ]]; then
+            echo "The requested screenshot lane did not pass."
             exit 1
           fi
           echo "Full validation passed."
@@ -242,7 +302,7 @@ jobs:
   merge-gate:
     name: Merge gate
     if: ${{ always() }}
-    needs: [gate-decision, integration, canonical-e2e, full-gate]
+    needs: [gate-decision, integration, canonical-e2e, canonical-screenshots, full-gate]
     runs-on: ubuntu-latest
     steps:
       - name: Enforce merge validation
@@ -252,6 +312,8 @@ jobs:
           MERGE_REQUIRED: ${{ needs.gate-decision.outputs.merge_required }}
           INTEGRATION_RESULT: ${{ needs.integration.result }}
           E2E_RESULT: ${{ needs.canonical-e2e.result }}
+          SCREENSHOTS_REQUIRED: ${{ needs.gate-decision.outputs.screenshots }}
+          SCREENSHOTS_RESULT: ${{ needs.canonical-screenshots.result }}
           FULL_GATE_RESULT: ${{ needs.full-gate.result }}
         run: |
           set -euo pipefail
@@ -266,6 +328,7 @@ jobs:
           if [[ "$FULL" != "true" ||
                 "$INTEGRATION_RESULT" != "success" ||
                 "$E2E_RESULT" != "success" ||
+                ("$SCREENSHOTS_REQUIRED" == "true" && "$SCREENSHOTS_RESULT" != "success") ||
                 "$FULL_GATE_RESULT" != "success" ]]; then
             echo "Merge validation requires successful integration and canonical E2E."
             exit 1

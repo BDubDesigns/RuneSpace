@@ -129,48 +129,7 @@ export async function cleanupTestUser(db: Db, authSchema: AuthSchema, rune: Rune
       .from(rune.characters)
       .where(eq(rune.characters.playerAccountId, account.id));
     for (const character of characterRows) {
-      await db
-        .delete(rune.characterPowerCellDailyClaims)
-        .where(eq(rune.characterPowerCellDailyClaims.characterId, character.id));
-      await db
-        .delete(rune.characterMiningState)
-        .where(eq(rune.characterMiningState.characterId, character.id));
-      await db
-        .delete(rune.characterRefiningState)
-        .where(eq(rune.characterRefiningState.characterId, character.id));
-      await db
-        .delete(rune.characterCargoHoldRepair)
-        .where(eq(rune.characterCargoHoldRepair.characterId, character.id));
-      await db
-        .delete(rune.cargoHoldItemInstances)
-        .where(eq(rune.cargoHoldItemInstances.characterId, character.id));
-      await db
-        .delete(rune.cargoHoldStacks)
-        .where(eq(rune.cargoHoldStacks.characterId, character.id));
-      await db
-        .delete(rune.characterStarterProvisioning)
-        .where(eq(rune.characterStarterProvisioning.characterId, character.id));
-      await db
-        .delete(rune.characterMissions)
-        .where(eq(rune.characterMissions.characterId, character.id));
-      await db
-        .delete(rune.characterScavengeReveals)
-        .where(eq(rune.characterScavengeReveals.characterId, character.id));
-      await db
-        .delete(rune.characterTravelState)
-        .where(eq(rune.characterTravelState.characterId, character.id));
-      await db.delete(rune.equippedItems).where(eq(rune.equippedItems.characterId, character.id));
-      await db.delete(rune.activeActions).where(eq(rune.activeActions.characterId, character.id));
-      await db
-        .delete(rune.characterSkillXp)
-        .where(eq(rune.characterSkillXp.characterId, character.id));
-      await db
-        .delete(rune.inventoryStacks)
-        .where(eq(rune.inventoryStacks.characterId, character.id));
-      await db
-        .delete(rune.operatorAuditLogs)
-        .where(eq(rune.operatorAuditLogs.characterId, character.id));
-      await db.delete(rune.itemInstances).where(eq(rune.itemInstances.characterId, character.id));
+      await cleanupTestCharacter(db, rune, character.id);
     }
     await db.delete(rune.characters).where(eq(rune.characters.playerAccountId, account.id));
     await db
@@ -179,4 +138,48 @@ export async function cleanupTestUser(db: Db, authSchema: AuthSchema, rune: Rune
   }
   await db.delete(rune.playerAccounts).where(eq(rune.playerAccounts.userId, userId));
   await db.delete(authSchema.user).where(eq(authSchema.user.id, userId));
+}
+
+/**
+ * Removes one disposable E2E character without invalidating its worker's
+ * Better Auth account. The order mirrors the FK-safe user teardown above.
+ */
+export async function cleanupTestCharacter(db: Db, rune: Rune, characterId: string) {
+  await db
+    .delete(rune.characterPowerCellDailyClaims)
+    .where(eq(rune.characterPowerCellDailyClaims.characterId, characterId));
+  await db
+    .delete(rune.characterMiningState)
+    .where(eq(rune.characterMiningState.characterId, characterId));
+  await db
+    .delete(rune.characterRefiningState)
+    .where(eq(rune.characterRefiningState.characterId, characterId));
+  await db
+    .delete(rune.characterCargoHoldRepair)
+    .where(eq(rune.characterCargoHoldRepair.characterId, characterId));
+  await db
+    .delete(rune.cargoHoldItemInstances)
+    .where(eq(rune.cargoHoldItemInstances.characterId, characterId));
+  await db.delete(rune.cargoHoldStacks).where(eq(rune.cargoHoldStacks.characterId, characterId));
+  await db
+    .delete(rune.characterStarterProvisioning)
+    .where(eq(rune.characterStarterProvisioning.characterId, characterId));
+  await db
+    .delete(rune.characterMissions)
+    .where(eq(rune.characterMissions.characterId, characterId));
+  await db
+    .delete(rune.characterScavengeReveals)
+    .where(eq(rune.characterScavengeReveals.characterId, characterId));
+  await db
+    .delete(rune.characterTravelState)
+    .where(eq(rune.characterTravelState.characterId, characterId));
+  await db.delete(rune.equippedItems).where(eq(rune.equippedItems.characterId, characterId));
+  await db.delete(rune.activeActions).where(eq(rune.activeActions.characterId, characterId));
+  await db.delete(rune.characterSkillXp).where(eq(rune.characterSkillXp.characterId, characterId));
+  await db.delete(rune.inventoryStacks).where(eq(rune.inventoryStacks.characterId, characterId));
+  await db
+    .delete(rune.operatorAuditLogs)
+    .where(eq(rune.operatorAuditLogs.characterId, characterId));
+  await db.delete(rune.itemInstances).where(eq(rune.itemInstances.characterId, characterId));
+  await db.delete(rune.characters).where(eq(rune.characters.id, characterId));
 }
