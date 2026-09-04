@@ -198,6 +198,7 @@ jobs:
         with:
           name: e2e-timing-shard-${{ matrix.shard }}
           path: .playwright/canonical-timing-*.json
+          include-hidden-files: true
           if-no-files-found: ignore
       # Failure diagnostics: always retained on a failed run, bounded to Playwright
       # output (screenshots, traces, report) — never unrelated build output.
