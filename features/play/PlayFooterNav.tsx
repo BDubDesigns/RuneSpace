@@ -76,8 +76,7 @@ export function FooterNavLink({
   active,
   "aria-label": ariaLabel,
   ...props
-}: FooterDestinationProps &
-  ComponentProps<typeof Link> & { freeSlotsCount?: number }) {
+}: FooterDestinationProps & ComponentProps<typeof Link> & { freeSlotsCount?: number }) {
   return (
     <Link
       {...props}

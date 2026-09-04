@@ -208,7 +208,8 @@ test("a full inventory turns the free-slots badge urgent", async ({ page }) => {
   await expect(page.locator("[data-missions-badge]")).toHaveCount(0);
 });
 
-test("backdrop click closes the overlay", async ({ page }) => {  await page.setViewportSize({ width: 390, height: 844 });
+test("backdrop click closes the overlay", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
   const nav = page.getByRole("navigation", { name: "Primary" });
   await nav.getByRole("button", { name: "Inventory" }).click();
   const dialog = page.getByRole("dialog", { name: "Inventory" });
