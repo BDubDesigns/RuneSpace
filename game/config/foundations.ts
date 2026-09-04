@@ -46,7 +46,7 @@ const dialogueIds = {
   tansyAfterClaim: asContentId("tansy_rusk_walk_it_off_after_claim"),
   tansyCapacitySlots: asContentId("tansy_rusk_walk_it_off_capacity_slots"),
   tansyCapacityMass: asContentId("tansy_rusk_walk_it_off_capacity_mass"),
-  // Issue #110 folds Tansy's old standalone post-quest idle chain into the
+  // Issue #110 folds Tansy's old standalone post-mission idle chain into the
   // Cut Your Teeth offer, so the retired v1 idle sequence keeps its stable
   // ID registered but no longer has an authored sequence.
   tansyAfterCompletion: asContentId("tansy_rusk_walk_it_off_after_completion"),

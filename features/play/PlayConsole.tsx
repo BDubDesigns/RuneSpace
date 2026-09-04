@@ -20,6 +20,7 @@ import { PowerAnnexClaimPanel } from "@/features/power-annex/PowerAnnexClaimPane
 import { LocationSceneHeader } from "@/features/location-scene/LocationSceneHeader";
 import { CargoHoldPanel } from "@/features/cargo/CargoHoldPanel";
 import { MissionObjectivePanel } from "@/features/missions/MissionObjectivePanel";
+import { MissionLogPanel } from "@/features/missions/MissionLogPanel";
 import { NpcInteractionPanel } from "@/features/npc/NpcInteractionPanel";
 import { InventoryPanel } from "@/features/inventory/InventoryPanel";
 import { EquipmentPanel } from "@/features/inventory/EquipmentPanel";
@@ -40,11 +41,15 @@ export function PlayConsole({ characterName }: { characterName: string }) {
     enqueueForeground,
     foregroundBusy,
     inventoryOpen,
+    missionsOpen,
+    missionsFocus,
+    setMissionsOpen,
     releaseCommand,
     setEquipmentOpen,
     setInventoryOpen,
     inventoryTrigger,
     equipmentTrigger,
+    missionsTrigger,
     setRefreshCallback,
     acceptState,
     state,
@@ -232,6 +237,13 @@ export function PlayConsole({ characterName }: { characterName: string }) {
           onClose={() => setEquipmentOpen(false)}
           state={state}
           triggerRef={equipmentTrigger}
+        />
+      ) : missionsOpen ? (
+        <MissionLogPanel
+          focusedMissionId={missionsFocus}
+          onClose={() => setMissionsOpen(false)}
+          state={state}
+          triggerRef={missionsTrigger}
         />
       ) : null}
     </div>

@@ -273,6 +273,65 @@ suite("issue #102 Walk It Off persistence and reward boundary (real PostgreSQL)"
         .from(rune.equippedItems)
         .where(eq(rune.equippedItems.itemInstanceId, cutters[0]!.id)),
     ).toHaveLength(0);
+    // The authored continuation accepts Cut Your Teeth exactly once even
+    // under concurrent first completions.
+    const continued = await db
+      .select()
+      .from(rune.characterMissions)
+      .where(
+        and(
+          eq(rune.characterMissions.characterId, character.id),
+          eq(rune.characterMissions.missionId, "cut_your_teeth"),
+        ),
+      );
+    expect(continued).toHaveLength(1);
+    expect(continued[0]?.completedAt).toBeNull();
+  });
+
+  it("accepts Cut Your Teeth atomically with exactly-once reward under retry", async () => {
+    const { userId, character } = await makeCharacter();
+    await acceptAtCrash(userId, character.id);
+    await move(character.id, LOCATION_IDS.theJag);
+    const first = await missions.completeMission(
+      userId,
+      character.id,
+      MISSION_IDS.walkItOff,
+      NPC_IDS.tansyRusk,
+      now,
+      deterministicRandom(),
+    );
+    expect(first.mission.status).toBe("completed");
+    const retry = await missions.completeMission(
+      userId,
+      character.id,
+      MISSION_IDS.walkItOff,
+      NPC_IDS.tansyRusk,
+      new Date(now.getTime() + 1_000),
+      deterministicRandom(),
+    );
+    expect(retry.mission.status).toBe("already_completed");
+    const cutters = await db
+      .select()
+      .from(rune.itemInstances)
+      .where(
+        and(
+          eq(rune.itemInstances.characterId, character.id),
+          eq(rune.itemInstances.itemId, ITEM_IDS.salvageCutter),
+        ),
+      );
+    expect(cutters).toHaveLength(1);
+    const continued = await db
+      .select()
+      .from(rune.characterMissions)
+      .where(
+        and(
+          eq(rune.characterMissions.characterId, character.id),
+          eq(rune.characterMissions.missionId, "cut_your_teeth"),
+        ),
+      );
+    expect(continued).toHaveLength(1);
+    expect(continued[0]?.acceptedAt).toEqual(now);
+    expect(continued[0]?.completedAt).toBeNull();
   });
 
   it("allows separate characters to accept their own mission row", async () => {

@@ -72,16 +72,16 @@ test("walks from Wade to Tansy, presents approved dialogue, and claims one carri
   await page.setViewportSize({ width: 390, height: 844 });
   const characterId = page.url().split("/").at(-1)!;
 
-  await expect(page.getByRole("button", { name: "Inventory 0/8" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Inventory" })).toBeVisible();
   await expect(page.getByRole("button", { name: /Talk to Wade Rusk/ })).toBeVisible();
   await expect(page.getByRole("button", { name: /Talk to Wade Rusk/ })).toHaveAttribute(
     "data-npc-turn-in",
     "false",
   );
-  // Quest guidance: brand-new character at Crash Site — Wade's Talk
-  // control receives the quest-available (blue) treatment.
+  // Mission guidance: brand-new character at Crash Site — Wade's Talk
+  // control receives the mission-available (blue) treatment.
   await expect(page.getByRole("button", { name: /Talk to Wade Rusk/ })).toHaveAttribute(
-    "data-quest-guidance",
+    "data-mission-guidance",
     "available",
   );
   await page.getByRole("button", { name: /Talk to Wade Rusk/ }).click();
@@ -165,10 +165,10 @@ test("walks from Wade to Tansy, presents approved dialogue, and claims one carri
     "data-npc-turn-in",
     "true",
   );
-  // Quest guidance: the required NPC interaction now receives the active
+  // Mission guidance: the required NPC interaction now receives the active
   // (green) treatment.
   await expect(page.getByRole("button", { name: /Talk to Tansy Rusk/ })).toHaveAttribute(
-    "data-quest-guidance",
+    "data-mission-guidance",
     "active",
   );
   await page.emulateMedia({ reducedMotion: "reduce" });
@@ -203,20 +203,20 @@ test("walks from Wade to Tansy, presents approved dialogue, and claims one carri
   await expect(tansyDialogue.getByRole("button", { name: "Finish" })).toBeVisible();
   await tansyDialogue.getByRole("button", { name: "Finish" }).click();
   await expect(tansyDialogue).toBeHidden();
-  await expect(page.getByRole("button", { name: "Inventory 1/8" })).toBeVisible();
-  // After Walk It Off completes, the objective panel leads the player into the
-  // next available story quest (Cut Your Teeth) instead of showing the
-  // completed mission as the dead-end fallback.
+  await expect(page.getByRole("button", { name: "Inventory" })).toBeVisible();
+  // Issue #137: completing Walk It Off atomically accepts Cut Your Teeth via
+  // the authored continuation — the HUD immediately shows the next
+  // assignment's live objective (already at The Jag, so location holds) with
+  // no second acceptance click.
   await expect(page.locator("[data-mission-objective]")).toContainText("Cut Your Teeth");
-  await expect(page.locator("[data-mission-objective]")).toContainText("Available");
+  await expect(page.locator("[data-mission-objective]")).toContainText("Active");
   await expect(page.locator("[data-mission-objective]")).toContainText(
-    "Speak with Tansy Rusk at The Jag to begin Cut Your Teeth.",
+    "Equip the Salvage Cutter from Inventory",
   );
-  // Quest guidance: the AVAILABLE next mission authors an offer presentation,
-  // so the quest-giver Talk control glows available (blue) — derived from
-  // projection, never from a mission-ID conditional.
-  await expect(page.getByRole("button", { name: /Talk to Tansy Rusk/ })).toHaveAttribute(
-    "data-quest-guidance",
+  // Mission guidance: Cut Your Teeth is accepted, so the equip affordance —
+  // not Tansy's Talk control — carries the active treatment.
+  await expect(page.getByRole("button", { name: /Talk to Tansy Rusk/ })).not.toHaveAttribute(
+    "data-mission-guidance",
     "available",
   );
 
@@ -238,17 +238,17 @@ test("walks from Wade to Tansy, presents approved dialogue, and claims one carri
   ).resolves.toHaveLength(0);
 
   await page.reload();
-  // After Walk It Off completes, the objective panel continues to lead the
-  // player into the next available story quest (Cut Your Teeth).
+  // After Walk It Off completes, the objective panel tracks the continued
+  // Cut Your Teeth assignment (accepted atomically, not advertised).
   await expect(page.locator("[data-mission-objective]")).toContainText("Cut Your Teeth");
-  await expect(page.locator("[data-mission-objective]")).toContainText("Available");
+  await expect(page.locator("[data-mission-objective]")).toContainText("Active");
   await page.getByRole("button", { name: /Talk to Tansy Rusk/ }).click();
-  // Issue #110 amendment: Tansy's post-Walk-It-Off beats now open the
-  // Cut Your Teeth offer instead of a standalone dead-end idle chain.
+  // Issue #137: Tansy routes to Cut Your Teeth's active equip reminder — the
+  // mission is already accepted, so there is no offer to accept.
   const postMissionDialogue = page.getByRole("dialog", { name: "Tansy Rusk dialogue" });
   await expect(
     postMissionDialogue.locator('[data-dialogue-text] [aria-hidden="true"]'),
-  ).toContainText("Still have all your fingers?");
+  ).toContainText("Equip it first");
   await expect(postMissionDialogue.locator('img[alt*="Tansy Rusk"]')).toBeVisible();
 });
 
@@ -317,8 +317,8 @@ test("supports the explorer-first Jag conversation and remote mission acceptance
   await expect(dialogue.getByRole("button", { name: "Finish" })).toBeVisible();
   await dialogue.getByRole("button", { name: "Finish" }).click();
   await expect(dialogue).toBeHidden();
-  // Same boundary as test 1: after Walk It Off completes, the objective panel
-  // leads into the next available story quest rather than the completed one.
+  // Same boundary as test 1: after Walk It Off completes, the continuation
+  // accepts Cut Your Teeth atomically — the HUD tracks it as Active.
   await expect(page.locator("[data-mission-objective]")).toContainText("Cut Your Teeth");
-  await expect(page.locator("[data-mission-objective]")).toContainText("Available");
+  await expect(page.locator("[data-mission-objective]")).toContainText("Active");
 });

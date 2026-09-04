@@ -85,22 +85,22 @@
   --rs-font-body: ui-sans-serif, system-ui, sans-serif;
   --rs-shadow-panel: 0 16px 42px rgb(0 0 0 / 0.34);
   --rs-glow-primary: 0 0 20px rgb(75 216 245 / 0.18);
-  /* Semantic quest guidance (issue #124): one high-contrast neon-green
-     treatment marks "this interaction advances your active quest". It is a
+  /* Semantic mission guidance (issue #124): one high-contrast neon-green
+     treatment marks "this interaction advances your active mission". It is a
      distinct guidance affordance — not success/error state — and stays
      static (no animation) so reduced-motion preferences need no special
-     handling. Consumers apply the .rs-quest-guidance class; no ad-hoc green
+     handling. Consumers apply the .rs-mission-guidance class; no ad-hoc green
      classes per component. */
-  --rs-quest-guidance-color: #3dff9e;
-  --rs-quest-guidance-glow: rgb(61 255 158 / 0.35);
-  --rs-quest-guidance-inset-glow: rgb(61 255 158 / 0.18);
-  /* Quest-available: blue/cyan sibling to the neon-green active treatment.
-     Same shared-class approach — available guides "new quest here", active
-     guides "this advances the quest you accepted". Distinct hue, same
+  --rs-mission-guidance-color: #3dff9e;
+  --rs-mission-guidance-glow: rgb(61 255 158 / 0.35);
+  --rs-mission-guidance-inset-glow: rgb(61 255 158 / 0.18);
+  /* Mission-available: blue/cyan sibling to the neon-green active treatment.
+     Same shared-class approach — available guides "new mission here", active
+     guides "this advances the mission you accepted". Distinct hue, same
      static treatment (no animation). */
-  --rs-quest-available-color: #4db8ff;
-  --rs-quest-available-glow: rgb(77 184 255 / 0.35);
-  --rs-quest-available-inset-glow: rgb(77 184 255 / 0.18);
+  --rs-mission-available-color: #4db8ff;
+  --rs-mission-available-glow: rgb(77 184 255 / 0.35);
+  --rs-mission-available-inset-glow: rgb(77 184 255 / 0.18);
   /* Translucent scrim behind the Inventory/Equipment modal. Derived from the
      page surface via color-mix so the page colour stays the single source of
      truth. The slash-opacity modifier cannot alpha a hex CSS variable, so the
@@ -193,67 +193,67 @@ body {
 }
 
 /*
- * Quest guidance treatment. Outline + restrained glow + neon-green border so
- * the target clearly reads as "this interaction advances your active quest".
+ * Mission guidance treatment. Outline + restrained glow + neon-green border so
+ * the target clearly reads as "this interaction advances your active mission".
  * Deliberately static: legibility never depends on animation.
  */
-.rs-quest-guidance {
-  border-color: var(--rs-quest-guidance-color);
-  box-shadow: 0 0 12px var(--rs-quest-guidance-glow);
-  color: var(--rs-quest-guidance-color);
-  outline: 2px solid var(--rs-quest-guidance-color);
+.rs-mission-guidance {
+  border-color: var(--rs-mission-guidance-color);
+  box-shadow: 0 0 12px var(--rs-mission-guidance-glow);
+  color: var(--rs-mission-guidance-color);
+  outline: 2px solid var(--rs-mission-guidance-color);
   outline-offset: 2px;
 }
 
 /* Beveled controls clip anything outside the polygon (outline and drop
    shadows included), so their guidance switches to an inset ring + glow that
    survives clip-path. */
-.rs-bevel.rs-quest-guidance {
+.rs-bevel.rs-mission-guidance {
   box-shadow:
-    inset 0 0 0 2px var(--rs-quest-guidance-color),
-    inset 0 0 16px var(--rs-quest-guidance-inset-glow);
+    inset 0 0 0 2px var(--rs-mission-guidance-color),
+    inset 0 0 16px var(--rs-mission-guidance-inset-glow);
   outline: none;
 }
 
 /*
- * Quest-available treatment. Blue/cyan sibling to the neon-green active
- * treatment: "there is a new quest here" vs "this advances the quest you
+ * Mission-available treatment. Blue/cyan sibling to the neon-green active
+ * treatment: "there is a new mission here" vs "this advances the mission you
  * accepted". Same token/shared-class approach, same static treatment (no
  * animation), clearly distinct hue. If an interaction ever qualifies for
- * both, active green wins (see .rs-quest-available.rs-quest-guidance below
+ * both, active green wins (see .rs-mission-available.rs-mission-guidance below
  * and the React priority logic).
  */
-.rs-quest-available {
-  border-color: var(--rs-quest-available-color);
-  box-shadow: 0 0 12px var(--rs-quest-available-glow);
-  color: var(--rs-quest-available-color);
-  outline: 2px solid var(--rs-quest-available-color);
+.rs-mission-available {
+  border-color: var(--rs-mission-available-color);
+  box-shadow: 0 0 12px var(--rs-mission-available-glow);
+  color: var(--rs-mission-available-color);
+  outline: 2px solid var(--rs-mission-available-color);
   outline-offset: 2px;
 }
 
-.rs-bevel.rs-quest-available {
+.rs-bevel.rs-mission-available {
   box-shadow:
-    inset 0 0 0 2px var(--rs-quest-available-color),
-    inset 0 0 16px var(--rs-quest-available-inset-glow);
+    inset 0 0 0 2px var(--rs-mission-available-color),
+    inset 0 0 16px var(--rs-mission-available-inset-glow);
   outline: none;
 }
 
 /* If both ever apply, active green wins visually. React also enforces this
    so only one class is normally present, but CSS guarantees it too. */
-.rs-quest-available.rs-quest-guidance,
-.rs-quest-guidance.rs-quest-available {
-  border-color: var(--rs-quest-guidance-color);
-  box-shadow: 0 0 12px var(--rs-quest-guidance-glow);
-  color: var(--rs-quest-guidance-color);
-  outline: 2px solid var(--rs-quest-guidance-color);
+.rs-mission-available.rs-mission-guidance,
+.rs-mission-guidance.rs-mission-available {
+  border-color: var(--rs-mission-guidance-color);
+  box-shadow: 0 0 12px var(--rs-mission-guidance-glow);
+  color: var(--rs-mission-guidance-color);
+  outline: 2px solid var(--rs-mission-guidance-color);
   outline-offset: 2px;
 }
 
-.rs-bevel.rs-quest-available.rs-quest-guidance,
-.rs-bevel.rs-quest-guidance.rs-quest-available {
+.rs-bevel.rs-mission-available.rs-mission-guidance,
+.rs-bevel.rs-mission-guidance.rs-mission-available {
   box-shadow:
-    inset 0 0 0 2px var(--rs-quest-guidance-color),
-    inset 0 0 16px var(--rs-quest-guidance-inset-glow);
+    inset 0 0 0 2px var(--rs-mission-guidance-color),
+    inset 0 0 16px var(--rs-mission-guidance-inset-glow);
   outline: none;
 }
 

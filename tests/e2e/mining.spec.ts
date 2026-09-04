@@ -123,8 +123,8 @@ test("owned character can start, observe, stop, and restore Ferrite Mining at Th
     name: "Latest mining attempt",
     exact: true,
   });
-  await expect(footer.getByRole("link", { name: "Characters" })).toHaveText("Chars");
-  await expect(footer.getByRole("button", { name: "Inventory 2/8" })).toBeVisible();
+  await expect(footer.getByRole("link", { name: "Characters" })).toHaveText("Characters");
+  await expect(footer.getByRole("button", { name: "Inventory" })).toBeVisible();
   await expect(latestResult).toContainText("Latest attempt: No yield");
   await expect(latestResult).toContainText("Roll 35.00 | Needed below 35.00");
   await expect(latestResult).toContainText("Missed by 0.01");
@@ -146,7 +146,7 @@ test("owned character can start, observe, stop, and restore Ferrite Mining at Th
   await page.screenshot({ path: "test-results/mining-mobile-active-viewport.png" });
   await page.getByText("This mining run").scrollIntoViewIfNeeded();
   await page.screenshot({ path: "test-results/mining-mobile-run-history-viewport.png" });
-  await page.getByRole("button", { name: "Inventory 2/8" }).click();
+  await page.getByRole("button", { name: "Inventory" }).click();
   const inventory = page.getByRole("dialog", { name: "Inventory" });
   await expect(inventory).toBeVisible();
   await expect(inventory.getByText("2 occupied / 8 slots")).toBeVisible();
@@ -308,7 +308,7 @@ test("owned character can start, observe, stop, and restore Ferrite Mining at Th
   await expect(inventory.getByLabel(/Empty inventory slot/)).toHaveCount(6);
   await page.screenshot({ path: "test-results/mining-mobile-inventory-10-plus-1.png" });
   await page.getByRole("button", { name: "Close inventory" }).click();
-  await expect(page.getByRole("button", { name: "Inventory 2/8" })).toBeFocused();
+  await expect(footer.getByRole("button", { name: "Inventory" })).toBeFocused();
   await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
   await expect(history).toBeVisible();
   await expect(footer).toBeVisible();
@@ -320,11 +320,11 @@ test("owned character can start, observe, stop, and restore Ferrite Mining at Th
   await page.setViewportSize({ width: 1440, height: 900 });
   await expect(footer).toHaveCSS("position", "fixed");
   await page.screenshot({ path: "test-results/mining-desktop-no-yield.png" });
-  await page.getByRole("button", { name: "Inventory 2/8" }).click();
+  await page.getByRole("button", { name: "Inventory" }).click();
   await expect(inventory.getByText("x10", { exact: true })).toBeVisible();
   await page.screenshot({ path: "test-results/mining-desktop-inventory-10-plus-1.png" });
   await page.keyboard.press("Escape");
-  await expect(page.getByRole("button", { name: "Inventory 2/8" })).toBeFocused();
+  await expect(footer.getByRole("button", { name: "Inventory" })).toBeFocused();
   await page.getByRole("button", { name: "Stop Mining" }).click();
   await expect(page.getByRole("button", { name: "Start Mining" })).toBeVisible();
   await expect(page.getByText("Mining stopped.")).toBeVisible();
@@ -459,12 +459,12 @@ test("retries an early unchanged Mining boundary without duplicating the attempt
   expect(persisted[0]?.runAttempts).toBe(1);
 });
 
-test("footer Characters navigation uses a compact visible label", async ({ page }) => {
+test("footer Characters navigation uses the full icon-plus-label destination", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   const characters = page.getByRole("navigation", { name: "Primary" }).getByRole("link", {
     name: "Characters",
   });
-  await expect(characters).toHaveText("Chars");
+  await expect(characters).toHaveText("Characters");
   await characters.click();
   await expect(page).toHaveURL(/\/characters$/);
 });
@@ -666,7 +666,7 @@ test("equipment drawer shows and updates the approved Mining loadout", async ({ 
   ).toBeVisible();
   await expect(equipment.getByText("16 slots", { exact: true })).toBeVisible();
   await equipment.getByRole("button", { name: "Close equipment" }).click();
-  const inventoryTrigger = footer.getByRole("button", { name: "Inventory 0/16" });
+  const inventoryTrigger = footer.getByRole("button", { name: "Inventory" });
   await expect(inventoryTrigger).toBeVisible();
   await inventoryTrigger.click();
   const inventory = page.getByRole("dialog", { name: "Inventory" });
@@ -898,7 +898,7 @@ test("equipment and inventory rendering shows artwork for illustrated items and 
   await equipment.getByRole("button", { name: "Close equipment" }).click();
 
   // Open inventory — should show illustrated and fallback stacks
-  await footer.getByRole("button", { name: "Inventory 3/8" }).click();
+  await footer.getByRole("button", { name: "Inventory" }).click();
   const inventory = page.getByRole("dialog", { name: "Inventory" });
   await expect(inventory.getByText("3 occupied / 8 slots")).toBeVisible();
 
@@ -1025,7 +1025,7 @@ test("a carried unequipped Cutter occupies one visible Inventory slot and leaves
     .set({ currentCharge: 3 })
     .where(eq(itemInstances.id, cutterRow.id));
   await page.getByRole("button", { name: "Refresh status" }).click();
-  await expect(footer.getByRole("button", { name: "Inventory 7/8" })).toBeVisible();
+  await expect(footer.getByRole("button", { name: "Inventory" })).toBeVisible();
 
   // Unequip the Cutter with exactly one slot remaining.
   await footer.getByRole("button", { name: "Equipment" }).click();
@@ -1038,7 +1038,7 @@ test("a carried unequipped Cutter occupies one visible Inventory slot and leaves
   await expect(equipment).toBeHidden();
 
   // Inventory renders eight occupied tiles: seven stacks plus the carried Cutter.
-  await footer.getByRole("button", { name: "Inventory 8/8" }).click();
+  await footer.getByRole("button", { name: "Inventory" }).click();
   const inventory = page.getByRole("dialog", { name: "Inventory" });
   await expect(inventory.getByText("8 occupied / 8 slots")).toBeVisible();
   await expect(inventory.locator("button[aria-pressed]")).toHaveCount(8);
@@ -1093,8 +1093,8 @@ test("a carried unequipped Cutter occupies one visible Inventory slot and leaves
   await equipment.getByRole("button", { name: "Close equipment" }).click();
   await expect(equipment).toBeHidden();
 
-  await expect(footer.getByRole("button", { name: "Inventory 7/8" })).toBeVisible();
-  await footer.getByRole("button", { name: "Inventory 7/8" }).click();
+  await expect(footer.getByRole("button", { name: "Inventory" })).toBeVisible();
+  await footer.getByRole("button", { name: "Inventory" }).click();
   const inventoryAfterReequip = page.getByRole("dialog", { name: "Inventory" });
   await expect(inventoryAfterReequip.getByText("7 occupied / 8 slots")).toBeVisible();
   await expect(
@@ -1350,9 +1350,9 @@ test("a full Inventory stack is dropped through inline confirmation and frees on
     })),
   );
   await page.getByRole("button", { name: "Refresh status" }).click();
-  await expect(footer.getByRole("button", { name: "Inventory 8/8" })).toBeVisible();
+  await expect(footer.getByRole("button", { name: "Inventory" })).toBeVisible();
 
-  await footer.getByRole("button", { name: "Inventory 8/8" }).click();
+  await footer.getByRole("button", { name: "Inventory" }).click();
   const inventory = page.getByRole("dialog", { name: "Inventory" });
   await expect(inventory.getByText("8 occupied / 8 slots")).toBeVisible();
   await expect(inventory.getByLabel(/Empty inventory slot/)).toHaveCount(0);
@@ -1439,7 +1439,7 @@ test("a full Inventory stack is dropped through inline confirmation and frees on
 
   // Carried mass updated authoritatively: 7 full stacks (7 kg) + 15 kg loadout.
   await expect(page.getByText("22 kg / 50 kg", { exact: true })).toBeVisible();
-  await expect(footer.getByRole("button", { name: "Inventory 7/8" })).toBeVisible();
+  await expect(footer.getByRole("button", { name: "Inventory" })).toBeVisible();
 });
 
 test("a selected Power Cell loads the depleted equipped Cutter from Inventory", async ({
@@ -1454,9 +1454,9 @@ test("a selected Power Cell loads the depleted equipped Cutter from Inventory", 
     { characterId, itemId: ITEM_IDS.powerCell, quantity: 1 },
   ]);
   await page.getByRole("button", { name: "Refresh status" }).click();
-  await expect(footer.getByRole("button", { name: "Inventory 3/8" })).toBeVisible();
+  await expect(footer.getByRole("button", { name: "Inventory" })).toBeVisible();
 
-  await footer.getByRole("button", { name: "Inventory 3/8" }).click();
+  await footer.getByRole("button", { name: "Inventory" }).click();
   const inventory = page.getByRole("dialog", { name: "Inventory" });
   const powerCellTile = inventory.getByRole("button", { name: "1 Power Cell" });
   await powerCellTile.click();
@@ -1519,9 +1519,9 @@ test("selected details stay open through actions and dismiss deliberately", asyn
     })),
   ]);
   await page.getByRole("button", { name: "Refresh status" }).click();
-  await expect(footer.getByRole("button", { name: "Inventory 7/8" })).toBeVisible();
+  await expect(footer.getByRole("button", { name: "Inventory" })).toBeVisible();
 
-  await footer.getByRole("button", { name: "Inventory 7/8" }).click();
+  await footer.getByRole("button", { name: "Inventory" }).click();
   const inventory = page.getByRole("dialog", { name: "Inventory" });
   const powerCellDetails = inventory.getByRole("region", { name: "Power Cell details" });
   const powerCellTile = inventory.locator("button[aria-pressed]").filter({ hasText: "Power Cell" });

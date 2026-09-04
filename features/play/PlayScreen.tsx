@@ -1,7 +1,6 @@
 "use client";
 
-import { ActionButton } from "@/components/ui/ActionButton";
-import { ActionLink } from "@/components/ui/ActionLink";
+import { Backpack, Shield, ScrollText, Users } from "lucide-react";
 import { GameShell, TopBar } from "@/components/ui/GameShell";
 import { RuneSpaceBrand } from "@/components/branding/RuneSpaceBrand";
 import { SignOutButton } from "@/features/auth/SignOutButton";
@@ -9,43 +8,73 @@ import { PlayBoundaryTestTrigger } from "@/features/diagnostics/PlayBoundaryTest
 import type { PlayGameplayState } from "@/server/play";
 import { PlayConsole } from "./PlayConsole";
 import { PlayProvider, usePlay } from "./PlayContext";
+import { FooterNavButton, FooterNavLink } from "./PlayFooterNav";
 
 function PlayFooter() {
-  const { equipmentTrigger, inventoryTrigger, setEquipmentOpen, setInventoryOpen, state } =
-    usePlay();
-  const totalSlots = state.inventory.slotsUsed + state.inventory.slotsAvailable;
+  const {
+    equipmentTrigger,
+    inventoryTrigger,
+    missionsTrigger,
+    setEquipmentOpen,
+    setInventoryOpen,
+    setMissionsOpen,
+    setMissionsFocus,
+    inventoryOpen,
+    equipmentOpen,
+    missionsOpen,
+    state,
+  } = usePlay();
+  const readyCount = state.missions.filter(
+    (mission) => mission.state === "ready_for_completion",
+  ).length;
   return (
-    <div className="mx-auto flex w-full max-w-xl gap-2 sm:max-w-7xl sm:justify-end">
-      <ActionLink
+    <div className="mx-auto flex w-full max-w-xl gap-1.5 sm:max-w-7xl sm:justify-end">
+      <FooterNavLink
+        active={false}
         aria-label="Characters"
-        className="flex-1 whitespace-nowrap sm:flex-none"
         href="/characters"
-        intent="secondary"
-      >
-        Chars
-      </ActionLink>
-      <ActionButton
-        ref={inventoryTrigger}
-        className="flex-[1.4] whitespace-nowrap sm:flex-none"
-        intent="secondary"
+        icon={<Users />}
+        label="Characters"
+      />
+      <FooterNavButton
+        active={inventoryOpen}
+        aria-label={`Inventory, ${state.inventory.slotsAvailable} slots free`}
+        freeSlotsCount={state.inventory.slotsAvailable}
+        icon={<Backpack />}
+        label="Inventory"
         onClick={() => {
           setEquipmentOpen(false);
+          setMissionsOpen(false);
           setInventoryOpen(true);
         }}
-      >
-        Inventory {state.inventory.slotsUsed}/{totalSlots}
-      </ActionButton>
-      <ActionButton
-        ref={equipmentTrigger}
-        className="flex-1 whitespace-nowrap sm:flex-none"
-        intent="secondary"
+        ref={inventoryTrigger}
+      />
+      <FooterNavButton
+        active={equipmentOpen}
+        aria-label="Equipment"
+        icon={<Shield />}
+        label="Equipment"
         onClick={() => {
           setInventoryOpen(false);
+          setMissionsOpen(false);
           setEquipmentOpen(true);
         }}
-      >
-        Equipment
-      </ActionButton>
+        ref={equipmentTrigger}
+      />
+      <FooterNavButton
+        active={missionsOpen}
+        aria-label={readyCount > 0 ? `Missions, ${readyCount} ready to turn in` : "Missions"}
+        badgeCount={readyCount}
+        icon={<ScrollText />}
+        label="Missions"
+        onClick={() => {
+          setInventoryOpen(false);
+          setEquipmentOpen(false);
+          setMissionsFocus(undefined);
+          setMissionsOpen(true);
+        }}
+        ref={missionsTrigger}
+      />
     </div>
   );
 }

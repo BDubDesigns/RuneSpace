@@ -7,7 +7,7 @@ import { refiningAwardFacts } from "@/game/domain/refining";
  * The items an action authoritatively produces, derived DIRECTLY from the
  * gameplay resolvers' award facts — not from a parallel hand-maintained
  * output table. Mining and Refining encode what they produce exactly once
- * (their award facts); quest-guidance recommendation validation reads that
+ * (their award facts); mission-guidance recommendation validation reads that
  * same source, so changing an action's authoritative output can never leave
  * guidance validation stale. Actions with no material output resolve to
  * undefined.

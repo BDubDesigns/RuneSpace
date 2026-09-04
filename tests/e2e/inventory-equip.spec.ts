@@ -101,7 +101,7 @@ test.describe("Inventory equip and compact selected visual", () => {
     await page.reload();
 
     const inventoryDrawer = page.getByRole("dialog", { name: "Inventory" });
-    await page.getByRole("button", { name: /Inventory \d+\/\d+/ }).click();
+    await page.getByRole("button", { name: "Inventory" }).click();
     await expect(inventoryDrawer).toBeVisible();
 
     // Exactly one carried unique Cutter tile; no stacks were seeded.
@@ -197,7 +197,7 @@ test.describe("Inventory equip and compact selected visual", () => {
     await page.reload();
 
     const inventoryDrawer = page.getByRole("dialog", { name: "Inventory" });
-    await page.getByRole("button", { name: /Inventory \d+\/\d+/ }).click();
+    await page.getByRole("button", { name: "Inventory" }).click();
     await expect(inventoryDrawer).toBeVisible();
     await expect(inventoryDrawer.getByText("Ferrite Shale", { exact: true }).first()).toBeVisible();
     await inventoryDrawer.locator("button[aria-pressed]").first().click();
@@ -252,7 +252,7 @@ test.describe("Inventory equip and compact selected visual", () => {
     await page.reload();
 
     const inventoryDrawer = page.getByRole("dialog", { name: "Inventory" });
-    await page.getByRole("button", { name: /Inventory \d+\/\d+/ }).click();
+    await page.getByRole("button", { name: "Inventory" }).click();
     await expect(inventoryDrawer).toBeVisible();
 
     // Select the carried spare MYKEA (a unique item tile). The equipped Cutter

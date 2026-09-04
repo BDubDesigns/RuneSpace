@@ -2,11 +2,11 @@
   "schemaVersion": 1,
   "projectSlug": "runespace",
   "workState": "active",
-  "currentFocus": "Shipping the authenticated admin/operator console (inspection, state repair, test-state controls) and addressing operator-console review corrections on its draft PR.",
+  "currentFocus": "Shipping the player-facing Mission Log with authored mission continuations and the four-destination bottom navigation (Characters, Inventory, Equipment, Missions).",
   "currentChange": {
-    "summary": "Authenticated admin/operator console for character inspection, state repair, and test-state controls.",
-    "stage": "review",
-    "pullRequestNumber": 136
+    "summary": "Mission Log overlay, Walk It Off to Cut Your Teeth authored continuation, and four-destination bottom navigation.",
+    "stage": "implementation",
+    "pullRequestNumber": 138
   },
   "latestCompleted": {
     "summary": "Extracted generic Play orchestration from the Mining feature into its own server and client boundary.",

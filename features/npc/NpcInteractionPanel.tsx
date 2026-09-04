@@ -15,7 +15,7 @@ import {
 import { MISSIONS } from "@/game/content/missions";
 import { getNpc, getNpcAtLocation } from "@/game/content/npcs";
 import { acceptMissionAction, completeMissionAction } from "@/server/actions";
-import { deriveQuestGuidanceTargets } from "@/game/domain/missions";
+import { deriveMissionGuidanceTargets } from "@/game/domain/missions";
 import { usePlay } from "@/features/play/PlayContext";
 
 /**
@@ -46,16 +46,16 @@ export function NpcInteractionPanel() {
     );
   const sequence = sequenceOverride ? getDialogue(sequenceOverride) : baseSequence;
   const dialogueNpc = sequence ? getNpc(sequence.npcId) : npc;
-  const guidance = deriveQuestGuidanceTargets(state.missions);
+  const guidance = deriveMissionGuidanceTargets(state.missions);
   // Available (blue) vs active (green) — distinct semantic sets. If the
-  // same NPC is ever in both (e.g. offers a new quest while also being the
+  // same NPC is ever in both (e.g. offers a new mission while also being the
   // turn-in for an active one), active green wins.
   const hasActiveGuidance = npc ? guidance.npcIds.has(npc.id) : false;
   const hasAvailableGuidance = npc ? guidance.availableNpcIds.has(npc.id) : false;
   const guidanceClass = hasActiveGuidance
-    ? "rs-quest-guidance"
+    ? "rs-mission-guidance"
     : hasAvailableGuidance
-      ? "rs-quest-available"
+      ? "rs-mission-available"
       : undefined;
   const guidanceValue = hasActiveGuidance
     ? "active"
@@ -147,6 +147,9 @@ export function NpcInteractionPanel() {
         }
         if (dialogue.action === "complete_mission" && result.mission.status === "completed") {
           // Only the authoritative success reveals the reward presentation.
+          // The atomic continuation (if any) is already accepted server-side;
+          // after the presentation closes, dialogue routes to the freshly
+          // accepted mission's active branch — no second acceptance click.
           const presentation = getMissionCompletionPresentation(missionId);
           if (presentation) {
             setSequenceOverride(presentation.id);
@@ -181,7 +184,7 @@ export function NpcInteractionPanel() {
           <ActionButton
             className={guidanceClass}
             data-npc-turn-in={turnInAvailable ? "true" : "false"}
-            data-quest-guidance={guidanceValue}
+            data-mission-guidance={guidanceValue}
             ref={triggerRef}
             disabled={foregroundBusy}
             intent={turnInAvailable ? "mission" : "secondary"}
