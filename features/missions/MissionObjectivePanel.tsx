@@ -66,7 +66,7 @@ export function MissionObjectivePanel({ state }: { state: PlayGameplayState }) {
             {ready ? "Ready to turn in" : "Active"}
           </span>
         </div>
-        {mission.requirements && mission.requirements.length > 1 && !ready ? (
+        {mission.requirements && mission.requirements.length > 1 ? (
           <ul className="mt-3 space-y-1.5" data-mission-objective-requirements>
             {mission.requirements.map((requirement, index) => (
               <li
