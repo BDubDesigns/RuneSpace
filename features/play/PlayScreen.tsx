@@ -24,7 +24,6 @@ function PlayFooter() {
     missionsOpen,
     state,
   } = usePlay();
-  const totalSlots = state.inventory.slotsUsed + state.inventory.slotsAvailable;
   const readyCount = state.missions.filter(
     (mission) => mission.state === "ready_for_completion",
   ).length;
@@ -39,7 +38,8 @@ function PlayFooter() {
       />
       <FooterNavButton
         active={inventoryOpen}
-        aria-label={`Inventory, ${state.inventory.slotsUsed} of ${totalSlots} slots used`}
+        aria-label={`Inventory, ${state.inventory.slotsAvailable} slots free`}
+        freeSlotsCount={state.inventory.slotsAvailable}
         icon={<Backpack />}
         label="Inventory"
         onClick={() => {

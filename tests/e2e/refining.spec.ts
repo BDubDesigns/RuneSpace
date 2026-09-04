@@ -99,7 +99,7 @@ test("Processing Yard Refining journey — Ferrite and Slag both branches, artwo
   await page.reload();
   await expect(page.getByRole("button", { name: "Inventory" })).toHaveAttribute(
     "aria-label",
-    "Inventory, 1 of 8 slots used",
+    "Inventory, 7 slots free",
   );
 
   // 2. travel to Abandoned Processing Yard

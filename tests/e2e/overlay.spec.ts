@@ -152,6 +152,18 @@ test("footer has four equal destinations and the Mission Log opens through the s
   });
   expect(overflow.scrollWidth).toBeLessThanOrEqual(overflow.clientWidth + 1);
 
+  // Inventory carries a neutral free-slots badge (informative, always shown),
+  // visually distinct from the attention-oriented Missions badge: no missions
+  // are ready here, so only the inventory badge is present.
+  const inventoryButton = nav.getByRole("button", { name: "Inventory" });
+  const freeBadge = page.locator("[data-inventory-free-badge]");
+  await expect(freeBadge).toBeVisible();
+  const ariaLabel = await inventoryButton.getAttribute("aria-label");
+  const freeMatch = ariaLabel?.match(/(\d+) slots free/);
+  expect(freeMatch).not.toBeNull();
+  await expect(freeBadge).toHaveText(freeMatch![1]!);
+  await expect(page.locator("[data-missions-badge]")).toHaveCount(0);
+
   await nav.getByRole("button", { name: "Missions" }).click();
   const dialog = page.getByRole("dialog", { name: "Mission Log" });
   await expect(dialog).toBeVisible();
@@ -168,8 +180,35 @@ test("footer has four equal destinations and the Mission Log opens through the s
   await expect(nav.getByRole("button", { name: "Missions" })).toBeFocused();
 });
 
-test("backdrop click closes the overlay", async ({ page }) => {
+test("a full inventory turns the free-slots badge urgent", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
+  const characterId = page.url().split("/").at(-1)!;
+  const nav = page.getByRole("navigation", { name: "Primary" });
+
+  // Fill every slot: eight full Ferrite Shale stacks (the overlay beforeEach
+  // seeds two, so replace them with eight).
+  await db.delete(inventoryStacks).where(eq(inventoryStacks.characterId, characterId));
+  await db.insert(inventoryStacks).values(
+    Array.from({ length: 8 }, () => ({
+      characterId,
+      itemId: ITEM_IDS.ferriteShale,
+      quantity: 10,
+    })),
+  );
+  await page.reload();
+
+  // The badge stays informative at zero free slots and switches to the urgent
+  // danger treatment instead of disappearing like the Missions badge does.
+  const inventoryButton = nav.getByRole("button", { name: "Inventory" });
+  await expect(inventoryButton).toHaveAttribute("aria-label", "Inventory, 0 slots free");
+  const freeBadge = page.locator("[data-inventory-free-badge]");
+  await expect(freeBadge).toHaveText("0");
+  const borderColor = await freeBadge.evaluate((el) => getComputedStyle(el).borderColor);
+  expect(borderColor).toBe("rgb(241, 108, 117)");
+  await expect(page.locator("[data-missions-badge]")).toHaveCount(0);
+});
+
+test("backdrop click closes the overlay", async ({ page }) => {  await page.setViewportSize({ width: 390, height: 844 });
   const nav = page.getByRole("navigation", { name: "Primary" });
   await nav.getByRole("button", { name: "Inventory" }).click();
   const dialog = page.getByRole("dialog", { name: "Inventory" });
