@@ -45,10 +45,15 @@ export function FooterNavLink({
   label,
   badgeCount,
   active,
+  "aria-label": ariaLabel,
   ...props
 }: FooterDestinationProps & ComponentProps<typeof Link>) {
   return (
-    <Link {...props} aria-label={label} className={destinationClassName(active ?? false)}>
+    <Link
+      {...props}
+      aria-label={ariaLabel ?? label}
+      className={destinationClassName(active ?? false)}
+    >
       <DestinationContent badgeCount={badgeCount} icon={icon} label={label} />
     </Link>
   );
@@ -65,12 +70,13 @@ export function FooterNavButton({
   badgeCount,
   active,
   ref,
+  "aria-label": ariaLabel,
   ...props
 }: FooterNavButtonProps) {
   return (
     <button
       {...props}
-      aria-label={label}
+      aria-label={ariaLabel ?? label}
       className={destinationClassName(active ?? false)}
       ref={ref}
       type="button"
