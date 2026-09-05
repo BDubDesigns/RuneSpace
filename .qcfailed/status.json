@@ -2,19 +2,19 @@
   "schemaVersion": 1,
   "projectSlug": "runespace",
   "workState": "active",
-  "currentFocus": "Shipping the player-facing Mission Log with authored mission continuations and the four-destination bottom navigation (Characters, Inventory, Equipment, Missions).",
+  "currentFocus": "Reviewing generic tracked-activity Mission progress and the Waste Not continuation delivered in Draft PR #144.",
   "currentChange": {
-    "summary": "Mission Log overlay, Walk It Off to Cut Your Teeth authored continuation, and four-destination bottom navigation.",
-    "stage": "implementation",
-    "pullRequestNumber": 138
+    "summary": "Waste Not continuation, tracked Mining/Refining Mission progress, and Cut Your Teeth's five-attempt gate.",
+    "stage": "review",
+    "pullRequestNumber": 144
   },
   "latestCompleted": {
     "summary": "Extracted generic Play orchestration from the Mining feature into its own server and client boundary.",
     "date": "2026-09-01",
     "url": "https://github.com/BDubDesigns/RuneSpace/pull/132"
   },
-  "nextStep": "Continue approved early-game work from the open backlog as prioritized by the product owner.",
-  "lastMeaningfulUpdate": "2026-09-02",
+  "nextStep": "Review Draft PR #144 and validate the Issue #141 migration and backfill before merge.",
+  "lastMeaningfulUpdate": "2026-09-05",
   "highlights": [
     {
       "summary": "Extracted generic Play orchestration from the Mining feature into its own server and client boundary.",

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   CUT_YOUR_TEETH,
   WALK_IT_OFF,
+  WASTE_NOT,
   MISSIONS,
   type MissionDefinition,
 } from "@/game/content/missions";
@@ -80,6 +81,13 @@ describe("issue #110 Cut Your Teeth authored boundaries (framework migration)", 
     expect(offer?.action).toBe("accept_mission");
     expect(offer?.beats[0]).toMatchObject({ text: "Still have all your fingers?" });
     expect(offer?.beats.some((beat) => beat.text.includes("scavenge"))).toBe(true);
+    expect(offer?.beats.some((beat) => /five real Mining attempts/.test(beat.text))).toBe(true);
+    expect(offer?.beats.some((beat) => /miss still counts/.test(beat.text))).toBe(true);
+    expect(
+      offer?.beats.some((beat) => /does not replace those five Mining attempts/.test(beat.text)),
+    ).toBe(true);
+    expect(CUT_YOUR_TEETH.summary).toContain("five real Mining attempts");
+    expect(CUT_YOUR_TEETH.summary).toContain("full stack of Ferrite Shale");
   });
 
   it("keeps the Cut Your Teeth offer owned by the CYT flow with SHOW SHALE action copy", () => {
@@ -101,6 +109,9 @@ describe("issue #110 Cut Your Teeth authored boundaries (framework migration)", 
     expect(route(activeProjection({ nextObjectiveKind: "equipped_item" }))?.id).toBe(
       DIALOGUE_IDS.tansyCutYourTeethEquipReminder,
     );
+    expect(route(activeProjection({ nextObjectiveKind: "tracked_activity" }))?.id).toBe(
+      DIALOGUE_IDS.tansyCutYourTeethMiningReminder,
+    );
     expect(route(activeProjection({ nextObjectiveKind: "carried_stack" }))?.id).toBe(
       DIALOGUE_IDS.tansyCutYourTeethStackReminder,
     );
@@ -112,7 +123,7 @@ describe("issue #110 Cut Your Teeth authored boundaries (framework migration)", 
     ).toBe(DIALOGUE_IDS.tansyCutYourTeethBusy);
     expect(
       getMissionCompletionPresentation(MISSION_IDS.cutYourTeeth)?.beats.map((b) => b.kind),
-    ).toEqual(["item", "skill_xp", "npc", "npc", "npc"]);
+    ).toEqual(["item", "skill_xp", "npc", "npc", "npc", "npc", "npc", "npc"]);
   });
 
   it("teaches the Mining loop in the incomplete-stack reminder and never lies about the busy state", () => {
@@ -146,6 +157,22 @@ describe("issue #110 Cut Your Teeth authored boundaries (framework migration)", 
     ]) {
       expect(getDialogue(dialogueId)?.npcId).toBe(NPC_IDS.tansyRusk);
     }
+  });
+});
+
+describe("issue #141 Waste Not persistent completed dialogue", () => {
+  it("routes both NPCs to Waste Not post-completion state", () => {
+    const projections = [
+      mission(MISSION_IDS.walkItOff, "completed"),
+      mission(MISSION_IDS.cutYourTeeth, "completed"),
+      mission(WASTE_NOT.id, "completed"),
+    ];
+    expect(resolveNpcMissionDialogue(NPC_IDS.wadeRusk, projections)?.sequence.id).toBe(
+      DIALOGUE_IDS.wadePostWasteNot,
+    );
+    expect(resolveNpcMissionDialogue(NPC_IDS.tansyRusk, projections)?.sequence.id).toBe(
+      DIALOGUE_IDS.tansyPostWasteNot,
+    );
   });
 });
 
@@ -188,12 +215,22 @@ describe("issue #124 ordered requirement projection", () => {
       carriedQuantities: new Map([[ITEM_IDS.ferriteShale, 4]]),
     });
     expect(projectMission(CUT_YOUR_TEETH, accepted(), THE_JAG, true, fourCarried)).toMatchObject({
+      currentObjective: "Complete 5 Mining attempts — 0 / 5",
+    });
+
+    const fiveAttempts = observation({
+      equippedItemIds: new Set([ITEM_IDS.salvageCutter]),
+      carriedQuantities: new Map([[ITEM_IDS.ferriteShale, 4]]),
+      trackedProgress: new Map([["mining-attempts", 5]]),
+    });
+    expect(projectMission(CUT_YOUR_TEETH, accepted(), THE_JAG, true, fiveAttempts)).toMatchObject({
       currentObjective: "Get a full stack of Ferrite Shale — 4 / 10",
     });
 
     const fullStack = observation({
       equippedItemIds: new Set([ITEM_IDS.salvageCutter]),
       carriedQuantities: new Map([[ITEM_IDS.ferriteShale, 12]]),
+      trackedProgress: new Map([["mining-attempts", 5]]),
     });
     expect(projectMission(CUT_YOUR_TEETH, accepted(), THE_JAG, true, fullStack)).toMatchObject({
       state: "ready_for_completion",
@@ -242,7 +279,10 @@ describe("issue #124 ordered requirement projection", () => {
       accepted(),
       THE_JAG,
       true,
-      observation({ equippedItemIds: new Set([ITEM_IDS.salvageCutter]) }),
+      observation({
+        equippedItemIds: new Set([ITEM_IDS.salvageCutter]),
+        trackedProgress: new Map([["mining-attempts", 5]]),
+      }),
     );
     expect(stack.stage).toMatchObject({
       requirementsSatisfied: false,
@@ -257,6 +297,7 @@ describe("issue #124 ordered requirement projection", () => {
       observation({
         equippedItemIds: new Set([ITEM_IDS.salvageCutter]),
         carriedQuantities: new Map([[ITEM_IDS.ferriteShale, 10]]),
+        trackedProgress: new Map([["mining-attempts", 5]]),
       }),
     );
     expect(ready.stage).toMatchObject({
@@ -275,6 +316,7 @@ describe("issue #124 ordered requirement projection", () => {
       observation({
         equippedItemIds: new Set([ITEM_IDS.salvageCutter]),
         carriedQuantities: new Map([[ITEM_IDS.ferriteShale, 10]]),
+        trackedProgress: new Map([["mining-attempts", 5]]),
       }),
     );
     expect(busy.stage).toMatchObject({
@@ -303,6 +345,7 @@ describe("issue #124 semantic mission guidance projection", () => {
       observation({
         equippedItemIds: new Set([ITEM_IDS.salvageCutter]),
         carriedQuantities: new Map([[ITEM_IDS.ferriteShale, 10]]),
+        trackedProgress: new Map([["mining-attempts", 5]]),
       }),
     );
     const targets = deriveMissionGuidanceTargets([projection]);

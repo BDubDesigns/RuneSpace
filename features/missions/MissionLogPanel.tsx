@@ -31,6 +31,10 @@ function MissionEntry({
   const ready = mission.state === "ready_for_completion";
   const completed = mission.state === "completed";
   const completedDate = completed ? formatCompletedDate(mission.completedAt) : undefined;
+  const requirements = mission.requirements ?? [];
+  const showCurrentObjective = !requirements.some(
+    (requirement) => requirement.objective === mission.currentObjective,
+  );
   return (
     <div
       className="border border-[color:var(--rs-border-structural)] bg-[color:var(--rs-surface-panel)]"
@@ -64,7 +68,7 @@ function MissionEntry({
           <p className="text-sm text-[color:var(--rs-text-secondary)]">{mission.summary}</p>
           {!completed && mission.requirements ? (
             <ul className="mt-3 space-y-1.5" data-mission-log-requirements>
-              {mission.requirements.map((requirement, index) => (
+              {requirements.map((requirement, index) => (
                 <li
                   className="flex items-start gap-2 text-sm"
                   data-mission-requirement-satisfied={requirement.satisfied ? "true" : "false"}
@@ -87,7 +91,7 @@ function MissionEntry({
               ))}
             </ul>
           ) : null}
-          {!completed ? (
+          {!completed && showCurrentObjective ? (
             <p
               className={`mt-3 text-sm font-semibold ${ready ? "text-[color:var(--rs-mission-accent-strong)]" : "text-[color:var(--rs-text-secondary)]"}`}
               data-mission-log-next={ready ? "turn-in" : "objective"}

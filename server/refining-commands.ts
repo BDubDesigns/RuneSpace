@@ -15,7 +15,7 @@ import { refiningPreflightStopReason } from "@/game/domain/refining";
 import { levelFromXp } from "@/game/domain/progression";
 import { withResolvedOwnedCharacter } from "@/server/action-resolution";
 import { loadOwnedItemInstances } from "@/server/carried-inventory";
-import type { PersistedRefiningOutcome } from "@/server/refining";
+import { resetE2eRefiningRandom, type PersistedRefiningOutcome } from "@/server/refining";
 import {
   createPlayResolver,
   ensurePlayProvisioning,
@@ -176,6 +176,7 @@ export async function startRefining(
           preflight,
         );
       }
+      resetE2eRefiningRandom(context.character.id);
       await transaction.insert(activeActions).values({
         characterId: context.character.id,
         actionId: ACTION_IDS.refining,

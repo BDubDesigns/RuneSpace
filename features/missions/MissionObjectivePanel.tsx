@@ -7,8 +7,8 @@ import { usePlay } from "@/features/play/PlayContext";
 
 /**
  * The compact gameplay briefing: the most relevant accepted, incomplete
- * mission and its simultaneous current-stage requirements. Never advertises
- * unaccepted missions. Tapping opens the Mission Log focused on this entry.
+ * mission's current objective. Never advertises unaccepted missions. Tapping
+ * opens the Mission Log focused on this entry.
  */
 export function MissionObjectivePanel({ state }: { state: PlayGameplayState }) {
   const { setMissionsOpen, setMissionsFocus } = usePlay();
@@ -66,21 +66,10 @@ export function MissionObjectivePanel({ state }: { state: PlayGameplayState }) {
             {ready ? "Ready to turn in" : "Active"}
           </span>
         </div>
-        {mission.requirements && mission.requirements.length > 1 ? (
-          <ul className="mt-3 space-y-1.5" data-mission-objective-requirements>
-            {mission.requirements.map((requirement, index) => (
-              <li
-                className="flex items-start gap-2 text-sm text-[color:var(--rs-mission-text)]"
-                data-mission-requirement-satisfied={requirement.satisfied ? "true" : "false"}
-                key={`${requirement.kind}-${index}`}
-              >
-                <span aria-hidden="true">{requirement.satisfied ? "✓" : "·"}</span>
-                <span>{requirement.objective}</span>
-              </li>
-            ))}
-          </ul>
-        ) : null}
-        <p className="mt-3 text-sm text-[color:var(--rs-mission-text)]">
+        <p
+          className="mt-3 text-sm text-[color:var(--rs-mission-text)]"
+          data-mission-objective-current
+        >
           {mission.currentObjective}
         </p>
       </button>

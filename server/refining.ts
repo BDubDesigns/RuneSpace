@@ -63,7 +63,12 @@ const systemRandom: RefiningRandom = {
   nextBasisPoints: () => randomInt(10_000),
 };
 
-let e2eRefiningGlobalIndex = 0;
+const e2eRefiningIndices = new Map<string, number>();
+const UNBOUND_E2E_REFINING_CHARACTER = "__unbound__";
+
+type ContextualRefiningRandom = RefiningRandom & {
+  setCharacterId(characterId: string): void;
+};
 
 /**
  * CI-only deterministic Refining random source for the focused browser
@@ -72,10 +77,23 @@ let e2eRefiningGlobalIndex = 0;
  * selected only by explicit CI configuration, never by a request or normal
  * runtime user.
  */
-export function e2eRefiningRandom(): RefiningRandom {
+export function e2eRefiningRandom(): ContextualRefiningRandom {
+  let characterId = UNBOUND_E2E_REFINING_CHARACTER;
   return {
-    nextBasisPoints: () => [0, 9_000][e2eRefiningGlobalIndex++ % 2]!,
+    setCharacterId: (value) => {
+      characterId = value;
+    },
+    nextBasisPoints: () => {
+      const index = e2eRefiningIndices.get(characterId) ?? 0;
+      e2eRefiningIndices.set(characterId, index + 1);
+      return [0, 9_000][index % 2]!;
+    },
   };
+}
+
+/** Reset only the CI-only deterministic sequence when a new Refining run starts. */
+export function resetE2eRefiningRandom(characterId: string): void {
+  e2eRefiningIndices.delete(characterId);
 }
 
 /**
@@ -154,10 +172,14 @@ export function createRefiningResolver(
   random: RefiningRandom,
   onOutcome?: (outcome: PersistedRefiningOutcome) => void,
 ): ActionResolver<RefiningSnapshot, PersistedRefiningOutcome> {
+  const setCharacterId = (
+    random as RefiningRandom & { setCharacterId?: (characterId: string) => void }
+  ).setCharacterId;
   return {
     supports: (action) => action.actionId === ACTION_IDS.refining,
     load: async (transaction, { character }) => loadRefiningSnapshot(transaction, character.id),
     resolve: ({ action, snapshot, window }) => {
+      setCharacterId?.(action.characterId);
       const resolved = resolveRefining({
         elapsedTicks: window.elapsedTicks,
         snapshot,

@@ -1,6 +1,14 @@
 import { and, eq } from "drizzle-orm";
 import { afterEach, beforeAll, describe, expect, it } from "vitest";
-import { ITEM_IDS, LOCATION_IDS, MISSION_IDS, NPC_IDS, SKILL_IDS } from "@/game/config/foundations";
+import {
+  GAME_TICK_MS,
+  ITEM_IDS,
+  LOCATION_IDS,
+  MISSION_IDS,
+  NPC_IDS,
+  SKILL_IDS,
+} from "@/game/config/foundations";
+import { getEffectiveGameBalance } from "@/game/config/balance";
 import { cleanupTestUser, createCharacterForUser, createTestUser } from "./fixtures";
 
 const DATABASE_URL = process.env.DATABASE_URL;
@@ -15,6 +23,7 @@ suite("issue #110 Cut Your Teeth persistence and XP boundary (real PostgreSQL)",
   let play: typeof import("@/server/play");
   let missions: typeof import("@/server/missions");
   let equipment: typeof import("@/server/equipment");
+  let miningCommands: typeof import("@/server/mining-commands");
   const createdUsers: string[] = [];
   const now = new Date("2026-01-01T00:00:00.000Z");
 
@@ -27,6 +36,7 @@ suite("issue #110 Cut Your Teeth persistence and XP boundary (real PostgreSQL)",
     play = await import("@/server/play");
     missions = await import("@/server/missions");
     equipment = await import("@/server/equipment");
+    miningCommands = await import("@/server/mining-commands");
   });
 
   afterEach(async () => {
@@ -104,6 +114,19 @@ suite("issue #110 Cut Your Teeth persistence and XP boundary (real PostgreSQL)",
     await db
       .insert(rune.inventoryStacks)
       .values({ characterId, itemId: ITEM_IDS.ferriteShale, quantity });
+  }
+
+  async function completeMiningAttempts(userId: string, characterId: string) {
+    const start = new Date(now.getTime() + 10_000);
+    await miningCommands.startFerriteShaleMining(userId, characterId, start, deterministicRandom());
+    const durationMs = getEffectiveGameBalance().mining.attemptDurationTicks * GAME_TICK_MS * 5 + 1;
+    const stopped = await miningCommands.stopMining(
+      userId,
+      characterId,
+      new Date(start.getTime() + durationMs),
+      deterministicRandom(),
+    );
+    expect(stopped.run.attempts).toBeGreaterThanOrEqual(5);
   }
 
   async function miningXp(characterId: string) {
@@ -211,6 +234,8 @@ suite("issue #110 Cut Your Teeth persistence and XP boundary (real PostgreSQL)",
     expect(await miningXp(character.id)).toBe(beforeAnyXp);
 
     await equipCutter(userId, character.id);
+    await completeMiningAttempts(userId, character.id);
+    const beforeCompletionXp = await miningXp(character.id);
 
     // Dropping below one full stack falls back to refusal — inventory is the truth.
     // Scope the destructive delete to THIS character's shale only; a concurrent
@@ -233,7 +258,7 @@ suite("issue #110 Cut Your Teeth persistence and XP boundary (real PostgreSQL)",
       deterministicRandom(),
     );
     expect(nineOnly.mission).toMatchObject({ status: "refused", reason: "insufficient_items" });
-    expect(await miningXp(character.id)).toBe(beforeAnyXp);
+    expect(await miningXp(character.id)).toBe(beforeCompletionXp);
     await db
       .delete(rune.inventoryStacks)
       .where(
@@ -253,7 +278,7 @@ suite("issue #110 Cut Your Teeth persistence and XP boundary (real PostgreSQL)",
       deterministicRandom(),
     );
     expect(completed.mission.status).toBe("completed");
-    expect(await miningXp(character.id)).toBe(beforeAnyXp + 100);
+    expect(await miningXp(character.id)).toBe(beforeCompletionXp + 100);
 
     // Shale was inspected, not consumed.
     const stacks = await db
@@ -291,7 +316,7 @@ suite("issue #110 Cut Your Teeth persistence and XP boundary (real PostgreSQL)",
       ),
     ]);
     expect([retry.mission.status, again.mission.status].flat()).toContain("already_completed");
-    expect(await miningXp(character.id)).toBe(beforeAnyXp + 100);
+    expect(await miningXp(character.id)).toBe(beforeCompletionXp + 100);
 
     // Objective projection reflects the completed state through real state reads.
     const state = await play.getPlayGameplayState(userId, character.id, now, deterministicRandom());
@@ -310,6 +335,7 @@ suite("issue #110 Cut Your Teeth persistence and XP boundary (real PostgreSQL)",
       .onConflictDoNothing(); // continuation already accepted; idempotent safeguard
     await equipCutter(userId, character.id);
     await addShale(character.id, 10);
+    await completeMiningAttempts(userId, character.id);
     await db.insert(rune.activeActions).values({
       characterId: character.id,
       actionId: "ferrite_shale_mining",
@@ -325,20 +351,19 @@ suite("issue #110 Cut Your Teeth persistence and XP boundary (real PostgreSQL)",
       deterministicRandom(),
     );
     expect(busy.mission).toMatchObject({ status: "refused", reason: "not_stationary" });
-    expect(await miningXp(character.id)).toBe(0);
+    expect(await miningXp(character.id)).toBe(75);
   });
 
-  it("immediately reaches SHOW SHALE when already equipped with a full stack", async () => {
+  it("reaches SHOW SHALE only after five real Mining attempts", async () => {
     const { userId, character } = await makeCharacter();
     await completeWalkItOffAtTheJag(userId, character.id);
 
-    // Pre-authoritative boundary: the Cutter is granted by mission one and the
-    // player already has a full stack. Cut Your Teeth arrives already accepted
-    // via the continuation, so the projection must immediately present the
-    // ready-for-completion turn-in objective (SHOW SHALE), not an intermediate
-    // equip/stack step, because the authoritative requirements already hold.
+    // The Cutter is granted by mission one and the player already has a full
+    // stack. Cut Your Teeth arrives already accepted via the continuation, but
+    // the new tracked Mining requirement still has to be earned authoritatively.
     await equipCutter(userId, character.id);
     await addShale(character.id, 10);
+    await completeMiningAttempts(userId, character.id);
 
     const state = await play.getPlayGameplayState(userId, character.id, now, deterministicRandom());
     const cyt = state.missions.find((mission) => mission.missionId === "cut_your_teeth");
@@ -358,7 +383,7 @@ suite("issue #110 Cut Your Teeth persistence and XP boundary (real PostgreSQL)",
       deterministicRandom(),
     );
     expect(completed.mission.status).toBe("completed");
-    expect(await miningXp(character.id)).toBe(100);
+    expect(await miningXp(character.id)).toBe(175);
   });
 
   it("keeps requirements recognized while busy and never asks for more shale", async () => {
@@ -370,6 +395,7 @@ suite("issue #110 Cut Your Teeth persistence and XP boundary (real PostgreSQL)",
       .onConflictDoNothing(); // continuation already accepted; idempotent safeguard
     await equipCutter(userId, character.id);
     await addShale(character.id, 10);
+    await completeMiningAttempts(userId, character.id);
     await db.insert(rune.activeActions).values({
       characterId: character.id,
       actionId: "ferrite_shale_mining",
@@ -416,6 +442,7 @@ suite("issue #110 Cut Your Teeth persistence and XP boundary (real PostgreSQL)",
       .onConflictDoNothing(); // continuation already accepted; idempotent safeguard
     await equipCutter(userId, character.id);
     await addShale(character.id, 10);
+    await completeMiningAttempts(userId, character.id);
 
     // Two FIRST completion requests race: the mission is accepted and
     // incomplete with every requirement satisfied. Exactly one must win.
@@ -442,7 +469,7 @@ suite("issue #110 Cut Your Teeth persistence and XP boundary (real PostgreSQL)",
     expect(statuses).toContain("already_completed");
 
     // Exactly +100 Mining XP total, once.
-    expect(await miningXp(character.id)).toBe(100);
+    expect(await miningXp(character.id)).toBe(175);
 
     // Shale unchanged — shown, never consumed.
     const stacks = await db
@@ -488,6 +515,18 @@ suite("issue #110 Cut Your Teeth persistence and XP boundary (real PostgreSQL)",
     expect(rows).toHaveLength(1);
     expect(rows[0]?.acceptedAt).toEqual(now);
     expect(rows[0]?.completedAt).toBeNull();
+    const progressRows = await db
+      .select()
+      .from(rune.characterMissionProgress)
+      .where(eq(rune.characterMissionProgress.characterId, character.id));
+    expect(progressRows).toEqual([
+      expect.objectContaining({
+        missionId: MISSION_IDS.cutYourTeeth,
+        progressKey: "mining-attempts",
+        progress: 0,
+      }),
+    ]);
+    expect(progressRows.some((row) => row.missionId === MISSION_IDS.wasteNot)).toBe(false);
     // Walk It Off is complete; Cut Your Teeth is already the tracked mission.
     const wio = state.missions.find((mission) => mission.missionId === "walk_it_off");
     expect(wio?.state).toBe("completed");
@@ -528,10 +567,13 @@ suite("issue #110 Cut Your Teeth persistence and XP boundary (real PostgreSQL)",
       .insert(rune.characterMissions)
       .values({ characterId: character.id, missionId: "cut_your_teeth", acceptedAt: now })
       .onConflictDoNothing(); // continuation already accepted; idempotent safeguard
-    // Cutter equipped, but ZERO Ferrite Shale carried. The full-stack
-    // requirement must resolve from the canonical item definition even though
-    // the character owns none — the objective must read 0 / 10, never 0 / 1.
+    // Five real Mining attempts are complete, but ZERO Ferrite Shale is
+    // carried. The full-stack requirement must resolve from the canonical item
+    // definition even though the character owns none — the objective must read
+    // 0 / 10, never 0 / 1.
     await equipCutter(userId, character.id);
+    await completeMiningAttempts(userId, character.id);
+    await db.delete(rune.inventoryStacks).where(eq(rune.inventoryStacks.characterId, character.id));
 
     const state = await play.getPlayGameplayState(userId, character.id, now, deterministicRandom());
     const cyt = state.missions.find((mission) => mission.missionId === "cut_your_teeth");
@@ -554,6 +596,8 @@ suite("issue #110 Cut Your Teeth persistence and XP boundary (real PostgreSQL)",
       .values({ characterId: character.id, missionId: "cut_your_teeth", acceptedAt: now })
       .onConflictDoNothing(); // continuation already accepted; idempotent safeguard
     await equipCutter(userId, character.id);
+    await completeMiningAttempts(userId, character.id);
+    await db.delete(rune.inventoryStacks).where(eq(rune.inventoryStacks.characterId, character.id));
     await addShale(character.id, 4);
 
     const state = await play.getPlayGameplayState(userId, character.id, now, deterministicRandom());

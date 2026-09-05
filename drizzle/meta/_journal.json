@@ -113,6 +113,13 @@
       "when": 1788302261020,
       "tag": "0015_operator_audit_log",
       "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "7",
+      "when": 1788590697358,
+      "tag": "0016_waste-not-mission-progress",
+      "breakpoints": true
     }
   ]
 }
