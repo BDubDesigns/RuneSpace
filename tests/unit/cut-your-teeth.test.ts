@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   CUT_YOUR_TEETH,
   WALK_IT_OFF,
+  WASTE_NOT,
   MISSIONS,
   type MissionDefinition,
 } from "@/game/content/missions";
@@ -80,6 +81,13 @@ describe("issue #110 Cut Your Teeth authored boundaries (framework migration)", 
     expect(offer?.action).toBe("accept_mission");
     expect(offer?.beats[0]).toMatchObject({ text: "Still have all your fingers?" });
     expect(offer?.beats.some((beat) => beat.text.includes("scavenge"))).toBe(true);
+    expect(offer?.beats.some((beat) => /five real Mining attempts/.test(beat.text))).toBe(true);
+    expect(offer?.beats.some((beat) => /miss still counts/.test(beat.text))).toBe(true);
+    expect(
+      offer?.beats.some((beat) => /does not replace those five Mining attempts/.test(beat.text)),
+    ).toBe(true);
+    expect(CUT_YOUR_TEETH.summary).toContain("five real Mining attempts");
+    expect(CUT_YOUR_TEETH.summary).toContain("full stack of Ferrite Shale");
   });
 
   it("keeps the Cut Your Teeth offer owned by the CYT flow with SHOW SHALE action copy", () => {
@@ -149,6 +157,22 @@ describe("issue #110 Cut Your Teeth authored boundaries (framework migration)", 
     ]) {
       expect(getDialogue(dialogueId)?.npcId).toBe(NPC_IDS.tansyRusk);
     }
+  });
+});
+
+describe("issue #141 Waste Not persistent completed dialogue", () => {
+  it("routes both NPCs to Waste Not post-completion state", () => {
+    const projections = [
+      mission(MISSION_IDS.walkItOff, "completed"),
+      mission(MISSION_IDS.cutYourTeeth, "completed"),
+      mission(WASTE_NOT.id, "completed"),
+    ];
+    expect(resolveNpcMissionDialogue(NPC_IDS.wadeRusk, projections)?.sequence.id).toBe(
+      DIALOGUE_IDS.wadePostWasteNot,
+    );
+    expect(resolveNpcMissionDialogue(NPC_IDS.tansyRusk, projections)?.sequence.id).toBe(
+      DIALOGUE_IDS.tansyPostWasteNot,
+    );
   });
 });
 

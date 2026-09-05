@@ -411,4 +411,40 @@ test("equips the Cutter through Inventory, shows a full stack, and earns Mining 
     0,
   );
   expect(finalStacks.find((s) => s.itemId === ITEM_IDS.slag)?.quantity).toBeGreaterThan(0);
+
+  // After the one-shot Waste Not presentation closes, both NPCs retain the
+  // newest authored completed-Mission story state instead of falling back to
+  // stale Cut Your Teeth dialogue.
+  await page.getByRole("button", { name: /Talk to Wade Rusk/ }).click();
+  const wadePostWaste = page.getByRole("dialog", { name: "Wade Rusk dialogue" });
+  await expect(wadePostWaste).toBeVisible();
+  await expect(wadePostWaste.locator('[data-dialogue-text] [aria-hidden="true"]')).toContainText(
+    "Waste Not was a good first pass",
+  );
+  await expect(
+    wadePostWaste.locator('[data-dialogue-text] [aria-hidden="true"]'),
+  ).not.toContainText("Tansy says you made the Processing Yard run");
+  await wadePostWaste.getByRole("button", { name: "Next", exact: true }).click();
+  await expect(wadePostWaste.getByRole("button", { name: "Finish" })).toBeVisible();
+  await wadePostWaste.getByRole("button", { name: "Finish" }).click();
+  await expect(wadePostWaste).toBeHidden();
+
+  await db
+    .update(characters)
+    .set({ currentLocationId: LOCATION_IDS.theJag })
+    .where(eq(characters.id, characterId));
+  await page.reload();
+  await page.getByRole("button", { name: /Talk to Tansy Rusk/ }).click();
+  const tansyPostWaste = page.getByRole("dialog", { name: "Tansy Rusk dialogue" });
+  await expect(tansyPostWaste).toBeVisible();
+  await expect(tansyPostWaste.locator('[data-dialogue-text] [aria-hidden="true"]')).toContainText(
+    "You finished the Cutter lesson and the hopper run",
+  );
+  await expect(
+    tansyPostWaste.locator('[data-dialogue-text] [aria-hidden="true"]'),
+  ).not.toContainText("You kept the shale");
+  await tansyPostWaste.getByRole("button", { name: "Next", exact: true }).click();
+  await expect(tansyPostWaste.getByRole("button", { name: "Finish" })).toBeVisible();
+  await tansyPostWaste.getByRole("button", { name: "Finish" }).click();
+  await expect(tansyPostWaste).toBeHidden();
 });

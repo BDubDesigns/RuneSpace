@@ -41,6 +41,8 @@ const dialogueIds = {
   wadeWalkItOffActiveFollowUp: asContentId("wade_rusk_walk_it_off_active_follow_up"),
   wadePostCutYourTeeth: asContentId("wade_rusk_post_cut_your_teeth"),
   tansyPostCutYourTeeth: asContentId("tansy_rusk_post_cut_your_teeth"),
+  wadePostWasteNot: asContentId("wade_rusk_post_waste_not"),
+  tansyPostWasteNot: asContentId("tansy_rusk_post_waste_not"),
   tansyBeforeMission: asContentId("tansy_rusk_walk_it_off_before_mission"),
   tansyAfterRemoteAcceptance: asContentId("tansy_rusk_walk_it_off_after_remote_acceptance"),
   tansyCompletion: asContentId("tansy_rusk_walk_it_off_completion"),

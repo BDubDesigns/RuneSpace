@@ -270,7 +270,7 @@ export const CUT_YOUR_TEETH: MissionDefinition = {
   id: MISSION_IDS.cutYourTeeth,
   title: "Cut Your Teeth",
   summary:
-    "Equip your Salvage Cutter, then show Tansy Rusk a full stack of Ferrite Shale at The Jag.",
+    "Make five real Mining attempts with your equipped Salvage Cutter, then show Tansy Rusk a full stack of Ferrite Shale at The Jag.",
   prerequisiteMissionId: MISSION_IDS.walkItOff,
   continuationMissionId: MISSION_IDS.wasteNot,
   offers: [
@@ -358,6 +358,10 @@ export const WASTE_NOT: MissionDefinition = {
     busyDialogueId: DIALOGUE_IDS.wadeWasteNotBusy,
     completionPresentationDialogueId: DIALOGUE_IDS.wadeWasteNotCompletion,
   },
+  completedNpcDialogue: [
+    { npcId: NPC_IDS.wadeRusk, dialogueId: DIALOGUE_IDS.wadePostWasteNot },
+    { npcId: NPC_IDS.tansyRusk, dialogueId: DIALOGUE_IDS.tansyPostWasteNot },
+  ],
 };
 
 /** Ordered chain of authored missions; later entries may require earlier ones. */

@@ -3,11 +3,10 @@ import { and, eq } from "drizzle-orm";
 import { afterEach, beforeAll, describe, expect, it } from "vitest";
 import { ACTION_IDS, MISSION_IDS } from "@/game/config/foundations";
 import {
-  applyBackfill,
-  lockPopulation,
+  EXECUTION_CONFIRMATION,
+  executeBackfill,
   queryScan,
   reportFromScan,
-  verifyApplied,
 } from "@/scripts/waste-not-backfill.mjs";
 import { cleanupTestUser, createCharacterForUser, createTestUser } from "./fixtures";
 
@@ -119,17 +118,20 @@ suite("Issue #141 Waste Not backfill (real PostgreSQL)", () => {
           .where(eq(rune.characterMissionProgress.characterId, eligibleId)),
       ).toEqual([]);
 
-      await client.query("BEGIN");
-      await client.query("SET TRANSACTION ISOLATION LEVEL SERIALIZABLE");
-      await lockPopulation(client);
-      await applyBackfill(client, report.wouldAcceptCharacterIds, now);
-      expect(await verifyApplied(client, report)).toMatchObject({
-        expected: 1,
+      await expect(
+        executeBackfill(client, report, EXECUTION_CONFIRMATION, now),
+      ).resolves.toMatchObject({
+        mode: "execute",
         accepted: 1,
-        progressAtZero: 1,
-        passed: true,
+        verification: {
+          withinTransaction: {
+            expected: 1,
+            accepted: 1,
+            progressAtZero: 1,
+            passed: true,
+          },
+        },
       });
-      await client.query("COMMIT");
 
       const after = await queryScan(client);
       expect(after.wouldAcceptCharacterIds).toEqual([]);
@@ -138,11 +140,9 @@ suite("Issue #141 Waste Not backfill (real PostgreSQL)", () => {
       ]);
       expect(after.alreadyAcceptedCharacterIds).toEqual([alreadyAcceptedId, eligibleId].sort());
 
-      await client.query("BEGIN");
-      await client.query("SET TRANSACTION ISOLATION LEVEL SERIALIZABLE");
-      await lockPopulation(client);
-      await applyBackfill(client, report.wouldAcceptCharacterIds, now);
-      await client.query("COMMIT");
+      await expect(
+        executeBackfill(client, report, EXECUTION_CONFIRMATION, now),
+      ).resolves.toMatchObject({ mode: "execute", accepted: 0 });
       expect(
         await db
           .select()
@@ -166,6 +166,103 @@ suite("Issue #141 Waste Not backfill (real PostgreSQL)", () => {
           progress: 0,
         }),
       ]);
+    } finally {
+      await client.end();
+    }
+  });
+
+  it("rejects an unconfirmed execution without writing", async () => {
+    const eligibleId = await makeCompletedCut("Unconfirmed");
+    const client = new Client({ connectionString: DATABASE_URL });
+    await client.connect();
+    try {
+      const report = reportFromScan(await queryScan(client));
+      await expect(executeBackfill(client, report, "WRONG-CONFIRMATION", now)).rejects.toThrow(
+        `--execute requires --confirm ${EXECUTION_CONFIRMATION}`,
+      );
+      await expect(
+        executeBackfill(
+          client,
+          { ...report, counts: { ...report.counts, wouldAccept: 99 } },
+          EXECUTION_CONFIRMATION,
+          now,
+        ),
+      ).rejects.toThrow("report counts do not match its character cohorts");
+      expect(
+        await db
+          .select()
+          .from(rune.characterMissions)
+          .where(
+            and(
+              eq(rune.characterMissions.characterId, eligibleId),
+              eq(rune.characterMissions.missionId, MISSION_IDS.wasteNot),
+            ),
+          ),
+      ).toEqual([]);
+    } finally {
+      await client.end();
+    }
+  });
+
+  it("rejects database-state drift before writes", async () => {
+    const reviewedId = await makeCompletedCut("Reviewed");
+    const client = new Client({ connectionString: DATABASE_URL });
+    await client.connect();
+    try {
+      const report = reportFromScan(await queryScan(client));
+      await makeCompletedCut("Drifted");
+      await expect(executeBackfill(client, report, EXECUTION_CONFIRMATION, now)).rejects.toThrow(
+        "database state no longer matches the reviewed dry-run report",
+      );
+      expect(
+        await db
+          .select()
+          .from(rune.characterMissions)
+          .where(
+            and(
+              eq(rune.characterMissions.characterId, reviewedId),
+              eq(rune.characterMissions.missionId, MISSION_IDS.wasteNot),
+            ),
+          ),
+      ).toEqual([]);
+    } finally {
+      await client.end();
+    }
+  });
+
+  it("rolls back mission and progress rows when the guarded execution fails", async () => {
+    const eligibleId = await makeCompletedCut("Rollback");
+    const client = new Client({ connectionString: DATABASE_URL });
+    await client.connect();
+    try {
+      const report = reportFromScan(await queryScan(client));
+      const failingClient = {
+        query: async (query: string, parameters?: unknown[]) => {
+          if (query.includes("INSERT INTO character_mission_progress"))
+            throw new Error("simulated backfill failure");
+          return client.query(query, parameters);
+        },
+      };
+      await expect(
+        executeBackfill(failingClient as never, report, EXECUTION_CONFIRMATION, now),
+      ).rejects.toThrow("simulated backfill failure");
+      expect(
+        await db
+          .select()
+          .from(rune.characterMissions)
+          .where(
+            and(
+              eq(rune.characterMissions.characterId, eligibleId),
+              eq(rune.characterMissions.missionId, MISSION_IDS.wasteNot),
+            ),
+          ),
+      ).toEqual([]);
+      expect(
+        await db
+          .select()
+          .from(rune.characterMissionProgress)
+          .where(eq(rune.characterMissionProgress.characterId, eligibleId)),
+      ).toEqual([]);
     } finally {
       await client.end();
     }

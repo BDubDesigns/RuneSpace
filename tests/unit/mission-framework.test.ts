@@ -311,7 +311,8 @@ describe("issue #124 generic UI consumers", () => {
   it("contains no mission-ID branches or objective-prose parsing in features", () => {
     const featuresRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../../features");
     const offenders: string[] = [];
-    const missionIdLiterals = /walk_it_off|cut_your_teeth|walkItOff|cutYourTeeth|MISSION_IDS/;
+    const missionIdLiterals =
+      /walk_it_off|cut_your_teeth|waste_not|walkItOff|cutYourTeeth|wasteNot|MISSION_IDS/;
     function scan(dir: string) {
       for (const entry of readdirSync(dir)) {
         const full = join(dir, entry);

@@ -56,7 +56,7 @@ function stableJson(value) {
   });
 }
 
-function parseArgs(argv) {
+export function parseArguments(argv) {
   const options = { mode: "dry-run" };
   for (let index = 0; index < argv.length; index += 1) {
     const argument = argv[index];
@@ -70,34 +70,61 @@ function parseArgs(argv) {
   if (options.mode !== "dry-run" && !options.expectedReport) {
     fail("--expected-report is required for --execute and --verify");
   }
+  if (options.mode === "dry-run" && (options.expectedReport || options.confirm)) {
+    fail("--expected-report and --confirm are valid only with --verify or --execute");
+  }
   if (options.mode === "execute" && options.confirm !== EXECUTION_CONFIRMATION) {
     fail(`--confirm must equal ${EXECUTION_CONFIRMATION}`);
+  }
+  if (options.mode === "verify" && options.confirm) {
+    fail("--confirm is valid only with --execute");
   }
   return options;
 }
 
-function databaseUrl() {
-  const raw = process.env.DATABASE_URL;
+function databaseUrl(environment = process.env) {
+  // Match the Issue #126 maintenance boundary: the managed host/deployment
+  // runner owns database-topology safety; this operation owns the reviewed
+  // report, confirmation, and transaction guards.
+  const raw = environment.DATABASE_URL;
   if (!raw) fail("DATABASE_URL is required");
-  let parsed;
-  try {
-    parsed = new URL(raw);
-  } catch {
-    fail("DATABASE_URL is invalid");
-  }
-  if (parsed.hostname !== "localhost" && parsed.hostname !== "127.0.0.1") {
-    fail("refusing to run outside a localhost database");
-  }
   return raw;
 }
 
-function expectedComparable(report) {
-  return {
-    authority: report.authority,
-    wouldAcceptCharacterIds: report.wouldAcceptCharacterIds,
-    skippedActiveAction: report.skippedActiveAction,
-    alreadyAcceptedCharacterIds: report.alreadyAcceptedCharacterIds,
+function assertSortedUniqueIds(ids, label) {
+  if (!Array.isArray(ids) || ids.some((id) => typeof id !== "string" || id.length === 0))
+    fail(`${label} must contain non-empty character IDs`);
+  const sorted = [...ids].sort();
+  if (stableJson(sorted) !== stableJson(ids)) fail(`${label} must be sorted`);
+  if (new Set(ids).size !== ids.length) fail(`${label} must be unique`);
+}
+
+function assertReportShape(report) {
+  if (!report || report.kind !== REPORT_KIND || report.schemaVersion !== REPORT_SCHEMA_VERSION) {
+    fail("expected report kind or schema version is invalid");
+  }
+  if (report.mode !== "dry-run") fail("expected report must be a dry-run report");
+  if (stableJson(report.authority) !== stableJson(AUTHORITY))
+    fail("expected report uses different canonical mission or progress IDs");
+  assertSortedUniqueIds(report.wouldAcceptCharacterIds, "wouldAcceptCharacterIds");
+  assertSortedUniqueIds(report.alreadyAcceptedCharacterIds, "alreadyAcceptedCharacterIds");
+  if (!Array.isArray(report.skippedActiveAction)) fail("skippedActiveAction must be an array");
+  const skippedKeys = report.skippedActiveAction.map((entry) => {
+    if (!entry || typeof entry.characterId !== "string" || typeof entry.actionId !== "string")
+      fail("skippedActiveAction entries are invalid");
+    return `${entry.characterId}:${entry.actionId}`;
+  });
+  if (stableJson([...skippedKeys].sort()) !== stableJson(skippedKeys))
+    fail("skippedActiveAction must be sorted");
+  if (new Set(skippedKeys).size !== skippedKeys.length) fail("skippedActiveAction must be unique");
+  if (!report.counts || typeof report.counts !== "object") fail("report counts are missing");
+  const expectedCounts = {
+    wouldAccept: report.wouldAcceptCharacterIds.length,
+    skippedActiveAction: report.skippedActiveAction.length,
+    alreadyAccepted: report.alreadyAcceptedCharacterIds.length,
   };
+  if (stableJson(report.counts) !== stableJson(expectedCounts))
+    fail("report counts do not match its character cohorts");
 }
 
 function loadExpectedReport(path) {
@@ -107,15 +134,7 @@ function loadExpectedReport(path) {
   } catch {
     fail("could not read or parse the expected dry-run report");
   }
-  if (!report || report.kind !== REPORT_KIND || report.schemaVersion !== REPORT_SCHEMA_VERSION) {
-    fail("expected report kind or schema version is invalid");
-  }
-  if (!Array.isArray(report.wouldAcceptCharacterIds))
-    fail("expected eligible character IDs are invalid");
-  if (!Array.isArray(report.skippedActiveAction))
-    fail("expected skipped active-action report is invalid");
-  if (!Array.isArray(report.alreadyAcceptedCharacterIds))
-    fail("expected already-accepted IDs are invalid");
+  assertReportShape(report);
   return report;
 }
 
@@ -225,9 +244,21 @@ export function reportFromScan(scan) {
 }
 
 function assertExpectedReportMatches(scan, expectedReport) {
+  assertReportShape(expectedReport);
+  const expectedAccepted = new Set([
+    ...expectedReport.wouldAcceptCharacterIds,
+    ...expectedReport.alreadyAcceptedCharacterIds,
+  ]);
+  const actualPending = new Set(scan.wouldAcceptCharacterIds);
+  const actualAccepted = new Set(scan.alreadyAcceptedCharacterIds);
+  const actualCohort = new Set([...actualPending, ...actualAccepted]);
+  const expectedCohort = [...expectedAccepted].sort();
+  const actualCohortSorted = [...actualCohort].sort();
+  const expectedPending = expectedCohort.filter((id) => !actualAccepted.has(id));
   if (
-    stableJson(expectedComparable(reportFromScan(scan))) !==
-    stableJson(expectedComparable(expectedReport))
+    stableJson(actualCohortSorted) !== stableJson(expectedCohort) ||
+    stableJson([...actualPending].sort()) !== stableJson(expectedPending) ||
+    stableJson(scan.skippedActiveAction) !== stableJson(expectedReport.skippedActiveAction)
   ) {
     fail("database state no longer matches the reviewed dry-run report; aborting without writes");
   }
@@ -260,6 +291,7 @@ export async function applyBackfill(client, characterIds, now) {
 }
 
 export async function verifyApplied(client, expectedReport) {
+  assertReportShape(expectedReport);
   const rows = await client.query(
     `
       SELECT cm.character_id, cm.accepted_at, cm.completed_at, p.progress
@@ -287,73 +319,85 @@ export async function verifyApplied(client, expectedReport) {
   };
 }
 
-async function run(options) {
-  if (options.help) {
-    process.stdout.write(`${USAGE}\n`);
-    return;
+export async function executeBackfill(client, expectedReport, confirmation, now = new Date()) {
+  assertReportShape(expectedReport);
+  if (confirmation !== EXECUTION_CONFIRMATION) {
+    fail(`--execute requires --confirm ${EXECUTION_CONFIRMATION}`);
   }
-  const client = new Client({ connectionString: databaseUrl() });
+  const before = await queryScan(client);
+  assertExpectedReportMatches(before, expectedReport);
+  await client.query("BEGIN ISOLATION LEVEL SERIALIZABLE");
+  let committed = false;
+  try {
+    await lockPopulation(client);
+    const lockedScan = await queryScan(client);
+    assertExpectedReportMatches(lockedScan, expectedReport);
+    const pendingIds = expectedReport.wouldAcceptCharacterIds.filter((characterId) =>
+      lockedScan.wouldAcceptCharacterIds.includes(characterId),
+    );
+    await applyBackfill(client, pendingIds, now);
+    const verification = await verifyApplied(client, expectedReport);
+    if (!verification.passed) fail("backfill verification failed; rolling back");
+    await client.query("COMMIT");
+    committed = true;
+    const afterCommit = await verifyApplied(client, expectedReport);
+    if (!afterCommit.passed) fail("post-commit backfill verification failed");
+    return {
+      kind: REPORT_KIND,
+      schemaVersion: REPORT_SCHEMA_VERSION,
+      mode: "execute",
+      generatedAt: new Date().toISOString(),
+      accepted: pendingIds.length,
+      skippedActiveAction: expectedReport.skippedActiveAction,
+      verification: { withinTransaction: verification, afterCommit },
+    };
+  } catch (error) {
+    if (!committed) await client.query("ROLLBACK").catch(() => {});
+    throw error;
+  }
+}
+
+export async function runWithDatabase(options, environment = process.env) {
+  if (options.mode === "help") return undefined;
+  const client = new Client({ connectionString: databaseUrl(environment) });
   await client.connect();
   try {
-    if (options.mode === "dry-run") {
-      const report = reportFromScan(await queryScan(client));
-      process.stdout.write(`${JSON.stringify(report)}\n`);
-      return;
-    }
-
+    if (options.mode === "dry-run") return reportFromScan(await queryScan(client));
     const expectedReport = loadExpectedReport(options.expectedReport);
     if (options.mode === "verify") {
-      const verification = await verifyApplied(client, expectedReport);
-      process.stdout.write(
-        `${JSON.stringify({
-          kind: REPORT_KIND,
-          schemaVersion: REPORT_SCHEMA_VERSION,
-          mode: "verify",
-          generatedAt: new Date().toISOString(),
-          verification,
-        })}\n`,
-      );
-      if (!verification.passed) process.exitCode = 1;
-      return;
+      return {
+        kind: REPORT_KIND,
+        schemaVersion: REPORT_SCHEMA_VERSION,
+        mode: "verify",
+        generatedAt: new Date().toISOString(),
+        verification: await verifyApplied(client, expectedReport),
+      };
     }
-
-    const before = await queryScan(client);
-    assertExpectedReportMatches(before, expectedReport);
-    await client.query("BEGIN");
-    await client.query("SET TRANSACTION ISOLATION LEVEL SERIALIZABLE");
-    try {
-      await lockPopulation(client);
-      const lockedScan = await queryScan(client);
-      assertExpectedReportMatches(lockedScan, expectedReport);
-      await applyBackfill(client, expectedReport.wouldAcceptCharacterIds, new Date());
-      const verification = await verifyApplied(client, expectedReport);
-      if (!verification.passed) fail("backfill verification failed; rolling back");
-      await client.query("COMMIT");
-      process.stdout.write(
-        `${JSON.stringify({
-          kind: REPORT_KIND,
-          schemaVersion: REPORT_SCHEMA_VERSION,
-          mode: "execute",
-          generatedAt: new Date().toISOString(),
-          accepted: expectedReport.wouldAcceptCharacterIds.length,
-          skippedActiveAction: expectedReport.skippedActiveAction,
-          verification,
-        })}\n`,
-      );
-    } catch (error) {
-      await client.query("ROLLBACK");
-      throw error;
-    }
+    return await executeBackfill(client, expectedReport, options.confirm);
   } finally {
-    await client.end();
+    await client.end().catch(() => {});
+  }
+}
+
+export async function main(argv = process.argv.slice(2), environment = process.env, io = console) {
+  try {
+    const options = parseArguments(argv);
+    if (options.help) {
+      io.log(USAGE);
+      return 0;
+    }
+    const report = await runWithDatabase(options, environment);
+    io.log(JSON.stringify(report, null, 2));
+    if (report?.mode === "verify" && !report.verification.passed) return 1;
+    return 0;
+  } catch (error) {
+    io.error(`${error instanceof Error ? error.message : String(error)}\n${USAGE}`);
+    return 1;
   }
 }
 
 if (fileURLToPath(import.meta.url) === process.argv[1]) {
-  try {
-    await run(parseArgs(process.argv.slice(2)));
-  } catch (error) {
-    process.stderr.write(`${error instanceof Error ? error.message : String(error)}\n${USAGE}\n`);
-    process.exitCode = 1;
-  }
+  main().then((status) => {
+    process.exitCode = status;
+  });
 }

@@ -218,6 +218,31 @@ const dialogue = {
       tansyLocal(EXPRESSION_IDS.smile, "Stick around. There'll be more work when you want it."),
     ],
   },
+  [DIALOGUE_IDS.wadePostWasteNot]: {
+    id: DIALOGUE_IDS.wadePostWasteNot,
+    npcId: NPC_IDS.wadeRusk,
+    beats: [
+      wadeLocal(
+        EXPRESSION_IDS.neutral,
+        "Waste Not was a good first pass. You saw the process through.",
+      ),
+      wadeLocal(
+        EXPRESSION_IDS.neutral,
+        "Keep the basics close. There is plenty of wreck work left, but the next job can wait until it is clear.",
+      ),
+    ],
+  },
+  [DIALOGUE_IDS.tansyPostWasteNot]: {
+    id: DIALOGUE_IDS.tansyPostWasteNot,
+    npcId: NPC_IDS.tansyRusk,
+    beats: [
+      tansyLocal(EXPRESSION_IDS.smile, "You finished the Cutter lesson and the hopper run."),
+      tansyLocal(
+        EXPRESSION_IDS.neutral,
+        "The basics are in place now. Keep what you learned close; the wreck will still be here when there is another useful job.",
+      ),
+    ],
+  },
   [DIALOGUE_IDS.tansyBeforeMission]: {
     id: DIALOGUE_IDS.tansyBeforeMission,
     npcId: NPC_IDS.tansyRusk,
@@ -355,16 +380,16 @@ const dialogue = {
       ),
       tansyLocal(EXPRESSION_IDS.neutral, "Ten pieces, if you're counting."),
       tansyLocal(
-        EXPRESSION_IDS.smile,
-        "Technically, you could scavenge the stuff while you're out walking around.",
-      ),
-      tansyLocal(
         EXPRESSION_IDS.neutral,
-        "Wouldn't teach you anything about Mining, though. The Jag's right here if you want the practice.",
+        "Before you bring it back, make five real Mining attempts at The Jag. A miss still counts; I need you to learn the loop, not win five times.",
       ),
       tansyLocal(
         EXPRESSION_IDS.smile,
-        "Bring me a full stack either way. Keep your fingers attached and I'll call it a pass.",
+        "The Shale itself is source-agnostic. If you scavenge some along the way, it can fill the stack, but it does not replace those five Mining attempts.",
+      ),
+      tansyLocal(
+        EXPRESSION_IDS.smile,
+        "Bring me a full stack after the practice. Keep your fingers attached and I'll call it a pass.",
       ),
     ],
     action: "accept_mission",
