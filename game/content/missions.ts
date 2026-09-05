@@ -42,9 +42,9 @@ export type MissionReward =
 export type CarriedStackTurnIn = "show" | "consume_required_quantity";
 
 /**
- * One reusable live-state requirement evaluated against current authoritative
- * character state on every projection. Requirements never create progress
- * tracking: satisfaction is recomputed from live location/equipment/inventory.
+ * One reusable requirement evaluated against current authoritative character
+ * state or the narrow durable tracked-activity projection. Live-state
+ * requirements remain recomputed from location/equipment/inventory.
  *
  * The closed union is justified by the two production missions and the known
  * needs of the next ordinary missions. A future real mission earns any new
@@ -85,6 +85,21 @@ export type MissionRequirement =
        * separate from requirement truth and validated against the action's
        * authoritative outputs — never a duplicated drop table.
        */
+      recommendedActionId?: ActionId;
+    }
+  | {
+      kind: "tracked_activity";
+      /** Stable identity for this requirement's durable progress row. */
+      progressKey: string;
+      /** Closed production activity vocabulary owned by the gameplay boundary. */
+      activity: "mining" | "refining";
+      /** Closed production metric vocabulary; both activities count attempts. */
+      metric: "attempts";
+      /** Positive authored target; current progress is persisted separately. */
+      target: number;
+      /** Player-facing copy; `{current}` and `{target}` are substituted. */
+      objective: string;
+      /** Optional authored action guidance for the activity being taught. */
       recommendedActionId?: ActionId;
     };
 
@@ -153,6 +168,8 @@ export type MissionDialogue = {
   equipmentReminderDialogueId?: DialogueId;
   /** First unmet requirement is a carried_stack. */
   carriedReminderDialogueId?: DialogueId;
+  /** First unmet requirement is a tracked activity. */
+  trackedActivityReminderDialogueId?: DialogueId;
   /** Requirements satisfied but the turn-in is not performable (busy). */
   busyDialogueId?: DialogueId;
   /**
@@ -183,7 +200,7 @@ export type MissionDefinition = {
    * the story.
    */
   continuationMissionId?: MissionId;
-  /** One or more authored offer interactions (possibly several routes). */
+  /** Authored offer interactions; continuation-only missions may have none. */
   offers: readonly MissionOffer[];
   /** Ordered reusable live-state requirements. */
   requirements: readonly MissionRequirement[];
@@ -255,6 +272,7 @@ export const CUT_YOUR_TEETH: MissionDefinition = {
   summary:
     "Equip your Salvage Cutter, then show Tansy Rusk a full stack of Ferrite Shale at The Jag.",
   prerequisiteMissionId: MISSION_IDS.walkItOff,
+  continuationMissionId: MISSION_IDS.wasteNot,
   offers: [
     {
       npcId: NPC_IDS.tansyRusk,
@@ -268,6 +286,15 @@ export const CUT_YOUR_TEETH: MissionDefinition = {
       kind: "equipped_item",
       itemId: ITEM_IDS.salvageCutter,
       objective: "Equip the {item} from Inventory",
+    },
+    {
+      kind: "tracked_activity",
+      progressKey: "mining-attempts",
+      activity: "mining",
+      metric: "attempts",
+      target: 5,
+      objective: "Complete 5 Mining attempts — {current} / {target}",
+      recommendedActionId: ACTION_IDS.ferriteShaleMining,
     },
     {
       kind: "carried_stack",
@@ -287,6 +314,7 @@ export const CUT_YOUR_TEETH: MissionDefinition = {
   reward: { kind: "skill_xp", skillId: SKILL_IDS.mining, amount: 100 },
   dialogue: {
     equipmentReminderDialogueId: DIALOGUE_IDS.tansyCutYourTeethEquipReminder,
+    trackedActivityReminderDialogueId: DIALOGUE_IDS.tansyCutYourTeethMiningReminder,
     carriedReminderDialogueId: DIALOGUE_IDS.tansyCutYourTeethStackReminder,
     busyDialogueId: DIALOGUE_IDS.tansyCutYourTeethBusy,
     completionPresentationDialogueId: DIALOGUE_IDS.tansyCutYourTeethCompletion,
@@ -297,8 +325,43 @@ export const CUT_YOUR_TEETH: MissionDefinition = {
   ],
 };
 
+/** Waste Not is accepted only as Cut Your Teeth's authored continuation. */
+export const WASTE_NOT: MissionDefinition = {
+  id: MISSION_IDS.wasteNot,
+  title: "Waste Not",
+  summary:
+    "Complete five Refining attempts at the Abandoned Processing Yard, then report to Wade Rusk at the Crash Site.",
+  prerequisiteMissionId: MISSION_IDS.cutYourTeeth,
+  offers: [],
+  requirements: [
+    {
+      kind: "tracked_activity",
+      progressKey: "refining-attempts",
+      activity: "refining",
+      metric: "attempts",
+      target: 5,
+      objective:
+        "Complete 5 Refining attempts at the Abandoned Processing Yard — {current} / {target}",
+      recommendedActionId: ACTION_IDS.refining,
+    },
+  ],
+  turnIn: {
+    npcId: NPC_IDS.wadeRusk,
+    locationId: LOCATION_IDS.crashSite,
+    requiresStationary: true,
+    objective: "Return to Wade Rusk at the Crash Site",
+    dialogueId: DIALOGUE_IDS.wadeWasteNotTurnIn,
+  },
+  reward: { kind: "skill_xp", skillId: SKILL_IDS.refining, amount: 100 },
+  dialogue: {
+    trackedActivityReminderDialogueId: DIALOGUE_IDS.wadeWasteNotTrackedActivityReminder,
+    busyDialogueId: DIALOGUE_IDS.wadeWasteNotBusy,
+    completionPresentationDialogueId: DIALOGUE_IDS.wadeWasteNotCompletion,
+  },
+};
+
 /** Ordered chain of authored missions; later entries may require earlier ones. */
-export const MISSIONS: readonly MissionDefinition[] = [WALK_IT_OFF, CUT_YOUR_TEETH];
+export const MISSIONS: readonly MissionDefinition[] = [WALK_IT_OFF, CUT_YOUR_TEETH, WASTE_NOT];
 
 const missions = new Map<string, MissionDefinition>(
   MISSIONS.map((mission) => [mission.id, mission]),

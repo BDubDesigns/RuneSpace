@@ -121,6 +121,10 @@ function tansySkillXpBeat(skillId: SkillId, amount: number): DialogueBeat {
   return { kind: "skill_xp", skillId, amount, backgroundId: jag, text: "" };
 }
 
+function wadeSkillXpBeat(skillId: SkillId, amount: number): DialogueBeat {
+  return { kind: "skill_xp", skillId, amount, backgroundId: crash, text: "" };
+}
+
 const dialogue = {
   [DIALOGUE_IDS.wadeOffer]: {
     id: DIALOGUE_IDS.wadeOffer,
@@ -375,6 +379,16 @@ const dialogue = {
       ),
     ],
   },
+  [DIALOGUE_IDS.tansyCutYourTeethMiningReminder]: {
+    id: DIALOGUE_IDS.tansyCutYourTeethMiningReminder,
+    npcId: NPC_IDS.tansyRusk,
+    beats: [
+      tansyLocal(
+        EXPRESSION_IDS.neutral,
+        "The Cutter is equipped. Now make five real Mining attempts at The Jag. Misses still teach the lesson.",
+      ),
+    ],
+  },
   [DIALOGUE_IDS.tansyCutYourTeethStackReminder]: {
     id: DIALOGUE_IDS.tansyCutYourTeethStackReminder,
     npcId: NPC_IDS.tansyRusk,
@@ -432,6 +446,67 @@ const dialogue = {
       tansyLocal(
         EXPRESSION_IDS.smile,
         "You can run a Cutter. Next we'll teach you what to do with the stuff that comes out.",
+      ),
+      tansyLocal(
+        EXPRESSION_IDS.neutral,
+        "Mining pulls the raw material out. Refining is what turns the useful parts into something Wade can work with.",
+      ),
+      tansyLocal(
+        EXPRESSION_IDS.smile,
+        "Take the shale to the Abandoned Processing Yard. The hopper uses two pieces per attempt, and I want five attempts.",
+      ),
+      tansyLocal(
+        EXPRESSION_IDS.neutral,
+        "A success makes Refined Ferrite. A failure makes Slag. Both count, and you keep the Slag — it is still useful material.",
+      ),
+    ],
+  },
+  [DIALOGUE_IDS.wadeWasteNotTrackedActivityReminder]: {
+    id: DIALOGUE_IDS.wadeWasteNotTrackedActivityReminder,
+    npcId: NPC_IDS.wadeRusk,
+    beats: [
+      wadeLocal(
+        EXPRESSION_IDS.neutral,
+        "Tansy sent you to the Abandoned Processing Yard. Finish five Refining attempts, then come back and report.",
+      ),
+    ],
+  },
+  [DIALOGUE_IDS.wadeWasteNotBusy]: {
+    id: DIALOGUE_IDS.wadeWasteNotBusy,
+    npcId: NPC_IDS.wadeRusk,
+    beats: [
+      wadeLocal(
+        EXPRESSION_IDS.neutral,
+        "Finish what you are doing first. I will hear the Processing Yard report when you are stationary.",
+      ),
+    ],
+  },
+  [DIALOGUE_IDS.wadeWasteNotTurnIn]: {
+    id: DIALOGUE_IDS.wadeWasteNotTurnIn,
+    npcId: NPC_IDS.wadeRusk,
+    beats: [
+      wadeLocal(EXPRESSION_IDS.neutral, "Tansy says you made the Processing Yard run."),
+      wadeLocal(EXPRESSION_IDS.neutral, "All right. Tell me what came out of the hopper."),
+    ],
+    action: "complete_mission",
+    actionLabel: "REPORT TO WADE",
+  },
+  [DIALOGUE_IDS.wadeWasteNotCompletion]: {
+    id: DIALOGUE_IDS.wadeWasteNotCompletion,
+    npcId: NPC_IDS.wadeRusk,
+    beats: [
+      wadeSkillXpBeat(SKILL_IDS.refining, 100),
+      wadeLocal(
+        EXPRESSION_IDS.neutral,
+        "Tansy taught you the hopper, and you brought the results back without wasting the useful material.",
+      ),
+      wadeLocal(
+        EXPRESSION_IDS.neutral,
+        "Keep the Slag. If it came out of the process, it has a use somewhere on a wreck like this.",
+      ),
+      wadeLocal(
+        EXPRESSION_IDS.neutral,
+        "The Refined Ferrite will help when we get back to the ship. For now, that is a solid start on the wreck work ahead.",
       ),
     ],
   },
@@ -574,6 +649,9 @@ function turnInStageSequence(
   }
   if (stage.nextObjectiveKind === "carried_stack") {
     return dialogueOr(definition.dialogue.carriedReminderDialogueId, turnIn);
+  }
+  if (stage.nextObjectiveKind === "tracked_activity") {
+    return dialogueOr(definition.dialogue.trackedActivityReminderDialogueId, turnIn);
   }
   return turnIn;
 }

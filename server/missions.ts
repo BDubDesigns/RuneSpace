@@ -1,6 +1,7 @@
 import { and, eq, isNull } from "drizzle-orm";
 import type { DatabaseTransaction, ResolvedCharacterContext } from "@/server/action-resolution";
 import {
+  characterMissionProgress,
   characterMissions,
   characters,
   equippedItems,
@@ -40,6 +41,7 @@ import {
 } from "@/server/play";
 import { grantCharacterSkillXp } from "@/server/progression";
 import { applyStackRemovalPlan, loadOwnedItemInstances } from "@/server/carried-inventory";
+import { ensureMissionProgressRows } from "@/server/mission-progress";
 
 export type MissionAcceptance =
   | { status: "accepted" | "already_accepted" | "already_completed" }
@@ -58,6 +60,7 @@ export type MissionCompletion =
         | "wrong_npc"
         | "prerequisite"
         | "equipment"
+        | "tracked_activity"
         | "insufficient_items"
         | "capacity";
       capacityReason?: "slots" | "mass";
@@ -225,6 +228,7 @@ export async function acceptMission(
           acceptedAt: now,
         })
         .onConflictDoNothing();
+      await ensureMissionProgressRows(transaction, context.character.id, definition, now);
       return stateFor({ status: "accepted" });
     },
   );
@@ -373,7 +377,7 @@ async function completeMissionForDefinition(input: {
   }
 
   const balance = getEffectiveGameBalance();
-  const [itemState, assignments, stacks] = await Promise.all([
+  const [itemState, assignments, stacks, progressRows] = await Promise.all([
     loadOwnedItemInstances(transaction, context.character.id),
     transaction
       .select()
@@ -385,11 +389,22 @@ async function completeMissionForDefinition(input: {
       .from(inventoryStacks)
       .where(eq(inventoryStacks.characterId, context.character.id))
       .for("update"),
+    transaction
+      .select()
+      .from(characterMissionProgress)
+      .where(
+        and(
+          eq(characterMissionProgress.characterId, context.character.id),
+          eq(characterMissionProgress.missionId, definition.id),
+        ),
+      )
+      .for("update"),
   ]);
   const carriedById = new Map(itemState.carriedInstances.map((i) => [i.id, i.itemId]));
   const observation = buildCompletionObservation(
     assignmentCarriedItemIds(assignments, carriedById),
     stacks,
+    new Map(progressRows.map((row) => [row.progressKey, row.progress])),
   );
 
   // Re-evaluate every authored requirement against live authoritative
@@ -410,6 +425,17 @@ async function completeMissionForDefinition(input: {
         return stateFor({
           status: "refused",
           reason: "equipment",
+          message: `Objective not met: ${renderRequirementCopy(requirement, observation)}.`,
+        });
+      }
+      continue;
+    }
+    if (requirement.kind === "tracked_activity") {
+      const progress = observation.trackedProgress?.get(requirement.progressKey) ?? 0;
+      if (progress < requirement.target) {
+        return stateFor({
+          status: "refused",
+          reason: "tracked_activity",
           message: `Objective not met: ${renderRequirementCopy(requirement, observation)}.`,
         });
       }
@@ -551,14 +577,24 @@ async function completeMissionForDefinition(input: {
       ),
     );
   if (definition.continuationMissionId) {
-    await transaction
-      .insert(characterMissions)
-      .values({
-        characterId: context.character.id,
-        missionId: definition.continuationMissionId,
-        acceptedAt: now,
-      })
-      .onConflictDoNothing();
+    const continuation = getMission(definition.continuationMissionId);
+    if (!continuation) {
+      throw new Error(
+        `${definition.id} references unknown continuation ${definition.continuationMissionId}`,
+      );
+    }
+    const existingContinuation = missionRow(rows, continuation.id);
+    if (!existingContinuation?.completedAt) {
+      await transaction
+        .insert(characterMissions)
+        .values({
+          characterId: context.character.id,
+          missionId: continuation.id,
+          acceptedAt: now,
+        })
+        .onConflictDoNothing();
+      await ensureMissionProgressRows(transaction, context.character.id, continuation, now);
+    }
   }
   return stateFor({ status: "completed", reward: rewardInfo });
 }
@@ -581,6 +617,15 @@ function renderRequirementCopy(
   observation: MissionObservation,
 ): string {
   if (requirement.kind === "at_location") return requirement.objective;
+  if (requirement.kind === "tracked_activity") {
+    const current = Math.min(
+      observation.trackedProgress?.get(requirement.progressKey) ?? 0,
+      requirement.target,
+    );
+    return requirement.objective
+      .replace("{current}", String(current))
+      .replace("{target}", String(requirement.target));
+  }
   const itemName = observation.itemNames.get(requirement.itemId) ?? requirement.itemId;
   if (requirement.kind === "equipped_item") {
     return requirement.objective.replace("{item}", itemName);
@@ -637,6 +682,7 @@ function assignmentCarriedItemIds(
 function buildCompletionObservation(
   equippedCarriedIds: ReadonlySet<string>,
   stacks: readonly { itemId: string; quantity: number }[],
+  trackedProgress: ReadonlyMap<string, number> = new Map(),
 ): MissionObservation {
   const balance = getEffectiveGameBalance();
   const carriedQuantities = new Map<string, number>();
@@ -666,7 +712,13 @@ function buildCompletionObservation(
     const definition = getItemDefinition(itemId, balance);
     if (definition?.kind === "stack") stackLimits.set(itemId, definition.stackLimit);
   }
-  return { equippedItemIds: equippedCarriedIds, carriedQuantities, stackLimits, itemNames };
+  return {
+    equippedItemIds: equippedCarriedIds,
+    carriedQuantities,
+    stackLimits,
+    itemNames,
+    trackedProgress,
+  };
 }
 
 /** Applies one pure removal plan to an in-memory candidate stack list. */

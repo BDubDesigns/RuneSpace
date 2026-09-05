@@ -91,6 +91,7 @@ import {
   type PersistedMiningOutcome,
 } from "@/server/mining";
 import { loadMissionProjections } from "@/server/mission-state";
+import { recordTrackedActivity } from "@/server/mission-progress";
 import type { MissionProjection } from "@/game/domain/missions";
 import { loadPlaySnapshot } from "@/server/play-state";
 
@@ -284,6 +285,25 @@ type PlayResolverEntry = {
   actionId: string;
 };
 
+function withTrackedActivityProgress<Snapshot, Outcome extends { characterId: string }>(
+  resolver: ActionResolver<Snapshot, Outcome>,
+  activity: "mining" | "refining",
+  attemptCount: (outcome: Outcome) => number,
+): ActionResolver<Snapshot, Outcome> {
+  return {
+    ...resolver,
+    persist: async (transaction, outcome, context) => {
+      await resolver.persist(transaction, outcome, context);
+      await recordTrackedActivity(transaction, {
+        characterId: outcome.characterId,
+        activity,
+        metric: "attempts",
+        attemptCount: attemptCount(outcome),
+      });
+    },
+  };
+}
+
 /**
  * Compose the activity resolvers into one owned-character play resolver.
  *
@@ -352,11 +372,19 @@ export function createPlayResolver(
   const entries: PlayResolverEntry[] = [
     {
       actionId: ACTION_IDS.ferriteShaleMining,
-      resolver: createMiningResolver(random, onMiningOutcome) as PlayResolver,
+      resolver: withTrackedActivityProgress(
+        createMiningResolver(random, onMiningOutcome),
+        "mining",
+        (outcome) => outcome.attempts.length,
+      ) as PlayResolver,
     },
     {
       actionId: ACTION_IDS.refining,
-      resolver: createRefiningResolver(refiningRandom, onRefiningOutcome) as PlayResolver,
+      resolver: withTrackedActivityProgress(
+        createRefiningResolver(refiningRandom, onRefiningOutcome),
+        "refining",
+        (outcome) => outcome.resolvedAttempts.length,
+      ) as PlayResolver,
     },
     {
       actionId: ACTION_IDS.travel,
