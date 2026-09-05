@@ -101,9 +101,10 @@ test("equips the Cutter through Inventory, shows a full stack, and earns Mining 
 
   // Objective derives equip-first precedence from authoritative equipment.
   await expect(page.locator("[data-mission-objective]")).toContainText("Cut Your Teeth");
-  await expect(page.locator("[data-mission-objective]")).toContainText(
+  await expect(page.locator("[data-mission-objective-current]")).toHaveText(
     "Equip the Salvage Cutter from Inventory",
   );
+  await expect(page.locator("[data-mission-objective-requirements]")).toHaveCount(0);
 
   // Mission guidance: the unmet equip requirement targets the Cutter affordance
   // in Inventory, while Start Mining is NOT highlighted (equip comes first in
@@ -145,7 +146,10 @@ test("equips the Cutter through Inventory, shows a full stack, and earns Mining 
   await expect(page.locator("[data-mission-objective]")).toContainText(
     "Complete 5 Mining attempts — 0 / 5",
   );
-  await expect(page.locator("[data-mission-objective-current]")).toHaveCount(0);
+  await expect(page.locator("[data-mission-objective-current]")).toHaveText(
+    "Complete 5 Mining attempts — 0 / 5",
+  );
+  await expect(page.locator("[data-mission-objective-requirements]")).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Start Mining" })).toHaveAttribute(
     "data-mission-guidance",
     "active",
@@ -190,29 +194,53 @@ test("equips the Cutter through Inventory, shows a full stack, and earns Mining 
     .set({ startedAt: miningAgo, resolvedThroughAt: miningAgo })
     .where(eq(activeActions.characterId, characterId));
   await page.getByRole("button", { name: "Refresh status" }).click();
-  await expect(page.locator("[data-mission-objective]")).toContainText(
-    "Complete 5 Mining attempts — 5 / 5",
+  await expect(page.locator("[data-mission-objective-current]")).toHaveText(
+    "Get a full stack of Ferrite Shale — 3 / 10",
   );
   await page.getByRole("button", { name: "Stop Mining" }).click();
 
-  // Restore the full stack: every requirement holds and guidance moves to the
-  // turn-in NPC. The HUD shows all four simultaneous requirements together
-  // plus the turn-in objective.
-  await db.delete(inventoryStacks).where(eq(inventoryStacks.characterId, characterId));
-  await addShale(characterId, 10);
+  // As the next requirement becomes current, the compact HUD follows the
+  // projected objective without taking over the Mission Log's checklist.
   await page.reload();
-  await expect(page.locator("[data-mission-objective-requirements]")).toContainText(
-    "Get a full stack of Ferrite Shale — 10 / 10",
+  await expect(page.locator("[data-mission-objective-current]")).toHaveText(
+    "Get a full stack of Ferrite Shale — 3 / 10",
   );
+  await expect(page.locator("[data-mission-objective-requirements]")).toHaveCount(0);
+
+  // The detailed Mission Log retains all authored requirements and omits the
+  // current objective when it is already represented by the checklist.
+  await page.getByRole("button", { name: "Missions" }).click();
+  const progressLog = page.getByRole("dialog", { name: "Mission Log" });
+  const progressCut = progressLog.locator('[data-mission-log-entry="cut_your_teeth"]');
+  await expect(progressCut.locator("[data-mission-log-requirements] li")).toHaveCount(4);
+  await expect(progressCut.locator("[data-mission-log-requirements]")).toContainText(
+    "Complete 5 Mining attempts — 5 / 5",
+  );
+  await expect(progressCut.locator("[data-mission-log-next]")).toHaveCount(0);
+  await page.keyboard.press("Escape");
+
+  // Restore the full stack: every requirement holds and guidance moves to the
+  // turn-in NPC. The HUD now shows only the distinct turn-in objective.
+  await db
+    .update(inventoryStacks)
+    .set({ quantity: 10 })
+    .where(eq(inventoryStacks.characterId, characterId));
+  await page.reload();
+  await expect(page.locator("[data-mission-objective-requirements]")).toHaveCount(0);
 
   // Objective advances past both steps: with a full stack already carried,
   // equip + collect satisfy instantly and the turn-in objective shows.
-  await expect(page.locator("[data-mission-objective]")).toContainText(
-    "Show a full stack of Ferrite Shale to Tansy Rusk",
-  );
   await expect(page.locator("[data-mission-objective-current]")).toHaveText(
     "Show a full stack of Ferrite Shale to Tansy Rusk",
   );
+  await page.getByRole("button", { name: "Missions" }).click();
+  const readyLog = page.getByRole("dialog", { name: "Mission Log" });
+  const readyCut = readyLog.locator('[data-mission-log-entry="cut_your_teeth"]');
+  await expect(readyCut.locator("[data-mission-log-requirements] li")).toHaveCount(4);
+  await expect(readyCut.locator("[data-mission-log-next]")).toHaveText(
+    "Show a full stack of Ferrite Shale to Tansy Rusk",
+  );
+  await page.keyboard.press("Escape");
   await expect(page.getByRole("button", { name: /Talk to Tansy Rusk/ })).toHaveAttribute(
     "data-mission-guidance",
     "active",
@@ -285,9 +313,16 @@ test("equips the Cutter through Inventory, shows a full stack, and earns Mining 
   // active Waste Not mission. The HUD advances to its tracked requirement,
   // rather than exposing a premature completion action.
   await expect(page.locator("[data-mission-objective]")).toContainText("Waste Not");
-  await expect(page.locator("[data-mission-objective]")).toContainText(
+  await expect(page.locator("[data-mission-objective-current]")).toHaveText(
     "Complete 5 Refining attempts at the Abandoned Processing Yard — 0 / 5",
   );
+  await expect(page.locator("[data-mission-objective-requirements]")).toHaveCount(0);
+  await page.getByRole("button", { name: "Missions" }).click();
+  const wasteProgressLog = page.getByRole("dialog", { name: "Mission Log" });
+  const wasteProgress = wasteProgressLog.locator('[data-mission-log-entry="waste_not"]');
+  await expect(wasteProgress.locator("[data-mission-log-requirements] li")).toHaveCount(1);
+  await expect(wasteProgress.locator("[data-mission-log-next]")).toHaveCount(0);
+  await page.keyboard.press("Escape");
   await page.getByRole("button", { name: "Missions" }).click();
   const log = page.getByRole("dialog", { name: "Mission Log" });
   await expect(log).toBeVisible();
@@ -379,12 +414,21 @@ test("equips the Cutter through Inventory, shows a full stack, and earns Mining 
     .where(eq(activeActions.characterId, characterId));
   await page.getByRole("button", { name: "Refresh status" }).click();
   await expect(page.getByText("5 attempts", { exact: true })).toBeVisible();
-  await expect(page.locator("[data-mission-objective-requirements]")).toContainText(
-    "Complete 5 Refining attempts at the Abandoned Processing Yard — 5 / 5",
-  );
   await expect(page.locator("[data-mission-objective-current]")).toHaveText(
     "Return to Wade Rusk at the Crash Site",
   );
+  await expect(page.locator("[data-mission-objective-requirements]")).toHaveCount(0);
+  await page.getByRole("button", { name: "Missions" }).click();
+  const wasteReadyLog = page.getByRole("dialog", { name: "Mission Log" });
+  const wasteReady = wasteReadyLog.locator('[data-mission-log-entry="waste_not"]');
+  await expect(wasteReady.locator("[data-mission-log-requirements] li")).toHaveCount(1);
+  await expect(wasteReady.locator("[data-mission-log-requirements]")).toContainText(
+    "Complete 5 Refining attempts at the Abandoned Processing Yard — 5 / 5",
+  );
+  await expect(wasteReady.locator("[data-mission-log-next]")).toHaveText(
+    "Return to Wade Rusk at the Crash Site",
+  );
+  await page.keyboard.press("Escape");
   const refiningXpBeforeWasteTurnIn = await refiningXpTotal(characterId);
   await expect(page.locator("[data-mission-objective]")).toContainText(
     "Return to Wade Rusk at the Crash Site",
