@@ -20,12 +20,10 @@ test.describe("Inventory equip and compact selected visual", () => {
     const characterId = page.url().split("/").at(-1)!;
     const balance = getEffectiveGameBalance();
 
-    // before() auto-provisions an equipped Cutter + starter container and
-    // leaves the starter-provisioning marker present. To exercise the
-    // empty-carried-inventory fallback we need a carried Salvage Cutter with an
-    // EMPTY Mining-tool slot and no other carried items. Because the starter
-    // marker already exists, `getMiningGameplayState` will NOT auto-equip a new
-    // Cutter on reload, so the state we seed below is authoritative and stable:
+    // beforeEach opens an isolated character. First-play provisioning supplies
+    // the starter container only; the fixture does not seed a legacy Cutter.
+    // Reset the item/equipment rows and explicitly establish the authoritative
+    // state needed for the empty-carried-inventory fallback:
     //   - carried: exactly one Salvage Cutter (the only carried unique item),
     //   - equipped: one MYKEA container (required by the loadout rule), tool slot EMPTY,
     //   - no carried stacks, no other unique items.
@@ -190,11 +188,11 @@ test.describe("Inventory equip and compact selected visual", () => {
     await page.setViewportSize({ width: 390, height: 844 });
     const characterId = page.url().split("/").at(-1)!;
 
-    // before() auto-provisions an equipped Cutter + one container (marker
-    // present). Add a spare carried MYKEA container: it is a unique item that
-    // is eligible for a CONTAINER slot, but Issue #68 scopes Inventory Equip to
-    // the authoritative Mining-tool slot only, so its details must expose NO
-    // Equip action. Keep the marker present so the loadout is not re-provisioned.
+    // beforeEach opens an isolated character and first-play provisioning
+    // supplies the starter container only; no legacy Cutter is present. Add a
+    // spare carried MYKEA container: it is a unique item that is eligible for a
+    // CONTAINER slot, but Issue #68 scopes Inventory Equip to the authoritative
+    // Mining-tool slot only, so its details must expose NO Equip action.
     await db.insert(itemInstances).values({
       characterId,
       itemId: ITEM_IDS.mykeaSchleppraum8,
@@ -205,8 +203,8 @@ test.describe("Inventory equip and compact selected visual", () => {
     await page.getByRole("button", { name: "Inventory" }).click();
     await expect(inventoryDrawer).toBeVisible();
 
-    // Select the carried spare MYKEA (a unique item tile). The equipped Cutter
-    // is not carried; the spare MYKEA is the additional carried unique.
+    // Select the carried spare MYKEA (the unique item added by this test); the
+    // starter container remains the only equipped item.
     const spareTile = inventoryDrawer
       .locator("button[aria-pressed]")
       .filter({ hasText: "MYKEA SCHLEPPRAUM-8" })

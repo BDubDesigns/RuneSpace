@@ -2,6 +2,11 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
 
 const SLOWEST_COUNT = 10;
+const INTENTIONAL_SERIAL_EXCEPTION = {
+  suite: "Admin Operator",
+  spec: "tests/e2e/admin-operator.spec.ts",
+  reason: "fixed admin identity and process-global allowlist",
+};
 
 /**
  * Small canonical-only reporter. The list reporter remains the human-readable
@@ -42,6 +47,10 @@ export default class E2ETimingReporter {
     console.log(
       `[e2e-timing] total ${totalMs} ms; tests ${this.tests.length}; workers ${this.workers}; shard ${shard}`,
     );
+    console.log(
+      `[e2e-timing] intentional serial exception: ${INTENTIONAL_SERIAL_EXCEPTION.suite} ` +
+        `(${INTENTIONAL_SERIAL_EXCEPTION.reason})`,
+    );
     for (const test of slowest) {
       console.log(`[e2e-timing] ${test.durationMs} ms — ${test.file} — ${test.title}`);
     }
@@ -62,6 +71,7 @@ export default class E2ETimingReporter {
                   total: Number(process.env.RUNESPACE_E2E_SHARD_TOTAL),
                 }
               : null,
+            intentionalSerialException: INTENTIONAL_SERIAL_EXCEPTION,
             slowest,
           },
           null,

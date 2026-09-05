@@ -149,10 +149,18 @@ if (fileURLToPath(import.meta.url) === process.argv[1]) {
   let disposableDatabase;
   let runtime;
   let timeout;
+  let workerStateDirectory;
+  let powerAnnexClockPath;
   const signalHandlers = [];
 
   try {
     disposableDatabase = await createDisposableDatabase(baseDatabaseUrl, `focused_${spec}`);
+    workerStateDirectory = resolve(ROOT, ".playwright", "workers", disposableDatabase.databaseName);
+    powerAnnexClockPath = resolve(
+      ROOT,
+      ".playwright",
+      `power-annex-clock-${disposableDatabase.databaseName}`,
+    );
     const env = buildFocusedEnv({
       databaseUrl: disposableDatabase.databaseUrl,
       databaseName: disposableDatabase.databaseName,
@@ -190,11 +198,18 @@ if (fileURLToPath(import.meta.url) === process.argv[1]) {
     console.error(error instanceof Error ? error.message : error);
     process.exitCode = 1;
   } finally {
-    if (timeout) clearTimeout(timeout);
-    if (runtime) await runtime.terminateOwned();
-    for (const [signal, handler] of signalHandlers) process.removeListener(signal, handler);
-    if (disposableDatabase) {
-      await dropDisposableDatabase(baseDatabaseUrl, disposableDatabase.databaseName);
+    try {
+      if (timeout) clearTimeout(timeout);
+      if (runtime) await runtime.terminateOwned();
+      for (const [signal, handler] of signalHandlers) process.removeListener(signal, handler);
+      if (disposableDatabase) {
+        await dropDisposableDatabase(baseDatabaseUrl, disposableDatabase.databaseName);
+      }
+    } finally {
+      // Focused runs own the same run-scoped fixture paths; leave every other
+      // run's state and curated artifacts untouched.
+      if (workerStateDirectory) rmSync(workerStateDirectory, { force: true, recursive: true });
+      if (powerAnnexClockPath) rmSync(powerAnnexClockPath, { force: true });
     }
   }
 }

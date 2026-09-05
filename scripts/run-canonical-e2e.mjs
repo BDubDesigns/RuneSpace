@@ -43,6 +43,7 @@ let fail;
 let disposableDatabase;
 let timeout;
 let powerAnnexClockPath;
+let workerStateDirectory;
 let runId;
 const signalHandlers = [];
 
@@ -220,6 +221,7 @@ async function main() {
   try {
     disposableDatabase = await createDisposableDatabase(baseDatabaseUrl, "canonical");
     runId = disposableDatabase.databaseName;
+    workerStateDirectory = resolve(ROOT, ".playwright", "workers", runId);
     const screenshotLane = captureScreenshots;
     const env = {
       ...process.env,
@@ -266,11 +268,18 @@ async function main() {
     runtime.throwIfAborted();
     log(`All canonical E2E checks passed in ${Date.now() - startedAt} ms.`);
   } finally {
-    if (timeout) clearTimeout(timeout);
-    if (runtime) await runtime.terminateOwned();
-    for (const [signal, handler] of signalHandlers) process.removeListener(signal, handler);
-    if (disposableDatabase) {
-      await dropDisposableDatabase(baseDatabaseUrl, disposableDatabase.databaseName);
+    try {
+      if (timeout) clearTimeout(timeout);
+      if (runtime) await runtime.terminateOwned();
+      for (const [signal, handler] of signalHandlers) process.removeListener(signal, handler);
+      if (disposableDatabase) {
+        await dropDisposableDatabase(baseDatabaseUrl, disposableDatabase.databaseName);
+      }
+    } finally {
+      // Keep timing JSON for the CI artifact upload, but remove only this run's
+      // worker storage and Power Annex clock after all child processes stop.
+      if (workerStateDirectory) rmSync(workerStateDirectory, { force: true, recursive: true });
+      if (powerAnnexClockPath) rmSync(powerAnnexClockPath, { force: true });
     }
   }
 }
