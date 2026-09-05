@@ -385,7 +385,7 @@ const dialogue = {
       ),
       tansyLocal(
         EXPRESSION_IDS.smile,
-        "The Shale itself is source-agnostic. If you scavenge some along the way, it can fill the stack, but it does not replace those five Mining attempts.",
+        "I don't care where the Shale comes from. If you scavenge some along the way, it can fill the stack, but it does not replace those five Mining attempts.",
       ),
       tansyLocal(
         EXPRESSION_IDS.smile,
