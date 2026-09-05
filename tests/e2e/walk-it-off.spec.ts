@@ -1,59 +1,11 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, openTestCharacter } from "./fixtures";
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
-import {
-  activeActions,
-  characterMissions,
-  characterStarterProvisioning,
-  characterTravelState,
-  characters,
-  equippedItems,
-  inventoryStacks,
-  itemInstances,
-} from "@/db/rune-space";
-import { ITEM_IDS, LOCATION_IDS } from "@/game/config/foundations";
-import { miningStorageStatePath } from "./mining.setup";
+import { activeActions, equippedItems, itemInstances } from "@/db/rune-space";
+import { ITEM_IDS } from "@/game/config/foundations";
 
-const e2eDatabaseHost = process.env.DATABASE_URL ? new URL(process.env.DATABASE_URL).hostname : "";
-
-test.beforeAll(() => {
-  if (e2eDatabaseHost !== "localhost" && e2eDatabaseHost !== "127.0.0.1") {
-    throw new Error("Walk It Off E2E fixtures require a disposable localhost PostgreSQL database");
-  }
-});
-
-test.use({ storageState: miningStorageStatePath });
-test.describe.configure({ mode: "serial" });
-
-async function openPlayPage(page: import("@playwright/test").Page) {
-  await page.goto("/characters");
-  await page.getByRole("link", { name: "Play" }).click();
-  await page.waitForURL(/\/play\/[^/]+$/);
-  return page.url().split("/").at(-1)!;
-}
-
-test.beforeEach(async ({ page }) => {
-  const characterId = await openPlayPage(page);
-  await db.transaction(async (transaction) => {
-    await transaction.delete(activeActions).where(eq(activeActions.characterId, characterId));
-    await transaction
-      .delete(characterTravelState)
-      .where(eq(characterTravelState.characterId, characterId));
-    await transaction
-      .delete(characterMissions)
-      .where(eq(characterMissions.characterId, characterId));
-    await transaction.delete(inventoryStacks).where(eq(inventoryStacks.characterId, characterId));
-    await transaction.delete(equippedItems).where(eq(equippedItems.characterId, characterId));
-    await transaction.delete(itemInstances).where(eq(itemInstances.characterId, characterId));
-    await transaction
-      .delete(characterStarterProvisioning)
-      .where(eq(characterStarterProvisioning.characterId, characterId));
-    await transaction
-      .update(characters)
-      .set({ currentLocationId: LOCATION_IDS.crashSite })
-      .where(eq(characters.id, characterId));
-  });
-  await page.reload();
+test.beforeEach(async ({ page, testCharacter }) => {
+  await openTestCharacter(page, testCharacter.id);
 });
 
 async function fastForwardArrival(page: import("@playwright/test").Page, characterId: string) {

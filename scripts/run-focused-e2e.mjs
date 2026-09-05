@@ -15,7 +15,7 @@
 // - a clearly fake local build-and-runtime auth placeholder (never deployment)
 // - RUNESPACE_E2E_CANONICAL_HTTP=true (plain-HTTP test origin sessions)
 // - production build/server startup and readiness
-// - stale auth-state cleanup and per-invocation Playwright output cleanup
+// - per-invocation Playwright output cleanup
 // - deterministic teardown of ONLY its own processes (targeted kill, no
 //   broad pkill), safe when process ownership is uncertain
 //
@@ -101,9 +101,11 @@ export function buildFocusedEnv({ databaseUrl, port, databaseName }) {
     CI: "true",
     DATABASE_URL: databaseUrl,
     ...(databaseName ? { RUNESPACE_DISPOSABLE_TEST_DB: databaseName } : {}),
+    ...(databaseName ? { RUNESPACE_E2E_RUN_ID: databaseName } : {}),
     BETTER_AUTH_SECRET: FOCUSED_AUTH_SECRET,
     RUNESPACE_E2E_CANONICAL_HTTP: "true",
     RUNESPACE_E2E_EXTERNAL_SERVER: "true",
+    RUNESPACE_E2E_WORKERS: "1",
     // The Mining phase needs the canonical phase flags: CI + RUNESPACE_E2E_MINING
     // select the deterministic server-side mining RNG, and
     // RUNESPACE_E2E_PLAY_ERROR is baked into the client bundle at build time by
@@ -117,15 +119,11 @@ export function buildFocusedEnv({ databaseUrl, port, databaseName }) {
 }
 
 function prepareState(log) {
-  for (const path of [
-    resolve(ROOT, ".playwright/mining-auth-state.json"),
-    resolve(ROOT, "test-results"),
-    resolve(ROOT, "playwright-report"),
-  ]) {
+  for (const path of [resolve(ROOT, "test-results"), resolve(ROOT, "playwright-report")]) {
     if (existsSync(path)) rmSync(path, { force: true, recursive: true });
   }
   mkdirSync(resolve(ROOT, ".playwright"), { recursive: true });
-  log("Stale auth state and per-invocation Playwright output cleaned.");
+  log("Per-invocation Playwright output cleaned.");
   // Note: artifacts/e2e-review/ is deliberately NOT cleaned — curated
   // canonical screenshots must survive focused runs.
 }
@@ -151,10 +149,18 @@ if (fileURLToPath(import.meta.url) === process.argv[1]) {
   let disposableDatabase;
   let runtime;
   let timeout;
+  let workerStateDirectory;
+  let powerAnnexClockPath;
   const signalHandlers = [];
 
   try {
     disposableDatabase = await createDisposableDatabase(baseDatabaseUrl, `focused_${spec}`);
+    workerStateDirectory = resolve(ROOT, ".playwright", "workers", disposableDatabase.databaseName);
+    powerAnnexClockPath = resolve(
+      ROOT,
+      ".playwright",
+      `power-annex-clock-${disposableDatabase.databaseName}`,
+    );
     const env = buildFocusedEnv({
       databaseUrl: disposableDatabase.databaseUrl,
       databaseName: disposableDatabase.databaseName,
@@ -192,11 +198,18 @@ if (fileURLToPath(import.meta.url) === process.argv[1]) {
     console.error(error instanceof Error ? error.message : error);
     process.exitCode = 1;
   } finally {
-    if (timeout) clearTimeout(timeout);
-    if (runtime) await runtime.terminateOwned();
-    for (const [signal, handler] of signalHandlers) process.removeListener(signal, handler);
-    if (disposableDatabase) {
-      await dropDisposableDatabase(baseDatabaseUrl, disposableDatabase.databaseName);
+    try {
+      if (timeout) clearTimeout(timeout);
+      if (runtime) await runtime.terminateOwned();
+      for (const [signal, handler] of signalHandlers) process.removeListener(signal, handler);
+      if (disposableDatabase) {
+        await dropDisposableDatabase(baseDatabaseUrl, disposableDatabase.databaseName);
+      }
+    } finally {
+      // Focused runs own the same run-scoped fixture paths; leave every other
+      // run's state and curated artifacts untouched.
+      if (workerStateDirectory) rmSync(workerStateDirectory, { force: true, recursive: true });
+      if (powerAnnexClockPath) rmSync(powerAnnexClockPath, { force: true });
     }
   }
 }

@@ -1,75 +1,12 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, openTestCharacter } from "./fixtures";
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
-import {
-  activeActions,
-  cargoHoldItemInstances,
-  cargoHoldStacks,
-  characterCargoHoldRepair,
-  characterMiningState,
-  characterRefiningState,
-  characterSkillXp,
-  characterStarterProvisioning,
-  characterTravelState,
-  characters,
-  equippedItems,
-  inventoryStacks,
-  itemInstances,
-} from "@/db/rune-space";
+import { activeActions, characters, inventoryStacks } from "@/db/rune-space";
 import { ITEM_IDS, LOCATION_IDS } from "@/game/config/foundations";
-import { miningStorageStatePath } from "./mining.setup";
+import { captureReviewScreenshot } from "./review-screenshot";
 
-const e2eDatabaseHost = process.env.DATABASE_URL ? new URL(process.env.DATABASE_URL).hostname : "";
-
-test.beforeAll(() => {
-  if (e2eDatabaseHost !== "localhost" && e2eDatabaseHost !== "127.0.0.1") {
-    throw new Error("Cargo Hold E2E fixtures require a disposable localhost PostgreSQL database");
-  }
-});
-
-test.use({ storageState: miningStorageStatePath });
-test.describe.configure({ mode: "serial" });
-
-async function openCargoFixture(page: import("@playwright/test").Page) {
-  await page.goto("/characters");
-  await page.getByRole("link", { name: "Play" }).click();
-  await page.waitForURL(/\/play\/[^/]+$/);
-  return page.url().split("/").at(-1)!;
-}
-
-test.beforeEach(async ({ page }) => {
-  const characterId = await openCargoFixture(page);
-  await db.transaction(async (transaction) => {
-    await transaction.delete(activeActions).where(eq(activeActions.characterId, characterId));
-    await transaction
-      .delete(characterTravelState)
-      .where(eq(characterTravelState.characterId, characterId));
-    await transaction
-      .delete(cargoHoldItemInstances)
-      .where(eq(cargoHoldItemInstances.characterId, characterId));
-    await transaction.delete(cargoHoldStacks).where(eq(cargoHoldStacks.characterId, characterId));
-    await transaction
-      .delete(characterCargoHoldRepair)
-      .where(eq(characterCargoHoldRepair.characterId, characterId));
-    await transaction
-      .delete(characterMiningState)
-      .where(eq(characterMiningState.characterId, characterId));
-    await transaction
-      .delete(characterRefiningState)
-      .where(eq(characterRefiningState.characterId, characterId));
-    await transaction.delete(inventoryStacks).where(eq(inventoryStacks.characterId, characterId));
-    await transaction.delete(equippedItems).where(eq(equippedItems.characterId, characterId));
-    await transaction.delete(itemInstances).where(eq(itemInstances.characterId, characterId));
-    await transaction.delete(characterSkillXp).where(eq(characterSkillXp.characterId, characterId));
-    await transaction
-      .delete(characterStarterProvisioning)
-      .where(eq(characterStarterProvisioning.characterId, characterId));
-    await transaction
-      .update(characters)
-      .set({ currentLocationId: LOCATION_IDS.crashSite })
-      .where(eq(characters.id, characterId));
-  });
-  await page.reload();
+test.beforeEach(async ({ page, testCharacter }) => {
+  await openTestCharacter(page, testCharacter.id);
 });
 
 test("repairs the Cargo Hold, hard-stops Welding, and transfers occupied storage on mobile and desktop", async ({
@@ -103,7 +40,7 @@ test("repairs the Cargo Hold, hard-stops Welding, and transfers occupied storage
   await expect(cargoPanel.locator("[data-cargo-repair-materials]")).toContainText("0 / 15");
   await expect(cargoPanel.locator("[data-cargo-repair-materials]")).toContainText("0 / 6");
   await expect(cargoPanel).toContainText("LOCKED until both material requirements are complete");
-  await page.screenshot({ path: "test-results/cargo-mobile-repair.png" });
+  await captureReviewScreenshot(page, "cargo-mobile-repair.png");
 
   await cargoPanel.getByRole("button", { name: "CONTRIBUTE MATERIALS" }).click();
   const confirmation = page.locator("[data-cargo-confirmation]");
@@ -133,7 +70,7 @@ test("repairs the Cargo Hold, hard-stops Welding, and transfers occupied storage
   await expect(completionAnnouncement).toHaveText("CARGO HOLD RESTORED");
   await expect(restoredStatus).toContainText("0 / 32 SLOTS OCCUPIED");
   await expect(cargoPanel.getByRole("button", { name: "OPEN CARGO HOLD" })).toBeVisible();
-  await page.screenshot({ path: "test-results/cargo-mobile-restored.png" });
+  await captureReviewScreenshot(page, "cargo-mobile-restored.png");
 
   await expectSteadyState();
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
@@ -162,7 +99,7 @@ test("repairs the Cargo Hold, hard-stops Welding, and transfers occupied storage
   await page.setViewportSize({ width: 1280, height: 800 });
   await expect(cargoPanel.locator("[data-cargo-mode='carried']")).toBeVisible();
   await expect(cargoPanel.locator("[data-cargo-mode='cargo']")).toBeVisible();
-  await page.screenshot({ path: "test-results/cargo-desktop-storage.png" });
+  await captureReviewScreenshot(page, "cargo-desktop-storage.png");
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(1280);
 
   await db

@@ -81,7 +81,7 @@ See `.env.example`. Validated at startup by `server/env.ts` (Zod).
 
 - **Unit:** `pnpm test` (Vitest, pure domain/schema logic — fast, no DOM).
 - **Integration:** `pnpm test:integration` (Vitest against a fresh disposable PostgreSQL database; migrations and cleanup are automatic).
-- **Browser:** `pnpm test:e2e` (Playwright, focused journeys, using a disposable database). CI runs the canonical browser-journey job (Mining, Overlay, Travel, Character Profile, Power Annex, and the repeated Mining play-boundary check) via `pnpm test:e2e:canonical`; see `docs/testing-strategy.md`.
+- **Browser:** `pnpm test:e2e` (Playwright, focused journeys, using a disposable database). CI runs the 70-test canonical browser-journey selection across 13 behavioral specs via `pnpm test:e2e:canonical`; smoke, ownership, design-system, and QC Studio specs remain outside that merge-gate selection. See `docs/testing-strategy.md` for the sharded runner and opt-in screenshot lane.
 - **Strategy:** risk-based — pure rules, server/persistence boundaries, and a few critical mobile journeys. See `docs/testing-strategy.md`.
 
 ## Coolify

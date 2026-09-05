@@ -1,66 +1,13 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, openTestCharacter } from "./fixtures";
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
-import {
-  activeActions,
-  cargoHoldItemInstances,
-  cargoHoldStacks,
-  characters,
-  characterCargoHoldRepair,
-  characterMiningState,
-  characterRefiningState,
-  characterStarterProvisioning,
-  characterTravelState,
-  equippedItems,
-  inventoryStacks,
-  itemInstances,
-} from "@/db/rune-space";
+import { activeActions, characters, inventoryStacks } from "@/db/rune-space";
 import { ACTION_IDS, ITEM_IDS, LOCATION_IDS } from "@/game/config/foundations";
 import { GAME_TICK_MS } from "@/game/config/foundations";
-import { miningStorageStatePath } from "./mining.setup";
+import { captureReviewScreenshot } from "./review-screenshot";
 
-const e2eDatabaseHost = process.env.DATABASE_URL ? new URL(process.env.DATABASE_URL).hostname : "";
-
-test.beforeAll(() => {
-  if (e2eDatabaseHost !== "localhost" && e2eDatabaseHost !== "127.0.0.1") {
-    throw new Error("Refining E2E fixtures require a disposable localhost PostgreSQL database");
-  }
-});
-
-test.use({ storageState: miningStorageStatePath });
-test.describe.configure({ mode: "serial" });
-
-async function openRefiningFixture(page: import("@playwright/test").Page) {
-  await page.goto("/characters");
-  await page.getByRole("link", { name: "Play" }).click();
-  await page.waitForURL(/\/play\/[^\/]+$/);
-  return page.url().split("/").at(-1)!;
-}
-
-test.beforeEach(async ({ page }) => {
-  const characterId = await openRefiningFixture(page);
-  await Promise.all([
-    db.delete(activeActions).where(eq(activeActions.characterId, characterId)),
-    db.delete(cargoHoldItemInstances).where(eq(cargoHoldItemInstances.characterId, characterId)),
-    db.delete(cargoHoldStacks).where(eq(cargoHoldStacks.characterId, characterId)),
-    db
-      .delete(characterCargoHoldRepair)
-      .where(eq(characterCargoHoldRepair.characterId, characterId)),
-    db.delete(characterTravelState).where(eq(characterTravelState.characterId, characterId)),
-    db.delete(characterMiningState).where(eq(characterMiningState.characterId, characterId)),
-    db.delete(characterRefiningState).where(eq(characterRefiningState.characterId, characterId)),
-    db.delete(inventoryStacks).where(eq(inventoryStacks.characterId, characterId)),
-    db
-      .update(characters)
-      .set({ currentLocationId: LOCATION_IDS.crashSite })
-      .where(eq(characters.id, characterId)),
-    db
-      .delete(characterStarterProvisioning)
-      .where(eq(characterStarterProvisioning.characterId, characterId)),
-  ]);
-  await db.delete(equippedItems).where(eq(equippedItems.characterId, characterId));
-  await db.delete(itemInstances).where(eq(itemInstances.characterId, characterId));
-  await page.reload();
+test.beforeEach(async ({ page, testCharacter }) => {
+  await openTestCharacter(page, testCharacter.id);
 });
 
 async function travelTo(
@@ -138,7 +85,7 @@ test("Processing Yard Refining journey — Ferrite and Slag both branches, artwo
   await expect(latestRefining.getByLabel("15 Refining XP earned")).toBeVisible();
   await expect(page.getByText("1 attempts", { exact: true })).toBeVisible();
   await expect(page.getByText("1 Refined Ferrite", { exact: true }).first()).toBeVisible();
-  await page.screenshot({ path: "test-results/refining-mobile-active.png" });
+  await captureReviewScreenshot(page, "refining-mobile-active.png");
 
   // 6. deterministic failure: exactly 1 Slag +3 XP (second roll 9000 >= 4000)
   const secondAttemptAgo = new Date(Date.now() - 7 * GAME_TICK_MS - 100);
@@ -174,9 +121,9 @@ test("Processing Yard Refining journey — Ferrite and Slag both branches, artwo
     .poll(() => slagImg.evaluate((img: HTMLImageElement) => img.complete && img.naturalWidth > 0))
     .toBe(true);
   await page.getByRole("button", { name: "Close inventory" }).click();
-  await page.screenshot({ path: "test-results/refining-mobile-result.png" });
+  await captureReviewScreenshot(page, "refining-mobile-result.png");
   await page.setViewportSize({ width: 1280, height: 800 });
-  await page.screenshot({ path: "test-results/refining-desktop-active.png" });
+  await captureReviewScreenshot(page, "refining-desktop-active.png");
 
   // 8. refresh/reload while Refining retains authoritative run/progress state
   await page.reload();

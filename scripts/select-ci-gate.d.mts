@@ -16,3 +16,8 @@ export function shouldRequireMergeGate(input: {
   eventName: string;
   event: PullRequestGateEvent;
 }): boolean;
+
+export function shouldRunScreenshotLane(input: {
+  eventName: string;
+  event: PullRequestGateEvent;
+}): boolean;

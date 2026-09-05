@@ -1,23 +1,19 @@
-import { expect, test } from "@playwright/test";
+import { expect } from "@playwright/test";
 import { and, eq } from "drizzle-orm";
 import { db } from "@/db";
 import {
   activeActions,
-  cargoHoldItemInstances,
-  cargoHoldStacks,
   characters,
-  characterCargoHoldRepair,
   characterMiningState,
-  characterStarterProvisioning,
   equippedItems,
   inventoryStacks,
   itemInstances,
 } from "@/db/rune-space";
 import { ACTION_IDS, ITEM_IDS, LOCATION_IDS } from "@/game/config/foundations";
-import { miningStorageStatePath } from "./mining.setup";
+import { openTestCharacter, test } from "./fixtures";
 import { seedLegacyStarterCutter } from "./legacy-starter";
+import { captureReviewScreenshot } from "./review-screenshot";
 
-const e2eDatabaseHost = process.env.DATABASE_URL ? new URL(process.env.DATABASE_URL).hostname : "";
 const RESULT_FEEDBACK_DURATION_MS = 3_600;
 
 function animationDurationSeconds(value: string): number {
@@ -25,75 +21,13 @@ function animationDurationSeconds(value: string): number {
   return value.endsWith("ms") ? duration / 1_000 : duration;
 }
 
-test.beforeAll(() => {
-  if (e2eDatabaseHost !== "localhost" && e2eDatabaseHost !== "127.0.0.1") {
-    throw new Error("Mining E2E fixtures require a disposable localhost PostgreSQL database");
-  }
-});
-
-test.use({ storageState: miningStorageStatePath });
-test.describe.configure({ mode: "serial" });
-
-async function openMiningFixture(page: import("@playwright/test").Page) {
-  await page.goto("/characters");
-  await page.getByRole("link", { name: "Play" }).click();
-  await page.waitForURL(/\/play\/[^/]+$/);
-  return page.url().split("/").at(-1)!;
-}
-
-async function travelToJag(page: import("@playwright/test").Page, characterId: string) {
-  await page.getByRole("button", { name: /The Long Scramble/ }).click();
-  await page.getByRole("button", { name: /Walk to The Long Scramble/ }).click();
-  await expect(page.getByText("In transit", { exact: true }).first()).toBeVisible();
-  const atScramble = new Date(Date.now() - 25_000);
+test.beforeEach(async ({ page, testCharacter }) => {
   await db
-    .update(activeActions)
-    .set({ startedAt: atScramble, resolvedThroughAt: atScramble })
-    .where(eq(activeActions.characterId, characterId));
-  await page.reload();
-  await expect(page.getByRole("button", { name: /The Long Scramble/ }).first()).toHaveAttribute(
-    "aria-current",
-    "true",
-  );
-  await page.getByRole("button", { name: /The Jag/ }).click();
-  await page.getByRole("button", { name: /Walk to The Jag/ }).click();
-  await expect(page.getByText("In transit", { exact: true }).first()).toBeVisible();
-  const atJag = new Date(Date.now() - 25_000);
-  await db
-    .update(activeActions)
-    .set({ startedAt: atJag, resolvedThroughAt: atJag })
-    .where(eq(activeActions.characterId, characterId));
-  await page.reload();
-  await expect(page.getByRole("button", { name: /The Jag/ }).first()).toHaveAttribute(
-    "aria-current",
-    "true",
-  );
-}
-
-test.beforeEach(async ({ page }) => {
-  const characterId = await openMiningFixture(page);
-  await Promise.all([
-    db.delete(activeActions).where(eq(activeActions.characterId, characterId)),
-    db.delete(cargoHoldItemInstances).where(eq(cargoHoldItemInstances.characterId, characterId)),
-    db.delete(cargoHoldStacks).where(eq(cargoHoldStacks.characterId, characterId)),
-    db
-      .delete(characterCargoHoldRepair)
-      .where(eq(characterCargoHoldRepair.characterId, characterId)),
-    db.delete(characterMiningState).where(eq(characterMiningState.characterId, characterId)),
-    db.delete(inventoryStacks).where(eq(inventoryStacks.characterId, characterId)),
-    db
-      .update(characters)
-      .set({ currentLocationId: LOCATION_IDS.crashSite })
-      .where(eq(characters.id, characterId)),
-    db
-      .delete(characterStarterProvisioning)
-      .where(eq(characterStarterProvisioning.characterId, characterId)),
-  ]);
-  await db.delete(equippedItems).where(eq(equippedItems.characterId, characterId));
-  await db.delete(itemInstances).where(eq(itemInstances.characterId, characterId));
-  await seedLegacyStarterCutter(characterId);
-  await page.reload();
-  await travelToJag(page, characterId);
+    .update(characters)
+    .set({ currentLocationId: LOCATION_IDS.theJag })
+    .where(eq(characters.id, testCharacter.id));
+  await seedLegacyStarterCutter(testCharacter.id);
+  await openTestCharacter(page, testCharacter.id);
 });
 
 test("owned character can start, observe, stop, and restore Ferrite Mining at The Jag", async ({
@@ -130,7 +64,7 @@ test("owned character can start, observe, stop, and restore Ferrite Mining at Th
   await expect(latestResult).toContainText("Missed by 0.01");
   await expect(latestResult).toContainText("2 attempts resolved while away");
   await expect(latestResult).toHaveAttribute("data-feedback-state", "new");
-  await page.screenshot({ path: "test-results/mining-mobile-no-yield.png" });
+  await captureReviewScreenshot(page, "mining-mobile-no-yield.png");
   await expect(page.getByText("This mining run")).toBeVisible();
   await expect(page.getByText("2 attempts", { exact: true })).toBeVisible();
   await expect(page.getByText("1 successful", { exact: true })).toBeVisible();
@@ -143,9 +77,9 @@ test("owned character can start, observe, stop, and restore Ferrite Mining at Th
   await expect(history).toContainText("Roll 35.00 | Needed below 35.00");
   await expect(history).toContainText("Missed by 0.01");
   await expect(history).toContainText("Roll 0.00 | Needed below 35.00");
-  await page.screenshot({ path: "test-results/mining-mobile-active-viewport.png" });
+  await captureReviewScreenshot(page, "mining-mobile-active-viewport.png");
   await page.getByText("This mining run").scrollIntoViewIfNeeded();
-  await page.screenshot({ path: "test-results/mining-mobile-run-history-viewport.png" });
+  await captureReviewScreenshot(page, "mining-mobile-run-history-viewport.png");
   await page.getByRole("button", { name: "Inventory" }).click();
   const inventory = page.getByRole("dialog", { name: "Inventory" });
   await expect(inventory).toBeVisible();
@@ -306,7 +240,7 @@ test("owned character can start, observe, stop, and restore Ferrite Mining at Th
   expect(partialFill.fraction).toBeGreaterThan(0.08);
   expect(partialFill.fraction).toBeLessThan(0.12);
   await expect(inventory.getByLabel(/Empty inventory slot/)).toHaveCount(6);
-  await page.screenshot({ path: "test-results/mining-mobile-inventory-10-plus-1.png" });
+  await captureReviewScreenshot(page, "mining-mobile-inventory-10-plus-1.png");
   await page.getByRole("button", { name: "Close inventory" }).click();
   await expect(footer.getByRole("button", { name: "Inventory" })).toBeFocused();
   await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
@@ -316,13 +250,13 @@ test("owned character can start, observe, stop, and restore Ferrite Mining at Th
   expect(historyBox).not.toBeNull();
   expect(footerBox).not.toBeNull();
   expect(historyBox!.y + historyBox!.height).toBeLessThanOrEqual(footerBox!.y);
-  await page.screenshot({ path: "test-results/mining-mobile-page-bottom.png" });
+  await captureReviewScreenshot(page, "mining-mobile-page-bottom.png");
   await page.setViewportSize({ width: 1440, height: 900 });
   await expect(footer).toHaveCSS("position", "fixed");
-  await page.screenshot({ path: "test-results/mining-desktop-no-yield.png" });
+  await captureReviewScreenshot(page, "mining-desktop-no-yield.png");
   await page.getByRole("button", { name: "Inventory" }).click();
   await expect(inventory.getByText("x10", { exact: true })).toBeVisible();
-  await page.screenshot({ path: "test-results/mining-desktop-inventory-10-plus-1.png" });
+  await captureReviewScreenshot(page, "mining-desktop-inventory-10-plus-1.png");
   await page.keyboard.press("Escape");
   await expect(footer.getByRole("button", { name: "Inventory" })).toBeFocused();
   await page.getByRole("button", { name: "Stop Mining" }).click();
@@ -351,9 +285,9 @@ test("owned character can start, observe, stop, and restore Ferrite Mining at Th
     (element) => getComputedStyle(element).animationDuration,
   );
   expect(animationDurationSeconds(reducedMotionDuration)).toBeLessThanOrEqual(0.0001);
-  await page.screenshot({ path: "test-results/mining-desktop-success.png" });
+  await captureReviewScreenshot(page, "mining-desktop-success.png");
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.screenshot({ path: "test-results/mining-mobile-success.png" });
+  await captureReviewScreenshot(page, "mining-mobile-success.png");
   await page.waitForTimeout(RESULT_FEEDBACK_DURATION_MS + 250);
   await expect(latestResult).toHaveAttribute("data-feedback-state", "calm");
   await page.waitForTimeout(300);
@@ -362,8 +296,11 @@ test("owned character can start, observe, stop, and restore Ferrite Mining at Th
   await expect(latestResult).toHaveAttribute("data-feedback-state", "calm");
 });
 
-test("automatically resolves Mining and starts the next authoritative timer", async ({ page }) => {
-  const characterId = page.url().split("/").at(-1)!;
+test("automatically resolves Mining and starts the next authoritative timer", async ({
+  page,
+  testCharacter,
+}) => {
+  const characterId = testCharacter.id;
   await page.goto("/characters");
   const boundaryStart = new Date(Date.now() - 4_500);
   await db.insert(activeActions).values({
@@ -372,7 +309,7 @@ test("automatically resolves Mining and starts the next authoritative timer", as
     startedAt: boundaryStart,
     resolvedThroughAt: boundaryStart,
   });
-  await page.getByRole("link", { name: "Play" }).click();
+  await page.locator(`a[href="/play/${characterId}"]`).click();
   await page.waitForURL(/\/play\/[^/]+$/);
 
   await expect(page.getByText("1 successful", { exact: true })).toBeVisible({ timeout: 10_000 });
@@ -386,8 +323,9 @@ test("automatically resolves Mining and starts the next authoritative timer", as
 
 test("automatically resolves a boosted Mining attempt and decrements charge once", async ({
   page,
+  testCharacter,
 }) => {
-  const characterId = page.url().split("/").at(-1)!;
+  const characterId = testCharacter.id;
   await page.goto("/characters");
   const cutter = (
     await db
@@ -408,7 +346,7 @@ test("automatically resolves a boosted Mining attempt and decrements charge once
     startedAt: boundaryStart,
     resolvedThroughAt: boundaryStart,
   });
-  await page.getByRole("link", { name: "Play" }).click();
+  await page.locator(`a[href="/play/${characterId}"]`).click();
   await page.waitForURL(/\/play\/[^/]+$/);
 
   await expect(page.getByText("POWER CELL BOOST · 1 / 10")).toBeVisible();
@@ -428,8 +366,9 @@ test("automatically resolves a boosted Mining attempt and decrements charge once
 
 test("retries an early unchanged Mining boundary without duplicating the attempt", async ({
   page,
+  testCharacter,
 }) => {
-  const characterId = page.url().split("/").at(-1)!;
+  const characterId = testCharacter.id;
   const refreshRequests: string[] = [];
   page.on("request", (request) => {
     if (request.method() === "POST" && request.headers()["next-action"])
@@ -439,7 +378,6 @@ test("retries an early unchanged Mining boundary without duplicating the attempt
     const realNow = Date.now;
     Date.now = () => realNow() + 2_000;
   });
-  await page.goto("/characters");
   const boundaryStart = new Date(Date.now() - 4_500);
   await db.insert(activeActions).values({
     characterId,
@@ -447,8 +385,7 @@ test("retries an early unchanged Mining boundary without duplicating the attempt
     startedAt: boundaryStart,
     resolvedThroughAt: boundaryStart,
   });
-  await page.getByRole("link", { name: "Play" }).click();
-  await page.waitForURL(/\/play\/[^/]+$/);
+  await page.reload();
 
   await expect(page.getByText("1 successful", { exact: true })).toBeVisible({ timeout: 10_000 });
   expect(refreshRequests.length).toBeGreaterThanOrEqual(2);
@@ -483,7 +420,7 @@ test("shell reserves the fixed footer once and keeps the global background fixed
     scrollHeight: document.documentElement.scrollHeight,
   }));
   expect(characterMetrics.scrollHeight - characterMetrics.clientHeight).toBeLessThanOrEqual(2);
-  await page.screenshot({ path: "test-results/layout-mobile-characters.png" });
+  await captureReviewScreenshot(page, "layout-mobile-characters.png");
 
   const playHref = await page.getByRole("link", { name: "Play" }).getAttribute("href");
   const characterId = playHref?.split("/").at(-1);
@@ -492,7 +429,7 @@ test("shell reserves the fixed footer once and keeps the global background fixed
     .update(characters)
     .set({ currentLocationId: LOCATION_IDS.abandonedProcessingYard })
     .where(eq(characters.id, characterId!));
-  await page.getByRole("link", { name: "Play" }).click();
+  await page.locator(`a[href="/play/${characterId!}"]`).click();
   await page.waitForURL(/\/play\/[^/]+$/);
   await page.setViewportSize({ width: 390, height: 844 });
   await page.reload();
@@ -544,7 +481,7 @@ test("shell reserves the fixed footer once and keeps the global background fixed
       yardBottomGeometry.navTop - yardBottomGeometry.contentBottom - yardGeometry.expectedGap,
     ),
   ).toBeLessThanOrEqual(2);
-  await page.screenshot({ path: "test-results/layout-mobile-play-yard.png" });
+  await captureReviewScreenshot(page, "layout-mobile-play-yard.png");
 
   const background = await page.evaluate(() => ({
     htmlAttachment: getComputedStyle(document.documentElement).backgroundAttachment,
@@ -591,7 +528,7 @@ test("shell reserves the fixed footer once and keeps the global background fixed
   // fixed toolbar without changing the toolbar's own box height.
   const bottomGap = bottomGeometry.navTop - bottomGeometry.contentBottom;
   expect(Math.abs(bottomGap - bottomGeometry.expectedGap)).toBeLessThanOrEqual(2);
-  await page.screenshot({ path: "test-results/layout-mobile-play-bottom.png" });
+  await captureReviewScreenshot(page, "layout-mobile-play-bottom.png");
 
   // A viewport-height change (a proxy for browser-chrome/orientation changes)
   // must not create a tail, while the genuinely tall Crash Site state remains
@@ -617,7 +554,7 @@ test("shell reserves the fixed footer once and keeps the global background fixed
   expect(landscapeGeometry.scrollRange).toBeGreaterThan(10);
   const landscapeGap = landscapeGeometry.navTop - landscapeGeometry.contentBottom;
   expect(Math.abs(landscapeGap - landscapeGeometry.expectedGap)).toBeLessThanOrEqual(2);
-  await page.screenshot({ path: "test-results/layout-mobile-play-scrolled-background.png" });
+  await captureReviewScreenshot(page, "layout-mobile-play-scrolled-background.png");
 });
 
 test("equipment drawer shows and updates the approved Mining loadout", async ({ page }) => {
@@ -673,10 +610,10 @@ test("equipment drawer shows and updates the approved Mining loadout", async ({ 
   await expect(inventory.getByLabel("16 inventory slots")).toBeVisible();
   await inventory.getByRole("button", { name: "Close inventory" }).click();
   await equipmentTrigger.click();
-  await page.screenshot({ path: "test-results/mining-mobile-equipment.png" });
+  await captureReviewScreenshot(page, "mining-mobile-equipment.png");
   await page.setViewportSize({ width: 1440, height: 900 });
   await expect(equipment).toBeVisible();
-  await page.screenshot({ path: "test-results/mining-desktop-equipment.png" });
+  await captureReviewScreenshot(page, "mining-desktop-equipment.png");
 });
 
 test("Power Cell loading boosts Mining attempts and falls back after depletion", async ({
@@ -889,11 +826,11 @@ test("equipment and inventory rendering shows artwork for illustrated items and 
   await expect(mykeaArt).toHaveCSS("object-fit", "contain");
 
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.screenshot({ path: "test-results/mining-mobile-equipment-artwork.png" });
+  await captureReviewScreenshot(page, "mining-mobile-equipment-artwork.png");
 
   // Desktop equipment view
   await page.setViewportSize({ width: 1440, height: 900 });
-  await page.screenshot({ path: "test-results/mining-desktop-equipment-artwork.png" });
+  await captureReviewScreenshot(page, "mining-desktop-equipment-artwork.png");
 
   await equipment.getByRole("button", { name: "Close equipment" }).click();
 
@@ -986,9 +923,9 @@ test("equipment and inventory rendering shows artwork for illustrated items and 
   expect(invArtState.cssHeight).toBe("80px");
 
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.screenshot({ path: "test-results/mining-mobile-inventory-mixed.png" });
+  await captureReviewScreenshot(page, "mining-mobile-inventory-mixed.png");
   await page.setViewportSize({ width: 1440, height: 900 });
-  await page.screenshot({ path: "test-results/mining-desktop-inventory-mixed.png" });
+  await captureReviewScreenshot(page, "mining-desktop-inventory-mixed.png");
 
   await page.setViewportSize({ width: 390, height: 844 });
 }, 30_000);
@@ -1076,12 +1013,10 @@ test("a carried unequipped Cutter occupies one visible Inventory slot and leaves
       name: "Cutter charge: 3 of 10 charges remaining",
     }),
   ).toBeVisible();
-  await page.screenshot({
-    path: "test-results/mining-mobile-inventory-carried-cutter-selected.png",
-  });
+  await captureReviewScreenshot(page, "mining-mobile-inventory-carried-cutter-selected.png");
   // Every slot is occupied: no empty tile remains.
   await expect(inventory.getByLabel(/Empty inventory slot/)).toHaveCount(0);
-  await page.screenshot({ path: "test-results/mining-mobile-inventory-carried-cutter.png" });
+  await captureReviewScreenshot(page, "mining-mobile-inventory-carried-cutter.png");
   await inventory.getByRole("button", { name: "Close inventory" }).click();
 
   // Re-equipping the same instance removes it from Inventory again.
@@ -1245,8 +1180,7 @@ test("the Play boundary resets, navigates, and hides failure details", async ({ 
  * single full-width header panel containing both the larger lockup and Sign
  * out, overflow freedom, icon metadata, and that the banner no longer
  * duplicates the location subtitle. Sign-out operability is covered by the
- * dedicated `signout` spec so this serial group's shared session (and its CI
- * retries) stay intact.
+ * dedicated `signout` spec, which owns its own account and runs independently.
  */
 test("production header is one full-width panel with the larger lockup and Sign out", async ({
   page,
@@ -1297,7 +1231,7 @@ test("production header is one full-width panel with the larger lockup and Sign 
     () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
   );
   expect(mobileWidth).toBeLessThanOrEqual(0);
-  await page.screenshot({ path: "test-results/mining-mobile-header.png" });
+  await captureReviewScreenshot(page, "mining-mobile-header.png");
 
   await page.setViewportSize({ width: 1440, height: 900 });
   await expect(lockup).toBeVisible();
@@ -1312,7 +1246,7 @@ test("production header is one full-width panel with the larger lockup and Sign 
     () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
   );
   expect(desktopWidth).toBeLessThanOrEqual(0);
-  await page.screenshot({ path: "test-results/mining-desktop-header.png" });
+  await captureReviewScreenshot(page, "mining-desktop-header.png");
 
   // The app metadata must reference the committed emblem icon assets, and each
   // referenced URL must be served with a non-empty body.
@@ -1405,7 +1339,7 @@ test("a full Inventory stack is dropped through inline confirmation and frees on
   expect(previewBox!.height).toBeGreaterThanOrEqual(104);
   expect(previewBox!.height).toBeLessThanOrEqual(120);
   expect(statsBox!.height).toBeGreaterThan(previewBox!.height);
-  await page.screenshot({ path: "test-results/mining-mobile-inventory-selection.png" });
+  await captureReviewScreenshot(page, "mining-mobile-inventory-selection.png");
 
   // Drop stack enters the inline permanent-destruction confirmation.
   await details.getByRole("button", { name: "Drop stack (10)" }).click();
@@ -1416,7 +1350,7 @@ test("a full Inventory stack is dropped through inline confirmation and frees on
   );
   const cancel = confirmation.getByRole("button", { name: "Cancel" });
   await expect(cancel).toBeFocused();
-  await page.screenshot({ path: "test-results/mining-mobile-inventory-drop-confirmation.png" });
+  await captureReviewScreenshot(page, "mining-mobile-inventory-drop-confirmation.png");
   // Keyboard confirm: Tab reaches the destructive control, Enter confirms.
   await page.keyboard.press("Tab");
   await page.keyboard.press("Enter");
@@ -1434,7 +1368,7 @@ test("a full Inventory stack is dropped through inline confirmation and frees on
   // After a successful confirm, keyboard focus returns to the grid.
   await expect(inventory.locator("button[aria-pressed]").first()).toBeFocused();
 
-  await page.screenshot({ path: "test-results/mining-mobile-inventory-drop-success.png" });
+  await captureReviewScreenshot(page, "mining-mobile-inventory-drop-success.png");
   await inventory.getByRole("button", { name: "Close inventory" }).click();
 
   // Carried mass updated authoritatively: 7 full stacks (7 kg) + 15 kg loadout.
@@ -1494,7 +1428,7 @@ test("a selected Power Cell loads the depleted equipped Cutter from Inventory", 
   // The charged Cutter now refuses an immediate second load with the reason.
   await expect(inventory.getByRole("button", { name: "5 Power Cell" }).first()).toBeVisible();
 
-  await page.screenshot({ path: "test-results/mining-mobile-inventory-cell-loaded.png" });
+  await captureReviewScreenshot(page, "mining-mobile-inventory-cell-loaded.png");
 
   // The Equipment surface reflects the same authoritative charge.
   await inventory.getByRole("button", { name: "Close inventory" }).click();
@@ -1589,5 +1523,5 @@ test("selected details stay open through actions and dismiss deliberately", asyn
     (element) => element.scrollWidth - element.clientWidth,
   );
   expect(drawerOverflow).toBeLessThanOrEqual(1);
-  await page.screenshot({ path: "test-results/mining-mobile-inventory-dossier.png" });
+  await captureReviewScreenshot(page, "mining-mobile-inventory-dossier.png");
 });

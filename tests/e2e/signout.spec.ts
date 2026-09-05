@@ -14,8 +14,6 @@ function uniqueEmail() {
   return `signout-fixture-${Date.now()}-${Math.floor(Math.random() * 1e6)}@example.com`;
 }
 
-test.describe.configure({ mode: "serial" });
-
 test("Sign out from the authenticated header returns to the signed-out landing", async ({
   page,
 }) => {

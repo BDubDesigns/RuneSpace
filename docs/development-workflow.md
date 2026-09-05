@@ -137,8 +137,9 @@ simply an unclaimed port here.
   through `RUNESPACE_FOCUSED_E2E_PORT` (a validated high port in
   `1024..65535`).
 - The focused runner currently supports `mining`, `character-profile`,
-  `location-population`, `character-portraits`, and `cargo-hold`; it does not support the
-  Travel phase. To run one Travel test in isolation, start from the repository
+  `location-population`, `character-portraits`, `cargo-hold`, `inventory-equip`,
+  `walk-it-off`, and `cut-your-teeth`; it does not support the Travel phase. To
+  run one Travel test in isolation, start from the repository
   root, choose a separately confirmed-free high port, and let Playwright own a
   production server with the managed local environment:
 
@@ -197,12 +198,35 @@ cd /home/brandon/workspace/projects/runespace
 The focused runner (`scripts/run-focused-e2e.mjs`) reuses the canonical
 primitives and process supervisor from `scripts/e2e-shared.mjs`. It validates
 the localhost-only database and Node 22, selects and verifies its high port,
-cleans stale auth state and per-invocation Playwright output (never the curated
+cleans per-invocation Playwright output (never the curated
 `artifacts/e2e-review/`), applies migrations, performs one production build with
 a local build-and-runtime auth placeholder, starts the production server, waits
 for readiness, runs the selected phase (`--project=chromium`), and terminates
 only its own processes. Focused execution is iteration evidence only — only
 `pnpm test:e2e:canonical` and the matching CI job establish CI parity.
+
+Issue #139's canonical browser contract is intentionally narrower than the
+whole `tests/e2e/` directory: the Playwright config allowlists the existing
+behavioral specs and excludes smoke, ownership, design-system, and QC Studio
+coverage from the Full/Merge browser gate. Ordinary authenticated tests use one
+worker-scoped Better Auth session and one fresh server-created character per
+test. The admin operator spec remains serial because its fixed identity and
+process-global allowlist are the explicit shared boundary; sign-out, portraits,
+registration, and character creation retain independent sessions.
+
+The canonical runner invokes that selection once with zero retries and
+retain-on-failure traces. GitHub runs three `--shard` jobs concurrently, each
+with its own PostgreSQL service, disposable database, and production server.
+The initial local/CI benchmark uses two Playwright workers; keep timing summaries
+from `.playwright/canonical-timing-*.json` and choose a later worker count from
+GitHub wall-clock and stability evidence rather than treating two as a permanent
+target. Curated review screenshots are opt-in only: the `e2e-screenshots` label
+runs a separate deterministic one-worker, unsharded lane using the same
+selection and fixtures. The normal three behavioral shards do not generate that
+manifest. For the Issue #139 stress evidence, run inventory-equip at least ten
+times with at least two workers and zero retries, plus a repeated state-heavy
+gameplay spec in parallel with zero retries; report failures, retries, and wall
+clock separately from the canonical gate.
 
 ### Generic fresh clone or Docker Compose setup
 For a separately created generic local Docker database, `.env.example` contains
@@ -222,10 +246,11 @@ Run affected focused checks when their required environment is available. For
 example, integration tests require PostgreSQL and browser tests require the
 Playwright browser dependencies and their database setup.
 
-Canonical CI also runs PostgreSQL integration tests and the canonical E2E
-browser-journey job (Mining, Overlay, Travel, and the repeated Mining
-play-boundary check). A local skip or unavailable environment is not a pass:
-report it as unexecuted and wait for the corresponding canonical CI result.
+Canonical CI also runs PostgreSQL integration tests and three concurrent shards
+of the explicit canonical E2E behavioral selection. A separate one-worker
+screenshot lane runs only when the `e2e-screenshots` label is requested. A local
+skip or unavailable environment is not a pass: report it as unexecuted and wait
+for the corresponding canonical CI result.
 
 ### Focused implementation checks, then full canonical parity
 

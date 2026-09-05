@@ -1,65 +1,15 @@
-import { expect, test } from "@playwright/test";
+import { test, expect, openTestCharacter } from "./fixtures";
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
-import {
-  activeActions,
-  cargoHoldItemInstances,
-  cargoHoldStacks,
-  characters,
-  characterCargoHoldRepair,
-  characterMiningState,
-  characterStarterProvisioning,
-  equippedItems,
-  inventoryStacks,
-  itemInstances,
-} from "@/db/rune-space";
-import { ITEM_IDS, LOCATION_IDS } from "@/game/config/foundations";
+import { equippedItems, itemInstances, inventoryStacks } from "@/db/rune-space";
+import { ITEM_IDS } from "@/game/config/foundations";
 import { getEffectiveGameBalance } from "@/game/config/balance";
-import { miningStorageStatePath } from "./mining.setup";
-
-const e2eDatabaseHost = process.env.DATABASE_URL ? new URL(process.env.DATABASE_URL).hostname : "";
-
-test.beforeAll(() => {
-  if (e2eDatabaseHost !== "localhost" && e2eDatabaseHost !== "127.0.0.1") {
-    throw new Error(
-      "Inventory equip E2E fixtures require a disposable localhost PostgreSQL database",
-    );
-  }
-});
-
-test.use({ storageState: miningStorageStatePath });
+import { captureReviewScreenshot } from "./review-screenshot";
 
 // The Inventory/Equipment surface is exercised on the primary Mining page at
 // the same canonical portrait viewport used across the browser suite.
-async function openPlayPage(page: import("@playwright/test").Page) {
-  await page.goto("/characters");
-  await page.getByRole("link", { name: "Play" }).click();
-  await page.waitForURL(/\/play\/[^/]+$/);
-  return page.url().split("/").at(-1)!;
-}
-
-test.beforeEach(async ({ page }) => {
-  const characterId = await openPlayPage(page);
-  await Promise.all([
-    db.delete(activeActions).where(eq(activeActions.characterId, characterId)),
-    db.delete(cargoHoldItemInstances).where(eq(cargoHoldItemInstances.characterId, characterId)),
-    db.delete(cargoHoldStacks).where(eq(cargoHoldStacks.characterId, characterId)),
-    db
-      .delete(characterCargoHoldRepair)
-      .where(eq(characterCargoHoldRepair.characterId, characterId)),
-    db.delete(characterMiningState).where(eq(characterMiningState.characterId, characterId)),
-    db.delete(inventoryStacks).where(eq(inventoryStacks.characterId, characterId)),
-    db
-      .update(characters)
-      .set({ currentLocationId: LOCATION_IDS.crashSite })
-      .where(eq(characters.id, characterId)),
-    db
-      .delete(characterStarterProvisioning)
-      .where(eq(characterStarterProvisioning.characterId, characterId)),
-  ]);
-  await db.delete(equippedItems).where(eq(equippedItems.characterId, characterId));
-  await db.delete(itemInstances).where(eq(itemInstances.characterId, characterId));
-  await page.reload();
+test.beforeEach(async ({ page, testCharacter }) => {
+  await openTestCharacter(page, testCharacter.id);
 });
 
 test.describe("Inventory equip and compact selected visual", () => {
@@ -70,12 +20,10 @@ test.describe("Inventory equip and compact selected visual", () => {
     const characterId = page.url().split("/").at(-1)!;
     const balance = getEffectiveGameBalance();
 
-    // before() auto-provisions an equipped Cutter + starter container and
-    // leaves the starter-provisioning marker present. To exercise the
-    // empty-carried-inventory fallback we need a carried Salvage Cutter with an
-    // EMPTY Mining-tool slot and no other carried items. Because the starter
-    // marker already exists, `getMiningGameplayState` will NOT auto-equip a new
-    // Cutter on reload, so the state we seed below is authoritative and stable:
+    // beforeEach opens an isolated character. First-play provisioning supplies
+    // the starter container only; the fixture does not seed a legacy Cutter.
+    // Reset the item/equipment rows and explicitly establish the authoritative
+    // state needed for the empty-carried-inventory fallback:
     //   - carried: exactly one Salvage Cutter (the only carried unique item),
     //   - equipped: one MYKEA container (required by the loadout rule), tool slot EMPTY,
     //   - no carried stacks, no other unique items.
@@ -115,7 +63,7 @@ test.describe("Inventory equip and compact selected visual", () => {
     await expect(detailsPanel.getByRole("button", { name: /Equip in Mining tool/ })).toBeVisible();
 
     // Frozen review screenshot: narrow portrait selected-item details (Issue #68).
-    await page.screenshot({ path: "test-results/inventory-equip-mobile-selected-cutter.png" });
+    await captureReviewScreenshot(page, "inventory-equip-mobile-selected-cutter.png");
 
     // Compact selected visual: at the 390px portrait viewport the selected
     // artwork tile stays ~7rem (112px) wide instead of stretching across the
@@ -180,7 +128,7 @@ test.describe("Inventory equip and compact selected visual", () => {
 
     // Frozen review screenshot: the Salvage Cutter Equip state, shown equipped
     // in the Mining-tool slot without a reload (Issue #68).
-    await page.screenshot({ path: "test-results/inventory-equip-mobile-equipped.png" });
+    await captureReviewScreenshot(page, "inventory-equip-mobile-equipped.png");
   });
 
   test("keeps the selected-stack visual compact on narrow portrait and does not overflow", async ({
@@ -240,11 +188,11 @@ test.describe("Inventory equip and compact selected visual", () => {
     await page.setViewportSize({ width: 390, height: 844 });
     const characterId = page.url().split("/").at(-1)!;
 
-    // before() auto-provisions an equipped Cutter + one container (marker
-    // present). Add a spare carried MYKEA container: it is a unique item that
-    // is eligible for a CONTAINER slot, but Issue #68 scopes Inventory Equip to
-    // the authoritative Mining-tool slot only, so its details must expose NO
-    // Equip action. Keep the marker present so the loadout is not re-provisioned.
+    // beforeEach opens an isolated character and first-play provisioning
+    // supplies the starter container only; no legacy Cutter is present. Add a
+    // spare carried MYKEA container: it is a unique item that is eligible for a
+    // CONTAINER slot, but Issue #68 scopes Inventory Equip to the authoritative
+    // Mining-tool slot only, so its details must expose NO Equip action.
     await db.insert(itemInstances).values({
       characterId,
       itemId: ITEM_IDS.mykeaSchleppraum8,
@@ -255,8 +203,8 @@ test.describe("Inventory equip and compact selected visual", () => {
     await page.getByRole("button", { name: "Inventory" }).click();
     await expect(inventoryDrawer).toBeVisible();
 
-    // Select the carried spare MYKEA (a unique item tile). The equipped Cutter
-    // is not carried; the spare MYKEA is the additional carried unique.
+    // Select the carried spare MYKEA (the unique item added by this test); the
+    // starter container remains the only equipped item.
     const spareTile = inventoryDrawer
       .locator("button[aria-pressed]")
       .filter({ hasText: "MYKEA SCHLEPPRAUM-8" })

@@ -42,6 +42,16 @@ export function shouldRequireMergeGate({ eventName: name, event: payload }) {
   return false;
 }
 
+export function shouldRunScreenshotLane({ eventName: name, event: payload }) {
+  if (name !== "pull_request" || !shouldRunFullGate({ eventName: name, event: payload })) {
+    return false;
+  }
+  const labels = Array.isArray(payload.pull_request?.labels)
+    ? payload.pull_request.labels.map((label) => label.name)
+    : [];
+  return labels.includes("e2e-screenshots");
+}
+
 if (fileURLToPath(import.meta.url) === process.argv[1]) {
   const eventName = process.env.GITHUB_EVENT_NAME;
   const eventPath = process.env.GITHUB_EVENT_PATH;
@@ -54,9 +64,11 @@ if (fileURLToPath(import.meta.url) === process.argv[1]) {
   const event = JSON.parse(readFileSync(eventPath, "utf8"));
   const full = shouldRunFullGate({ eventName, event });
   const mergeRequired = shouldRequireMergeGate({ eventName, event });
+  const screenshots = shouldRunScreenshotLane({ eventName, event });
   appendFileSync(outputPath, `full=${full}\n`);
   appendFileSync(outputPath, `merge_required=${mergeRequired}\n`);
+  appendFileSync(outputPath, `screenshots=${screenshots}\n`);
   console.log(
-    `[ci-gate] ${full ? "full" : "fast-only"}, ${mergeRequired ? "merge-required" : "draft"}`,
+    `[ci-gate] ${full ? "full" : "fast-only"}, ${mergeRequired ? "merge-required" : "draft"}, ${screenshots ? "screenshots" : "no screenshots"}`,
   );
 }
