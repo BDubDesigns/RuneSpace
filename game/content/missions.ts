@@ -214,6 +214,11 @@ export type MissionDefinition = {
    * in the router; never replays the one-shot completion presentation.
    */
   completedNpcDialogue?: readonly MissionNpcDialogue[];
+  /**
+   * Ordinary contextual dialogue while this mission is active for relevant
+   * NPCs who are neither an offer nor the turn-in NPC.
+   */
+  activeNpcDialogue?: readonly MissionNpcDialogue[];
 };
 
 /**
@@ -323,6 +328,7 @@ export const CUT_YOUR_TEETH: MissionDefinition = {
     { npcId: NPC_IDS.tansyRusk, dialogueId: DIALOGUE_IDS.tansyPostCutYourTeeth },
     { npcId: NPC_IDS.wadeRusk, dialogueId: DIALOGUE_IDS.wadePostCutYourTeeth },
   ],
+  activeNpcDialogue: [{ npcId: NPC_IDS.wadeRusk, dialogueId: DIALOGUE_IDS.wadeCutYourTeethActive }],
 };
 
 /** Waste Not is accepted only as Cut Your Teeth's authored continuation. */
@@ -358,6 +364,7 @@ export const WASTE_NOT: MissionDefinition = {
     busyDialogueId: DIALOGUE_IDS.wadeWasteNotBusy,
     completionPresentationDialogueId: DIALOGUE_IDS.wadeWasteNotCompletion,
   },
+  activeNpcDialogue: [{ npcId: NPC_IDS.tansyRusk, dialogueId: DIALOGUE_IDS.tansyWasteNotActive }],
   completedNpcDialogue: [
     { npcId: NPC_IDS.wadeRusk, dialogueId: DIALOGUE_IDS.wadePostWasteNot },
     { npcId: NPC_IDS.tansyRusk, dialogueId: DIALOGUE_IDS.tansyPostWasteNot },

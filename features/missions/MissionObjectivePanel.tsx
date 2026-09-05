@@ -27,6 +27,9 @@ export function MissionObjectivePanel({ state }: { state: PlayGameplayState }) {
   const showRequirements =
     requirements.length > 1 ||
     requirements.some((requirement) => requirement.kind === "tracked_activity");
+  const showCurrentObjective =
+    !showRequirements ||
+    !requirements.some((requirement) => requirement.objective === mission.currentObjective);
 
   function openLog() {
     setMissionsFocus(missionId);
@@ -84,9 +87,14 @@ export function MissionObjectivePanel({ state }: { state: PlayGameplayState }) {
             ))}
           </ul>
         ) : null}
-        <p className="mt-3 text-sm text-[color:var(--rs-mission-text)]">
-          {mission.currentObjective}
-        </p>
+        {showCurrentObjective ? (
+          <p
+            className="mt-3 text-sm text-[color:var(--rs-mission-text)]"
+            data-mission-objective-current
+          >
+            {mission.currentObjective}
+          </p>
+        ) : null}
       </button>
     </Panel>
   );

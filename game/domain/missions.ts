@@ -521,6 +521,29 @@ export function validateMissionDefinitions(definitions: readonly MissionDefiniti
         seen.add(entry.npcId);
       }
     }
+    if (definition.activeNpcDialogue) {
+      const offerNpcIds = new Set(definition.offers.map((offer) => offer.npcId));
+      const seen = new Set<string>();
+      for (const entry of definition.activeNpcDialogue) {
+        if (!getNpc(entry.npcId))
+          throw new Error(`${where} active dialogue references unknown NPC "${entry.npcId}".`);
+        assertDialogue(definition.id, entry.dialogueId, "active NPC dialogue");
+        assertDialogueNpc(definition.id, entry.dialogueId, entry.npcId, "active NPC dialogue");
+        if (entry.npcId === definition.turnIn.npcId) {
+          throw new Error(
+            `${where} active NPC dialogue cannot override turn-in dialogue for NPC "${entry.npcId}".`,
+          );
+        }
+        if (offerNpcIds.has(entry.npcId)) {
+          throw new Error(
+            `${where} active NPC dialogue cannot override an offer NPC for NPC "${entry.npcId}".`,
+          );
+        }
+        if (seen.has(entry.npcId))
+          throw new Error(`${where} duplicates active dialogue for NPC "${entry.npcId}".`);
+        seen.add(entry.npcId);
+      }
+    }
     const progressKeys = new Set<string>();
     for (const requirement of definition.requirements) {
       if (requirement.kind === "at_location") {

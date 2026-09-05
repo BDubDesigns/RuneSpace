@@ -206,6 +206,19 @@ const dialogue = {
       ),
     ],
   },
+  [DIALOGUE_IDS.wadeCutYourTeethActive]: {
+    id: DIALOGUE_IDS.wadeCutYourTeethActive,
+    npcId: NPC_IDS.wadeRusk,
+    beats: [
+      wadeLocal(EXPRESSION_IDS.neutral, "You're a long way from The Jag."),
+      wadeLocal(
+        EXPRESSION_IDS.neutral,
+        "Unless you're wandering on purpose. Scavenging. Loose parts turn up in strange places.",
+      ),
+      wadeLocal(EXPRESSION_IDS.scowl, "...No. You're lost."),
+      wadeLocal(EXPRESSION_IDS.neutral, "Yeah. That's probably it."),
+    ],
+  },
   [DIALOGUE_IDS.tansyPostCutYourTeeth]: {
     id: DIALOGUE_IDS.tansyPostCutYourTeeth,
     npcId: NPC_IDS.tansyRusk,
@@ -496,6 +509,16 @@ const dialogue = {
       ),
     ],
   },
+  [DIALOGUE_IDS.tansyWasteNotActive]: {
+    id: DIALOGUE_IDS.tansyWasteNotActive,
+    npcId: NPC_IDS.tansyRusk,
+    beats: [
+      tansyLocal(
+        EXPRESSION_IDS.neutral,
+        "The hopper's at the Abandoned Processing Yard. Make five Refining attempts, then report back to Wade.",
+      ),
+    ],
+  },
   [DIALOGUE_IDS.wadeWasteNotBusy]: {
     id: DIALOGUE_IDS.wadeWasteNotBusy,
     npcId: NPC_IDS.wadeRusk,
@@ -635,6 +658,11 @@ export function resolveNpcMissionDialogueWithDefinitions(
       const sequence = turnInStageSequence(definition, projection.stage);
       if (sequence) return { sequence, missionId: definition.id };
       continue;
+    }
+    const activeNpcDialogue = definition.activeNpcDialogue?.find((entry) => entry.npcId === npcId);
+    if (activeNpcDialogue) {
+      const sequence = getDialogue(activeNpcDialogue.dialogueId);
+      if (sequence) return { sequence, missionId: definition.id };
     }
     const offer = definition.offers.find((candidate) => candidate.npcId === npcId);
     const activeId = offer?.activeDialogueId;

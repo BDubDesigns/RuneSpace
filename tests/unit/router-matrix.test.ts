@@ -99,7 +99,7 @@ describe("router matrix parity", () => {
   ) => p(MISSION_IDS.cutYourTeeth, state, stage, prereq);
   const waste = (state: NpcDialogueProjection["state"]) => p(MISSION_IDS.wasteNot, state);
 
-  it("Wade: offer when WIO not accepted, follow-up after", () => {
+  it("Wade: offer when WIO not accepted, active Cut follow-up after", () => {
     expect(resolveNpcMissionDialogue(NPC_IDS.wadeRusk, [wio("not_accepted")])?.sequence.id).toBe(
       DIALOGUE_IDS.wadeOffer,
     );
@@ -108,7 +108,7 @@ describe("router matrix parity", () => {
     );
     expect(
       resolveNpcMissionDialogue(NPC_IDS.wadeRusk, [wio("completed"), cyt("active")])?.sequence.id,
-    ).toBe(DIALOGUE_IDS.wadeFollowUp);
+    ).toBe(DIALOGUE_IDS.wadeCutYourTeethActive);
   });
 
   it("Tansy: explorer offer → completion → after-remote-acceptance stays available", () => {
@@ -289,6 +289,19 @@ describe("router matrix parity", () => {
       resolveNpcMissionDialogue(NPC_IDS.tansyRusk, [wio("completed"), cyt("completed")])?.sequence
         .id,
     ).toBe(DIALOGUE_IDS.tansyPostCutYourTeeth);
+  });
+
+  it("active authored NPC dialogue wins over completed-story fallback", () => {
+    expect(
+      resolveNpcMissionDialogue(NPC_IDS.tansyRusk, [
+        wio("completed"),
+        cyt("completed"),
+        waste("active"),
+      ])?.sequence.id,
+    ).toBe(DIALOGUE_IDS.tansyWasteNotActive);
+    expect(
+      resolveNpcMissionDialogue(NPC_IDS.wadeRusk, [wio("completed"), cyt("active")])?.sequence.id,
+    ).toBe(DIALOGUE_IDS.wadeCutYourTeethActive);
   });
 
   it("Waste Not completed state wins for both NPCs after its presentation closes", () => {

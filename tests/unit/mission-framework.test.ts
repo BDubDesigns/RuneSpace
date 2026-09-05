@@ -210,6 +210,62 @@ describe("issue #124 mission registry validation", () => {
     ).not.toThrow();
   });
 
+  it("validates active NPC dialogue as a distinct generic mapping", () => {
+    const activeNpcDefinition = (activeNpcDialogue: MissionDefinition["activeNpcDialogue"]) =>
+      definitionOf({
+        id: "active_npc_dialogue" as ContentId,
+        offers: [
+          {
+            npcId: NPC_IDS.tansyRusk,
+            locationId: LOCATION_IDS.theJag,
+            dialogueId: DIALOGUE_IDS.tansyCutYourTeethOffer,
+          },
+        ],
+        turnIn: {
+          npcId: NPC_IDS.tansyRusk,
+          locationId: LOCATION_IDS.theJag,
+          requiresStationary: true,
+          objective: "Talk to Tansy Rusk",
+          dialogueId: DIALOGUE_IDS.tansyCutYourTeethTurnIn,
+        },
+        activeNpcDialogue,
+      });
+
+    expect(() =>
+      validateMissionDefinitions([
+        activeNpcDefinition([
+          { npcId: NPC_IDS.wadeRusk, dialogueId: DIALOGUE_IDS.wadeCutYourTeethActive },
+        ]),
+      ]),
+    ).not.toThrow();
+    expect(() =>
+      validateMissionDefinitions([
+        activeNpcDefinition([
+          { npcId: NPC_IDS.wadeRusk, dialogueId: DIALOGUE_IDS.tansyWasteNotActive },
+        ]),
+      ]),
+    ).toThrow(/belongs to NPC/i);
+    expect(() =>
+      validateMissionDefinitions([
+        activeNpcDefinition([
+          { npcId: NPC_IDS.wadeRusk, dialogueId: DIALOGUE_IDS.wadeCutYourTeethActive },
+          { npcId: NPC_IDS.wadeRusk, dialogueId: DIALOGUE_IDS.wadeCutYourTeethActive },
+        ]),
+      ]),
+    ).toThrow(/duplicates active dialogue/i);
+    const offerConflict = activeNpcDefinition([
+      { npcId: NPC_IDS.tansyRusk, dialogueId: DIALOGUE_IDS.tansyWasteNotActive },
+    ]);
+    offerConflict.turnIn = {
+      npcId: NPC_IDS.wadeRusk,
+      locationId: LOCATION_IDS.crashSite,
+      requiresStationary: true,
+      objective: "Talk to Wade Rusk",
+      dialogueId: DIALOGUE_IDS.wadeWasteNotTurnIn,
+    };
+    expect(() => validateMissionDefinitions([offerConflict])).toThrow(/offer NPC/i);
+  });
+
   it("rejects a stackable item reward: validation and runtime capability must agree", () => {
     // Ferrite Shale is stackable; the generic completion boundary executes
     // item rewards only as one new unique instance. A stackable reward would

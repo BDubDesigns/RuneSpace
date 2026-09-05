@@ -145,6 +145,7 @@ test("equips the Cutter through Inventory, shows a full stack, and earns Mining 
   await expect(page.locator("[data-mission-objective]")).toContainText(
     "Complete 5 Mining attempts — 0 / 5",
   );
+  await expect(page.locator("[data-mission-objective-current]")).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Start Mining" })).toHaveAttribute(
     "data-mission-guidance",
     "active",
@@ -152,6 +153,34 @@ test("equips the Cutter through Inventory, shows a full stack, and earns Mining 
   await expect(page.getByRole("button", { name: /Talk to Tansy Rusk/ })).not.toHaveAttribute(
     "data-mission-guidance",
   );
+
+  // An active Cut Your Teeth mission owns Wade's contextual off-path dialogue
+  // while the player is away from Tansy; it does not fall back to Walk It Off.
+  await db
+    .update(characters)
+    .set({ currentLocationId: LOCATION_IDS.crashSite })
+    .where(eq(characters.id, characterId));
+  await page.reload();
+  await page.getByRole("button", { name: /Talk to Wade Rusk/ }).click();
+  const wadeDuringCut = page.getByRole("dialog", { name: "Wade Rusk dialogue" });
+  await expect(wadeDuringCut).toBeVisible();
+  await expect(wadeDuringCut.locator('[data-dialogue-text] [aria-hidden="true"]')).toContainText(
+    "You're a long way from The Jag",
+  );
+  await expect(
+    wadeDuringCut.locator('[data-dialogue-text] [aria-hidden="true"]'),
+  ).not.toContainText("Tansy give you the Cutter");
+  await wadeDuringCut.getByRole("button", { name: "Next", exact: true }).click();
+  await wadeDuringCut.getByRole("button", { name: "Next", exact: true }).click();
+  await wadeDuringCut.getByRole("button", { name: "Next", exact: true }).click();
+  await expect(wadeDuringCut.getByRole("button", { name: "Finish" })).toBeVisible();
+  await wadeDuringCut.getByRole("button", { name: "Finish" }).click();
+  await expect(wadeDuringCut).toBeHidden();
+  await db
+    .update(characters)
+    .set({ currentLocationId: LOCATION_IDS.theJag })
+    .where(eq(characters.id, characterId));
+  await page.reload();
 
   await page.getByRole("button", { name: "Start Mining" }).click();
   await expect(page.getByRole("button", { name: "Stop Mining" })).toBeVisible();
@@ -179,6 +208,9 @@ test("equips the Cutter through Inventory, shows a full stack, and earns Mining 
   // Objective advances past both steps: with a full stack already carried,
   // equip + collect satisfy instantly and the turn-in objective shows.
   await expect(page.locator("[data-mission-objective]")).toContainText(
+    "Show a full stack of Ferrite Shale to Tansy Rusk",
+  );
+  await expect(page.locator("[data-mission-objective-current]")).toHaveText(
     "Show a full stack of Ferrite Shale to Tansy Rusk",
   );
   await expect(page.getByRole("button", { name: /Talk to Tansy Rusk/ })).toHaveAttribute(
@@ -275,28 +307,25 @@ test("equips the Cutter through Inventory, shows a full stack, and earns Mining 
     .where(eq(equippedItems.itemInstanceId, cutterId));
   expect(assignments[0]?.assignmentKind).toBe("gear");
 
-  // Issue #129: after closing the completion presentation, subsequent talks
-  // resolve ordinary post-CYT dialogue — not a replay of the item/XP presentation.
+  // While Waste Not is active, Tansy owns contextual active-Mission dialogue
+  // rather than falling back to stale completed Cut Your Teeth dialogue.
   await page.getByRole("button", { name: /Talk to Tansy Rusk/ }).click();
   const tansyPost = page.getByRole("dialog", { name: "Tansy Rusk dialogue" });
   await expect(tansyPost).toBeVisible();
   await expect(tansyPost.locator('[data-dialogue-subject="item"]')).toHaveCount(0);
   await expect(tansyPost.locator("[data-dialogue-skill-xp-tile]")).toHaveCount(0);
   await expect(tansyPost.locator('[data-dialogue-text] [aria-hidden="true"]')).toContainText(
+    "The hopper's at the Abandoned Processing Yard",
+  );
+  await expect(tansyPost.locator('[data-dialogue-text] [aria-hidden="true"]')).not.toContainText(
     "You kept the shale?",
   );
-  await tansyPost.getByRole("button", { name: "Next", exact: true }).click();
-  await expect(tansyPost.locator('[data-dialogue-text] [aria-hidden="true"]')).toContainText(
-    "You know how to handle the Cutter now",
-  );
-  await tansyPost.getByRole("button", { name: "Next", exact: true }).click();
   await expect(tansyPost.getByRole("button", { name: "Finish" })).toBeVisible();
   await tansyPost.getByRole("button", { name: "Finish" }).click();
   await expect(tansyPost).toBeHidden();
 
-  // Reload also resolves ordinary post-CYT dialogue and does not replay the
-  // reward presentation. XP, shale, and the active Waste Not assignment
-  // remain intact.
+  // Reload preserves the active Waste Not dialogue ownership and does not
+  // replay the Cut completion presentation.
   await page.reload();
   await expect(page.locator("[data-mission-objective]")).toContainText("Waste Not");
   await page.getByRole("button", { name: /Talk to Tansy Rusk/ }).click();
@@ -305,10 +334,11 @@ test("equips the Cutter through Inventory, shows a full stack, and earns Mining 
   await expect(tansyPostReload.locator('[data-dialogue-subject="item"]')).toHaveCount(0);
   await expect(tansyPostReload.locator("[data-dialogue-skill-xp-tile]")).toHaveCount(0);
   await expect(tansyPostReload.locator('[data-dialogue-text] [aria-hidden="true"]')).toContainText(
-    "You kept the shale?",
+    "The hopper's at the Abandoned Processing Yard",
   );
-  await tansyPostReload.getByRole("button", { name: "Next", exact: true }).click();
-  await tansyPostReload.getByRole("button", { name: "Next", exact: true }).click();
+  await expect(
+    tansyPostReload.locator('[data-dialogue-text] [aria-hidden="true"]'),
+  ).not.toContainText("You kept the shale?");
   await expect(tansyPostReload.getByRole("button", { name: "Finish" })).toBeVisible();
   await tansyPostReload.getByRole("button", { name: "Finish" }).click();
   await expect(tansyPostReload).toBeHidden();
@@ -351,6 +381,9 @@ test("equips the Cutter through Inventory, shows a full stack, and earns Mining 
   await expect(page.getByText("5 attempts", { exact: true })).toBeVisible();
   await expect(page.locator("[data-mission-objective-requirements]")).toContainText(
     "Complete 5 Refining attempts at the Abandoned Processing Yard — 5 / 5",
+  );
+  await expect(page.locator("[data-mission-objective-current]")).toHaveText(
+    "Return to Wade Rusk at the Crash Site",
   );
   const refiningXpBeforeWasteTurnIn = await refiningXpTotal(characterId);
   await expect(page.locator("[data-mission-objective]")).toContainText(

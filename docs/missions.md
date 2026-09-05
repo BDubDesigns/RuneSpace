@@ -99,6 +99,8 @@ type MissionNpcDialogue = { npcId: NpcId; dialogueId: DialogueId };
 
 A mission may also author `completedNpcDialogue: readonly MissionNpcDialogue[]` on `MissionDefinition` so a later mission can advance story dialogue for NPCs outside its offer/turn-in set (e.g. Cut Your Teeth advancing Wade after Tansy's turn-in).
 
+An active mission may author `activeNpcDialogue: readonly MissionNpcDialogue[]` for contextual dialogue at relevant NPCs who are neither offer nor turn-in NPCs. The mapping is optional and additive; the turn-in NPC's stage-aware dialogue and an offer NPC's `activeDialogueId` remain their existing owners. Validation rejects unknown or duplicate NPC mappings, NPC/dialogue mismatches, and attempts to override an offer or turn-in route.
+
 Consumers never read `offers[0]` as "the" offer and never infer location from an NPC record.
 
 ## 5. Ordered requirement vocabulary
@@ -192,11 +194,11 @@ Dialogue remains **authored content** while semantic mission state **selects** t
 ### Authored dialogue homes
 
 - **Sequences** — `game/content/dialogue.ts` (`DialogueSequence`, `DIALOGUE_SEQUENCES`, `getDialogue`). Beats are presentation only (`npc` / `item` / `skill_xp`); item and skill-XP beats never mutate state.
-- **Semantic mapping** — `MissionOffer` (`dialogueId`, `acceptedContinuationDialogueId`, `activeDialogueId`) plus `MissionDefinition.completedNpcDialogue` (ordinary post-completion story dialogue per NPC) and `MissionDialogue` for turn-in-stage branches, capacity, and the one-shot completion presentation.
+- **Semantic mapping** — `MissionOffer` (`dialogueId`, `acceptedContinuationDialogueId`, `activeDialogueId`) plus `MissionDefinition.activeNpcDialogue` (contextual active dialogue for relevant off-path NPCs), `MissionDefinition.completedNpcDialogue` (ordinary post-completion story dialogue per NPC), and `MissionDialogue` for turn-in-stage branches, capacity, and the one-shot completion presentation.
 
 ### Currently supported semantic dialogue routing
 
-All routed through the single generic router `resolveNpcMissionDialogue(npcId, projections)` in `game/content/dialogue.ts`, which consumes `NpcDialogueProjection` (`missionId`, `state`, `prerequisiteSatisfied`, `stage`). Routing scans projections newest-first in three tiers: offers → active missions → completed missions, driven exclusively by semantic state, never by mission-ID chains in UI code. Completed-story routing prefers the newest/furthest authored mission state for each NPC; `completionPresentationDialogueId` is **not** persistent idle dialogue — it is immediate one-shot presentation after success (§9.1).
+All routed through the single generic router `resolveNpcMissionDialogue(npcId, projections)` in `game/content/dialogue.ts`, which consumes `NpcDialogueProjection` (`missionId`, `state`, `prerequisiteSatisfied`, `stage`). Routing scans projections newest-first in three tiers: offers → active missions → completed missions, driven exclusively by semantic state, never by mission-ID chains in UI code. Within active missions, turn-in stage routing wins first, then `activeNpcDialogue`, then an offer's `activeDialogueId`. Completed-story routing is used only when no active mission owns dialogue for the NPC and prefers the newest/furthest authored mission state; `completionPresentationDialogueId` is **not** persistent idle dialogue — it is immediate one-shot presentation after success (§9.1).
 
 | Routing tier | Kind | Source | When it is selected |
 | --- | --- | --- | --- |
@@ -207,6 +209,7 @@ All routed through the single generic router `resolveNpcMissionDialogue(npcId, p
 | Active (turn-in NPC) | **Equipment reminder** | `MissionDialogue.equipmentReminderDialogueId` | first unmet requirement `kind === "equipped_item"` |
 | Active (turn-in NPC) | **Carried-item reminder** | `MissionDialogue.carriedReminderDialogueId` | first unmet requirement `kind === "carried_stack"` |
 | Active (other offer NPC) | **Active follow-up** | `MissionOffer.activeDialogueId` | the offer NPC while the mission is active — e.g. Wade while Walk It Off is active |
+| Active (relevant off-path NPC) | **Active contextual dialogue** | `MissionDefinition.activeNpcDialogue` | an authored active mission mapping for an NPC who is neither an offer nor turn-in NPC |
 | Completion | **Capacity refusal — slots** | `MissionDialogue.capacitySlotsDialogueId` | item reward preflight failed on `slots` (selected generically from the mission's mapping after a `capacity` refusal) |
 | Completion | **Capacity refusal — mass** | `MissionDialogue.capacityMassDialogueId` | item reward preflight failed on `mass` |
 | Completed story | **Ordinary post-completion dialogue** | `MissionDefinition.completedNpcDialogue` | newest completed mission that authors ordinary dialogue for this NPC; one-shot completion presentation is **not** reused here |
@@ -314,10 +317,16 @@ An ordinary mission is one that uses already-supported semantics: authored conte
 
 An ordinary mission using existing semantics should generally require:
 
-1. **Stable mission/dialogue IDs** — entries in `MISSION_IDS` / `DIALOGUE_IDS` (`game/config/foundations.ts`) plus any new item/NPC/location/action IDs it genuinely needs.
-2. **One mission definition** — a single `MissionDefinition` in `game/content/missions.ts` with offers, ordered requirements, `turnIn`, reward, and `dialogue` mapping. Add it to `MISSIONS` in authored order (the chain order matters for newest-first routing).
-3. **Authored dialogue sequences** — in `game/content/dialogue.ts`, plus any needed idle/continuation/capacity/completion beats referenced by the definition.
-4. **Focused definition / projection / integration / E2E coverage** for the new behavior — balance-adjacent derivation, validation, and journey coverage appropriate to what the mission newly exercises. No need to retrofit unrelated docs.
+1. **Identity and presentation** — stable mission/dialogue IDs, title, and summary; add only genuinely needed item/NPC/location/action IDs.
+2. **Discovery semantics** — prerequisite versus explicit continuation, whether the mission is manually discoverable, and every authored offer route or immediate post-acceptance continuation.
+3. **Ordered requirements and guidance** — requirement order, live-state versus tracked-activity semantics, stable tracked key/positive target where applicable, and recommended action guidance.
+4. **Turn-in semantics** — NPC, location, stationary requirement, objective copy, and whether the turn-in is distinct from any requirement location.
+5. **Reward and presentation** — exactly-once reward shape, capacity/refusal behavior where applicable, and the one-shot completion presentation.
+6. **Active dialogue ownership** — offer-NPC active follow-up, turn-in reminders/busy dialogue, and `activeNpcDialogue` for relevant off-path/revisit NPCs who need contextual state while the mission is active.
+7. **Persistent story state** — `completedNpcDialogue` for every relevant NPC, including which later mission should supersede that dialogue so completed story state cannot regress.
+8. **Persistence rollout** — migration ownership, acceptance/continuation initialization, existing-character migration or backfill behavior, and idempotence/rollback expectations.
+9. **Manual preview checks** — refresh/reload, partial progress, success and failure attempts, stopped/restarted activity, turn-in gating, exactly-once reward, completion presentation close, and post-completion revisits to relevant NPCs.
+10. **Focused automated coverage** — definition validation, projection/guidance precedence, active/completed routing, persistence/concurrency at the correct integration layer, and the complete player journey when a new mission changes it.
 
 ### It should not normally require
 
