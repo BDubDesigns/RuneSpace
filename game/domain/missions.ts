@@ -1,4 +1,5 @@
 import { getItemDefinition, skillLevelThresholds } from "@/game/config/balance";
+import { ACTION_IDS } from "@/game/config/foundations";
 import { getActionOutputItemIds } from "@/game/domain/action-outputs";
 import { getDialogue } from "@/game/content/dialogue";
 import { getLocation } from "@/game/content/locations";
@@ -31,6 +32,8 @@ export type MissionObservation = {
   stackLimits: ReadonlyMap<string, number>;
   /** Authoritative display names by item ID for authored copy. */
   itemNames: ReadonlyMap<string, string>;
+  /** Durable current progress by authored tracked-requirement key. */
+  trackedProgress?: ReadonlyMap<string, number>;
 };
 
 /**
@@ -72,10 +75,10 @@ export type MissionRequirementStatus = {
   /** Whether this requirement currently holds against authoritative state. */
   satisfied: boolean;
   /**
-   * Live quantity progress for carried-stack requirements
-   * (`carried` clamps at `required`); absent for other kinds.
+   * Generic numeric progress for carried-stack and tracked-activity
+   * requirements; both values are clamped to the authored target.
    */
-  progress?: { carried: number; required: number };
+  progress?: { current: number; target: number };
   /** The item this requirement observes, when it observes one. */
   itemId?: string;
   /** The location this requirement observes, when it observes one. */
@@ -146,6 +149,15 @@ function renderRequirementObjective(
   observation: MissionObservation | undefined,
 ): string {
   if (requirement.kind === "at_location") return requirement.objective;
+  if (requirement.kind === "tracked_activity") {
+    const current = Math.min(
+      observation?.trackedProgress?.get(requirement.progressKey) ?? 0,
+      requirement.target,
+    );
+    return requirement.objective
+      .replace("{current}", String(current))
+      .replace("{target}", String(requirement.target));
+  }
   const itemName = observation?.itemNames.get(requirement.itemId) ?? requirement.itemId;
   if (requirement.kind === "equipped_item") {
     return requirement.objective.replace("{item}", itemName);
@@ -181,6 +193,10 @@ function requirementSatisfied(
       const carried = observation?.carriedQuantities.get(requirement.itemId) ?? 0;
       return carried >= requiredCarriedQuantity(requirement, observation);
     }
+    case "tracked_activity":
+      return (
+        (observation?.trackedProgress?.get(requirement.progressKey) ?? 0) >= requirement.target
+      );
   }
 }
 
@@ -282,7 +298,10 @@ function deriveGuidance(
   if (firstUnsatisfied.kind === "equipped_item") {
     return { equipmentItemId: firstUnsatisfied.itemId };
   }
-  if (firstUnsatisfied.kind === "carried_stack" && firstUnsatisfied.recommendedActionId) {
+  if (
+    (firstUnsatisfied.kind === "carried_stack" || firstUnsatisfied.kind === "tracked_activity") &&
+    firstUnsatisfied.recommendedActionId
+  ) {
     return { actionId: firstUnsatisfied.recommendedActionId };
   }
   return undefined;
@@ -347,13 +366,25 @@ function projectRequirement(
       locationId: requirement.locationId,
     };
   }
-  const itemName = observation?.itemNames.get(requirement.itemId) ?? requirement.itemId;
   if (requirement.kind === "equipped_item") {
+    const itemName = observation?.itemNames.get(requirement.itemId) ?? requirement.itemId;
     return {
       kind: requirement.kind,
       objective: requirement.objective.replace("{item}", itemName),
       satisfied,
       itemId: requirement.itemId,
+    };
+  }
+  if (requirement.kind === "tracked_activity") {
+    const current = Math.min(
+      observation?.trackedProgress?.get(requirement.progressKey) ?? 0,
+      requirement.target,
+    );
+    return {
+      kind: requirement.kind,
+      objective: renderRequirementObjective(requirement, observation),
+      satisfied,
+      progress: { current, target: requirement.target },
     };
   }
   const required = requiredCarriedQuantity(requirement, observation);
@@ -362,7 +393,7 @@ function projectRequirement(
     kind: requirement.kind,
     objective: renderRequirementObjective(requirement, observation),
     satisfied,
-    progress: { carried: Math.min(rawCarried, required), required },
+    progress: { current: Math.min(rawCarried, required), target: required },
     itemId: requirement.itemId,
   };
 }
@@ -429,9 +460,14 @@ export function deriveMissionGuidanceTargets(
  */
 export function validateMissionDefinitions(definitions: readonly MissionDefinition[]): void {
   const knownIds = new Set(definitions.map((definition) => definition.id));
+  const continuationTargets = new Set(
+    definitions
+      .map((definition) => definition.continuationMissionId)
+      .filter((missionId): missionId is string => missionId !== undefined),
+  );
   for (const definition of definitions) {
     const where = `Mission "${definition.id}"`;
-    if (definition.offers.length === 0) {
+    if (definition.offers.length === 0 && !continuationTargets.has(definition.id)) {
       throw new Error(`${where} must author at least one offer interaction.`);
     }
     if (definition.prerequisiteMissionId !== undefined) {
@@ -485,12 +521,45 @@ export function validateMissionDefinitions(definitions: readonly MissionDefiniti
         seen.add(entry.npcId);
       }
     }
+    const progressKeys = new Set<string>();
     for (const requirement of definition.requirements) {
       if (requirement.kind === "at_location") {
         if (!getLocation(requirement.locationId)) {
           throw new Error(
             `${where} requirement references unknown location "${requirement.locationId}".`,
           );
+        }
+        continue;
+      }
+      if (requirement.kind === "tracked_activity") {
+        if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(requirement.progressKey)) {
+          throw new Error(
+            `${where} tracked activity progress key must be lowercase hyphenated text.`,
+          );
+        }
+        if (progressKeys.has(requirement.progressKey)) {
+          throw new Error(
+            `${where} duplicates tracked activity progress key "${requirement.progressKey}".`,
+          );
+        }
+        progressKeys.add(requirement.progressKey);
+        if (requirement.activity !== "mining" && requirement.activity !== "refining") {
+          throw new Error(`${where} references unsupported tracked activity.`);
+        }
+        if (requirement.metric !== "attempts") {
+          throw new Error(`${where} references unsupported tracked activity metric.`);
+        }
+        if (!Number.isInteger(requirement.target) || requirement.target <= 0) {
+          throw new Error(`${where} tracked activity target must be a positive integer.`);
+        }
+        if (requirement.recommendedActionId) {
+          const expectedActionId =
+            requirement.activity === "mining" ? ACTION_IDS.ferriteShaleMining : ACTION_IDS.refining;
+          if (requirement.recommendedActionId !== expectedActionId) {
+            throw new Error(
+              `${where} tracked activity guidance must target its authoritative activity action.`,
+            );
+          }
         }
         continue;
       }
@@ -536,6 +605,12 @@ export function validateMissionDefinitions(definitions: readonly MissionDefiniti
       assertDialogue(definition.id, dialogue.equipmentReminderDialogueId, "equipment reminder");
     if (dialogue.carriedReminderDialogueId)
       assertDialogue(definition.id, dialogue.carriedReminderDialogueId, "carried reminder");
+    if (dialogue.trackedActivityReminderDialogueId)
+      assertDialogue(
+        definition.id,
+        dialogue.trackedActivityReminderDialogueId,
+        "tracked activity reminder",
+      );
     if (dialogue.busyDialogueId) assertDialogue(definition.id, dialogue.busyDialogueId, "busy");
     if (dialogue.completionPresentationDialogueId) {
       assertDialogue(

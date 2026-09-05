@@ -42,6 +42,20 @@ describe("issue #124 mission registry validation", () => {
     expect(() => validateMissionDefinitions([definitionOf({ offers: [] })])).toThrow(/offer/i);
   });
 
+  it("allows an offerless mission only when an authored continuation reaches it", () => {
+    const continuationOnly = definitionOf({
+      id: "continuation_only" as ContentId,
+      offers: [],
+      prerequisiteMissionId: undefined,
+    });
+    const predecessor = definitionOf({
+      id: "continuation_source" as ContentId,
+      continuationMissionId: continuationOnly.id,
+    });
+    expect(() => validateMissionDefinitions([predecessor, continuationOnly])).not.toThrow();
+    expect(() => validateMissionDefinitions([continuationOnly])).toThrow(/offer/i);
+  });
+
   it("rejects an unknown prerequisite and a self-prerequisite", () => {
     expect(() =>
       validateMissionDefinitions([
@@ -297,7 +311,8 @@ describe("issue #124 generic UI consumers", () => {
   it("contains no mission-ID branches or objective-prose parsing in features", () => {
     const featuresRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../../features");
     const offenders: string[] = [];
-    const missionIdLiterals = /walk_it_off|cut_your_teeth|walkItOff|cutYourTeeth|MISSION_IDS/;
+    const missionIdLiterals =
+      /walk_it_off|cut_your_teeth|waste_not|walkItOff|cutYourTeeth|wasteNot|MISSION_IDS/;
     function scan(dir: string) {
       for (const entry of readdirSync(dir)) {
         const full = join(dir, entry);
@@ -423,6 +438,7 @@ describe("issue #137 authored mission continuation validation", () => {
 
   it("accepts the production Walk It Off → Cut Your Teeth continuation", () => {
     expect(WALK_IT_OFF.continuationMissionId).toBe(MISSION_IDS.cutYourTeeth);
+    expect(CUT_YOUR_TEETH.continuationMissionId).toBe(MISSION_IDS.wasteNot);
     expect(() => validateMissionDefinitions(MISSIONS)).not.toThrow();
   });
 
@@ -483,7 +499,7 @@ describe("issue #137 simultaneous current-stage requirement projection", () => {
 
   const accepted = { acceptedAt: new Date("2026-01-01T00:00:00.000Z") };
 
-  it("exposes all three Cut Your Teeth requirements with live satisfaction", () => {
+  it("exposes all four Cut Your Teeth requirements with live satisfaction", () => {
     const projected = projectMission(
       CUT_YOUR_TEETH,
       accepted,
@@ -493,19 +509,23 @@ describe("issue #137 simultaneous current-stage requirement projection", () => {
         carriedQuantities: new Map([[ITEM_IDS.ferriteShale, 4]]),
       }),
     );
-    expect(projected.requirements).toHaveLength(3);
+    expect(projected.requirements).toHaveLength(4);
     expect(projected.requirements?.map((requirement) => requirement.kind)).toEqual([
       "at_location",
       "equipped_item",
+      "tracked_activity",
       "carried_stack",
     ]);
     expect(projected.requirements?.map((requirement) => requirement.satisfied)).toEqual([
       true,
       false,
       false,
+      false,
     ]);
-    expect(projected.requirements?.[2]?.progress).toEqual({ carried: 4, required: 10 });
-    expect(projected.requirements?.[2]?.objective).toBe(
+    expect(projected.requirements?.[2]?.progress).toEqual({ current: 0, target: 5 });
+    expect(projected.requirements?.[3]?.progress).toEqual({ current: 4, target: 10 });
+    expect(projected.requirements?.[2]?.objective).toBe("Complete 5 Mining attempts — 0 / 5");
+    expect(projected.requirements?.[3]?.objective).toBe(
       "Get a full stack of Ferrite Shale — 4 / 10",
     );
     expect(projected.stage?.nextObjectiveKind).toBe("equipped_item");
@@ -520,10 +540,12 @@ describe("issue #137 simultaneous current-stage requirement projection", () => {
       cutYourTeethObservation({
         equippedItemIds: new Set([ITEM_IDS.salvageCutter]),
         carriedQuantities: new Map([[ITEM_IDS.ferriteShale, 4]]),
+        trackedProgress: new Map([["mining-attempts", 5]]),
       }),
     );
     expect(unequipped.requirements?.[1]?.satisfied).toBe(true);
-    expect(unequipped.requirements?.[2]?.progress).toEqual({ carried: 4, required: 10 });
+    expect(unequipped.requirements?.[2]?.progress).toEqual({ current: 5, target: 5 });
+    expect(unequipped.requirements?.[3]?.progress).toEqual({ current: 4, target: 10 });
 
     const regressed = projectMission(
       CUT_YOUR_TEETH,
@@ -535,7 +557,8 @@ describe("issue #137 simultaneous current-stage requirement projection", () => {
       }),
     );
     expect(regressed.requirements?.[1]?.satisfied).toBe(false);
-    expect(regressed.requirements?.[2]?.progress).toEqual({ carried: 2, required: 10 });
+    expect(regressed.requirements?.[2]?.progress).toEqual({ current: 0, target: 5 });
+    expect(regressed.requirements?.[3]?.progress).toEqual({ current: 2, target: 10 });
   });
 
   it("shows the turn-in objective when every requirement holds", () => {
@@ -547,6 +570,7 @@ describe("issue #137 simultaneous current-stage requirement projection", () => {
       cutYourTeethObservation({
         equippedItemIds: new Set([ITEM_IDS.salvageCutter]),
         carriedQuantities: new Map([[ITEM_IDS.ferriteShale, 10]]),
+        trackedProgress: new Map([["mining-attempts", 5]]),
       }),
     );
     expect(projected.state).toBe("ready_for_completion");

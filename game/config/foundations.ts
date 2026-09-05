@@ -32,6 +32,7 @@ const npcIds = {
 const missionIds = {
   walkItOff: asContentId("walk_it_off"),
   cutYourTeeth: asContentId("cut_your_teeth"),
+  wasteNot: asContentId("waste_not"),
 } as const satisfies Record<string, ContentId>;
 
 const dialogueIds = {
@@ -40,6 +41,8 @@ const dialogueIds = {
   wadeWalkItOffActiveFollowUp: asContentId("wade_rusk_walk_it_off_active_follow_up"),
   wadePostCutYourTeeth: asContentId("wade_rusk_post_cut_your_teeth"),
   tansyPostCutYourTeeth: asContentId("tansy_rusk_post_cut_your_teeth"),
+  wadePostWasteNot: asContentId("wade_rusk_post_waste_not"),
+  tansyPostWasteNot: asContentId("tansy_rusk_post_waste_not"),
   tansyBeforeMission: asContentId("tansy_rusk_walk_it_off_before_mission"),
   tansyAfterRemoteAcceptance: asContentId("tansy_rusk_walk_it_off_after_remote_acceptance"),
   tansyCompletion: asContentId("tansy_rusk_walk_it_off_completion"),
@@ -52,10 +55,15 @@ const dialogueIds = {
   tansyAfterCompletion: asContentId("tansy_rusk_walk_it_off_after_completion"),
   tansyCutYourTeethOffer: asContentId("tansy_rusk_cut_your_teeth_offer"),
   tansyCutYourTeethEquipReminder: asContentId("tansy_rusk_cut_your_teeth_equip_reminder"),
+  tansyCutYourTeethMiningReminder: asContentId("tansy_rusk_cut_your_teeth_mining_reminder"),
   tansyCutYourTeethStackReminder: asContentId("tansy_rusk_cut_your_teeth_stack_reminder"),
   tansyCutYourTeethTurnIn: asContentId("tansy_rusk_cut_your_teeth_turn_in"),
   tansyCutYourTeethBusy: asContentId("tansy_rusk_cut_your_teeth_busy"),
   tansyCutYourTeethCompletion: asContentId("tansy_rusk_cut_your_teeth_completion"),
+  wadeWasteNotTrackedActivityReminder: asContentId("wade_rusk_waste_not_tracked_activity_reminder"),
+  wadeWasteNotBusy: asContentId("wade_rusk_waste_not_busy"),
+  wadeWasteNotTurnIn: asContentId("wade_rusk_waste_not_turn_in"),
+  wadeWasteNotCompletion: asContentId("wade_rusk_waste_not_completion"),
 } as const satisfies Record<string, ContentId>;
 
 const expressionIds = {

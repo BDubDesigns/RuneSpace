@@ -1,5 +1,10 @@
 import { eq } from "drizzle-orm";
-import { characterMissions, equippedItems, inventoryStacks } from "@/db/rune-space";
+import {
+  characterMissionProgress,
+  characterMissions,
+  equippedItems,
+  inventoryStacks,
+} from "@/db/rune-space";
 import { getEffectiveGameBalance, getItemDefinition } from "@/game/config/balance";
 import { MISSIONS, type MissionDefinition } from "@/game/content/missions";
 import {
@@ -20,20 +25,24 @@ validateMissionDefinitions(MISSIONS);
 
 /**
  * Authoritative mission projection for the play state. Persistence contains
- * only accepted/completed timestamps; state and objective copy are derived
- * from authored content plus the current location/action boundary and a live
- * observation of equipment/inventory. No quest progress is ever persisted.
+ * accepted/completed timestamps plus narrow authored tracked-activity progress;
+ * state and objective copy are derived from authored content, the current
+ * location/action boundary, and live equipment/inventory observation.
  */
 export async function loadMissionProjections(
   transaction: DatabaseTransaction,
   characterId: string,
   input: { currentLocationId: string; activeActionId?: string },
 ): Promise<readonly MissionProjection[]> {
-  const [rows, itemState, stackRows, assignmentRows] = await Promise.all([
+  const [rows, progressRows, itemState, stackRows, assignmentRows] = await Promise.all([
     transaction
       .select()
       .from(characterMissions)
       .where(eq(characterMissions.characterId, characterId)),
+    transaction
+      .select()
+      .from(characterMissionProgress)
+      .where(eq(characterMissionProgress.characterId, characterId)),
     loadOwnedItemInstances(transaction, characterId),
     transaction
       .select()
@@ -47,18 +56,25 @@ export async function loadMissionProjections(
       .for("update"),
   ]);
   const byMissionId = new Map(rows.map((row) => [row.missionId, row]));
+  const progressByMissionId = new Map<string, Map<string, number>>();
+  for (const row of progressRows) {
+    const progress = progressByMissionId.get(row.missionId) ?? new Map<string, number>();
+    progress.set(row.progressKey, row.progress);
+    progressByMissionId.set(row.missionId, progress);
+  }
   const stationary = input.activeActionId === undefined;
   const observation = buildObservation(assignmentRows, itemState.carriedInstances, stackRows);
-  return MISSIONS.map((mission) =>
-    projectMission(
+  return MISSIONS.map((mission) => {
+    const trackedProgress = progressByMissionId.get(mission.id);
+    return projectMission(
       mission,
       byMissionId.get(mission.id),
       input.currentLocationId,
       stationary,
-      observation,
+      trackedProgress ? { ...observation, trackedProgress } : observation,
       prerequisiteCompletedFor(mission, byMissionId),
-    ),
-  );
+    );
+  });
 }
 
 /**

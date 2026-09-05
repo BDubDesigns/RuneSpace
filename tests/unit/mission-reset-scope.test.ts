@@ -35,11 +35,11 @@ describe("missionChainResetScope", () => {
   });
 
   it("matches the current authored mission chain", () => {
-    // Only Walk It Off has a prerequisite (Cut Your Teeth requires it).
+    // Cut Your Teeth and Waste Not form the authored prerequisite chain.
     const wio = "walk_it_off";
     const cyt = "cut_your_teeth";
     const ids = MISSIONS.map((m) => ({ id: m.id, prerequisiteMissionId: m.prerequisiteMissionId }));
-    expect(missionChainResetScope(wio, ids)).toEqual([wio, cyt]);
-    expect(missionChainResetScope(cyt, ids)).toEqual([cyt]);
+    expect(missionChainResetScope(wio, ids)).toEqual([wio, cyt, "waste_not"]);
+    expect(missionChainResetScope(cyt, ids)).toEqual([cyt, "waste_not"]);
   });
 });

@@ -11,7 +11,12 @@ import {
   resolveNpcMissionDialogueWithDefinitions,
   type NpcDialogueProjection,
 } from "@/game/content/dialogue";
-import { CUT_YOUR_TEETH, WALK_IT_OFF, type MissionDefinition } from "@/game/content/missions";
+import {
+  CUT_YOUR_TEETH,
+  WALK_IT_OFF,
+  WASTE_NOT,
+  type MissionDefinition,
+} from "@/game/content/missions";
 
 function p(
   missionId: string,
@@ -92,6 +97,7 @@ describe("router matrix parity", () => {
     stage?: NpcDialogueProjection["stage"],
     prereq = true,
   ) => p(MISSION_IDS.cutYourTeeth, state, stage, prereq);
+  const waste = (state: NpcDialogueProjection["state"]) => p(MISSION_IDS.wasteNot, state);
 
   it("Wade: offer when WIO not accepted, follow-up after", () => {
     expect(resolveNpcMissionDialogue(NPC_IDS.wadeRusk, [wio("not_accepted")])?.sequence.id).toBe(
@@ -283,5 +289,16 @@ describe("router matrix parity", () => {
       resolveNpcMissionDialogue(NPC_IDS.tansyRusk, [wio("completed"), cyt("completed")])?.sequence
         .id,
     ).toBe(DIALOGUE_IDS.tansyPostCutYourTeeth);
+  });
+
+  it("Waste Not completed state wins for both NPCs after its presentation closes", () => {
+    const projections = [wio("completed"), cyt("completed"), waste("completed")];
+    expect(resolveNpcMissionDialogue(NPC_IDS.wadeRusk, projections)?.sequence.id).toBe(
+      DIALOGUE_IDS.wadePostWasteNot,
+    );
+    expect(resolveNpcMissionDialogue(NPC_IDS.tansyRusk, projections)?.sequence.id).toBe(
+      DIALOGUE_IDS.tansyPostWasteNot,
+    );
+    expect(WASTE_NOT.completedNpcDialogue).toHaveLength(2);
   });
 });

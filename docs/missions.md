@@ -20,8 +20,9 @@ The framework deliberately does not attempt to support every future mission shap
 
 | Concern | Current home(s) | Notes |
 | --- | --- | --- |
-| Mission definitions / content | `game/content/missions.ts` — `MissionDefinition`, `MissionOffer`, `MissionRequirement`, `MissionTurnIn`, `MissionDialogue`, `MissionReward`, `MISSIONS` registry, `WALK_IT_OFF` / `CUT_YOUR_TEETH` | `getMission(id)` is the content accessor. |
-| Generic mission projection | `game/domain/missions.ts` — `projectMission`, `deriveMissionState`, `deriveMissionGuidanceTargets`, `validateMissionDefinitions`; `server/mission-state.ts` — `loadMissionProjections` | Projection recomputes from live authoritative state; no mission progress is persisted beyond `acceptedAt` / `completedAt`. |
+| Mission definitions / content | `game/content/missions.ts` — `MissionDefinition`, `MissionOffer`, `MissionRequirement`, `MissionTurnIn`, `MissionDialogue`, `MissionReward`, `MISSIONS` registry, `WALK_IT_OFF` / `CUT_YOUR_TEETH` / `WASTE_NOT` | `getMission(id)` is the content accessor. |
+| Generic mission projection | `game/domain/missions.ts` — `projectMission`, `deriveMissionState`, `deriveMissionGuidanceTargets`, `validateMissionDefinitions`; `server/mission-state.ts` — `loadMissionProjections` | Projection combines live authoritative state with current generic tracked progress; targets and activity definitions remain content-owned. |
+| Tracked activity progress | `db/rune-space.ts` — `characterMissionProgress`; `server/mission-progress.ts` — row initialization and capped attempt consumption | One row per character, mission, and stable authored `progressKey`; only current progress is persisted. There is no event history, provenance, lifetime counter, or acceptance-time slicing. |
 | Generic acceptance / completion boundary | `server/missions.ts` — `acceptMission`, `completeMission` (+ `completeMissionWithDefinition` test seam); `server/actions.ts` — `acceptMissionAction` / `completeMissionAction`; `game/schemas/gameplay.ts` — `AcceptMissionRequestSchema` / `CompleteMissionRequestSchema` | Shared `runMissionCommand` character lock / reconciliation wrapper. See §12. |
 | Authored dialogue | `game/content/dialogue.ts` — `DIALOGUE_SEQUENCES` / `getDialogue`; `game/domain/missions.ts` stage types consumed by `resolveNpcMissionDialogue`, `getMissionCapacityRefusalDialogue`, `getMissionCompletionPresentation` | Sequences are content; routing is semantic state (§9). |
 | Semantic guidance projection | `game/domain/missions.ts` — `MissionGuidance`, `MissionGuidanceTargets`, `deriveMissionGuidanceTargets`; `app/globals.css` — `--rs-mission-guidance-*` / `--rs-mission-available-*` and `.rs-mission-guidance` / `.rs-mission-available` | Guidance is a derived set consumed by `NpcInteractionPanel`, `MiningActivity`, `RefiningConsole`, `EquipmentPanel`, `InventoryPanel`. |
@@ -39,7 +40,7 @@ type MissionDefinition = {
   summary: string;
   prerequisiteMissionId?: MissionId;     // absent for the first mission
   continuationMissionId?: MissionId;     // zero-or-one authored continuation, see §3.1
-  offers: readonly MissionOffer[];       // ≥1 authored offer interactions
+  offers: readonly MissionOffer[];       // ≥1, or [] for a linked continuation-only mission
   requirements: readonly MissionRequirement[]; // ordered live-state checks
   turnIn: MissionTurnIn;                 // authoritative completion interaction
   reward: MissionReward;                 // exactly one, see §8
@@ -51,7 +52,7 @@ type MissionDefinition = {
 - **`title` / `summary`** — player-facing names on the mission.
 - **`prerequisiteMissionId`** — when present, the referenced mission must be `completed` before this one is offered or accepted. An eligibility rule only — never a reveal mechanism (see §10–§11). Validated at module load (unknown ID or self-cycle fails fast).
 - **`continuationMissionId`** — zero-or-one explicitly authored automatic continuation (§3.1).
-- **`offers[]`** — one or more authored offer routes (§4).
+- **`offers[]`** — one or more authored offer routes (§4), except a continuation-only mission may use an empty array only when another authored mission points to it with `continuationMissionId`. An unlinked offerless definition fails validation.
 - **`requirements[]`** — ordered requirements (§5) evaluated against live authoritative state on every projection.
 - **`turnIn`** — `npcId` + `locationId` + `requiresStationary: true` + objective copy + `dialogueId` (§7). Mission location semantics are authored here and **never** derived from an NPC's `homeLocationId`.
 - **`reward`** — exactly one narrow reward (§8).
@@ -68,7 +69,7 @@ Rules:
 - **Explicit authoring, never prerequisite inference.** A prerequisite only says the later mission cannot begin first — it does not imply discovery or a direct narrative continuation. The predecessor must name its continuation.
 - **Singular only.** No arrays, fan-out, or branching continuation choices.
 - **Validated narrowly:** unknown continuation IDs, self-continuations, and cycles fail fast. The target must have no prerequisite or require the predecessor — otherwise the auto-accept would contradict the target's own eligibility rule.
-- **First production use:** Walk It Off continues into Cut Your Teeth. Completing Walk It Off at The Jag accepts Cut Your Teeth immediately; the completion presentation flows into the next assignment with no second acceptance click.
+- **First production use:** Walk It Off continues into Cut Your Teeth, and Cut Your Teeth continues into Waste Not. Completing either predecessor accepts its authored continuation immediately; the completion presentation flows into the next assignment with no second acceptance click. Waste Not has no manual acceptance route.
 
 ## 4. Mission offers
 
@@ -108,6 +109,7 @@ The currently supported live-state requirement kinds (`MissionRequirement`) are 
 | --- | --- | --- |
 | `at_location` | `locationId`, `objective` | `currentLocationId === locationId` (current location alone) |
 | `equipped_item` | `itemId`, `objective` | the item genuinely occupies its authoritative compatible slot (carried instance + `equippedItems` assignment; a stored instance does not count) |
+| `tracked_activity` | `progressKey`, `activity`, `metric: "attempts"`, `target`, `objective`, `recommendedActionId?` | current persisted progress for the stable key reaches the authored target; resolved attempts count whether the activity succeeds or fails |
 | `carried_stack` | `itemId`, `quantity?`, `turnIn`, `objective`, `recommendedActionId?` | current carried quantity for `itemId` ≥ resolved required quantity (§6) |
 
 **Ordering owns the objective.** The first unmet requirement in authored order becomes the current semantic objective / guidance step. `requirements` order is gameplay — changing it changes the player's progression and guidance.
@@ -116,11 +118,12 @@ For example, Cut Your Teeth authors:
 
 1. `at_location: The Jag` → "Return to The Jag"
 2. `equipped_item: salvageCutter` → "Equip the {item} from Inventory"
-3. `carried_stack: ferriteShale` (full stack, show) → "Get a full stack of {item} — {carried} / {required}"
+3. `tracked_activity: mining-attempts` (five attempts) → "Complete 5 Mining attempts — {current} / {target}"
+4. `carried_stack: ferriteShale` (full stack, show) → "Get a full stack of {item} — {carried} / {required}"
 
 If the character is away from The Jag, (1) is the current objective even though (2) and (3) are also unmet.
 
-**Live-state observation, not provenance.** Requirements observe current authoritative state (location, `equippedItems` + carried instances, `inventoryStacks`). The framework never creates "visited / mined since acceptance" ledgers. Scavenged shale and mined shale are indistinguishable — carried `ferriteShale` counts regardless of how it was obtained. See §14 for what this boundary currently excludes.
+**Live-state observation, plus narrow current counters.** Location, equipment, and carried-stack requirements observe current authoritative state. Tracked activities use only the current capped progress value for their stable authored key; the framework does not create per-attempt timestamps, event history, provenance, or lifetime counters. Scavenged shale and mined shale are indistinguishable — carried `ferriteShale` counts regardless of how it was obtained. See §14 for what this boundary currently excludes.
 
 ## 6. Carried-stack quantity and disposition
 
@@ -246,6 +249,7 @@ Derived from the **first unmet requirement in authored order** on each accepted-
 | --- | --- |
 | *(all satisfied)* | `npcId: turnIn.npcId` — the turn-in NPC is the target even while the character is busy (§7) |
 | `equipped_item` | `equipmentItemId: requirement.itemId` — the equipment affordance / inventory tile for that item |
+| `tracked_activity` (with `recommendedActionId`) | `actionId: requirement.recommendedActionId` — the authored activity control |
 | `carried_stack` (with `recommendedActionId`) | `actionId: requirement.recommendedActionId` — the authored recommended gameplay action |
 
 Each consumer answers "am I that target?":
@@ -256,7 +260,7 @@ Each consumer answers "am I that target?":
 
 ### Teaching intent (`recommendedActionId`)
 
-`recommendedActionId` on a `carried_stack` requirement expresses **teaching / recommendation intent** — which gameplay interaction this mission is intentionally guiding the player toward for acquisition. It is distinct from requirement truth (which observes carried quantity regardless of provenance) and is **validated against the action's authoritative output facts** (`getActionOutputItemIds` in `game/domain/action-outputs.ts`, which derives directly from the gameplay resolvers' award facts `miningAwardFacts` / `refiningAwardFacts`). Changing what an action authoritatively produces cannot leave mission-guidance validation stale, and the generic action registry is intentionally not widened beyond this narrow capability check.
+`recommendedActionId` on a `carried_stack` or `tracked_activity` requirement expresses **teaching / recommendation intent** — which gameplay interaction this mission is intentionally guiding the player toward. Carried-item recommendations are distinct from requirement truth (which observes carried quantity regardless of provenance) and are **validated against the action's authoritative output facts** (`getActionOutputItemIds` in `game/domain/action-outputs.ts`, which derives directly from the gameplay resolvers' award facts `miningAwardFacts` / `refiningAwardFacts`). Tracked-activity recommendations are validated against the authored activity. Changing what an action authoritatively produces cannot leave mission-guidance validation stale, and the generic action registry is intentionally not widened beyond this narrow capability check.
 
 Not every technically possible acquisition path should be highlighted. Only the authored `recommendedActionId` on the current unmet carried requirement is highlighted. Cut Your Teeth recommends `ferrite_shale_mining` — Scavenge also yields Ferrite Shale, but has no `ActionId` to author there and is never highlighted merely because it can produce the same item.
 
@@ -289,13 +293,18 @@ Every other rule is **re-read and revalidated server-side inside the character t
 - authored offer route for acceptance (`definition.offers.find(npcId)`);
 - stationary presence at `offer.locationId` (acceptance) or `turnIn.locationId` (completion);
 - NPC identity for turn-in;
-- every authored requirement against live equipment/inventory (`at_location`, `equipped_item`, `carried_stack` with the authoritative carried quantity);
+- every authored requirement against live state (`at_location`, `equipped_item`, `tracked_activity` current progress, and `carried_stack` with the authoritative carried quantity);
 - for consumed carried requirements, an exact pure removal plan via the inventory planner without mutating rows (§6);
 - for item rewards, a **post-consumption preflight**: plans are applied cumulatively to an in-memory candidate inventory and the reward's capacity is checked against that post-consumption candidate — consumption may legitimately free the slot or mass the reward needs;
 - only after the complete plan is valid, consumption through the authoritative carried-stack boundary, the single declared reward, the guarded `completedAt` stamp, and the authored continuation acceptance (if any, idempotent via `onConflictDoNothing`) commit in the same transaction; any failure (insufficient quantity, capacity still blocked, reward application error) leaves the whole transaction uncommitted;
+- resolved Mining and Refining attempts are handed from the activity resolver to generic mission progress in the same transaction, after activity persistence and before the action cursor advances. Attempts before acceptance reconcile while no mission progress row is active and receive no credit; no per-attempt timestamp or event ledger is added;
 - the character lock (`withResolvedOwnedCharacter` / `runMissionCommand`) plus the `completedAt` `isNull` guard make acceptance and completion — and therefore consumption, reward, and continuation — exactly-once under retries and concurrent first completions.
 
 Do not document or introduce client-authoritative shortcuts. The client never supplies required items, quantities, `consume` behavior, rewards, prerequisite status, or completion eligibility.
+
+### 12.1 One-time Waste Not backfill
+
+The Issue #141 maintenance script is separate from normal runtime acceptance. It is dry-run by default, emits a reviewed cohort report, and requires an explicit confirmation token plus an unchanged report for execution. The eligible cohort is stationary characters with completed Walk It Off and Cut Your Teeth rows and no Waste Not row. Characters with an active action are reported and skipped. Execution inserts Waste Not and its `refining-attempts` row at `0 / 5`, grants no historical credit, and is idempotent. Rerun it after skipped characters are stationary; no permanent legacy branch is added to mission runtime.
 
 ## 13. Authoring an ordinary new mission
 
@@ -329,12 +338,12 @@ When in doubt, favour adding or correcting authored mission content and reusing 
 
 ## 14. Current limitations
 
-The framework currently models **one live-state phase** per mission. Requirements observe current authoritative state (§5) and no durable progress is persisted beyond `acceptedAt` / `completedAt`. This keeps ordinary missions simple, but the following progress shapes are **not yet modelled** and must earn an explicit framework extension when a real mission needs them:
+The framework currently models **one live-state phase** per mission. Requirements observe current authoritative state (§5), while tracked activity requirements persist only a capped current value keyed by character, mission, and authored `progressKey`. This keeps ordinary missions simple, but the following progress shapes are **not yet modelled** and must earn an explicit framework extension when a real mission needs them:
 
 - **Multi-location history** such as "visit A → visit B → return to A" when the visits leave no durable evidence in current state (e.g. two `at_location` steps that would both already be satisfied by the current location).
 - **Remembered conversation steps** or arbitrary dialogue memory beyond the single generic accept/complete actions.
 - **NPC relocation based on mission progression** — mission location semantics are intentionally authored on the definition, not derived from `npc.homeLocationId`, so a future NPC-movement feature does not inherit an accidental invariant, but movement itself is not yet implemented.
-- **Arbitrary persistent per-step ledgers** (counts, flags, or provenance tracking like "shale mined since acceptance" — current carried-stack requirements intentionally count any carried quantity (§5–§6)).
+- **Arbitrary persistent per-step ledgers** beyond the narrow tracked-attempt contract (timestamps, event history, flags, provenance, or lifetime counters like "shale mined since acceptance" — current carried-stack requirements intentionally count any carried quantity (§5–§6)).
 - **Branching, repeatable, or timed mission systems.**
 - **Persistent multi-stage missions.** A mission surface shows all requirements of the **current stage/leg** but never future-stage objectives. The current production framework is one stage, so authored requirements form the current simultaneous requirement set. A future mission with genuinely sequential legs (e.g. deliver one material set, then receive a new objective elsewhere) earns a deliberate multi-stage extension then — not speculatively now.
 
@@ -360,7 +369,14 @@ Short concrete examples that demonstrate the framework vocabulary. Do not copy m
 
 - **Prerequisite:** `walkItOff` must be `completed` before it can be accepted. Never advertised: it arrives already accepted via Walk It Off's continuation (§3.1).
 - **Offer:** single `Tansy` at `The Jag` (`tansyCutYourTeethOffer`) remains for eligibility/acceptance validation, but no Available presentation exists — unaccepted Cut Your Teeth never appears in the Mission Log or HUD.
-- **Requirements (ordered, shown simultaneously):** `at_location: The Jag` → `equipped_item: salvageCutter` → `carried_stack: ferriteShale` with omitted `quantity` (full authoritative stack, currently `10`), `turnIn: "show"`, `recommendedActionId: ferrite_shale_mining`. Player-facing surfaces render all three together with live satisfaction/progress (e.g. "✓ At The Jag / ✓ Equip Salvage Cutter / Ferrite Shale — 4 / 10"), while `stage.nextObjectiveKind` keeps the first-unmet ordering for dialogue/guidance precedence. The stack is shown, never consumed (§6).
-- **Teaching intent:** `recommendedActionId` highlights `Start Mining` while the carried step is the current objective (§10) — validated against `miningAwardFacts`. Scavenged shale still satisfies the requirement (§5).
+- **Requirements (ordered, shown simultaneously):** `at_location: The Jag` → `equipped_item: salvageCutter` → `tracked_activity: mining-attempts` for five attempts → `carried_stack: ferriteShale` with omitted `quantity` (full authoritative stack, currently `10`), `turnIn: "show"`, `recommendedActionId: ferrite_shale_mining`. Player-facing surfaces render all four together with live satisfaction/progress (e.g. "✓ At The Jag / ✓ Equip Salvage Cutter / Mining attempts — 3 / 5 / Ferrite Shale — 4 / 10"), while `stage.nextObjectiveKind` keeps the first-unmet ordering for dialogue/guidance precedence. The stack is shown, never consumed (§6).
+- **Teaching intent:** the tracked requirement highlights `Start Mining` while it is the current objective (§10), and the carried step retains the same recommendation if attempts are complete but the stack is not. Mining success and failure both count; Scavenged shale still satisfies the carried requirement (§5).
 - **Turn-in:** `Tansy` at `The Jag`, stationary only; `stage.turnInAvailable` distinguishes "I carry 10 but I'm still mining" (busy) from "ready to show" (§7). The turn-in dialogue (`SHOW SHALE`) carries `complete_mission`; the `skill_xp` reward (+100 Mining) and `item` beat are presentation only after the authoritative success.
 - **Dialogue stage routing:** `equipmentReminder` vs `carriedReminder` vs `busy` vs `completionPresentation` vs `turnIn` selected semantically from `stage.nextObjectiveKind` / `requirementsSatisfied` / `turnInAvailable` — never from prose.
+
+### Waste Not — continuation-only tracked activity
+
+- **Acceptance:** `offers: []` is valid because Cut Your Teeth authors `continuationMissionId: wasteNot`; there is no manual acceptance route or mission-ID branch in acceptance logic.
+- **Requirement:** one generic `tracked_activity` requirement with stable `progressKey: "refining-attempts"`, `activity: "refining"`, `metric: "attempts"`, target `5`, and a recommended Refining action. Successes and failures both count, and no live Processing Yard requirement is added to the mission.
+- **Turn-in / reward:** five current attempts make the mission ready only at the stationary Crash Site turn-in with Wade. Completion grants +100 Refining XP; Refining's existing output, Shale consumption, and inventory behavior remain unchanged.
+- **Persistence:** acceptance and continuation initialize the current progress row at zero. The resolver hands authoritative resolved-attempt counts to the generic mission progress boundary in the same transaction. Target/activity definitions remain authored content, not persistence data.

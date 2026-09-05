@@ -23,6 +23,10 @@ export function MissionObjectivePanel({ state }: { state: PlayGameplayState }) {
   const ready = mission.state === "ready_for_completion";
   const missionId = mission.missionId;
   const missionTitle = mission.title;
+  const requirements = mission.requirements ?? [];
+  const showRequirements =
+    requirements.length > 1 ||
+    requirements.some((requirement) => requirement.kind === "tracked_activity");
 
   function openLog() {
     setMissionsFocus(missionId);
@@ -66,9 +70,9 @@ export function MissionObjectivePanel({ state }: { state: PlayGameplayState }) {
             {ready ? "Ready to turn in" : "Active"}
           </span>
         </div>
-        {mission.requirements && mission.requirements.length > 1 ? (
+        {showRequirements ? (
           <ul className="mt-3 space-y-1.5" data-mission-objective-requirements>
-            {mission.requirements.map((requirement, index) => (
+            {requirements.map((requirement, index) => (
               <li
                 className="flex items-start gap-2 text-sm text-[color:var(--rs-mission-text)]"
                 data-mission-requirement-satisfied={requirement.satisfied ? "true" : "false"}

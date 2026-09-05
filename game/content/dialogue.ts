@@ -121,6 +121,10 @@ function tansySkillXpBeat(skillId: SkillId, amount: number): DialogueBeat {
   return { kind: "skill_xp", skillId, amount, backgroundId: jag, text: "" };
 }
 
+function wadeSkillXpBeat(skillId: SkillId, amount: number): DialogueBeat {
+  return { kind: "skill_xp", skillId, amount, backgroundId: crash, text: "" };
+}
+
 const dialogue = {
   [DIALOGUE_IDS.wadeOffer]: {
     id: DIALOGUE_IDS.wadeOffer,
@@ -212,6 +216,31 @@ const dialogue = {
         "You know how to handle the Cutter now — that's the basics sorted. The rest builds on that.",
       ),
       tansyLocal(EXPRESSION_IDS.smile, "Stick around. There'll be more work when you want it."),
+    ],
+  },
+  [DIALOGUE_IDS.wadePostWasteNot]: {
+    id: DIALOGUE_IDS.wadePostWasteNot,
+    npcId: NPC_IDS.wadeRusk,
+    beats: [
+      wadeLocal(
+        EXPRESSION_IDS.neutral,
+        "Waste Not was a good first pass. You saw the process through.",
+      ),
+      wadeLocal(
+        EXPRESSION_IDS.neutral,
+        "Keep the basics close. There is plenty of wreck work left, but the next job can wait until it is clear.",
+      ),
+    ],
+  },
+  [DIALOGUE_IDS.tansyPostWasteNot]: {
+    id: DIALOGUE_IDS.tansyPostWasteNot,
+    npcId: NPC_IDS.tansyRusk,
+    beats: [
+      tansyLocal(EXPRESSION_IDS.smile, "You finished the Cutter lesson and the hopper run."),
+      tansyLocal(
+        EXPRESSION_IDS.neutral,
+        "The basics are in place now. Keep what you learned close; the wreck will still be here when there is another useful job.",
+      ),
     ],
   },
   [DIALOGUE_IDS.tansyBeforeMission]: {
@@ -351,16 +380,16 @@ const dialogue = {
       ),
       tansyLocal(EXPRESSION_IDS.neutral, "Ten pieces, if you're counting."),
       tansyLocal(
-        EXPRESSION_IDS.smile,
-        "Technically, you could scavenge the stuff while you're out walking around.",
-      ),
-      tansyLocal(
         EXPRESSION_IDS.neutral,
-        "Wouldn't teach you anything about Mining, though. The Jag's right here if you want the practice.",
+        "Before you bring it back, make five real Mining attempts at The Jag. A miss still counts; I need you to learn the loop, not win five times.",
       ),
       tansyLocal(
         EXPRESSION_IDS.smile,
-        "Bring me a full stack either way. Keep your fingers attached and I'll call it a pass.",
+        "I don't care where the Shale comes from. If you scavenge some along the way, it can fill the stack, but it does not replace those five Mining attempts.",
+      ),
+      tansyLocal(
+        EXPRESSION_IDS.smile,
+        "Bring me a full stack after the practice. Keep your fingers attached and I'll call it a pass.",
       ),
     ],
     action: "accept_mission",
@@ -372,6 +401,16 @@ const dialogue = {
       tansyLocal(
         EXPRESSION_IDS.neutral,
         "Cutter's still in your Inventory. Equip it first. Tools work better when they're not in a bag.",
+      ),
+    ],
+  },
+  [DIALOGUE_IDS.tansyCutYourTeethMiningReminder]: {
+    id: DIALOGUE_IDS.tansyCutYourTeethMiningReminder,
+    npcId: NPC_IDS.tansyRusk,
+    beats: [
+      tansyLocal(
+        EXPRESSION_IDS.neutral,
+        "The Cutter is equipped. Now make five real Mining attempts at The Jag. Misses still teach the lesson.",
       ),
     ],
   },
@@ -432,6 +471,67 @@ const dialogue = {
       tansyLocal(
         EXPRESSION_IDS.smile,
         "You can run a Cutter. Next we'll teach you what to do with the stuff that comes out.",
+      ),
+      tansyLocal(
+        EXPRESSION_IDS.neutral,
+        "Mining pulls the raw material out. Refining is what turns the useful parts into something Wade can work with.",
+      ),
+      tansyLocal(
+        EXPRESSION_IDS.smile,
+        "Take the shale to the Abandoned Processing Yard. The hopper uses two pieces per attempt, and I want five attempts.",
+      ),
+      tansyLocal(
+        EXPRESSION_IDS.neutral,
+        "A success makes Refined Ferrite. A failure makes Slag. Both count, and you keep the Slag — it is still useful material.",
+      ),
+    ],
+  },
+  [DIALOGUE_IDS.wadeWasteNotTrackedActivityReminder]: {
+    id: DIALOGUE_IDS.wadeWasteNotTrackedActivityReminder,
+    npcId: NPC_IDS.wadeRusk,
+    beats: [
+      wadeLocal(
+        EXPRESSION_IDS.neutral,
+        "Tansy sent you to the Abandoned Processing Yard. Finish five Refining attempts, then come back and report.",
+      ),
+    ],
+  },
+  [DIALOGUE_IDS.wadeWasteNotBusy]: {
+    id: DIALOGUE_IDS.wadeWasteNotBusy,
+    npcId: NPC_IDS.wadeRusk,
+    beats: [
+      wadeLocal(
+        EXPRESSION_IDS.neutral,
+        "Finish what you are doing first. I will hear the Processing Yard report when you are stationary.",
+      ),
+    ],
+  },
+  [DIALOGUE_IDS.wadeWasteNotTurnIn]: {
+    id: DIALOGUE_IDS.wadeWasteNotTurnIn,
+    npcId: NPC_IDS.wadeRusk,
+    beats: [
+      wadeLocal(EXPRESSION_IDS.neutral, "Tansy says you made the Processing Yard run."),
+      wadeLocal(EXPRESSION_IDS.neutral, "All right. Tell me what came out of the hopper."),
+    ],
+    action: "complete_mission",
+    actionLabel: "REPORT TO WADE",
+  },
+  [DIALOGUE_IDS.wadeWasteNotCompletion]: {
+    id: DIALOGUE_IDS.wadeWasteNotCompletion,
+    npcId: NPC_IDS.wadeRusk,
+    beats: [
+      wadeSkillXpBeat(SKILL_IDS.refining, 100),
+      wadeLocal(
+        EXPRESSION_IDS.neutral,
+        "Tansy taught you the hopper, and you brought the results back without wasting the useful material.",
+      ),
+      wadeLocal(
+        EXPRESSION_IDS.neutral,
+        "Keep the Slag. If it came out of the process, it has a use somewhere on a wreck like this.",
+      ),
+      wadeLocal(
+        EXPRESSION_IDS.neutral,
+        "The Refined Ferrite will help when we get back to the ship. For now, that is a solid start on the wreck work ahead.",
       ),
     ],
   },
@@ -574,6 +674,9 @@ function turnInStageSequence(
   }
   if (stage.nextObjectiveKind === "carried_stack") {
     return dialogueOr(definition.dialogue.carriedReminderDialogueId, turnIn);
+  }
+  if (stage.nextObjectiveKind === "tracked_activity") {
+    return dialogueOr(definition.dialogue.trackedActivityReminderDialogueId, turnIn);
   }
   return turnIn;
 }

@@ -384,6 +384,36 @@ export const characterMissions = pgTable(
   ],
 );
 
+/** Durable progress for authored tracked-activity mission requirements. */
+export const characterMissionProgress = pgTable(
+  "character_mission_progress",
+  {
+    characterId: text("character_id")
+      .notNull()
+      .references(() => characters.id, { onDelete: "restrict" }),
+    missionId: text("mission_id").notNull(),
+    progressKey: text("progress_key").notNull(),
+    progress: integer("progress").notNull().default(0),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    primaryKey({
+      columns: [table.characterId, table.missionId, table.progressKey],
+      name: "character_mission_progress_pk",
+    }),
+    foreignKey({
+      columns: [table.characterId, table.missionId],
+      foreignColumns: [characterMissions.characterId, characterMissions.missionId],
+      name: "character_mission_progress_mission_fk",
+    }).onDelete("cascade"),
+    check("character_mission_progress_non_negative", sql`${table.progress} >= 0`),
+    index("character_mission_progress_character_mission_idx").on(
+      table.characterId,
+      table.missionId,
+    ),
+  ],
+);
+
 /** A bounded player-facing stop status, not an attempt history. */
 export const characterMiningState = pgTable("character_mining_state", {
   characterId: text("character_id")
@@ -582,6 +612,7 @@ export type ActiveAction = typeof activeActions.$inferSelect;
 export type CharacterTravelState = typeof characterTravelState.$inferSelect;
 export type CharacterScavengeReveal = typeof characterScavengeReveals.$inferSelect;
 export type CharacterMission = typeof characterMissions.$inferSelect;
+export type CharacterMissionProgress = typeof characterMissionProgress.$inferSelect;
 export type CharacterPowerCellDailyClaim = typeof characterPowerCellDailyClaims.$inferSelect;
 export type CharacterCargoHoldRepair = typeof characterCargoHoldRepair.$inferSelect;
 export type CargoHoldStack = typeof cargoHoldStacks.$inferSelect;
