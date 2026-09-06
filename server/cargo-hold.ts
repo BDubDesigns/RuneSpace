@@ -13,7 +13,6 @@ import { getEffectiveGameBalance, getItemDefinition } from "@/game/config/balanc
 import { ACTION_IDS, LOCATION_IDS } from "@/game/config/foundations";
 import { isActionAvailableAtLocation } from "@/game/content/locations";
 import {
-  cargoHoldMaterialsComplete,
   cargoHoldRepairComplete,
   planCargoHoldMaterialContribution,
   type CargoHoldRepairState,
@@ -237,13 +236,7 @@ export async function contributeCargoHoldMaterials(
       await ensurePlayProvisioning(transaction, context.character.id);
       const balance = getEffectiveGameBalance();
       const repair = await loadRepair(transaction, context.character.id);
-      const access = await accessRefusal(
-        transaction,
-        context.character.id,
-        context.action,
-        repair,
-        false,
-      );
+      const access = await accessRefusal(transaction, context.character.id, context.action, repair);
       if (access) {
         return {
           state: await stateAfterCargoCommand(transaction, context.character.id, now),
@@ -846,29 +839,23 @@ export async function startCargoHoldWelding(
           "repair_complete",
         );
       }
-      if (!cargoHoldMaterialsComplete(repairProjection, balance)) {
-        return stateFromTransaction(
-          transaction,
-          context.character.id,
-          EMPTY_RECENT_RESULT,
-          undefined,
-          undefined,
-          undefined,
-          undefined,
-          now,
-          EMPTY_RECENT_RESULT,
-          undefined,
-          undefined,
-          "welding_locked",
-        );
-      }
-      await transaction.insert(activeActions).values({
-        characterId: context.character.id,
-        actionId: ACTION_IDS.cargoHoldWelding,
-        startedAt: now,
-        resolvedThroughAt: now,
-      });
-      return stateAfterCargoCommand(transaction, context.character.id, now);
+      // Until the future Wade repair mission exists, completion is the only
+      // authoritative Cargo Hold reveal signal. Partial repair progress —
+      // including preserved pre-beta progress — never unlocks Welding.
+      return stateFromTransaction(
+        transaction,
+        context.character.id,
+        EMPTY_RECENT_RESULT,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        now,
+        EMPTY_RECENT_RESULT,
+        undefined,
+        undefined,
+        "welding_locked",
+      );
     },
     now,
   );

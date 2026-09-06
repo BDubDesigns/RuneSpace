@@ -92,17 +92,37 @@ Crash Site exposes the damaged ship's Cargo Hold repair. The repair is
 character-scoped and persistent: it is not a generic construction system, a
 bank abstraction, or a reclaimable deposit.
 
-- The exact recipe is **15 Refined Ferrite and 6 Slag**. A contribution command
-  locks the character and carried stacks, caps each material to the useful
-  outstanding amount, removes only that exact amount, and commits the progress
-  atomically. Contributions may be partial across commands. The player must
-  confirm the exact quantities; installed materials cannot be recovered.
-- Welding is a standard server-authoritative skill and the only repair activity
-  in this slice. It is available only while stationary at Crash Site after both
-  material requirements are complete. Each increment is one whole **5-tick / 3
-  second** pass, grants **1 repair progress and 50 Welding XP**, and resolves
-  deterministically with no roll. Twelve increments complete the repair for
-  **600 total Welding XP**. A partial pass consumes no progress or XP.
+### Interim Cargo Hold reveal gate (Issue #128)
+
+Until the future Wade repair-introduction Mission exists, every incomplete
+repair state is locked. The player sees only a compact **Damaged Cargo Hold**
+teaser; repair materials, progress, Welding controls, recipe guidance, and
+storage details remain hidden. The authoritative guards live at the player
+commands in `server/cargo-hold.ts`: material contribution and Welding start
+require the existing completion signal (`completedAt` via
+`cargoHoldRepairComplete`). Row existence, material progress, and preserved
+pre-beta partial progress are not unlock signals. No schema or generic unlock
+registry is introduced.
+
+The future Wade Mission should replace or extend these command-boundary guards
+with its canonical Mission-derived unlock. It should use the Mission
+framework's `show` semantics when proving possession of repair materials, so
+the Cargo Hold repair mechanic can consume them rather than consuming the same
+supply twice.
+
+- Once the future introduction gate permits repair, the exact recipe is **15
+  Refined Ferrite and 6 Slag**. A contribution command locks the character and
+  carried stacks, caps each material to the useful outstanding amount, removes
+  only that exact amount, and commits the progress atomically. Contributions
+  may be partial across commands. The player must confirm the exact quantities;
+  installed materials cannot be recovered.
+- Once unlocked, Welding is a standard server-authoritative skill and the only
+  repair activity in this slice. It is available only while stationary at Crash
+  Site after both material requirements are complete. Each increment is one
+  whole **5-tick / 3 second** pass, grants **1 repair progress and 50 Welding
+  XP**, and resolves deterministically with no roll. Twelve increments complete
+  the repair for **600 total Welding XP**. A partial pass consumes no progress
+  or XP.
 - Welding uses the normal one-active-action, lazy-resolution, stop, and Travel
   replacement contracts. Completion is a hard stop at 12/12; no further action
   or XP can be generated. Travel and other commands resolve only completed
