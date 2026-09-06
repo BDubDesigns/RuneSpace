@@ -21,8 +21,13 @@ suite("Issue #148 Hold It Together backfill (real PostgreSQL)", () => {
   let rune: typeof import("@/db/rune-space");
   let ownership: typeof import("@/server/ownership");
   let characters: typeof import("@/server/characters");
+  let play: typeof import("@/server/play");
   const createdUsers: string[] = [];
   const now = new Date("2026-01-01T00:00:00.000Z");
+  const deterministicRandom = {
+    nextBasisPoints: () => 0,
+    nextUnit: () => 0,
+  };
 
   beforeAll(async () => {
     db = (await import("@/db")).db;
@@ -30,6 +35,7 @@ suite("Issue #148 Hold It Together backfill (real PostgreSQL)", () => {
     rune = await import("@/db/rune-space");
     ownership = await import("@/server/ownership");
     characters = await import("@/server/characters");
+    play = await import("@/server/play");
   });
 
   afterEach(async () => {
@@ -72,7 +78,17 @@ suite("Issue #148 Hold It Together backfill (real PostgreSQL)", () => {
       { characterId: eligible.character.id, itemId: ITEM_IDS.refinedFerrite, quantity: 4 },
       { characterId: eligible.character.id, itemId: ITEM_IDS.slag, quantity: 2 },
     ]);
-    await db
+    // Provision the normal Cargo Hold repair row through the ordinary gameplay
+    // boundary (the same route cargo-hold.test.ts uses), then seed the valid
+    // partial-Welding state. Without this the UPDATE below affects zero rows
+    // and the preservation assertion is vacuous.
+    await play.getPlayGameplayState(
+      eligible.userId,
+      eligible.character.id,
+      now,
+      deterministicRandom,
+    );
+    const seeded = await db
       .update(rune.characterCargoHoldRepair)
       .set({
         refinedFerriteContributed: 15,
@@ -81,7 +97,15 @@ suite("Issue #148 Hold It Together backfill (real PostgreSQL)", () => {
         completedAt: null,
         updatedAt: now,
       })
-      .where(eq(rune.characterCargoHoldRepair.characterId, eligible.character.id));
+      .where(eq(rune.characterCargoHoldRepair.characterId, eligible.character.id))
+      .returning();
+    expect(seeded).toHaveLength(1);
+    expect(seeded[0]).toMatchObject({
+      refinedFerriteContributed: 15,
+      slagContributed: 6,
+      weldingProgress: 4,
+      completedAt: null,
+    });
     const before = {
       stacks: await db
         .select()
