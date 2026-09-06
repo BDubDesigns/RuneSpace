@@ -3,6 +3,56 @@
 Follow `AGENTS.md` for the normative architecture, scope, and agent-behavior
 contract. This document provides the supporting procedure.
 
+## Agent instruction loading audit and RuneSpace operating ceiling
+
+This audit was recorded on 2026-09-05 against the fresh `origin/main` snapshot
+(`2ab026b`). It distinguishes measured runtime behavior from documentation or
+source evidence. Harness limits are version/configuration-sensitive and the
+RuneSpace ceiling below is an intentional repository policy, not a universal
+harness limit.
+
+### Fresh-main baseline
+
+The `origin/main` `AGENTS.md` measured:
+
+| Metric | Value | Method |
+| --- | ---: | --- |
+| UTF-8 bytes | 19,584 | `wc -c` |
+| Unicode code points | 19,528 | UTF-8 `wc -m` |
+| Lines | 315 | `wc -l` |
+| Words | 2,537 | `wc -w` |
+| Rough tokens | 4,882 | code points divided by four; documented approximation, not tokenizer output |
+
+The cumulative UTF-8 byte count crossed 4 KiB after line 75 (4,142 bytes),
+8 KiB after line 134 (8,267 bytes), and 16 KiB after line 264 (16,430 bytes).
+Future instruction-size reports should repeat these measurements for the exact
+fresh-main and final files rather than relying on this snapshot.
+
+### Harness findings
+
+| Harness/version | Discovery and composition | Size/truncation finding | Evidence classification |
+| --- | --- | --- | --- |
+| Codex CLI 0.153.4 | Official guidance describes global and project instruction files composed from project root toward the working directory, with nearer guidance later in the chain. | The official AGENTS guide describes a default 32 KiB `project_doc_max_bytes` limit for the combined chain, while the advanced configuration reference describes the setting as bytes read from each `AGENTS.md`. This scope wording is unresolved. | Documentation evidence from the [Codex AGENTS.md guide](https://learn.chatgpt.com/docs/agent-configuration/agents-md) and [advanced configuration](https://learn.chatgpt.com/docs/config-file/config-advanced). A local sentinel probe was not completed because the restricted environment could not create Codex's state database; no measured Codex truncation behavior is claimed. |
+| Hermes runtime 0.20.0 | On host `brandonsvnic`, the inspected source is `/home/ubuntu/hermes-agent-src/agent/prompt_builder.py` (lines 1282, 1312–1330, and 1964–1986). The source tree is not a Git checkout; its file mtime is 2026-08-06 05:42:57 UTC, package metadata reports `1.0.0`, and the imported runtime reports `hermes_cli.__version__ == 0.20.0`. It loads `AGENTS.md` from the explicit working directory, selects one project-context type by priority, and wraps the selected content in its prompt. | With no configured override, the source default is 20,000 **characters**. An explicit `context_file_max_chars` key in `/home/ubuntu/.hermes/config.yaml` is read through `load_config_readonly()` and wins over the dynamic/default calculation; that key was `not-configured` on the inspected host. No environment-variable override mechanism was verified, so none is claimed. Oversize content keeps a head and tail with an omission marker and warning. | Source evidence was confirmed by a real sentinel probe: a 20,029-character synthetic `AGENTS.md` produced 18,178 characters with both sentinels retained, an omission marker, and an explicit truncation warning. This is measured Hermes behavior for the inspected runtime/source, not a claim about every Hermes version. |
+| OpenCode 1.17.13 | `opencode debug paths` reported `/home/brandon/.local/share/opencode/log`; exact evidence is in `/home/brandon/.local/share/opencode/log/opencode.log` at lines 44778, 44818, 44869, 46291, and 46319. Those entries record evaluated permission glob patterns containing `AGENTS.md`, including `**/{AGENTS.md,CLAUDE.md,CONTRIBUTING.md,.cursorrules}` and `**/{AGENTS.md,CONTRIBUTING.md,.github/agents/**,.opencode/**}`. | Composition behavior: **unknown**. Size limit: **unknown**. Truncation behavior: **unknown**. Configurability: **unknown**. No sentinel probe was completed and no source/configuration artifact exposing those behaviors was verified. | Measured local command/log evidence establishes discovery only; it does not establish composition or size behavior. |
+
+### RuneSpace policy: 16 KiB operating ceiling
+
+RuneSpace chooses a 16,384-byte UTF-8 ceiling for the root `AGENTS.md`, enforced
+by `tests/unit/agent-instructions.test.ts`. This is a **RuneSpace operating
+ceiling**, not a discovered hard limit imposed by Codex, Hermes, or OpenCode.
+It is intentionally conservative because Hermes describes its cap in characters
+while the repository guard measures bytes; byte counting also remains safe if
+future instructions contain more multibyte text. The ceiling leaves headroom
+below the inspected Hermes 20,000-character default and the documented Codex
+32 KiB setting, while avoiding dependence on OpenCode's unverified limit.
+
+Keep high-priority scope, authority, SSOT, safety, validation, and review rules
+in the root file. Move detailed procedures to the existing focused documents
+linked by `AGENTS.md`; do not solve size pressure by weakening critical policy
+or creating a documentation maze. If a harness version or configuration changes,
+repeat the audit and update this record with measured evidence.
+
 ## One issue, one branch, one draft PR
 - Fetch `origin`, then create each dedicated branch from the latest `origin/main`.
 - Produce **one draft pull request** per issue. Do not open multiple PRs for the
@@ -416,6 +466,9 @@ The PR must include:
   limitations
 - whether gameplay, balance, persistence, or player-facing behavior changed and
   the approved decisions governing any such change
+- for instruction-policy or harness audits, the exact baseline/final size
+  metrics, moved-content map, operating-ceiling rationale, harness evidence
+  classification, sentinel-probe results, and unverified limitations
 
 ## Observe CI and deployment progress
 Keep the PR draft while canonical CI runs, and follow the run to a terminal

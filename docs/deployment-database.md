@@ -123,6 +123,31 @@ manually or add migration execution to application startup.
 > enforces that journal `when` values strictly increase and `idx` is contiguous
 > from `0`, and that every journal tag has a matching `drizzle/<tag>.sql` file.
 
+## Committed schema migrations versus one-time data repair
+
+These operations have different ownership and lifecycle contracts:
+
+- A committed Drizzle migration changes the authoritative schema for every
+  environment. It belongs in the migration journal and SQL directory, must be
+  safe to apply in deployment order, and is validated through the normal
+  migration workflow above.
+- A pre-beta data repair or backfill corrects a known, finite cohort of
+  obsolete development/test state. It must not become a permanent runtime
+  compatibility branch. Prefer a repository-owned maintenance script when it
+  materially improves reviewability, safety, or repeatability; reviewed direct
+  SQL is acceptable only for a tiny, known repair.
+- A repair should identify its exact cohort, preserve unrelated state and
+  domain invariants, be idempotent, and provide a dry-run or reviewed report
+  where practical. Require explicit confirmation before writes, keep it out of
+  normal request and login paths, document the operator procedure and
+  retirement path, and never point it at production during development or CI.
+
+Do not add fallback reads, hidden state flags, alternate persistence paths, or
+login-time repairs merely to preserve obsolete pre-release state for a small
+dev/test cohort. Revisit this pre-beta policy before beta or public player-data
+commitments. A one-time data repair is not a schema migration just because its
+script or report is committed to the repository.
+
 ### Backup and restore
 
 For a destructive database operation on the Coolify PostgreSQL resource, create
