@@ -1,315 +1,152 @@
 # AGENTS.md — Read this before editing RuneSpace
 
 RuneSpace can be developed with any capable coding harness. These rules keep the
-codebase safe to modify and consistent with the architecture. **Read the relevant
-`docs/` before editing, and re-read them when the change crosses a boundary.**
-
-This is the repository's sole normative authority for agent behavior. See
-`docs/development-workflow.md` for supporting procedure.
+codebase safe to modify and consistent with the architecture. **Read the
+relevant `docs/` before editing, and re-read them when the change crosses a
+boundary.** This file is the repository's normative agent-behavior contract;
+`docs/development-workflow.md` provides supporting procedure.
 
 ## Before you plan
-- Read the docs that govern the area you are touching. Route by area:
-  - Architecture, boundaries, single source of truth: `docs/architecture.md`,
-    `docs/component-boundaries.md`.
-  - Game rules, content, balance: `docs/game-rules.md`,
-    `docs/gameplay-foundations.md`.
-  - UI tokens, styling, or overlay motion: `docs/design-system.md`.
-  - Authentication, trusted hosts/origins, cookies, or auth env:
-    `docs/authentication.md`.
-  - Tests and the canonical E2E runner: `docs/testing-strategy.md`. Choose the
-    cheapest reliable test layer (unit → integration → E2E) per its ownership guide.
-  - Branch/PR procedure, validation, observing CI/deploys:
-    `docs/development-workflow.md`.
-  - Coolify/database operations: `docs/deployment-database.md`.
-  - QC Studio exports / applying creator-authored Studio content:
-    `docs/qc-studio.md`.
-- Inspect existing code first. Search for an existing component, domain rule,
-  schema, or helper before creating a new one.
 
-## Scope discipline
-- Work **only** the issue you are assigned. Do not begin another issue.
-- **Never invent** game mechanics, balance values, content, lore, NPCs, quests,
-  resources, or architecture without explicit approval. If the issue does not
-  specify it, do not add it.
-- Request product-owner approval before choosing unresolved gameplay values or
-  visual direction.
-- Implement only the acceptance criteria of the issue. Do not perform unrelated
-  cleanup or scope expansion.
-- When a user supplies a QC Studio export targeting RuneSpace, read
-  `docs/qc-studio.md` before applying it. Treat the export as approved authoring
-  content, resolve it against the current authoritative repository state,
-  preserve native RuneSpace representation, and do not infer unrelated gameplay
-  changes.
+- Read the docs that govern the area you are touching:
+  - Architecture and boundaries: `docs/architecture.md`,
+    `docs/component-boundaries.md`.
+  - Game rules and content: `docs/game-rules.md`,
+    `docs/gameplay-foundations.md`.
+  - UI tokens and motion: `docs/design-system.md`.
+  - Authentication and trusted hosts: `docs/authentication.md`.
+  - Tests and canonical E2E: `docs/testing-strategy.md`.
+  - Branches, PRs, validation, and CI: `docs/development-workflow.md`.
+  - Database and deployment operations: `docs/deployment-database.md`.
+  - QC Studio exports: `docs/qc-studio.md`.
+- Inspect existing components, rules, schemas, helpers, tests, scripts, and CI
+  before creating anything new.
+
+## Scope and pre-beta data compatibility
+
+- Work **only** the assigned issue. Do not begin another issue, expand scope,
+  or perform unrelated cleanup.
+- Never invent game mechanics, balance, content, lore, NPCs, quests, resources,
+  architecture, or visual direction. Obtain product-owner approval for
+  unresolved gameplay or visual choices.
+- RuneSpace is pre-beta. Do not add permanent runtime compatibility for
+  obsolete pre-release state belonging to a small dev/test cohort unless Brandon
+  explicitly requires it. Prefer one explicit, narrow, idempotent migration,
+  backfill, or maintenance repair instead.
+- A one-time repair should identify its exact cohort, preserve invariants, and
+  provide a dry-run or reviewed report where practical. Document the reason,
+  inputs, safety checks, and retirement path, keep the operation outside normal
+  runtime request/login flow, and remove or retire it after use. A repository-
+  owned maintenance script is preferred when it materially improves review,
+  safety, or repeatability; reviewed direct SQL is acceptable for a tiny,
+  known repair.
+- Avoid permanent legacy runtime branches, old-state detection on every request,
+  alternate NPC or Mission paths, dual persistence, hidden flags, fallback
+  reads, or login-time repairs for obsolete pre-release state. Distinguish a
+  one-time data repair from a normal committed Drizzle/schema migration; see
+  `docs/deployment-database.md`. Revisit this policy before beta or public
+  player-data commitments.
+- For an approved QC Studio export, read `docs/qc-studio.md`, resolve it against
+  the current authoritative repository state, preserve native RuneSpace
+  representation, and do not infer unrelated gameplay changes.
 
 ## Architecture rules
-- Keep **server-authoritative rules outside React components**. Game logic,
-  XP, fuel, rewards, quest state, timers, and travel outcomes are resolved by
-  domain code (`game/domain/`) and applied through `server/`. The browser is
-  never the trusted source of progression.
-- Preserve **single source of truth (SSOT)**: each rule, identifier, content
-  definition, and persistence shape has one authoritative home. Do not duplicate
-  config values, rules, or content inside UI components.
-- Follow the boundary map in `docs/architecture.md` exactly:
-  - `app/` — routes/layouts/pages, thin composition only
-  - `components/` — reusable visual primitives only
-  - `features/` — player-facing vertical features (composition + wiring)
-  - `game/domain/` — pure rules, calculations, state transitions, IDs
-  - `game/content/` — typed content definitions, referenced by stable IDs
-  - `game/schemas/` — Zod validation for content and request boundaries
+
+- Keep server-authoritative rules outside React. Game logic, XP, fuel, rewards,
+  quest state, timers, and travel outcomes belong in `game/domain/` and
+  `server/`; the browser is never the trusted source of progression.
+- Preserve single source of truth: each rule, identifier, content definition,
+  and persistence shape has one authoritative home. Do not duplicate config or
+  rules in UI components.
+- Follow the boundary map in `docs/architecture.md`:
+  - `app/` — routes, layouts, pages; thin composition only
+  - `components/` — reusable visual primitives
+  - `features/` — player-facing vertical features and wiring
+  - `game/domain/` — pure rules, calculations, transitions, and IDs
+  - `game/content/` — typed content definitions referenced by stable IDs
+  - `game/schemas/` — Zod content and request boundaries
   - `server/` — orchestration, authorized commands, persistence, timers
   - `db/` — Drizzle schema, migrations, narrow persistence code
-  - `minigames/` — isolated Phaser boundaries, typed contracts only
+  - `minigames/` — isolated Phaser boundaries with typed contracts
 
-## Component & module extraction
-- Search for an existing component/domain rule/schema before adding a new one.
-- Extract a shared visual primitive when a **second real consumer** needs the
-  same styling/behavior.
-- Extract domain logic when a **second real feature** needs the same rule.
-- Split a module when one file gains multiple distinct responsibilities.
-- Avoid giant page components and feature god-objects.
-- Avoid speculative universal abstractions based only on superficial similarity.
-  Rule: _Build the smallest clear boundary needed now; generalize when a second
-  real use case proves what is shared._
+## Component, module, and dependency discipline
 
-## Dependencies
-- Add **no dependency** without a concrete, documented need. Prefer the existing
-  stack (Next.js, React, Tailwind, Drizzle, pg, Zod, Vitest, Playwright, pnpm).
-  If you must add one, note the justification in the PR and docs.
+- Search for an existing component, domain rule, schema, or helper first.
+- Extract a shared visual primitive or domain rule only when a second real
+  consumer proves the boundary. Split modules when responsibilities diverge;
+  avoid god objects and speculative universal abstractions.
+- Add no dependency without a concrete documented need. Prefer the existing
+  Next.js, React, Tailwind, Drizzle, pg, Zod, Vitest, and Playwright stack.
 
 ## Issue execution workflow
 
-When asked to work on one approved GitHub issue, the active model implements that
-issue. This workflow is harness-neutral and does not require project-local
-subagents or automation that may be unavailable.
+1. Implement one approved issue only and stop after that issue is done.
+2. Fetch the remote and create one fresh branch from the latest `origin/main`,
+   not an assumed local branch.
+3. Read the issue, this file, relevant docs, code, tests, package scripts, and
+   CI workflow before planning. Do not invent unspecified behavior.
+4. Track acceptance criteria against evidence. For boundary, SSOT, concurrency,
+   security, test/documentation conflicts, or two failed attempts, seek a
+   separate model review when available; otherwise self-review carefully.
+5. Validate proportionally. Use unit, integration, or E2E according to the
+   ownership guide. If E2E specs change, run the targeted spec first and then
+   `pnpm test:e2e:canonical`; zero retries and deterministic fixtures are part
+   of the proof, not problems to hide with sleeps or retries.
+6. Use `./scripts/managed-host-run.sh` for managed-host and Node-22-bound
+   commands. On Hermes, every DB-backed command must run through
+   `scripts/runespace-db.mjs` after creating a validated disposable database.
+   Run the full local CI-parity sequence before marking a PR ready when the
+   environment is available; report unavailable checks as unexecuted.
+7. Open or update exactly one Draft PR. Include `closes #<issue>`, branch and
+   PR identity, local and remote validation, architectural decisions,
+   limitations, unresolved questions, and whether gameplay, persistence, or
+   player-facing behavior changed. Stop for human review; do not merge without
+   explicit product-owner instruction.
+8. Follow triggered workflows to terminal state. Draft PRs intentionally skip
+   PostgreSQL/canonical jobs unless `full-ci` is applied, and the draft-only
+   Merge gate is expected to remain unsatisfied. Inspect failed logs, repair on
+   the same branch, push, and follow replacement runs.
 
-1. **One issue only.** Work the single approved issue you were given. Do not begin
-   another issue, and do not self-select issues. Stop after this issue is done.
-2. **Start from current remote state.** Fetch the remote, then create one fresh
-   branch from the latest `origin/main`, not an assumed local branch.
-3. **Read and inspect first.** Read the issue, this `AGENTS.md`, the relevant
-   `docs/`, code, tests, package scripts, and CI workflow before planning. Do
-   not invent mechanics, content, lore, balance, architecture, or visual direction.
-4. **Plan against evidence.** Keep a checklist of the issue acceptance criteria and
-   their status using the harness's available task-tracking mechanism, if any.
-5. **Seek a separate model pass when available.** For boundary or SSOT ambiguity,
-   contracts, concurrency, security, test/documentation conflicts, two failed
-   attempts, or substantial scope growth, ask a separate model to review the
-   problem. Before a draft PR, request a separate-model final review when the
-   harness supports it. Automated delegation being unavailable must not block
-   ordinary work; perform and document a careful self-review instead. OpenCode
-   users may switch models manually for either pass.
-6. **Validate proportionally, then prove full parity.** During implementation,
-   run focused checks for the touched boundary plus enough static validation to
-   avoid pushing an obviously broken checkpoint. When a change adds or touches
-   E2E specs, run the new/targeted spec(s) first in isolation
-   (`pnpm test:e2e:focused <phase>` or `pnpm test:e2e -- <spec> --project=chromium`)
-   to catch fixture errors quickly, then run the *full* canonical suite
-   `pnpm test:e2e:canonical` — the exact job GitHub's Full gate runs — before
-   assuming the work will pass CI. `fast-checks` (typecheck/lint/unit/build)
-   intentionally skips PostgreSQL integration and canonical E2E; a green fast
-   run is not evidence the merge gate will pass. A coherent draft preview push
-   is allowed before the complete local CI-parity sequence when real-device
-   review is the goal; Coolify preview deployment remains independent of the
-   expensive gate. Before marking a PR ready or requesting final review, run
-   the complete local CI-parity sequence when the environment is available:
-   `pnpm install --frozen-lockfile`, `pnpm typecheck`, `pnpm lint`,
-   `pnpm format:check`, `pnpm test`, `pnpm build`, integration tests, and
-   `pnpm test:e2e:canonical`. Resolve failures or document genuine external
-   blockers. The managed focused runner does not currently include the Travel
-   phase; use the direct Travel-only command documented in
-   `docs/development-workflow.md` when that spec is the affected boundary.
-   After a correction to a ready PR, focused local evidence plus the required
-   remote gate rerun is sufficient; do not blindly repeat the entire local
-   suite after every small correction. On Hermes
-   (`/opt/data/workspace/RuneSpace`), every DB-backed command in that sequence
-   (`pnpm drizzle-kit migrate`, `pnpm test:integration`,
-   `pnpm test:e2e:canonical`, `pnpm test:e2e:focused`) MUST go through
-   `node scripts/runespace-db.mjs` after `create <key>` — never run them
-   directly through `managed-host-run.sh` alone. See the Hermes
-   disposable-database sequence below.
-7. **One draft PR.** Create or update exactly one draft pull request for the issue.
-   Work stops at a draft PR for human review. Do not merge unless the product
-   owner explicitly instructs it to merge after review. Include the exact branch,
-   PR, local validation results, canonical CI result, architectural decisions,
-   review approach, limitations, and unresolved questions; for UI changes include
-   the preview URL as the default visual evidence (frozen screenshots only when
-   requested or the preview is unavailable). Include `closes #<issue number>` in
-   the PR body: the closing keyword is a body reference that takes effect only
-   when the PR is merged, and merging remains the product owner's explicit
-   action — a branch name or PR title does not replace the body reference. Do not
-   hand-maintain a commit SHA in the body — GitHub shows the head commit. State
-   exactly whether gameplay, balance, persistence, or player-facing behavior
-   changed and which approved decisions governed those changes.
-8. **Follow every workflow that actually triggers.** Draft synchronization runs
-   the fast checks and intentionally does not run the PostgreSQL or canonical
-   jobs unless `full-ci` is present. Applying `full-ci`, marking the PR ready,
-   pushing to a ready PR, pushing to `main`, or manually dispatching the workflow
-   requests the full gate. Follow triggered jobs until every required job is green
-   or a genuine external blocker is precisely documented — an in-progress run is
-   not a pass. Poll actual state (`gh pr checks`, preview probe) at short,
-   individually bounded intervals — never one long blind `sleep`. For a failed
-   job, inspect the logs, repair on the same branch, push, and follow the
-   replacement run. The required `Merge gate` is intentionally unsatisfied on
-   draft-only checkpoints so skipped expensive jobs cannot satisfy branch
-   protection; do not mistake that expected draft guard for an application
-   regression. Treat optional improvements separately from blockers. Never begin
-   another issue early.
+## QC Failed status manifest
 
-## QC Failed status manifest upkeep
+RuneSpace publishes the intentionally public `.qcfailed/status.json`; it must
+never contain secrets, credentials, private account information, internal
+corporate information, unpublished client work, or speculation. It is schema
+version `1`, uses project slug `runespace`, and restricts `workState` to
+`active`, `maintenance`, or `paused`. Status sentences are factual and at
+most 240 characters; dates are real non-future `YYYY-MM-DD` values; URLs are
+absolute public HTTPS URLs; `highlights` has zero to three entries.
 
-RuneSpace publishes a small, intentionally **public** status manifest at
-`.qcfailed/status.json` (schema version one) so the live "Current Build Floor /
-QC Operations Console" on qcfailed.com can show what RuneSpace is actively
-working on. Supporting procedure lives in `docs/development-workflow.md`; this
-section is the normative contract. The manifest must never contain secrets,
-credentials, private account information, internal corporate information,
-unpublished client work, or speculative claims.
+- Update the manifest in the same PR only when a meaningful product PR changes
+  current focus, the latest completed milestone, next step, work state, or
+  public highlights. Infrastructure-only, dependency, typo, CI-only, and
+  test-only work must not displace product milestones.
+- A meaningful product PR may add `currentChange` with the actual PR number and
+  stage (`implementation`, `review`, `preview`, or `merge-ready`) after
+  the PR exists. Never store a preview URL in the manifest; qcfailed.com
+  derives it.
+- On the next meaningful product PR, roll the prior merged change into
+  `latestCompleted` when appropriate. Never present a closed-unmerged change
+  as completed. qcfailed.com owns remote validation, PR interpretation, preview
+  probing, and public rendering; RuneSpace only maintains the manifest contract.
 
-### Schema-one field meanings
-- `schemaVersion` — always `1`.
-- `projectSlug` — the stable public slug, `runespace`.
-- `workState` — `active`, `maintenance`, or `paused`; the manifest carries the
-  current truthful value.
-- `currentFocus` / `latestCompleted.summary` / `nextStep` — concise public-safe
-  sentences, each no longer than 240 characters.
-- `latestCompleted` / `highlights` / dates — real, non-future `YYYY-MM-DD`
-  values; URLs are absolute public `https` URLs; `highlights` holds zero to
-  three entries.
-- `currentChange` — optional; only a meaningful product PR adds it.
+## Tooling and safety reminders
 
-### Meaningful-status upkeep
-When a PR meaningfully changes RuneSpace's current focus, latest completed
-milestone, next meaningful step, work state, or portfolio-worthy public
-highlights, update `.qcfailed/status.json` in that same PR. Do not update it
-for every commit, dependency bump, typo fix, CI-only change, test-only
-correction, or other trivial maintenance. Keep status text public-safe,
-factual, concise, and reviewable beside the work that caused it.
-
-### Active-review upkeep
-After opening a meaningful product pull request, add or update `currentChange`
-on that PR branch with the actual PR number, and advance `stage` as work moves
-through `implementation`, `review`, `preview`, and `merge-ready`. Do not copy a
-preview URL into the manifest.
-
-### Rollover after merge
-When starting the next meaningful product PR, move the previously merged change
-into `latestCompleted` when appropriate, update `currentFocus`, `nextStep`,
-`lastMeaningfulUpdate`, and highlights truthfully, and replace `currentChange`
-with the new active change only after the new PR exists. Never present a
-closed-unmerged change as completed.
-
-### Why the PR number is stored but the preview URL is not
-`.qcfailed/status.json` stores only the PR number (via `currentChange`); it
-never stores a preview URL. qcfailed.com derives preview URLs locally from the
-PR number against its allowlisted template rather than trusting a remote URL.
-
-### Verified RuneSpace preview pattern
-RuneSpace's preview pattern is `https://pr-{pullRequestNumber}.runespace.qcfailed.com`.
-The qcfailed.com project catalog owns the allowlisted template; do not add this
-template to `.qcfailed/status.json`.
-
-### Infrastructure-only work must not displace product milestones
-Workflow hardening, dependency bumps, typo fixes, CI-only corrections,
-test-only flakes, and other infrastructure-only maintenance must not add or
-replace `currentChange`, and must not silently displace the latest public
-product milestone in `latestCompleted`/`highlights`, unless Brandon explicitly
-decides the work is portfolio-worthy.
-
-### qcfailed.com responsibilities
-qcfailed.com, not RuneSpace, remains responsible for remote validation, GitHub
-PR-state interpretation, preview probing, fallback snapshots, and public
-rendering. RuneSpace only keeps the committed manifest parseable and internally
-consistent (see `tests/unit/qcfailed-status.test.ts`).
-
-## Tooling reference
-- pnpm is the package manager; the lockfile is committed and installs are frozen.
-- Node 22 and pnpm 9.15.4 are pinned (see `package.json` `engines`/`packageManager`).
-- Key scripts: `dev`, `build`, `start`, `lint`, `format`, `format:check`,
-  `typecheck`, `test`, `test:integration`, `test:e2e`, `test:e2e:canonical`.
-- `test:integration` and `test:e2e` create and clean up a uniquely named local
-  disposable database before running fixtures; their `*:raw` variants are
-  internal runner targets and must not be pointed at the development database.
-  `test:e2e` is a quick development command; `test:e2e:canonical` is the
-  required CI-parity browser command that agents must use to validate E2E
-  behavior (and frozen screenshots when requested via
-  `RUNESPACE_E2E_SCREENSHOTS=true`).
-- **Host Node note:** Some development hosts may have a user-local Node 24
-  installation (e.g., at `~/.local/node-v24.18.0-linux-x64/bin/node`) that
-  `.bashrc` prepends to `PATH` for interactive shells. Non-interactive shells
-  (including this harness) do not source `.bashrc` and fall back to the system
-  Node 22 at `/usr/bin/node`. Both versions coexist; do not uninstall either.
-  Verify the active version with `node --version` before running validation.
-
-### Host-local PostgreSQL
-- On Brandon's managed RuneSpace host checkouts, run database-backed and Node-22-bound
-  commands through `./scripts/managed-host-run.sh`. It defaults to the existing
-  `/home/brandon/.config/runespace/dev.env` and `/usr/bin` toolchain, while managed
-  containers may provide `RUNESPACE_PRIVATE_ENV` and `RUNESPACE_NODE_BIN_DIR`.
-  The wrapper always requires Node 22 and validates a localhost-only `DATABASE_URL`
-  before executing the command. Do not `source` or print the private file manually.
-- Never print, `cat`, `echo`, log, commit, or include the private file's contents in reports.
-  Do not guess PostgreSQL credentials or substitute Docker Compose credentials from `.env.example`.
-  Do not use `postgres://runespace:runespace@localhost:5432/runespace` on this managed host.
-- If the private file or configured Node binary is missing or unreadable,
-  `managed-host-run.sh` refuses to start; stop and report the environment blocker
-  rather than inventing fallback credentials or tool paths.
-- The canonical runner's localhost safety check remains authoritative. Never access the Coolify
-  production database for local testing.
-- Managed hosts provisioned with the dedicated `runespace_dev` role and
-  `runespace_control` database use `scripts/runespace-db.mjs` for disposable
-  databases. It accepts only `issue-<positive-number>`, `scratch`, or
-  `scratch-<lowercase-hyphenated-slug>` keys and refuses remote URLs, other roles,
-  other control databases, and unsafe names. `create` refuses existing databases;
-  `drop` force-closes only the validated disposable target; `run` probes that target
-  and executes an argument vector without a shell.
-- Brandon's home host ONLY — `managed-host-run.sh` directly (`/home/brandon/workspace/projects/runespace`) — DO NOT USE ON HERMES:
-  ```bash
-  cd /home/brandon/workspace/projects/runespace
-  ./scripts/managed-host-run.sh pnpm install --frozen-lockfile
-  ./scripts/managed-host-run.sh pnpm typecheck
-  ./scripts/managed-host-run.sh pnpm lint
-  ./scripts/managed-host-run.sh pnpm format:check
-  ./scripts/managed-host-run.sh pnpm test
-  ./scripts/managed-host-run.sh pnpm drizzle-kit migrate
-  ./scripts/managed-host-run.sh pnpm test:integration
-  # Production build: `next build` runs as production, so server/env.ts requires a
-  # BETTER_AUTH_SECRET of at least 16 characters. Scope a clearly fake build-only
-  # placeholder to this one invocation only (matching .github/workflows/ci.yml).
-  ./scripts/managed-host-run.sh env \
-    BETTER_AUTH_SECRET="insecure-ci-build-only-secret-do-not-use-in-prod-0000000000" \
-    pnpm build
-  ./scripts/managed-host-run.sh pnpm test:e2e:canonical
-  ```
-- Hermes host ONLY (`/opt/data/workspace/RuneSpace`) — MANDATORY for every DB-backed command (replace `issue-84` with the assigned issue key):
-  ```bash
-  cd /opt/data/workspace/RuneSpace
-  ./scripts/managed-host-run.sh pnpm install --frozen-lockfile
-  ./scripts/managed-host-run.sh node scripts/runespace-db.mjs create issue-84
-  ./scripts/managed-host-run.sh node scripts/runespace-db.mjs run issue-84 -- pnpm drizzle-kit migrate
-  ./scripts/managed-host-run.sh node scripts/runespace-db.mjs run issue-84 -- pnpm test:integration
-  ./scripts/managed-host-run.sh node scripts/runespace-db.mjs run issue-84 -- pnpm test:e2e:canonical
-  ./scripts/managed-host-run.sh node scripts/runespace-db.mjs drop issue-84
-  ```
-
-### Managed-host ports and process cleanup
-- Port `3000` belongs to OpenChamber. Never use it for RuneSpace work and never
-  kill its process.
-- Port `3200` belongs to the canonical RuneSpace E2E runner
-  (`scripts/run-canonical-e2e.mjs`).
-- An independent focused E2E run must use a separately confirmed-free high port,
-  never `3000` or `3200`. `pnpm test:e2e:focused` defaults to `3310` and refuses
-  to start unless that port is confirmed available.
-- `pnpm test:e2e:focused <phase>` currently supports `mining`,
-  `character-profile`, `location-population`, and `character-portraits`; it does
-  not support `travel`. Run one Travel test with the direct command in
-  `docs/development-workflow.md`, using a separately confirmed-free high port.
-- Do not manually assemble `next build` + `next start` for browser validation on
-  the managed host. Use `pnpm test:e2e:focused <phase>`, `pnpm test:e2e:canonical`,
-  or the deployed PR preview unless diagnosing the runner itself.
-- In a restricted coding harness, a `listen EPERM` error before Playwright
-  starts means the harness blocked the local test-server port; allow loopback
-  server binding and rerun the same command before diagnosing the test.
-- Before cleaning up any listener, inspect the owning PID with `ss -tlnp` and
-  kill only a positively identified RuneSpace-owned test-server PID with a
-  targeted `kill <pid>`. Never use broad `pkill -f` or blanket Next.js
-  cleanup.
+- pnpm is the package manager; Node 22 and pnpm 9.15.4 are pinned. Key checks
+  are `pnpm typecheck`, `pnpm lint`, `pnpm format:check`, `pnpm test`, and
+  `pnpm build`. `pnpm test:integration` and E2E entry points use disposable
+  databases; their `*:raw` variants are internal and must not target
+  development data.
+- On managed hosts, the wrapper validates a localhost-only `DATABASE_URL` and
+  loads private environment data without exposing it. Never print, source, log,
+  commit, or guess credentials; never use the Coolify production database for
+  local testing.
+- Hermes uses approved `issue-<positive-number>` or `scratch` database keys
+  through `scripts/runespace-db.mjs`; create, run, and drop only the validated
+  disposable target. On the managed host, port 3000 belongs to OpenChamber,
+  canonical E2E uses 3200, focused E2E uses a confirmed-free high port such as
+  3310, and cleanup must target only a positively identified RuneSpace PID.
+- Read `docs/development-workflow.md` for exact managed-host, CI, preview,
+  status-manifest, and review procedure. Do not access production or remove
+  broad services, volumes, networks, credentials, or data without explicit
+  approval.
