@@ -104,11 +104,11 @@ require the existing completion signal (`completedAt` via
 pre-beta partial progress are not unlock signals. No schema or generic unlock
 registry is introduced.
 
-The future Wade Mission should replace or extend these command-boundary guards
-with its canonical Mission-derived unlock. It should use the Mission
-framework's `show` semantics when proving possession of repair materials, so
-the Cargo Hold repair mechanic can consume them rather than consuming the same
-supply twice.
+Mission #4, the future Wade Mission, should observe authoritative Cargo Hold
+repair completion rather than adding separate `show` / `consume` material
+requirements. The existing Cargo Hold repair system owns the **15 Refined
+Ferrite + 6 Slag** recipe and material consumption; Mission #4 should read the
+resulting completion signal and must not duplicate either responsibility.
 
 - Once the future introduction gate permits repair, the exact recipe is **15
   Refined Ferrite and 6 Slag**. A contribution command locks the character and
