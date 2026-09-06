@@ -75,8 +75,8 @@ suite("Issue #148 Hold It Together backfill (real PostgreSQL)", () => {
     await db
       .update(rune.characterCargoHoldRepair)
       .set({
-        refinedFerriteContributed: 7,
-        slagContributed: 3,
+        refinedFerriteContributed: 15,
+        slagContributed: 6,
         weldingProgress: 4,
         completedAt: null,
         updatedAt: now,

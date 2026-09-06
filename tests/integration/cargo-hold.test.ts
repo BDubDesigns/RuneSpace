@@ -211,6 +211,7 @@ suite("issue #128 Cargo Hold repair gate and existing Welding mechanics (real Po
       slagContributed: balance.cargoHold.slagRequired,
       weldingProgress: 3,
       complete: false,
+      repairAvailable: false,
     });
 
     const contribution = await cargo.contributeCargoHoldMaterials(
@@ -232,6 +233,218 @@ suite("issue #128 Cargo Hold repair gate and existing Welding mechanics (real Po
     );
     expect(welding.weldingError).toBe("welding_locked");
     expect(await inventoryAndCargoRows(character.id)).toEqual(before);
+
+    // Accepting Hold It Together through the backfill path unlocks the repair
+    // flow without touching the preserved partial state, and Welding resumes
+    // from 3 rather than resetting. Only future resolved increments grant XP.
+    await db.insert(rune.characterMissions).values([
+      {
+        characterId: character.id,
+        missionId: MISSION_IDS.wasteNot,
+        acceptedAt: now,
+        completedAt: now,
+      },
+      {
+        characterId: character.id,
+        missionId: MISSION_IDS.holdItTogether,
+        acceptedAt: new Date(now.getTime() + 1_000),
+      },
+    ]);
+    const unlocked = await play.getPlayGameplayState(
+      userId,
+      character.id,
+      new Date(now.getTime() + 2_000),
+      deterministicRandom,
+    );
+    expect(unlocked.cargoHold.repair).toMatchObject({
+      repairAvailable: true,
+      complete: false,
+      materialComplete: true,
+      weldingProgress: 3,
+    });
+    expect(
+      unlocked.missions.find((mission) => mission.missionId === MISSION_IDS.holdItTogether),
+    ).toMatchObject({ state: "active" });
+    expect(unlocked.welding.totalXp).toBe(0);
+
+    const repairedState = await inventoryAndCargoRows(character.id);
+    expect(repairedState).toEqual(before);
+    const repair = (
+      await db
+        .select()
+        .from(rune.characterCargoHoldRepair)
+        .where(eq(rune.characterCargoHoldRepair.characterId, character.id))
+    )[0]!;
+    expect(repair).toMatchObject({
+      refinedFerriteContributed: 15,
+      slagContributed: 6,
+      weldingProgress: 3,
+      completedAt: null,
+    });
+
+    const startAt = new Date(now.getTime() + 3_000);
+    const started = await cargo.startCargoHoldWelding(
+      userId,
+      character.id,
+      startAt,
+      deterministicRandom,
+    );
+    expect(started.activeAction?.actionId).toBe(ACTION_IDS.cargoHoldWelding);
+
+    const resolved = await play.getPlayGameplayState(
+      userId,
+      character.id,
+      new Date(startAt.getTime() + 4 * balance.welding.attemptDurationTicks * 600 + 100),
+      deterministicRandom,
+    );
+    expect(resolved.cargoHold.repair.weldingProgress).toBe(3 + 4);
+    expect(resolved.welding.totalXp).toBe(4 * balance.welding.xpPerIncrement);
+    expect(resolved.cargoHold.repair.complete).toBe(false);
+    expect(
+      resolved.missions.find((mission) => mission.missionId === MISSION_IDS.holdItTogether),
+    ).toMatchObject({ state: "active" });
+  });
+
+  it("completes Hold It Together for an already-repaired legacy hold without replaying repair XP", async () => {
+    const { userId, character, now } = await makeCharacter();
+    // Completed repair plus stored Cargo from before the Mission existed.
+    const completedAt = new Date(now.getTime() - 60_000);
+    await db
+      .update(rune.characterCargoHoldRepair)
+      .set({
+        refinedFerriteContributed: balance.cargoHold.refinedFerriteRequired,
+        slagContributed: balance.cargoHold.slagRequired,
+        weldingProgress: balance.welding.repairIncrements,
+        completedAt,
+        updatedAt: now,
+      })
+      .where(eq(rune.characterCargoHoldRepair.characterId, character.id));
+    await db.insert(rune.cargoHoldStacks).values({
+      characterId: character.id,
+      itemId: ITEM_IDS.ferriteShale,
+      quantity: 3,
+    });
+    const storedUnique = (
+      await db
+        .insert(rune.itemInstances)
+        .values({ characterId: character.id, itemId: ITEM_IDS.salvageCutter, currentCharge: 4 })
+        .returning()
+    )[0]!;
+    await db.insert(rune.cargoHoldItemInstances).values({
+      characterId: character.id,
+      itemInstanceId: storedUnique.id,
+      storedAt: now,
+    });
+    // Give the character some Welding XP history so a +600 replay would be visible.
+    await db
+      .update(rune.characterSkillXp)
+      .set({ totalXp: 42 })
+      .where(
+        and(
+          eq(rune.characterSkillXp.characterId, character.id),
+          eq(rune.characterSkillXp.skillId, SKILL_IDS.welding),
+        ),
+      );
+
+    // The Mission arrives through the backfill path without touching Cargo or XP.
+    await db.insert(rune.characterMissions).values([
+      {
+        characterId: character.id,
+        missionId: MISSION_IDS.wasteNot,
+        acceptedAt: completedAt,
+        completedAt,
+      },
+      {
+        characterId: character.id,
+        missionId: MISSION_IDS.holdItTogether,
+        acceptedAt: now,
+      },
+    ]);
+    const ready = await play.getPlayGameplayState(
+      userId,
+      character.id,
+      new Date(now.getTime() + 1_000),
+      deterministicRandom,
+    );
+    expect(ready.cargoHold.repair).toMatchObject({
+      repairAvailable: true,
+      complete: true,
+      weldingProgress: balance.welding.repairIncrements,
+    });
+    expect(
+      ready.missions.find((mission) => mission.missionId === MISSION_IDS.holdItTogether),
+    ).toMatchObject({ state: "ready_for_completion" });
+    expect(ready.welding.totalXp).toBe(42);
+    expect(
+      await db
+        .select()
+        .from(rune.characterMissionProgress)
+        .where(eq(rune.characterMissionProgress.characterId, character.id)),
+    ).toEqual([]);
+
+    const completion = await missions.completeMission(
+      userId,
+      character.id,
+      MISSION_IDS.holdItTogether,
+      NPC_IDS.wadeRusk,
+      new Date(now.getTime() + 2_000),
+      deterministicRandom,
+    );
+    expect(completion.mission).toEqual({ status: "completed" });
+
+    const after = await play.getPlayGameplayState(
+      userId,
+      character.id,
+      new Date(now.getTime() + 3_000),
+      deterministicRandom,
+    );
+    // Exactly +100 Mission Welding XP once: no historical +600 repair XP replay.
+    expect(after.welding.totalXp).toBe(42 + 100);
+    expect(
+      after.missions.find((mission) => mission.missionId === MISSION_IDS.holdItTogether),
+    ).toMatchObject({ state: "completed" });
+
+    const repair = (
+      await db
+        .select()
+        .from(rune.characterCargoHoldRepair)
+        .where(eq(rune.characterCargoHoldRepair.characterId, character.id))
+    )[0]!;
+    expect(repair).toMatchObject({
+      refinedFerriteContributed: balance.cargoHold.refinedFerriteRequired,
+      slagContributed: balance.cargoHold.slagRequired,
+      weldingProgress: balance.welding.repairIncrements,
+      completedAt,
+    });
+    expect(
+      await db
+        .select()
+        .from(rune.cargoHoldStacks)
+        .where(eq(rune.cargoHoldStacks.characterId, character.id)),
+    ).toEqual([expect.objectContaining({ itemId: ITEM_IDS.ferriteShale, quantity: 3 })]);
+    expect(
+      await db
+        .select()
+        .from(rune.cargoHoldItemInstances)
+        .where(eq(rune.cargoHoldItemInstances.characterId, character.id)),
+    ).toEqual([expect.objectContaining({ itemInstanceId: storedUnique.id })]);
+
+    const repeated = await missions.completeMission(
+      userId,
+      character.id,
+      MISSION_IDS.holdItTogether,
+      NPC_IDS.wadeRusk,
+      new Date(now.getTime() + 4_000),
+      deterministicRandom,
+    );
+    expect(repeated.mission.status).toBe("already_completed");
+    const afterRetry = await play.getPlayGameplayState(
+      userId,
+      character.id,
+      new Date(now.getTime() + 5_000),
+      deterministicRandom,
+    );
+    expect(afterRetry.welding.totalXp).toBe(42 + 100);
   });
 
   it("unlocks the existing repair flow after Hold It Together acceptance", async () => {

@@ -564,7 +564,7 @@ const dialogue = {
     beats: [
       wadeLocal(
         EXPRESSION_IDS.neutral,
-        "The Cargo Hold is still buckled. Install the repair materials at the crash site, then use the welder until the frame locks.",
+        "The Cargo Hold is still buckled. Install the repair materials at the crash site, then weld the frame until it locks.",
       ),
       wadeLocal(
         EXPRESSION_IDS.neutral,
