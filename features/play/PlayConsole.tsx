@@ -158,7 +158,9 @@ export function PlayConsole({ characterName }: { characterName: string }) {
               <p className="max-w-2xl text-sm leading-relaxed text-[color:var(--rs-text-secondary)]">
                 {getLocation(currentLocationId)?.description}
               </p>
-              <CargoHoldPanel />
+              <div className="mt-4">
+                <CargoHoldPanel />
+              </div>
             </div>
           ) : atTheLongScramble ? (
             <div className="mt-4">
