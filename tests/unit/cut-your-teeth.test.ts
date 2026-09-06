@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   CUT_YOUR_TEETH,
+  HOLD_IT_TOGETHER,
   WALK_IT_OFF,
   WASTE_NOT,
   MISSIONS,
@@ -173,6 +174,61 @@ describe("issue #141 Waste Not persistent completed dialogue", () => {
     expect(resolveNpcMissionDialogue(NPC_IDS.tansyRusk, projections)?.sequence.id).toBe(
       DIALOGUE_IDS.tansyPostWasteNot,
     );
+  });
+});
+
+describe("issue #148 Hold It Together authored and observed repair boundary", () => {
+  it("continues from Waste Not and awards separate Welding XP", () => {
+    expect(WASTE_NOT.continuationMissionId).toBe(MISSION_IDS.holdItTogether);
+    expect(HOLD_IT_TOGETHER).toMatchObject({
+      id: MISSION_IDS.holdItTogether,
+      prerequisiteMissionId: MISSION_IDS.wasteNot,
+      offers: [],
+      requirements: [{ kind: "cargo_hold_repaired" }],
+      reward: { kind: "skill_xp", skillId: SKILL_IDS.welding, amount: 100 },
+    });
+  });
+
+  it("observes authoritative Cargo completion without tracking progress", () => {
+    expect(
+      projectMission(HOLD_IT_TOGETHER, accepted(), CRASH_SITE, true, observation()),
+    ).toMatchObject({
+      state: "active",
+      currentObjective: "Repair the Cargo Hold at the Crash Site",
+      requirements: [{ kind: "cargo_hold_repaired", satisfied: false }],
+      stage: {
+        requirementsSatisfied: false,
+        turnInAvailable: false,
+        nextObjectiveKind: "cargo_hold_repaired",
+      },
+    });
+    expect(
+      projectMission(
+        HOLD_IT_TOGETHER,
+        accepted(),
+        CRASH_SITE,
+        true,
+        observation({ cargoHoldRepairComplete: true }),
+      ),
+    ).toMatchObject({
+      state: "ready_for_completion",
+      currentObjective: "Report the repaired Cargo Hold to Wade Rusk",
+      requirements: [{ kind: "cargo_hold_repaired", satisfied: true }],
+    });
+  });
+
+  it("routes Wade's repair reminder through semantic requirement state", () => {
+    expect(
+      resolveNpcMissionDialogue(NPC_IDS.wadeRusk, [
+        mission(MISSION_IDS.holdItTogether, "active", {
+          stage: {
+            requirementsSatisfied: false,
+            turnInAvailable: false,
+            nextObjectiveKind: "cargo_hold_repaired",
+          },
+        }),
+      ])?.sequence.id,
+    ).toBe(DIALOGUE_IDS.wadeHoldItTogetherRepairReminder);
   });
 });
 

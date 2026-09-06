@@ -1,7 +1,14 @@
 import { and, eq } from "drizzle-orm";
 import { afterEach, beforeAll, describe, expect, it } from "vitest";
 import { getEffectiveGameBalance } from "@/game/config/balance";
-import { ACTION_IDS, ITEM_IDS, LOCATION_IDS, SKILL_IDS } from "@/game/config/foundations";
+import {
+  ACTION_IDS,
+  ITEM_IDS,
+  LOCATION_IDS,
+  MISSION_IDS,
+  NPC_IDS,
+  SKILL_IDS,
+} from "@/game/config/foundations";
 import { cleanupTestUser, createCharacterForUser, createTestUser } from "./fixtures";
 
 const DATABASE_URL = process.env.DATABASE_URL;
@@ -16,6 +23,7 @@ suite("issue #128 Cargo Hold repair gate and existing Welding mechanics (real Po
   let play: typeof import("@/server/play");
   let cargo: typeof import("@/server/cargo-hold");
   let equipment: typeof import("@/server/equipment");
+  let missions: typeof import("@/server/missions");
   const createdUsers: string[] = [];
   const balance = getEffectiveGameBalance();
   const deterministicRandom = {
@@ -32,6 +40,7 @@ suite("issue #128 Cargo Hold repair gate and existing Welding mechanics (real Po
     play = await import("@/server/play");
     cargo = await import("@/server/cargo-hold");
     equipment = await import("@/server/equipment");
+    missions = await import("@/server/missions");
   });
 
   afterEach(async () => {
@@ -223,6 +232,126 @@ suite("issue #128 Cargo Hold repair gate and existing Welding mechanics (real Po
     );
     expect(welding.weldingError).toBe("welding_locked");
     expect(await inventoryAndCargoRows(character.id)).toEqual(before);
+  });
+
+  it("unlocks the existing repair flow after Hold It Together acceptance", async () => {
+    const { userId, character, now } = await makeCharacter();
+    await db.insert(rune.characterMissions).values([
+      {
+        characterId: character.id,
+        missionId: MISSION_IDS.wasteNot,
+        acceptedAt: now,
+        completedAt: now,
+      },
+      {
+        characterId: character.id,
+        missionId: MISSION_IDS.holdItTogether,
+        acceptedAt: now,
+      },
+    ]);
+    await db.insert(rune.inventoryStacks).values([
+      { characterId: character.id, itemId: ITEM_IDS.refinedFerrite, quantity: 20 },
+      { characterId: character.id, itemId: ITEM_IDS.slag, quantity: 10 },
+    ]);
+
+    const unlocked = await play.getPlayGameplayState(
+      userId,
+      character.id,
+      now,
+      deterministicRandom,
+    );
+    expect(unlocked.cargoHold.repair).toMatchObject({
+      repairAvailable: true,
+      complete: false,
+      materialComplete: false,
+    });
+
+    const contribution = await cargo.contributeCargoHoldMaterials(
+      userId,
+      character.id,
+      { expectedRefinedFerrite: 15, expectedSlag: 6 },
+      now,
+      deterministicRandom,
+    );
+    expect(contribution.cargo).toEqual({ status: "committed", refinedFerrite: 15, slag: 6 });
+    expect(contribution.state.cargoHold.repair.materialComplete).toBe(true);
+    expect(
+      await db
+        .select()
+        .from(rune.inventoryStacks)
+        .where(eq(rune.inventoryStacks.characterId, character.id)),
+    ).toEqual([
+      expect.objectContaining({ itemId: ITEM_IDS.refinedFerrite, quantity: 5 }),
+      expect.objectContaining({ itemId: ITEM_IDS.slag, quantity: 4 }),
+    ]);
+
+    const started = await cargo.startCargoHoldWelding(
+      userId,
+      character.id,
+      now,
+      deterministicRandom,
+    );
+    expect(started.activeAction?.actionId).toBe(ACTION_IDS.cargoHoldWelding);
+
+    const repairCompletedAt = new Date(
+      now.getTime() + balance.welding.repairIncrements * balance.welding.attemptDurationTicks * 600,
+    );
+    const completed = await play.getPlayGameplayState(
+      userId,
+      character.id,
+      new Date(
+        now.getTime() +
+          balance.welding.repairIncrements * balance.welding.attemptDurationTicks * 600,
+      ),
+      deterministicRandom,
+    );
+    expect(completed.cargoHold.repair).toMatchObject({
+      repairAvailable: true,
+      weldingProgress: balance.welding.repairIncrements,
+      complete: true,
+    });
+    expect(completed.welding.totalXp).toBe(
+      balance.welding.repairIncrements * balance.welding.xpPerIncrement,
+    );
+    expect(
+      completed.missions.find((mission) => mission.missionId === MISSION_IDS.holdItTogether),
+    ).toMatchObject({ state: "ready_for_completion" });
+
+    const completion = await missions.completeMission(
+      userId,
+      character.id,
+      MISSION_IDS.holdItTogether,
+      NPC_IDS.wadeRusk,
+      new Date(repairCompletedAt.getTime() + 1),
+      deterministicRandom,
+    );
+    expect(completion.mission).toEqual({ status: "completed" });
+    const afterMission = await play.getPlayGameplayState(
+      userId,
+      character.id,
+      new Date(repairCompletedAt.getTime() + 2_000),
+      deterministicRandom,
+    );
+    expect(afterMission.welding.totalXp).toBe(
+      balance.welding.repairIncrements * balance.welding.xpPerIncrement + 100,
+    );
+
+    const repeated = await missions.completeMission(
+      userId,
+      character.id,
+      MISSION_IDS.holdItTogether,
+      NPC_IDS.wadeRusk,
+      new Date(repairCompletedAt.getTime() + 3_000),
+      deterministicRandom,
+    );
+    expect(repeated.mission.status).toBe("already_completed");
+    const afterRetry = await play.getPlayGameplayState(
+      userId,
+      character.id,
+      new Date(repairCompletedAt.getTime() + 4_000),
+      deterministicRandom,
+    );
+    expect(afterRetry.welding.totalXp).toBe(afterMission.welding.totalXp);
   });
 
   it("resolves only whole Welding passes, preserves a partial stop, and hard-stops at completion", async () => {

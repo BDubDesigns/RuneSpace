@@ -34,6 +34,8 @@ export type MissionObservation = {
   itemNames: ReadonlyMap<string, string>;
   /** Durable current progress by authored tracked-requirement key. */
   trackedProgress?: ReadonlyMap<string, number>;
+  /** Authoritative completion state for the Cargo Hold repair. */
+  cargoHoldRepairComplete?: boolean;
 };
 
 /**
@@ -158,6 +160,7 @@ function renderRequirementObjective(
       .replace("{current}", String(current))
       .replace("{target}", String(requirement.target));
   }
+  if (requirement.kind === "cargo_hold_repaired") return requirement.objective;
   const itemName = observation?.itemNames.get(requirement.itemId) ?? requirement.itemId;
   if (requirement.kind === "equipped_item") {
     return requirement.objective.replace("{item}", itemName);
@@ -197,6 +200,8 @@ function requirementSatisfied(
       return (
         (observation?.trackedProgress?.get(requirement.progressKey) ?? 0) >= requirement.target
       );
+    case "cargo_hold_repaired":
+      return observation?.cargoHoldRepairComplete === true;
   }
 }
 
@@ -385,6 +390,13 @@ function projectRequirement(
       objective: renderRequirementObjective(requirement, observation),
       satisfied,
       progress: { current, target: requirement.target },
+    };
+  }
+  if (requirement.kind === "cargo_hold_repaired") {
+    return {
+      kind: requirement.kind,
+      objective: requirement.objective,
+      satisfied,
     };
   }
   const required = requiredCarriedQuantity(requirement, observation);
@@ -586,6 +598,7 @@ export function validateMissionDefinitions(definitions: readonly MissionDefiniti
         }
         continue;
       }
+      if (requirement.kind === "cargo_hold_repaired") continue;
       const itemDefinition = getItemDefinition(requirement.itemId);
       if (!itemDefinition) {
         throw new Error(`${where} requirement references unknown item "${requirement.itemId}".`);
@@ -633,6 +646,12 @@ export function validateMissionDefinitions(definitions: readonly MissionDefiniti
         definition.id,
         dialogue.trackedActivityReminderDialogueId,
         "tracked activity reminder",
+      );
+    if (dialogue.cargoRepairReminderDialogueId)
+      assertDialogue(
+        definition.id,
+        dialogue.cargoRepairReminderDialogueId,
+        "cargo repair reminder",
       );
     if (dialogue.busyDialogueId) assertDialogue(definition.id, dialogue.busyDialogueId, "busy");
     if (dialogue.completionPresentationDialogueId) {

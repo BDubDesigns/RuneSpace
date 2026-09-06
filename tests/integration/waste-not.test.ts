@@ -237,6 +237,37 @@ suite("issue #141 Waste Not tracked activity (real PostgreSQL)", () => {
       miningRandom(),
     );
     expect(completion.mission.status).toBe("completed");
+    expect(
+      await db
+        .select()
+        .from(rune.characterMissions)
+        .where(
+          and(
+            eq(rune.characterMissions.characterId, character.id),
+            eq(rune.characterMissions.missionId, MISSION_IDS.holdItTogether),
+          ),
+        ),
+    ).toEqual([expect.objectContaining({ acceptedAt: expect.any(Date), completedAt: null })]);
+    expect(
+      await db
+        .select()
+        .from(rune.characterMissionProgress)
+        .where(
+          and(
+            eq(rune.characterMissionProgress.characterId, character.id),
+            eq(rune.characterMissionProgress.missionId, MISSION_IDS.holdItTogether),
+          ),
+        ),
+    ).toEqual([]);
+    const manualHoldAcceptance = await missions.acceptMission(
+      userId,
+      character.id,
+      MISSION_IDS.holdItTogether,
+      NPC_IDS.wadeRusk,
+      new Date(now.getTime() + 61_000),
+      miningRandom(),
+    );
+    expect(manualHoldAcceptance.mission.status).toBe("already_accepted");
 
     const refiningXp = await db
       .select()

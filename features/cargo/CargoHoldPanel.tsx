@@ -4,18 +4,26 @@ import { useEffect, useRef, useState, useTransition } from "react";
 import { ActionButton } from "@/components/ui/ActionButton";
 import { Feedback } from "@/components/ui/Feedback";
 import { Panel } from "@/components/ui/Panel";
+import { StatusMeter } from "@/components/ui/StatusMeter";
 import { ItemVisual } from "@/components/items/ItemVisual";
 import { InventoryStackVisual } from "@/components/items/InventoryStackVisual";
 import { getEffectiveGameBalance } from "@/game/config/balance";
-import type { CargoHoldTransferActionResult } from "@/server/actions";
+import { ACTION_IDS, GAME_TICK_MS } from "@/game/config/foundations";
+import type {
+  CargoHoldMaterialContributionActionResult,
+  CargoHoldTransferActionResult,
+  PlayActionResult,
+} from "@/server/actions";
 import {
   contributeCargoHoldMaterialsAction,
   depositCargoStackAction,
   depositCargoUniqueItemAction,
+  startWeldingAction,
+  stopWeldingAction,
   withdrawCargoStackAction,
   withdrawCargoUniqueItemAction,
 } from "@/server/actions";
-import type { CargoHoldStackState } from "@/server/play";
+import type { CargoHoldStackState, PlayGameplayState } from "@/server/play";
 import { usePlay } from "@/features/play/PlayContext";
 
 type Confirmation = {
@@ -33,6 +41,21 @@ function transferMessage(result: CargoHoldTransferActionResult): string | undefi
   return result.cargo.message;
 }
 
+function weldingMessage(state: PlayGameplayState): string | undefined {
+  if (state.weldingError === "welding_unavailable_here")
+    return "Welding is available only while stationary at Crash Site.";
+  if (state.weldingError === "welding_locked")
+    return "Install 15 Refined Ferrite and 6 Slag before Welding.";
+  if (state.weldingError === "repair_complete") return "The Cargo Hold is already operational.";
+  if (state.commandError === "another_action_active")
+    return "Another activity is active. Finish it before starting Welding.";
+  return undefined;
+}
+
+function resultError(result: PlayActionResult | CargoHoldMaterialContributionActionResult) {
+  return "error" in result ? result.error : undefined;
+}
+
 export function CargoHoldPanel() {
   const { enqueueForeground, releaseCommand, acceptState, state } = usePlay();
   const [confirmation, setConfirmation] = useState<Confirmation>();
@@ -42,10 +65,28 @@ export function CargoHoldPanel() {
   const [pending, setPending] = useState<string>();
   const [completionFeedbackVisible, setCompletionFeedbackVisible] = useState(false);
   const [completionAnnouncement, setCompletionAnnouncement] = useState("");
+  const [now, setNow] = useState(Date.now());
   const [, startTransition] = useTransition();
   const balance = getEffectiveGameBalance();
   const repair = state.cargoHold.repair;
   const previousCompletion = useRef(repair.complete);
+  const activeWelding = state.activeAction?.actionId === ACTION_IDS.cargoHoldWelding;
+  const weldingAttemptDurationMs = balance.welding.attemptDurationTicks * GAME_TICK_MS;
+  const weldingElapsed = activeWelding
+    ? Math.max(0, now - new Date(state.activeAction!.progressStartedAt).getTime())
+    : 0;
+  const weldingAttemptProgress = activeWelding
+    ? Math.min(100, (weldingElapsed / weldingAttemptDurationMs) * 100)
+    : 0;
+  const secondsRemaining = activeWelding
+    ? Math.max(0, (new Date(state.activeAction!.nextAttemptAt).getTime() - now) / 1_000)
+    : 0;
+
+  useEffect(() => {
+    if (!activeWelding) return;
+    const timer = window.setInterval(() => setNow(Date.now()), 250);
+    return () => window.clearInterval(timer);
+  }, [activeWelding]);
 
   useEffect(() => {
     const wasComplete = previousCompletion.current;
@@ -60,6 +101,37 @@ export function CargoHoldPanel() {
     }, COMPLETION_FEEDBACK_DURATION_MS);
     return () => window.clearTimeout(timer);
   }, [repair.complete]);
+
+  function applyStateResult(result: PlayActionResult) {
+    const error = resultError(result);
+    if (error) {
+      setMessage(error);
+      return;
+    }
+    if (!result.state) return;
+    acceptState(result.state);
+    setMessage(weldingMessage(result.state));
+  }
+
+  function runWeldingCommand(intent: "start" | "stop") {
+    enqueueForeground(() => {
+      setPending(intent);
+      startTransition(async () => {
+        try {
+          const result =
+            intent === "start"
+              ? await startWeldingAction(state.characterId)
+              : await stopWeldingAction(state.characterId);
+          applyStateResult(result);
+        } catch {
+          setMessage("Comms interruption. Welding status could not be confirmed.");
+        } finally {
+          releaseCommand();
+          setPending(undefined);
+        }
+      });
+    });
+  }
 
   function commitMaterials() {
     if (!confirmation) return;
@@ -311,9 +383,15 @@ export function CargoHoldPanel() {
           </p>
           <h2
             className="mt-1 font-display text-xl font-bold uppercase tracking-wide"
-            data-cargo-hold-status={repair.complete ? undefined : "locked"}
+            data-cargo-hold-status={
+              repair.complete || repair.repairAvailable ? undefined : "locked"
+            }
           >
-            {repair.complete ? "CARGO HOLD" : "Damaged Cargo Hold"}
+            {repair.complete
+              ? "CARGO HOLD"
+              : repair.repairAvailable
+                ? "CARGO HOLD REPAIR"
+                : "Damaged Cargo Hold"}
           </h2>
         </div>
         {repair.complete ? (
@@ -394,6 +472,113 @@ export function CargoHoldPanel() {
                 </div>
               </div>
             </section>
+          ) : null}
+        </>
+      ) : repair.repairAvailable ? (
+        <>
+          <p className="mt-3 max-w-2xl text-sm leading-relaxed text-[color:var(--rs-text-secondary)]">
+            Restore the damaged Cargo Hold with replacement plating and packed bulkhead filler.
+            Refined Ferrite is structural material; Slag is thermal packing, not a welding tool.
+          </p>
+          <div className="mt-4 grid gap-2 sm:grid-cols-2" data-cargo-repair-materials>
+            <div className="border border-[color:var(--rs-border-structural)] bg-[color:var(--rs-surface-panel)] p-3">
+              <p className="font-display text-xs uppercase tracking-wide">Refined Ferrite</p>
+              <p className="mt-1 font-display text-2xl font-bold">
+                {repair.refinedFerriteContributed} / {repair.refinedFerriteRequired}
+              </p>
+              <p className="text-xs text-[color:var(--rs-text-secondary)]">
+                replacement plating and braces
+              </p>
+            </div>
+            <div className="border border-[color:var(--rs-border-structural)] bg-[color:var(--rs-surface-panel)] p-3">
+              <p className="font-display text-xs uppercase tracking-wide">Slag</p>
+              <p className="mt-1 font-display text-2xl font-bold">
+                {repair.slagContributed} / {repair.slagRequired}
+              </p>
+              <p className="text-xs text-[color:var(--rs-text-secondary)]">
+                thermal packing for bulkhead voids
+              </p>
+            </div>
+          </div>
+          <div className="mt-4 border border-[color:var(--rs-border-structural)] bg-[color:var(--rs-surface-panel)] p-3">
+            <p className="font-display text-xs uppercase tracking-wide">Welding</p>
+            {!repair.materialComplete ? (
+              <p className="mt-1 text-sm text-[color:var(--rs-text-secondary)]">
+                LOCKED until both material requirements are complete.
+              </p>
+            ) : (
+              <>
+                <p className="mt-1 text-sm text-[color:var(--rs-text-secondary)]">
+                  Material installation complete.
+                </p>
+                <div className="mt-3">
+                  <StatusMeter
+                    detail={`${repair.weldingProgress} / ${repair.weldingIncrements} completed increments`}
+                    label="CARGO HOLD REPAIR"
+                    value={(repair.weldingProgress / repair.weldingIncrements) * 100}
+                  />
+                </div>
+              </>
+            )}
+          </div>
+          <div className="mt-4 border border-[color:var(--rs-border-subtle)] bg-[color:var(--rs-surface-panel)] p-3">
+            <p className="font-display text-xs uppercase tracking-wide">Reward</p>
+            <p className="mt-1 text-sm">
+              Cargo Hold — {balance.cargoHold.capacitySlots} occupied slots
+            </p>
+            <p className="mt-1 text-xs text-[color:var(--rs-text-secondary)]">
+              No aggregate Cargo mass limit.
+            </p>
+          </div>
+          {repair.materialComplete ? (
+            <div className="mt-4 flex flex-wrap items-center gap-3">
+              {activeWelding || pending === "stop" ? (
+                <ActionButton
+                  disabled={Boolean(pending)}
+                  intent="danger"
+                  loading={pending === "stop"}
+                  onClick={() => runWeldingCommand("stop")}
+                >
+                  STOP WELDING
+                </ActionButton>
+              ) : repair.weldingProgress < repair.weldingIncrements ? (
+                <ActionButton
+                  disabled={Boolean(pending)}
+                  intent="mining"
+                  loading={pending === "start"}
+                  onClick={() => runWeldingCommand("start")}
+                >
+                  START WELDING
+                </ActionButton>
+              ) : null}
+              <span className="text-xs uppercase tracking-wide text-[color:var(--rs-text-secondary)]">
+                {balance.welding.attemptDurationTicks} ticks /{" "}
+                {(balance.welding.attemptDurationTicks * GAME_TICK_MS) / 1000}s per weld pass · +
+                {balance.welding.xpPerIncrement} Welding XP
+              </span>
+            </div>
+          ) : (
+            <ActionButton
+              className="mt-4"
+              disabled={
+                Boolean(pending) ||
+                (repair.availableContribution.refinedFerrite === 0 &&
+                  repair.availableContribution.slag === 0)
+              }
+              intent="mining"
+              onClick={() => setConfirmation(repair.availableContribution)}
+            >
+              CONTRIBUTE MATERIALS
+            </ActionButton>
+          )}
+          {activeWelding ? (
+            <div className="mt-4">
+              <StatusMeter
+                detail={`${secondsRemaining.toFixed(1)}s to next weld pass`}
+                label="Current welding pass"
+                value={weldingAttemptProgress}
+              />
+            </div>
           ) : null}
         </>
       ) : (

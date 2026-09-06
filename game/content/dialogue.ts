@@ -554,7 +554,66 @@ const dialogue = {
       ),
       wadeLocal(
         EXPRESSION_IDS.neutral,
-        "The Refined Ferrite will help when we get back to the ship. For now, that is a solid start on the wreck work ahead.",
+        "The Refined Ferrite and Slag are ready for the next job. Hold It Together is yours now: get the Cargo Hold sealed, then report back.",
+      ),
+    ],
+  },
+  [DIALOGUE_IDS.wadeHoldItTogetherRepairReminder]: {
+    id: DIALOGUE_IDS.wadeHoldItTogetherRepairReminder,
+    npcId: NPC_IDS.wadeRusk,
+    beats: [
+      wadeLocal(
+        EXPRESSION_IDS.neutral,
+        "The Cargo Hold is still buckled. Install the repair materials at the crash site, then use the welder until the frame locks.",
+      ),
+      wadeLocal(
+        EXPRESSION_IDS.neutral,
+        "The repair system records the exact material contribution and each Welding pass. Get the Hold operational, then report back to me.",
+      ),
+    ],
+  },
+  [DIALOGUE_IDS.wadeHoldItTogetherBusy]: {
+    id: DIALOGUE_IDS.wadeHoldItTogetherBusy,
+    npcId: NPC_IDS.wadeRusk,
+    beats: [
+      wadeLocal(
+        EXPRESSION_IDS.neutral,
+        "Finish the active work first. I will take the Cargo Hold report when you are stationary.",
+      ),
+    ],
+  },
+  [DIALOGUE_IDS.wadeHoldItTogetherTurnIn]: {
+    id: DIALOGUE_IDS.wadeHoldItTogetherTurnIn,
+    npcId: NPC_IDS.wadeRusk,
+    beats: [
+      wadeLocal(EXPRESSION_IDS.neutral, "The Hold is back together? Let me see the repair status."),
+      wadeLocal(
+        EXPRESSION_IDS.neutral,
+        "All right. That storage is ready for the wreck work ahead.",
+      ),
+    ],
+    action: "complete_mission",
+    actionLabel: "REPORT REPAIR",
+  },
+  [DIALOGUE_IDS.wadeHoldItTogetherCompletion]: {
+    id: DIALOGUE_IDS.wadeHoldItTogetherCompletion,
+    npcId: NPC_IDS.wadeRusk,
+    beats: [
+      wadeSkillXpBeat(SKILL_IDS.welding, 100),
+      wadeLocal(
+        EXPRESSION_IDS.neutral,
+        "The Cargo Hold is operational. You installed the material, learned the timing, and finished the job cleanly.",
+      ),
+    ],
+  },
+  [DIALOGUE_IDS.wadePostHoldItTogether]: {
+    id: DIALOGUE_IDS.wadePostHoldItTogether,
+    npcId: NPC_IDS.wadeRusk,
+    beats: [
+      wadeLocal(EXPRESSION_IDS.neutral, "The Cargo Hold is holding. That gives us room to work."),
+      wadeLocal(
+        EXPRESSION_IDS.neutral,
+        "Keep the Welding lesson in mind. Wreck work gets easier when the basics stay reliable.",
       ),
     ],
   },
@@ -705,6 +764,9 @@ function turnInStageSequence(
   }
   if (stage.nextObjectiveKind === "tracked_activity") {
     return dialogueOr(definition.dialogue.trackedActivityReminderDialogueId, turnIn);
+  }
+  if (stage.nextObjectiveKind === "cargo_hold_repaired") {
+    return dialogueOr(definition.dialogue.cargoRepairReminderDialogueId, turnIn);
   }
   return turnIn;
 }

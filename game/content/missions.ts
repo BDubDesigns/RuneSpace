@@ -101,6 +101,11 @@ export type MissionRequirement =
       objective: string;
       /** Optional authored action guidance for the activity being taught. */
       recommendedActionId?: ActionId;
+    }
+  | {
+      kind: "cargo_hold_repaired";
+      /** The authoritative Cargo Hold completion state satisfies this requirement. */
+      objective: string;
     };
 
 /** The kinds a requirement may take, used for semantic stage routing. */
@@ -170,6 +175,8 @@ export type MissionDialogue = {
   carriedReminderDialogueId?: DialogueId;
   /** First unmet requirement is a tracked activity. */
   trackedActivityReminderDialogueId?: DialogueId;
+  /** First unmet requirement is the Cargo Hold repair. */
+  cargoRepairReminderDialogueId?: DialogueId;
   /** Requirements satisfied but the turn-in is not performable (busy). */
   busyDialogueId?: DialogueId;
   /**
@@ -338,6 +345,7 @@ export const WASTE_NOT: MissionDefinition = {
   summary:
     "Complete five Refining attempts at the Abandoned Processing Yard, then report to Wade Rusk at the Crash Site.",
   prerequisiteMissionId: MISSION_IDS.cutYourTeeth,
+  continuationMissionId: MISSION_IDS.holdItTogether,
   offers: [],
   requirements: [
     {
@@ -371,8 +379,44 @@ export const WASTE_NOT: MissionDefinition = {
   ],
 };
 
+/** Hold It Together is accepted only as Waste Not's authored continuation. */
+export const HOLD_IT_TOGETHER: MissionDefinition = {
+  id: MISSION_IDS.holdItTogether,
+  title: "Hold It Together",
+  summary: "Repair the Cargo Hold at the Crash Site, then report to Wade Rusk.",
+  prerequisiteMissionId: MISSION_IDS.wasteNot,
+  offers: [],
+  requirements: [
+    {
+      kind: "cargo_hold_repaired",
+      objective: "Repair the Cargo Hold at the Crash Site",
+    },
+  ],
+  turnIn: {
+    npcId: NPC_IDS.wadeRusk,
+    locationId: LOCATION_IDS.crashSite,
+    requiresStationary: true,
+    objective: "Report the repaired Cargo Hold to Wade Rusk",
+    dialogueId: DIALOGUE_IDS.wadeHoldItTogetherTurnIn,
+  },
+  reward: { kind: "skill_xp", skillId: SKILL_IDS.welding, amount: 100 },
+  dialogue: {
+    cargoRepairReminderDialogueId: DIALOGUE_IDS.wadeHoldItTogetherRepairReminder,
+    busyDialogueId: DIALOGUE_IDS.wadeHoldItTogetherBusy,
+    completionPresentationDialogueId: DIALOGUE_IDS.wadeHoldItTogetherCompletion,
+  },
+  completedNpcDialogue: [
+    { npcId: NPC_IDS.wadeRusk, dialogueId: DIALOGUE_IDS.wadePostHoldItTogether },
+  ],
+};
+
 /** Ordered chain of authored missions; later entries may require earlier ones. */
-export const MISSIONS: readonly MissionDefinition[] = [WALK_IT_OFF, CUT_YOUR_TEETH, WASTE_NOT];
+export const MISSIONS: readonly MissionDefinition[] = [
+  WALK_IT_OFF,
+  CUT_YOUR_TEETH,
+  WASTE_NOT,
+  HOLD_IT_TOGETHER,
+];
 
 const missions = new Map<string, MissionDefinition>(
   MISSIONS.map((mission) => [mission.id, mission]),

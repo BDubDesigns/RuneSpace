@@ -91,6 +91,7 @@ import {
   type PersistedMiningOutcome,
 } from "@/server/mining";
 import { loadMissionProjections } from "@/server/mission-state";
+import { loadCargoRepairAccess } from "@/server/cargo-repair-access";
 import { recordTrackedActivity } from "@/server/mission-progress";
 import type { MissionProjection } from "@/game/domain/missions";
 import { loadPlaySnapshot } from "@/server/play-state";
@@ -126,6 +127,7 @@ export type CargoHoldState = {
     weldingIncrements: number;
     materialComplete: boolean;
     complete: boolean;
+    repairAvailable: boolean;
     completedAt?: string;
     availableContribution: { refinedFerrite: number; slag: number };
   };
@@ -672,6 +674,7 @@ export async function stateFromTransaction(
   };
   const materialComplete = cargoHoldMaterialsComplete(repairState, balance);
   const repairComplete = cargoHoldRepairComplete(repairState, balance);
+  const cargoRepairAccess = await loadCargoRepairAccess(transaction, characterId, repairState);
   const carriedRefinedFerrite = stacks
     .filter((stack) => stack.itemId === ITEM_IDS.refinedFerrite)
     .reduce((total, stack) => total + stack.quantity, 0);
@@ -921,6 +924,7 @@ export async function stateFromTransaction(
         weldingIncrements: balance.welding.repairIncrements,
         materialComplete,
         complete: repairComplete,
+        repairAvailable: cargoRepairAccess.repairAvailable,
         completedAt: repairState.completedAt?.toISOString(),
         availableContribution,
       },

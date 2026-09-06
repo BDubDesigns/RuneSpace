@@ -1,5 +1,6 @@
 import { eq } from "drizzle-orm";
 import {
+  characterCargoHoldRepair,
   characterMissionProgress,
   characterMissions,
   equippedItems,
@@ -7,6 +8,7 @@ import {
 } from "@/db/rune-space";
 import { getEffectiveGameBalance, getItemDefinition } from "@/game/config/balance";
 import { MISSIONS, type MissionDefinition } from "@/game/content/missions";
+import { cargoHoldRepairComplete } from "@/game/domain/cargo-hold";
 import {
   projectMission,
   validateMissionDefinitions,
@@ -34,7 +36,7 @@ export async function loadMissionProjections(
   characterId: string,
   input: { currentLocationId: string; activeActionId?: string },
 ): Promise<readonly MissionProjection[]> {
-  const [rows, progressRows, itemState, stackRows, assignmentRows] = await Promise.all([
+  const [rows, progressRows, itemState, stackRows, assignmentRows, repairRows] = await Promise.all([
     transaction
       .select()
       .from(characterMissions)
@@ -54,6 +56,10 @@ export async function loadMissionProjections(
       .from(equippedItems)
       .where(eq(equippedItems.characterId, characterId))
       .for("update"),
+    transaction
+      .select()
+      .from(characterCargoHoldRepair)
+      .where(eq(characterCargoHoldRepair.characterId, characterId)),
   ]);
   const byMissionId = new Map(rows.map((row) => [row.missionId, row]));
   const progressByMissionId = new Map<string, Map<string, number>>();
@@ -63,7 +69,12 @@ export async function loadMissionProjections(
     progressByMissionId.set(row.missionId, progress);
   }
   const stationary = input.activeActionId === undefined;
-  const observation = buildObservation(assignmentRows, itemState.carriedInstances, stackRows);
+  const observation = buildObservation(
+    assignmentRows,
+    itemState.carriedInstances,
+    stackRows,
+    repairRows[0],
+  );
   return MISSIONS.map((mission) => {
     const trackedProgress = progressByMissionId.get(mission.id);
     return projectMission(
@@ -120,6 +131,14 @@ function buildObservation(
   assignments: readonly { itemInstanceId: string }[],
   carriedInstances: readonly { id: string; itemId: string }[],
   stackRows: readonly { itemId: string; quantity: number }[],
+  repairRow:
+    | {
+        refinedFerriteContributed: number;
+        slagContributed: number;
+        weldingProgress: number;
+        completedAt: Date | null;
+      }
+    | undefined,
 ): MissionObservation {
   const balance = getEffectiveGameBalance();
   const carriedById = new Map(carriedInstances.map((instance) => [instance.id, instance.itemId]));
@@ -153,5 +172,19 @@ function buildObservation(
     const definition = getItemDefinition(itemId, balance);
     if (definition?.kind === "stack") stackLimits.set(itemId, definition.stackLimit);
   }
-  return { equippedItemIds: equippedCarriedIds, carriedQuantities, stackLimits, itemNames };
+  return {
+    equippedItemIds: equippedCarriedIds,
+    carriedQuantities,
+    stackLimits,
+    itemNames,
+    cargoHoldRepairComplete: cargoHoldRepairComplete(
+      repairRow ?? {
+        refinedFerriteContributed: 0,
+        slagContributed: 0,
+        weldingProgress: 0,
+        completedAt: null,
+      },
+      balance,
+    ),
+  };
 }

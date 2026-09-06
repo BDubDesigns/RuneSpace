@@ -473,7 +473,7 @@ test("equips the Cutter through Inventory, shows a full stack, and earns Mining 
   );
   await wade.getByRole("button", { name: "Next", exact: true }).click();
   await expect(wade.locator('[data-dialogue-text] [aria-hidden="true"]')).toContainText(
-    "Refined Ferrite will help",
+    "Hold It Together is yours now",
   );
   await expect(wade.getByRole("button", { name: "Finish" })).toBeVisible();
   await wade.getByRole("button", { name: "Finish" }).click();
@@ -489,22 +489,22 @@ test("equips the Cutter through Inventory, shows a full stack, and earns Mining 
   );
   expect(finalStacks.find((s) => s.itemId === ITEM_IDS.slag)?.quantity).toBeGreaterThan(0);
 
-  // After the one-shot Waste Not presentation closes, both NPCs retain the
-  // newest authored completed-Mission story state instead of falling back to
-  // stale Cut Your Teeth dialogue.
+  // After the one-shot Waste Not presentation closes, Wade routes the newly
+  // accepted Hold It Together objective while Tansy retains her completed
+  // Mission story state.
   await page.getByRole("button", { name: /Talk to Wade Rusk/ }).click();
-  const wadePostWaste = page.getByRole("dialog", { name: "Wade Rusk dialogue" });
-  await expect(wadePostWaste).toBeVisible();
-  await expect(wadePostWaste.locator('[data-dialogue-text] [aria-hidden="true"]')).toContainText(
-    "Waste Not was a good first pass",
-  );
+  const wadeHoldItTogether = page.getByRole("dialog", { name: "Wade Rusk dialogue" });
+  await expect(wadeHoldItTogether).toBeVisible();
   await expect(
-    wadePostWaste.locator('[data-dialogue-text] [aria-hidden="true"]'),
-  ).not.toContainText("Tansy says you made the Processing Yard run");
-  await wadePostWaste.getByRole("button", { name: "Next", exact: true }).click();
-  await expect(wadePostWaste.getByRole("button", { name: "Finish" })).toBeVisible();
-  await wadePostWaste.getByRole("button", { name: "Finish" }).click();
-  await expect(wadePostWaste).toBeHidden();
+    wadeHoldItTogether.locator('[data-dialogue-text] [aria-hidden="true"]'),
+  ).toContainText("The Cargo Hold is still buckled");
+  await expect(
+    wadeHoldItTogether.locator('[data-dialogue-text] [aria-hidden="true"]'),
+  ).not.toContainText("Waste Not was a good first pass");
+  await wadeHoldItTogether.getByRole("button", { name: "Next", exact: true }).click();
+  await expect(wadeHoldItTogether.getByRole("button", { name: "Finish" })).toBeVisible();
+  await wadeHoldItTogether.getByRole("button", { name: "Finish" }).click();
+  await expect(wadeHoldItTogether).toBeHidden();
 
   await db
     .update(characters)
