@@ -155,6 +155,9 @@ export function PlayConsole({ characterName }: { characterName: string }) {
             </>
           ) : currentLocationId === LOCATION_IDS.crashSite ? (
             <div className="mt-4">
+              <p className="max-w-2xl text-sm leading-relaxed text-[color:var(--rs-text-secondary)]">
+                {getLocation(currentLocationId)?.description}
+              </p>
               <CargoHoldPanel />
             </div>
           ) : atTheLongScramble ? (

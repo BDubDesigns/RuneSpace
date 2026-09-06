@@ -23,7 +23,7 @@ const locationDefinitions = [
     id: LOCATION_IDS.crashSite,
     displayName: "Crash Site",
     description:
-      "The damaged ship rests on broken ground, its fractured hull and scattered salvage marking the impact site.",
+      "Your wrecked ship lies half-sunk in mud and scrap, with only a few systems still worth salvaging.",
     adjacentLocationIds: [
       LOCATION_IDS.abandonedProcessingYard,
       LOCATION_IDS.emergencyPowerAnnex,

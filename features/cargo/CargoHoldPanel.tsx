@@ -396,7 +396,11 @@ export function CargoHoldPanel() {
             </section>
           ) : null}
         </>
-      ) : null}
+      ) : (
+        <p className="mt-3 max-w-2xl text-sm leading-relaxed text-[color:var(--rs-text-secondary)]">
+          The Cargo Hold is buckled from the crash and still inaccessible.
+        </p>
+      )}
       <p
         aria-atomic="true"
         aria-live="polite"

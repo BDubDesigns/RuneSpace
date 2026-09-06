@@ -26,6 +26,9 @@ describe("issue #47 location content", () => {
       ].sort(),
     );
     expect(getLocation(LOCATION_IDS.crashSite)?.displayName).toBe("Crash Site");
+    expect(getLocation(LOCATION_IDS.crashSite)?.description).toBe(
+      "Your wrecked ship lies half-sunk in mud and scrap, with only a few systems still worth salvaging.",
+    );
     expect(getLocation(LOCATION_IDS.abandonedProcessingYard)?.displayName).toBe(
       "Abandoned Processing Yard",
     );

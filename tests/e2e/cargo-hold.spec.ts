@@ -34,10 +34,19 @@ test("keeps damaged Cargo Hold locked and transfers completed storage on mobile 
     await expect(completionAnnouncement).toHaveText("");
   };
   await expect(cargoPanel).toBeVisible();
+  await expect(
+    page.getByRole("paragraph").filter({
+      hasText:
+        "Your wrecked ship lies half-sunk in mud and scrap, with only a few systems still worth salvaging.",
+    }),
+  ).toBeVisible();
   await expect(lockedStatus).toBeVisible();
   await expect(
     cargoPanel.getByRole("heading", { name: "Damaged Cargo Hold", exact: true }),
   ).toBeVisible();
+  await expect(cargoPanel).toContainText(
+    "The Cargo Hold is buckled from the crash and still inaccessible.",
+  );
   await expect(cargoPanel.locator("[data-cargo-repair-materials]")).toHaveCount(0);
   await expect(cargoPanel).not.toContainText("Refined Ferrite");
   await expect(cargoPanel).not.toContainText("Slag");
