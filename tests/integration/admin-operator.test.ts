@@ -119,29 +119,26 @@ suite("issue #113 admin operator console (real PostgreSQL)", () => {
       .where(eq(rune.characters.id, characterId));
   }
 
-  /** Seed + install the Cargo-hold repair materials so Welding can actually run. */
-  async function installRepairMaterials(userId: string, characterId: string, at: Date) {
+  /** Seed the already-unlocked repair state and active Welding action as a test fixture. */
+  async function seedWeldingAction(characterId: string, at: Date) {
     const { getEffectiveGameBalance } = await import("@/game/config/balance");
     const balance = getEffectiveGameBalance();
-    await db.insert(rune.inventoryStacks).values([
-      {
-        characterId,
-        itemId: ITEM_IDS.refinedFerrite,
-        quantity: balance.cargoHold.refinedFerriteRequired,
-      },
-      { characterId, itemId: ITEM_IDS.slag, quantity: balance.cargoHold.slagRequired },
-    ]);
-    const contribution = await cargo.contributeCargoHoldMaterials(
-      userId,
+    await db
+      .update(rune.characterCargoHoldRepair)
+      .set({
+        refinedFerriteContributed: balance.cargoHold.refinedFerriteRequired,
+        slagContributed: balance.cargoHold.slagRequired,
+        weldingProgress: 0,
+        completedAt: null,
+        updatedAt: at,
+      })
+      .where(eq(rune.characterCargoHoldRepair.characterId, characterId));
+    await db.insert(rune.activeActions).values({
       characterId,
-      {
-        expectedRefinedFerrite: balance.cargoHold.refinedFerriteRequired,
-        expectedSlag: balance.cargoHold.slagRequired,
-      },
-      at,
-      detRandom,
-    );
-    expect(contribution.cargo.status).toBe("committed");
+      actionId: ACTION_IDS.cargoHoldWelding,
+      startedAt: at,
+      resolvedThroughAt: at,
+    });
   }
 
   // -------------------------------------------------------------------------
@@ -1049,8 +1046,7 @@ suite("issue #113 admin operator console (real PostgreSQL)", () => {
     const startedAt = new Date("2026-01-01T00:00:00.000Z");
     await play.getPlayGameplayState(userId, character.id, startedAt, detRandom);
     // Cargo Hold access requires being stationary at the Crash Site (default).
-    await installRepairMaterials(userId, character.id, startedAt);
-    await cargo.startCargoHoldWelding(userId, character.id, startedAt, detRandom);
+    await seedWeldingAction(character.id, startedAt);
     const stopAt = tick(startedAt, 5); // exactly one 5-tick pass
     const result = await adminCommands.stopCurrentActionAsAdmin(ADMIN, character.id, stopAt);
     expect(result.outcome.kind).toBe("interrupted");
@@ -1116,8 +1112,7 @@ suite("issue #113 admin operator console (real PostgreSQL)", () => {
     const startedAt = new Date("2026-01-01T00:00:00.000Z");
     await play.getPlayGameplayState(userId, character.id, startedAt, detRandom);
     // Cargo Hold access requires being stationary at the Crash Site (default).
-    await installRepairMaterials(userId, character.id, startedAt);
-    await cargo.startCargoHoldWelding(userId, character.id, startedAt, detRandom);
+    await seedWeldingAction(character.id, startedAt);
     const partialAt = tick(startedAt, 4); // 4 ticks < 5-tick pass
     const result = await adminCommands.stopCurrentActionAsAdmin(ADMIN, character.id, partialAt);
     expect(result.outcome.kind).toBe("interrupted");

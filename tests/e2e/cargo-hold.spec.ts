@@ -1,7 +1,8 @@
 import { expect, test, openTestCharacter } from "./fixtures";
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
-import { activeActions, characters, inventoryStacks } from "@/db/rune-space";
+import { characterCargoHoldRepair, characters, inventoryStacks } from "@/db/rune-space";
+import { getEffectiveGameBalance } from "@/game/config/balance";
 import { ITEM_IDS, LOCATION_IDS } from "@/game/config/foundations";
 import { captureReviewScreenshot } from "./review-screenshot";
 
@@ -9,19 +10,15 @@ test.beforeEach(async ({ page, testCharacter }) => {
   await openTestCharacter(page, testCharacter.id);
 });
 
-test("repairs the Cargo Hold, hard-stops Welding, and transfers occupied storage on mobile and desktop", async ({
+test("keeps damaged Cargo Hold locked and transfers completed storage on mobile and desktop", async ({
   page,
 }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   const characterId = page.url().split("/").at(-1)!;
-
-  await db.insert(inventoryStacks).values([
-    { characterId, itemId: ITEM_IDS.refinedFerrite, quantity: 15 },
-    { characterId, itemId: ITEM_IDS.slag, quantity: 6 },
-  ]);
-  await page.reload();
+  const balance = getEffectiveGameBalance();
 
   const cargoPanel = page.locator("[data-cargo-hold]");
+  const lockedStatus = cargoPanel.locator('[data-cargo-hold-status="locked"]');
   const restoredStatus = cargoPanel.locator('[data-cargo-hold-status="restored"]');
   const operationalStatus = cargoPanel.locator('[data-cargo-hold-status="operational"]');
   const completionAnnouncement = cargoPanel.locator("[data-cargo-hold-announcement]");
@@ -37,39 +34,39 @@ test("repairs the Cargo Hold, hard-stops Welding, and transfers occupied storage
     await expect(completionAnnouncement).toHaveText("");
   };
   await expect(cargoPanel).toBeVisible();
-  await expect(cargoPanel.locator("[data-cargo-repair-materials]")).toContainText("0 / 15");
-  await expect(cargoPanel.locator("[data-cargo-repair-materials]")).toContainText("0 / 6");
-  await expect(cargoPanel).toContainText("LOCKED until both material requirements are complete");
-  await captureReviewScreenshot(page, "cargo-mobile-repair.png");
+  await expect(
+    page.getByRole("paragraph").filter({
+      hasText:
+        "Your wrecked ship lies half-sunk in mud and scrap, with only a few systems still worth salvaging.",
+    }),
+  ).toBeVisible();
+  await expect(lockedStatus).toBeVisible();
+  await expect(
+    cargoPanel.getByRole("heading", { name: "Damaged Cargo Hold", exact: true }),
+  ).toBeVisible();
+  await expect(cargoPanel).toContainText(
+    "The Cargo Hold is buckled from the crash and still inaccessible.",
+  );
+  await expect(cargoPanel.locator("[data-cargo-repair-materials]")).toHaveCount(0);
+  await expect(cargoPanel).not.toContainText("Refined Ferrite");
+  await expect(cargoPanel).not.toContainText("Slag");
+  await expect(cargoPanel).not.toContainText("Welding");
+  await expect(cargoPanel).not.toContainText("CONTRIBUTE MATERIALS");
+  await expect(cargoPanel).not.toContainText("START WELDING");
+  await captureReviewScreenshot(page, "cargo-mobile-locked.png");
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
 
-  await cargoPanel.getByRole("button", { name: "CONTRIBUTE MATERIALS" }).click();
-  const confirmation = page.locator("[data-cargo-confirmation]");
-  await expect(confirmation).toContainText("Refined Ferrite ×15");
-  await expect(confirmation).toContainText("Slag ×6");
-  await expect(confirmation).toContainText("cannot be recovered");
-  await confirmation.getByRole("button", { name: "COMMIT MATERIALS" }).click();
-  await expect(cargoPanel.locator("[data-cargo-repair-materials]")).toContainText("15 / 15");
-  await expect(cargoPanel.locator("[data-cargo-repair-materials]")).toContainText("6 / 6");
-  await expect(cargoPanel.getByRole("button", { name: "START WELDING" })).toBeVisible();
-
-  await cargoPanel.getByRole("button", { name: "START WELDING" }).click();
-  await expect(cargoPanel.getByRole("button", { name: "STOP WELDING" })).toBeVisible();
-  await expect(cargoPanel).toContainText("0 / 12 completed increments");
-  await expect(cargoPanel).toContainText("Current welding pass");
-
-  const completedAgo = new Date(Date.now() - 12 * 5 * 600 - 100);
   await db
-    .update(activeActions)
-    .set({ startedAt: completedAgo, resolvedThroughAt: completedAgo })
-    .where(eq(activeActions.characterId, characterId));
-  // The mounted play boundary reconciles due work without a reload. This
-  // proves the completion transition is authoritative and immediate in the
-  // existing action-state presentation.
-  await expect(restoredStatus).toBeVisible({ timeout: 10_000 });
-  await expect(restoredStatus).toContainText("CARGO HOLD RESTORED");
-  await expect(completionAnnouncement).toHaveText("CARGO HOLD RESTORED");
-  await expect(restoredStatus).toContainText("0 / 32 SLOTS OCCUPIED");
-  await expect(cargoPanel.getByRole("button", { name: "OPEN CARGO HOLD" })).toBeVisible();
+    .update(characterCargoHoldRepair)
+    .set({
+      refinedFerriteContributed: balance.cargoHold.refinedFerriteRequired,
+      slagContributed: balance.cargoHold.slagRequired,
+      weldingProgress: balance.welding.repairIncrements,
+      completedAt: new Date(),
+      updatedAt: new Date(),
+    })
+    .where(eq(characterCargoHoldRepair.characterId, characterId));
+  await page.reload();
   await captureReviewScreenshot(page, "cargo-mobile-restored.png");
 
   await expectSteadyState();

@@ -124,7 +124,7 @@ const REFINING_REQUIRED = [
 ];
 
 const CARGO_HOLD_REQUIRED = [
-  "cargo-mobile-repair.png",
+  "cargo-mobile-locked.png",
   "cargo-mobile-restored.png",
   "cargo-desktop-storage.png",
 ];
