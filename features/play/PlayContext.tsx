@@ -31,6 +31,7 @@ type PlayContextValue = {
   releaseCommand: () => void;
   requestAutoRefresh: (schedulerToken?: number) => void;
   setRefreshCallback: (fn: (opts?: { background?: boolean }) => void) => void;
+  openInventory: (tab: "inventory" | "equipment") => void;
   setInventoryOpen: Dispatch<SetStateAction<boolean>>;
   setInventoryTab: Dispatch<SetStateAction<"inventory" | "equipment">>;
   setMissionsOpen: Dispatch<SetStateAction<boolean>>;
@@ -76,6 +77,14 @@ export function PlayProvider({
   const foregroundQueue = useRef<(() => void) | null>(null);
   const stateRef = useRef(state);
   stateRef.current = state;
+
+  const openInventory = useCallback((tab: "inventory" | "equipment") => {
+    // These updates are batched together so contextual callers can open the
+    // shared drawer directly on the requested tab without a tab-click relay.
+    setMissionsOpen(false);
+    setInventoryTab(tab);
+    setInventoryOpen(true);
+  }, []);
 
   const acquireCommand = useCallback((opts?: { background?: boolean }) => {
     const ok = tryAcquire(gateModel.current);
@@ -208,6 +217,7 @@ export function PlayProvider({
         releaseCommand,
         requestAutoRefresh,
         setRefreshCallback,
+        openInventory,
         setInventoryOpen,
         setInventoryTab,
         setMissionsOpen,

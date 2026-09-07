@@ -35,7 +35,7 @@ small number of critical mobile player journeys.
   for managed-host iteration instead.
 - The canonical CI-parity command: `pnpm test:e2e:canonical`. This is the single
   source of truth for local and CI behavioral verification. Its canonical
-  selection is an explicit allowlist of the existing 71 behavioral tests in 13
+  selection is an explicit allowlist of the existing 72 behavioral tests in 13
   specs: Mining, Inventory Equip, Overlay, Walk It Off, Cut Your Teeth, Travel,
   Location Population, Character Profile, Character Portraits, Refining, Cargo
   Hold, Admin Operator, and Sign-out. It intentionally excludes noncanonical
@@ -134,13 +134,16 @@ cannot be proven by server tests alone:
   presentation from the authoritative Travel/Scavenge projection without
   owning commands or persistence.
 - Location Population and Character Profile E2E coverage proves that
-  same-location browsing remains on Location and is absent from Map.
+  same-location browsing remains on Location and is absent from Map; the
+  stationary Long Scramble composition has scene/description/population and no
+  activity placeholder.
 - Travel E2E coverage opens Map during an active Travel, keeps the Map URL
   mounted through authoritative arrival, and proves route/transit treatment
   clears, Back changes to Location, and stationary Map interaction is restored.
 - Overlay and Inventory/Equipment E2E coverage proves the four footer
   destinations and the shared tabbed overlay while retaining existing
-  server-confirmed loadout and inventory behavior.
+  server-confirmed loadout and inventory behavior. Mission equipment guidance
+  also proves the shared Play entry point can open Equipment directly.
 
 These tests use the existing narrow authoritative character/state fixtures;
 they do not reconstruct a full early-game progression solely to reach a UI

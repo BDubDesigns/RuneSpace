@@ -74,7 +74,7 @@ All chrome is HTML/CSS rendered over/around the image. All scrim/hairline/plate 
 
 The header is inside the generic play console `Panel tone="raised"` (`!p-0 overflow-hidden` so the scene's top edge aligns with the panel's bevel). The rest of the panel is `p-5`:
 
-- During **stationary** play, the header is visible and the location's activity controls flow directly below it. The generic `PlayConsole` keeps per-activity gating (e.g. `showMiningActivity` for Mining), success-chance display, start/stop/refresh, latest-attempt feedback, and recovery — none are removed or gated by artwork.
+- During **stationary** play, the header is visible and the location's activity controls flow directly below it. The generic `PlayConsole` keeps per-activity gating (e.g. `showMiningActivity` for Mining), success-chance display, start/stop/refresh, latest-attempt feedback, and recovery — none are removed or gated by artwork. The Long Scramble intentionally composes scene, description, and population without an activity block or generic production placeholder.
 - **Processing Yard** receives scene art while exposing its stationary Refining console; Mining controls remain available only at The Jag.
 - The **Annex** scene composes with the existing `PowerAnnexClaimPanel` inside
   the stationary Location surface; the claim authority and UI remain owned by

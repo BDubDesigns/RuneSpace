@@ -46,19 +46,21 @@ export function LocationSurface({ characterName }: { characterName: string }) {
         <div className="mt-4">
           <LocationPopulationPanel />
         </div>
-        <div className="mt-5" data-location-activity>
-          {locationId === LOCATION_IDS.abandonedProcessingYard ? (
-            <RefiningConsole showDescription={false} />
-          ) : locationId === LOCATION_IDS.theJag ? (
-            <MiningActivity characterName={characterName} />
-          ) : locationId === LOCATION_IDS.crashSite ? (
-            <CargoHoldPanel />
-          ) : locationId === LOCATION_IDS.emergencyPowerAnnex ? (
-            <PowerAnnexClaimPanel />
-          ) : (
-            <Feedback tone="muted">No production activity is available here.</Feedback>
-          )}
-        </div>
+        {locationId === LOCATION_IDS.theLongScramble ? null : (
+          <div className="mt-5" data-location-activity>
+            {locationId === LOCATION_IDS.abandonedProcessingYard ? (
+              <RefiningConsole showDescription={false} />
+            ) : locationId === LOCATION_IDS.theJag ? (
+              <MiningActivity characterName={characterName} />
+            ) : locationId === LOCATION_IDS.crashSite ? (
+              <CargoHoldPanel />
+            ) : locationId === LOCATION_IDS.emergencyPowerAnnex ? (
+              <PowerAnnexClaimPanel />
+            ) : (
+              <Feedback tone="muted">No production activity is available here.</Feedback>
+            )}
+          </div>
+        )}
       </div>
     </Panel>
   );

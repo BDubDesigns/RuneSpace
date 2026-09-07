@@ -96,6 +96,9 @@ below.
   server-authoritative command and projection boundaries remain unchanged.
 - Mission guidance continues to use the existing derived semantic targets on
   the primary surface. Issue #145 does not move or rewrite mission guidance.
+  When its current target is an equipment item, the mission surface may open
+  the shared overlay directly on Equipment through `PlayContext.openInventory`;
+  the footer always calls the same entry point with the Inventory tab.
   Map does not gain MISSION or TURN IN markers; those destination/turn-in
   guidance semantics belong to Issue #143.
 

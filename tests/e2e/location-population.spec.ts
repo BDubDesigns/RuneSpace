@@ -4,6 +4,7 @@ import { db } from "@/db";
 import * as authSchema from "@/db/auth-schema";
 import * as rune from "@/db/rune-space";
 import { LOCATION_IDS, PORTRAIT_IDS, SKILL_IDS } from "@/game/config/foundations";
+import { getLocation } from "@/game/content/locations";
 import { createCharacter } from "@/server/characters";
 import { ensurePlayerAccount } from "@/server/ownership";
 import { cleanupTestUser, createTestUser } from "../integration/fixtures";
@@ -82,6 +83,30 @@ async function indicatorCount(page: import("@playwright/test").Page): Promise<nu
   if (!count) throw new Error("Population indicator has no count");
   return Number(count);
 }
+
+test("The Long Scramble shows its scene, description, and population without fake activity", async ({
+  page,
+  testCharacter,
+}) => {
+  const location = getLocation(LOCATION_IDS.theLongScramble);
+  expect(location).toBeDefined();
+  await db
+    .update(rune.characters)
+    .set({ currentLocationId: LOCATION_IDS.theLongScramble })
+    .where(eq(rune.characters.id, testCharacter.id));
+  await openTestCharacter(page, testCharacter.id);
+
+  await expect(page.locator("[data-location-surface]")).toBeVisible();
+  await expect(
+    page.locator(`[data-location-scene="${LOCATION_IDS.theLongScramble}"]`),
+  ).toBeVisible();
+  await expect(page.locator("[data-location-description]")).toContainText(location!.description);
+  await expect(page.locator("[data-location-population]")).toBeVisible();
+  await expect(page.locator("[data-location-activity]")).toHaveCount(0);
+  await expect(
+    page.getByText("No production activity is available here.", { exact: true }),
+  ).toHaveCount(0);
+});
 
 populationTest(
   "the occupied tile shows other characters and owners, and re-scopes on travel",

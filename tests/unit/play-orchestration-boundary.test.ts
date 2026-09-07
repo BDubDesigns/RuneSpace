@@ -154,6 +154,8 @@ describe("client play shell ownership (#127)", () => {
     expect(ctx).toContain("export function PlayProvider");
     expect(ctx).toContain("export function usePlay");
     expect(ctx).toContain('from "@/server/play"');
+    expect(ctx).toContain('openInventory: (tab: "inventory" | "equipment") => void');
+    expect(ctx).toContain("setInventoryTab(tab)");
     // old files gone
     const { existsSync } = require("node:fs");
     expect(existsSync("features/mining/MiningPlayScreen.tsx")).toBe(false);

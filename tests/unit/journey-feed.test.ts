@@ -54,29 +54,50 @@ describe("Journey feed presentation", () => {
     });
   });
 
-  it("renders a server-confirmed outcome as feed presentation", () => {
+  it("distinguishes a committed outcome from a pending reveal", () => {
     const outcome = getScavengeOutcome("ferrite_shale_2");
     expect(outcome).toBeDefined();
-    const feed = deriveJourneyFeed(
-      makeTravel({
-        scavenge: {
-          opportunityStartTick: 3,
-          opensAt: new Date(startedAt.getTime() + 1_800).toISOString(),
-          expiresAt: new Date(startedAt.getTime() + 4_800).toISOString(),
-          outcome: {
-            outcomeId: outcome!.id,
-            itemId: outcome!.itemId!,
-            label: outcome!.label,
-            quantity: outcome!.quantity,
-          },
+    const claimedTravel = makeTravel({
+      scavenge: {
+        opportunityStartTick: 3,
+        opensAt: new Date(startedAt.getTime() + 1_800).toISOString(),
+        expiresAt: new Date(startedAt.getTime() + 4_800).toISOString(),
+        outcome: {
+          outcomeId: outcome!.id,
+          itemId: outcome!.itemId!,
+          label: outcome!.label,
+          quantity: outcome!.quantity,
         },
-      }),
-      new Date(startedAt.getTime() + 2_000),
-    );
-    const event = feed.find((candidate) => candidate.id === "scavenge-claimed");
+      },
+    });
+    const now = new Date(startedAt.getTime() + 2_000);
+    const pendingFeed = deriveJourneyFeed(claimedTravel, now, [
+      {
+        claimedAt: now.toISOString(),
+        itemId: outcome!.itemId,
+        label: outcome!.label,
+        outcomeId: outcome!.id,
+        quantity: outcome!.quantity,
+        revealId: "reveal-1",
+      },
+    ]);
+    const pendingEvent = pendingFeed.find((candidate) => candidate.id === "scavenge-claimed");
 
-    expect(event).toMatchObject({ kind: "scavenge", title: "Scavenge claimed" });
-    expect(event?.detail).toContain("server confirmed 2 Ferrite Shale x2");
-    expect(feed.some((candidate) => candidate.interactive)).toBe(false);
+    expect(pendingEvent).toMatchObject({
+      interactive: true,
+      kind: "scavenge",
+      title: "Scavenge claimed",
+    });
+    expect(pendingEvent?.detail).toContain("server confirmed Ferrite Shale x2");
+    expect(pendingEvent?.detail).toContain("The reward reveal is ready.");
+    expect(pendingEvent?.detail).not.toContain("2 Ferrite Shale x2");
+
+    const acknowledgedFeed = deriveJourneyFeed(claimedTravel, now, []);
+    const acknowledgedEvent = acknowledgedFeed.find(
+      (candidate) => candidate.id === "scavenge-claimed",
+    );
+    expect(acknowledgedEvent).toMatchObject({ interactive: false });
+    expect(acknowledgedEvent?.detail).toContain("No reward reveal is pending.");
+    expect(acknowledgedEvent?.detail).not.toContain("The reward reveal is ready.");
   });
 });

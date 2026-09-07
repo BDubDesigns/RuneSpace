@@ -197,3 +197,14 @@ export async function openEquipmentTab(page: Page) {
   await expect(equipmentDialog).toBeVisible();
   return equipmentDialog;
 }
+
+/** Open Equipment through the active mission's contextual Play entry point. */
+export async function openEquipmentFromMissionGuidance(page: Page) {
+  await page.getByRole("button", { name: "Open Equipment", exact: true }).click();
+  const equipmentDialog = page.getByRole("dialog", { name: "Equipment" });
+  await expect(equipmentDialog).toBeVisible();
+  await expect(
+    equipmentDialog.getByRole("tab", { name: "Equipment", exact: true }),
+  ).toHaveAttribute("aria-selected", "true");
+  return equipmentDialog;
+}

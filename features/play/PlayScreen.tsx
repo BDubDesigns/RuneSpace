@@ -17,8 +17,8 @@ function PlayFooter() {
   const {
     inventoryTrigger,
     missionsTrigger,
+    openInventory,
     setInventoryOpen,
-    setInventoryTab,
     setMissionsOpen,
     setMissionsFocus,
     inventoryOpen,
@@ -44,9 +44,7 @@ function PlayFooter() {
         icon={<Backpack />}
         label="Inventory"
         onClick={() => {
-          setMissionsOpen(false);
-          setInventoryTab("inventory");
-          setInventoryOpen(true);
+          openInventory("inventory");
         }}
         ref={inventoryTrigger}
       />

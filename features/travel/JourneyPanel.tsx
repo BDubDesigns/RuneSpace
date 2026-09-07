@@ -33,7 +33,7 @@ export function JourneyPanel() {
   const origin = getLocation(travel.originLocationId)?.displayName ?? "origin";
   const destination = getLocation(travel.destinationLocationId)?.displayName ?? "destination";
   const remainingSeconds = Math.max(0, (new Date(travel.arrivesAt).getTime() - now) / 1_000);
-  const feed = deriveJourneyFeed(travel, new Date(now));
+  const feed = deriveJourneyFeed(travel, new Date(now), state.scavengeReveals);
 
   return (
     <Panel tone="raised" data-journey-surface>
@@ -63,7 +63,7 @@ export function JourneyPanel() {
               {event.title}
             </p>
             <p className="mt-1 text-sm text-[color:var(--rs-text-secondary)]">{event.detail}</p>
-            {event.interactive || event.id === "scavenge-claimed" ? <ScavengeControl /> : null}
+            {event.interactive ? <ScavengeControl /> : null}
           </li>
         ))}
       </ol>

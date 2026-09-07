@@ -1,4 +1,4 @@
-import type { PlayGameplayState } from "@/server/play";
+import type { PlayGameplayState, ScavengeReveal } from "@/server/play";
 import { LOCATION_IDS } from "@/game/config/foundations";
 import { getLocation } from "@/game/content/locations";
 import { scavengeWindowAt } from "@/game/domain/scavenge";
@@ -34,7 +34,11 @@ function routeFlavor(travel: TravelState): string {
   );
 }
 
-export function deriveJourneyFeed(travel: TravelState, now: Date): readonly JourneyFeedEvent[] {
+export function deriveJourneyFeed(
+  travel: TravelState,
+  now: Date,
+  scavengeReveals: readonly ScavengeReveal[] = [],
+): readonly JourneyFeedEvent[] {
   const origin = getLocation(travel.originLocationId)?.displayName ?? "origin";
   const destination = getLocation(travel.destinationLocationId)?.displayName ?? "destination";
   const timing = scavengeWindowAt({
@@ -59,10 +63,13 @@ export function deriveJourneyFeed(travel: TravelState, now: Date): readonly Jour
   ];
 
   if (travel.scavenge.outcome) {
-    const quantity = travel.scavenge.outcome.quantity;
+    const revealPending = scavengeReveals.some(
+      (reveal) => reveal.outcomeId === travel.scavenge.outcome?.outcomeId,
+    );
     events.push({
-      detail: `The server confirmed ${quantity} ${travel.scavenge.outcome.label}. The reward reveal is ready.`,
+      detail: `The server confirmed ${travel.scavenge.outcome.label}. ${revealPending ? "The reward reveal is ready." : "No reward reveal is pending."}`,
       id: "scavenge-claimed",
+      interactive: revealPending,
       kind: "scavenge",
       title: "Scavenge claimed",
     });

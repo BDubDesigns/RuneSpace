@@ -1,4 +1,10 @@
-import { expect, openMapSurface, test, openTestCharacter } from "./fixtures";
+import {
+  expect,
+  openEquipmentFromMissionGuidance,
+  openMapSurface,
+  test,
+  openTestCharacter,
+} from "./fixtures";
 import { and, eq } from "drizzle-orm";
 import { db } from "@/db";
 import {
@@ -106,6 +112,13 @@ test("equips the Cutter through Inventory, shows a full stack, and earns Mining 
     "Equip the Salvage Cutter from Inventory",
   );
   await expect(page.locator("[data-mission-objective-requirements]")).toHaveCount(0);
+
+  // The mission context opens the shared drawer directly on Equipment. This
+  // must not regress into the footer Inventory -> Equipment tab relay.
+  const directEquipment = await openEquipmentFromMissionGuidance(page);
+  await expect(directEquipment).toBeVisible();
+  await expect(page.getByRole("dialog", { name: "Inventory" })).toHaveCount(0);
+  await page.keyboard.press("Escape");
 
   // Mission guidance: the unmet equip requirement targets the Cutter affordance
   // in Inventory, while Start Mining is NOT highlighted (equip comes first in
