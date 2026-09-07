@@ -79,8 +79,14 @@ export function CargoHoldPanel() {
   // without any mission-ID branching. Stopping active Welding never advances
   // the mission, so it is never guided.
   const cargoRepairGuided = deriveMissionGuidanceTargets(state.missions).cargoRepair;
+  const contributionAvailable =
+    repair.availableContribution.refinedFerrite > 0 || repair.availableContribution.slag > 0;
   const contributeGuided =
-    cargoRepairGuided && !repair.complete && !repair.materialComplete && !activeWelding;
+    cargoRepairGuided &&
+    !repair.complete &&
+    !repair.materialComplete &&
+    !activeWelding &&
+    contributionAvailable;
   const startWeldingGuided =
     cargoRepairGuided && !repair.complete && repair.materialComplete && !activeWelding;
   const weldingAttemptDurationMs = balance.welding.attemptDurationTicks * GAME_TICK_MS;
@@ -575,11 +581,7 @@ export function CargoHoldPanel() {
             <ActionButton
               className={contributeGuided ? "rs-mission-guidance mt-4" : "mt-4"}
               data-mission-guidance={contributeGuided ? "active" : undefined}
-              disabled={
-                Boolean(pending) ||
-                (repair.availableContribution.refinedFerrite === 0 &&
-                  repair.availableContribution.slag === 0)
-              }
+              disabled={Boolean(pending) || !contributionAvailable}
               intent="mining"
               onClick={() => setConfirmation(repair.availableContribution)}
             >

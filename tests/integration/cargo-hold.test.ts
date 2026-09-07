@@ -10,6 +10,7 @@ import {
   SKILL_IDS,
 } from "@/game/config/foundations";
 import { cleanupTestUser, createCharacterForUser, createTestUser } from "./fixtures";
+import { deriveMissionGuidanceTargets } from "@/game/domain/missions";
 
 const DATABASE_URL = process.env.DATABASE_URL;
 const suite = DATABASE_URL ? describe : describe.skip;
@@ -445,6 +446,33 @@ suite("issue #128 Cargo Hold repair gate and existing Welding mechanics (real Po
       deterministicRandom,
     );
     expect(afterRetry.welding.totalXp).toBe(42 + 100);
+  });
+
+  it("withholds Cargo repair guidance when no useful contribution is available", async () => {
+    const { userId, character, now } = await makeCharacter();
+    await db.insert(rune.characterMissions).values([
+      {
+        characterId: character.id,
+        missionId: MISSION_IDS.wasteNot,
+        acceptedAt: now,
+        completedAt: now,
+      },
+      {
+        characterId: character.id,
+        missionId: MISSION_IDS.holdItTogether,
+        acceptedAt: now,
+      },
+    ]);
+    // No carried Refined Ferrite or Slag: the mission still targets Cargo
+    // repair, but CONTRIBUTE MATERIALS is disabled and must not be guided.
+    const guided = await play.getPlayGameplayState(userId, character.id, now, deterministicRandom);
+    expect(guided.cargoHold.repair).toMatchObject({
+      repairAvailable: true,
+      complete: false,
+      materialComplete: false,
+      availableContribution: { refinedFerrite: 0, slag: 0 },
+    });
+    expect(deriveMissionGuidanceTargets(guided.missions).cargoRepair).toBe(true);
   });
 
   it("unlocks the existing repair flow after Hold It Together acceptance", async () => {
