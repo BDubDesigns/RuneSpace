@@ -519,6 +519,16 @@ const dialogue = {
       ),
     ],
   },
+  [DIALOGUE_IDS.tansyHoldItTogetherActive]: {
+    id: DIALOGUE_IDS.tansyHoldItTogetherActive,
+    npcId: NPC_IDS.tansyRusk,
+    beats: [
+      tansyLocal(
+        EXPRESSION_IDS.neutral,
+        "Heard Wade put you on the Cargo Hold. Don't get cute with the welds. Clean seams, steady heat, and let the Ferrite do its job.",
+      ),
+    ],
+  },
   [DIALOGUE_IDS.wadeWasteNotBusy]: {
     id: DIALOGUE_IDS.wadeWasteNotBusy,
     npcId: NPC_IDS.wadeRusk,

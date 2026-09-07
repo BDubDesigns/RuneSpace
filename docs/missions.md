@@ -101,6 +101,18 @@ A mission may also author `completedNpcDialogue: readonly MissionNpcDialogue[]` 
 
 An active mission may author `activeNpcDialogue: readonly MissionNpcDialogue[]` for contextual dialogue at relevant NPCs who are neither offer nor turn-in NPCs. The mapping is optional and additive; the turn-in NPC's stage-aware dialogue and an offer NPC's `activeDialogueId` remain their existing owners. Validation rejects unknown or duplicate NPC mappings, NPC/dialogue mismatches, and attempts to override an offer or turn-in route.
 
+### Optional contextual NPC dialogue
+
+A mission may author `activeNpcDialogue` for NPCs who are not the offer or turn-in NPC when it makes narrative sense for them to react to the player's current work.
+
+These branches are optional world-reactivity and exploration rewards. They may provide characterization, commentary, or nonessential hints, but must never contain information required to discover, progress, or complete the mission.
+
+Do not author every NPC for every mission. Use this selectively where the NPC's relationship, expertise, location, or story connection makes the reaction feel natural.
+
+Keep this within the existing semantic mission routing system; never implement these reactions as UI-side mission-ID or prose checks.
+
+Concrete example: Hold It Together authors `activeNpcDialogue` for Tansy (`tansy_rusk_hold_it_together_active`) — she acknowledges Wade put the player on the Cargo Hold repair with practical mechanic flavor ("Don't get cute with the welds. Clean seams, steady heat, and let the Ferrite do its job."), without naming the repair recipe, the Cargo UI mechanics, or becoming an objective, turn-in, or alternate progression path.
+
 Consumers never read `offers[0]` as "the" offer and never infer location from an NPC record.
 
 ## 5. Ordered requirement vocabulary

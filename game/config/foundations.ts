@@ -64,6 +64,7 @@ const dialogueIds = {
   tansyCutYourTeethCompletion: asContentId("tansy_rusk_cut_your_teeth_completion"),
   wadeWasteNotTrackedActivityReminder: asContentId("wade_rusk_waste_not_tracked_activity_reminder"),
   tansyWasteNotActive: asContentId("tansy_rusk_waste_not_active"),
+  tansyHoldItTogetherActive: asContentId("tansy_rusk_hold_it_together_active"),
   wadeWasteNotBusy: asContentId("wade_rusk_waste_not_busy"),
   wadeWasteNotTurnIn: asContentId("wade_rusk_waste_not_turn_in"),
   wadeWasteNotCompletion: asContentId("wade_rusk_waste_not_completion"),

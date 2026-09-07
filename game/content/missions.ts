@@ -405,6 +405,9 @@ export const HOLD_IT_TOGETHER: MissionDefinition = {
     busyDialogueId: DIALOGUE_IDS.wadeHoldItTogetherBusy,
     completionPresentationDialogueId: DIALOGUE_IDS.wadeHoldItTogetherCompletion,
   },
+  activeNpcDialogue: [
+    { npcId: NPC_IDS.tansyRusk, dialogueId: DIALOGUE_IDS.tansyHoldItTogetherActive },
+  ],
   completedNpcDialogue: [
     { npcId: NPC_IDS.wadeRusk, dialogueId: DIALOGUE_IDS.wadePostHoldItTogether },
   ],
