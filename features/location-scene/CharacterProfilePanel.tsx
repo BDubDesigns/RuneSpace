@@ -7,23 +7,8 @@ import { StatusMeter } from "@/components/ui/StatusMeter";
 import { CharacterPortrait } from "@/components/portraits/CharacterPortrait";
 import type { CharacterProfile } from "@/game/domain/character-profile";
 
-/**
- * One compact, mobile-first profile panel for a selected same-location
- * character (issue #64).
- *
- * - The panel is a non-modal inline region (deliberately not the modal Drawer:
- *   the #62 character-name list must stay interactive so selecting another
- *   character updates the same panel rather than stacking panels). It has an
- *   accessible name, an explicit Close control, Escape support, and returns
- *   focus to the list button that opened the current view.
- * - Every open, every target switch, and every accepted authoritative
- *   gameplay revision re-reads the narrow server boundary: the server
- *   rechecks same-location visibility on each read, so a target that is no
- *   longer visible yields the generic refusal and a safe error state. A
- *   request-generation token discards completions that raced a newer one.
- * - Only the approved public identity and progression fields are rendered;
- *   the panel never displays emails, account IDs, or internal IDs.
- */
+/** Public same-location profile presentation. The server remains the authority
+ * for visibility and only returns the approved public projection. */
 export function CharacterProfilePanel({
   activeCharacterId,
   targetName,
@@ -34,11 +19,8 @@ export function CharacterProfilePanel({
 }: {
   activeCharacterId: string;
   targetName: string | undefined;
-  /** Accepted authoritative gameplay state identity; revalidates the profile. */
   refreshKey: unknown;
-  /** The list button that opened the current view; focus returns here on close. */
   openerRef: RefObject<HTMLButtonElement | null>;
-  /** The panel section element; the owner uses it for focus-recovery checks. */
   panelRef: RefObject<HTMLElement | null>;
   onClose: () => void;
 }) {
@@ -50,18 +32,11 @@ export function CharacterProfilePanel({
   const headingRef = useRef<HTMLHeadingElement>(null);
   const openedFor = useRef<string | undefined>(undefined);
 
-  // Focus the panel heading when it first opens so the new context is
-  // announced and the panel scrolls into view on mobile. While the panel is
-  // open, switching targets keeps focus on the newly activated list button
-  // instead of stealing it back into the panel.
   useEffect(() => {
-    if (targetName && openedFor.current === undefined) {
-      headingRef.current?.focus();
-    }
+    if (targetName && openedFor.current === undefined) headingRef.current?.focus();
     openedFor.current = targetName ?? undefined;
   }, [targetName]);
 
-  // Escape closes, consistent with the shared overlay system.
   useEffect(() => {
     if (!targetName) return;
     function onKeyDown(event: KeyboardEvent) {
@@ -71,9 +46,6 @@ export function CharacterProfilePanel({
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [targetName, onClose]);
 
-  // Fresh authoritative read on every open/switch and on every accepted
-  // authoritative gameplay revision (the same revalidation approach as the
-  // #62 population read — no polling, presence, or real-time system).
   useEffect(() => {
     const name = targetName;
     const token = requestToken.current + 1;
@@ -94,9 +66,6 @@ export function CharacterProfilePanel({
       { headers: { accept: "application/json" } },
     ).then(
       async (response) => {
-        // Read the body first, then check the generation token: a superseded
-        // request must never write state for a newer target, not even after
-        // its headers arrived before a target switch.
         const body = (await response.json().catch(() => null)) as {
           profile?: CharacterProfile;
           error?: string;
@@ -113,9 +82,6 @@ export function CharacterProfilePanel({
         setProfile(body.profile);
         setLiveMessage(`Profile for ${body.profile.displayName} loaded`);
       },
-      // A transport interruption of this read is non-fatal but stays visible:
-      // the panel shows the safe unavailable state; the next accepted
-      // gameplay revision (or a reopen) revalidates.
       () => {
         if (token !== requestToken.current) return;
         setLoading(false);
@@ -124,8 +90,7 @@ export function CharacterProfilePanel({
         setLiveMessage("Profile unavailable");
       },
     );
-    // `refreshKey` identity changes exactly when accepted authoritative
-    // gameplay state arrives, so every accepted revision revalidates.
+    // Accepted gameplay state identity is the authoritative revalidation key.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [targetName, activeCharacterId, refreshKey]);
 
@@ -161,7 +126,6 @@ export function CharacterProfilePanel({
           <p aria-live="polite" className="sr-only">
             {liveMessage}
           </p>
-
           {loading ? (
             <p className="mt-3 text-sm text-[color:var(--rs-text-secondary)]">Loading profile…</p>
           ) : null}
@@ -170,7 +134,6 @@ export function CharacterProfilePanel({
               <Feedback tone="muted">{error}</Feedback>
             </div>
           ) : null}
-
           {profile ? (
             <>
               <div className="mt-3 flex gap-3">
@@ -191,10 +154,6 @@ export function CharacterProfilePanel({
                   </p>
                 </div>
               </div>
-
-              {/* Reusable skill list: skills and their player-facing names come
-                  from the server's authoritative projection; no per-skill
-                  component conditional exists here. */}
               <ul className="mt-4 space-y-3">
                 {profile.skills.map((skill) => (
                   <li className="min-w-0" data-character-skill key={skill.displayName}>

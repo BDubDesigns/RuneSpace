@@ -189,7 +189,8 @@ describe("client play shell ownership (#127)", () => {
     expect(existsSync("features/mining/EquipmentPanel.tsx")).toBe(false);
     // PlayConsole composes the generic Inventory/Equipment drawers, not Mining.
     const playConsole = readFileSync("features/play/PlayConsole.tsx", "utf8");
-    expect(playConsole).toContain('from "@/features/inventory/InventoryPanel"');
-    expect(playConsole).toContain('from "@/features/inventory/EquipmentPanel"');
+    const sharedPanel = readFileSync("features/inventory/InventoryEquipmentPanel.tsx", "utf8");
+    expect(sharedPanel).toContain("export function InventoryEquipmentPanel");
+    expect(playConsole).toContain('from "@/features/inventory/InventoryEquipmentPanel"');
   });
 });

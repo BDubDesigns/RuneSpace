@@ -35,7 +35,7 @@ small number of critical mobile player journeys.
   for managed-host iteration instead.
 - The canonical CI-parity command: `pnpm test:e2e:canonical`. This is the single
   source of truth for local and CI behavioral verification. Its canonical
-  selection is an explicit allowlist of the existing 70 behavioral tests in 13
+  selection is an explicit allowlist of the existing 71 behavioral tests in 13
   specs: Mining, Inventory Equip, Overlay, Walk It Off, Cut Your Teeth, Travel,
   Location Population, Character Profile, Character Portraits, Refining, Cargo
   Hold, Admin Operator, and Sign-out. It intentionally excludes noncanonical
@@ -112,7 +112,7 @@ small number of critical mobile player journeys.
   `pnpm test:e2e:canonical` and the matching CI job establish CI parity.
 - Managed-host focused iteration uses `pnpm test:e2e:focused <phase>` (currently
   `mining`, `character-profile`, `location-population`, `character-portraits`,
-  `cargo-hold`, `inventory-equip`, `walk-it-off`, and `cut-your-teeth`; recipe
+  `cargo-hold`, `inventory-equip`, `travel`, `walk-it-off`, and `cut-your-teeth`; recipe
   in `docs/development-workflow.md`). The focused runner
   reuses the canonical primitives from `scripts/e2e-shared.mjs` (localhost-only
   database safety, Node 22 validation, port availability, targeted process
@@ -124,6 +124,32 @@ small number of critical mobile player journeys.
   and the matching CI job establish CI parity.
 - GitHub Actions remains the final authority; canonical execution must use the
   same `pnpm test:e2e:canonical` command.
+
+### Issue #145 surface coverage
+
+The dedicated Play-surface change has focused coverage for the boundaries that
+cannot be proven by server tests alone:
+
+- `tests/unit/journey-feed.test.ts` proves that Journey feed entries derive
+  presentation from the authoritative Travel/Scavenge projection without
+  owning commands or persistence.
+- Location Population and Character Profile E2E coverage proves that
+  same-location browsing remains on Location and is absent from Map.
+- Travel E2E coverage opens Map during an active Travel, keeps the Map URL
+  mounted through authoritative arrival, and proves route/transit treatment
+  clears, Back changes to Location, and stationary Map interaction is restored.
+- Overlay and Inventory/Equipment E2E coverage proves the four footer
+  destinations and the shared tabbed overlay while retaining existing
+  server-confirmed loadout and inventory behavior.
+
+These tests use the existing narrow authoritative character/state fixtures;
+they do not reconstruct a full early-game progression solely to reach a UI
+surface. The final CI-parity sequence follows `docs/development-workflow.md`:
+run the normal committed migration check (`pnpm drizzle-kit migrate`) when the
+managed disposable database is available, then typecheck, lint, format check,
+unit tests, `pnpm test:integration`, build, focused E2E, and the full
+`pnpm test:e2e:canonical` run.
+
 - Uploading an artifact is not proof that promised evidence exists. Verify each
   expected evidence file before upload, and inspect artifact contents whenever
   evidence is part of the definition of done.

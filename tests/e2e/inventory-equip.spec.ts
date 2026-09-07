@@ -1,4 +1,4 @@
-import { test, expect, openTestCharacter } from "./fixtures";
+import { test, expect, openEquipmentTab, openTestCharacter } from "./fixtures";
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { equippedItems, itemInstances, inventoryStacks } from "@/db/rune-space";
@@ -114,8 +114,7 @@ test.describe("Inventory equip and compact selected visual", () => {
     // footer Equipment button.
     await page.getByRole("button", { name: "Close inventory" }).click();
     await expect(inventoryDrawer).toBeHidden();
-    await page.getByRole("button", { name: "Equipment" }).click();
-    const equipmentDrawer = page.getByRole("dialog", { name: "Equipment" });
+    const equipmentDrawer = await openEquipmentTab(page);
     await expect(equipmentDrawer).toBeVisible();
     // The Mining-tool slot section carries the equipped Salvage Cutter: the
     // "Equipped" badge confirms the slot is occupied and the section's content

@@ -77,7 +77,7 @@ function latestAnnouncement(attempt: RefiningRunAttempt, batch: number): string 
     : `${catchUp}Slag produced. ${roll} ${attempt.xpAwarded} Refining XP earned.`;
 }
 
-export function RefiningConsole() {
+export function RefiningConsole({ showDescription = true }: { showDescription?: boolean }) {
   const {
     acquireCommand,
     enqueueForeground,
@@ -205,10 +205,12 @@ export function RefiningConsole() {
 
   return (
     <>
-      <p className="mt-4 max-w-2xl text-sm leading-relaxed text-[color:var(--rs-text-secondary)]">
-        Rusted conveyors and a refurbished hopper stand ready. Feed 2 Ferrite Shale to refine it
-        into Refined Ferrite or Slag.
-      </p>
+      {showDescription ? (
+        <p className="mt-4 max-w-2xl text-sm leading-relaxed text-[color:var(--rs-text-secondary)]">
+          Rusted conveyors and a refurbished hopper stand ready. Feed 2 Ferrite Shale to refine it
+          into Refined Ferrite or Slag.
+        </p>
+      ) : null}
       <div className="mt-5 flex flex-wrap gap-3">
         {isActive || pendingCommand === "stop" ? (
           <ActionButton

@@ -1,68 +1,61 @@
 "use client";
 
 import { useEffect, useTransition } from "react";
-import { Panel } from "@/components/ui/Panel";
-import { Feedback } from "@/components/ui/Feedback";
-import { SectionHeader } from "@/components/ui/SectionHeader";
-import { SkillProgressCard } from "@/features/shared/run-presentation";
 import { CargoReadout } from "@/features/shared/CargoReadout";
+import { SkillProgressCard } from "@/features/shared/run-presentation";
 import { RefiningRunPanel } from "@/features/refining/RefiningRunPanel";
 import { MiningRunPanel } from "@/features/mining/MiningRunPanel";
-import { MiningActivity } from "@/features/mining/MiningActivity";
 import { getEffectiveGameBalance } from "@/game/config/balance";
 import { LOCATION_IDS } from "@/game/config/foundations";
-import { getLocation } from "@/game/content/locations";
-import { usePlay } from "./PlayContext";
+import { LocationSurface } from "@/features/location-scene/LocationSurface";
+import { InventoryEquipmentPanel } from "@/features/inventory/InventoryEquipmentPanel";
+import { MissionLogPanel } from "@/features/missions/MissionLogPanel";
+import { MissionObjectivePanel } from "@/features/missions/MissionObjectivePanel";
+import { NpcInteractionPanel } from "@/features/npc/NpcInteractionPanel";
+import { JourneyPanel } from "@/features/travel/JourneyPanel";
 import { LocalMapPanel } from "@/features/travel/LocalMapPanel";
 import { ScavengeRevealOverlay } from "@/features/travel/ScavengeRevealOverlay";
-import { RefiningConsole } from "@/features/refining/RefiningConsole";
-import { PowerAnnexClaimPanel } from "@/features/power-annex/PowerAnnexClaimPanel";
-import { LocationSceneHeader } from "@/features/location-scene/LocationSceneHeader";
-import { CargoHoldPanel } from "@/features/cargo/CargoHoldPanel";
-import { MissionObjectivePanel } from "@/features/missions/MissionObjectivePanel";
-import { MissionLogPanel } from "@/features/missions/MissionLogPanel";
-import { NpcInteractionPanel } from "@/features/npc/NpcInteractionPanel";
-import { InventoryPanel } from "@/features/inventory/InventoryPanel";
-import { EquipmentPanel } from "@/features/inventory/EquipmentPanel";
-import { refreshPlayAction } from "@/server/actions";
 import { reportClientDiagnostic } from "@/features/diagnostics/client";
+import { refreshPlayAction } from "@/server/actions";
+import { usePlay } from "./PlayContext";
+
+export type PlaySurface = "primary" | "map";
 
 /**
- * The generic player-facing play composition. It routes by the authoritative
- * location, composes every activity surface (Mining, Refining, Travel,
- * Scavenging, Cargo Hold, Power Annex, missions, NPC interactions, location
- * presentation), and hosts the shared Inventory/Equipment drawers. This is the
- * application play shell — it is not a Mining concern.
+ * Generic player-facing composition. The primary surface is derived from the
+ * authoritative Travel state; Map is the only explicitly routed surface.
+ * Activities and overlays remain feature-owned and server-authoritative.
  */
-export function PlayConsole({ characterName }: { characterName: string }) {
+export function PlayConsole({
+  characterName,
+  surface = "primary",
+  onMapExit,
+}: {
+  characterName: string;
+  surface?: PlaySurface;
+  onMapExit: () => void;
+}) {
   const {
     acquireCommand,
-    equipmentOpen,
-    enqueueForeground,
-    foregroundBusy,
+    acceptState,
     inventoryOpen,
+    inventoryTrigger,
     missionsOpen,
     missionsFocus,
-    setMissionsOpen,
-    releaseCommand,
-    setEquipmentOpen,
-    setInventoryOpen,
-    inventoryTrigger,
-    equipmentTrigger,
     missionsTrigger,
+    releaseCommand,
+    setInventoryOpen,
+    setMissionsOpen,
     setRefreshCallback,
-    acceptState,
     state,
   } = usePlay();
   const balance = getEffectiveGameBalance();
   const inTransit = Boolean(state.travelState);
   const currentLocationId = state.location.currentLocationId;
-  const atProcessingYard = currentLocationId === LOCATION_IDS.abandonedProcessingYard;
-  const atTheJag = currentLocationId === LOCATION_IDS.theJag;
-  const atTheLongScramble = currentLocationId === LOCATION_IDS.theLongScramble;
-  const showMiningActivity = atTheJag && !inTransit;
-  const showRefiningActivity = atProcessingYard && !inTransit;
-
+  const stationaryPrimary = surface === "primary" && !inTransit;
+  const showMiningActivity = stationaryPrimary && currentLocationId === LOCATION_IDS.theJag;
+  const showRefiningActivity =
+    stationaryPrimary && currentLocationId === LOCATION_IDS.abandonedProcessingYard;
   const [, startTransition] = useTransition();
 
   function applyReconciliation(result: Awaited<ReturnType<typeof refreshPlayAction>>) {
@@ -96,152 +89,76 @@ export function PlayConsole({ characterName }: { characterName: string }) {
 
   return (
     <div className="space-y-4">
-      <Panel tone="raised" className="overflow-hidden !p-0">
-        {/* Responsive industrial scene header integrated into the top of the existing
-            location/activity panel. Same asset on mobile + desktop; frame height
-            is responsive (shallow cinematic strip on mobile, taller on desktop).
-            Transit never shows the destination — location stays authoritative origin
-            until arrival commits. */}
-        {!inTransit
-          ? (() => {
-              const currentLocation = getLocation(currentLocationId);
-              if (!currentLocation) return null;
-              const atPowerAnnex = currentLocationId === LOCATION_IDS.emergencyPowerAnnex;
-              return (
-                <LocationSceneHeader
-                  location={currentLocation}
-                  characterName={characterName}
-                  resourceLabels={
-                    atTheJag
-                      ? ["Ferrite Shale"]
-                      : atProcessingYard
-                        ? ["Refined Ferrite", "Slag"]
-                        : atPowerAnnex
-                          ? ["Power Cell"]
-                          : undefined
-                  }
-                />
-              );
-            })()
-          : null}
-        <div className="p-5">
-          {/* Eyebrow + resource plate now live inside the scene header; keep only
-              a compact heading row here so the panel doesn't repeat the eyebrow.
-              During transit the location truth is the walk description below. */}
-          {!inTransit ? (
-            <div className="flex flex-wrap items-start justify-between gap-4">
-              <SectionHeader eyebrow={getLocation(currentLocationId)?.displayName ?? "Location"}>
-                Activity
-              </SectionHeader>
-            </div>
-          ) : (
-            <SectionHeader eyebrow="In transit">Journey</SectionHeader>
-          )}
+      {surface === "map" ? (
+        <LocalMapPanel onBack={onMapExit} onTravelStarted={onMapExit} />
+      ) : inTransit ? (
+        <JourneyPanel />
+      ) : (
+        <LocationSurface characterName={characterName} />
+      )}
 
-          {inTransit ? (
-            <p className="mt-4 max-w-2xl text-sm leading-relaxed text-[color:var(--rs-text-secondary)]">
-              You are walking between locations. The active work stopped before departure, and no
-              new activity can begin until you arrive. Use the world map below to follow your
-              journey.
-            </p>
-          ) : atProcessingYard ? (
-            <RefiningConsole />
-          ) : atTheJag ? (
-            <>
-              <p className="mt-4 max-w-2xl text-sm leading-relaxed text-[color:var(--rs-text-secondary)]">
-                {getLocation(currentLocationId)?.description}
-              </p>
-              <MiningActivity characterName={characterName} />
-            </>
-          ) : currentLocationId === LOCATION_IDS.crashSite ? (
-            <div className="mt-4">
-              <p className="max-w-2xl text-sm leading-relaxed text-[color:var(--rs-text-secondary)]">
-                {getLocation(currentLocationId)?.description}
-              </p>
-              <div className="mt-4">
-                <CargoHoldPanel />
-              </div>
-            </div>
-          ) : atTheLongScramble ? (
-            <div className="mt-4">
-              <p className="max-w-2xl text-sm leading-relaxed text-[color:var(--rs-text-secondary)]">
-                {getLocation(currentLocationId)?.description}
-              </p>
-            </div>
-          ) : (
-            <div className="mt-4">
-              <p className="max-w-2xl text-sm leading-relaxed text-[color:var(--rs-text-secondary)]">
-                {getLocation(currentLocationId)?.description}
-              </p>
-              <Feedback tone="muted">No production activity is available here.</Feedback>
-            </div>
-          )}
-        </div>
-      </Panel>
-      <MissionObjectivePanel state={state} />
-      {!inTransit ? <NpcInteractionPanel /> : null}
-      <ScavengeRevealOverlay />
-      <LocalMapPanel />
-      <PowerAnnexClaimPanel />
-      {showMiningActivity || showRefiningActivity ? (
+      {surface === "primary" ? (
         <>
-          <div className="grid gap-4 sm:grid-cols-2">
-            {showMiningActivity ? (
-              <SkillProgressCard
-                level={state.mining.level}
-                title="Mining progression"
-                tone="mining"
-                totalXp={state.mining.totalXp}
-                xpIntoLevel={state.mining.xpIntoLevel}
-                xpToNextLevel={state.mining.xpToNextLevel}
-              />
-            ) : (
-              <SkillProgressCard
-                level={state.refining.level}
-                title="Refining progression"
-                tone="refining"
-                totalXp={state.refining.totalXp}
-                xpIntoLevel={state.refining.xpIntoLevel}
-                xpToNextLevel={state.refining.xpToNextLevel}
-              />
-            )}
-            {showMiningActivity ? (
-              <CargoReadout
-                state={state}
-                items={[{ label: "Ferrite Shale", quantity: state.ferriteShaleQuantity }]}
-              />
-            ) : (
-              <CargoReadout
-                state={state}
-                items={[
-                  { label: "Refined Ferrite", quantity: state.refinedFerriteQuantity },
-                  { label: "Slag", quantity: state.slagQuantity },
-                ]}
-              />
-            )}
-          </div>
-          {showMiningActivity ? (
-            <MiningRunPanel run={state.run} balance={balance} />
-          ) : (
-            <RefiningRunPanel
-              ferriteQuantity={state.refinedFerriteQuantity}
-              run={state.refiningRun}
-              slagQuantity={state.slagQuantity}
-            />
-          )}
+          <MissionObjectivePanel state={state} />
+          {!inTransit ? <NpcInteractionPanel /> : null}
+          {showMiningActivity || showRefiningActivity ? (
+            <>
+              <div className="grid gap-4 sm:grid-cols-2">
+                {showMiningActivity ? (
+                  <SkillProgressCard
+                    level={state.mining.level}
+                    title="Mining progression"
+                    tone="mining"
+                    totalXp={state.mining.totalXp}
+                    xpIntoLevel={state.mining.xpIntoLevel}
+                    xpToNextLevel={state.mining.xpToNextLevel}
+                  />
+                ) : (
+                  <SkillProgressCard
+                    level={state.refining.level}
+                    title="Refining progression"
+                    tone="refining"
+                    totalXp={state.refining.totalXp}
+                    xpIntoLevel={state.refining.xpIntoLevel}
+                    xpToNextLevel={state.refining.xpToNextLevel}
+                  />
+                )}
+                {showMiningActivity ? (
+                  <CargoReadout
+                    state={state}
+                    items={[{ label: "Ferrite Shale", quantity: state.ferriteShaleQuantity }]}
+                  />
+                ) : (
+                  <CargoReadout
+                    state={state}
+                    items={[
+                      { label: "Refined Ferrite", quantity: state.refinedFerriteQuantity },
+                      { label: "Slag", quantity: state.slagQuantity },
+                    ]}
+                  />
+                )}
+              </div>
+              {showMiningActivity ? (
+                <MiningRunPanel run={state.run} balance={balance} />
+              ) : (
+                <RefiningRunPanel
+                  ferriteQuantity={state.refinedFerriteQuantity}
+                  run={state.refiningRun}
+                  slagQuantity={state.slagQuantity}
+                />
+              )}
+            </>
+          ) : null}
         </>
       ) : null}
+
+      <ScavengeRevealOverlay />
+
       {inventoryOpen ? (
-        <InventoryPanel
+        <InventoryEquipmentPanel
           state={state}
           onClose={() => setInventoryOpen(false)}
           triggerRef={inventoryTrigger}
-        />
-      ) : equipmentOpen ? (
-        <EquipmentPanel
-          onClose={() => setEquipmentOpen(false)}
-          state={state}
-          triggerRef={equipmentTrigger}
         />
       ) : missionsOpen ? (
         <MissionLogPanel

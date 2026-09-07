@@ -1,4 +1,4 @@
-import { expect, test, openTestCharacter } from "./fixtures";
+import { expect, openMapSurface, test, openTestCharacter } from "./fixtures";
 import { and, eq } from "drizzle-orm";
 import { db } from "@/db";
 import {
@@ -69,6 +69,7 @@ async function travelTo(
   locationId: string,
   walkButton: RegExp,
 ) {
+  await openMapSurface(page);
   await page.getByLabel("Local map").scrollIntoViewIfNeeded();
   await expect(page.locator(`[data-map-location="${locationId}"]`)).toBeVisible();
   await page.locator(`[data-map-location="${locationId}"]`).click();

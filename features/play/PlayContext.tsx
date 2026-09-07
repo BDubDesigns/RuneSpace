@@ -18,8 +18,7 @@ import { cancelRefresh, tryAcquire, release, requestRefresh, type GateModel } fr
 type PlayContextValue = {
   inventoryOpen: boolean;
   inventoryTrigger: RefObject<HTMLButtonElement | null>;
-  equipmentOpen: boolean;
-  equipmentTrigger: RefObject<HTMLButtonElement | null>;
+  inventoryTab: "inventory" | "equipment";
   missionsOpen: boolean;
   missionsTrigger: RefObject<HTMLButtonElement | null>;
   missionsFocus?: string;
@@ -33,7 +32,7 @@ type PlayContextValue = {
   requestAutoRefresh: (schedulerToken?: number) => void;
   setRefreshCallback: (fn: (opts?: { background?: boolean }) => void) => void;
   setInventoryOpen: Dispatch<SetStateAction<boolean>>;
-  setEquipmentOpen: Dispatch<SetStateAction<boolean>>;
+  setInventoryTab: Dispatch<SetStateAction<"inventory" | "equipment">>;
   setMissionsOpen: Dispatch<SetStateAction<boolean>>;
   setMissionsFocus: Dispatch<SetStateAction<string | undefined>>;
   acceptState: (nextState: PlayGameplayState) => void;
@@ -62,13 +61,12 @@ export function PlayProvider({
 }) {
   const [state, setState] = useState(initialState);
   const [inventoryOpen, setInventoryOpen] = useState(false);
-  const [equipmentOpen, setEquipmentOpen] = useState(false);
+  const [inventoryTab, setInventoryTab] = useState<"inventory" | "equipment">("inventory");
   const [missionsOpen, setMissionsOpen] = useState(false);
   const [missionsFocus, setMissionsFocus] = useState<string | undefined>(undefined);
   const [busy, setBusy] = useState(false);
   const [foregroundBusy, setForegroundBusy] = useState(false);
   const inventoryTrigger = useRef<HTMLButtonElement>(null);
-  const equipmentTrigger = useRef<HTMLButtonElement>(null);
   const missionsTrigger = useRef<HTMLButtonElement>(null);
   const gateModel = useRef<GateModel>({ locked: false, pending: false });
   const refreshCallback = useRef<((opts?: { background?: boolean }) => void) | undefined>(
@@ -199,8 +197,7 @@ export function PlayProvider({
       value={{
         inventoryOpen,
         inventoryTrigger,
-        equipmentOpen,
-        equipmentTrigger,
+        inventoryTab,
         missionsOpen,
         missionsTrigger,
         missionsFocus,
@@ -212,7 +209,7 @@ export function PlayProvider({
         requestAutoRefresh,
         setRefreshCallback,
         setInventoryOpen,
-        setEquipmentOpen,
+        setInventoryTab,
         setMissionsOpen,
         setMissionsFocus,
         acceptState,

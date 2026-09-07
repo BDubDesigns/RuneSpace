@@ -326,8 +326,9 @@ lines from the same authoritative adjacency.
 
 ### Location population (issue #62)
 
-The current-location map tile shows the other characters currently persisted
-at that same location, so the world feels inhabited:
+The stationary Location surface shows the other characters currently persisted
+at that same location, so the world feels inhabited. The dedicated Map does not
+render this population flow; surface ownership is defined in `docs/architecture.md`.
 
 - **Source of truth:** `characters.current_location_id`. The read boundary is
   scoped by the owned active character; the server resolves the location and
@@ -343,7 +344,7 @@ at that same location, so the world feels inhabited:
   over persisted skill XP — no new level formula or stored level), and the
   owner's public name (`user.name`). Emails, account IDs, character database
   IDs, and private state are never exposed.
-- **Presentation:** a compact count indicator on the occupied tile plus an
+- **Presentation:** a compact count indicator on the Location surface plus an
   accessible "Characters here" disclosure (label, compact count badge, and
   disclosure chevron) revealing the list, associated with that tile. Each
   entry is an interactive row — character name, owner name, and a compact

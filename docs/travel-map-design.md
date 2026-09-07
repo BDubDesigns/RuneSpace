@@ -1,11 +1,18 @@
-# Travel Map — Hybrid Plated-Signage (Issue #53)
+# Travel Map — Hybrid Plated-Signage (Issues #53 and #145)
 
 ## Scope
-Owns the compact `LocalMapPanel` treatment only. Full current-location scene artwork is #78.
+Owns the dedicated, query-backed `LocalMapPanel` treatment only. The current
+location scene and same-location population/profile flow belong to Location
+(see `docs/architecture.md` and `docs/location-scenes.md`); Journey owns the
+in-transit presentation. Full current-location scene artwork is #78.
 Five locations: Crash Site (`crash_site_deposit`), Abandoned Processing Yard (`processing_yard`),
 Emergency Power Annex (`power_annex`), The Long Scramble (`the_long_scramble`), and The Jag
 (`the_jag`). The panel's job is fast readable navigation and gameplay-state communication on a phone;
 hexes are **not** miniature scene paintings.
+
+The Play footer's four destinations are **Characters · Inventory · Map ·
+Missions**. Map is entered with `?surface=map`; it is not an inline activity
+section on Location.
 
 ## Canonical paths
 - Panel: `features/travel/LocalMapPanel.tsx`
@@ -19,7 +26,9 @@ hexes are **not** miniature scene paintings.
 2. **Upper-middle / center** — decorative location identifier (Layer 2, `aria-hidden`, clipped to hex, `0.72W×0.68H@0.58`).
 3. **Lower-middle** — location nameplate (Layer 3, fitted smoked plaque, `inline-flex`, reduced padding, centered, 1–2 lines, max-width controlled).
 4. **Bottom** — activity/status plate (`Mining` / `Daily cells` / `Refining`, `data-map-status`, same smoked family), rendered only where a production status is meaningful.
-5. **Corner/secondary** — population chip (`N here`, `data-map-population`) on the current tile only, same family.
+5. **Corner/secondary** — reserved for map presentation only. Same-location
+   population browsing and profiles are Location-owned and are not rendered on
+   Map.
 
 The decorative asset must conform to these zones; UI is never moved to accommodate art.
 
@@ -35,14 +44,14 @@ The decorative asset must conform to these zones; UI is never moved to accommoda
   width is ~71.6% (Crash Site), 61.8% (Processing Yard), 64.2% (Power Annex) at the unified 140 — inside the relaxed 55–75% invariant. The zone is centered slightly above hex
   center (~6% H offset) so the lower nameplate cluster overlaps minimally. Subordinate to state/name/status
   plates, does not change bounds, does not overlap routes, does not hide `data-route-progress`.
-- **Layer 3 — nameplate / status / population (HexButton):** `justify-between` with `py-1.5`; state **plate** pinned
+- **Layer 3 — nameplate / status (HexButton):** `justify-between` with `py-1.5`; state **plate** pinned
   high as a fitted smoked plaque (`data-map-state`, `rs-map-plate rs-map-plate--state`, `inline-flex whitespace-nowrap`, always fits, may overhang),
   dedicated spacer `h-[44px]` (`data-map-artwork-spacer`) defining the mid band, then lower fitted
   cluster (`data-map-nameplate` as `rs-map-plate rs-map-plate--nameplate` at `inline-flex max-w-[66%]`, reduced `px-2` hugging),
-  `data-map-population` and `data-map-status` as same-family smoked plaques. All plates share `rs-map-plate`:
+  `data-map-status` as same-family smoked plaques. All plates share `rs-map-plate`:
   dark navy/charcoal `linear-gradient` (top→bottom `0.74→0.62`), `clip-path` chamfer (`var(--rs-bevel-small)`),
   outer + inner inset border, faint top highlight/bottom shadow. Not flat UI boxes. Overlap is minimal because the plates
-  sit low and the art sits centered in the spacer-defined band. The current The Jag tile (YOU ARE HERE + N here + MINING) is the stress case.
+  sit low and the art sits centered in the spacer-defined band. The current The Jag tile (YOU ARE HERE + MINING) is the stress case.
 - **Routes:** `undirectedRoutes` (`stroke accent-secondary`, `strokeWidth=3`) and `data-route-progress`
   (`stroke accent-arcane`, `3.5`) drawn at same z-order / widths as before.
 
@@ -53,10 +62,13 @@ The decorative asset must conform to these zones; UI is never moved to accommoda
   Processing Yard no longer sits inside an oversized slab; plate surface is the shared smoked
   dark navy/charcoal (partially transparent, top→bottom gradient, chamfered + double border, highlight/shadow).
 
-## Population treatment
-Preserved (`You are here` + `N here`). Web-visible `N here` remains on the current tile; accessible button
-`aria-label` still announces `N other characters here.` Disclosure/list (`Characters here`) and profile flow
-(issues #62/#64) are untouched. Population is never color-only.
+## Population and profile boundary
+
+Map does not own population disclosure or profile browsing. The current
+Location surface renders `LocationPopulationPanel`, which reads the existing
+public projection and composes the existing `CharacterProfilePanel`. This keeps
+same-location browsing attached to the authoritative current location rather
+than duplicating it in map tiles.
 
 ## State / route / travel preservation
 - `current` / `reachable` / `selected` / `origin` / `destination` / `readOnly while inTransit`
@@ -65,6 +77,15 @@ Preserved (`You are here` + `N here`). Web-visible `N here` remains on the curre
 - Selection never begins travel. Master-detail flow: select hex → detail card → explicit `Walk` confirm
   (`beginTravelAction`, `WALK_SECONDS`). All adjacency/route math (`axial`, `deriveRouteEndpoints` apothem +
   `LOCAL_MAP_ROUTE_GAP`, `routeProgressSegment` forward/reverse equality) unchanged.
+- Map's read-only state is derived solely from accepted `state.travelState`; there is no separate client
+  flag recording that Map was opened during Travel. While that state exists, route progress and transit
+  treatment are shown and Back leads to Journey. If Travel resolves while the URL remains `?surface=map`,
+  the panel immediately becomes stationary: route progress/transit treatment clear, normal stationary
+  selection becomes available, and Back leads to Location.
+- Journey's feed may present a Scavenge event, but `ScavengeControl` and the existing Travel/Scavenge
+  server actions remain authoritative. Map does not claim, resolve, or persist Scavenge outcomes.
+- Map does not render MISSION or TURN IN guidance markers. Issue #143 is the later owner of those
+  destination and turn-in marker semantics.
 - Flat-top five-hex local map, `LOCAL_MAP_HEX_WIDTH=140` unified (no mobile/desktop branching, one `buildLocalMapGeometry` path), `hexButtonStyle` overlay,
   `LOCAL_MAP_PADDING`, `LOCAL_MAP_ROUTE_GAP=30` (~30px edge-to-edge at the unified 140), and single-path `buildLocalMapGeometry` remain authoritative.
 
@@ -96,14 +117,14 @@ recognizable yet subordinate to gameplay state.
 
 ## Accessibility
 - Decorative `image` + wrapper `g` are `aria-hidden="true"`; no extra focus target; no role/label on art.
-- Native `button`s retain `aria-current`, `aria-pressed`, `aria-label` (current/reachable/population/selected/inTransit),
+- Native `button`s retain `aria-current`, `aria-pressed`, `aria-label` (current/reachable/selected/inTransit),
   `aria-describedby` to description, `disabled` during transit, visible `:focus-visible` ring (`rs-focus`), touch target
   from `hexButtonStyle` (`hexWidth × hexHeight` ≥ ~108×93, ≥44px practical minimum). Text-based state never color-only.
 - Respects `prefers-reduced-motion` (panel has no animations; global `* { animation-duration: 0.01ms }` covers the hex button
   `scale-[1.025]` hover).
 
 ## Responsiveness
-- Primary constraint 390px mobile (compact `108` hexes where the current tile shows `YOU ARE HERE` + `N here` +
-  a production status when present: `Mining`/`Daily cells`/`Refining`). Not scaled at breakpoints: `140` + `11px` + fitted `66%` are consistent at both breakpoints. Verified: no horizontal
+- Primary constraint 390px mobile (compact `108` hexes where the current tile shows `YOU ARE HERE` plus a
+  production status when present: `Mining`/`Daily cells`/`Refining`). Not scaled at breakpoints: `140` + `11px` + fitted `66%` are consistent at both breakpoints. Verified: no horizontal
   `overflow-x`, no collision with the fixed bottom nav (`--rs-bottom-nav-clearance`), and the map container is
   `mx-auto` centered with geometry-derived `width`/`height`.

@@ -1,4 +1,4 @@
-import { expect, test, openTestCharacter } from "./fixtures";
+import { expect, test, openMapSurface, openTestCharacter } from "./fixtures";
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import * as authSchema from "@/db/auth-schema";
@@ -7,7 +7,6 @@ import { LOCATION_IDS, PORTRAIT_IDS, SKILL_IDS } from "@/game/config/foundations
 import { createCharacter } from "@/server/characters";
 import { ensurePlayerAccount } from "@/server/ownership";
 import { cleanupTestUser, createTestUser } from "../integration/fixtures";
-import { expectElementsInsideHexes } from "./map-geometry";
 import { populationDisclosure } from "./population-disclosure";
 import { captureReviewScreenshot } from "./review-screenshot";
 
@@ -78,30 +77,10 @@ const populationTest = test.extend<{ population: PopulationFixture }>({
   },
 });
 
-/** Scroll the local map into the center of the viewport so neither hex is
- * hidden by the fixed bottom navigation. */
-async function scrollMapIntoView(page: import("@playwright/test").Page) {
-  await page.evaluate(() => {
-    const el = document.querySelector('[aria-label="Local map"]');
-    if (el) el.scrollIntoView({ block: "center" });
-  });
-}
-
-async function expectPopulationIndicatorInsideHex(page: import("@playwright/test").Page) {
-  const geometry = await expectElementsInsideHexes(
-    page.locator('[aria-label="Local map"]'),
-    "data-map-population",
-  );
-  expect(geometry.labels.length).toBeGreaterThanOrEqual(1);
-  expect(geometry.allInside).toBe(true);
-  expect(geometry.routeOverlaps).toEqual([]);
-}
-
 async function indicatorCount(page: import("@playwright/test").Page): Promise<number> {
-  const text = (await page.locator("[data-map-population]").textContent()) ?? "";
-  const match = text.match(/\d+/);
-  if (!match) throw new Error(`Population indicator has no count: "${text}"`);
-  return Number(match[0]);
+  const count = await page.locator("[data-population-count]").getAttribute("data-population-count");
+  if (!count) throw new Error("Population indicator has no count");
+  return Number(count);
 }
 
 populationTest(
@@ -115,25 +94,23 @@ populationTest(
     await page.setViewportSize({ width: 390, height: 844 });
     const activeName = (await page.locator("main h1").first().textContent())!.trim();
 
-    // The current tile communicates that other characters are present.
-    const indicator = page.locator("[data-map-population]");
+    // The stationary Location surface communicates that other characters are present.
+    const indicator = page.locator("[data-location-population]");
     await expect(indicator).toBeVisible();
     const before = await indicatorCount(page);
     expect(before).toBeGreaterThanOrEqual(3);
-    await expectPopulationIndicatorInsideHex(page);
     const overflow = await page.evaluate(
       () => document.documentElement.scrollWidth - window.innerWidth,
     );
     expect(overflow).toBeLessThanOrEqual(0);
 
     // The disclosure reveals the approved public entries. Its compact count
-    // badge always matches the tile indicator count (both come from the same
-    // authoritative read).
+    // always matches the same authoritative read.
     const disclosure = populationDisclosure(page);
     await expect(disclosure).toHaveAttribute("aria-expanded", "false");
     const badge = page.locator("[data-population-count]");
     await expect(badge).toBeVisible();
-    expect(Number((await badge.textContent())?.trim())).toBe(before);
+    expect(Number(await badge.getAttribute("data-population-count"))).toBe(before);
     await disclosure.click();
     await expect(disclosure).toHaveAttribute("aria-expanded", "true");
     await expect(
@@ -152,7 +129,6 @@ populationTest(
     await expect(page.getByRole("button", { name: /player Rada Stonehand/ })).toHaveCount(2);
     await expect(page.getByRole("button", { name: new RegExp(`^${activeName},`) })).toHaveCount(0);
 
-    await scrollMapIntoView(page);
     await captureReviewScreenshot(page, "location-population-mobile-list.png");
 
     // Refreshed authoritative gameplay state revalidates the population: a
@@ -163,7 +139,7 @@ populationTest(
     const radaThreeOwner = await seedCharacter("Rada Stonehand", radaThree);
     population.userIds.push(radaThreeOwner.userId);
     await page.reload();
-    await expect(page.getByText("World map")).toBeVisible();
+    await expect(page.locator("[data-location-surface]")).toBeVisible();
     expect(await indicatorCount(page)).toBe(before + 1);
     // Disclosure collapsed on reload — reopen to see the new entry
     await expect(populationDisclosure(page)).toHaveAttribute("aria-expanded", "false");
@@ -176,10 +152,11 @@ populationTest(
     // arrival transition is observable: the previous tile's entries and count
     // must never appear on the destination tile while the replacement read is
     // in flight.
-    await scrollMapIntoView(page);
+    await openMapSurface(page);
     await page.getByRole("button", { name: /Abandoned Processing Yard/ }).click();
     await page.getByRole("button", { name: /Walk to Abandoned Processing Yard/ }).click();
     await expect(page.getByText("Journey progress")).toBeVisible();
+    await openMapSurface(page);
     const departPast = new Date(Date.now() - 25_000);
     await db
       .update(rune.activeActions)
@@ -196,10 +173,12 @@ populationTest(
     await expect(
       page.getByRole("button", { name: /Abandoned Processing Yard/ }).first(),
     ).toHaveAttribute("aria-current", "true", { timeout: 45_000 });
+    // Map remains a spatial, read-only surface and never shows population.
     await expect(page.locator("[data-map-population]")).toHaveCount(0);
-
-    // Once the yard read lands, the re-scoped population appears.
-    await expect(page.locator("[data-map-population]")).toBeVisible();
+    await expect(page.locator("[data-location-population]")).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Back to Location" })).toBeVisible();
+    await page.getByRole("button", { name: "Back to Location" }).click();
+    await expect(page.locator("[data-location-surface]")).toBeVisible();
     await page.unroute("**/api/location-population?*");
 
     // The yard population lists the yard character and none of the Crash Site
@@ -208,12 +187,14 @@ populationTest(
     await expect(yardDisclosure).toHaveAttribute("aria-expanded", "false");
     // The accessible label is truthful about the count: with exactly one other
     // character present (the seeded CI fixture state) it must be the singular
-    // "Show 1 character here"; with any leftover characters it must stay
+    // "View 1 other character here"; with any leftover characters it must stay
     // consistent with the badge count.
-    const yardCount = Number((await page.locator("[data-population-count]").textContent())?.trim());
+    const yardCount = Number(
+      await page.locator("[data-population-count]").getAttribute("data-population-count"),
+    );
     await expect(yardDisclosure).toHaveAttribute(
       "aria-label",
-      yardCount === 1 ? "Show 1 character here" : /^Show \d+ characters here$/,
+      yardCount === 1 ? "View 1 other character here" : /^View \d+ other characters here$/,
     );
     await yardDisclosure.click();
     await expect(
@@ -224,7 +205,6 @@ populationTest(
     for (const absent of [population.radaOne, population.radaTwo, population.kaelCutter]) {
       await expect(page.getByRole("button", { name: new RegExp(`^${absent},`) })).toHaveCount(0);
     }
-    await scrollMapIntoView(page);
     await captureReviewScreenshot(page, "location-population-mobile-yard.png");
   },
 );
