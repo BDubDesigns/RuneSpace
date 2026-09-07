@@ -106,6 +106,11 @@ profileTest(
     await radaTrigger.click();
     const panel = page.locator("[data-character-profile-panel]");
     await expect(panel).toBeVisible();
+    // The profile belongs directly to the selected row so a later row does
+    // not push the selected character's details below the full population.
+    await expect(
+      radaTrigger.locator("xpath=following-sibling::*[1][@data-character-profile-panel]"),
+    ).toBeVisible();
     await expect(radaTrigger).toHaveAttribute("aria-expanded", "true");
     // The opened character's row stays visibly selected (Viewing indicator,
     // never color alone) and transfers only to the newly selected row.
@@ -167,6 +172,9 @@ profileTest(
     // never recolor the selection rail.
     await radaTwoTrigger.click();
     await expect(panel).toHaveCount(1);
+    await expect(
+      radaTwoTrigger.locator("xpath=following-sibling::*[1][@data-character-profile-panel]"),
+    ).toBeVisible();
     await expect(panel.getByText(radaTwo, { exact: true })).toBeVisible();
     await expect(panel.getByText("Player: Profile Rada Stonehand")).toBeVisible();
     await expect(panel.getByText("Overall level 1")).toBeVisible();

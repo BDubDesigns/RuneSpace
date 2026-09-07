@@ -56,17 +56,27 @@ function LocationPopulationTrigger({
 }
 
 function LocationPopulationList({
+  activeCharacterId,
   entries,
   error,
   open,
   profileTarget,
   onOpenProfile,
+  onCloseProfile,
+  profilePanelRef,
+  profileTriggerRef,
+  refreshKey,
 }: {
+  activeCharacterId: string;
   entries: readonly LocationPopulationEntry[];
   error?: string;
   open: boolean;
   profileTarget?: string;
   onOpenProfile: (displayName: string, trigger: HTMLButtonElement) => void;
+  onCloseProfile: () => void;
+  profilePanelRef: RefObject<HTMLElement | null>;
+  profileTriggerRef: RefObject<HTMLButtonElement | null>;
+  refreshKey: unknown;
 }) {
   return (
     <div
@@ -117,6 +127,16 @@ function LocationPopulationList({
                   className={`h-3 w-3 shrink-0 ${selected ? "text-[color:var(--rs-accent-mining)]" : "text-[color:var(--rs-text-muted)]"}`}
                 />
               </button>
+              {selected ? (
+                <CharacterProfilePanel
+                  activeCharacterId={activeCharacterId}
+                  onClose={onCloseProfile}
+                  openerRef={profileTriggerRef}
+                  panelRef={profilePanelRef}
+                  refreshKey={refreshKey}
+                  targetName={profileTarget}
+                />
+              ) : null}
             </div>
           );
         })
@@ -216,25 +236,22 @@ export function LocationPopulationPanel() {
       )}
       {count > 0 ? (
         <LocationPopulationList
+          activeCharacterId={state.characterId}
           entries={population}
           error={populationError}
+          onCloseProfile={closeProfile}
           onOpenProfile={openProfile}
           open={populationOpen}
+          profilePanelRef={profilePanelRef}
           profileTarget={profileTarget}
+          profileTriggerRef={profileTriggerRef}
+          refreshKey={state}
         />
       ) : populationError ? (
         <div className="mt-2">
           <Feedback tone="muted">{populationError}</Feedback>
         </div>
       ) : null}
-      <CharacterProfilePanel
-        activeCharacterId={state.characterId}
-        onClose={closeProfile}
-        openerRef={profileTriggerRef}
-        panelRef={profilePanelRef}
-        refreshKey={state}
-        targetName={profileTarget}
-      />
     </section>
   );
 }
