@@ -136,7 +136,7 @@ export function ScavengeControl() {
             {lifecycle === "waiting"
               ? "Keep an eye out…"
               : lifecycle === "available"
-                ? "Something turned up"
+                ? "Worth checking out"
                 : lifecycle === "missed"
                   ? "Scavenge missed"
                   : "Scavenge claimed"}
@@ -172,7 +172,7 @@ export function ScavengeControl() {
           ? "This optional bonus does not change your walking time."
           : lifecycle === "available"
             ? capacity.ok
-              ? "Claim it before the bar drains. The server decides the result."
+              ? "Claim it before the bar drains."
               : capacityMessage(capacity.reason)
             : lifecycle === "missed"
               ? "The three-second window came and went; Travel is unaffected."
