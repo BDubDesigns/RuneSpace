@@ -490,8 +490,9 @@ test("equips the Cutter through Inventory, shows a full stack, and earns Mining 
   expect(finalStacks.find((s) => s.itemId === ITEM_IDS.slag)?.quantity).toBeGreaterThan(0);
 
   // After the one-shot Waste Not presentation closes, Wade routes the newly
-  // accepted Hold It Together objective while Tansy retains her completed
-  // Mission story state.
+  // accepted Hold It Together objective. Tansy no longer falls back to her
+  // completed Waste Not story state here: Hold It Together is active, so her
+  // authored contextual activeNpcDialogue takes precedence by design.
   await page.getByRole("button", { name: /Talk to Wade Rusk/ }).click();
   const wadeHoldItTogether = page.getByRole("dialog", { name: "Wade Rusk dialogue" });
   await expect(wadeHoldItTogether).toBeVisible();
@@ -515,7 +516,7 @@ test("equips the Cutter through Inventory, shows a full stack, and earns Mining 
   const tansyPostWaste = page.getByRole("dialog", { name: "Tansy Rusk dialogue" });
   await expect(tansyPostWaste).toBeVisible();
   await expect(tansyPostWaste.locator('[data-dialogue-text] [aria-hidden="true"]')).toContainText(
-    "You finished the Cutter lesson and the hopper run",
+    "Don't get cute with the welds",
   );
   await expect(
     tansyPostWaste.locator('[data-dialogue-text] [aria-hidden="true"]'),
