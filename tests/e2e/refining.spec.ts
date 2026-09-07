@@ -1,4 +1,4 @@
-import { expect, test, openTestCharacter } from "./fixtures";
+import { expect, openMapSurface, test, openTestCharacter } from "./fixtures";
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { activeActions, characters, inventoryStacks } from "@/db/rune-space";
@@ -16,6 +16,7 @@ async function travelTo(
   locationId: string,
   walkButton: RegExp,
 ) {
+  await openMapSurface(page);
   await page.getByLabel("Local map").scrollIntoViewIfNeeded();
   await expect(page.locator(`[data-map-location="${locationId}"]`)).toBeVisible();
   await page.locator(`[data-map-location="${locationId}"]`).click();
@@ -57,8 +58,9 @@ test("Processing Yard Refining journey — Ferrite and Slag both branches, artwo
     /Walk to Abandoned Processing Yard/,
   );
 
-  // 3. Yard is active; Refining level/progress shown; success chance 40.00%
-  await expect(page.getByText("Refining", { exact: true }).first()).toBeVisible();
+  // 3. Yard is active; the Location surface exposes the Refining activity and
+  // its level/progress supporting panels.
+  await expect(page.getByRole("button", { name: "Start Refining" })).toBeVisible();
   await expect(page.getByText("Refining progression")).toBeVisible();
   await expect(page.getByText(/Success chance: 40\.00%/)).toBeVisible();
   // Crash Site has no production-status plate after Mining moved to The Jag, so
@@ -132,6 +134,9 @@ test("Processing Yard Refining journey — Ferrite and Slag both branches, artwo
   await expect(latestRefining).toContainText("Latest attempt: Slag");
 
   // 9. Travel while Refining resolves only completed attempts; incomplete <7 tick discarded
+  // Enter the dedicated Map before moving the cursor back so navigation time
+  // cannot turn the intentionally incomplete boundary into a completed tick.
+  await openMapSurface(page);
   const incompleteCursor = new Date(Date.now() - 6 * GAME_TICK_MS);
   await db
     .update(activeActions)
@@ -157,7 +162,7 @@ test("Processing Yard Refining journey — Ferrite and Slag both branches, artwo
     .where(eq(activeActions.characterId, characterId));
   // Reload forces getMiningGameplayState(now) to resolve travel arrival
   await page.reload();
-  await expect(page.getByText("Mining", { exact: true }).first()).toBeVisible();
+  await expect(page.locator("[data-location-surface]")).toBeVisible();
   const shaleAfter = (
     await db.select().from(inventoryStacks).where(eq(inventoryStacks.characterId, characterId))
   )

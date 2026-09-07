@@ -1,4 +1,4 @@
-import { expect, test, openTestCharacter } from "./fixtures";
+import { expect, openMapSurface, test, openTestCharacter } from "./fixtures";
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { activeActions, equippedItems, itemInstances } from "@/db/rune-space";
@@ -93,6 +93,7 @@ test("walks from Wade to Tansy, presents approved dialogue, and claims one carri
   await wadeActiveFollowUp.getByRole("button", { name: "Finish" }).click();
   await expect(wadeActiveFollowUp).toBeHidden();
 
+  await openMapSurface(page);
   await page
     .getByRole("button", { name: /The Long Scramble/ })
     .first()
@@ -101,6 +102,7 @@ test("walks from Wade to Tansy, presents approved dialogue, and claims one carri
   await expect(page.locator("[data-mission-objective]")).toContainText("Travel to The Jag");
   await expect(page.locator("[data-npc-interaction]")).toHaveCount(0);
   await fastForwardArrival(page, characterId);
+  await openMapSurface(page);
   await page
     .getByRole("button", { name: /The Jag/ })
     .first()
@@ -210,12 +212,14 @@ test("supports the explorer-first Jag conversation and remote mission acceptance
   await page.setViewportSize({ width: 390, height: 844 });
   const characterId = page.url().split("/").at(-1)!;
 
+  await openMapSurface(page);
   await page
     .getByRole("button", { name: /The Long Scramble/ })
     .first()
     .click();
   await page.getByRole("button", { name: /Walk to The Long Scramble/ }).click();
   await fastForwardArrival(page, characterId);
+  await openMapSurface(page);
   await page
     .getByRole("button", { name: /The Jag/ })
     .first()

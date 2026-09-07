@@ -10,7 +10,7 @@ import {
   itemInstances,
 } from "@/db/rune-space";
 import { ACTION_IDS, ITEM_IDS, LOCATION_IDS } from "@/game/config/foundations";
-import { openTestCharacter, test } from "./fixtures";
+import { openEquipmentTab, openMapSurface, openTestCharacter, test } from "./fixtures";
 import { seedLegacyStarterCutter } from "./legacy-starter";
 import { captureReviewScreenshot } from "./review-screenshot";
 
@@ -433,7 +433,7 @@ test("shell reserves the fixed footer once and keeps the global background fixed
   await page.waitForURL(/\/play\/[^/]+$/);
   await page.setViewportSize({ width: 390, height: 844 });
   await page.reload();
-  await expect(page.getByText("World map", { exact: true })).toBeVisible();
+  await expect(page.locator("[data-location-surface]")).toBeVisible();
 
   const yardGeometry = await page.evaluate(() => {
     const spacingProbe = document.createElement("div");
@@ -462,10 +462,10 @@ test("shell reserves the fixed footer once and keeps the global background fixed
       yardGeometry.expectedClearance - yardGeometry.expectedBoxHeight - yardGeometry.expectedGap,
     ),
   ).toBeLessThanOrEqual(2);
-  // The Yard now hosts the full Refining activity stack (activity + map +
-  // skill progress + cargo + run history), so it scrolls like the Crash
-  // Site. The real layout contract is enforced below: the bottom nav stays
-  // fixed with the shared space-3 gap, and the global background stays fixed.
+  // The Yard hosts the full Refining activity stack, so it scrolls like the
+  // Crash Site. The real layout contract is enforced below: the bottom nav
+  // stays fixed with the shared space-3 gap, and the global background stays
+  // fixed.
   expect(yardGeometry.scrollHeight - yardGeometry.clientHeight).toBeGreaterThan(10);
   await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
   const yardBottomGeometry = await page.evaluate(() => {
@@ -560,9 +560,8 @@ test("shell reserves the fixed footer once and keeps the global background fixed
 test("equipment drawer shows and updates the approved Mining loadout", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   const footer = page.getByRole("navigation", { name: "Primary" });
-  const equipmentTrigger = footer.getByRole("button", { name: "Equipment" });
-  await equipmentTrigger.click();
-  const equipment = page.getByRole("dialog", { name: "Equipment" });
+  const equipmentTrigger = footer.getByRole("button", { name: "Inventory" });
+  const equipment = await openEquipmentTab(page);
   const miningTool = equipment.getByLabel("Mining tool");
   const firstContainer = equipment.getByLabel("Container attachment 1");
   const secondContainer = equipment.getByLabel("Container attachment 2");
@@ -589,7 +588,7 @@ test("equipment drawer shows and updates the approved Mining loadout", async ({ 
     itemId: ITEM_IDS.mykeaSchleppraum8,
   });
   await page.getByRole("button", { name: "Refresh status" }).click();
-  await equipmentTrigger.click();
+  await openEquipmentTab(page);
   const equipSecondContainer = secondContainer.getByRole("button", {
     name: "Equip in Container attachment 2",
   });
@@ -609,7 +608,7 @@ test("equipment drawer shows and updates the approved Mining loadout", async ({ 
   const inventory = page.getByRole("dialog", { name: "Inventory" });
   await expect(inventory.getByLabel("16 inventory slots")).toBeVisible();
   await inventory.getByRole("button", { name: "Close inventory" }).click();
-  await equipmentTrigger.click();
+  await openEquipmentTab(page);
   await captureReviewScreenshot(page, "mining-mobile-equipment.png");
   await page.setViewportSize({ width: 1440, height: 900 });
   await expect(equipment).toBeVisible();
@@ -628,8 +627,7 @@ test("Power Cell loading boosts Mining attempts and falls back after depletion",
   });
   await page.getByRole("button", { name: "Refresh status" }).click();
 
-  await page.getByRole("button", { name: "Equipment" }).click();
-  const equipment = page.getByRole("dialog", { name: "Equipment" });
+  const equipment = await openEquipmentTab(page);
   await expect(equipment.getByText("Depleted · 0 / 10", { exact: true })).toBeVisible();
   await expect(equipment.getByText("Carried Power Cells: 2", { exact: true })).toBeVisible();
   await expect(equipment.getByRole("button", { name: "Load Power Cell" })).toBeVisible();
@@ -714,8 +712,7 @@ test("an interrupted equipment command is presented as an error after a muted su
   });
   await page.getByRole("button", { name: "Refresh status" }).click();
 
-  await page.getByRole("button", { name: "Equipment" }).click();
-  const equipment = page.getByRole("dialog", { name: "Equipment" });
+  const equipment = await openEquipmentTab(page);
   await equipment.getByRole("button", { name: "Load Power Cell" }).click();
   await expect(equipment.getByText("Power Cell loaded · 10 boosted attempts ready.")).toBeVisible();
   // The successful load is muted, never an alert.
@@ -737,7 +734,7 @@ test("an interrupted equipment command is presented as an error after a muted su
     }
     await route.continue();
   });
-  await page.getByRole("button", { name: "Equipment" }).click();
+  await openEquipmentTab(page);
   const secondContainer = equipment.getByLabel("Container attachment 2");
   await secondContainer.getByRole("button", { name: "Equip in Container attachment 2" }).click();
   const interruption = equipment.getByRole("alert");
@@ -773,8 +770,7 @@ test("equipment and inventory rendering shows artwork for illustrated items and 
 
   // Open equipment drawer and verify equipped items show artwork.
   const footer = page.getByRole("navigation", { name: "Primary" });
-  await footer.getByRole("button", { name: "Equipment" }).click();
-  const equipment = page.getByRole("dialog", { name: "Equipment" });
+  const equipment = await openEquipmentTab(page);
 
   const miningTool = equipment.getByLabel("Mining tool");
   const firstContainer = equipment.getByLabel("Container attachment 1");
@@ -965,8 +961,7 @@ test("a carried unequipped Cutter occupies one visible Inventory slot and leaves
   await expect(footer.getByRole("button", { name: "Inventory" })).toBeVisible();
 
   // Unequip the Cutter with exactly one slot remaining.
-  await footer.getByRole("button", { name: "Equipment" }).click();
-  const equipment = page.getByRole("dialog", { name: "Equipment" });
+  const equipment = await openEquipmentTab(page);
   const miningTool = equipment.getByLabel("Mining tool");
   await miningTool.getByRole("button", { name: "Unequip" }).click();
   await expect(equipment.getByRole("alert")).toHaveCount(0);
@@ -1020,7 +1015,7 @@ test("a carried unequipped Cutter occupies one visible Inventory slot and leaves
   await inventory.getByRole("button", { name: "Close inventory" }).click();
 
   // Re-equipping the same instance removes it from Inventory again.
-  await footer.getByRole("button", { name: "Equipment" }).click();
+  await openEquipmentTab(page);
   const reequipTool = equipment.getByLabel("Mining tool");
   await reequipTool.getByRole("button", { name: "Equip in Mining tool" }).click();
   await expect(reequipTool.getByText("Salvage Cutter", { exact: true }).first()).toBeVisible();
@@ -1166,7 +1161,7 @@ test("the Play boundary resets, navigates, and hides failure details", async ({ 
   await page.evaluate(() => window.sessionStorage.removeItem("runespace-e2e-play-error"));
   await page.getByRole("button", { name: "Retry connection" }).click();
   // Recovery returns to the current location, which may not be Crash Site after Travel E2E.
-  await expect(page.getByText("World map", { exact: true })).toBeVisible();
+  await expect(page.locator("[data-location-surface]")).toBeVisible();
 
   await page.evaluate(() => window.sessionStorage.setItem("runespace-e2e-play-error", "1"));
   await page.reload();
@@ -1222,9 +1217,7 @@ test("production header is one full-width panel with the larger lockup and Sign 
   // location panel is the authoritative presentation.
   await expect(header.getByText("Crash Site", { exact: true })).toHaveCount(0);
   await expect(header.getByText(/In transit/)).toHaveCount(0);
-  await expect(
-    page.getByRole("main").getByText("Crash Site", { exact: true }).first(),
-  ).toBeVisible();
+  await expect(page.locator("[data-location-surface]")).toBeVisible();
 
   // The single panel must not create horizontal document overflow at mobile width.
   const mobileWidth = await page.evaluate(
@@ -1432,8 +1425,7 @@ test("a selected Power Cell loads the depleted equipped Cutter from Inventory", 
 
   // The Equipment surface reflects the same authoritative charge.
   await inventory.getByRole("button", { name: "Close inventory" }).click();
-  await footer.getByRole("button", { name: "Equipment" }).click();
-  const equipment = page.getByRole("dialog", { name: "Equipment" });
+  const equipment = await openEquipmentTab(page);
   await expect(equipment.getByText("Loaded · 10 / 10", { exact: true })).toBeVisible();
   await expect(equipment.getByText("Carried Power Cells: 10", { exact: true })).toBeVisible();
 });

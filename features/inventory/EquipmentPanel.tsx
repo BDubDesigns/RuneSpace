@@ -23,10 +23,12 @@ export function EquipmentPanel({
   state,
   onClose,
   triggerRef,
+  embedded = false,
 }: {
   state: PlayGameplayState;
   onClose: () => void;
   triggerRef: RefObject<HTMLButtonElement | null>;
+  embedded?: boolean;
 }) {
   const { foregroundBusy } = usePlay();
   const [message, setMessage] = useState<string>();
@@ -45,14 +47,13 @@ export function EquipmentPanel({
   // equip affordance receives the treatment. No mission-ID branching here.
   const missionGuidanceTargets = deriveMissionGuidanceTargets(state.missions);
 
-  return (
-    <Drawer
-      eyebrow="Server-confirmed loadout"
-      label="Equipment"
-      onClose={onClose}
-      title="Equipment"
-      triggerRef={triggerRef}
-    >
+  const content = (
+    <>
+      {embedded ? (
+        <p className="mt-4 text-xs uppercase tracking-[0.16em] text-[color:var(--rs-text-muted)]">
+          Server-confirmed loadout
+        </p>
+      ) : null}
       <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
         <p>
           <span className="block text-[color:var(--rs-text-muted)]">Container capacity</span>
@@ -210,6 +211,19 @@ export function EquipmentPanel({
           </section>
         ))}
       </div>
+    </>
+  );
+
+  if (embedded) return content;
+  return (
+    <Drawer
+      eyebrow="Server-confirmed loadout"
+      label="Equipment"
+      onClose={onClose}
+      title="Equipment"
+      triggerRef={triggerRef}
+    >
+      {content}
     </Drawer>
   );
 }

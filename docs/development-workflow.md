@@ -188,26 +188,14 @@ simply an unclaimed port here.
   `1024..65535`).
 - The focused runner currently supports `mining`, `character-profile`,
   `location-population`, `character-portraits`, `cargo-hold`, `inventory-equip`,
-  `walk-it-off`, and `cut-your-teeth`; it does not support the Travel phase. To
-  run one Travel test in isolation, start from the repository
-  root, choose a separately confirmed-free high port, and let Playwright own a
-  production server with the managed local environment:
+  `travel`, `walk-it-off`, and `cut-your-teeth`. To run one Travel test in
+  isolation, use the same disposable lifecycle with `travel`:
 
   ```bash
-  ./scripts/managed-host-run.sh env \
-    CI=true \
-    PLAYWRIGHT_PORT=3311 \
-    BASE_URL=http://127.0.0.1:3311 \
-    RUNESPACE_E2E_CANONICAL_HTTP=true \
-    BETTER_AUTH_SECRET="canonical-e2e-local-test-secret-not-for-production" \
-    RUNESPACE_RELEASE_ID=local-ci-parity \
-    pnpm test:e2e tests/e2e/travel.spec.ts \
-    --project=chromium \
-    --grep "directional map affordances follow native scroll truth"
+  ./scripts/managed-host-run.sh pnpm test:e2e:focused travel
   ```
 
-  Replace the `--grep` text with the exact Travel test title when diagnosing a
-  different Travel failure. This is focused iteration evidence only; run
+  This is focused iteration evidence only; run
   `./scripts/managed-host-run.sh pnpm test:e2e:canonical` for CI-parity proof.
 - In a restricted coding harness, a `listen EPERM` error before Playwright
   starts means the harness blocked the local test-server port. Allow loopback

@@ -1,4 +1,4 @@
-import { expect, test, openTestCharacter } from "./fixtures";
+import { expect, openEquipmentTab, test, openTestCharacter } from "./fixtures";
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { inventoryStacks } from "@/db/rune-space";
@@ -76,9 +76,7 @@ test("Inventory opens as a centered modal with a dimmed backdrop", async ({ page
 
 test("Equipment opens through the same shared modal pattern", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
-  const nav = page.getByRole("navigation", { name: "Primary" });
-  await nav.getByRole("button", { name: "Equipment" }).click();
-  const dialog = page.getByRole("dialog", { name: "Equipment" });
+  const dialog = await openEquipmentTab(page);
   await expect(dialog).toBeVisible();
   await expectBackdropCoversViewport(page, dialog);
   await expect(dialog).toHaveAttribute("aria-modal", "true");
@@ -101,8 +99,7 @@ test("only one overlay can be open at a time", async ({ page }) => {
   // Close inventory, then open equipment — the normal user flow.
   await page.keyboard.press("Escape");
   await expect(page.getByRole("dialog", { name: "Inventory" })).toHaveCount(0);
-  await nav.getByRole("button", { name: "Equipment" }).click();
-  await expect(page.getByRole("dialog", { name: "Equipment" })).toBeVisible();
+  await openEquipmentTab(page);
   // Close and open missions — the third overlay joins the same single-open rule.
   await page.keyboard.press("Escape");
   await nav.getByRole("button", { name: "Missions" }).click();
@@ -123,8 +120,20 @@ test("footer has four equal destinations and the Mission Log opens through the s
   const nav = page.getByRole("navigation", { name: "Primary" });
   await expect(nav.getByRole("link", { name: "Characters" })).toBeVisible();
   await expect(nav.getByRole("button", { name: "Inventory" })).toBeVisible();
-  await expect(nav.getByRole("button", { name: "Equipment" })).toBeVisible();
+  await expect(nav.getByRole("tab", { name: "Equipment" })).toHaveCount(0);
   await expect(nav.getByRole("button", { name: "Missions" })).toBeVisible();
+  const footerLabels = await nav
+    .locator("a, button")
+    .evaluateAll((elements) =>
+      elements.map((element) =>
+        (element.getAttribute("aria-label") ?? "")
+          .replace(/, \d+ slots free$/, "")
+          .replace(/, \d+ ready to turn in$/, ""),
+      ),
+    );
+  expect(footerLabels).toEqual(["Characters", "Inventory", "Map", "Missions"]);
+  await expect(nav.getByRole("link", { name: "Equipment" })).toHaveCount(0);
+  await expect(nav.getByRole("button", { name: "Equipment" })).toHaveCount(0);
   // No horizontal overflow at the narrow mobile width.
   const overflow = await page.evaluate(() => {
     const el = document.querySelector('nav[aria-label="Primary"]');
@@ -203,9 +212,7 @@ test("backdrop click closes the overlay", async ({ page }) => {
 
 test("clicking inside the panel does not close the overlay", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
-  const nav = page.getByRole("navigation", { name: "Primary" });
-  await nav.getByRole("button", { name: "Equipment" }).click();
-  const dialog = page.getByRole("dialog", { name: "Equipment" });
+  const dialog = await openEquipmentTab(page);
   await expect(dialog).toBeVisible();
   // Click on the section header inside the panel.
   await dialog.getByText("Server-confirmed loadout").click();
@@ -379,8 +386,7 @@ test("desktop modal is centered with backdropped play screen", async ({ page }) 
   await expect(dialog).toBeVisible();
   await captureReviewScreenshot(page, "overlay-desktop-inventory.png");
   await dialog.getByRole("button", { name: "Close inventory" }).click();
-  await nav.getByRole("button", { name: "Equipment" }).click();
-  const equipDialog = page.getByRole("dialog", { name: "Equipment" });
+  const equipDialog = await openEquipmentTab(page);
   await expect(equipDialog).toBeVisible();
   await captureReviewScreenshot(page, "overlay-desktop-equipment.png");
 });

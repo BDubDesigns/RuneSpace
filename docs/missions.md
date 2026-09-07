@@ -239,6 +239,13 @@ Action labels on sequences (`actionLabel`, e.g. "Claim Cutter", "SHOW SHALE") ar
 
 Mission guidance answers one question for UI consumers — *"is this entity / control currently a mission-guidance target?"* — without consumers inspecting mission IDs, objective prose, or drop tables. Every guidance consumer reads the same derived set via `deriveMissionGuidanceTargets(state.missions)`.
 
+The Issue #145 Play split does not change these semantics. The primary
+Location/Journey composition continues to consume the existing semantic
+guidance targets through the Mission Objective panel and feature-owned
+affordances. The dedicated Map remains navigation-only for this issue; it does
+not add MISSION or TURN IN markers. Map guidance markers are deferred to Issue
+#143, which will own that later presentation change.
+
 ### Two semantic meanings
 
 | Meaning | CSS treatment | What it signals |

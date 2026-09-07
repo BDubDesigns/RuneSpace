@@ -154,6 +154,8 @@ describe("client play shell ownership (#127)", () => {
     expect(ctx).toContain("export function PlayProvider");
     expect(ctx).toContain("export function usePlay");
     expect(ctx).toContain('from "@/server/play"');
+    expect(ctx).toContain('openInventory: (tab: "inventory" | "equipment") => void');
+    expect(ctx).toContain("setInventoryTab(tab)");
     // old files gone
     const { existsSync } = require("node:fs");
     expect(existsSync("features/mining/MiningPlayScreen.tsx")).toBe(false);
@@ -189,7 +191,8 @@ describe("client play shell ownership (#127)", () => {
     expect(existsSync("features/mining/EquipmentPanel.tsx")).toBe(false);
     // PlayConsole composes the generic Inventory/Equipment drawers, not Mining.
     const playConsole = readFileSync("features/play/PlayConsole.tsx", "utf8");
-    expect(playConsole).toContain('from "@/features/inventory/InventoryPanel"');
-    expect(playConsole).toContain('from "@/features/inventory/EquipmentPanel"');
+    const sharedPanel = readFileSync("features/inventory/InventoryEquipmentPanel.tsx", "utf8");
+    expect(sharedPanel).toContain("export function InventoryEquipmentPanel");
+    expect(playConsole).toContain('from "@/features/inventory/InventoryEquipmentPanel"');
   });
 });

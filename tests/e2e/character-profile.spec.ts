@@ -1,4 +1,4 @@
-import { expect, test, openTestCharacter } from "./fixtures";
+import { expect, test, openMapSurface, openTestCharacter } from "./fixtures";
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import * as authSchema from "@/db/auth-schema";
@@ -94,10 +94,10 @@ profileTest(
     const disclosure = populationDisclosure(page);
     // The disclosure label is "Characters here" with a compact count badge and
     // a truthful show/hide accessible label.
-    await expect(disclosure).toHaveAttribute("aria-label", /^Show \d+ characters here$/);
+    await expect(disclosure).toHaveAttribute("aria-label", /^View \d+ other characters here$/);
     const badge = page.locator("[data-population-count]");
     await expect(badge).toBeVisible();
-    expect(Number((await badge.textContent())?.trim())).toBeGreaterThanOrEqual(3);
+    expect(Number(await badge.getAttribute("data-population-count"))).toBeGreaterThanOrEqual(3);
     await disclosure.click();
 
     const radaTrigger = page.getByRole("button", {
@@ -106,6 +106,11 @@ profileTest(
     await radaTrigger.click();
     const panel = page.locator("[data-character-profile-panel]");
     await expect(panel).toBeVisible();
+    // The profile belongs directly to the selected row so a later row does
+    // not push the selected character's details below the full population.
+    await expect(
+      radaTrigger.locator("xpath=following-sibling::*[1][@data-character-profile-panel]"),
+    ).toBeVisible();
     await expect(radaTrigger).toHaveAttribute("aria-expanded", "true");
     // The opened character's row stays visibly selected (Viewing indicator,
     // never color alone) and transfers only to the newly selected row.
@@ -167,6 +172,9 @@ profileTest(
     // never recolor the selection rail.
     await radaTwoTrigger.click();
     await expect(panel).toHaveCount(1);
+    await expect(
+      radaTwoTrigger.locator("xpath=following-sibling::*[1][@data-character-profile-panel]"),
+    ).toBeVisible();
     await expect(panel.getByText(radaTwo, { exact: true })).toBeVisible();
     await expect(panel.getByText("Player: Profile Rada Stonehand")).toBeVisible();
     await expect(panel.getByText("Overall level 1")).toBeVisible();
@@ -314,7 +322,7 @@ profileTest(
     // Reload clears the profile panel and re-scopes population. The moved
     // character (radaOne) is now at the Yard, so it must NOT appear in the
     // Crash Site disclosure anymore.
-    await expect(page.getByText("World map")).toBeVisible();
+    await expect(page.locator("[data-location-surface]")).toBeVisible();
     await populationDisclosure(page).click();
     await expect(
       page.getByRole("button", { name: `${radaOne}, Level 2, player Profile Rada Stonehand` }),
@@ -341,9 +349,11 @@ profileTest(
 
     // Travel away: the open profile panel must be invalidated immediately on the
     // authoritative location change (no stale crash-site content at the yard).
+    await openMapSurface(page);
     await page.getByRole("button", { name: /Abandoned Processing Yard/ }).click();
     await page.getByRole("button", { name: /Walk to Abandoned Processing Yard/ }).click();
     await expect(page.getByText("Journey progress")).toBeVisible();
+    await openMapSurface(page);
     const departPast = new Date(Date.now() - 25_000);
     await db
       .update(rune.activeActions)

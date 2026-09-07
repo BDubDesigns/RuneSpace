@@ -38,10 +38,12 @@ export function InventoryPanel({
   state,
   onClose,
   triggerRef,
+  embedded = false,
 }: {
   state: PlayGameplayState;
   onClose: () => void;
   triggerRef: RefObject<HTMLButtonElement | null>;
+  embedded?: boolean;
 }) {
   const { acquireCommand, acceptState, enqueueForeground, foregroundBusy, releaseCommand } =
     usePlay();
@@ -264,6 +266,258 @@ export function InventoryPanel({
     enqueueForeground(execute);
   }
 
+  const content = (
+    <div className="pb-2" data-inventory-surface onClick={onSurfaceClick}>
+      <p className="mt-2 text-sm text-[color:var(--rs-text-secondary)]">
+        {state.inventory.slotsUsed} occupied / {totalSlots} slots
+      </p>
+      {message ? (
+        <div className="mt-4">
+          <Feedback tone={message.tone}>{message.message}</Feedback>
+        </div>
+      ) : null}
+      <div
+        ref={gridRef}
+        className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4"
+        aria-label={`${totalSlots} inventory slots`}
+        tabIndex={-1}
+      >
+        {state.inventory.stacks.map((stack) => (
+          <InventoryStackVisual
+            interactive
+            itemId={stack.itemId}
+            key={stack.id}
+            name={stack.name}
+            onSelect={() => toggleSelect({ kind: "stack", id: stack.id })}
+            quantity={stack.quantity}
+            selected={selected?.kind === "stack" && selected.id === stack.id}
+            stackLimit={stack.stackLimit}
+          />
+        ))}
+        {state.inventory.uniqueItems.map((item) => (
+          <ItemVisual
+            accessibleLabel={item.name}
+            additionalDescription={
+              item.currentCharge !== undefined
+                ? `${item.currentCharge} of ${balance.items.salvageCutter.maximumCharge} charges remaining`
+                : undefined
+            }
+            badge={
+              item.currentCharge !== undefined
+                ? `${item.currentCharge}/${balance.items.salvageCutter.maximumCharge}`
+                : undefined
+            }
+            className={
+              missionGuidanceTargets.equipmentItemIds.has(item.itemId)
+                ? "rs-mission-guidance"
+                : undefined
+            }
+            interactive
+            itemId={item.itemId}
+            key={item.id}
+            name={item.name}
+            onSelect={() => toggleSelect({ kind: "unique", id: item.id })}
+            missionGuidance={missionGuidanceTargets.equipmentItemIds.has(item.itemId)}
+            selected={selected?.kind === "unique" && selected.id === item.id}
+          />
+        ))}
+        {Array.from({ length: Math.max(0, totalSlots - state.inventory.slotsUsed) }, (_, index) => (
+          <div
+            aria-label={`Empty inventory slot ${state.inventory.slotsUsed + index + 1}`}
+            className="min-h-28 border border-dashed border-[color:var(--rs-border-subtle)] bg-[color:var(--rs-surface-panel)] p-3 text-xs uppercase tracking-wide text-[color:var(--rs-text-muted)]"
+            key={`empty-${state.inventory.slotsUsed + index}`}
+            onClick={clearSelection}
+          >
+            Empty slot
+          </div>
+        ))}
+      </div>
+      {resolvedSelection ? (
+        <section
+          aria-label={`${resolvedSelection.entry.name} details`}
+          className="mt-4 border border-[color:var(--rs-border-structural)] bg-[color:var(--rs-surface-panel)] p-3"
+          data-details-panel
+          ref={detailsRef}
+        >
+          <div className="flex items-center justify-between gap-2">
+            <h3
+              className="font-display text-xs uppercase tracking-[0.16em] text-[color:var(--rs-accent-mining)]"
+              ref={detailsHeadingRef}
+              tabIndex={-1}
+            >
+              Item details
+            </h3>
+            <ActionButton className="px-3" intent="secondary" onClick={clearSelection}>
+              Close details
+            </ActionButton>
+          </div>
+          <div className="mt-3 grid items-start gap-3 sm:grid-cols-[7rem_minmax(0,1fr)]">
+            {resolvedSelection.kind === "stack" ? (
+              <InventoryStackVisual
+                className="h-28 w-28 self-start"
+                itemId={resolvedSelection.entry.itemId}
+                name={resolvedSelection.entry.name}
+                quantity={resolvedSelection.entry.quantity}
+                stackLimit={resolvedSelection.entry.stackLimit}
+              />
+            ) : (
+              <ItemVisual
+                accessibleLabel={resolvedSelection.entry.name}
+                badge={
+                  resolvedSelection.entry.currentCharge !== undefined
+                    ? `${resolvedSelection.entry.currentCharge}/${balance.items.salvageCutter.maximumCharge}`
+                    : undefined
+                }
+                className="h-28 w-28 self-start"
+                itemId={resolvedSelection.entry.itemId}
+                name={resolvedSelection.entry.name}
+              />
+            )}
+            <dl className="min-w-0 text-sm text-[color:var(--rs-text-secondary)]">
+              <InventoryDetailsStats selection={resolvedSelection} />
+            </dl>
+          </div>
+          {selectedIsPowerCell ? (
+            <div className="mt-3 border border-[color:var(--rs-border-subtle)] bg-[color:var(--rs-surface-panel)] p-3">
+              <p className="font-display text-xs uppercase tracking-[0.16em] text-[color:var(--rs-accent-mining)]">
+                Load effect
+              </p>
+              <ul className="mt-2 space-y-1 text-sm text-[color:var(--rs-text-secondary)]">
+                <li>{balance.items.salvageCutter.maximumCharge} boosted attempts</li>
+                <li>Speeds attempt timing only</li>
+                <li>Success chance, yield, and XP remain unchanged</li>
+              </ul>
+            </div>
+          ) : null}
+          {resolvedSelection.kind === "unique" ? (
+            <>
+              {resolvedSelection.entry.currentCharge !== undefined ? (
+                <div className="mt-3">
+                  <StatusMeter
+                    detail={`${resolvedSelection.entry.currentCharge} of ${balance.items.salvageCutter.maximumCharge} charges remaining`}
+                    label="Cutter charge"
+                    value={
+                      (resolvedSelection.entry.currentCharge /
+                        balance.items.salvageCutter.maximumCharge) *
+                      100
+                    }
+                  />
+                </div>
+              ) : null}
+              <p className="mt-3 text-xs uppercase tracking-wide text-[color:var(--rs-text-muted)]">
+                Unique item — cannot be dropped.
+              </p>
+              {equipAvailability ? (
+                <div className="mt-3 border-t border-[color:var(--rs-border-subtle)] pt-3">
+                  <ActionButton
+                    disabled={!equipAvailability.enabled}
+                    intent="mining"
+                    loading={foregroundBusy}
+                    onClick={runEquip}
+                  >
+                    {equipAvailability.enabled
+                      ? `Equip in ${equipAvailability.slotLabel}`
+                      : "Equip Cutter"}
+                  </ActionButton>
+                  {!equipAvailability.enabled ? (
+                    <Feedback>Another command is in progress.</Feedback>
+                  ) : null}
+                </div>
+              ) : null}
+            </>
+          ) : null}
+          {selectedIsPowerCell ? (
+            <div className="mt-3 border-t border-[color:var(--rs-border-subtle)] pt-3">
+              <ActionButton
+                disabled={!loadAvailability?.enabled}
+                intent="mining"
+                loading={loadBusy}
+                onClick={loadPowerCell}
+              >
+                Load into Salvage Cutter
+              </ActionButton>
+              {loadAvailability && !loadAvailability.enabled ? (
+                loadAvailability.reason === "charged" ? (
+                  <Feedback>
+                    Power Cell already loaded — {loadAvailability.remainingCharge} boosted attempts
+                    remain. Deplete the Cutter before loading another.
+                  </Feedback>
+                ) : loadAvailability.reason === "no_cutter" ? (
+                  <Feedback>Equip a Salvage Cutter before loading a Power Cell.</Feedback>
+                ) : loadAvailability.reason === "no_cells" ? (
+                  <Feedback>No loose Power Cells are carried.</Feedback>
+                ) : (
+                  <Feedback>Another command is in progress.</Feedback>
+                )
+              ) : null}
+            </div>
+          ) : null}
+          {resolvedSelection.kind === "stack" ? (
+            <div className="mt-3 border-t border-[color:var(--rs-accent-danger)] pt-3">
+              <p className="font-display text-xs uppercase tracking-[0.16em] text-[color:var(--rs-accent-danger)]">
+                Drop
+              </p>
+              <div className="mt-2 flex flex-wrap gap-2">
+                {stackDropActions(resolvedSelection.entry.quantity).map((action) => (
+                  <ActionButton
+                    disabled={foregroundBusy}
+                    intent="danger"
+                    key={action.mode}
+                    onClick={(event) =>
+                      openConfirmation(action, resolvedSelection.entry, event.currentTarget)
+                    }
+                  >
+                    {action.label}
+                  </ActionButton>
+                ))}
+              </div>
+            </div>
+          ) : null}
+        </section>
+      ) : null}
+      {confirming ? (
+        <div
+          role="alert"
+          className="mt-4 border border-[color:var(--rs-accent-danger)] bg-[color:var(--rs-surface-panel)] p-3"
+        >
+          <p className="font-display text-sm uppercase tracking-wide text-[color:var(--rs-accent-danger)]">
+            Confirm drop
+          </p>
+          <p className="mt-2 text-sm text-[color:var(--rs-text-secondary)]">
+            {confirming.mode === "stack"
+              ? `Drop the full stack of ${confirming.expectedQuantity} ${confirming.itemName}?`
+              : `Drop 1 ${confirming.itemName}?`}
+          </p>
+          <p className="mt-2 text-sm text-[color:var(--rs-text-secondary)]">
+            Dropped items are permanently destroyed in the current development build.
+          </p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <ActionButton
+              disabled={foregroundBusy}
+              intent="secondary"
+              onClick={() => {
+                confirmTriggerRef.current?.focus();
+                setConfirming(undefined);
+              }}
+              ref={cancelButtonRef}
+            >
+              Cancel
+            </ActionButton>
+            <ActionButton
+              disabled={foregroundBusy}
+              intent="danger"
+              loading={foregroundBusy}
+              onClick={runDiscard}
+            >
+              {confirming.confirmLabel}
+            </ActionButton>
+          </div>
+        </div>
+      ) : null}
+    </div>
+  );
+
+  if (embedded) return content;
   return (
     <Drawer
       eyebrow="MYKEA SCHLEPPRAUM-8"
@@ -272,257 +526,7 @@ export function InventoryPanel({
       title="Inventory"
       triggerRef={triggerRef}
     >
-      <div className="pb-2" data-inventory-surface onClick={onSurfaceClick}>
-        <p className="mt-2 text-sm text-[color:var(--rs-text-secondary)]">
-          {state.inventory.slotsUsed} occupied / {totalSlots} slots
-        </p>
-        {message ? (
-          <div className="mt-4">
-            <Feedback tone={message.tone}>{message.message}</Feedback>
-          </div>
-        ) : null}
-        <div
-          ref={gridRef}
-          className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4"
-          aria-label={`${totalSlots} inventory slots`}
-          tabIndex={-1}
-        >
-          {state.inventory.stacks.map((stack) => (
-            <InventoryStackVisual
-              interactive
-              itemId={stack.itemId}
-              key={stack.id}
-              name={stack.name}
-              onSelect={() => toggleSelect({ kind: "stack", id: stack.id })}
-              quantity={stack.quantity}
-              selected={selected?.kind === "stack" && selected.id === stack.id}
-              stackLimit={stack.stackLimit}
-            />
-          ))}
-          {state.inventory.uniqueItems.map((item) => (
-            <ItemVisual
-              accessibleLabel={item.name}
-              additionalDescription={
-                item.currentCharge !== undefined
-                  ? `${item.currentCharge} of ${balance.items.salvageCutter.maximumCharge} charges remaining`
-                  : undefined
-              }
-              badge={
-                item.currentCharge !== undefined
-                  ? `${item.currentCharge}/${balance.items.salvageCutter.maximumCharge}`
-                  : undefined
-              }
-              className={
-                missionGuidanceTargets.equipmentItemIds.has(item.itemId)
-                  ? "rs-mission-guidance"
-                  : undefined
-              }
-              interactive
-              itemId={item.itemId}
-              key={item.id}
-              name={item.name}
-              onSelect={() => toggleSelect({ kind: "unique", id: item.id })}
-              missionGuidance={missionGuidanceTargets.equipmentItemIds.has(item.itemId)}
-              selected={selected?.kind === "unique" && selected.id === item.id}
-            />
-          ))}
-          {Array.from(
-            { length: Math.max(0, totalSlots - state.inventory.slotsUsed) },
-            (_, index) => (
-              <div
-                aria-label={`Empty inventory slot ${state.inventory.slotsUsed + index + 1}`}
-                className="min-h-28 border border-dashed border-[color:var(--rs-border-subtle)] bg-[color:var(--rs-surface-panel)] p-3 text-xs uppercase tracking-wide text-[color:var(--rs-text-muted)]"
-                key={`empty-${state.inventory.slotsUsed + index}`}
-                onClick={clearSelection}
-              >
-                Empty slot
-              </div>
-            ),
-          )}
-        </div>
-        {resolvedSelection ? (
-          <section
-            aria-label={`${resolvedSelection.entry.name} details`}
-            className="mt-4 border border-[color:var(--rs-border-structural)] bg-[color:var(--rs-surface-panel)] p-3"
-            data-details-panel
-            ref={detailsRef}
-          >
-            <div className="flex items-center justify-between gap-2">
-              <h3
-                className="font-display text-xs uppercase tracking-[0.16em] text-[color:var(--rs-accent-mining)]"
-                ref={detailsHeadingRef}
-                tabIndex={-1}
-              >
-                Item details
-              </h3>
-              <ActionButton className="px-3" intent="secondary" onClick={clearSelection}>
-                Close details
-              </ActionButton>
-            </div>
-            <div className="mt-3 grid items-start gap-3 sm:grid-cols-[7rem_minmax(0,1fr)]">
-              {resolvedSelection.kind === "stack" ? (
-                <InventoryStackVisual
-                  className="h-28 w-28 self-start"
-                  itemId={resolvedSelection.entry.itemId}
-                  name={resolvedSelection.entry.name}
-                  quantity={resolvedSelection.entry.quantity}
-                  stackLimit={resolvedSelection.entry.stackLimit}
-                />
-              ) : (
-                <ItemVisual
-                  accessibleLabel={resolvedSelection.entry.name}
-                  badge={
-                    resolvedSelection.entry.currentCharge !== undefined
-                      ? `${resolvedSelection.entry.currentCharge}/${balance.items.salvageCutter.maximumCharge}`
-                      : undefined
-                  }
-                  className="h-28 w-28 self-start"
-                  itemId={resolvedSelection.entry.itemId}
-                  name={resolvedSelection.entry.name}
-                />
-              )}
-              <dl className="min-w-0 text-sm text-[color:var(--rs-text-secondary)]">
-                <InventoryDetailsStats selection={resolvedSelection} />
-              </dl>
-            </div>
-            {selectedIsPowerCell ? (
-              <div className="mt-3 border border-[color:var(--rs-border-subtle)] bg-[color:var(--rs-surface-panel)] p-3">
-                <p className="font-display text-xs uppercase tracking-[0.16em] text-[color:var(--rs-accent-mining)]">
-                  Load effect
-                </p>
-                <ul className="mt-2 space-y-1 text-sm text-[color:var(--rs-text-secondary)]">
-                  <li>{balance.items.salvageCutter.maximumCharge} boosted attempts</li>
-                  <li>Speeds attempt timing only</li>
-                  <li>Success chance, yield, and XP remain unchanged</li>
-                </ul>
-              </div>
-            ) : null}
-            {resolvedSelection.kind === "unique" ? (
-              <>
-                {resolvedSelection.entry.currentCharge !== undefined ? (
-                  <div className="mt-3">
-                    <StatusMeter
-                      detail={`${resolvedSelection.entry.currentCharge} of ${balance.items.salvageCutter.maximumCharge} charges remaining`}
-                      label="Cutter charge"
-                      value={
-                        (resolvedSelection.entry.currentCharge /
-                          balance.items.salvageCutter.maximumCharge) *
-                        100
-                      }
-                    />
-                  </div>
-                ) : null}
-                <p className="mt-3 text-xs uppercase tracking-wide text-[color:var(--rs-text-muted)]">
-                  Unique item — cannot be dropped.
-                </p>
-                {equipAvailability ? (
-                  <div className="mt-3 border-t border-[color:var(--rs-border-subtle)] pt-3">
-                    <ActionButton
-                      disabled={!equipAvailability.enabled}
-                      intent="mining"
-                      loading={foregroundBusy}
-                      onClick={runEquip}
-                    >
-                      {equipAvailability.enabled
-                        ? `Equip in ${equipAvailability.slotLabel}`
-                        : "Equip Cutter"}
-                    </ActionButton>
-                    {!equipAvailability.enabled ? (
-                      <Feedback>Another command is in progress.</Feedback>
-                    ) : null}
-                  </div>
-                ) : null}
-              </>
-            ) : null}
-            {selectedIsPowerCell ? (
-              <div className="mt-3 border-t border-[color:var(--rs-border-subtle)] pt-3">
-                <ActionButton
-                  disabled={!loadAvailability?.enabled}
-                  intent="mining"
-                  loading={loadBusy}
-                  onClick={loadPowerCell}
-                >
-                  Load into Salvage Cutter
-                </ActionButton>
-                {loadAvailability && !loadAvailability.enabled ? (
-                  loadAvailability.reason === "charged" ? (
-                    <Feedback>
-                      Power Cell already loaded — {loadAvailability.remainingCharge} boosted
-                      attempts remain. Deplete the Cutter before loading another.
-                    </Feedback>
-                  ) : loadAvailability.reason === "no_cutter" ? (
-                    <Feedback>Equip a Salvage Cutter before loading a Power Cell.</Feedback>
-                  ) : loadAvailability.reason === "no_cells" ? (
-                    <Feedback>No loose Power Cells are carried.</Feedback>
-                  ) : (
-                    <Feedback>Another command is in progress.</Feedback>
-                  )
-                ) : null}
-              </div>
-            ) : null}
-            {resolvedSelection.kind === "stack" ? (
-              <div className="mt-3 border-t border-[color:var(--rs-accent-danger)] pt-3">
-                <p className="font-display text-xs uppercase tracking-[0.16em] text-[color:var(--rs-accent-danger)]">
-                  Drop
-                </p>
-                <div className="mt-2 flex flex-wrap gap-2">
-                  {stackDropActions(resolvedSelection.entry.quantity).map((action) => (
-                    <ActionButton
-                      disabled={foregroundBusy}
-                      intent="danger"
-                      key={action.mode}
-                      onClick={(event) =>
-                        openConfirmation(action, resolvedSelection.entry, event.currentTarget)
-                      }
-                    >
-                      {action.label}
-                    </ActionButton>
-                  ))}
-                </div>
-              </div>
-            ) : null}
-          </section>
-        ) : null}
-        {confirming ? (
-          <div
-            role="alert"
-            className="mt-4 border border-[color:var(--rs-accent-danger)] bg-[color:var(--rs-surface-panel)] p-3"
-          >
-            <p className="font-display text-sm uppercase tracking-wide text-[color:var(--rs-accent-danger)]">
-              Confirm drop
-            </p>
-            <p className="mt-2 text-sm text-[color:var(--rs-text-secondary)]">
-              {confirming.mode === "stack"
-                ? `Drop the full stack of ${confirming.expectedQuantity} ${confirming.itemName}?`
-                : `Drop 1 ${confirming.itemName}?`}
-            </p>
-            <p className="mt-2 text-sm text-[color:var(--rs-text-secondary)]">
-              Dropped items are permanently destroyed in the current development build.
-            </p>
-            <div className="mt-3 flex flex-wrap gap-2">
-              <ActionButton
-                disabled={foregroundBusy}
-                intent="secondary"
-                onClick={() => {
-                  confirmTriggerRef.current?.focus();
-                  setConfirming(undefined);
-                }}
-                ref={cancelButtonRef}
-              >
-                Cancel
-              </ActionButton>
-              <ActionButton
-                disabled={foregroundBusy}
-                intent="danger"
-                loading={foregroundBusy}
-                onClick={runDiscard}
-              >
-                {confirming.confirmLabel}
-              </ActionButton>
-            </div>
-          </div>
-        ) : null}
-      </div>
+      {content}
     </Drawer>
   );
 }

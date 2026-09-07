@@ -1,6 +1,7 @@
 "use client";
 
-import { Backpack, Shield, ScrollText, Users } from "lucide-react";
+import { Backpack, Map as MapIcon, ScrollText, Users } from "lucide-react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { GameShell, TopBar } from "@/components/ui/GameShell";
 import { RuneSpaceBrand } from "@/components/branding/RuneSpaceBrand";
 import { SignOutButton } from "@/features/auth/SignOutButton";
@@ -11,16 +12,16 @@ import { PlayProvider, usePlay } from "./PlayContext";
 import { FooterNavButton, FooterNavLink } from "./PlayFooterNav";
 
 function PlayFooter() {
+  const pathname = usePathname();
+  const mapActive = useSearchParams().get("surface") === "map";
   const {
-    equipmentTrigger,
     inventoryTrigger,
     missionsTrigger,
-    setEquipmentOpen,
+    openInventory,
     setInventoryOpen,
     setMissionsOpen,
     setMissionsFocus,
     inventoryOpen,
-    equipmentOpen,
     missionsOpen,
     state,
   } = usePlay();
@@ -43,23 +44,17 @@ function PlayFooter() {
         icon={<Backpack />}
         label="Inventory"
         onClick={() => {
-          setEquipmentOpen(false);
-          setMissionsOpen(false);
-          setInventoryOpen(true);
+          openInventory("inventory");
         }}
         ref={inventoryTrigger}
       />
-      <FooterNavButton
-        active={equipmentOpen}
-        aria-label="Equipment"
-        icon={<Shield />}
-        label="Equipment"
-        onClick={() => {
-          setInventoryOpen(false);
-          setMissionsOpen(false);
-          setEquipmentOpen(true);
-        }}
-        ref={equipmentTrigger}
+      <FooterNavLink
+        active={mapActive}
+        aria-current={mapActive ? "page" : undefined}
+        aria-label="Map"
+        href={`${pathname}?surface=map`}
+        icon={<MapIcon />}
+        label="Map"
       />
       <FooterNavButton
         active={missionsOpen}
@@ -69,7 +64,6 @@ function PlayFooter() {
         label="Missions"
         onClick={() => {
           setInventoryOpen(false);
-          setEquipmentOpen(false);
           setMissionsFocus(undefined);
           setMissionsOpen(true);
         }}
@@ -90,11 +84,20 @@ export function PlayScreen({
   characterName: string;
   initialState: PlayGameplayState;
 }) {
+  const pathname = usePathname();
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const mapActive = searchParams.get("surface") === "map";
+
   return (
     <PlayProvider initialState={initialState}>
       <GameShell bottomNav={<PlayFooter />} topBar={<PlayTopBar />}>
         <PlayBoundaryTestTrigger />
-        <PlayConsole characterName={characterName} />
+        <PlayConsole
+          characterName={characterName}
+          onMapExit={() => router.replace(pathname)}
+          surface={mapActive ? "map" : "primary"}
+        />
       </GameShell>
     </PlayProvider>
   );

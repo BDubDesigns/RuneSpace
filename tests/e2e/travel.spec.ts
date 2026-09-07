@@ -1,4 +1,4 @@
-import { expect, test, openTestCharacter } from "./fixtures";
+import { expect, test, openMapSurface, openTestCharacter } from "./fixtures";
 import { writeFile } from "node:fs/promises";
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
@@ -227,9 +227,12 @@ async function arriveAtPowerAnnex(page: import("@playwright/test").Page, charact
     .set({ startedAt: arrivedPast, resolvedThroughAt: arrivedPast })
     .where(eq(activeActions.characterId, characterId));
   await page.reload();
+  await openMapSurface(page);
   await expect(
     page.getByRole("button", { name: /DeWhat\? Emergency Power Annex/ }).first(),
   ).toHaveAttribute("aria-current", "true");
+  await page.getByRole("button", { name: "Back to Location" }).click();
+  await page.waitForURL(/\/play\/[^/?]+$/);
 }
 
 async function openScavengeOpportunity(
@@ -261,13 +264,13 @@ async function openScavengeOpportunity(
 
 test.beforeEach(async ({ page, testCharacter }) => {
   await openTestCharacter(page, testCharacter.id);
-  await expect(page.getByText("World map")).toBeVisible();
+  await openMapSurface(page);
 });
 
 test("selecting a destination does not begin travel; confirmation is required", async ({
   page,
 }) => {
-  const characterId = page.url().split("/").at(-1)!;
+  const characterId = new URL(page.url()).pathname.split("/").at(-1)!;
 
   // Stationary at the Crash Site (no Mining here after issue #83 — Mining is at The Jag).
   await page.setViewportSize({ width: 390, height: 844 });
@@ -415,9 +418,14 @@ test("automatically reconciles arrival without refresh or reload", async ({
   await page.waitForURL(/\/play\/[^/]+$/);
 
   await expect(page.getByText("Journey progress")).toBeVisible();
+  // Open the dedicated Map while Travel is authoritative. Arrival must clear
+  // the read-only route treatment in place without a client transit latch.
+  await openMapSurface(page);
   await expect(
     page.getByRole("button", { name: /Abandoned Processing Yard/ }).first(),
   ).toHaveAttribute("aria-current", "true", { timeout: 10_000 });
+  await expect(page.locator("[data-route-progress]")).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Back to Location" })).toBeVisible();
   await expect(
     db.select().from(activeActions).where(eq(activeActions.characterId, characterId)),
   ).resolves.toEqual([]);
@@ -429,7 +437,7 @@ test("automatically reconciles arrival without refresh or reload", async ({
 test("the full journey walks, arrives, and returns between the original locations", async ({
   page,
 }) => {
-  const characterId = page.url().split("/").at(-1)!;
+  const characterId = new URL(page.url()).pathname.split("/").at(-1)!;
 
   // Stationary at the Crash Site — screenshot. Mining is at The Jag after issue #83,
   // so go via Long Scramble -> Jag, mine there, then return via Yard for the classic
@@ -446,6 +454,7 @@ test("the full journey walks, arrives, and returns between the original location
     .set({ startedAt: departPast, resolvedThroughAt: departPast })
     .where(eq(activeActions.characterId, characterId));
   await page.reload();
+  await openMapSurface(page);
   await expect(page.getByRole("button", { name: /The Long Scramble/ }).first()).toHaveAttribute(
     "aria-current",
     "true",
@@ -459,12 +468,14 @@ test("the full journey walks, arrives, and returns between the original location
     .set({ startedAt: departPast, resolvedThroughAt: departPast })
     .where(eq(activeActions.characterId, characterId));
   await page.reload();
+  await openMapSurface(page);
   await expect(page.getByRole("button", { name: /The Jag/ }).first()).toHaveAttribute(
     "aria-current",
     "true",
   );
   await seedLegacyStarterCutter(characterId);
   await page.reload();
+  await page.getByRole("button", { name: "Back to Location" }).click();
   await page.getByRole("button", { name: "Start Mining" }).click();
   await expect(page.getByRole("button", { name: "Stop Mining" })).toBeVisible();
   const twoAttemptsAgo = new Date(Date.now() - 12_100);
@@ -477,6 +488,7 @@ test("the full journey walks, arrives, and returns between the original location
   await expect(page.getByText("Latest attempt:", { exact: false })).toBeVisible();
 
   // Return to Crash Site via Long Scramble.
+  await openMapSurface(page);
   await page.getByRole("button", { name: /The Long Scramble/ }).click();
   await page.getByRole("button", { name: /Walk to The Long Scramble/ }).click();
   await expect(page.getByText("In transit", { exact: true }).first()).toBeVisible();
@@ -486,6 +498,7 @@ test("the full journey walks, arrives, and returns between the original location
     .set({ startedAt: departPast, resolvedThroughAt: departPast })
     .where(eq(activeActions.characterId, characterId));
   await page.reload();
+  await openMapSurface(page);
   await expect(page.getByRole("button", { name: /The Long Scramble/ }).first()).toHaveAttribute(
     "aria-current",
     "true",
@@ -499,6 +512,7 @@ test("the full journey walks, arrives, and returns between the original location
     .set({ startedAt: departPast, resolvedThroughAt: departPast })
     .where(eq(activeActions.characterId, characterId));
   await page.reload();
+  await openMapSurface(page);
   await expect(page.getByRole("button", { name: /Crash Site/ }).first()).toHaveAttribute(
     "aria-current",
     "true",
@@ -506,6 +520,7 @@ test("the full journey walks, arrives, and returns between the original location
 
   // From Crash Site, verify the walk to Yard still works (proving the
   // original triangle remains intact after the Scramble/Jag branch).
+  await openMapSurface(page);
   await page.getByRole("button", { name: /Abandoned Processing Yard/ }).click();
   await expect(page.getByText(/Walking time: 24 seconds/)).toBeVisible();
   await page.getByRole("button", { name: /Walk to Abandoned Processing Yard/ }).click();
@@ -522,13 +537,9 @@ test("the full journey walks, arrives, and returns between the original location
       "The active work stopped before departure. No new activity can begin until you arrive.",
     ),
   ).toBeVisible();
-  await expect(
-    page.getByText(
-      "You are walking between locations. The active work stopped before departure, and no new activity can begin until you arrive. Use the world map below to follow your journey.",
-    ),
-  ).toBeVisible();
   await expect(page.getByText(/paused/i)).toHaveCount(0);
   await expectNoMiningDashboards(page);
+  await openMapSurface(page);
   await expectRouteProgressStartsAt(page, LOCATION_IDS.crashSite);
   // Hybrid chassis rivets (data-map-rivet) are intentional and exempt; no other circles must appear during transit.
   await expect(
@@ -556,13 +567,15 @@ test("the full journey walks, arrives, and returns between the original location
     .set({ startedAt: yardDepartPast, resolvedThroughAt: yardDepartPast })
     .where(eq(activeActions.characterId, characterId));
   await page.reload();
-  await expect(page.getByText("World map")).toBeVisible();
+  await openMapSurface(page);
 
   // Arrived at the Processing Yard.
   await expect(page.getByText("You are here", { exact: false }).first()).toBeVisible();
   await expect(
     page.getByRole("button", { name: /Abandoned Processing Yard/ }).first(),
   ).toHaveAttribute("aria-current", "true");
+  await page.getByRole("button", { name: "Back to Location" }).click();
+  await expect(page.locator("[data-location-surface]")).toBeVisible();
   // Refining is available at the Yard (issue #81): the activity panel shows
   // the Refining console, not the old "offline" message.
   await expect(page.getByRole("button", { name: "Start Refining" })).toBeVisible();
@@ -580,6 +593,7 @@ test("the full journey walks, arrives, and returns between the original location
   await page.setViewportSize({ width: 390, height: 844 });
 
   // Return journey: select the Crash Site and walk back.
+  await openMapSurface(page);
   await page
     .getByRole("button", { name: /Crash Site/ })
     .first()
@@ -588,6 +602,7 @@ test("the full journey walks, arrives, and returns between the original location
   await page.getByRole("button", { name: /Walk to Crash Site/ }).click();
   await expect(page.getByText("Journey progress")).toBeVisible();
   await expectMiningDashboardsHidden(page);
+  await openMapSurface(page);
   await expectRouteProgressStartsAt(page, LOCATION_IDS.abandonedProcessingYard);
   await expect(
     page.locator('[aria-label="Local map"] svg circle:not([data-map-rivet])'),
@@ -600,7 +615,14 @@ test("the full journey walks, arrives, and returns between the original location
     .set({ startedAt: returnPast, resolvedThroughAt: returnPast })
     .where(eq(activeActions.characterId, characterId));
   await page.reload();
-  await expect(page.getByText("World map")).toBeVisible();
+  await expect(page.getByRole("group", { name: "Local map" })).toBeVisible();
+  await expect(page.getByRole("button", { name: /Crash Site/ }).first()).toHaveAttribute(
+    "aria-current",
+    "true",
+  );
+  await page.getByRole("button", { name: "Back to Location" }).click();
+  await expect(page.locator("[data-location-surface]")).toBeVisible();
+  await openMapSurface(page);
 
   // Back at the Crash Site — Mining is at The Jag (issue #83), so verify no
   // Mining dashboards here, then walk via Scramble -> Jag to prove Mining again.
@@ -618,6 +640,7 @@ test("the full journey walks, arrives, and returns between the original location
     .set({ startedAt: jagDepartPast, resolvedThroughAt: jagDepartPast })
     .where(eq(activeActions.characterId, characterId));
   await page.reload();
+  await openMapSurface(page);
   await page.getByRole("button", { name: /The Jag/ }).click();
   await page.getByRole("button", { name: /Walk to The Jag/ }).click();
   await expect(page.getByText("In transit", { exact: true }).first()).toBeVisible();
@@ -627,10 +650,12 @@ test("the full journey walks, arrives, and returns between the original location
     .set({ startedAt: jagDepartPast, resolvedThroughAt: jagDepartPast })
     .where(eq(activeActions.characterId, characterId));
   await page.reload();
+  await openMapSurface(page);
   await expect(page.getByRole("button", { name: /The Jag/ }).first()).toHaveAttribute(
     "aria-current",
     "true",
   );
+  await page.getByRole("button", { name: "Back to Location" }).click();
   await expect(page.getByRole("button", { name: "Start Mining" })).toBeVisible();
   await expectMiningDashboardsVisible(page);
   await page.getByRole("button", { name: "Start Mining" }).click();
@@ -639,7 +664,7 @@ test("the full journey walks, arrives, and returns between the original location
 
 test("keyboard users can select and confirm a destination", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
-  const characterId = page.url().split("/").at(-1)!;
+  const characterId = new URL(page.url()).pathname.split("/").at(-1)!;
 
   // 1. Focus the reachable destination hex.
   const yard = page.getByRole("button", { name: /Abandoned Processing Yard/ }).first();
@@ -693,7 +718,7 @@ test("reduced-motion presentation retains equivalent travel information", async 
 });
 
 test("Scavenge presents the committed outcome on a readable weighted reel", async ({ page }) => {
-  const characterId = page.url().split("/").at(-1)!;
+  const characterId = new URL(page.url()).pathname.split("/").at(-1)!;
   const labels = [
     "Zilch",
     "Nothing Burger",
@@ -715,7 +740,7 @@ test("Scavenge presents the committed outcome on a readable weighted reel", asyn
   const journeyBox = await journeyProgress.boundingBox();
   expect(scavengeBox).not.toBeNull();
   expect(journeyBox).not.toBeNull();
-  expect(scavengeBox!.y).toBeLessThan(journeyBox!.y);
+  expect(scavengeBox!.y).toBeGreaterThan(journeyBox!.y);
   await opportunity.getByRole("button", { name: "SCAVENGE NOW" }).click();
   await expect(page.locator("[data-scavenge-reel]")).toBeVisible();
   const startReel = page.getByRole("button", { name: "START REEL" });
@@ -754,13 +779,20 @@ test("Scavenge presents the committed outcome on a readable weighted reel", asyn
   await page.getByRole("button", { name: "START REEL" }).click();
   await expect(page.getByRole("button", { name: "Reeling…" })).toBeVisible();
   await expect(page.locator("[data-scavenge-result]")).toBeVisible({ timeout: 8_000 });
+  const claimedJourneyEvent = page
+    .locator('[data-journey-event="scavenge"]')
+    .filter({ hasText: "Scavenge result" });
+  await expect(claimedJourneyEvent).toHaveCount(1);
+  await expect(claimedJourneyEvent).toContainText(/Found \d+|Nothing Burger|Zilch|Nada|Whammy!/);
+  await expect(claimedJourneyEvent.locator("[data-scavenge-state]")).toHaveCount(0);
+  await expect(claimedJourneyEvent.getByRole("button")).toHaveCount(0);
   await expect(page.getByRole("button", { name: "DONE", exact: true })).toBeFocused();
 });
 
 test("Scavenge explains when every possible reward needs an open inventory slot", async ({
   page,
 }) => {
-  const characterId = page.url().split("/").at(-1)!;
+  const characterId = new URL(page.url()).pathname.split("/").at(-1)!;
   await openScavengeOpportunity(page, characterId);
   await db.insert(inventoryStacks).values(
     Array.from({ length: 8 }, () => ({
@@ -787,7 +819,7 @@ test("Scavenge explains when every possible reward needs an open inventory slot"
 test("Scavenge Skip reveal bypasses animation and the reel preference remains reversible", async ({
   page,
 }) => {
-  const characterId = page.url().split("/").at(-1)!;
+  const characterId = new URL(page.url()).pathname.split("/").at(-1)!;
   const opportunity = await openScavengeOpportunity(page, characterId);
   await opportunity.getByRole("button", { name: "SCAVENGE NOW" }).click();
   await expect(page.getByRole("button", { name: "Skip reveal" })).toBeVisible();
@@ -805,13 +837,15 @@ test("Scavenge Skip reveal bypasses animation and the reel preference remains re
   await preference.uncheck();
   await expect(preference).not.toBeChecked();
   await page.getByRole("button", { name: "DONE", exact: true }).click();
-  await expect(page.locator('[data-scavenge-state="claimed"]')).toContainText(
-    "Reward claimed for this Travel leg.",
-  );
+  await expect(page.locator("[data-scavenge-reel]")).toHaveCount(0);
+  await expect(
+    page.locator('[data-journey-event="scavenge"]').filter({ hasText: "Scavenge result" }),
+  ).toBeVisible();
+  await expect(page.locator('[data-scavenge-state="claimed"]')).toHaveCount(0);
 });
 
 test("reduced motion bypasses the Scavenge reel without changing the reveal", async ({ page }) => {
-  const characterId = page.url().split("/").at(-1)!;
+  const characterId = new URL(page.url()).pathname.split("/").at(-1)!;
   await page.emulateMedia({ reducedMotion: "reduce" });
   const opportunity = await openScavengeOpportunity(page, characterId);
   await opportunity.getByRole("button", { name: "SCAVENGE NOW" }).click();
@@ -821,7 +855,7 @@ test("reduced motion bypasses the Scavenge reel without changing the reveal", as
 });
 
 test("arrival does not destroy a committed Scavenge reveal", async ({ page }) => {
-  const characterId = page.url().split("/").at(-1)!;
+  const characterId = new URL(page.url()).pathname.split("/").at(-1)!;
   const opportunity = await openScavengeOpportunity(page, characterId);
   await opportunity.getByRole("button", { name: "SCAVENGE NOW" }).click();
   await expect(page.locator("[data-scavenge-reel]")).toBeVisible();
@@ -833,9 +867,7 @@ test("arrival does not destroy a committed Scavenge reveal", async ({ page }) =>
     .where(eq(activeActions.characterId, characterId));
   await page.reload();
 
-  await expect(
-    page.getByRole("button", { name: /Abandoned Processing Yard/ }).first(),
-  ).toHaveAttribute("aria-current", "true");
+  await expect(page.locator("[data-location-surface]")).toBeVisible();
   await expect(page.locator("[data-scavenge-reel]")).toBeVisible();
   await page.getByRole("button", { name: "START REEL" }).click();
   await expect(page.locator("[data-scavenge-result]")).toBeVisible({ timeout: 8_000 });
@@ -844,7 +876,7 @@ test("arrival does not destroy a committed Scavenge reveal", async ({ page }) =>
 test("Travel arrival reconciliation preserves a Scavenge reel already in motion", async ({
   page,
 }) => {
-  const characterId = page.url().split("/").at(-1)!;
+  const characterId = new URL(page.url()).pathname.split("/").at(-1)!;
   const opportunity = await openScavengeOpportunity(page, characterId, {
     opportunityStartTick: 30,
     travelAgeMs: 19_000,
@@ -864,9 +896,7 @@ test("Travel arrival reconciliation preserves a Scavenge reel already in motion"
 
   await page.getByRole("button", { name: "START REEL" }).click();
   await expect(page.getByRole("button", { name: "Reeling…" })).toBeVisible();
-  await expect(
-    page.getByRole("button", { name: /Abandoned Processing Yard/ }).first(),
-  ).toHaveAttribute("aria-current", "true", { timeout: 8_000 });
+  await expect(page.locator("[data-location-surface]")).toBeVisible({ timeout: 8_000 });
   // Arrival reconciliation must not tear the reveal down nor reset it to
   // pending: the committed reveal survives in whatever stage arrival landed
   // (a mid-spin reel or the already-revealed result) and always reaches the
@@ -903,8 +933,10 @@ test("travels to the Power Annex and claims independently by Pacific reset date"
   const availableTileBox = await availableTile.boundingBox();
   expect(availableTileBox?.width ?? 0).toBeLessThan(200);
   await expectPowerAnnexRewardLayout(page, { claimed: false });
+  await openMapSurface(page);
   await expectMapStatusPlatesInsideHex(page);
   await captureReviewScreenshot(page, "power-annex-mobile-available.png");
+  await page.getByRole("button", { name: "Back to Location" }).click();
   await page.getByRole("button", { name: "Claim Power Cells" }).click();
   await expect(
     page.getByText(/Today's emergency allotment claimed: 5 Power Cells awarded/),
@@ -921,8 +953,10 @@ test("travels to the Power Annex and claims independently by Pacific reset date"
     ),
   ).toBeVisible();
   await expectPowerAnnexRewardLayout(page, { claimed: true });
+  await openMapSurface(page);
   await expectMapStatusPlatesInsideHex(page);
   await captureReviewScreenshot(page, "power-annex-mobile-claimed.png");
+  await page.getByRole("button", { name: "Back to Location" }).click();
 
   await page.getByRole("button", { name: /Inventory/ }).click();
   const claimedCell = page.getByLabel("5 Power Cell", { exact: true });
@@ -936,6 +970,7 @@ test("travels to the Power Annex and claims independently by Pacific reset date"
   if (!controlledClock) {
     await page.setViewportSize({ width: 1440, height: 900 });
     await expectPowerAnnexRewardLayout(page, { claimed: true });
+    await openMapSurface(page);
     await expectMapStatusPlatesInsideHex(page);
     await captureReviewScreenshot(page, "power-annex-desktop-available.png");
     return;
@@ -951,8 +986,10 @@ test("travels to the Power Annex and claims independently by Pacific reset date"
   ).toBeVisible();
   await page.setViewportSize({ width: 1440, height: 900 });
   await expectPowerAnnexRewardLayout(page, { claimed: false });
+  await openMapSurface(page);
   await expectMapStatusPlatesInsideHex(page);
   await captureReviewScreenshot(page, "power-annex-desktop-available.png");
+  await page.getByRole("button", { name: "Back to Location" }).click();
   await page.getByRole("button", { name: "Claim Power Cells" }).click();
   await expect(
     page.getByText(/Today's emergency allotment claimed: 5 Power Cells awarded/),
@@ -963,6 +1000,7 @@ test("travels to the Power Annex and claims independently by Pacific reset date"
   await expect(desktopClaimedTile.getByText("x0", { exact: true })).toBeVisible();
   await expect(desktopClaimedTile.locator("img")).toHaveClass(/grayscale/);
   await expectPowerAnnexRewardLayout(page, { claimed: true });
+  await openMapSurface(page);
   await expectMapStatusPlatesInsideHex(page);
   await captureReviewScreenshot(page, "power-annex-desktop-claimed.png");
   await page.getByRole("button", { name: /Inventory/ }).click();

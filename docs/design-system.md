@@ -14,9 +14,33 @@ Translucent tokens: a Tailwind slash-opacity modifier such as `bg-[color:var(--r
 
 `components/ui/` contains presentational primitives only: panels, headings, actions, form fields, feedback, status meters, and the responsive shell. Intent variants use `primary`, `secondary`, `success`, `mining`, `arcane`, and `danger`; use the semantic intent, never a visual hex value.
 
+## Play surface chrome (Issue #145)
+
+The Play footer is the fixed four-destination navigation: **Characters ·
+Inventory · Map · Missions**. Inventory and Equipment share one Drawer and are
+selected with tabs; Equipment is not a fifth footer destination. The surface
+ownership and state rules are defined once in `docs/architecture.md`.
+
+Location, Map, and Journey are separate compositions: Location presents the
+stationary scene, activity, and same-location population/profile flow; Map is
+the dedicated `?surface=map` navigation surface; Journey is the in-transit
+status/feed surface. Journey feed entries are presentation only, while Travel
+and Scavenge actions remain server-authoritative. Map is read-only only while
+`state.travelState` exists, including after a refresh/reconciliation; it must
+not retain an "opened while traveling" client latch. MISSION and TURN IN Map
+guidance are intentionally deferred to Issue #143.
+
 ## Overlay motion
 
-Shared overlay panels (`components/ui/Drawer.tsx`, used by Inventory and Equipment) animate enter and exit with **opacity only**. Do not add `transform` (scale or translate) to the panel animation: a transformed element becomes a containing block for `position: absolute` descendants, which breaks the absolutely-positioned artwork, nameplate, and badge inside `components/items/VisualTile.tsx` (they jitter or misplace for the animation's duration). If a future overlay needs motion beyond a fade, keep it off any element that contains absolutely-positioned item tiles, or restructure those tiles first.
+Shared overlay panels (`components/ui/Drawer.tsx`, including the tabbed
+Inventory/Equipment surface) animate enter and exit with **opacity only**. Do
+not add `transform` (scale or translate) to the panel animation: a transformed
+element becomes a containing block for `position: absolute` descendants, which
+breaks the absolutely-positioned artwork, nameplate, and badge inside
+`components/items/VisualTile.tsx` (they jitter or misplace for the animation's
+duration). If a future overlay needs motion beyond a fade, keep it off any
+element that contains absolutely-positioned item tiles, or restructure those
+tiles first.
 
 ## Accessibility
 

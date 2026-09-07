@@ -67,6 +67,46 @@ RuneSpace's application-wide play boundary is **Play**, not Mining. Mining was t
 
 See `docs/gameplay-foundations.md` for timing/progression/inventory contracts and `docs/missions.md` for the declarative mission framework.
 
+### Play surfaces (Issue #145)
+
+This section is the single source of truth for the player-facing Play surface
+ownership. The detailed visual rules remain in the feature documents linked
+below.
+
+- **Location** is the stationary primary surface, composed by
+  `features/location-scene/LocationSurface.tsx`. It owns the current-location
+  scene, description, activity composition, and same-location population/profile
+  flow through `LocationPopulationPanel`. Population browsing does not belong on
+  Map.
+- **Map** is the dedicated query-backed `?surface=map` surface, composed by
+  `features/travel/LocalMapPanel.tsx`. It reuses the existing five-location
+  geometry, route, selection, and explicit Travel confirmation behavior. Map is
+  read-only exactly when authoritative `state.travelState` is present. If Travel
+  resolves while the URL remains on Map, the same surface immediately clears
+  transit treatment, enables ordinary stationary interaction, and changes Back
+  to Location; there is no client latch for how Map was opened.
+- **Journey** is the in-transit primary surface, composed by
+  `features/travel/JourneyPanel.tsx`. Its status and feed are presentation only.
+  The existing server-authoritative Travel state and `ScavengeControl` command
+  remain the gameplay authority; Journey does not resolve, persist, or invent
+  outcomes.
+- The fixed Play footer has four destinations: **Characters · Inventory · Map ·
+  Missions**. Inventory and Equipment are two tabs in one shared overlay owned
+  by `features/inventory/InventoryEquipmentPanel.tsx`; their existing
+  server-authoritative command and projection boundaries remain unchanged.
+- Mission guidance continues to use the existing derived semantic targets on
+  the primary surface. Issue #145 does not move or rewrite mission guidance.
+  When its current target is an equipment item, the mission surface may open
+  the shared overlay directly on Equipment through `PlayContext.openInventory`;
+  the footer always calls the same entry point with the Inventory tab.
+  Map does not gain MISSION or TURN IN markers; those destination/turn-in
+  guidance semantics belong to Issue #143.
+
+The composition is therefore `PlayConsole → Location | Map | Journey`, with
+activity-specific controls and overlays remaining feature-owned. See
+`docs/location-scenes.md`, `docs/travel-map-design.md`, and
+`docs/design-system.md` for their surface-specific presentation rules.
+
 ## Where minigames fit
 
 Phaser experiences live in `minigames/`, isolated from the main React tree. They communicate through small typed contracts; any progression result is server-validated. They are not part of this foundation issue.

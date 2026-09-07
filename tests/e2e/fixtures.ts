@@ -174,6 +174,37 @@ export { expect };
 /** Navigate directly to the exact test-owned character, never the first row in a list. */
 export async function openTestCharacter(page: Page, characterId: string) {
   await page.goto(`/play/${characterId}`);
-  await page.waitForURL(new RegExp(`/play/${characterId}$`));
+  await page.waitForURL(new RegExp(`/play/${characterId}(?:\\?[^#]*)?$`));
   return characterId;
+}
+
+/** Navigate to the dedicated, route-backed Map surface inside Play. */
+export async function openMapSurface(page: Page) {
+  if (new URL(page.url()).searchParams.get("surface") !== "map") {
+    await page.getByRole("link", { name: "Map" }).click();
+    await page.waitForURL(/\/play\/[^/?]+\?surface=map$/);
+  }
+  await expect(page.getByRole("group", { name: "Local map" })).toBeVisible();
+}
+
+/** Open the shared Inventory/Equipment drawer directly on its Equipment tab. */
+export async function openEquipmentTab(page: Page) {
+  await page.getByRole("button", { name: /Inventory/ }).click();
+  const dialog = page.getByRole("dialog", { name: "Inventory" });
+  await expect(dialog).toBeVisible();
+  await dialog.getByRole("tab", { name: "Equipment", exact: true }).click();
+  const equipmentDialog = page.getByRole("dialog", { name: "Equipment" });
+  await expect(equipmentDialog).toBeVisible();
+  return equipmentDialog;
+}
+
+/** Open Equipment through the active mission's contextual Play entry point. */
+export async function openEquipmentFromMissionGuidance(page: Page) {
+  await page.getByRole("button", { name: "Open Equipment", exact: true }).click();
+  const equipmentDialog = page.getByRole("dialog", { name: "Equipment" });
+  await expect(equipmentDialog).toBeVisible();
+  await expect(
+    equipmentDialog.getByRole("tab", { name: "Equipment", exact: true }),
+  ).toHaveAttribute("aria-selected", "true");
+  return equipmentDialog;
 }
