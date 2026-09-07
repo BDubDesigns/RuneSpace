@@ -521,7 +521,8 @@ test("equips the Cutter through Inventory, shows a full stack, and earns Mining 
   await expect(
     tansyPostWaste.locator('[data-dialogue-text] [aria-hidden="true"]'),
   ).not.toContainText("You kept the shale");
-  await tansyPostWaste.getByRole("button", { name: "Next", exact: true }).click();
+  // Single-beat contextual dialogue: the player renders Finish directly on
+  // the final beat, with no Next step.
   await expect(tansyPostWaste.getByRole("button", { name: "Finish" })).toBeVisible();
   await tansyPostWaste.getByRole("button", { name: "Finish" }).click();
   await expect(tansyPostWaste).toBeHidden();
