@@ -84,6 +84,19 @@ than duplicating it in map tiles.
   selection becomes available, and Back leads to Location.
 - Journey's feed may present a Scavenge event, but `ScavengeControl` and the existing Travel/Scavenge
   server actions remain authoritative. Map does not claim, resolve, or persist Scavenge outcomes.
+- Journey feed entries are a deterministic temporal projection of the active Travel state: departure
+  is immediate, two small passive flavor beats are derived from fractions of `startedAt` → `arrivesAt`,
+  and Scavenge appears only at its existing authoritative window. Future beats remain hidden until
+  their presentation moment, so a refresh reconstructs the same chronological feed without durable
+  flavor history or a generic event-scripting engine.
+- Travel flavor uses a modest authored pool of general lines plus a separate Holo Hollow pool. The
+  current five locations declare the narrow `holo_hollow` region eligibility in the location registry;
+  optional directed route lines are keyed by origin and destination, with no implicit reverse reuse.
+  Flavor is presentation-only and does not select, resolve, or mutate gameplay state.
+- Waiting Scavenge is not presented as a forecast event. An available window renders the existing
+  actionable control, a missed window may leave a subdued after-the-fact entry, and a claimed outcome
+  is concise result copy. The reveal overlay remains the owner of reward presentation; the Journey
+  feed does not render a second claimed control.
 - Map does not render MISSION or TURN IN guidance markers. Issue #143 is the later owner of those
   destination and turn-in marker semantics.
 - Flat-top five-hex local map, `LOCAL_MAP_HEX_WIDTH=140` unified (no mobile/desktop branching, one `buildLocalMapGeometry` path), `hexButtonStyle` overlay,

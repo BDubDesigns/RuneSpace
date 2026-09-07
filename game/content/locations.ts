@@ -24,6 +24,7 @@ const locationDefinitions = [
     displayName: "Crash Site",
     description:
       "Your wrecked ship lies half-sunk in mud and scrap, with only a few systems still worth salvaging.",
+    region: "holo_hollow" as const,
     adjacentLocationIds: [
       LOCATION_IDS.abandonedProcessingYard,
       LOCATION_IDS.emergencyPowerAnnex,
@@ -49,6 +50,7 @@ const locationDefinitions = [
     displayName: "Abandoned Processing Yard",
     description:
       "Rusted conveyors and a refurbished hopper stand ready — Ferrite Shale can be refined here into Refined Ferrite and Slag.",
+    region: "holo_hollow" as const,
     adjacentLocationIds: [LOCATION_IDS.crashSite, LOCATION_IDS.emergencyPowerAnnex],
     availableActionIds: [ACTION_IDS.refining],
     dormantActivities: [],
@@ -70,6 +72,7 @@ const locationDefinitions = [
     displayName: "DeWhat? Emergency Power Annex",
     description:
       "A mostly intact DeWhat? emergency-supply depot can dispense one registered worker allotment per Pacific reset day.",
+    region: "holo_hollow" as const,
     adjacentLocationIds: [LOCATION_IDS.crashSite, LOCATION_IDS.abandonedProcessingYard],
     availableActionIds: [],
     dormantActivities: [],
@@ -91,6 +94,7 @@ const locationDefinitions = [
     displayName: "The Long Scramble",
     description:
       "A steep run of fractured stone and loose hardpan climbing toward the high ridge. Nothing worth stopping for, which is unfortunate given how long it takes to cross.",
+    region: "holo_hollow" as const,
     adjacentLocationIds: [LOCATION_IDS.crashSite, LOCATION_IDS.theJag],
     availableActionIds: [],
     dormantActivities: [],
@@ -112,6 +116,7 @@ const locationDefinitions = [
     displayName: "The Jag",
     description:
       "An exposed ferrite seam carved into the hardpan by whoever got here first. Calling it a mine would be generous, but the shale cuts just fine.",
+    region: "holo_hollow" as const,
     adjacentLocationIds: [LOCATION_IDS.theLongScramble],
     availableActionIds: [ACTION_IDS.ferriteShaleMining],
     dormantActivities: [],

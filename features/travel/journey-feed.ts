@@ -1,5 +1,10 @@
-import type { PlayGameplayState, ScavengeReveal } from "@/server/play";
-import { LOCATION_IDS } from "@/game/config/foundations";
+import type { PlayGameplayState } from "@/server/play";
+import {
+  DIRECTED_ROUTE_TRAVEL_FLAVOR,
+  GENERAL_TRAVEL_FLAVOR,
+  HOLO_HOLLOW_TRAVEL_FLAVOR,
+  type TravelFlavorLine,
+} from "@/game/content/travel-flavor";
 import { getLocation } from "@/game/content/locations";
 import { scavengeWindowAt } from "@/game/domain/scavenge";
 
@@ -13,89 +18,159 @@ export type JourneyFeedEvent = {
 
 type TravelState = NonNullable<PlayGameplayState["travelState"]>;
 
-const ROUTE_FLAVOR: Record<string, string> = {
-  [`${LOCATION_IDS.crashSite}:${LOCATION_IDS.abandonedProcessingYard}`]:
-    "The old service route cuts through wet scrap and collapsed fencing.",
-  [`${LOCATION_IDS.crashSite}:${LOCATION_IDS.emergencyPowerAnnex}`]:
-    "The emergency route follows a line of half-buried marker lights.",
-  [`${LOCATION_IDS.crashSite}:${LOCATION_IDS.theLongScramble}`]:
-    "The ground rises into loose stone and a long, exposed climb.",
-  [`${LOCATION_IDS.abandonedProcessingYard}:${LOCATION_IDS.emergencyPowerAnnex}`]:
-    "Rust flakes from the yard as the route bends toward the intact depot.",
-  [`${LOCATION_IDS.theLongScramble}:${LOCATION_IDS.theJag}`]:
-    "The ridge narrows before the ferrite seam comes into view.",
+const JOURNEY_FLAVOR_FRACTIONS = [0.24, 0.62] as const;
+
+export type JourneyFlavorBeat = {
+  detail: string;
+  id: string;
+  presentationAt: number;
 };
 
-function routeFlavor(travel: TravelState): string {
-  return (
-    ROUTE_FLAVOR[`${travel.originLocationId}:${travel.destinationLocationId}`] ??
-    ROUTE_FLAVOR[`${travel.destinationLocationId}:${travel.originLocationId}`] ??
-    "The route is quiet except for the sound of your own equipment."
-  );
+export function getEligibleTravelFlavorPool(
+  originLocationId: string,
+  destinationLocationId: string,
+): readonly TravelFlavorLine[] {
+  const origin = getLocation(originLocationId);
+  const destination = getLocation(destinationLocationId);
+  const lines: TravelFlavorLine[] = [...GENERAL_TRAVEL_FLAVOR];
+
+  if (origin?.region === "holo_hollow" && destination?.region === "holo_hollow") {
+    lines.push(...HOLO_HOLLOW_TRAVEL_FLAVOR);
+  }
+
+  const directed = DIRECTED_ROUTE_TRAVEL_FLAVOR[`${originLocationId}:${destinationLocationId}`];
+  if (directed) lines.push(directed);
+  return lines;
 }
 
-export function deriveJourneyFeed(
-  travel: TravelState,
-  now: Date,
-  scavengeReveals: readonly ScavengeReveal[] = [],
-): readonly JourneyFeedEvent[] {
+function stableHash(value: string): number {
+  let hash = 2_166_136_261;
+  for (let index = 0; index < value.length; index += 1) {
+    hash ^= value.charCodeAt(index);
+    hash = Math.imul(hash, 16_777_619);
+  }
+  return hash >>> 0;
+}
+
+function selectDistinctFlavorLines(
+  lines: readonly TravelFlavorLine[],
+  seed: number,
+): readonly TravelFlavorLine[] {
+  if (lines.length < 2) return lines;
+  const firstIndex = seed % lines.length;
+  const secondOffset = 1 + ((seed >>> 8) % (lines.length - 1));
+  return [lines[firstIndex]!, lines[(firstIndex + secondOffset) % lines.length]!];
+}
+
+export function deriveJourneyFlavorBeats(travel: TravelState): readonly JourneyFlavorBeat[] {
+  const startedAt = new Date(travel.startedAt).getTime();
+  const arrivesAt = new Date(travel.arrivesAt).getTime();
+  const duration = Math.max(0, arrivesAt - startedAt);
+  const seed = stableHash(
+    [
+      travel.originLocationId,
+      travel.destinationLocationId,
+      travel.startedAt,
+      travel.arrivesAt,
+    ].join("|"),
+  );
+  const lines = selectDistinctFlavorLines(
+    getEligibleTravelFlavorPool(travel.originLocationId, travel.destinationLocationId),
+    seed,
+  );
+
+  return lines.map((line, index) => {
+    const fraction = JOURNEY_FLAVOR_FRACTIONS[index] ?? JOURNEY_FLAVOR_FRACTIONS.at(-1)!;
+    return {
+      detail: line.text,
+      id: line.id,
+      presentationAt: startedAt + duration * fraction,
+    };
+  });
+}
+
+function scavengeResultDetail(outcome: NonNullable<TravelState["scavenge"]["outcome"]>): string {
+  const label = outcome.label.replace(/\s+x\d+$/i, "");
+  return outcome.quantity > 0
+    ? `Found ${outcome.quantity} ${label}.`
+    : `${label}. Nothing useful this time.`;
+}
+
+export function deriveJourneyFeed(travel: TravelState, now: Date): readonly JourneyFeedEvent[] {
   const origin = getLocation(travel.originLocationId)?.displayName ?? "origin";
-  const destination = getLocation(travel.destinationLocationId)?.displayName ?? "destination";
+  const nowAt = now.getTime();
+  const startedAt = new Date(travel.startedAt).getTime();
   const timing = scavengeWindowAt({
     claimed: Boolean(travel.scavenge.outcome),
     now,
     opportunityStartTick: travel.scavenge.opportunityStartTick,
     travelStartedAt: new Date(travel.startedAt),
   });
-  const events: JourneyFeedEvent[] = [
+  const candidates: Array<JourneyFeedEvent & { presentationAt: number; sequence: number }> = [];
+  let sequence = 0;
+  const addIfReached = (event: JourneyFeedEvent, presentationAt: number) => {
+    if (presentationAt <= nowAt)
+      candidates.push({ ...event, presentationAt, sequence: sequence++ });
+  };
+
+  addIfReached(
     {
-      detail: `Walking from ${origin} to ${destination}.`,
+      detail: `Leaving ${origin}.`,
       id: "departure",
       kind: "status",
       title: "Journey underway",
     },
-    {
-      detail: routeFlavor(travel),
-      id: "route-flavor",
-      kind: "flavor",
-      title: "Along the route",
-    },
-  ];
+    startedAt,
+  );
 
-  if (travel.scavenge.outcome) {
-    const revealPending = scavengeReveals.some(
-      (reveal) => reveal.outcomeId === travel.scavenge.outcome?.outcomeId,
+  for (const beat of deriveJourneyFlavorBeats(travel)) {
+    addIfReached(
+      {
+        detail: beat.detail,
+        id: beat.id,
+        kind: "flavor",
+        title: "Along the route",
+      },
+      beat.presentationAt,
     );
-    events.push({
-      detail: `The server confirmed ${travel.scavenge.outcome.label}. ${revealPending ? "The reward reveal is ready." : "No reward reveal is pending."}`,
-      id: "scavenge-claimed",
-      interactive: revealPending,
-      kind: "scavenge",
-      title: "Scavenge claimed",
-    });
-  } else if (timing.lifecycle === "available") {
-    events.push({
-      detail: "An optional find is available. Claiming it does not change your walking time.",
-      id: "scavenge-available",
-      interactive: true,
-      kind: "scavenge",
-      title: "Something turned up",
-    });
-  } else if (timing.lifecycle === "missed") {
-    events.push({
-      detail: "The optional find passed by. Travel continues normally.",
-      id: "scavenge-missed",
-      kind: "scavenge",
-      title: "Scavenge missed",
-    });
-  } else {
-    events.push({
-      detail: "An optional find may appear during this Travel leg.",
-      id: "scavenge-waiting",
-      kind: "scavenge",
-      title: "Optional find ahead",
-    });
   }
 
-  return events;
+  if (travel.scavenge.outcome) {
+    addIfReached(
+      {
+        detail: scavengeResultDetail(travel.scavenge.outcome),
+        id: "scavenge-claimed",
+        kind: "scavenge",
+        title: "Scavenge result",
+      },
+      timing.opensAt.getTime(),
+    );
+  } else if (timing.lifecycle === "available") {
+    addIfReached(
+      {
+        detail: "Something useful turned up along the route.",
+        id: "scavenge-available",
+        interactive: true,
+        kind: "scavenge",
+        title: "Something turned up",
+      },
+      timing.opensAt.getTime(),
+    );
+  } else if (timing.lifecycle === "missed") {
+    addIfReached(
+      {
+        detail: "The optional find passed by. Travel continues normally.",
+        id: "scavenge-missed",
+        kind: "scavenge",
+        title: "Scavenge missed",
+      },
+      timing.expiresAt.getTime(),
+    );
+  }
+
+  return candidates
+    .sort(
+      (left, right) => left.presentationAt - right.presentationAt || left.sequence - right.sequence,
+    )
+    .map(({ presentationAt: _presentationAt, sequence: _sequence, ...event }) => event);
 }

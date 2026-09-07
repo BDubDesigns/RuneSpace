@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Feedback } from "@/components/ui/Feedback";
 import { Panel } from "@/components/ui/Panel";
 import { SectionHeader } from "@/components/ui/SectionHeader";
 import { StatusMeter } from "@/components/ui/StatusMeter";
@@ -33,7 +32,7 @@ export function JourneyPanel() {
   const origin = getLocation(travel.originLocationId)?.displayName ?? "origin";
   const destination = getLocation(travel.destinationLocationId)?.displayName ?? "destination";
   const remainingSeconds = Math.max(0, (new Date(travel.arrivesAt).getTime() - now) / 1_000);
-  const feed = deriveJourneyFeed(travel, new Date(now), state.scavengeReveals);
+  const feed = deriveJourneyFeed(travel, new Date(now));
 
   return (
     <Panel tone="raised" data-journey-surface>
@@ -67,7 +66,6 @@ export function JourneyPanel() {
           </li>
         ))}
       </ol>
-      <Feedback tone="muted">Travel timing and outcomes remain server-confirmed.</Feedback>
     </Panel>
   );
 }

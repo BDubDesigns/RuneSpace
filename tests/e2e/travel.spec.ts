@@ -779,6 +779,13 @@ test("Scavenge presents the committed outcome on a readable weighted reel", asyn
   await page.getByRole("button", { name: "START REEL" }).click();
   await expect(page.getByRole("button", { name: "Reeling…" })).toBeVisible();
   await expect(page.locator("[data-scavenge-result]")).toBeVisible({ timeout: 8_000 });
+  const claimedJourneyEvent = page
+    .locator('[data-journey-event="scavenge"]')
+    .filter({ hasText: "Scavenge result" });
+  await expect(claimedJourneyEvent).toHaveCount(1);
+  await expect(claimedJourneyEvent).toContainText(/Found \d+|Nothing Burger|Zilch|Nada|Whammy!/);
+  await expect(claimedJourneyEvent.locator("[data-scavenge-state]")).toHaveCount(0);
+  await expect(claimedJourneyEvent.getByRole("button")).toHaveCount(0);
   await expect(page.getByRole("button", { name: "DONE", exact: true })).toBeFocused();
 });
 
@@ -830,9 +837,11 @@ test("Scavenge Skip reveal bypasses animation and the reel preference remains re
   await preference.uncheck();
   await expect(preference).not.toBeChecked();
   await page.getByRole("button", { name: "DONE", exact: true }).click();
-  await expect(page.locator('[data-scavenge-state="claimed"]')).toContainText(
-    "Reward claimed for this Travel leg.",
-  );
+  await expect(page.locator("[data-scavenge-reel]")).toHaveCount(0);
+  await expect(
+    page.locator('[data-journey-event="scavenge"]').filter({ hasText: "Scavenge result" }),
+  ).toBeVisible();
+  await expect(page.locator('[data-scavenge-state="claimed"]')).toHaveCount(0);
 });
 
 test("reduced motion bypasses the Scavenge reel without changing the reveal", async ({ page }) => {

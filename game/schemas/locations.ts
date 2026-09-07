@@ -23,6 +23,7 @@ export const LocationDefinitionSchema = z
     id: LocationIdSchema,
     displayName: z.string(),
     description: z.string(),
+    region: z.enum(["holo_hollow"]),
     adjacentLocationIds: z.array(LocationIdSchema),
     availableActionIds: z.array(z.string()),
     dormantActivities: z.array(LocationDormantActivitySchema),
