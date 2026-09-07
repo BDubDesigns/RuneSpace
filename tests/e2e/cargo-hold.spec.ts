@@ -79,6 +79,12 @@ test("keeps damaged Cargo Hold locked and transfers completed storage on mobile 
   await expect(lockedStatus).toHaveCount(0);
   await expect(cargoPanel.locator("[data-cargo-repair-materials]")).toContainText("0 / 15");
   await expect(cargoPanel.locator("[data-cargo-repair-materials]")).toContainText("0 / 6");
+  // Mission guidance: Hold It Together is active with materials still needed,
+  // so CONTRIBUTE MATERIALS carries the generic green treatment.
+  await expect(cargoPanel.getByRole("button", { name: "CONTRIBUTE MATERIALS" })).toHaveAttribute(
+    "data-mission-guidance",
+    "active",
+  );
   await cargoPanel.getByRole("button", { name: "CONTRIBUTE MATERIALS" }).click();
   const confirmation = page.locator("[data-cargo-confirmation]");
   await expect(confirmation).toContainText("Refined Ferrite ×15");
@@ -86,9 +92,18 @@ test("keeps damaged Cargo Hold locked and transfers completed storage on mobile 
   await confirmation.getByRole("button", { name: "COMMIT MATERIALS" }).click();
   await expect(cargoPanel.locator("[data-cargo-repair-materials]")).toContainText("15 / 15");
   await expect(cargoPanel.locator("[data-cargo-repair-materials]")).toContainText("6 / 6");
+  // Materials complete and Welding idle: START WELDING is now the guided affordance.
+  await expect(cargoPanel.getByRole("button", { name: "START WELDING" })).toHaveAttribute(
+    "data-mission-guidance",
+    "active",
+  );
   await expect(cargoPanel.getByRole("button", { name: "START WELDING" })).toBeVisible();
   await cargoPanel.getByRole("button", { name: "START WELDING" }).click();
   await expect(cargoPanel.getByRole("button", { name: "STOP WELDING" })).toBeVisible();
+  // Active Welding never advances the mission: STOP WELDING carries no green guidance.
+  await expect(cargoPanel.getByRole("button", { name: "STOP WELDING" })).not.toHaveAttribute(
+    "data-mission-guidance",
+  );
 
   const completedAgo = new Date(
     Date.now() -

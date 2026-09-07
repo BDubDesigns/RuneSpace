@@ -52,6 +52,14 @@ export type MissionGuidance = {
   /** The authored recommended acquisition action for the first unmet carried requirement. */
   actionId?: string;
   /**
+   * The Cargo Hold repair surface is the current progression target: the
+   * first unmet requirement observes authoritative Cargo repair completion.
+   * The Cargo panel owns the repair/material/Welding substate and selects
+   * the advancing affordance (contribute materials vs start Welding) from
+   * this single semantic flag — never from a mission ID or objective prose.
+   */
+  cargoRepair?: true;
+  /**
    * The NPC(s) whose authored offer interaction is currently a
    * mission-availability target. Only missions with NO prerequisite author
    * open discovery: every offer whose location matches the player's current
@@ -309,6 +317,9 @@ function deriveGuidance(
   ) {
     return { actionId: firstUnsatisfied.recommendedActionId };
   }
+  if (firstUnsatisfied.kind === "cargo_hold_repaired") {
+    return { cargoRepair: true as const };
+  }
   return undefined;
 }
 
@@ -444,6 +455,8 @@ export type MissionGuidanceTargets = {
   npcIds: ReadonlySet<string>;
   equipmentItemIds: ReadonlySet<string>;
   actionIds: ReadonlySet<string>;
+  /** True while an accepted mission's current target is the Cargo Hold repair surface. */
+  cargoRepair: boolean;
 };
 
 export function deriveMissionGuidanceTargets(
@@ -453,6 +466,7 @@ export function deriveMissionGuidanceTargets(
   const npcIds = new Set<string>();
   const equipmentItemIds = new Set<string>();
   const actionIds = new Set<string>();
+  let cargoRepair = false;
   for (const projection of projections) {
     if (projection.guidance?.availableNpcIds) {
       for (const id of projection.guidance.availableNpcIds) availableNpcIds.add(id);
@@ -461,8 +475,9 @@ export function deriveMissionGuidanceTargets(
     if (projection.guidance?.equipmentItemId)
       equipmentItemIds.add(projection.guidance.equipmentItemId);
     if (projection.guidance?.actionId) actionIds.add(projection.guidance.actionId);
+    if (projection.guidance?.cargoRepair) cargoRepair = true;
   }
-  return { availableNpcIds, npcIds, equipmentItemIds, actionIds };
+  return { availableNpcIds, npcIds, equipmentItemIds, actionIds, cargoRepair };
 }
 
 /**

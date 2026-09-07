@@ -25,7 +25,7 @@ The framework deliberately does not attempt to support every future mission shap
 | Tracked activity progress | `db/rune-space.ts` — `characterMissionProgress`; `server/mission-progress.ts` — row initialization and capped attempt consumption | One row per character, mission, and stable authored `progressKey`; only current progress is persisted. There is no event history, provenance, lifetime counter, or acceptance-time slicing. Cargo repair completion is observed separately from its authoritative repair row and never creates mission progress. |
 | Generic acceptance / completion boundary | `server/missions.ts` — `acceptMission`, `completeMission` (+ `completeMissionWithDefinition` test seam); `server/actions.ts` — `acceptMissionAction` / `completeMissionAction`; `game/schemas/gameplay.ts` — `AcceptMissionRequestSchema` / `CompleteMissionRequestSchema` | Shared `runMissionCommand` character lock / reconciliation wrapper. See §12. |
 | Authored dialogue | `game/content/dialogue.ts` — `DIALOGUE_SEQUENCES` / `getDialogue`; `game/domain/missions.ts` stage types consumed by `resolveNpcMissionDialogue`, `getMissionCapacityRefusalDialogue`, `getMissionCompletionPresentation` | Sequences are content; routing is semantic state (§9). |
-| Semantic guidance projection | `game/domain/missions.ts` — `MissionGuidance`, `MissionGuidanceTargets`, `deriveMissionGuidanceTargets`; `app/globals.css` — `--rs-mission-guidance-*` / `--rs-mission-available-*` and `.rs-mission-guidance` / `.rs-mission-available` | Guidance is a derived set consumed by `NpcInteractionPanel`, `MiningActivity`, `RefiningConsole`, `EquipmentPanel`, `InventoryPanel`. |
+| Semantic guidance projection | `game/domain/missions.ts` — `MissionGuidance`, `MissionGuidanceTargets`, `deriveMissionGuidanceTargets`; `app/globals.css` — `--rs-mission-guidance-*` / `--rs-mission-available-*` and `.rs-mission-guidance` / `.rs-mission-available` | Guidance is a derived set consumed by `NpcInteractionPanel`, `MiningActivity`, `RefiningConsole`, `EquipmentPanel`, `InventoryPanel`, `CargoHoldPanel`. |
 
 The shared play-state assembly projects `state.missions` through the generic play boundary (`server/play.ts` `stateFromTransaction`, surfaced by `PlayContext` / `usePlay` via `features/play/PlayConsole.tsx`). That play layer is the current host for projection and is not a mission-framework contract; do not depend on its module name to reason about missions.
 
@@ -268,13 +268,14 @@ Derived from the **first unmet requirement in authored order** on each accepted-
 | `equipped_item` | `equipmentItemId: requirement.itemId` — the equipment affordance / inventory tile for that item |
 | `tracked_activity` (with `recommendedActionId`) | `actionId: requirement.recommendedActionId` — the authored activity control |
 | `carried_stack` (with `recommendedActionId`) | `actionId: requirement.recommendedActionId` — the authored recommended gameplay action |
-| `cargo_hold_repaired` | no separate guidance target | Cargo repair controls are unlocked by accepted Hold It Together; the requirement itself observes completion |
+| `cargo_hold_repaired` | `cargoRepair: true` — the Cargo Hold repair surface is the current target; the Cargo panel selects the advancing affordance (contribute materials vs start Welding) from authoritative repair/material/Welding substate |
 
 Each consumer answers "am I that target?":
 
 - **NPC Talk** — `guidance.npcIds.has(npc.id)` (green) vs `guidance.availableNpcIds.has(npc.id)` (blue).
 - **Cutter Inventory tile / Equipment "Equip in slot"** — `guidance.equipmentItemIds.has(itemId)` (the Cutter step).
 - **Start Mining / Start Refining** — `guidance.actionIds.has(actionId)` while the action is currently relevant/available. An action highlights only when its `ActionId` is the authored `recommendedActionId` on the current unmet carried requirement.
+- **Cargo Hold repair** — `guidance.cargoRepair` while an accepted mission's current objective observes Cargo repair completion. The Cargo panel owns the repair/material/Welding substate and guides exactly one advancing affordance: CONTRIBUTE MATERIALS while materials are still needed (and a contribution is possible), START WELDING once materials are complete and Welding is idle. STOP WELDING is never guided — stopping does not advance the mission. Completed repair clears the flag and the generic projection moves green guidance to the turn-in NPC.
 
 ### Teaching intent (`recommendedActionId`)
 
@@ -282,7 +283,7 @@ Each consumer answers "am I that target?":
 
 Not every technically possible acquisition path should be highlighted. Only the authored `recommendedActionId` on the current unmet carried requirement is highlighted. Cut Your Teeth recommends `ferrite_shale_mining` — Scavenge also yields Ferrite Shale, but has no `ActionId` to author there and is never highlighted merely because it can produce the same item.
 
-`MissionGuidanceTargets` is the union across all missions: `availableNpcIds`, `npcIds`, `equipmentItemIds`, `actionIds`.
+`MissionGuidanceTargets` is the union across all missions: `availableNpcIds`, `npcIds`, `equipmentItemIds`, `actionIds`, `cargoRepair`.
 
 ## 11. Explorer-first behavior
 

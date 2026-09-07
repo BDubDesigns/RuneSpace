@@ -24,6 +24,7 @@ import {
   withdrawCargoUniqueItemAction,
 } from "@/server/actions";
 import type { CargoHoldStackState, PlayGameplayState } from "@/server/play";
+import { deriveMissionGuidanceTargets } from "@/game/domain/missions";
 import { usePlay } from "@/features/play/PlayContext";
 
 type Confirmation = {
@@ -71,6 +72,17 @@ export function CargoHoldPanel() {
   const repair = state.cargoHold.repair;
   const previousCompletion = useRef(repair.complete);
   const activeWelding = state.activeAction?.actionId === ACTION_IDS.cargoHoldWelding;
+  // Mission guidance consumes the ONE derived target set: an accepted mission
+  // whose current objective observes Cargo repair completion projects the
+  // generic cargoRepair flag, and this panel — which owns the authoritative
+  // repair/material/Welding substate — selects the advancing affordance
+  // without any mission-ID branching. Stopping active Welding never advances
+  // the mission, so it is never guided.
+  const cargoRepairGuided = deriveMissionGuidanceTargets(state.missions).cargoRepair;
+  const contributeGuided =
+    cargoRepairGuided && !repair.complete && !repair.materialComplete && !activeWelding;
+  const startWeldingGuided =
+    cargoRepairGuided && !repair.complete && repair.materialComplete && !activeWelding;
   const weldingAttemptDurationMs = balance.welding.attemptDurationTicks * GAME_TICK_MS;
   const weldingElapsed = activeWelding
     ? Math.max(0, now - new Date(state.activeAction!.progressStartedAt).getTime())
@@ -543,6 +555,8 @@ export function CargoHoldPanel() {
                 </ActionButton>
               ) : repair.weldingProgress < repair.weldingIncrements ? (
                 <ActionButton
+                  className={startWeldingGuided ? "rs-mission-guidance" : undefined}
+                  data-mission-guidance={startWeldingGuided ? "active" : undefined}
                   disabled={Boolean(pending)}
                   intent="mining"
                   loading={pending === "start"}
@@ -559,7 +573,8 @@ export function CargoHoldPanel() {
             </div>
           ) : (
             <ActionButton
-              className="mt-4"
+              className={contributeGuided ? "rs-mission-guidance mt-4" : "mt-4"}
+              data-mission-guidance={contributeGuided ? "active" : undefined}
               disabled={
                 Boolean(pending) ||
                 (repair.availableContribution.refinedFerrite === 0 &&

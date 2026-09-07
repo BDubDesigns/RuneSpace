@@ -15,6 +15,7 @@ import {
 import {
   CONVERSATION_BACKGROUND_IDS,
   DIALOGUE_IDS,
+  ACTION_IDS,
   ITEM_IDS,
   LOCATION_IDS,
   MISSION_IDS,
@@ -460,6 +461,62 @@ describe("issue #124 semantic mission guidance projection", () => {
     ]);
     // No active NPC guidance before acceptance.
     expect([...deriveMissionGuidanceTargets([atCrashSite]).npcIds]).toEqual([]);
+  });
+
+  it("projects the Cargo repair surface while Hold It Together is the current objective", () => {
+    // Repair incomplete: the generic projection flags the Cargo surface, with
+    // no NPC/equipment/action target competing for green guidance.
+    const incomplete = projectMission(
+      HOLD_IT_TOGETHER,
+      accepted(),
+      CRASH_SITE,
+      true,
+      observation(),
+    );
+    expect(incomplete).toMatchObject({
+      state: "active",
+      stage: { nextObjectiveKind: "cargo_hold_repaired" },
+      guidance: { cargoRepair: true },
+    });
+    expect(incomplete.guidance?.npcId).toBeUndefined();
+    expect(incomplete.guidance?.equipmentItemId).toBeUndefined();
+    expect(incomplete.guidance?.actionId).toBeUndefined();
+    const targets = deriveMissionGuidanceTargets([incomplete]);
+    expect(targets.cargoRepair).toBe(true);
+    expect([...targets.npcIds]).toEqual([]);
+    expect([...targets.actionIds]).toEqual([]);
+  });
+
+  it("clears Cargo guidance on repair completion and moves green guidance to Wade", () => {
+    const ready = projectMission(
+      HOLD_IT_TOGETHER,
+      accepted(),
+      CRASH_SITE,
+      true,
+      observation({ cargoHoldRepairComplete: true }),
+    );
+    expect(ready).toMatchObject({
+      state: "ready_for_completion",
+      guidance: { npcId: NPC_IDS.wadeRusk },
+    });
+    expect(ready.guidance?.cargoRepair).toBeUndefined();
+    const targets = deriveMissionGuidanceTargets([ready]);
+    expect(targets.cargoRepair).toBe(false);
+    expect([...targets.npcIds]).toEqual([NPC_IDS.wadeRusk]);
+  });
+
+  it("leaves Waste Not Refining guidance unchanged by the Cargo extension", () => {
+    const refining = projectMission(
+      WASTE_NOT,
+      accepted(),
+      LOCATION_IDS.abandonedProcessingYard,
+      true,
+      observation({ trackedProgress: new Map([["refining-attempts", 2]]) }),
+    );
+    expect(refining.guidance).toEqual({ actionId: ACTION_IDS.refining });
+    const targets = deriveMissionGuidanceTargets([refining]);
+    expect(targets.cargoRepair).toBe(false);
+    expect([...targets.actionIds]).toEqual([ACTION_IDS.refining]);
   });
 });
 
