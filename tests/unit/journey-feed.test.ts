@@ -100,6 +100,12 @@ describe("Journey feed presentation", () => {
     );
     expect(pool.some((line) => line.id === "general-gear-creak")).toBe(true);
     expect(pool.some((line) => line.id === "holo-shale-ticks")).toBe(true);
+    expect(pool.find((line) => line.id === "general-distant-motion")?.text).toBe(
+      "A faint sound comes from somewhere beyond the route.",
+    );
+    expect(pool.find((line) => line.id === "holo-shale-ticks")?.text).toBe(
+      "A few loose stones tick against the ground as you pass.",
+    );
 
     const selections = [0, 1, 2, 3].map((offset) => {
       const journeyStart = new Date(startedAt.getTime() + offset * 60_000);
@@ -140,6 +146,7 @@ describe("Journey feed presentation", () => {
       (event) => event.id === "scavenge-available",
     );
     expect(available).toMatchObject({
+      detail: "Something turned up along the route.",
       interactive: true,
       kind: "scavenge",
       title: "Something turned up",

@@ -11,7 +11,7 @@ export const GENERAL_TRAVEL_FLAVOR = [
   { id: "general-footsteps", text: "For a while, the only sound is your own footsteps." },
   {
     id: "general-distant-motion",
-    text: "Something distant moves just beyond the edge of hearing.",
+    text: "A faint sound comes from somewhere beyond the route.",
   },
   {
     id: "general-pack-shift",
@@ -21,7 +21,7 @@ export const GENERAL_TRAVEL_FLAVOR = [
 
 /** Lines valid for Travel within the current Holo Hollow region. */
 export const HOLO_HOLLOW_TRAVEL_FLAVOR = [
-  { id: "holo-shale-ticks", text: "Loose shale ticks downhill long after your last step." },
+  { id: "holo-shale-ticks", text: "A few loose stones tick against the ground as you pass." },
   { id: "holo-hardpan", text: "Hardpan gives slightly underfoot, then firms up again." },
   {
     id: "holo-salvage-route",

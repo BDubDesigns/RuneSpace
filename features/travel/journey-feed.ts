@@ -148,7 +148,7 @@ export function deriveJourneyFeed(travel: TravelState, now: Date): readonly Jour
   } else if (timing.lifecycle === "available") {
     addIfReached(
       {
-        detail: "Something useful turned up along the route.",
+        detail: "Something turned up along the route.",
         id: "scavenge-available",
         interactive: true,
         kind: "scavenge",
