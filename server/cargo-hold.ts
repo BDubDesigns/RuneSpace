@@ -13,7 +13,7 @@ import { getEffectiveGameBalance, getItemDefinition } from "@/game/config/balanc
 import { ACTION_IDS, LOCATION_IDS } from "@/game/config/foundations";
 import { isActionAvailableAtLocation } from "@/game/content/locations";
 import {
-  cargoHoldRepairComplete,
+  cargoHoldMaterialsComplete,
   planCargoHoldMaterialContribution,
   type CargoHoldRepairState,
 } from "@/game/domain/cargo-hold";
@@ -37,6 +37,7 @@ import {
   stateFromTransaction,
   type PlayGameplayState,
 } from "@/server/play";
+import { loadCargoRepairAccess } from "@/server/cargo-repair-access";
 
 export type CargoHoldMaterialContributionRequest = {
   expectedRefinedFerrite: number;
@@ -126,7 +127,7 @@ async function accessRefusal(
   characterId: string,
   action: { actionId: string } | undefined,
   repair: typeof characterCargoHoldRepair.$inferSelect,
-  requireRestoredHold = true,
+  operation: "repair" | "storage" = "storage",
 ): Promise<CargoHoldRefusal | undefined> {
   if (action?.actionId === ACTION_IDS.travel) {
     return {
@@ -154,14 +155,16 @@ async function accessRefusal(
       message: "Cargo Hold access is only available while stationary at Crash Site.",
     };
   }
-  if (
-    requireRestoredHold &&
-    !cargoHoldRepairComplete(repairState(repair), getEffectiveGameBalance())
-  ) {
+  const access = await loadCargoRepairAccess(transaction, characterId, repairState(repair));
+  const allowed = operation === "repair" ? access.repairAvailable : access.complete;
+  if (!allowed) {
     return {
       status: "refused",
       reason: "repair_incomplete",
-      message: "Restore the Cargo Hold before using its storage.",
+      message:
+        operation === "repair"
+          ? "Accept Hold It Together before repairing the Cargo Hold."
+          : "Restore the Cargo Hold before using its storage.",
     };
   }
   return undefined;
@@ -236,7 +239,13 @@ export async function contributeCargoHoldMaterials(
       await ensurePlayProvisioning(transaction, context.character.id);
       const balance = getEffectiveGameBalance();
       const repair = await loadRepair(transaction, context.character.id);
-      const access = await accessRefusal(transaction, context.character.id, context.action, repair);
+      const access = await accessRefusal(
+        transaction,
+        context.character.id,
+        context.action,
+        repair,
+        "repair",
+      );
       if (access) {
         return {
           state: await stateAfterCargoCommand(transaction, context.character.id, now),
@@ -823,7 +832,12 @@ export async function startCargoHoldWelding(
         );
       }
       const repairProjection = repairState(repair);
-      if (cargoHoldRepairComplete(repairProjection, balance)) {
+      const access = await loadCargoRepairAccess(
+        transaction,
+        context.character.id,
+        repairProjection,
+      );
+      if (access.complete) {
         return stateFromTransaction(
           transaction,
           context.character.id,
@@ -839,23 +853,45 @@ export async function startCargoHoldWelding(
           "repair_complete",
         );
       }
-      // Until the future Wade repair mission exists, completion is the only
-      // authoritative Cargo Hold reveal signal. Partial repair progress —
-      // including preserved pre-beta progress — never unlocks Welding.
-      return stateFromTransaction(
-        transaction,
-        context.character.id,
-        EMPTY_RECENT_RESULT,
-        undefined,
-        undefined,
-        undefined,
-        undefined,
-        now,
-        EMPTY_RECENT_RESULT,
-        undefined,
-        undefined,
-        "welding_locked",
-      );
+      if (!access.repairAvailable) {
+        return stateFromTransaction(
+          transaction,
+          context.character.id,
+          EMPTY_RECENT_RESULT,
+          undefined,
+          undefined,
+          undefined,
+          undefined,
+          now,
+          EMPTY_RECENT_RESULT,
+          undefined,
+          undefined,
+          "welding_locked",
+        );
+      }
+      if (!cargoHoldMaterialsComplete(repairProjection, balance)) {
+        return stateFromTransaction(
+          transaction,
+          context.character.id,
+          EMPTY_RECENT_RESULT,
+          undefined,
+          undefined,
+          undefined,
+          undefined,
+          now,
+          EMPTY_RECENT_RESULT,
+          undefined,
+          undefined,
+          "welding_locked",
+        );
+      }
+      await transaction.insert(activeActions).values({
+        characterId: context.character.id,
+        actionId: ACTION_IDS.cargoHoldWelding,
+        startedAt: now,
+        resolvedThroughAt: now,
+      });
+      return stateAfterCargoCommand(transaction, context.character.id, now);
     },
     now,
   );

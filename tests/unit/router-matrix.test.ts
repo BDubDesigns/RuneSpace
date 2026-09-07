@@ -13,6 +13,7 @@ import {
 } from "@/game/content/dialogue";
 import {
   CUT_YOUR_TEETH,
+  HOLD_IT_TOGETHER,
   WALK_IT_OFF,
   WASTE_NOT,
   type MissionDefinition,
@@ -98,6 +99,7 @@ describe("router matrix parity", () => {
     prereq = true,
   ) => p(MISSION_IDS.cutYourTeeth, state, stage, prereq);
   const waste = (state: NpcDialogueProjection["state"]) => p(MISSION_IDS.wasteNot, state);
+  const hold = (state: NpcDialogueProjection["state"]) => p(MISSION_IDS.holdItTogether, state);
 
   it("Wade: offer when WIO not accepted, active Cut follow-up after", () => {
     expect(resolveNpcMissionDialogue(NPC_IDS.wadeRusk, [wio("not_accepted")])?.sequence.id).toBe(
@@ -313,5 +315,38 @@ describe("router matrix parity", () => {
       DIALOGUE_IDS.tansyPostWasteNot,
     );
     expect(WASTE_NOT.completedNpcDialogue).toHaveLength(2);
+  });
+
+  it("Hold It Together active: Tansy routes to contextual dialogue, Wade keeps his reminder", () => {
+    const stage: NpcDialogueProjection["stage"] = {
+      requirementsSatisfied: false,
+      turnInAvailable: false,
+      nextObjectiveKind: "cargo_hold_repaired",
+    };
+    const projections = [
+      wio("completed"),
+      cyt("completed"),
+      waste("completed"),
+      p(MISSION_IDS.holdItTogether, "active", stage),
+    ];
+    expect(HOLD_IT_TOGETHER.activeNpcDialogue).toEqual([
+      { npcId: NPC_IDS.tansyRusk, dialogueId: DIALOGUE_IDS.tansyHoldItTogetherActive },
+    ]);
+    const tansy = resolveNpcMissionDialogue(NPC_IDS.tansyRusk, projections);
+    expect(tansy?.sequence.id).toBe(DIALOGUE_IDS.tansyHoldItTogetherActive);
+    expect(tansy?.missionId).toBe(MISSION_IDS.holdItTogether);
+    // Wade is the turn-in NPC: incomplete repair keeps his cargo reminder.
+    expect(resolveNpcMissionDialogue(NPC_IDS.wadeRusk, projections)?.sequence.id).toBe(
+      DIALOGUE_IDS.wadeHoldItTogetherRepairReminder,
+    );
+    // After completion, Tansy falls back to her Waste Not story dialogue —
+    // Hold It Together authors no completed dialogue for her.
+    const completed = [wio("completed"), cyt("completed"), waste("completed"), hold("completed")];
+    expect(resolveNpcMissionDialogue(NPC_IDS.tansyRusk, completed)?.sequence.id).toBe(
+      DIALOGUE_IDS.tansyPostWasteNot,
+    );
+    expect(resolveNpcMissionDialogue(NPC_IDS.wadeRusk, completed)?.sequence.id).toBe(
+      DIALOGUE_IDS.wadePostHoldItTogether,
+    );
   });
 });

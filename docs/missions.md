@@ -20,12 +20,12 @@ The framework deliberately does not attempt to support every future mission shap
 
 | Concern | Current home(s) | Notes |
 | --- | --- | --- |
-| Mission definitions / content | `game/content/missions.ts` — `MissionDefinition`, `MissionOffer`, `MissionRequirement`, `MissionTurnIn`, `MissionDialogue`, `MissionReward`, `MISSIONS` registry, `WALK_IT_OFF` / `CUT_YOUR_TEETH` / `WASTE_NOT` | `getMission(id)` is the content accessor. |
+| Mission definitions / content | `game/content/missions.ts` — `MissionDefinition`, `MissionOffer`, `MissionRequirement`, `MissionTurnIn`, `MissionDialogue`, `MissionReward`, `MISSIONS` registry, `WALK_IT_OFF` / `CUT_YOUR_TEETH` / `WASTE_NOT` / `HOLD_IT_TOGETHER` | `getMission(id)` is the content accessor. |
 | Generic mission projection | `game/domain/missions.ts` — `projectMission`, `deriveMissionState`, `deriveMissionGuidanceTargets`, `validateMissionDefinitions`; `server/mission-state.ts` — `loadMissionProjections` | Projection combines live authoritative state with current generic tracked progress; targets and activity definitions remain content-owned. |
-| Tracked activity progress | `db/rune-space.ts` — `characterMissionProgress`; `server/mission-progress.ts` — row initialization and capped attempt consumption | One row per character, mission, and stable authored `progressKey`; only current progress is persisted. There is no event history, provenance, lifetime counter, or acceptance-time slicing. |
+| Tracked activity progress | `db/rune-space.ts` — `characterMissionProgress`; `server/mission-progress.ts` — row initialization and capped attempt consumption | One row per character, mission, and stable authored `progressKey`; only current progress is persisted. There is no event history, provenance, lifetime counter, or acceptance-time slicing. Cargo repair completion is observed separately from its authoritative repair row and never creates mission progress. |
 | Generic acceptance / completion boundary | `server/missions.ts` — `acceptMission`, `completeMission` (+ `completeMissionWithDefinition` test seam); `server/actions.ts` — `acceptMissionAction` / `completeMissionAction`; `game/schemas/gameplay.ts` — `AcceptMissionRequestSchema` / `CompleteMissionRequestSchema` | Shared `runMissionCommand` character lock / reconciliation wrapper. See §12. |
 | Authored dialogue | `game/content/dialogue.ts` — `DIALOGUE_SEQUENCES` / `getDialogue`; `game/domain/missions.ts` stage types consumed by `resolveNpcMissionDialogue`, `getMissionCapacityRefusalDialogue`, `getMissionCompletionPresentation` | Sequences are content; routing is semantic state (§9). |
-| Semantic guidance projection | `game/domain/missions.ts` — `MissionGuidance`, `MissionGuidanceTargets`, `deriveMissionGuidanceTargets`; `app/globals.css` — `--rs-mission-guidance-*` / `--rs-mission-available-*` and `.rs-mission-guidance` / `.rs-mission-available` | Guidance is a derived set consumed by `NpcInteractionPanel`, `MiningActivity`, `RefiningConsole`, `EquipmentPanel`, `InventoryPanel`. |
+| Semantic guidance projection | `game/domain/missions.ts` — `MissionGuidance`, `MissionGuidanceTargets`, `deriveMissionGuidanceTargets`; `app/globals.css` — `--rs-mission-guidance-*` / `--rs-mission-available-*` and `.rs-mission-guidance` / `.rs-mission-available` | Guidance is a derived set consumed by `NpcInteractionPanel`, `MiningActivity`, `RefiningConsole`, `EquipmentPanel`, `InventoryPanel`, `CargoHoldPanel`. |
 
 The shared play-state assembly projects `state.missions` through the generic play boundary (`server/play.ts` `stateFromTransaction`, surfaced by `PlayContext` / `usePlay` via `features/play/PlayConsole.tsx`). That play layer is the current host for projection and is not a mission-framework contract; do not depend on its module name to reason about missions.
 
@@ -69,7 +69,7 @@ Rules:
 - **Explicit authoring, never prerequisite inference.** A prerequisite only says the later mission cannot begin first — it does not imply discovery or a direct narrative continuation. The predecessor must name its continuation.
 - **Singular only.** No arrays, fan-out, or branching continuation choices.
 - **Validated narrowly:** unknown continuation IDs, self-continuations, and cycles fail fast. The target must have no prerequisite or require the predecessor — otherwise the auto-accept would contradict the target's own eligibility rule.
-- **First production use:** Walk It Off continues into Cut Your Teeth, and Cut Your Teeth continues into Waste Not. Completing either predecessor accepts its authored continuation immediately; the completion presentation flows into the next assignment with no second acceptance click. Waste Not has no manual acceptance route.
+- **First production use:** Walk It Off continues into Cut Your Teeth, Cut Your Teeth continues into Waste Not, and Waste Not continues into Hold It Together. Completing a predecessor accepts its authored continuation immediately; the completion presentation flows into the next assignment with no second acceptance click. Waste Not and Hold It Together have no manual acceptance route.
 
 ## 4. Mission offers
 
@@ -101,6 +101,18 @@ A mission may also author `completedNpcDialogue: readonly MissionNpcDialogue[]` 
 
 An active mission may author `activeNpcDialogue: readonly MissionNpcDialogue[]` for contextual dialogue at relevant NPCs who are neither offer nor turn-in NPCs. The mapping is optional and additive; the turn-in NPC's stage-aware dialogue and an offer NPC's `activeDialogueId` remain their existing owners. Validation rejects unknown or duplicate NPC mappings, NPC/dialogue mismatches, and attempts to override an offer or turn-in route.
 
+### Optional contextual NPC dialogue
+
+A mission may author `activeNpcDialogue` for NPCs who are not the offer or turn-in NPC when it makes narrative sense for them to react to the player's current work.
+
+These branches are optional world-reactivity and exploration rewards. They may provide characterization, commentary, or nonessential hints, but must never contain information required to discover, progress, or complete the mission.
+
+Do not author every NPC for every mission. Use this selectively where the NPC's relationship, expertise, location, or story connection makes the reaction feel natural.
+
+Keep this within the existing semantic mission routing system; never implement these reactions as UI-side mission-ID or prose checks.
+
+Concrete example: Hold It Together authors `activeNpcDialogue` for Tansy (`tansy_rusk_hold_it_together_active`) — she acknowledges Wade put the player on the Cargo Hold repair with practical mechanic flavor ("Don't get cute with the welds. Clean seams, steady heat, and let the Ferrite do its job."), without naming the repair recipe, the Cargo UI mechanics, or becoming an objective, turn-in, or alternate progression path.
+
 Consumers never read `offers[0]` as "the" offer and never infer location from an NPC record.
 
 ## 5. Ordered requirement vocabulary
@@ -113,6 +125,7 @@ The currently supported live-state requirement kinds (`MissionRequirement`) are 
 | `equipped_item` | `itemId`, `objective` | the item genuinely occupies its authoritative compatible slot (carried instance + `equippedItems` assignment; a stored instance does not count) |
 | `tracked_activity` | `progressKey`, `activity`, `metric: "attempts"`, `target`, `objective`, `recommendedActionId?` | current persisted progress for the stable key reaches the authored target; resolved attempts count whether the activity succeeds or fails |
 | `carried_stack` | `itemId`, `quantity?`, `turnIn`, `objective`, `recommendedActionId?` | current carried quantity for `itemId` ≥ resolved required quantity (§6) |
+| `cargo_hold_repaired` | `objective` | authoritative Cargo Hold repair completion (`completed_at` is present); no mission-progress row is created |
 
 **Ordering owns the objective.** The first unmet requirement in authored order becomes the current semantic objective / guidance step. `requirements` order is gameplay — changing it changes the player's progression and guidance.
 
@@ -208,6 +221,7 @@ All routed through the single generic router `resolveNpcMissionDialogue(npcId, p
 | Active (turn-in NPC) | **Requirements satisfied but busy** | `MissionDialogue.busyDialogueId` | requirements hold but `turnInAvailable` is false because the character is still busy |
 | Active (turn-in NPC) | **Equipment reminder** | `MissionDialogue.equipmentReminderDialogueId` | first unmet requirement `kind === "equipped_item"` |
 | Active (turn-in NPC) | **Carried-item reminder** | `MissionDialogue.carriedReminderDialogueId` | first unmet requirement `kind === "carried_stack"` |
+| Active (turn-in NPC) | **Cargo repair reminder** | `MissionDialogue.cargoRepairReminderDialogueId` | first unmet requirement `kind === "cargo_hold_repaired"` |
 | Active (other offer NPC) | **Active follow-up** | `MissionOffer.activeDialogueId` | the offer NPC while the mission is active — e.g. Wade while Walk It Off is active |
 | Active (relevant off-path NPC) | **Active contextual dialogue** | `MissionDefinition.activeNpcDialogue` | an authored active mission mapping for an NPC who is neither an offer nor turn-in NPC |
 | Completion | **Capacity refusal — slots** | `MissionDialogue.capacitySlotsDialogueId` | item reward preflight failed on `slots` (selected generically from the mission's mapping after a `capacity` refusal) |
@@ -254,12 +268,14 @@ Derived from the **first unmet requirement in authored order** on each accepted-
 | `equipped_item` | `equipmentItemId: requirement.itemId` — the equipment affordance / inventory tile for that item |
 | `tracked_activity` (with `recommendedActionId`) | `actionId: requirement.recommendedActionId` — the authored activity control |
 | `carried_stack` (with `recommendedActionId`) | `actionId: requirement.recommendedActionId` — the authored recommended gameplay action |
+| `cargo_hold_repaired` | `cargoRepair: true` — the Cargo Hold repair surface is the current target; the Cargo panel selects the advancing affordance (contribute materials vs start Welding) from authoritative repair/material/Welding substate |
 
 Each consumer answers "am I that target?":
 
 - **NPC Talk** — `guidance.npcIds.has(npc.id)` (green) vs `guidance.availableNpcIds.has(npc.id)` (blue).
 - **Cutter Inventory tile / Equipment "Equip in slot"** — `guidance.equipmentItemIds.has(itemId)` (the Cutter step).
 - **Start Mining / Start Refining** — `guidance.actionIds.has(actionId)` while the action is currently relevant/available. An action highlights only when its `ActionId` is the authored `recommendedActionId` on the current unmet carried requirement.
+- **Cargo Hold repair** — `guidance.cargoRepair` while an accepted mission's current objective observes Cargo repair completion. The Cargo panel owns the repair/material/Welding substate and guides exactly one advancing affordance: CONTRIBUTE MATERIALS while materials are still needed (and a contribution is possible), START WELDING once materials are complete and Welding is idle. STOP WELDING is never guided — stopping does not advance the mission. Completed repair clears the flag and the generic projection moves green guidance to the turn-in NPC.
 
 ### Teaching intent (`recommendedActionId`)
 
@@ -267,7 +283,7 @@ Each consumer answers "am I that target?":
 
 Not every technically possible acquisition path should be highlighted. Only the authored `recommendedActionId` on the current unmet carried requirement is highlighted. Cut Your Teeth recommends `ferrite_shale_mining` — Scavenge also yields Ferrite Shale, but has no `ActionId` to author there and is never highlighted merely because it can produce the same item.
 
-`MissionGuidanceTargets` is the union across all missions: `availableNpcIds`, `npcIds`, `equipmentItemIds`, `actionIds`.
+`MissionGuidanceTargets` is the union across all missions: `availableNpcIds`, `npcIds`, `equipmentItemIds`, `actionIds`, `cargoRepair`.
 
 ## 11. Explorer-first behavior
 
@@ -301,6 +317,7 @@ Every other rule is **re-read and revalidated server-side inside the character t
 - for item rewards, a **post-consumption preflight**: plans are applied cumulatively to an in-memory candidate inventory and the reward's capacity is checked against that post-consumption candidate — consumption may legitimately free the slot or mass the reward needs;
 - only after the complete plan is valid, consumption through the authoritative carried-stack boundary, the single declared reward, the guarded `completedAt` stamp, and the authored continuation acceptance (if any, idempotent via `onConflictDoNothing`) commit in the same transaction; any failure (insufficient quantity, capacity still blocked, reward application error) leaves the whole transaction uncommitted;
 - resolved Mining and Refining attempts are handed from the activity resolver to generic mission progress in the same transaction, after activity persistence and before the action cursor advances. Attempts before acceptance reconcile while no mission progress row is active and receive no credit; no per-attempt timestamp or event ledger is added;
+- Cargo Hold repair completion is read from `character_cargo_hold_repair.completed_at` for `cargo_hold_repaired`; the mission framework does not consume repair materials, advance Welding, or maintain a second repair-progress representation;
 - the character lock (`withResolvedOwnedCharacter` / `runMissionCommand`) plus the `completedAt` `isNull` guard make acceptance and completion — and therefore consumption, reward, and continuation — exactly-once under retries and concurrent first completions.
 
 Do not document or introduce client-authoritative shortcuts. The client never supplies required items, quantities, `consume` behavior, rewards, prerequisite status, or completion eligibility.
@@ -308,6 +325,10 @@ Do not document or introduce client-authoritative shortcuts. The client never su
 ### 12.1 One-time Waste Not backfill
 
 The Issue #141 maintenance script is separate from normal runtime acceptance. It is dry-run by default, emits a reviewed cohort report, and requires an explicit confirmation token plus an unchanged report for execution. The eligible cohort is stationary characters with completed Walk It Off and Cut Your Teeth rows and no Waste Not row. Characters with an active action are reported and skipped. Execution inserts Waste Not and its `refining-attempts` row at `0 / 5`, grants no historical credit, and is idempotent. Rerun it after skipped characters are stationary; no permanent legacy branch is added to mission runtime.
+
+### 12.2 One-time Hold It Together continuation backfill
+
+The Issue #148 maintenance script is separate from normal runtime continuation. It is dry-run by default, emits a reviewed cohort report, and requires an explicit confirmation token plus an unchanged report for execution. The eligible cohort is characters with completed Waste Not and no Hold It Together row. Execution inserts only an accepted Hold It Together row; it never completes the mission, creates a progress row, grants the mission reward, consumes materials, changes Welding or Cargo repair state, or alters storage. Population and character locks, a serializable transaction, an execution-time cohort recheck, post-commit verification, and `ON CONFLICT DO NOTHING` keep the repair narrow and idempotent. No permanent legacy branch is added to mission runtime.
 
 ## 13. Authoring an ordinary new mission
 
@@ -389,3 +410,10 @@ Short concrete examples that demonstrate the framework vocabulary. Do not copy m
 - **Requirement:** one generic `tracked_activity` requirement with stable `progressKey: "refining-attempts"`, `activity: "refining"`, `metric: "attempts"`, target `5`, and a recommended Refining action. Successes and failures both count, and no live Processing Yard requirement is added to the mission.
 - **Turn-in / reward:** five current attempts make the mission ready only at the stationary Crash Site turn-in with Wade. Completion grants +100 Refining XP; Refining's existing output, Shale consumption, and inventory behavior remain unchanged.
 - **Persistence:** acceptance and continuation initialize the current progress row at zero. The resolver hands authoritative resolved-attempt counts to the generic mission progress boundary in the same transaction. Target/activity definitions remain authored content, not persistence data.
+
+### Hold It Together — continuation-only Cargo repair
+
+- **Acceptance:** `offers: []` is valid because Waste Not authors `continuationMissionId: holdItTogether`; completion of Waste Not accepts Hold It Together atomically with no second acceptance click. The Issue #148 pre-beta repair accepts the same mission row only for characters with completed Waste Not and no existing Hold It Together row.
+- **Requirement:** one generic `cargo_hold_repaired` requirement observes `character_cargo_hold_repair.completed_at`. It has no `characterMissionProgress` row, Welding counter, material requirement, provenance rule, or historical backfill.
+- **Repair boundary:** an accepted Hold It Together unlocks incomplete repair contribution and Welding start. Completed Cargo Holds remain usable regardless of mission state, while Cargo storage still requires authoritative repair completion. Cargo owns the 15 Refined Ferrite + 6 Slag recipe, consumption, Welding timing, per-increment XP, and capacity.
+- **Turn-in / reward:** the repaired Hold makes the mission ready for Wade at the stationary Crash Site turn-in. Completion grants a separate +100 Welding XP exactly once; existing repair XP is never replayed.

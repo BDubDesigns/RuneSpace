@@ -33,6 +33,7 @@ const missionIds = {
   walkItOff: asContentId("walk_it_off"),
   cutYourTeeth: asContentId("cut_your_teeth"),
   wasteNot: asContentId("waste_not"),
+  holdItTogether: asContentId("hold_it_together"),
 } as const satisfies Record<string, ContentId>;
 
 const dialogueIds = {
@@ -63,9 +64,15 @@ const dialogueIds = {
   tansyCutYourTeethCompletion: asContentId("tansy_rusk_cut_your_teeth_completion"),
   wadeWasteNotTrackedActivityReminder: asContentId("wade_rusk_waste_not_tracked_activity_reminder"),
   tansyWasteNotActive: asContentId("tansy_rusk_waste_not_active"),
+  tansyHoldItTogetherActive: asContentId("tansy_rusk_hold_it_together_active"),
   wadeWasteNotBusy: asContentId("wade_rusk_waste_not_busy"),
   wadeWasteNotTurnIn: asContentId("wade_rusk_waste_not_turn_in"),
   wadeWasteNotCompletion: asContentId("wade_rusk_waste_not_completion"),
+  wadeHoldItTogetherRepairReminder: asContentId("wade_rusk_hold_it_together_repair_reminder"),
+  wadeHoldItTogetherBusy: asContentId("wade_rusk_hold_it_together_busy"),
+  wadeHoldItTogetherTurnIn: asContentId("wade_rusk_hold_it_together_turn_in"),
+  wadeHoldItTogetherCompletion: asContentId("wade_rusk_hold_it_together_completion"),
+  wadePostHoldItTogether: asContentId("wade_rusk_post_hold_it_together"),
 } as const satisfies Record<string, ContentId>;
 
 const expressionIds = {

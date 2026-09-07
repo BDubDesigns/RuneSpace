@@ -71,6 +71,7 @@ function baseState(inventory: PlayGameplayState["inventory"]): PlayGameplayState
         weldingIncrements: 12,
         materialComplete: false,
         complete: false,
+        repairAvailable: false,
         availableContribution: { refinedFerrite: 0, slag: 0 },
       },
       stacks: [],

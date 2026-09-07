@@ -1,6 +1,7 @@
 import { and, eq, isNull } from "drizzle-orm";
 import type { DatabaseTransaction, ResolvedCharacterContext } from "@/server/action-resolution";
 import {
+  characterCargoHoldRepair,
   characterMissionProgress,
   characterMissions,
   characters,
@@ -25,6 +26,7 @@ import {
 import { resolveItemPresentation } from "@/game/content/item-presentation";
 import { getNpc } from "@/game/content/npcs";
 import { deriveEquipmentLoadout, isCompatibleEquipmentAssignment } from "@/game/domain/equipment";
+import { cargoHoldRepairComplete } from "@/game/domain/cargo-hold";
 import {
   planExactStackRemoval,
   planUniqueItemAddition,
@@ -61,6 +63,7 @@ export type MissionCompletion =
         | "prerequisite"
         | "equipment"
         | "tracked_activity"
+        | "cargo_hold_repaired"
         | "insufficient_items"
         | "capacity";
       capacityReason?: "slots" | "mass";
@@ -377,7 +380,7 @@ async function completeMissionForDefinition(input: {
   }
 
   const balance = getEffectiveGameBalance();
-  const [itemState, assignments, stacks, progressRows] = await Promise.all([
+  const [itemState, assignments, stacks, progressRows, repairRows] = await Promise.all([
     loadOwnedItemInstances(transaction, context.character.id),
     transaction
       .select()
@@ -399,12 +402,18 @@ async function completeMissionForDefinition(input: {
         ),
       )
       .for("update"),
+    transaction
+      .select()
+      .from(characterCargoHoldRepair)
+      .where(eq(characterCargoHoldRepair.characterId, context.character.id))
+      .for("update"),
   ]);
   const carriedById = new Map(itemState.carriedInstances.map((i) => [i.id, i.itemId]));
   const observation = buildCompletionObservation(
     assignmentCarriedItemIds(assignments, carriedById),
     stacks,
     new Map(progressRows.map((row) => [row.progressKey, row.progress])),
+    repairRows[0],
   );
 
   // Re-evaluate every authored requirement against live authoritative
@@ -437,6 +446,16 @@ async function completeMissionForDefinition(input: {
           status: "refused",
           reason: "tracked_activity",
           message: `Objective not met: ${renderRequirementCopy(requirement, observation)}.`,
+        });
+      }
+      continue;
+    }
+    if (requirement.kind === "cargo_hold_repaired") {
+      if (observation.cargoHoldRepairComplete !== true) {
+        return stateFor({
+          status: "refused",
+          reason: "cargo_hold_repaired",
+          message: `Objective not met: ${requirement.objective}.`,
         });
       }
       continue;
@@ -626,6 +645,7 @@ function renderRequirementCopy(
       .replace("{current}", String(current))
       .replace("{target}", String(requirement.target));
   }
+  if (requirement.kind === "cargo_hold_repaired") return requirement.objective;
   const itemName = observation.itemNames.get(requirement.itemId) ?? requirement.itemId;
   if (requirement.kind === "equipped_item") {
     return requirement.objective.replace("{item}", itemName);
@@ -683,6 +703,14 @@ function buildCompletionObservation(
   equippedCarriedIds: ReadonlySet<string>,
   stacks: readonly { itemId: string; quantity: number }[],
   trackedProgress: ReadonlyMap<string, number> = new Map(),
+  repairRow:
+    | {
+        refinedFerriteContributed: number;
+        slagContributed: number;
+        weldingProgress: number;
+        completedAt: Date | null;
+      }
+    | undefined,
 ): MissionObservation {
   const balance = getEffectiveGameBalance();
   const carriedQuantities = new Map<string, number>();
@@ -701,7 +729,7 @@ function buildCompletionObservation(
       mission.requirements
         .filter(
           (requirement): requirement is Extract<MissionRequirement, { itemId: string }> =>
-            requirement.kind !== "at_location",
+            requirement.kind === "equipped_item" || requirement.kind === "carried_stack",
         )
         .map((requirement) => requirement.itemId),
     ),
@@ -718,6 +746,15 @@ function buildCompletionObservation(
     stackLimits,
     itemNames,
     trackedProgress,
+    cargoHoldRepairComplete: cargoHoldRepairComplete(
+      repairRow ?? {
+        refinedFerriteContributed: 0,
+        slagContributed: 0,
+        weldingProgress: 0,
+        completedAt: null,
+      },
+      balance,
+    ),
   };
 }
 

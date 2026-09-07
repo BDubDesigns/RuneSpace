@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   CUT_YOUR_TEETH,
+  HOLD_IT_TOGETHER,
   WALK_IT_OFF,
   WASTE_NOT,
   MISSIONS,
@@ -14,6 +15,7 @@ import {
 import {
   CONVERSATION_BACKGROUND_IDS,
   DIALOGUE_IDS,
+  ACTION_IDS,
   ITEM_IDS,
   LOCATION_IDS,
   MISSION_IDS,
@@ -173,6 +175,61 @@ describe("issue #141 Waste Not persistent completed dialogue", () => {
     expect(resolveNpcMissionDialogue(NPC_IDS.tansyRusk, projections)?.sequence.id).toBe(
       DIALOGUE_IDS.tansyPostWasteNot,
     );
+  });
+});
+
+describe("issue #148 Hold It Together authored and observed repair boundary", () => {
+  it("continues from Waste Not and awards separate Welding XP", () => {
+    expect(WASTE_NOT.continuationMissionId).toBe(MISSION_IDS.holdItTogether);
+    expect(HOLD_IT_TOGETHER).toMatchObject({
+      id: MISSION_IDS.holdItTogether,
+      prerequisiteMissionId: MISSION_IDS.wasteNot,
+      offers: [],
+      requirements: [{ kind: "cargo_hold_repaired" }],
+      reward: { kind: "skill_xp", skillId: SKILL_IDS.welding, amount: 100 },
+    });
+  });
+
+  it("observes authoritative Cargo completion without tracking progress", () => {
+    expect(
+      projectMission(HOLD_IT_TOGETHER, accepted(), CRASH_SITE, true, observation()),
+    ).toMatchObject({
+      state: "active",
+      currentObjective: "Repair the Cargo Hold at the Crash Site",
+      requirements: [{ kind: "cargo_hold_repaired", satisfied: false }],
+      stage: {
+        requirementsSatisfied: false,
+        turnInAvailable: false,
+        nextObjectiveKind: "cargo_hold_repaired",
+      },
+    });
+    expect(
+      projectMission(
+        HOLD_IT_TOGETHER,
+        accepted(),
+        CRASH_SITE,
+        true,
+        observation({ cargoHoldRepairComplete: true }),
+      ),
+    ).toMatchObject({
+      state: "ready_for_completion",
+      currentObjective: "Report the repaired Cargo Hold to Wade Rusk",
+      requirements: [{ kind: "cargo_hold_repaired", satisfied: true }],
+    });
+  });
+
+  it("routes Wade's repair reminder through semantic requirement state", () => {
+    expect(
+      resolveNpcMissionDialogue(NPC_IDS.wadeRusk, [
+        mission(MISSION_IDS.holdItTogether, "active", {
+          stage: {
+            requirementsSatisfied: false,
+            turnInAvailable: false,
+            nextObjectiveKind: "cargo_hold_repaired",
+          },
+        }),
+      ])?.sequence.id,
+    ).toBe(DIALOGUE_IDS.wadeHoldItTogetherRepairReminder);
   });
 });
 
@@ -404,6 +461,62 @@ describe("issue #124 semantic mission guidance projection", () => {
     ]);
     // No active NPC guidance before acceptance.
     expect([...deriveMissionGuidanceTargets([atCrashSite]).npcIds]).toEqual([]);
+  });
+
+  it("projects the Cargo repair surface while Hold It Together is the current objective", () => {
+    // Repair incomplete: the generic projection flags the Cargo surface, with
+    // no NPC/equipment/action target competing for green guidance.
+    const incomplete = projectMission(
+      HOLD_IT_TOGETHER,
+      accepted(),
+      CRASH_SITE,
+      true,
+      observation(),
+    );
+    expect(incomplete).toMatchObject({
+      state: "active",
+      stage: { nextObjectiveKind: "cargo_hold_repaired" },
+      guidance: { cargoRepair: true },
+    });
+    expect(incomplete.guidance?.npcId).toBeUndefined();
+    expect(incomplete.guidance?.equipmentItemId).toBeUndefined();
+    expect(incomplete.guidance?.actionId).toBeUndefined();
+    const targets = deriveMissionGuidanceTargets([incomplete]);
+    expect(targets.cargoRepair).toBe(true);
+    expect([...targets.npcIds]).toEqual([]);
+    expect([...targets.actionIds]).toEqual([]);
+  });
+
+  it("clears Cargo guidance on repair completion and moves green guidance to Wade", () => {
+    const ready = projectMission(
+      HOLD_IT_TOGETHER,
+      accepted(),
+      CRASH_SITE,
+      true,
+      observation({ cargoHoldRepairComplete: true }),
+    );
+    expect(ready).toMatchObject({
+      state: "ready_for_completion",
+      guidance: { npcId: NPC_IDS.wadeRusk },
+    });
+    expect(ready.guidance?.cargoRepair).toBeUndefined();
+    const targets = deriveMissionGuidanceTargets([ready]);
+    expect(targets.cargoRepair).toBe(false);
+    expect([...targets.npcIds]).toEqual([NPC_IDS.wadeRusk]);
+  });
+
+  it("leaves Waste Not Refining guidance unchanged by the Cargo extension", () => {
+    const refining = projectMission(
+      WASTE_NOT,
+      accepted(),
+      LOCATION_IDS.abandonedProcessingYard,
+      true,
+      observation({ trackedProgress: new Map([["refining-attempts", 2]]) }),
+    );
+    expect(refining.guidance).toEqual({ actionId: ACTION_IDS.refining });
+    const targets = deriveMissionGuidanceTargets([refining]);
+    expect(targets.cargoRepair).toBe(false);
+    expect([...targets.actionIds]).toEqual([ACTION_IDS.refining]);
   });
 });
 

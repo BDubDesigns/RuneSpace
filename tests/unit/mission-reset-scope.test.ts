@@ -35,11 +35,11 @@ describe("missionChainResetScope", () => {
   });
 
   it("matches the current authored mission chain", () => {
-    // Cut Your Teeth and Waste Not form the authored prerequisite chain.
+    // Cut Your Teeth, Waste Not, and Hold It Together form the authored chain.
     const wio = "walk_it_off";
     const cyt = "cut_your_teeth";
     const ids = MISSIONS.map((m) => ({ id: m.id, prerequisiteMissionId: m.prerequisiteMissionId }));
-    expect(missionChainResetScope(wio, ids)).toEqual([wio, cyt, "waste_not"]);
-    expect(missionChainResetScope(cyt, ids)).toEqual([cyt, "waste_not"]);
+    expect(missionChainResetScope(wio, ids)).toEqual([wio, cyt, "waste_not", "hold_it_together"]);
+    expect(missionChainResetScope(cyt, ids)).toEqual([cyt, "waste_not", "hold_it_together"]);
   });
 });

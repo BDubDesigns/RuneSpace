@@ -34,6 +34,8 @@ export type MissionObservation = {
   itemNames: ReadonlyMap<string, string>;
   /** Durable current progress by authored tracked-requirement key. */
   trackedProgress?: ReadonlyMap<string, number>;
+  /** Authoritative completion state for the Cargo Hold repair. */
+  cargoHoldRepairComplete?: boolean;
 };
 
 /**
@@ -49,6 +51,14 @@ export type MissionGuidance = {
   equipmentItemId?: string;
   /** The authored recommended acquisition action for the first unmet carried requirement. */
   actionId?: string;
+  /**
+   * The Cargo Hold repair surface is the current progression target: the
+   * first unmet requirement observes authoritative Cargo repair completion.
+   * The Cargo panel owns the repair/material/Welding substate and selects
+   * the advancing affordance (contribute materials vs start Welding) from
+   * this single semantic flag — never from a mission ID or objective prose.
+   */
+  cargoRepair?: true;
   /**
    * The NPC(s) whose authored offer interaction is currently a
    * mission-availability target. Only missions with NO prerequisite author
@@ -158,6 +168,7 @@ function renderRequirementObjective(
       .replace("{current}", String(current))
       .replace("{target}", String(requirement.target));
   }
+  if (requirement.kind === "cargo_hold_repaired") return requirement.objective;
   const itemName = observation?.itemNames.get(requirement.itemId) ?? requirement.itemId;
   if (requirement.kind === "equipped_item") {
     return requirement.objective.replace("{item}", itemName);
@@ -197,6 +208,8 @@ function requirementSatisfied(
       return (
         (observation?.trackedProgress?.get(requirement.progressKey) ?? 0) >= requirement.target
       );
+    case "cargo_hold_repaired":
+      return observation?.cargoHoldRepairComplete === true;
   }
 }
 
@@ -304,6 +317,9 @@ function deriveGuidance(
   ) {
     return { actionId: firstUnsatisfied.recommendedActionId };
   }
+  if (firstUnsatisfied.kind === "cargo_hold_repaired") {
+    return { cargoRepair: true as const };
+  }
   return undefined;
 }
 
@@ -387,6 +403,13 @@ function projectRequirement(
       progress: { current, target: requirement.target },
     };
   }
+  if (requirement.kind === "cargo_hold_repaired") {
+    return {
+      kind: requirement.kind,
+      objective: requirement.objective,
+      satisfied,
+    };
+  }
   const required = requiredCarriedQuantity(requirement, observation);
   const rawCarried = observation?.carriedQuantities.get(requirement.itemId) ?? 0;
   return {
@@ -432,6 +455,8 @@ export type MissionGuidanceTargets = {
   npcIds: ReadonlySet<string>;
   equipmentItemIds: ReadonlySet<string>;
   actionIds: ReadonlySet<string>;
+  /** True while an accepted mission's current target is the Cargo Hold repair surface. */
+  cargoRepair: boolean;
 };
 
 export function deriveMissionGuidanceTargets(
@@ -441,6 +466,7 @@ export function deriveMissionGuidanceTargets(
   const npcIds = new Set<string>();
   const equipmentItemIds = new Set<string>();
   const actionIds = new Set<string>();
+  let cargoRepair = false;
   for (const projection of projections) {
     if (projection.guidance?.availableNpcIds) {
       for (const id of projection.guidance.availableNpcIds) availableNpcIds.add(id);
@@ -449,8 +475,9 @@ export function deriveMissionGuidanceTargets(
     if (projection.guidance?.equipmentItemId)
       equipmentItemIds.add(projection.guidance.equipmentItemId);
     if (projection.guidance?.actionId) actionIds.add(projection.guidance.actionId);
+    if (projection.guidance?.cargoRepair) cargoRepair = true;
   }
-  return { availableNpcIds, npcIds, equipmentItemIds, actionIds };
+  return { availableNpcIds, npcIds, equipmentItemIds, actionIds, cargoRepair };
 }
 
 /**
@@ -586,6 +613,7 @@ export function validateMissionDefinitions(definitions: readonly MissionDefiniti
         }
         continue;
       }
+      if (requirement.kind === "cargo_hold_repaired") continue;
       const itemDefinition = getItemDefinition(requirement.itemId);
       if (!itemDefinition) {
         throw new Error(`${where} requirement references unknown item "${requirement.itemId}".`);
@@ -633,6 +661,12 @@ export function validateMissionDefinitions(definitions: readonly MissionDefiniti
         definition.id,
         dialogue.trackedActivityReminderDialogueId,
         "tracked activity reminder",
+      );
+    if (dialogue.cargoRepairReminderDialogueId)
+      assertDialogue(
+        definition.id,
+        dialogue.cargoRepairReminderDialogueId,
+        "cargo repair reminder",
       );
     if (dialogue.busyDialogueId) assertDialogue(definition.id, dialogue.busyDialogueId, "busy");
     if (dialogue.completionPresentationDialogueId) {

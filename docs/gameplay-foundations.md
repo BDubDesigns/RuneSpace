@@ -92,25 +92,31 @@ Crash Site exposes the damaged ship's Cargo Hold repair. The repair is
 character-scoped and persistent: it is not a generic construction system, a
 bank abstraction, or a reclaimable deposit.
 
-### Interim Cargo Hold reveal gate (Issue #128)
+### Cargo Hold repair introduction (Issues #128 and #148)
 
-Until the future Wade repair-introduction Mission exists, every incomplete
-repair state is locked. The player sees only a compact **Damaged Cargo Hold**
-teaser; repair materials, progress, Welding controls, recipe guidance, and
-storage details remain hidden. The authoritative guards live at the player
-commands in `server/cargo-hold.ts`: material contribution and Welding start
-require the existing completion signal (`completedAt` via
+An incomplete Cargo Hold shows only a compact **Damaged Cargo Hold** teaser
+until the player accepts Mission #4, **Hold It Together**, through Waste Not's
+authored continuation. The accepted mission is the authoritative repair-access
+signal: it reveals the existing material and Welding controls and authorizes
+repair commands. A completed repair remains available even if no Mission #4
+row exists, so already repaired Holds and their storage are never invalidated.
+
+The authoritative guards live at the player commands in `server/cargo-hold.ts`
+and share the same derived access predicate as the play-state presentation.
+Incomplete repair contribution and Welding start require Mission #4 acceptance;
+Cargo storage still requires the repair completion signal (`completedAt` via
 `cargoHoldRepairComplete`). Row existence, material progress, and preserved
 pre-beta partial progress are not unlock signals. No schema or generic unlock
 registry is introduced.
 
-Mission #4, the future Wade Mission, should observe authoritative Cargo Hold
-repair completion rather than adding separate `show` / `consume` material
-requirements. The existing Cargo Hold repair system owns the **15 Refined
-Ferrite + 6 Slag** recipe and material consumption; Mission #4 should read the
-resulting completion signal and must not duplicate either responsibility.
+Mission #4 observes authoritative Cargo Hold repair completion rather than
+owning material consumption or Welding progress. The existing Cargo Hold
+repair system owns the **15 Refined Ferrite + 6 Slag** recipe and material
+consumption; Welding remains five ticks per increment with **50 Welding XP**
+per increment and twelve increments for **600 total Welding XP**. Mission #4
+adds a separate **100 Welding XP** turn-in reward exactly once.
 
-- Once the future introduction gate permits repair, the exact recipe is **15
+- Once the Hold It Together introduction gate permits repair, the exact recipe is **15
   Refined Ferrite and 6 Slag**. A contribution command locks the character and
   carried stacks, caps each material to the useful outstanding amount, removes
   only that exact amount, and commits the progress atomically. Contributions
