@@ -146,10 +146,10 @@ describe("Journey feed presentation", () => {
       (event) => event.id === "scavenge-available",
     );
     expect(available).toMatchObject({
-      detail: "Something turned up along the route.",
+      detail: "You notice something off the route worth checking out.",
       interactive: true,
       kind: "scavenge",
-      title: "Something turned up",
+      title: "Something catches your eye",
     });
 
     const missed = deriveJourneyFeed(makeTravel(), new Date(startedAt.getTime() + 4_800)).find(
