@@ -134,7 +134,8 @@ absolute public HTTPS URLs; `highlights` has zero to three entries.
 
 For meaningful player-facing gameplay, UX, balance, content, or progression
 changes, decide whether a public Update is warranted. When it is, add one
-through `docs/public-updates.md` in the same PR unless the issue says otherwise.
+following the authoring procedure in `docs/public-updates.md` in the same PR
+unless the issue says otherwise.
 Do not add Updates for internal-only work without meaningful player impact, or
 rewrite a published Update for unrelated later changes; an issue's explicit
 Update requirement is authoritative.

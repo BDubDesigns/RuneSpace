@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  formatPublicUpdateDate,
   getLatestPublishedUpdate,
   getPublicUpdate,
   getPublicUpdatePath,
@@ -60,5 +61,10 @@ describe("public Updates content boundary", () => {
     expect(getPublicUpdate(update.slug)).toEqual(update);
     expect(getPublicUpdatePath(update)).toBe(`/updates/${update.slug}`);
     expect(getPublishedUpdates()[0]).toEqual(update);
+  });
+
+  it("formats the authored calendar date without shifting it through UTC", () => {
+    expect(formatPublicUpdateDate("2026-09-08T23:30:00-07:00")).toBe("September 8, 2026");
+    expect(formatPublicUpdateDate("2026-09-08T00:30:00+14:00")).toBe("September 8, 2026");
   });
 });

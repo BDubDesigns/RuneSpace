@@ -22,7 +22,7 @@ test.describe("public Updates", () => {
       "href",
       `/updates/${updateSlug}`,
     );
-    await expect(page.getByText("September 7, 2026", { exact: true })).toBeVisible();
+    await expect(page.getByText("September 8, 2026", { exact: true })).toBeVisible();
 
     await page.getByRole("link", { name: updateTitle, exact: true }).click();
     await expect(page).toHaveURL(`/updates/${updateSlug}`);
@@ -31,7 +31,7 @@ test.describe("public Updates", () => {
     await expect(page.getByRole("heading", { name: "Patch notes", level: 2 })).toBeVisible();
     await expect(page.getByRole("heading", { name: "Added", level: 3 })).toBeVisible();
     await expect(page.getByRole("heading", { name: "Changed", level: 3 })).toBeVisible();
-    await expect(page.getByRole("heading", { name: "Fixed", level: 3 })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Fixed", level: 3 })).toHaveCount(0);
     await expect(page.locator('link[rel="canonical"]')).toHaveAttribute(
       "href",
       `/updates/${updateSlug}`,
