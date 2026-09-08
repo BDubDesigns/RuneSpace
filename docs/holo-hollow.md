@@ -69,57 +69,107 @@ Locals may bend or evade limits in varied ways — aliases, pooled quotas, buyer
 looking away, informal arrangements, corruption, or other workarounds — but
 compliance and attitudes should differ by person.
 
-## Geography and local destinations
+## Geography: World Locations and Local Places
 
 ### Holo Hollow proper
 
-Holo Hollow begins as **one world/map hex**.
+Holo Hollow begins as **one World Location / world-map hex**.
 
-Businesses, social spaces, and other places inside town are **local
-destinations** available only while the character is physically at the Holo
-Hollow world location. Entering a local destination is immediate and does not:
+RuneSpace should distinguish two spatial concepts:
+
+- A **World Location** participates in the world map. It owns map position,
+  adjacency, ordinary Travel/Journey semantics, and the character's authoritative
+  persisted world position.
+- A **Local Place** belongs to exactly one parent World Location. It has no
+  world-map coordinate or adjacency of its own and does not become a Travel
+  destination merely because the player can enter it.
+
+Businesses, social spaces, and other places inside Holo Hollow are Local Places
+available only while the character is physically at the Holo Hollow World
+Location. Entering a Local Place is immediate and does not:
 
 - start Travel or Journey;
 - award Travel progression;
 - create a Scavenge opportunity;
 - change the character's authoritative world location.
 
-A local destination may have its own:
+A Local Place may have its own:
 
+- stable content identity;
 - name and description;
-- location art;
-- present NPCs;
+- scene/location art;
+- resident NPC;
 - activities and interactions;
-- access state;
-- clear return control to the Holo Hollow town surface.
+- merchant or other feature ownership where appropriate;
+- derived access state;
+- clear return control to the parent World Location surface.
 
-The Holo Hollow Location surface should list the available local destinations.
-Opening one should feel like entering a real place, not opening a generic modal
-or pretending the building is another world hex.
+The first implementation needs only **one level** of Local Places. Do not build a
+recursive place-within-place hierarchy until a real future gameplay requirement
+proves that it is necessary.
 
-This local-destination concept should be generic enough to support later cities,
-stations, facilities, secured rooms, or businesses without Holo-Hollow-specific
-conditionals.
+The Holo Hollow Location surface should list its Local Places. Opening one should
+feel like entering a real place, not opening a generic modal and not pretending
+the building is another World Location.
 
-### Visible-but-locked local destinations
+Which Local Place the player is viewing is presentation/navigation state, not a
+second persisted character coordinate. It should survive normal refresh/history
+behavior through the existing route-backed Play composition or the narrowest
+consistent equivalent chosen after implementation inspection. The exact query or
+route shape is an implementation decision; the invariant is that the database
+continues to say the character is at Holo Hollow.
 
-A local destination may be visible before it is enterable. Access should be
-derived from generic Mission/world-state conditions rather than hard-coded checks
-for one named building.
+Client navigation into a Local Place never grants gameplay permission by itself.
+Server-authoritative commands such as merchant trades must still validate the
+owned character's current World Location, stationary state, requested Local
+Place, current access, and the authoritative feature/content rules.
+
+This Local Place concept should be generic enough to support later settlements,
+stations, facilities, businesses, or comparable contained places without
+Holo-Hollow-specific conditionals. Do not force existing simple World Locations
+to author Local Places when they do not need them, and do not refactor unrelated
+existing location/activity branches merely to make the abstraction look more
+universal.
+
+### Visible-but-locked Local Places
+
+A Local Place may be visible before it is enterable. Presentation should consume
+a generic derived access result, such as available or locked plus a player-facing
+reason, rather than hard-coded checks for one named building.
+
+Do not build a broad generic requirements DSL preemptively. Add only the smallest
+condition mechanism proven necessary when a real Mission/world-state unlock is
+implemented.
 
 **HH B&B** is the first planned example: early explorers may see it but are
 refused entry because it currently serves locals and regular workers only. A
 follow-up Wade Power Cell Mission introduces Mara Kells and, on completion,
-changes that destination to enterable.
+changes that Local Place to enterable.
 
 The locked place should remain visible so the player can notice that the world
 changed when access is later granted.
 
+### NPC presence in Local Places
+
+The foundation does not require a generic simultaneous multi-NPC interaction
+system.
+
+Persistent NPC presence should resolve from the relevant spatial context:
+ordinary existing World Locations can continue to behave as they do now, while
+Holo Hollow's resident interaction is scoped to the active Local Place. Bix is
+the resident interaction in his shop and Renn is the resident interaction at the
+Community Assistance Center.
+
+Mara's later appearance in Bix's shop during the Wade apprentice Mission is an
+authored dialogue/cutscene beat. It does not make Mara a persistent second shop
+NPC and does not justify building multi-NPC interaction UI before the game has a
+real need for it.
+
 ### Holo Drive-In
 
-The Holo Drive-In / projector site is a **separate nearby world hex**. Travel
-between Holo Hollow and the Drive-In uses ordinary Travel/Journey semantics.
-Do not invent a special short intra-town travel rule for it.
+The Holo Drive-In / projector site is a **separate nearby World Location / world
+hex**. Travel between Holo Hollow and the Drive-In uses ordinary Travel/Journey
+semantics. Do not invent a special short intra-town travel rule for it.
 
 ### Class and district boundaries
 
@@ -127,7 +177,7 @@ Do not split Holo Hollow into multiple world hexes merely to express richer and
 poorer areas. Initially communicate class/economic differences through art,
 architecture, cleanliness, prices, accessibility, NPCs, and dialogue.
 
-A later district may become its own world location only when unique gameplay,
+A later district may become its own World Location only when unique gameplay,
 NPC density, businesses, Missions, or persistent world-state meaning justify the
 extra geography.
 
@@ -195,7 +245,7 @@ Holo Hollow:
 - Mara: stop waiting and make the current town work;
 - Renn: neither version has much future, so leave while you still can.
 
-Renn's initial encounter location is the Holo Hollow Community Assistance
+Renn's initial encounter Local Place is the Holo Hollow Community Assistance
 Center, keeping a social NPC available even before HH B&B unlocks.
 
 ## Repurposed tourism infrastructure
@@ -274,10 +324,14 @@ one small economic loop without pulling future systems forward prematurely.
 
 ### In scope
 
-- Holo Hollow as a world location/hex;
-- Holo Hollow town Location presentation and local-destination navigation;
-- generic immediate local destinations that preserve the current world location;
-- generic visible-but-locked local-destination access state;
+- Holo Hollow as a World Location / world hex;
+- Holo Hollow town Location presentation and generic Local Place navigation;
+- one-level Local Places attached to exactly one parent World Location;
+- route-backed/presentation Local Place state that does not mutate persisted
+  character world position;
+- generic derived visible-but-locked Local Place access presentation;
+- local-place-scoped resident NPC resolution without speculative simultaneous
+  multi-NPC interaction UI;
 - Bix Weller;
 - Holo Hollow Souvenirs + Mining Supplies;
 - Mara Kells;
@@ -303,6 +357,12 @@ implementation issue explicitly allows it.
 ### Out of scope
 
 - Wade's three-Power-Cell apprentice Mission;
+- Mara's authored Bix-shop appearance during that Mission;
+- simultaneous multiple-NPC interaction UI or a generic multi-NPC scene system;
+- recursively nested Local Places;
+- a speculative generic Local Place requirements DSL;
+- broad refactoring of existing simple World Location activity composition solely
+  to make Local Places look universal;
 - HH B&B rest/healing mechanics;
 - food effects or combat consumables;
 - player-facing ration claims;
@@ -340,7 +400,8 @@ The Mission should:
   tip;
 - let Bix point the player toward the Emergency Power Annex as the renewable
   daily Cell source;
-- introduce Mara naturally during the Bix interaction;
+- introduce Mara naturally during the Bix interaction as an authored dialogue
+  participant rather than a persistent second shop NPC;
 - unlock HH B&B only after the Mission is completed;
 - prefer one sequential Mission if the generic Mission framework supports the
   needed conversation/activity stages rather than splitting it into arbitrary
