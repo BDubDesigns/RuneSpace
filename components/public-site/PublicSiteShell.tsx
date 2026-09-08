@@ -34,20 +34,22 @@ export function PublicSiteShell({
               sizes="(max-width: 640px) 46vw, 208px"
             />
           </Link>
-          <nav aria-label="Public" className="hidden min-w-0 flex-1 sm:block">
-            <ul className="flex items-center gap-5">
-              {navigation.map((item) => (
-                <li key={`${item.href}-${item.label}`}>
-                  <Link
-                    className="rs-focus inline-flex min-h-[var(--rs-touch-target)] items-center text-sm font-semibold text-[color:var(--rs-text-secondary)] underline-offset-4 transition duration-[var(--rs-duration-fast)] hover:text-[color:var(--rs-text-primary)] hover:underline"
-                    href={item.href}
-                  >
-                    {item.label}
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          </nav>
+          {navigation.length > 0 ? (
+            <nav aria-label="Public" className="hidden min-w-0 flex-1 sm:block">
+              <ul className="flex items-center gap-5">
+                {navigation.map((item) => (
+                  <li key={`${item.href}-${item.label}`}>
+                    <Link
+                      className="rs-focus inline-flex min-h-[var(--rs-touch-target)] items-center text-sm font-semibold text-[color:var(--rs-text-secondary)] underline-offset-4 transition duration-[var(--rs-duration-fast)] hover:text-[color:var(--rs-text-primary)] hover:underline"
+                      href={item.href}
+                    >
+                      {item.label}
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </nav>
+          ) : null}
           {headerActions ? <div className="ml-auto shrink-0">{headerActions}</div> : null}
         </div>
       </header>
@@ -56,7 +58,20 @@ export function PublicSiteShell({
 
       <footer className="border-t border-[color:var(--rs-border-structural)] bg-[color:var(--rs-surface-raised)]">
         <div className="mx-auto flex w-full max-w-6xl flex-col gap-3 px-4 py-6 text-sm text-[color:var(--rs-text-muted)] sm:flex-row sm:items-center sm:justify-between sm:px-6">
-          <p>RuneSpace is licensed under AGPL-3.0.</p>
+          <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
+            <p>RuneSpace is licensed under AGPL-3.0.</p>
+            <p>
+              Built by{" "}
+              <a
+                className="rs-focus inline-flex min-h-[var(--rs-touch-target)] items-center text-[color:var(--rs-accent-primary)] underline"
+                href="https://github.com/BDubDesigns"
+                rel="noreferrer"
+                target="_blank"
+              >
+                Brandon
+              </a>
+            </p>
+          </div>
           <div className="flex flex-wrap gap-x-5 gap-y-2">
             <a
               className="rs-focus inline-flex min-h-[var(--rs-touch-target)] items-center text-[color:var(--rs-accent-primary)] underline"

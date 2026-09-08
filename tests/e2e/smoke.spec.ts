@@ -12,9 +12,11 @@ test("public landing loads with pre-alpha identity and entry actions", async ({ 
   await expect(page.getByRole("link", { name: "Sign in" }).first()).toBeVisible();
   await expect(page.getByRole("link", { name: "Register", exact: true })).toHaveCount(2);
   await expect(page.getByRole("link", { name: "Sign in", exact: true })).toHaveCount(3);
-  await expect(
-    page.getByRole("navigation", { name: "Public" }).getByRole("link", { name: "Home" }),
-  ).toHaveCount(0);
+  await expect(page.getByRole("navigation", { name: "Public" })).toHaveCount(0);
+  await expect(page.getByRole("link", { name: "Brandon", exact: true })).toHaveAttribute(
+    "href",
+    "https://github.com/BDubDesigns",
+  );
   await expect(page.getByRole("img", { name: /Location view/ })).toBeVisible();
   await expect(page.getByRole("img", { name: /local Map view/ })).toBeVisible();
   await expect(page.getByRole("img", { name: /Journey view/ })).toBeVisible();
