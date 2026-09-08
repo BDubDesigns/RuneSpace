@@ -48,6 +48,6 @@ test("Sign out from the authenticated header returns to the signed-out landing",
   // Activating it clears the session and returns to the signed-out landing.
   await signOut.click();
   await expect(page).toHaveURL(/\/$/);
-  await expect(page.getByRole("link", { name: "Sign in" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Sign in" }).first()).toBeVisible();
   await expect(page.getByRole("button", { name: "Sign out" })).toHaveCount(0);
 });
