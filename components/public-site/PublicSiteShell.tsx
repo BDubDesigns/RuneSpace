@@ -7,7 +7,7 @@ export type PublicSiteNavItem = {
   label: string;
 };
 
-const defaultNavigation: readonly PublicSiteNavItem[] = [{ href: "/", label: "Home" }];
+const defaultNavigation: readonly PublicSiteNavItem[] = [];
 
 /** Presentational header, page frame, and footer for public RuneSpace pages. */
 export function PublicSiteShell({

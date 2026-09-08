@@ -5,6 +5,7 @@ test("signed-in visitors stay on the public homepage with a characters entry", a
 
   await expect(page).toHaveURL(/\/$/);
   await expect(page.getByRole("heading", { name: "RuneSpace" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "My characters", exact: true })).toHaveCount(3);
   await expect(
     page.getByRole("link", { name: "My characters", exact: true }).first(),
   ).toHaveAttribute("href", "/characters");

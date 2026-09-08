@@ -1,10 +1,10 @@
 export const publicLandingContent = {
   hero: {
-    eyebrow: "Pre-alpha / active development",
-    status: "Playable pre-alpha — active development.",
+    eyebrow: "Low-fi sci-fi RPG / Holo Hollow",
+    status: "Playable pre-alpha",
     title: "The ship is down. The work starts here.",
     description:
-      "RuneSpace is a browser-first, low-fi sci-fi RPG about making something useful from a bad landing. Travel Holo Hollow, learn the local trades, and turn salvage into a way forward.",
+      "RuneSpace is a browser-first, low-fi sci-fi RPG about making something useful from a bad landing. Travel through Holo Hollow, learn the local trades, and turn salvage into a way forward.",
   },
   buildSignal: [
     { label: "Region", value: "Holo Hollow" },

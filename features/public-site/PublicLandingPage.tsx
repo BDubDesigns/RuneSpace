@@ -45,6 +45,7 @@ function PublicSectionHeader({
 export function PublicLandingPage({ signedIn }: { signedIn: boolean }) {
   const { adventure, buildSignal, capabilities, currentBuild, hero, showcase, status } =
     publicLandingContent;
+  const prominentActionClassName = "min-h-14 px-6 py-3 text-base sm:min-h-16 sm:px-8 sm:text-lg";
 
   const playEntry = signedIn ? (
     <ActionLink href="/characters">My characters</ActionLink>
@@ -80,11 +81,19 @@ export function PublicLandingPage({ signedIn }: { signedIn: boolean }) {
             </p>
             <div className="mt-8 flex flex-wrap gap-3">
               {signedIn ? (
-                <ActionLink href="/characters">My characters</ActionLink>
+                <ActionLink className={prominentActionClassName} href="/characters">
+                  My characters
+                </ActionLink>
               ) : (
                 <>
-                  <ActionLink href="/register">Register</ActionLink>
-                  <ActionLink href="/sign-in" intent="secondary">
+                  <ActionLink className={prominentActionClassName} href="/register">
+                    Register
+                  </ActionLink>
+                  <ActionLink
+                    className={prominentActionClassName}
+                    href="/sign-in"
+                    intent="secondary"
+                  >
                     Sign in
                   </ActionLink>
                 </>
@@ -219,6 +228,48 @@ export function PublicLandingPage({ signedIn }: { signedIn: boolean }) {
               {status.body}
             </p>
           </div>
+        </section>
+
+        <section aria-labelledby="final-cta-heading" className="pt-20 sm:pt-28">
+          <Panel
+            tone="raised"
+            className="flex min-w-0 flex-col items-start gap-6 !p-6 sm:!p-8 lg:flex-row lg:items-center lg:justify-between lg:gap-12"
+          >
+            <div className="min-w-0">
+              <p className="font-display text-xs uppercase tracking-[0.16em] text-[color:var(--rs-accent-mining)]">
+                Holo Hollow / Crash Site
+              </p>
+              <h2
+                className="mt-3 max-w-2xl font-display text-2xl font-bold tracking-tight text-[color:var(--rs-text-primary)] sm:text-3xl"
+                id="final-cta-heading"
+              >
+                THE WRECK ISN&apos;T GOING TO FIX ITSELF.
+              </h2>
+              <p className="mt-3 text-sm leading-6 text-[color:var(--rs-text-secondary)] sm:text-base">
+                Take the next job and keep the ship moving.
+              </p>
+            </div>
+            <div className="flex shrink-0 flex-wrap gap-3">
+              {signedIn ? (
+                <ActionLink className={prominentActionClassName} href="/characters">
+                  My characters
+                </ActionLink>
+              ) : (
+                <>
+                  <ActionLink className={prominentActionClassName} href="/register">
+                    Register
+                  </ActionLink>
+                  <ActionLink
+                    className={prominentActionClassName}
+                    href="/sign-in"
+                    intent="secondary"
+                  >
+                    Sign in
+                  </ActionLink>
+                </>
+              )}
+            </div>
+          </Panel>
         </section>
       </div>
     </PublicSiteShell>
