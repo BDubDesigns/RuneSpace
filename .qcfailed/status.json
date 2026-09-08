@@ -2,19 +2,19 @@
   "schemaVersion": 1,
   "projectSlug": "runespace",
   "workState": "active",
-  "currentFocus": "Reviewing Mission #4 Hold It Together and the Cargo Hold repair introduction in Draft PR #149.",
+  "currentFocus": "Reviewing the public RuneSpace landing page and reusable public-site shell in Draft PR #160.",
   "currentChange": {
-    "summary": "Adds Mission #4 Hold It Together to unlock incomplete Cargo Hold repair and teach Welding while preserving existing Cargo state.",
-    "stage": "implementation",
-    "pullRequestNumber": 149
+    "summary": "Adds a public RuneSpace landing page, reusable public-site shell, and current-game Location, Map, and Journey showcase.",
+    "stage": "review",
+    "pullRequestNumber": 160
   },
   "latestCompleted": {
-    "summary": "Gated incomplete Cargo Hold repair until the Wade repair-introduction Mission while preserving repaired storage and Welding mechanics.",
-    "date": "2026-09-06",
-    "url": "https://github.com/BDubDesigns/RuneSpace/pull/147"
+    "summary": "Added dedicated Location, Map, and Journey surfaces while preserving authoritative travel, scavenging, inventory, and mission behavior.",
+    "date": "2026-09-07",
+    "url": "https://github.com/BDubDesigns/RuneSpace/pull/150"
   },
-  "nextStep": "Review Draft PR #149; Brandon may approve product and code review before merge.",
-  "lastMeaningfulUpdate": "2026-09-06",
+  "nextStep": "Review Draft PR #160 on mobile and desktop; Brandon may approve product and code review before merge.",
+  "lastMeaningfulUpdate": "2026-09-07",
   "highlights": [
     {
       "summary": "Extracted generic Play orchestration from the Mining feature into its own server and client boundary.",
