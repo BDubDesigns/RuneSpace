@@ -2,19 +2,19 @@
   "schemaVersion": 1,
   "projectSlug": "runespace",
   "workState": "active",
-  "currentFocus": "Reviewing the public RuneSpace landing page and reusable public-site shell in Draft PR #160.",
+  "currentFocus": "Reviewing the repository-authored public Updates system and patch notes in Draft PR #161.",
   "currentChange": {
-    "summary": "Adds a public RuneSpace landing page, reusable public-site shell, and current-game Location, Map, and Journey showcase.",
+    "summary": "Adds public Updates, patch notes, and latest-Update homepage projection.",
     "stage": "review",
-    "pullRequestNumber": 160
+    "pullRequestNumber": 161
   },
   "latestCompleted": {
-    "summary": "Added dedicated Location, Map, and Journey surfaces while preserving authoritative travel, scavenging, inventory, and mission behavior.",
-    "date": "2026-09-07",
-    "url": "https://github.com/BDubDesigns/RuneSpace/pull/150"
+    "summary": "Added a public RuneSpace landing page, reusable public-site shell, and current-game Location, Map, and Journey showcase.",
+    "date": "2026-09-08",
+    "url": "https://github.com/BDubDesigns/RuneSpace/pull/160"
   },
-  "nextStep": "Review Draft PR #160 on mobile and desktop; Brandon may approve product and code review before merge.",
-  "lastMeaningfulUpdate": "2026-09-07",
+  "nextStep": "Review Draft PR #161 on mobile and desktop; Brandon may approve product and code review before merge.",
+  "lastMeaningfulUpdate": "2026-09-08",
   "highlights": [
     {
       "summary": "Extracted generic Play orchestration from the Mining feature into its own server and client boundary.",
