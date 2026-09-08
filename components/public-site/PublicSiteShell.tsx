@@ -35,8 +35,8 @@ export function PublicSiteShell({
             />
           </Link>
           {navigation.length > 0 ? (
-            <nav aria-label="Public" className="hidden min-w-0 flex-1 sm:block">
-              <ul className="flex items-center gap-5">
+            <nav aria-label="Public" className="min-w-0 flex-1 overflow-x-auto">
+              <ul className="flex min-w-max items-center gap-4 sm:gap-5">
                 {navigation.map((item) => (
                   <li key={`${item.href}-${item.label}`}>
                     <Link
