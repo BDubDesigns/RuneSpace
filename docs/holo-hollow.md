@@ -3,9 +3,9 @@
 ## Status and scope
 
 This document is the canonical approved product/design direction for Holo Hollow.
-It records settled worldbuilding, first-town structure, NPC roles, Credits, and
-the initial merchant economy. It does **not** mean every described system is
-implemented yet.
+It records settled worldbuilding, first-town structure, NPC roles, Credits, the
+initial merchant economy, and the first-slice player-facing UX. It does **not**
+mean every described system is implemented yet.
 
 Existing authoritative gameplay mechanics remain owned by their current docs:
 
@@ -73,7 +73,24 @@ compliance and attitudes should differ by person.
 
 ### Holo Hollow proper
 
-Holo Hollow begins as **one World Location / world-map hex**.
+Holo Hollow begins as **one World Location / world-map hex** at approved axial
+coordinate **`(-1, 1)`**.
+
+At that coordinate Holo Hollow is directly adjacent to:
+
+- **Crash Site**;
+- **Emergency Power Annex**;
+- **The Long Scramble**.
+
+It is **not** directly adjacent to The Jag or the Abandoned Processing Yard.
+This is intentional. Wade can send the player directly into town, Bix's Power
+Cell advice naturally points toward the nearby Annex, and the Long Scramble
+remains part of the physical route toward The Jag instead of Holo Hollow becoming
+a universal hub.
+
+The exact Holo Drive-In coordinate remains deferred. When implemented, it should
+occupy a neighboring World Location / world hex consistent with the approved
+Holo Hollow geography.
 
 RuneSpace should distinguish two spatial concepts:
 
@@ -317,6 +334,41 @@ Cells. At the approved 8-Credit retail price, Wade provides exactly **24
 Credits** for that purchase. The Mission still requires visiting/talking to Bix
 even if the player already owns enough Cells.
 
+### First merchant transaction UX
+
+**Talk to Bix** and **Trade** are separate player actions. The later Wade Mission
+can therefore require the Bix conversation independently of whether the player
+actually buys Power Cells.
+
+Trade uses one small reusable Buy/Sell surface:
+
+- **Buy** initially contains Power Cells only;
+- **Sell** initially contains Ferrite Shale, Refined Ferrite, Slag, and Power
+  Cells;
+- each item row shows its authoritative unit price and the player's owned
+  quantity where relevant;
+- quantity begins at **1** and provides minus, plus, and **Max** controls;
+- the transaction total updates before commit;
+- one explicit **Buy** or **Sell** action commits the selected transaction;
+- do not add a redundant second "Are you sure?" confirmation modal after the
+  player has already selected quantity and seen the total;
+- after a successful transaction, the player remains in Bix's shop, Credits and
+  inventory update immediately, and concise feedback confirms the result.
+
+This is a reusable merchant interaction pattern, not a Bix-only one-off. The UI
+must not invent its own inventory-stack removal/addition behavior; authoritative
+trade commands reuse the game's inventory ownership and validation boundaries.
+
+### Credit presentation
+
+The current Credit balance should be prominent while trading and available in
+Inventory/character information.
+
+Do **not** add Credits to the persistent gameplay top bar in this first economy
+slice. Credits are not relevant enough during every Travel/Mining/etc. moment to
+justify permanent HUD space yet. A later economy expansion may revisit that
+choice if the balance becomes continuously relevant.
+
 ## First Holo Hollow foundation slice
 
 The first implementation slice should establish the town as a place and create
@@ -324,13 +376,14 @@ one small economic loop without pulling future systems forward prematurely.
 
 ### In scope
 
-- Holo Hollow as a World Location / world hex;
+- Holo Hollow as a World Location at axial coordinate `(-1, 1)`, adjacent to
+  Crash Site, Emergency Power Annex, and The Long Scramble;
 - Holo Hollow town Location presentation and generic Local Place navigation;
 - one-level Local Places attached to exactly one parent World Location;
 - route-backed/presentation Local Place state that does not mutate persisted
   character world position;
 - generic derived visible-but-locked Local Place access presentation;
-- local-place-scoped resident NPC resolution without speculative simultaneous
+- Local-Place-scoped resident NPC resolution without speculative simultaneous
   multi-NPC interaction UI;
 - Bix Weller;
 - Holo Hollow Souvenirs + Mining Supplies;
@@ -342,6 +395,11 @@ one small economic loop without pulling future systems forward prematurely.
 - Bix buying Ferrite Shale, Refined Ferrite, Slag, and Power Cells;
 - Bix selling Power Cells;
 - the approved initial playtest prices in this document;
+- separate Talk and Trade actions at Bix's shop;
+- reusable Buy/Sell trade UX with quantity controls, Max, live total, and one
+  explicit commit action without a redundant confirmation modal;
+- Credit balance visible in trade and Inventory/character information, without a
+  permanent Credit HUD element in this slice;
 - visible environmental hooks toward the depot/hauler area, future contract
   board, and nearby Drive-In where useful;
 - three new early Holo Hollow residents only: Bix, Mara, and Renn.
@@ -349,15 +407,26 @@ one small economic loop without pulling future systems forward prematurely.
 Do not add a fourth NPC merely to hit a number. Add future residents when a
 distinct character need exists.
 
-Final Holo Hollow location-art generation/preparation is a separate dedicated
-asset step. The design and implementation boundaries may be established before
-final art exists, using only repository-approved temporary treatment if an
-implementation issue explicitly allows it.
+Final Holo Hollow asset generation/preparation is a separate dedicated asset
+step. For this foundation slice, that pass needs:
+
+- Holo Hollow exterior/town presentation;
+- Bix's shop;
+- Holo Hollow Community Assistance Center;
+- an appropriate visible-but-locked/exterior treatment for HH B&B;
+- Bix character art and dialogue needed by this slice;
+- Renn character art and dialogue needed by this slice.
+
+Mara's full portrait/expression set and the enterable HH B&B interior may wait
+for the follow-up Wade apprentice Mission asset pass, because that Mission is
+what actually introduces Mara to the player and unlocks the B&B.
 
 ### Out of scope
 
 - Wade's three-Power-Cell apprentice Mission;
 - Mara's authored Bix-shop appearance during that Mission;
+- Mara's full portrait/expression set and the enterable HH B&B interior unless
+  separately approved for the foundation asset package;
 - simultaneous multiple-NPC interaction UI or a generic multi-NPC scene system;
 - recursively nested Local Places;
 - a speculative generic Local Place requirements DSL;
