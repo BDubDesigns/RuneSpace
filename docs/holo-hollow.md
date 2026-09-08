@@ -1,0 +1,409 @@
+# Holo Hollow — Settlement, Economy, and First-Town Design
+
+## Status and scope
+
+This document is the canonical approved product/design direction for Holo Hollow.
+It records settled worldbuilding, first-town structure, NPC roles, Credits, and
+the initial merchant economy. It does **not** mean every described system is
+implemented yet.
+
+Existing authoritative gameplay mechanics remain owned by their current docs:
+
+- Mining, Refining, Power Cells, Cargo Hold repair, and Travel timing/rules:
+  `docs/gameplay-foundations.md`
+- Mission framework and shipped Mission progression: `docs/missions.md`
+- Location/Map/Journey surface ownership: `docs/location-scenes.md` and
+  `docs/travel-map-design.md`
+- General game rules and server-authoritative boundaries: `docs/game-rules.md`
+  and `docs/architecture.md`
+
+This document should not duplicate those contracts. It owns Holo Hollow's
+approved product direction and the boundaries future implementation must honor.
+
+## Settlement identity
+
+Holo Hollow is a declining Ferrite-mining settlement built on the remains of a
+former holo-tourism economy.
+
+Its major tourist draw was the nearby Holo Drive-In / projector complex. Families
+once traveled to Holo Hollow to watch holo entertainment, buy souvenirs, stay in
+family lodging, eat, and spend money across the settlement.
+
+The entertainment industry later moved to a newer distribution/encoding format.
+Holo Hollow's projector remained compatible with legacy media but could not show
+new releases, and the town could not afford the compatible replacement or
+upgrade. Tourism collapsed.
+
+The settlement adapted around Ferrite extraction, limited local Refining, repair
+work, hauling, and gig/delivery work. Ferrite is now itself a declining trade:
+newer materials are increasingly preferred and Ferrite extraction faces tighter
+regulation and environmental scrutiny.
+
+Holo Hollow should feel economically strained, dirty, and diminished without
+becoming a misery exhibit. It is still a home. Residents retain humor, routines,
+friendships, local pride, traditions, food, ridiculous stories, and things they
+believe are worth preserving.
+
+A useful thematic question is:
+
+> What happens to people when the thing their community was built around stops
+> mattering?
+
+Different residents should answer that question differently through nostalgia,
+adaptation, resentment, pragmatism, departure, reinvention, or attempts to
+rebuild.
+
+## Government and Ferrite regulation
+
+The broad federal-ish authority is the **S.S.A. — Settled Systems Authority**.
+A narrower extraction/resource regulator may exist later; its name is not yet
+canon.
+
+Ferrite regulation should support legitimate disagreement. Extraction may cause
+real environmental harm, while quotas and enforcement may also threaten the
+livelihoods of people with few alternatives. Do not frame the regulator as a
+cartoonishly evil "space EPA," and do not frame every local as using the same
+illegal workaround.
+
+Locals may bend or evade limits in varied ways — aliases, pooled quotas, buyers
+looking away, informal arrangements, corruption, or other workarounds — but
+compliance and attitudes should differ by person.
+
+## Geography and local destinations
+
+### Holo Hollow proper
+
+Holo Hollow begins as **one world/map hex**.
+
+Businesses, social spaces, and other places inside town are **local
+destinations** available only while the character is physically at the Holo
+Hollow world location. Entering a local destination is immediate and does not:
+
+- start Travel or Journey;
+- award Travel progression;
+- create a Scavenge opportunity;
+- change the character's authoritative world location.
+
+A local destination may have its own:
+
+- name and description;
+- location art;
+- present NPCs;
+- activities and interactions;
+- access state;
+- clear return control to the Holo Hollow town surface.
+
+The Holo Hollow Location surface should list the available local destinations.
+Opening one should feel like entering a real place, not opening a generic modal
+or pretending the building is another world hex.
+
+This local-destination concept should be generic enough to support later cities,
+stations, facilities, secured rooms, or businesses without Holo-Hollow-specific
+conditionals.
+
+### Visible-but-locked local destinations
+
+A local destination may be visible before it is enterable. Access should be
+derived from generic Mission/world-state conditions rather than hard-coded checks
+for one named building.
+
+**HH B&B** is the first planned example: early explorers may see it but are
+refused entry because it currently serves locals and regular workers only. A
+follow-up Wade Power Cell Mission introduces Mara Kells and, on completion,
+changes that destination to enterable.
+
+The locked place should remain visible so the player can notice that the world
+changed when access is later granted.
+
+### Holo Drive-In
+
+The Holo Drive-In / projector site is a **separate nearby world hex**. Travel
+between Holo Hollow and the Drive-In uses ordinary Travel/Journey semantics.
+Do not invent a special short intra-town travel rule for it.
+
+### Class and district boundaries
+
+Do not split Holo Hollow into multiple world hexes merely to express richer and
+poorer areas. Initially communicate class/economic differences through art,
+architecture, cleanliness, prices, accessibility, NPCs, and dialogue.
+
+A later district may become its own world location only when unique gameplay,
+NPC density, businesses, Missions, or persistent world-state meaning justify the
+extra geography.
+
+## First residents and businesses
+
+### Bix Weller — Holo Hollow Souvenirs + Mining Supplies
+
+Bix Weller runs **Holo Hollow Souvenirs + Mining Supplies**.
+
+The business should visibly preserve its tourism history: the original **Holo
+Hollow Souvenirs** sign remains, with a rough later **+ Mining Supplies** addition
+painted or bolted onto it.
+
+Bix fundamentally still thinks of the business as a souvenir shop that happens
+to sell mining supplies, even though mining/material business is effectively all
+it does now. This is mild denial and identity preservation, not a joke he is
+performing for the player.
+
+His parents owned the shop during the tourism era. Bix grew up there, later took
+over the business, and is roughly Wade Rusk's age. Bix and Wade grew up together
+and likely went to school together, giving their present-day teasing and
+familiarity a long history.
+
+Bix is dry, observant, mildly sarcastic, and fundamentally decent. He will make
+money from the player, but he will not make money from the player being stupid.
+He may provide useful local knowledge even when doing so is not the most
+profitable possible choice.
+
+Bix misses Holo Hollow's tourism years and believes the town may yet recover
+that part of its identity.
+
+### Mara Kells — HH B&B
+
+Mara Kells owns **HH B&B**, the family bed-and-breakfast her family operated for
+families visiting Holo Hollow during the tourism years.
+
+As tourism disappeared, Mara adapted the business into the town's practical
+inn/cantina for locals, miners, haulers, contractors, and working travelers.
+Unused tourist infrastructure became useful because Mara accepted the town that
+actually existed rather than waiting for the old one to return.
+
+Mara loves Bix and has known him for years, but thinks he is a dingdong for
+assuming tourism will simply come back. She is the pragmatic counterpoint to
+Bix's nostalgia.
+
+HH B&B remains a useful long-term home for future systems such as rest/healing,
+food, combat consumables, lodging, travelers, rumors, and Mission encounters,
+but those mechanics should not be built before gameplay creates a real need.
+
+### Renn Calder — pessimistic younger miner
+
+Renn Calder is a younger Ferrite miner, roughly late 20s to early 30s, who grew
+up after Holo Hollow's tourism boom was already mostly gone.
+
+Renn cares about Holo Hollow but thinks the older generation often confuses
+loyalty with denial. Renn believes Ferrite has little long-term future and would
+tell younger residents such as Tansy not to sacrifice their whole lives to the
+town.
+
+Renn should initially exist primarily for social/worldbuilding conversation, not
+as a merchant or Mission dispenser. Renn provides an important third view of
+Holo Hollow:
+
+- Bix: the old Holo Hollow can come back;
+- Mara: stop waiting and make the current town work;
+- Renn: neither version has much future, so leave while you still can.
+
+Renn's initial encounter location is the Holo Hollow Community Assistance
+Center, keeping a social NPC available even before HH B&B unlocks.
+
+## Repurposed tourism infrastructure
+
+### Holo Hollow Community Assistance Center
+
+The former Holo Hollow Visitor Center is now the **Holo Hollow Community
+Assistance Center**.
+
+The old visitor-center identity should remain visibly legible beneath newer
+practical municipal/government labeling. The building handles local assistance
+and ration distribution.
+
+Cheap, unappetizing but nutritious daily rations may be referenced through art,
+dialogue, or worldbuilding. Do **not** implement a player-facing ration claim,
+food item, healing effect, or consumable system until food/healing gameplay has
+an actual purpose.
+
+### Depot / hauler area
+
+A depot, old parking/landing area, or hauler staging area may be visible in the
+first town slice. It can foreshadow later paid transport and reinforce the town's
+working economy.
+
+Functional paid rides are deferred. Do not add special travel timing or one-way
+rides in the foundation slice merely because the depot is visible.
+
+### Future contract board
+
+Tourism-era ticket/information infrastructure may later support a contract/job
+board. The first foundation may visually foreshadow that future use, but the
+full contract system is not part of the first town slice.
+
+## Credits and first merchant economy
+
+Credits are **character-scoped**, not account-scoped.
+
+New characters begin with **10 Credits**.
+
+Bix's initial approved playtest prices are:
+
+| Item | Bix buys from player | Bix sells to player |
+| --- | ---: | ---: |
+| Ferrite Shale | 2 Credits | Not initially stocked |
+| Refined Ferrite | 10 Credits | Not initially stocked |
+| Slag | 1 Credit | Not initially stocked |
+| Power Cell | 3 Credits | 8 Credits |
+
+These values are approved **initial playtest balance**, not permanent sacred
+economy constants. They should be authored centrally and tuned after real
+playtesting when the wider item economy is visible.
+
+The intended relationships matter more than preserving the exact numbers
+forever:
+
+- raw Shale has modest guaranteed value;
+- successful Refining creates meaningful added value;
+- Slag is disappointing but not worthless;
+- ordinary merchant selling is convenient but financially mediocre relative to
+  later authored contracts;
+- Bix buys Power Cells even though the Emergency Power Annex provides a limited
+  free daily allotment, because selling a Cell for a few Credits is an
+  intentional player choice rather than misuse of the system;
+- buying Power Cells is a useful convenience/time-value purchase rather than an
+  automatic requirement.
+
+A later Wade apprentice Mission asks the player to bring Tansy three Power
+Cells. At the approved 8-Credit retail price, Wade provides exactly **24
+Credits** for that purchase. The Mission still requires visiting/talking to Bix
+even if the player already owns enough Cells.
+
+## First Holo Hollow foundation slice
+
+The first implementation slice should establish the town as a place and create
+one small economic loop without pulling future systems forward prematurely.
+
+### In scope
+
+- Holo Hollow as a world location/hex;
+- Holo Hollow town Location presentation and local-destination navigation;
+- generic immediate local destinations that preserve the current world location;
+- generic visible-but-locked local-destination access state;
+- Bix Weller;
+- Holo Hollow Souvenirs + Mining Supplies;
+- Mara Kells;
+- HH B&B visible but locked before its later Mission unlock;
+- Renn Calder;
+- Holo Hollow Community Assistance Center and Renn interaction;
+- character-scoped Credits with a 10-Credit starting balance;
+- Bix buying Ferrite Shale, Refined Ferrite, Slag, and Power Cells;
+- Bix selling Power Cells;
+- the approved initial playtest prices in this document;
+- visible environmental hooks toward the depot/hauler area, future contract
+  board, and nearby Drive-In where useful;
+- three new early Holo Hollow residents only: Bix, Mara, and Renn.
+
+Do not add a fourth NPC merely to hit a number. Add future residents when a
+distinct character need exists.
+
+Final Holo Hollow location-art generation/preparation is a separate dedicated
+asset step. The design and implementation boundaries may be established before
+final art exists, using only repository-approved temporary treatment if an
+implementation issue explicitly allows it.
+
+### Out of scope
+
+- Wade's three-Power-Cell apprentice Mission;
+- HH B&B rest/healing mechanics;
+- food effects or combat consumables;
+- player-facing ration claims;
+- full contract/job-board system;
+- functional depot rides/public transportation;
+- player housing;
+- free or paid town storage/warehousing;
+- projector restoration implementation;
+- post-restoration tourism/economic simulation;
+- combat;
+- a second town hex solely for class distinction;
+- speculative generic city simulation or NPC scheduling.
+
+## Follow-up Wade apprentice Mission
+
+The Mission after **Hold It Together** should not auto-start. The player talks to
+Wade after repairing the Cargo Hold.
+
+Wade is reservedly pleased and declares the player his apprentice whether they
+like it or not. During that conversation, Tansy contacts Wade through the
+existing remote-dialogue/comms presentation and says she has run out of Power
+Cells while Mining. Wade has none.
+
+Wade sends his new apprentice to bring Tansy **3 Power Cells** and gives the
+player exactly **24 Credits** — the retail cost of three Cells from Bix.
+
+The Mission should:
+
+- require the player to visit and interact with Bix even if they already carry
+  three Cells;
+- allow existing inventory to satisfy the final delivery requirement;
+- let the player keep Wade's allowance if they already own the Cells;
+- introduce Bix and Holo Hollow's merchant economy;
+- let Bix joke about Wade providing exactly the purchase price and no delivery
+  tip;
+- let Bix point the player toward the Emergency Power Annex as the renewable
+  daily Cell source;
+- introduce Mara naturally during the Bix interaction;
+- unlock HH B&B only after the Mission is completed;
+- prefer one sequential Mission if the generic Mission framework supports the
+  needed conversation/activity stages rather than splitting it into arbitrary
+  Mission IDs to work around missing framework capability.
+
+This Mission is a **follow-up issue**, not part of the first Holo Hollow
+foundation implementation.
+
+## Contracts and economic progression
+
+Later contracts should generally **buy outcomes**, while Missions may require
+performing behaviors because they teach or advance narrative progression.
+
+Commercial contracts should normally accept inventory acquired before the
+contract was accepted unless a specific authored contract gives a real in-world
+reason not to. Do not add timed XP multipliers or anti-stockpiling systems merely
+to force fresh production.
+
+The intended later Cargo decision is:
+
+- sell materials to Bix now for a mediocre guaranteed price; or
+- keep valuable Cargo space occupied in hopes of a better authored contract
+  later.
+
+That gives the repaired Cargo Hold strategic meaning without adding free town
+storage.
+
+## Holo Drive-In and Tansy's longer arc
+
+The old projector is obsolete, not simply dead. It can still show legacy-format
+films, so local families continue a recurring cheap movie tradition with the
+same old films everyone has seen and can quote from memory.
+
+Wade used to take Tansy to the movies every Friday after her parents died,
+continuing a tradition her parents had started with her. Establish the recurring
+Wade/Tansy movie tradition before revealing its full emotional history so the
+later detail has weight rather than functioning as an exposition dump.
+
+A later projector-restoration/upgrade Mission should make the site compatible
+with current releases again. That is tied to Tansy's longer character arc: she
+has difficulty imagining leaving Holo Hollow while she believes the town has no
+future. Seeing a credible path toward renewed visitors and reinvention is part of
+what eventually allows her to feel okay leaving and traveling with the player.
+
+Projector restoration should produce visible persistent consequences rather than
+only completing a Mission checkbox. Later effects may include changed dialogue,
+renewed visitors, reopened or improved businesses, new economic opportunities,
+or modest physical changes.
+
+Exact projector hardware, media-corporation names, implementation timing, and
+post-restoration simulation remain future design work.
+
+## Tone guardrails
+
+- Do not turn every NPC into a Mission dispenser.
+- Do not make Holo Hollow uniformly miserable.
+- Do not dump town history through exposition when signage, reused buildings,
+  conversation, Missions, and environmental details can reveal it naturally.
+- Keep RuneSpace's satirical streak, but prefer believable people. Institutions,
+  corporate products, bureaucracy, signage, and absurd circumstances can carry
+  more of the joke than parody character names.
+- Do not invent generic fantasy-RPG abstractions such as a Quest Guild or
+  context-free General Store when Holo Hollow's history can produce a specific
+  business instead.
+- Preserve legitimate disagreement about Ferrite, regulation, staying, leaving,
+  tourism, and the town's future.
