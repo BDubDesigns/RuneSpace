@@ -5,14 +5,19 @@ import { expect, test } from "@playwright/test";
 test("public landing loads with pre-alpha identity and entry actions", async ({ page }) => {
   await page.goto("/");
 
-  await expect(page.getByRole("heading", { name: "RuneSpace" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "RuneSpace", exact: true })).toBeVisible();
   await expect(page.getByText("Low-fi sci-fi RPG / Holo Hollow", { exact: true })).toBeVisible();
   await expect(page.getByText("Playable pre-alpha", { exact: true })).toBeVisible();
   await expect(page.getByRole("link", { name: "Register" }).first()).toBeVisible();
   await expect(page.getByRole("link", { name: "Sign in" }).first()).toBeVisible();
   await expect(page.getByRole("link", { name: "Register", exact: true })).toHaveCount(2);
   await expect(page.getByRole("link", { name: "Sign in", exact: true })).toHaveCount(3);
-  await expect(page.getByRole("navigation", { name: "Public" })).toHaveCount(0);
+  await expect(page.getByRole("navigation", { name: "Public" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Home", exact: true })).toHaveAttribute("href", "/");
+  await expect(page.getByRole("link", { name: "Updates", exact: true })).toHaveAttribute(
+    "href",
+    "/updates",
+  );
   await expect(page.getByRole("link", { name: "Brandon", exact: true })).toHaveAttribute(
     "href",
     "https://github.com/BDubDesigns",

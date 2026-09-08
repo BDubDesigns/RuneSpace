@@ -3,7 +3,12 @@ import { RuneSpaceBrand } from "@/components/branding/RuneSpaceBrand";
 import { PublicSiteShell } from "@/components/public-site/PublicSiteShell";
 import { ActionLink } from "@/components/ui/ActionLink";
 import { Panel } from "@/components/ui/Panel";
-import { publicLandingContent } from "./public-site-content";
+import {
+  formatPublicUpdateDate,
+  getLatestPublishedUpdate,
+  getPublicUpdatePath,
+} from "./public-updates";
+import { publicLandingContent, publicSiteNavigation } from "./public-site-content";
 
 function BuildSignal({ label, value }: { label: string; value: string }) {
   return (
@@ -45,6 +50,7 @@ function PublicSectionHeader({
 export function PublicLandingPage({ signedIn }: { signedIn: boolean }) {
   const { adventure, buildSignal, capabilities, currentBuild, hero, showcase, status } =
     publicLandingContent;
+  const latestUpdate = getLatestPublishedUpdate();
   const prominentActionClassName = "min-h-14 px-6 py-3 text-base sm:min-h-16 sm:px-8 sm:text-lg";
 
   const playEntry = signedIn ? (
@@ -56,7 +62,7 @@ export function PublicLandingPage({ signedIn }: { signedIn: boolean }) {
   );
 
   return (
-    <PublicSiteShell headerActions={playEntry}>
+    <PublicSiteShell headerActions={playEntry} navigation={publicSiteNavigation}>
       <div className="mx-auto w-full max-w-6xl px-4 pb-16 sm:px-6 lg:pb-24">
         <section className="grid min-w-0 gap-10 py-12 sm:py-16 lg:grid-cols-[minmax(0,1.35fr)_minmax(18rem,0.65fr)] lg:items-end lg:gap-16 lg:py-24">
           <div className="min-w-0">
@@ -153,6 +159,33 @@ export function PublicLandingPage({ signedIn }: { signedIn: boolean }) {
                 </figcaption>
               </figure>
             ))}
+          </div>
+        </section>
+
+        <section aria-labelledby="latest-update-heading" className="pt-20 sm:pt-28">
+          <div className="border-y border-[color:var(--rs-border-structural)] py-8 sm:flex sm:items-end sm:justify-between sm:gap-12 sm:py-10">
+            <div className="min-w-0">
+              <p className="font-display text-xs uppercase tracking-[0.16em] text-[color:var(--rs-accent-primary)]">
+                Latest update
+              </p>
+              <p className="mt-3 text-xs font-semibold uppercase tracking-[0.12em] text-[color:var(--rs-text-muted)]">
+                <time dateTime={latestUpdate.publishedAt}>
+                  {formatPublicUpdateDate(latestUpdate.publishedAt)}
+                </time>
+              </p>
+              <h2
+                className="mt-2 max-w-2xl font-display text-2xl font-bold tracking-tight text-[color:var(--rs-text-primary)] sm:text-3xl"
+                id="latest-update-heading"
+              >
+                {latestUpdate.title}
+              </h2>
+              <p className="mt-3 max-w-2xl text-sm leading-6 text-[color:var(--rs-text-secondary)] sm:text-base">
+                {latestUpdate.summary}
+              </p>
+            </div>
+            <ActionLink className="mt-6 shrink-0 sm:mt-0" href={getPublicUpdatePath(latestUpdate)}>
+              Read update
+            </ActionLink>
           </div>
         </section>
 

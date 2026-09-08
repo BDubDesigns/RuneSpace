@@ -1,3 +1,8 @@
+export const publicSiteNavigation = [
+  { href: "/", label: "Home" },
+  { href: "/updates", label: "Updates" },
+] as const;
+
 export const publicLandingContent = {
   hero: {
     eyebrow: "Low-fi sci-fi RPG / Holo Hollow",

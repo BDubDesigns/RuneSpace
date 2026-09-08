@@ -130,6 +130,16 @@ absolute public HTTPS URLs; `highlights` has zero to three entries.
   as completed. qcfailed.com owns remote validation, PR interpretation, preview
   probing, and public rendering; RuneSpace only maintains the manifest contract.
 
+## Public Updates
+
+For meaningful player-facing gameplay, UX, balance, content, or progression
+changes, decide whether a public Update is warranted. When it is, add one
+following the authoring procedure in `docs/public-updates.md` in the same PR
+unless the issue says otherwise.
+Do not add Updates for internal-only work without meaningful player impact, or
+rewrite a published Update for unrelated later changes; an issue's explicit
+Update requirement is authoritative.
+
 ## Tooling and safety reminders
 
 - pnpm is the package manager; Node 22 and pnpm 9.15.4 are pinned. Key checks
