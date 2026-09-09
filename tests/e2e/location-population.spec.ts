@@ -185,14 +185,15 @@ populationTest(
     await page.reload();
     await expect(page.locator("[data-location-surface]")).toBeVisible();
     // Crash Site is the shared default location for every concurrently
-    // running test's character, so its total population can also shift from
-    // unrelated ambient traffic between these two reads. An exact `before + 1`
-    // equality is therefore not a reliable proof; what this step actually
-    // owns is proving revalidation picked up the newly seeded character
-    // without a manual refresh — the count must not still be stale (it can
-    // only have grown, never shrunk, relative to our own addition), and the
-    // specific new row's visibility below is the precise content proof.
-    expect(await indicatorCount(page)).toBeGreaterThanOrEqual(before + 1);
+    // running test's character, so its total population can shift from
+    // unrelated ambient traffic between these two reads in either direction
+    // (another test's character can arrive at or depart Crash Site in the
+    // same window) — an earlier `before + 1` lower-bound assertion here still
+    // observed a real failure (ambient departures offsetting our own
+    // addition), so no numeric bound on the shared total is reliable. What
+    // this step actually owns is proving revalidation picked up the newly
+    // seeded character without a manual refresh, which the specific new
+    // row's visibility below proves precisely and deterministically.
     // Disclosure collapsed on reload — reopen to see the new entry
     await expect(populationDisclosure(page)).toHaveAttribute("aria-expanded", "false");
     await populationDisclosure(page).click();

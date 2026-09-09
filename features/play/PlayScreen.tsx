@@ -89,17 +89,33 @@ function PlayFooter() {
  * would squeeze the lockup below its approved mobile height.
  *
  * Unread adds the existing `--rs-glow-primary` shadow token (already used for
- * the header panel itself) — no new color or shadow recipe, just applied to a
- * smaller control so it reads clearly. It drops away completely once
- * acknowledged; `.rs-focus:focus-visible` sets `outline`, a separate property
- * from `box-shadow`, so the glow never interferes with the focus ring.
+ * the header panel itself) as an exterior halo — no new color or shadow
+ * recipe. Two things keep it from silently doing nothing:
+ * - `ActionButton` always carries `rs-bevel`, whose clip-path clips any
+ *   shadow drawn outside the element's own box (see `.rs-bevel` and the
+ *   `.rs-bevel.rs-mission-guidance` note in `app/globals.css`), so the glow
+ *   is applied to the unclipped `<form>` wrapper around the button rather
+ *   than the beveled button itself; `rs-bevel` stays untouched.
+ * - Tailwind's `shadow-[var(...)]` arbitrary-value syntax only sets the
+ *   `--tw-shadow-color`/`--tw-shadow` custom properties, not the `box-shadow`
+ *   property itself, unless a base `shadow` utility is also present (verified
+ *   in the compiled CSS — this silently does nothing on its own, which is
+ *   also true of the header's existing identical usage). An inline style sets
+ *   `box-shadow` directly instead, avoiding that ambiguity.
+ * The halo drops away completely once acknowledged; `.rs-focus:focus-visible`
+ * sets `outline` on the button, a separate property from the wrapper's
+ * `box-shadow`, so it never interferes with the focus ring.
  */
 function NewsControl({ unread }: { unread: boolean }) {
   return (
-    <form action={acknowledgeNewsAction}>
+    <form
+      action={acknowledgeNewsAction}
+      className="inline-flex"
+      style={unread ? { boxShadow: "var(--rs-glow-primary)" } : undefined}
+    >
       <ActionButton
         aria-label={unread ? "News, unread update available" : "News"}
-        className={`relative px-2.5 ${unread ? "shadow-[var(--rs-glow-primary)]" : ""}`}
+        className="relative px-2.5"
         intent="secondary"
         type="submit"
       >
