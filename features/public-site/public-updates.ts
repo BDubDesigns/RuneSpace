@@ -5,6 +5,27 @@ export type { PublicUpdate } from "@/game/schemas/public-updates";
 
 const authoredUpdates = [
   {
+    slug: "cargo-hold-is-easier-to-scan",
+    title: "The Cargo Hold Is Easier to Scan",
+    publishedAt: "2026-09-09T20:00:00-07:00",
+    summary:
+      "Deposit and Withdraw now work from a compact grid you select into, instead of a long list of permanent buttons.",
+    body: [
+      "The repaired Cargo Hold at the Crash Site started to feel heavier than it should the moment you had more than a few things stored in it. Every stack and every unique item rendered as its own tall row with WITHDRAW 1 and WITHDRAW STACK sitting there permanently, whether you needed them or not, and Carried Inventory did the same thing on the deposit side.",
+      "Cargo and Carried now render as a compact grid of tiles — the same artwork, name, and quantity you're used to, just smaller and side by side. Select a tile and the Deposit or Withdraw actions for that one item appear below it. Select something else and the actions move with it.",
+      "Nothing about what the Cargo Hold can hold or how a transfer works has changed. Stack limits, unique-item handling, and the 32-slot capacity are exactly what they were before — this only changes how you look at what's stored and pick the thing you want to move.",
+    ],
+    patchNotes: [
+      {
+        heading: "Changed",
+        items: [
+          "Cargo Hold and Carried Inventory contents now render as a compact selectable tile grid instead of one large row per stored item.",
+          "Deposit and Withdraw actions now appear only for the currently selected item, in one action area beneath the grid.",
+        ],
+      },
+    ],
+  },
+  {
     slug: "talk-is-a-conversation-now",
     title: "Talk Is a Conversation Now",
     publishedAt: "2026-09-09T15:00:00-07:00",
