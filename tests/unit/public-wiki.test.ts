@@ -74,4 +74,55 @@ describe("public Wiki content boundary", () => {
   it("returns undefined for an unknown slug", () => {
     expect(getWikiArticle("not-a-real-article")).toBeUndefined();
   });
+
+  it("accepts a paragraph with a deliberate link segment to a real article", () => {
+    const articles = validatePublicWikiArticles([
+      baseArticle,
+      {
+        ...baseArticle,
+        slug: "second-article",
+        title: "Second Article",
+        sections: [
+          {
+            paragraphs: [["See ", { text: "First Article", articleSlug: "first-article" }, "."]],
+          },
+        ],
+      },
+    ]);
+
+    expect(articles[1]!.sections[0]!.paragraphs).toEqual([
+      ["See ", { text: "First Article", articleSlug: "first-article" }, "."],
+    ]);
+  });
+
+  it("rejects a link segment whose target does not resolve to a real article slug", () => {
+    expect(() =>
+      validatePublicWikiArticles([
+        {
+          ...baseArticle,
+          sections: [
+            {
+              paragraphs: [["See ", { text: "Nowhere", articleSlug: "not-a-real-article" }, "."]],
+            },
+          ],
+        },
+      ]),
+    ).toThrow('Wiki article "first-article" links to unknown article slug: not-a-real-article');
+  });
+
+  it("resolves the real Wiki collection's authored internal links to known articles", () => {
+    const knownSlugs = new Set(getWikiArticles().map((article) => article.slug));
+
+    for (const article of getWikiArticles()) {
+      for (const section of article.sections) {
+        for (const paragraph of section.paragraphs ?? []) {
+          if (typeof paragraph === "string") continue;
+          for (const segment of paragraph) {
+            if (typeof segment === "string") continue;
+            expect(knownSlugs.has(segment.articleSlug)).toBe(true);
+          }
+        }
+      }
+    }
+  });
 });

@@ -145,10 +145,13 @@ Update requirement is authoritative.
 When a gameplay, content, UX, balance, or progression change materially
 changes a fact already documented in the public Wiki, update the affected
 Wiki page(s) in the same PR following `docs/public-wiki.md`, unless the issue
-says otherwise. Add a new Wiki page only when the player-facing information
-volume warrants one; internal-only CI/test/refactor/architecture work does
-not require a Wiki edit unless it changes actual player-visible behavior.
-Never publish approved-but-unshipped design as current Wiki behavior.
+says otherwise. Add a new Wiki page only when new player-facing information
+does not fit cleanly into an existing page; otherwise update the most
+relevant existing page(s) — never a blanket "new feature = new page" rule,
+and never one thin page per new item, NPC, action, or mechanic. Internal-only
+CI/test/refactor/architecture work does not require a Wiki edit unless it
+changes actual player-visible behavior. Never publish approved-but-unshipped
+design as current Wiki behavior.
 
 ## Tooling and safety reminders
 

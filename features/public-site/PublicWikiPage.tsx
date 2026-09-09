@@ -3,7 +3,33 @@ import type { ReactNode } from "react";
 import { PublicSiteShell } from "@/components/public-site/PublicSiteShell";
 import { ActionLink } from "@/components/ui/ActionLink";
 import { Panel } from "@/components/ui/Panel";
+import type { WikiParagraph } from "@/game/schemas/public-wiki";
 import { getWikiArticlePath, getWikiArticles, type WikiArticle } from "./public-wiki";
+
+const wikiLinkClassName =
+  "rs-focus rounded-sm underline decoration-[color:var(--rs-accent-primary)] decoration-2 underline-offset-2 hover:text-[color:var(--rs-accent-primary)]";
+
+function WikiParagraphText({ paragraph }: { paragraph: WikiParagraph }) {
+  if (typeof paragraph === "string") return <>{paragraph}</>;
+
+  return (
+    <>
+      {paragraph.map((segment, index) =>
+        typeof segment === "string" ? (
+          <span key={index}>{segment}</span>
+        ) : (
+          <Link
+            className={wikiLinkClassName}
+            href={getWikiArticlePath({ slug: segment.articleSlug })}
+            key={index}
+          >
+            {segment.text}
+          </Link>
+        ),
+      )}
+    </>
+  );
+}
 import { publicSiteNavigation } from "./public-site-content";
 
 export function PublicWikiIndexPage() {
@@ -89,8 +115,10 @@ export function PublicWikiArticlePage({ article }: { article: WikiArticle }) {
                       : "space-y-4 text-base leading-8 text-[color:var(--rs-text-secondary)]"
                   }
                 >
-                  {section.paragraphs.map((paragraph) => (
-                    <p key={paragraph}>{paragraph}</p>
+                  {section.paragraphs.map((paragraph, index) => (
+                    <p key={index}>
+                      <WikiParagraphText paragraph={paragraph} />
+                    </p>
                   ))}
                 </div>
               ) : null}

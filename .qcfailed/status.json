@@ -2,10 +2,10 @@
   "schemaVersion": 1,
   "projectSlug": "runespace",
   "workState": "active",
-  "currentFocus": "Building a repository-backed public player Wiki covering the currently shipped Holo Hollow loop.",
+  "currentFocus": "Reviewing the repository-backed public player Wiki covering the currently shipped Holo Hollow loop in Draft PR #162.",
   "currentChange": {
     "summary": "Adds a public /wiki manual covering the currently shipped Holo Hollow loop.",
-    "stage": "implementation",
+    "stage": "review",
     "pullRequestNumber": 162
   },
   "latestCompleted": {

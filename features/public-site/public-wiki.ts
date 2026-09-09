@@ -41,7 +41,15 @@ const authoredWikiArticles = [
       {
         heading: "Where to go next",
         paragraphs: [
-          "See Travel & Scavenging for how walking works, Mining & Refining for the two work loops, and Missions for the full job list.",
+          [
+            "See ",
+            { text: "Travel & Scavenging", articleSlug: "travel-and-scavenging" },
+            " for how walking works, ",
+            { text: "Mining & Refining", articleSlug: "mining-and-refining" },
+            " for the two work loops, and ",
+            { text: "Missions", articleSlug: "missions" },
+            " for the full job list.",
+          ],
         ],
       },
     ],
@@ -76,7 +84,11 @@ const authoredWikiArticles = [
         heading: "Scavenging while you walk",
         paragraphs: [
           "Every ordinary walk gives you one chance to scavenge along the way. The opportunity opens at some point during the walk and stays open for a few seconds before it's gone for good — there's no way to trigger it early or get a second chance on the same leg.",
-          "Claiming it can turn up a little Ferrite Shale, a Power Cell or two, some Refined Ferrite, or nothing at all. It never costs you anything to try, and it never slows down or speeds up your arrival.",
+          [
+            "Claiming it can turn up a little Ferrite Shale, a ",
+            { text: "Power Cell", articleSlug: "power-cells" },
+            " or two, some Refined Ferrite, or nothing at all. It never costs you anything to try, and it never slows down or speeds up your arrival.",
+          ],
         ],
       },
     ],
@@ -94,7 +106,11 @@ const authoredWikiArticles = [
       {
         heading: "Mining at The Jag",
         paragraphs: [
-          "Mining is only available at The Jag, and only while you have a Salvage Cutter equipped. Each attempt takes about six seconds; a success gives you one or two Ferrite Shale. Your chance of success improves as your Mining skill grows, and Mining stops on its own if you run out of room to carry more shale.",
+          [
+            "Mining is only available at The Jag, and only while you have a Salvage Cutter equipped. Each attempt takes about six seconds; a success gives you one or two Ferrite Shale. Your chance of success improves as your Mining skill grows, and Mining stops on its own if you run out of room to carry more shale. A charged ",
+            { text: "Power Cell", articleSlug: "power-cells" },
+            " can speed this up.",
+          ],
         ],
       },
       {
@@ -133,7 +149,11 @@ const authoredWikiArticles = [
       {
         heading: "Equipping gear",
         paragraphs: [
-          "Open Inventory or Equipment to equip an item, such as your Salvage Cutter, into its matching slot. Equipped items disappear from the Inventory grid while they're worn — they're not gone, just equipped.",
+          [
+            "Open Inventory or Equipment to equip an item, such as your ",
+            { text: "Salvage Cutter", articleSlug: "mining-and-refining" },
+            ", into its matching slot. Equipped items disappear from the Inventory grid while they're worn — they're not gone, just equipped.",
+          ],
         ],
       },
       {
@@ -159,7 +179,11 @@ const authoredWikiArticles = [
         heading: "Charging the Salvage Cutter",
         paragraphs: [
           "Load one carried Power Cell into an equipped, empty Salvage Cutter from Inventory or Equipment. This sets the Cutter's charge to ten uses and consumes the cell completely — a Cutter that already has charge can't be topped up early.",
-          "While the Cutter has charge, each Mining attempt takes about three seconds instead of six — everything else about Mining (chance of success, what you find, XP) stays the same. Once the charge runs out, Mining automatically goes back to its normal speed.",
+          [
+            "While the Cutter has charge, each ",
+            { text: "Mining", articleSlug: "mining-and-refining" },
+            " attempt takes about three seconds instead of six — everything else about Mining (chance of success, what you find, XP) stays the same. Once the charge runs out, Mining automatically goes back to its normal speed.",
+          ],
         ],
       },
     ],
@@ -177,13 +201,21 @@ const authoredWikiArticles = [
       {
         heading: "Unlocking the repair",
         paragraphs: [
-          "The repair opens up once Wade Rusk puts you on the Hold It Together job, which arrives automatically after you finish Waste Not. Until then, the Cargo Hold just shows as damaged.",
+          [
+            "The repair opens up once Wade Rusk puts you on the ",
+            { text: "Hold It Together", articleSlug: "missions" },
+            " job, which arrives automatically after you finish Waste Not. Until then, the Cargo Hold just shows as damaged.",
+          ],
         ],
       },
       {
         heading: "The material recipe",
         paragraphs: [
-          "The repair needs exactly 15 Refined Ferrite and 6 Slag. You can contribute materials across more than one visit, but the game asks you to confirm the exact amount each time — once installed, materials can't be taken back out.",
+          [
+            "The repair needs exactly 15 ",
+            { text: "Refined Ferrite and 6 Slag", articleSlug: "mining-and-refining" },
+            ". You can contribute materials across more than one visit, but the game asks you to confirm the exact amount each time — once installed, materials can't be taken back out.",
+          ],
         ],
       },
       {
@@ -222,7 +254,7 @@ const authoredWikiArticles = [
       {
         heading: "How missions work in practice",
         paragraphs: [
-          "Objectives update live as you meet them, and the current one is always clear in the Mission Log. Finishing one of these jobs hands you the next one automatically — there's nothing extra to accept. When every objective is met, talk to the NPC named in the job to turn it in.",
+          "Objectives update live as you meet them, and the current one is always clear in the Mission Log. Finishing Walk It Off, Cut Your Teeth, or Waste Not hands you the next job in the chain automatically — there's nothing extra to accept. Hold It Together is currently the last job in the chain. When every objective on a job is met, talk to the NPC named in it to turn it in.",
         ],
       },
     ],
@@ -235,7 +267,11 @@ const authoredWikiArticles = [
     sections: [
       {
         paragraphs: [
-          "Holo Hollow is the wrecked stretch of ground you're stranded in. It currently has five connected locations — see Travel & Scavenging for how they connect.",
+          [
+            "Holo Hollow is the wrecked stretch of ground you're stranded in. It currently has five connected locations — see ",
+            { text: "Travel & Scavenging", articleSlug: "travel-and-scavenging" },
+            " for how they connect.",
+          ],
         ],
       },
       {
@@ -251,7 +287,7 @@ const authoredWikiArticles = [
       {
         heading: "Who's here",
         paragraphs: [
-          "Wade Rusk, a Holo Hollow recovery and salvage operator, is based at the Crash Site. Tansy Rusk, a field mechanic and miner, is based at The Jag. They're the only two people around right now.",
+          "Wade Rusk, a Holo Hollow recovery and salvage operator, is based at the Crash Site. Tansy Rusk, a field mechanic and miner, is based at The Jag. They're the only two NPCs currently present in the playable area — other player characters can also be around.",
           "This is an early, playable build — check the Updates page for what's new in Holo Hollow.",
         ],
       },
@@ -274,6 +310,20 @@ const authoredWikiArticles = [
           "Mining — a successful Mining attempt at The Jag grants Mining XP.",
           "Refining — a Refining attempt at the Abandoned Processing Yard grants Refining XP, whether it succeeds or not.",
           "Welding — each completed welding pass on the Cargo Hold repair grants Welding XP.",
+        ],
+      },
+      {
+        heading: "Mission rewards",
+        paragraphs: [
+          [
+            "The current missions also grant skill XP when you complete them: ",
+            { text: "Cut Your Teeth", articleSlug: "missions" },
+            " grants +100 Mining XP, ",
+            { text: "Waste Not", articleSlug: "missions" },
+            " grants +100 Refining XP, and ",
+            { text: "Hold It Together", articleSlug: "missions" },
+            " grants +100 Welding XP.",
+          ],
         ],
       },
       {
@@ -300,6 +350,22 @@ export function validatePublicWikiArticles(input: readonly unknown[]): readonly 
       throw new Error(`Duplicate Wiki article slug: ${article.slug}`);
     }
     seenSlugs.add(article.slug);
+  }
+
+  for (const article of articles) {
+    for (const section of article.sections) {
+      for (const paragraph of section.paragraphs ?? []) {
+        if (typeof paragraph === "string") continue;
+        for (const segment of paragraph) {
+          if (typeof segment === "string") continue;
+          if (!seenSlugs.has(segment.articleSlug)) {
+            throw new Error(
+              `Wiki article "${article.slug}" links to unknown article slug: ${segment.articleSlug}`,
+            );
+          }
+        }
+      }
+    }
   }
 
   return articles;

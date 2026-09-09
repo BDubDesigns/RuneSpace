@@ -53,16 +53,8 @@ export function PublicLandingPage({ signedIn }: { signedIn: boolean }) {
   const latestUpdate = getLatestPublishedUpdate();
   const prominentActionClassName = "min-h-14 px-6 py-3 text-base sm:min-h-16 sm:px-8 sm:text-lg";
 
-  const playEntry = signedIn ? (
-    <ActionLink href="/characters">My characters</ActionLink>
-  ) : (
-    <ActionLink href="/sign-in" intent="secondary">
-      Sign in
-    </ActionLink>
-  );
-
   return (
-    <PublicSiteShell headerActions={playEntry} navigation={publicSiteNavigation}>
+    <PublicSiteShell navigation={publicSiteNavigation}>
       <div className="mx-auto w-full max-w-6xl px-4 pb-16 sm:px-6 lg:pb-24">
         <section className="grid min-w-0 gap-10 py-12 sm:py-16 lg:grid-cols-[minmax(0,1.35fr)_minmax(18rem,0.65fr)] lg:items-end lg:gap-16 lg:py-24">
           <div className="min-w-0">

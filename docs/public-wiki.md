@@ -26,7 +26,18 @@ index renders articles in the exact order they appear in
 `authoredWikiArticles` — authored order **is** the index grouping. Reorder
 the array to change the index; do not add a second ordering mechanism.
 
-The collection rejects duplicate slugs and missing/malformed required fields.
+A `paragraphs` entry is ordinary prose (a string), or — only when a specific
+phrase should link to another Wiki article — an array of segments mixing
+plain strings with `{ text, articleSlug }` link objects that concatenate into
+the same prose. This is a deliberate, narrow, author-controlled link: you
+choose exactly which phrase links where. Do not implement automatic
+keyword replacement/autolinking, and do not extend this pattern to `list`
+items or any richer inline formatting (bold, italics, etc.) — it exists only
+for cross-linking related articles.
+
+The collection rejects duplicate slugs, missing/malformed required fields,
+and any link segment whose `articleSlug` does not match a real authored
+article.
 `getWikiArticles()` returns the validated collection in authored order;
 `getWikiArticle(slug)` looks up one article; `getWikiArticlePath(article)` is
 the single canonical route projection used by the index, the article route,
@@ -75,9 +86,15 @@ until real content volume demonstrates a need.
 
 When a gameplay/content/UX/balance/progression change materially changes a
 fact already documented in the Wiki, update the affected article(s) in the
-**same PR** unless the issue says otherwise. Add a new article only when the
-player-facing information volume actually warrants one — do not create a page
-per internal registry/entity by default, and do not add empty placeholder
-pages for unshipped systems. Internal-only CI/test/refactor/architecture work
-does not require a Wiki update unless it changes actual player-visible
-behavior.
+**same PR** unless the issue says otherwise.
+
+Add a new article only when the new player-facing information does not fit
+cleanly into an existing article; otherwise update the most relevant existing
+article(s). Do not use a blanket "new feature = new article" rule, and do not
+create a page per internal registry/entity, item, NPC, action, or mechanic by
+default — a new page earns its place only when the genuinely new player-facing
+information volume warrants a standalone article. Do not add empty placeholder
+pages for unshipped systems.
+
+Internal-only CI/test/refactor/architecture work does not require a Wiki
+update unless it changes actual player-visible behavior.
