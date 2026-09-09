@@ -3,12 +3,17 @@
   "projectSlug": "runespace",
   "workState": "active",
   "currentFocus": "Building a repository-backed public player Wiki covering the currently shipped Holo Hollow loop.",
+  "currentChange": {
+    "summary": "Adds a public /wiki manual covering the currently shipped Holo Hollow loop.",
+    "stage": "implementation",
+    "pullRequestNumber": 162
+  },
   "latestCompleted": {
     "summary": "Added public Updates, patch notes, and the latest-Update homepage projection.",
     "date": "2026-09-08",
     "url": "https://github.com/BDubDesigns/RuneSpace/pull/161"
   },
-  "nextStep": "Open a Draft PR for the player Wiki, validate it, and review /wiki and an article on mobile and desktop.",
+  "nextStep": "Review Draft PR #162 on mobile and desktop; Brandon may approve product and code review before merge.",
   "lastMeaningfulUpdate": "2026-09-08",
   "highlights": [
     {
