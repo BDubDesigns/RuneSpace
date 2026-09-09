@@ -57,11 +57,12 @@ The approved RuneSpace identity is a small set of committed production assets. A
 Canonical asset paths:
 
 - `public/branding/runespace-header-lockup.png` — the horizontal **RuneSpace wordmark / lockup** for the authenticated game header. Intrinsic size 1455×376. Render it through the shared `components/branding/RuneSpaceBrand.tsx` component, which sets the accessible name (`alt="RuneSpace"`) and fixed intrinsic dimensions so the header does not jump while the image loads.
-- `public/branding/runespace-emblem.png` — the standalone **R emblem master**, used as the source for favicon/app-icon exports. Do not use it as the header lockup.
+- `public/branding/runespace-emblem.png` — the standalone **R emblem master**, used as the source for favicon/app-icon exports. Do not use it as the header lockup, with one narrow owner-approved exception: `components/public-site/PublicSiteShell.tsx` renders it as the **public-site header** identity below the responsive breakpoint documented below. The authenticated game header and every other public width still require the full lockup; do not extend the emblem to any other header or broaden this into a general alternate-logo rule.
 - `public/favicon.ico`, `public/favicon-16x16.png`, `public/favicon-32x32.png`, `public/apple-touch-icon.png`, `public/icon-192.png`, `public/icon-512.png` — exported emblem icons referenced by the app metadata in `app/layout.tsx`.
 
 Sizing and clear space (approved by the product owner; supersedes the earlier location-subtitle-in-header requirement):
 
 - Authenticated game header: one full-width beveled header panel spanning the game-shell content width. `RuneSpaceBrand`'s default `h-auto w-auto max-h-11 max-w-[min(52vw,100%)] sm:max-h-12 sm:max-w-[min(13rem,100%)]` renders the lockup at ~44px on mobile and ~48px from the `sm` breakpoint; the caps let it shrink responsively before wrapping or overflowing, while the shared `TopBar` `trailing` slot keeps the Sign out control vertically centered inside the same panel. The header deliberately does not repeat the current-location or `In transit` subtitle — the main page location/activity panel is the authoritative visible location presentation.
 - Signed-out landing: override with `h-14 w-auto sm:h-16` (~56px on mobile, ~64px from the `sm` breakpoint), inside the existing `Development build` heading card.
+- Public-site header (`PublicSiteShell`): the full lockup at every width `min-[390px]` and above; below `390px`, the standalone R emblem, so the Home / Updates / Wiki nav strip fits without horizontal scrolling on narrow phones. This swap is specific to the public-site header only.
 - Keep the accessible brand name; do not change the approved files' contents, compression, or dimensions.
