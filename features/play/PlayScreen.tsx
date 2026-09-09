@@ -88,9 +88,13 @@ function PlayFooter() {
  * out — see `RuneSpaceBrand`'s size contract), so a wider labeled button here
  * would squeeze the lockup below its approved mobile height.
  *
- * Unread adds the existing `--rs-glow-primary` shadow token (already used for
- * the header panel itself) as an exterior halo — no new color or shadow
- * recipe. Two things keep it from silently doing nothing:
+ * Unread adds the dedicated `--rs-glow-news-unread` attention token (see
+ * `app/globals.css`) as an exterior halo — derived from the same
+ * `--rs-accent-primary` cyan as `--rs-glow-primary`, but deliberately
+ * stronger since this needs to read as an attention affordance, not
+ * restrained panel ambiance; kept separate from the mission
+ * guidance/available tokens since those already carry gameplay meaning this
+ * control doesn't share. Two things keep it from silently doing nothing:
  * - `ActionButton` always carries `rs-bevel`, whose clip-path clips any
  *   shadow drawn outside the element's own box (see `.rs-bevel` and the
  *   `.rs-bevel.rs-mission-guidance` note in `app/globals.css`), so the glow
@@ -111,7 +115,7 @@ function NewsControl({ unread }: { unread: boolean }) {
     <form
       action={acknowledgeNewsAction}
       className="inline-flex"
-      style={unread ? { boxShadow: "var(--rs-glow-primary)" } : undefined}
+      style={unread ? { boxShadow: "var(--rs-glow-news-unread)" } : undefined}
     >
       <ActionButton
         aria-label={unread ? "News, unread update available" : "News"}
