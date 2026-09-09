@@ -7,7 +7,7 @@ const authoredUpdates = [
   {
     slug: "you-have-news",
     title: "You Have News",
-    publishedAt: "2026-09-09T12:00:00-07:00",
+    publishedAt: "2026-09-09T01:00:00-07:00",
     summary:
       "Signed-in accounts now get a quiet News indicator in the game shell whenever a new Update is waiting to be read.",
     body: [

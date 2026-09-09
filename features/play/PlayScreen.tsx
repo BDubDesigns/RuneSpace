@@ -87,13 +87,19 @@ function PlayFooter() {
  * already calibrated around exactly two controls (the brand lockup and Sign
  * out — see `RuneSpaceBrand`'s size contract), so a wider labeled button here
  * would squeeze the lockup below its approved mobile height.
+ *
+ * Unread adds the existing `--rs-glow-primary` shadow token (already used for
+ * the header panel itself) — no new color or shadow recipe, just applied to a
+ * smaller control so it reads clearly. It drops away completely once
+ * acknowledged; `.rs-focus:focus-visible` sets `outline`, a separate property
+ * from `box-shadow`, so the glow never interferes with the focus ring.
  */
 function NewsControl({ unread }: { unread: boolean }) {
   return (
     <form action={acknowledgeNewsAction}>
       <ActionButton
         aria-label={unread ? "News, unread update available" : "News"}
-        className="relative px-2.5"
+        className={`relative px-2.5 ${unread ? "shadow-[var(--rs-glow-primary)]" : ""}`}
         intent="secondary"
         type="submit"
       >

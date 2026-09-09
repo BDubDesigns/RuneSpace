@@ -93,6 +93,40 @@ suite("account-level news read-through (real PostgreSQL)", () => {
     expect(second?.newsReadThroughAt?.getTime()).toBe(first?.newsReadThroughAt?.getTime());
   });
 
+  it("advanceNewsReadThroughAt never regresses a stale/out-of-order write, even racing concurrently", async () => {
+    const userId = await makeUser("Racing Acknowledger");
+    const account = await ownership.ensurePlayerAccount(userId);
+    const older = new Date("2026-09-01T00:00:00Z");
+    const newer = new Date("2026-09-10T00:00:00Z");
+
+    // A stale/older candidate arriving after the boundary is already newer
+    // must never overwrite it (simulating an overlapping old-deployment
+    // request that read a since-superseded "newest" instant).
+    await accountNews.advanceNewsReadThroughAt(account.id, newer);
+    await accountNews.advanceNewsReadThroughAt(account.id, older);
+    const [afterStaleWrite] = await db
+      .select()
+      .from(rune.playerAccounts)
+      .where(eq(rune.playerAccounts.id, account.id));
+    expect(afterStaleWrite?.newsReadThroughAt?.getTime()).toBe(newer.getTime());
+
+    // The same guarantee holds under actual concurrent execution, not just
+    // sequential ordering: whichever of the two conditional UPDATEs commits
+    // last must still leave the row at the later instant, regardless of
+    // which request's UPDATE statement PostgreSQL executes first.
+    const secondUserId = await makeUser("Concurrent Racing Acknowledger");
+    const secondAccount = await ownership.ensurePlayerAccount(secondUserId);
+    await Promise.all([
+      accountNews.advanceNewsReadThroughAt(secondAccount.id, older),
+      accountNews.advanceNewsReadThroughAt(secondAccount.id, newer),
+    ]);
+    const [afterRace] = await db
+      .select()
+      .from(rune.playerAccounts)
+      .where(eq(rune.playerAccounts.id, secondAccount.id));
+    expect(afterRace?.newsReadThroughAt?.getTime()).toBe(newer.getTime());
+  });
+
   it("shares one news state across multiple characters under the same account", async () => {
     const userId = await makeUser("Multi Character");
     const account = await ownership.ensurePlayerAccount(userId);
