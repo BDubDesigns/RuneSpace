@@ -1,11 +1,13 @@
 "use client";
 
-import { Backpack, Map as MapIcon, ScrollText, Users } from "lucide-react";
+import { Backpack, Mail, Map as MapIcon, ScrollText, Users } from "lucide-react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { ActionButton } from "@/components/ui/ActionButton";
 import { GameShell, TopBar } from "@/components/ui/GameShell";
 import { RuneSpaceBrand } from "@/components/branding/RuneSpaceBrand";
 import { SignOutButton } from "@/features/auth/SignOutButton";
 import { PlayBoundaryTestTrigger } from "@/features/diagnostics/PlayBoundaryTestTrigger";
+import { acknowledgeNewsAction } from "@/server/actions";
 import type { PlayGameplayState } from "@/server/play";
 import { PlayConsole } from "./PlayConsole";
 import { PlayProvider, usePlay } from "./PlayContext";
@@ -73,16 +75,89 @@ function PlayFooter() {
   );
 }
 
-function PlayTopBar() {
-  return <TopBar title={<RuneSpaceBrand />} trailing={<SignOutButton />} />;
+/**
+ * Account-level unread-news control (issue #156). Submitting the form is an
+ * ordinary navigation (works without client JavaScript): the server action
+ * advances the authenticated account's news read-through boundary to the
+ * newest published Update's instant, then redirects to `/updates`. The
+ * unread dot is `aria-hidden`; the real state is folded into the button's
+ * `aria-label`, matching the existing footer badge convention.
+ *
+ * Icon-only with a compact footprint: the header panel's mobile budget is
+ * already calibrated around exactly two controls (the brand lockup and Sign
+ * out — see `RuneSpaceBrand`'s size contract), so a wider labeled button here
+ * would squeeze the lockup below its approved mobile height.
+ *
+ * Unread adds the dedicated `--rs-glow-news-unread` attention token (see
+ * `app/globals.css`) as an exterior halo — derived from the same
+ * `--rs-accent-primary` cyan as `--rs-glow-primary`, but deliberately
+ * stronger since this needs to read as an attention affordance, not
+ * restrained panel ambiance; kept separate from the mission
+ * guidance/available tokens since those already carry gameplay meaning this
+ * control doesn't share. Two things keep it from silently doing nothing:
+ * - `ActionButton` always carries `rs-bevel`, whose clip-path clips any
+ *   shadow drawn outside the element's own box (see `.rs-bevel` and the
+ *   `.rs-bevel.rs-mission-guidance` note in `app/globals.css`), so the glow
+ *   is applied to the unclipped `<form>` wrapper around the button rather
+ *   than the beveled button itself; `rs-bevel` stays untouched.
+ * - Tailwind's `shadow-[var(...)]` arbitrary-value syntax only sets the
+ *   `--tw-shadow-color`/`--tw-shadow` custom properties, not the `box-shadow`
+ *   property itself, unless a base `shadow` utility is also present (verified
+ *   in the compiled CSS — this silently does nothing on its own, which is
+ *   also true of the header's existing identical usage). An inline style sets
+ *   `box-shadow` directly instead, avoiding that ambiguity.
+ * The halo drops away completely once acknowledged; `.rs-focus:focus-visible`
+ * sets `outline` on the button, a separate property from the wrapper's
+ * `box-shadow`, so it never interferes with the focus ring.
+ */
+function NewsControl({ unread }: { unread: boolean }) {
+  return (
+    <form
+      action={acknowledgeNewsAction}
+      className="inline-flex"
+      style={unread ? { boxShadow: "var(--rs-glow-news-unread)" } : undefined}
+    >
+      <ActionButton
+        aria-label={unread ? "News, unread update available" : "News"}
+        className="relative px-2.5"
+        intent="secondary"
+        type="submit"
+      >
+        <Mail aria-hidden="true" className="h-4 w-4" />
+        <span className="sr-only">News</span>
+        {unread ? (
+          <span
+            aria-hidden="true"
+            className="absolute right-1 top-1 h-2.5 w-2.5 rounded-full border border-[color:var(--rs-surface-control)] bg-[color:var(--rs-accent-primary)]"
+          />
+        ) : null}
+      </ActionButton>
+    </form>
+  );
+}
+
+function PlayTopBar({ newsUnread }: { newsUnread: boolean }) {
+  return (
+    <TopBar
+      title={<RuneSpaceBrand />}
+      trailing={
+        <div className="flex items-center gap-2">
+          <NewsControl unread={newsUnread} />
+          <SignOutButton />
+        </div>
+      }
+    />
+  );
 }
 
 export function PlayScreen({
   characterName,
   initialState,
+  newsUnread,
 }: {
   characterName: string;
   initialState: PlayGameplayState;
+  newsUnread: boolean;
 }) {
   const pathname = usePathname();
   const router = useRouter();
@@ -91,7 +166,7 @@ export function PlayScreen({
 
   return (
     <PlayProvider initialState={initialState}>
-      <GameShell bottomNav={<PlayFooter />} topBar={<PlayTopBar />}>
+      <GameShell bottomNav={<PlayFooter />} topBar={<PlayTopBar newsUnread={newsUnread} />}>
         <PlayBoundaryTestTrigger />
         <PlayConsole
           characterName={characterName}

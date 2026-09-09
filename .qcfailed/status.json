@@ -2,19 +2,19 @@
   "schemaVersion": 1,
   "projectSlug": "runespace",
   "workState": "active",
-  "currentFocus": "Reviewing the repository-backed public player Wiki covering the currently shipped Holo Hollow loop in Draft PR #162.",
+  "currentFocus": "Finishing the account-level unread-news indicator for published Updates in PR #163.",
   "currentChange": {
-    "summary": "Adds a public /wiki manual covering the currently shipped Holo Hollow loop.",
-    "stage": "review",
-    "pullRequestNumber": 162
+    "summary": "Adds an account-level unread-news indicator to the authenticated game shell for published Updates.",
+    "stage": "merge-ready",
+    "pullRequestNumber": 163
   },
   "latestCompleted": {
-    "summary": "Added public Updates, patch notes, and the latest-Update homepage projection.",
-    "date": "2026-09-08",
-    "url": "https://github.com/BDubDesigns/RuneSpace/pull/161"
+    "summary": "Added a repository-backed public player Wiki covering the currently shipped Holo Hollow loop.",
+    "date": "2026-09-09",
+    "url": "https://github.com/BDubDesigns/RuneSpace/pull/162"
   },
-  "nextStep": "Review Draft PR #162 on mobile and desktop; Brandon may approve product and code review before merge.",
-  "lastMeaningfulUpdate": "2026-09-08",
+  "nextStep": "Let full CI complete on PR #163's final commit and merge to main once every required check is green.",
+  "lastMeaningfulUpdate": "2026-09-09",
   "highlights": [
     {
       "summary": "Extracted generic Play orchestration from the Mining feature into its own server and client boundary.",

@@ -21,7 +21,11 @@ Every object requires:
 - `publishedAt`: an ISO-8601 timestamp with an explicit timezone, such as
   `2026-09-07T12:00:00-07:00` or `2026-09-07T19:00:00Z`. Ordering is derived
   from this field, never from array order, filesystem timestamps, Git dates, or
-  the current clock.
+  the current clock. Its parsed instant must be unique across every authored
+  Update — two Updates cannot publish at the same instant, even when spelled
+  with different UTC offsets — because the account-level news read-through
+  boundary (issue #156) identifies "the newest published Update" by this same
+  instant and cannot distinguish two Updates that share one.
 - `summary`: the short excerpt shown on the index and homepage.
 - `body`: an ordered array of prose paragraphs.
 - `patchNotes`: an ordered array of sections, each with a `heading` such as
@@ -33,8 +37,9 @@ reference them with the public path, for example
 `/updates/repair-complete.webp`, plus its real `alt`, `width`, and `height`.
 Do not reference source-only assets, remote URLs, or generated images.
 
-The collection rejects duplicate slugs, missing required fields, malformed
-timestamps, and invalid image references. `getPublishedUpdates()` returns the
+The collection rejects duplicate slugs, duplicate `publishedAt` instants,
+missing required fields, malformed timestamps, and invalid image references.
+`getPublishedUpdates()` returns the
 validated collection sorted newest-first by `publishedAt`; ties use the stable
 slug as a deterministic secondary order. `getLatestPublishedUpdate()` is the
 homepage projection, so homepage code must not special-case an article.

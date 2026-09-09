@@ -15,6 +15,8 @@ import { captureReviewScreenshot } from "./review-screenshot";
 const token = () => Math.random().toString(36).slice(2, 8);
 
 type ProfileFixture = {
+  radaOwnerName: string;
+  kaelOwnerName: string;
   radaOne: string;
   radaTwo: string;
   kaelCutter: string;
@@ -48,6 +50,15 @@ async function seedCharacter(
 }
 
 async function seedProfileFixture(): Promise<ProfileFixture> {
+  // The Crash Site population is a live, globally shared read (every
+  // concurrently-running test's characters default there), so two separately
+  // scheduled invocations of this fixture must never share an owner display
+  // name — otherwise their population entries can be counted together under
+  // `fullyParallel` scheduling. A per-invocation token keeps each run's owner
+  // names (and therefore every "player <name>" assertion) unambiguous.
+  const fixtureToken = token();
+  const radaOwnerName = `Profile Rada Stonehand ${fixtureToken}`;
+  const kaelOwnerName = `Profile Kael Brighthome ${fixtureToken}`;
   const radaOne = `Rada One ${token()}`;
   const radaTwo = `Rada Two ${token()}`;
   const kaelCutter = `Kael Cutter ${token()}`;
@@ -55,15 +66,17 @@ async function seedProfileFixture(): Promise<ProfileFixture> {
   // Two characters owned by one player, plus another player's character, all
   // at the Crash Site; one character at the Processing Yard to prove the
   // location scope.
-  const radaOneOwner = await seedCharacter("Profile Rada Stonehand", radaOne, 500);
-  const radaTwoOwner = await seedCharacter("Profile Rada Stonehand", radaTwo);
-  const kaelCutterOwner = await seedCharacter("Profile Kael Brighthome", kaelCutter, 500);
-  const yard = await seedCharacter("Profile Kael Brighthome", yardGhost);
+  const radaOneOwner = await seedCharacter(radaOwnerName, radaOne, 500);
+  const radaTwoOwner = await seedCharacter(radaOwnerName, radaTwo);
+  const kaelCutterOwner = await seedCharacter(kaelOwnerName, kaelCutter, 500);
+  const yard = await seedCharacter(kaelOwnerName, yardGhost);
   await db
     .update(rune.characters)
     .set({ currentLocationId: LOCATION_IDS.abandonedProcessingYard })
     .where(eq(rune.characters.id, yard.characterId));
   return {
+    radaOwnerName,
+    kaelOwnerName,
     radaOne,
     radaTwo,
     kaelCutter,
@@ -88,7 +101,7 @@ const profileTest = test.extend<{ profile: ProfileFixture }>({
 profileTest(
   "selecting a same-location character opens its public profile panel",
   async ({ page, testCharacter, profile }) => {
-    const { radaOne, radaTwo, kaelCutter } = profile;
+    const { radaOne, radaTwo, kaelCutter, radaOwnerName, kaelOwnerName } = profile;
     await openTestCharacter(page, testCharacter.id);
     await page.setViewportSize({ width: 390, height: 844 });
     const disclosure = populationDisclosure(page);
@@ -101,7 +114,7 @@ profileTest(
     await disclosure.click();
 
     const radaTrigger = page.getByRole("button", {
-      name: `${radaOne}, Level 2, player Profile Rada Stonehand`,
+      name: `${radaOne}, Level 2, player ${radaOwnerName}`,
     });
     await radaTrigger.click();
     const panel = page.locator("[data-character-profile-panel]");
@@ -124,7 +137,7 @@ profileTest(
     await expect(panelPortrait).toBeVisible();
     expect((await panelPortrait.getAttribute("alt"))?.length ?? 0).toBeGreaterThan(0);
     await expect(panel.getByText(radaOne, { exact: true })).toBeVisible();
-    await expect(panel.getByText("Player: Profile Rada Stonehand")).toBeVisible();
+    await expect(panel.getByText(`Player: ${radaOwnerName}`)).toBeVisible();
     await expect(panel.getByText("Overall level 2")).toBeVisible();
     const skillRow = panel.locator("[data-character-skill]");
     // Mining, Refining, and the approved Welding skill all publish.
@@ -148,15 +161,15 @@ profileTest(
     // the inter-row separator), so it is visible in any list position; the
     // unselected non-first row must show no stray left rail.
     const kaelTrigger = page.getByRole("button", {
-      name: `${kaelCutter}, Level 2, player Profile Kael Brighthome`,
+      name: `${kaelCutter}, Level 2, player ${kaelOwnerName}`,
     });
     const radaTwoTrigger = page.getByRole("button", {
-      name: `${radaTwo}, Level 1, player Profile Rada Stonehand`,
+      name: `${radaTwo}, Level 1, player ${radaOwnerName}`,
     });
     await kaelTrigger.click();
     await expect(panel).toHaveCount(1);
     await expect(panel.getByText(kaelCutter, { exact: true })).toBeVisible();
-    await expect(panel.getByText("Player: Profile Kael Brighthome")).toBeVisible();
+    await expect(panel.getByText(`Player: ${kaelOwnerName}`)).toBeVisible();
     await expect(panel.getByText(radaOne, { exact: true })).toHaveCount(0);
     await expect(kaelTrigger).toHaveAttribute("aria-expanded", "true");
     await expect(radaTrigger).toHaveAttribute("aria-expanded", "false");
@@ -176,7 +189,7 @@ profileTest(
       radaTwoTrigger.locator("xpath=following-sibling::*[1][@data-character-profile-panel]"),
     ).toBeVisible();
     await expect(panel.getByText(radaTwo, { exact: true })).toBeVisible();
-    await expect(panel.getByText("Player: Profile Rada Stonehand")).toBeVisible();
+    await expect(panel.getByText(`Player: ${radaOwnerName}`)).toBeVisible();
     await expect(panel.getByText("Overall level 1")).toBeVisible();
     await expect(panel.locator("[data-character-portrait] img")).toBeVisible();
     await expect(radaTwoTrigger).toHaveAttribute("aria-expanded", "true");
@@ -217,13 +230,13 @@ profileTest(
 profileTest(
   "the profile panel works from the keyboard with predictable focus return",
   async ({ page, testCharacter, profile }) => {
-    const { radaOne, radaTwo } = profile;
+    const { radaOne, radaTwo, radaOwnerName } = profile;
     await openTestCharacter(page, testCharacter.id);
     await page.setViewportSize({ width: 390, height: 844 });
     await populationDisclosure(page).click();
 
     const opener = page.getByRole("button", {
-      name: `${radaOne}, Level 2, player Profile Rada Stonehand`,
+      name: `${radaOne}, Level 2, player ${radaOwnerName}`,
     });
     const panel = page.locator("[data-character-profile-panel]");
     await opener.focus();
@@ -247,7 +260,7 @@ profileTest(
     await page.keyboard.press("Enter");
     await expect(panel).toBeVisible();
     const second = page.getByRole("button", {
-      name: `${radaTwo}, Level 1, player Profile Rada Stonehand`,
+      name: `${radaTwo}, Level 1, player ${radaOwnerName}`,
     });
     await second.focus();
     await page.keyboard.press("Enter");
@@ -269,13 +282,13 @@ profileTest(
 profileTest(
   "a failed profile read shows visible accessible feedback",
   async ({ page, testCharacter, profile }) => {
-    const { radaOne } = profile;
+    const { radaOne, radaOwnerName } = profile;
     await openTestCharacter(page, testCharacter.id);
     await page.setViewportSize({ width: 390, height: 844 });
     await populationDisclosure(page).click();
     await page.route("**/api/character-profile?*", (route) => route.abort());
     await page
-      .getByRole("button", { name: `${radaOne}, Level 2, player Profile Rada Stonehand` })
+      .getByRole("button", { name: `${radaOne}, Level 2, player ${radaOwnerName}` })
       .click();
     const panel = page.locator("[data-character-profile-panel]");
     await expect(panel).toBeVisible();
@@ -291,13 +304,13 @@ profileTest(
     // the accepted authoritative revision revalidates the population, and a
     // target that is no longer visible must never keep showing stale data.
     test.setTimeout(120_000);
-    const { radaOne, radaTwo } = profile;
+    const { radaOne, radaTwo, radaOwnerName } = profile;
     await openTestCharacter(page, testCharacter.id);
     await page.setViewportSize({ width: 390, height: 844 });
     const characterId = page.url().split("/").at(-1)!;
     await populationDisclosure(page).click();
     const trigger = page.getByRole("button", {
-      name: `${radaOne}, Level 2, player Profile Rada Stonehand`,
+      name: `${radaOne}, Level 2, player ${radaOwnerName}`,
     });
     await trigger.click();
     const panel = page.locator("[data-character-profile-panel]");
@@ -325,11 +338,11 @@ profileTest(
     await expect(page.locator("[data-location-surface]")).toBeVisible();
     await populationDisclosure(page).click();
     await expect(
-      page.getByRole("button", { name: `${radaOne}, Level 2, player Profile Rada Stonehand` }),
+      page.getByRole("button", { name: `${radaOne}, Level 2, player ${radaOwnerName}` }),
     ).toHaveCount(0);
     // Open another visible character to prove the panel still works
     await page
-      .getByRole("button", { name: `${radaTwo}, Level 1, player Profile Rada Stonehand` })
+      .getByRole("button", { name: `${radaTwo}, Level 1, player ${radaOwnerName}` })
       .click();
     await expect(panel.getByText(radaTwo, { exact: true })).toBeVisible();
     await page.keyboard.press("Escape");
@@ -340,10 +353,10 @@ profileTest(
       await populationDisclosure(page).click();
     }
     await expect(
-      page.getByRole("button", { name: `${radaTwo}, Level 1, player Profile Rada Stonehand` }),
+      page.getByRole("button", { name: `${radaTwo}, Level 1, player ${radaOwnerName}` }),
     ).toBeVisible({ timeout: 10_000 });
     await page
-      .getByRole("button", { name: `${radaTwo}, Level 1, player Profile Rada Stonehand` })
+      .getByRole("button", { name: `${radaTwo}, Level 1, player ${radaOwnerName}` })
       .click();
     await expect(panel).toBeVisible();
 

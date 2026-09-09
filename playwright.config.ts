@@ -23,7 +23,7 @@ const requestedWorkers = process.env.RUNESPACE_E2E_WORKERS
   ? Number.parseInt(process.env.RUNESPACE_E2E_WORKERS, 10)
   : undefined;
 const canonicalSpecPattern =
-  /.*\/(?:admin-operator|cargo-hold|character-portraits|character-profile|cut-your-teeth|inventory-equip|location-population|mining|overlay|refining|signout|travel|walk-it-off)\.spec\.ts$/;
+  /.*\/(?:account-news|admin-operator|cargo-hold|character-portraits|character-profile|cut-your-teeth|inventory-equip|location-population|mining|overlay|refining|signout|travel|walk-it-off)\.spec\.ts$/;
 const timingOutput = process.env.RUNESPACE_E2E_TIMING_OUTPUT;
 
 export default defineConfig({

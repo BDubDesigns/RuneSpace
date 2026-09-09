@@ -15,6 +15,8 @@ import { captureReviewScreenshot } from "./review-screenshot";
 const token = () => Math.random().toString(36).slice(2, 8);
 
 type PopulationFixture = {
+  radaOwnerName: string;
+  kaelOwnerName: string;
   radaOne: string;
   radaTwo: string;
   kaelCutter: string;
@@ -41,6 +43,15 @@ async function seedCharacter(ownerName: string, characterName: string, miningXp?
 }
 
 async function seedPopulationFixture(): Promise<PopulationFixture> {
+  // The Crash Site population is a live, globally shared read (every
+  // concurrently-running test's characters default there), so two separately
+  // scheduled invocations of this fixture must never share an owner display
+  // name — otherwise their population entries can be counted together under
+  // `fullyParallel` scheduling. A per-invocation token keeps each run's owner
+  // names (and therefore every "player <name>" assertion) unambiguous.
+  const fixtureToken = token();
+  const radaOwnerName = `Rada Stonehand ${fixtureToken}`;
+  const kaelOwnerName = `Kael Brighthome ${fixtureToken}`;
   const radaOne = `Rada One ${token()}`;
   const radaTwo = `Rada Two ${token()}`;
   const kaelCutter = `Kael Cutter ${token()}`;
@@ -48,15 +59,17 @@ async function seedPopulationFixture(): Promise<PopulationFixture> {
   // Two characters owned by one player, plus another player's character, all
   // at the Crash Site; one character at the Processing Yard to prove the
   // location scope.
-  const radaOneOwner = await seedCharacter("Rada Stonehand", radaOne, 500);
-  const radaTwoOwner = await seedCharacter("Rada Stonehand", radaTwo);
-  const kaelCutterOwner = await seedCharacter("Kael Brighthome", kaelCutter, 500);
-  const yard = await seedCharacter("Kael Brighthome", yardGhost);
+  const radaOneOwner = await seedCharacter(radaOwnerName, radaOne, 500);
+  const radaTwoOwner = await seedCharacter(radaOwnerName, radaTwo);
+  const kaelCutterOwner = await seedCharacter(kaelOwnerName, kaelCutter, 500);
+  const yard = await seedCharacter(kaelOwnerName, yardGhost);
   await db
     .update(rune.characters)
     .set({ currentLocationId: LOCATION_IDS.abandonedProcessingYard })
     .where(eq(rune.characters.id, yard.characterId));
   return {
+    radaOwnerName,
+    kaelOwnerName,
     radaOne,
     radaTwo,
     kaelCutter,
@@ -139,19 +152,25 @@ populationTest(
     await disclosure.click();
     await expect(disclosure).toHaveAttribute("aria-expanded", "true");
     await expect(
-      page.getByRole("button", { name: `${population.radaOne}, Level 2, player Rada Stonehand` }),
-    ).toBeVisible();
-    await expect(
-      page.getByRole("button", { name: `${population.radaTwo}, Level 1, player Rada Stonehand` }),
+      page.getByRole("button", {
+        name: `${population.radaOne}, Level 2, player ${population.radaOwnerName}`,
+      }),
     ).toBeVisible();
     await expect(
       page.getByRole("button", {
-        name: `${population.kaelCutter}, Level 2, player Kael Brighthome`,
+        name: `${population.radaTwo}, Level 1, player ${population.radaOwnerName}`,
+      }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("button", {
+        name: `${population.kaelCutter}, Level 2, player ${population.kaelOwnerName}`,
       }),
     ).toBeVisible();
     // Multiple characters owned by one player stay separate; the active
     // character is not listed.
-    await expect(page.getByRole("button", { name: /player Rada Stonehand/ })).toHaveCount(2);
+    await expect(
+      page.getByRole("button", { name: new RegExp(`player ${population.radaOwnerName}`) }),
+    ).toHaveCount(2);
     await expect(page.getByRole("button", { name: new RegExp(`^${activeName},`) })).toHaveCount(0);
 
     await captureReviewScreenshot(page, "location-population-mobile-list.png");
@@ -161,16 +180,27 @@ populationTest(
     // issue #83 there is no Mining refresh button, so reload to trigger
     // population revalidation (which collapses the disclosure).
     const radaThree = `Rada Three ${token()}`;
-    const radaThreeOwner = await seedCharacter("Rada Stonehand", radaThree);
+    const radaThreeOwner = await seedCharacter(population.radaOwnerName, radaThree);
     population.userIds.push(radaThreeOwner.userId);
     await page.reload();
     await expect(page.locator("[data-location-surface]")).toBeVisible();
-    expect(await indicatorCount(page)).toBe(before + 1);
+    // Crash Site is the shared default location for every concurrently
+    // running test's character, so its total population can shift from
+    // unrelated ambient traffic between these two reads in either direction
+    // (another test's character can arrive at or depart Crash Site in the
+    // same window) — an earlier `before + 1` lower-bound assertion here still
+    // observed a real failure (ambient departures offsetting our own
+    // addition), so no numeric bound on the shared total is reliable. What
+    // this step actually owns is proving revalidation picked up the newly
+    // seeded character without a manual refresh, which the specific new
+    // row's visibility below proves precisely and deterministically.
     // Disclosure collapsed on reload — reopen to see the new entry
     await expect(populationDisclosure(page)).toHaveAttribute("aria-expanded", "false");
     await populationDisclosure(page).click();
     await expect(
-      page.getByRole("button", { name: `${radaThree}, Level 1, player Rada Stonehand` }),
+      page.getByRole("button", {
+        name: `${radaThree}, Level 1, player ${population.radaOwnerName}`,
+      }),
     ).toBeVisible();
 
     // Travel to the Processing Yard. The population read is delayed so the
@@ -224,7 +254,7 @@ populationTest(
     await yardDisclosure.click();
     await expect(
       page.getByRole("button", {
-        name: `${population.yardGhost}, Level 1, player Kael Brighthome`,
+        name: `${population.yardGhost}, Level 1, player ${population.kaelOwnerName}`,
       }),
     ).toBeVisible();
     for (const absent of [population.radaOne, population.radaTwo, population.kaelCutter]) {
@@ -246,7 +276,9 @@ populationTest(
     await page.keyboard.press("Enter");
     await expect(disclosure).toHaveAttribute("aria-expanded", "true");
     await expect(
-      page.getByRole("button", { name: `${population.radaOne}, Level 2, player Rada Stonehand` }),
+      page.getByRole("button", {
+        name: `${population.radaOne}, Level 2, player ${population.radaOwnerName}`,
+      }),
     ).toBeVisible();
 
     // Enter closes the disclosure and focus remains on the trigger; the

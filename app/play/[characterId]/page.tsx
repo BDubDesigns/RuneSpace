@@ -2,8 +2,14 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { PlayScreen } from "@/features/play/PlayScreen";
 import { auth } from "@/server/auth";
-import { requireCurrentUser, requireOwnedCharacter, OwnershipError } from "@/server/ownership";
+import {
+  requireCurrentUser,
+  requireOwnedCharacter,
+  requirePlayerAccount,
+  OwnershipError,
+} from "@/server/ownership";
 import { getPlayGameplayState } from "@/server/play";
+import { getAccountNewsUnread } from "@/server/account-news";
 
 export const metadata = { title: "Play — RuneSpace" };
 
@@ -22,15 +28,22 @@ export default async function PlayPage({ params }: { params: Promise<{ character
 
   let displayName = "Character";
   let playState;
+  let newsUnread = false;
   try {
     const user = await requireCurrentUser(await headers());
     const character = await requireOwnedCharacter(user.id, characterId);
     displayName = character.displayName;
     playState = await getPlayGameplayState(user.id, characterId);
+    // Account-level (issue #156): derived from the same player account for
+    // every character, never from this specific character.
+    const account = await requirePlayerAccount(user.id);
+    newsUnread = getAccountNewsUnread(account);
   } catch (err) {
     if (err instanceof OwnershipError) redirect("/characters");
     throw err;
   }
 
-  return <PlayScreen characterName={displayName} initialState={playState!} />;
+  return (
+    <PlayScreen characterName={displayName} initialState={playState!} newsUnread={newsUnread} />
+  );
 }

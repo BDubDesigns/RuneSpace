@@ -33,6 +33,21 @@ describe("public Updates content boundary", () => {
     ).toThrow("Duplicate public Update slug: first-update");
   });
 
+  it("rejects two Updates that publish at the same instant, even with different offsets", () => {
+    expect(() =>
+      validatePublicUpdates([
+        baseUpdate,
+        {
+          ...baseUpdate,
+          slug: "same-instant-update",
+          // Same instant as baseUpdate's 2026-09-01T12:00:00Z, spelled with a
+          // different UTC offset.
+          publishedAt: "2026-09-01T05:00:00-07:00",
+        },
+      ]),
+    ).toThrow("Duplicate public Update publishedAt instant");
+  });
+
   it("requires an explicit ISO-8601 timezone or offset", () => {
     expect(() =>
       validatePublicUpdates([{ ...baseUpdate, publishedAt: "2026-09-01T12:00:00" }]),
