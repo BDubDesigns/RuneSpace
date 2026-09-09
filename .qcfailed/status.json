@@ -2,10 +2,10 @@
   "schemaVersion": 1,
   "projectSlug": "runespace",
   "workState": "active",
-  "currentFocus": "Reviewing the account-level unread-news indicator for published Updates in Draft PR #163.",
+  "currentFocus": "Finishing the account-level unread-news indicator for published Updates in PR #163.",
   "currentChange": {
     "summary": "Adds an account-level unread-news indicator to the authenticated game shell for published Updates.",
-    "stage": "review",
+    "stage": "merge-ready",
     "pullRequestNumber": 163
   },
   "latestCompleted": {
@@ -13,7 +13,7 @@
     "date": "2026-09-09",
     "url": "https://github.com/BDubDesigns/RuneSpace/pull/162"
   },
-  "nextStep": "Review the latest push addressing Draft PR #163 feedback on mobile and desktop; Brandon may approve product and code review before merge.",
+  "nextStep": "Let full CI complete on PR #163's final commit and merge to main once every required check is green.",
   "lastMeaningfulUpdate": "2026-09-09",
   "highlights": [
     {
