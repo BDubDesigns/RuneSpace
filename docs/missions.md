@@ -10,7 +10,7 @@ Base your work on the current PR #125 implementation (`game/content/missions.ts`
 
 RuneSpace currently supports **ordinary single-phase, server-authoritative missions expressed primarily through authored mission definitions**.
 
-- A mission is a small declarative definition (offers, ordered requirements, turn-in, one reward, dialogue mapping) plus authored dialogue sequences.
+- A mission is a small declarative definition (offers, ordered requirements, turn-in, one reward, dialogue mapping) plus authored dialogue sequences. Its conversations are surfaced through the one canonical NPC conversation model (`docs/npc-conversations.md`).
 - Generic projection derives live state (`not_accepted` / `active` / `ready_for_completion` / `completed`), objective copy, and semantic guidance from authoritative character state on every command.
 - Generic server commands handle acceptance and completion for all missions.
 
@@ -24,7 +24,8 @@ The framework deliberately does not attempt to support every future mission shap
 | Generic mission projection | `game/domain/missions.ts` — `projectMission`, `deriveMissionState`, `deriveMissionGuidanceTargets`, `validateMissionDefinitions`; `server/mission-state.ts` — `loadMissionProjections` | Projection combines live authoritative state with current generic tracked progress; targets and activity definitions remain content-owned. |
 | Tracked activity progress | `db/rune-space.ts` — `characterMissionProgress`; `server/mission-progress.ts` — row initialization and capped attempt consumption | One row per character, mission, and stable authored `progressKey`; only current progress is persisted. There is no event history, provenance, lifetime counter, or acceptance-time slicing. Cargo repair completion is observed separately from its authoritative repair row and never creates mission progress. |
 | Generic acceptance / completion boundary | `server/missions.ts` — `acceptMission`, `completeMission` (+ `completeMissionWithDefinition` test seam); `server/actions.ts` — `acceptMissionAction` / `completeMissionAction`; `game/schemas/gameplay.ts` — `AcceptMissionRequestSchema` / `CompleteMissionRequestSchema` | Shared `runMissionCommand` character lock / reconciliation wrapper. See §12. |
-| Authored dialogue | `game/content/dialogue.ts` — `DIALOGUE_SEQUENCES` / `getDialogue`; `game/domain/missions.ts` stage types consumed by `resolveNpcMissionDialogue`, `getMissionCapacityRefusalDialogue`, `getMissionCompletionPresentation` | Sequences are content; routing is semantic state (§9). |
+| Authored dialogue | `game/content/dialogue.ts` — `DIALOGUE_SEQUENCES` / `getDialogue` | Sequences are pure presentation content (no `action`). |
+| NPC conversation resolution | `game/domain/conversation.ts` — `resolveNpcConversation`, `NpcConversationEntry`, `getMissionCapacityRefusalDialogue`, `getMissionCompletionPresentation`; authored topics in `game/content/conversation-topics.ts` | The one canonical conversation model (§9); see `docs/npc-conversations.md`. |
 | Semantic guidance projection | `game/domain/missions.ts` — `MissionGuidance`, `MissionGuidanceTargets`, `deriveMissionGuidanceTargets`; `app/globals.css` — `--rs-mission-guidance-*` / `--rs-mission-available-*` and `.rs-mission-guidance` / `.rs-mission-available` | Guidance is a derived set consumed by `NpcInteractionPanel`, `MiningActivity`, `RefiningConsole`, `EquipmentPanel`, `InventoryPanel`, `CargoHoldPanel`. |
 
 The shared play-state assembly projects `state.missions` through the generic play boundary (`server/play.ts` `stateFromTransaction`, surfaced by `PlayContext` / `usePlay` via `features/play/PlayConsole.tsx`). That play layer is the current host for projection and is not a mission-framework contract; do not depend on its module name to reason about missions.
@@ -78,7 +79,7 @@ A mission may have **multiple authored offer routes**. Offer NPC / location / di
 **Useful example — Walk It Off** (`WALK_IT_OFF.offers`):
 
 - **Route A:** `Wade` at `Crash Site` — `dialogueId: wadeOffer`, `activeDialogueId` while the mission is active; ordinary completed story via `completedNpcDialogue` (Wade) after completion.
-- **Route B:** `Tansy` at `The Jag` — `dialogueId: tansyBeforeMission`, `acceptedContinuationDialogueId: tansyAfterRemoteAcceptance`.
+- **Route B:** `Tansy` at `The Jag` — `dialogueId: tansyBeforeMission`, `acceptedContinuation: { dialogueId: tansyAfterRemoteAcceptance, completesMission: true }`. Tansy is Walk It Off's turn-in NPC, so the continuation walks straight into the authored Cutter claim; validation rejects `completesMission` at an NPC who does not own the turn-in.
 
 Both routes are real. The second exists so a player who walks straight to The Jag can meet Tansy first and immediately receive the same mission — the framework calls this *explorer-first remote acceptance*. Offer location/dialogue semantics are authored explicitly in `MissionOffer`:
 
@@ -87,7 +88,11 @@ type MissionOffer = {
   npcId: NpcId;
   locationId: LocationId;
   dialogueId: DialogueId;
-  acceptedContinuationDialogueId?: DialogueId; // shown right after accept at this offer
+  actionLabel?: string;                        // authored acceptance control copy
+  acceptedContinuation?: {                     // shown right after accept at this offer
+    dialogueId: DialogueId;
+    completesMission?: true;                   // the continuation presents this mission's turn-in
+  };
   activeDialogueId?: DialogueId;               // active follow-up at this offer NPC
 };
 
@@ -174,7 +179,8 @@ type MissionTurnIn = {
   locationId: LocationId;        // the mission's completion location, authored here
   requiresStationary: true;      // must be stationary (no active action)
   objective: string;             // shown once every requirement holds
-  dialogueId: DialogueId;        // drives the complete_mission action
+  dialogueId: DialogueId;        // the turn-in conversation
+  actionLabel?: string;          // authored completion control copy ("Claim Cutter", "SHOW SHALE", ...)
 };
 ```
 
@@ -200,40 +206,79 @@ type MissionReward =
 
 **Not currently supported:** stackable item rewards, bundles, multi-reward missions, credits, reputation, generic effects, or similar. A real mission that genuinely needs one of these earns an explicit, narrow framework extension — do not add a mission-specific transaction or widen the reward union speculatively.
 
-## 9. Dialogue
+## 9. Conversations and dialogue
 
-Dialogue remains **authored content** while semantic mission state **selects** the appropriate sequence. Server and UI code must not parse dialogue or objective prose to determine gameplay rules.
+Since #164 every NPC uses **one canonical conversation model**: `Talk to <NPC>`
+opens a conversation hub listing the currently relevant conversations, and the
+player selects one. `docs/npc-conversations.md` is the authoritative contract for
+that model, including replayable social topics and their availability. This
+section covers only what Mission content owns.
+
+Dialogue remains **authored content** while semantic mission state **selects**
+the appropriate sequence. Server and UI code must not parse dialogue or objective
+prose to determine gameplay rules.
 
 ### Authored dialogue homes
 
-- **Sequences** — `game/content/dialogue.ts` (`DialogueSequence`, `DIALOGUE_SEQUENCES`, `getDialogue`). Beats are presentation only (`npc` / `item` / `skill_xp`); item and skill-XP beats never mutate state.
-- **Semantic mapping** — `MissionOffer` (`dialogueId`, `acceptedContinuationDialogueId`, `activeDialogueId`) plus `MissionDefinition.activeNpcDialogue` (contextual active dialogue for relevant off-path NPCs), `MissionDefinition.completedNpcDialogue` (ordinary post-completion story dialogue per NPC), and `MissionDialogue` for turn-in-stage branches, capacity, and the one-shot completion presentation.
+- **Sequences** — `game/content/dialogue.ts` (`DialogueSequence`, `DIALOGUE_SEQUENCES`, `getDialogue`). A sequence is `{ id, npcId, beats }` and nothing else. Beats are presentation only (`npc` / `item` / `skill_xp`); item and skill-XP beats never mutate state.
+- **Semantic mapping** — `MissionOffer` (`dialogueId`, `actionLabel`, `acceptedContinuation`, `activeDialogueId`) plus `MissionDefinition.activeNpcDialogue` (contextual active dialogue for relevant off-path NPCs), `MissionDefinition.completedNpcDialogue` (ordinary post-completion story dialogue per NPC), and `MissionDialogue` for turn-in-stage branches, capacity, and the one-shot completion presentation.
+
+### Mission action semantics are Mission-owned
+
+A sequence carries **no** `action` and **no** `actionLabel`. The Mission command
+a conversation may run — and the authored copy on its control — is resolved from
+Mission content into the conversation entry:
+
+| Conversation | Command | Label source |
+| --- | --- | --- |
+| Offer | `accept_mission` | `MissionOffer.actionLabel`, else `Accept mission` |
+| Turn-in | `complete_mission` | `MissionTurnIn.actionLabel`, else `Turn in` |
+| Acceptance continuation with `completesMission` | `complete_mission` | the same `MissionTurnIn.actionLabel` |
+| Reminder / busy / contextual / completed-story / capacity refusal / completion presentation | *(none)* | — |
+
+So dialogue prose can never determine gameplay truth, and a social topic can
+never accidentally carry a Mission command.
 
 ### Currently supported semantic dialogue routing
 
-All routed through the single generic router `resolveNpcMissionDialogue(npcId, projections)` in `game/content/dialogue.ts`, which consumes `NpcDialogueProjection` (`missionId`, `state`, `prerequisiteSatisfied`, `stage`). Routing scans projections newest-first in three tiers: offers → active missions → completed missions, driven exclusively by semantic state, never by mission-ID chains in UI code. Within active missions, turn-in stage routing wins first, then `activeNpcDialogue`, then an offer's `activeDialogueId`. Completed-story routing is used only when no active mission owns dialogue for the NPC and prefers the newest/furthest authored mission state; `completionPresentationDialogueId` is **not** persistent idle dialogue — it is immediate one-shot presentation after success (§9.1).
+All routed through the single generic resolver
+`resolveNpcConversation(npcId, projections)` in `game/domain/conversation.ts`,
+which consumes `NpcConversationProjection` (`missionId`, `state`,
+`prerequisiteSatisfied`, `stage`, `guidance`) — structurally satisfied by
+`MissionProjection`, so the client passes `state.missions` directly. Resolution
+scans newest-first: accepted missions, then available offers, then (only when
+neither exists for that NPC) the single latest completed-story follow-up, then
+replayable topics. It is driven exclusively by semantic state, never by
+mission-ID chains in UI code. Within an accepted mission, turn-in stage routing
+owns the turn-in NPC, while `activeNpcDialogue` and an offer's
+`activeDialogueId` own other NPCs. `completionPresentationDialogueId` is **not**
+persistent idle dialogue — it is immediate one-shot presentation after success
+(§9.1).
 
 | Routing tier | Kind | Source | When it is selected |
 | --- | --- | --- | --- |
 | Offer | **Offer** | `MissionOffer.dialogueId` | `not_accepted` + prerequisite satisfied + this NPC authors an offer |
-| Offer | **Authored acceptance continuation** | `MissionOffer.acceptedContinuationDialogueId` | returned alongside the offer resolution; UI presents it immediately after a successful `accept_mission` at that offer (Tansy remote acceptance → Cutter claim) |
+| Offer | **Authored acceptance continuation** | `MissionOffer.acceptedContinuation` | returned alongside the offer entry; the UI presents it immediately after a successful `accept_mission` at that offer (Tansy remote acceptance → Cutter claim) |
 | Active (turn-in NPC) | **Turn-in** | `MissionTurnIn.dialogueId` | `active` / `ready_for_completion` + every requirement holds (the stage turns the interaction into a completion attempt; busy is distinguished below) |
 | Active (turn-in NPC) | **Requirements satisfied but busy** | `MissionDialogue.busyDialogueId` | requirements hold but `turnInAvailable` is false because the character is still busy |
 | Active (turn-in NPC) | **Equipment reminder** | `MissionDialogue.equipmentReminderDialogueId` | first unmet requirement `kind === "equipped_item"` |
 | Active (turn-in NPC) | **Carried-item reminder** | `MissionDialogue.carriedReminderDialogueId` | first unmet requirement `kind === "carried_stack"` |
+| Active (turn-in NPC) | **Tracked-activity reminder** | `MissionDialogue.trackedActivityReminderDialogueId` | first unmet requirement `kind === "tracked_activity"` |
 | Active (turn-in NPC) | **Cargo repair reminder** | `MissionDialogue.cargoRepairReminderDialogueId` | first unmet requirement `kind === "cargo_hold_repaired"` |
 | Active (other offer NPC) | **Active follow-up** | `MissionOffer.activeDialogueId` | the offer NPC while the mission is active — e.g. Wade while Walk It Off is active |
 | Active (relevant off-path NPC) | **Active contextual dialogue** | `MissionDefinition.activeNpcDialogue` | an authored active mission mapping for an NPC who is neither an offer nor turn-in NPC |
 | Completion | **Capacity refusal — slots** | `MissionDialogue.capacitySlotsDialogueId` | item reward preflight failed on `slots` (selected generically from the mission's mapping after a `capacity` refusal) |
 | Completion | **Capacity refusal — mass** | `MissionDialogue.capacityMassDialogueId` | item reward preflight failed on `mass` |
-| Completed story | **Ordinary post-completion dialogue** | `MissionDefinition.completedNpcDialogue` | newest completed mission that authors ordinary dialogue for this NPC; one-shot completion presentation is **not** reused here |
-| Completion presentation (one-shot) | **Completion presentation** | `MissionDialogue.completionPresentationDialogueId` (`getMissionCompletionPresentation`) | presentation-only beats (`item` / `skill_xp`) shown immediately after the authoritative success via the transient override in `NpcInteractionPanel`; subsequent conversations route to the completed-story dialogue above |
+| Completed story | **Ordinary post-completion dialogue** | `MissionDefinition.completedNpcDialogue` | newest completed mission that authors ordinary dialogue for this NPC, and only when that NPC has no current mission conversation; one-shot completion presentation is **not** reused here |
+| Completion presentation (one-shot) | **Completion presentation** | `MissionDialogue.completionPresentationDialogueId` (`getMissionCompletionPresentation`) | presentation-only beats (`item` / `skill_xp`) shown immediately after the authoritative success via the transient override in `NpcConversation`; subsequent conversations route to the completed-story dialogue above |
 
-Action labels on sequences (`actionLabel`, e.g. "Claim Cutter", "SHOW SHALE") are authored copy for the terminal control. Capacity and completion beats are presentation only — the authoritative completion stamp, consumption, and reward already committed when they become visible.
+Capacity and completion beats are presentation only — the authoritative
+completion stamp, consumption, and reward already committed when they become
+visible.
 
 ### 9.1 Completion presentation is one-shot, not persistent idle
 
-`MissionDialogue.completionPresentationDialogueId` is narrowly-scoped one-shot UI presentation shown immediately after the authoritative completion succeeds (via the transient `sequenceOverride` in `NpcInteractionPanel`). After that conversation closes, later talks route to ordinary completed-story dialogue (the newest authored `completedNpcDialogue`), not a replay of the reward beats. A refresh/reopen after completion likewise routes to ordinary story dialogue — no durable pending-presentation persistence is added in this issue. Ordinary future missions should author new post-completion dialogue instead of reusing the presentation as idle.
+`MissionDialogue.completionPresentationDialogueId` is narrowly-scoped one-shot UI presentation shown immediately after the authoritative completion succeeds (via the transient open-conversation override in `features/npc/NpcConversation.tsx`). After that conversation closes, later talks route to ordinary completed-story dialogue (the newest authored `completedNpcDialogue`), not a replay of the reward beats. A refresh/reopen after completion likewise routes to ordinary story dialogue — no durable pending-presentation persistence exists. Ordinary future missions should author new post-completion dialogue instead of reusing the presentation as idle.
 
 ## 10. Mission guidance
 
@@ -279,7 +324,7 @@ Derived from the **first unmet requirement in authored order** on each accepted-
 
 Each consumer answers "am I that target?":
 
-- **NPC Talk** — `guidance.npcIds.has(npc.id)` (green) vs `guidance.availableNpcIds.has(npc.id)` (blue).
+- **NPC Talk** — `guidance.npcIds.has(npc.id)` (green) vs `guidance.availableNpcIds.has(npc.id)` (blue). Each Mission entry inside the conversation hub reuses the same projected guidance (`docs/npc-conversations.md` §4), so the control and the entry can never disagree.
 - **Cutter Inventory tile / Equipment "Equip in slot"** — `guidance.equipmentItemIds.has(itemId)` (the Cutter step).
 - **Start Mining / Start Refining** — `guidance.actionIds.has(actionId)` while the action is currently relevant/available. An action highlights only when its `ActionId` is the authored `recommendedActionId` on the current unmet carried requirement.
 - **Cargo Hold repair** — `guidance.cargoRepair` while an accepted mission's current objective observes Cargo repair completion. The Cargo panel owns the repair/material/Welding substate and guides exactly one advancing affordance: CONTRIBUTE MATERIALS while materials are still needed (and a contribution is possible), START WELDING once materials are complete and Welding is idle. STOP WELDING is never guided — stopping does not advance the mission. Completed repair clears the flag and the generic projection moves green guidance to the turn-in NPC.
@@ -360,7 +405,7 @@ An ordinary mission using existing semantics should generally require:
 
 - a new bespoke server completion transaction,
 - a new mission-specific server command or request schema,
-- edits to generic mission projection (`game/domain/missions.ts`) or the dialogue router (`game/content/dialogue.ts`),
+- edits to generic mission projection (`game/domain/missions.ts`) or the NPC conversation resolver (`game/domain/conversation.ts`),
 - mission-ID branches in React (`features/…`),
 - parsing objective or dialogue prose to determine gameplay rules,
 - new mission-specific guidance CSS.
@@ -369,7 +414,7 @@ An ordinary mission using existing semantics should generally require:
 
 > If an ordinary mission using already-supported semantics seems to require mission-ID checks in UI, a bespoke accept/complete transaction, or prose parsing, stop and inspect whether the framework is being bypassed.
 
-That pattern is a signal that authored content (offers, requirements, turn-in, dialogue mapping, guidance targets) is not carrying the semantics it should, or that guidance/dialogue routing is being special-cased instead of consumed through `deriveMissionGuidanceTargets` / `resolveNpcMissionDialogue` / `MissionProjection.stage`.
+That pattern is a signal that authored content (offers, requirements, turn-in, dialogue mapping, guidance targets) is not carrying the semantics it should, or that guidance/conversation routing is being special-cased instead of consumed through `deriveMissionGuidanceTargets` / `resolveNpcConversation` / `MissionProjection.stage`.
 
 When in doubt, favour adding or correcting authored mission content and reusing the existing semantic paths over introducing mission-specific code.
 
@@ -399,7 +444,7 @@ Short concrete examples that demonstrate the framework vocabulary. Do not copy m
 - **Turn-in:** `Tansy` at `The Jag`, stationary only. No duplicated `at_location: The Jag` requirement needed for eligibility (§7). `turnIn.objective: "Talk to Tansy Rusk"`.
 - **Reward:** one `item` — the Salvage Cutter. Registry validates it is a unique item because the generic completion path executes only that shape (§8).
 - **Continuation:** `continuationMissionId: cutYourTeeth` (§3.1). Completing Walk It Off atomically accepts Cut Your Teeth — no second acceptance click.
-- **Dialogue:** offer sequences plus `completionPresentation` (`tansyAfterClaim`, which presents the already-granted Cutter via an `item` beat) and `capacitySlots` / `capacityMass` refusal branches that the server selects generically after a `capacity` refusal.
+- **Dialogue:** offer sequences plus `completionPresentation` (`tansyAfterClaim`, which presents the already-granted Cutter via an `item` beat) and `capacitySlots` / `capacityMass` refusal branches that the server selects generically after a `capacity` refusal. The Cutter claim's `Claim Cutter` control copy is authored on `turnIn.actionLabel`, not on the sequence.
 - **Guidance + explorer-first:** no prerequisite, so at Crash Site blue targets Wade and at The Jag blue targets Tansy — each derived from the matching authored offer at the current location while not yet accepted.
 
 ### Cut Your Teeth — equip-and-collect
@@ -408,7 +453,7 @@ Short concrete examples that demonstrate the framework vocabulary. Do not copy m
 - **Offer:** single `Tansy` at `The Jag` (`tansyCutYourTeethOffer`) remains for eligibility/acceptance validation, but no Available presentation exists — unaccepted Cut Your Teeth never appears in the Mission Log or HUD.
 - **Requirements (ordered, shown simultaneously):** `at_location: The Jag` → `equipped_item: salvageCutter` → `tracked_activity: mining-attempts` for five attempts → `carried_stack: ferriteShale` with omitted `quantity` (full authoritative stack, currently `10`), `turnIn: "show"`, `recommendedActionId: ferrite_shale_mining`. Player-facing surfaces render all four together with live satisfaction/progress (e.g. "✓ At The Jag / ✓ Equip Salvage Cutter / Mining attempts — 3 / 5 / Ferrite Shale — 4 / 10"), while `stage.nextObjectiveKind` keeps the first-unmet ordering for dialogue/guidance precedence. The stack is shown, never consumed (§6).
 - **Teaching intent:** the tracked requirement highlights `Start Mining` while it is the current objective (§10), and the carried step retains the same recommendation if attempts are complete but the stack is not. Mining success and failure both count; Scavenged shale still satisfies the carried requirement (§5).
-- **Turn-in:** `Tansy` at `The Jag`, stationary only; `stage.turnInAvailable` distinguishes "I carry 10 but I'm still mining" (busy) from "ready to show" (§7). The turn-in dialogue (`SHOW SHALE`) carries `complete_mission`; the `skill_xp` reward (+100 Mining) and `item` beat are presentation only after the authoritative success.
+- **Turn-in:** `Tansy` at `The Jag`, stationary only; `stage.turnInAvailable` distinguishes "I carry 10 but I'm still mining" (busy) from "ready to show" (§7). The turn-in conversation carries `complete_mission` with the authored `SHOW SHALE` copy; the `skill_xp` reward (+100 Mining) and `item` beat are presentation only after the authoritative success.
 - **Dialogue stage routing:** `equipmentReminder` vs `carriedReminder` vs `busy` vs `completionPresentation` vs `turnIn` selected semantically from `stage.nextObjectiveKind` / `requirementsSatisfied` / `turnInAvailable` — never from prose.
 
 ### Waste Not — continuation-only tracked activity

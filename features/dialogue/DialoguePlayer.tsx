@@ -1,29 +1,41 @@
 "use client";
 
-import { useEffect, useRef, useState, type RefObject } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ActionButton } from "@/components/ui/ActionButton";
-import { Drawer } from "@/components/ui/Drawer";
 import type { DialogueSequence } from "@/game/content/dialogue";
-import { getNpc } from "@/game/content/npcs";
 import { resolveDialogueItem, resolveDialogueSpeaker } from "@/game/content/dialogue";
 import { DialogueScene } from "./DialogueScene";
 
 const CHARACTER_REVEAL_MS = 20;
 
+/**
+ * Plays one authored dialogue sequence inside the NPC conversation surface.
+ *
+ * The player is presentation only. It never decides which sequence is relevant
+ * and never owns Mission authority: the conversation hub selects the sequence,
+ * and the optional terminal control's copy and command come from Mission-derived
+ * conversation metadata (`game/domain/conversation.ts`).
+ *
+ * `onBack` from the first beat and `onFinish` on the last beat both return to
+ * the conversation hub; dismissing the surface is the hosting drawer's job.
+ */
 export function DialoguePlayer({
   sequence,
+  actionLabel,
   onAction,
   actionBusy = false,
   actionMessage,
-  onClose,
-  triggerRef,
+  onBack,
+  onFinish,
 }: {
   sequence: DialogueSequence;
+  /** Present only when this conversation genuinely drives a Mission command now. */
+  actionLabel?: string;
   onAction?: () => void;
   actionBusy?: boolean;
   actionMessage?: string;
-  onClose: () => void;
-  triggerRef?: RefObject<HTMLButtonElement | null>;
+  onBack: () => void;
+  onFinish: () => void;
 }) {
   const [beatIndex, setBeatIndex] = useState(0);
   const [revealedChars, setRevealedChars] = useState(0);
@@ -76,24 +88,10 @@ export function DialoguePlayer({
   const resolvedItem = resolveDialogueItem(beat);
   if (!resolvedSpeaker && !resolvedItem && beat.kind !== "skill_xp") return null;
 
-  // The drawer keeps the conversation's stable identity even when the current
-  // beat presents an item or XP tile; the scene panel (not the drawer title)
-  // announces the reveal so the beat is never announced as an NPC speaking.
-  const drawerNpc = getNpc(sequence.npcId);
-  const drawerLabel = drawerNpc?.displayName ?? "Dialogue";
-
   const currentBeatTextLength = beatCharacters.length;
   const isComplete = reducedMotion || revealedChars >= currentBeatTextLength;
   const isLastBeat = beatIndex === sequence.beats.length - 1;
   const nextLabel = isComplete && isLastBeat ? "Finish" : "Next";
-  // Authored action copy stays mission-specific: every completion control is
-  // the sequence's own explicit label (e.g. "Claim Cutter" for Walk It Off's
-  // Cutter claim, "SHOW SHALE" for Cut Your Teeth's turn-in). Falls back to a
-  // generic label only when the sequence does not author one — matching main's
-  // established "Claim Cutter" default for completion controls.
-  const actionLabel =
-    sequence.actionLabel ??
-    (sequence.action === "accept_mission" ? "Accept mission" : "Claim Cutter");
   const visibleText = reducedMotion ? beat.text : beatCharacters.slice(0, revealedChars).join("");
 
   function restart() {
@@ -105,7 +103,10 @@ export function DialoguePlayer({
   }
 
   function goBack() {
-    if (beatIndex === 0) return;
+    if (beatIndex === 0) {
+      onBack();
+      return;
+    }
     const previousIndex = beatIndex - 1;
     viewedBeats.current.add(previousIndex);
     setBeatIndex(previousIndex);
@@ -118,7 +119,7 @@ export function DialoguePlayer({
       return;
     }
     if (isLastBeat) {
-      onClose();
+      onFinish();
       return;
     }
     viewedBeats.current.add(beatIndex);
@@ -127,56 +128,52 @@ export function DialoguePlayer({
   }
 
   return (
-    <Drawer
-      label={`${drawerLabel} dialogue`}
-      title={drawerLabel}
-      eyebrow="Story dialogue"
-      onClose={onClose}
-      triggerRef={triggerRef}
-      size="wide"
-    >
-      <div className="mt-4">
-        <DialogueScene
-          actionMessage={actionMessage}
-          beat={beat}
-          controls={
-            <>
+    <div className="mt-4" data-dialogue-player={sequence.id}>
+      <DialogueScene
+        actionMessage={actionMessage}
+        beat={beat}
+        controls={
+          <>
+            <ActionButton
+              aria-label="Restart dialogue"
+              className="px-3"
+              intent="secondary"
+              onClick={restart}
+            >
+              ↻ <span className="sr-only">Restart dialogue</span>
+            </ActionButton>
+            <div className="flex flex-wrap justify-end gap-2">
               <ActionButton
-                aria-label="Restart dialogue"
-                className="px-3"
+                aria-label={beatIndex === 0 ? "Back to conversation topics" : "Back"}
+                data-dialogue-back
                 intent="secondary"
-                onClick={restart}
+                onClick={goBack}
               >
-                ↻ <span className="sr-only">Restart dialogue</span>
+                Back
               </ActionButton>
-              <div className="flex flex-wrap justify-end gap-2">
-                <ActionButton disabled={beatIndex === 0} intent="secondary" onClick={goBack}>
-                  Back
+              {actionLabel && isLastBeat && isComplete ? (
+                <ActionButton
+                  data-dialogue-action
+                  disabled={actionBusy}
+                  loading={actionBusy}
+                  intent="primary"
+                  onClick={onAction}
+                >
+                  {actionLabel}
                 </ActionButton>
-                {sequence.action && isLastBeat && isComplete ? (
-                  <ActionButton
-                    data-dialogue-action
-                    disabled={actionBusy}
-                    loading={actionBusy}
-                    intent="primary"
-                    onClick={onAction}
-                  >
-                    {actionLabel}
-                  </ActionButton>
-                ) : (
-                  <ActionButton data-dialogue-next intent="primary" onClick={goNext}>
-                    {nextLabel}
-                  </ActionButton>
-                )}
-              </div>
-            </>
-          }
-          isComplete={isComplete}
-          onTextClick={() => setRevealedChars(currentBeatTextLength)}
-          portraitGeneration={portraitGeneration}
-          visibleText={visibleText}
-        />
-      </div>
-    </Drawer>
+              ) : (
+                <ActionButton data-dialogue-next intent="primary" onClick={goNext}>
+                  {nextLabel}
+                </ActionButton>
+              )}
+            </div>
+          </>
+        }
+        isComplete={isComplete}
+        onTextClick={() => setRevealedChars(currentBeatTextLength)}
+        portraitGeneration={portraitGeneration}
+        visibleText={visibleText}
+      />
+    </div>
   );
 }

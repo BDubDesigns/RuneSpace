@@ -211,9 +211,13 @@ For `source.kind: "new_draft"`:
   current authored RuneSpace content.
 - Do not rewrite approved dialogue copy for style, grammar, or preference
   unless the creator explicitly asks for that change.
-- Preserve `sequence.action` when supplied, including existing actions such as
-  `accept_mission` or `complete_mission`. Do not infer additional quest or
-  gameplay behavior from dialogue.
+- RuneSpace dialogue sequences are pure presentation content: they carry no
+  `action` or `actionLabel`. Mission command semantics and control copy live on
+  Mission conversation content (`MissionOffer.actionLabel`,
+  `MissionTurnIn.actionLabel`; see `docs/npc-conversations.md`). A Studio draft
+  may still declare an `action` for its own terminal-control preview, but
+  applying an export must never move that action into a RuneSpace sequence or
+  infer additional quest or gameplay behavior from dialogue.
 - Changing dialogue through QC Studio must not accidentally change mission
   mechanics, rewards, persistence, or progression unless the export or request
   explicitly calls for that separate change.

@@ -35,13 +35,18 @@ function toStudioBeat(beat: DialogueBeat): StudioDialogueBeat {
   return { ...beat };
 }
 
+/**
+ * Production sequences are pure presentation content (#164): Mission action
+ * semantics live on Mission conversation content, not on the sequence. The
+ * Studio keeps its own optional draft `action` for previewing a terminal
+ * control, but it is never imported from a production sequence.
+ */
 function toStudioSequence(sequence: DialogueSequence): StudioDialogueSequence {
   return {
     id: sequence.id,
     title: formatStableId(sequence.id),
     npcId: sequence.npcId,
     beats: sequence.beats.map(toStudioBeat),
-    ...(sequence.action ? { action: sequence.action } : {}),
   };
 }
 

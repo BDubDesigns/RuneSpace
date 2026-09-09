@@ -123,17 +123,35 @@ export type MissionOffer = {
   /** The offer/acceptance dialogue sequence. */
   dialogueId: DialogueId;
   /**
-   * Optional authored continuation shown immediately after acceptance at this
-   * offer (e.g. Tansy's remote-acceptance follow-up that leads straight to the
-   * Cutter claim).
+   * Authored copy for the acceptance control on this offer's conversation.
+   * Falls back to the generic acceptance label when omitted.
    */
-  acceptedContinuationDialogueId?: DialogueId;
+  actionLabel?: string;
+  /**
+   * Optional authored continuation presented immediately after a successful
+   * acceptance at this offer (e.g. Tansy's remote-acceptance follow-up that
+   * leads straight to the Cutter claim).
+   */
+  acceptedContinuation?: MissionOfferContinuation;
   /**
    * Authored dialogue while this mission is active (e.g. Wade reminding the
    * player to reach Tansy at The Jag). Distinct from ordinary completed-story
    * dialogue authored via completedNpcDialogue.
    */
   activeDialogueId?: DialogueId;
+};
+
+/**
+ * An authored post-acceptance continuation for one offer route. `completesMission`
+ * is the one narrow case proven by production content: Tansy's explorer-first
+ * acceptance walks straight into this mission's own authoritative turn-in, so the
+ * continuation presents the mission's turn-in action instead of ending the
+ * conversation. The action itself stays server-authoritative — this only says
+ * which authored control the continuation shows.
+ */
+export type MissionOfferContinuation = {
+  dialogueId: DialogueId;
+  completesMission?: true;
 };
 
 /**
@@ -159,8 +177,13 @@ export type MissionTurnIn = {
   requiresStationary: true;
   /** Objective copy once every requirement holds. */
   objective: string;
-  /** The turn-in dialogue sequence (carries the complete_mission action). */
+  /** The turn-in dialogue sequence. The conversation attaches the completion action. */
   dialogueId: DialogueId;
+  /**
+   * Authored copy for the completion control (e.g. "Claim Cutter",
+   * "SHOW SHALE"). Falls back to a generic label when omitted.
+   */
+  actionLabel?: string;
 };
 
 /**
@@ -249,7 +272,10 @@ export const WALK_IT_OFF: MissionDefinition = {
       npcId: NPC_IDS.tansyRusk,
       locationId: LOCATION_IDS.theJag,
       dialogueId: DIALOGUE_IDS.tansyBeforeMission,
-      acceptedContinuationDialogueId: DIALOGUE_IDS.tansyAfterRemoteAcceptance,
+      acceptedContinuation: {
+        dialogueId: DIALOGUE_IDS.tansyAfterRemoteAcceptance,
+        completesMission: true,
+      },
     },
   ],
   requirements: [
@@ -261,6 +287,7 @@ export const WALK_IT_OFF: MissionDefinition = {
     requiresStationary: true,
     objective: "Talk to Tansy Rusk",
     dialogueId: DIALOGUE_IDS.tansyCompletion,
+    actionLabel: "Claim Cutter",
   },
   reward: { kind: "item", itemId: ITEM_IDS.salvageCutter },
   dialogue: {
@@ -322,6 +349,7 @@ export const CUT_YOUR_TEETH: MissionDefinition = {
     requiresStationary: true,
     objective: "Show a full stack of Ferrite Shale to Tansy Rusk",
     dialogueId: DIALOGUE_IDS.tansyCutYourTeethTurnIn,
+    actionLabel: "SHOW SHALE",
   },
   reward: { kind: "skill_xp", skillId: SKILL_IDS.mining, amount: 100 },
   dialogue: {
@@ -365,6 +393,7 @@ export const WASTE_NOT: MissionDefinition = {
     requiresStationary: true,
     objective: "Return to Wade Rusk at the Crash Site",
     dialogueId: DIALOGUE_IDS.wadeWasteNotTurnIn,
+    actionLabel: "REPORT TO WADE",
   },
   reward: { kind: "skill_xp", skillId: SKILL_IDS.refining, amount: 100 },
   dialogue: {
@@ -398,6 +427,7 @@ export const HOLD_IT_TOGETHER: MissionDefinition = {
     requiresStationary: true,
     objective: "Report the repaired Cargo Hold to Wade Rusk",
     dialogueId: DIALOGUE_IDS.wadeHoldItTogetherTurnIn,
+    actionLabel: "REPORT REPAIR",
   },
   reward: { kind: "skill_xp", skillId: SKILL_IDS.welding, amount: 100 },
   dialogue: {

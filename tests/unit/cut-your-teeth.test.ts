@@ -7,11 +7,12 @@ import {
   MISSIONS,
   type MissionDefinition,
 } from "@/game/content/missions";
+import { getDialogue } from "@/game/content/dialogue";
 import {
-  getDialogue,
   getMissionCompletionPresentation,
-  resolveNpcMissionDialogue,
-} from "@/game/content/dialogue";
+  resolveNpcConversation,
+  type NpcConversationEntry,
+} from "@/game/domain/conversation";
 import {
   CONVERSATION_BACKGROUND_IDS,
   DIALOGUE_IDS,
@@ -66,21 +67,20 @@ describe("issue #110 Cut Your Teeth authored boundaries (framework migration)", 
   it("routes Tansy to the Cut Your Teeth offer once Walk It Off is completed", () => {
     // Generic router: Walk It Off not accepted → the explorer-first offer.
     expect(
-      resolveNpcMissionDialogue(NPC_IDS.tansyRusk, [
+      missionEntry(NPC_IDS.tansyRusk, [
         mission(MISSION_IDS.walkItOff, "not_accepted"),
         mission(MISSION_IDS.cutYourTeeth, "not_accepted", { prerequisiteSatisfied: false }),
-      ])?.sequence.id,
+      ])?.dialogueId,
     ).toBe(DIALOGUE_IDS.tansyBeforeMission);
     // Walk It Off complete, Cut Your Teeth not yet accepted → the CYT offer.
     expect(
-      resolveNpcMissionDialogue(NPC_IDS.tansyRusk, [
+      missionEntry(NPC_IDS.tansyRusk, [
         mission(MISSION_IDS.walkItOff, "completed"),
         mission(MISSION_IDS.cutYourTeeth, "not_accepted"),
-      ])?.sequence.id,
+      ])?.dialogueId,
     ).toBe(DIALOGUE_IDS.tansyCutYourTeethOffer);
     // The amendment folds the old idle beats into the offer's opening.
     const offer = getDialogue(DIALOGUE_IDS.tansyCutYourTeethOffer);
-    expect(offer?.action).toBe("accept_mission");
     expect(offer?.beats[0]).toMatchObject({ text: "Still have all your fingers?" });
     expect(offer?.beats.some((beat) => beat.text.includes("scavenge"))).toBe(true);
     expect(offer?.beats.some((beat) => /five real Mining attempts/.test(beat.text))).toBe(true);
@@ -93,38 +93,44 @@ describe("issue #110 Cut Your Teeth authored boundaries (framework migration)", 
   });
 
   it("keeps the Cut Your Teeth offer owned by the CYT flow with SHOW SHALE action copy", () => {
-    const offer = getDialogue(DIALOGUE_IDS.tansyCutYourTeethOffer);
-    expect(offer?.action).toBe("accept_mission");
-    expect(offer?.actionLabel).toBeUndefined();
-    const turnIn = getDialogue(DIALOGUE_IDS.tansyCutYourTeethTurnIn);
-    expect(turnIn?.action).toBe("complete_mission");
-    expect(turnIn?.actionLabel).toBe("SHOW SHALE");
+    // Action semantics belong to Mission content, never to the dialogue prose.
+    const offerEntry = missionEntry(NPC_IDS.tansyRusk, [
+      mission(MISSION_IDS.walkItOff, "completed"),
+      mission(MISSION_IDS.cutYourTeeth, "not_accepted"),
+    ]);
+    expect(offerEntry?.dialogueId).toBe(DIALOGUE_IDS.tansyCutYourTeethOffer);
+    expect(offerEntry?.action).toEqual({ kind: "accept_mission", label: "Accept mission" });
+    expect(CUT_YOUR_TEETH.turnIn.actionLabel).toBe("SHOW SHALE");
+    const turnInEntry = missionEntry(NPC_IDS.tansyRusk, [
+      activeProjection({ requirementsSatisfied: true, turnInAvailable: true }),
+    ]);
+    expect(turnInEntry?.dialogueId).toBe(DIALOGUE_IDS.tansyCutYourTeethTurnIn);
+    expect(turnInEntry?.action).toEqual({ kind: "complete_mission", label: "SHOW SHALE" });
     // Walk It Off's Cutter claim keeps its existing mission-specific copy.
-    expect(getDialogue(DIALOGUE_IDS.tansyCompletion)?.actionLabel).toBe("Claim Cutter");
+    expect(WALK_IT_OFF.turnIn.actionLabel).toBe("Claim Cutter");
   });
 
   it("resolves contextual active sequences for equip, stack, ready, and busy states", () => {
     // Through the generic router, the turn-in NPC branches on semantic stage.
-    const route = (projection: MissionProjection) =>
-      resolveNpcMissionDialogue(NPC_IDS.tansyRusk, [projection])?.sequence;
+    const route = (projection: MissionProjection) => missionEntry(NPC_IDS.tansyRusk, [projection]);
 
-    expect(route(activeProjection({ nextObjectiveKind: "equipped_item" }))?.id).toBe(
+    expect(route(activeProjection({ nextObjectiveKind: "equipped_item" }))?.dialogueId).toBe(
       DIALOGUE_IDS.tansyCutYourTeethEquipReminder,
     );
-    expect(route(activeProjection({ nextObjectiveKind: "tracked_activity" }))?.id).toBe(
+    expect(route(activeProjection({ nextObjectiveKind: "tracked_activity" }))?.dialogueId).toBe(
       DIALOGUE_IDS.tansyCutYourTeethMiningReminder,
     );
-    expect(route(activeProjection({ nextObjectiveKind: "carried_stack" }))?.id).toBe(
+    expect(route(activeProjection({ nextObjectiveKind: "carried_stack" }))?.dialogueId).toBe(
       DIALOGUE_IDS.tansyCutYourTeethStackReminder,
     );
     expect(
-      route(activeProjection({ requirementsSatisfied: true, turnInAvailable: true }))?.id,
+      route(activeProjection({ requirementsSatisfied: true, turnInAvailable: true }))?.dialogueId,
     ).toBe(DIALOGUE_IDS.tansyCutYourTeethTurnIn);
     expect(
-      route(activeProjection({ requirementsSatisfied: true, turnInAvailable: false }))?.id,
+      route(activeProjection({ requirementsSatisfied: true, turnInAvailable: false }))?.dialogueId,
     ).toBe(DIALOGUE_IDS.tansyCutYourTeethBusy);
     expect(
-      getMissionCompletionPresentation(MISSION_IDS.cutYourTeeth)?.beats.map((b) => b.kind),
+      getMissionCompletionPresentation(MISSION_IDS.cutYourTeeth)?.beats.map((beat) => beat.kind),
     ).toEqual(["item", "skill_xp", "npc", "npc", "npc", "npc", "npc", "npc"]);
   });
 
@@ -169,10 +175,10 @@ describe("issue #141 Waste Not persistent completed dialogue", () => {
       mission(MISSION_IDS.cutYourTeeth, "completed"),
       mission(WASTE_NOT.id, "completed"),
     ];
-    expect(resolveNpcMissionDialogue(NPC_IDS.wadeRusk, projections)?.sequence.id).toBe(
+    expect(missionEntry(NPC_IDS.wadeRusk, projections)?.dialogueId).toBe(
       DIALOGUE_IDS.wadePostWasteNot,
     );
-    expect(resolveNpcMissionDialogue(NPC_IDS.tansyRusk, projections)?.sequence.id).toBe(
+    expect(missionEntry(NPC_IDS.tansyRusk, projections)?.dialogueId).toBe(
       DIALOGUE_IDS.tansyPostWasteNot,
     );
   });
@@ -220,7 +226,7 @@ describe("issue #148 Hold It Together authored and observed repair boundary", ()
 
   it("routes Wade's repair reminder through semantic requirement state", () => {
     expect(
-      resolveNpcMissionDialogue(NPC_IDS.wadeRusk, [
+      missionEntry(NPC_IDS.wadeRusk, [
         mission(MISSION_IDS.holdItTogether, "active", {
           stage: {
             requirementsSatisfied: false,
@@ -228,7 +234,7 @@ describe("issue #148 Hold It Together authored and observed repair boundary", ()
             nextObjectiveKind: "cargo_hold_repaired",
           },
         }),
-      ])?.sequence.id,
+      ])?.dialogueId,
     ).toBe(DIALOGUE_IDS.wadeHoldItTogetherRepairReminder);
   });
 });
@@ -617,6 +623,16 @@ describe("issue #124 turn-in location is an independent eligibility constraint",
     });
   });
 });
+
+function missionEntry(
+  npcId: string,
+  projections: readonly MissionProjection[],
+): Extract<NpcConversationEntry, { kind: "mission" }> | undefined {
+  return resolveNpcConversation(npcId, projections).find(
+    (entry): entry is Extract<NpcConversationEntry, { kind: "mission" }> =>
+      entry.kind === "mission",
+  );
+}
 
 function mission(
   missionId: string,

@@ -12,13 +12,6 @@ import {
   type NpcId,
   type SkillId,
 } from "@/game/config/foundations";
-import type { MissionState } from "@/game/domain/missions";
-import {
-  MISSIONS,
-  getMission,
-  type MissionDefinition,
-  type MissionRequirementKind,
-} from "./missions";
 import { getItemPresentation } from "./item-presentation";
 import { getSkillPresentation } from "./skill-presentation";
 import { getNpc, resolveNpcExpression } from "./npcs";
@@ -57,18 +50,18 @@ export type DialogueBeat =
       text: string;
     };
 
+/**
+ * An authored dialogue sequence is presentation content and nothing else: an
+ * ordered list of beats spoken/presented by one NPC. Mission action semantics
+ * (accept / turn in, and the authored control copy) are NOT stored here — they
+ * belong to the Mission-derived conversation metadata resolved in
+ * `game/domain/conversation.ts`, so a social topic can never accidentally carry
+ * a Mission command and dialogue prose can never determine gameplay truth.
+ */
 export type DialogueSequence = {
   id: DialogueId;
   npcId: NpcId;
   beats: readonly DialogueBeat[];
-  action?: "accept_mission" | "complete_mission";
-  /**
-   * Mission-specific action copy shown on the terminal control when the
-   * sequence has an action. Authored per sequence (e.g. "Claim Cutter" for
-   * Walk It Off's Cutter claim, "SHOW SHALE" for Cut Your Teeth's turn-in).
-   * Falls back to a generic label only when omitted.
-   */
-  actionLabel?: string;
 };
 
 const crash = CONVERSATION_BACKGROUND_IDS.crashSiteExterior;
@@ -159,7 +152,6 @@ const dialogue = {
       ),
       wadeLocal(EXPRESSION_IDS.neutral, "Go find her. Tell her I sent you."),
     ],
-    action: "accept_mission",
   },
   [DIALOGUE_IDS.wadeFollowUp]: {
     id: DIALOGUE_IDS.wadeFollowUp,
@@ -286,7 +278,6 @@ const dialogue = {
         "Good. Since you're already standing in front of her, let's all pretend this was the plan all along.",
       ),
     ],
-    action: "accept_mission",
   },
   [DIALOGUE_IDS.tansyAfterRemoteAcceptance]: {
     id: DIALOGUE_IDS.tansyAfterRemoteAcceptance,
@@ -300,7 +291,6 @@ const dialogue = {
       tansyLocal(EXPRESSION_IDS.smile, "I threw this together from spare parts and stubbornness."),
       tansyLocal(EXPRESSION_IDS.neutral, "It's not pretty, but pretty doesn't cut shale."),
     ],
-    action: "complete_mission",
   },
   [DIALOGUE_IDS.tansyCompletion]: {
     id: DIALOGUE_IDS.tansyCompletion,
@@ -331,8 +321,6 @@ const dialogue = {
       ),
       tansyLocal(EXPRESSION_IDS.smile, "You'll figure it out."),
     ],
-    action: "complete_mission",
-    actionLabel: "Claim Cutter",
   },
   [DIALOGUE_IDS.tansyAfterClaim]: {
     id: DIALOGUE_IDS.tansyAfterClaim,
@@ -405,7 +393,6 @@ const dialogue = {
         "Bring me a full stack after the practice. Keep your fingers attached and I'll call it a pass.",
       ),
     ],
-    action: "accept_mission",
   },
   [DIALOGUE_IDS.tansyCutYourTeethEquipReminder]: {
     id: DIALOGUE_IDS.tansyCutYourTeethEquipReminder,
@@ -467,8 +454,6 @@ const dialogue = {
     id: DIALOGUE_IDS.tansyCutYourTeethTurnIn,
     npcId: NPC_IDS.tansyRusk,
     beats: [tansyLocal(EXPRESSION_IDS.neutral, "Got the full stack? Let me see.")],
-    action: "complete_mission",
-    actionLabel: "SHOW SHALE",
   },
   [DIALOGUE_IDS.tansyCutYourTeethCompletion]: {
     id: DIALOGUE_IDS.tansyCutYourTeethCompletion,
@@ -546,8 +531,6 @@ const dialogue = {
       wadeLocal(EXPRESSION_IDS.neutral, "Tansy says you made the Processing Yard run."),
       wadeLocal(EXPRESSION_IDS.neutral, "All right. Tell me what came out of the hopper."),
     ],
-    action: "complete_mission",
-    actionLabel: "REPORT TO WADE",
   },
   [DIALOGUE_IDS.wadeWasteNotCompletion]: {
     id: DIALOGUE_IDS.wadeWasteNotCompletion,
@@ -602,8 +585,6 @@ const dialogue = {
         "All right. That storage is ready for the wreck work ahead.",
       ),
     ],
-    action: "complete_mission",
-    actionLabel: "REPORT REPAIR",
   },
   [DIALOGUE_IDS.wadeHoldItTogetherCompletion]: {
     id: DIALOGUE_IDS.wadeHoldItTogetherCompletion,
@@ -627,6 +608,118 @@ const dialogue = {
       ),
     ],
   },
+
+  // ---- Replayable social topics (#164) -------------------------------------
+  // Ordinary NPC conversations. They carry no Mission action, gate nothing,
+  // and stay replayable; the player character remains silent throughout.
+
+  [DIALOGUE_IDS.wadeRecoveryWorkTopic]: {
+    id: DIALOGUE_IDS.wadeRecoveryWorkTopic,
+    npcId: NPC_IDS.wadeRusk,
+    beats: [
+      wadeLocal(EXPRESSION_IDS.neutral, "Recovery work. That's the polite name for it."),
+      wadeLocal(
+        EXPRESSION_IDS.scowl,
+        "Somebody's bad day lands in the mud, and I decide whether it moves again or gets sold for parts.",
+      ),
+      wadeLocal(
+        EXPRESSION_IDS.neutral,
+        "Most of it is patience. You look at a wreck long enough and it tells you which half is still worth something.",
+      ),
+      wadeLocal(
+        EXPRESSION_IDS.neutral,
+        "Holo Hollow doesn't get replacement stock. What's here is what's here. So you keep the old equipment running, or you go without.",
+      ),
+      wadeLocal(
+        EXPRESSION_IDS.scowl,
+        "Which is why I get irritated when something arrives at speed and makes more work for everyone.",
+      ),
+      wadeLocal(EXPRESSION_IDS.neutral, "No. I'm not going to stop bringing that up."),
+    ],
+  },
+  [DIALOGUE_IDS.tansyMiningTopic]: {
+    id: DIALOGUE_IDS.tansyMiningTopic,
+    npcId: NPC_IDS.tansyRusk,
+    beats: [
+      tansyLocal(EXPRESSION_IDS.smile, "The Jag? It's a seam, not a mine. Big difference."),
+      tansyLocal(
+        EXPRESSION_IDS.neutral,
+        "Nobody dug this out. The ground cracked open and left the ferrite sitting there where anyone with a cutter can reach it.",
+      ),
+      tansyLocal(
+        EXPRESSION_IDS.neutral,
+        "Shale comes out in pieces. Some days it comes out clean, some days you swing eleven times for nothing.",
+      ),
+      tansyLocal(
+        EXPRESSION_IDS.smile,
+        "That's not the tool. That's you. The more you work it, the more often it bites.",
+      ),
+      tansyLocal(
+        EXPRESSION_IDS.concerned,
+        "And keep an eye on your charge. A dead Cutter is a very heavy stick.",
+      ),
+    ],
+  },
+  [DIALOGUE_IDS.tansyBeyondHoloHollowTopic]: {
+    id: DIALOGUE_IDS.tansyBeyondHoloHollowTopic,
+    npcId: NPC_IDS.tansyRusk,
+    beats: [
+      tansyLocal(EXPRESSION_IDS.neutral, "What's it like out there?"),
+      tansyLocal(
+        EXPRESSION_IDS.smile,
+        "You used to run deliveries, right? Going station to station, different planets...",
+      ),
+      tansyLocal(EXPRESSION_IDS.concerned, "...Oh."),
+      tansyLocal(
+        EXPRESSION_IDS.concerned,
+        "Right. You hit your head hard enough that you don't remember any of it.",
+      ),
+      tansyLocal(EXPRESSION_IDS.smile, "Sorry. That was a pretty stupid question."),
+      tansyLocal(EXPRESSION_IDS.neutral, "I think about it sometimes."),
+      tansyLocal(EXPRESSION_IDS.smile, "Not maps. I've seen maps."),
+      tansyLocal(EXPRESSION_IDS.neutral, "I mean actually being there."),
+      tansyLocal(
+        EXPRESSION_IDS.smile,
+        "Different stations. Different planets. Places where nobody knows Wade, nobody knows me, and nobody has an opinion about how I'm holding a wrench.",
+      ),
+      tansyLocal(EXPRESSION_IDS.concerned, "I think about it more than I probably should."),
+      tansyLocal(EXPRESSION_IDS.neutral, "Then something breaks."),
+      tansyLocal(EXPRESSION_IDS.smile, "Something always breaks."),
+      tansyLocal(
+        EXPRESSION_IDS.concerned,
+        "Wade's got more years behind him than he'll admit. Half the people around here who know how to keep the old equipment running are getting older too.",
+      ),
+      tansyLocal(
+        EXPRESSION_IDS.neutral,
+        "And Holo Hollow isn't exactly overflowing with people lining up to replace them.",
+      ),
+      tansyLocal(
+        EXPRESSION_IDS.concerned,
+        "So every time I think about leaving, there's this little voice asking who I'm leaving everything to.",
+      ),
+      tansyLocal(EXPRESSION_IDS.neutral, "Wade never asked me to stay."),
+      tansyLocal(EXPRESSION_IDS.smile, "He'd probably be furious if he knew I blamed him."),
+      tansyLocal(EXPRESSION_IDS.concerned, "That almost makes it worse."),
+      tansyLocal(EXPRESSION_IDS.neutral, "I could go."),
+      tansyLocal(EXPRESSION_IDS.neutral, "I know that."),
+      tansyLocal(
+        EXPRESSION_IDS.concerned,
+        "I just haven't figured out how to want something for myself without feeling like I'm taking it away from somebody else.",
+      ),
+      tansyLocal(EXPRESSION_IDS.neutral, "And meanwhile, you already went out there."),
+      tansyLocal(EXPRESSION_IDS.smile, "You just got cheated out of remembering it."),
+      tansyLocal(
+        EXPRESSION_IDS.smile,
+        "So I guess if either of us ever makes it off this rock, we've both got some sightseeing to do.",
+      ),
+      tansyLocal(EXPRESSION_IDS.neutral, "Anyway."),
+      tansyLocal(EXPRESSION_IDS.smile, "That got heavier than I meant it to."),
+      tansyLocal(
+        EXPRESSION_IDS.smile,
+        "Next time I'm telling you about the time Wade tried to repair a coolant manifold with a serving spoon.",
+      ),
+    ],
+  },
 } as const satisfies Record<DialogueId, DialogueSequence>;
 
 /** Ordered authoritative dialogue catalog consumed by the RuneSpace adapter. */
@@ -634,175 +727,6 @@ export const DIALOGUE_SEQUENCES = Object.values(dialogue);
 
 export function getDialogue(dialogueId: string): DialogueSequence | undefined {
   return dialogue[dialogueId as DialogueId];
-}
-
-/**
- * The semantic mission-state surface the dialogue router consumes. Projections
- * arrive in authored registry order; routing scans newest-first. Routing is
- * driven exclusively by this semantic state — never by parsing objective copy
- * and never by hard-coded mission-ID chains in UI code.
- */
-export type NpcDialogueProjection = {
-  missionId: string;
-  state: MissionState;
-  prerequisiteSatisfied: boolean;
-  stage?: {
-    requirementsSatisfied: boolean;
-    turnInAvailable: boolean;
-    nextObjectiveKind?: MissionRequirementKind;
-  };
-};
-
-export type NpcDialogueResolution = {
-  sequence: DialogueSequence;
-  /** The mission whose accept/complete command this conversation drives. */
-  missionId: string;
-  /**
-   * Offer-only: authored continuation shown immediately after acceptance at
-   * this offer (e.g. the remote-acceptance follow-up that leads straight to
-   * the Cutter claim).
-   */
-  acceptedContinuationDialogueId?: DialogueId;
-};
-
-/**
- * One generic semantic router for every ordinary mission's NPC conversations.
- * Authored sequences stay content; this mapping keys them off projected
- * mission state:
- *
- * 1. OFFERS (newest mission first): a not-yet-accepted mission whose
- *    prerequisite is satisfied and which authors an offer at this NPC offers
- *    that sequence. This is how the chain advances — the next mission's offer
- *    appears as soon as the previous one completes.
- * 2. ACTIVE (newest first): for the turn-in NPC, stage branches select the
- *    turn-in, busy, or requirement-reminder sequences; for other offer NPCs,
- *    their authored activeDialogueId is used.
- * 3. COMPLETED (newest first): ordinary post-completion story dialogue wins
- *    over the one-shot completion presentation. The newest completed mission
- *    that authors dialogue for this NPC via completedNpcDialogue is selected;
- *    presentation is shown only via the transient override immediately after success.
- */
-export function resolveNpcMissionDialogue(
-  npcId: string,
-  projections: readonly NpcDialogueProjection[],
-): NpcDialogueResolution | undefined {
-  return resolveNpcMissionDialogueWithDefinitions(npcId, projections, MISSIONS);
-}
-
-/**
- * Pure routing helper that resolves against an explicit ordered definition
- * list. Production callers use `resolveNpcMissionDialogue` (which injects
- * `MISSIONS`); tests inject synthetic ordered definitions to prove generic
- * fallback/win semantics without adding player-visible fake missions.
- */
-export function resolveNpcMissionDialogueWithDefinitions(
-  npcId: string,
-  projections: readonly NpcDialogueProjection[],
-  definitions: readonly MissionDefinition[],
-): NpcDialogueResolution | undefined {
-  const byId = new Map(definitions.map((definition) => [definition.id, definition]));
-  const newestFirst = [...projections].reverse();
-
-  // 1. Offers.
-  for (const projection of newestFirst) {
-    if (projection.state !== "not_accepted" || !projection.prerequisiteSatisfied) continue;
-    const definition = byId.get(projection.missionId);
-    const offer = definition?.offers.find((candidate) => candidate.npcId === npcId);
-    if (!definition || !offer) continue;
-    const sequence = getDialogue(offer.dialogueId);
-    if (!sequence) continue;
-    return {
-      sequence,
-      missionId: definition.id,
-      acceptedContinuationDialogueId: offer.acceptedContinuationDialogueId,
-    };
-  }
-
-  // 2. Active missions.
-  for (const projection of newestFirst) {
-    if (projection.state !== "active" && projection.state !== "ready_for_completion") continue;
-    const definition = byId.get(projection.missionId);
-    if (!definition) continue;
-    if (definition.turnIn.npcId === npcId) {
-      const sequence = turnInStageSequence(definition, projection.stage);
-      if (sequence) return { sequence, missionId: definition.id };
-      continue;
-    }
-    const activeNpcDialogue = definition.activeNpcDialogue?.find((entry) => entry.npcId === npcId);
-    if (activeNpcDialogue) {
-      const sequence = getDialogue(activeNpcDialogue.dialogueId);
-      if (sequence) return { sequence, missionId: definition.id };
-    }
-    const offer = definition.offers.find((candidate) => candidate.npcId === npcId);
-    const activeId = offer?.activeDialogueId;
-    const sequence = activeId ? getDialogue(activeId) : undefined;
-    if (sequence) return { sequence, missionId: definition.id };
-  }
-
-  // 3. Completed missions — ordinary story-state dialogue (newest authored win).
-  for (const projection of newestFirst) {
-    if (projection.state !== "completed") continue;
-    const definition = byId.get(projection.missionId);
-    if (!definition) continue;
-    const entry = definition.completedNpcDialogue?.find((candidate) => candidate.npcId === npcId);
-    if (entry) {
-      const sequence = getDialogue(entry.dialogueId);
-      if (sequence) return { sequence, missionId: definition.id };
-      continue;
-    }
-  }
-
-  return undefined;
-}
-
-/** Selects the turn-in NPC's authored sequence from semantic stage data. */
-function turnInStageSequence(
-  definition: NonNullable<ReturnType<typeof getMission>>,
-  stage: NpcDialogueProjection["stage"],
-): DialogueSequence | undefined {
-  const turnIn = getDialogue(definition.turnIn.dialogueId);
-  if (!stage) return turnIn;
-  if (stage.turnInAvailable) return turnIn;
-  if (stage.requirementsSatisfied) {
-    return dialogueOr(definition.dialogue.busyDialogueId, turnIn);
-  }
-  if (stage.nextObjectiveKind === "equipped_item") {
-    return dialogueOr(definition.dialogue.equipmentReminderDialogueId, turnIn);
-  }
-  if (stage.nextObjectiveKind === "carried_stack") {
-    return dialogueOr(definition.dialogue.carriedReminderDialogueId, turnIn);
-  }
-  if (stage.nextObjectiveKind === "tracked_activity") {
-    return dialogueOr(definition.dialogue.trackedActivityReminderDialogueId, turnIn);
-  }
-  if (stage.nextObjectiveKind === "cargo_hold_repaired") {
-    return dialogueOr(definition.dialogue.cargoRepairReminderDialogueId, turnIn);
-  }
-  return turnIn;
-}
-
-function dialogueOr(dialogueId: DialogueId | undefined, fallback?: DialogueSequence) {
-  return (dialogueId ? getDialogue(dialogueId) : undefined) ?? fallback;
-}
-
-/** Authored item-reward capacity refusal dialogue, if any. */
-export function getMissionCapacityRefusalDialogue(
-  missionId: string,
-  capacityReason: "slots" | "mass",
-): DialogueSequence | undefined {
-  const definition = getMission(missionId);
-  const dialogueId =
-    capacityReason === "slots"
-      ? definition?.dialogue.capacitySlotsDialogueId
-      : definition?.dialogue.capacityMassDialogueId;
-  return dialogueId ? getDialogue(dialogueId) : undefined;
-}
-
-/** Authored presentation-only completion beats revealed after authoritative success. */
-export function getMissionCompletionPresentation(missionId: string): DialogueSequence | undefined {
-  const definition = getMission(missionId);
-  const dialogueId = definition?.dialogue.completionPresentationDialogueId;
-  return dialogueId ? getDialogue(dialogueId) : undefined;
 }
 
 export function resolveDialogueSpeaker(dialogueBeat: DialogueBeat) {

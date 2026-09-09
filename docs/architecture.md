@@ -65,7 +65,7 @@ RuneSpace's application-wide play boundary is **Play**, not Mining. Mining was t
 - **RNG ownership is activity-local:** activity RNG implementations remain activity-owned (Mining RNG, Refining E2E RNG), while Play owns the default wiring so generic callers no longer import Mining merely to obtain a random source.
 - **Server-authoritative state/reconciliation is unchanged:** the generic extraction is an ownership refactor; the browser remains untrusted and all progression resolves server-side in the locked action transaction.
 
-See `docs/gameplay-foundations.md` for timing/progression/inventory contracts and `docs/missions.md` for the declarative mission framework.
+See `docs/gameplay-foundations.md` for timing/progression/inventory contracts, `docs/missions.md` for the declarative mission framework, and `docs/npc-conversations.md` for the one canonical NPC conversation model (conversation hub, Mission-derived entries, and replayable topics).
 
 ### Play surfaces (Issue #145)
 
@@ -118,4 +118,4 @@ Phaser experiences live in `minigames/`, isolated from the main React tree. They
 
 ## Current status
 
-RuneSpace is a **playable pre-alpha** under active development. The generic Play shell is live and composes the connected early-game loop: Travel/Scavenging, Ferrite Shale Mining at The Jag, Refining at the Abandoned Processing Yard, Welding/Cargo Hold repair at Crash Site, Inventory/Equipment, locations and Power Cells/Power Annex, NPC interactions, and the declarative mission framework (Walk It Off / Cut Your Teeth / Waste Not). The architecture beyond this vertical slice — additional skills, quests, hex exploration, multiplayer, and minigames — remains scoped to future approved issues.
+RuneSpace is a **playable pre-alpha** under active development. The generic Play shell is live and composes the connected early-game loop: Travel/Scavenging, Ferrite Shale Mining at The Jag, Refining at the Abandoned Processing Yard, Welding/Cargo Hold repair at Crash Site, Inventory/Equipment, locations and Power Cells/Power Annex, NPC conversations, and the declarative mission framework (Walk It Off / Cut Your Teeth / Waste Not / Hold It Together). The architecture beyond this vertical slice — additional skills, quests, hex exploration, multiplayer, and minigames — remains scoped to future approved issues.

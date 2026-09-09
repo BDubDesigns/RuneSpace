@@ -41,7 +41,7 @@ const authoredWikiArticles = [
           [
             "Talk to Wade Rusk or Tansy Rusk — they hand out the ",
             { text: "current jobs", articleSlug: "missions" },
-            " and react to your progress.",
+            ", react to your progress, and have other things worth asking about.",
           ],
           [
             "Put Refined Ferrite and Slag toward the ",
@@ -283,6 +283,17 @@ const authoredWikiArticles = [
         heading: "How missions work in practice",
         paragraphs: [
           "Objectives update live as you meet them, and the current one is always clear in the Mission Log. Finishing Walk It Off, Cut Your Teeth, or Waste Not hands you the next job in the chain automatically — there's nothing extra to accept. Hold It Together is currently the last job in the chain. When every objective on a job is met, talk to the NPC named in it to turn it in.",
+        ],
+      },
+      {
+        heading: "Talking to people",
+        paragraphs: [
+          "Talk opens a list of the conversations you can have with that person right now, rather than a single fixed exchange.",
+        ],
+        list: [
+          "Anything tied to a job comes first, marked Available, Active, Turn in, or Completed. Available and Turn in are highlighted the same way they are out in the world.",
+          "Below that, Talk about lists subjects you can bring up any time. They're always replayable, and a few only appear once you've finished the work that would make the two of you talk about them.",
+          "Back on the first line of a conversation, and Finish at the end, both return you to that person's list. Close leaves the conversation entirely.",
         ],
       },
     ],

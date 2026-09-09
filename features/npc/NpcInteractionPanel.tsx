@@ -1,51 +1,31 @@
 "use client";
 
-import { useRef, useState, useTransition } from "react";
+import { useRef, useState } from "react";
 import { ActionButton } from "@/components/ui/ActionButton";
 import { Feedback } from "@/components/ui/Feedback";
 import { Panel } from "@/components/ui/Panel";
-import { reportClientDiagnostic } from "@/features/diagnostics/client";
-import { DialoguePlayer } from "@/features/dialogue/DialoguePlayer";
-import {
-  getDialogue,
-  getMissionCapacityRefusalDialogue,
-  getMissionCompletionPresentation,
-  resolveNpcMissionDialogue,
-} from "@/game/content/dialogue";
-import { MISSIONS } from "@/game/content/missions";
-import { getNpc, getNpcAtLocation } from "@/game/content/npcs";
-import { acceptMissionAction, completeMissionAction } from "@/server/actions";
+import { NpcConversation } from "@/features/npc/NpcConversation";
+import { getNpcAtLocation } from "@/game/content/npcs";
+import { resolveNpcConversation } from "@/game/domain/conversation";
 import { deriveMissionGuidanceTargets } from "@/game/domain/missions";
 import { usePlay } from "@/features/play/PlayContext";
 
 /**
- * Resolves the conversation for the NPC at the player's current location from
- * the authoritative mission projections through ONE generic semantic router.
- * Routing uses semantic mission state only (state, stage.requirementsSatisfied,
- * stage.turnInAvailable, stage.nextObjectiveKind) — it never parses
- * player-facing objective copy and contains no per-mission ID chains, so an
- * ordinary third mission converses through this panel without edits.
+ * The stationary NPC interaction surface: one `Talk to <NPC>` control that opens
+ * the canonical conversation hub.
+ *
+ * The available conversations come from ONE generic resolver over authoritative
+ * mission projections and authored conversation topics. This panel contains no
+ * per-mission ID chains and never parses player-facing objective copy, so a new
+ * ordinary mission or a new authored topic appears here without edits.
  */
 export function NpcInteractionPanel() {
-  const { acquireCommand, acceptState, foregroundBusy, releaseCommand, state } = usePlay();
+  const { foregroundBusy, state } = usePlay();
   const [open, setOpen] = useState(false);
-  const [message, setMessage] = useState<string>();
-  const [pending, setPending] = useState(false);
-  const [sequenceOverride, setSequenceOverride] = useState<string>();
-  const [, startTransition] = useTransition();
   const triggerRef = useRef<HTMLButtonElement>(null);
   const npc = getNpcAtLocation(state.location.currentLocationId);
   const stationary = !state.activeAction && !state.travelState;
-  const resolved = npc ? resolveNpcMissionDialogue(npc.id, state.missions) : undefined;
-  const missionId = resolved?.missionId;
-  const baseSequence = resolved?.sequence;
-  const overrideIsCompletion =
-    sequenceOverride !== undefined &&
-    MISSIONS.some(
-      (mission) => mission.dialogue.completionPresentationDialogueId === sequenceOverride,
-    );
-  const sequence = sequenceOverride ? getDialogue(sequenceOverride) : baseSequence;
-  const dialogueNpc = sequence ? getNpc(sequence.npcId) : npc;
+  const entries = npc ? resolveNpcConversation(npc.id, state.missions) : [];
   const guidance = deriveMissionGuidanceTargets(state.missions);
   // Available (blue) vs active (green) — distinct semantic sets. If the
   // same NPC is ever in both (e.g. offers a new mission while also being the
@@ -62,113 +42,12 @@ export function NpcInteractionPanel() {
     : hasAvailableGuidance
       ? "available"
       : undefined;
-  if (!npc || !sequence || !dialogueNpc) return null;
-  const dialogue = sequence;
-  const npcId = npc.id;
-  // The Talk control reads as a turn-in exactly when the conversation drives a
-  // completion command right now (stationary, complete_mission authored, and
-  // not merely re-viewing the presentation beats after success).
+  if (!npc || entries.length === 0) return null;
+  // The Talk control reads as a turn-in exactly when one of the currently
+  // available conversations drives a completion command right now.
   const turnInAvailable =
-    stationary && dialogue.action === "complete_mission" && !overrideIsCompletion;
-
-  function openDialogue() {
-    setMessage(undefined);
-    setSequenceOverride(undefined);
-    setOpen(true);
-  }
-
-  function closeDialogue() {
-    setOpen(false);
-    setSequenceOverride(undefined);
-    setMessage(undefined);
-  }
-
-  function runDialogueAction() {
-    if (!stationary) {
-      setMessage("You must be stationary to complete this conversation action.");
-      return;
-    }
-    if (!missionId) {
-      setMessage("This conversation is not driving a mission command.");
-      return;
-    }
-    if (!acquireCommand()) {
-      setMessage("Another command is being confirmed. Try again in a moment.");
-      return;
-    }
-    setPending(true);
-    startTransition(async () => {
-      try {
-        const isAccept = dialogue.action === "accept_mission";
-        const command = { characterId: state.characterId, missionId, npcId };
-        const result = isAccept
-          ? await acceptMissionAction(command)
-          : await completeMissionAction(command);
-        if ("error" in result) {
-          setMessage(result.error);
-          return;
-        }
-        acceptState(result.state);
-        if (result.mission.status === "refused") {
-          if (
-            "reason" in result.mission &&
-            result.mission.reason === "capacity" &&
-            result.mission.capacityReason
-          ) {
-            const refusal = getMissionCapacityRefusalDialogue(
-              missionId,
-              result.mission.capacityReason,
-            );
-            if (refusal) {
-              setSequenceOverride(refusal.id);
-              setMessage(undefined);
-            } else {
-              setMessage(result.mission.message);
-            }
-          } else {
-            setMessage(result.mission.message);
-          }
-          return;
-        }
-        if (result.mission.status === "accepted") {
-          // Offers may author an immediate continuation (e.g. the remote
-          // acceptance follow-up that leads straight to the Cutter claim);
-          // otherwise acceptance hands control to the objective panel.
-          const continuation = resolved?.acceptedContinuationDialogueId;
-          if (continuation) {
-            setSequenceOverride(continuation);
-            setMessage(undefined);
-          } else {
-            setMessage(undefined);
-            setOpen(false);
-            setSequenceOverride(undefined);
-          }
-          return;
-        }
-        if (dialogue.action === "complete_mission" && result.mission.status === "completed") {
-          // Only the authoritative success reveals the reward presentation.
-          // The atomic continuation (if any) is already accepted server-side;
-          // after the presentation closes, dialogue routes to the freshly
-          // accepted mission's active branch — no second acceptance click.
-          const presentation = getMissionCompletionPresentation(missionId);
-          if (presentation) {
-            setSequenceOverride(presentation.id);
-            setMessage(undefined);
-            return;
-          }
-        }
-        setMessage(undefined);
-        setOpen(false);
-        setSequenceOverride(undefined);
-      } catch (error) {
-        reportClientDiagnostic("mining-command", error, { miningActive: false });
-        setMessage("Comms interruption. Mission status could not be confirmed.");
-      } finally {
-        setPending(false);
-        releaseCommand();
-      }
-    });
-  }
+    stationary &&
+    entries.some((entry) => entry.kind === "mission" && entry.action?.kind === "complete_mission");
 
   return (
     <>
@@ -188,7 +67,7 @@ export function NpcInteractionPanel() {
             ref={triggerRef}
             disabled={foregroundBusy}
             intent={turnInAvailable ? "mission" : "secondary"}
-            onClick={openDialogue}
+            onClick={() => setOpen(true)}
           >
             Talk to {npc.displayName}
           </ActionButton>
@@ -198,15 +77,13 @@ export function NpcInteractionPanel() {
             Conversations with gameplay actions require a stationary character.
           </Feedback>
         ) : null}
-        {message && !open ? <Feedback tone="danger">{message}</Feedback> : null}
       </Panel>
       {open ? (
-        <DialoguePlayer
-          actionBusy={pending}
-          actionMessage={message}
-          onAction={dialogue.action ? runDialogueAction : undefined}
-          onClose={closeDialogue}
-          sequence={dialogue}
+        <NpcConversation
+          entries={entries}
+          npc={npc}
+          onClose={() => setOpen(false)}
+          stationary={stationary}
           triggerRef={triggerRef}
         />
       ) : null}

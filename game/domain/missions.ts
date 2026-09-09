@@ -524,12 +524,20 @@ export function validateMissionDefinitions(definitions: readonly MissionDefiniti
         throw new Error(`${where} offer references unknown location "${offer.locationId}".`);
       }
       assertDialogue(definition.id, offer.dialogueId, "offer");
-      if (offer.acceptedContinuationDialogueId) {
+      if (offer.acceptedContinuation) {
         assertDialogue(
           definition.id,
-          offer.acceptedContinuationDialogueId,
+          offer.acceptedContinuation.dialogueId,
           "accepted continuation",
         );
+        if (
+          offer.acceptedContinuation.completesMission &&
+          definition.turnIn.npcId !== offer.npcId
+        ) {
+          throw new Error(
+            `${where} accepted continuation at NPC "${offer.npcId}" cannot present a turn-in owned by "${definition.turnIn.npcId}".`,
+          );
+        }
       }
       if (offer.activeDialogueId) {
         assertDialogue(definition.id, offer.activeDialogueId, "active");

@@ -7,11 +7,8 @@ import {
   NPC_IDS,
 } from "@/game/config/foundations";
 import { getConversationBackground } from "@/game/content/conversation-backgrounds";
-import {
-  getDialogue,
-  resolveDialogueSpeaker,
-  resolveNpcMissionDialogue,
-} from "@/game/content/dialogue";
+import { getDialogue, resolveDialogueSpeaker } from "@/game/content/dialogue";
+import { resolveNpcConversation } from "@/game/domain/conversation";
 import { WALK_IT_OFF } from "@/game/content/missions";
 import { getNpcAtLocation } from "@/game/content/npcs";
 import { ITEM_IDS } from "@/game/config/foundations";
@@ -38,18 +35,20 @@ describe("issue #102 authored NPC and mission boundaries", () => {
 
   it("uses typed beats and state-specific dialogue without player choices", () => {
     // Walk It Off's two authored offer routes keep their original sequences,
-    // now resolved through the ONE generic semantic router.
-    const offer = resolveNpcMissionDialogue(NPC_IDS.wadeRusk, [
-      walkItOffProjection("not_accepted"),
-    ])?.sequence;
-    const explorer = resolveNpcMissionDialogue(NPC_IDS.tansyRusk, [
-      walkItOffProjection("not_accepted"),
-    ])?.sequence;
-    const completion = resolveNpcMissionDialogue(NPC_IDS.tansyRusk, [
-      walkItOffProjection("active"),
-    ])?.sequence;
-    expect(offer?.action).toBe("accept_mission");
-    expect(completion?.action).toBe("complete_mission");
+    // now resolved through the ONE canonical NPC conversation model. Mission
+    // action semantics are carried by the conversation entry, never the sequence.
+    const wadeOffer = missionEntry(NPC_IDS.wadeRusk, [walkItOffProjection("not_accepted")]);
+    const tansyOffer = missionEntry(NPC_IDS.tansyRusk, [walkItOffProjection("not_accepted")]);
+    const tansyTurnIn = missionEntry(NPC_IDS.tansyRusk, [walkItOffProjection("active")]);
+    const offer = getDialogue(wadeOffer!.dialogueId);
+    const explorer = getDialogue(tansyOffer!.dialogueId);
+    expect(wadeOffer?.action?.kind).toBe("accept_mission");
+    expect(tansyTurnIn?.action?.kind).toBe("complete_mission");
+    expect(tansyTurnIn?.action?.label).toBe("Claim Cutter");
+    expect(tansyOffer?.acceptedContinuation?.dialogueId).toBe(
+      DIALOGUE_IDS.tansyAfterRemoteAcceptance,
+    );
+    expect(tansyOffer?.acceptedContinuation?.action?.kind).toBe("complete_mission");
     expect(offer?.beats).toHaveLength(13);
     expect(explorer?.beats).toHaveLength(16);
     expect(offer?.beats[0]).toMatchObject({
@@ -69,7 +68,6 @@ describe("issue #102 authored NPC and mission boundaries", () => {
       presentationMode: "comms",
       text: "What now? You know I'm busy, Tansy.",
     });
-    expect(getDialogue(DIALOGUE_IDS.tansyAfterRemoteAcceptance)?.action).toBe("complete_mission");
     // Post-claim opens with the presentation-only Cutter item beat, then two Tansy beats.
     expect(getDialogue(DIALOGUE_IDS.tansyAfterClaim)?.beats).toHaveLength(3);
     expect(getDialogue(DIALOGUE_IDS.tansyAfterClaim)?.beats[0]).toMatchObject({
@@ -146,6 +144,11 @@ describe("unique reward capacity planning", () => {
     ).toEqual({ ok: true });
   });
 });
+
+function missionEntry(npcId: string, projections: readonly MissionProjection[]) {
+  const entries = resolveNpcConversation(npcId, projections);
+  return entries.find((entry) => entry.kind === "mission");
+}
 
 function walkItOffProjection(state: MissionProjection["state"]): MissionProjection {
   return {
