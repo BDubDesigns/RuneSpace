@@ -130,8 +130,10 @@ export function PublicWikiArticlePage({ article }: { article: WikiArticle }) {
                       : "list-disc space-y-3 pl-5 text-base leading-7 text-[color:var(--rs-text-secondary)]"
                   }
                 >
-                  {section.list.map((item) => (
-                    <li key={item}>{item}</li>
+                  {section.list.map((item, index) => (
+                    <li key={index}>
+                      <WikiParagraphText paragraph={item} />
+                    </li>
                   ))}
                 </ul>
               ) : null}

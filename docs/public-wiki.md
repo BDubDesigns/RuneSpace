@@ -19,21 +19,23 @@ Every article requires:
 - `summary`: the short excerpt shown on the `/wiki` index and used as the
   page's meta description.
 - `sections`: an ordered array of content blocks, each with an optional
-  `heading`, one or more `paragraphs`, and an optional `list` of short items.
+  `heading`, and `paragraphs` and/or a `list` of short items — at least one of
+  the two is required.
 
 There is no `publishedAt`/date field and no category metadata. The `/wiki`
 index renders articles in the exact order they appear in
 `authoredWikiArticles` — authored order **is** the index grouping. Reorder
 the array to change the index; do not add a second ordering mechanism.
 
-A `paragraphs` entry is ordinary prose (a string), or — only when a specific
-phrase should link to another Wiki article — an array of segments mixing
-plain strings with `{ text, articleSlug }` link objects that concatenate into
-the same prose. This is a deliberate, narrow, author-controlled link: you
-choose exactly which phrase links where. Do not implement automatic
-keyword replacement/autolinking, and do not extend this pattern to `list`
-items or any richer inline formatting (bold, italics, etc.) — it exists only
-for cross-linking related articles.
+Each entry in `paragraphs` or `list` is ordinary prose (a string), or — only
+when a specific phrase should link to another Wiki article — an array of
+segments mixing plain strings with `{ text, articleSlug }` link objects that
+concatenate into the same prose. `paragraphs` and `list` entries share this
+exact shape; there is no separate list-specific link mechanism. This is a
+deliberate, narrow, author-controlled link: you choose exactly which phrase
+links where. Do not implement automatic keyword replacement/autolinking, and
+do not extend this pattern to any richer inline formatting (bold, italics,
+etc.) — it exists only for cross-linking related articles.
 
 The collection rejects duplicate slugs, missing/malformed required fields,
 and any link segment whose `articleSlug` does not match a real authored

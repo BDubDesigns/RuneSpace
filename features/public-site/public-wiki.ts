@@ -1,5 +1,5 @@
 import { WikiArticleSchema } from "@/game/schemas/public-wiki";
-import type { WikiArticle } from "@/game/schemas/public-wiki";
+import type { WikiArticle, WikiParagraph } from "@/game/schemas/public-wiki";
 
 export type { WikiArticle } from "@/game/schemas/public-wiki";
 
@@ -32,10 +32,22 @@ const authoredWikiArticles = [
         heading: "The early loop",
         paragraphs: ["A normal session looks like this:"],
         list: [
-          "Check the Map and walk to a location that has work — The Jag for Mining, the Abandoned Processing Yard for Refining.",
+          [
+            "Check the Map and walk to a location that has work — The Jag for ",
+            { text: "Mining", articleSlug: "mining-and-refining" },
+            ", the Abandoned Processing Yard for Refining.",
+          ],
           "Do the work, then walk back when you have something worth bringing home.",
-          "Talk to Wade Rusk or Tansy Rusk — they hand out the current jobs and react to your progress.",
-          "Put Refined Ferrite and Slag toward the Cargo Hold repair back at the Crash Site.",
+          [
+            "Talk to Wade Rusk or Tansy Rusk — they hand out the ",
+            { text: "current jobs", articleSlug: "missions" },
+            " and react to your progress.",
+          ],
+          [
+            "Put Refined Ferrite and Slag toward the ",
+            { text: "Cargo Hold repair", articleSlug: "cargo-hold-and-welding" },
+            " back at the Crash Site.",
+          ],
         ],
       },
       {
@@ -245,10 +257,26 @@ const authoredWikiArticles = [
       {
         heading: "The current chain",
         list: [
-          "Walk It Off — reach The Jag and talk to Tansy Rusk. Wade can also send you on your way from the Crash Site. Finishing this hands you a Salvage Cutter.",
-          "Cut Your Teeth — equip your Salvage Cutter, make five Mining attempts, then show Tansy a full stack of Ferrite Shale.",
-          "Waste Not — make five Refining attempts at the Abandoned Processing Yard, then report back to Wade at the Crash Site.",
-          "Hold It Together — repair the Cargo Hold, then report the finished repair to Wade.",
+          [
+            "Walk It Off — reach The Jag and talk to Tansy Rusk. Wade can also send you on your way from the Crash Site. Finishing this hands you a ",
+            { text: "Salvage Cutter", articleSlug: "inventory-and-equipment" },
+            ".",
+          ],
+          [
+            "Cut Your Teeth — equip your Salvage Cutter, make five ",
+            { text: "Mining attempts", articleSlug: "mining-and-refining" },
+            ", then show Tansy a full stack of Ferrite Shale.",
+          ],
+          [
+            "Waste Not — make five ",
+            { text: "Refining attempts", articleSlug: "mining-and-refining" },
+            " at the Abandoned Processing Yard, then report back to Wade at the Crash Site.",
+          ],
+          [
+            "Hold It Together — ",
+            { text: "repair the Cargo Hold", articleSlug: "cargo-hold-and-welding" },
+            ", then report the finished repair to Wade.",
+          ],
         ],
       },
       {
@@ -277,11 +305,30 @@ const authoredWikiArticles = [
       {
         heading: "The locations",
         list: [
-          "Crash Site — your wrecked ship, half-sunk in mud and scrap. Home to the Cargo Hold repair and Wade Rusk.",
-          "Abandoned Processing Yard — rusted conveyors and a refurbished hopper where Ferrite Shale is refined into Refined Ferrite and Slag.",
-          "DeWhat? Emergency Power Annex — a mostly intact emergency-supply depot that dispenses Power Cells.",
+          [
+            "Crash Site — your wrecked ship, half-sunk in mud and scrap. Home to the ",
+            { text: "Cargo Hold repair", articleSlug: "cargo-hold-and-welding" },
+            " and Wade Rusk.",
+          ],
+          [
+            "Abandoned Processing Yard — rusted conveyors and a refurbished hopper where ",
+            {
+              text: "Ferrite Shale is refined into Refined Ferrite and Slag",
+              articleSlug: "mining-and-refining",
+            },
+            ".",
+          ],
+          [
+            "DeWhat? Emergency Power Annex — a mostly intact emergency-supply depot that dispenses ",
+            { text: "Power Cells", articleSlug: "power-cells" },
+            ".",
+          ],
           "The Long Scramble — a steep, barren stretch of fractured stone with nothing to stop for. It's just the way through to The Jag.",
-          "The Jag — an exposed ferrite seam, home to Ferrite Shale Mining and Tansy Rusk.",
+          [
+            "The Jag — an exposed ferrite seam, home to ",
+            { text: "Ferrite Shale Mining", articleSlug: "mining-and-refining" },
+            " and Tansy Rusk.",
+          ],
         ],
       },
       {
@@ -352,19 +399,24 @@ export function validatePublicWikiArticles(input: readonly unknown[]): readonly 
     seenSlugs.add(article.slug);
   }
 
-  for (const article of articles) {
-    for (const section of article.sections) {
-      for (const paragraph of section.paragraphs ?? []) {
-        if (typeof paragraph === "string") continue;
-        for (const segment of paragraph) {
-          if (typeof segment === "string") continue;
-          if (!seenSlugs.has(segment.articleSlug)) {
-            throw new Error(
-              `Wiki article "${article.slug}" links to unknown article slug: ${segment.articleSlug}`,
-            );
-          }
+  const assertKnownLinkTargets = (article: WikiArticle, entries: readonly WikiParagraph[]) => {
+    for (const entry of entries) {
+      if (typeof entry === "string") continue;
+      for (const segment of entry) {
+        if (typeof segment === "string") continue;
+        if (!seenSlugs.has(segment.articleSlug)) {
+          throw new Error(
+            `Wiki article "${article.slug}" links to unknown article slug: ${segment.articleSlug}`,
+          );
         }
       }
+    }
+  };
+
+  for (const article of articles) {
+    for (const section of article.sections) {
+      assertKnownLinkTargets(article, section.paragraphs ?? []);
+      assertKnownLinkTargets(article, section.list ?? []);
     }
   }
 

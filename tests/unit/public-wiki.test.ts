@@ -110,14 +110,49 @@ describe("public Wiki content boundary", () => {
     ).toThrow('Wiki article "first-article" links to unknown article slug: not-a-real-article');
   });
 
-  it("resolves the real Wiki collection's authored internal links to known articles", () => {
+  it("accepts a list item with a deliberate link segment to a real article", () => {
+    const articles = validatePublicWikiArticles([
+      baseArticle,
+      {
+        ...baseArticle,
+        slug: "second-article",
+        title: "Second Article",
+        sections: [
+          {
+            list: [["See ", { text: "First Article", articleSlug: "first-article" }, "."]],
+          },
+        ],
+      },
+    ]);
+
+    expect(articles[1]!.sections[0]!.list).toEqual([
+      ["See ", { text: "First Article", articleSlug: "first-article" }, "."],
+    ]);
+  });
+
+  it("rejects a list-item link segment whose target does not resolve to a real article slug", () => {
+    expect(() =>
+      validatePublicWikiArticles([
+        {
+          ...baseArticle,
+          sections: [
+            {
+              list: [["See ", { text: "Nowhere", articleSlug: "not-a-real-article" }, "."]],
+            },
+          ],
+        },
+      ]),
+    ).toThrow('Wiki article "first-article" links to unknown article slug: not-a-real-article');
+  });
+
+  it("resolves the real Wiki collection's authored internal links (paragraphs and lists) to known articles", () => {
     const knownSlugs = new Set(getWikiArticles().map((article) => article.slug));
 
     for (const article of getWikiArticles()) {
       for (const section of article.sections) {
-        for (const paragraph of section.paragraphs ?? []) {
-          if (typeof paragraph === "string") continue;
-          for (const segment of paragraph) {
+        for (const entry of [...(section.paragraphs ?? []), ...(section.list ?? [])]) {
+          if (typeof entry === "string") continue;
+          for (const segment of entry) {
             if (typeof segment === "string") continue;
             expect(knownSlugs.has(segment.articleSlug)).toBe(true);
           }

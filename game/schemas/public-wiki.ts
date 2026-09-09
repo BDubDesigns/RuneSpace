@@ -34,9 +34,11 @@ const wikiSegmentText = z.string().min(1);
 const WikiParagraphSegmentSchema = z.union([wikiSegmentText, WikiLinkSegmentSchema]);
 
 /**
- * Ordinary prose, or — only when an author deliberately wants to link one
- * phrase within it — an ordered array of text and link segments that
- * concatenate into the same prose.
+ * One run of prose — a paragraph or a list item. Ordinary text, or — only
+ * when an author deliberately wants to link one phrase within it — an
+ * ordered array of text and link segments that concatenate into the same
+ * prose. Paragraphs and list items share this exact shape; there is no
+ * separate list-specific link mechanism.
  */
 const WikiParagraphSchema = z.union([wikiText, z.array(WikiParagraphSegmentSchema).min(1)]);
 
@@ -45,7 +47,7 @@ export const WikiArticleSectionSchema = z
   .object({
     heading: wikiText.optional(),
     paragraphs: z.array(WikiParagraphSchema).min(1).optional(),
-    list: z.array(wikiText).min(1).optional(),
+    list: z.array(WikiParagraphSchema).min(1).optional(),
   })
   .strict()
   .refine((section) => Boolean(section.paragraphs?.length) || Boolean(section.list?.length), {
