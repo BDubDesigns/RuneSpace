@@ -628,7 +628,7 @@ const dialogue = {
       ),
       wadeLocal(
         EXPRESSION_IDS.neutral,
-        "Holo Hollow doesn't get replacement stock. What's here is what's here. So you keep the old equipment running, or you go without.",
+        "I don't build from scratch. I make what's already lying around work again — or work as something else.",
       ),
       wadeLocal(
         EXPRESSION_IDS.scowl,
@@ -644,7 +644,7 @@ const dialogue = {
       tansyLocal(EXPRESSION_IDS.smile, "The Jag? It's a seam, not a mine. Big difference."),
       tansyLocal(
         EXPRESSION_IDS.neutral,
-        "Nobody dug this out. The ground cracked open and left the ferrite sitting there where anyone with a cutter can reach it.",
+        "Whoever got here first carved it out of the hardpan. Calling it a mine's generous, but the shale cuts fine.",
       ),
       tansyLocal(
         EXPRESSION_IDS.neutral,

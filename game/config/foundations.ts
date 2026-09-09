@@ -51,6 +51,12 @@ const dialogueIds = {
   tansyAfterClaim: asContentId("tansy_rusk_walk_it_off_after_claim"),
   tansyCapacitySlots: asContentId("tansy_rusk_walk_it_off_capacity_slots"),
   tansyCapacityMass: asContentId("tansy_rusk_walk_it_off_capacity_mass"),
+  // Issue #110 folds Tansy's old standalone post-mission idle chain into the
+  // Cut Your Teeth offer, so the retired v1 idle sequence keeps its stable
+  // ID registered but no longer has an authored sequence. Issue #164's
+  // conversation-model migration removes the old direct-Talk resolver
+  // entirely, but this retired identity is preserved rather than deleted.
+  tansyAfterCompletion: asContentId("tansy_rusk_walk_it_off_after_completion"),
   tansyCutYourTeethOffer: asContentId("tansy_rusk_cut_your_teeth_offer"),
   tansyCutYourTeethEquipReminder: asContentId("tansy_rusk_cut_your_teeth_equip_reminder"),
   tansyCutYourTeethMiningReminder: asContentId("tansy_rusk_cut_your_teeth_mining_reminder"),
