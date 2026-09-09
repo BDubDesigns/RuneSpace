@@ -1,13 +1,21 @@
-import { expect, test } from "@playwright/test";
+import { db } from "@/db";
+import * as authSchema from "@/db/auth-schema";
+import * as rune from "@/db/rune-space";
+import { cleanupTestUser } from "../integration/fixtures";
+import { establishAuthenticatedSession, expect, test } from "./fixtures";
 
 /**
  * Isolated Sign-out check (Issue #52).
  *
  * Signing out revokes the server-side session, so it is deliberately NOT part
  * of the shared serial mining fixture (whose CI retries would reuse an invalid
- * session). This spec registers its own fresh account per run and asserts that
- * the authenticated header's Sign out control returns the player to the
- * signed-out landing.
+ * session). This spec's actual contract is the authenticated header's Sign
+ * out control, not the registration form, so its session comes from
+ * `establishAuthenticatedSession` rather than the real `/register` HTTP flow
+ * — see that helper's docstring for why: Better Auth's default sign-up/sign-in
+ * rate limit is a small budget shared across every concurrently running spec
+ * on this one local test run, and the registration form itself is already
+ * covered by its own dedicated journey.
  */
 
 function uniqueEmail() {
@@ -15,39 +23,36 @@ function uniqueEmail() {
 }
 
 test("Sign out from the authenticated header returns to the signed-out landing", async ({
-  page,
+  browser,
 }) => {
-  const databaseUrl = process.env.DATABASE_URL;
-  const databaseHost = databaseUrl ? new URL(databaseUrl).hostname : "";
-  if (databaseHost !== "localhost" && databaseHost !== "127.0.0.1") {
-    throw new Error("Sign-out E2E fixtures require a disposable localhost PostgreSQL database");
+  const { context, userId } = await establishAuthenticatedSession(
+    browser,
+    "Sign-out Fixture",
+    uniqueEmail(),
+  );
+  try {
+    const page = await context.newPage();
+    await page.goto("/characters");
+    await page.waitForURL(/\/characters$/);
+    await page.getByRole("link", { name: "New character" }).click();
+    const characterName = `Signout ${Date.now().toString(36)}${Math.floor(Math.random() * 36).toString(36)}`;
+    await page.getByLabel("Character name").fill(characterName);
+    // Character creation requires a deliberate portrait choice (issue #65).
+    await page.getByRole("button", { name: "Cargo Pilot portrait" }).click();
+    await page.getByRole("button", { name: "Create character" }).click();
+    await expect(page.getByRole("img", { name: "RuneSpace" })).toBeVisible();
+
+    // The control is present inside the single header panel beside the brand.
+    const signOut = page.getByRole("banner").getByRole("button", { name: "Sign out" });
+    await expect(signOut).toBeVisible();
+
+    // Activating it clears the session and returns to the signed-out landing.
+    await signOut.click();
+    await expect(page).toHaveURL(/\/$/);
+    await expect(page.getByRole("link", { name: "Sign in" }).first()).toBeVisible();
+    await expect(page.getByRole("button", { name: "Sign out" })).toHaveCount(0);
+  } finally {
+    await context.close();
+    await cleanupTestUser(db, authSchema, rune, userId);
   }
-
-  // Register a fresh account and character for this isolated check. The
-  // character name must stay within the 24-character limit (a longer name is
-  // truncated and its truncated timestamp can collide with an earlier run on
-  // the shared database), so use a compact base-36 timestamp plus a random
-  // digit.
-  await page.goto("/register");
-  await page.getByLabel("Display name").fill("Sign-out Fixture");
-  await page.getByLabel("Email").fill(uniqueEmail());
-  await page.getByLabel("Password", { exact: true }).fill("sup3r-secret-password");
-  await page.getByRole("button", { name: "Create account" }).click();
-  await page.getByRole("link", { name: "New character" }).click();
-  const characterName = `Signout ${Date.now().toString(36)}${Math.floor(Math.random() * 36).toString(36)}`;
-  await page.getByLabel("Character name").fill(characterName);
-  // Character creation requires a deliberate portrait choice (issue #65).
-  await page.getByRole("button", { name: "Cargo Pilot portrait" }).click();
-  await page.getByRole("button", { name: "Create character" }).click();
-  await expect(page.getByRole("img", { name: "RuneSpace" })).toBeVisible();
-
-  // The control is present inside the single header panel beside the brand.
-  const signOut = page.getByRole("banner").getByRole("button", { name: "Sign out" });
-  await expect(signOut).toBeVisible();
-
-  // Activating it clears the session and returns to the signed-out landing.
-  await signOut.click();
-  await expect(page).toHaveURL(/\/$/);
-  await expect(page.getByRole("link", { name: "Sign in" }).first()).toBeVisible();
-  await expect(page.getByRole("button", { name: "Sign out" })).toHaveCount(0);
 });

@@ -1,0 +1,1 @@
+ALTER TABLE "player_accounts" ADD COLUMN "news_read_through_at" timestamp with time zone;

@@ -54,6 +54,14 @@ export const playerAccounts = pgTable(
       .notNull()
       .defaultNow()
       .$onUpdate(() => new Date()),
+    // Issue #156 — the account-level news read-through boundary. Null means
+    // "never acknowledged" (every pre-existing account's true state; no
+    // backfill needed). Always set to the newest published Update's
+    // `publishedAt` instant at the moment of acknowledgement, never the
+    // wall-clock time, so a delayed request can never mark a not-yet-published
+    // Update as read. This is intentionally the only unread-news state: no
+    // per-Update row, no per-character row.
+    newsReadThroughAt: timestamp("news_read_through_at", { withTimezone: true }),
   },
   (table) => [index("player_accounts_user_id_idx").on(table.userId)],
 );

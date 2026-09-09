@@ -1,4 +1,10 @@
-import { test as base, expect, type Page } from "@playwright/test";
+import {
+  test as base,
+  expect,
+  type Browser,
+  type BrowserContext,
+  type Page,
+} from "@playwright/test";
 import { hashPassword } from "better-auth/crypto";
 import { parseSetCookieHeader } from "better-auth/cookies";
 import { mkdir } from "node:fs/promises";
@@ -52,24 +58,88 @@ function workerEmail(runId: string, workerIndex: number) {
   return `e2e-${runId}-w${workerIndex}-${randomUUID().slice(0, 8)}@example.com`;
 }
 
+function resolveBaseURL(): string {
+  const port = process.env.PLAYWRIGHT_PORT ?? "3000";
+  const baseURL = process.env.BASE_URL ?? `http://127.0.0.1:${port}`;
+  if (!baseURL) throw new Error("Playwright base URL is required for session establishment");
+  return baseURL;
+}
+
+/**
+ * Establish a real authenticated browser session for a fresh Better Auth
+ * user, bypassing the real `/register` and `/sign-in` HTTP forms entirely.
+ *
+ * Better Auth's default rate limit specially restricts `/sign-in`, `/sign-up`,
+ * `/change-password`, and `/change-email` to 3 requests per rolling 10-second
+ * window (see `better-auth`'s `rate-limiter` module), keyed globally across
+ * every Playwright worker on this one local test run (all traffic shares one
+ * loopback IP). Two or three specs submitting the real registration form
+ * concurrently is enough to exceed that budget and silently strand a test on
+ * `/register`. The auth-schema account is created directly with Better Auth's
+ * own password hash, then Better Auth's server API issues the signed browser
+ * session cookie directly — indistinguishable to the app from a real sign-in,
+ * without touching the rate-limited path. Callers that specifically need to
+ * exercise the registration or sign-in *form* itself (not just an
+ * authenticated session) must not use this helper.
+ */
+export async function establishAuthenticatedSession(
+  browser: Browser,
+  displayName: string,
+  email: string,
+): Promise<{ context: BrowserContext; userId: string }> {
+  assertDisposableE2EDatabase();
+  const baseURL = resolveBaseURL();
+  const userId = randomUUID();
+  const password = "sup3r-secret-password";
+  const now = new Date();
+  await db.insert(authSchema.user).values({
+    id: userId,
+    name: displayName,
+    email,
+    emailVerified: false,
+    createdAt: now,
+    updatedAt: now,
+  });
+  await db.insert(authSchema.account).values({
+    id: randomUUID(),
+    accountId: userId,
+    providerId: "credential",
+    userId,
+    password: await hashPassword(password),
+  });
+
+  const signIn = await auth.api.signInEmail({
+    headers: new Headers({ host: new URL(baseURL).host }),
+    body: { email, password },
+    returnHeaders: true,
+  });
+  const sessionCookie = [
+    ...parseSetCookieHeader(signIn.headers.get("set-cookie") ?? "").entries(),
+  ].find(([name, cookie]) => name.endsWith("session_token") && cookie.value);
+  if (!sessionCookie) {
+    throw new Error("Better Auth sign-in did not return a session cookie");
+  }
+
+  const context = await browser.newContext({ baseURL });
+  await context.addCookies([
+    { name: sessionCookie[0], value: sessionCookie[1].value, url: baseURL },
+  ]);
+  return { context, userId };
+}
+
 /**
  * The ordinary authenticated browser contract:
  * one Better Auth account/session per Playwright worker, with a storage-state
- * file that sibling workers can never overwrite. The auth-schema account is
- * created directly with Better Auth's own password hash, then Better Auth's
- * server API issues the signed browser session cookie. This avoids both the
- * signup and sign-in IP limiters when several workers start together;
- * registration and character creation remain covered by their dedicated
- * special-journey specs.
+ * file that sibling workers can never overwrite. Session establishment goes
+ * through `establishAuthenticatedSession` (see its docstring for why this
+ * avoids the signup/sign-in rate limiters when several workers start
+ * together); registration and character creation remain covered by their
+ * dedicated special-journey specs.
  */
 export const test = base.extend<TestFixtures, WorkerFixtures>({
   workerAuth: [
     async ({ browser }, use, workerInfo) => {
       assertDisposableE2EDatabase();
-      const port = process.env.PLAYWRIGHT_PORT ?? "3000";
-      const baseURL = process.env.BASE_URL ?? `http://127.0.0.1:${port}`;
-      if (!baseURL) throw new Error("Playwright base URL is required for worker authentication");
-
       const runId = runIdFor();
       const storageStatePath = resolve(
         process.cwd(),
@@ -80,43 +150,13 @@ export const test = base.extend<TestFixtures, WorkerFixtures>({
       );
       await mkdir(dirname(storageStatePath), { recursive: true });
 
-      const userId = randomUUID();
-      const password = "sup3r-secret-password";
       const email = workerEmail(runId, workerInfo.workerIndex);
-      const now = new Date();
-      await db.insert(authSchema.user).values({
-        id: userId,
-        name: `E2E Worker ${workerInfo.workerIndex}`,
+      const { context, userId } = await establishAuthenticatedSession(
+        browser,
+        `E2E Worker ${workerInfo.workerIndex}`,
         email,
-        emailVerified: false,
-        createdAt: now,
-        updatedAt: now,
-      });
-      await db.insert(authSchema.account).values({
-        id: randomUUID(),
-        accountId: userId,
-        providerId: "credential",
-        userId,
-        password: await hashPassword(password),
-      });
-
-      const signIn = await auth.api.signInEmail({
-        headers: new Headers({ host: new URL(baseURL).host }),
-        body: { email, password },
-        returnHeaders: true,
-      });
-      const sessionCookie = [
-        ...parseSetCookieHeader(signIn.headers.get("set-cookie") ?? "").entries(),
-      ].find(([name, cookie]) => name.endsWith("session_token") && cookie.value);
-      if (!sessionCookie) {
-        throw new Error("Better Auth worker sign-in did not return a session cookie");
-      }
-
-      const context = await browser.newContext({ baseURL });
+      );
       try {
-        await context.addCookies([
-          { name: sessionCookie[0], value: sessionCookie[1].value, url: baseURL },
-        ]);
         const page = await context.newPage();
         try {
           await page.goto("/characters");

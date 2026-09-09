@@ -35,11 +35,11 @@ small number of critical mobile player journeys.
   for managed-host iteration instead.
 - The canonical CI-parity command: `pnpm test:e2e:canonical`. This is the single
   source of truth for local and CI behavioral verification. Its canonical
-  selection is an explicit allowlist of the existing 72 behavioral tests in 13
+  selection is an explicit allowlist of the existing 73 behavioral tests in 14
   specs: Mining, Inventory Equip, Overlay, Walk It Off, Cut Your Teeth, Travel,
   Location Population, Character Profile, Character Portraits, Refining, Cargo
-  Hold, Admin Operator, and Sign-out. It intentionally excludes noncanonical
-  `smoke`, `ownership`, `design-system`, and QC Studio specs. It:
+  Hold, Admin Operator, Sign-out, and Account News. It intentionally excludes
+  noncanonical `smoke`, `ownership`, `design-system`, and QC Studio specs. It:
   - requires Node 22.x
   - requires a localhost-only disposable PostgreSQL database (refuses remote)
   - selects a dedicated test port
@@ -49,7 +49,8 @@ small number of critical mobile player journeys.
     invokes Playwright once with the canonical allowlist and Chromium project
   - authenticates once per Playwright worker and creates a fresh authoritative
     test character for each test; special registration, character-creation,
-    portrait, ownership, admin, and sign-out journeys keep their own contracts
+    portrait, ownership, admin, sign-out, and account-news journeys keep their
+    own contracts
   - the Power Annex journey uses a disposable runner-only clock file, gated to
     CI against localhost PostgreSQL, to cross a Pacific reset boundary without
     depending on the host wall clock

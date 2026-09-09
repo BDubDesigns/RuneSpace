@@ -4,6 +4,7 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { ensurePlayerAccount, requireCurrentUser, OwnershipError } from "@/server/ownership";
 import { createCharacter, changeCharacterPortrait, CharacterError } from "@/server/characters";
+import { acknowledgeNews } from "@/server/account-news";
 import {
   getPlayGameplayState,
   beginTravel,
@@ -92,6 +93,22 @@ export async function createCharacterAction(formData: FormData): Promise<ActionR
     // Re-throw redirect navigation and any unexpected error.
     throw err;
   }
+}
+
+/**
+ * Acknowledge account-level news (issue #156). The authenticated account's
+ * news read-through boundary advances to the newest published Update's
+ * instant as resolved server-side, then the browser navigates to the Updates
+ * index — an ordinary form submission, so this works as normal navigation
+ * even without client JavaScript. Errors intentionally fall through to the
+ * thrown redirect/error rather than a client-visible result: this control has
+ * no other in-place error affordance, and a failed acknowledgement should
+ * surface the same way any other broken navigation would.
+ */
+export async function acknowledgeNewsAction(): Promise<void> {
+  const user = await requireCurrentUser(await headers());
+  await acknowledgeNews(user.id);
+  redirect("/updates");
 }
 
 export type ChangeCharacterPortraitActionResult = { characterId?: string; error?: string };

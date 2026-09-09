@@ -5,6 +5,27 @@ export type { PublicUpdate } from "@/game/schemas/public-updates";
 
 const authoredUpdates = [
   {
+    slug: "you-have-news",
+    title: "You Have News",
+    publishedAt: "2026-09-09T12:00:00-07:00",
+    summary:
+      "Signed-in accounts now get a quiet News indicator in the game shell whenever a new Update is waiting to be read.",
+    body: [
+      "Updates were previously something you had to remember to go check. Now every signed-in RuneSpace account gets a small News control next to Sign out at the top of the game — and it only calls attention to itself when there's actually something new.",
+      "The indicator is account-level: it doesn't matter which of your characters you're playing, and you don't need to acknowledge the same release on each one separately. Opening News takes you to the Updates index and clears the indicator through whatever was newest at that moment. If another Update ships later, the indicator comes back on its own.",
+      "It's a small addition, but it closes the loop the Updates page opened: the news doesn't just exist somewhere, it finds you.",
+    ],
+    patchNotes: [
+      {
+        heading: "Added",
+        items: [
+          "A News control in the authenticated game shell, next to Sign out, with an unread indicator that appears when a newer Update has been published than the account has acknowledged.",
+          "Opening News navigates to the Updates index and clears the indicator for every character on the account.",
+        ],
+      },
+    ],
+  },
+  {
     slug: "a-field-manual-for-holo-hollow",
     title: "A Field Manual for Holo Hollow",
     publishedAt: "2026-09-08T18:00:00-07:00",
@@ -76,12 +97,27 @@ const authoredUpdates = [
 export function validatePublicUpdates(input: readonly unknown[]): readonly PublicUpdate[] {
   const updates = PublicUpdateSchema.array().min(1).parse(input);
   const seenSlugs = new Set<string>();
+  // Keyed by parsed instant (not the raw string) so two different offset
+  // representations of the same instant are still caught as a collision: the
+  // account-level news read-through boundary (issue #156) orders and
+  // compares Updates by this same parsed instant, so two Updates sharing one
+  // instant would be indistinguishable to that boundary.
+  const seenInstants = new Map<number, string>();
 
   for (const update of updates) {
     if (seenSlugs.has(update.slug)) {
       throw new Error(`Duplicate public Update slug: ${update.slug}`);
     }
     seenSlugs.add(update.slug);
+
+    const instant = Date.parse(update.publishedAt);
+    const collidingSlug = seenInstants.get(instant);
+    if (collidingSlug !== undefined) {
+      throw new Error(
+        `Duplicate public Update publishedAt instant: ${update.slug} collides with ${collidingSlug}`,
+      );
+    }
+    seenInstants.set(instant, update.slug);
   }
 
   return [...updates].sort((left, right) => {
