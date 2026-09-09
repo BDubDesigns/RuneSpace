@@ -3,12 +3,17 @@
   "projectSlug": "runespace",
   "workState": "active",
   "currentFocus": "Redesigning the operational Cargo Hold contents into a compact selectable item grid (Issue #151).",
+  "currentChange": {
+    "summary": "Replaces per-item Deposit/Withdraw action rows with a compact selectable Cargo Hold and Carried Inventory tile grid.",
+    "stage": "review",
+    "pullRequestNumber": 166
+  },
   "latestCompleted": {
     "summary": "Replaced the single-dialogue Talk interaction with one canonical NPC conversation hub plus replayable social topics.",
     "date": "2026-09-09",
     "url": "https://github.com/BDubDesigns/RuneSpace/pull/165"
   },
-  "nextStep": "Open the Draft PR for Issue #151 and complete human review.",
+  "nextStep": "Complete human review of PR #166 and run full CI before merging to main.",
   "lastMeaningfulUpdate": "2026-09-09",
   "highlights": [
     {
