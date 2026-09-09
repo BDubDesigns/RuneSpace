@@ -140,6 +140,16 @@ Do not add Updates for internal-only work without meaningful player impact, or
 rewrite a published Update for unrelated later changes; an issue's explicit
 Update requirement is authoritative.
 
+## Player Wiki
+
+When a gameplay, content, UX, balance, or progression change materially
+changes a fact already documented in the public Wiki, update the affected
+Wiki page(s) in the same PR following `docs/public-wiki.md`, unless the issue
+says otherwise. Add a new Wiki page only when the player-facing information
+volume warrants one; internal-only CI/test/refactor/architecture work does
+not require a Wiki edit unless it changes actual player-visible behavior.
+Never publish approved-but-unshipped design as current Wiki behavior.
+
 ## Tooling and safety reminders
 
 - pnpm is the package manager; Node 22 and pnpm 9.15.4 are pinned. Key checks

@@ -2,18 +2,13 @@
   "schemaVersion": 1,
   "projectSlug": "runespace",
   "workState": "active",
-  "currentFocus": "Reviewing the repository-authored public Updates system and patch notes in Draft PR #161.",
-  "currentChange": {
-    "summary": "Adds public Updates, patch notes, and latest-Update homepage projection.",
-    "stage": "review",
-    "pullRequestNumber": 161
-  },
+  "currentFocus": "Building a repository-backed public player Wiki covering the currently shipped Holo Hollow loop.",
   "latestCompleted": {
-    "summary": "Added a public RuneSpace landing page, reusable public-site shell, and current-game Location, Map, and Journey showcase.",
+    "summary": "Added public Updates, patch notes, and the latest-Update homepage projection.",
     "date": "2026-09-08",
-    "url": "https://github.com/BDubDesigns/RuneSpace/pull/160"
+    "url": "https://github.com/BDubDesigns/RuneSpace/pull/161"
   },
-  "nextStep": "Review Draft PR #161 on mobile and desktop; Brandon may approve product and code review before merge.",
+  "nextStep": "Open a Draft PR for the player Wiki, validate it, and review /wiki and an article on mobile and desktop.",
   "lastMeaningfulUpdate": "2026-09-08",
   "highlights": [
     {

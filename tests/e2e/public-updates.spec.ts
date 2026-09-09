@@ -22,7 +22,10 @@ test.describe("public Updates", () => {
       "href",
       `/updates/${updateSlug}`,
     );
-    await expect(page.getByText("September 8, 2026", { exact: true })).toBeVisible();
+    const updateListItem = page
+      .getByRole("listitem")
+      .filter({ has: page.getByRole("link", { name: updateTitle, exact: true }) });
+    await expect(updateListItem.getByText("September 8, 2026", { exact: true })).toBeVisible();
 
     await page.getByRole("link", { name: updateTitle, exact: true }).click();
     await expect(page).toHaveURL(`/updates/${updateSlug}`);

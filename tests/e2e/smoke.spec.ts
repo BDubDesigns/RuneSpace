@@ -18,6 +18,10 @@ test("public landing loads with pre-alpha identity and entry actions", async ({ 
     "href",
     "/updates",
   );
+  await expect(page.getByRole("link", { name: "Wiki", exact: true })).toHaveAttribute(
+    "href",
+    "/wiki",
+  );
   await expect(page.getByRole("link", { name: "Brandon", exact: true })).toHaveAttribute(
     "href",
     "https://github.com/BDubDesigns",
@@ -42,4 +46,43 @@ test("public landing stays contained on a narrow viewport", async ({ page }) => 
     expect(box!.x).toBeGreaterThanOrEqual(0);
     expect(box!.x + box!.width).toBeLessThanOrEqual(390);
   }
+});
+
+test("signed-out header nav (Home, Updates, Wiki) and entry action stay usable on a narrow viewport", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/");
+
+  // The header never overflows the page itself — this is the actual contract
+  // for "no horizontal page overflow" at narrow widths.
+  const header = page.getByRole("banner");
+  await expect(header).toBeVisible();
+  const headerBox = await header.boundingBox();
+  expect(headerBox, "header should have a layout box").not.toBeNull();
+  expect(headerBox!.x).toBeGreaterThanOrEqual(0);
+  expect(headerBox!.x + headerBox!.width).toBeLessThanOrEqual(390);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
+
+  // The Public nav is intentionally its own horizontally scrollable strip
+  // (`overflow-x-auto` in PublicSiteShell) rather than something that pushes
+  // the page wider — Home, Updates, and Wiki all stay present and reachable
+  // by scrolling the strip, even when they don't all fit unscrolled.
+  const nav = page.getByRole("navigation", { name: "Public" });
+  await expect(nav).toBeVisible();
+  for (const name of ["Home", "Updates", "Wiki"]) {
+    await expect(page.getByRole("link", { name, exact: true })).toHaveCount(1);
+  }
+  const wikiLink = page.getByRole("link", { name: "Wiki", exact: true });
+  await wikiLink.scrollIntoViewIfNeeded();
+  await expect(wikiLink).toBeInViewport();
+
+  // The primary entry action sits outside the scrollable nav strip and must
+  // always be fully visible without any scrolling.
+  const signIn = page.getByRole("link", { name: "Sign in", exact: true }).first();
+  await expect(signIn).toBeVisible();
+  const signInBox = await signIn.boundingBox();
+  expect(signInBox, "Sign in should have a layout box").not.toBeNull();
+  expect(signInBox!.x).toBeGreaterThanOrEqual(0);
+  expect(signInBox!.x + signInBox!.width).toBeLessThanOrEqual(390);
 });
