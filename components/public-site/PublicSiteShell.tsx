@@ -1,6 +1,20 @@
+import Image from "next/image";
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { RuneSpaceBrand } from "@/components/branding/RuneSpaceBrand";
+
+const EMBLEM_WIDTH = 1292;
+const EMBLEM_HEIGHT = 1340;
+
+/**
+ * Below `min-[390px]`, the full horizontal lockup plus Home/Updates/Wiki no
+ * longer fits the compact public header without the nav strip needing an
+ * internal scroll. Only below that breakpoint, swap to the standalone R
+ * emblem (`public/branding/runespace-emblem.png`) so the nav fits without
+ * scrolling; the full lockup remains the header identity everywhere else.
+ * This swap is deliberately scoped to the public-site header only — it does
+ * not change the authenticated game header or general branding guidance.
+ */
 
 export type PublicSiteNavItem = {
   href: string;
@@ -29,9 +43,18 @@ export function PublicSiteShell({
             href="/"
           >
             <RuneSpaceBrand
-              className="block h-10 w-auto max-w-[min(46vw,12rem)] sm:h-11 sm:max-w-[13rem]"
+              className="hidden h-10 w-auto max-w-[min(46vw,12rem)] min-[390px]:block sm:h-11 sm:max-w-[13rem]"
               priority
               sizes="(max-width: 640px) 46vw, 208px"
+            />
+            <Image
+              alt="RuneSpace"
+              className="block h-10 w-auto min-[390px]:hidden"
+              height={EMBLEM_HEIGHT}
+              priority
+              sizes="40px"
+              src="/branding/runespace-emblem.png"
+              width={EMBLEM_WIDTH}
             />
           </Link>
           {navigation.length > 0 ? (

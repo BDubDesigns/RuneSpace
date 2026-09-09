@@ -1,6 +1,7 @@
 export const publicSiteNavigation = [
   { href: "/", label: "Home" },
   { href: "/updates", label: "Updates" },
+  { href: "/wiki", label: "Wiki" },
 ] as const;
 
 export const publicLandingContent = {

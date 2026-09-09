@@ -5,6 +5,27 @@ export type { PublicUpdate } from "@/game/schemas/public-updates";
 
 const authoredUpdates = [
   {
+    slug: "a-field-manual-for-holo-hollow",
+    title: "A Field Manual for Holo Hollow",
+    publishedAt: "2026-09-08T18:00:00-07:00",
+    summary:
+      "A new public Wiki lays out how travel, work, gear, and the current missions actually work — no account required.",
+    body: [
+      "Holo Hollow has a manual now. The new Wiki is a short, plain-language guide to what's actually playable today: how to get around, how the two work loops fit together, what your gear does, and what each current mission asks of you.",
+      "It's built to answer the questions a new arrival actually has, in the order they come up. Getting Started opens with the loop; Travel & Scavenging, Mining & Refining, Inventory & Equipment, Power Cells, and Cargo Hold & Welding cover the mechanics one at a time; Missions and Holo Hollow tie the current jobs and locations together; Skills & Progression explains how Mining, Refining, and Welding actually track your progress.",
+      "The Wiki only documents what's shipped and playable right now — it will grow the same way the game does, one real build at a time.",
+    ],
+    patchNotes: [
+      {
+        heading: "Added",
+        items: [
+          "A public /wiki manual with nine articles covering the current playable Holo Hollow loop: Getting Started, Travel & Scavenging, Mining & Refining, Inventory & Equipment, Power Cells, Cargo Hold & Welding, Missions, Holo Hollow, and Skills & Progression.",
+          "A Wiki link in the shared public site navigation, alongside Home and Updates.",
+        ],
+      },
+    ],
+  },
+  {
     slug: "runespace-is-starting-to-feel-like-a-game",
     title: "RuneSpace Is Starting to Feel Like a Game",
     publishedAt: "2026-09-08T12:00:00-07:00",
