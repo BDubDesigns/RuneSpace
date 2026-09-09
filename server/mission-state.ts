@@ -7,8 +7,10 @@ import {
   inventoryStacks,
 } from "@/db/rune-space";
 import { getEffectiveGameBalance, getItemDefinition } from "@/game/config/balance";
+import { CONVERSATION_TOPICS } from "@/game/content/conversation-topics";
 import { MISSIONS, type MissionDefinition } from "@/game/content/missions";
 import { cargoHoldRepairComplete } from "@/game/domain/cargo-hold";
+import { validateConversationTopics } from "@/game/domain/conversation";
 import {
   projectMission,
   validateMissionDefinitions,
@@ -24,6 +26,12 @@ import { resolveItemPresentation } from "@/game/content/item-presentation";
 // acquisition action that does not authoritatively produce the required item
 // all fail here, never at runtime inside a player transaction.
 validateMissionDefinitions(MISSIONS);
+
+// Authored conversation topics are validated on the same module-load boundary:
+// unknown NPCs/dialogue, NPC mismatches, duplicate subjects, unknown Mission
+// gates, and any attempt to reuse a Mission-owned sequence as a replayable
+// social topic all fail here rather than inside a player conversation.
+validateConversationTopics(CONVERSATION_TOPICS, MISSIONS);
 
 /**
  * Authoritative mission projection for the play state. Persistence contains

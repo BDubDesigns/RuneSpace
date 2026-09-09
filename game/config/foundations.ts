@@ -53,7 +53,9 @@ const dialogueIds = {
   tansyCapacityMass: asContentId("tansy_rusk_walk_it_off_capacity_mass"),
   // Issue #110 folds Tansy's old standalone post-mission idle chain into the
   // Cut Your Teeth offer, so the retired v1 idle sequence keeps its stable
-  // ID registered but no longer has an authored sequence.
+  // ID registered but no longer has an authored sequence. Issue #164's
+  // conversation-model migration removes the old direct-Talk resolver
+  // entirely, but this retired identity is preserved rather than deleted.
   tansyAfterCompletion: asContentId("tansy_rusk_walk_it_off_after_completion"),
   tansyCutYourTeethOffer: asContentId("tansy_rusk_cut_your_teeth_offer"),
   tansyCutYourTeethEquipReminder: asContentId("tansy_rusk_cut_your_teeth_equip_reminder"),
@@ -73,6 +75,22 @@ const dialogueIds = {
   wadeHoldItTogetherTurnIn: asContentId("wade_rusk_hold_it_together_turn_in"),
   wadeHoldItTogetherCompletion: asContentId("wade_rusk_hold_it_together_completion"),
   wadePostHoldItTogether: asContentId("wade_rusk_post_hold_it_together"),
+  // Replayable social/worldbuilding topics (#164). These are ordinary NPC
+  // conversations: they never carry a Mission action and never gate progression.
+  wadeRecoveryWorkTopic: asContentId("wade_rusk_topic_recovery_work"),
+  tansyMiningTopic: asContentId("tansy_rusk_topic_mining"),
+  tansyBeyondHoloHollowTopic: asContentId("tansy_rusk_topic_beyond_holo_hollow"),
+} as const satisfies Record<string, ContentId>;
+
+/**
+ * Stable identities for authored replayable conversation topics (#164). A
+ * topic is a UI subject the player can revisit; it is never player-spoken
+ * dialogue and never a Mission.
+ */
+const conversationTopicIds = {
+  wadeRecoveryWork: asContentId("wade_rusk_recovery_work"),
+  tansyMining: asContentId("tansy_rusk_mining"),
+  tansyBeyondHoloHollow: asContentId("tansy_rusk_beyond_holo_hollow"),
 } as const satisfies Record<string, ContentId>;
 
 const expressionIds = {
@@ -140,6 +158,7 @@ export const ITEM_IDS = itemIds;
 export const NPC_IDS = npcIds;
 export const MISSION_IDS = missionIds;
 export const DIALOGUE_IDS = dialogueIds;
+export const CONVERSATION_TOPIC_IDS = conversationTopicIds;
 export const EXPRESSION_IDS = expressionIds;
 export const CONVERSATION_BACKGROUND_IDS = conversationBackgroundIds;
 export const PORTRAIT_IDS = portraitIds;
@@ -149,6 +168,8 @@ export type ItemId = (typeof ITEM_IDS)[keyof typeof ITEM_IDS];
 export type NpcId = (typeof NPC_IDS)[keyof typeof NPC_IDS];
 export type MissionId = (typeof MISSION_IDS)[keyof typeof MISSION_IDS];
 export type DialogueId = (typeof DIALOGUE_IDS)[keyof typeof DIALOGUE_IDS];
+export type ConversationTopicId =
+  (typeof CONVERSATION_TOPIC_IDS)[keyof typeof CONVERSATION_TOPIC_IDS];
 export type ExpressionId = (typeof EXPRESSION_IDS)[keyof typeof EXPRESSION_IDS];
 export type ConversationBackgroundId =
   (typeof CONVERSATION_BACKGROUND_IDS)[keyof typeof CONVERSATION_BACKGROUND_IDS];

@@ -5,6 +5,34 @@ export type { PublicUpdate } from "@/game/schemas/public-updates";
 
 const authoredUpdates = [
   {
+    slug: "talk-is-a-conversation-now",
+    title: "Talk Is a Conversation Now",
+    publishedAt: "2026-09-09T15:00:00-07:00",
+    summary:
+      "Talking to Wade or Tansy now opens a list of what you can actually talk about — the current job, plus subjects you can revisit any time.",
+    body: [
+      "Until now, talking to someone in Holo Hollow gave you exactly one conversation: whatever the game decided was most relevant at that moment. It worked for handing out jobs, but it meant Wade and Tansy only ever had one thing to say.",
+      "Talk now opens a conversation instead. Anything tied to your current work shows up first — a job that is available, one you are in the middle of, or one that is ready to hand in — and below that is a list of subjects you can bring up whenever you like.",
+      "Those subjects stay available. Ask Wade about recovery work, ask Tansy about mining the seam at The Jag, and come back and ask again later. A few subjects only show up once you have done the work that would make the two of you talk about them.",
+      "Nothing about the jobs themselves changed. Walk It Off, Cut Your Teeth, Waste Not, and Hold It Together ask for exactly what they asked for before, hand out the same rewards, and are still turned in with the same person in the same place.",
+    ],
+    patchNotes: [
+      {
+        heading: "Added",
+        items: [
+          "Talk now opens a conversation list for that person: current job conversations first, then a Talk about section of subjects you can revisit.",
+          "Wade and Tansy each have new subjects to talk about that are not tied to a job, and one of Tansy's opens up after you finish the current run of work.",
+        ],
+      },
+      {
+        heading: "Changed",
+        items: [
+          "Finishing a conversation returns you to that person's conversation list instead of closing straight back to the world.",
+        ],
+      },
+    ],
+  },
+  {
     slug: "you-have-news",
     title: "You Have News",
     publishedAt: "2026-09-09T01:00:00-07:00",

@@ -26,7 +26,7 @@ The following are live on `main` as server-authoritative, Play-orchestrated syst
 - **Welding & Cargo Hold** — ship Cargo Hold repair at Crash Site and Welding progression.
 - **Inventory & Equipment** — carried stacks/unique items, slot/mass capacity, containers, and Equipment.
 - **Locations & presentation** — location scenes and the local world map.
-- **Missions & NPC interactions** — declarative mission framework (`docs/missions.md`), authored missions (Walk It Off / Cut Your Teeth), and NPC dialogue/interaction (`docs/qc-studio.md` for authoring).
+- **Missions & NPC conversations** — declarative mission framework (`docs/missions.md`), authored missions (Walk It Off / Cut Your Teeth / Waste Not / Hold It Together), the one canonical NPC conversation model with replayable topics (`docs/npc-conversations.md`), and dialogue authoring (`docs/qc-studio.md`).
 
 ## World & skills
 

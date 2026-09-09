@@ -2,6 +2,7 @@ import {
   expect,
   openEquipmentFromMissionGuidance,
   openMapSurface,
+  openNpcDialogue,
   test,
   openTestCharacter,
 } from "./fixtures";
@@ -179,9 +180,7 @@ test("equips the Cutter through Inventory, shows a full stack, and earns Mining 
     .set({ currentLocationId: LOCATION_IDS.crashSite })
     .where(eq(characters.id, characterId));
   await page.reload();
-  await page.getByRole("button", { name: /Talk to Wade Rusk/ }).click();
-  const wadeDuringCut = page.getByRole("dialog", { name: "Wade Rusk dialogue" });
-  await expect(wadeDuringCut).toBeVisible();
+  const wadeDuringCut = await openNpcDialogue(page, "Wade Rusk", /Cut Your Teeth/);
   await expect(wadeDuringCut.locator('[data-dialogue-text] [aria-hidden="true"]')).toContainText(
     "You're a long way from The Jag",
   );
@@ -193,6 +192,8 @@ test("equips the Cutter through Inventory, shows a full stack, and earns Mining 
   await wadeDuringCut.getByRole("button", { name: "Next", exact: true }).click();
   await expect(wadeDuringCut.getByRole("button", { name: "Finish" })).toBeVisible();
   await wadeDuringCut.getByRole("button", { name: "Finish" }).click();
+  await expect(wadeDuringCut.locator("[data-conversation-hub]")).toBeVisible();
+  await page.keyboard.press("Escape");
   await expect(wadeDuringCut).toBeHidden();
   await db
     .update(characters)
@@ -262,10 +263,9 @@ test("equips the Cutter through Inventory, shows a full stack, and earns Mining 
   // The Missions footer badge counts ready-to-turn-in missions only: exactly 1.
   await expect(page.locator("[data-missions-badge]")).toHaveText("1");
 
-  // Talk to Tansy: active + ready routes to the turn-in with SHOW SHALE control.
-  await page.getByRole("button", { name: /Talk to Tansy Rusk/ }).click();
-  const tansy = page.getByRole("dialog", { name: "Tansy Rusk dialogue" });
-  await expect(tansy).toBeVisible();
+  // Talk to Tansy: the hub marks Cut Your Teeth as the turn-in, and its
+  // conversation carries the authored SHOW SHALE completion control.
+  const tansy = await openNpcDialogue(page, "Tansy Rusk", /Cut Your Teeth/);
   const showShale = tansy.getByRole("button", { name: "SHOW SHALE" });
   await expect(showShale).toBeVisible();
   const miningXpBeforeCutTurnIn = await miningXpTotal(characterId);
@@ -310,6 +310,8 @@ test("equips the Cutter through Inventory, shows a full stack, and earns Mining 
   );
   await expect(tansy.getByRole("button", { name: "Finish" })).toBeVisible();
   await tansy.getByRole("button", { name: "Finish" }).click();
+  await expect(tansy.locator("[data-conversation-hub]")).toBeVisible();
+  await page.keyboard.press("Escape");
   await expect(tansy).toBeHidden();
 
   // Shale was inspected, never consumed.
@@ -358,9 +360,7 @@ test("equips the Cutter through Inventory, shows a full stack, and earns Mining 
 
   // While Waste Not is active, Tansy owns contextual active-Mission dialogue
   // rather than falling back to stale completed Cut Your Teeth dialogue.
-  await page.getByRole("button", { name: /Talk to Tansy Rusk/ }).click();
-  const tansyPost = page.getByRole("dialog", { name: "Tansy Rusk dialogue" });
-  await expect(tansyPost).toBeVisible();
+  const tansyPost = await openNpcDialogue(page, "Tansy Rusk", /Waste Not/);
   await expect(tansyPost.locator('[data-dialogue-subject="item"]')).toHaveCount(0);
   await expect(tansyPost.locator("[data-dialogue-skill-xp-tile]")).toHaveCount(0);
   await expect(tansyPost.locator('[data-dialogue-text] [aria-hidden="true"]')).toContainText(
@@ -371,15 +371,15 @@ test("equips the Cutter through Inventory, shows a full stack, and earns Mining 
   );
   await expect(tansyPost.getByRole("button", { name: "Finish" })).toBeVisible();
   await tansyPost.getByRole("button", { name: "Finish" }).click();
+  await expect(tansyPost.locator("[data-conversation-hub]")).toBeVisible();
+  await page.keyboard.press("Escape");
   await expect(tansyPost).toBeHidden();
 
   // Reload preserves the active Waste Not dialogue ownership and does not
   // replay the Cut completion presentation.
   await page.reload();
   await expect(page.locator("[data-mission-objective]")).toContainText("Waste Not");
-  await page.getByRole("button", { name: /Talk to Tansy Rusk/ }).click();
-  const tansyPostReload = page.getByRole("dialog", { name: "Tansy Rusk dialogue" });
-  await expect(tansyPostReload).toBeVisible();
+  const tansyPostReload = await openNpcDialogue(page, "Tansy Rusk", /Waste Not/);
   await expect(tansyPostReload.locator('[data-dialogue-subject="item"]')).toHaveCount(0);
   await expect(tansyPostReload.locator("[data-dialogue-skill-xp-tile]")).toHaveCount(0);
   await expect(tansyPostReload.locator('[data-dialogue-text] [aria-hidden="true"]')).toContainText(
@@ -390,6 +390,8 @@ test("equips the Cutter through Inventory, shows a full stack, and earns Mining 
   ).not.toContainText("You kept the shale?");
   await expect(tansyPostReload.getByRole("button", { name: "Finish" })).toBeVisible();
   await tansyPostReload.getByRole("button", { name: "Finish" }).click();
+  await expect(tansyPostReload.locator("[data-conversation-hub]")).toBeVisible();
+  await page.keyboard.press("Escape");
   await expect(tansyPostReload).toBeHidden();
   expect(await miningXpTotal(characterId)).toBe(miningXpBeforeCutTurnIn + 100);
   const stacksAfterReload = await db
@@ -467,9 +469,7 @@ test("equips the Cutter through Inventory, shows a full stack, and earns Mining 
     "data-mission-guidance",
     "active",
   );
-  await page.getByRole("button", { name: /Talk to Wade Rusk/ }).click();
-  const wade = page.getByRole("dialog", { name: "Wade Rusk dialogue" });
-  await expect(wade).toBeVisible();
+  const wade = await openNpcDialogue(page, "Wade Rusk", /Waste Not/);
   await wade.getByRole("button", { name: "Next", exact: true }).click();
   await expect(wade.getByRole("button", { name: "REPORT TO WADE" })).toBeVisible();
   await wade.getByRole("button", { name: "REPORT TO WADE" }).click();
@@ -491,6 +491,8 @@ test("equips the Cutter through Inventory, shows a full stack, and earns Mining 
   );
   await expect(wade.getByRole("button", { name: "Finish" })).toBeVisible();
   await wade.getByRole("button", { name: "Finish" }).click();
+  await expect(wade.locator("[data-conversation-hub]")).toBeVisible();
+  await page.keyboard.press("Escape");
   await expect(wade).toBeHidden();
   expect(await miningXpTotal(characterId)).toBe(miningXpBeforeCutTurnIn + 100);
   expect(await refiningXpTotal(characterId)).toBe(refiningXpBeforeWasteTurnIn + 100);
@@ -507,9 +509,7 @@ test("equips the Cutter through Inventory, shows a full stack, and earns Mining 
   // accepted Hold It Together objective. Tansy no longer falls back to her
   // completed Waste Not story state here: Hold It Together is active, so her
   // authored contextual activeNpcDialogue takes precedence by design.
-  await page.getByRole("button", { name: /Talk to Wade Rusk/ }).click();
-  const wadeHoldItTogether = page.getByRole("dialog", { name: "Wade Rusk dialogue" });
-  await expect(wadeHoldItTogether).toBeVisible();
+  const wadeHoldItTogether = await openNpcDialogue(page, "Wade Rusk", /Hold It Together/);
   await expect(
     wadeHoldItTogether.locator('[data-dialogue-text] [aria-hidden="true"]'),
   ).toContainText("The Cargo Hold is still buckled");
@@ -519,6 +519,8 @@ test("equips the Cutter through Inventory, shows a full stack, and earns Mining 
   await wadeHoldItTogether.getByRole("button", { name: "Next", exact: true }).click();
   await expect(wadeHoldItTogether.getByRole("button", { name: "Finish" })).toBeVisible();
   await wadeHoldItTogether.getByRole("button", { name: "Finish" }).click();
+  await expect(wadeHoldItTogether.locator("[data-conversation-hub]")).toBeVisible();
+  await page.keyboard.press("Escape");
   await expect(wadeHoldItTogether).toBeHidden();
 
   await db
@@ -526,9 +528,7 @@ test("equips the Cutter through Inventory, shows a full stack, and earns Mining 
     .set({ currentLocationId: LOCATION_IDS.theJag })
     .where(eq(characters.id, characterId));
   await page.reload();
-  await page.getByRole("button", { name: /Talk to Tansy Rusk/ }).click();
-  const tansyPostWaste = page.getByRole("dialog", { name: "Tansy Rusk dialogue" });
-  await expect(tansyPostWaste).toBeVisible();
+  const tansyPostWaste = await openNpcDialogue(page, "Tansy Rusk", /Hold It Together/);
   await expect(tansyPostWaste.locator('[data-dialogue-text] [aria-hidden="true"]')).toContainText(
     "Don't get cute with the welds",
   );
@@ -539,5 +539,7 @@ test("equips the Cutter through Inventory, shows a full stack, and earns Mining 
   // the final beat, with no Next step.
   await expect(tansyPostWaste.getByRole("button", { name: "Finish" })).toBeVisible();
   await tansyPostWaste.getByRole("button", { name: "Finish" }).click();
+  await expect(tansyPostWaste.locator("[data-conversation-hub]")).toBeVisible();
+  await page.keyboard.press("Escape");
   await expect(tansyPostWaste).toBeHidden();
 });

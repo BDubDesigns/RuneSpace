@@ -13,6 +13,8 @@ boundary.** This file is the repository's normative agent-behavior contract;
     `docs/component-boundaries.md`.
   - Game rules and content: `docs/game-rules.md`,
     `docs/gameplay-foundations.md`.
+  - Missions and NPC conversations: `docs/missions.md`,
+    `docs/npc-conversations.md`.
   - UI tokens and motion: `docs/design-system.md`.
   - Authentication and trusted hosts: `docs/authentication.md`.
   - Tests and canonical E2E: `docs/testing-strategy.md`.

@@ -248,3 +248,32 @@ export async function openEquipmentFromMissionGuidance(page: Page) {
   ).toHaveAttribute("aria-selected", "true");
   return equipmentDialog;
 }
+
+/**
+ * Open one NPC's canonical conversation hub (#164). `Talk to <NPC>` no longer
+ * commits to a single winning sequence — it presents the conversations that are
+ * currently available with that NPC.
+ */
+export async function openNpcConversation(page: Page, npcName: string) {
+  await page.getByRole("button", { name: new RegExp(`Talk to ${npcName}`) }).click();
+  const conversation = page.getByRole("dialog", { name: `${npcName} conversation` });
+  await expect(conversation).toBeVisible();
+  await expect(conversation.locator("[data-conversation-hub]")).toBeVisible();
+  return conversation;
+}
+
+/** Select one hub entry and play its authored dialogue sequence. */
+export async function openConversationEntry(
+  conversation: import("@playwright/test").Locator,
+  entryName: string | RegExp,
+) {
+  await conversation.getByRole("button", { name: entryName }).click();
+  await expect(conversation.locator("[data-dialogue-text]")).toBeVisible();
+  return conversation;
+}
+
+/** Open the NPC's conversation and go straight into one entry's dialogue. */
+export async function openNpcDialogue(page: Page, npcName: string, entryName: string | RegExp) {
+  const conversation = await openNpcConversation(page, npcName);
+  return openConversationEntry(conversation, entryName);
+}
