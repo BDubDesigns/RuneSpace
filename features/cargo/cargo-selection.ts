@@ -54,14 +54,12 @@ export function resolveCargoSelection(
 }
 
 /**
- * Selecting the already-selected entry toggles it closed; any other
- * selection (including one in the other area) replaces the current one.
+ * Cargo selection identity: Carried and Cargo entries live in separate storage
+ * areas as well as separate stack/unique namespaces, so two selections match
+ * only when the area, the kind, and the id all do. The shared
+ * selectable-details contract applies the toggle rule on top of this predicate
+ * (see `features/shared/use-selectable-details.ts`).
  */
-export function toggleCargoSelection(
-  current: CargoSelection | undefined,
-  next: CargoSelection,
-): CargoSelection | undefined {
-  if (current && current.area === next.area && current.kind === next.kind && current.id === next.id)
-    return undefined;
-  return next;
+export function sameCargoSelection(current: CargoSelection, next: CargoSelection): boolean {
+  return current.area === next.area && current.kind === next.kind && current.id === next.id;
 }

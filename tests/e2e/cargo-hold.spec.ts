@@ -293,6 +293,15 @@ test("renders a dense Cargo Hold as a compact selectable grid (Issue #151)", asy
   await page.keyboard.press("Enter");
   await expect(cargoFerriteTile).toHaveAttribute("aria-pressed", "true");
   await expect(selection).toBeVisible();
+  // Shared selectable-details contract: an explicit selection moves focus to
+  // the selected item's action-area heading, so a keyboard user reaches the
+  // Withdraw controls immediately instead of tabbing through the rest of a
+  // dense grid (the same reveal the Inventory drawer performs).
+  const selectionHeading = selection.locator("[data-cargo-selection-heading]");
+  await expect(selectionHeading).toHaveAttribute("tabindex", "-1");
+  await expect
+    .poll(() => selectionHeading.evaluate((element) => element === document.activeElement))
+    .toBe(true);
   await expect(selection).toContainText("Ferrite Shale");
   await expect(selection.getByRole("button", { name: "WITHDRAW 1" })).toBeVisible();
   await expect(selection.getByRole("button", { name: "WITHDRAW STACK" })).toBeVisible();

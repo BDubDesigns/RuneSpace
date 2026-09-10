@@ -16,11 +16,13 @@ import {
   deriveInventoryEquipAvailability,
   derivePowerCellLoadAvailability,
   resolveInventorySelection,
+  sameInventorySelection,
   stackDropActions,
-  toggleInventorySelection,
   type InventorySelection,
   type InventoryStackEntry,
+  type ResolvedInventorySelection,
 } from "./inventory-selection";
+import { useSelectableDetails } from "@/features/shared/use-selectable-details";
 import { InventoryDetailsStats } from "./InventoryDetailsStats";
 import { useEquipCommand } from "./useEquipCommand";
 import { useLoadPowerCell, type LoadPowerCellFeedback } from "@/features/mining/useLoadPowerCell";
@@ -48,13 +50,24 @@ export function InventoryPanel({
   const { acquireCommand, acceptState, enqueueForeground, foregroundBusy, releaseCommand } =
     usePlay();
   const [, startTransition] = useTransition();
-  const [selected, setSelected] = useState<InventorySelection | undefined>();
   const [confirming, setConfirming] = useState<DropConfirmation | undefined>();
   const [message, setMessage] = useState<LoadPowerCellFeedback>();
-  // Set when an Equip command succeeds so focus can return to the grid after
-  // the equipped tile disappears (its button would otherwise be removed). It is
-  // armed only from the hook's success callback, never before submission.
-  const equipReturnFocusRef = useRef(false);
+  const gridRef = useRef<HTMLDivElement>(null);
+  // Selection, authoritative reconciliation, the explicit-selection reveal, and
+  // post-command focus restoration all come from the shared selectable-details
+  // contract; Drop, Equip, and Power Cell loading remain owned here.
+  const {
+    armFocusReturn,
+    clear: clearSelected,
+    detailsHeadingRef,
+    detailsRef,
+    resolved: resolvedSelection,
+    select,
+    selection: selected,
+  } = useSelectableDetails<InventorySelection, ResolvedInventorySelection>({
+    resolve: (selection) => resolveInventorySelection(state.inventory, selection),
+    isSameSelection: sameInventorySelection,
+  });
   const { equip } = useEquipCommand(
     (feedback) => {
       // Replacement-safe feedback mirror: the equipment command and the Power
@@ -66,19 +79,14 @@ export function InventoryPanel({
     // refusal or uncertain transport leave the flag set and trigger equip
     // focus behavior on some later, unrelated reconciliation.
     () => {
-      equipReturnFocusRef.current = true;
+      armFocusReturn(() => gridRef.current);
     },
   );
-  const gridRef = useRef<HTMLDivElement>(null);
   const cancelButtonRef = useRef<HTMLButtonElement>(null);
   const confirmTriggerRef = useRef<HTMLButtonElement>(null);
   const hasConfirmedRef = useRef(false);
-  const detailsRef = useRef<HTMLElement>(null);
-  const detailsHeadingRef = useRef<HTMLHeadingElement>(null);
-  const revealRequestedRef = useRef(false);
   const totalSlots = state.inventory.slotsUsed + state.inventory.slotsAvailable;
   const balance = getEffectiveGameBalance();
-  const resolvedSelection = resolveInventorySelection(state.inventory, selected);
   // Mission guidance is consumed from the ONE derived target set: while an
   // equipped-item requirement is the current unmet step, the matching carried
   // item's tile receives the treatment so the player finds the equip path.
@@ -104,29 +112,6 @@ export function InventoryPanel({
     : undefined;
   const { busy: loadBusy, loadPowerCell } = useLoadPowerCell(setMessage, selectedPowerCell);
 
-  // Reconcile the selection with authoritative state: when the selected entry
-  // no longer exists (stack consumed, dropped, or unique item re-equipped),
-  // clear the selection so the stale tile never lingers.
-  useEffect(() => {
-    if (selected && !resolvedSelection) setSelected(undefined);
-  }, [selected, resolvedSelection]);
-
-  // After a successful Equip, the equipped tile disappears and the selection
-  // reconciles away. Return focus to an inventory element (prefer the former
-  // selected tile if it still exists, else any occupied tile); if no occupied
-  // tile remains (for example the Cutter was the only carried item), fall back
-  // to the grid container itself, which is programmatically focusable via
-  // tabIndex={-1}. Focus is never moved outside the drawer.
-  useEffect(() => {
-    if (!equipReturnFocusRef.current || resolvedSelection) return;
-    equipReturnFocusRef.current = false;
-    const grid = gridRef.current;
-    if (!grid) return;
-    const tile = grid.querySelector<HTMLButtonElement>('button[aria-pressed="true"]');
-    const target = tile ?? grid.querySelector<HTMLButtonElement>("button[aria-pressed]") ?? grid;
-    target.focus();
-  }, [resolvedSelection]);
-
   // Reconcile the pending confirmation: when the authoritative stack changed
   // or vanished since confirmation, clear it safely and explain why.
   useEffect(() => {
@@ -140,22 +125,6 @@ export function InventoryPanel({
       });
     }
   }, [confirming, state.inventory.stacks]);
-
-  // Reveal the details panel only for an explicit player selection (never for
-  // authoritative reconciliation): scroll the drawer so the panel is visible,
-  // then move focus to its heading. Smooth scrolling yields to
-  // prefers-reduced-motion.
-  useEffect(() => {
-    if (!revealRequestedRef.current) return;
-    revealRequestedRef.current = false;
-    if (!resolvedSelection) return;
-    const panel = detailsRef.current;
-    const heading = detailsHeadingRef.current;
-    if (!panel || !heading) return;
-    const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    panel.scrollIntoView({ block: "nearest", behavior: reduceMotion ? "auto" : "smooth" });
-    heading.focus({ preventScroll: true });
-  }, [resolvedSelection]);
 
   // Keyboard flow: focus Cancel when the confirmation appears; when it closes
   // (cancel, success, or refusal), return focus to the selected tile or the
@@ -176,11 +145,9 @@ export function InventoryPanel({
   // Selecting the same tile again toggles details closed; any other selection
   // replaces the current one. Both paths discard transient confirmation state.
   function toggleSelect(next: InventorySelection) {
-    const nextSelection = toggleInventorySelection(selected, next);
-    revealRequestedRef.current = nextSelection !== undefined;
     setMessage(undefined);
     setConfirming(undefined);
-    setSelected(nextSelection);
+    select(next);
   }
 
   // Passive dismissal (empty slot, unused drawer space, Close details): clears
@@ -188,7 +155,7 @@ export function InventoryPanel({
   // authoritative feedback already shown to the player.
   function clearSelection() {
     setConfirming(undefined);
-    setSelected(undefined);
+    clearSelected();
   }
 
   function onSurfaceClick(event: React.MouseEvent<HTMLDivElement>) {

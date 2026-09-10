@@ -28,10 +28,12 @@ import { deriveMissionGuidanceTargets } from "@/game/domain/missions";
 import { usePlay } from "@/features/play/PlayContext";
 import {
   resolveCargoSelection,
-  toggleCargoSelection,
+  sameCargoSelection,
   type CargoArea,
   type CargoSelection,
+  type ResolvedCargoSelection,
 } from "@/features/cargo/cargo-selection";
+import { useSelectableDetails } from "@/features/shared/use-selectable-details";
 
 type Confirmation = {
   refinedFerrite: number;
@@ -68,7 +70,6 @@ export function CargoHoldPanel() {
   const [confirmation, setConfirmation] = useState<Confirmation>();
   const [storageOpen, setStorageOpen] = useState(false);
   const [storageMode, setStorageMode] = useState<StorageMode>("carried");
-  const [selected, setSelected] = useState<CargoSelection>();
   const [message, setMessage] = useState<string>();
   const [pending, setPending] = useState<string>();
   const [completionFeedbackVisible, setCompletionFeedbackVisible] = useState(false);
@@ -79,13 +80,21 @@ export function CargoHoldPanel() {
   // target always exists even when the area has no occupied tiles left.
   const carriedGridRef = useRef<HTMLElement>(null);
   const cargoGridRef = useRef<HTMLElement>(null);
-  // Armed with the area whose item a transfer command just acted on, so that
-  // if the transferred item disappears from the authoritative response (a
-  // full Withdraw/Deposit vacates the tile) focus returns to that area's grid
-  // rather than being dropped by the browser. Left unset when the selected
-  // stack merely changes quantity, since the tile itself persists and keeps
-  // focus automatically.
-  const returnFocusAreaRef = useRef<CargoArea | undefined>(undefined);
+  // Selection, authoritative reconciliation, the explicit-selection reveal, and
+  // post-transfer focus restoration all come from the shared selectable-details
+  // contract shared with the Inventory drawer; Deposit/Withdraw stays here.
+  const {
+    armFocusReturn,
+    clear: clearSelection,
+    detailsHeadingRef,
+    detailsRef,
+    resolved: resolvedSelection,
+    select,
+    selection: selected,
+  } = useSelectableDetails<CargoSelection, ResolvedCargoSelection>({
+    resolve: (selection) => resolveCargoSelection(state, selection),
+    isSameSelection: sameCargoSelection,
+  });
   const balance = getEffectiveGameBalance();
   const repair = state.cargoHold.repair;
   const previousCompletion = useRef(repair.complete);
@@ -117,29 +126,6 @@ export function CargoHoldPanel() {
   const secondsRemaining = activeWelding
     ? Math.max(0, (new Date(state.activeAction!.nextAttemptAt).getTime() - now) / 1_000)
     : 0;
-  const resolvedSelection = resolveCargoSelection(state, selected);
-
-  // Reconcile the selection with authoritative state: when the selected entry
-  // no longer exists (fully withdrawn/deposited elsewhere), clear the
-  // selection so the stale tile and its action area never linger.
-  useEffect(() => {
-    if (selected && !resolvedSelection) setSelected(undefined);
-  }, [selected, resolvedSelection]);
-
-  // After a transfer command vacates the selected tile, return focus to that
-  // area's grid (its first occupied tile, or the grid container itself) so
-  // keyboard users are never dropped to the document body.
-  useEffect(() => {
-    const area = returnFocusAreaRef.current;
-    if (!area) return;
-    returnFocusAreaRef.current = undefined;
-    if (resolvedSelection) return;
-    const grid = area === "carried" ? carriedGridRef.current : cargoGridRef.current;
-    if (!grid) return;
-    const tile = grid.querySelector<HTMLButtonElement>('button[aria-pressed="true"]');
-    (tile ?? grid.querySelector<HTMLButtonElement>("button[aria-pressed]") ?? grid).focus();
-  }, [resolvedSelection]);
-
   useEffect(() => {
     if (!activeWelding) return;
     const timer = window.setInterval(() => setNow(Date.now()), 250);
@@ -233,8 +219,10 @@ export function CargoHoldPanel() {
             // Armed only on a confirmed non-error result, immediately before
             // the authoritative state that may vacate the selected tile is
             // accepted — never on submission, so a mid-flight render can never
-            // consume the flag before the real reconciliation happens.
-            returnFocusAreaRef.current = area;
+            // consume the arm before the real reconciliation happens.
+            armFocusReturn(() =>
+              area === "carried" ? carriedGridRef.current : cargoGridRef.current,
+            );
             acceptState(result.state);
             setMessage(transferMessage(result));
           }
@@ -252,11 +240,7 @@ export function CargoHoldPanel() {
   // other selection (including one in the other area) replaces it.
   function toggleSelect(next: CargoSelection) {
     setMessage(undefined);
-    setSelected((current) => toggleCargoSelection(current, next));
-  }
-
-  function clearSelection() {
-    setSelected(undefined);
+    select(next);
   }
 
   function stackTransferButtons(stackId: string, quantity: number, area: CargoArea) {
@@ -458,9 +442,15 @@ export function CargoHoldPanel() {
         aria-label={`${resolvedSelection.entry.name} selected`}
         className="mt-4 border border-[color:var(--rs-border-structural)] bg-[color:var(--rs-surface-panel)] p-3"
         data-cargo-selection
+        ref={detailsRef}
       >
         <div className="flex items-center justify-between gap-2">
-          <h3 className="font-display text-xs uppercase tracking-[0.16em] text-[color:var(--rs-accent-mining)]">
+          <h3
+            className="font-display text-xs uppercase tracking-[0.16em] text-[color:var(--rs-accent-mining)]"
+            data-cargo-selection-heading
+            ref={detailsHeadingRef}
+            tabIndex={-1}
+          >
             {area === "carried" ? "Carried item" : "Stored item"}
           </h3>
           <ActionButton className="px-3" intent="secondary" onClick={clearSelection}>
