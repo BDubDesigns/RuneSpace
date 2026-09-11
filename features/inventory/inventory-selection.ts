@@ -39,16 +39,16 @@ export function resolveInventorySelection(
 }
 
 /**
- * Selecting the already-selected entry toggles it closed; any other selection
- * replaces the current one. Returns `undefined` when the player dismisses the
- * current details panel by activating its tile again.
+ * Inventory selection identity: stack rows and unique instances live in two
+ * distinct namespaces, so two selections match only when both the kind and the
+ * id do. The shared selectable-details contract applies the toggle rule on top
+ * of this predicate (see `features/shared/use-selectable-details.ts`).
  */
-export function toggleInventorySelection(
-  current: InventorySelection | undefined,
+export function sameInventorySelection(
+  current: InventorySelection,
   next: InventorySelection,
-): InventorySelection | undefined {
-  if (current && current.kind === next.kind && current.id === next.id) return undefined;
-  return next;
+): boolean {
+  return current.kind === next.kind && current.id === next.id;
 }
 
 export type StackDropAction = { mode: "one" | "stack"; label: string };

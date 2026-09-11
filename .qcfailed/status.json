@@ -2,18 +2,18 @@
   "schemaVersion": 1,
   "projectSlug": "runespace",
   "workState": "active",
-  "currentFocus": "Unifying every NPC conversation into one Talk hub with Mission context and replayable topics in PR #165.",
+  "currentFocus": "Redesigning the operational Cargo Hold contents into a compact selectable item grid (Issue #151).",
   "currentChange": {
-    "summary": "Replaces the single-dialogue Talk interaction with one canonical NPC conversation hub plus replayable social topics.",
+    "summary": "Replaces per-item Deposit/Withdraw action rows with a compact selectable Cargo Hold and Carried Inventory tile grid.",
     "stage": "review",
-    "pullRequestNumber": 165
+    "pullRequestNumber": 166
   },
   "latestCompleted": {
-    "summary": "Added an account-level unread-news indicator to the authenticated game shell for published Updates.",
+    "summary": "Replaced the single-dialogue Talk interaction with one canonical NPC conversation hub plus replayable social topics.",
     "date": "2026-09-09",
-    "url": "https://github.com/BDubDesigns/RuneSpace/pull/163"
+    "url": "https://github.com/BDubDesigns/RuneSpace/pull/165"
   },
-  "nextStep": "Complete human review of PR #165 and run full CI before merging to main.",
+  "nextStep": "Complete human review of PR #166 and run full CI before merging to main.",
   "lastMeaningfulUpdate": "2026-09-09",
   "highlights": [
     {
