@@ -41,6 +41,28 @@ test.describe("public Updates", () => {
     );
   });
 
+  test("renders the Holo Hollow Update with its town hero", async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto("/updates/holo-hollow-opens-for-business");
+
+    await expect(
+      page.getByRole("heading", { name: "Holo Hollow Opens for Business", level: 1 }),
+    ).toBeVisible();
+    const hero = page.getByRole("img", { name: /main street of Holo Hollow/ });
+    await hero.scrollIntoViewIfNeeded();
+    await expect(hero).toBeVisible();
+    // The committed file actually loads rather than rendering a broken image.
+    await expect
+      .poll(() => hero.evaluate((image: HTMLImageElement) => image.complete && image.naturalWidth))
+      .toBeGreaterThan(0);
+    const box = (await hero.boundingBox())!;
+    expect(box.x).toBeGreaterThanOrEqual(0);
+    expect(box.x + box.width).toBeLessThanOrEqual(390);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
+      390,
+    );
+  });
+
   test("returns a normal 404 for an unknown Update slug", async ({ page }) => {
     const response = await page.goto("/updates/not-a-real-update");
 

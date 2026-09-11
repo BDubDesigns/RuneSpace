@@ -10,9 +10,15 @@ const authoredUpdates = [
     publishedAt: "2026-09-10T20:00:00-07:00",
     summary:
       "The town you have been hearing about is finally on the map. Walk into Holo Hollow, meet Bix and Renn, and spend your first Credits.",
+    hero: {
+      src: "/updates/holo-hollow-town.webp",
+      alt: "Weathered main street of Holo Hollow, faded holo-tourism signage above working shopfronts under an overcast sky",
+      width: 1536,
+      height: 384,
+    },
     body: [
       "Wade and Tansy have been talking about Holo Hollow since the day you crawled out of your ship. It is now a real place you can walk to — one hex out from the Crash Site, the Power Annex, and the bottom of the Long Scramble.",
-      "Holo Hollow is a mining town built on the bones of a tourist town, and it has not entirely decided which one it is. Step off the street and into the places that are open: Holo Hollow Souvenirs + Mining Supplies, where Bix Weller sells cutting gear under a sign that still advertises novelty holo toys, and the Community Assistance Center, where Renn Calder can tell you what the place used to be. HH B&B is there too, though the rooms are held for locals and regular crews for now.",
+      "Holo Hollow is a mining town built on the bones of a tourist town, and it has not entirely decided which one it is. Step off the street and into the places that are open: Holo Hollow Souvenirs + Mining Supplies, where Bix Weller keeps mining supplies under a sign that still advertises novelty holo toys, and the Community Assistance Center, where Renn Calder can tell you what the place used to be. HH B&B is there too, though the rooms are held for locals and regular crews for now.",
       "Your character also has Credits — ten of them to start, whether the character is new or one you have been playing. Bix will buy Ferrite Shale, Refined Ferrite, Slag, and spare Power Cells, and he will sell you Power Cells at eight Credits apiece. He is aware that is more than he pays for them, and he will tell you why if you ask.",
       "Talking and trading are separate. You can ask Bix about the shop without buying a thing, and you can buy a Power Cell without hearing the whole story of the projector nights. Both are worth doing.",
     ],

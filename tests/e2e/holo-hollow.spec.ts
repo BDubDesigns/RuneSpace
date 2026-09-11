@@ -51,8 +51,18 @@ test("presents Holo Hollow's places, keeps HH B&B visible but locked, and enters
   await expect(bnb).toBeVisible();
   await expect(bnb).toHaveAttribute("data-local-place-access", "locked");
   await expect(bnb.locator("[data-local-place-locked-reason]")).toContainText("locals");
-  // A locked place is not a link, so there is nothing to click into.
+  // A locked place is not a link, so there is nothing to click into. Its
+  // explicit CTA says so instead of offering Enter.
   await expect(bnb.getByRole("link")).toHaveCount(0);
+  await expect(bnb.getByRole("button", { name: "Locals only" })).toBeDisabled();
+
+  // Every open place offers an explicit Enter control; the card-sized link
+  // beneath it stays out of the tab order and the accessibility tree.
+  await expect(directory.getByRole("link", { name: /^Enter / })).toHaveCount(2);
+  await expect(directory.locator("[data-local-place-card-link]").first()).toHaveAttribute(
+    "tabindex",
+    "-1",
+  );
 
   // Entering an open place is navigation, not a journey.
   await directory.locator(`[data-local-place="${LOCAL_PLACE_IDS.holoHollowSouvenirs}"]`).click();
@@ -78,6 +88,15 @@ test("presents Holo Hollow's places, keeps HH B&B visible but locked, and enters
   // Browser Back leaves the shop and returns to the town surface.
   await page.goBack();
   await expect(page.locator("[data-local-place-directory]")).toBeVisible();
+
+  // The explicit Enter control leads to exactly the place the card does.
+  await directory
+    .getByRole("link", { name: "Enter Holo Hollow Souvenirs + Mining Supplies" })
+    .click();
+  await page.waitForURL(new RegExp(`place=${LOCAL_PLACE_IDS.holoHollowSouvenirs}`));
+  await expect(
+    page.locator(`[data-local-place-surface="${LOCAL_PLACE_IDS.holoHollowSouvenirs}"]`),
+  ).toBeVisible();
 });
 
 test("scopes each resident to their own Local Place", async ({ page, testCharacter }) => {
@@ -90,16 +109,32 @@ test("scopes each resident to their own Local Place", async ({ page, testCharact
   // Standing in town exposes neither resident.
   await expect(page.locator("[data-npc-interaction]")).toHaveCount(0);
 
-  // Bix is the contact inside his shop, and Talk is separate from Trade.
+  // Bix is the contact inside his shop: one person, with Talk above Trade.
   await page
     .locator("[data-local-place-directory]")
     .locator(`[data-local-place="${LOCAL_PLACE_IDS.holoHollowSouvenirs}"]`)
     .click();
+  const contact = page.locator("[data-npc-interaction]");
+  const actions = contact.locator("[data-npc-action]");
+  await expect(actions).toHaveCount(2);
+  await expect(actions.nth(0)).toHaveAttribute("data-npc-action", "talk");
+  await expect(actions.nth(0)).toHaveText("Talk");
+  await expect(actions.nth(1)).toHaveAttribute("data-npc-action", "trade");
+  await expect(actions.nth(1)).toHaveText("Trade");
   await expect(page.getByRole("button", { name: /Talk to Bix Weller/ })).toBeVisible();
   await expect(page.getByRole("button", { name: /Talk to Renn Calder/ })).toHaveCount(0);
-  // Trade is an offered action, not something that unfolds on arrival.
-  await expect(page.locator('[data-local-place-action="trade"]')).toBeVisible();
+  // Trade belongs to Bix's card, not the shop description, and is offered
+  // rather than unfolded on arrival.
+  await expect(page.locator("[data-local-place-surface] [data-npc-action]")).toHaveCount(0);
   await expect(page.locator("[data-trade-panel]")).toHaveCount(0);
+  // On a phone the actions stack vertically at full card width.
+  const talkBox = (await actions.nth(0).boundingBox())!;
+  const tradeBox = (await actions.nth(1).boundingBox())!;
+  const contactBox = (await contact.boundingBox())!;
+  expect(tradeBox.y).toBeGreaterThanOrEqual(talkBox.y + talkBox.height);
+  expect(Math.abs(tradeBox.x - talkBox.x)).toBeLessThanOrEqual(1);
+  expect(Math.abs(tradeBox.width - talkBox.width)).toBeLessThanOrEqual(1);
+  expect(talkBox.width).toBeGreaterThan(contactBox.width * 0.8);
 
   // Talk stays the canonical conversation hub and carries no merchant command.
   const conversation = await openNpcConversation(page, "Bix Weller");
@@ -108,21 +143,36 @@ test("scopes each resident to their own Local Place", async ({ page, testCharact
   await expect(conversation.getByRole("button", { name: /Trade/ })).toHaveCount(0);
   await page.keyboard.press("Escape");
 
-  // Choosing Trade opens the Buy/Sell surface, and it can be closed again.
-  await page.locator('[data-local-place-action="trade"]').click();
+  // Choosing Trade opens the Buy/Sell surface beneath Bix's card, and it can
+  // be closed again.
+  const trade = contact.locator('[data-npc-action="trade"]');
+  await trade.click();
   await expect(page.locator("[data-trade-panel]")).toBeVisible();
-  await page.locator('[data-local-place-action="trade"]').click();
+  await trade.click();
   await expect(page.locator("[data-trade-panel]")).toHaveCount(0);
+  await trade.click();
+  await expect(page.locator("[data-trade-panel]")).toBeVisible();
 
-  // Renn is the contact at the Assistance Center, with no merchant function.
+  // Renn is the contact at the Assistance Center: Talk only, no merchant.
   await page.locator("[data-local-place-exit]").click();
   await page
     .locator("[data-local-place-directory]")
     .locator(`[data-local-place="${LOCAL_PLACE_IDS.holoHollowAssistanceCenter}"]`)
     .click();
   await expect(page.getByRole("button", { name: /Talk to Renn Calder/ })).toBeVisible();
+  await expect(contact.locator("[data-npc-action]")).toHaveCount(1);
+  await expect(contact.locator('[data-npc-action="trade"]')).toHaveCount(0);
   await expect(page.locator("[data-trade-panel]")).toHaveCount(0);
   await expect(page.getByRole("button", { name: /Talk to Bix Weller/ })).toHaveCount(0);
+
+  // Trade left open in Bix's shop does not reappear on return.
+  await page.locator("[data-local-place-exit]").click();
+  await page
+    .locator("[data-local-place-directory]")
+    .locator(`[data-local-place="${LOCAL_PLACE_IDS.holoHollowSouvenirs}"]`)
+    .click();
+  await expect(page.getByRole("button", { name: /Talk to Bix Weller/ })).toBeVisible();
+  await expect(page.locator("[data-trade-panel]")).toHaveCount(0);
 });
 
 test("buys and sells against the authoritative balance without leaving the shop", async ({
@@ -138,7 +188,7 @@ test("buys and sells against the authoritative balance without leaving the shop"
     .locator("[data-local-place-directory]")
     .locator(`[data-local-place="${LOCAL_PLACE_IDS.holoHollowSouvenirs}"]`)
     .click();
-  await page.locator('[data-local-place-action="trade"]').click();
+  await page.locator('[data-npc-action="trade"]').click();
 
   const trade = page.locator("[data-trade-panel]");
   await expect(trade.locator("[data-trade-credits]")).toContainText("20 Credits");
@@ -194,4 +244,38 @@ test("buys and sells against the authoritative balance without leaving the shop"
   // The same balance is available from Inventory.
   await page.getByRole("button", { name: /Inventory/ }).click();
   await expect(page.locator("[data-inventory-credits]")).toContainText("14 Credits");
+});
+
+test("opening Trade reveals the Trade surface above the bottom navigation", async ({
+  page,
+  testCharacter,
+}) => {
+  const characterId = testCharacter.id;
+  await page.setViewportSize({ width: 390, height: 844 });
+  await arriveInHoloHollow(characterId, { credits: 20 });
+  await openTestCharacter(page, characterId);
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page
+    .locator("[data-local-place-directory]")
+    .locator(`[data-local-place="${LOCAL_PLACE_IDS.holoHollowSouvenirs}"]`)
+    .click();
+  const trade = page.locator('[data-npc-action="trade"]');
+  await expect(trade).toBeVisible();
+  const navTop = (await page.getByRole("navigation", { name: "Primary" }).boundingBox())!.y;
+
+  await trade.click();
+  const region = page.locator("[data-npc-trade]");
+  // Focus moves into the surface the player just opened ...
+  await expect(region).toBeFocused();
+  // ... and the surface, which fits this viewport in Buy mode, is scrolled
+  // fully clear of the fixed bottom navigation rather than clipped by it.
+  const box = (await region.boundingBox())!;
+  expect(box.y).toBeGreaterThanOrEqual(0);
+  expect(box.y + box.height).toBeLessThanOrEqual(navTop + 1);
+  await expect(region.getByRole("heading", { name: "Buy and sell" })).toBeInViewport();
+
+  // Closing Trade leaves focus on the control the player used.
+  await trade.click();
+  await expect(region).toHaveCount(0);
+  await expect(trade).toBeFocused();
 });

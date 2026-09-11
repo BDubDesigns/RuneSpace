@@ -21,7 +21,7 @@ const localPlaceDefinitions = [
     parentLocationId: LOCATION_IDS.holoHollow,
     displayName: "Holo Hollow Souvenirs + Mining Supplies",
     description:
-      "The original Holo Hollow Souvenirs sign still hangs over the door, with a rougher + Mining Supplies board bolted on underneath. Shelves of tourist-era trinkets sit beside the cutting gear and cells that actually sell.",
+      "The original Holo Hollow Souvenirs sign still hangs over the door, with a rougher + Mining Supplies board bolted on underneath. Shelves of tourist-era trinkets sit beside the mining supplies that actually sell.",
     access: { kind: "open" as const },
     merchantId: MERCHANT_IDS.bixWeller,
     presentation: {

@@ -35,7 +35,28 @@ An optional `hero` may reference a committed image under `public/landing/` or
 `public/updates/`. Store new Update-specific images in `public/updates/` and
 reference them with the public path, for example
 `/updates/repair-complete.webp`, plus its real `alt`, `width`, and `height`.
-Do not reference source-only assets, remote URLs, or generated images.
+Do not reference source-only assets, remote URLs, or generated images. When the
+art already ships elsewhere in the repository (for example a location scene),
+commit a copy of that same approved file under `public/updates/` rather than
+widening the allowed paths.
+
+### Hero image policy
+
+- A player-facing Update should normally ship with a hero when the release has
+  a strong, already-available visual asset that materially represents the
+  feature or milestone — for example the approved scene for a new location.
+- Do not omit an obvious relevant hero merely because `hero` is optional in the
+  schema. Optional means "not every Update has one", not "leave it out".
+- A hero is not mandatory. When no suitable existing image exists, publish the
+  Update without one; missing art never blocks an otherwise appropriate
+  Update, and authors must not invent or generate decorative filler art merely
+  to satisfy this convention.
+- Prefer repo-local committed assets and public paths, and keep the schema's
+  requirements: accurate, descriptive `alt` text and the image's real intrinsic
+  `width` and `height`.
+- The article model supports one hero only. Secondary inline article images are
+  not part of this contract; do not add them without an approved change to the
+  schema and renderer.
 
 The collection rejects duplicate slugs, duplicate `publishedAt` instants,
 missing required fields, malformed timestamps, and invalid image references.

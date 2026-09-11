@@ -107,7 +107,11 @@ export function PlayConsole({
       {surface === "primary" ? (
         <>
           <MissionObjectivePanel state={state} />
-          {!inTransit ? <NpcInteractionPanel localPlaceId={localPlaceId} /> : null}
+          {!inTransit ? (
+            // Keyed by the requested place so a contact's opened Trade surface
+            // never survives leaving the place and reappears on return.
+            <NpcInteractionPanel key={localPlaceId ?? ""} localPlaceId={localPlaceId} />
+          ) : null}
           {showMiningActivity || showRefiningActivity ? (
             <>
               <div className="grid gap-4 sm:grid-cols-2">

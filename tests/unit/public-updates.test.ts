@@ -1,3 +1,5 @@
+import { existsSync } from "node:fs";
+import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
   formatPublicUpdateDate,
@@ -68,6 +70,24 @@ describe("public Updates content boundary", () => {
         },
       ]),
     ).toThrow();
+  });
+
+  it("points every authored hero at a committed public file", () => {
+    for (const update of getPublishedUpdates()) {
+      if (!update.hero) continue;
+      expect(
+        existsSync(resolve(process.cwd(), "public", `.${update.hero.src}`)),
+        `${update.slug} hero ${update.hero.src}`,
+      ).toBe(true);
+    }
+  });
+
+  it("ships the Holo Hollow town art as that release's hero", () => {
+    expect(getPublicUpdate("holo-hollow-opens-for-business")?.hero).toMatchObject({
+      src: "/updates/holo-hollow-town.webp",
+      width: 1536,
+      height: 384,
+    });
   });
 
   it("uses one stable route projection for lookup and links", () => {

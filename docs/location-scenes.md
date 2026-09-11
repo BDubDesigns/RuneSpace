@@ -117,6 +117,14 @@ Local Place scenes (`game/content/local-places.ts`, issue #159) use the same
 `LocationSceneHeader`, which takes any subject carrying an id, a display name,
 and scene metadata.
 
+**Known art follow-up (non-blocking).** The three Holo Hollow Local Place
+exteriors (`holo-hollow-souvenirs-exterior.webp`,
+`holo-hollow-assistance-center-exterior.webp`, `hh-bnb-exterior.webp`) are
+accepted for issue #159, but their surroundings are visually very similar, so
+the buildings read as if they occupy nearly the same spot. A later approved art
+polish pass should give each building a more distinct setting. Do not
+regenerate or replace these assets outside that pass.
+
 ## Explicit non-goals (not in this slice)
 
 No map-hex redesign, new locations/adjacency, Travel/Mining/Power Cell/inventory/equipment/persistence/reward changes, Annex Enter/Exit mechanic, multiple selectable scenes per location, full-screen hero art, parallax, particles, video backgrounds, cinematic transitions, or broad header/footer redesign.
