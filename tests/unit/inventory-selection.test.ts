@@ -6,9 +6,11 @@ import {
   deriveInventoryEquipAvailability,
   derivePowerCellLoadAvailability,
   resolveInventorySelection,
+  sameInventorySelection,
   stackDropActions,
-  toggleInventorySelection,
+  type InventorySelection,
 } from "@/features/inventory/inventory-selection";
+import { toggleSelection } from "@/features/shared/selectable-details";
 import { DiscardInventoryStackRequestSchema } from "@/game/schemas/gameplay";
 
 function inventoryState(
@@ -175,33 +177,35 @@ describe("stack drop action derivation", () => {
 });
 
 describe("selection toggling", () => {
+  // The toggle rule itself is the shared selectable-details contract; Inventory
+  // owns only what counts as the same selection.
+  const toggle = (current: InventorySelection | undefined, next: InventorySelection) =>
+    toggleSelection(current, next, sameInventorySelection);
+
   it("selecting the currently selected entry toggles the selection off", () => {
     const current = { kind: "stack" as const, id: ferriteStack.id };
-    expect(toggleInventorySelection(current, { kind: "stack", id: ferriteStack.id })).toBe(
-      undefined,
-    );
+    expect(toggle(current, { kind: "stack", id: ferriteStack.id })).toBe(undefined);
     const unique = { kind: "unique" as const, id: carriedCutter.id };
-    expect(toggleInventorySelection(unique, { kind: "unique", id: carriedCutter.id })).toBe(
-      undefined,
-    );
+    expect(toggle(unique, { kind: "unique", id: carriedCutter.id })).toBe(undefined);
   });
 
   it("selecting another item replaces the current selection", () => {
     const current = { kind: "stack" as const, id: ferriteStack.id };
-    expect(toggleInventorySelection(current, { kind: "unique", id: carriedCutter.id })).toEqual({
+    expect(toggle(current, { kind: "unique", id: carriedCutter.id })).toEqual({
       kind: "unique",
       id: carriedCutter.id,
     });
-    expect(toggleInventorySelection(undefined, { kind: "stack", id: ferriteStack.id })).toEqual({
+    expect(toggle(undefined, { kind: "stack", id: ferriteStack.id })).toEqual({
       kind: "stack",
       id: ferriteStack.id,
     });
   });
 
   it("does not toggle off across identity namespaces that share an ID", () => {
-    expect(
-      toggleInventorySelection({ kind: "stack", id: "same-id" }, { kind: "unique", id: "same-id" }),
-    ).toEqual({ kind: "unique", id: "same-id" });
+    expect(toggle({ kind: "stack", id: "same-id" }, { kind: "unique", id: "same-id" })).toEqual({
+      kind: "unique",
+      id: "same-id",
+    });
   });
 });
 

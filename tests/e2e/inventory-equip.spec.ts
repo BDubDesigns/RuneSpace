@@ -181,6 +181,40 @@ test.describe("Inventory equip and compact selected visual", () => {
     expect(desktopOverflow).toBe(false);
   });
 
+  test("moves focus to the selected item's details heading after a keyboard selection", async ({
+    page,
+  }) => {
+    // The shared selectable-details contract (Inventory and Cargo Hold) reveals
+    // the selected item's details and moves focus to its heading, so a keyboard
+    // user reaches that item's actions instead of tabbing through the rest of
+    // the grid. This asserts the destination Inventory has always relied on.
+    await page.setViewportSize({ width: 390, height: 844 });
+    const characterId = page.url().split("/").at(-1)!;
+    await db.insert(inventoryStacks).values({
+      characterId,
+      itemId: ITEM_IDS.ferriteShale,
+      quantity: 5,
+    });
+    await page.reload();
+
+    const inventoryDrawer = page.getByRole("dialog", { name: "Inventory" });
+    await page.getByRole("button", { name: "Inventory" }).click();
+    await expect(inventoryDrawer).toBeVisible();
+
+    const tile = inventoryDrawer.locator("button[aria-pressed]").first();
+    await tile.focus();
+    await page.keyboard.press("Enter");
+    await expect(tile).toHaveAttribute("aria-pressed", "true");
+
+    const detailsPanel = inventoryDrawer.locator("[data-details-panel]");
+    await expect(detailsPanel).toBeVisible();
+    const heading = detailsPanel.getByRole("heading", { name: "Item details" });
+    await expect(heading).toHaveAttribute("tabindex", "-1");
+    await expect
+      .poll(() => heading.evaluate((element) => element === document.activeElement))
+      .toBe(true);
+  });
+
   test("exposes no Equip action in Inventory details for an ineligible carried unique item", async ({
     page,
   }) => {
