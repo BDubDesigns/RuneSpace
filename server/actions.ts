@@ -36,6 +36,7 @@ import {
 import { EquipmentRuleError } from "@/game/domain/equipment";
 import { TravelRuleError } from "@/server/travel";
 import { claimPowerCells, type PowerAnnexClaimResult } from "@/server/power-annex";
+import { tradeWithMerchant, type TradeResult } from "@/server/trade";
 import {
   acceptMission,
   completeMission,
@@ -49,6 +50,7 @@ import {
   ScavengeClaimRequestSchema,
   ScavengeRevealAcknowledgmentRequestSchema,
   ClaimPowerCellsRequestSchema,
+  TradeRequestSchema,
   LoadPowerCellRequestSchema,
   DiscardInventoryStackRequestSchema,
   CargoHoldMaterialContributionRequestSchema,
@@ -461,6 +463,21 @@ export async function claimPowerCellsAction(input: unknown): Promise<PowerAnnexA
   try {
     const user = await requireCurrentUser(await headers());
     return await claimPowerCells(user.id, request.data.characterId);
+  } catch (error) {
+    if (error instanceof OwnershipError) return { error: error.message };
+    throw error;
+  }
+}
+
+export type TradeActionResult = TradeResult | { error: string };
+
+export async function tradeWithMerchantAction(input: unknown): Promise<TradeActionResult> {
+  const request = TradeRequestSchema.safeParse(input);
+  if (!request.success) return { error: "Invalid trade command." };
+  try {
+    const user = await requireCurrentUser(await headers());
+    const { characterId, ...trade } = request.data;
+    return await tradeWithMerchant(user.id, characterId, trade);
   } catch (error) {
     if (error instanceof OwnershipError) return { error: error.message };
     throw error;

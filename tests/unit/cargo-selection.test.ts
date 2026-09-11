@@ -46,6 +46,7 @@ function cargoState(): PlayGameplayState {
     characterId: "character-1",
     missions: [],
     location: { currentLocationId: "crash_site" },
+    credits: 0,
     mining: { totalXp: 0, level: 1, xpIntoLevel: 0 },
     refining: { totalXp: 0, level: 1, xpIntoLevel: 0 },
     welding: { totalXp: 0, level: 1, xpIntoLevel: 0 },

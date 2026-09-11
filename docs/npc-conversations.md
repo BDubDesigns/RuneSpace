@@ -53,6 +53,16 @@ Other NPC actions stay outside Talk. Bix will later expose **Talk** and
 | Content validation at module load | `server/mission-state.ts` — `validateMissionDefinitions` + `validateConversationTopics` |
 | Player-facing surfaces | `features/npc/NpcInteractionPanel.tsx` (Talk control + guidance), `features/npc/NpcConversation.tsx` (hub + command execution), `features/dialogue/DialoguePlayer.tsx` / `DialogueScene.tsx` (beat presentation) |
 | Server authority | `server/missions.ts` — `acceptMission` / `completeMission` (unchanged by #164) |
+| Which resident is present | `game/content/npcs.ts` — `getResidentNpc({ locationId, localPlaceId })` |
+
+**Where a resident stands (#159).** `getResidentNpc` resolves one NPC from a
+spatial context. An NPC with no `localPlaceId` is present at their World
+Location, which is how Wade and Tansy have always worked and still do.
+An NPC with a `localPlaceId` is found only inside that Local Place, which is
+how Bix and Renn share Holo Hollow without either appearing merely because the
+player is standing in town. It stays a single-resident lookup: there is no
+simultaneous multi-NPC interaction system, and an NPC whose conversation
+content is not authored yet simply has no expression art or background.
 
 ## 3. Ownership rule: sequences are presentation, Missions own action semantics
 
@@ -147,6 +157,17 @@ reuses a Mission-owned sequence.
 | Wade Rusk | Recovery work | always |
 | Tansy Rusk | Mining | always |
 | Tansy Rusk | Beyond Holo Hollow | after **Hold It Together** is completed |
+| Bix Weller | The shop | always |
+| Bix Weller | Power Cells | always |
+| Bix Weller | Holo Hollow | always |
+| Renn Calder | The Assistance Center | always |
+| Renn Calder | Ferrite | always |
+| Renn Calder | Life here | always |
+
+Bix's **Trade** action is deliberately separate from **Talk** (see
+`docs/holo-hollow.md`): the conversation hub never carries a merchant command,
+so a later Mission can require the conversation independently of any purchase.
+Renn is a social NPC only — no merchant function and no Mission.
 
 **Beyond Holo Hollow** seeds Tansy's long-term arc without resolving it: she
 wants to see other stations and planets, has spent her life around Holo Hollow

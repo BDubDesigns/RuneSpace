@@ -235,9 +235,17 @@ export function InventoryPanel({
 
   const content = (
     <div className="pb-2" data-inventory-surface onClick={onSurfaceClick}>
-      <p className="mt-2 text-sm text-[color:var(--rs-text-secondary)]">
-        {state.inventory.slotsUsed} occupied / {totalSlots} slots
-      </p>
+      <div className="mt-2 flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+        <p className="text-sm text-[color:var(--rs-text-secondary)]">
+          {state.inventory.slotsUsed} occupied / {totalSlots} slots
+        </p>
+        <p
+          className="font-display text-sm font-bold text-[color:var(--rs-accent-primary)]"
+          data-inventory-credits
+        >
+          {state.credits} Credits
+        </p>
+      </div>
       {message ? (
         <div className="mt-4">
           <Feedback tone={message.tone}>{message.message}</Feedback>

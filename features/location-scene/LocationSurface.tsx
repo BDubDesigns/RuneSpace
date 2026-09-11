@@ -4,8 +4,12 @@ import { Panel } from "@/components/ui/Panel";
 import { SectionHeader } from "@/components/ui/SectionHeader";
 import { Feedback } from "@/components/ui/Feedback";
 import { LOCATION_IDS } from "@/game/config/foundations";
+import { getLocalPlacesForLocation } from "@/game/content/local-places";
 import { getLocation } from "@/game/content/locations";
+import { resolveActiveLocalPlace } from "@/game/domain/local-places";
 import { CargoHoldPanel } from "@/features/cargo/CargoHoldPanel";
+import { LocalPlaceDirectory } from "@/features/local-places/LocalPlaceDirectory";
+import { LocalPlaceSurface } from "@/features/local-places/LocalPlaceSurface";
 import { MiningActivity } from "@/features/mining/MiningActivity";
 import { PowerAnnexClaimPanel } from "@/features/power-annex/PowerAnnexClaimPanel";
 import { RefiningConsole } from "@/features/refining/RefiningConsole";
@@ -13,12 +17,38 @@ import { usePlay } from "@/features/play/PlayContext";
 import { LocationPopulationPanel } from "./LocationPopulationPanel";
 import { LocationSceneHeader } from "./LocationSceneHeader";
 
-export function LocationSurface({ characterName }: { characterName: string }) {
+export function LocationSurface({
+  characterName,
+  localPlaceId,
+}: {
+  characterName: string;
+  localPlaceId?: string;
+}) {
   const { state } = usePlay();
   const locationId = state.location.currentLocationId;
   const location = getLocation(locationId);
   if (!location || state.travelState) return null;
 
+  // The shared interpretation: a hand-edited URL naming an unknown,
+  // wrong-parent, or locked place falls back to the town surface rather than
+  // revealing an interior. The resident panel reads the same answer.
+  const activePlace = resolveActiveLocalPlace({
+    locationId,
+    requestedLocalPlaceId: localPlaceId,
+  });
+  if (activePlace) {
+    return (
+      <LocalPlaceSurface
+        characterName={characterName}
+        parentDisplayName={location.displayName}
+        place={activePlace}
+      />
+    );
+  }
+
+  // A settlement presents its places instead of a production activity; the
+  // existing simple locations are untouched.
+  const localPlaces = getLocalPlacesForLocation(locationId);
   const resourceLabels =
     locationId === LOCATION_IDS.theJag
       ? ["Ferrite Shale"]
@@ -46,7 +76,12 @@ export function LocationSurface({ characterName }: { characterName: string }) {
         <div className="mt-4">
           <LocationPopulationPanel />
         </div>
-        {locationId === LOCATION_IDS.theLongScramble ? null : (
+        {localPlaces.length > 0 ? (
+          <div className="mt-5">
+            <LocalPlaceDirectory locationId={locationId} />
+          </div>
+        ) : null}
+        {locationId === LOCATION_IDS.theLongScramble || localPlaces.length > 0 ? null : (
           <div className="mt-5" data-location-activity>
             {locationId === LOCATION_IDS.abandonedProcessingYard ? (
               <RefiningConsole showDescription={false} />

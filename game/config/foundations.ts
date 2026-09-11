@@ -27,6 +27,11 @@ const itemIds = {
 const npcIds = {
   wadeRusk: asContentId("wade_rusk"),
   tansyRusk: asContentId("tansy_rusk"),
+  // Holo Hollow residents (#159). Each lives in one Local Place rather than at
+  // the bare Holo Hollow World Location; see game/content/local-places.
+  bixWeller: asContentId("bix_weller"),
+  maraKells: asContentId("mara_kells"),
+  rennCalder: asContentId("renn_calder"),
 } as const satisfies Record<string, ContentId>;
 
 const missionIds = {
@@ -80,6 +85,13 @@ const dialogueIds = {
   wadeRecoveryWorkTopic: asContentId("wade_rusk_topic_recovery_work"),
   tansyMiningTopic: asContentId("tansy_rusk_topic_mining"),
   tansyBeyondHoloHollowTopic: asContentId("tansy_rusk_topic_beyond_holo_hollow"),
+  // Holo Hollow foundation topics (#159).
+  bixTheShopTopic: asContentId("bix_weller_topic_the_shop"),
+  bixPowerCellsTopic: asContentId("bix_weller_topic_power_cells"),
+  bixHoloHollowTopic: asContentId("bix_weller_topic_holo_hollow"),
+  rennAssistanceCenterTopic: asContentId("renn_calder_topic_assistance_center"),
+  rennFerriteTopic: asContentId("renn_calder_topic_ferrite"),
+  rennLifeHereTopic: asContentId("renn_calder_topic_life_here"),
 } as const satisfies Record<string, ContentId>;
 
 /**
@@ -91,6 +103,12 @@ const conversationTopicIds = {
   wadeRecoveryWork: asContentId("wade_rusk_recovery_work"),
   tansyMining: asContentId("tansy_rusk_mining"),
   tansyBeyondHoloHollow: asContentId("tansy_rusk_beyond_holo_hollow"),
+  bixTheShop: asContentId("bix_weller_the_shop"),
+  bixPowerCells: asContentId("bix_weller_power_cells"),
+  bixHoloHollow: asContentId("bix_weller_holo_hollow"),
+  rennAssistanceCenter: asContentId("renn_calder_assistance_center"),
+  rennFerrite: asContentId("renn_calder_ferrite"),
+  rennLifeHere: asContentId("renn_calder_life_here"),
 } as const satisfies Record<string, ContentId>;
 
 const expressionIds = {
@@ -98,11 +116,20 @@ const expressionIds = {
   smile: asContentId("smile"),
   concerned: asContentId("concerned"),
   scowl: asContentId("scowl"),
+  // Added for the approved Holo Hollow resident expression sets (#159). The
+  // shared vocabulary stays generic; each NPC maps it to its own authored art.
+  amused: asContentId("amused"),
+  sardonic: asContentId("sardonic"),
+  guarded: asContentId("guarded"),
 } as const satisfies Record<string, ContentId>;
 
 const conversationBackgroundIds = {
   crashSiteExterior: asContentId("crash_site_exterior"),
   theJagExterior: asContentId("the_jag_exterior"),
+  // Holo Hollow ships dedicated interior conversation art rather than reusing
+  // an exterior location scene (#159).
+  holoHollowSouvenirsInterior: asContentId("holo_hollow_souvenirs_interior"),
+  holoHollowAssistanceCenterInterior: asContentId("holo_hollow_assistance_center_interior"),
 } as const satisfies Record<string, ContentId>;
 
 export const ACTION_IDS = {
@@ -112,13 +139,32 @@ export const ACTION_IDS = {
   travel: asContentId("travel"),
 } as const satisfies Record<string, ContentId>;
 
-/** Stable identities for the approved local world (issues #40, #47, and #83). */
+/** Stable identities for the approved local world (issues #40, #47, #83, #159). */
 export const LOCATION_IDS = {
   crashSite: asContentId("crash_site"),
   abandonedProcessingYard: asContentId("abandoned_processing_yard"),
   emergencyPowerAnnex: asContentId("dewhat_emergency_power_annex"),
   theLongScramble: asContentId("the_long_scramble"),
   theJag: asContentId("the_jag"),
+  holoHollow: asContentId("holo_hollow"),
+} as const satisfies Record<string, ContentId>;
+
+/**
+ * Stable identities for Local Places (#159): interior/adjacent town places
+ * belonging to exactly one parent World Location. A Local Place never owns a
+ * world-map coordinate, adjacency, or Travel semantics of its own, and which
+ * one the player is viewing is navigation state, never persisted character
+ * state. See game/content/local-places.
+ */
+export const LOCAL_PLACE_IDS = {
+  holoHollowSouvenirs: asContentId("holo_hollow_souvenirs"),
+  holoHollowAssistanceCenter: asContentId("holo_hollow_assistance_center"),
+  hhBnb: asContentId("hh_bnb"),
+} as const satisfies Record<string, ContentId>;
+
+/** Stable merchant identities (#159). A Local Place authors which one it owns. */
+export const MERCHANT_IDS = {
+  bixWeller: asContentId("bix_weller_shop"),
 } as const satisfies Record<string, ContentId>;
 
 /**
@@ -174,5 +220,7 @@ export type ExpressionId = (typeof EXPRESSION_IDS)[keyof typeof EXPRESSION_IDS];
 export type ConversationBackgroundId =
   (typeof CONVERSATION_BACKGROUND_IDS)[keyof typeof CONVERSATION_BACKGROUND_IDS];
 export type LocationId = (typeof LOCATION_IDS)[keyof typeof LOCATION_IDS];
+export type LocalPlaceId = (typeof LOCAL_PLACE_IDS)[keyof typeof LOCAL_PLACE_IDS];
+export type MerchantId = (typeof MERCHANT_IDS)[keyof typeof MERCHANT_IDS];
 export type ActionId = (typeof ACTION_IDS)[keyof typeof ACTION_IDS];
 export type PortraitId = (typeof PORTRAIT_IDS)[keyof typeof PORTRAIT_IDS];

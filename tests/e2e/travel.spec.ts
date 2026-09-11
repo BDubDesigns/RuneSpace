@@ -9,6 +9,7 @@ import {
   inventoryStacks,
 } from "@/db/rune-space";
 import { ACTION_IDS, ITEM_IDS, LOCATION_IDS } from "@/game/config/foundations";
+import { LOCAL_MAP_LOCATION_IDS } from "@/game/content/locations";
 import { POWER_CELL_DAILY_ALLOTMENT } from "@/game/domain/power-annex";
 import { seedLegacyStarterCutter } from "./legacy-starter";
 import { expectElementsInsideHexes } from "./map-geometry";
@@ -72,6 +73,7 @@ async function expectMapNameplatesInsideHex(page: import("@playwright/test").Pag
   );
   expect(geometry.labels.sort()).toEqual([
     "Crash Site",
+    "Holo Hollow",
     "Long Scramble",
     "Power Annex",
     "Processing Yard",
@@ -94,8 +96,12 @@ async function expectMapStateLabelsInsideHex(
   expect(geometry.routeOverlaps).toEqual([]);
 }
 
+// Six hexes from the Crash Site: it is "You are here", the Processing Yard,
+// Power Annex, Long Scramble, and Holo Hollow are all directly reachable, and
+// The Jag is only visible behind the Scramble.
 const STATIONARY_STATE_LABELS = [
   "You are here",
+  "Reachable",
   "Reachable",
   "Reachable",
   "Reachable",
@@ -106,6 +112,7 @@ const SELECTED_STATE_LABELS = [
   "Selected",
   "Reachable",
   "Reachable",
+  "Reachable",
   "Visible",
 ] as const;
 const IN_TRANSIT_STATE_LABELS = [
@@ -113,8 +120,12 @@ const IN_TRANSIT_STATE_LABELS = [
   "Destination",
   "Reachable",
   "Reachable",
+  "Reachable",
   "Visible",
 ] as const;
+
+/** Six chassis rivets per rendered hex; derived so a new location can't stale this. */
+const MAP_RIVET_COUNT = LOCAL_MAP_LOCATION_IDS.length * 6;
 
 async function expectPowerAnnexRewardLayout(
   page: import("@playwright/test").Page,
@@ -545,7 +556,9 @@ test("the full journey walks, arrives, and returns between the original location
   await expect(
     page.locator('[aria-label="Local map"] svg circle:not([data-map-rivet])'),
   ).toHaveCount(0);
-  await expect(page.locator('[aria-label="Local map"] svg circle[data-map-rivet]')).toHaveCount(30);
+  await expect(page.locator('[aria-label="Local map"] svg circle[data-map-rivet]')).toHaveCount(
+    MAP_RIVET_COUNT,
+  );
 
   await scrollMapIntoView(page);
   await expectMapNameplatesInsideHex(page);
@@ -607,7 +620,9 @@ test("the full journey walks, arrives, and returns between the original location
   await expect(
     page.locator('[aria-label="Local map"] svg circle:not([data-map-rivet])'),
   ).toHaveCount(0);
-  await expect(page.locator('[aria-label="Local map"] svg circle[data-map-rivet]')).toHaveCount(30);
+  await expect(page.locator('[aria-label="Local map"] svg circle[data-map-rivet]')).toHaveCount(
+    MAP_RIVET_COUNT,
+  );
 
   const returnPast = new Date(Date.now() - 25_000);
   await db

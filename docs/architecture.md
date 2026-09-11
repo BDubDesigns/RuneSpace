@@ -78,8 +78,14 @@ below.
   scene, description, activity composition, and same-location population/profile
   flow through `LocationPopulationPanel`. Population browsing does not belong on
   Map.
+- **Local Place** is a place inside the current World Location (issue #159),
+  composed by `features/local-places/`. It is a variant of the Location surface,
+  not a fourth surface: the footer gains no destination, the character's
+  authoritative position never changes, and the open place lives in the `place`
+  query parameter so refresh and Back behave sensibly. See
+  `docs/gameplay-foundations.md` for the full contract.
 - **Map** is the dedicated query-backed `?surface=map` surface, composed by
-  `features/travel/LocalMapPanel.tsx`. It reuses the existing five-location
+  `features/travel/LocalMapPanel.tsx`. It reuses the existing location
   geometry, route, selection, and explicit Travel confirmation behavior. Map is
   read-only exactly when authoritative `state.travelState` is present. If Travel
   resolves while the URL remains on Map, the same surface immediately clears

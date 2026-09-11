@@ -17,6 +17,9 @@ import {
  * - DeWhat? Emergency Power Annex: the daily Power Cell reward source.
  * - The Long Scramble (#83): intentionally barren traversal tile.
  * - The Jag (#83): Ferrite Shale Mining.
+ * - Holo Hollow (#159): the first settlement. Its town places are Local Places
+ *   (game/content/local-places), not separate World Locations, so they own no
+ *   map coordinate, adjacency, or Travel semantics.
  */
 const locationDefinitions = [
   {
@@ -29,6 +32,7 @@ const locationDefinitions = [
       LOCATION_IDS.abandonedProcessingYard,
       LOCATION_IDS.emergencyPowerAnnex,
       LOCATION_IDS.theLongScramble,
+      LOCATION_IDS.holoHollow,
     ],
     availableActionIds: [ACTION_IDS.cargoHoldWelding],
     dormantActivities: [],
@@ -73,7 +77,11 @@ const locationDefinitions = [
     description:
       "A mostly intact DeWhat? emergency-supply depot can dispense one registered worker allotment per Pacific reset day.",
     region: "holo_hollow" as const,
-    adjacentLocationIds: [LOCATION_IDS.crashSite, LOCATION_IDS.abandonedProcessingYard],
+    adjacentLocationIds: [
+      LOCATION_IDS.crashSite,
+      LOCATION_IDS.abandonedProcessingYard,
+      LOCATION_IDS.holoHollow,
+    ],
     availableActionIds: [],
     dormantActivities: [],
     presentation: {
@@ -95,7 +103,7 @@ const locationDefinitions = [
     description:
       "A steep run of fractured stone and loose hardpan climbing toward the high ridge. Nothing worth stopping for, which is unfortunate given how long it takes to cross.",
     region: "holo_hollow" as const,
-    adjacentLocationIds: [LOCATION_IDS.crashSite, LOCATION_IDS.theJag],
+    adjacentLocationIds: [LOCATION_IDS.crashSite, LOCATION_IDS.theJag, LOCATION_IDS.holoHollow],
     availableActionIds: [],
     dormantActivities: [],
     presentation: {
@@ -133,6 +141,34 @@ const locationDefinitions = [
       },
     },
   },
+  {
+    id: LOCATION_IDS.holoHollow,
+    displayName: "Holo Hollow",
+    description:
+      "A declining Ferrite-mining settlement built on the remains of a holo-tourism economy. Faded attraction signage still hangs over shopfronts that now serve miners and haulers.",
+    region: "holo_hollow" as const,
+    adjacentLocationIds: [
+      LOCATION_IDS.crashSite,
+      LOCATION_IDS.emergencyPowerAnnex,
+      LOCATION_IDS.theLongScramble,
+    ],
+    availableActionIds: [],
+    dormantActivities: [],
+    presentation: {
+      mapIconKey: "holo_hollow" as const,
+      layout: "holo_hollow" as const,
+      localMap: { axial: { q: -1, r: 1 }, label: "Holo Hollow" },
+      scene: {
+        // Delivered at its native 1536x384 4:1 resolution (#159): approved art
+        // is never upscaled merely to match the older 1920x480 convention.
+        asset: "/location-scenes/holo-hollow.webp" as const,
+        width: 1536,
+        height: 384,
+        alt: "Weathered main street of a small mining settlement, faded holo-tourism signage above working shopfronts under an overcast sky",
+        focal: { x: 50, y: 45 } as const,
+      },
+    },
+  },
 ] as const satisfies readonly LocationDefinition[];
 
 export const LOCATIONS: readonly LocationDefinition[] = locationDefinitions.map((location) =>
@@ -160,11 +196,12 @@ export function areLocationsAdjacent(originId: string, destinationId: string): b
   return getLocation(originId)?.adjacentLocationIds.includes(destinationId as never) ?? false;
 }
 
-/** The ordered five-location local map (issue #83). */
+/** The ordered local map (issues #83 and #159). */
 export const LOCAL_MAP_LOCATION_IDS: readonly LocationDefinition["id"][] = [
   LOCATION_IDS.crashSite,
   LOCATION_IDS.abandonedProcessingYard,
   LOCATION_IDS.emergencyPowerAnnex,
   LOCATION_IDS.theLongScramble,
   LOCATION_IDS.theJag,
+  LOCATION_IDS.holoHollow,
 ];

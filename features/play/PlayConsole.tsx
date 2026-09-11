@@ -28,10 +28,17 @@ export type PlaySurface = "primary" | "map";
  */
 export function PlayConsole({
   characterName,
+  localPlaceId,
   surface = "primary",
   onMapExit,
 }: {
   characterName: string;
+  /**
+   * The Local Place the route currently has open. Presentation state only: it
+   * decides which resident and place surface are shown, never what a server
+   * command is allowed to do.
+   */
+  localPlaceId?: string;
   surface?: PlaySurface;
   onMapExit: () => void;
 }) {
@@ -94,13 +101,17 @@ export function PlayConsole({
       ) : inTransit ? (
         <JourneyPanel />
       ) : (
-        <LocationSurface characterName={characterName} />
+        <LocationSurface characterName={characterName} localPlaceId={localPlaceId} />
       )}
 
       {surface === "primary" ? (
         <>
           <MissionObjectivePanel state={state} />
-          {!inTransit ? <NpcInteractionPanel /> : null}
+          {!inTransit ? (
+            // Keyed by the requested place so a contact's opened Trade surface
+            // never survives leaving the place and reappears on return.
+            <NpcInteractionPanel key={localPlaceId ?? ""} localPlaceId={localPlaceId} />
+          ) : null}
           {showMiningActivity || showRefiningActivity ? (
             <>
               <div className="grid gap-4 sm:grid-cols-2">

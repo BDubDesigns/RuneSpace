@@ -8,6 +8,7 @@ export const MAP_IDENTIFIER_ASSET_BY_KEY = {
   power_annex: "/map-icons/power-annex.webp",
   the_long_scramble: "/map-icons/the-long-scramble.png",
   the_jag: "/map-icons/the-jag.png",
+  holo_hollow: "/map-icons/holo-hollow.webp",
 } as const satisfies Record<MapIconKey, string>;
 
 /**

@@ -66,6 +66,8 @@ export type DialogueSequence = {
 
 const crash = CONVERSATION_BACKGROUND_IDS.crashSiteExterior;
 const jag = CONVERSATION_BACKGROUND_IDS.theJagExterior;
+const bixShop = CONVERSATION_BACKGROUND_IDS.holoHollowSouvenirsInterior;
+const assistanceCenter = CONVERSATION_BACKGROUND_IDS.holoHollowAssistanceCenterInterior;
 
 function wadeLocal(expressionId: ExpressionId, text: string): DialogueBeat {
   return {
@@ -95,6 +97,28 @@ function tansyLocal(expressionId: ExpressionId, text: string): DialogueBeat {
     speakerNpcId: NPC_IDS.tansyRusk,
     expressionId,
     backgroundId: jag,
+    presentationMode: "local",
+    text,
+  };
+}
+
+function bixLocal(expressionId: ExpressionId, text: string): DialogueBeat {
+  return {
+    kind: "npc",
+    speakerNpcId: NPC_IDS.bixWeller,
+    expressionId,
+    backgroundId: bixShop,
+    presentationMode: "local",
+    text,
+  };
+}
+
+function rennLocal(expressionId: ExpressionId, text: string): DialogueBeat {
+  return {
+    kind: "npc",
+    speakerNpcId: NPC_IDS.rennCalder,
+    expressionId,
+    backgroundId: assistanceCenter,
     presentationMode: "local",
     text,
   };
@@ -718,6 +742,126 @@ const dialogue = {
         EXPRESSION_IDS.smile,
         "Next time I'm telling you about the time Wade tried to repair a coolant manifold with a serving spoon.",
       ),
+    ],
+  },
+  [DIALOGUE_IDS.bixTheShopTopic]: {
+    id: DIALOGUE_IDS.bixTheShopTopic,
+    npcId: NPC_IDS.bixWeller,
+    beats: [
+      bixLocal(EXPRESSION_IDS.neutral, "Holo Hollow Souvenirs."),
+      bixLocal(EXPRESSION_IDS.concerned, "And Mining Supplies."),
+      bixLocal(EXPRESSION_IDS.amused, "That part came later."),
+      bixLocal(
+        EXPRESSION_IDS.neutral,
+        "My parents filled this place with shirts, mugs, little projector toys. Anything a kid could talk somebody into buying on the way home.",
+      ),
+      bixLocal(EXPRESSION_IDS.amused, "I still stock the souvenirs."),
+      bixLocal(EXPRESSION_IDS.concerned, "They don't move much."),
+      bixLocal(EXPRESSION_IDS.neutral, "Mining gear does."),
+      bixLocal(EXPRESSION_IDS.amused, "That doesn't make this a mining store."),
+    ],
+  },
+  [DIALOGUE_IDS.bixPowerCellsTopic]: {
+    id: DIALOGUE_IDS.bixPowerCellsTopic,
+    npcId: NPC_IDS.bixWeller,
+    beats: [
+      bixLocal(EXPRESSION_IDS.neutral, "Power Cells are eight Credits."),
+      bixLocal(EXPRESSION_IDS.concerned, "Yes, I know."),
+      bixLocal(
+        EXPRESSION_IDS.neutral,
+        "Getting anything out here costs money before I even put it on a shelf.",
+      ),
+      bixLocal(EXPRESSION_IDS.neutral, "If you've got extras, I'll buy them for three."),
+      bixLocal(EXPRESSION_IDS.amused, "If that price offends you, keep the Cell. They're useful."),
+      bixLocal(EXPRESSION_IDS.concerned, "I'm not going to wrestle it away from you."),
+    ],
+  },
+  [DIALOGUE_IDS.bixHoloHollowTopic]: {
+    id: DIALOGUE_IDS.bixHoloHollowTopic,
+    npcId: NPC_IDS.bixWeller,
+    beats: [
+      bixLocal(EXPRESSION_IDS.neutral, "Used to be busier."),
+      bixLocal(
+        EXPRESSION_IDS.amused,
+        "People came here on purpose, if you can believe that. Whole families.",
+      ),
+      bixLocal(
+        EXPRESSION_IDS.neutral,
+        "Projector nights. Full rooms. Kids trying to spend every Credit they had before their parents got them back in the speeder.",
+      ),
+      bixLocal(
+        EXPRESSION_IDS.concerned,
+        "Then the new releases stopped working here and everybody discovered somewhere else to be.",
+      ),
+      bixLocal(EXPRESSION_IDS.neutral, "Mining kept the place going."),
+      bixLocal(EXPRESSION_IDS.amused, "Sort of."),
+      bixLocal(EXPRESSION_IDS.neutral, "Still here, though."),
+    ],
+  },
+  [DIALOGUE_IDS.rennAssistanceCenterTopic]: {
+    id: DIALOGUE_IDS.rennAssistanceCenterTopic,
+    npcId: NPC_IDS.rennCalder,
+    beats: [
+      rennLocal(EXPRESSION_IDS.neutral, "Used to be the Visitor Center."),
+      rennLocal(
+        EXPRESSION_IDS.sardonic,
+        "Brochures. Maps. Somebody behind the counter telling tourists what they absolutely couldn't leave Holo Hollow without seeing.",
+      ),
+      rennLocal(
+        EXPRESSION_IDS.neutral,
+        "Now it's forms, ration crates, notices, and whoever needs a hand that week.",
+      ),
+      rennLocal(
+        EXPRESSION_IDS.guarded,
+        "People like to talk about needing this place like it's embarrassing.",
+      ),
+      rennLocal(EXPRESSION_IDS.neutral, "It isn't."),
+      rennLocal(
+        EXPRESSION_IDS.guarded,
+        "Needing help isn't the part that should embarrass anybody.",
+      ),
+    ],
+  },
+  [DIALOGUE_IDS.rennFerriteTopic]: {
+    id: DIALOGUE_IDS.rennFerriteTopic,
+    npcId: NPC_IDS.rennCalder,
+    beats: [
+      rennLocal(EXPRESSION_IDS.neutral, "Ferrite is work."),
+      rennLocal(
+        EXPRESSION_IDS.guarded,
+        "It's rock. Useful rock, if somebody still wants enough of it.",
+      ),
+      rennLocal(EXPRESSION_IDS.neutral, "Every year somebody says demand's about to turn around."),
+      rennLocal(EXPRESSION_IDS.guarded, "Every year we get another reason to wait one more year."),
+      rennLocal(EXPRESSION_IDS.sardonic, "People talk about Ferrite like it's a weather system."),
+      rennLocal(
+        EXPRESSION_IDS.sardonic,
+        "Market'll turn. Quotas'll loosen. New contracts'll come through.",
+      ),
+      rennLocal(EXPRESSION_IDS.guarded, "I'm tired of building plans around 'one more year.'"),
+    ],
+  },
+  [DIALOGUE_IDS.rennLifeHereTopic]: {
+    id: DIALOGUE_IDS.rennLifeHereTopic,
+    npcId: NPC_IDS.rennCalder,
+    beats: [
+      rennLocal(EXPRESSION_IDS.neutral, "If I hated Holo Hollow, leaving would be easy."),
+      rennLocal(EXPRESSION_IDS.guarded, "That's the part people miss."),
+      rennLocal(
+        EXPRESSION_IDS.neutral,
+        "I know everybody. I know which roof leaks. I know who'll show up when something breaks at two in the morning.",
+      ),
+      rennLocal(
+        EXPRESSION_IDS.sardonic,
+        "I also know exactly how many times I've heard 'a few more good years.'",
+      ),
+      rennLocal(
+        EXPRESSION_IDS.guarded,
+        "Caring about a place doesn't mean you owe it your whole life.",
+      ),
+      rennLocal(EXPRESSION_IDS.neutral, "Sometimes staying is loyalty."),
+      rennLocal(EXPRESSION_IDS.guarded, "Sometimes it's just being afraid to go."),
+      rennLocal(EXPRESSION_IDS.neutral, "Those aren't the same thing."),
     ],
   },
 } as const satisfies Record<DialogueId, DialogueSequence>;

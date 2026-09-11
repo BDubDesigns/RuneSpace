@@ -34,6 +34,22 @@ export const CONVERSATION_BACKGROUNDS = [
     asset: theJagScene.asset,
     alt: theJagScene.alt,
   },
+  // Holo Hollow's residents are met inside their Local Places, so these are
+  // dedicated approved interior art rather than a reused exterior scene. The
+  // location is still the parent World Location: a Local Place never owns a
+  // world position of its own.
+  {
+    id: CONVERSATION_BACKGROUND_IDS.holoHollowSouvenirsInterior,
+    locationId: LOCATION_IDS.holoHollow,
+    asset: "/location-scenes/holo-hollow-souvenirs-interior.webp",
+    alt: "Cluttered shop interior with souvenir shelves beside racked mining supplies",
+  },
+  {
+    id: CONVERSATION_BACKGROUND_IDS.holoHollowAssistanceCenterInterior,
+    locationId: LOCATION_IDS.holoHollow,
+    asset: "/location-scenes/holo-hollow-assistance-center-interior.webp",
+    alt: "Assistance center interior with a service counter, posted notices, and stacked ration crates",
+  },
 ] as const satisfies readonly ConversationBackgroundDefinition[];
 
 const backgroundById = new Map<string, ConversationBackgroundDefinition>(

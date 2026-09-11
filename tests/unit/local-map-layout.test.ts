@@ -55,8 +55,9 @@ describe("five-cell flat-top local map layout (issue #83)", () => {
 
   it("derives one route per undirected registry edge and animates both directions", () => {
     const geometry = buildLocalMapGeometry();
-    expect(geometry.undirectedRoutes).toHaveLength(5);
-    expect(Object.keys(geometry.routeSegments)).toHaveLength(10);
+    // Holo Hollow (#159) adds three edges: Crash Site, Power Annex, Long Scramble.
+    expect(geometry.undirectedRoutes).toHaveLength(8);
+    expect(Object.keys(geometry.routeSegments)).toHaveLength(16);
     expect(
       geometry.undirectedRoutes.every(
         (route) =>

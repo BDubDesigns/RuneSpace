@@ -10,7 +10,7 @@ import { getConversationBackground } from "@/game/content/conversation-backgroun
 import { getDialogue, resolveDialogueSpeaker } from "@/game/content/dialogue";
 import { resolveNpcConversation } from "@/game/domain/conversation";
 import { WALK_IT_OFF } from "@/game/content/missions";
-import { getNpcAtLocation } from "@/game/content/npcs";
+import { getResidentNpc } from "@/game/content/npcs";
 import { ITEM_IDS } from "@/game/config/foundations";
 import { deriveMissionState, projectMission, type MissionProjection } from "@/game/domain/missions";
 import { planUniqueItemAddition } from "@/game/domain/inventory";
@@ -18,9 +18,10 @@ import { getLocation } from "@/game/content/locations";
 
 describe("issue #102 authored NPC and mission boundaries", () => {
   it("keeps Wade and Tansy static at existing locations", () => {
-    expect(getNpcAtLocation(LOCATION_IDS.crashSite)?.id).toBe(NPC_IDS.wadeRusk);
-    expect(getNpcAtLocation(LOCATION_IDS.theJag)?.id).toBe(NPC_IDS.tansyRusk);
-    expect(getLocation("holo_hollow")).toBeUndefined();
+    // Neither has a Local Place, so both still resolve from their World
+    // Location alone exactly as before Holo Hollow's Local Places existed.
+    expect(getResidentNpc({ locationId: LOCATION_IDS.crashSite })?.id).toBe(NPC_IDS.wadeRusk);
+    expect(getResidentNpc({ locationId: LOCATION_IDS.theJag })?.id).toBe(NPC_IDS.tansyRusk);
   });
 
   it("keeps conversation backgrounds independently replaceable", () => {

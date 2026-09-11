@@ -34,6 +34,7 @@ export const LocationDefinitionSchema = z
         "power_annex",
         "the_long_scramble",
         "the_jag",
+        "holo_hollow",
       ]),
       layout: z.enum([
         "crash_site",
@@ -41,6 +42,7 @@ export const LocationDefinitionSchema = z
         "power_annex",
         "the_long_scramble",
         "the_jag",
+        "holo_hollow",
       ]),
       localMap: z
         .object({

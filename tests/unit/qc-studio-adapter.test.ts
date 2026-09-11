@@ -18,8 +18,15 @@ describe("RuneSpace QC Studio adapter", () => {
   });
 
   it("only exposes expressions authored for each RuneSpace NPC", () => {
+    // An NPC whose conversation content is not authored yet legitimately has no
+    // expression art; every NPC who actually speaks must have some.
+    const speakers = new Set(
+      runespaceDialogueAdapter.sequences.flatMap((sequence) =>
+        sequence.beats.flatMap((beat) => (beat.kind === "npc" ? [beat.speakerNpcId] : [])),
+      ),
+    );
     for (const npc of runespaceDialogueAdapter.npcs) {
-      expect(npc.expressions.length).toBeGreaterThan(0);
+      if (speakers.has(npc.id)) expect(npc.expressions.length).toBeGreaterThan(0);
       for (const expression of npc.expressions) {
         expect(expression.asset).toMatch(/^\/npc-art\//);
       }

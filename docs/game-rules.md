@@ -43,4 +43,10 @@ The following are live on `main` as server-authoritative, Play-orchestrated syst
 
 ## Non-goals (currently)
 
-The following remain explicitly out of scope until later approved issues: additional quest/mission content beyond the current authored missions, additional crafting/gathering activities beyond the approved Mining/Refining/Welding slices, hex exploration, fuel consumption beyond the approved Cargo Hold repair, ships/speeders, combat, Phaser minigames, chat/clans/multiplayer/economy/trading, a CMS, background workers, and autonomous issue selection. See `docs/gameplay-foundations.md` for the authoritative slice boundaries.
+The following remain explicitly out of scope until later approved issues: additional quest/mission content beyond the current authored missions, additional crafting/gathering activities beyond the approved Mining/Refining/Welding slices, hex exploration, fuel consumption beyond the approved Cargo Hold repair, ships/speeders, combat, Phaser minigames, chat/clans/multiplayer, player-to-player trading and any player-driven market or economy simulation, a CMS, background workers, and autonomous issue selection. See `docs/gameplay-foundations.md` for the authoritative slice boundaries.
+
+The approved NPC merchant loop (Credits and Bix's fixed buy/sell catalog, issue
+#159) is in scope and described in `docs/gameplay-foundations.md` and
+`docs/holo-hollow.md`. It is deliberately not a market: prices are authored
+content, stock is fixed, and no merchant wallet, restock timer, dynamic pricing,
+or player-to-player exchange exists.

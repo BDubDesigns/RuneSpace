@@ -144,6 +144,24 @@ export const CompleteMissionRequestSchema = z.object({
   npcId: ContentId,
 });
 
+/**
+ * A merchant transaction identifies only the intent: the owned character, which
+ * Local Place the player is trading in, the item, the direction, and how many.
+ *
+ * The Local Place is a request, not proof of anything — the server revalidates
+ * it against the character's authoritative World Location, that place's derived
+ * access, and whether it actually owns a merchant. Unit price, total, stock
+ * eligibility, affordability, and capacity are all server-resolved, so no price
+ * or total appears in this contract at all.
+ */
+export const TradeRequestSchema = z.object({
+  characterId: z.string().uuid(),
+  localPlaceId: ContentId,
+  itemId: ItemIdSchema,
+  direction: z.enum(["buy", "sell"]),
+  quantity: z.number().int().positive(),
+});
+
 /** Containers can only hold non-container item definitions. */
 export const ContainerContentItemSchema = z.object({
   itemId: ItemIdSchema,

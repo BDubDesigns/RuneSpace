@@ -32,6 +32,9 @@ presentation: {
 
 - `asset` is validated as `/location-scenes/*.webp` (local only, no remote URLs, no `..` traversal).
 - `width`/`height` are intrinsic delivered dimensions (used by `next/image` for `sizes` + layout stability).
+- The contract is the **4:1 aspect ratio**, not a fixed pixel size. Approved art
+  is recorded at the resolution it was actually delivered at and is never
+  upscaled to match an older entry (Holo Hollow's 1536×384 set, issue #159).
 - `alt` is concise, useful, distinct per location — decorative wrappers are elsewhere.
 - `focal` is optional `{x,y}` in percent (0–100), defaulting to center-top-ish when absent. It drives `object-position` so the shared viewport keeps the subject readable without shipping a second crop. New locations add one entry; no per-location CSS branches.
 - Resolver helper: `resolveLocationScene(getLocation, id)` returns `scene | undefined` (unknown id → `undefined`, never a broken path).
@@ -105,9 +108,22 @@ latch is used.
 ## Adding a future location
 
 1. Add its scene entry to `game/content/locations.ts` under `presentation.scene` (`asset`, `width`, `height`, `alt`, optional `focal {x,y}` in percent). Ensure `asset` is already committed under `public/location-scenes/<slug>.webp` and follows the repo's existing asset conventions — do not relying on incoming filenames.
-2. Commit one local WebP (appropriate Lanczos downsample, q75–82 range, no baked text/chrome).
+2. Commit one local WebP (appropriate Lanczos downsample, q75–82 range, no baked text/chrome). Approved delivered art is committed as delivered; never upscale it to match an existing entry's pixel size.
 3. Record intrinsic dimensions and focal where justified.
 4. No UI code changes beyond the data entry — `LocationSceneHeader` consumes the registry.
+
+Local Place scenes (`game/content/local-places.ts`, issue #159) use the same
+`/location-scenes/` directory, the same metadata shape, and the same
+`LocationSceneHeader`, which takes any subject carrying an id, a display name,
+and scene metadata.
+
+**Known art follow-up (non-blocking).** The three Holo Hollow Local Place
+exteriors (`holo-hollow-souvenirs-exterior.webp`,
+`holo-hollow-assistance-center-exterior.webp`, `hh-bnb-exterior.webp`) are
+accepted for issue #159, but their surroundings are visually very similar, so
+the buildings read as if they occupy nearly the same spot. A later approved art
+polish pass should give each building a more distinct setting. Do not
+regenerate or replace these assets outside that pass.
 
 ## Explicit non-goals (not in this slice)
 

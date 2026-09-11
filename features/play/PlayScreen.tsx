@@ -7,6 +7,7 @@ import { GameShell, TopBar } from "@/components/ui/GameShell";
 import { RuneSpaceBrand } from "@/components/branding/RuneSpaceBrand";
 import { SignOutButton } from "@/features/auth/SignOutButton";
 import { PlayBoundaryTestTrigger } from "@/features/diagnostics/PlayBoundaryTestTrigger";
+import { LOCAL_PLACE_PARAM } from "@/features/local-places/navigation";
 import { acknowledgeNewsAction } from "@/server/actions";
 import type { PlayGameplayState } from "@/server/play";
 import { PlayConsole } from "./PlayConsole";
@@ -163,6 +164,7 @@ export function PlayScreen({
   const router = useRouter();
   const searchParams = useSearchParams();
   const mapActive = searchParams.get("surface") === "map";
+  const localPlaceId = searchParams.get(LOCAL_PLACE_PARAM) ?? undefined;
 
   return (
     <PlayProvider initialState={initialState}>
@@ -170,6 +172,7 @@ export function PlayScreen({
         <PlayBoundaryTestTrigger />
         <PlayConsole
           characterName={characterName}
+          localPlaceId={localPlaceId}
           onMapExit={() => router.replace(pathname)}
           surface={mapActive ? "map" : "primary"}
         />
