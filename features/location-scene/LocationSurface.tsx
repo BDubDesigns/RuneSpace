@@ -4,9 +4,9 @@ import { Panel } from "@/components/ui/Panel";
 import { SectionHeader } from "@/components/ui/SectionHeader";
 import { Feedback } from "@/components/ui/Feedback";
 import { LOCATION_IDS } from "@/game/config/foundations";
-import { getLocalPlaceInLocation, getLocalPlacesForLocation } from "@/game/content/local-places";
+import { getLocalPlacesForLocation } from "@/game/content/local-places";
 import { getLocation } from "@/game/content/locations";
-import { deriveLocalPlaceAccess } from "@/game/domain/local-places";
+import { resolveActiveLocalPlace } from "@/game/domain/local-places";
 import { CargoHoldPanel } from "@/features/cargo/CargoHoldPanel";
 import { LocalPlaceDirectory } from "@/features/local-places/LocalPlaceDirectory";
 import { LocalPlaceSurface } from "@/features/local-places/LocalPlaceSurface";
@@ -29,15 +29,13 @@ export function LocationSurface({
   const location = getLocation(locationId);
   if (!location || state.travelState) return null;
 
-  // A requested place is honored only when it genuinely belongs to the
-  // authoritative current location and its derived access allows entry, so a
-  // hand-edited URL falls back to the town surface rather than revealing a
-  // locked interior.
-  const requestedPlace = localPlaceId
-    ? getLocalPlaceInLocation(locationId, localPlaceId)
-    : undefined;
-  const activePlace =
-    requestedPlace && deriveLocalPlaceAccess(requestedPlace).available ? requestedPlace : undefined;
+  // The shared interpretation: a hand-edited URL naming an unknown,
+  // wrong-parent, or locked place falls back to the town surface rather than
+  // revealing an interior. The resident panel reads the same answer.
+  const activePlace = resolveActiveLocalPlace({
+    locationId,
+    requestedLocalPlaceId: localPlaceId,
+  });
   if (activePlace) {
     return (
       <LocalPlaceSurface

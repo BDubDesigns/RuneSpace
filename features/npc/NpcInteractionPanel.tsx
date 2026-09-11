@@ -7,6 +7,7 @@ import { Panel } from "@/components/ui/Panel";
 import { NpcConversation } from "@/features/npc/NpcConversation";
 import { getResidentNpc } from "@/game/content/npcs";
 import { resolveNpcConversation } from "@/game/domain/conversation";
+import { resolveActiveLocalPlace } from "@/game/domain/local-places";
 import { deriveMissionGuidanceTargets } from "@/game/domain/missions";
 import { usePlay } from "@/features/play/PlayContext";
 
@@ -19,16 +20,22 @@ import { usePlay } from "@/features/play/PlayContext";
  * per-mission ID chains and never parses player-facing objective copy, so a new
  * ordinary mission or a new authored topic appears here without edits.
  *
- * `localPlaceId` is the Local Place the player currently has open. It is
- * navigation/presentation state passed down from the route, never authoritative
- * position: the resident it resolves decides who can be talked to here, while
- * every gameplay command still revalidates its own location server-side.
+ * `localPlaceId` is the Local Place the route currently requests. It is
+ * navigation state, never authoritative position, so it is validated through
+ * the same shared interpretation the place surface uses before it can count as
+ * resident context: an unknown, wrong-parent, or locked place resolves nobody.
+ * Every gameplay command still revalidates its own location server-side.
  */
 export function NpcInteractionPanel({ localPlaceId }: { localPlaceId?: string }) {
   const { foregroundBusy, state } = usePlay();
   const [open, setOpen] = useState(false);
   const triggerRef = useRef<HTMLButtonElement>(null);
-  const npc = getResidentNpc({ locationId: state.location.currentLocationId, localPlaceId });
+  const locationId = state.location.currentLocationId;
+  const activePlace = resolveActiveLocalPlace({
+    locationId,
+    requestedLocalPlaceId: localPlaceId,
+  });
+  const npc = getResidentNpc({ locationId, localPlaceId: activePlace?.id });
   const stationary = !state.activeAction && !state.travelState;
   const entries = npc ? resolveNpcConversation(npc.id, state.missions) : [];
   const guidance = deriveMissionGuidanceTargets(state.missions);

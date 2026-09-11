@@ -1,3 +1,4 @@
+import { getLocalPlaceInLocation } from "@/game/content/local-places";
 import type { LocalPlaceDefinition } from "@/game/schemas/local-places";
 
 /**
@@ -22,4 +23,26 @@ export function deriveLocalPlaceAccess(place: LocalPlaceDefinition): LocalPlaceA
   return place.access.kind === "open"
     ? { available: true }
     : { available: false, reason: place.access.reason };
+}
+
+/**
+ * The single interpretation of "which Local Place is the player actually in".
+ *
+ * Navigation state is a request, not a fact: the id in the route may name a
+ * place that does not exist, belongs to a different World Location, or is
+ * locked. Only a place that passes all three checks counts as active, and every
+ * presentation surface reads that one answer — the place surface and the
+ * resident it hosts can never disagree about where the player is.
+ *
+ * This is presentation's shared reading of the same content and access rules the
+ * server applies; it never replaces the server's own independent validation.
+ */
+export function resolveActiveLocalPlace(input: {
+  locationId: string;
+  requestedLocalPlaceId?: string;
+}): LocalPlaceDefinition | undefined {
+  if (!input.requestedLocalPlaceId) return undefined;
+  const place = getLocalPlaceInLocation(input.locationId, input.requestedLocalPlaceId);
+  if (!place) return undefined;
+  return deriveLocalPlaceAccess(place).available ? place : undefined;
 }

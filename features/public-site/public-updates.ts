@@ -7,7 +7,7 @@ const authoredUpdates = [
   {
     slug: "holo-hollow-opens-for-business",
     title: "Holo Hollow Opens for Business",
-    publishedAt: "2026-09-11T12:00:00-07:00",
+    publishedAt: "2026-09-10T20:00:00-07:00",
     summary:
       "The town you have been hearing about is finally on the map. Walk into Holo Hollow, meet Bix and Renn, and spend your first Credits.",
     body: [

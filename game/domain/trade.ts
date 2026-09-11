@@ -1,3 +1,4 @@
+import { planStackAddition, type StackState } from "@/game/domain/inventory";
 import type { MerchantDefinition } from "@/game/schemas/merchants";
 
 /**
@@ -83,9 +84,9 @@ export function quoteTrade(input: {
 }
 
 /**
- * How many units a balance can pay for. This is the purchase cap behind the
- * Max control; carried-capacity limits stay with the inventory planner, which
- * the authoritative command consults separately.
+ * How many units a balance alone can pay for, ignoring what the player can
+ * actually carry. Callers presenting a purchase cap want
+ * `maximumPurchasableQuantity`, which also respects carried capacity.
  */
 export function maximumAffordableQuantity(credits: number, unitPrice: number): number {
   if (!Number.isInteger(credits) || credits < 0)
@@ -93,4 +94,41 @@ export function maximumAffordableQuantity(credits: number, unitPrice: number): n
   if (!Number.isInteger(unitPrice) || unitPrice <= 0)
     throw new RangeError("Unit price must be positive");
   return Math.floor(credits / unitPrice);
+}
+
+/**
+ * The largest genuinely useful purchase: what the balance can pay for, reduced
+ * to what the carried Inventory can actually accept.
+ *
+ * Stack filling, free slots, and carried mass are not re-derived here — the
+ * quantity is handed to the ordinary inventory planner, whose partial result
+ * reports exactly how much would not fit. That keeps one set of capacity rules
+ * for Mining, instantaneous rewards, and merchant purchases alike.
+ *
+ * This is a client-side preview only. The authoritative command re-plans the
+ * submitted quantity under the character lock and still refuses anything that
+ * no longer fits.
+ */
+export function maximumPurchasableQuantity(input: {
+  credits: number;
+  unitPrice: number;
+  existingStacks: readonly StackState<string>[];
+  itemId: string;
+  stackLimit: number;
+  availableSlots: number;
+  availableWeight: number;
+  itemWeight: number;
+}): number {
+  const affordable = maximumAffordableQuantity(input.credits, input.unitPrice);
+  if (affordable === 0) return 0;
+  const plan = planStackAddition(
+    input.existingStacks,
+    input.itemId,
+    affordable,
+    input.stackLimit,
+    input.availableSlots,
+    input.availableWeight,
+    input.itemWeight,
+  );
+  return affordable - plan.remainingQuantity;
 }

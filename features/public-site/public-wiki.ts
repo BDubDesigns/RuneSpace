@@ -230,6 +230,7 @@ const authoredWikiArticles = [
             ". Step into his shop and choose Trade. Talking to Bix and trading with him are separate — you can do either without the other.",
           ],
           "Pick Buy or Sell, choose a quantity with the minus, plus, and Max controls, check the total, and confirm with a single Buy or Sell. You stay in the shop afterwards, with your Credits and Inventory updated straight away.",
+          "When buying, Max is the most you can actually take away — it accounts for your Credits and for the room left in your Inventory. When selling, Max is everything you're carrying of that item.",
         ],
       },
       {

@@ -8,8 +8,9 @@ import { Panel } from "@/components/ui/Panel";
 import { SectionHeader } from "@/components/ui/SectionHeader";
 import { usePlay } from "@/features/play/PlayContext";
 import { resolveItemPresentation } from "@/game/content/item-presentation";
+import { getItemDefinition } from "@/game/config/balance";
 import {
-  maximumAffordableQuantity,
+  maximumPurchasableQuantity,
   merchantPurchasableItemIds,
   merchantSellableItemIds,
   merchantUnitPrice,
@@ -63,6 +64,26 @@ export function TradePanel({
 
   function setQuantity(itemId: string, quantity: number) {
     setQuantities((current) => ({ ...current, [itemId]: Math.max(1, quantity) }));
+  }
+
+  /**
+   * The Max preview for a purchase. Capacity comes from the shared inventory
+   * planner via the domain helper, so this surface never re-derives stacking,
+   * slot, or mass rules of its own.
+   */
+  function purchasableMaximum(itemId: string, unitPrice: number): number {
+    const definition = getItemDefinition(itemId);
+    if (!definition || definition.kind !== "stack") return 0;
+    return maximumPurchasableQuantity({
+      credits: state.credits,
+      unitPrice,
+      existingStacks: state.inventory.stacks,
+      itemId,
+      stackLimit: definition.stackLimit,
+      availableSlots: state.inventory.slotsAvailable,
+      availableWeight: Math.max(0, state.inventory.capacityGrams - state.inventory.massGrams),
+      itemWeight: definition.massGrams,
+    });
   }
 
   function commit(itemId: string, quantity: number) {
@@ -146,8 +167,10 @@ export function TradePanel({
           const owned = ownedQuantity(itemId);
           const quantity = quantityFor(itemId);
           const total = unitPrice * quantity;
-          const maximum =
-            mode === "buy" ? maximumAffordableQuantity(state.credits, unitPrice) : owned;
+          // Buy caps at the largest purchase that is both affordable and
+          // actually carryable; Sell caps at the authoritative carried
+          // quantity. The server re-plans either way.
+          const maximum = mode === "buy" ? purchasableMaximum(itemId, unitPrice) : owned;
           const affordable = mode === "buy" ? total <= state.credits : quantity <= owned;
 
           return (

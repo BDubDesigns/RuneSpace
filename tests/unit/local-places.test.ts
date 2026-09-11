@@ -8,7 +8,7 @@ import {
 } from "@/game/content/local-places";
 import { LOCATIONS, areLocationsAdjacent, getLocation } from "@/game/content/locations";
 import { getResidentNpc } from "@/game/content/npcs";
-import { deriveLocalPlaceAccess } from "@/game/domain/local-places";
+import { deriveLocalPlaceAccess, resolveActiveLocalPlace } from "@/game/domain/local-places";
 
 /**
  * The world-map geometry rule the authored adjacency is expected to agree with.
@@ -129,6 +129,58 @@ describe("issue #159 Local Place registry", () => {
     expect(getLocalPlace(LOCAL_PLACE_IDS.holoHollowSouvenirs)?.merchantId).toBeDefined();
     expect(getLocalPlace(LOCAL_PLACE_IDS.holoHollowAssistanceCenter)?.merchantId).toBeUndefined();
     expect(getLocalPlace(LOCAL_PLACE_IDS.hhBnb)?.merchantId).toBeUndefined();
+  });
+});
+
+describe("issue #159 active Local Place interpretation", () => {
+  it("accepts an open place requested from its own parent location", () => {
+    expect(
+      resolveActiveLocalPlace({
+        locationId: LOCATION_IDS.holoHollow,
+        requestedLocalPlaceId: LOCAL_PLACE_IDS.holoHollowSouvenirs,
+      })?.id,
+    ).toBe(LOCAL_PLACE_IDS.holoHollowSouvenirs);
+  });
+
+  it("resolves nothing when no place is requested", () => {
+    expect(resolveActiveLocalPlace({ locationId: LOCATION_IDS.holoHollow })).toBeUndefined();
+  });
+
+  it("refuses a hand-edited request for an unknown, wrong-parent, or locked place", () => {
+    for (const requested of ["not_a_place", LOCAL_PLACE_IDS.hhBnb]) {
+      expect(
+        resolveActiveLocalPlace({
+          locationId: LOCATION_IDS.holoHollow,
+          requestedLocalPlaceId: requested,
+        }),
+        `${requested} must not become active`,
+      ).toBeUndefined();
+    }
+    expect(
+      resolveActiveLocalPlace({
+        locationId: LOCATION_IDS.crashSite,
+        requestedLocalPlaceId: LOCAL_PLACE_IDS.holoHollowSouvenirs,
+      }),
+    ).toBeUndefined();
+  });
+
+  it("gives the place surface and the resident panel the same answer", () => {
+    // The locked B&B is the case that matters: its resident must not become
+    // active context just because its id appears in the URL.
+    const requestedLocalPlaceId = LOCAL_PLACE_IDS.hhBnb;
+    const active = resolveActiveLocalPlace({
+      locationId: LOCATION_IDS.holoHollow,
+      requestedLocalPlaceId,
+    });
+    expect(active).toBeUndefined();
+    expect(
+      getResidentNpc({ locationId: LOCATION_IDS.holoHollow, localPlaceId: active?.id }),
+    ).toBeUndefined();
+    // Reading the raw request instead would have resolved Mara.
+    expect(
+      getResidentNpc({ locationId: LOCATION_IDS.holoHollow, localPlaceId: requestedLocalPlaceId })
+        ?.id,
+    ).toBe(NPC_IDS.maraKells);
   });
 });
 

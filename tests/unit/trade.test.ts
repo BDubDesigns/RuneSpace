@@ -5,6 +5,7 @@ import { ITEM_IDS, MERCHANT_IDS, NPC_IDS } from "@/game/config/foundations";
 import { getMerchant } from "@/game/content/merchants";
 import {
   maximumAffordableQuantity,
+  maximumPurchasableQuantity,
   merchantPurchasableItemIds,
   merchantSellableItemIds,
   merchantUnitPrice,
@@ -115,5 +116,58 @@ describe("issue #159 trade arithmetic", () => {
   it("refuses to derive a maximum from impossible inputs", () => {
     expect(() => maximumAffordableQuantity(-1, 8)).toThrow(RangeError);
     expect(() => maximumAffordableQuantity(10, 0)).toThrow(RangeError);
+  });
+});
+
+describe("issue #159 Buy Max respects what the player can carry", () => {
+  const powerCell = getItemDefinition(ITEM_IDS.powerCell)!;
+  const stackLimit = powerCell.kind === "stack" ? powerCell.stackLimit : 0;
+  const itemWeight = powerCell.massGrams;
+
+  function maxPurchase(overrides: {
+    credits: number;
+    existingStacks?: readonly { id: string; itemId: string; quantity: number }[];
+    availableSlots?: number;
+    availableWeight?: number;
+  }) {
+    return maximumPurchasableQuantity({
+      credits: overrides.credits,
+      unitPrice: 8,
+      existingStacks: (overrides.existingStacks ?? []) as never,
+      itemId: ITEM_IDS.powerCell,
+      stackLimit,
+      availableSlots: overrides.availableSlots ?? 8,
+      availableWeight: overrides.availableWeight ?? 50_000,
+      itemWeight,
+    });
+  }
+
+  it("caps at affordability when there is room to spare", () => {
+    expect(maxPurchase({ credits: 24 })).toBe(3);
+    expect(maxPurchase({ credits: 7 })).toBe(0);
+  });
+
+  it("caps at free slots rather than promising an impossible purchase", () => {
+    // One free slot holds one stack, so an affordable ten cells is capped.
+    expect(maxPurchase({ credits: 1_000, availableSlots: 1 })).toBe(stackLimit);
+    expect(maxPurchase({ credits: 1_000, availableSlots: 0 })).toBe(0);
+  });
+
+  it("fills an existing partial stack before needing a new slot", () => {
+    const partial = [{ id: "stack-1", itemId: ITEM_IDS.powerCell, quantity: stackLimit - 1 }];
+    // No free slots at all, but the partial stack still has one space.
+    expect(maxPurchase({ credits: 1_000, existingStacks: partial, availableSlots: 0 })).toBe(1);
+  });
+
+  it("caps at carried mass", () => {
+    expect(maxPurchase({ credits: 1_000, availableWeight: itemWeight * 2 })).toBe(2);
+    expect(maxPurchase({ credits: 1_000, availableWeight: 0 })).toBe(0);
+  });
+
+  it("takes whichever limit binds first", () => {
+    // Affordable 2, mass allows 4, slots allow plenty — affordability wins.
+    expect(maxPurchase({ credits: 16, availableWeight: itemWeight * 4 })).toBe(2);
+    // Affordable 4, mass allows 1 — mass wins.
+    expect(maxPurchase({ credits: 32, availableWeight: itemWeight })).toBe(1);
   });
 });

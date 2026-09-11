@@ -96,13 +96,23 @@ test("scopes each resident to their own Local Place", async ({ page, testCharact
     .locator(`[data-local-place="${LOCAL_PLACE_IDS.holoHollowSouvenirs}"]`)
     .click();
   await expect(page.getByRole("button", { name: /Talk to Bix Weller/ })).toBeVisible();
-  await expect(page.locator("[data-trade-panel]")).toBeVisible();
   await expect(page.getByRole("button", { name: /Talk to Renn Calder/ })).toHaveCount(0);
+  // Trade is an offered action, not something that unfolds on arrival.
+  await expect(page.locator('[data-local-place-action="trade"]')).toBeVisible();
+  await expect(page.locator("[data-trade-panel]")).toHaveCount(0);
 
+  // Talk stays the canonical conversation hub and carries no merchant command.
   const conversation = await openNpcConversation(page, "Bix Weller");
   const topics = conversation.locator('[data-conversation-section="topics"]').getByRole("button");
   await expect(topics).toHaveCount(3);
+  await expect(conversation.getByRole("button", { name: /Trade/ })).toHaveCount(0);
   await page.keyboard.press("Escape");
+
+  // Choosing Trade opens the Buy/Sell surface, and it can be closed again.
+  await page.locator('[data-local-place-action="trade"]').click();
+  await expect(page.locator("[data-trade-panel]")).toBeVisible();
+  await page.locator('[data-local-place-action="trade"]').click();
+  await expect(page.locator("[data-trade-panel]")).toHaveCount(0);
 
   // Renn is the contact at the Assistance Center, with no merchant function.
   await page.locator("[data-local-place-exit]").click();
@@ -128,6 +138,7 @@ test("buys and sells against the authoritative balance without leaving the shop"
     .locator("[data-local-place-directory]")
     .locator(`[data-local-place="${LOCAL_PLACE_IDS.holoHollowSouvenirs}"]`)
     .click();
+  await page.locator('[data-local-place-action="trade"]').click();
 
   const trade = page.locator("[data-trade-panel]");
   await expect(trade.locator("[data-trade-credits]")).toContainText("20 Credits");
