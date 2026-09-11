@@ -5,6 +5,38 @@ export type { PublicUpdate } from "@/game/schemas/public-updates";
 
 const authoredUpdates = [
   {
+    slug: "holo-hollow-opens-for-business",
+    title: "Holo Hollow Opens for Business",
+    publishedAt: "2026-09-11T12:00:00-07:00",
+    summary:
+      "The town you have been hearing about is finally on the map. Walk into Holo Hollow, meet Bix and Renn, and spend your first Credits.",
+    body: [
+      "Wade and Tansy have been talking about Holo Hollow since the day you crawled out of your ship. It is now a real place you can walk to — one hex out from the Crash Site, the Power Annex, and the bottom of the Long Scramble.",
+      "Holo Hollow is a mining town built on the bones of a tourist town, and it has not entirely decided which one it is. Step off the street and into the places that are open: Holo Hollow Souvenirs + Mining Supplies, where Bix Weller sells cutting gear under a sign that still advertises novelty holo toys, and the Community Assistance Center, where Renn Calder can tell you what the place used to be. HH B&B is there too, though the rooms are held for locals and regular crews for now.",
+      "Your character also has Credits — ten of them to start, whether the character is new or one you have been playing. Bix will buy Ferrite Shale, Refined Ferrite, Slag, and spare Power Cells, and he will sell you Power Cells at eight Credits apiece. He is aware that is more than he pays for them, and he will tell you why if you ask.",
+      "Talking and trading are separate. You can ask Bix about the shop without buying a thing, and you can buy a Power Cell without hearing the whole story of the projector nights. Both are worth doing.",
+    ],
+    patchNotes: [
+      {
+        heading: "Added",
+        items: [
+          "Holo Hollow is a new location on the map, reachable from the Crash Site, the Emergency Power Annex, and The Long Scramble.",
+          "Holo Hollow Souvenirs + Mining Supplies and the Community Assistance Center can be entered from the town; HH B&B is visible but closed to outside guests for now.",
+          "Bix Weller and Renn Calder are new people to talk to, each with several subjects you can revisit any time.",
+          "Credits are a new per-character currency. Every character starts with 10.",
+          "Trade with Bix: buy Power Cells for 8 Credits each, and sell Ferrite Shale (2), Refined Ferrite (10), Slag (1), or spare Power Cells (3).",
+          "Your Credit balance is shown while trading and in your Inventory.",
+        ],
+      },
+      {
+        heading: "Changed",
+        items: [
+          "Stepping into a shop or building in town is instant — it is not a journey, it does not interrupt anything, and the map still shows you in Holo Hollow.",
+        ],
+      },
+    ],
+  },
+  {
     slug: "talk-is-a-conversation-now",
     title: "Talk Is a Conversation Now",
     publishedAt: "2026-09-09T15:00:00-07:00",

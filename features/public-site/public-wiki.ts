@@ -73,17 +73,22 @@ const authoredWikiArticles = [
     sections: [
       {
         paragraphs: [
-          "Holo Hollow currently has five connected locations. You can only walk between locations that are directly connected — there's no fast travel or shortcut.",
+          "Holo Hollow currently has six connected locations. You can only walk between locations that are directly connected — there's no fast travel or shortcut.",
         ],
       },
       {
         heading: "The local map",
         list: [
-          "Crash Site — connects to the Abandoned Processing Yard, the DeWhat? Emergency Power Annex, and The Long Scramble.",
+          "Crash Site — connects to the Abandoned Processing Yard, the DeWhat? Emergency Power Annex, The Long Scramble, and the town of Holo Hollow.",
           "Abandoned Processing Yard — connects to Crash Site and the Power Annex.",
-          "DeWhat? Emergency Power Annex — connects to Crash Site and the Abandoned Processing Yard.",
-          "The Long Scramble — connects to Crash Site and The Jag. It has no work of its own; it's just the way through.",
+          "DeWhat? Emergency Power Annex — connects to Crash Site, the Abandoned Processing Yard, and the town of Holo Hollow.",
+          "The Long Scramble — connects to Crash Site, The Jag, and the town of Holo Hollow. It has no work of its own; it's just the way through.",
           "The Jag — only connects to The Long Scramble. There's no direct route between Crash Site and The Jag.",
+          [
+            "Holo Hollow — the ",
+            { text: "town", articleSlug: "holo-hollow" },
+            " connects to Crash Site, the Power Annex, and The Long Scramble. There's no direct route between the town and The Jag or the Processing Yard.",
+          ],
         ],
       },
       {
@@ -201,6 +206,54 @@ const authoredWikiArticles = [
     ],
   },
   {
+    slug: "credits-and-trading",
+    title: "Credits & Trading",
+    summary:
+      "Your character's Credits, and buying and selling at Bix Weller's shop in Holo Hollow.",
+    sections: [
+      {
+        paragraphs: [
+          "Credits are your character's money. Each character has their own balance — Credits aren't shared between the characters on your account. Every character starts with 10 Credits.",
+          [
+            "You can see your balance in your ",
+            { text: "Inventory", articleSlug: "inventory-and-equipment" },
+            ", and it's shown while you're trading.",
+          ],
+        ],
+      },
+      {
+        heading: "Trading with Bix",
+        paragraphs: [
+          [
+            "Bix Weller runs Holo Hollow Souvenirs + Mining Supplies, in the ",
+            { text: "town of Holo Hollow", articleSlug: "holo-hollow" },
+            ". Step into his shop and choose Trade. Talking to Bix and trading with him are separate — you can do either without the other.",
+          ],
+          "Pick Buy or Sell, choose a quantity with the minus, plus, and Max controls, check the total, and confirm with a single Buy or Sell. You stay in the shop afterwards, with your Credits and Inventory updated straight away.",
+        ],
+      },
+      {
+        heading: "What Bix pays",
+        list: [
+          "Ferrite Shale — 2 Credits each",
+          "Refined Ferrite — 10 Credits each",
+          "Slag — 1 Credit each",
+          "Power Cell — 3 Credits each",
+        ],
+      },
+      {
+        heading: "What Bix sells",
+        paragraphs: [
+          [
+            { text: "Power Cells", articleSlug: "power-cells" },
+            " cost 8 Credits each. That's more than he pays for them, which he'll explain if you ask him about Power Cells. He doesn't stock anything else at the moment.",
+          ],
+          "A purchase has to fit: if your Inventory doesn't have room for the whole amount, or you can't afford it, nothing is bought and nothing is charged.",
+        ],
+      },
+    ],
+  },
+  {
     slug: "cargo-hold-and-welding",
     title: "Cargo Hold & Welding",
     summary: "Repairing the ship's Cargo Hold and what it gives you once it's welded shut.",
@@ -302,12 +355,12 @@ const authoredWikiArticles = [
     slug: "holo-hollow",
     title: "Holo Hollow",
     summary:
-      "The five connected locations that make up the current playable world, and who you'll meet there.",
+      "The six connected locations that make up the current playable world, the town itself, and who you'll meet there.",
     sections: [
       {
         paragraphs: [
           [
-            "Holo Hollow is the wrecked stretch of ground you're stranded in. It currently has five connected locations — see ",
+            "Holo Hollow is the wrecked stretch of ground you're stranded in, and also the name of the settlement at the middle of it. It currently has six connected locations — see ",
             { text: "Travel & Scavenging", articleSlug: "travel-and-scavenging" },
             " for how they connect.",
           ],
@@ -340,12 +393,33 @@ const authoredWikiArticles = [
             { text: "Ferrite Shale Mining", articleSlug: "mining-and-refining" },
             " and Tansy Rusk.",
           ],
+          [
+            "Holo Hollow — the town itself, a declining mining settlement built on the remains of a holo-tourism economy. It connects to the Crash Site, the Power Annex, and The Long Scramble, and it's where you can ",
+            { text: "spend Credits", articleSlug: "credits-and-trading" },
+            ".",
+          ],
+        ],
+      },
+      {
+        heading: "In town",
+        paragraphs: [
+          "Standing in Holo Hollow, you can step into the places that are open. Going inside is instant: it isn't a journey, it doesn't interrupt anything, and the map still shows you in Holo Hollow.",
+        ],
+        list: [
+          [
+            "Holo Hollow Souvenirs + Mining Supplies — Bix Weller's shop, where you can ",
+            { text: "buy and sell", articleSlug: "credits-and-trading" },
+            ".",
+          ],
+          "Holo Hollow Community Assistance Center — the old Visitor Center, now handling local assistance and rations. Renn Calder is usually here.",
+          "HH B&B — visible from the street, but its rooms are held for locals and regular working crews rather than outside guests, so you can't go in yet.",
         ],
       },
       {
         heading: "Who's here",
         paragraphs: [
-          "Wade Rusk, a Holo Hollow recovery and salvage operator, is based at the Crash Site. Tansy Rusk, a field mechanic and miner, is based at The Jag. They're the only two NPCs currently present in the playable area — other player characters can also be around.",
+          "Wade Rusk, a Holo Hollow recovery and salvage operator, is based at the Crash Site. Tansy Rusk, a field mechanic and miner, is based at The Jag.",
+          "In town, Bix Weller runs the souvenir and mining-supply shop, and Renn Calder, a Ferrite miner, is found at the Community Assistance Center. Each of them is only there when you're actually inside their building — you won't find them standing in the street. Other player characters can also be around.",
           "This is an early, playable build — check the Updates page for what's new in Holo Hollow.",
         ],
       },

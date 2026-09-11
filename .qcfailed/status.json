@@ -2,19 +2,14 @@
   "schemaVersion": 1,
   "projectSlug": "runespace",
   "workState": "active",
-  "currentFocus": "Unifying every NPC conversation into one Talk hub with Mission context and replayable topics in PR #165.",
-  "currentChange": {
-    "summary": "Replaces the single-dialogue Talk interaction with one canonical NPC conversation hub plus replayable social topics.",
-    "stage": "review",
-    "pullRequestNumber": 165
-  },
+  "currentFocus": "Building the Holo Hollow settlement foundation: Local Places, character Credits, and the first NPC merchant loop.",
   "latestCompleted": {
-    "summary": "Added an account-level unread-news indicator to the authenticated game shell for published Updates.",
+    "summary": "Unified every NPC conversation into one Talk hub with Mission context and replayable topics.",
     "date": "2026-09-09",
-    "url": "https://github.com/BDubDesigns/RuneSpace/pull/163"
+    "url": "https://github.com/BDubDesigns/RuneSpace/pull/165"
   },
-  "nextStep": "Complete human review of PR #165 and run full CI before merging to main.",
-  "lastMeaningfulUpdate": "2026-09-09",
+  "nextStep": "Complete human review of the Holo Hollow foundation and run full CI before merging to main.",
+  "lastMeaningfulUpdate": "2026-09-11",
   "highlights": [
     {
       "summary": "Extracted generic Play orchestration from the Mining feature into its own server and client boundary.",

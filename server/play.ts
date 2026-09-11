@@ -250,6 +250,12 @@ export type PlayGameplayState = {
   commandError?: "another_action_active";
   /** Authoritative persistent current location (stable ID from the registry). */
   location: { currentLocationId: string };
+  /**
+   * Authoritative character-scoped Credit balance (issue #159). This is the
+   * only balance any surface may display; the client never computes, caches, or
+   * submits a balance of its own.
+   */
+  credits: number;
   /** Present only while the character is in transit (server-authoritative). */
   travelState?: {
     originLocationId: string;
@@ -540,7 +546,7 @@ export async function stateFromTransaction(
   miningStopReason?: MiningStopReason,
   commandError?: PlayGameplayState["commandError"],
   travelError?: PlayGameplayState["travelError"],
-  characterRow?: { currentLocationId: string },
+  characterRow?: { currentLocationId: string; credits: number },
   now = new Date(),
   refiningRecentResult: PlayGameplayState["refiningRecentResult"] = {
     successes: 0,
@@ -701,6 +707,7 @@ export async function stateFromTransaction(
           : undefined,
     }));
   const currentLocationId = character[0]?.currentLocationId ?? LOCATION_IDS.crashSite;
+  const credits = character[0]?.credits ?? 0;
   const missions = await loadMissionProjections(transaction, characterId, {
     currentLocationId,
     activeActionId: action?.actionId,
@@ -770,6 +777,7 @@ export async function stateFromTransaction(
     characterId,
     missions,
     location: { currentLocationId },
+    credits,
     scavengeReveals,
     travelState,
     powerAnnex:

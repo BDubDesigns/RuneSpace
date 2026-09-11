@@ -141,8 +141,9 @@ adds a separate **100 Welding XP** turn-in reward exactly once.
   Equipped items cannot be deposited. Withdrawals must fit the carried
   Inventory's authoritative slot and mass limits.
 - The storage surface renders occupied entries only; it does not render a 32
-  tile empty grid. Cargo Hold has no generic transfer, bank, trading, or
-  multi-container abstraction in this issue.
+  tile empty grid. Cargo Hold has no generic transfer, bank, or multi-container
+  abstraction, and no trading of its own: the approved NPC merchant loop
+  (below) operates on carried Inventory only.
 
 ## Inventory and equipment
 
@@ -185,8 +186,10 @@ adds a separate **100 Welding XP** turn-in reward exactly once.
   server-authoritative `discardInventoryStack` command locks the owned stack,
   validates the confirmed quantity after any due-work reconciliation, and
   refuses safely when the stack changed. Real ground items, map coordinates,
-  visibility to other players, pickup, trading, and transfers remain future
-  work; no world object is created by dropping.
+  visibility to other players, pickup, and player-to-player transfers remain
+  future work; no world object is created by dropping. Selling to an approved
+  NPC merchant is a separate authoritative command (see Credits below), not a
+  drop or a transfer.
 - Inventory Power Cell loading is a convenience route to the same
   server-authoritative `loadSalvageCutterPowerCell` command and transaction the
   Equipment surface uses, via the same `loadPowerCellAction` client action. It
@@ -194,6 +197,72 @@ adds a separate **100 Welding XP** turn-in reward exactly once.
   depleted Cutter, and no conflicting command in flight, and it explains the
   reason whenever it is unavailable. Equipment remains the full Cutter
   charge/status surface.
+
+## Credits and merchant transactions (issue #159)
+
+Credits are RuneSpace's character-scoped currency. Product-level rules — the
+approved price table, merchant personality, and Trade UX — belong to
+`docs/holo-hollow.md`; this section owns the durable mechanical contract.
+
+- `characters.credits` is the single source of truth. It is `NOT NULL`, defaults
+  to the approved starting balance for both newly provisioned characters and the
+  migration backfill of existing ones, and carries a database CHECK that refuses
+  a negative balance regardless of application logic. Clients never submit,
+  compute, or cache a balance; the only balance any surface shows is the one
+  projected by authoritative play state.
+- Merchant catalogs are validated typed content (`game/content/merchants.ts`),
+  referenced by stable merchant ID. Prices are authored there — never in JSX,
+  command handlers, or request payloads. A trade request carries only intent:
+  the owned character, the Local Place, the item, the direction, and a whole
+  positive quantity.
+- A trade runs on the instantaneous locked-character boundary
+  (`withLockedOwnedCharacter`), so an expired Mining or Travel row stays blocking
+  until its own command resolves it and can never be progressed as a side effect
+  of trading. Under that lock the command re-reads the authoritative balance and
+  inventory, re-quotes from content, and applies the Credit change and the
+  inventory change in the same transaction. Any refusal — unaffordable,
+  insufficient carried quantity, untraded item, invalid quantity, or a purchase
+  that will not fit — commits nothing at all.
+- Merchant buy/sell reuses the generic carried-inventory boundary
+  (`consumeStackableItem`, `planExactStackAddition`, `addStackableItem`) rather
+  than any merchant-specific stack rule, so stacking, partial stacks, slot
+  capacity, and carried mass behave exactly as everywhere else. A purchase is
+  all-or-nothing: a partial fill is never delivered.
+- There is no merchant wallet, finite merchant stock, restock timer, dynamic
+  pricing, buy limit, or player-to-player exchange.
+
+## Local Places (issue #159)
+
+A Local Place is a place inside one parent World Location — a shop, a municipal
+building, an inn. It exists so a settlement can have interiors without inventing
+a second geography.
+
+- A Local Place belongs to exactly one parent World Location and has no axial
+  coordinate, no adjacency, and no available action IDs of its own. It is never
+  a Travel destination and is never modelled as a `LocationDefinition`.
+- Entering one changes nothing authoritative: it does not start Travel or a
+  Journey, does not award Travel progression, does not create Scavenge, and does
+  not move `characters.current_location_id`. The database still says the
+  character is at the parent World Location.
+- Which Local Place is open is **navigation state, not character state**. It
+  lives in the route (the `place` query parameter, alongside the existing
+  `surface` parameter) so refresh and browser Back behave sensibly. It is
+  deliberately absent from persisted character state and from projected play
+  state — there is no second character position to keep in sync.
+- Because that state is not authoritative, a server command never treats a
+  submitted Local Place as proof of anything. It revalidates: the character is
+  owned and stationary, its authoritative World Location is that place's parent,
+  the place exists there, its derived access permits entry, and the place
+  actually owns the feature being used.
+- Access is one derived result (`available`, or locked with a player-facing
+  in-world reason) consumed by both presentation and commands. A locked place
+  stays visible and says why. Presentation never tests for a particular
+  building.
+- Nesting is one level only. There is no recursive place-within-place engine and
+  no generic requirement-expression language; a later Mission-driven unlock earns
+  the smallest additional condition its real unlock proves necessary.
+- Ordinary World Locations are unaffected: a location with no authored Local
+  Places renders and behaves exactly as before.
 
 ## Approved identities and boundaries
 

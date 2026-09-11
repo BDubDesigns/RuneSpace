@@ -54,11 +54,9 @@ const studioNpcs: StudioNpc[] = NPCS.map((npc) => ({
   id: npc.id,
   displayName: npc.displayName,
   role: npc.role,
-  expressions: Object.entries(npc.expressionAssets).map(([id, asset]) => ({
-    id,
-    label: formatStableId(id),
-    asset,
-  })),
+  expressions: Object.entries(npc.expressionAssets ?? {}).flatMap(([id, asset]) =>
+    asset ? [{ id, label: formatStableId(id), asset }] : [],
+  ),
 }));
 
 const studioBackgrounds: StudioConversationBackground[] = CONVERSATION_BACKGROUNDS.map(

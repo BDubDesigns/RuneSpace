@@ -5,7 +5,7 @@ import { ActionButton } from "@/components/ui/ActionButton";
 import { Feedback } from "@/components/ui/Feedback";
 import { Panel } from "@/components/ui/Panel";
 import { NpcConversation } from "@/features/npc/NpcConversation";
-import { getNpcAtLocation } from "@/game/content/npcs";
+import { getResidentNpc } from "@/game/content/npcs";
 import { resolveNpcConversation } from "@/game/domain/conversation";
 import { deriveMissionGuidanceTargets } from "@/game/domain/missions";
 import { usePlay } from "@/features/play/PlayContext";
@@ -18,12 +18,17 @@ import { usePlay } from "@/features/play/PlayContext";
  * mission projections and authored conversation topics. This panel contains no
  * per-mission ID chains and never parses player-facing objective copy, so a new
  * ordinary mission or a new authored topic appears here without edits.
+ *
+ * `localPlaceId` is the Local Place the player currently has open. It is
+ * navigation/presentation state passed down from the route, never authoritative
+ * position: the resident it resolves decides who can be talked to here, while
+ * every gameplay command still revalidates its own location server-side.
  */
-export function NpcInteractionPanel() {
+export function NpcInteractionPanel({ localPlaceId }: { localPlaceId?: string }) {
   const { foregroundBusy, state } = usePlay();
   const [open, setOpen] = useState(false);
   const triggerRef = useRef<HTMLButtonElement>(null);
-  const npc = getNpcAtLocation(state.location.currentLocationId);
+  const npc = getResidentNpc({ locationId: state.location.currentLocationId, localPlaceId });
   const stationary = !state.activeAction && !state.travelState;
   const entries = npc ? resolveNpcConversation(npc.id, state.missions) : [];
   const guidance = deriveMissionGuidanceTargets(state.missions);

@@ -12,9 +12,11 @@ describe("location scene registry (issue #78)", () => {
       expect(scene!.asset).not.toContain("..");
       expect(scene!.width).toBeGreaterThan(0);
       expect(scene!.height).toBeGreaterThan(0);
-      // Delivered intrinsic: 1920x480 (4:1 ultra-wide, single asset for mobile+desktop)
-      expect(scene!.width).toBe(1920);
-      expect(scene!.height).toBe(480);
+      // Scenes are 4:1 ultra-wide, one asset for mobile and desktop. The ratio
+      // is the contract, not a fixed pixel size: approved art is recorded at
+      // its real delivered resolution and never upscaled to match an older
+      // entry (#159).
+      expect(scene!.width / scene!.height).toBe(4);
       expect(scene!.alt.trim().length).toBeGreaterThan(10);
       // Focal metadata exists and is in valid percent range
       expect(scene!.focal).toBeDefined();

@@ -3,8 +3,19 @@
 import Image from "next/image";
 import type { LocationDefinition } from "@/game/schemas/locations";
 
+/**
+ * The scene chrome needs only an identity, a title, and scene metadata. Both a
+ * World Location and a Local Place satisfy this, so entering Bix's shop reuses
+ * exactly the same header treatment as arriving at a location.
+ */
+export type SceneSubject = {
+  id: string;
+  displayName: string;
+  presentation: { scene: LocationDefinition["presentation"]["scene"] };
+};
+
 export type LocationSceneHeaderProps = {
-  location: LocationDefinition;
+  location: SceneSubject;
   characterName: string;
   /** Contextual plates (e.g. FERRITE SHALE at Crash Site, REFINED FERRITE +
       SLAG at the Processing Yard). Stacked bottom-right; omit to hide. */

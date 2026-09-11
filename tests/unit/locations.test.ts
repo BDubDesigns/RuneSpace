@@ -15,7 +15,7 @@ describe("issue #47 location content", () => {
     expect(LOCATION_IDS.crashSite).toBe("crash_site");
   });
 
-  it("resolves exactly the five approved local locations (issue #83)", () => {
+  it("resolves exactly the approved local locations (issues #83 and #159)", () => {
     expect(LOCATIONS.map((l) => l.id).sort()).toEqual(
       [
         LOCATION_IDS.crashSite,
@@ -23,6 +23,7 @@ describe("issue #47 location content", () => {
         LOCATION_IDS.emergencyPowerAnnex,
         LOCATION_IDS.theLongScramble,
         LOCATION_IDS.theJag,
+        LOCATION_IDS.holoHollow,
       ].sort(),
     );
     expect(getLocation(LOCATION_IDS.crashSite)?.displayName).toBe("Crash Site");

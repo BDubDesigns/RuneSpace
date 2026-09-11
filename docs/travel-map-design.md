@@ -5,10 +5,13 @@ Owns the dedicated, query-backed `LocalMapPanel` treatment only. The current
 location scene and same-location population/profile flow belong to Location
 (see `docs/architecture.md` and `docs/location-scenes.md`); Journey owns the
 in-transit presentation. Full current-location scene artwork is #78.
-Five locations: Crash Site (`crash_site_deposit`), Abandoned Processing Yard (`processing_yard`),
-Emergency Power Annex (`power_annex`), The Long Scramble (`the_long_scramble`), and The Jag
-(`the_jag`). The panel's job is fast readable navigation and gameplay-state communication on a phone;
-hexes are **not** miniature scene paintings.
+Six locations: Crash Site (`crash_site_deposit`), Abandoned Processing Yard (`processing_yard`),
+Emergency Power Annex (`power_annex`), The Long Scramble (`the_long_scramble`), The Jag
+(`the_jag`), and Holo Hollow (`holo_hollow`). The panel's job is fast readable navigation and
+gameplay-state communication on a phone; hexes are **not** miniature scene paintings.
+
+Holo Hollow's town places are Local Places (`docs/gameplay-foundations.md`), not
+map hexes: they own no coordinate, no adjacency, and never appear on this panel.
 
 The Play footer's four destinations are **Characters · Inventory · Map ·
 Missions**. Map is entered with `?surface=map`; it is not an inline activity
@@ -90,7 +93,7 @@ than duplicating it in map tiles.
   their presentation moment, so a refresh reconstructs the same chronological feed without durable
   flavor history or a generic event-scripting engine.
 - Travel flavor uses a modest authored pool of general lines plus a separate Holo Hollow pool. The
-  current five locations declare the narrow `holo_hollow` region eligibility in the location registry;
+  current locations all declare the narrow `holo_hollow` region eligibility in the location registry;
   optional directed route lines are keyed by origin and destination, with no implicit reverse reuse.
   Flavor is presentation-only and does not select, resolve, or mutate gameplay state.
 - Waiting Scavenge is not presented as a forecast event. An available window renders the existing

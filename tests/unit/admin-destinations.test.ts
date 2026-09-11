@@ -10,7 +10,7 @@ import { getLocation } from "@/game/content/locations";
  * `dwhat_emergency_power_annex`.
  */
 describe("ADMIN_DESTINATIONS canonical resolution", () => {
-  it("offers at least the five authored world locations", () => {
+  it("offers every authored world location", () => {
     const ids = ADMIN_DESTINATIONS.map((d) => d.locationId);
     expect(ids.sort()).toEqual(
       [
@@ -19,6 +19,7 @@ describe("ADMIN_DESTINATIONS canonical resolution", () => {
         "dewhat_emergency_power_annex",
         "the_long_scramble",
         "the_jag",
+        "holo_hollow",
       ].sort(),
     );
   });

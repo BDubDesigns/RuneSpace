@@ -37,6 +37,17 @@ import { user } from "./auth-schema";
 export const SLOT_MIN = 1;
 export const SLOT_MAX = 3;
 
+/**
+ * The starting Credit balance written by the column default and the issue #159
+ * migration backfill.
+ *
+ * The authoritative game rule lives in game/config/balance (`credits`); this
+ * layer deliberately imports no game content, so the value is mirrored here
+ * exactly the way `current_location_id` mirrors the starting location. A unit
+ * test asserts the two never drift apart.
+ */
+export const STARTING_CREDITS = 10;
+
 export const playerAccounts = pgTable(
   "player_accounts",
   {
@@ -124,12 +135,18 @@ export const characters = pgTable(
     // validated server-side on every write; there is no database FK because
     // portraits are content, not rows.
     portraitId: text("portrait_id"),
+    // Server-authoritative character-scoped currency (issue #159). Every
+    // character owns one balance; new characters and the migration backfill
+    // both start at the approved ten Credits. The database refuses a negative
+    // balance outright, so an arithmetic mistake cannot quietly mint debt.
+    credits: integer("credits").notNull().default(STARTING_CREDITS),
   },
   (table) => [
     check(
       "characters_slot_range",
       sql`${table.slot} >= ${sql.raw(String(SLOT_MIN))} AND ${table.slot} <= ${sql.raw(String(SLOT_MAX))}`,
     ),
+    check("characters_credits_non_negative", sql`${table.credits} >= 0`),
     uniqueIndex("characters_account_slot_unique").on(table.playerAccountId, table.slot),
     uniqueIndex("characters_normalized_name_unique").on(table.normalizedName),
     index("characters_player_account_id_idx").on(table.playerAccountId),

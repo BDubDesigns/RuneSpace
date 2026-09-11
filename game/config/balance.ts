@@ -97,6 +97,10 @@ const balanceSchema = z.object({
       z.literal("container_attachment_2"),
     ]),
   }),
+  /** Character-scoped currency (issue #159). Merchant prices are content. */
+  credits: z.object({
+    startingBalance: z.literal(10),
+  }),
 });
 
 export type EffectiveGameBalance = z.infer<typeof balanceSchema>;
@@ -187,6 +191,7 @@ const defaults = balanceSchema.parse({
     startingCapacityGrams: 50_000,
     containerSuitSlotIds: ["container_attachment_1", "container_attachment_2"],
   },
+  credits: { startingBalance: 10 },
 });
 
 /** The sole effective-balance boundary until Issue #19 introduces approved overrides. */

@@ -67,6 +67,48 @@ export const CONVERSATION_TOPICS = [
     dialogueId: DIALOGUE_IDS.tansyBeyondHoloHollowTopic,
     availability: { kind: "mission_completed", missionId: MISSION_IDS.holdItTogether },
   },
+  {
+    id: CONVERSATION_TOPIC_IDS.bixTheShop,
+    npcId: NPC_IDS.bixWeller,
+    label: "The shop",
+    dialogueId: DIALOGUE_IDS.bixTheShopTopic,
+    availability: { kind: "always" },
+  },
+  {
+    id: CONVERSATION_TOPIC_IDS.bixPowerCells,
+    npcId: NPC_IDS.bixWeller,
+    label: "Power Cells",
+    dialogueId: DIALOGUE_IDS.bixPowerCellsTopic,
+    availability: { kind: "always" },
+  },
+  {
+    id: CONVERSATION_TOPIC_IDS.bixHoloHollow,
+    npcId: NPC_IDS.bixWeller,
+    label: "Holo Hollow",
+    dialogueId: DIALOGUE_IDS.bixHoloHollowTopic,
+    availability: { kind: "always" },
+  },
+  {
+    id: CONVERSATION_TOPIC_IDS.rennAssistanceCenter,
+    npcId: NPC_IDS.rennCalder,
+    label: "The Assistance Center",
+    dialogueId: DIALOGUE_IDS.rennAssistanceCenterTopic,
+    availability: { kind: "always" },
+  },
+  {
+    id: CONVERSATION_TOPIC_IDS.rennFerrite,
+    npcId: NPC_IDS.rennCalder,
+    label: "Ferrite",
+    dialogueId: DIALOGUE_IDS.rennFerriteTopic,
+    availability: { kind: "always" },
+  },
+  {
+    id: CONVERSATION_TOPIC_IDS.rennLifeHere,
+    npcId: NPC_IDS.rennCalder,
+    label: "Life here",
+    dialogueId: DIALOGUE_IDS.rennLifeHereTopic,
+    availability: { kind: "always" },
+  },
 ] as const satisfies readonly ConversationTopicDefinition[];
 
 const topicsById = new Map<string, ConversationTopicDefinition>(
