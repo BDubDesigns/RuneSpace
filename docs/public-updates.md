@@ -58,6 +58,10 @@ widening the allowed paths.
   not part of this contract; do not add them without an approved change to the
   schema and renderer.
 
+`docs/art-cookbook.md` owns the visual-production and asset-review guidance for
+choosing, generating, and accepting artwork. This document owns the publishing
+contract and public-site path rules.
+
 The collection rejects duplicate slugs, duplicate `publishedAt` instants,
 missing required fields, malformed timestamps, and invalid image references.
 `getPublishedUpdates()` returns the
@@ -71,8 +75,8 @@ There is no draft, scheduled, embargo, or CMS state in this content model. An
 Update on a feature branch or Draft PR is not published. Merging the PR to
 `main` is the publication boundary for this pre-alpha workflow.
 
-When a later player-facing milestone warrants an Update, add a new entry. Do
-not rewrite an already-published entry to describe unrelated later changes.
+When a later player-facing milestone warrants an Update, add a new entry. Do not
+rewrite an already-published entry to describe unrelated later changes.
 Internal-only CI, test, refactor, documentation, dependency, and maintenance
 work generally does not warrant an Update unless it has meaningful player
 impact worth communicating.
