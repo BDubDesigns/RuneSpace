@@ -289,15 +289,18 @@ suite("Issue #24 Salvage Cutter Power Cell boosting (real PostgreSQL)", () => {
       message: "Inventory changed. Review the selected Power Cell and try again.",
     });
     expect((await cutter(character.id)).currentCharge).toBeNull();
-    await expect(
-      db
-        .select()
-        .from(rune.inventoryStacks)
-        .where(eq(rune.inventoryStacks.characterId, character.id)),
-    ).resolves.toMatchObject([
-      { id: selectedStackId, quantity: 3 },
-      { id: untouchedStackId, quantity: 1 },
-    ]);
+    // Unordered select: the UPDATE above can move the selected row after the
+    // untouched one in heap order, so compare order-independently.
+    const after = await db
+      .select()
+      .from(rune.inventoryStacks)
+      .where(eq(rune.inventoryStacks.characterId, character.id));
+    expect(summarizeStacks(after)).toEqual(
+      summarizeStacks([
+        { id: selectedStackId, quantity: 3 },
+        { id: untouchedStackId, quantity: 1 },
+      ]),
+    );
   });
 
   it("switches a persisted active batch from boosted to normal timing", async () => {
