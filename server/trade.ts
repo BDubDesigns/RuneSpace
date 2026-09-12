@@ -14,6 +14,7 @@ import { deriveEquipmentLoadout } from "@/game/domain/equipment";
 import { planExactStackAddition } from "@/game/domain/inventory";
 import { deriveLocalPlaceAccess } from "@/game/domain/local-places";
 import { quoteTrade, type TradeDirection } from "@/game/domain/trade";
+import { loadCompletedMissionIds } from "@/server/mission-state";
 import { withLockedOwnedCharacter, type DatabaseTransaction } from "@/server/action-resolution";
 import {
   addStackableItem,
@@ -139,7 +140,13 @@ export async function tradeWithMerchant(
     const place = getLocalPlaceInLocation(character.currentLocationId, request.localPlaceId);
     if (!place) return refuse("unknown_place", "That place is not open to you from here.");
 
-    const access = deriveLocalPlaceAccess(place);
+    // Access is revalidated from the character's own completed Missions, so a
+    // mission-gated place cannot be traded in merely because the browser had it
+    // on screen.
+    const access = deriveLocalPlaceAccess(
+      place,
+      await loadCompletedMissionIds(transaction, character.id),
+    );
     if (!access.available) return refuse("place_locked", access.reason);
 
     const merchant = place.merchantId ? getMerchant(place.merchantId) : undefined;

@@ -50,6 +50,12 @@ export const CONVERSATION_BACKGROUNDS = [
     asset: "/location-scenes/holo-hollow-assistance-center-interior.webp",
     alt: "Assistance center interior with a service counter, posted notices, and stacked ration crates",
   },
+  {
+    id: CONVERSATION_BACKGROUND_IDS.hhBnbInterior,
+    locationId: LOCATION_IDS.holoHollow,
+    asset: "/location-scenes/hh-bnb-interior.webp",
+    alt: "Working inn interior with a worn bar, mismatched seating, and tourism-era fittings kept in service",
+  },
 ] as const satisfies readonly ConversationBackgroundDefinition[];
 
 const backgroundById = new Map<string, ConversationBackgroundDefinition>(

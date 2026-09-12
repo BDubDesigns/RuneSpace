@@ -7,8 +7,10 @@ import { usePathname } from "next/navigation";
 import { ActionButton } from "@/components/ui/ActionButton";
 import { ActionLink } from "@/components/ui/ActionLink";
 import { SectionHeader } from "@/components/ui/SectionHeader";
+import { usePlay } from "@/features/play/PlayContext";
 import { getLocalPlacesForLocation } from "@/game/content/local-places";
 import { deriveLocalPlaceAccess } from "@/game/domain/local-places";
+import { deriveCompletedMissionIds } from "@/game/domain/missions";
 import type { LocalPlaceDefinition } from "@/game/schemas/local-places";
 import { localPlaceHref } from "./navigation";
 
@@ -28,15 +30,19 @@ import { localPlaceHref } from "./navigation";
  */
 export function LocalPlaceDirectory({ locationId }: { locationId: string }) {
   const pathname = usePathname();
+  const { state } = usePlay();
   const places = getLocalPlacesForLocation(locationId);
   if (places.length === 0) return null;
+  // A place whose door opens on Mission completion reads that authoritative
+  // state here, so the world visibly changes as soon as the Mission is done.
+  const completedMissionIds = deriveCompletedMissionIds(state.missions);
 
   return (
     <div data-local-place-directory>
       <SectionHeader eyebrow="Around town">Places</SectionHeader>
       <ul className="mt-4 grid gap-3 sm:grid-cols-2">
         {places.map((place) => {
-          const access = deriveLocalPlaceAccess(place);
+          const access = deriveLocalPlaceAccess(place, completedMissionIds);
           const href = localPlaceHref(pathname, place.id);
           const reasonId = `local-place-reason-${place.id}`;
 

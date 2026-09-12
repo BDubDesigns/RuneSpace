@@ -1,4 +1,4 @@
-import { and, eq, isNull } from "drizzle-orm";
+import { and, eq, isNull, sql } from "drizzle-orm";
 import type { DatabaseTransaction, ResolvedCharacterContext } from "@/server/action-resolution";
 import {
   characterCargoHoldRepair,
@@ -43,10 +43,19 @@ import {
 } from "@/server/play";
 import { grantCharacterSkillXp } from "@/server/progression";
 import { applyStackRemovalPlan, loadOwnedItemInstances } from "@/server/carried-inventory";
-import { ensureMissionProgressRows } from "@/server/mission-progress";
+import { ensureMissionProgressRows, recordMissionConversation } from "@/server/mission-progress";
 
 export type MissionAcceptance =
   | { status: "accepted" | "already_accepted" | "already_completed" }
+  | { status: "refused"; message: string };
+
+/**
+ * The outcome of the generic mandatory-conversation command. `acknowledged` and
+ * `already_acknowledged` are both successes: the authored scene genuinely
+ * happened and the requirement holds.
+ */
+export type MissionConversationAcknowledgement =
+  | { status: "acknowledged" | "already_acknowledged" }
   | { status: "refused"; message: string };
 
 export type MissionCompletion =
@@ -64,6 +73,7 @@ export type MissionCompletion =
         | "equipment"
         | "tracked_activity"
         | "cargo_hold_repaired"
+        | "npc_conversation"
         | "insufficient_items"
         | "capacity";
       capacityReason?: "slots" | "mass";
@@ -78,6 +88,11 @@ export type MissionAcceptanceResult = {
 export type MissionCompletionResult = {
   state: PlayGameplayState;
   mission: MissionCompletion;
+};
+
+export type MissionConversationAcknowledgementResult = {
+  state: PlayGameplayState;
+  mission: MissionConversationAcknowledgement;
 };
 
 type CommandOutcome = { successes: number; failures: number; awardedXp: number };
@@ -112,7 +127,9 @@ function missionRow(rows: MissionRows, missionId: string) {
  * play state from the transaction, including any Mining/Refining work that
  * was resolved inside the same transaction.
  */
-async function runMissionCommand<Mission extends MissionAcceptance | MissionCompletion>(
+async function runMissionCommand<
+  Mission extends MissionAcceptance | MissionCompletion | MissionConversationAcknowledgement,
+>(
   userId: string,
   characterId: string,
   now: Date,
@@ -232,7 +249,115 @@ export async function acceptMission(
         })
         .onConflictDoNothing();
       await ensureMissionProgressRows(transaction, context.character.id, definition, now);
+      // This branch is only reached for a genuinely fresh acceptance: the
+      // mission rows were locked above and an existing accepted/completed row
+      // already returned. So the authored acceptance effect commits with the
+      // acceptance stamp itself and cannot be granted twice by a retry or a
+      // concurrent request, which blocks on that same lock and then sees the
+      // accepted row. The balance is incremented in SQL rather than from a
+      // read value, so no in-memory total can go stale.
+      if (offer.acceptEffect) {
+        await transaction
+          .update(characters)
+          .set({ credits: sql`${characters.credits} + ${offer.acceptEffect.amount}` })
+          .where(eq(characters.id, context.character.id));
+      }
       return stateFor({ status: "accepted" });
+    },
+  );
+}
+
+/**
+ * Generic mandatory-conversation command.
+ *
+ * Some missions require the player to actually meet somebody — Keep the Change
+ * sends Wade's new apprentice to meet Bix — independently of any merchant,
+ * item, or location activity. The browser submits only which mission, NPC, and
+ * authored sequence it just played; this command revalidates all of it against
+ * the authored definition inside the character lock:
+ *
+ * 1. the mission exists, is accepted, and is not already completed;
+ * 2. the definition genuinely authors a conversation requirement for exactly
+ *    that NPC and that dialogue, so credit can never be claimed for another
+ *    scene or another person;
+ * 3. the character is stationary at the requirement's authored location.
+ *
+ * Satisfaction is a single capped mission-progress row, so replaying the scene
+ * or retrying the command converges on the same satisfied state.
+ */
+export async function acknowledgeMissionConversation(
+  userId: string,
+  characterId: string,
+  missionId: string,
+  npcId: string,
+  dialogueId: string,
+  now = new Date(),
+  random?: MiningRandom,
+): Promise<MissionConversationAcknowledgementResult> {
+  return runMissionCommand<MissionConversationAcknowledgement>(
+    userId,
+    characterId,
+    now,
+    random,
+    async ({ transaction, context, stateFor }) => {
+      await ensurePlayProvisioning(transaction, context.character.id);
+      const definition = getMission(missionId);
+      if (!definition) {
+        return stateFor({ status: "refused", message: "Unknown mission." });
+      }
+      const requirement = definition.requirements.find(
+        (candidate): candidate is Extract<MissionRequirement, { kind: "npc_conversation" }> =>
+          candidate.kind === "npc_conversation" &&
+          candidate.npcId === npcId &&
+          candidate.dialogueId === dialogueId,
+      );
+      if (!requirement) {
+        return stateFor({
+          status: "refused",
+          message: `${definition.title} does not need that conversation.`,
+        });
+      }
+
+      const rows = await transaction
+        .select()
+        .from(characterMissions)
+        .where(eq(characterMissions.characterId, context.character.id))
+        .for("update");
+      const existing = missionRow(rows, definition.id);
+      if (!existing?.acceptedAt) {
+        return stateFor({ status: "refused", message: `Accept ${definition.title} first.` });
+      }
+      if (existing.completedAt) return stateFor({ status: "already_acknowledged" });
+
+      const locationId = await currentLocation(transaction, context.character.id);
+      if (context.action || locationId !== requirement.locationId) {
+        return stateFor({
+          status: "refused",
+          message: `Meet ${getNpc(requirement.npcId)?.displayName ?? "them"} in person while you are stationary at ${locationName(requirement.locationId)}.`,
+        });
+      }
+
+      const progressRows = await transaction
+        .select()
+        .from(characterMissionProgress)
+        .where(
+          and(
+            eq(characterMissionProgress.characterId, context.character.id),
+            eq(characterMissionProgress.missionId, definition.id),
+            eq(characterMissionProgress.progressKey, requirement.progressKey),
+          ),
+        )
+        .for("update");
+      if ((progressRows[0]?.progress ?? 0) >= 1) {
+        return stateFor({ status: "already_acknowledged" });
+      }
+      await recordMissionConversation(transaction, {
+        characterId: context.character.id,
+        missionId: definition.id,
+        progressKey: requirement.progressKey,
+        now,
+      });
+      return stateFor({ status: "acknowledged" });
     },
   );
 }
@@ -460,6 +585,16 @@ async function completeMissionForDefinition(input: {
       }
       continue;
     }
+    if (requirement.kind === "npc_conversation") {
+      if ((observation.trackedProgress?.get(requirement.progressKey) ?? 0) < 1) {
+        return stateFor({
+          status: "refused",
+          reason: "npc_conversation",
+          message: `Objective not met: ${requirement.objective}.`,
+        });
+      }
+      continue;
+    }
     const carried = observation.carriedQuantities.get(requirement.itemId) ?? 0;
     if (carried < resolveRequiredQuantity(requirement, observation)) {
       return stateFor({
@@ -507,7 +642,7 @@ async function completeMissionForDefinition(input: {
   // Preflight the declared reward against the post-consumption candidate
   // inventory. Consumption may legitimately free the slot or mass the
   // reward needs, so the original pre-consumption snapshot must not gate it.
-  if (definition.reward.kind === "item") {
+  if (definition.reward?.kind === "item") {
     const itemDefinition = getItemDefinition(definition.reward.itemId, balance);
     if (!itemDefinition || itemDefinition.kind !== "unique") {
       throw new Error(`${definition.id} reward is not a unique item definition`);
@@ -554,7 +689,10 @@ async function completeMissionForDefinition(input: {
   }
 
   let rewardInfo: { itemId: string; quantity: 1; itemInstanceId?: string } | undefined;
-  if (definition.reward.kind === "item") {
+  if (!definition.reward) {
+    // A mission whose real outcome is world/social state authors no completion
+    // reward; the completion stamp below is the whole commit.
+  } else if (definition.reward.kind === "item") {
     // Initial charge derives from the item's authored charge capacity —
     // chargeable items are granted depleted (charge is earned through the
     // Power Cell gameplay), items without a charge state get the schema's
@@ -646,6 +784,7 @@ function renderRequirementCopy(
       .replace("{target}", String(requirement.target));
   }
   if (requirement.kind === "cargo_hold_repaired") return requirement.objective;
+  if (requirement.kind === "npc_conversation") return requirement.objective;
   const itemName = observation.itemNames.get(requirement.itemId) ?? requirement.itemId;
   if (requirement.kind === "equipped_item") {
     return requirement.objective.replace("{item}", itemName);

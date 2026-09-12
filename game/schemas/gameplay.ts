@@ -143,6 +143,17 @@ export const CompleteMissionRequestSchema = z.object({
   missionId: ContentId,
   npcId: ContentId,
 });
+/**
+ * Narrow identity for the generic mandatory-conversation command. The dialogue
+ * is part of the intent so the server can confirm the played scene is the one
+ * the mission actually authored for that NPC; it grants nothing by itself.
+ */
+export const AcknowledgeMissionConversationRequestSchema = z.object({
+  characterId: z.string().uuid(),
+  missionId: ContentId,
+  npcId: ContentId,
+  dialogueId: ContentId,
+});
 
 /**
  * A merchant transaction identifies only the intent: the owned character, which

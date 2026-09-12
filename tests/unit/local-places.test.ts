@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { LOCAL_PLACE_IDS, LOCATION_IDS, NPC_IDS } from "@/game/config/foundations";
+import {
+  CONVERSATION_BACKGROUND_IDS,
+  EXPRESSION_IDS,
+  LOCAL_PLACE_IDS,
+  LOCATION_IDS,
+  MISSION_IDS,
+  NPC_IDS,
+} from "@/game/config/foundations";
 import {
   LOCAL_PLACES,
   getLocalPlace,
@@ -8,7 +15,12 @@ import {
 } from "@/game/content/local-places";
 import { LOCATIONS, areLocationsAdjacent, getLocation } from "@/game/content/locations";
 import { getResidentNpc } from "@/game/content/npcs";
-import { deriveLocalPlaceAccess, resolveActiveLocalPlace } from "@/game/domain/local-places";
+import {
+  deriveLocalPlaceAccess,
+  resolveActiveLocalPlace,
+  validateLocalPlaceAccess,
+} from "@/game/domain/local-places";
+import { deriveCompletedMissionIds } from "@/game/domain/missions";
 
 /**
  * The world-map geometry rule the authored adjacency is expected to agree with.
@@ -217,12 +229,97 @@ describe("issue #159 Local-Place-scoped residents", () => {
     ).toBeUndefined();
   });
 
-  it("keeps Mara with the locked B&B without an authored conversation yet", () => {
+  it("keeps Mara as the B&B's resident, now with her authored conversation art", () => {
     const mara = getResidentNpc({
       locationId: LOCATION_IDS.holoHollow,
       localPlaceId: LOCAL_PLACE_IDS.hhBnb,
     });
     expect(mara?.id).toBe(NPC_IDS.maraKells);
-    expect(mara?.expressionAssets).toBeUndefined();
+    // Issue #170 supplies her approved set. The shared expression vocabulary is
+    // mapped to her own art; `firm` is composed and matter-of-fact rather than
+    // reusing `guarded`, which means wary.
+    expect(mara?.conversationBackgroundId).toBe(CONVERSATION_BACKGROUND_IDS.hhBnbInterior);
+    expect(mara?.expressionAssets).toEqual({
+      [EXPRESSION_IDS.neutral]: "/npc-art/mara-neutral-pragmatic.png",
+      [EXPRESSION_IDS.amused]: "/npc-art/mara-warm-wry.png",
+      [EXPRESSION_IDS.firm]: "/npc-art/mara-firm-no-nonsense.png",
+    });
+  });
+});
+
+/**
+ * Issue #170: HH B&B opens because the player finished Keep the Change, and for
+ * no other reason. Access is derived from that completion — there is no second
+ * persisted unlock flag that could disagree with the Mission record.
+ */
+describe("issue #170 mission-derived Local Place access", () => {
+  const bnb = () => getLocalPlace(LOCAL_PLACE_IDS.hhBnb)!;
+  const completed = new Set<string>([MISSION_IDS.keepTheChange]);
+
+  it("gates the B&B on Keep the Change rather than on a stored flag", () => {
+    expect(bnb().access).toEqual({
+      kind: "locked_until_mission_completed",
+      missionId: MISSION_IDS.keepTheChange,
+      reason: expect.any(String),
+    });
+  });
+
+  it("stays locked with an in-world reason until that Mission is completed", () => {
+    const locked = deriveLocalPlaceAccess(bnb(), new Set());
+    expect(locked.available).toBe(false);
+    expect(locked.available === false && locked.reason).toContain("locals");
+    // Completing a different Mission changes nothing.
+    expect(deriveLocalPlaceAccess(bnb(), new Set([MISSION_IDS.holdItTogether])).available).toBe(
+      false,
+    );
+  });
+
+  it("opens once that Mission is completed", () => {
+    expect(deriveLocalPlaceAccess(bnb(), completed)).toEqual({ available: true });
+    expect(
+      resolveActiveLocalPlace({
+        locationId: LOCATION_IDS.holoHollow,
+        requestedLocalPlaceId: LOCAL_PLACE_IDS.hhBnb,
+        completedMissionIds: completed,
+      })?.id,
+    ).toBe(LOCAL_PLACE_IDS.hhBnb);
+  });
+
+  it("makes Mara reachable only through that opened place", () => {
+    const active = resolveActiveLocalPlace({
+      locationId: LOCATION_IDS.holoHollow,
+      requestedLocalPlaceId: LOCAL_PLACE_IDS.hhBnb,
+      completedMissionIds: completed,
+    });
+    expect(
+      getResidentNpc({ locationId: LOCATION_IDS.holoHollow, localPlaceId: active?.id })?.id,
+    ).toBe(NPC_IDS.maraKells);
+    // Still nobody merely for standing in town, and still nobody while locked.
+    expect(getResidentNpc({ locationId: LOCATION_IDS.holoHollow })).toBeUndefined();
+    expect(
+      resolveActiveLocalPlace({
+        locationId: LOCATION_IDS.holoHollow,
+        requestedLocalPlaceId: LOCAL_PLACE_IDS.hhBnb,
+      }),
+    ).toBeUndefined();
+  });
+
+  it("derives completed Mission ids from authoritative projections only", () => {
+    expect(
+      deriveCompletedMissionIds([
+        { missionId: MISSION_IDS.holdItTogether, state: "completed" },
+        { missionId: MISSION_IDS.keepTheChange, state: "ready_for_completion" },
+      ]),
+    ).toEqual(new Set([MISSION_IDS.holdItTogether]));
+    expect(
+      deriveCompletedMissionIds([{ missionId: MISSION_IDS.keepTheChange, state: "completed" }]),
+    ).toEqual(completed);
+  });
+
+  it("fails fast when an authored place gates on a Mission that does not exist", () => {
+    expect(() =>
+      validateLocalPlaceAccess(LOCAL_PLACES, new Set([MISSION_IDS.keepTheChange])),
+    ).not.toThrow();
+    expect(() => validateLocalPlaceAccess(LOCAL_PLACES, new Set())).toThrow(/unknown mission/i);
   });
 });

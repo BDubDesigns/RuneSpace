@@ -10,7 +10,7 @@ import { getMerchant } from "@/game/content/merchants";
 import { getResidentNpc } from "@/game/content/npcs";
 import { resolveNpcConversation } from "@/game/domain/conversation";
 import { resolveActiveLocalPlace } from "@/game/domain/local-places";
-import { deriveMissionGuidanceTargets } from "@/game/domain/missions";
+import { deriveCompletedMissionIds, deriveMissionGuidanceTargets } from "@/game/domain/missions";
 import { usePlay } from "@/features/play/PlayContext";
 
 /**
@@ -60,6 +60,7 @@ export function NpcInteractionPanel({ localPlaceId }: { localPlaceId?: string })
   const activePlace = resolveActiveLocalPlace({
     locationId,
     requestedLocalPlaceId: localPlaceId,
+    completedMissionIds: deriveCompletedMissionIds(state.missions),
   });
   const npc = getResidentNpc({ locationId, localPlaceId: activePlace?.id });
   const placeMerchant = activePlace?.merchantId ? getMerchant(activePlace.merchantId) : undefined;

@@ -13,16 +13,45 @@ export type LocalPlaceAccess = { available: true } | { available: false; reason:
 /**
  * The single semantic Local Place access predicate.
  *
- * It currently depends only on authored content, because the approved
- * foundation needs exactly two outcomes: open places, and HH B&B locked with an
- * in-world reason. Keeping the derivation behind this function is what lets a
- * later Mission/world-state unlock change the inputs without rewriting the
- * Local Place system or scattering building-specific checks through React.
+ * Access is derived, never persisted: an authored place is open, permanently
+ * locked with an in-world reason, or locked until one authored Mission is
+ * completed. The mission-gated rule reads the character's completed Missions —
+ * already authoritative state — so a world-state unlock like HH B&B's needs no
+ * second `unlocked` flag to keep in sync.
+ *
+ * `completedMissionIds` is the set of Missions the character has completed.
+ * Callers with no mission context supply nothing and mission-gated places stay
+ * locked, which is the safe direction: presentation and commands both derive
+ * this from the same authoritative state.
  */
-export function deriveLocalPlaceAccess(place: LocalPlaceDefinition): LocalPlaceAccess {
-  return place.access.kind === "open"
+export function deriveLocalPlaceAccess(
+  place: LocalPlaceDefinition,
+  completedMissionIds: ReadonlySet<string> = new Set(),
+): LocalPlaceAccess {
+  if (place.access.kind === "open") return { available: true };
+  if (place.access.kind === "locked") return { available: false, reason: place.access.reason };
+  return completedMissionIds.has(place.access.missionId)
     ? { available: true }
     : { available: false, reason: place.access.reason };
+}
+
+/**
+ * Startup validation for authored Local Place access. A mission-gated place
+ * whose Mission does not exist would silently stay locked forever, so it fails
+ * fast at module load instead of reaching a player as an unopenable door.
+ */
+export function validateLocalPlaceAccess(
+  places: readonly LocalPlaceDefinition[],
+  knownMissionIds: ReadonlySet<string>,
+): void {
+  for (const place of places) {
+    if (place.access.kind !== "locked_until_mission_completed") continue;
+    if (!knownMissionIds.has(place.access.missionId)) {
+      throw new Error(
+        `Local Place "${place.id}" gates access on unknown mission "${place.access.missionId}".`,
+      );
+    }
+  }
 }
 
 /**
@@ -40,9 +69,10 @@ export function deriveLocalPlaceAccess(place: LocalPlaceDefinition): LocalPlaceA
 export function resolveActiveLocalPlace(input: {
   locationId: string;
   requestedLocalPlaceId?: string;
+  completedMissionIds?: ReadonlySet<string>;
 }): LocalPlaceDefinition | undefined {
   if (!input.requestedLocalPlaceId) return undefined;
   const place = getLocalPlaceInLocation(input.locationId, input.requestedLocalPlaceId);
   if (!place) return undefined;
-  return deriveLocalPlaceAccess(place).available ? place : undefined;
+  return deriveLocalPlaceAccess(place, input.completedMissionIds).available ? place : undefined;
 }

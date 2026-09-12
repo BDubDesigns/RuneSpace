@@ -9,15 +9,26 @@ export const LocalPlaceIdSchema = ContentId;
 /**
  * The authored access rule for one Local Place.
  *
- * Deliberately a closed two-kind union: a place is open, or it is visible but
- * locked with a player-facing in-world reason. There is no requirement
- * expression language, no condition vocabulary, and no world-state scripting
- * here. When a real Mission/world-state unlock is implemented it earns the
- * smallest additional explicit kind its unlock actually proves necessary.
+ * Deliberately a closed union of the three rules real content has proven: a
+ * place is open, permanently locked with a player-facing in-world reason, or
+ * locked until one authored Mission is completed (#170 unlocks HH B&B when
+ * Keep the Change completes). There is still no requirement expression
+ * language, no condition vocabulary, and no world-state scripting here.
+ *
+ * The mission-gated kind stores no unlock flag of its own: completion of the
+ * named Mission is already authoritative character state, so access is derived
+ * from it rather than persisted a second time.
  */
 export const LocalPlaceAccessRuleSchema = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("open") }).strict(),
   z.object({ kind: z.literal("locked"), reason: z.string().min(1) }).strict(),
+  z
+    .object({
+      kind: z.literal("locked_until_mission_completed"),
+      missionId: ContentId,
+      reason: z.string().min(1),
+    })
+    .strict(),
 ]);
 
 /**

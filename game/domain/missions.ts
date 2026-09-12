@@ -93,6 +93,12 @@ export type MissionRequirementStatus = {
   itemId?: string;
   /** The location this requirement observes, when it observes one. */
   locationId?: string;
+  /**
+   * The NPC this requirement observes, when it observes one. Conversation
+   * routing reads this so a satisfied mandatory conversation can stop being
+   * offered without inspecting mission IDs.
+   */
+  npcId?: string;
 };
 
 /**
@@ -169,6 +175,7 @@ function renderRequirementObjective(
       .replace("{target}", String(requirement.target));
   }
   if (requirement.kind === "cargo_hold_repaired") return requirement.objective;
+  if (requirement.kind === "npc_conversation") return requirement.objective;
   const itemName = observation?.itemNames.get(requirement.itemId) ?? requirement.itemId;
   if (requirement.kind === "equipped_item") {
     return requirement.objective.replace("{item}", itemName);
@@ -210,6 +217,10 @@ function requirementSatisfied(
       );
     case "cargo_hold_repaired":
       return observation?.cargoHoldRepairComplete === true;
+    case "npc_conversation":
+      // The durable mission-progress row for this authored key is the only
+      // evidence; the conversation itself is never replayed as proof.
+      return (observation?.trackedProgress?.get(requirement.progressKey) ?? 0) >= 1;
   }
 }
 
@@ -320,6 +331,11 @@ function deriveGuidance(
   if (firstUnsatisfied.kind === "cargo_hold_repaired") {
     return { cargoRepair: true as const };
   }
+  if (firstUnsatisfied.kind === "npc_conversation") {
+    // The person to go and meet is the interaction target, exactly as the
+    // turn-in NPC is once every requirement holds.
+    return { npcId: firstUnsatisfied.npcId };
+  }
   return undefined;
 }
 
@@ -410,6 +426,14 @@ function projectRequirement(
       satisfied,
     };
   }
+  if (requirement.kind === "npc_conversation") {
+    return {
+      kind: requirement.kind,
+      objective: requirement.objective,
+      satisfied,
+      npcId: requirement.npcId,
+    };
+  }
   const required = requiredCarriedQuantity(requirement, observation);
   const rawCarried = observation?.carriedQuantities.get(requirement.itemId) ?? 0;
   return {
@@ -421,8 +445,12 @@ function projectRequirement(
   };
 }
 
-/** Projects the actually-earned reward for a completed mission. */
-function projectEarnedReward(definition: MissionDefinition): MissionEarnedReward {
+/**
+ * Projects the actually-earned reward for a completed mission, or nothing when
+ * the mission authored no completion reward.
+ */
+function projectEarnedReward(definition: MissionDefinition): MissionEarnedReward | undefined {
+  if (!definition.reward) return undefined;
   if (definition.reward.kind === "item") {
     return {
       kind: "item",
@@ -458,6 +486,23 @@ export type MissionGuidanceTargets = {
   /** True while an accepted mission's current target is the Cargo Hold repair surface. */
   cargoRepair: boolean;
 };
+
+/**
+ * The Missions the character has completed.
+ *
+ * Derived world state (such as a Local Place that opens once a Mission is done)
+ * reads this instead of persisting a second unlock flag that could drift from
+ * the authoritative completion record.
+ */
+export function deriveCompletedMissionIds(
+  projections: readonly { missionId: string; state: MissionState }[],
+): ReadonlySet<string> {
+  return new Set(
+    projections
+      .filter((projection) => projection.state === "completed")
+      .map((projection) => projection.missionId),
+  );
+}
 
 export function deriveMissionGuidanceTargets(
   projections: readonly MissionProjection[],
@@ -543,6 +588,14 @@ export function validateMissionDefinitions(definitions: readonly MissionDefiniti
         assertDialogue(definition.id, offer.activeDialogueId, "active");
         assertDialogueNpc(definition.id, offer.activeDialogueId, offer.npcId, "active");
       }
+      if (offer.acceptEffect) {
+        if (offer.acceptEffect.kind !== "credits") {
+          throw new Error(`${where} offer references an unsupported acceptance effect.`);
+        }
+        if (!Number.isInteger(offer.acceptEffect.amount) || offer.acceptEffect.amount <= 0) {
+          throw new Error(`${where} offer Credit grant must be a positive integer.`);
+        }
+      }
     }
     if (definition.completedNpcDialogue) {
       const seen = new Set<string>();
@@ -622,6 +675,58 @@ export function validateMissionDefinitions(definitions: readonly MissionDefiniti
         continue;
       }
       if (requirement.kind === "cargo_hold_repaired") continue;
+      if (requirement.kind === "npc_conversation") {
+        if (!getNpc(requirement.npcId)) {
+          throw new Error(
+            `${where} conversation requirement references unknown NPC "${requirement.npcId}".`,
+          );
+        }
+        if (!getLocation(requirement.locationId)) {
+          throw new Error(
+            `${where} conversation requirement references unknown location "${requirement.locationId}".`,
+          );
+        }
+        assertDialogue(definition.id, requirement.dialogueId, "conversation requirement");
+        assertDialogueNpc(
+          definition.id,
+          requirement.dialogueId,
+          requirement.npcId,
+          "conversation requirement",
+        );
+        if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(requirement.progressKey)) {
+          throw new Error(
+            `${where} conversation requirement progress key must be lowercase hyphenated text.`,
+          );
+        }
+        if (progressKeys.has(requirement.progressKey)) {
+          throw new Error(`${where} duplicates progress key "${requirement.progressKey}".`);
+        }
+        progressKeys.add(requirement.progressKey);
+        // Routing at the turn-in NPC is stage-owned and an offer NPC owns its
+        // own active follow-up, so a mandatory conversation at either would
+        // fight an existing owner for the same hub entry.
+        if (requirement.npcId === definition.turnIn.npcId) {
+          throw new Error(
+            `${where} conversation requirement cannot target its own turn-in NPC "${requirement.npcId}".`,
+          );
+        }
+        if (definition.offers.some((offer) => offer.npcId === requirement.npcId)) {
+          throw new Error(
+            `${where} conversation requirement cannot target offer NPC "${requirement.npcId}".`,
+          );
+        }
+        if (
+          definition.requirements.filter(
+            (candidate) =>
+              candidate.kind === "npc_conversation" && candidate.npcId === requirement.npcId,
+          ).length > 1
+        ) {
+          throw new Error(
+            `${where} duplicates a conversation requirement for NPC "${requirement.npcId}".`,
+          );
+        }
+        continue;
+      }
       const itemDefinition = getItemDefinition(requirement.itemId);
       if (!itemDefinition) {
         throw new Error(`${where} requirement references unknown item "${requirement.itemId}".`);
@@ -676,6 +781,13 @@ export function validateMissionDefinitions(definitions: readonly MissionDefiniti
         dialogue.cargoRepairReminderDialogueId,
         "cargo repair reminder",
       );
+    if (dialogue.conversationReminderDialogueId) {
+      assertDialogue(
+        definition.id,
+        dialogue.conversationReminderDialogueId,
+        "conversation reminder",
+      );
+    }
     if (dialogue.busyDialogueId) assertDialogue(definition.id, dialogue.busyDialogueId, "busy");
     if (dialogue.completionPresentationDialogueId) {
       assertDialogue(
@@ -688,7 +800,10 @@ export function validateMissionDefinitions(definitions: readonly MissionDefiniti
       assertDialogue(definition.id, dialogue.capacitySlotsDialogueId, "capacity slots");
     if (dialogue.capacityMassDialogueId)
       assertDialogue(definition.id, dialogue.capacityMassDialogueId, "capacity mass");
-    if (definition.reward.kind === "item") {
+    if (!definition.reward) {
+      // A mission may deliberately author no completion reward when its real
+      // outcome is world/social state (Keep the Change pays up front instead).
+    } else if (definition.reward.kind === "item") {
       const rewardDefinition = getItemDefinition(definition.reward.itemId);
       if (!rewardDefinition) {
         throw new Error(`${where} reward references unknown item "${definition.reward.itemId}".`);

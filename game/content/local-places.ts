@@ -1,4 +1,9 @@
-import { LOCAL_PLACE_IDS, LOCATION_IDS, MERCHANT_IDS } from "@/game/config/foundations";
+import {
+  LOCAL_PLACE_IDS,
+  LOCATION_IDS,
+  MERCHANT_IDS,
+  MISSION_IDS,
+} from "@/game/config/foundations";
 import { LocalPlaceDefinitionSchema, type LocalPlaceDefinition } from "@/game/schemas/local-places";
 
 /**
@@ -57,10 +62,14 @@ const localPlaceDefinitions = [
     displayName: "HH B&B",
     description:
       "A family bed-and-breakfast from the tourism years, now the town's working inn for miners, haulers, and contractors.",
-    // Visible but not enterable in this slice. The building plainly exists; the
-    // player is simply refused entry for an in-world reason.
+    // Visible from the start, enterable once the player is somebody Mara knows:
+    // Keep the Change (#170) puts them to work for Wade, introduces them to Bix
+    // and Mara, and has them follow through on a job that mattered to Tansy.
+    // Access derives from that Mission's completion — the authoritative state —
+    // rather than a second persisted unlock flag.
     access: {
-      kind: "locked" as const,
+      kind: "locked_until_mission_completed" as const,
+      missionId: MISSION_IDS.keepTheChange,
       reason: "Rooms here are held for locals and regular working crews, not outside guests.",
     },
     presentation: {

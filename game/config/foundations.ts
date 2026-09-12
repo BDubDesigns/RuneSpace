@@ -39,6 +39,7 @@ const missionIds = {
   cutYourTeeth: asContentId("cut_your_teeth"),
   wasteNot: asContentId("waste_not"),
   holdItTogether: asContentId("hold_it_together"),
+  keepTheChange: asContentId("keep_the_change"),
 } as const satisfies Record<string, ContentId>;
 
 const dialogueIds = {
@@ -80,6 +81,20 @@ const dialogueIds = {
   wadeHoldItTogetherTurnIn: asContentId("wade_rusk_hold_it_together_turn_in"),
   wadeHoldItTogetherCompletion: asContentId("wade_rusk_hold_it_together_completion"),
   wadePostHoldItTogether: asContentId("wade_rusk_post_hold_it_together"),
+  // Keep the Change (#170): Wade's apprenticeship job, the required Bix
+  // introduction where Mara meets the player, and Tansy's Power Cell delivery.
+  wadeKeepTheChangeOffer: asContentId("wade_rusk_keep_the_change_offer"),
+  wadeKeepTheChangeActive: asContentId("wade_rusk_keep_the_change_active"),
+  bixKeepTheChangeIntroduction: asContentId("bix_weller_keep_the_change_introduction"),
+  tansyKeepTheChangeConversationReminder: asContentId(
+    "tansy_rusk_keep_the_change_conversation_reminder",
+  ),
+  tansyKeepTheChangeCarriedReminder: asContentId("tansy_rusk_keep_the_change_carried_reminder"),
+  tansyKeepTheChangeBusy: asContentId("tansy_rusk_keep_the_change_busy"),
+  tansyKeepTheChangeTurnIn: asContentId("tansy_rusk_keep_the_change_turn_in"),
+  tansyKeepTheChangeCompletion: asContentId("tansy_rusk_keep_the_change_completion"),
+  wadePostKeepTheChange: asContentId("wade_rusk_post_keep_the_change"),
+  tansyPostKeepTheChange: asContentId("tansy_rusk_post_keep_the_change"),
   // Replayable social/worldbuilding topics (#164). These are ordinary NPC
   // conversations: they never carry a Mission action and never gate progression.
   wadeRecoveryWorkTopic: asContentId("wade_rusk_topic_recovery_work"),
@@ -92,6 +107,10 @@ const dialogueIds = {
   rennAssistanceCenterTopic: asContentId("renn_calder_topic_assistance_center"),
   rennFerriteTopic: asContentId("renn_calder_topic_ferrite"),
   rennLifeHereTopic: asContentId("renn_calder_topic_life_here"),
+  // Mara's own replayable topics, reachable once Keep the Change unlocks HH B&B
+  // (#170). Her Bix-shop appearance is authored Mission dialogue, not a topic.
+  maraTheBnbTopic: asContentId("mara_kells_topic_the_bnb"),
+  maraBixTopic: asContentId("mara_kells_topic_bix"),
 } as const satisfies Record<string, ContentId>;
 
 /**
@@ -109,6 +128,8 @@ const conversationTopicIds = {
   rennAssistanceCenter: asContentId("renn_calder_assistance_center"),
   rennFerrite: asContentId("renn_calder_ferrite"),
   rennLifeHere: asContentId("renn_calder_life_here"),
+  maraTheBnb: asContentId("mara_kells_the_bnb"),
+  maraBix: asContentId("mara_kells_bix"),
 } as const satisfies Record<string, ContentId>;
 
 const expressionIds = {
@@ -121,6 +142,9 @@ const expressionIds = {
   amused: asContentId("amused"),
   sardonic: asContentId("sardonic"),
   guarded: asContentId("guarded"),
+  // Added for Mara's approved expression set (#170): composed and matter-of-fact
+  // rather than wary (guarded) or displeased (scowl).
+  firm: asContentId("firm"),
 } as const satisfies Record<string, ContentId>;
 
 const conversationBackgroundIds = {
@@ -130,6 +154,7 @@ const conversationBackgroundIds = {
   // an exterior location scene (#159).
   holoHollowSouvenirsInterior: asContentId("holo_hollow_souvenirs_interior"),
   holoHollowAssistanceCenterInterior: asContentId("holo_hollow_assistance_center_interior"),
+  hhBnbInterior: asContentId("hh_bnb_interior"),
 } as const satisfies Record<string, ContentId>;
 
 export const ACTION_IDS = {

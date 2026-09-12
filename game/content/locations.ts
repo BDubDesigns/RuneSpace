@@ -75,7 +75,7 @@ const locationDefinitions = [
     id: LOCATION_IDS.emergencyPowerAnnex,
     displayName: "DeWhat? Emergency Power Annex",
     description:
-      "A mostly intact DeWhat? emergency-supply depot can dispense one registered worker allotment per Pacific reset day.",
+      "An automated DeWhat? depot, installed back when Settled Systems still required a public emergency power supply for Holo Hollow's visitors. The tourists left; the contract did not. It still issues its daily allotment of Power Cells to anyone who walks up.",
     region: "holo_hollow" as const,
     adjacentLocationIds: [
       LOCATION_IDS.crashSite,

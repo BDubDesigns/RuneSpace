@@ -14,7 +14,11 @@ import {
   type MissionConversationAction,
   type NpcConversationEntry,
 } from "@/game/domain/conversation";
-import { acceptMissionAction, completeMissionAction } from "@/server/actions";
+import {
+  acceptMissionAction,
+  acknowledgeMissionConversationAction,
+  completeMissionAction,
+} from "@/server/actions";
 
 /**
  * One open conversation: the authored sequence currently being played plus the
@@ -125,7 +129,15 @@ export function NpcConversation({
         const result =
           action.kind === "accept_mission"
             ? await acceptMissionAction(command)
-            : await completeMissionAction(command);
+            : action.kind === "complete_mission"
+              ? await completeMissionAction(command)
+              : // A mandatory conversation reports the sequence it played so the
+                // server can confirm it is the authored one before satisfying
+                // the requirement.
+                await acknowledgeMissionConversationAction({
+                  ...command,
+                  dialogueId: action.dialogueId,
+                });
         if ("error" in result) {
           setMessage(result.error);
           return;

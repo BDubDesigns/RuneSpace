@@ -258,9 +258,20 @@ a second geography.
   in-world reason) consumed by both presentation and commands. A locked place
   stays visible and says why. Presentation never tests for a particular
   building.
+- The authored access rules are a closed three-kind union: `open`, `locked` with
+  a reason, and (issue #170) `locked_until_mission_completed` naming one
+  Mission. The derivation takes the character's completed Missions and answers
+  the same single question, so a world-state unlock **stores nothing of its
+  own**: HH B&B opens because `character_missions` says Keep the Change is
+  completed, and there is no `bnb_unlocked` flag that could disagree with it.
+  Presentation reads those completed ids from the projected Mission state
+  (`deriveCompletedMissionIds`); commands re-read them from the database inside
+  their own transaction (`loadCompletedMissionIds`), so client navigation still
+  proves nothing. Module-load validation rejects a place gating on a Mission
+  that does not exist.
 - Nesting is one level only. There is no recursive place-within-place engine and
-  no generic requirement-expression language; a later Mission-driven unlock earns
-  the smallest additional condition its real unlock proves necessary.
+  no generic requirement-expression language; the mission-gated kind above is
+  the smallest additional condition #170's real unlock proved necessary.
 - Ordinary World Locations are unaffected: a location with no authored Local
   Places renders and behaves exactly as before.
 
@@ -580,6 +591,12 @@ server-side even against a stale or manipulated client.
   boundary; no mutable claimed flag or midnight background job clears state.
   The inventory award and claim record commit atomically. The Annex is the only
   approved source in this slice; there are no starter or backfilled Power Cells.
+- The mechanic above is unchanged by issue #170, which only added the
+  worldbuilding around it: the depot is surviving S.S.A.-required
+  emergency-continuity infrastructure from Holo Hollow's tourism era, and the
+  per-person daily limit exists for fair emergency access. That canon lives in
+  `docs/holo-hollow.md`; no ration system, quota model, or new daily
+  persistence was introduced.
 - Power Cell boosting is defined in the Issue #24 section below.
 
 ### Salvage Cutter Power Cell boost (issue #24)

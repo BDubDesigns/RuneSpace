@@ -19,6 +19,23 @@ export function trackedActivityRequirements(
   );
 }
 
+/** Return the authored conversation requirements owned by one mission. */
+export function conversationRequirements(
+  definition: MissionDefinition,
+): readonly Extract<MissionRequirement, { kind: "npc_conversation" }>[] {
+  return definition.requirements.filter(
+    (requirement): requirement is Extract<MissionRequirement, { kind: "npc_conversation" }> =>
+      requirement.kind === "npc_conversation",
+  );
+}
+
+/** Every authored requirement that owns a durable progress row, by stable key. */
+function progressKeyedRequirements(
+  definition: MissionDefinition,
+): readonly { progressKey: string }[] {
+  return [...trackedActivityRequirements(definition), ...conversationRequirements(definition)];
+}
+
 /**
  * Initialize the durable rows owned by an accepted mission. The authored
  * definition remains the source of target/activity semantics; persistence
@@ -30,7 +47,7 @@ export async function ensureMissionProgressRows(
   definition: MissionDefinition,
   now = new Date(),
 ): Promise<void> {
-  const requirements = trackedActivityRequirements(definition);
+  const requirements = progressKeyedRequirements(definition);
   if (requirements.length === 0) return;
   await transaction
     .insert(characterMissionProgress)
@@ -44,6 +61,43 @@ export async function ensureMissionProgressRows(
       })),
     )
     .onConflictDoNothing();
+}
+
+/**
+ * Record that one authored mandatory conversation genuinely happened.
+ *
+ * The row is a satisfied/unsatisfied marker for the authored key, so writing it
+ * twice is a no-op: replaying the scene, retrying the command, or racing two
+ * requests all converge on the same single satisfied row. The caller owns
+ * validating the mission, NPC, dialogue, and position inside its transaction.
+ */
+export async function recordMissionConversation(
+  transaction: DatabaseTransaction,
+  input: {
+    characterId: string;
+    missionId: string;
+    progressKey: string;
+    now?: Date;
+  },
+): Promise<void> {
+  const now = input.now ?? new Date();
+  await transaction
+    .insert(characterMissionProgress)
+    .values({
+      characterId: input.characterId,
+      missionId: input.missionId,
+      progressKey: input.progressKey,
+      progress: 1,
+      updatedAt: now,
+    })
+    .onConflictDoUpdate({
+      target: [
+        characterMissionProgress.characterId,
+        characterMissionProgress.missionId,
+        characterMissionProgress.progressKey,
+      ],
+      set: { progress: 1, updatedAt: now },
+    });
 }
 
 /**

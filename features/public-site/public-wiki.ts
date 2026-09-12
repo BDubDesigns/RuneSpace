@@ -193,6 +193,28 @@ const authoredWikiArticles = [
         ],
       },
       {
+        heading: "Why the Annex gives them away",
+        paragraphs: [
+          [
+            "The Annex is left over from the years when ",
+            { text: "Holo Hollow", articleSlug: "holo-hollow" },
+            " was a tourist town. With families and travellers coming out to the projector shows, the Settled Systems Authority required the settlement to keep a public emergency power depot, so anyone stranded out here could keep the essentials running until help arrived.",
+          ],
+          "DeWhat? won that contract and installed the automated Annex. Then the tourism dried up — and the contract didn't. The depot is still public infrastructure, and it still hands out its daily allotment.",
+          "Five per person, per day, is about fair access rather than generosity: enough portable power to keep heat, comms or a tool alive in an emergency, and not enough for one person to empty the rack for everybody else.",
+        ],
+      },
+      {
+        heading: "Why Bix still sells them",
+        paragraphs: [
+          [
+            "The free allotment is personal and capped, so it doesn't stock a shop for a whole town. People who have already used today's five, or who need more than five, or who would simply rather not wait for the reset, can buy a cell from ",
+            { text: "Bix Weller", articleSlug: "credits-and-trading" },
+            " instead. He also buys spare cells from anyone who would rather have the Credits.",
+          ],
+        ],
+      },
+      {
         heading: "Charging the Salvage Cutter",
         paragraphs: [
           "Load one carried Power Cell into an equipped, empty Salvage Cutter from Inventory or Equipment. This sets the Cutter's charge to ten uses and consumes the cell completely — a Cutter that already has charge can't be topped up early.",
@@ -331,12 +353,29 @@ const authoredWikiArticles = [
             { text: "repair the Cargo Hold", articleSlug: "cargo-hold-and-welding" },
             ", then report the finished repair to Wade.",
           ],
+          [
+            "Keep the Change — Wade makes you his apprentice and hands you 24 Credits to get Tansy three ",
+            { text: "Power Cells", articleSlug: "power-cells" },
+            ". Meet Bix Weller in town, then take the cells to Tansy at The Jag.",
+          ],
         ],
       },
       {
         heading: "How missions work in practice",
         paragraphs: [
-          "Objectives update live as you meet them, and the current one is always clear in the Mission Log. Finishing Walk It Off, Cut Your Teeth, or Waste Not hands you the next job in the chain automatically — there's nothing extra to accept. Hold It Together is currently the last job in the chain. When every objective on a job is met, talk to the NPC named in it to turn it in.",
+          "Objectives update live as you meet them, and the current one is always clear in the Mission Log. Finishing Walk It Off, Cut Your Teeth, or Waste Not hands you the next job in the chain automatically — there's nothing extra to accept. Keep the Change works differently: after Hold It Together, go back and talk to Wade to take it on. It's currently the last job in the chain. When every objective on a job is met, talk to the NPC named in it to turn it in.",
+        ],
+      },
+      {
+        heading: "Keep the Change in detail",
+        paragraphs: [
+          "Wade's 24 Credits are a job budget, handed over when you accept. They're yours: three cells cost 24 Credits at Bix's price, but if you already have cells, or claim them free at the Annex, you keep whatever you don't spend. There's no second payout when you finish, and nothing is reimbursed.",
+          [
+            "Meeting Bix is part of the job even if you already have three cells — Wade wants his apprentice to know who keeps useful things on a shelf. Talking to him is all that's required; you never have to buy or sell anything. The three cells themselves can come from anywhere: your ",
+            { text: "Inventory", articleSlug: "inventory-and-equipment" },
+            ", the Annex, or Bix's shelf.",
+          ],
+          "Handing them over takes exactly three cells. Any extras you're carrying stay with you.",
         ],
       },
       {
@@ -384,9 +423,9 @@ const authoredWikiArticles = [
             ".",
           ],
           [
-            "DeWhat? Emergency Power Annex — a mostly intact emergency-supply depot that dispenses ",
+            "DeWhat? Emergency Power Annex — an automated public depot, left over from the tourism years, that still hands out ",
             { text: "Power Cells", articleSlug: "power-cells" },
-            ".",
+            " every day.",
           ],
           "The Long Scramble — a steep, barren stretch of fractured stone with nothing to stop for. It's just the way through to The Jag.",
           [
@@ -413,14 +452,22 @@ const authoredWikiArticles = [
             ".",
           ],
           "Holo Hollow Community Assistance Center — the old Visitor Center, now handling local assistance and rations. Renn Calder is usually here.",
-          "HH B&B — visible from the street, but its rooms are held for locals and regular working crews rather than outside guests, so you can't go in yet.",
+          [
+            "HH B&B — a family bed-and-breakfast from the tourism years, now the town's working inn. Its rooms are held for locals and regular working crews, so the door stays shut to you until you've finished ",
+            { text: "Keep the Change", articleSlug: "missions" },
+            " and the town knows who you are.",
+          ],
         ],
       },
       {
         heading: "Who's here",
         paragraphs: [
           "Wade Rusk, a Holo Hollow recovery and salvage operator, is based at the Crash Site. Tansy Rusk, a field mechanic and miner, is based at The Jag.",
-          "In town, Bix Weller runs the souvenir and mining-supply shop, and Renn Calder, a Ferrite miner, is found at the Community Assistance Center. Each of them is only there when you're actually inside their building — you won't find them standing in the street. Other player characters can also be around.",
+          [
+            "In town, Bix Weller runs the souvenir and mining-supply shop, and Renn Calder, a Ferrite miner, is found at the Community Assistance Center. Mara Kells owns the HH B&B — you'll meet her in Bix's shop during ",
+            { text: "Keep the Change", articleSlug: "missions" },
+            ", and you can find her at the B&B once it's open to you. Each of them is only there when you're actually inside their building — you won't find them standing in the street. Other player characters can also be around.",
+          ],
           "This is an early, playable build — check the Updates page for what's new in Holo Hollow.",
         ],
       },
