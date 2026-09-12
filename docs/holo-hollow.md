@@ -4,13 +4,23 @@
 
 This document is the canonical approved product/design direction for Holo Hollow.
 It records settled worldbuilding, first-town structure, NPC roles, Credits, the
-initial merchant economy, and the first-slice player-facing UX. It does **not**
-mean every described system is implemented yet.
+initial merchant economy, and the first-slice player-facing UX.
+
+The Holo Hollow foundation shipped in PR #167 (issue #159). The **Holo Hollow
+foundation (shipped in #167)** section below records what is live and what
+remains deferred. Everything else here is approved direction, not a claim that
+the described system exists yet.
 
 Existing authoritative gameplay mechanics remain owned by their current docs:
 
 - Mining, Refining, Power Cells, Cargo Hold repair, and Travel timing/rules:
   `docs/gameplay-foundations.md`
+- Local Place and Credits/merchant-transaction mechanical contracts:
+  `docs/gameplay-foundations.md`
+- NPC conversation model and Local-Place resident resolution:
+  `docs/npc-conversations.md`
+- Art direction, generation workflow, asset preparation, and visual QA:
+  `docs/art-cookbook.md`
 - Mission framework and shipped Mission progression: `docs/missions.md`
 - Location/Map/Journey surface ownership: `docs/location-scenes.md` and
   `docs/travel-map-design.md`
@@ -130,11 +140,11 @@ feel like entering a real place, not opening a generic modal and not pretending
 the building is another World Location.
 
 Which Local Place the player is viewing is presentation/navigation state, not a
-second persisted character coordinate. It should survive normal refresh/history
-behavior through the existing route-backed Play composition or the narrowest
-consistent equivalent chosen after implementation inspection. The exact query or
-route shape is an implementation decision; the invariant is that the database
-continues to say the character is at Holo Hollow.
+second persisted character coordinate. The shipped foundation keeps it in the
+route-backed Play composition's `place` query parameter so it survives normal
+refresh/history behavior (`docs/gameplay-foundations.md` owns that contract).
+The invariant is that the database continues to say the character is at Holo
+Hollow.
 
 Client navigation into a Local Place never grants gameplay permission by itself.
 Server-authoritative commands such as merchant trades must still validate the
@@ -158,10 +168,11 @@ Do not build a broad generic requirements DSL preemptively. Add only the smalles
 condition mechanism proven necessary when a real Mission/world-state unlock is
 implemented.
 
-**HH B&B** is the first planned example: early explorers may see it but are
-refused entry because it currently serves locals and regular workers only. A
-follow-up Wade Power Cell Mission introduces Mara Kells and, on completion,
-changes that Local Place to enterable.
+**HH B&B** is the first example and shipped visible but locked: early explorers
+may see it but are refused entry because it currently serves locals and regular
+workers only. A follow-up Wade Power Cell Mission introduces Mara Kells and, on
+completion, changes that Local Place to enterable. That Mission and unlock are
+not implemented yet.
 
 The locked place should remain visible so the player can notice that the world
 changed when access is later granted.
@@ -369,64 +380,84 @@ slice. Credits are not relevant enough during every Travel/Mining/etc. moment to
 justify permanent HUD space yet. A later economy expansion may revisit that
 choice if the balance becomes continuously relevant.
 
-## First Holo Hollow foundation slice
+## Holo Hollow foundation (shipped in #167)
 
-The first implementation slice should establish the town as a place and create
-one small economic loop without pulling future systems forward prematurely.
+The first slice established the town as a place and one small economic loop
+without pulling future systems forward prematurely. It shipped in PR #167
+(issue #159). Its mechanical contracts live in `docs/gameplay-foundations.md`
+(Local Places, Credits, and merchant transactions) and
+`docs/npc-conversations.md` (resident resolution and topics); this section
+records the product-level shipped state.
 
-### In scope
+### Shipped
 
-- Holo Hollow as a World Location at axial coordinate `(-1, 1)`, adjacent to
+- Holo Hollow as one World Location at axial coordinate `(-1, 1)`, adjacent to
   Crash Site, Emergency Power Annex, and The Long Scramble;
 - Holo Hollow town Location presentation and generic Local Place navigation;
-- one-level Local Places attached to exactly one parent World Location;
-- route-backed/presentation Local Place state that does not mutate persisted
+- one-level Local Places attached to exactly one parent World Location, with
+  the open place held in route/presentation state rather than persisted
   character world position;
 - generic derived visible-but-locked Local Place access presentation;
-- Local-Place-scoped resident NPC resolution without speculative simultaneous
-  multi-NPC interaction UI;
-- Bix Weller;
-- Holo Hollow Souvenirs + Mining Supplies;
-- Mara Kells;
-- HH B&B visible but locked before its later Mission unlock;
-- Renn Calder;
-- Holo Hollow Community Assistance Center and Renn interaction;
+- Local-Place-scoped resident NPC resolution without simultaneous multi-NPC
+  interaction UI;
+- Holo Hollow Souvenirs + Mining Supplies, with Bix Weller as its resident;
+- Holo Hollow Community Assistance Center, with Renn Calder as its resident
+  social NPC;
+- HH B&B visible but locked, with an in-world refusal reason;
+- Mara Kells registered as HH B&B's resident identity only, with no authored
+  conversation, portrait, or expression art yet;
 - character-scoped Credits with a 10-Credit starting balance;
-- Bix buying Ferrite Shale, Refined Ferrite, Slag, and Power Cells;
-- Bix selling Power Cells;
-- the approved initial playtest prices in this document;
+- Bix buying Ferrite Shale, Refined Ferrite, Slag, and Power Cells, and selling
+  Power Cells, at the approved initial playtest prices in this document;
 - separate Talk and Trade actions at Bix's shop;
 - reusable Buy/Sell trade UX with quantity controls, Max, live total, and one
   explicit commit action without a redundant confirmation modal;
-- Credit balance visible in trade and Inventory/character information, without a
-  permanent Credit HUD element in this slice;
-- visible environmental hooks toward the depot/hauler area, future contract
-  board, and nearby Drive-In where useful;
-- three new early Holo Hollow residents only: Bix, Mara, and Renn.
+- Credit balance visible in Trade and Inventory, without a permanent Credit HUD
+  element;
+- a public Update announcing the town and initial player Wiki coverage.
 
-Do not add a fourth NPC merely to hit a number. Add future residents when a
-distinct character need exists.
+Holo Hollow's early residents are Bix, Mara, and Renn. Do not add a fourth NPC
+merely to hit a number. Add future residents when a distinct character need
+exists.
 
-Final Holo Hollow asset generation/preparation is a separate dedicated asset
-step. For this foundation slice, that pass needs:
+### Shipped art
 
-- Holo Hollow exterior/town presentation;
-- Bix's shop;
-- Holo Hollow Community Assistance Center;
-- an appropriate visible-but-locked/exterior treatment for HH B&B;
-- Bix character art and dialogue needed by this slice;
-- Renn character art and dialogue needed by this slice.
+The foundation asset pass delivered:
 
-Mara's full portrait/expression set and the enterable HH B&B interior may wait
-for the follow-up Wade apprentice Mission asset pass, because that Mission is
-what actually introduces Mara to the player and unlocks the B&B.
+- the Holo Hollow town scene, its World Location map identifier, and a copy of
+  the town scene as the public Update hero;
+- exterior Local Place scenes for Bix's shop, the Community Assistance Center,
+  and HH B&B;
+- dedicated conversation interiors for Bix's shop and the Community Assistance
+  Center;
+- Bix and Renn neutral portraits with two further expressions each.
 
-### Out of scope
+Later Holo Hollow assets follow `docs/art-cookbook.md`; the runtime scene
+contract is in `docs/location-scenes.md`.
 
-- Wade's three-Power-Cell apprentice Mission;
+**Known non-blocking art debt.** The three Local Place exteriors reuse nearly
+identical surrounding/background composition, so the buildings read as if they
+occupy almost the same spot. A later dedicated art polish pass should replace
+them with more spatially distinct scenes while preserving the approved building
+identities. This is future visual polish, not a reason to reopen #167.
+
+Visible environmental hooks toward the depot/hauler area, future contract
+board, and nearby Drive-In remain approved direction for later Holo Hollow art
+and content; they are not recorded here as shipped.
+
+### Deferred
+
+Follow-up work, not part of the shipped foundation:
+
+- Wade's three-Power-Cell apprentice Mission (see below);
 - Mara's authored Bix-shop appearance during that Mission;
-- Mara's full portrait/expression set and the enterable HH B&B interior unless
-  separately approved for the foundation asset package;
+- Mara's full portrait/expression set and the enterable HH B&B interior, which
+  belong to that Mission's asset pass because it introduces Mara to the player;
+- the HH B&B unlock on that Mission's completion;
+- replacing the similar Local Place exteriors (art debt above).
+
+### Still out of scope
+
 - simultaneous multiple-NPC interaction UI or a generic multi-NPC scene system;
 - recursively nested Local Places;
 - a speculative generic Local Place requirements DSL;

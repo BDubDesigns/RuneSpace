@@ -1,6 +1,6 @@
 # RuneSpace
 
-> **Status: Playable pre-alpha — active development.** RuneSpace is a browser-first, low-fi sci-fi RPG with a real early-game vertical slice: server-authoritative Play orchestration, Travel/Scavenging, Ferrite Shale Mining, Refining, Welding/Cargo Hold repair, Inventory/Equipment, locations, Power Cell/Power Annex, NPC interactions, missions, and skill progression (Walk It Off / Cut Your Teeth). Still early and under active development.
+> **Status: Playable pre-alpha — active development.** RuneSpace is a browser-first, low-fi sci-fi RPG with a real early-game vertical slice: server-authoritative Play orchestration, Travel/Scavenging, Ferrite Shale Mining, Refining, Welding/Cargo Hold repair, Inventory/Equipment, locations, Power Cell/Power Annex, NPC interactions, the Holo Hollow settlement with Local Places, character Credits, and NPC merchant Trade, missions, and skill progression. Still early and under active development.
 
 RuneSpace is a planned browser-first, mobile-friendly, low-fi sci-fi RPG inspired by the progression, quests, social texture, and long-term grind of old-school MMORPGs and action-point games. It is not a RuneScape clone.
 
@@ -100,6 +100,7 @@ Read these before contributing:
 - [`docs/gameplay-foundations.md`](./docs/gameplay-foundations.md) — server-authoritative timing, progression, inventory, and action contracts.
 - [`docs/missions.md`](./docs/missions.md) — declarative mission framework and authoring contract (single-phase, server-authoritative).
 - [`docs/component-boundaries.md`](./docs/component-boundaries.md) — extraction rules.
+- [`docs/art-cookbook.md`](./docs/art-cookbook.md) — art direction, generation workflow, asset preparation, and visual QA.
 - [`docs/testing-strategy.md`](./docs/testing-strategy.md) — risk-based testing.
 - [`docs/development-workflow.md`](./docs/development-workflow.md) — one issue/branch/draft-PR workflow.
 - [`docs/admin-console.md`](./docs/admin-console.md) — admin/operator console authorization, commands, and audit (issue #113).
