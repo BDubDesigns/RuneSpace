@@ -2,19 +2,19 @@
   "schemaVersion": 1,
   "projectSlug": "runespace",
   "workState": "active",
-  "currentFocus": "Building the Holo Hollow settlement foundation: Local Places, character Credits, and the first NPC merchant loop.",
+  "currentFocus": "Turning the Holo Hollow foundation into progression: Wade's apprentice job, the Bix introduction, the Emergency Power Annex backstory, and the HH B&B unlock.",
   "currentChange": {
-    "summary": "Adds Holo Hollow as the first settlement with generic Local Places, character-scoped Credits, and one server-authoritative merchant loop.",
+    "summary": "Adds the Keep the Change mission: Wade's apprenticeship and up-front job budget, a required Bix introduction, the Power Annex backstory, and the HH B&B unlock.",
     "stage": "review",
-    "pullRequestNumber": 167
+    "pullRequestNumber": 171
   },
   "latestCompleted": {
-    "summary": "Replaced per-item Deposit/Withdraw action rows with a compact selectable Cargo Hold and Carried Inventory tile grid.",
+    "summary": "Added Holo Hollow as the first settlement with generic Local Places, character-scoped Credits, and one server-authoritative merchant loop.",
     "date": "2026-09-11",
-    "url": "https://github.com/BDubDesigns/RuneSpace/pull/166"
+    "url": "https://github.com/BDubDesigns/RuneSpace/pull/167"
   },
-  "nextStep": "Complete human review of PR #167 and run full CI before merging to main.",
-  "lastMeaningfulUpdate": "2026-09-11",
+  "nextStep": "Complete human review of the Keep the Change mission PR and run full CI before merging to main.",
+  "lastMeaningfulUpdate": "2026-09-12",
   "highlights": [
     {
       "summary": "Extracted generic Play orchestration from the Mining feature into its own server and client boundary.",

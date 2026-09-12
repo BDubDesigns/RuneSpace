@@ -2,6 +2,7 @@ import { getItemDefinition, skillLevelThresholds } from "@/game/config/balance";
 import { ACTION_IDS } from "@/game/config/foundations";
 import { getActionOutputItemIds } from "@/game/domain/action-outputs";
 import { getDialogue } from "@/game/content/dialogue";
+import { getLocalPlaceInLocation } from "@/game/content/local-places";
 import { getLocation } from "@/game/content/locations";
 import { getNpc } from "@/game/content/npcs";
 import { resolveItemPresentation } from "@/game/content/item-presentation";
@@ -47,6 +48,14 @@ export type MissionObservation = {
 export type MissionGuidance = {
   /** The NPC whose interaction the current objective requires. */
   npcId?: string;
+  /**
+   * The Local Place at the player's current World Location where that `npcId`
+   * target lives. A Local Place resident is not on screen until the player
+   * steps inside, so the place's entrance carries the active guidance until
+   * then. Derived from authored NPC placement for accepted progression only —
+   * never from availability, and never the World Location itself.
+   */
+  localPlaceId?: string;
   /** The item whose equipped state is the first unmet requirement. */
   equipmentItemId?: string;
   /** The authored recommended acquisition action for the first unmet carried requirement. */
@@ -60,14 +69,14 @@ export type MissionGuidance = {
    */
   cargoRepair?: true;
   /**
-   * The NPC(s) whose authored offer interaction is currently a
-   * mission-availability target. Only missions with NO prerequisite author
-   * open discovery: every offer whose location matches the player's current
-   * location for a mission that is not yet accepted and not completed.
-   * Prerequisite-gated missions never advertise — a prerequisite is an
-   * eligibility rule, not a reveal mechanism. Availability guides NPC
-   * interactions only; advancement after acceptance guides NPC/equipment/
-   * action progression.
+   * The NPC(s) whose authored offer interaction is currently a local
+   * mission-availability target: every offer at the player's current location
+   * for a mission that is not accepted, not completed, and whose prerequisite
+   * (if any) is satisfied. This is local discovery through the offering NPC
+   * only — "this person has work for you" — and never a global signal: it
+   * reveals nothing in the Mission Log and contributes no map, route, or
+   * destination guidance. Progression after acceptance is separate (`npcId`,
+   * `equipmentItemId`, `actionId`, `cargoRepair`).
    */
   availableNpcIds?: readonly string[];
 };
@@ -93,6 +102,12 @@ export type MissionRequirementStatus = {
   itemId?: string;
   /** The location this requirement observes, when it observes one. */
   locationId?: string;
+  /**
+   * The NPC this requirement observes, when it observes one. Conversation
+   * routing reads this so a satisfied mandatory conversation can stop being
+   * offered without inspecting mission IDs.
+   */
+  npcId?: string;
 };
 
 /**
@@ -169,6 +184,7 @@ function renderRequirementObjective(
       .replace("{target}", String(requirement.target));
   }
   if (requirement.kind === "cargo_hold_repaired") return requirement.objective;
+  if (requirement.kind === "npc_conversation") return requirement.objective;
   const itemName = observation?.itemNames.get(requirement.itemId) ?? requirement.itemId;
   if (requirement.kind === "equipped_item") {
     return requirement.objective.replace("{item}", itemName);
@@ -210,6 +226,10 @@ function requirementSatisfied(
       );
     case "cargo_hold_repaired":
       return observation?.cargoHoldRepairComplete === true;
+    case "npc_conversation":
+      // The durable mission-progress row for this authored key is the only
+      // evidence; the conversation itself is never replayed as proof.
+      return (observation?.trackedProgress?.get(requirement.progressKey) ?? 0) >= 1;
   }
 }
 
@@ -282,20 +302,24 @@ function deriveCurrentObjective(
  * "what should the player interact with next" without consumers inspecting
  * mission definitions, objective prose, or drop tables.
  *
- * Availability is intentionally narrow: only prerequisite-free missions
- * advertise open discovery. Prerequisite-gated missions never appear merely
- * because their prerequisite is satisfied — the continuation mechanism (or
- * world discovery) owns that transition.
+ * Availability is LOCAL discovery only: a mission that is not accepted, whose
+ * prerequisite (if any) is satisfied, advertises through the NPC(s) authoring
+ * an offer at the player's current location — exactly the offers the
+ * conversation hub surfaces, so the Talk control and the hub entry share one
+ * answer. It never produces an objective, a progression target, or anything a
+ * global surface (Mission Log, map, route) reads; those derive from accepted
+ * state only.
  */
 function deriveGuidance(
   definition: MissionDefinition,
   state: MissionState,
   currentLocationId: string,
   observation: MissionObservation | undefined,
+  prerequisiteSatisfied: boolean,
 ): MissionGuidance | undefined {
   if (state === "completed") return undefined;
   if (state === "not_accepted") {
-    if (definition.prerequisiteMissionId) return undefined;
+    if (!prerequisiteSatisfied) return undefined;
     const availableNpcIds = definition.offers
       .filter((offer) => offer.locationId === currentLocationId)
       .map((offer) => offer.npcId);
@@ -306,7 +330,7 @@ function deriveGuidance(
   if (!firstUnsatisfied) {
     // Every requirement holds: the turn-in NPC is the interaction target even
     // while the character is still busy (turn-in merely not performable yet).
-    return { npcId: definition.turnIn.npcId };
+    return npcGuidance(definition.turnIn.npcId, currentLocationId);
   }
   if (firstUnsatisfied.kind === "equipped_item") {
     return { equipmentItemId: firstUnsatisfied.itemId };
@@ -320,7 +344,27 @@ function deriveGuidance(
   if (firstUnsatisfied.kind === "cargo_hold_repaired") {
     return { cargoRepair: true as const };
   }
+  if (firstUnsatisfied.kind === "npc_conversation") {
+    // The person to go and meet is the interaction target, exactly as the
+    // turn-in NPC is once every requirement holds.
+    return npcGuidance(firstUnsatisfied.npcId, currentLocationId);
+  }
   return undefined;
+}
+
+/**
+ * Active guidance toward one NPC. When that NPC is the resident of a Local
+ * Place at the player's current World Location, they only appear once the
+ * player steps inside, so the place is carried too and its entrance becomes
+ * the target until then. Derived purely from authored NPC placement; an NPC
+ * elsewhere in the world produces no place or location target at all.
+ */
+function npcGuidance(npcId: string, currentLocationId: string): MissionGuidance {
+  const residentPlaceId = getNpc(npcId)?.localPlaceId;
+  const place = residentPlaceId
+    ? getLocalPlaceInLocation(currentLocationId, residentPlaceId)
+    : undefined;
+  return place ? { npcId, localPlaceId: place.id } : { npcId };
 }
 
 export function projectMission(
@@ -363,7 +407,13 @@ export function projectMission(
       turnInAvailable: state === "ready_for_completion" && requirementsSatisfied,
       nextObjectiveKind: firstUnsatisfied?.kind,
     },
-    guidance: deriveGuidance(definition, state, currentLocationId, observation),
+    guidance: deriveGuidance(
+      definition,
+      state,
+      currentLocationId,
+      observation,
+      prerequisiteSatisfied,
+    ),
   };
 }
 
@@ -410,6 +460,14 @@ function projectRequirement(
       satisfied,
     };
   }
+  if (requirement.kind === "npc_conversation") {
+    return {
+      kind: requirement.kind,
+      objective: requirement.objective,
+      satisfied,
+      npcId: requirement.npcId,
+    };
+  }
   const required = requiredCarriedQuantity(requirement, observation);
   const rawCarried = observation?.carriedQuantities.get(requirement.itemId) ?? 0;
   return {
@@ -421,8 +479,12 @@ function projectRequirement(
   };
 }
 
-/** Projects the actually-earned reward for a completed mission. */
-function projectEarnedReward(definition: MissionDefinition): MissionEarnedReward {
+/**
+ * Projects the actually-earned reward for a completed mission, or nothing when
+ * the mission authored no completion reward.
+ */
+function projectEarnedReward(definition: MissionDefinition): MissionEarnedReward | undefined {
+  if (!definition.reward) return undefined;
   if (definition.reward.kind === "item") {
     return {
       kind: "item",
@@ -453,17 +515,40 @@ export type MissionGuidanceTargets = {
   availableNpcIds: ReadonlySet<string>;
   /** NPC(s) whose interaction advances/completes an accepted mission. */
   npcIds: ReadonlySet<string>;
+  /**
+   * Local Place(s) at the current World Location whose entrance leads to an
+   * accepted mission's NPC target (see `MissionGuidance.localPlaceId`).
+   */
+  localPlaceIds: ReadonlySet<string>;
   equipmentItemIds: ReadonlySet<string>;
   actionIds: ReadonlySet<string>;
   /** True while an accepted mission's current target is the Cargo Hold repair surface. */
   cargoRepair: boolean;
 };
 
+/**
+ * The Missions the character has completed.
+ *
+ * Derived world state (such as a Local Place that opens once a Mission is done)
+ * reads this instead of persisting a second unlock flag that could drift from
+ * the authoritative completion record.
+ */
+export function deriveCompletedMissionIds(
+  projections: readonly { missionId: string; state: MissionState }[],
+): ReadonlySet<string> {
+  return new Set(
+    projections
+      .filter((projection) => projection.state === "completed")
+      .map((projection) => projection.missionId),
+  );
+}
+
 export function deriveMissionGuidanceTargets(
   projections: readonly MissionProjection[],
 ): MissionGuidanceTargets {
   const availableNpcIds = new Set<string>();
   const npcIds = new Set<string>();
+  const localPlaceIds = new Set<string>();
   const equipmentItemIds = new Set<string>();
   const actionIds = new Set<string>();
   let cargoRepair = false;
@@ -472,12 +557,13 @@ export function deriveMissionGuidanceTargets(
       for (const id of projection.guidance.availableNpcIds) availableNpcIds.add(id);
     }
     if (projection.guidance?.npcId) npcIds.add(projection.guidance.npcId);
+    if (projection.guidance?.localPlaceId) localPlaceIds.add(projection.guidance.localPlaceId);
     if (projection.guidance?.equipmentItemId)
       equipmentItemIds.add(projection.guidance.equipmentItemId);
     if (projection.guidance?.actionId) actionIds.add(projection.guidance.actionId);
     if (projection.guidance?.cargoRepair) cargoRepair = true;
   }
-  return { availableNpcIds, npcIds, equipmentItemIds, actionIds, cargoRepair };
+  return { availableNpcIds, npcIds, localPlaceIds, equipmentItemIds, actionIds, cargoRepair };
 }
 
 /**
@@ -542,6 +628,14 @@ export function validateMissionDefinitions(definitions: readonly MissionDefiniti
       if (offer.activeDialogueId) {
         assertDialogue(definition.id, offer.activeDialogueId, "active");
         assertDialogueNpc(definition.id, offer.activeDialogueId, offer.npcId, "active");
+      }
+      if (offer.acceptEffect) {
+        if (offer.acceptEffect.kind !== "credits") {
+          throw new Error(`${where} offer references an unsupported acceptance effect.`);
+        }
+        if (!Number.isInteger(offer.acceptEffect.amount) || offer.acceptEffect.amount <= 0) {
+          throw new Error(`${where} offer Credit grant must be a positive integer.`);
+        }
       }
     }
     if (definition.completedNpcDialogue) {
@@ -622,6 +716,58 @@ export function validateMissionDefinitions(definitions: readonly MissionDefiniti
         continue;
       }
       if (requirement.kind === "cargo_hold_repaired") continue;
+      if (requirement.kind === "npc_conversation") {
+        if (!getNpc(requirement.npcId)) {
+          throw new Error(
+            `${where} conversation requirement references unknown NPC "${requirement.npcId}".`,
+          );
+        }
+        if (!getLocation(requirement.locationId)) {
+          throw new Error(
+            `${where} conversation requirement references unknown location "${requirement.locationId}".`,
+          );
+        }
+        assertDialogue(definition.id, requirement.dialogueId, "conversation requirement");
+        assertDialogueNpc(
+          definition.id,
+          requirement.dialogueId,
+          requirement.npcId,
+          "conversation requirement",
+        );
+        if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(requirement.progressKey)) {
+          throw new Error(
+            `${where} conversation requirement progress key must be lowercase hyphenated text.`,
+          );
+        }
+        if (progressKeys.has(requirement.progressKey)) {
+          throw new Error(`${where} duplicates progress key "${requirement.progressKey}".`);
+        }
+        progressKeys.add(requirement.progressKey);
+        // Routing at the turn-in NPC is stage-owned and an offer NPC owns its
+        // own active follow-up, so a mandatory conversation at either would
+        // fight an existing owner for the same hub entry.
+        if (requirement.npcId === definition.turnIn.npcId) {
+          throw new Error(
+            `${where} conversation requirement cannot target its own turn-in NPC "${requirement.npcId}".`,
+          );
+        }
+        if (definition.offers.some((offer) => offer.npcId === requirement.npcId)) {
+          throw new Error(
+            `${where} conversation requirement cannot target offer NPC "${requirement.npcId}".`,
+          );
+        }
+        if (
+          definition.requirements.filter(
+            (candidate) =>
+              candidate.kind === "npc_conversation" && candidate.npcId === requirement.npcId,
+          ).length > 1
+        ) {
+          throw new Error(
+            `${where} duplicates a conversation requirement for NPC "${requirement.npcId}".`,
+          );
+        }
+        continue;
+      }
       const itemDefinition = getItemDefinition(requirement.itemId);
       if (!itemDefinition) {
         throw new Error(`${where} requirement references unknown item "${requirement.itemId}".`);
@@ -676,6 +822,13 @@ export function validateMissionDefinitions(definitions: readonly MissionDefiniti
         dialogue.cargoRepairReminderDialogueId,
         "cargo repair reminder",
       );
+    if (dialogue.conversationReminderDialogueId) {
+      assertDialogue(
+        definition.id,
+        dialogue.conversationReminderDialogueId,
+        "conversation reminder",
+      );
+    }
     if (dialogue.busyDialogueId) assertDialogue(definition.id, dialogue.busyDialogueId, "busy");
     if (dialogue.completionPresentationDialogueId) {
       assertDialogue(
@@ -688,7 +841,10 @@ export function validateMissionDefinitions(definitions: readonly MissionDefiniti
       assertDialogue(definition.id, dialogue.capacitySlotsDialogueId, "capacity slots");
     if (dialogue.capacityMassDialogueId)
       assertDialogue(definition.id, dialogue.capacityMassDialogueId, "capacity mass");
-    if (definition.reward.kind === "item") {
+    if (!definition.reward) {
+      // A mission may deliberately author no completion reward when its real
+      // outcome is world/social state (Keep the Change pays up front instead).
+    } else if (definition.reward.kind === "item") {
       const rewardDefinition = getItemDefinition(definition.reward.itemId);
       if (!rewardDefinition) {
         throw new Error(`${where} reward references unknown item "${definition.reward.itemId}".`);

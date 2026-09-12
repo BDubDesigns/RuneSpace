@@ -75,8 +75,8 @@ export function PowerAnnexClaimPanel() {
         DeWhat? Emergency Power Annex
       </SectionHeader>
       <p className="mt-3 max-w-2xl text-sm leading-relaxed text-[color:var(--rs-text-secondary)]">
-        The damaged depot dispenses one registered worker allotment per RuneSpace reset day.
-        Eligibility belongs to this character and requires being stationary at the Annex.
+        The depot dispenses one emergency allotment per person, per RuneSpace reset day. Eligibility
+        belongs to this character and requires being stationary at the Annex.
       </p>
       <div
         className="mt-4 grid min-w-0 grid-cols-[7rem_minmax(0,1fr)] items-center gap-3"

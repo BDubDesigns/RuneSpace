@@ -84,15 +84,21 @@ export const NPCS: readonly NpcDefinition[] = [
     },
   },
   {
-    // Mara owns HH B&B, which is visible but locked in this slice, so she has
-    // no authored conversation yet. The follow-up Wade apprentice Mission owns
-    // her introduction, her portrait set, and the B&B interior; her identity is
-    // registered here so the locked place already has its resident.
+    // Mara is met during Keep the Change's authored Bix scene (#170) and is
+    // HH B&B's resident once that Mission opens the door. Her expression set is
+    // shared vocabulary mapped to her own approved art: composed and
+    // matter-of-fact reads as `firm` rather than wary or displeased.
     id: NPC_IDS.maraKells,
     displayName: "Mara Kells",
     role: "HH B&B owner",
     homeLocationId: LOCATION_IDS.holoHollow,
     localPlaceId: LOCAL_PLACE_IDS.hhBnb,
+    conversationBackgroundId: CONVERSATION_BACKGROUND_IDS.hhBnbInterior,
+    expressionAssets: {
+      [EXPRESSION_IDS.neutral]: "/npc-art/mara-neutral-pragmatic.png",
+      [EXPRESSION_IDS.amused]: "/npc-art/mara-warm-wry.png",
+      [EXPRESSION_IDS.firm]: "/npc-art/mara-firm-no-nonsense.png",
+    },
   },
 ] as const satisfies readonly NpcDefinition[];
 

@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, useTransition } from "react";
 import { ActionButton } from "@/components/ui/ActionButton";
 import { Feedback } from "@/components/ui/Feedback";
+import { MissionActionButton } from "@/components/ui/MissionActionButton";
 import { StatusMeter } from "@/components/ui/StatusMeter";
 import { ItemVisual } from "@/components/items/ItemVisual";
 import { VisualTile } from "@/components/items/VisualTile";
@@ -297,15 +298,14 @@ export function MiningActivity({ characterName }: { characterName: string }) {
             Stop Mining
           </ActionButton>
         ) : (
-          <ActionButton
-            className={startMiningGuided ? "rs-mission-guidance" : undefined}
-            data-mission-guidance={startMiningGuided ? "active" : undefined}
+          <MissionActionButton
+            guidance={startMiningGuided ? "active" : undefined}
             intent="mining"
             loading={foregroundBusy && pendingCommand === "start"}
             onClick={() => runForeground("start", startMiningAction)}
           >
             Start Mining
-          </ActionButton>
+          </MissionActionButton>
         )}
         <ActionButton
           intent="secondary"

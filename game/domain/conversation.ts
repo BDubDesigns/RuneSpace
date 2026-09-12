@@ -8,6 +8,7 @@ import {
   MISSIONS,
   getMission,
   type MissionDefinition,
+  type MissionRequirement,
   type MissionRequirementKind,
 } from "@/game/content/missions";
 import { getNpc } from "@/game/content/npcs";
@@ -35,6 +36,8 @@ import type { MissionState } from "@/game/domain/missions";
 export const DEFAULT_ACCEPT_ACTION_LABEL = "Accept mission";
 /** Generic completion copy when a turn-in authors none. */
 export const DEFAULT_COMPLETE_ACTION_LABEL = "Turn in";
+/** Generic copy closing a mandatory conversation when none is authored. */
+export const DEFAULT_ACKNOWLEDGE_ACTION_LABEL = "Got it";
 
 /**
  * The semantic Mission surface the conversation resolver consumes. It is
@@ -55,6 +58,12 @@ export type NpcConversationProjection = {
     turnInAvailable: boolean;
     nextObjectiveKind?: MissionRequirementKind;
   };
+  /**
+   * Live per-requirement satisfaction. Only mandatory-conversation routing
+   * reads it: a one-time authored scene stops being offered once the
+   * authoritative requirement holds, so the encounter does not replay.
+   */
+  requirements?: readonly { kind: MissionRequirementKind; satisfied: boolean; npcId?: string }[];
   /** The already-derived semantic guidance targets for this mission, if any. */
   guidance?: {
     npcId?: string;
@@ -71,8 +80,14 @@ export type MissionConversationRole = "offer" | "active" | "turn_in" | "complete
  * drives that command right now.
  */
 export type MissionConversationAction = {
-  kind: "accept_mission" | "complete_mission";
+  kind: "accept_mission" | "complete_mission" | "acknowledge_conversation";
   label: string;
+  /**
+   * The authored sequence the command is being reported for. Present only for
+   * `acknowledge_conversation`, whose server command confirms the played scene
+   * is the one the mission authored.
+   */
+  dialogueId?: DialogueId;
 };
 
 /** The authored continuation presented immediately after a successful acceptance. */
@@ -222,6 +237,34 @@ function activeEntry(
     };
   }
 
+  // A mandatory authored conversation is a one-time story event, not idle
+  // dialogue: it is offered while its authoritative requirement is unsatisfied
+  // and disappears from the hub once the scene has genuinely happened. Backing
+  // out before the terminal control leaves the requirement unsatisfied, so the
+  // encounter can be entered again until it actually commits.
+  const conversation = definition.requirements.find(
+    (candidate): candidate is Extract<MissionRequirement, { kind: "npc_conversation" }> =>
+      candidate.kind === "npc_conversation" && candidate.npcId === npcId,
+  );
+  if (conversation && !conversationRequirementSatisfied(projection, npcId)) {
+    if (!getDialogue(conversation.dialogueId)) return undefined;
+    return {
+      kind: "mission",
+      id: `${definition.id}:conversation`,
+      label: definition.title,
+      role: "active",
+      roleLabel: ROLE_LABELS.active,
+      dialogueId: conversation.dialogueId,
+      missionId: definition.id,
+      guidance: guidanceFor(npcId, projection),
+      action: {
+        kind: "acknowledge_conversation",
+        label: conversation.actionLabel ?? DEFAULT_ACKNOWLEDGE_ACTION_LABEL,
+        dialogueId: conversation.dialogueId,
+      },
+    };
+  }
+
   const contextual = definition.activeNpcDialogue?.find((entry) => entry.npcId === npcId);
   const offer = definition.offers.find((candidate) => candidate.npcId === npcId);
   const dialogueId = contextual?.dialogueId ?? offer?.activeDialogueId;
@@ -303,6 +346,22 @@ export function topicAvailable(
   );
 }
 
+/**
+ * Whether this NPC's mandatory conversation already holds for the character.
+ * Read from the projected requirement statuses, never from conversation
+ * history — RuneSpace persists nothing about conversations themselves.
+ */
+function conversationRequirementSatisfied(
+  projection: NpcConversationProjection,
+  npcId: string,
+): boolean {
+  return (
+    projection.requirements?.some(
+      (status) => status.kind === "npc_conversation" && status.npcId === npcId && status.satisfied,
+    ) ?? false
+  );
+}
+
 function completionAction(definition: MissionDefinition): MissionConversationAction {
   return {
     kind: "complete_mission",
@@ -339,6 +398,9 @@ function turnInStageDialogueId(
   }
   if (stage.nextObjectiveKind === "cargo_hold_repaired") {
     return dialogueOr(definition.dialogue.cargoRepairReminderDialogueId, turnIn);
+  }
+  if (stage.nextObjectiveKind === "npc_conversation") {
+    return dialogueOr(definition.dialogue.conversationReminderDialogueId, turnIn);
   }
   return turnIn;
 }
@@ -428,6 +490,12 @@ export function validateConversationTopics(
 function missionOwnedDialogueIds(definitions: readonly MissionDefinition[]): readonly string[] {
   return definitions.flatMap((definition) => [
     definition.turnIn.dialogueId,
+    ...definition.requirements
+      .filter(
+        (requirement): requirement is Extract<MissionRequirement, { kind: "npc_conversation" }> =>
+          requirement.kind === "npc_conversation",
+      )
+      .map((requirement) => requirement.dialogueId),
     ...definition.offers.flatMap((offer) => [
       offer.dialogueId,
       ...(offer.acceptedContinuation ? [offer.acceptedContinuation.dialogueId] : []),

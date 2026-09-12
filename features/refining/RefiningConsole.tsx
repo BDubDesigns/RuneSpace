@@ -5,6 +5,7 @@ import { ActionButton } from "@/components/ui/ActionButton";
 import { ItemVisual } from "@/components/items/ItemVisual";
 import { VisualTile } from "@/components/items/VisualTile";
 import { Feedback } from "@/components/ui/Feedback";
+import { MissionActionButton } from "@/components/ui/MissionActionButton";
 import { StatusMeter } from "@/components/ui/StatusMeter";
 import { getEffectiveGameBalance } from "@/game/config/balance";
 import { ACTION_IDS, GAME_TICK_MS, ITEM_IDS } from "@/game/config/foundations";
@@ -221,15 +222,14 @@ export function RefiningConsole({ showDescription = true }: { showDescription?: 
             Stop Refining
           </ActionButton>
         ) : (
-          <ActionButton
-            className={startRefiningGuided ? "rs-mission-guidance" : undefined}
-            data-mission-guidance={startRefiningGuided ? "active" : undefined}
+          <MissionActionButton
+            guidance={startRefiningGuided ? "active" : undefined}
             intent="mining"
             loading={foregroundBusy && pendingCommand === "start"}
             onClick={() => runForeground("start", startRefiningAction)}
           >
             Start Refining
-          </ActionButton>
+          </MissionActionButton>
         )}
         <ActionButton
           intent="secondary"

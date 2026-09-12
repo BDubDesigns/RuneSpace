@@ -35,11 +35,25 @@ describe("missionChainResetScope", () => {
   });
 
   it("matches the current authored mission chain", () => {
-    // Cut Your Teeth, Waste Not, and Hold It Together form the authored chain.
+    // Cut Your Teeth, Waste Not, Hold It Together, and Keep the Change form the
+    // authored chain. Keep the Change is reached by prerequisite rather than by
+    // continuation, and the reset scope follows prerequisite edges either way.
     const wio = "walk_it_off";
     const cyt = "cut_your_teeth";
     const ids = MISSIONS.map((m) => ({ id: m.id, prerequisiteMissionId: m.prerequisiteMissionId }));
-    expect(missionChainResetScope(wio, ids)).toEqual([wio, cyt, "waste_not", "hold_it_together"]);
-    expect(missionChainResetScope(cyt, ids)).toEqual([cyt, "waste_not", "hold_it_together"]);
+    expect(missionChainResetScope(wio, ids)).toEqual([
+      wio,
+      cyt,
+      "waste_not",
+      "hold_it_together",
+      "keep_the_change",
+    ]);
+    expect(missionChainResetScope(cyt, ids)).toEqual([
+      cyt,
+      "waste_not",
+      "hold_it_together",
+      "keep_the_change",
+    ]);
+    expect(missionChainResetScope("keep_the_change", ids)).toEqual(["keep_the_change"]);
   });
 });

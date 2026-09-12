@@ -48,7 +48,7 @@ separate actions (`docs/holo-hollow.md`).
 | --- | --- |
 | Authored dialogue sequences (presentation content) | `game/content/dialogue.ts` — `DialogueSequence`, `DIALOGUE_SEQUENCES`, `getDialogue` |
 | Authored replayable topics | `game/content/conversation-topics.ts` — `ConversationTopicDefinition`, `CONVERSATION_TOPICS`, `getNpcConversationTopics` |
-| Mission conversation metadata | `game/content/missions.ts` — `MissionOffer` (`dialogueId`, `actionLabel`, `acceptedContinuation`, `activeDialogueId`), `MissionTurnIn` (`dialogueId`, `actionLabel`), `MissionDialogue`, `activeNpcDialogue`, `completedNpcDialogue` |
+| Mission conversation metadata | `game/content/missions.ts` — `MissionOffer` (`dialogueId`, `actionLabel`, `acceptedContinuation`, `activeDialogueId`), `MissionTurnIn` (`dialogueId`, `actionLabel`), `MissionDialogue`, `activeNpcDialogue`, `completedNpcDialogue`, and the `npc_conversation` requirement's own `dialogueId` / `actionLabel` |
 | Conversation resolution (pure) | `game/domain/conversation.ts` — `resolveNpcConversation`, `NpcConversationEntry`, `topicAvailable`, `validateConversationTopics`, `getMissionCompletionPresentation`, `getMissionCapacityRefusalDialogue` |
 | Content validation at module load | `server/mission-state.ts` — `validateMissionDefinitions` + `validateConversationTopics` |
 | Player-facing surfaces | `features/npc/NpcInteractionPanel.tsx` (Talk control + guidance), `features/npc/NpcConversation.tsx` (hub + command execution), `features/dialogue/DialoguePlayer.tsx` / `DialogueScene.tsx` (beat presentation) |
@@ -75,8 +75,10 @@ Mission content:
 
 ```ts
 type MissionConversationAction = {
-  kind: "accept_mission" | "complete_mission";
-  label: string; // MissionOffer.actionLabel / MissionTurnIn.actionLabel, else a generic default
+  kind: "accept_mission" | "complete_mission" | "acknowledge_conversation";
+  label: string; // MissionOffer.actionLabel / MissionTurnIn.actionLabel / the
+                 // requirement's actionLabel, else a generic default
+  dialogueId?: DialogueId; // acknowledge_conversation only — which scene was played
 };
 ```
 
@@ -104,8 +106,9 @@ hard-coded mission-ID chains — and returns an ordered entry list:
 
 1. **Accepted Mission conversations**, newest Mission first. For the turn-in NPC
    the stage branch is selected exactly as before (turn-in / busy / equipment /
-   carried / tracked-activity / cargo-repair reminder); for other NPCs the
-   authored `activeNpcDialogue`, else that NPC's offer `activeDialogueId`.
+   carried / tracked-activity / cargo-repair / conversation reminder); for other
+   NPCs an **unsatisfied mandatory conversation** (§4.1) wins first, then the
+   authored `activeNpcDialogue`, then that NPC's offer `activeDialogueId`.
 2. **Available offers**, newest first: a `not_accepted` Mission whose projected
    prerequisite is satisfied and which authors an offer at this NPC.
 3. **The latest relevant completed-story follow-up** — at most one entry, and
@@ -122,6 +125,25 @@ Entry guidance (`"available"` / `"active"`) is read from the projection's own
 `guidance` (`MissionGuidance.npcId` / `availableNpcIds`, `docs/missions.md` §10),
 so the hub cannot drift from the Talk control's treatment. Active green wins
 when a projection somehow reports both.
+
+### 4.1 One-time mandatory conversations
+
+A Mission may require the player to genuinely meet somebody (`npc_conversation`,
+`docs/missions.md` §5). That scene is a **one-time story event**, not idle
+dialogue:
+
+- it appears in that NPC's hub only while the requirement is unsatisfied, and
+  carries `acknowledge_conversation`, whose server command is the only thing
+  that can satisfy it;
+- leaving early records nothing, so it can be entered again — the event has not
+  authoritatively happened yet;
+- once the command succeeds the entry disappears from the hub permanently. It is
+  **not** moved into `Talk about`, and nothing else replays it. Keep the Change's
+  Bix scene — where Mara meets the player — is the production example.
+
+Satisfaction is read from the projection's own requirement statuses, so this
+needs no conversation history (§6). The authored sequence keeps its stable
+content ID for identity even once ordinary play can no longer reach it.
 
 ## 5. Replayable topics
 
@@ -160,14 +182,24 @@ reuses a Mission-owned sequence.
 | Bix Weller | The shop | always |
 | Bix Weller | Power Cells | always |
 | Bix Weller | Holo Hollow | always |
+| Mara Kells | The B&B | always |
+| Mara Kells | Bix | always |
 | Renn Calder | The Assistance Center | always |
 | Renn Calder | Ferrite | always |
 | Renn Calder | Life here | always |
 
 Bix's **Trade** action is deliberately separate from **Talk** (see
 `docs/holo-hollow.md`): the conversation hub never carries a merchant command,
-so a later Mission can require the conversation independently of any purchase.
+so Keep the Change requires the conversation with Bix while never requiring a
+purchase — opening Trade satisfies nothing.
 Renn is a social NPC only — no merchant function and no Mission.
+
+Mara's topics carry no availability gate of their own because she is only
+reachable inside HH B&B, and that Local Place's access already derives from Keep
+the Change's completion (`docs/gameplay-foundations.md`, Local Places). One gate,
+not two: a second condition could otherwise leave her present with nothing to
+say. Her appearance in Bix's shop during that Mission is authored Mission
+dialogue, never a topic, and never makes her a second resident of the shop.
 
 **Beyond Holo Hollow** seeds Tansy's long-term arc without resolving it: she
 wants to see other stations and planets, has spent her life around Holo Hollow
@@ -190,6 +222,14 @@ domain, content, and UI files.
 If future gameplay requires the player having learned a specific fact to matter
 mechanically, that concrete knowledge requirement earns persistence then — as a
 deliberate, narrow extension, not as conversation history.
+
+**Issue #170 is exactly that case, and stayed inside this boundary.** Keep the
+Change needs one fact to matter mechanically: the player has actually met Bix.
+That is persisted as the Mission's own requirement progress (one capped row for
+one authored key, `docs/missions.md` §12.3) — not as a conversation record.
+There is still no `seenTopicIds`, no NEW badge, no viewed-topic checkmark, no
+conversation-history table, and no has-met flag for anybody else; optional
+topics remain replayable and unrecorded.
 
 ## 7. Authoring checklist
 

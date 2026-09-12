@@ -68,6 +68,7 @@ const crash = CONVERSATION_BACKGROUND_IDS.crashSiteExterior;
 const jag = CONVERSATION_BACKGROUND_IDS.theJagExterior;
 const bixShop = CONVERSATION_BACKGROUND_IDS.holoHollowSouvenirsInterior;
 const assistanceCenter = CONVERSATION_BACKGROUND_IDS.holoHollowAssistanceCenterInterior;
+const bnb = CONVERSATION_BACKGROUND_IDS.hhBnbInterior;
 
 function wadeLocal(expressionId: ExpressionId, text: string): DialogueBeat {
   return {
@@ -108,6 +109,48 @@ function bixLocal(expressionId: ExpressionId, text: string): DialogueBeat {
     speakerNpcId: NPC_IDS.bixWeller,
     expressionId,
     backgroundId: bixShop,
+    presentationMode: "local",
+    text,
+  };
+}
+
+/**
+ * Tansy calling in remotely from the seam. Like `wadeComms`, a remote caller is
+ * shown against their own location — The Jag — with the comms treatment
+ * carrying the distance.
+ */
+function tansyComms(expressionId: ExpressionId, text: string): DialogueBeat {
+  return {
+    kind: "npc",
+    speakerNpcId: NPC_IDS.tansyRusk,
+    expressionId,
+    backgroundId: jag,
+    presentationMode: "comms",
+    text,
+  };
+}
+
+/**
+ * Mara during her authored appearance in Bix's shop (#170). She is a guest in
+ * his scene — one authored beat speaker, not a second resident of the shop.
+ */
+function maraAtBixShop(expressionId: ExpressionId, text: string): DialogueBeat {
+  return {
+    kind: "npc",
+    speakerNpcId: NPC_IDS.maraKells,
+    expressionId,
+    backgroundId: bixShop,
+    presentationMode: "local",
+    text,
+  };
+}
+
+function maraLocal(expressionId: ExpressionId, text: string): DialogueBeat {
+  return {
+    kind: "npc",
+    speakerNpcId: NPC_IDS.maraKells,
+    expressionId,
+    backgroundId: bnb,
     presentationMode: "local",
     text,
   };
@@ -633,6 +676,228 @@ const dialogue = {
     ],
   },
 
+  // ---- Keep the Change (#170) ----------------------------------------------
+  // Wade's apprenticeship job. The opening scene carries the post-repair beat
+  // itself — Wade acknowledges the Cargo Hold worked and makes the player his
+  // apprentice — so nothing forces a separate conversation between the two.
+
+  [DIALOGUE_IDS.wadeKeepTheChangeOffer]: {
+    id: DIALOGUE_IDS.wadeKeepTheChangeOffer,
+    npcId: NPC_IDS.wadeRusk,
+    beats: [
+      wadeLocal(EXPRESSION_IDS.neutral, "Cargo Hold's still holding. I checked the seams myself."),
+      wadeLocal(
+        EXPRESSION_IDS.neutral,
+        "You showed up, you listened, and you finished it. That is rarer than it ought to be.",
+      ),
+      wadeLocal(EXPRESSION_IDS.neutral, "So you're my apprentice now. I'm not asking."),
+      wadeLocal(
+        EXPRESSION_IDS.scowl,
+        "Don't look pleased. It mostly means you get the jobs I don't want to do twice.",
+      ),
+      tansyComms(EXPRESSION_IDS.concerned, "Wade. Wade, pick up."),
+      tansyComms(
+        EXPRESSION_IDS.concerned,
+        "I'm dry on Power Cells. Completely dry. The Cutter's a very heavy stick out here.",
+      ),
+      tansyComms(EXPRESSION_IDS.neutral, "Three would get me through the rest of this seam."),
+      wadeLocal(EXPRESSION_IDS.neutral, "I've got none in the crate. I checked this morning."),
+      tansyComms(
+        EXPRESSION_IDS.smile,
+        "Oh. Okay. Could someone bring me three? I'd really rather not lose the afternoon walking back.",
+      ),
+      wadeLocal(
+        EXPRESSION_IDS.neutral,
+        "Tansy needs three Power Cells. Bix charges eight Credits each. Here's twenty-four Credits.",
+      ),
+      wadeLocal(
+        EXPRESSION_IDS.neutral,
+        "If you've already got some, or you know a cheaper way, good. Keep what you don't spend.",
+      ),
+      wadeLocal(
+        EXPRESSION_IDS.neutral,
+        "Still go see Bix. You're working out of Holo Hollow now. You ought to know who keeps the useful stuff on a shelf.",
+      ),
+      wadeLocal(
+        EXPRESSION_IDS.neutral,
+        "Cells go to Tansy at The Jag. She's the one sitting on a dead tool, not me.",
+      ),
+    ],
+  },
+  [DIALOGUE_IDS.wadeKeepTheChangeActive]: {
+    id: DIALOGUE_IDS.wadeKeepTheChangeActive,
+    npcId: NPC_IDS.wadeRusk,
+    beats: [
+      wadeLocal(
+        EXPRESSION_IDS.neutral,
+        "Tansy's still waiting. Three Power Cells, at The Jag, however you come by them.",
+      ),
+      wadeLocal(
+        EXPRESSION_IDS.neutral,
+        "And see Bix while you're in town. That part isn't a suggestion.",
+      ),
+    ],
+  },
+  [DIALOGUE_IDS.bixKeepTheChangeIntroduction]: {
+    id: DIALOGUE_IDS.bixKeepTheChangeIntroduction,
+    npcId: NPC_IDS.bixWeller,
+    beats: [
+      bixLocal(EXPRESSION_IDS.neutral, "So you're the one who came down out of the sky."),
+      bixLocal(EXPRESSION_IDS.amused, "And Wade's already got you running errands. That was fast."),
+      bixLocal(
+        EXPRESSION_IDS.neutral,
+        "Three Power Cells. Eight Credits each. Twenty-four Credits.",
+      ),
+      bixLocal(EXPRESSION_IDS.amused, "Let me guess. That's exactly what Wade handed you."),
+      bixLocal(EXPRESSION_IDS.amused, "No delivery tip. That's Wade."),
+      bixLocal(
+        EXPRESSION_IDS.neutral,
+        "Before you spend it, though — the Annex'll issue you five Cells per local day.",
+      ),
+      bixLocal(
+        EXPRESSION_IDS.neutral,
+        "Back when projector nights filled every room in town, Settled Systems required an emergency power depot.",
+      ),
+      bixLocal(EXPRESSION_IDS.neutral, "DeWhat? got the contract."),
+      bixLocal(EXPRESSION_IDS.amused, "Tourists left. Contract didn't."),
+      bixLocal(
+        EXPRESSION_IDS.neutral,
+        "Five per person, per local day. Enough to keep heat, comms, or a tool alive until somebody got help.",
+      ),
+      bixLocal(EXPRESSION_IDS.amused, "Limit keeps one enterprising idiot from emptying the rack."),
+      bixLocal(EXPRESSION_IDS.concerned, "And yes, I still sell them."),
+      bixLocal(
+        EXPRESSION_IDS.neutral,
+        "The Annex gives you five. It gives me five. That doesn't stock a store.",
+      ),
+      bixLocal(
+        EXPRESSION_IDS.neutral,
+        "Need another one? Eight Credits. Got extras? I'll give you three Credits each.",
+      ),
+      bixLocal(EXPRESSION_IDS.amused, "That's called a store."),
+      maraAtBixShop(EXPRESSION_IDS.amused, "Morning, Bix. How's business?"),
+      bixLocal(
+        EXPRESSION_IDS.neutral,
+        "Hey Mara. Have you met the crash survivor? Wade has decided to make them his apprentice.",
+      ),
+      maraAtBixShop(EXPRESSION_IDS.amused, "Wade made you his apprentice?"),
+      bixLocal(
+        EXPRESSION_IDS.amused,
+        "Yup. Already sent them on their first errand. Tansy ran out of Power Cells while working The Jag.",
+      ),
+      maraAtBixShop(EXPRESSION_IDS.amused, "Ahh, you lucky bastard, you."),
+      maraAtBixShop(
+        EXPRESSION_IDS.firm,
+        "Wade can be demanding. But pay attention, and you will learn a lot from him.",
+      ),
+      maraAtBixShop(
+        EXPRESSION_IDS.amused,
+        "And hey, if he's putting you to work, maybe you're not a tourist anymore.",
+      ),
+      maraAtBixShop(
+        EXPRESSION_IDS.firm,
+        "Get Tansy what she needs first. She's out at The Jag with a dead Cutter while we're standing here yapping.",
+      ),
+      maraAtBixShop(
+        EXPRESSION_IDS.amused,
+        "After that, come find me. The B&B's only open for people who work here. That's you now.",
+      ),
+      bixLocal(EXPRESSION_IDS.amused, "Sounds like you're in, kid."),
+      bixLocal(
+        EXPRESSION_IDS.neutral,
+        "Tansy's waitin'. Cells are on the shelf if you want to buy them. Annex is up the road if you don't.",
+      ),
+    ],
+  },
+  [DIALOGUE_IDS.tansyKeepTheChangeConversationReminder]: {
+    id: DIALOGUE_IDS.tansyKeepTheChangeConversationReminder,
+    npcId: NPC_IDS.tansyRusk,
+    beats: [
+      tansyLocal(
+        EXPRESSION_IDS.neutral,
+        "Wade sent you? Then you've already been told to go see Bix.",
+      ),
+      tansyLocal(
+        EXPRESSION_IDS.smile,
+        "Do that part first. He's the one who keeps Cells on a shelf, and he'll know if you skipped him.",
+      ),
+    ],
+  },
+  [DIALOGUE_IDS.tansyKeepTheChangeCarriedReminder]: {
+    id: DIALOGUE_IDS.tansyKeepTheChangeCarriedReminder,
+    npcId: NPC_IDS.tansyRusk,
+    beats: [
+      tansyLocal(
+        EXPRESSION_IDS.concerned,
+        "Three Power Cells. I'm not being dramatic — the Cutter is dead weight without them.",
+      ),
+      tansyLocal(
+        EXPRESSION_IDS.neutral,
+        "Bix sells them for eight Credits. The Annex hands out five a day for nothing. Either one works.",
+      ),
+    ],
+  },
+  [DIALOGUE_IDS.tansyKeepTheChangeBusy]: {
+    id: DIALOGUE_IDS.tansyKeepTheChangeBusy,
+    npcId: NPC_IDS.tansyRusk,
+    beats: [
+      tansyLocal(
+        EXPRESSION_IDS.neutral,
+        "Finish what you're doing. I'll take the Cells when you're standing still.",
+      ),
+    ],
+  },
+  [DIALOGUE_IDS.tansyKeepTheChangeTurnIn]: {
+    id: DIALOGUE_IDS.tansyKeepTheChangeTurnIn,
+    npcId: NPC_IDS.tansyRusk,
+    beats: [
+      tansyLocal(EXPRESSION_IDS.smile, "Please tell me those are Cells."),
+      tansyLocal(EXPRESSION_IDS.neutral, "Three is exactly right. Hand them over."),
+    ],
+  },
+  [DIALOGUE_IDS.tansyKeepTheChangeCompletion]: {
+    id: DIALOGUE_IDS.tansyKeepTheChangeCompletion,
+    npcId: NPC_IDS.tansyRusk,
+    beats: [
+      // Presentation only: the authoritative turn-in has already taken the
+      // three Power Cells when this sequence becomes visible.
+      itemBeat(ITEM_IDS.powerCell, 3),
+      tansyLocal(EXPRESSION_IDS.smile, "That's the seam back in business."),
+      tansyLocal(
+        EXPRESSION_IDS.neutral,
+        "And whatever's left of Wade's money stays in your pocket. That's how the job was supposed to work.",
+      ),
+      tansyLocal(
+        EXPRESSION_IDS.smile,
+        "Word travels fast out here. Mara's expecting you at the B&B — try not to make it weird.",
+      ),
+    ],
+  },
+  [DIALOGUE_IDS.wadePostKeepTheChange]: {
+    id: DIALOGUE_IDS.wadePostKeepTheChange,
+    npcId: NPC_IDS.wadeRusk,
+    beats: [
+      wadeLocal(EXPRESSION_IDS.neutral, "Tansy's cutting again. That's the job done."),
+      wadeLocal(
+        EXPRESSION_IDS.neutral,
+        "And you met Bix. Next time you need something, you know where it is and what it costs.",
+      ),
+      wadeLocal(
+        EXPRESSION_IDS.neutral,
+        "Whatever's left of that twenty-four is yours. Don't make a ceremony out of it.",
+      ),
+    ],
+  },
+  [DIALOGUE_IDS.tansyPostKeepTheChange]: {
+    id: DIALOGUE_IDS.tansyPostKeepTheChange,
+    npcId: NPC_IDS.tansyRusk,
+    beats: [
+      tansyLocal(EXPRESSION_IDS.smile, "Still running on your Cells. Thanks for that."),
+      tansyLocal(EXPRESSION_IDS.neutral, "Wade is proud of you, you know."),
+      tansyLocal(EXPRESSION_IDS.smile, "Though he'd never say it out loud."),
+    ],
+  },
+
   // ---- Replayable social topics (#164) -------------------------------------
   // Ordinary NPC conversations. They carry no Mission action, gate nothing,
   // and stay replayable; the player character remains silent throughout.
@@ -862,6 +1127,54 @@ const dialogue = {
       rennLocal(EXPRESSION_IDS.neutral, "Sometimes staying is loyalty."),
       rennLocal(EXPRESSION_IDS.guarded, "Sometimes it's just being afraid to go."),
       rennLocal(EXPRESSION_IDS.neutral, "Those aren't the same thing."),
+    ],
+  },
+  [DIALOGUE_IDS.maraTheBnbTopic]: {
+    id: DIALOGUE_IDS.maraTheBnbTopic,
+    npcId: NPC_IDS.maraKells,
+    beats: [
+      maraLocal(
+        EXPRESSION_IDS.neutral,
+        "Family business. My parents ran it when people came here on purpose.",
+      ),
+      maraLocal(
+        EXPRESSION_IDS.amused,
+        "Every room decorated for families who drove out to watch a projector show.",
+      ),
+      maraLocal(
+        EXPRESSION_IDS.neutral,
+        "The tourists stopped coming. The rooms didn't stop existing.",
+      ),
+      maraLocal(
+        EXPRESSION_IDS.firm,
+        "So I stopped waiting. Miners, haulers, contractors, anybody working a long stretch out here — that's who fills them now.",
+      ),
+      maraLocal(EXPRESSION_IDS.amused, "Same beds. Fewer complaints about the pillows."),
+      maraLocal(
+        EXPRESSION_IDS.neutral,
+        "It isn't the business my parents built. It's the one this town actually needed.",
+      ),
+    ],
+  },
+  [DIALOGUE_IDS.maraBixTopic]: {
+    id: DIALOGUE_IDS.maraBixTopic,
+    npcId: NPC_IDS.maraKells,
+    beats: [
+      maraLocal(
+        EXPRESSION_IDS.amused,
+        "Bix and I have known each other since we were kids running between these two buildings.",
+      ),
+      maraLocal(
+        EXPRESSION_IDS.neutral,
+        "He's decent. He'll tell you the truth even when a lie would make him money.",
+      ),
+      maraLocal(EXPRESSION_IDS.firm, "He's also still waiting for tourism to come back."),
+      maraLocal(
+        EXPRESSION_IDS.amused,
+        "Years of waiting, and a whole shelf of souvenir mugs to prove it.",
+      ),
+      maraLocal(EXPRESSION_IDS.neutral, "I love him dearly. He's a dingdong."),
+      maraLocal(EXPRESSION_IDS.amused, "Don't tell him I said the first part."),
     ],
   },
 } as const satisfies Record<DialogueId, DialogueSequence>;

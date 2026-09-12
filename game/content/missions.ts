@@ -30,6 +30,20 @@ export type MissionReward =
   | { kind: "skill_xp"; skillId: SkillId; amount: number };
 
 /**
+ * An authored effect applied when one offer route's acceptance commits.
+ *
+ * This is an up-front job budget, not a reward: Keep the Change hands the
+ * player Wade's Credits at acceptance so they can go buy what the job needs.
+ * It is applied inside the generic acceptance transaction, in the branch that
+ * has already proven this is a genuinely fresh acceptance, so the existing
+ * acceptance guard makes it exactly-once without a second mechanism.
+ *
+ * Deliberately narrow: one closed shape, authored per offer route, never a
+ * generic effect list.
+ */
+export type MissionAcceptEffect = { kind: "credits"; amount: number };
+
+/**
  * Explicit turn-in disposition for a carried-stack requirement. Requirement
  * satisfaction (does the character carry the quantity?) is deliberately kept
  * separate from consumption (does the turn-in take the items?).
@@ -106,6 +120,37 @@ export type MissionRequirement =
       kind: "cargo_hold_repaired";
       /** The authoritative Cargo Hold completion state satisfies this requirement. */
       objective: string;
+    }
+  | {
+      /**
+       * A mandatory authored conversation: the mission requires the player to
+       * actually meet this NPC and see this scene (Keep the Change requires
+       * Wade's new apprentice to meet Bix). It is satisfied only by the generic
+       * `acknowledgeMissionConversation` command, never by opening a merchant,
+       * arriving at a location, or reading dialogue prose.
+       *
+       * Durable satisfaction reuses the existing mission-progress row keyed by
+       * `progressKey`; no conversation history, viewed-topic flag, or new
+       * persistence shape is introduced.
+       */
+      kind: "npc_conversation";
+      npcId: NpcId;
+      /**
+       * The authored location this conversation happens at. Mission location
+       * semantics are never derived from the NPC's home location.
+       */
+      locationId: LocationId;
+      /** The authored sequence whose terminal control satisfies this requirement. */
+      dialogueId: DialogueId;
+      /** Stable identity for this requirement's durable progress row. */
+      progressKey: string;
+      /** Player-facing copy; no substitutions. */
+      objective: string;
+      /**
+       * Authored copy for the terminal control on that conversation. Falls back
+       * to a generic label when omitted.
+       */
+      actionLabel?: string;
     };
 
 /** The kinds a requirement may take, used for semantic stage routing. */
@@ -139,6 +184,11 @@ export type MissionOffer = {
    * dialogue authored via completedNpcDialogue.
    */
   activeDialogueId?: DialogueId;
+  /**
+   * Applied exactly once when acceptance at THIS offer route commits (Wade's
+   * 24-Credit job budget). Absent for an ordinary offer.
+   */
+  acceptEffect?: MissionAcceptEffect;
 };
 
 /**
@@ -200,6 +250,8 @@ export type MissionDialogue = {
   trackedActivityReminderDialogueId?: DialogueId;
   /** First unmet requirement is the Cargo Hold repair. */
   cargoRepairReminderDialogueId?: DialogueId;
+  /** First unmet requirement is a mandatory authored NPC conversation. */
+  conversationReminderDialogueId?: DialogueId;
   /** Requirements satisfied but the turn-in is not performable (busy). */
   busyDialogueId?: DialogueId;
   /**
@@ -235,7 +287,12 @@ export type MissionDefinition = {
   /** Ordered reusable live-state requirements. */
   requirements: readonly MissionRequirement[];
   turnIn: MissionTurnIn;
-  reward: MissionReward;
+  /**
+   * At most one authored completion reward. Absent when the mission's real
+   * outcome is world/social state rather than a grant: Keep the Change pays its
+   * budget up front at acceptance and deliberately adds no completion payout.
+   */
+  reward?: MissionReward;
   dialogue: MissionDialogue;
   /**
    * Ordinary post-completion story dialogue for one or more relevant NPCs
@@ -443,12 +500,80 @@ export const HOLD_IT_TOGETHER: MissionDefinition = {
   ],
 };
 
+/**
+ * Keep the Change — Wade's apprenticeship job (#170).
+ *
+ * The first mission that is neither the opening discovery nor an authored
+ * continuation: Hold It Together names no continuation, so the player earns it
+ * by going back to Wade and taking the job themselves.
+ *
+ * Wade's 24 Credits arrive up front as the offer's accept effect — the retail
+ * cost of three Power Cells from Bix — and whatever the player does not spend
+ * stays theirs. Meeting Bix is a real ordered requirement even for a player who
+ * already carries Cells, because the job is also a professional introduction;
+ * buying anything never is. The three Cells may come from any legitimate source
+ * and are consumed at the delivery through the generic carried-stack boundary.
+ */
+export const KEEP_THE_CHANGE: MissionDefinition = {
+  id: MISSION_IDS.keepTheChange,
+  title: "Keep the Change",
+  summary: "Meet Bix Weller in Holo Hollow, then get three Power Cells to Tansy Rusk at The Jag.",
+  prerequisiteMissionId: MISSION_IDS.holdItTogether,
+  offers: [
+    {
+      npcId: NPC_IDS.wadeRusk,
+      locationId: LOCATION_IDS.crashSite,
+      dialogueId: DIALOGUE_IDS.wadeKeepTheChangeOffer,
+      actionLabel: "TAKE THE JOB",
+      acceptEffect: { kind: "credits", amount: 24 },
+      activeDialogueId: DIALOGUE_IDS.wadeKeepTheChangeActive,
+    },
+  ],
+  requirements: [
+    {
+      kind: "npc_conversation",
+      npcId: NPC_IDS.bixWeller,
+      locationId: LOCATION_IDS.holoHollow,
+      dialogueId: DIALOGUE_IDS.bixKeepTheChangeIntroduction,
+      progressKey: "bix-introduction",
+      objective: "Meet Bix Weller at his shop in Holo Hollow",
+      actionLabel: "GOOD TO KNOW",
+    },
+    {
+      kind: "carried_stack",
+      itemId: ITEM_IDS.powerCell,
+      quantity: 3,
+      turnIn: "consume_required_quantity",
+      objective: "Carry three {item} — {carried} / {required}",
+    },
+  ],
+  turnIn: {
+    npcId: NPC_IDS.tansyRusk,
+    locationId: LOCATION_IDS.theJag,
+    requiresStationary: true,
+    objective: "Take the Power Cells to Tansy Rusk at The Jag",
+    dialogueId: DIALOGUE_IDS.tansyKeepTheChangeTurnIn,
+    actionLabel: "HAND OVER CELLS",
+  },
+  dialogue: {
+    conversationReminderDialogueId: DIALOGUE_IDS.tansyKeepTheChangeConversationReminder,
+    carriedReminderDialogueId: DIALOGUE_IDS.tansyKeepTheChangeCarriedReminder,
+    busyDialogueId: DIALOGUE_IDS.tansyKeepTheChangeBusy,
+    completionPresentationDialogueId: DIALOGUE_IDS.tansyKeepTheChangeCompletion,
+  },
+  completedNpcDialogue: [
+    { npcId: NPC_IDS.wadeRusk, dialogueId: DIALOGUE_IDS.wadePostKeepTheChange },
+    { npcId: NPC_IDS.tansyRusk, dialogueId: DIALOGUE_IDS.tansyPostKeepTheChange },
+  ],
+};
+
 /** Ordered chain of authored missions; later entries may require earlier ones. */
 export const MISSIONS: readonly MissionDefinition[] = [
   WALK_IT_OFF,
   CUT_YOUR_TEETH,
   WASTE_NOT,
   HOLD_IT_TOGETHER,
+  KEEP_THE_CHANGE,
 ];
 
 const missions = new Map<string, MissionDefinition>(

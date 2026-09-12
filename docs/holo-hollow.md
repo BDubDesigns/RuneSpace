@@ -168,11 +168,11 @@ Do not build a broad generic requirements DSL preemptively. Add only the smalles
 condition mechanism proven necessary when a real Mission/world-state unlock is
 implemented.
 
-**HH B&B** is the first example and shipped visible but locked: early explorers
-may see it but are refused entry because it currently serves locals and regular
-workers only. A follow-up Wade Power Cell Mission introduces Mara Kells and, on
-completion, changes that Local Place to enterable. That Mission and unlock are
-not implemented yet.
+**HH B&B** is the first example. It shipped visible but locked in #167, and
+#170 supplied its unlock: Keep the Change introduces Mara Kells and, on
+completion, makes the place enterable. Access derives from that Mission's
+completion through the one generic access predicate — no second persisted
+unlock flag exists (`docs/gameplay-foundations.md`, Local Places).
 
 The locked place should remain visible so the player can notice that the world
 changed when access is later granted.
@@ -188,10 +188,12 @@ Holo Hollow's resident interaction is scoped to the active Local Place. Bix is
 the resident interaction in his shop and Renn is the resident interaction at the
 Community Assistance Center.
 
-Mara's later appearance in Bix's shop during the Wade apprentice Mission is an
-authored dialogue/cutscene beat. It does not make Mara a persistent second shop
-NPC and does not justify building multi-NPC interaction UI before the game has a
-real need for it.
+Mara's appearance in Bix's shop during the Wade apprentice Mission is an
+authored dialogue beat. It does not make Mara a persistent second shop
+NPC and did not justify building multi-NPC interaction UI. As shipped in #170 it
+needed no new system at all: a dialogue beat already carries its own
+`speakerNpcId`, so Mara simply speaks inside Bix's own authored sequence while
+`getResidentNpc` keeps resolving exactly one resident per place.
 
 ### Holo Drive-In
 
@@ -291,6 +293,35 @@ Cheap, unappetizing but nutritious daily rations may be referenced through art,
 dialogue, or worldbuilding. Do **not** implement a player-facing ration claim,
 food item, healing effect, or consumable system until food/healing gameplay has
 an actual purpose.
+
+### DeWhat? Emergency Power Annex
+
+The Annex is **old S.S.A.-required emergency-continuity infrastructure from
+Holo Hollow's tourism era** (canon established in #170).
+
+When projector nights still brought families and travelers into a remote
+settlement, the Settled Systems Authority required a public emergency-power
+depot so stranded residents and travelers could keep essential systems running
+until help arrived. **DeWhat? won the contract and installed the automated
+Annex.**
+
+Tourism later collapsed. The contract did not. The Annex remains active public
+infrastructure and still issues its limited daily allotment of standardized
+Power Cells.
+
+The in-world purpose of the per-person daily limit is fair emergency access:
+enough portable power for essential heat, comms, lighting, or tools without
+letting one person empty the public reserve. The gameplay rule itself is
+unchanged and owned by `docs/gameplay-foundations.md` (Daily Power Annex claim).
+
+Free public Cells and Bix's paid stock coexist for ordinary economic reasons:
+the allotment is personal and capped, it does not stock Bix's shelves for the
+whole town, people may already have used theirs or need more than the limit,
+some would rather pay than wait for a reset, and Bix buys spare Cells from
+people who would rather have Credits.
+
+This is worldbuilding around an existing mechanic. Do **not** turn it into a
+government simulation, a ration system, or new daily persistence.
 
 ### Depot / hauler area
 
@@ -447,14 +478,15 @@ and content; they are not recorded here as shipped.
 
 ### Deferred
 
-Follow-up work, not part of the shipped foundation:
+Follow-up work, not part of the shipped foundation. Everything except the art
+debt shipped afterwards in #170 (see "Keep the Change" below):
 
-- Wade's three-Power-Cell apprentice Mission (see below);
-- Mara's authored Bix-shop appearance during that Mission;
-- Mara's full portrait/expression set and the enterable HH B&B interior, which
-  belong to that Mission's asset pass because it introduces Mara to the player;
-- the HH B&B unlock on that Mission's completion;
-- replacing the similar Local Place exteriors (art debt above).
+- ~~Wade's three-Power-Cell apprentice Mission~~ — shipped in #170;
+- ~~Mara's authored Bix-shop appearance during that Mission~~ — shipped in #170;
+- ~~Mara's portrait/expression set and the HH B&B conversation interior~~ —
+  shipped in #170;
+- ~~the HH B&B unlock on that Mission's completion~~ — shipped in #170;
+- replacing the similar Local Place exteriors (art debt above) — still open.
 
 ### Still out of scope
 
@@ -476,9 +508,12 @@ Follow-up work, not part of the shipped foundation:
 - a second town hex solely for class distinction;
 - speculative generic city simulation or NPC scheduling.
 
-## Follow-up Wade apprentice Mission
+## Keep the Change — the Wade apprentice Mission (shipped in #170)
 
-The Mission after **Hold It Together** should not auto-start. The player talks to
+This section recorded approved direction before implementation; it now records
+what shipped. The Mission framework contract lives in `docs/missions.md`.
+
+The Mission after **Hold It Together** does not auto-start. The player talks to
 Wade after repairing the Cargo Hold.
 
 Wade is reservedly pleased and declares the player his apprentice whether they
@@ -489,26 +524,28 @@ Cells while Mining. Wade has none.
 Wade sends his new apprentice to bring Tansy **3 Power Cells** and gives the
 player exactly **24 Credits** — the retail cost of three Cells from Bix.
 
-The Mission should:
+As shipped, the Mission:
 
-- require the player to visit and interact with Bix even if they already carry
-  three Cells;
-- allow existing inventory to satisfy the final delivery requirement;
-- let the player keep Wade's allowance if they already own the Cells;
-- introduce Bix and Holo Hollow's merchant economy;
-- let Bix joke about Wade providing exactly the purchase price and no delivery
-  tip;
-- let Bix point the player toward the Emergency Power Annex as the renewable
-  daily Cell source;
-- introduce Mara naturally during the Bix interaction as an authored dialogue
-  participant rather than a persistent second shop NPC;
-- unlock HH B&B only after the Mission is completed;
-- prefer one sequential Mission if the generic Mission framework supports the
-  needed conversation/activity stages rather than splitting it into arbitrary
-  Mission IDs to work around missing framework capability.
+- requires the player to visit and complete the authored conversation with Bix
+  even if they already carry three Cells, and never requires Trade, a purchase,
+  or a sale;
+- accepts Cells from any legitimate source, including inventory owned before
+  acceptance, the Annex allotment, and Bix's shelf, with no provenance tracking;
+- lets the player keep every Credit they do not spend — there is no completion
+  payout and no reimbursement;
+- introduces Bix and Holo Hollow's merchant economy, including his joke about
+  Wade providing exactly the purchase price and no delivery tip;
+- has Bix explain the Annex's S.S.A./DeWhat? history, its per-person daily
+  limit, and why he still sells Cells;
+- introduces Mara as an authored guest speaker inside Bix's own dialogue
+  sequence rather than a persistent second shop NPC, and that one-time encounter
+  is not replayable afterwards;
+- unlocks HH B&B only on completion, derived from the Mission record;
+- stayed one sequential Mission on the generic framework, with four narrow
+  generic extensions rather than Mission-specific code (`docs/missions.md`
+  §8.1, §9.2, §12.3).
 
-This Mission is a **follow-up issue**, not part of the first Holo Hollow
-foundation implementation.
+The player character stays silent throughout, as everywhere else in RuneSpace.
 
 ## Contracts and economic progression
 

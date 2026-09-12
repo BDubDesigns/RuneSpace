@@ -5,6 +5,7 @@ import { ItemVisual } from "@/components/items/ItemVisual";
 import { ActionButton } from "@/components/ui/ActionButton";
 import { Drawer } from "@/components/ui/Drawer";
 import { Feedback } from "@/components/ui/Feedback";
+import { MissionActionButton } from "@/components/ui/MissionActionButton";
 import { StatusMeter } from "@/components/ui/StatusMeter";
 import { getEffectiveGameBalance } from "@/game/config/balance";
 import { GAME_TICK_MS } from "@/game/config/foundations";
@@ -187,13 +188,8 @@ export function EquipmentPanel({
                         {formatMassGrams(item.massGrams)}
                       </p>
                     </div>
-                    <ActionButton
-                      className={
-                        missionGuidanceTargets.equipmentItemIds.has(item.itemId)
-                          ? "rs-mission-guidance"
-                          : undefined
-                      }
-                      data-mission-guidance={
+                    <MissionActionButton
+                      guidance={
                         missionGuidanceTargets.equipmentItemIds.has(item.itemId)
                           ? "active"
                           : undefined
@@ -203,7 +199,7 @@ export function EquipmentPanel({
                       onClick={() => equip(item.itemInstanceId, slot.target, "")}
                     >
                       Equip in {slot.label}
-                    </ActionButton>
+                    </MissionActionButton>
                   </div>
                 ))}
               </div>

@@ -5,10 +5,12 @@ import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { ActionButton } from "@/components/ui/ActionButton";
-import { ActionLink } from "@/components/ui/ActionLink";
+import { MissionActionLink } from "@/components/ui/MissionActionLink";
 import { SectionHeader } from "@/components/ui/SectionHeader";
+import { usePlay } from "@/features/play/PlayContext";
 import { getLocalPlacesForLocation } from "@/game/content/local-places";
 import { deriveLocalPlaceAccess } from "@/game/domain/local-places";
+import { deriveCompletedMissionIds, deriveMissionGuidanceTargets } from "@/game/domain/missions";
 import type { LocalPlaceDefinition } from "@/game/schemas/local-places";
 import { localPlaceHref } from "./navigation";
 
@@ -28,17 +30,27 @@ import { localPlaceHref } from "./navigation";
  */
 export function LocalPlaceDirectory({ locationId }: { locationId: string }) {
   const pathname = usePathname();
+  const { state } = usePlay();
   const places = getLocalPlacesForLocation(locationId);
   if (places.length === 0) return null;
+  // A place whose door opens on Mission completion reads that authoritative
+  // state here, so the world visibly changes as soon as the Mission is done.
+  const completedMissionIds = deriveCompletedMissionIds(state.missions);
+  // An accepted Mission whose target NPC lives inside one of these places
+  // guides that place's entrance; the NPC takes over once the player is inside.
+  const guidance = deriveMissionGuidanceTargets(state.missions);
 
   return (
     <div data-local-place-directory>
       <SectionHeader eyebrow="Around town">Places</SectionHeader>
       <ul className="mt-4 grid gap-3 sm:grid-cols-2">
         {places.map((place) => {
-          const access = deriveLocalPlaceAccess(place);
+          const access = deriveLocalPlaceAccess(place, completedMissionIds);
           const href = localPlaceHref(pathname, place.id);
           const reasonId = `local-place-reason-${place.id}`;
+          // A guided doorway sits on the neutral control surface like every other
+          // green-guided control; the primary fill would tint it under the green.
+          const guided = guidance.localPlaceIds.has(place.id);
 
           return (
             <li className="flex" key={place.id}>
@@ -60,14 +72,16 @@ export function LocalPlaceDirectory({ locationId }: { locationId: string }) {
                     <PlaceSummary place={place} />
                   </div>
                   <div className="relative mt-auto p-3 pt-0">
-                    <ActionLink
+                    <MissionActionLink
                       aria-label={`Enter ${place.displayName}`}
-                      className="w-full"
                       data-local-place-enter
+                      guidance={guided ? "active" : undefined}
+                      haloClassName="w-full"
                       href={href}
+                      intent={guided ? "secondary" : "primary"}
                     >
                       Enter
-                    </ActionLink>
+                    </MissionActionLink>
                   </div>
                 </article>
               ) : (

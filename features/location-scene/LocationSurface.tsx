@@ -7,6 +7,7 @@ import { LOCATION_IDS } from "@/game/config/foundations";
 import { getLocalPlacesForLocation } from "@/game/content/local-places";
 import { getLocation } from "@/game/content/locations";
 import { resolveActiveLocalPlace } from "@/game/domain/local-places";
+import { deriveCompletedMissionIds } from "@/game/domain/missions";
 import { CargoHoldPanel } from "@/features/cargo/CargoHoldPanel";
 import { LocalPlaceDirectory } from "@/features/local-places/LocalPlaceDirectory";
 import { LocalPlaceSurface } from "@/features/local-places/LocalPlaceSurface";
@@ -35,6 +36,7 @@ export function LocationSurface({
   const activePlace = resolveActiveLocalPlace({
     locationId,
     requestedLocalPlaceId: localPlaceId,
+    completedMissionIds: deriveCompletedMissionIds(state.missions),
   });
   if (activePlace) {
     return (

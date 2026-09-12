@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, useTransition } from "react";
 import { ActionButton } from "@/components/ui/ActionButton";
 import { Feedback } from "@/components/ui/Feedback";
+import { MissionActionButton } from "@/components/ui/MissionActionButton";
 import { Panel } from "@/components/ui/Panel";
 import { StatusMeter } from "@/components/ui/StatusMeter";
 import { ItemVisual } from "@/components/items/ItemVisual";
@@ -680,16 +681,15 @@ export function CargoHoldPanel() {
                   STOP WELDING
                 </ActionButton>
               ) : repair.weldingProgress < repair.weldingIncrements ? (
-                <ActionButton
-                  className={startWeldingGuided ? "rs-mission-guidance" : undefined}
-                  data-mission-guidance={startWeldingGuided ? "active" : undefined}
+                <MissionActionButton
+                  guidance={startWeldingGuided ? "active" : undefined}
                   disabled={Boolean(pending)}
                   intent="mining"
                   loading={pending === "start"}
                   onClick={() => runWeldingCommand("start")}
                 >
                   START WELDING
-                </ActionButton>
+                </MissionActionButton>
               ) : null}
               <span className="text-xs uppercase tracking-wide text-[color:var(--rs-text-secondary)]">
                 {balance.welding.attemptDurationTicks} ticks /{" "}
@@ -698,15 +698,15 @@ export function CargoHoldPanel() {
               </span>
             </div>
           ) : (
-            <ActionButton
-              className={contributeGuided ? "rs-mission-guidance mt-4" : "mt-4"}
-              data-mission-guidance={contributeGuided ? "active" : undefined}
+            <MissionActionButton
+              guidance={contributeGuided ? "active" : undefined}
+              haloClassName="mt-4"
               disabled={Boolean(pending) || !contributionAvailable}
               intent="mining"
               onClick={() => setConfirmation(repair.availableContribution)}
             >
               CONTRIBUTE MATERIALS
-            </ActionButton>
+            </MissionActionButton>
           )}
           {activeWelding ? (
             <div className="mt-4">

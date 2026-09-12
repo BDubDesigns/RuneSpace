@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { and, eq, isNotNull } from "drizzle-orm";
 import {
   characterCargoHoldRepair,
   characterMissionProgress,
@@ -8,9 +8,11 @@ import {
 } from "@/db/rune-space";
 import { getEffectiveGameBalance, getItemDefinition } from "@/game/config/balance";
 import { CONVERSATION_TOPICS } from "@/game/content/conversation-topics";
+import { LOCAL_PLACES } from "@/game/content/local-places";
 import { MISSIONS, type MissionDefinition } from "@/game/content/missions";
 import { cargoHoldRepairComplete } from "@/game/domain/cargo-hold";
 import { validateConversationTopics } from "@/game/domain/conversation";
+import { validateLocalPlaceAccess } from "@/game/domain/local-places";
 import {
   projectMission,
   validateMissionDefinitions,
@@ -32,6 +34,11 @@ validateMissionDefinitions(MISSIONS);
 // gates, and any attempt to reuse a Mission-owned sequence as a replayable
 // social topic all fail here rather than inside a player conversation.
 validateConversationTopics(CONVERSATION_TOPICS, MISSIONS);
+
+// Local Place access that derives from Mission completion is validated on the
+// same boundary: a place gating on a Mission that does not exist would stay
+// locked forever rather than failing visibly.
+validateLocalPlaceAccess(LOCAL_PLACES, new Set(MISSIONS.map((mission) => mission.id)));
 
 /**
  * Authoritative mission projection for the play state. Persistence contains
@@ -94,6 +101,25 @@ export async function loadMissionProjections(
       prerequisiteCompletedFor(mission, byMissionId),
     );
   });
+}
+
+/**
+ * The Missions this character has completed, as the authoritative read for
+ * derived world state (a Local Place that opens once a Mission is done).
+ * Commands use this so access is revalidated server-side from the completion
+ * record itself rather than trusted from the browser.
+ */
+export async function loadCompletedMissionIds(
+  transaction: DatabaseTransaction,
+  characterId: string,
+): Promise<ReadonlySet<string>> {
+  const rows = await transaction
+    .select({ missionId: characterMissions.missionId })
+    .from(characterMissions)
+    .where(
+      and(eq(characterMissions.characterId, characterId), isNotNull(characterMissions.completedAt)),
+    );
+  return new Set(rows.map((row) => row.missionId));
 }
 
 /**

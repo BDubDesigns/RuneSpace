@@ -39,9 +39,11 @@ import { claimPowerCells, type PowerAnnexClaimResult } from "@/server/power-anne
 import { tradeWithMerchant, type TradeResult } from "@/server/trade";
 import {
   acceptMission,
+  acknowledgeMissionConversation,
   completeMission,
   type MissionAcceptanceResult,
   type MissionCompletionResult,
+  type MissionConversationAcknowledgementResult,
 } from "@/server/missions";
 import {
   EquipEquipmentRequestSchema,
@@ -61,6 +63,7 @@ import {
   ChangeCharacterPortraitRequestSchema,
   AcceptMissionRequestSchema,
   CompleteMissionRequestSchema,
+  AcknowledgeMissionConversationRequestSchema,
 } from "@/game/schemas/gameplay";
 
 /**
@@ -160,6 +163,10 @@ export type MissionActionResult =
   | MissionCompletionResult
   | { error: string };
 
+export type MissionConversationActionResult =
+  | MissionConversationAcknowledgementResult
+  | { error: string };
+
 /**
  * Generic mission acceptance command. The browser submits only narrow command
  * identity/intent (owned character, authored mission, NPC); the server
@@ -197,6 +204,32 @@ export async function completeMissionAction(input: unknown): Promise<MissionActi
       request.data.characterId,
       request.data.missionId,
       request.data.npcId,
+    );
+  } catch (error) {
+    if (error instanceof OwnershipError) return { error: error.message };
+    throw error;
+  }
+}
+
+/**
+ * Generic mandatory-conversation command. The browser reports only which
+ * mission, NPC, and authored sequence it played; the server confirms the
+ * mission authors exactly that conversation and that the character is really
+ * there before the requirement is satisfied.
+ */
+export async function acknowledgeMissionConversationAction(
+  input: unknown,
+): Promise<MissionConversationActionResult> {
+  const request = AcknowledgeMissionConversationRequestSchema.safeParse(input);
+  if (!request.success) return { error: "Invalid mission conversation command." };
+  try {
+    const user = await requireCurrentUser(await headers());
+    return await acknowledgeMissionConversation(
+      user.id,
+      request.data.characterId,
+      request.data.missionId,
+      request.data.npcId,
+      request.data.dialogueId,
     );
   } catch (error) {
     if (error instanceof OwnershipError) return { error: error.message };

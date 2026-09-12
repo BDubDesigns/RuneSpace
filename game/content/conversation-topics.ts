@@ -89,6 +89,23 @@ export const CONVERSATION_TOPICS = [
     availability: { kind: "always" },
   },
   {
+    // Mara is reachable only inside HH B&B, which Keep the Change opens, so the
+    // Local Place access rule is the single gate — her topics add no second
+    // condition that could leave her present with nothing to say.
+    id: CONVERSATION_TOPIC_IDS.maraTheBnb,
+    npcId: NPC_IDS.maraKells,
+    label: "The B&B",
+    dialogueId: DIALOGUE_IDS.maraTheBnbTopic,
+    availability: { kind: "always" },
+  },
+  {
+    id: CONVERSATION_TOPIC_IDS.maraBix,
+    npcId: NPC_IDS.maraKells,
+    label: "Bix",
+    dialogueId: DIALOGUE_IDS.maraBixTopic,
+    availability: { kind: "always" },
+  },
+  {
     id: CONVERSATION_TOPIC_IDS.rennAssistanceCenter,
     npcId: NPC_IDS.rennCalder,
     label: "The Assistance Center",
