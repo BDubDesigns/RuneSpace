@@ -3,7 +3,7 @@ import { ACTION_IDS } from "@/game/config/foundations";
 import { getActionOutputItemIds } from "@/game/domain/action-outputs";
 import { getDialogue } from "@/game/content/dialogue";
 import { getLocalPlaceInLocation } from "@/game/content/local-places";
-import { getLocation } from "@/game/content/locations";
+import { getLocation, isActionAvailableAtLocation, LOCATIONS } from "@/game/content/locations";
 import { getNpc } from "@/game/content/npcs";
 import { resolveItemPresentation } from "@/game/content/item-presentation";
 import { getSkillPresentation } from "@/game/content/skill-presentation";
@@ -46,14 +46,33 @@ export type MissionObservation = {
  * or drop tables.
  */
 export type MissionGuidance = {
+  /**
+   * The targets below are the Mission's final handoff: every authored
+   * requirement holds and only the turn-in remains. This is the turn-in
+   * phase, derived from the same requirement check as
+   * `stage.requirementsSatisfied` — not "the turn-in command is executable
+   * right now" (`stage.turnInAvailable`), so it holds while the player is
+   * still somewhere else or busy. Absent while authored work remains.
+   */
+  turnIn?: true;
+  /**
+   * The World Location where the next Mission boundary is, when that is not
+   * the player's current location. Resolved only from authored data (an
+   * `at_location` or `npc_conversation` requirement's location, the turn-in
+   * location, or the one location offering a recommended action) and never
+   * invented: with several legitimate places and no authored route, there is
+   * no destination. Arriving there ends it and hands off to the local
+   * boundary below.
+   */
+  locationId?: string;
   /** The NPC whose interaction the current objective requires. */
   npcId?: string;
   /**
    * The Local Place at the player's current World Location where that `npcId`
    * target lives. A Local Place resident is not on screen until the player
-   * steps inside, so the place's entrance carries the active guidance until
-   * then. Derived from authored NPC placement for accepted progression only —
-   * never from availability, and never the World Location itself.
+   * steps inside, so the place's entrance carries the guidance until then.
+   * Derived from authored NPC placement for accepted Missions only — never
+   * from availability, and never the World Location itself.
    */
   localPlaceId?: string;
   /** The item whose equipped state is the first unmet requirement. */
@@ -306,9 +325,13 @@ function deriveCurrentObjective(
  * prerequisite (if any) is satisfied, advertises through the NPC(s) authoring
  * an offer at the player's current location — exactly the offers the
  * conversation hub surfaces, so the Talk control and the hub entry share one
- * answer. It never produces an objective, a progression target, or anything a
- * global surface (Mission Log, map, route) reads; those derive from accepted
- * state only.
+ * answer. It never produces an objective, a progression target, a Local Place
+ * entrance, or anything a global surface (Mission Log, map, route) reads.
+ *
+ * Accepted guidance follows the next authored boundary: a World Location
+ * elsewhere (`locationId`), then — once there — the Local Place entrance, NPC,
+ * equipment, or action. Once every requirement holds the same handoff chain
+ * points at the authored turn-in, flagged `turnIn`.
  */
 function deriveGuidance(
   definition: MissionDefinition,
@@ -328,9 +351,21 @@ function deriveGuidance(
   }
   const firstUnsatisfied = firstUnsatisfiedRequirement(definition, currentLocationId, observation);
   if (!firstUnsatisfied) {
-    // Every requirement holds: the turn-in NPC is the interaction target even
-    // while the character is still busy (turn-in merely not performable yet).
-    return npcGuidance(definition.turnIn.npcId, currentLocationId);
+    // Every requirement holds: the Mission is in its turn-in phase, and the
+    // authored handoff is the target wherever the player is and even while
+    // they are busy (the turn-in is merely not performable yet).
+    return {
+      ...npcBoundaryGuidance(
+        definition.turnIn.npcId,
+        definition.turnIn.locationId,
+        currentLocationId,
+      ),
+      turnIn: true as const,
+    };
+  }
+  if (firstUnsatisfied.kind === "at_location") {
+    // Unsatisfied means the player is elsewhere: the location is the target.
+    return { locationId: firstUnsatisfied.locationId };
   }
   if (firstUnsatisfied.kind === "equipped_item") {
     return { equipmentItemId: firstUnsatisfied.itemId };
@@ -339,25 +374,61 @@ function deriveGuidance(
     (firstUnsatisfied.kind === "carried_stack" || firstUnsatisfied.kind === "tracked_activity") &&
     firstUnsatisfied.recommendedActionId
   ) {
-    return { actionId: firstUnsatisfied.recommendedActionId };
+    return {
+      actionId: firstUnsatisfied.recommendedActionId,
+      ...actionDestination(firstUnsatisfied.recommendedActionId, currentLocationId),
+    };
   }
   if (firstUnsatisfied.kind === "cargo_hold_repaired") {
     return { cargoRepair: true as const };
   }
   if (firstUnsatisfied.kind === "npc_conversation") {
-    // The person to go and meet is the interaction target, exactly as the
-    // turn-in NPC is once every requirement holds.
-    return npcGuidance(firstUnsatisfied.npcId, currentLocationId);
+    // The person to go and meet is the target, exactly as the turn-in NPC is
+    // once every requirement holds.
+    return npcBoundaryGuidance(
+      firstUnsatisfied.npcId,
+      firstUnsatisfied.locationId,
+      currentLocationId,
+    );
   }
+  // A carried requirement with no authored route (several legitimate
+  // sources) gets no guidance: the framework never picks one for the player.
   return undefined;
 }
 
 /**
- * Active guidance toward one NPC. When that NPC is the resident of a Local
- * Place at the player's current World Location, they only appear once the
- * player steps inside, so the place is carried too and its entrance becomes
- * the target until then. Derived purely from authored NPC placement; an NPC
- * elsewhere in the world produces no place or location target at all.
+ * Guidance toward one NPC at an authored World Location: that location while
+ * the player is elsewhere, then the NPC (and its Local Place entrance, if any)
+ * once the player has arrived.
+ */
+function npcBoundaryGuidance(
+  npcId: string,
+  locationId: string,
+  currentLocationId: string,
+): MissionGuidance {
+  if (locationId !== currentLocationId) return { npcId, locationId };
+  return npcGuidance(npcId, currentLocationId);
+}
+
+/**
+ * Where an authored recommended action can be done, when it cannot be done
+ * here: the one World Location that offers it. Several (or none) means there is
+ * no single authored destination, so none is invented.
+ */
+function actionDestination(actionId: string, currentLocationId: string): MissionGuidance {
+  if (isActionAvailableAtLocation(currentLocationId, actionId)) return {};
+  const offering = LOCATIONS.filter((location) =>
+    (location.availableActionIds as readonly string[]).includes(actionId),
+  );
+  const [only, ...others] = offering;
+  return only && others.length === 0 ? { locationId: only.id } : {};
+}
+
+/**
+ * Guidance toward one NPC at the player's current World Location. When that NPC
+ * is the resident of a Local Place here, they only appear once the player steps
+ * inside, so the place is carried too and its entrance becomes the target until
+ * then. Derived purely from authored NPC placement.
  */
 function npcGuidance(npcId: string, currentLocationId: string): MissionGuidance {
   const residentPlaceId = getNpc(npcId)?.localPlaceId;
@@ -505,26 +576,65 @@ function projectEarnedReward(definition: MissionDefinition): MissionEarnedReward
 /**
  * The union of currently projected mission-guidance targets across all missions.
  * UI surfaces consume this single derived set instead of inspecting mission
- * state themselves. `availableNpcIds` (blue) and `npcIds` (green) are
- * semantically distinct: a consumer can tell "new mission here" from "this
- * interaction advances the mission you accepted" without inferring intent
- * from mission state, dialogue IDs, or colours.
+ * state themselves. Three meanings stay semantically distinct even though two
+ * share blue presentation: `availableNpcIds` ("this person has work for you",
+ * local discovery only), the active sets ("this advances the Mission you
+ * accepted", green), and the `turnIn*` sets ("the work is done — hand it in",
+ * blue). A consumer never infers one from another, from Mission state,
+ * dialogue IDs, or colours.
  */
 export type MissionGuidanceTargets = {
   /** NPC(s) whose authored offer is currently a mission-availability target. */
   availableNpcIds: ReadonlySet<string>;
-  /** NPC(s) whose interaction advances/completes an accepted mission. */
+  /** NPC(s) whose interaction advances an accepted Mission's remaining work. */
   npcIds: ReadonlySet<string>;
+  /** NPC(s) who are the final handoff of a Mission in its turn-in phase. */
+  turnInNpcIds: ReadonlySet<string>;
   /**
    * Local Place(s) at the current World Location whose entrance leads to an
-   * accepted mission's NPC target (see `MissionGuidance.localPlaceId`).
+   * accepted Mission's active NPC target (see `MissionGuidance.localPlaceId`).
    */
   localPlaceIds: ReadonlySet<string>;
+  /** Local Place(s) here whose entrance leads to a turn-in NPC. */
+  turnInLocalPlaceIds: ReadonlySet<string>;
+  /** World Location(s) elsewhere where an accepted Mission's next work is (MISSION). */
+  locationIds: ReadonlySet<string>;
+  /** World Location(s) elsewhere where a Mission's final handoff is (TURN IN). */
+  turnInLocationIds: ReadonlySet<string>;
   equipmentItemIds: ReadonlySet<string>;
   actionIds: ReadonlySet<string>;
   /** True while an accepted mission's current target is the Cargo Hold repair surface. */
   cargoRepair: boolean;
 };
+
+/** The one Mission meaning a guided control presents. */
+export type MissionGuidanceMeaning = "active" | "turn_in" | "available";
+
+/**
+ * The meaning an NPC's controls present when several Missions target them.
+ * Deterministic precedence: active green (work remains) over turn-in blue over
+ * available blue — accepted work first, and an accepted Mission's handoff
+ * before a new offer. Every underlying fact stays in the target sets.
+ */
+export function npcGuidanceMeaning(
+  targets: MissionGuidanceTargets,
+  npcId: string,
+): MissionGuidanceMeaning | undefined {
+  if (targets.npcIds.has(npcId)) return "active";
+  if (targets.turnInNpcIds.has(npcId)) return "turn_in";
+  if (targets.availableNpcIds.has(npcId)) return "available";
+  return undefined;
+}
+
+/** The meaning a Local Place entrance presents; same precedence as NPCs. */
+export function localPlaceGuidanceMeaning(
+  targets: MissionGuidanceTargets,
+  localPlaceId: string,
+): Exclude<MissionGuidanceMeaning, "available"> | undefined {
+  if (targets.localPlaceIds.has(localPlaceId)) return "active";
+  if (targets.turnInLocalPlaceIds.has(localPlaceId)) return "turn_in";
+  return undefined;
+}
 
 /**
  * The Missions the character has completed.
@@ -548,22 +658,42 @@ export function deriveMissionGuidanceTargets(
 ): MissionGuidanceTargets {
   const availableNpcIds = new Set<string>();
   const npcIds = new Set<string>();
+  const turnInNpcIds = new Set<string>();
   const localPlaceIds = new Set<string>();
+  const turnInLocalPlaceIds = new Set<string>();
+  const locationIds = new Set<string>();
+  const turnInLocationIds = new Set<string>();
   const equipmentItemIds = new Set<string>();
   const actionIds = new Set<string>();
   let cargoRepair = false;
   for (const projection of projections) {
-    if (projection.guidance?.availableNpcIds) {
-      for (const id of projection.guidance.availableNpcIds) availableNpcIds.add(id);
+    const guidance = projection.guidance;
+    if (!guidance) continue;
+    if (guidance.availableNpcIds) {
+      for (const id of guidance.availableNpcIds) availableNpcIds.add(id);
     }
-    if (projection.guidance?.npcId) npcIds.add(projection.guidance.npcId);
-    if (projection.guidance?.localPlaceId) localPlaceIds.add(projection.guidance.localPlaceId);
-    if (projection.guidance?.equipmentItemId)
-      equipmentItemIds.add(projection.guidance.equipmentItemId);
-    if (projection.guidance?.actionId) actionIds.add(projection.guidance.actionId);
-    if (projection.guidance?.cargoRepair) cargoRepair = true;
+    const turnIn = guidance.turnIn === true;
+    if (guidance.npcId) (turnIn ? turnInNpcIds : npcIds).add(guidance.npcId);
+    if (guidance.localPlaceId) {
+      (turnIn ? turnInLocalPlaceIds : localPlaceIds).add(guidance.localPlaceId);
+    }
+    if (guidance.locationId) (turnIn ? turnInLocationIds : locationIds).add(guidance.locationId);
+    if (guidance.equipmentItemId) equipmentItemIds.add(guidance.equipmentItemId);
+    if (guidance.actionId) actionIds.add(guidance.actionId);
+    if (guidance.cargoRepair) cargoRepair = true;
   }
-  return { availableNpcIds, npcIds, localPlaceIds, equipmentItemIds, actionIds, cargoRepair };
+  return {
+    availableNpcIds,
+    npcIds,
+    turnInNpcIds,
+    localPlaceIds,
+    turnInLocalPlaceIds,
+    locationIds,
+    turnInLocationIds,
+    equipmentItemIds,
+    actionIds,
+    cargoRepair,
+  };
 }
 
 /**

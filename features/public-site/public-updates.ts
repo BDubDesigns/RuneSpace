@@ -5,6 +5,40 @@ export type { PublicUpdate } from "@/game/schemas/public-updates";
 
 const authoredUpdates = [
   {
+    slug: "following-the-job",
+    title: "Following the Job",
+    publishedAt: "2026-09-12T20:00:00-07:00",
+    summary:
+      "The Map now spells out MISSION and TURN IN in plain text, and the person you hand a finished job to lights up blue instead of green.",
+    body: [
+      "Guidance used to run out at the edge of the room you were standing in. If a job's next step was somewhere else, you knew a location was probably relevant, but nothing on the Map actually said so — and once every objective on a job was done, the person waiting to receive it still glowed the same green as work you hadn't finished yet.",
+      "The Map now labels a hex MISSION when it's where an accepted job needs you next, and TURN IN when it's where a finished job gets handed in — each with a glowing outline around the hex, visible from anywhere on the Map, not just once you arrive. Get there and the same handoff you already know continues as normal: a building's Enter lights up, then the person inside.",
+      "Blue is now reserved for conversations: someone with a new job for you, or the person waiting for one you've already finished. Green always means there's still work to do. And when a job can genuinely be finished more than one way — three Power Cells can come from your Inventory, the Annex, or Bix's shelf — nothing gets highlighted for that step. That choice stays yours.",
+    ],
+    patchNotes: [
+      {
+        heading: "Added",
+        items: [
+          "The Map labels a hex MISSION when it's an accepted job's destination, and TURN IN when it's where a finished job is handed in, each with a glowing outline.",
+          "A finished job's hand-in point is now highlighted even from elsewhere, before you've arrived there.",
+        ],
+      },
+      {
+        heading: "Changed",
+        items: [
+          "The person you hand a finished job to is now highlighted blue instead of green.",
+          "Green now always means there is work still to do.",
+        ],
+      },
+      {
+        heading: "Fixed",
+        items: [
+          "The keyboard focus outline is now visible on buttons, including buttons highlighted for a job. Clicking or tapping a button doesn't show it.",
+        ],
+      },
+    ],
+  },
+  {
     slug: "keep-the-change",
     title: "Keep the Change",
     publishedAt: "2026-09-11T20:00:00-07:00",

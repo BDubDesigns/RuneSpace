@@ -256,9 +256,10 @@ test("equips the Cutter through Inventory, shows a full stack, and earns Mining 
     "Show a full stack of Ferrite Shale to Tansy Rusk",
   );
   await page.keyboard.press("Escape");
+  // Every requirement holds: Tansy is the blue TURN IN handoff (#143).
   await expect(page.getByRole("button", { name: /Talk to Tansy Rusk/ })).toHaveAttribute(
     "data-mission-guidance",
-    "active",
+    "turn_in",
   );
   // The Missions footer badge counts ready-to-turn-in missions only: exactly 1.
   await expect(page.locator("[data-missions-badge]")).toHaveText("1");
@@ -408,6 +409,12 @@ test("equips the Cutter through Inventory, shows a full stack, and earns Mining 
     .set({ currentLocationId: LOCATION_IDS.crashSite })
     .where(eq(characters.id, characterId));
   await page.reload();
+  // Map guidance (#143): Refining is only offered at the Processing Yard, so
+  // that hex is the green MISSION destination until the player arrives.
+  await openMapSurface(page);
+  const yardHex = page.locator(`[data-map-location="${LOCATION_IDS.abandonedProcessingYard}"]`);
+  await expect(yardHex).toHaveAttribute("data-mission-guidance", "active");
+  await expect(yardHex.locator("[data-map-mission-marker]")).toHaveText(/^Mission$/i);
   await travelTo(
     page,
     characterId,
@@ -464,10 +471,18 @@ test("equips the Cutter through Inventory, shows a full stack, and earns Mining 
     refinedStacks.find((stack) => stack.itemId === ITEM_IDS.ferriteShale)?.quantity,
   ).toBeUndefined();
 
+  // Still at the Yard with the work done: the Crash Site is already the blue
+  // TURN IN destination, and the Yard itself carries no guidance.
+  await openMapSurface(page);
+  const crashHex = page.locator(`[data-map-location="${LOCATION_IDS.crashSite}"]`);
+  await expect(crashHex).toHaveAttribute("data-mission-guidance", "turn_in");
+  await expect(crashHex.locator("[data-map-mission-marker]")).toHaveText(/^Turn in$/i);
+  await expect(page.locator("[data-map-location][data-mission-guidance]")).toHaveCount(1);
   await travelTo(page, characterId, LOCATION_IDS.crashSite, /Walk to Crash Site/);
+  // Refining is done: Wade (giver ≠ turn-in proof) is the blue TURN IN handoff.
   await expect(page.getByRole("button", { name: /Talk to Wade Rusk/ })).toHaveAttribute(
     "data-mission-guidance",
-    "active",
+    "turn_in",
   );
   const wade = await openNpcDialogue(page, "Wade Rusk", /Waste Not/);
   await wade.getByRole("button", { name: "Next", exact: true }).click();

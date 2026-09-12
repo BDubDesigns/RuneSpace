@@ -367,6 +367,14 @@ const authoredWikiArticles = [
         ],
       },
       {
+        heading: "Following a job",
+        paragraphs: [
+          "Once you've accepted a job, green and blue highlights point you toward whatever's next, wherever that actually is — the place on the Map, a building's Enter, a person, a piece of equipment, or an action control.",
+          "Green means work still to do: the destination on the Map, a building's Enter once you've arrived, the person to talk to, the equipment to equip, or the action to start. Blue means a conversation — either someone has a new job for you, or a finished job is ready to hand in. The moment every objective on a job is met, it turns blue: the person you hand it in to lights up blue instead of green, and the Map labels their location TURN IN in plain text, even before you've arrived there. An accepted job's own destination is labeled MISSION the same way.",
+          "When a job can be finished more than one legitimate way — three Power Cells can come from your Inventory, the Annex, or Bix's shelf — nothing gets highlighted for that step. It's your call.",
+        ],
+      },
+      {
         heading: "Keep the Change in detail",
         paragraphs: [
           "Wade's 24 Credits are a job budget, handed over when you accept. They're yours: three cells cost 24 Credits at Bix's price, but if you already have cells, or claim them free at the Annex, you keep whatever you don't spend. There's no second payout when you finish, and nothing is reimbursed.",

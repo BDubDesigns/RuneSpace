@@ -34,9 +34,9 @@ records execution state only, so a fresh session can reconstruct the run.
 
 | Slice | Branch | Staging SHA before | PR | Staging SHA after | Status |
 | --- | --- | --- | --- | --- | --- |
-| #173 | `issue-173-bevel-focus-visible` | (ledger commit) | — | — | in progress |
-| #143 | — | — | — | — | pending |
-| #174 | — | — | — | — | pending |
+| #173 | `issue-173-bevel-focus-visible` | `44ca235` | #177 | `058adfa` | integrated (commit `9e4c782`, `--no-ff` merge) |
+| #143 | `issue-143-mission-destination-guidance` | `058adfa` | — | — | in progress |
+| #174 | `issue-174-mission-guidance-strips` | (post-#143 staging head) | — | — | planned |
 
 Final combined staging SHA: _pending_.
 
@@ -178,3 +178,112 @@ Final combined staging SHA: _pending_.
 5. Docs: `docs/missions.md` §10, `docs/travel-map-design.md`,
    `docs/design-system.md`; public Wiki/Update per `docs/public-wiki.md` /
    `docs/public-updates.md` if player-facing facts change.
+
+### Execution log
+
+- Domain implemented directly (Opus): `MissionGuidance.turnIn` / `.locationId`;
+  `npcBoundaryGuidance` (remote World Location → local NPC/Local Place) used
+  for `npc_conversation` and turn-in; `at_location` → `locationId`;
+  `actionDestination` (single offering location, else none); carried
+  requirements with no `recommendedActionId` → no guidance. Target sets split
+  into active / `turnIn*`; `npcGuidanceMeaning` / `localPlaceGuidanceMeaning`
+  own precedence (active > turn_in > available). `MissionGuidanceKind` gains
+  `turn_in` (blue class, own `mission-turn-in` halo tone). Consumers: Talk,
+  Local Place Enter, hub entries (`conversation.ts guidanceFor`), Map hexes
+  (MISSION / TURN IN plate overlaid in the artwork band + ring polygon outside
+  the chassis; aria "Mission destination." / "Mission turn-in.").
+- Updated 8 pre-#143 unit tests that encoded the superseded semantics (turn-in
+  green in `npcIds`; "no World Location channel") — each strengthened to the
+  refreshed contract, none weakened. Updated E2E turn-in expectations
+  (walk-it-off Tansy, cut-your-teeth Tansy + Wade) from `active` to `turn_in`.
+- Delegated (Sonnet, reviewed by Opus): `tests/unit/mission-destination-guidance.test.ts`
+  (21 tests, every #143 projection case + the four proof Missions + hub entries;
+  no implementation discrepancies found). Docs/Wiki/Update pass delegated to a
+  second Sonnet agent (review pending).
+- New/extended E2E: walk-it-off (The Jag MISSION on map after acceptance),
+  cut-your-teeth (Processing Yard MISSION before travel; Crash Site TURN IN at the
+  Yard; Wade `turn_in`), holo-hollow new test (Keep the Change: Holo Hollow
+  MISSION from Crash Site → no invented Cell source → The Jag TURN IN while in
+  Holo Hollow → Tansy `turn_in` halo at The Jag; ring paint check).
+- Local: `pnpm typecheck` ✅, `pnpm lint` ✅, unit 688/688 ✅ (before the new file);
+  with the new file 72 files / 709 tests ✅. Docs agent output reviewed; one
+  correction made (`travel-map-design.md` described "both plates" — it is one
+  plate reading MISSION / TURN IN / MISSION · TURN IN).
+- Targeted E2E (plain `pnpm test:e2e`, holo-hollow + walk-it-off +
+  cut-your-teeth, `--retries=0`): 9 passed, 1 failed —
+  `cut-your-teeth.spec.ts:212` expected "3 / 10" shale, got "1 / 10". Observed
+  a real (non-deterministic) Mining roll in the failure screenshot; the plain run
+  lacks `RUNESPACE_E2E_MINING=true`, which the focused/canonical runners set to
+  select the deterministic server Mining RNG. Test-environment difference, not a
+  #143 defect (the failing line precedes every #143 assertion in that test).
+  Reproducing through the sanctioned `pnpm test:e2e:focused cut-your-teeth`.
+- Visual review (real Chromium, `docs/screenshots/issue-143/`): green Holo
+  Hollow ring + MISSION and blue The Jag ring + TURN IN paint clearly; current /
+  reachable / visible plates stay legible at 390px and desktop. Defect found:
+  the marker plate drifted right (touching The Jag's edge) because
+  `.rs-map-plate { position: relative }` (later in globals.css) overrode the
+  Tailwind `absolute`. Fix: absolute wrapper span positions, plate inside.
+- `pnpm test:e2e:focused cut-your-teeth` (sanctioned runner, deterministic Mining
+  flags): **1/1 passed** — including every new #143 assertion in it (Processing
+  Yard MISSION, Crash Site TURN IN from the Yard, Tansy + Wade `turn_in`).
+  Diagnosis confirmed: the plain-run failure was the missing
+  `RUNESPACE_E2E_MINING` flag, not a code defect.
+
+---
+
+## #174 — compact top-of-Play Mission guidance strips
+
+### Findings (read-only inspection, pre-#143-merge)
+
+- Play composition: `PlayScreen` → `GameShell` (`space-y-4`: `PlayTopBar`
+  header, then `<main>`) → `PlayConsole`, whose `space-y-4` container renders
+  exactly one surface first (Map → `LocalMapPanel`; in transit → `JourneyPanel`;
+  else `LocationSurface`, which also hosts the active Local Place). The first
+  child of `PlayConsole`'s container is therefore "immediately below the Play
+  header, before primary surface content" on every surface — the one shared
+  boundary.
+- Current `MissionObjectivePanel` (`[data-mission-objective]`): renders only on
+  `surface === "primary"` (never Map), shows ONE Mission (newest
+  `ready_for_completion`, else newest active), brass `--rs-mission-*` card.
+  Existing interactions: (a) the whole card is a button opening the Mission Log
+  focused on that Mission; (b) an **Open Equipment** shortcut when the Mission's
+  guidance targets equipment — covered by `openEquipmentFromMissionGuidance`
+  (cut-your-teeth E2E: "must not regress into the footer Inventory → Equipment
+  tab relay").
+- Mission order: `state.missions` is authored `MISSIONS` order (server
+  `loadMissionProjections`) — the existing deterministic order.
+- #143 semantics to consume: `projection.stage.requirementsSatisfied` (turn-in
+  phase; mirrors `guidance.turnIn`) — no UI re-derivation.
+
+### Plan / checkpoint
+
+1. New `features/missions/MissionGuidanceStrips.tsx`, rendered as the first
+   child of `PlayConsole` on every surface (Location, Local Place, Journey, Map),
+   normal flow, not sticky; replaces `MissionObjectivePanel`.
+2. One strip per accepted non-completed Mission (`active` /
+   `ready_for_completion`) in `state.missions` order; no selection/tracking;
+   no strip stack at all when none.
+3. Semantic phase from one domain helper (`missionGuidancePhase(projection)` →
+   `"work" | "turn_in"`, reading `stage.requirementsSatisfied`) — green work /
+   blue turn-in via the shared Mission tokens; dark surface, crisp text, border,
+   real exterior glow (not clipped: no bevel/clip-path/overflow on the strip).
+4. Content: Mission title · current objective, plus compact progress for every
+   authored requirement that has numeric progress (preserves multi-requirement
+   Missions), all from the projection; no Mission-ID branches, no prose parsing.
+5. Interaction reconciliation (issue: "stop and reconcile explicitly"):
+   - Click-to-open-Mission-Log is **removed** — #174 explicitly forbids
+     click-to-open Mission Log on strips; the footer Missions button remains the
+     Log's entry point.
+   - **Open Equipment** is an existing, tested Mission-guidance affordance, not
+     new strip behavior. Preserve it: rendered as a separate compact control
+     beside/below the owning strip when that Mission's guidance targets
+     equipment (unchanged trigger + accessible name). The strip itself stays
+     non-interactive.
+6. Tests: unit for the phase helper + strip model; E2E: stack placement
+   (first child under header) on Location, Local Place, Journey, Map; green vs
+   blue incl. remote turn-in; multi-strip stacking + mixed state; 390px no
+   overflow; glow paints; update existing `[data-mission-objective]`
+   assertions to the strip contract.
+7. Docs: `docs/missions.md` (short strip section pointing to §10),
+   `docs/design-system.md`; Wiki/Update amended in the same unpublished
+   `following-the-job` Update if player-facing.

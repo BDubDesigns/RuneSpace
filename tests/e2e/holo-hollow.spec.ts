@@ -1,6 +1,11 @@
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
-import { characterMissions, characters, inventoryStacks } from "@/db/rune-space";
+import {
+  characterMissionProgress,
+  characterMissions,
+  characters,
+  inventoryStacks,
+} from "@/db/rune-space";
 import { ITEM_IDS, LOCAL_PLACE_IDS, LOCATION_IDS, MISSION_IDS } from "@/game/config/foundations";
 import {
   expect,
@@ -97,6 +102,87 @@ test("hands an accepted Mission's NPC target to its Local Place entrance, then t
     page.getByRole("button", { name: /Talk to Bix Weller/ }),
     "active",
   );
+});
+
+test("guides Keep the Change across the map: Holo Hollow MISSION, then The Jag TURN IN before arrival", async ({
+  page,
+  testCharacter,
+}) => {
+  const characterId = testCharacter.id;
+  await page.setViewportSize({ width: 390, height: 844 });
+  const now = new Date();
+  await db
+    .insert(characterMissions)
+    .values([
+      ...[
+        MISSION_IDS.walkItOff,
+        MISSION_IDS.cutYourTeeth,
+        MISSION_IDS.wasteNot,
+        MISSION_IDS.holdItTogether,
+      ].map((missionId) => ({ characterId, missionId, acceptedAt: now, completedAt: now })),
+      { characterId, missionId: MISSION_IDS.keepTheChange, acceptedAt: now },
+    ]);
+  await openTestCharacter(page, characterId);
+  await page.emulateMedia({ reducedMotion: "reduce" });
+
+  // Accepted at the Crash Site with Bix still to meet: Holo Hollow is the one
+  // green MISSION destination, named in text and in the accessible label.
+  await openMapSurface(page);
+  const guidedHexes = page.locator("[data-map-location][data-mission-guidance]");
+  const hollowHex = page.locator(`[data-map-location="${LOCATION_IDS.holoHollow}"]`);
+  await expect(hollowHex).toHaveAttribute("data-mission-guidance", "active");
+  await expect(hollowHex.locator("[data-map-mission-marker]")).toHaveText(/^Mission$/i);
+  await expect(hollowHex).toHaveAttribute("aria-label", /Mission destination\./);
+  await expect(guidedHexes).toHaveCount(1);
+
+  // Bix met in town, Cells still missing: the Cells can come from Inventory,
+  // the Annex, or Bix, so nothing is invented — no hex, doorway, or action.
+  await db.insert(characterMissionProgress).values({
+    characterId,
+    missionId: MISSION_IDS.keepTheChange,
+    progressKey: "bix-introduction",
+    progress: 1,
+  });
+  await arriveInHoloHollow(characterId);
+  await page.reload();
+  await expect(page.getByRole("group", { name: "Local map" })).toBeVisible();
+  await expect(guidedHexes).toHaveCount(0);
+  await openTestCharacter(page, characterId);
+  await expect(page.locator("[data-local-place-directory]")).toBeVisible();
+  await expect(page.locator("[data-mission-guidance]")).toHaveCount(0);
+
+  // Three Cells carried while still in Holo Hollow: every requirement holds, so
+  // The Jag is already the blue TURN IN destination — before arrival.
+  await db.insert(inventoryStacks).values({ characterId, itemId: ITEM_IDS.powerCell, quantity: 3 });
+  await openTestCharacter(page, characterId);
+  await openMapSurface(page);
+  const jagHex = page.locator(`[data-map-location="${LOCATION_IDS.theJag}"]`);
+  await expect(jagHex).toHaveAttribute("data-mission-guidance", "turn_in");
+  await expect(jagHex.locator("[data-map-mission-marker]")).toHaveText(/^Turn in$/i);
+  await expect(jagHex).toHaveAttribute("aria-label", /Mission turn-in\./);
+  await expect(guidedHexes).toHaveCount(1);
+  // The blue ring is a painted layer, not only an attribute.
+  const ring = page.locator('[data-map-mission-ring="turn_in"]');
+  await expect(ring).toHaveCount(1);
+  const ringPaint = await ring.evaluate((element) => {
+    const style = getComputedStyle(element);
+    return { stroke: style.stroke, filter: style.filter };
+  });
+  expect(ringPaint.stroke).not.toBe("none");
+  expect(ringPaint.filter).toContain("drop-shadow");
+
+  // At The Jag the destination hands off to Tansy, the blue TURN IN handoff.
+  await db
+    .update(characters)
+    .set({ currentLocationId: LOCATION_IDS.theJag })
+    .where(eq(characters.id, characterId));
+  await openTestCharacter(page, characterId);
+  await expectExteriorMissionHalo(
+    page.getByRole("button", { name: /Talk to Tansy Rusk/ }),
+    "turn_in",
+  );
+  await openMapSurface(page);
+  await expect(guidedHexes).toHaveCount(0);
 });
 
 test("presents Holo Hollow's places, keeps HH B&B visible but locked, and enters a shop without travelling", async ({

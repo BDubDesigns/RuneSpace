@@ -297,7 +297,9 @@ body {
   max-width: 100%;
 }
 
-.rs-control-halo[data-halo="mission-available"] {
+/* Available and turn-in are distinct meanings that share the blue treatment. */
+.rs-control-halo[data-halo="mission-available"],
+.rs-control-halo[data-halo="mission-turn-in"] {
   filter: drop-shadow(0 0 2px var(--rs-mission-available-color))
     drop-shadow(0 0 12px var(--rs-mission-available-glow));
 }
@@ -402,6 +404,30 @@ body {
 
 .rs-map-plate--status {
   color: var(--rs-text-secondary);
+}
+
+/* Map Mission guidance (#143): an explicit MISSION / TURN IN plate (text, so
+   colour is never the only signal) plus a glowing ring outside the hex chassis
+   so current/selected/reachable/transit treatment stays legible. Shared
+   Mission tokens only; active green, turn-in blue. */
+.rs-map-plate--mission[data-map-mission-marker="active"] {
+  border-color: var(--rs-mission-guidance-color);
+  color: var(--rs-mission-guidance-color);
+}
+
+.rs-map-plate--mission[data-map-mission-marker="turn_in"] {
+  border-color: var(--rs-mission-available-color);
+  color: var(--rs-mission-available-color);
+}
+
+.rs-map-mission-ring[data-map-mission-ring="active"] {
+  stroke: var(--rs-mission-guidance-color);
+  filter: drop-shadow(0 0 4px var(--rs-mission-guidance-glow));
+}
+
+.rs-map-mission-ring[data-map-mission-ring="turn_in"] {
+  stroke: var(--rs-mission-available-color);
+  filter: drop-shadow(0 0 4px var(--rs-mission-available-glow));
 }
 
 .rs-dialogue-scene[data-presentation-mode="comms"] .rs-dialogue-scene__comms-overlay {

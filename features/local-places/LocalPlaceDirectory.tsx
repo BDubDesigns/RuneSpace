@@ -10,7 +10,11 @@ import { SectionHeader } from "@/components/ui/SectionHeader";
 import { usePlay } from "@/features/play/PlayContext";
 import { getLocalPlacesForLocation } from "@/game/content/local-places";
 import { deriveLocalPlaceAccess } from "@/game/domain/local-places";
-import { deriveCompletedMissionIds, deriveMissionGuidanceTargets } from "@/game/domain/missions";
+import {
+  deriveCompletedMissionIds,
+  deriveMissionGuidanceTargets,
+  localPlaceGuidanceMeaning,
+} from "@/game/domain/missions";
 import type { LocalPlaceDefinition } from "@/game/schemas/local-places";
 import { localPlaceHref } from "./navigation";
 
@@ -37,7 +41,8 @@ export function LocalPlaceDirectory({ locationId }: { locationId: string }) {
   // state here, so the world visibly changes as soon as the Mission is done.
   const completedMissionIds = deriveCompletedMissionIds(state.missions);
   // An accepted Mission whose target NPC lives inside one of these places
-  // guides that place's entrance; the NPC takes over once the player is inside.
+  // guides that place's entrance — green for remaining work, blue when that NPC
+  // is the turn-in; the NPC takes over once the player is inside.
   const guidance = deriveMissionGuidanceTargets(state.missions);
 
   return (
@@ -50,7 +55,7 @@ export function LocalPlaceDirectory({ locationId }: { locationId: string }) {
           const reasonId = `local-place-reason-${place.id}`;
           // A guided doorway sits on the neutral control surface like every other
           // green-guided control; the primary fill would tint it under the green.
-          const guided = guidance.localPlaceIds.has(place.id);
+          const guided = localPlaceGuidanceMeaning(guidance, place.id);
 
           return (
             <li className="flex" key={place.id}>
@@ -75,7 +80,7 @@ export function LocalPlaceDirectory({ locationId }: { locationId: string }) {
                     <MissionActionLink
                       aria-label={`Enter ${place.displayName}`}
                       data-local-place-enter
-                      guidance={guided ? "active" : undefined}
+                      guidance={guided}
                       haloClassName="w-full"
                       href={href}
                       intent={guided ? "secondary" : "primary"}

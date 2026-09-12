@@ -27,8 +27,10 @@ the dedicated `?surface=map` navigation surface; Journey is the in-transit
 status/feed surface. Journey feed entries are presentation only, while Travel
 and Scavenge actions remain server-authoritative. Map is read-only only while
 `state.travelState` exists, including after a refresh/reconciliation; it must
-not retain an "opened while traveling" client latch. MISSION and TURN IN Map
-guidance are intentionally deferred to Issue #143.
+not retain an "opened while traveling" client latch. Map hexes render MISSION
+and TURN IN Mission-guidance markers (Issue #143); see `docs/missions.md` §10
+for guidance semantics and `docs/travel-map-design.md` for the marker/ring
+presentation contract.
 
 ## Overlay motion
 
@@ -53,9 +55,13 @@ failing visually.
 Any beveled control that carries Mission guidance goes through the shared
 `components/ui/MissionGuidanceHalo`: an `ActionButton` becomes a
 `MissionActionButton` and an `ActionLink` (such as a Local Place **Enter**)
-becomes a `MissionActionLink`. Each takes one resolved `guidance`
-(`"available"` blue or `"active"` green; callers resolve active-wins first). The
-control keeps the shared `.rs-mission-*` color treatment and
+becomes a `MissionActionLink`. Each takes one resolved `guidance` value —
+`"available"` (blue, a new Mission offer), `"active"` (green, accepted work),
+or `"turn_in"` (blue, every requirement satisfied and only the handoff
+remains — its own `mission-turn-in` halo tone, distinct from `"available"`'s
+even though both paint blue); callers resolve precedence (active over turn-in
+over available) before passing one value. `docs/missions.md` §10 owns the
+semantics. The control keeps the shared `.rs-mission-*` color treatment and
 `data-mission-guidance`; the unclipped `.rs-control-halo` wrapper paints the
 exterior halo with `filter: drop-shadow()` from the existing Mission tokens, so
 the glow traces the chamfer. Pass layout classes for the control's outer box
