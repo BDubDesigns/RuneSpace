@@ -2,10 +2,6 @@
 
 Owns the responsive industrial scene header integrated into the top of the existing location/activity panel. Single asset per location, shared `LocationSceneHeader` component, registry-owned metadata — no location conditionals in UI, no separate artwork per breakpoint.
 
-Art generation, master/derivative handling, NPC/environment composition, map
-identifier processing, and visual QA are documented in `docs/art-cookbook.md`.
-This document owns the runtime location-scene contract and presentation behavior.
-
 ## Canonical paths
 
 - Component: `features/location-scene/LocationSceneHeader.tsx` (shared, single responsive viewport: mobile shallow cinematic strip, desktop taller reveal)
@@ -112,7 +108,7 @@ latch is used.
 ## Adding a future location
 
 1. Add its scene entry to `game/content/locations.ts` under `presentation.scene` (`asset`, `width`, `height`, `alt`, optional `focal {x,y}` in percent). Ensure `asset` is already committed under `public/location-scenes/<slug>.webp` and follows the repo's existing asset conventions — do not relying on incoming filenames.
-2. Prepare and visually approve the source/derivative according to `docs/art-cookbook.md`; record the approved delivered file rather than upscaling it to match an older entry's pixel size.
+2. Commit one local WebP (appropriate Lanczos downsample, q75–82 range, no baked text/chrome). Approved delivered art is committed as delivered; never upscale it to match an existing entry's pixel size.
 3. Record intrinsic dimensions and focal where justified.
 4. No UI code changes beyond the data entry — `LocationSceneHeader` consumes the registry.
 
@@ -126,9 +122,8 @@ exteriors (`holo-hollow-souvenirs-exterior.webp`,
 `holo-hollow-assistance-center-exterior.webp`, `hh-bnb-exterior.webp`) are
 accepted for issue #159, but their surroundings are visually very similar, so
 the buildings read as if they occupy nearly the same spot. A later approved art
-polish pass should give each building a more distinct setting while preserving
-the approved building identities. Do not regenerate or replace these assets
-outside that pass.
+polish pass should give each building a more distinct setting. Do not
+regenerate or replace these assets outside that pass.
 
 ## Explicit non-goals (not in this slice)
 
