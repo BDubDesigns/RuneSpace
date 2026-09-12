@@ -304,8 +304,8 @@ Before accepting a set, rapidly flip between all variants as a crude animation
 test.
 
 Production portrait files live under `public/npc-art/` and should use predictable
-identity/expression names such as `<npc>-neutral.png` and
-`<npc>-concerned.png`.
+identity/expression names such as `bix-neutral-dry.png` and
+`bix-skeptical-concerned.png`.
 
 ## Dialogue backgrounds
 
@@ -331,9 +331,11 @@ truthful and visually appropriate.
 Map identifiers are small decorative location identifiers and must remain
 recognizable at map scale.
 
-Current production assets are local `public/map-icons/<slug>.webp` files that
-are tightly cropped, transparent, lossless, and no more than 512 px on the long
-edge.
+The current proven pipeline produces local `public/map-icons/<slug>.webp` files
+that are tightly cropped, transparent, lossless, and no more than 512 px on the
+long edge. New or reprocessed map identifiers should follow it. `the-jag.png`
+and `the-long-scramble.png` are legacy identifiers that predate this pipeline;
+they remain follow-up optimization/art debt, not the pattern for new work.
 
 The proven raster workflow is:
 
@@ -460,8 +462,9 @@ Use predictable names that describe identity rather than generation history.
 
 Good:
 
-- `bix-weller-neutral.png`
-- `bix-weller-amused.png`
+- `bix-neutral-dry.png`
+- `bix-amused-knowing.png`
+- `renn-serious-guarded.png`
 - `holo-hollow-souvenirs-exterior.webp`
 - `holo-hollow-souvenirs-interior.webp`
 - `holo-hollow.webp`
