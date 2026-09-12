@@ -833,7 +833,7 @@ const dialogue = {
       ),
       tansyLocal(
         EXPRESSION_IDS.neutral,
-        "Bix sells them for eight. The Annex hands out five a day for nothing. Either one works.",
+        "Bix sells them for eight Credits. The Annex hands out five a day for nothing. Either one works.",
       ),
     ],
   },
@@ -859,6 +859,9 @@ const dialogue = {
     id: DIALOGUE_IDS.tansyKeepTheChangeCompletion,
     npcId: NPC_IDS.tansyRusk,
     beats: [
+      // Presentation only: the authoritative turn-in has already taken the
+      // three Power Cells when this sequence becomes visible.
+      itemBeat(ITEM_IDS.powerCell, 3),
       tansyLocal(EXPRESSION_IDS.smile, "That's the seam back in business."),
       tansyLocal(
         EXPRESSION_IDS.neutral,
@@ -890,10 +893,8 @@ const dialogue = {
     npcId: NPC_IDS.tansyRusk,
     beats: [
       tansyLocal(EXPRESSION_IDS.smile, "Still running on your Cells. Thanks for that."),
-      tansyLocal(
-        EXPRESSION_IDS.neutral,
-        "Wade's apprentice. He'll never say it in those words, but that's what you are now.",
-      ),
+      tansyLocal(EXPRESSION_IDS.neutral, "Wade is proud of you, you know."),
+      tansyLocal(EXPRESSION_IDS.smile, "Though he'd never say it out loud."),
     ],
   },
 

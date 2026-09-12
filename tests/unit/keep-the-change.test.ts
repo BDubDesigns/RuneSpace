@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   CONVERSATION_BACKGROUND_IDS,
   DIALOGUE_IDS,
+  EXPRESSION_IDS,
   ITEM_IDS,
   LOCATION_IDS,
   MISSION_IDS,
@@ -547,6 +548,47 @@ describe("Keep the Change authored content", () => {
         expect(beat.backgroundId, dialogueId).toBe(CONVERSATION_BACKGROUND_IDS.theJagExterior);
       }
     }
+  });
+
+  it("shows the three Power Cells exactly once, as the hand-over opens Tansy's completion", () => {
+    const [handOver, firstLine] = getDialogue(DIALOGUE_IDS.tansyKeepTheChangeCompletion)!.beats;
+    expect(handOver).toMatchObject({ kind: "item", itemId: ITEM_IDS.powerCell, quantity: 3 });
+    expect(handOver?.backgroundId).toBe(CONVERSATION_BACKGROUND_IDS.theJagExterior);
+    expect(firstLine).toMatchObject({ kind: "npc", speakerNpcId: NPC_IDS.tansyRusk });
+    // No other Keep the Change scene repeats the reveal — not the turn-in
+    // prompt before the Cells change hands, and not the replayable follow-up.
+    const itemBeats = newSequences.flatMap((dialogueId) =>
+      getDialogue(dialogueId)!.beats.filter((beat) => beat.kind === "item"),
+    );
+    expect(itemBeats).toEqual([handOver]);
+    expect(KEEP_THE_CHANGE.dialogue.completionPresentationDialogueId).toBe(
+      DIALOGUE_IDS.tansyKeepTheChangeCompletion,
+    );
+  });
+
+  it("has Tansy name Bix's price in Credits", () => {
+    const text = getDialogue(DIALOGUE_IDS.tansyKeepTheChangeCarriedReminder)!
+      .beats.map((beat) => beat.text)
+      .join(" ");
+    expect(text).toContain("Bix sells them for eight Credits.");
+  });
+
+  it("has Tansy say Wade is proud rather than deny the apprenticeship he announced", () => {
+    const beats = getDialogue(DIALOGUE_IDS.tansyPostKeepTheChange)!.beats;
+    expect(beats.slice(-2)).toMatchObject([
+      {
+        kind: "npc",
+        expressionId: EXPRESSION_IDS.neutral,
+        text: "Wade is proud of you, you know.",
+      },
+      {
+        kind: "npc",
+        expressionId: EXPRESSION_IDS.smile,
+        text: "Though he'd never say it out loud.",
+      },
+    ]);
+    // Wade says "apprentice" to the player's face, so Tansy never claims he won't.
+    expect(beats.map((beat) => beat.text).join(" ")).not.toMatch(/apprentice/i);
   });
 
   it("has Mara appear as an authored guest in Bix's scene, not a shop resident", () => {
