@@ -116,7 +116,7 @@ latch is used.
 
 ## Adding a future location
 
-1. Add its scene entry to `game/content/locations.ts` under `presentation.scene` (`asset`, `width`, `height`, `alt`, optional `focal {x,y}` in percent). Ensure `asset` is already committed under `public/location-scenes/<slug>.webp` (the schema also accepts `.png`) and follows the repo's existing asset conventions — do not relying on incoming filenames.
+1. Add its scene entry to `game/content/locations.ts` under `presentation.scene` (`asset`, `width`, `height`, `alt`, optional `focal {x,y}` in percent). Ensure `asset` is already committed under `public/location-scenes/<slug>.webp` (the schema also accepts `.png`) and follows the repo's existing asset conventions — do not rely on incoming filenames.
 2. Prepare and visually approve the asset according to `docs/art-cookbook.md`, with no baked text/chrome. Approved delivered art is committed as delivered; never upscale it to match an existing entry's pixel size.
 3. Record the committed file's actual intrinsic dimensions and focal where justified.
 4. No UI code changes beyond the data entry — `LocationSceneHeader` consumes the registry.

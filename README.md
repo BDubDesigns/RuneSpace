@@ -1,6 +1,6 @@
 # RuneSpace
 
-> **Status: Playable pre-alpha — active development.** RuneSpace is a browser-first, low-fi sci-fi RPG with a real early-game vertical slice: server-authoritative Play orchestration, Travel/Scavenging, Ferrite Shale Mining, Refining, Welding/Cargo Hold repair, Inventory/Equipment, locations, Power Cell/Power Annex, NPC interactions, the Holo Hollow settlement with Local Places, character Credits, and NPC merchant Trade, missions, and skill progression (Walk It Off / Cut Your Teeth). Still early and under active development.
+> **Status: Playable pre-alpha — active development.** RuneSpace is a browser-first, low-fi sci-fi RPG with a real early-game vertical slice: server-authoritative Play orchestration, Travel/Scavenging, Ferrite Shale Mining, Refining, Welding/Cargo Hold repair, Inventory/Equipment, locations, Power Cell/Power Annex, NPC interactions, the Holo Hollow settlement with Local Places, character Credits, and NPC merchant Trade, missions, and skill progression. Still early and under active development.
 
 RuneSpace is a planned browser-first, mobile-friendly, low-fi sci-fi RPG inspired by the progression, quests, social texture, and long-term grind of old-school MMORPGs and action-point games. It is not a RuneScape clone.
 
