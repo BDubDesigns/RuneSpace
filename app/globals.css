@@ -81,6 +81,9 @@
   --rs-space-8: 2rem;
   --rs-bevel: 0.65rem;
   --rs-bevel-small: 0.4rem;
+  /* How far inside a beveled control its focus ring's outer edge sits: past
+     the --rs-bevel-small chamfer so the ring is never cut at the corners. */
+  --rs-bevel-focus-inset: 0.4375rem;
   --rs-font-display: ui-monospace, SFMono-Regular, Menlo, monospace;
   --rs-font-body: ui-sans-serif, system-ui, sans-serif;
   --rs-shadow-panel: 0 16px 42px rgb(0 0 0 / 0.34);
@@ -200,6 +203,16 @@ body {
 .rs-focus:focus-visible {
   outline: 2px solid var(--rs-focus-ring);
   outline-offset: 3px;
+}
+
+/* A beveled control's clip-path clips any outline drawn outside it, so its
+   keyboard-focus ring is drawn inside instead. The inset keeps the whole ring
+   clear of the chamfered corners (uncut) and leaves a visible gap inside a
+   Mission-guided control's inset ring, so focus and guidance read as two
+   separate marks. This rule also outranks the Mission `outline: none` below. */
+.rs-bevel.rs-focus:focus-visible {
+  outline: 2px solid var(--rs-focus-ring);
+  outline-offset: calc(-1 * var(--rs-bevel-focus-inset));
 }
 
 /*

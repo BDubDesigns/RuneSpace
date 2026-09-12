@@ -314,3 +314,137 @@ export async function expectExteriorMissionHalo(
   expect(paint.haloOverflow).toBe("visible");
   expect(paint.haloFilter).toContain("drop-shadow");
 }
+
+type ScreenshotDiff = {
+  width: number;
+  height: number;
+  /** Clearly changed pixels anywhere in the element. */
+  changed: number;
+  /** Clearly changed pixels within the outer band of each side: top, right, bottom, left. */
+  sides: [number, number, number, number];
+};
+
+/** Width, in CSS pixels, of the outer band of each side that a focus ring must reach. */
+const FOCUS_RING_BAND_CSS_PX = 12;
+
+async function clearFocus(page: Page) {
+  await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+}
+
+/**
+ * Center the control in the viewport. An element screenshot captures whatever
+ * is painted over the element's box, so a control left under the fixed bottom
+ * navigation would compare the navigation with itself.
+ */
+async function centerInViewport(control: import("@playwright/test").Locator) {
+  await control.evaluate((element) => element.scrollIntoView({ block: "center" }));
+}
+
+/**
+ * Compare two screenshots of the same element by decoding them in the browser
+ * (no image dependency), counting pixels whose color clearly changed.
+ */
+async function diffElementScreenshots(
+  page: Page,
+  before: Buffer,
+  after: Buffer,
+): Promise<ScreenshotDiff> {
+  const scale = await page.evaluate(() => window.devicePixelRatio);
+  return page.evaluate(
+    async ({ before, after, band }) => {
+      const decode = async (base64: string) => {
+        const bytes = Uint8Array.from(atob(base64), (char) => char.charCodeAt(0));
+        const bitmap = await createImageBitmap(new Blob([bytes], { type: "image/png" }));
+        const canvas = new OffscreenCanvas(bitmap.width, bitmap.height);
+        const context = canvas.getContext("2d")!;
+        context.drawImage(bitmap, 0, 0);
+        return context.getImageData(0, 0, bitmap.width, bitmap.height);
+      };
+      const [a, b] = await Promise.all([decode(before), decode(after)]);
+      if (a.width !== b.width || a.height !== b.height) {
+        throw new Error(`Screenshot size changed: ${a.width}x${a.height} → ${b.width}x${b.height}`);
+      }
+      const sides: [number, number, number, number] = [0, 0, 0, 0];
+      let changed = 0;
+      for (let y = 0; y < a.height; y += 1) {
+        for (let x = 0; x < a.width; x += 1) {
+          const i = (y * a.width + x) * 4;
+          const delta =
+            Math.abs(a.data[i] - b.data[i]) +
+            Math.abs(a.data[i + 1] - b.data[i + 1]) +
+            Math.abs(a.data[i + 2] - b.data[i + 2]);
+          if (delta <= 60) continue;
+          changed += 1;
+          if (y < band) sides[0] += 1;
+          if (x >= a.width - band) sides[1] += 1;
+          if (y >= a.height - band) sides[2] += 1;
+          if (x < band) sides[3] += 1;
+        }
+      }
+      return { width: a.width, height: a.height, changed, sides };
+    },
+    {
+      before: before.toString("base64"),
+      after: after.toString("base64"),
+      band: Math.ceil(FOCUS_RING_BAND_CSS_PX * scale),
+    },
+  );
+}
+
+/**
+ * Prove a beveled control's keyboard focus ring really paints (#173).
+ *
+ * `.rs-bevel`'s clip-path once clipped the focus outline away while
+ * `getComputedStyle()` still reported it, so this compares real screenshots of
+ * the control at rest and keyboard-focused. The focused control must change
+ * along every side — a ring, not a tint — including on top of Mission
+ * guidance, which proves focus stays a separate mark from the green/blue
+ * treatment.
+ */
+export async function expectKeyboardFocusRingPaints(control: import("@playwright/test").Locator) {
+  const page = control.page();
+  await centerInViewport(control);
+  await clearFocus(page);
+  const resting = await control.screenshot({ animations: "disabled" });
+  // Keyboard modality, so a scripted focus matches :focus-visible like Tab does.
+  await page.keyboard.press("Shift");
+  await control.focus();
+  await expect(control).toBeFocused();
+  expect(await control.evaluate((element) => element.matches(":focus-visible"))).toBe(true);
+  const focused = await control.screenshot({ animations: "disabled" });
+  await clearFocus(page);
+
+  const diff = await diffElementScreenshots(page, resting, focused);
+  expect(diff.changed).toBeGreaterThanOrEqual(diff.width + diff.height);
+  const [top, right, bottom, left] = diff.sides;
+  expect(top).toBeGreaterThanOrEqual(diff.width / 2);
+  expect(bottom).toBeGreaterThanOrEqual(diff.width / 2);
+  expect(left).toBeGreaterThanOrEqual(diff.height / 2);
+  expect(right).toBeGreaterThanOrEqual(diff.height / 2);
+}
+
+/**
+ * Prove pointer focus does not show the keyboard focus ring (#173).
+ *
+ * Presses on the control and releases off it, so the control takes pointer
+ * focus without being activated, then compares it to its resting pixels.
+ */
+export async function expectPointerFocusWithoutRing(control: import("@playwright/test").Locator) {
+  const page = control.page();
+  await centerInViewport(control);
+  await clearFocus(page);
+  await page.mouse.move(0, 0);
+  const resting = await control.screenshot({ animations: "disabled" });
+  const box = (await control.boundingBox())!;
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(0, 0);
+  await page.mouse.up();
+  await expect(control).toBeFocused();
+  expect(await control.evaluate((element) => element.matches(":focus-visible"))).toBe(false);
+  const pointerFocused = await control.screenshot({ animations: "disabled" });
+  await clearFocus(page);
+
+  const diff = await diffElementScreenshots(page, resting, pointerFocused);
+  expect(diff.changed).toBeLessThanOrEqual(Math.ceil(diff.width * diff.height * 0.002));
+}
