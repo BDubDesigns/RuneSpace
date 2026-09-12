@@ -36,9 +36,10 @@ records execution state only, so a fresh session can reconstruct the run.
 | --- | --- | --- | --- | --- | --- |
 | #173 | `issue-173-bevel-focus-visible` | `44ca235` | #177 | `058adfa` | integrated (commit `9e4c782`, `--no-ff` merge) |
 | #143 | `issue-143-mission-destination-guidance` | `058adfa` | #178 | `ab0e754` | integrated (commit `96df680`, `--no-ff` merge) |
-| #174 | `issue-174-mission-guidance-strips` | `ab0e754` | — | — | in progress |
+| #174 | `issue-174-mission-guidance-strips` | `ab0e754` | #179 | `12de109` | integrated (commit `6d97358`, `--no-ff` merge) |
 
-Final combined staging SHA: _pending_.
+Final combined code SHA: `12de1098767c46ac51e3e0c7ef95f01421800ede` (all three
+slices). Later staging commits, if any, are ledger-only documentation.
 
 ---
 
@@ -351,3 +352,70 @@ Final combined staging SHA: _pending_.
   "73 behavioral tests in 14 specs" and omits holo-hollow; nothing enforces the
   count, and the text was already stale before this run. Docs: `docs/missions.md` strip subsection, `design-system.md`
   note; Wiki line + unpublished `following-the-job` Update amended.
+
+---
+
+## Final combined validation (staging head `12de109`)
+
+All three slices integrated in order: `44ca235` → #173 `058adfa` → #143
+`ab0e754` → #174 `12de109`. `origin/main` unchanged at `caed481`.
+
+### Local CI-parity sequence (home host, `./scripts/managed-host-run.sh`)
+
+| Step | Result |
+| --- | --- |
+| `pnpm install --frozen-lockfile` | ✅ |
+| `pnpm typecheck` | ✅ |
+| `pnpm lint` | ✅ |
+| `pnpm format:check` | ✅ |
+| `pnpm test` | ✅ 73 files / 713 tests |
+| `pnpm drizzle-kit migrate` (committed-migration check; no new migrations) | ✅ |
+| `pnpm test:integration` (disposable PostgreSQL) | ✅ 23 files / 258 passed, 9 skipped (gated backfill suites) |
+| `pnpm build` (CI build-only placeholder secret) | ✅ |
+| `pnpm test:e2e:canonical` | ✅ 83 passed, 0 retries (215.8 s) |
+
+### Composition checks (#176)
+
+- #173 on later controls: the canonical walk-it-off test paints and diffs the
+  keyboard focus ring on Tansy's Talk control, which #143 made blue `turn_in`;
+  holo-hollow paints it on the green Enter link at 390px and desktop.
+- #143 ↔ #174 agreement: the canonical strip test asserts the blue Keep the
+  Change strip and the Map's blue The Jag TURN IN hex for the same state, and
+  that strips never carry `data-mission-guidance` (so #143's "no invented
+  guidance" count stays meaningful).
+- Keep the Change end-to-end: holo-hollow covers Holo Hollow MISSION → shop
+  Enter green → Bix green → no invented Cell source → The Jag TURN IN while
+  remote → Tansy blue at The Jag.
+- Mission discovery unchanged: walk-it-off still asserts Wade's blue
+  `available` offer and no strip before acceptance; availability never reaches
+  the map or a Local Place entrance (unit + E2E).
+- Mission Log unchanged: cut-your-teeth still asserts the Log's requirement
+  checklist and next-step copy.
+- Mobile: strips and map markers verified at 390px (no horizontal overflow).
+
+### Remote
+
+- Slice PRs into staging: #177 and #178 — every check ✅ (fast, PostgreSQL,
+  canonical shards 1–3, Full gate, Merge gate); #179 — every check ✅ as well.
+- Draft review PR `staging → main`: **#180** (opened per Brandon's approval,
+  `full-ci` applied). Combined-head run `34691151983` on `12de109`:
+  fast checks ✅, PostgreSQL integration ✅, canonical shards 1–3 ✅, Full gate
+  ✅; Merge gate ✗ by design ("Draft checkpoint: merge validation is
+  intentionally unsatisfied"). The superseded run `34691150986` shows cancelled
+  jobs (including the unexpanded `shard ${{ matrix.shard }}` row) because the
+  `full-ci` label started the replacement run — CI concurrency, not a failure. The first run was cancelled by the label-triggered
+  replacement run (expected CI concurrency); draft `Merge gate` is designed to
+  stay unsatisfied. Preview: `https://pr-180.runespace.qcfailed.com` —
+  `/api/build-info` `releaseId` = `12de1098767c46ac51e3e0c7ef95f01421800ede`,
+  **exact match** with the PR head (verified by bounded polling).
+
+### Run end state
+
+- `main`: `caed481` — untouched by the run (no merge, no push, no reset).
+- `staging/mission-guidance-cleanup`: code head `12de109` = #173 → #143 → #174,
+  each via its own PR (#177, #178, #179) and `--no-ff` merge; this ledger's
+  final update is a docs-only commit on top.
+- Draft review PR #180 (`staging → main`, `full-ci`) is Brandon's to review
+  and merge; issues #173, #143, #174, #176 stay open until then.
+- No production deployment, no production or preview database changes, no
+  Coolify/Docker/CI configuration changes.
