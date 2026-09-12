@@ -53,8 +53,6 @@ export function LocalPlaceDirectory({ locationId }: { locationId: string }) {
           const access = deriveLocalPlaceAccess(place, completedMissionIds);
           const href = localPlaceHref(pathname, place.id);
           const reasonId = `local-place-reason-${place.id}`;
-          // A guided doorway sits on the neutral control surface like every other
-          // green-guided control; the primary fill would tint it under the green.
           const guided = localPlaceGuidanceMeaning(guidance, place.id);
 
           return (
@@ -83,7 +81,7 @@ export function LocalPlaceDirectory({ locationId }: { locationId: string }) {
                       guidance={guided}
                       haloClassName="w-full"
                       href={href}
-                      intent={guided ? "secondary" : "primary"}
+                      intent="primary"
                     >
                       Enter
                     </MissionActionLink>

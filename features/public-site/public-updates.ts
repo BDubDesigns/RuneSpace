@@ -7,7 +7,7 @@ const authoredUpdates = [
   {
     slug: "following-the-job",
     title: "Following the Job",
-    publishedAt: "2026-09-12T20:00:00-07:00",
+    publishedAt: "2026-09-12T08:00:00-07:00",
     summary:
       "The Map now spells out MISSION and TURN IN in plain text, every accepted job gets a compact strip at the top of the screen, and a finished job turns blue.",
     body: [

@@ -419,3 +419,110 @@ All three slices integrated in order: `44ca235` → #173 `058adfa` → #143
   and merge; issues #173, #143, #174, #176 stay open until then.
 - No production deployment, no production or preview database changes, no
   Coolify/Docker/CI configuration changes.
+
+---
+
+## PR #180 human-preview correction pass (2026-09-12)
+
+Brandon's preview review of #180 requested five narrow corrections; Mission
+semantics and architecture unchanged. Work is committed directly to the PR #180
+branch (`staging/mission-guidance-cleanup`); no merge, no new staging branch.
+
+### Findings (inspection before any edit)
+
+- Guided-control tint (code): every guided `MissionActionButton` inherits a
+  tinted caller intent — Mining, Refining, Welding, Contribute Materials, and
+  Equip pass `intent="mining"` (translucent amber `…-subtle` fill); NPC Talk
+  switches to `intent="mission"` (translucent brown) exactly when a turn-in is
+  executable; only Local Place Enter hand-picks `secondary` when guided. On top,
+  `.rs-bevel.rs-mission-guidance/-available` add an inset `0 0 16px` semantic
+  glow. Correction belongs at the shared `MissionActionButton` /
+  `MissionActionLink` boundary. Rendered before-evidence captured first
+  (temporary hooks: computed background/box-shadow/halo filter + screenshots).
+- Update timestamps: existing instants are 09-08 12:00/18:00, 09-09
+  01:00/15:00/20:00, 09-10 20:00, 09-11 20:00 (all −07:00). `following-the-job`
+  was 09-12 20:00 −07:00 (future at review time). `2026-09-12T08:00:00-07:00`
+  collides with nothing and is before review time.
+- News boundary: `acknowledgeNews` writes the newest Update's `publishedAt` into
+  `player_accounts.news_read_through_at` monotonically (never regresses). A
+  future instant would push that boundary into the future. Production never saw
+  it (#180 unmerged); a disposable preview account that opened News during
+  review may keep a later boundary than the corrected instant — preview data is
+  not touched.
+- `.qcfailed/status.json` still showed #171 in `review`; #171 merged
+  2026-09-12T10:09Z.
+
+### Done so far
+
+- `.qcfailed/status.json`: #171 → `latestCompleted` (2026-09-12);
+  `currentChange` = PR #180, stage `preview`; `currentFocus` / `nextStep`
+  updated; highlights preserved. `tests/unit/qcfailed-status.test.ts` 9/9 ✅.
+- PR #180 body: `closes #176` added; GitHub closing references now
+  #143, #173, #174, #176.
+
+### Before-evidence (unchanged code, real Chromium)
+
+| Control | Computed background | Inset box-shadow |
+| --- | --- | --- |
+| Blue turn-in Talk (Tansy, `intent="mission"`) | `rgba(122, 91, 43, 0.24)` translucent brown | 2px ring + `0 0 16px` blue glow |
+| Green Start Refining (`intent="mining"`) | `rgba(245, 196, 81, 0.1)` translucent amber | 2px ring + `0 0 16px` green glow |
+| Blue available Talk (Wade, `secondary`) | `rgb(14, 33, 48)` opaque neutral | 2px ring + `0 0 16px` blue glow |
+| Green Enter link (`secondary`) | `rgb(14, 33, 48)` opaque neutral | 2px ring + `0 0 16px` green glow |
+
+Rendered: the translucent fills let the wrapper's exterior drop-shadow halo
+show through the interior, and the inset glow adds more — Start Refining and
+turn-in Talk read washed/fuzzy beside the neutral Refresh status control. Map
+at 390px: The Jag's blue TURN IN ring (`drop-shadow(0 0 4px …glow)`) barely
+separates from the cyan current/reachable chassis. Both confirm the reported
+defects.
+
+### Corrections applied
+
+1. Shared boundary: `MissionActionButton` / `MissionActionLink` render a guided
+   control on the neutral `secondary` surface whatever `intent` the caller
+   passes (unguided controls keep their intent). Local Place Enter's manual
+   guided toggle removed as redundant. No per-feature patches.
+2. `.rs-bevel.rs-mission-guidance/-available` (and the combined rule): the
+   inset `0 0 16px` glow removed; the 2px inset edge ring stays. The two
+   now-unused `--rs-mission-*-inset-glow` tokens deleted.
+3. Map: Mission ring stroke 3 → 4px; halo from one `drop-shadow(0 0 4px glow)`
+   to three layers (`3px color`, `9px color`, `16px glow`). The opaque chassis
+   drawn over the ring keeps the hex interior untinted. No new colour, marker,
+   or animation.
+4. `following-the-job` `publishedAt` → `2026-09-12T08:00:00-07:00` (unique,
+   whole-hour Pacific, before review time); article content unchanged.
+5. Regression: `expectExteriorMissionHalo` now asserts every guided control's
+   background equals the neutral `--rs-surface-control` surface (compared via a
+   probe element, no literal colour) and carries no blurred inset shadow — so
+   all existing guided-control checks (Talk available/turn-in/active, Enter,
+   Cargo, Start Refining) enforce the contract generically. Cut Your Teeth adds
+   keyboard-focus + pointer-focus checks on the green-guided Start Refining.
+6. Docs: `docs/design-system.md` and `docs/missions.md` record the neutral-
+   interior contract.
+- Local: typecheck ✅, lint ✅, format ✅, unit 73 files / 713 ✅ (incl.
+  public-updates and qcfailed-status contracts).
+
+### After-evidence and validation
+
+- Computed after the fix: Start Refining (green) and turn-in Talk (blue) both
+  `rgb(14, 33, 48)` (neutral `--rs-surface-control`), box-shadow only the 2px
+  inset edge ring; exterior halo filter unchanged. Rendered (real Chromium,
+  `docs/screenshots/pr-180-corrections/`): Start Refining matches the unguided
+  Refresh status interior with green text/edge/halo; turn-in Talk dark with blue
+  edge/halo; Map at 390px — The Jag TURN IN now carries a clearly visible blue
+  glow distinct from the adjacent cyan current-location hex, Holo Hollow
+  (reachable + MISSION) a strong green glow; routes, neighbours, and state
+  plates unobscured; hex interiors untinted. "Current location + Mission
+  target" cannot occur by design (arrival removes the map target).
+- Targeted E2E, `--retries=0`: holo-hollow + walk-it-off + account-news
+  **11/11** (guided halos + neutral interior, keyboard focus on blue turn-in
+  Talk and green Enter at 390px/desktop, pointer focus, green MISSION + blue
+  TURN IN map targets, strip/map agreement, News unread/read-through);
+  `pnpm test:e2e:focused cut-your-teeth` **1/1** (green Start Refining: neutral
+  interior, keyboard + pointer focus).
+- Update ordering (authored instants): all eight unique; `following-the-job`
+  (`2026-09-12T15:00Z`) remains newest and is not in the future (host clock
+  17:41Z at check).
+- Observed, not changed (authored content, out of scope): the Keep the Change
+  carried objective renders "Carry three Power Cell — 0 / 3".
+- Temporary capture hooks removed before commit.

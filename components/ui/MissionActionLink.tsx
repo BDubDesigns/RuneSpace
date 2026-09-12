@@ -16,18 +16,21 @@ type MissionActionLinkProps = ComponentProps<typeof ActionLink> & {
 /**
  * An `ActionLink` that can carry Mission guidance with a visible exterior halo.
  * `ActionLink` is beveled like `ActionButton`, so it shares the same
- * `MissionGuidanceHalo` rather than a clipped one-off style.
+ * `MissionGuidanceHalo` rather than a clipped one-off style. While guided it
+ * sits on the neutral `secondary` surface, like `MissionActionButton`.
  */
 export function MissionActionLink({
   guidance,
   haloClassName = "",
   className = "",
+  intent,
   ...props
 }: MissionActionLinkProps) {
   return (
     <MissionGuidanceHalo guidance={guidance} className={haloClassName}>
       <ActionLink
         {...props}
+        intent={guidance ? "secondary" : intent}
         className={`grow ${missionGuidanceClassName(guidance)} ${className}`}
         data-mission-guidance={guidance}
       />

@@ -1,5 +1,8 @@
 import {
   expect,
+  expectExteriorMissionHalo,
+  expectKeyboardFocusRingPaints,
+  expectPointerFocusWithoutRing,
   openEquipmentFromMissionGuidance,
   openMapSurface,
   openNpcDialogue,
@@ -434,10 +437,11 @@ test("equips the Cutter through Inventory, shows a full stack, and earns Mining 
   await expect(page.locator("[data-mission-strip]")).toContainText(
     "Complete 5 Refining attempts at the Abandoned Processing Yard — 0 / 5",
   );
-  await expect(page.getByRole("button", { name: "Start Refining" })).toHaveAttribute(
-    "data-mission-guidance",
-    "active",
-  );
+  await expectExteriorMissionHalo(page.getByRole("button", { name: "Start Refining" }), "active");
+  // A green-guided button still shows its own keyboard focus ring; pointer
+  // focus does not (#173 on a guided control).
+  await expectKeyboardFocusRingPaints(page.getByRole("button", { name: "Start Refining" }));
+  await expectPointerFocusWithoutRing(page.getByRole("button", { name: "Start Refining" }));
   await page.getByRole("button", { name: "Start Refining" }).click();
   await expect(page.getByRole("button", { name: "Stop Refining" })).toBeVisible();
   const refiningAgo = new Date(Date.now() - 5 * 7 * GAME_TICK_MS - 100);

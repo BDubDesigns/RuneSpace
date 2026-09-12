@@ -315,6 +315,24 @@ export async function expectExteriorMissionHalo(
   expect(paint.haloClipPath).toBe("none");
   expect(paint.haloOverflow).toBe("visible");
   expect(paint.haloFilter).toContain("drop-shadow");
+  // The Mission colour lives on the edge ring and the exterior halo, never
+  // inside: the control sits on the ordinary dark control surface (a tinted or
+  // translucent fill lets the halo wash through) with no blurred inset glow.
+  const interior = await control.evaluate((element) => {
+    const probe = document.createElement("span");
+    probe.style.backgroundColor = "var(--rs-surface-control)";
+    document.body.append(probe);
+    const neutral = getComputedStyle(probe).backgroundColor;
+    probe.remove();
+    const style = getComputedStyle(element);
+    const blurredInset = style.boxShadow.split(/,(?![^(]*\))/).some((layer) => {
+      const lengths = layer.match(/-?\d+(?:\.\d+)?px/g) ?? [];
+      return layer.includes("inset") && parseFloat(lengths[2] ?? "0") > 0;
+    });
+    return { background: style.backgroundColor, neutral, blurredInset };
+  });
+  expect(interior.background).toBe(interior.neutral);
+  expect(interior.blurredInset).toBe(false);
 }
 
 type ScreenshotDiff = {

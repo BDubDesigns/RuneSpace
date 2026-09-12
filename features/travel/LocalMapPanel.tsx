@@ -341,7 +341,7 @@ function HexMapSvg({
                 data-map-mission-ring={missionMarkerTone(missionMarker)}
                 fill="none"
                 points={hexPoints(cx, cy, hexWidth + 12)}
-                strokeWidth="3"
+                strokeWidth="4"
               />
             ) : null}
             {/* Layer 1: shared plated chassis — outer hex fill unchanged */}

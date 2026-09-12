@@ -61,7 +61,12 @@ or `"turn_in"` (blue, every requirement satisfied and only the handoff
 remains — its own `mission-turn-in` halo tone, distinct from `"available"`'s
 even though both paint blue); callers resolve precedence (active over turn-in
 over available) before passing one value. `docs/missions.md` §10 owns the
-semantics. The control keeps the shared `.rs-mission-*` color treatment and
+semantics. A guided control always sits on the ordinary dark `secondary`
+control surface — `MissionActionButton` / `MissionActionLink` override the
+caller's `intent` while guided — so the Mission colour lives only on its text,
+its 2px inset edge ring, and its exterior halo, never its interior (a tinted or
+translucent fill lets the halo wash through and blurs the control). The
+control keeps the shared `.rs-mission-*` color treatment and
 `data-mission-guidance`; the unclipped `.rs-control-halo` wrapper paints the
 exterior halo with `filter: drop-shadow()` from the existing Mission tokens, so
 the glow traces the chamfer. Pass layout classes for the control's outer box
