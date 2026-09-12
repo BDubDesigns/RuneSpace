@@ -611,6 +611,21 @@ export type MissionGuidanceTargets = {
 export type MissionGuidanceMeaning = "active" | "turn_in" | "available";
 
 /**
+ * Where an accepted Mission stands: authored work remains (`work`, green) or
+ * every authored requirement holds and only the final handoff remains
+ * (`turn_in`, blue) — wherever the player currently is. This is the same fact
+ * `guidance.turnIn` carries; it is not "the turn-in is executable right now"
+ * (`stage.turnInAvailable`).
+ */
+export type MissionGuidancePhase = "work" | "turn_in";
+
+export function missionGuidancePhase(
+  projection: Pick<MissionProjection, "stage">,
+): MissionGuidancePhase {
+  return projection.stage?.requirementsSatisfied ? "turn_in" : "work";
+}
+
+/**
  * The meaning an NPC's controls present when several Missions target them.
  * Deterministic precedence: active green (work remains) over turn-in blue over
  * available blue — accepted work first, and an accepted Mission's handoff

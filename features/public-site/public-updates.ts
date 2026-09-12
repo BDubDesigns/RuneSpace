@@ -9,7 +9,7 @@ const authoredUpdates = [
     title: "Following the Job",
     publishedAt: "2026-09-12T20:00:00-07:00",
     summary:
-      "The Map now spells out MISSION and TURN IN in plain text, and the person you hand a finished job to lights up blue instead of green.",
+      "The Map now spells out MISSION and TURN IN in plain text, every accepted job gets a compact strip at the top of the screen, and a finished job turns blue.",
     body: [
       "Guidance used to run out at the edge of the room you were standing in. If a job's next step was somewhere else, you knew a location was probably relevant, but nothing on the Map actually said so — and once every objective on a job was done, the person waiting to receive it still glowed the same green as work you hadn't finished yet.",
       "The Map now labels a hex MISSION when it's where an accepted job needs you next, and TURN IN when it's where a finished job gets handed in — each with a glowing outline around the hex, visible from anywhere on the Map, not just once you arrive. Get there and the same handoff you already know continues as normal: a building's Enter lights up, then the person inside.",
@@ -28,6 +28,7 @@ const authoredUpdates = [
         items: [
           "The person you hand a finished job to is now highlighted blue instead of green.",
           "Green now always means there is work still to do.",
+          "Your accepted jobs now sit at the top of the screen as compact strips, one per job — green while work remains, blue once a job is ready to hand in. They stay there on the Map and while you travel.",
         ],
       },
       {

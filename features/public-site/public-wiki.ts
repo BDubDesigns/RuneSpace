@@ -363,7 +363,7 @@ const authoredWikiArticles = [
       {
         heading: "How missions work in practice",
         paragraphs: [
-          "Objectives update live as you meet them, and the current one is always clear in the Mission Log. Finishing Walk It Off, Cut Your Teeth, or Waste Not hands you the next job in the chain automatically — there's nothing extra to accept. Keep the Change works differently: after Hold It Together, go back and talk to Wade to take it on. It's currently the last job in the chain. When every objective on a job is met, talk to the NPC named in it to turn it in.",
+          "Objectives update live as you meet them. Every job you've accepted gets its own strip at the top of the screen, on the Map and while travelling too — green while there's still work to do, blue once it's ready to hand in — and the Mission Log keeps the full checklist. Finishing Walk It Off, Cut Your Teeth, or Waste Not hands you the next job in the chain automatically — there's nothing extra to accept. Keep the Change works differently: after Hold It Together, go back and talk to Wade to take it on. It's currently the last job in the chain. When every objective on a job is met, talk to the NPC named in it to turn it in.",
         ],
       },
       {

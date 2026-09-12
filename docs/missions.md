@@ -432,6 +432,34 @@ Each consumer answers "am I that target, and with which meaning?":
 
 `MissionGuidanceTargets` is the union across all missions: `availableNpcIds`, `npcIds`, `turnInNpcIds`, `localPlaceIds`, `turnInLocalPlaceIds`, `locationIds`, `turnInLocationIds`, `equipmentItemIds`, `actionIds`, `cargoRepair`.
 
+### Play Mission strips (Issue #174)
+
+The in-Play Mission surface is a compact stack of strips rendered once, as the
+first content under the Play header, by `features/missions/MissionGuidanceStrips.tsx`
+from `PlayConsole` — so it leads Location, Local Place, Journey, and Map alike.
+It is ordinary document flow (never sticky or fixed) and scrolls away normally.
+
+- One strip per accepted, non-completed Mission (`active` /
+  `ready_for_completion`) in the authoritative Mission order; unaccepted,
+  available, and completed Missions never appear, and an empty stack renders
+  nothing. There is no selected, tracked, or primary Mission.
+- Each strip's colour is its semantic phase, `missionGuidancePhase(projection)`
+  (`game/domain/missions.ts`): `work` (green, `.rs-mission-guidance`) while an
+  authored requirement remains, `turn_in` (blue, the shared blue treatment)
+  once every requirement holds — the same fact as `guidance.turnIn`, so the
+  strip stays blue while the player is remote, busy, or has arrived. A text
+  phase label (Active / Turn in) keeps colour from being the only signal.
+- Content comes from the projection only: title, the current objective, and
+  any other still-unmet requirement with numeric progress (so simultaneous
+  requirements such as Mining attempts and a Ferrite Shale stack stay visible).
+  It is not the Mission Log, which keeps the full checklist.
+- A strip is a status row, not an interaction target: it exposes
+  `data-mission-phase="work" | "turn_in"` and never `data-mission-guidance`,
+  which stays reserved for the controls and places a player acts on.
+- Strips are informational: no click-to-track/select/open-Log, no collapse.
+  The pre-existing Open Equipment shortcut stays inside the strip whose Mission
+  currently targets equipment.
+
 ## 11. Explorer-first behavior
 
 **Walk It Off can simultaneously advertise both Wade (Crash Site) and Tansy (The Jag) as available mission interactions.**

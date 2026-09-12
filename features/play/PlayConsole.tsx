@@ -10,7 +10,7 @@ import { LOCATION_IDS } from "@/game/config/foundations";
 import { LocationSurface } from "@/features/location-scene/LocationSurface";
 import { InventoryEquipmentPanel } from "@/features/inventory/InventoryEquipmentPanel";
 import { MissionLogPanel } from "@/features/missions/MissionLogPanel";
-import { MissionObjectivePanel } from "@/features/missions/MissionObjectivePanel";
+import { MissionGuidanceStrips } from "@/features/missions/MissionGuidanceStrips";
 import { NpcInteractionPanel } from "@/features/npc/NpcInteractionPanel";
 import { JourneyPanel } from "@/features/travel/JourneyPanel";
 import { LocalMapPanel } from "@/features/travel/LocalMapPanel";
@@ -96,6 +96,8 @@ export function PlayConsole({
 
   return (
     <div className="space-y-4">
+      {/* Mission guidance leads every Play surface, directly under the header. */}
+      <MissionGuidanceStrips state={state} />
       {surface === "map" ? (
         <LocalMapPanel onBack={onMapExit} onTravelStarted={onMapExit} />
       ) : inTransit ? (
@@ -106,7 +108,6 @@ export function PlayConsole({
 
       {surface === "primary" ? (
         <>
-          <MissionObjectivePanel state={state} />
           {!inTransit ? (
             // Keyed by the requested place so a contact's opened Trade surface
             // never survives leaving the place and reappears on return.

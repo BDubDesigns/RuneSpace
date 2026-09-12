@@ -108,11 +108,14 @@ test("equips the Cutter through Inventory, shows a full stack, and earns Mining 
   await page.emulateMedia({ reducedMotion: "reduce" });
 
   // Objective derives equip-first precedence from authoritative equipment.
-  await expect(page.locator("[data-mission-objective]")).toContainText("Cut Your Teeth");
-  await expect(page.locator("[data-mission-objective-current]")).toHaveText(
+  await expect(page.locator("[data-mission-strip]")).toContainText("Cut Your Teeth");
+  await expect(page.locator("[data-mission-strip-objective]")).toHaveText(
     "Equip the Salvage Cutter from Inventory",
   );
-  await expect(page.locator("[data-mission-objective-requirements]")).toHaveCount(0);
+  // The strip keeps simultaneous numeric progress in view compactly (#174).
+  await expect(page.locator("[data-mission-strip-also]")).toContainText(
+    "Complete 5 Mining attempts",
+  );
 
   // The mission context opens the shared drawer directly on Equipment. This
   // must not regress into the footer Inventory -> Equipment tab relay.
@@ -158,13 +161,15 @@ test("equips the Cutter through Inventory, shows a full stack, and earns Mining 
   // shale.
   await db.delete(inventoryStacks).where(eq(inventoryStacks.characterId, characterId));
   await page.reload();
-  await expect(page.locator("[data-mission-objective]")).toContainText(
+  await expect(page.locator("[data-mission-strip]")).toContainText(
     "Complete 5 Mining attempts — 0 / 5",
   );
-  await expect(page.locator("[data-mission-objective-current]")).toHaveText(
+  await expect(page.locator("[data-mission-strip-objective]")).toHaveText(
     "Complete 5 Mining attempts — 0 / 5",
   );
-  await expect(page.locator("[data-mission-objective-requirements]")).toHaveCount(0);
+  await expect(page.locator("[data-mission-strip-also]")).toContainText(
+    "Get a full stack of Ferrite Shale",
+  );
   await expect(page.getByRole("button", { name: "Start Mining" })).toHaveAttribute(
     "data-mission-guidance",
     "active",
@@ -209,7 +214,7 @@ test("equips the Cutter through Inventory, shows a full stack, and earns Mining 
     .set({ startedAt: miningAgo, resolvedThroughAt: miningAgo })
     .where(eq(activeActions.characterId, characterId));
   await page.getByRole("button", { name: "Refresh status" }).click();
-  await expect(page.locator("[data-mission-objective-current]")).toHaveText(
+  await expect(page.locator("[data-mission-strip-objective]")).toHaveText(
     "Get a full stack of Ferrite Shale — 3 / 10",
   );
   await page.getByRole("button", { name: "Stop Mining" }).click();
@@ -217,10 +222,10 @@ test("equips the Cutter through Inventory, shows a full stack, and earns Mining 
   // As the next requirement becomes current, the compact HUD follows the
   // projected objective without taking over the Mission Log's checklist.
   await page.reload();
-  await expect(page.locator("[data-mission-objective-current]")).toHaveText(
+  await expect(page.locator("[data-mission-strip-objective]")).toHaveText(
     "Get a full stack of Ferrite Shale — 3 / 10",
   );
-  await expect(page.locator("[data-mission-objective-requirements]")).toHaveCount(0);
+  await expect(page.locator("[data-mission-strip-also]")).toHaveCount(0);
 
   // The detailed Mission Log retains all authored requirements and omits the
   // current objective when it is already represented by the checklist.
@@ -241,11 +246,16 @@ test("equips the Cutter through Inventory, shows a full stack, and earns Mining 
     .set({ quantity: 10 })
     .where(eq(inventoryStacks.characterId, characterId));
   await page.reload();
-  await expect(page.locator("[data-mission-objective-requirements]")).toHaveCount(0);
+  await expect(page.locator("[data-mission-strip-also]")).toHaveCount(0);
+  // Every requirement holds: the strip is in its blue turn-in phase (#174).
+  await expect(page.locator("[data-mission-strip]")).toHaveAttribute(
+    "data-mission-phase",
+    "turn_in",
+  );
 
   // Objective advances past both steps: with a full stack already carried,
   // equip + collect satisfy instantly and the turn-in objective shows.
-  await expect(page.locator("[data-mission-objective-current]")).toHaveText(
+  await expect(page.locator("[data-mission-strip-objective]")).toHaveText(
     "Show a full stack of Ferrite Shale to Tansy Rusk",
   );
   await page.getByRole("button", { name: "Missions" }).click();
@@ -329,11 +339,11 @@ test("equips the Cutter through Inventory, shows a full stack, and earns Mining 
   // Cut Your Teeth is completed and its authored continuation is now the
   // active Waste Not mission. The HUD advances to its tracked requirement,
   // rather than exposing a premature completion action.
-  await expect(page.locator("[data-mission-objective]")).toContainText("Waste Not");
-  await expect(page.locator("[data-mission-objective-current]")).toHaveText(
+  await expect(page.locator("[data-mission-strip]")).toContainText("Waste Not");
+  await expect(page.locator("[data-mission-strip-objective]")).toHaveText(
     "Complete 5 Refining attempts at the Abandoned Processing Yard — 0 / 5",
   );
-  await expect(page.locator("[data-mission-objective-requirements]")).toHaveCount(0);
+  await expect(page.locator("[data-mission-strip-also]")).toHaveCount(0);
   await page.getByRole("button", { name: "Missions" }).click();
   const wasteProgressLog = page.getByRole("dialog", { name: "Mission Log" });
   const wasteProgress = wasteProgressLog.locator('[data-mission-log-entry="waste_not"]');
@@ -379,7 +389,7 @@ test("equips the Cutter through Inventory, shows a full stack, and earns Mining 
   // Reload preserves the active Waste Not dialogue ownership and does not
   // replay the Cut completion presentation.
   await page.reload();
-  await expect(page.locator("[data-mission-objective]")).toContainText("Waste Not");
+  await expect(page.locator("[data-mission-strip]")).toContainText("Waste Not");
   const tansyPostReload = await openNpcDialogue(page, "Tansy Rusk", /Waste Not/);
   await expect(tansyPostReload.locator('[data-dialogue-subject="item"]')).toHaveCount(0);
   await expect(tansyPostReload.locator("[data-dialogue-skill-xp-tile]")).toHaveCount(0);
@@ -421,7 +431,7 @@ test("equips the Cutter through Inventory, shows a full stack, and earns Mining 
     LOCATION_IDS.abandonedProcessingYard,
     /Walk to Abandoned Processing Yard/,
   );
-  await expect(page.locator("[data-mission-objective]")).toContainText(
+  await expect(page.locator("[data-mission-strip]")).toContainText(
     "Complete 5 Refining attempts at the Abandoned Processing Yard — 0 / 5",
   );
   await expect(page.getByRole("button", { name: "Start Refining" })).toHaveAttribute(
@@ -437,10 +447,15 @@ test("equips the Cutter through Inventory, shows a full stack, and earns Mining 
     .where(eq(activeActions.characterId, characterId));
   await page.getByRole("button", { name: "Refresh status" }).click();
   await expect(page.getByText("5 attempts", { exact: true })).toBeVisible();
-  await expect(page.locator("[data-mission-objective-current]")).toHaveText(
+  await expect(page.locator("[data-mission-strip-objective]")).toHaveText(
     "Return to Wade Rusk at the Crash Site",
   );
-  await expect(page.locator("[data-mission-objective-requirements]")).toHaveCount(0);
+  await expect(page.locator("[data-mission-strip-also]")).toHaveCount(0);
+  // Refining done while still at the Yard: the strip is already blue (#174).
+  await expect(page.locator("[data-mission-strip]")).toHaveAttribute(
+    "data-mission-phase",
+    "turn_in",
+  );
   await page.getByRole("button", { name: "Missions" }).click();
   const wasteReadyLog = page.getByRole("dialog", { name: "Mission Log" });
   const wasteReady = wasteReadyLog.locator('[data-mission-log-entry="waste_not"]');
@@ -453,7 +468,7 @@ test("equips the Cutter through Inventory, shows a full stack, and earns Mining 
   );
   await page.keyboard.press("Escape");
   const refiningXpBeforeWasteTurnIn = await refiningXpTotal(characterId);
-  await expect(page.locator("[data-mission-objective]")).toContainText(
+  await expect(page.locator("[data-mission-strip]")).toContainText(
     "Return to Wade Rusk at the Crash Site",
   );
 

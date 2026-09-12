@@ -696,7 +696,7 @@ describe("issue #137 mission terminology guard", () => {
       "game/content/missions.ts",
       "server/missions.ts",
       "server/mission-state.ts",
-      "features/missions/MissionObjectivePanel.tsx",
+      "features/missions/MissionGuidanceStrips.tsx",
       "features/missions/MissionLogPanel.tsx",
       "features/play/PlayScreen.tsx",
       "features/play/PlayConsole.tsx",

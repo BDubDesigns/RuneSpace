@@ -35,8 +35,8 @@ records execution state only, so a fresh session can reconstruct the run.
 | Slice | Branch | Staging SHA before | PR | Staging SHA after | Status |
 | --- | --- | --- | --- | --- | --- |
 | #173 | `issue-173-bevel-focus-visible` | `44ca235` | #177 | `058adfa` | integrated (commit `9e4c782`, `--no-ff` merge) |
-| #143 | `issue-143-mission-destination-guidance` | `058adfa` | — | — | in progress |
-| #174 | `issue-174-mission-guidance-strips` | (post-#143 staging head) | — | — | planned |
+| #143 | `issue-143-mission-destination-guidance` | `058adfa` | #178 | `ab0e754` | integrated (commit `96df680`, `--no-ff` merge) |
+| #174 | `issue-174-mission-guidance-strips` | `ab0e754` | — | — | in progress |
 
 Final combined staging SHA: _pending_.
 
@@ -287,3 +287,67 @@ Final combined staging SHA: _pending_.
 7. Docs: `docs/missions.md` (short strip section pointing to §10),
    `docs/design-system.md`; Wiki/Update amended in the same unpublished
    `following-the-job` Update if player-facing.
+
+### Execution log
+
+- Branch `issue-174-mission-guidance-strips` from `ab0e754` (post-#143).
+- PR #178 (#143) remote CI: fast checks, PostgreSQL integration, canonical E2E
+  shards 1–3, Full gate, Merge gate — all ✅.
+- Implemented directly (Opus): `missionGuidancePhase` (domain; reads
+  `stage.requirementsSatisfied`, unit-proven identical to `guidance.turnIn` in
+  every Keep the Change stage × location); `features/missions/MissionGuidanceStrips.tsx`
+  rendered as `PlayConsole`'s first child on every surface; old
+  `MissionObjectivePanel` deleted. Strips reuse the shared
+  `.rs-mission-guidance` / blue classes on a dark `--rs-surface-panel` row, text
+  phase label (Active / Turn in), current objective, plus other unmet
+  requirements with numeric progress (projection text, no parsing).
+- Reconciliation (recorded per #174 "stop and reconcile explicitly"):
+  click-to-open-Mission-Log removed (explicitly forbidden on strips; the footer
+  Missions button remains the Log entry point). The existing, tested Open
+  Equipment shortcut is preserved unchanged in accessible name and behaviour,
+  inside the strip whose Mission targets equipment; the strip itself is not a
+  control.
+- Test migration: `[data-mission-objective*]` → strip selectors in walk-it-off /
+  cut-your-teeth. The six old "HUD lists no requirements" assertions encoded the
+  superseded single-objective design: two now assert the in-progress
+  requirement IS shown (equip stage → Mining; Mining stage → Shale), four stay
+  count 0 where no other numeric requirement remains, plus new blue-phase
+  assertions. Walk-it-off's "NPC panel immediately follows the objective
+  panel" sibling check replaced by a turn-in-phase check (layout intentionally
+  changed); new "no strip stack before any Mission is accepted" check.
+- Terminology guard (`mission-framework.test.ts`) listed the deleted panel;
+  retargeted to its successor file (guard strength unchanged).
+- New canonical E2E (holo-hollow): two accepted Missions (Hold It Together
+  work + Keep the Change remote turn-in) — first child under the header on
+  Location, Map, Local Place, Journey; order; phases in text; blue stays blue at
+  The Jag; completed strip disappears; static position + scrolls away; glow not
+  clipped; 390px no overflow; stack < 35% of viewport; strip and Map TURN IN
+  agree.
+- Local: typecheck ✅, lint ✅, format ✅, unit 73 files / 713 ✅, Wiki/Update
+  validation ✅. `pnpm test:integration` (disposable PostgreSQL) on the #174
+  branch: 23 files / 258 passed, 9 skipped (gated one-time backfill suites) ✅.
+- First #174 targeted run: the #143 Keep the Change map test failed at its
+  "no invented guidance anywhere" check (`page.locator("[data-mission-guidance]")`
+  count 0 in Holo Hollow after Bix) because the new strips also carried
+  `data-mission-guidance`. Diagnosis: a strip is a status row, not an
+  interaction target, so the attribute conflated two meanings. Fix in the
+  component (not the test): strips expose only `data-mission-phase`
+  (`work` / `turn_in`); the #174 E2E asserts phase and that the stack contains
+  no `[data-mission-guidance]`; `docs/missions.md` records the contract. The
+  new strip test itself passed on that run (plain run: 9 passed, 1 failed —
+  exactly `holo-hollow.spec.ts:152`, expected 0 / received 1).
+- `pnpm test:e2e:focused cut-your-teeth` on the #174 branch: **1/1 passed**
+  (strip selectors + blue-phase assertions). The later attribute fix touches no
+  selector this spec uses.
+- Temporary screenshot hooks removed after capture; rerunning holo-hollow +
+  walk-it-off on the fixed component.
+- Visual verification (real Chromium, 390px, `docs/screenshots/issue-174/`):
+  Location and Map show the green Hold It Together (Active) and blue Keep the
+  Change (Turn in, remote) strips as the first content under the header, dark
+  interiors, crisp white objective text, shared border/outline/glow; the Map's
+  The Jag TURN IN hex agrees with the blue strip; Journey shows the single
+  remaining blue strip above the transit panel. Compact, no overflow.
+- Noted, not changed (out of scope): `docs/testing-strategy.md` still quotes
+  "73 behavioral tests in 14 specs" and omits holo-hollow; nothing enforces the
+  count, and the text was already stale before this run. Docs: `docs/missions.md` strip subsection, `design-system.md`
+  note; Wiki line + unpublished `following-the-job` Update amended.
