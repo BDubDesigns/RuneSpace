@@ -26,6 +26,7 @@ The following are live on `main` as server-authoritative, Play-orchestrated syst
 - **Welding & Cargo Hold** — ship Cargo Hold repair at Crash Site and Welding progression.
 - **Inventory & Equipment** — carried stacks/unique items, slot/mass capacity, containers, and Equipment.
 - **Locations & presentation** — location scenes and the local world map.
+- **Holo Hollow, Local Places & Credits** — the first settlement, one-level Local Places inside it, character-scoped Credits, and Bix's authored merchant Trade (`docs/gameplay-foundations.md`, `docs/holo-hollow.md`).
 - **Missions & NPC conversations** — declarative mission framework (`docs/missions.md`), authored missions (Walk It Off / Cut Your Teeth / Waste Not / Hold It Together), the one canonical NPC conversation model with replayable topics (`docs/npc-conversations.md`), and dialogue authoring (`docs/qc-studio.md`).
 
 ## World & skills
@@ -46,7 +47,7 @@ The following are live on `main` as server-authoritative, Play-orchestrated syst
 The following remain explicitly out of scope until later approved issues: additional quest/mission content beyond the current authored missions, additional crafting/gathering activities beyond the approved Mining/Refining/Welding slices, hex exploration, fuel consumption beyond the approved Cargo Hold repair, ships/speeders, combat, Phaser minigames, chat/clans/multiplayer, player-to-player trading and any player-driven market or economy simulation, a CMS, background workers, and autonomous issue selection. See `docs/gameplay-foundations.md` for the authoritative slice boundaries.
 
 The approved NPC merchant loop (Credits and Bix's fixed buy/sell catalog, issue
-#159) is in scope and described in `docs/gameplay-foundations.md` and
+#159) is live and described in `docs/gameplay-foundations.md` and
 `docs/holo-hollow.md`. It is deliberately not a market: prices are authored
 content, stock is fixed, and no merchant wallet, restock timer, dynamic pricing,
 or player-to-player exchange exists.

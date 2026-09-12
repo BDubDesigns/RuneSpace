@@ -39,8 +39,8 @@ Rules the presentation must keep:
 - The surface is mobile-first, keyboard-operable, and uses the shared
   `components/ui/Drawer` conventions.
 
-Other NPC actions stay outside Talk. Bix will later expose **Talk** and
-**Trade** as separate actions (`docs/holo-hollow.md`).
+Other NPC actions stay outside Talk. Bix exposes **Talk** and **Trade** as
+separate actions (`docs/holo-hollow.md`).
 
 ## 2. Authoritative homes
 
