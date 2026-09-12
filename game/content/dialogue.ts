@@ -746,12 +746,13 @@ const dialogue = {
       bixLocal(EXPRESSION_IDS.amused, "And Wade's already got you running errands. That was fast."),
       bixLocal(
         EXPRESSION_IDS.neutral,
-        "Three Power Cells. Eight each. Twenty-four, and I'd wager he handed you exactly twenty-four.",
+        "Three Power Cells. Eight Credits each. Twenty-four Credits.",
       ),
+      bixLocal(EXPRESSION_IDS.amused, "Let me guess. That's exactly what Wade handed you."),
       bixLocal(EXPRESSION_IDS.amused, "No delivery tip. That's Wade."),
       bixLocal(
         EXPRESSION_IDS.neutral,
-        "Before you spend his money, though — the Annex'll issue you five a day.",
+        "Before you spend it, though — the Annex'll issue you five Cells per local day.",
       ),
       bixLocal(
         EXPRESSION_IDS.neutral,
@@ -765,39 +766,46 @@ const dialogue = {
       ),
       bixLocal(EXPRESSION_IDS.amused, "Limit keeps one enterprising idiot from emptying the rack."),
       bixLocal(EXPRESSION_IDS.concerned, "And yes, I still sell them."),
-      bixLocal(EXPRESSION_IDS.neutral, "The Annex gives you five. It gives me five."),
       bixLocal(
         EXPRESSION_IDS.neutral,
-        "It does not stock my shelf for everybody in town who already burned through theirs.",
+        "The Annex gives you five. It gives me five. That doesn't stock a store.",
       ),
       bixLocal(
         EXPRESSION_IDS.neutral,
-        "Need one now, it's eight. Got extras, I'll give you three.",
+        "Need another one? Eight Credits. Got extras? I'll give you three Credits each.",
       ),
       bixLocal(EXPRESSION_IDS.amused, "That's called a store."),
-      maraAtBixShop(EXPRESSION_IDS.amused, "Ahh, you lucky bastard, you."),
-      bixLocal(EXPRESSION_IDS.neutral, "Mara. This is the one from the crash."),
-      maraAtBixShop(
-        EXPRESSION_IDS.amused,
-        "I know. I've watched you walk past my door for days like somebody reading a menu they can't afford.",
+      maraAtBixShop(EXPRESSION_IDS.amused, "Morning, Bix. How's business?"),
+      bixLocal(
+        EXPRESSION_IDS.neutral,
+        "Hey Mara. Have you met the crash survivor? Wade has decided to make them his apprentice.",
       ),
-      maraAtBixShop(EXPRESSION_IDS.firm, "Wade doesn't take on help. Wade complains about help."),
+      maraAtBixShop(EXPRESSION_IDS.amused, "Wade made you his apprentice?"),
+      bixLocal(
+        EXPRESSION_IDS.amused,
+        "Yup. Already sent them on their first errand. Tansy ran out of Power Cells while working The Jag.",
+      ),
+      maraAtBixShop(EXPRESSION_IDS.amused, "Ahh, you lucky bastard, you."),
+      maraAtBixShop(
+        EXPRESSION_IDS.firm,
+        "Wade can be demanding. But pay attention, and you will learn a lot from him.",
+      ),
       maraAtBixShop(
         EXPRESSION_IDS.amused,
-        "So if Wade's putting you to work, maybe you're not a tourist anymore.",
+        "And hey, if he's putting you to work, maybe you're not a tourist anymore.",
       ),
       maraAtBixShop(
         EXPRESSION_IDS.firm,
-        "Get Tansy what she needs first. She's out there with a dead Cutter while we stand here talking.",
+        "Get Tansy what she needs first. She's out at The Jag with a dead Cutter while we're standing here yapping.",
       ),
       maraAtBixShop(
         EXPRESSION_IDS.amused,
-        "Then come find me. The B&B's for people who work here.",
+        "After that, come find me. The B&B's only open for people who work here. That's you now.",
       ),
-      bixLocal(EXPRESSION_IDS.amused, "She means that as a compliment."),
+      bixLocal(EXPRESSION_IDS.amused, "Sounds like you're in, kid."),
       bixLocal(
         EXPRESSION_IDS.neutral,
-        "Cells are on the shelf if you want them. Annex is up the road if you don't.",
+        "Tansy's waitin'. Cells are on the shelf if you want to buy them. Annex is up the road if you don't.",
       ),
     ],
   },

@@ -48,6 +48,9 @@ export function LocalPlaceDirectory({ locationId }: { locationId: string }) {
           const access = deriveLocalPlaceAccess(place, completedMissionIds);
           const href = localPlaceHref(pathname, place.id);
           const reasonId = `local-place-reason-${place.id}`;
+          // A guided doorway sits on the neutral control surface like every other
+          // green-guided control; the primary fill would tint it under the green.
+          const guided = guidance.localPlaceIds.has(place.id);
 
           return (
             <li className="flex" key={place.id}>
@@ -72,9 +75,10 @@ export function LocalPlaceDirectory({ locationId }: { locationId: string }) {
                     <MissionActionLink
                       aria-label={`Enter ${place.displayName}`}
                       data-local-place-enter
-                      guidance={guidance.localPlaceIds.has(place.id) ? "active" : undefined}
+                      guidance={guided ? "active" : undefined}
                       haloClassName="w-full"
                       href={href}
+                      intent={guided ? "secondary" : "primary"}
                     >
                       Enter
                     </MissionActionLink>

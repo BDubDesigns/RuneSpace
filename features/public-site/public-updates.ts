@@ -20,7 +20,7 @@ const authoredUpdates = [
       "The Cargo Hold is holding, so Wade Rusk has decided what to do with you: you are his apprentice now, and he is not asking. Go back and talk to him at the Crash Site once Hold It Together is done. This one does not arrive on its own.",
       "While you are standing there, Tansy calls in from the seam. She is out of Power Cells and her Cutter is dead weight. She needs three, Wade has none, and Bix charges eight apiece — so Wade hands you twenty-four Credits and a piece of advice: if you already have cells, or you know a cheaper way, keep what you do not spend. That is the whole point. If the Annex or your existing stash covers the job, Wade really does mean it: keep the budget.",
       "You still have to go and see Bix. Not to buy anything — Wade just thinks his apprentice ought to know the person who keeps useful things on a shelf. Bix will explain why an automated depot up the road gives Power Cells away for nothing while he sells them for eight, and the answer turns out to involve a tourism-era Settled Systems contract that nobody ever got around to cancelling.",
-      "You will also meet Mara Kells, who owns the HH B&B and has been watching you wander past her door like a tourist. Get Tansy her cells, and the rooms that were held for locals and working crews are open to you too.",
+      "You will also meet Mara Kells, who owns the HH B&B and has an opinion about Wade taking on an apprentice. Get Tansy her cells, and the rooms that were held for locals and working crews are open to you too.",
     ],
     patchNotes: [
       {

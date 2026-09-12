@@ -567,10 +567,17 @@ describe("Keep the Change authored content", () => {
     ).toBe(NPC_IDS.bixWeller);
   });
 
-  it("preserves the approved Annex history, shop logic, and Mara's line", () => {
-    const text = getDialogue(DIALOGUE_IDS.bixKeepTheChangeIntroduction)!
-      .beats.map((beat) => beat.text)
+  const introBeats = () =>
+    getDialogue(DIALOGUE_IDS.bixKeepTheChangeIntroduction)!.beats.filter(
+      (beat): beat is Extract<typeof beat, { kind: "npc" }> => beat.kind === "npc",
+    );
+  const introText = () =>
+    introBeats()
+      .map((beat) => beat.text)
       .join(" ");
+
+  it("preserves the approved Annex history, shop logic, and Mara's line", () => {
+    const text = introText();
     expect(text).toContain("Ahh, you lucky bastard, you.");
     expect(text).toContain("not a tourist anymore");
     expect(text).toContain("Settled Systems required an emergency power depot");
@@ -580,6 +587,35 @@ describe("Keep the Change authored content", () => {
     expect(text).toContain("The Annex gives you five. It gives me five.");
     expect(text).toContain("That's called a store.");
     // Bix still points at the free source before taking Wade's money.
-    expect(text).toContain("five a day");
+    expect(text).toContain("five Cells per local day");
+  });
+
+  it("names Credits for every price and budget Bix mentions", () => {
+    const text = introText();
+    expect(text).toContain("Eight Credits each. Twenty-four Credits.");
+    expect(text).toContain("Need another one? Eight Credits.");
+    expect(text).toContain("I'll give you three Credits each.");
+    expect(text).not.toMatch(/\beight\b(?! Credits)/i);
+    expect(text).not.toMatch(/\btwenty-four\b(?! Credits)/i);
+  });
+
+  it("establishes Mara's entrance and the apprenticeship before her approved line", () => {
+    const beats = introBeats();
+    const firstMara = beats.findIndex((beat) => beat.speakerNpcId === NPC_IDS.maraKells);
+    const bixNamesMara = beats.findIndex(
+      (beat) => beat.speakerNpcId === NPC_IDS.bixWeller && beat.text.startsWith("Hey Mara"),
+    );
+    const apprenticeSetup = beats.findIndex(
+      (beat) => beat.speakerNpcId === NPC_IDS.bixWeller && /apprentice/.test(beat.text),
+    );
+    const lucky = beats.findIndex((beat) => beat.text === "Ahh, you lucky bastard, you.");
+    // She arrives with a greeting of her own, not the punchline.
+    expect(beats[firstMara]?.text).toBe("Morning, Bix. How's business?");
+    expect(bixNamesMara).toBeGreaterThan(firstMara);
+    expect(apprenticeSetup).toBeGreaterThan(firstMara);
+    expect(lucky).toBeGreaterThan(apprenticeSetup);
+    expect(beats[lucky]?.speakerNpcId).toBe(NPC_IDS.maraKells);
+    // No claim that Mara has watched the player around town beforehand.
+    expect(introText()).not.toMatch(/door/i);
   });
 });
