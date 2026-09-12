@@ -62,8 +62,9 @@ unsatisfied". As of 2026-09-12T19:29:04Z the PR carries `draft: false`,
 `mergeable_state: clean`, and run `34714301638` on the same commit `ec4d441`
 passed **including the Merge gate**. This is consistent, not contradictory:
 `scripts/select-ci-gate.mjs` keys `merge_required` off GitHub's real `draft`
-flag, so marking the PR ready for review flipped the gate. The PR is open and
-merge-ready, waiting on Brandon.
+flag, so marking the PR ready for review flipped the gate. Brandon squash-merged
+#180 at 2026-09-12T20:04:04Z; `main` is now `77a73df`, and issues #173, #143,
+#174 and #176 close with it.
 
 ### Not previously noted, and material
 
