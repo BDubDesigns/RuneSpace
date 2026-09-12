@@ -5,12 +5,12 @@ import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { ActionButton } from "@/components/ui/ActionButton";
-import { ActionLink } from "@/components/ui/ActionLink";
+import { MissionActionLink } from "@/components/ui/MissionActionLink";
 import { SectionHeader } from "@/components/ui/SectionHeader";
 import { usePlay } from "@/features/play/PlayContext";
 import { getLocalPlacesForLocation } from "@/game/content/local-places";
 import { deriveLocalPlaceAccess } from "@/game/domain/local-places";
-import { deriveCompletedMissionIds } from "@/game/domain/missions";
+import { deriveCompletedMissionIds, deriveMissionGuidanceTargets } from "@/game/domain/missions";
 import type { LocalPlaceDefinition } from "@/game/schemas/local-places";
 import { localPlaceHref } from "./navigation";
 
@@ -36,6 +36,9 @@ export function LocalPlaceDirectory({ locationId }: { locationId: string }) {
   // A place whose door opens on Mission completion reads that authoritative
   // state here, so the world visibly changes as soon as the Mission is done.
   const completedMissionIds = deriveCompletedMissionIds(state.missions);
+  // An accepted Mission whose target NPC lives inside one of these places
+  // guides that place's entrance; the NPC takes over once the player is inside.
+  const guidance = deriveMissionGuidanceTargets(state.missions);
 
   return (
     <div data-local-place-directory>
@@ -66,14 +69,15 @@ export function LocalPlaceDirectory({ locationId }: { locationId: string }) {
                     <PlaceSummary place={place} />
                   </div>
                   <div className="relative mt-auto p-3 pt-0">
-                    <ActionLink
+                    <MissionActionLink
                       aria-label={`Enter ${place.displayName}`}
-                      className="w-full"
                       data-local-place-enter
+                      guidance={guidance.localPlaceIds.has(place.id) ? "active" : undefined}
+                      haloClassName="w-full"
                       href={href}
                     >
                       Enter
-                    </ActionLink>
+                    </MissionActionLink>
                   </div>
                 </article>
               ) : (

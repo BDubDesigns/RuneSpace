@@ -2,6 +2,7 @@ import { getItemDefinition, skillLevelThresholds } from "@/game/config/balance";
 import { ACTION_IDS } from "@/game/config/foundations";
 import { getActionOutputItemIds } from "@/game/domain/action-outputs";
 import { getDialogue } from "@/game/content/dialogue";
+import { getLocalPlaceInLocation } from "@/game/content/local-places";
 import { getLocation } from "@/game/content/locations";
 import { getNpc } from "@/game/content/npcs";
 import { resolveItemPresentation } from "@/game/content/item-presentation";
@@ -47,6 +48,14 @@ export type MissionObservation = {
 export type MissionGuidance = {
   /** The NPC whose interaction the current objective requires. */
   npcId?: string;
+  /**
+   * The Local Place at the player's current World Location where that `npcId`
+   * target lives. A Local Place resident is not on screen until the player
+   * steps inside, so the place's entrance carries the active guidance until
+   * then. Derived from authored NPC placement for accepted progression only —
+   * never from availability, and never the World Location itself.
+   */
+  localPlaceId?: string;
   /** The item whose equipped state is the first unmet requirement. */
   equipmentItemId?: string;
   /** The authored recommended acquisition action for the first unmet carried requirement. */
@@ -321,7 +330,7 @@ function deriveGuidance(
   if (!firstUnsatisfied) {
     // Every requirement holds: the turn-in NPC is the interaction target even
     // while the character is still busy (turn-in merely not performable yet).
-    return { npcId: definition.turnIn.npcId };
+    return npcGuidance(definition.turnIn.npcId, currentLocationId);
   }
   if (firstUnsatisfied.kind === "equipped_item") {
     return { equipmentItemId: firstUnsatisfied.itemId };
@@ -338,9 +347,24 @@ function deriveGuidance(
   if (firstUnsatisfied.kind === "npc_conversation") {
     // The person to go and meet is the interaction target, exactly as the
     // turn-in NPC is once every requirement holds.
-    return { npcId: firstUnsatisfied.npcId };
+    return npcGuidance(firstUnsatisfied.npcId, currentLocationId);
   }
   return undefined;
+}
+
+/**
+ * Active guidance toward one NPC. When that NPC is the resident of a Local
+ * Place at the player's current World Location, they only appear once the
+ * player steps inside, so the place is carried too and its entrance becomes
+ * the target until then. Derived purely from authored NPC placement; an NPC
+ * elsewhere in the world produces no place or location target at all.
+ */
+function npcGuidance(npcId: string, currentLocationId: string): MissionGuidance {
+  const residentPlaceId = getNpc(npcId)?.localPlaceId;
+  const place = residentPlaceId
+    ? getLocalPlaceInLocation(currentLocationId, residentPlaceId)
+    : undefined;
+  return place ? { npcId, localPlaceId: place.id } : { npcId };
 }
 
 export function projectMission(
@@ -491,6 +515,11 @@ export type MissionGuidanceTargets = {
   availableNpcIds: ReadonlySet<string>;
   /** NPC(s) whose interaction advances/completes an accepted mission. */
   npcIds: ReadonlySet<string>;
+  /**
+   * Local Place(s) at the current World Location whose entrance leads to an
+   * accepted mission's NPC target (see `MissionGuidance.localPlaceId`).
+   */
+  localPlaceIds: ReadonlySet<string>;
   equipmentItemIds: ReadonlySet<string>;
   actionIds: ReadonlySet<string>;
   /** True while an accepted mission's current target is the Cargo Hold repair surface. */
@@ -519,6 +548,7 @@ export function deriveMissionGuidanceTargets(
 ): MissionGuidanceTargets {
   const availableNpcIds = new Set<string>();
   const npcIds = new Set<string>();
+  const localPlaceIds = new Set<string>();
   const equipmentItemIds = new Set<string>();
   const actionIds = new Set<string>();
   let cargoRepair = false;
@@ -527,12 +557,13 @@ export function deriveMissionGuidanceTargets(
       for (const id of projection.guidance.availableNpcIds) availableNpcIds.add(id);
     }
     if (projection.guidance?.npcId) npcIds.add(projection.guidance.npcId);
+    if (projection.guidance?.localPlaceId) localPlaceIds.add(projection.guidance.localPlaceId);
     if (projection.guidance?.equipmentItemId)
       equipmentItemIds.add(projection.guidance.equipmentItemId);
     if (projection.guidance?.actionId) actionIds.add(projection.guidance.actionId);
     if (projection.guidance?.cargoRepair) cargoRepair = true;
   }
-  return { availableNpcIds, npcIds, equipmentItemIds, actionIds, cargoRepair };
+  return { availableNpcIds, npcIds, localPlaceIds, equipmentItemIds, actionIds, cargoRepair };
 }
 
 /**

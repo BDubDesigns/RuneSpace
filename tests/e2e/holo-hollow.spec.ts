@@ -1,8 +1,15 @@
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
-import { characters, inventoryStacks } from "@/db/rune-space";
-import { ITEM_IDS, LOCAL_PLACE_IDS, LOCATION_IDS } from "@/game/config/foundations";
-import { expect, openNpcConversation, openTestCharacter, test } from "./fixtures";
+import { characterMissions, characters, inventoryStacks } from "@/db/rune-space";
+import { ITEM_IDS, LOCAL_PLACE_IDS, LOCATION_IDS, MISSION_IDS } from "@/game/config/foundations";
+import {
+  expect,
+  expectExteriorMissionHalo,
+  openMapSurface,
+  openNpcConversation,
+  openTestCharacter,
+  test,
+} from "./fixtures";
 
 /**
  * Holo Hollow's first settlement slice (#159): Local Place navigation, the
@@ -31,6 +38,59 @@ async function arriveInHoloHollow(
   }
 }
 
+test("hands an accepted Mission's NPC target to its Local Place entrance, then to the NPC", async ({
+  page,
+  testCharacter,
+}) => {
+  const characterId = testCharacter.id;
+  await page.setViewportSize({ width: 390, height: 844 });
+  const now = new Date();
+  // Keep the Change accepted with Bix not yet met: the current target is an
+  // NPC who lives inside a Local Place in this town.
+  await db
+    .insert(characterMissions)
+    .values([
+      ...[
+        MISSION_IDS.walkItOff,
+        MISSION_IDS.cutYourTeeth,
+        MISSION_IDS.wasteNot,
+        MISSION_IDS.holdItTogether,
+      ].map((missionId) => ({ characterId, missionId, acceptedAt: now, completedAt: now })),
+      { characterId, missionId: MISSION_IDS.keepTheChange, acceptedAt: now },
+    ]);
+  await arriveInHoloHollow(characterId);
+  await openTestCharacter(page, characterId);
+  await page.emulateMedia({ reducedMotion: "reduce" });
+
+  // The place holding the target is the green target, with a real exterior halo.
+  const directory = page.locator("[data-local-place-directory]");
+  const shop = directory.locator(`[data-local-place="${LOCAL_PLACE_IDS.holoHollowSouvenirs}"]`);
+  await expectExteriorMissionHalo(shop.getByRole("link", { name: /^Enter / }), "active");
+  // Only that one place is guided.
+  await expect(directory.locator("[data-mission-guidance]")).toHaveCount(1);
+  await expect(
+    directory
+      .locator(`[data-local-place="${LOCAL_PLACE_IDS.holoHollowAssistanceCenter}"]`)
+      .locator("[data-mission-guidance]"),
+  ).toHaveCount(0);
+
+  // No map or hex guidance is added for the building.
+  await openMapSurface(page);
+  await expect(
+    page.getByRole("group", { name: "Local map" }).locator("[data-mission-guidance]"),
+  ).toHaveCount(0);
+  await page.goBack();
+
+  // Inside, the doorway is gone and the NPC's own interaction takes over.
+  await shop.getByRole("link", { name: /^Enter / }).click();
+  await page.waitForURL(new RegExp(`place=${LOCAL_PLACE_IDS.holoHollowSouvenirs}`));
+  await expect(page.locator("[data-local-place-directory]")).toHaveCount(0);
+  await expectExteriorMissionHalo(
+    page.getByRole("button", { name: /Talk to Bix Weller/ }),
+    "active",
+  );
+});
+
 test("presents Holo Hollow's places, keeps HH B&B visible but locked, and enters a shop without travelling", async ({
   page,
   testCharacter,
@@ -45,6 +105,8 @@ test("presents Holo Hollow's places, keeps HH B&B visible but locked, and enters
   const directory = page.locator("[data-local-place-directory]");
   await expect(directory).toBeVisible();
   await expect(directory.locator("[data-local-place]")).toHaveCount(3);
+  // A fresh character's unaccepted Walk It Off advertises no place in town.
+  await expect(directory.locator("[data-mission-guidance]")).toHaveCount(0);
 
   // HH B&B is plainly there, and says why it cannot be entered.
   const bnb = directory.locator(`[data-local-place="${LOCAL_PLACE_IDS.hhBnb}"]`);

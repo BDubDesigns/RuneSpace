@@ -50,15 +50,18 @@ control therefore cannot render its own exterior Mission glow; left alone it
 only changes color and inset ring, which previously passed semantic checks while
 failing visually.
 
-Any `ActionButton` that carries Mission guidance must be a
-`components/ui/MissionActionButton`, which takes one resolved `guidance`
+Any beveled control that carries Mission guidance goes through the shared
+`components/ui/MissionGuidanceHalo`: an `ActionButton` becomes a
+`MissionActionButton` and an `ActionLink` (such as a Local Place **Enter**)
+becomes a `MissionActionLink`. Each takes one resolved `guidance`
 (`"available"` blue or `"active"` green; callers resolve active-wins first). The
-button keeps the shared `.rs-mission-*` color treatment and
-`data-mission-guidance`; an unclipped `.rs-control-halo` wrapper paints the
+control keeps the shared `.rs-mission-*` color treatment and
+`data-mission-guidance`; the unclipped `.rs-control-halo` wrapper paints the
 exterior halo with `filter: drop-shadow()` from the existing Mission tokens, so
 the glow traces the chamfer. Pass layout classes for the control's outer box
-through `haloClassName`. Features never hand-roll this wrapper, and the wrapper
-must never be beveled or clipped.
+through `haloClassName`. Features never hand-roll this wrapper, the wrapper must
+never be beveled or clipped, and ancestors within the glow's reach must not clip
+with `overflow: hidden`.
 
 Non-beveled Mission surfaces, such as the conversation hub's Mission entries,
 apply `.rs-mission-available` / `.rs-mission-guidance` directly — their own

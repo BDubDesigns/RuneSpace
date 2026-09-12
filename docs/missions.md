@@ -364,7 +364,7 @@ not add MISSION or TURN IN markers. Map guidance markers are deferred to Issue
 
 Both are static treatments (no animation) and use a shared-class approach — no per-component green/blue classes. Tokens and classes live in `app/globals.css`. Consumers set `data-mission-guidance="available" | "active"`.
 
-Beveled controls cannot paint their own exterior glow (`.rs-bevel`'s clip-path clips it), so a guided `ActionButton` is always a `components/ui/MissionActionButton`: the button keeps the color/inset treatment and an unclipped wrapper paints the exterior halo from the same tokens. Non-beveled surfaces such as hub Mission entries use the classes directly. See `docs/design-system.md`.
+Beveled controls cannot paint their own exterior glow (`.rs-bevel`'s clip-path clips it), so a guided `ActionButton` is always a `components/ui/MissionActionButton` and a guided `ActionLink` a `MissionActionLink`: the control keeps the color/inset treatment and the shared unclipped `MissionGuidanceHalo` wrapper paints the exterior halo from the same tokens. Non-beveled surfaces such as hub Mission entries use the classes directly. See `docs/design-system.md`.
 
 **Active green wins if something ever qualifies for both.** React priority (`hasActiveGuidance` over `hasAvailableGuidance`) ensures only one class is normally present; CSS also guarantees green wins when both classes coincide (`.rs-mission-available.rs-mission-guidance`).
 
@@ -392,6 +392,8 @@ Derived from the **first unmet requirement in authored order** on each accepted-
 | `cargo_hold_repaired` | `cargoRepair: true` — the Cargo Hold repair surface is the current target; the Cargo panel selects the advancing affordance (contribute materials vs start Welding) from authoritative repair/material/Welding substate |
 | `npc_conversation` | `npcId: requirement.npcId` — the person to go and meet, reusing the same green NPC guidance the turn-in NPC gets |
 
+**Local Place handoff.** Whenever the green target is an NPC (the turn-in NPC or an `npc_conversation` NPC) who is the authored resident of a Local Place at the player's **current** World Location, the projection also carries `localPlaceId`. That NPC only appears once the player steps inside, so until then the Local Place's **Enter** control is the green target; inside, the NPC's own Talk control takes over. This is derived from authored NPC placement alone — no mission IDs or prose — so any future Local Place resident works automatically. It applies to accepted progression only: available (blue) offers never guide a door, an NPC in another World Location produces no place target, and the World Location or map hex itself never becomes a target (map guidance remains Issue #143).
+
 Each consumer answers "am I that target?":
 
 - **NPC Talk** — `guidance.npcIds.has(npc.id)` (green) vs `guidance.availableNpcIds.has(npc.id)` (blue). Each Mission entry inside the conversation hub reuses the same projected guidance (`docs/npc-conversations.md` §4), so the control and the entry can never disagree.
@@ -405,7 +407,9 @@ Each consumer answers "am I that target?":
 
 Not every technically possible acquisition path should be highlighted. Only the authored `recommendedActionId` on the current unmet carried requirement is highlighted. Cut Your Teeth recommends `ferrite_shale_mining` — Scavenge also yields Ferrite Shale, but has no `ActionId` to author there and is never highlighted merely because it can produce the same item.
 
-`MissionGuidanceTargets` is the union across all missions: `availableNpcIds`, `npcIds`, `equipmentItemIds`, `actionIds`, `cargoRepair`.
+- **Local Place Enter** — `guidance.localPlaceIds.has(place.id)` on an open place's Enter control (green, via `MissionActionLink`).
+
+`MissionGuidanceTargets` is the union across all missions: `availableNpcIds`, `npcIds`, `localPlaceIds`, `equipmentItemIds`, `actionIds`, `cargoRepair`.
 
 ## 11. Explorer-first behavior
 

@@ -218,7 +218,7 @@ body {
 /* Beveled controls clip anything outside the polygon (outline and drop
    shadows included), so their guidance switches to an inset ring + glow that
    survives clip-path. Their exterior halo is painted by the unclipped
-   .rs-control-halo wrapper below (components/ui/MissionActionButton.tsx). */
+   .rs-control-halo wrapper below (components/ui/MissionGuidanceHalo.tsx). */
 .rs-bevel.rs-mission-guidance {
   box-shadow:
     inset 0 0 0 2px var(--rs-mission-guidance-color),
@@ -275,8 +275,9 @@ body {
  * control itself — so the glow follows the chamfer instead of boxing it.
  * The tone is selected by data-halo and uses the existing semantic tokens only.
  * Never give this wrapper .rs-bevel, a clip-path, or overflow clipping, or the
- * halo is silently clipped again. MissionActionButton owns it; features do not
- * apply it by hand.
+ * halo is silently clipped again — and keep overflow clipping off its
+ * ancestors within the glow's reach. MissionGuidanceHalo owns it (via
+ * MissionActionButton / MissionActionLink); features do not apply it by hand.
  */
 .rs-control-halo {
   display: inline-flex;
