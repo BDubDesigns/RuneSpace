@@ -42,6 +42,33 @@ duration). If a future overlay needs motion beyond a fade, keep it off any
 element that contains absolutely-positioned item tiles, or restructure those
 tiles first.
 
+## Mission guidance on beveled controls
+
+`ActionButton` always carries `.rs-bevel`, whose clip-path clips anything
+painted outside the control — outline and drop shadows included. A beveled
+control therefore cannot render its own exterior Mission glow; left alone it
+only changes color and inset ring, which previously passed semantic checks while
+failing visually.
+
+Any `ActionButton` that carries Mission guidance must be a
+`components/ui/MissionActionButton`, which takes one resolved `guidance`
+(`"available"` blue or `"active"` green; callers resolve active-wins first). The
+button keeps the shared `.rs-mission-*` color treatment and
+`data-mission-guidance`; an unclipped `.rs-control-halo` wrapper paints the
+exterior halo with `filter: drop-shadow()` from the existing Mission tokens, so
+the glow traces the chamfer. Pass layout classes for the control's outer box
+through `haloClassName`. Features never hand-roll this wrapper, and the wrapper
+must never be beveled or clipped.
+
+Non-beveled Mission surfaces, such as the conversation hub's Mission entries,
+apply `.rs-mission-available` / `.rs-mission-guidance` directly — their own
+outline and shadow are not clipped.
+
+The unread-News control in `features/play/PlayScreen.tsx` predates this and uses
+its own unclipped `<form>` wrapper with the separate `--rs-glow-news-unread`
+attention token. It could adopt `.rs-control-halo` with its own `news-unread`
+tone without sharing Mission semantics, but has not been migrated.
+
 ## Accessibility
 
 Controls use a 44px practical minimum target and visible `:focus-visible` ring. Error feedback has an alert role, disabled controls retain labels, and reduced-motion users receive near-instant transitions. Color supplements, rather than replaces, text labels and states.

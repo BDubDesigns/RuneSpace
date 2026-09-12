@@ -277,3 +277,40 @@ export async function openNpcDialogue(page: Page, npcName: string, entryName: st
   const conversation = await openNpcConversation(page, npcName);
   return openConversationEntry(conversation, entryName);
 }
+
+/**
+ * Prove a Mission-guided beveled control really paints its exterior halo.
+ *
+ * The guidance state lives on the button, but the button's own `.rs-bevel`
+ * clip-path clips anything painted outside it, so the glow must live on an
+ * unclipped wrapper. This regression previously passed semantic assertions
+ * while rendering no halo, so it checks computed paint, not class names.
+ */
+export async function expectExteriorMissionHalo(
+  control: import("@playwright/test").Locator,
+  guidance: "available" | "active",
+) {
+  await expect(control).toHaveAttribute("data-mission-guidance", guidance);
+  const halo = control.locator("xpath=..");
+  await expect(halo).toHaveAttribute(
+    "data-halo",
+    guidance === "active" ? "mission-active" : "mission-available",
+  );
+  const paint = await halo.evaluate((element) => {
+    const haloStyle = getComputedStyle(element);
+    const button = element.firstElementChild;
+    return {
+      haloClipPath: haloStyle.clipPath,
+      haloOverflow: haloStyle.overflow,
+      haloFilter: haloStyle.filter,
+      buttonClipPath: button ? getComputedStyle(button).clipPath : "missing",
+    };
+  });
+  // The button is clipped, so it cannot paint its own halo...
+  expect(paint.buttonClipPath).not.toBe("none");
+  expect(paint.buttonClipPath).not.toBe("missing");
+  // ...and the halo is painted by an element that is not clipped.
+  expect(paint.haloClipPath).toBe("none");
+  expect(paint.haloOverflow).toBe("visible");
+  expect(paint.haloFilter).toContain("drop-shadow");
+}

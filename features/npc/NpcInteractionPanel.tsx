@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { ActionButton } from "@/components/ui/ActionButton";
 import { Feedback } from "@/components/ui/Feedback";
+import { MissionActionButton } from "@/components/ui/MissionActionButton";
 import { Panel } from "@/components/ui/Panel";
 import { NpcConversation } from "@/features/npc/NpcConversation";
 import { TradePanel } from "@/features/trade/TradePanel";
@@ -73,11 +74,6 @@ export function NpcInteractionPanel({ localPlaceId }: { localPlaceId?: string })
   // turn-in for an active one), active green wins.
   const hasActiveGuidance = npc ? guidance.npcIds.has(npc.id) : false;
   const hasAvailableGuidance = npc ? guidance.availableNpcIds.has(npc.id) : false;
-  const guidanceClass = hasActiveGuidance
-    ? "rs-mission-guidance"
-    : hasAvailableGuidance
-      ? "rs-mission-available"
-      : "";
   const guidanceValue = hasActiveGuidance
     ? "active"
     : hasAvailableGuidance
@@ -104,19 +100,19 @@ export function NpcInteractionPanel({ localPlaceId }: { localPlaceId?: string })
           </div>
           <div className="flex flex-col gap-2 sm:w-44 sm:shrink-0" data-npc-actions>
             {entries.length > 0 ? (
-              <ActionButton
+              <MissionActionButton
                 aria-label={`Talk to ${npc.displayName}`}
-                className={`w-full ${guidanceClass}`}
                 data-npc-action="talk"
                 data-npc-turn-in={turnInAvailable ? "true" : "false"}
-                data-mission-guidance={guidanceValue}
+                guidance={guidanceValue}
+                haloClassName="w-full"
                 ref={triggerRef}
                 disabled={foregroundBusy}
                 intent={turnInAvailable ? "mission" : "secondary"}
                 onClick={() => setOpen(true)}
               >
                 Talk
-              </ActionButton>
+              </MissionActionButton>
             ) : null}
             {merchant ? (
               <ActionButton

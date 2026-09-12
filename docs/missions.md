@@ -364,6 +364,8 @@ not add MISSION or TURN IN markers. Map guidance markers are deferred to Issue
 
 Both are static treatments (no animation) and use a shared-class approach — no per-component green/blue classes. Tokens and classes live in `app/globals.css`. Consumers set `data-mission-guidance="available" | "active"`.
 
+Beveled controls cannot paint their own exterior glow (`.rs-bevel`'s clip-path clips it), so a guided `ActionButton` is always a `components/ui/MissionActionButton`: the button keeps the color/inset treatment and an unclipped wrapper paints the exterior halo from the same tokens. Non-beveled surfaces such as hub Mission entries use the classes directly. See `docs/design-system.md`.
+
 **Active green wins if something ever qualifies for both.** React priority (`hasActiveGuidance` over `hasAvailableGuidance`) ensures only one class is normally present; CSS also guarantees green wins when both classes coincide (`.rs-mission-available.rs-mission-guidance`).
 
 ### Available guidance (blue)

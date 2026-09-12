@@ -1,5 +1,6 @@
 import {
   expect,
+  expectExteriorMissionHalo,
   openConversationEntry,
   openMapSurface,
   openNpcConversation,
@@ -44,9 +45,10 @@ test("walks from Wade to Tansy, presents approved dialogue, and claims one carri
     "false",
   );
   // Mission guidance: brand-new character at Crash Site — Wade's Talk
-  // control receives the mission-available (blue) treatment.
-  await expect(page.getByRole("button", { name: /Talk to Wade Rusk/ })).toHaveAttribute(
-    "data-mission-guidance",
+  // control receives the mission-available (blue) treatment, including an
+  // exterior halo painted outside the beveled button's clip.
+  await expectExteriorMissionHalo(
+    page.getByRole("button", { name: /Talk to Wade Rusk/ }),
     "available",
   );
   // Talk opens the conversation hub (#164): the available Mission conversation
@@ -55,6 +57,11 @@ test("walks from Wade to Tansy, presents approved dialogue, and claims one carri
   const walkItOffEntry = conversation.getByRole("button", { name: /Walk It Off/ });
   await expect(walkItOffEntry).toHaveAttribute("data-mission-guidance", "available");
   await expect(walkItOffEntry).toContainText("Available");
+  // The hub entry is not beveled, so it keeps the direct exterior treatment.
+  await expect(walkItOffEntry).toHaveClass(/\brs-mission-available\b/);
+  expect(await walkItOffEntry.evaluate((element) => getComputedStyle(element).clipPath)).toBe(
+    "none",
+  );
   await expect(conversation.getByRole("button", { name: /Recovery work/ })).toBeVisible();
   await openConversationEntry(conversation, /Walk It Off/);
   const dialogue = conversation;

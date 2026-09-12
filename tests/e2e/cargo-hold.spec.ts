@@ -1,4 +1,4 @@
-import { expect, test, openTestCharacter } from "./fixtures";
+import { expect, expectExteriorMissionHalo, test, openTestCharacter } from "./fixtures";
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import {
@@ -84,9 +84,10 @@ test("keeps damaged Cargo Hold locked and transfers completed storage on mobile 
   await expect(cargoPanel.locator("[data-cargo-repair-materials]")).toContainText("0 / 15");
   await expect(cargoPanel.locator("[data-cargo-repair-materials]")).toContainText("0 / 6");
   // Mission guidance: Hold It Together is active with materials still needed,
-  // so CONTRIBUTE MATERIALS carries the generic green treatment.
-  await expect(cargoPanel.getByRole("button", { name: "CONTRIBUTE MATERIALS" })).toHaveAttribute(
-    "data-mission-guidance",
+  // so CONTRIBUTE MATERIALS carries the generic green treatment and its
+  // exterior halo.
+  await expectExteriorMissionHalo(
+    cargoPanel.getByRole("button", { name: "CONTRIBUTE MATERIALS" }),
     "active",
   );
   await cargoPanel.getByRole("button", { name: "CONTRIBUTE MATERIALS" }).click();
@@ -97,8 +98,8 @@ test("keeps damaged Cargo Hold locked and transfers completed storage on mobile 
   await expect(cargoPanel.locator("[data-cargo-repair-materials]")).toContainText("15 / 15");
   await expect(cargoPanel.locator("[data-cargo-repair-materials]")).toContainText("6 / 6");
   // Materials complete and Welding idle: START WELDING is now the guided affordance.
-  await expect(cargoPanel.getByRole("button", { name: "START WELDING" })).toHaveAttribute(
-    "data-mission-guidance",
+  await expectExteriorMissionHalo(
+    cargoPanel.getByRole("button", { name: "START WELDING" }),
     "active",
   );
   await expect(cargoPanel.getByRole("button", { name: "START WELDING" })).toBeVisible();
@@ -108,6 +109,10 @@ test("keeps damaged Cargo Hold locked and transfers completed storage on mobile 
   await expect(cargoPanel.getByRole("button", { name: "STOP WELDING" })).not.toHaveAttribute(
     "data-mission-guidance",
   );
+  // An ordinary unguided ActionButton gets no halo wrapper at all.
+  await expect(
+    cargoPanel.getByRole("button", { name: "STOP WELDING" }).locator("xpath=.."),
+  ).not.toHaveClass(/\brs-control-halo\b/);
 
   const completedAgo = new Date(
     Date.now() -
