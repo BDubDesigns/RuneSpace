@@ -16,6 +16,7 @@ boundary.** This file is the repository's normative agent-behavior contract;
   - Missions and NPC conversations: `docs/missions.md`,
     `docs/npc-conversations.md`.
   - UI tokens and motion: `docs/design-system.md`.
+  - Art generation, asset preparation, and visual QA: `docs/art-cookbook.md`.
   - Authentication and trusted hosts: `docs/authentication.md`.
   - Tests and canonical E2E: `docs/testing-strategy.md`.
   - Branches, PRs, validation, and CI: `docs/development-workflow.md`.
