@@ -74,7 +74,7 @@ tone without sharing Mission semantics, but has not been migrated.
 
 ## Accessibility
 
-Controls use a 44px practical minimum target and visible `:focus-visible` ring. Error feedback has an alert role, disabled controls retain labels, and reduced-motion users receive near-instant transitions. Color supplements, rather than replaces, text labels and states.
+Controls use a 44px practical minimum target and visible `:focus-visible` ring. A beveled control (`.rs-bevel` + `.rs-focus`: `ActionButton`, `ActionLink`, their Mission variants, form fields, footer destinations) would clip an outside ring, so one shared rule in `app/globals.css` draws its ring inside instead, inset by `--rs-bevel-focus-inset` so the ring clears the chamfer and sits apart from a Mission-guided control's inset green/blue ring — focus and Mission guidance stay two separate marks. Pointer focus shows no ring. Prove focus paints with rendered pixels (`expectKeyboardFocusRingPaints` in `tests/e2e/fixtures.ts`), not `getComputedStyle()`, which reports the clipped outline as present. Error feedback has an alert role, disabled controls retain labels, and reduced-motion users receive near-instant transitions. Color supplements, rather than replaces, text labels and states.
 
 ## Feature Styling
 

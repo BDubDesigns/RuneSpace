@@ -5,6 +5,8 @@ import { ITEM_IDS, LOCAL_PLACE_IDS, LOCATION_IDS, MISSION_IDS } from "@/game/con
 import {
   expect,
   expectExteriorMissionHalo,
+  expectKeyboardFocusRingPaints,
+  expectPointerFocusWithoutRing,
   openMapSurface,
   openNpcConversation,
   openTestCharacter,
@@ -66,6 +68,12 @@ test("hands an accepted Mission's NPC target to its Local Place entrance, then t
   const directory = page.locator("[data-local-place-directory]");
   const shop = directory.locator(`[data-local-place="${LOCAL_PLACE_IDS.holoHollowSouvenirs}"]`);
   await expectExteriorMissionHalo(shop.getByRole("link", { name: /^Enter / }), "active");
+  // Keyboard focus paints its own ring on the green-guided link (#173), on a
+  // phone and on a desktop viewport.
+  await expectKeyboardFocusRingPaints(shop.getByRole("link", { name: /^Enter / }));
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await expectKeyboardFocusRingPaints(shop.getByRole("link", { name: /^Enter / }));
+  await page.setViewportSize({ width: 390, height: 844 });
   // Only that one place is guided.
   await expect(directory.locator("[data-mission-guidance]")).toHaveCount(1);
   await expect(
@@ -121,6 +129,8 @@ test("presents Holo Hollow's places, keeps HH B&B visible but locked, and enters
   // Every open place offers an explicit Enter control; the card-sized link
   // beneath it stays out of the tab order and the accessibility tree.
   await expect(directory.getByRole("link", { name: /^Enter / })).toHaveCount(2);
+  // An unguided beveled ActionLink still paints a visible keyboard focus ring (#173).
+  await expectKeyboardFocusRingPaints(directory.getByRole("link", { name: /^Enter / }).first());
   await expect(directory.locator("[data-local-place-card-link]").first()).toHaveAttribute(
     "tabindex",
     "-1",
@@ -183,6 +193,10 @@ test("scopes each resident to their own Local Place", async ({ page, testCharact
   await expect(actions.nth(0)).toHaveText("Talk");
   await expect(actions.nth(1)).toHaveAttribute("data-npc-action", "trade");
   await expect(actions.nth(1)).toHaveText("Trade");
+  // An unguided beveled ActionButton paints a visible keyboard focus ring;
+  // pointer focus does not (#173).
+  await expectKeyboardFocusRingPaints(actions.nth(1));
+  await expectPointerFocusWithoutRing(actions.nth(1));
   await expect(page.getByRole("button", { name: /Talk to Bix Weller/ })).toBeVisible();
   await expect(page.getByRole("button", { name: /Talk to Renn Calder/ })).toHaveCount(0);
   // Trade belongs to Bix's card, not the shop description, and is offered

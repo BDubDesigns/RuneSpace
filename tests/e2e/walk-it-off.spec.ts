@@ -1,6 +1,8 @@
 import {
   expect,
   expectExteriorMissionHalo,
+  expectKeyboardFocusRingPaints,
+  expectPointerFocusWithoutRing,
   openConversationEntry,
   openMapSurface,
   openNpcConversation,
@@ -51,6 +53,10 @@ test("walks from Wade to Tansy, presents approved dialogue, and claims one carri
     page.getByRole("button", { name: /Talk to Wade Rusk/ }),
     "available",
   );
+  // Keyboard focus paints its own ring on top of the blue guidance (#173);
+  // pointer focus does not.
+  await expectKeyboardFocusRingPaints(page.getByRole("button", { name: /Talk to Wade Rusk/ }));
+  await expectPointerFocusWithoutRing(page.getByRole("button", { name: /Talk to Wade Rusk/ }));
   // Talk opens the conversation hub (#164): the available Mission conversation
   // above Wade's replayable social topic.
   const conversation = await openNpcConversation(page, "Wade Rusk");
@@ -159,6 +165,8 @@ test("walks from Wade to Tansy, presents approved dialogue, and claims one carri
     "data-mission-guidance",
     "active",
   );
+  // ...and keyboard focus still paints its own ring on top of the green (#173).
+  await expectKeyboardFocusRingPaints(page.getByRole("button", { name: /Talk to Tansy Rusk/ }));
   await page.emulateMedia({ reducedMotion: "reduce" });
   const tansyDialogue = await openNpcConversation(page, "Tansy Rusk");
   const turnInEntry = tansyDialogue.getByRole("button", { name: /Walk It Off/ });
