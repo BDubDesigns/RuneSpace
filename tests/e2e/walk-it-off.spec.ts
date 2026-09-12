@@ -41,6 +41,8 @@ test("walks from Wade to Tansy, presents approved dialogue, and claims one carri
   const characterId = page.url().split("/").at(-1)!;
 
   await expect(page.getByRole("button", { name: "Inventory" })).toBeVisible();
+  // An unaccepted, available Mission never gets a strip (#174).
+  await expect(page.locator("[data-mission-strips]")).toHaveCount(0);
   await expect(page.getByRole("button", { name: /Talk to Wade Rusk/ })).toBeVisible();
   await expect(page.getByRole("button", { name: /Talk to Wade Rusk/ })).toHaveAttribute(
     "data-npc-turn-in",
@@ -101,7 +103,7 @@ test("walks from Wade to Tansy, presents approved dialogue, and claims one carri
   await expect(conversation.getByRole("button", { name: /Recovery work/ })).toBeVisible();
   await page.keyboard.press("Escape");
   await expect(conversation).toBeHidden();
-  await expect(page.locator("[data-mission-objective]")).toContainText("Travel to The Jag");
+  await expect(page.locator("[data-mission-strip]")).toContainText("Travel to The Jag");
 
   // Issue #129: after accepting Walk It Off from Wade but before leaving Crash
   // Site, talking to Wade again must show the active follow-up, not the
@@ -146,7 +148,7 @@ test("walks from Wade to Tansy, presents approved dialogue, and claims one carri
     .first()
     .click();
   await page.getByRole("button", { name: /Walk to The Long Scramble/ }).click();
-  await expect(page.locator("[data-mission-objective]")).toContainText("Travel to The Jag");
+  await expect(page.locator("[data-mission-strip]")).toContainText("Travel to The Jag");
   await expect(page.locator("[data-npc-interaction]")).toHaveCount(0);
   await fastForwardArrival(page, characterId);
   await openMapSurface(page);
@@ -157,11 +159,11 @@ test("walks from Wade to Tansy, presents approved dialogue, and claims one carri
   await page.getByRole("button", { name: /Walk to The Jag/ }).click();
   await fastForwardArrival(page, characterId);
 
-  const missionObjective = page.locator("[data-mission-objective]");
+  // Arrival satisfies Walk It Off's only requirement: its strip is the blue
+  // turn-in phase at the top of Play (#174).
+  const missionObjective = page.locator("[data-mission-strip]");
   await expect(missionObjective).toContainText("Talk to Tansy Rusk");
-  await expect(
-    missionObjective.locator('xpath=following-sibling::*[1][@data-npc-interaction="true"]'),
-  ).toHaveCount(1);
+  await expect(missionObjective).toHaveAttribute("data-mission-phase", "turn_in");
   await expect(page.getByRole("button", { name: /Talk to Tansy Rusk/ })).toHaveAttribute(
     "data-npc-turn-in",
     "true",
@@ -216,9 +218,9 @@ test("walks from Wade to Tansy, presents approved dialogue, and claims one carri
   // the authored continuation — the HUD immediately shows the next
   // assignment's live objective (already at The Jag, so location holds) with
   // no second acceptance click.
-  await expect(page.locator("[data-mission-objective]")).toContainText("Cut Your Teeth");
-  await expect(page.locator("[data-mission-objective]")).toContainText("Active");
-  await expect(page.locator("[data-mission-objective]")).toContainText(
+  await expect(page.locator("[data-mission-strip]")).toContainText("Cut Your Teeth");
+  await expect(page.locator("[data-mission-strip]")).toContainText("Active");
+  await expect(page.locator("[data-mission-strip]")).toContainText(
     "Equip the Salvage Cutter from Inventory",
   );
   // Mission guidance: Cut Your Teeth is accepted, so the equip affordance —
@@ -248,8 +250,8 @@ test("walks from Wade to Tansy, presents approved dialogue, and claims one carri
   await page.reload();
   // After Walk It Off completes, the objective panel tracks the continued
   // Cut Your Teeth assignment (accepted atomically, not advertised).
-  await expect(page.locator("[data-mission-objective]")).toContainText("Cut Your Teeth");
-  await expect(page.locator("[data-mission-objective]")).toContainText("Active");
+  await expect(page.locator("[data-mission-strip]")).toContainText("Cut Your Teeth");
+  await expect(page.locator("[data-mission-strip]")).toContainText("Active");
   // Issue #137: Tansy routes to Cut Your Teeth's active equip reminder — the
   // mission is already accepted, so there is no offer to accept.
   const postMissionDialogue = await openNpcConversation(page, "Tansy Rusk");
@@ -341,8 +343,8 @@ test("supports the explorer-first Jag conversation and remote mission acceptance
   await expect(dialogue).toBeHidden();
   // Same boundary as test 1: after Walk It Off completes, the continuation
   // accepts Cut Your Teeth atomically — the HUD tracks it as Active.
-  await expect(page.locator("[data-mission-objective]")).toContainText("Cut Your Teeth");
-  await expect(page.locator("[data-mission-objective]")).toContainText("Active");
+  await expect(page.locator("[data-mission-strip]")).toContainText("Cut Your Teeth");
+  await expect(page.locator("[data-mission-strip]")).toContainText("Active");
 });
 
 test("keeps social topics replayable and gates Beyond Holo Hollow behind Hold It Together", async ({
@@ -394,7 +396,7 @@ test("keeps social topics replayable and gates Beyond Holo Hollow behind Hold It
   await page.keyboard.press("Escape");
   await expect(conversation).toBeHidden();
   // Selecting topics changed no world state.
-  await expect(page.locator("[data-mission-objective]")).toContainText("Hold It Together");
+  await expect(page.locator("[data-mission-strip]")).toContainText("Hold It Together");
 
   // Completing Hold It Together unlocks the authored gated topic.
   await db

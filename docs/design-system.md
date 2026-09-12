@@ -69,6 +69,14 @@ through `haloClassName`. Features never hand-roll this wrapper, the wrapper must
 never be beveled or clipped, and ancestors within the glow's reach must not clip
 with `overflow: hidden`.
 
+The Play Mission strips (`features/missions/MissionGuidanceStrips.tsx`, #174)
+are non-beveled too: each strip is a dark `--rs-surface-panel` row carrying the
+shared `.rs-mission-guidance` (work) or blue (turn-in) class directly, so its
+border, text colour, outline, and exterior glow come from the same tokens and
+are never clipped; body text stays `--rs-text-primary` for legibility. The stack
+is normal flow under the Play header, not sticky. Semantics live in
+`docs/missions.md` §10.
+
 Non-beveled Mission surfaces, such as the conversation hub's Mission entries,
 apply `.rs-mission-available` / `.rs-mission-guidance` directly — their own
 outline and shadow are not clipped.
