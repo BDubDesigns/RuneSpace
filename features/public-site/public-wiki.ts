@@ -363,7 +363,15 @@ const authoredWikiArticles = [
       {
         heading: "How missions work in practice",
         paragraphs: [
-          "Objectives update live as you meet them, and the current one is always clear in the Mission Log. Finishing Walk It Off, Cut Your Teeth, or Waste Not hands you the next job in the chain automatically — there's nothing extra to accept. Keep the Change works differently: after Hold It Together, go back and talk to Wade to take it on. It's currently the last job in the chain. When every objective on a job is met, talk to the NPC named in it to turn it in.",
+          "Objectives update live as you meet them. Every job you've accepted gets its own strip at the top of the screen, on the Map and while travelling too — green while there's still work to do, blue once it's ready to hand in — and the Mission Log keeps the full checklist. Finishing Walk It Off, Cut Your Teeth, or Waste Not hands you the next job in the chain automatically — there's nothing extra to accept. Keep the Change works differently: after Hold It Together, go back and talk to Wade to take it on. It's currently the last job in the chain. When every objective on a job is met, talk to the NPC named in it to turn it in.",
+        ],
+      },
+      {
+        heading: "Following a job",
+        paragraphs: [
+          "Once you've accepted a job, green and blue highlights point you toward whatever's next, wherever that actually is — the place on the Map, a building's Enter, a person, a piece of equipment, or an action control.",
+          "Green means work still to do: the destination on the Map, a building's Enter once you've arrived, the person to talk to, the equipment to equip, or the action to start. Blue means a conversation — either someone has a new job for you, or a finished job is ready to hand in. The moment every objective on a job is met, it turns blue: the person you hand it in to lights up blue instead of green, and the Map labels their location TURN IN in plain text, even before you've arrived there. An accepted job's own destination is labeled MISSION the same way.",
+          "When a job can be finished more than one legitimate way — three Power Cells can come from your Inventory, the Annex, or Bix's shelf — nothing gets highlighted for that step. It's your call.",
         ],
       },
       {

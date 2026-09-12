@@ -1,16 +1,24 @@
 import type { ReactNode } from "react";
 
-/** The two Mission guidance meanings a control can carry: blue discovery or green progression. */
-export type MissionGuidanceKind = "available" | "active";
+/**
+ * The Mission meanings a control can carry: blue "new Mission here"
+ * (`available`), green "this advances your accepted Mission" (`active`), and
+ * blue "the work is done — hand it in" (`turn_in`). Available and turn-in share
+ * the blue treatment but stay distinct values, so `data-mission-guidance`
+ * always names the real meaning.
+ */
+export type MissionGuidanceKind = "available" | "active" | "turn_in";
 
 const CONTROL_CLASS: Record<MissionGuidanceKind, string> = {
   available: "rs-mission-available",
   active: "rs-mission-guidance",
+  turn_in: "rs-mission-available",
 };
 
 const HALO_TONE: Record<MissionGuidanceKind, string> = {
   available: "mission-available",
   active: "mission-active",
+  turn_in: "mission-turn-in",
 };
 
 /** The shared color/inset treatment class for a guided control, or "" when unguided. */
@@ -35,7 +43,7 @@ export function MissionGuidanceHalo({
   className = "",
   children,
 }: {
-  /** The one resolved guidance value; callers resolve active-over-available first. */
+  /** The one resolved guidance value; callers resolve precedence first. */
   guidance?: MissionGuidanceKind;
   /** Layout classes for the control's outer box (e.g. `w-full`, margins). */
   className?: string;

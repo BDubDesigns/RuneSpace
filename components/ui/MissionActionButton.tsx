@@ -22,13 +22,23 @@ type MissionActionButtonProps = ComponentPropsWithoutRef<typeof ActionButton> & 
  * `data-mission-guidance`; `MissionGuidanceHalo` paints the glow the beveled
  * button would otherwise clip. Non-beveled controls (e.g. the conversation
  * hub's Mission entries) apply the `.rs-mission-*` classes directly.
+ *
+ * While guided, the button always sits on the neutral `secondary` surface,
+ * whatever `intent` the caller passes: the Mission colour lives on its text,
+ * edge ring, and exterior halo, never its interior (a tinted or translucent
+ * fill lets the halo wash through and blurs the control). Unguided, the
+ * caller's `intent` applies as usual.
  */
 export const MissionActionButton = forwardRef<HTMLButtonElement, MissionActionButtonProps>(
-  function MissionActionButton({ guidance, haloClassName = "", className = "", ...props }, ref) {
+  function MissionActionButton(
+    { guidance, haloClassName = "", className = "", intent, ...props },
+    ref,
+  ) {
     return (
       <MissionGuidanceHalo guidance={guidance} className={haloClassName}>
         <ActionButton
           {...props}
+          intent={guidance ? "secondary" : intent}
           ref={ref}
           className={`grow ${missionGuidanceClassName(guidance)} ${className}`}
           data-mission-guidance={guidance}

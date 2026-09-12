@@ -437,9 +437,10 @@ describe("mission-available vs mission-active guidance (availability is local di
     const accepted = { acceptedAt: new Date("2026-01-01T00:00:00.000Z") };
     const activeAtCrashSite = projectMission(WALK_IT_OFF, accepted, LOCATION_IDS.crashSite, true);
     expect(activeAtCrashSite.guidance?.availableNpcIds).toBeUndefined();
+    // Walk It Off's only requirement holds at The Jag, so Tansy is its turn-in.
     const activeAtTheJag = projectMission(WALK_IT_OFF, accepted, LOCATION_IDS.theJag, true);
     const targets = deriveMissionGuidanceTargets([activeAtTheJag]);
-    expect([...targets.npcIds]).toEqual([NPC_IDS.tansyRusk]);
+    expect([...targets.turnInNpcIds]).toEqual([NPC_IDS.tansyRusk]);
     expect([...targets.availableNpcIds]).toEqual([]);
   });
 
@@ -695,7 +696,7 @@ describe("issue #137 mission terminology guard", () => {
       "game/content/missions.ts",
       "server/missions.ts",
       "server/mission-state.ts",
-      "features/missions/MissionObjectivePanel.tsx",
+      "features/missions/MissionGuidanceStrips.tsx",
       "features/missions/MissionLogPanel.tsx",
       "features/play/PlayScreen.tsx",
       "features/play/PlayConsole.tsx",

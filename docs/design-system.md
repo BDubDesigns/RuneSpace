@@ -27,8 +27,10 @@ the dedicated `?surface=map` navigation surface; Journey is the in-transit
 status/feed surface. Journey feed entries are presentation only, while Travel
 and Scavenge actions remain server-authoritative. Map is read-only only while
 `state.travelState` exists, including after a refresh/reconciliation; it must
-not retain an "opened while traveling" client latch. MISSION and TURN IN Map
-guidance are intentionally deferred to Issue #143.
+not retain an "opened while traveling" client latch. Map hexes render MISSION
+and TURN IN Mission-guidance markers (Issue #143); see `docs/missions.md` §10
+for guidance semantics and `docs/travel-map-design.md` for the marker/ring
+presentation contract.
 
 ## Overlay motion
 
@@ -53,8 +55,17 @@ failing visually.
 Any beveled control that carries Mission guidance goes through the shared
 `components/ui/MissionGuidanceHalo`: an `ActionButton` becomes a
 `MissionActionButton` and an `ActionLink` (such as a Local Place **Enter**)
-becomes a `MissionActionLink`. Each takes one resolved `guidance`
-(`"available"` blue or `"active"` green; callers resolve active-wins first). The
+becomes a `MissionActionLink`. Each takes one resolved `guidance` value —
+`"available"` (blue, a new Mission offer), `"active"` (green, accepted work),
+or `"turn_in"` (blue, every requirement satisfied and only the handoff
+remains — its own `mission-turn-in` halo tone, distinct from `"available"`'s
+even though both paint blue); callers resolve precedence (active over turn-in
+over available) before passing one value. `docs/missions.md` §10 owns the
+semantics. A guided control always sits on the ordinary dark `secondary`
+control surface — `MissionActionButton` / `MissionActionLink` override the
+caller's `intent` while guided — so the Mission colour lives only on its text,
+its 2px inset edge ring, and its exterior halo, never its interior (a tinted or
+translucent fill lets the halo wash through and blurs the control). The
 control keeps the shared `.rs-mission-*` color treatment and
 `data-mission-guidance`; the unclipped `.rs-control-halo` wrapper paints the
 exterior halo with `filter: drop-shadow()` from the existing Mission tokens, so
@@ -62,6 +73,14 @@ the glow traces the chamfer. Pass layout classes for the control's outer box
 through `haloClassName`. Features never hand-roll this wrapper, the wrapper must
 never be beveled or clipped, and ancestors within the glow's reach must not clip
 with `overflow: hidden`.
+
+The Play Mission strips (`features/missions/MissionGuidanceStrips.tsx`, #174)
+are non-beveled too: each strip is a dark `--rs-surface-panel` row carrying the
+shared `.rs-mission-guidance` (work) or blue (turn-in) class directly, so its
+border, text colour, outline, and exterior glow come from the same tokens and
+are never clipped; body text stays `--rs-text-primary` for legibility. The stack
+is normal flow under the Play header, not sticky. Semantics live in
+`docs/missions.md` §10.
 
 Non-beveled Mission surfaces, such as the conversation hub's Mission entries,
 apply `.rs-mission-available` / `.rs-mission-guidance` directly — their own
@@ -74,7 +93,7 @@ tone without sharing Mission semantics, but has not been migrated.
 
 ## Accessibility
 
-Controls use a 44px practical minimum target and visible `:focus-visible` ring. Error feedback has an alert role, disabled controls retain labels, and reduced-motion users receive near-instant transitions. Color supplements, rather than replaces, text labels and states.
+Controls use a 44px practical minimum target and visible `:focus-visible` ring. A beveled control (`.rs-bevel` + `.rs-focus`: `ActionButton`, `ActionLink`, their Mission variants, form fields, footer destinations) would clip an outside ring, so one shared rule in `app/globals.css` draws its ring inside instead, inset by `--rs-bevel-focus-inset` so the ring clears the chamfer and sits apart from a Mission-guided control's inset green/blue ring — focus and Mission guidance stay two separate marks. Pointer focus shows no ring. Prove focus paints with rendered pixels (`expectKeyboardFocusRingPaints` in `tests/e2e/fixtures.ts`), not `getComputedStyle()`, which reports the clipped outline as present. Error feedback has an alert role, disabled controls retain labels, and reduced-motion users receive near-instant transitions. Color supplements, rather than replaces, text labels and states.
 
 ## Feature Styling
 

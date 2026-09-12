@@ -40,11 +40,13 @@ function turnInAtHoloHollow(npcId: ContentId, dialogueId: ContentId): MissionDef
 }
 
 describe("Local Place handoff for accepted Mission NPC guidance", () => {
-  it("leaves guidance toward an NPC outside any Local Place unchanged", () => {
+  it("leaves guidance toward an NPC outside any Local Place on that NPC", () => {
     // Walk It Off at The Jag: the turn-in NPC stands at the World Location.
     const projection = projectMission(WALK_IT_OFF, accepted, LOCATION_IDS.theJag, true);
-    expect(projection.guidance).toEqual({ npcId: NPC_IDS.tansyRusk });
-    expect(deriveMissionGuidanceTargets([projection]).localPlaceIds.size).toBe(0);
+    expect(projection.guidance).toEqual({ npcId: NPC_IDS.tansyRusk, turnIn: true });
+    const targets = deriveMissionGuidanceTargets([projection]);
+    expect(targets.localPlaceIds.size).toBe(0);
+    expect(targets.turnInLocalPlaceIds.size).toBe(0);
   });
 
   it("guides the entrance of the one Local Place holding the target NPC", () => {
@@ -61,13 +63,18 @@ describe("Local Place handoff for accepted Mission NPC guidance", () => {
     expect(targets.npcIds).toEqual(new Set([NPC_IDS.bixWeller]));
   });
 
-  it("never guides a Local Place from another World Location", () => {
+  it("guides the World Location, never a Local Place, from another World Location", () => {
     const projection = projectMission(KEEP_THE_CHANGE, accepted, LOCATION_IDS.crashSite, true);
-    expect(projection.guidance).toEqual({ npcId: NPC_IDS.bixWeller });
-    expect(deriveMissionGuidanceTargets([projection]).localPlaceIds.size).toBe(0);
+    expect(projection.guidance).toEqual({
+      npcId: NPC_IDS.bixWeller,
+      locationId: LOCATION_IDS.holoHollow,
+    });
+    const targets = deriveMissionGuidanceTargets([projection]);
+    expect(targets.localPlaceIds.size).toBe(0);
+    expect(targets.locationIds).toEqual(new Set([LOCATION_IDS.holoHollow]));
   });
 
-  it("works for any Local Place resident without naming one", () => {
+  it("works for any Local Place resident without naming one, including a turn-in", () => {
     const projection = projectMission(
       turnInAtHoloHollow(NPC_IDS.rennCalder, DIALOGUE_IDS.rennLifeHereTopic),
       accepted,
@@ -77,7 +84,14 @@ describe("Local Place handoff for accepted Mission NPC guidance", () => {
     expect(projection.guidance).toEqual({
       npcId: NPC_IDS.rennCalder,
       localPlaceId: LOCAL_PLACE_IDS.holoHollowAssistanceCenter,
+      turnIn: true,
     });
+    // A turn-in entrance is its own semantic target, not active work.
+    const targets = deriveMissionGuidanceTargets([projection]);
+    expect(targets.turnInLocalPlaceIds).toEqual(
+      new Set([LOCAL_PLACE_IDS.holoHollowAssistanceCenter]),
+    );
+    expect(targets.localPlaceIds.size).toBe(0);
   });
 
   it("never bridges an unaccepted available offer to a Local Place", () => {
@@ -91,18 +105,17 @@ describe("Local Place handoff for accepted Mission NPC guidance", () => {
     expect(deriveMissionGuidanceTargets([available]).localPlaceIds.size).toBe(0);
   });
 
-  it("adds only a Local Place channel — no World Location or map guidance", () => {
-    const targets = deriveMissionGuidanceTargets([
+  it("hands the World Location target off to the Local Place on arrival", () => {
+    const away = deriveMissionGuidanceTargets([
+      projectMission(KEEP_THE_CHANGE, accepted, LOCATION_IDS.crashSite, true),
+    ]);
+    expect(away.locationIds).toEqual(new Set([LOCATION_IDS.holoHollow]));
+    expect(away.localPlaceIds.size).toBe(0);
+    const arrived = deriveMissionGuidanceTargets([
       projectMission(KEEP_THE_CHANGE, accepted, LOCATION_IDS.holoHollow, true),
     ]);
-    // Map/hex guidance is Issue #143's; this change bridges into Local Places only.
-    expect(Object.keys(targets).sort()).toEqual([
-      "actionIds",
-      "availableNpcIds",
-      "cargoRepair",
-      "equipmentItemIds",
-      "localPlaceIds",
-      "npcIds",
-    ]);
+    // Arriving ends the map destination; the doorway takes over.
+    expect(arrived.locationIds.size).toBe(0);
+    expect(arrived.localPlaceIds).toEqual(new Set([LOCAL_PLACE_IDS.holoHollowSouvenirs]));
   });
 });

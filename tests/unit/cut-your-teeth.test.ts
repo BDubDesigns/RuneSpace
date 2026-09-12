@@ -420,8 +420,11 @@ describe("issue #124 semantic mission guidance projection", () => {
         trackedProgress: new Map([["mining-attempts", 5]]),
       }),
     );
+    // Work is done: Tansy is the blue turn-in handoff, not green active work.
+    expect(projection.guidance).toEqual({ npcId: NPC_IDS.tansyRusk, turnIn: true });
     const targets = deriveMissionGuidanceTargets([projection]);
-    expect([...targets.npcIds]).toEqual([NPC_IDS.tansyRusk]);
+    expect([...targets.turnInNpcIds]).toEqual([NPC_IDS.tansyRusk]);
+    expect([...targets.npcIds]).toEqual([]);
   });
 
   it("targets the Cutter equipment affordance while the equip requirement is unmet", () => {
@@ -502,7 +505,7 @@ describe("issue #124 semantic mission guidance projection", () => {
     expect([...targets.actionIds]).toEqual([]);
   });
 
-  it("clears Cargo guidance on repair completion and moves green guidance to Wade", () => {
+  it("clears Cargo guidance on repair completion and moves turn-in guidance to Wade", () => {
     const ready = projectMission(
       HOLD_IT_TOGETHER,
       accepted(),
@@ -512,12 +515,13 @@ describe("issue #124 semantic mission guidance projection", () => {
     );
     expect(ready).toMatchObject({
       state: "ready_for_completion",
-      guidance: { npcId: NPC_IDS.wadeRusk },
+      guidance: { npcId: NPC_IDS.wadeRusk, turnIn: true },
     });
     expect(ready.guidance?.cargoRepair).toBeUndefined();
     const targets = deriveMissionGuidanceTargets([ready]);
     expect(targets.cargoRepair).toBe(false);
-    expect([...targets.npcIds]).toEqual([NPC_IDS.wadeRusk]);
+    expect([...targets.turnInNpcIds]).toEqual([NPC_IDS.wadeRusk]);
+    expect([...targets.npcIds]).toEqual([]);
   });
 
   it("leaves Waste Not Refining guidance unchanged by the Cargo extension", () => {

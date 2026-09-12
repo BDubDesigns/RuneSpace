@@ -81,6 +81,9 @@
   --rs-space-8: 2rem;
   --rs-bevel: 0.65rem;
   --rs-bevel-small: 0.4rem;
+  /* How far inside a beveled control its focus ring's outer edge sits: past
+     the --rs-bevel-small chamfer so the ring is never cut at the corners. */
+  --rs-bevel-focus-inset: 0.4375rem;
   --rs-font-display: ui-monospace, SFMono-Regular, Menlo, monospace;
   --rs-font-body: ui-sans-serif, system-ui, sans-serif;
   --rs-shadow-panel: 0 16px 42px rgb(0 0 0 / 0.34);
@@ -103,14 +106,12 @@
      classes per component. */
   --rs-mission-guidance-color: #3dff9e;
   --rs-mission-guidance-glow: rgb(61 255 158 / 0.35);
-  --rs-mission-guidance-inset-glow: rgb(61 255 158 / 0.18);
   /* Mission-available: blue/cyan sibling to the neon-green active treatment.
      Same shared-class approach — available guides "new mission here", active
      guides "this advances the mission you accepted". Distinct hue, same
      static treatment (no animation). */
   --rs-mission-available-color: #4db8ff;
   --rs-mission-available-glow: rgb(77 184 255 / 0.35);
-  --rs-mission-available-inset-glow: rgb(77 184 255 / 0.18);
   /* Translucent scrim behind the Inventory/Equipment modal. Derived from the
      page surface via color-mix so the page colour stays the single source of
      truth. The slash-opacity modifier cannot alpha a hex CSS variable, so the
@@ -202,6 +203,16 @@ body {
   outline-offset: 3px;
 }
 
+/* A beveled control's clip-path clips any outline drawn outside it, so its
+   keyboard-focus ring is drawn inside instead. The inset keeps the whole ring
+   clear of the chamfered corners (uncut) and leaves a visible gap inside a
+   Mission-guided control's inset ring, so focus and guidance read as two
+   separate marks. This rule also outranks the Mission `outline: none` below. */
+.rs-bevel.rs-focus:focus-visible {
+  outline: 2px solid var(--rs-focus-ring);
+  outline-offset: calc(-1 * var(--rs-bevel-focus-inset));
+}
+
 /*
  * Mission guidance treatment. Outline + restrained glow + neon-green border so
  * the target clearly reads as "this interaction advances your active mission".
@@ -216,13 +227,12 @@ body {
 }
 
 /* Beveled controls clip anything outside the polygon (outline and drop
-   shadows included), so their guidance switches to an inset ring + glow that
-   survives clip-path. Their exterior halo is painted by the unclipped
+   shadows included), so their guidance switches to an inset edge ring that
+   survives clip-path, on the ordinary dark control surface — the colour never
+   fills the interior. Their exterior halo is painted by the unclipped
    .rs-control-halo wrapper below (components/ui/MissionGuidanceHalo.tsx). */
 .rs-bevel.rs-mission-guidance {
-  box-shadow:
-    inset 0 0 0 2px var(--rs-mission-guidance-color),
-    inset 0 0 16px var(--rs-mission-guidance-inset-glow);
+  box-shadow: inset 0 0 0 2px var(--rs-mission-guidance-color);
   outline: none;
 }
 
@@ -243,9 +253,7 @@ body {
 }
 
 .rs-bevel.rs-mission-available {
-  box-shadow:
-    inset 0 0 0 2px var(--rs-mission-available-color),
-    inset 0 0 16px var(--rs-mission-available-inset-glow);
+  box-shadow: inset 0 0 0 2px var(--rs-mission-available-color);
   outline: none;
 }
 
@@ -262,9 +270,7 @@ body {
 
 .rs-bevel.rs-mission-available.rs-mission-guidance,
 .rs-bevel.rs-mission-guidance.rs-mission-available {
-  box-shadow:
-    inset 0 0 0 2px var(--rs-mission-guidance-color),
-    inset 0 0 16px var(--rs-mission-guidance-inset-glow);
+  box-shadow: inset 0 0 0 2px var(--rs-mission-guidance-color);
   outline: none;
 }
 
@@ -284,7 +290,9 @@ body {
   max-width: 100%;
 }
 
-.rs-control-halo[data-halo="mission-available"] {
+/* Available and turn-in are distinct meanings that share the blue treatment. */
+.rs-control-halo[data-halo="mission-available"],
+.rs-control-halo[data-halo="mission-turn-in"] {
   filter: drop-shadow(0 0 2px var(--rs-mission-available-color))
     drop-shadow(0 0 12px var(--rs-mission-available-glow));
 }
@@ -389,6 +397,37 @@ body {
 
 .rs-map-plate--status {
   color: var(--rs-text-secondary);
+}
+
+/* Map Mission guidance (#143): an explicit MISSION / TURN IN plate (text, so
+   colour is never the only signal) plus a glowing ring outside the hex chassis
+   so current/selected/reachable/transit treatment stays legible. The ring's
+   layered exterior glow is deliberately strong: the Map is already full of
+   cyan, so the halo — not a fill — is what singles out the target hex. The
+   opaque chassis drawn over the ring keeps the hex interior untinted. Shared
+   Mission tokens only; active green, turn-in blue. */
+.rs-map-plate--mission[data-map-mission-marker="active"] {
+  border-color: var(--rs-mission-guidance-color);
+  color: var(--rs-mission-guidance-color);
+}
+
+.rs-map-plate--mission[data-map-mission-marker="turn_in"] {
+  border-color: var(--rs-mission-available-color);
+  color: var(--rs-mission-available-color);
+}
+
+.rs-map-mission-ring[data-map-mission-ring="active"] {
+  stroke: var(--rs-mission-guidance-color);
+  filter: drop-shadow(0 0 3px var(--rs-mission-guidance-color))
+    drop-shadow(0 0 9px var(--rs-mission-guidance-color))
+    drop-shadow(0 0 16px var(--rs-mission-guidance-glow));
+}
+
+.rs-map-mission-ring[data-map-mission-ring="turn_in"] {
+  stroke: var(--rs-mission-available-color);
+  filter: drop-shadow(0 0 3px var(--rs-mission-available-color))
+    drop-shadow(0 0 9px var(--rs-mission-available-color))
+    drop-shadow(0 0 16px var(--rs-mission-available-glow));
 }
 
 .rs-dialogue-scene[data-presentation-mode="comms"] .rs-dialogue-scene__comms-overlay {

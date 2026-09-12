@@ -1,10 +1,17 @@
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
-import { characterMissions, characters, inventoryStacks } from "@/db/rune-space";
+import {
+  characterMissionProgress,
+  characterMissions,
+  characters,
+  inventoryStacks,
+} from "@/db/rune-space";
 import { ITEM_IDS, LOCAL_PLACE_IDS, LOCATION_IDS, MISSION_IDS } from "@/game/config/foundations";
 import {
   expect,
   expectExteriorMissionHalo,
+  expectKeyboardFocusRingPaints,
+  expectPointerFocusWithoutRing,
   openMapSurface,
   openNpcConversation,
   openTestCharacter,
@@ -66,6 +73,12 @@ test("hands an accepted Mission's NPC target to its Local Place entrance, then t
   const directory = page.locator("[data-local-place-directory]");
   const shop = directory.locator(`[data-local-place="${LOCAL_PLACE_IDS.holoHollowSouvenirs}"]`);
   await expectExteriorMissionHalo(shop.getByRole("link", { name: /^Enter / }), "active");
+  // Keyboard focus paints its own ring on the green-guided link (#173), on a
+  // phone and on a desktop viewport.
+  await expectKeyboardFocusRingPaints(shop.getByRole("link", { name: /^Enter / }));
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await expectKeyboardFocusRingPaints(shop.getByRole("link", { name: /^Enter / }));
+  await page.setViewportSize({ width: 390, height: 844 });
   // Only that one place is guided.
   await expect(directory.locator("[data-mission-guidance]")).toHaveCount(1);
   await expect(
@@ -89,6 +102,228 @@ test("hands an accepted Mission's NPC target to its Local Place entrance, then t
     page.getByRole("button", { name: /Talk to Bix Weller/ }),
     "active",
   );
+});
+
+test("guides Keep the Change across the map: Holo Hollow MISSION, then The Jag TURN IN before arrival", async ({
+  page,
+  testCharacter,
+}) => {
+  const characterId = testCharacter.id;
+  await page.setViewportSize({ width: 390, height: 844 });
+  const now = new Date();
+  await db
+    .insert(characterMissions)
+    .values([
+      ...[
+        MISSION_IDS.walkItOff,
+        MISSION_IDS.cutYourTeeth,
+        MISSION_IDS.wasteNot,
+        MISSION_IDS.holdItTogether,
+      ].map((missionId) => ({ characterId, missionId, acceptedAt: now, completedAt: now })),
+      { characterId, missionId: MISSION_IDS.keepTheChange, acceptedAt: now },
+    ]);
+  await openTestCharacter(page, characterId);
+  await page.emulateMedia({ reducedMotion: "reduce" });
+
+  // Accepted at the Crash Site with Bix still to meet: Holo Hollow is the one
+  // green MISSION destination, named in text and in the accessible label.
+  await openMapSurface(page);
+  const guidedHexes = page.locator("[data-map-location][data-mission-guidance]");
+  const hollowHex = page.locator(`[data-map-location="${LOCATION_IDS.holoHollow}"]`);
+  await expect(hollowHex).toHaveAttribute("data-mission-guidance", "active");
+  await expect(hollowHex.locator("[data-map-mission-marker]")).toHaveText(/^Mission$/i);
+  await expect(hollowHex).toHaveAttribute("aria-label", /Mission destination\./);
+  await expect(guidedHexes).toHaveCount(1);
+
+  // Bix met in town, Cells still missing: the Cells can come from Inventory,
+  // the Annex, or Bix, so nothing is invented — no hex, doorway, or action.
+  await db.insert(characterMissionProgress).values({
+    characterId,
+    missionId: MISSION_IDS.keepTheChange,
+    progressKey: "bix-introduction",
+    progress: 1,
+  });
+  await arriveInHoloHollow(characterId);
+  await page.reload();
+  await expect(page.getByRole("group", { name: "Local map" })).toBeVisible();
+  await expect(guidedHexes).toHaveCount(0);
+  await openTestCharacter(page, characterId);
+  await expect(page.locator("[data-local-place-directory]")).toBeVisible();
+  await expect(page.locator("[data-mission-guidance]")).toHaveCount(0);
+
+  // Three Cells carried while still in Holo Hollow: every requirement holds, so
+  // The Jag is already the blue TURN IN destination — before arrival.
+  await db.insert(inventoryStacks).values({ characterId, itemId: ITEM_IDS.powerCell, quantity: 3 });
+  await openTestCharacter(page, characterId);
+  await openMapSurface(page);
+  const jagHex = page.locator(`[data-map-location="${LOCATION_IDS.theJag}"]`);
+  await expect(jagHex).toHaveAttribute("data-mission-guidance", "turn_in");
+  await expect(jagHex.locator("[data-map-mission-marker]")).toHaveText(/^Turn in$/i);
+  await expect(jagHex).toHaveAttribute("aria-label", /Mission turn-in\./);
+  await expect(guidedHexes).toHaveCount(1);
+  // The blue ring is a painted layer, not only an attribute.
+  const ring = page.locator('[data-map-mission-ring="turn_in"]');
+  await expect(ring).toHaveCount(1);
+  const ringPaint = await ring.evaluate((element) => {
+    const style = getComputedStyle(element);
+    return { stroke: style.stroke, filter: style.filter };
+  });
+  expect(ringPaint.stroke).not.toBe("none");
+  expect(ringPaint.filter).toContain("drop-shadow");
+
+  // At The Jag the destination hands off to Tansy, the blue TURN IN handoff.
+  await db
+    .update(characters)
+    .set({ currentLocationId: LOCATION_IDS.theJag })
+    .where(eq(characters.id, characterId));
+  await openTestCharacter(page, characterId);
+  await expectExteriorMissionHalo(
+    page.getByRole("button", { name: /Talk to Tansy Rusk/ }),
+    "turn_in",
+  );
+  await openMapSurface(page);
+  await expect(guidedHexes).toHaveCount(0);
+});
+
+test("stacks every accepted Mission as a compact strip under the Play header on every surface", async ({
+  page,
+  testCharacter,
+}) => {
+  const characterId = testCharacter.id;
+  await page.setViewportSize({ width: 390, height: 844 });
+  const now = new Date();
+  // Two accepted Missions at once: Hold It Together still has work (green);
+  // Keep the Change has every requirement met but hands in at The Jag — blue,
+  // even from the Crash Site.
+  await db
+    .insert(characterMissions)
+    .values([
+      ...[MISSION_IDS.walkItOff, MISSION_IDS.cutYourTeeth, MISSION_IDS.wasteNot].map(
+        (missionId) => ({ characterId, missionId, acceptedAt: now, completedAt: now }),
+      ),
+      { characterId, missionId: MISSION_IDS.holdItTogether, acceptedAt: now },
+      { characterId, missionId: MISSION_IDS.keepTheChange, acceptedAt: now },
+    ]);
+  await db.insert(characterMissionProgress).values({
+    characterId,
+    missionId: MISSION_IDS.keepTheChange,
+    progressKey: "bix-introduction",
+    progress: 1,
+  });
+  await db.insert(inventoryStacks).values({ characterId, itemId: ITEM_IDS.powerCell, quantity: 3 });
+  await openTestCharacter(page, characterId);
+  await page.emulateMedia({ reducedMotion: "reduce" });
+
+  const stack = page.locator("[data-mission-strips]");
+  const strips = stack.locator("[data-mission-strip]");
+  // One stack, the first Play content under the header, in Mission order, each
+  // strip carrying its own phase in text as well as colour.
+  async function expectStackLeadsSurface(count: number) {
+    await expect(stack).toBeVisible();
+    const placement = await stack.evaluate((element) => ({
+      first: element.parentElement?.firstElementChild === element,
+      afterHeader: element.closest("main")?.previousElementSibling?.tagName ?? "",
+      next: element.nextElementSibling?.getBoundingClientRect().top ?? Infinity,
+      bottom: element.getBoundingClientRect().bottom,
+      header: element.closest("main")?.previousElementSibling?.getBoundingClientRect().bottom ?? 0,
+      top: element.getBoundingClientRect().top,
+    }));
+    expect(placement.first).toBe(true);
+    expect(placement.afterHeader).toBe("HEADER");
+    expect(placement.top).toBeGreaterThanOrEqual(placement.header);
+    expect(placement.bottom).toBeLessThanOrEqual(placement.next);
+    await expect(strips).toHaveCount(count);
+    const width = await page.evaluate(() => document.documentElement.scrollWidth);
+    expect(width).toBeLessThanOrEqual(390);
+  }
+
+  await expectStackLeadsSurface(2);
+  const holdStrip = strips.nth(0);
+  const changeStrip = strips.nth(1);
+  await expect(holdStrip).toHaveAttribute("data-mission-strip", MISSION_IDS.holdItTogether);
+  await expect(holdStrip).toHaveAttribute("data-mission-phase", "work");
+  await expect(holdStrip.locator("[data-mission-strip-phase]")).toHaveText(/^Active$/i);
+  await expect(changeStrip).toHaveAttribute("data-mission-strip", MISSION_IDS.keepTheChange);
+  await expect(changeStrip).toHaveAttribute("data-mission-phase", "turn_in");
+  await expect(changeStrip.locator("[data-mission-strip-phase]")).toHaveText(/^Turn in$/i);
+  await expect(stack.locator("[data-mission-guidance]")).toHaveCount(0);
+  await expect(changeStrip.locator("[data-mission-strip-objective]")).toHaveText(
+    "Take the Power Cells to Tansy Rusk at The Jag",
+  );
+  // Compact: two strips take a small share of a phone screen.
+  expect((await stack.boundingBox())!.height).toBeLessThan(844 * 0.35);
+  // Dark surface, real exterior glow that nothing near it clips, normal flow.
+  const paint = await changeStrip.evaluate((element) => {
+    const style = getComputedStyle(element);
+    const clippers: string[] = [];
+    for (let node = element.parentElement; node && node.tagName !== "MAIN"; ) {
+      const nodeStyle = getComputedStyle(node);
+      if (nodeStyle.overflow !== "visible" || nodeStyle.clipPath !== "none") {
+        clippers.push(node.tagName);
+      }
+      node = node.parentElement;
+    }
+    return {
+      shadow: style.boxShadow,
+      clipPath: style.clipPath,
+      background: style.backgroundColor,
+      position: getComputedStyle(element.closest("[data-mission-strips]")!).position,
+      clippers,
+    };
+  });
+  expect(paint.shadow).not.toBe("none");
+  expect(paint.clipPath).toBe("none");
+  expect(paint.background).not.toBe("rgba(0, 0, 0, 0)");
+  expect(paint.position).toBe("static");
+  expect(paint.clippers).toEqual([]);
+  // Not sticky: it scrolls away with the page.
+  const topBefore = (await stack.boundingBox())!.y;
+  await page.evaluate(() => window.scrollTo(0, 240));
+  await expect.poll(async () => (await stack.boundingBox())!.y).toBeLessThan(topBefore - 100);
+  await page.evaluate(() => window.scrollTo(0, 0));
+
+  // Map: the same stack leads, and agrees with the Map's TURN IN destination.
+  await openMapSurface(page);
+  await expectStackLeadsSurface(2);
+  await expect(page.locator(`[data-map-location="${LOCATION_IDS.theJag}"]`)).toHaveAttribute(
+    "data-mission-guidance",
+    "turn_in",
+  );
+
+  // At The Jag the turn-in strip stays blue — arrival does not turn it green.
+  await db
+    .update(characters)
+    .set({ currentLocationId: LOCATION_IDS.theJag })
+    .where(eq(characters.id, characterId));
+  await openTestCharacter(page, characterId);
+  await expectStackLeadsSurface(2);
+  await expect(changeStrip).toHaveAttribute("data-mission-phase", "turn_in");
+
+  // Local Place: inside Bix's shop the stack still leads.
+  await arriveInHoloHollow(characterId);
+  await openTestCharacter(page, characterId);
+  await page
+    .locator(`[data-local-place="${LOCAL_PLACE_IDS.holoHollowSouvenirs}"]`)
+    .getByRole("link", { name: /^Enter / })
+    .click();
+  await page.waitForURL(new RegExp(`place=${LOCAL_PLACE_IDS.holoHollowSouvenirs}`));
+  await expectStackLeadsSurface(2);
+
+  // A completed Mission's strip is gone.
+  await db
+    .update(characterMissions)
+    .set({ completedAt: new Date() })
+    .where(eq(characterMissions.missionId, MISSION_IDS.holdItTogether));
+  await openTestCharacter(page, characterId);
+  await expectStackLeadsSurface(1);
+  await expect(strips.first()).toHaveAttribute("data-mission-strip", MISSION_IDS.keepTheChange);
+
+  // Journey: in transit, the stack leads the Journey surface too.
+  await openMapSurface(page);
+  await page.locator(`[data-map-location="${LOCATION_IDS.crashSite}"]`).click();
+  await page.getByRole("button", { name: /Walk to Crash Site/ }).click();
+  await expect(page.getByText("In transit", { exact: true }).first()).toBeVisible();
+  await expectStackLeadsSurface(1);
 });
 
 test("presents Holo Hollow's places, keeps HH B&B visible but locked, and enters a shop without travelling", async ({
@@ -121,6 +356,8 @@ test("presents Holo Hollow's places, keeps HH B&B visible but locked, and enters
   // Every open place offers an explicit Enter control; the card-sized link
   // beneath it stays out of the tab order and the accessibility tree.
   await expect(directory.getByRole("link", { name: /^Enter / })).toHaveCount(2);
+  // An unguided beveled ActionLink still paints a visible keyboard focus ring (#173).
+  await expectKeyboardFocusRingPaints(directory.getByRole("link", { name: /^Enter / }).first());
   await expect(directory.locator("[data-local-place-card-link]").first()).toHaveAttribute(
     "tabindex",
     "-1",
@@ -183,6 +420,10 @@ test("scopes each resident to their own Local Place", async ({ page, testCharact
   await expect(actions.nth(0)).toHaveText("Talk");
   await expect(actions.nth(1)).toHaveAttribute("data-npc-action", "trade");
   await expect(actions.nth(1)).toHaveText("Trade");
+  // An unguided beveled ActionButton paints a visible keyboard focus ring;
+  // pointer focus does not (#173).
+  await expectKeyboardFocusRingPaints(actions.nth(1));
+  await expectPointerFocusWithoutRing(actions.nth(1));
   await expect(page.getByRole("button", { name: /Talk to Bix Weller/ })).toBeVisible();
   await expect(page.getByRole("button", { name: /Talk to Renn Calder/ })).toHaveCount(0);
   // Trade belongs to Bix's card, not the shop description, and is offered
