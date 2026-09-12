@@ -115,15 +115,16 @@ function bixLocal(expressionId: ExpressionId, text: string): DialogueBeat {
 }
 
 /**
- * Tansy calling in from the seam while the player stands at the Crash Site: the
- * scene stays where the player is and the comms treatment carries the distance.
+ * Tansy calling in remotely from the seam. Like `wadeComms`, a remote caller is
+ * shown against their own location — The Jag — with the comms treatment
+ * carrying the distance.
  */
-function tansyCommsToCrashSite(expressionId: ExpressionId, text: string): DialogueBeat {
+function tansyComms(expressionId: ExpressionId, text: string): DialogueBeat {
   return {
     kind: "npc",
     speakerNpcId: NPC_IDS.tansyRusk,
     expressionId,
-    backgroundId: crash,
+    backgroundId: jag,
     presentationMode: "comms",
     text,
   };
@@ -694,23 +695,20 @@ const dialogue = {
         EXPRESSION_IDS.scowl,
         "Don't look pleased. It mostly means you get the jobs I don't want to do twice.",
       ),
-      tansyCommsToCrashSite(EXPRESSION_IDS.concerned, "Wade. Wade, pick up."),
-      tansyCommsToCrashSite(
+      tansyComms(EXPRESSION_IDS.concerned, "Wade. Wade, pick up."),
+      tansyComms(
         EXPRESSION_IDS.concerned,
         "I'm dry on Power Cells. Completely dry. The Cutter's a very heavy stick out here.",
       ),
-      tansyCommsToCrashSite(
-        EXPRESSION_IDS.neutral,
-        "Three would get me through the rest of this seam.",
-      ),
+      tansyComms(EXPRESSION_IDS.neutral, "Three would get me through the rest of this seam."),
       wadeLocal(EXPRESSION_IDS.neutral, "I've got none in the crate. I checked this morning."),
-      tansyCommsToCrashSite(
+      tansyComms(
         EXPRESSION_IDS.smile,
-        "Then it's your new apprentice's problem, isn't it.",
+        "Oh. Okay. Could someone bring me three? I'd really rather not lose the afternoon walking back.",
       ),
       wadeLocal(
         EXPRESSION_IDS.neutral,
-        "Tansy needs three Power Cells. Bix charges eight. Here's twenty-four.",
+        "Tansy needs three Power Cells. Bix charges eight Credits each. Here's twenty-four Credits.",
       ),
       wadeLocal(
         EXPRESSION_IDS.neutral,

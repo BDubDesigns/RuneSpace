@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  CONVERSATION_BACKGROUND_IDS,
   DIALOGUE_IDS,
   ITEM_IDS,
   LOCATION_IDS,
@@ -499,26 +500,53 @@ describe("Keep the Change authored content", () => {
     }
   });
 
-  it("carries Tansy's remote call inside Wade's own scene", () => {
+  it("carries Tansy's remote call from The Jag inside Wade's own scene", () => {
     const offer = getDialogue(DIALOGUE_IDS.wadeKeepTheChangeOffer)!;
     expect(offer.npcId).toBe(NPC_IDS.wadeRusk);
     const speakers = new Set(
       offer.beats.filter((beat) => beat.kind === "npc").map((beat) => beat.speakerNpcId),
     );
     expect(speakers).toEqual(new Set([NPC_IDS.wadeRusk, NPC_IDS.tansyRusk]));
-    // Tansy is on comms from the seam; Wade is in the room.
+    // Wade is in the room at the Crash Site. Tansy calls in from The Jag, shown
+    // against her own location with the comms treatment.
     for (const beat of offer.beats) {
       if (beat.kind !== "npc") continue;
-      expect(beat.presentationMode).toBe(
-        beat.speakerNpcId === NPC_IDS.tansyRusk ? "comms" : "local",
-      );
+      if (beat.speakerNpcId === NPC_IDS.tansyRusk) {
+        expect(beat.presentationMode).toBe("comms");
+        expect(beat.backgroundId).toBe(CONVERSATION_BACKGROUND_IDS.theJagExterior);
+        // She has not been told the player is Wade's apprentice yet.
+        expect(beat.text).not.toMatch(/apprentice/i);
+      } else {
+        expect(beat.presentationMode).toBe("local");
+        expect(beat.backgroundId).toBe(CONVERSATION_BACKGROUND_IDS.crashSiteExterior);
+      }
     }
-    // The apprenticeship beat lives here rather than in a separate forced talk.
+    // The apprenticeship beat lives here rather than in a separate forced talk,
+    // and Wade names the currency for both the price and the budget.
     const text = offer.beats.map((beat) => beat.text).join(" ");
     expect(text).toContain("Cargo Hold");
     expect(text).toContain("apprentice");
-    expect(text).toContain("Here's twenty-four");
+    expect(text).toContain("eight Credits");
+    expect(text).toContain("twenty-four Credits");
     expect(text).toContain("Keep what you don't spend");
+  });
+
+  it("meets Tansy in person at The Jag for every later Keep the Change scene", () => {
+    for (const dialogueId of [
+      DIALOGUE_IDS.tansyKeepTheChangeConversationReminder,
+      DIALOGUE_IDS.tansyKeepTheChangeCarriedReminder,
+      DIALOGUE_IDS.tansyKeepTheChangeBusy,
+      DIALOGUE_IDS.tansyKeepTheChangeTurnIn,
+      DIALOGUE_IDS.tansyKeepTheChangeCompletion,
+      DIALOGUE_IDS.tansyPostKeepTheChange,
+    ]) {
+      for (const beat of getDialogue(dialogueId)!.beats) {
+        if (beat.kind !== "npc") continue;
+        expect(beat.speakerNpcId, dialogueId).toBe(NPC_IDS.tansyRusk);
+        expect(beat.presentationMode, dialogueId).toBe("local");
+        expect(beat.backgroundId, dialogueId).toBe(CONVERSATION_BACKGROUND_IDS.theJagExterior);
+      }
+    }
   });
 
   it("has Mara appear as an authored guest in Bix's scene, not a shop resident", () => {
