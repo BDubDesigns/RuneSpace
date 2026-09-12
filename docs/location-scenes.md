@@ -2,6 +2,10 @@
 
 Owns the responsive industrial scene header integrated into the top of the existing location/activity panel. Single asset per location, shared `LocationSceneHeader` component, registry-owned metadata — no location conditionals in UI, no separate artwork per breakpoint.
 
+This document owns the runtime scene contract and presentation behavior. Art
+direction, generation, master/derivative handling, asset preparation, and visual
+QA belong to `docs/art-cookbook.md`.
+
 ## Canonical paths
 
 - Component: `features/location-scene/LocationSceneHeader.tsx` (shared, single responsive viewport: mobile shallow cinematic strip, desktop taller reveal)
@@ -23,14 +27,14 @@ Missions**, with Inventory and Equipment consolidated into one tabbed overlay.
 
 ```ts
 presentation: {
-  mapIconKey: "crash_site_deposit" | "processing_yard" | "power_annex" // hex identifier
-  layout:     "crash_site" | "processing_yard" | "power_annex"
+  mapIconKey: "crash_site_deposit" | "processing_yard" | … // hex identifier; full enum in game/schemas/locations.ts
+  layout:     "crash_site" | "processing_yard" | …          // full enum in game/schemas/locations.ts
   localMap:   { axial: {q,r}, label: string }
-  scene:      { asset: "/location-scenes/<slug>.webp", width: 1920, height: 480, alt: string, focal?: {x:0..100, y:0..100} }
+  scene:      { asset: "/location-scenes/<slug>.webp" | "/location-scenes/<slug>.png", width: number, height: number, alt: string, focal?: {x:0..100, y:0..100} }
 }
 ```
 
-- `asset` is validated as `/location-scenes/*.webp` (local only, no remote URLs, no `..` traversal).
+- `asset` is validated as `/location-scenes/*.webp` or `/location-scenes/*.png` (local only, no remote URLs, no `..` traversal).
 - `width`/`height` are intrinsic delivered dimensions (used by `next/image` for `sizes` + layout stability).
 - The contract is the **4:1 aspect ratio**, not a fixed pixel size. Approved art
   is recorded at the resolution it was actually delivered at and is never
@@ -49,6 +53,11 @@ Derived from the three supplied source images via repository-local optimization 
 | Abandoned Processing Yard | `img_fb1a4b922908.png` (conveyor / hopper / gantry / rust) | 2508×627 (2.6 MB PNG) | `processing-yard.webp` | 1920×480 | ~151,250 |
 | DeWhat? Emergency Power Annex | `img_b54f385f2859.png` (bunker capsule / cyan arcane light) | 2508×627 (2.1 MB PNG) | `power-annex.webp` | 1920×480 | ~95,352 |
 | **Total** |  |  |  |  | **~348 kB** (lossy WebP q80, ~95% saving vs 6.9 MB source PNGs) |
+
+This table records the original issue #78 set. Later scenes (The Long
+Scramble, The Jag, Holo Hollow, and Holo Hollow's Local Places) are recorded in
+`game/content/locations.ts` and `game/content/local-places.ts`, which are
+authoritative for current asset paths and dimensions.
 
 Aspect is 4:1 panoramic (2508:627 → 1920:480). No baked UI, labels, flavor text, or chrome in the raster. Restrained industrial ambience (rust, haze, wet ground, puddles) is in the photography; the UI adds cyan/amber accents.
 
@@ -107,9 +116,9 @@ latch is used.
 
 ## Adding a future location
 
-1. Add its scene entry to `game/content/locations.ts` under `presentation.scene` (`asset`, `width`, `height`, `alt`, optional `focal {x,y}` in percent). Ensure `asset` is already committed under `public/location-scenes/<slug>.webp` and follows the repo's existing asset conventions — do not relying on incoming filenames.
-2. Commit one local WebP (appropriate Lanczos downsample, q75–82 range, no baked text/chrome). Approved delivered art is committed as delivered; never upscale it to match an existing entry's pixel size.
-3. Record intrinsic dimensions and focal where justified.
+1. Add its scene entry to `game/content/locations.ts` under `presentation.scene` (`asset`, `width`, `height`, `alt`, optional `focal {x,y}` in percent). Ensure `asset` is already committed under `public/location-scenes/<slug>.webp` (the schema also accepts `.png`) and follows the repo's existing asset conventions — do not relying on incoming filenames.
+2. Prepare and visually approve the asset according to `docs/art-cookbook.md`, with no baked text/chrome. Approved delivered art is committed as delivered; never upscale it to match an existing entry's pixel size.
+3. Record the committed file's actual intrinsic dimensions and focal where justified.
 4. No UI code changes beyond the data entry — `LocationSceneHeader` consumes the registry.
 
 Local Place scenes (`game/content/local-places.ts`, issue #159) use the same
@@ -122,7 +131,8 @@ exteriors (`holo-hollow-souvenirs-exterior.webp`,
 `holo-hollow-assistance-center-exterior.webp`, `hh-bnb-exterior.webp`) are
 accepted for issue #159, but their surroundings are visually very similar, so
 the buildings read as if they occupy nearly the same spot. A later approved art
-polish pass should give each building a more distinct setting. Do not
+polish pass should give each building a more distinct setting while preserving
+the approved building identities (see `docs/art-cookbook.md`). Do not
 regenerate or replace these assets outside that pass.
 
 ## Explicit non-goals (not in this slice)

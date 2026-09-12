@@ -35,7 +35,11 @@ An optional `hero` may reference a committed image under `public/landing/` or
 `public/updates/`. Store new Update-specific images in `public/updates/` and
 reference them with the public path, for example
 `/updates/repair-complete.webp`, plus its real `alt`, `width`, and `height`.
-Do not reference source-only assets, remote URLs, or generated images. When the
+Reference only committed, repository-local, approved image files. RuneSpace
+intentionally uses AI-generated artwork, and approved generated art is welcome
+once it is committed; the boundary is stability, not provenance. Do not
+reference source-only or master assets, remote or external URLs, or images
+produced at build or request time. When the
 art already ships elsewhere in the repository (for example a location scene),
 commit a copy of that same approved file under `public/updates/` rather than
 widening the allowed paths.
@@ -57,6 +61,10 @@ widening the allowed paths.
 - The article model supports one hero only. Secondary inline article images are
   not part of this contract; do not add them without an approved change to the
   schema and renderer.
+
+`docs/art-cookbook.md` owns the visual-production rule for choosing, generating,
+and reviewing hero art. This document owns the publishing contract and
+public-site path rules.
 
 The collection rejects duplicate slugs, duplicate `publishedAt` instants,
 missing required fields, malformed timestamps, and invalid image references.

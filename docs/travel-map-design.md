@@ -102,17 +102,19 @@ than duplicating it in map tiles.
   feed does not render a second claimed control.
 - Map does not render MISSION or TURN IN guidance markers. Issue #143 is the later owner of those
   destination and turn-in marker semantics.
-- Flat-top five-hex local map, `LOCAL_MAP_HEX_WIDTH=140` unified (no mobile/desktop branching, one `buildLocalMapGeometry` path), `hexButtonStyle` overlay,
+- Flat-top six-hex local map, `LOCAL_MAP_HEX_WIDTH=140` unified (no mobile/desktop branching, one `buildLocalMapGeometry` path), `hexButtonStyle` overlay,
   `LOCAL_MAP_PADDING`, `LOCAL_MAP_ROUTE_GAP=30` (~30px edge-to-edge at the unified 140), and single-path `buildLocalMapGeometry` remain authoritative.
 
 ## Registry / metadata contract
-- `game/schemas/locations.ts: presentation.mapIconKey` is `z.enum(["crash_site_deposit","processing_yard","power_annex","the_long_scramble","the_jag"])`.
+- `game/schemas/locations.ts: presentation.mapIconKey` is `z.enum(["crash_site_deposit","processing_yard","power_annex","the_long_scramble","the_jag","holo_hollow"])`.
   No second identifier field was added. `features/travel/local-map-identifiers.ts` resolves local assets via
   `MAP_IDENTIFIER_ASSET_BY_KEY: Record<MapIconKey,string>` — one indirection, no scattered `if (id===…)` in panel code.
 - New locations **must** provide a compact identifier through the same `mapIconKey → helper` boundary and a local
   `public/map-icons/<slug>.webp` asset (lossless transparent, tightly cropped, ≤512 long edge); no baked text/status
-  in art; opaque background must be removed / made subordinate; respect hex zones and 55–65% painted width / ≤ `0.38`
-  opacity rules; report tight bbox + derived painted width at 140.
+  in art; respect the hex zones, artwork viewport, and opacity described above; report tight bbox + derived painted
+  width at 140. Generation, background keying, grayscale, trim, and export follow `docs/art-cookbook.md`.
+- `the-long-scramble.png` and `the-jag.png` are legacy 1254×1254 grayscale-alpha PNG identifiers that predate that
+  pipeline. They remain follow-up optimization/art debt, not the pattern for new identifiers.
 
 ## Assets (approved, local-only, optimized for raw <image> delivery)
 | File | Source (staging provenance) | BBox-cropped size | Delivered | Bytes | Saving |
@@ -121,6 +123,9 @@ than duplicating it in map tiles.
 | `public/map-icons/processing-yard.webp` | `img_57cb431b0abe.png` (hopper/conveyor/gantry/crusher) | 512×488 (from 1424×1358) | lossless WebP, RGBA, tight crop | 121,046 | 91% vs 1,312,699 PNG |
 | `public/map-icons/power-annex.webp` | `img_82b4c98005fa.png` (battery rack/power core) | 512×470 (from 1536×1409) | lossless WebP, RGBA, tight crop | 121,428 | 92% vs 1,498,011 PNG |
 | **Total** |  |  |  | **355,602** | **92% vs 4,291,045 raw** |
+
+This table records the original issue #53 set. `public/map-icons/holo-hollow.webp` (512×430 lossless transparent
+WebP) was added by issue #159; the two legacy PNG identifiers are noted in the metadata contract above.
 
 Derived from the three 1536² RGBA PNGs at 30e0c0a via tight alpha-bbox crop + Lanczos downsample to 512 long-edge +
 lossless WebP (method 4, Pillow). Transparent treatment preserved (RGBA, no opaque fill); no remote URL, no placeholder,
