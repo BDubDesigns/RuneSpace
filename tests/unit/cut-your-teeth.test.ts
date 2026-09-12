@@ -311,10 +311,13 @@ describe("issue #124 ordered requirement projection", () => {
     });
   });
 
-  it("exposes the prerequisite gate without advertising the mission", () => {
+  it("exposes the prerequisite gate and advertises only locally once it holds", () => {
     const locked = projectMission(CUT_YOUR_TEETH, undefined, THE_JAG, true, observation());
     expect(locked).toMatchObject({ state: "not_accepted", prerequisiteSatisfied: false });
     expect(locked.guidance?.availableNpcIds).toBeUndefined();
+    // An unaccepted-but-eligible Cut Your Teeth only exists outside normal play
+    // (e.g. after an operator reset); there the hub lists Tansy's offer, so her
+    // Talk control agrees and glows blue.
     const prerequisiteSatisfied = projectMission(
       CUT_YOUR_TEETH,
       undefined,
@@ -327,7 +330,13 @@ describe("issue #124 ordered requirement projection", () => {
       state: "not_accepted",
       prerequisiteSatisfied: true,
     });
-    expect(prerequisiteSatisfied.guidance?.availableNpcIds).toBeUndefined();
+    expect(prerequisiteSatisfied.guidance?.availableNpcIds).toEqual([
+      CUT_YOUR_TEETH.offers[0]!.npcId,
+    ]);
+    // In normal play the continuation arrives already accepted, so it is never
+    // in the available state and never advertises.
+    const continued = projectMission(CUT_YOUR_TEETH, accepted(), THE_JAG, true, observation());
+    expect(continued.guidance?.availableNpcIds).toBeUndefined();
   });
 
   it("emits semantic stage data for routing without parsing objective copy", () => {

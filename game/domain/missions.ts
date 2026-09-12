@@ -60,14 +60,14 @@ export type MissionGuidance = {
    */
   cargoRepair?: true;
   /**
-   * The NPC(s) whose authored offer interaction is currently a
-   * mission-availability target. Only missions with NO prerequisite author
-   * open discovery: every offer whose location matches the player's current
-   * location for a mission that is not yet accepted and not completed.
-   * Prerequisite-gated missions never advertise — a prerequisite is an
-   * eligibility rule, not a reveal mechanism. Availability guides NPC
-   * interactions only; advancement after acceptance guides NPC/equipment/
-   * action progression.
+   * The NPC(s) whose authored offer interaction is currently a local
+   * mission-availability target: every offer at the player's current location
+   * for a mission that is not accepted, not completed, and whose prerequisite
+   * (if any) is satisfied. This is local discovery through the offering NPC
+   * only — "this person has work for you" — and never a global signal: it
+   * reveals nothing in the Mission Log and contributes no map, route, or
+   * destination guidance. Progression after acceptance is separate (`npcId`,
+   * `equipmentItemId`, `actionId`, `cargoRepair`).
    */
   availableNpcIds?: readonly string[];
 };
@@ -293,20 +293,24 @@ function deriveCurrentObjective(
  * "what should the player interact with next" without consumers inspecting
  * mission definitions, objective prose, or drop tables.
  *
- * Availability is intentionally narrow: only prerequisite-free missions
- * advertise open discovery. Prerequisite-gated missions never appear merely
- * because their prerequisite is satisfied — the continuation mechanism (or
- * world discovery) owns that transition.
+ * Availability is LOCAL discovery only: a mission that is not accepted, whose
+ * prerequisite (if any) is satisfied, advertises through the NPC(s) authoring
+ * an offer at the player's current location — exactly the offers the
+ * conversation hub surfaces, so the Talk control and the hub entry share one
+ * answer. It never produces an objective, a progression target, or anything a
+ * global surface (Mission Log, map, route) reads; those derive from accepted
+ * state only.
  */
 function deriveGuidance(
   definition: MissionDefinition,
   state: MissionState,
   currentLocationId: string,
   observation: MissionObservation | undefined,
+  prerequisiteSatisfied: boolean,
 ): MissionGuidance | undefined {
   if (state === "completed") return undefined;
   if (state === "not_accepted") {
-    if (definition.prerequisiteMissionId) return undefined;
+    if (!prerequisiteSatisfied) return undefined;
     const availableNpcIds = definition.offers
       .filter((offer) => offer.locationId === currentLocationId)
       .map((offer) => offer.npcId);
@@ -379,7 +383,13 @@ export function projectMission(
       turnInAvailable: state === "ready_for_completion" && requirementsSatisfied,
       nextObjectiveKind: firstUnsatisfied?.kind,
     },
-    guidance: deriveGuidance(definition, state, currentLocationId, observation),
+    guidance: deriveGuidance(
+      definition,
+      state,
+      currentLocationId,
+      observation,
+      prerequisiteSatisfied,
+    ),
   };
 }
 

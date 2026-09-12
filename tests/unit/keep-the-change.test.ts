@@ -295,9 +295,69 @@ describe("Keep the Change objectives and guidance", () => {
     const locked = projectionFor(undefined, LOCATION_IDS.crashSite, {}, false);
     expect(locked.state).toBe("not_accepted");
     expect(locked.prerequisiteSatisfied).toBe(false);
-    // Prerequisite-gated missions never advertise, so no blue availability
-    // guidance appears even standing in front of Wade.
+    // No satisfied prerequisite means no offer, so no blue availability even
+    // standing in front of Wade.
     expect(deriveMissionGuidanceTargets([locked]).availableNpcIds.size).toBe(0);
+  });
+});
+
+/**
+ * Regression for the preview finding: the hub listed KEEP THE CHANGE —
+ * AVAILABLE at Wade while neither Wade's Talk control nor that entry glowed
+ * blue, because availability ignored every prerequisite-gated mission. The
+ * rule is now that eligible, unaccepted work advertises LOCALLY through its
+ * offering NPC and nowhere else.
+ */
+describe("Keep the Change local availability guidance", () => {
+  const available = () => projectionFor(undefined, LOCATION_IDS.crashSite);
+
+  it("lights Wade's Talk control and his hub entry with the same blue answer", () => {
+    const projection = available();
+    expect(projection.state).toBe("not_accepted");
+    expect(projection.guidance).toEqual({ availableNpcIds: [NPC_IDS.wadeRusk] });
+    // The Talk control reads the union of projected availability...
+    expect(deriveMissionGuidanceTargets([projection]).availableNpcIds).toEqual(
+      new Set([NPC_IDS.wadeRusk]),
+    );
+    // ...and the hub entry reads the same projection, so they cannot disagree.
+    const [offer] = missionEntries(NPC_IDS.wadeRusk, [projection]);
+    expect(offer).toMatchObject({ role: "offer", guidance: "available" });
+  });
+
+  it("is local discovery only — no global, progression, or destination signal", () => {
+    const targets = deriveMissionGuidanceTargets([available()]);
+    expect(targets.npcIds.size).toBe(0);
+    expect(targets.actionIds.size).toBe(0);
+    expect(targets.equipmentItemIds.size).toBe(0);
+    expect(targets.cargoRepair).toBe(false);
+    // Away from Wade's offer location nothing advertises at all.
+    for (const locationId of [LOCATION_IDS.holoHollow, LOCATION_IDS.theJag]) {
+      expect(
+        deriveMissionGuidanceTargets([projectionFor(undefined, locationId)]).availableNpcIds.size,
+      ).toBe(0);
+    }
+  });
+
+  it("stays out of the Mission Log and objective surfaces until accepted", () => {
+    // Those surfaces render accepted missions from their objective and
+    // requirement projection; an available mission carries neither.
+    const projection = available();
+    expect(projection.currentObjective).toBeUndefined();
+    expect(projection.requirements).toBeUndefined();
+  });
+
+  it("swaps blue discovery for green progression once accepted", () => {
+    const accepted = projectionFor(
+      { acceptedAt: new Date("2026-09-11T00:00:00.000Z") },
+      LOCATION_IDS.crashSite,
+    );
+    const targets = deriveMissionGuidanceTargets([accepted]);
+    expect(targets.availableNpcIds.size).toBe(0);
+    // The next progression step is meeting Bix, not talking to Wade again.
+    expect(targets.npcIds).toEqual(new Set([NPC_IDS.bixWeller]));
+    const [wadeEntry] = missionEntries(NPC_IDS.wadeRusk, [accepted]);
+    expect(wadeEntry).toMatchObject({ role: "active" });
+    expect(wadeEntry?.guidance).toBeUndefined();
   });
 });
 

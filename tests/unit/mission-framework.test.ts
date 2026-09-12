@@ -387,7 +387,7 @@ describe("issue #124 generic UI consumers", () => {
   });
 });
 
-describe("mission-available vs mission-active guidance (issue #137: prerequisites never reveal)", () => {
+describe("mission-available vs mission-active guidance (availability is local discovery only)", () => {
   it("projects every authored offer location for a prerequisite-free mission", () => {
     const atCrashSite = projectMission(WALK_IT_OFF, undefined, LOCATION_IDS.crashSite, true);
     const atTheJag = projectMission(WALK_IT_OFF, undefined, LOCATION_IDS.theJag, true);
@@ -397,7 +397,8 @@ describe("mission-available vs mission-active guidance (issue #137: prerequisite
     expect(atTheJag.guidance?.npcId).toBeUndefined();
   });
 
-  it("never advertises a prerequisite-gated mission, even when the prerequisite is satisfied", () => {
+  it("advertises a prerequisite-gated offer only locally, and only once the prerequisite holds", () => {
+    // Unsatisfied prerequisite: no offer, so nothing to advertise anywhere.
     const locked = projectMission(
       CUT_YOUR_TEETH,
       undefined,
@@ -407,7 +408,9 @@ describe("mission-available vs mission-active guidance (issue #137: prerequisite
       false,
     );
     expect(locked.guidance?.availableNpcIds).toBeUndefined();
-    const prerequisiteSatisfied = projectMission(
+    // Satisfied: the offering NPC glows blue at the offer's own location, the
+    // same condition under which the conversation hub lists the offer.
+    const atOfferLocation = projectMission(
       CUT_YOUR_TEETH,
       undefined,
       LOCATION_IDS.theJag,
@@ -415,8 +418,19 @@ describe("mission-available vs mission-active guidance (issue #137: prerequisite
       undefined,
       true,
     );
-    expect(prerequisiteSatisfied.guidance?.availableNpcIds).toBeUndefined();
-    expect(prerequisiteSatisfied.prerequisiteSatisfied).toBe(true);
+    expect(atOfferLocation.prerequisiteSatisfied).toBe(true);
+    expect(atOfferLocation.guidance?.availableNpcIds).toEqual([NPC_IDS.tansyRusk]);
+    // Anywhere else there is no discovery signal at all — availability is not
+    // a global reveal or a destination.
+    const elsewhere = projectMission(
+      CUT_YOUR_TEETH,
+      undefined,
+      LOCATION_IDS.crashSite,
+      true,
+      undefined,
+      true,
+    );
+    expect(elsewhere.guidance).toBeUndefined();
   });
 
   it("removes available guidance once the mission is accepted and shows active progression", () => {

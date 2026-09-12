@@ -370,9 +370,12 @@ Both are static treatments (no animation) and use a shared-class approach — no
 
 Derived in `game/domain/missions.ts` as `MissionGuidance.availableNpcIds`:
 
-- Only missions with **no prerequisite** advertise open discovery: for every such mission where `state === "not_accepted"` and it is not completed, **every** offer whose `locationId` matches the player's current location contributes its `npcId`. No `offers[0]` shortcut — all authored offer locations are covered.
-- Prerequisite-gated missions never advertise merely because their prerequisite is satisfied. A prerequisite is an eligibility rule, not a reveal mechanism. A directly continuing mission arrives via its predecessor's authored `continuationMissionId` (§3.1); ordinary world-discovered missions are accepted when the player encounters them.
-- Available guidance guides **NPC interactions only** (Talk affordances in `NpcInteractionPanel`).
+- A mission advertises when it is `not_accepted`, not completed, and its prerequisite (if any) is **satisfied**: **every** offer whose `locationId` matches the player's current location contributes its `npcId`. No `offers[0]` shortcut — all authored offer locations are covered. This is exactly the condition under which the conversation hub lists the offer, so the NPC's Talk control and the hub's AVAILABLE entry always agree.
+- An **unsatisfied** prerequisite means no offer and no availability anywhere. A prerequisite is an eligibility rule, not a reveal mechanism.
+- Availability is **local discovery only** — "this person has work for you." It lights the offering NPC's Talk control and that NPC's Mission entry in the hub, and nothing else: an available mission does **not** appear in the Mission Log or HUD objective, and contributes **no** map, hex, route, or destination guidance. Those global surfaces derive from accepted state only.
+- Continuation missions are unaffected: they arrive already accepted via their predecessor's authored `continuationMissionId` (§3.1), so in normal play they are never in the available state.
+
+**Keep the two meanings separate.** "Wade has work for you" is local discovery (blue, unaccepted, offering NPC only). "Go to The Jag" is active progression (green, accepted, and the only state future map guidance — Issue #143 — may derive from). They must not share semantics merely because both are called guidance.
 
 ### Active guidance (green)
 
@@ -408,14 +411,16 @@ Not every technically possible acquisition path should be highlighted. Only the 
 
 This is intentional. The mission authors no prerequisite and two real offer routes (Wade at the Crash Site and Tansy at The Jag) so a player who walks straight to The Jag meets Tansy first without missing the starter mission. Availability guidance is derived from every currently relevant authored offer at the player's current location (§10).
 
-Cut Your Teeth authors a prerequisite and is never advertised — it arrives as Walk It Off's authored continuation (§3.1), already accepted, with its live objectives projected immediately.
+Cut Your Teeth authors a prerequisite but is never advertised in normal play — it arrives as Walk It Off's authored continuation (§3.1), already accepted, with its live objectives projected immediately.
 
 Keep the Change shows the third shape: prerequisite-gated **and** manually
-accepted. Hold It Together names no continuation, so nothing auto-accepts it and
-nothing advertises it in blue; the player returns to Wade, whose hub offers it
-because he authors an offer route and the prerequisite now holds. A
-prerequisite-gated mission is discovered by going back to the person who would
-plausibly hand it out — not by a reveal mechanism.
+accepted. Hold It Together names no continuation, so nothing auto-accepts it.
+Once Hold It Together is completed, Wade advertises it **locally**: standing at
+the Crash Site, his Talk control and the KEEP THE CHANGE — AVAILABLE entry in
+his hub glow blue. Nothing advertises it anywhere else — no Mission Log entry,
+no map or route guidance toward Wade — so the player discovers it by going back
+to the person who would plausibly hand it out, not by a global reveal.
+Accepting it removes the blue and hands off to green progression (meet Bix).
 
 ## 12. Server authority / generic commands
 
@@ -555,8 +560,8 @@ Short concrete examples that demonstrate the framework vocabulary. Do not copy m
 
 ### Cut Your Teeth — equip-and-collect
 
-- **Prerequisite:** `walkItOff` must be `completed` before it can be accepted. Never advertised: it arrives already accepted via Walk It Off's continuation (§3.1).
-- **Offer:** single `Tansy` at `The Jag` (`tansyCutYourTeethOffer`) remains for eligibility/acceptance validation, but no Available presentation exists — unaccepted Cut Your Teeth never appears in the Mission Log or HUD.
+- **Prerequisite:** `walkItOff` must be `completed` before it can be accepted. Not advertised in normal play: it arrives already accepted via Walk It Off's continuation (§3.1).
+- **Offer:** single `Tansy` at `The Jag` (`tansyCutYourTeethOffer`) remains for eligibility/acceptance validation. Normal play never shows it as Available; if it is ever unaccepted with Walk It Off completed (e.g. after an operator reset), Tansy advertises it locally like any eligible offer (§10). Unaccepted Cut Your Teeth never appears in the Mission Log or HUD.
 - **Requirements (ordered, shown simultaneously):** `at_location: The Jag` → `equipped_item: salvageCutter` → `tracked_activity: mining-attempts` for five attempts → `carried_stack: ferriteShale` with omitted `quantity` (full authoritative stack, currently `10`), `turnIn: "show"`, `recommendedActionId: ferrite_shale_mining`. Player-facing surfaces render all four together with live satisfaction/progress (e.g. "✓ At The Jag / ✓ Equip Salvage Cutter / Mining attempts — 3 / 5 / Ferrite Shale — 4 / 10"), while `stage.nextObjectiveKind` keeps the first-unmet ordering for dialogue/guidance precedence. The stack is shown, never consumed (§6).
 - **Teaching intent:** the tracked requirement highlights `Start Mining` while it is the current objective (§10), and the carried step retains the same recommendation if attempts are complete but the stack is not. Mining success and failure both count; Scavenged shale still satisfies the carried requirement (§5).
 - **Turn-in:** `Tansy` at `The Jag`, stationary only; `stage.turnInAvailable` distinguishes "I carry 10 but I'm still mining" (busy) from "ready to show" (§7). The turn-in conversation carries `complete_mission` with the authored `SHOW SHALE` copy; the `skill_xp` reward (+100 Mining) and `item` beat are presentation only after the authoritative success.
