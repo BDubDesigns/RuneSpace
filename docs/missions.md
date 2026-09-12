@@ -188,6 +188,7 @@ type MissionTurnIn = {
 Key rules:
 
 - **All requirements may be satisfied while turn-in is still unavailable.** `deriveMissionState` and `MissionProjection.stage` distinguish `requirementsSatisfied` (every authored requirement holds) from `turnInAvailable` (requirements hold **and** the character is stationary **at** `turnIn.locationId`). `ready_for_completion` requires all three together. While busy, the objective already advances to the turn-in copy and guidance already targets the turn-in NPC, but the turn-in is merely not performable yet.
+- **Mission guidance's turn-in phase follows `requirementsSatisfied`, not `turnInAvailable`.** `deriveGuidance` (§10) enters the blue TURN IN state the moment every authored requirement holds, independent of whether the character has reached `turnIn.locationId` or is stationary there.
 - **`turnIn.locationId` is an independent eligibility constraint.** It is checked separately from the requirement list — in `deriveMissionState` for projection and again in `completeMissionForDefinition` for server authority.
 - **`requiresStationary` is independent.** `activeActionId !== undefined` refuses the turn-in regardless of requirements.
 - **Authors must not duplicate the turn-in location as an `at_location` requirement merely to make eligibility correct.** `at_location` requirements exist for objective progression when the mission actually requires that location *state* (e.g. Walk It Off's "Travel to The Jag" progression, Cut Your Teeth's "Return to The Jag" step). The turn-in constraint itself does not need a duplicated requirement to stay correct.
@@ -346,60 +347,71 @@ longer reach it.
 
 ## 10. Mission guidance
 
-Mission guidance answers one question for UI consumers — *"is this entity / control currently a mission-guidance target?"* — without consumers inspecting mission IDs, objective prose, or drop tables. Every guidance consumer reads the same derived set via `deriveMissionGuidanceTargets(state.missions)`.
+Mission guidance answers one question for UI consumers — *"is this entity / control currently a mission-guidance target?"* — without consumers inspecting mission IDs, objective prose, or drop tables. Every guidance consumer reads the same derived set via `deriveMissionGuidanceTargets(state.missions)`. This section is the one authoritative semantic model for Mission guidance across NPC interaction, Local Place entrances, and the Map; other docs (`docs/travel-map-design.md`, `docs/design-system.md`) point back here rather than repeat it.
 
-The Issue #145 Play split does not change these semantics. The primary
-Location/Journey composition continues to consume the existing semantic
-guidance targets through the Mission Objective panel and feature-owned
-affordances. The dedicated Map remains navigation-only for this issue; it does
-not add MISSION or TURN IN markers. Map guidance markers are deferred to Issue
-#143, which will own that later presentation change.
+The Issue #145 Play split does not change these semantics: the primary
+Location/Journey composition consumes the existing semantic guidance targets
+through the Mission Objective panel and feature-owned affordances. The
+dedicated Map (Issue #143) additionally renders explicit MISSION / TURN IN
+markers for the same World Location targets — see the Map hexes consumer
+below and `docs/travel-map-design.md`.
 
-### Two semantic meanings
+### Three semantic meanings
 
-| Meaning | CSS treatment | What it signals |
+| Meaning | Value / CSS treatment | What it signals |
 | --- | --- | --- |
-| **Mission available** | `.rs-mission-available` — blue/cyan (`--rs-mission-available-*`) | "There is a new mission here." An NPC's authored offer is currently available. |
-| **Accepted mission progression** | `.rs-mission-guidance` — neon green (`--rs-mission-guidance-*`) | "This interaction advances the mission you accepted." The active objective's target (NPC, equipment affordance, or authored recommended action). |
+| **Mission available** | `"available"` — `.rs-mission-available`, blue/cyan (`--rs-mission-available-*`) | "There is a new mission here." An NPC's authored offer is currently available. Local discovery only. |
+| **Accepted mission progression** | `"active"` — `.rs-mission-guidance`, neon green (`--rs-mission-guidance-*`) | "This interaction advances the mission you accepted." The active objective's target (a remote World Location, a Local Place entrance, an NPC, an equipment affordance, or an authored recommended action). |
+| **Mission turn-in** | `"turn_in"` — shares `.rs-mission-available`'s blue presentation, own `mission-turn-in` halo tone, `data-mission-guidance="turn_in"` | "The work is done — hand it in." Every authored requirement holds and only the final handoff remains, wherever it is currently authored to happen. |
 
-Both are static treatments (no animation) and use a shared-class approach — no per-component green/blue classes. Tokens and classes live in `app/globals.css`. Consumers set `data-mission-guidance="available" | "active"`.
+Available and turn-in share blue presentation but stay distinct semantic domain values (`MissionGuidanceMeaning = "active" | "turn_in" | "available"`); **presentation colour never defines domain state.** `data-mission-guidance` always names the real value, both on beveled controls and on Map hexes.
 
-Beveled controls cannot paint their own exterior glow (`.rs-bevel`'s clip-path clips it), so a guided `ActionButton` is always a `components/ui/MissionActionButton` and a guided `ActionLink` a `MissionActionLink`: the control keeps the color/inset treatment and the shared unclipped `MissionGuidanceHalo` wrapper paints the exterior halo from the same tokens. Non-beveled surfaces such as hub Mission entries use the classes directly. See `docs/design-system.md`.
+Every meaning is a static treatment (no animation) and uses a shared-class approach — no per-component green/blue classes. Tokens and classes live in `app/globals.css`. Consumers set `data-mission-guidance="available" | "active" | "turn_in"`.
 
-**Active green wins if something ever qualifies for both.** React priority (`hasActiveGuidance` over `hasAvailableGuidance`) ensures only one class is normally present; CSS also guarantees green wins when both classes coincide (`.rs-mission-available.rs-mission-guidance`).
+Beveled controls cannot paint their own exterior glow (`.rs-bevel`'s clip-path clips it), so a guided `ActionButton` is always a `components/ui/MissionActionButton` and a guided `ActionLink` a `MissionActionLink`: the control keeps the color/inset treatment and the shared unclipped `MissionGuidanceHalo` wrapper paints the exterior halo from the same tokens (`data-halo="mission-active" | "mission-turn-in" | "mission-available"`). Non-beveled surfaces such as hub Mission entries apply the classes directly. See `docs/design-system.md`.
 
-### Available guidance (blue)
+**Deterministic precedence when a control could carry more than one meaning.** Active green wins over turn-in blue, which wins over available blue (`npcGuidanceMeaning`, `localPlaceGuidanceMeaning` in `game/domain/missions.ts`) — accepted work first, then an accepted Mission's own handoff, then a new offer. Precedence only resolves which single meaning one control presents; every underlying fact stays in `MissionGuidanceTargets` (below). CSS also guarantees green wins when `.rs-mission-available` and `.rs-mission-guidance` coincide on the same element.
 
-Derived in `game/domain/missions.ts` as `MissionGuidance.availableNpcIds`:
+### Available guidance (blue, `"available"`)
+
+Derived in `game/domain/missions.ts` (`deriveGuidance`) as `MissionGuidance.availableNpcIds`:
 
 - A mission advertises when it is `not_accepted`, not completed, and its prerequisite (if any) is **satisfied**: **every** offer whose `locationId` matches the player's current location contributes its `npcId`. No `offers[0]` shortcut — all authored offer locations are covered. This is exactly the condition under which the conversation hub lists the offer, so the NPC's Talk control and the hub's AVAILABLE entry always agree.
 - An **unsatisfied** prerequisite means no offer and no availability anywhere. A prerequisite is an eligibility rule, not a reveal mechanism.
-- Availability is **local discovery only** — "this person has work for you." It lights the offering NPC's Talk control and that NPC's Mission entry in the hub, and nothing else: an available mission does **not** appear in the Mission Log or HUD objective, and contributes **no** map, hex, route, or destination guidance. Those global surfaces derive from accepted state only.
+- Availability is **local discovery only** — "this person has work for you." It lights the offering NPC's Talk control and that NPC's Mission entry in the hub, and nothing else: an available mission does **not** appear in the Mission Log or HUD objective, and contributes **no** map, hex, route, or destination guidance — never a World Location, never a Local Place entrance. Those handoff surfaces derive from accepted (active or turn-in) state only.
 - Continuation missions are unaffected: they arrive already accepted via their predecessor's authored `continuationMissionId` (§3.1), so in normal play they are never in the available state.
 
-**Keep the two meanings separate.** "Wade has work for you" is local discovery (blue, unaccepted, offering NPC only). "Go to The Jag" is active progression (green, accepted, and the only state future map guidance — Issue #143 — may derive from). They must not share semantics merely because both are called guidance.
+**Keep the three meanings separate.** "Wade has work for you" is local discovery (blue `available`, unaccepted, offering NPC only) and never becomes a World Location, Local Place, or map target. "Go to The Jag" is active progression (green `active`). "Take this to Tansy" is the turn-in handoff (blue `turn_in`), which begins the instant every requirement holds — not when the turn-in command becomes executable (§7). They must not share semantics merely because two of the three happen to share a colour.
 
-### Active guidance (green)
+### Active and turn-in guidance (green work, blue handoff)
 
-Derived from the **first unmet requirement in authored order** on each accepted-but-incomplete mission (`active` / `ready_for_completion`), or the turn-in NPC once every requirement holds:
+Derived from the **first unmet requirement in authored order** on each accepted-but-incomplete mission (`active` / `ready_for_completion`), or from the authored turn-in once every requirement holds:
 
 | First-unmet kind | Guidance target |
 | --- | --- |
-| *(all satisfied)* | `npcId: turnIn.npcId` — the turn-in NPC is the target even while the character is busy (§7) |
+| *(all requirements satisfied — turn-in phase)* | `npcId: turnIn.npcId`, flagged `turnIn: true` — the turn-in NPC is the target even while the character is busy (§7). While the character is still elsewhere, `locationId: turnIn.locationId` (also flagged `turnIn: true`) is the target instead; arriving hands off to the NPC (and its Local Place entrance, if any) |
+| `at_location` | `locationId: requirement.locationId` — unsatisfied means the player is elsewhere, so the location itself is the target; once satisfied it stops being a target anywhere |
 | `equipped_item` | `equipmentItemId: requirement.itemId` — the equipment affordance / inventory tile for that item |
-| `tracked_activity` (with `recommendedActionId`) | `actionId: requirement.recommendedActionId` — the authored activity control |
-| `carried_stack` (with `recommendedActionId`) | `actionId: requirement.recommendedActionId` — the authored recommended gameplay action |
+| `tracked_activity` / `carried_stack` (with `recommendedActionId`) | `actionId: requirement.recommendedActionId`, plus `locationId` naming the single World Location offering that action (`actionDestination`) when it cannot currently be done — none when the current location already offers it, none when zero or several World Locations do |
 | `cargo_hold_repaired` | `cargoRepair: true` — the Cargo Hold repair surface is the current target; the Cargo panel selects the advancing affordance (contribute materials vs start Welding) from authoritative repair/material/Welding substate |
-| `npc_conversation` | `npcId: requirement.npcId` — the person to go and meet, reusing the same green NPC guidance the turn-in NPC gets |
+| `npc_conversation` | `npcId: requirement.npcId` — the person to go and meet, reusing the same NPC-boundary guidance (`npcBoundaryGuidance`) the turn-in NPC uses. While the character is elsewhere, `locationId: requirement.locationId` is the target instead; arriving hands off to the NPC |
+| *(carried requirement with no `recommendedActionId`)* | no guidance at all (see Ambiguous acquisition, below) |
 
-**Local Place handoff.** Whenever the green target is an NPC (the turn-in NPC or an `npc_conversation` NPC) who is the authored resident of a Local Place at the player's **current** World Location, the projection also carries `localPlaceId`. That NPC only appears once the player steps inside, so until then the Local Place's **Enter** control is the green target; inside, the NPC's own Talk control takes over. This is derived from authored NPC placement alone — no mission IDs or prose — so any future Local Place resident works automatically. It applies to accepted progression only: available (blue) offers never guide a door, an NPC in another World Location produces no place target, and the World Location or map hex itself never becomes a target (map guidance remains Issue #143).
+**Generic World Location → Local Place → interaction handoff.** Guidance resolves in narrow steps, derived purely from authored data, never from mission IDs or prose:
 
-Each consumer answers "am I that target?":
+1. **World Location elsewhere** (`guidance.locationId`) — an unsatisfied `at_location` requirement targets its own location; an unsatisfied `npc_conversation` requirement targets its authored location while the player is elsewhere; the turn-in targets `turnIn.locationId` while elsewhere; a `recommendedActionId` requirement targets the single World Location offering that action.
+2. **Local Place entrance at the current location** (`guidance.localPlaceId`) — once the World Location step is resolved (or was never needed), if the NPC target (turn-in or `npc_conversation`) is the authored resident of a Local Place at the player's **current** World Location, that NPC does not appear on screen until the player steps inside, so the place's **Enter** control carries the guidance until then (`npcGuidance`). Derived purely from authored NPC placement — no mission IDs or prose — so any future Local Place resident works automatically.
+3. **NPC / equipment / action** — once inside (or immediately, for a target with no Local Place), the NPC's own Talk control, the equipment affordance, or the authored action becomes the target.
 
-- **NPC Talk** — `guidance.npcIds.has(npc.id)` (green) vs `guidance.availableNpcIds.has(npc.id)` (blue). Each Mission entry inside the conversation hub reuses the same projected guidance (`docs/npc-conversations.md` §4), so the control and the entry can never disagree.
-- **Cutter Inventory tile / Equipment "Equip in slot"** — `guidance.equipmentItemIds.has(itemId)` (the Cutter step).
-- **Start Mining / Start Refining** — `guidance.actionIds.has(actionId)` while the action is currently relevant/available. An action highlights only when its `ActionId` is the authored `recommendedActionId` on the current unmet carried requirement.
-- **Cargo Hold repair** — `guidance.cargoRepair` while an accepted mission's current objective observes Cargo repair completion. The Cargo panel owns the repair/material/Welding substate and guides exactly one advancing affordance: CONTRIBUTE MATERIALS while materials are still needed (and a contribution is possible), START WELDING once materials are complete and Welding is idle. STOP WELDING is never guided — stopping does not advance the mission. Completed repair clears the flag and the generic projection moves green guidance to the turn-in NPC.
+Arriving at a step removes that step's guidance and hands off to the next; the player's current World Location, and a Local Place the player has already entered, never themselves carry a target once their handoff is complete. This handoff applies to accepted progression (green) and turn-in (blue) alike, and turn-in entrances are their **own** blue target (`turnInLocalPlaceIds`) — distinct from an active target's green entrance (`localPlaceIds`) even when it is the same physical door. Available (blue) offers never guide a door or a World Location — availability remains local discovery only (see above).
+
+### Ambiguous acquisition never invents guidance
+
+A `carried_stack` or `tracked_activity` requirement authored **without** a `recommendedActionId` gets no guidance at all when it is the first unmet requirement — not a location, not an action, nothing. Several legitimate acquisition sources with no single authored route means the framework never picks one for the player. Keep the Change's Power Cell requirement is the proof case: once Bix's mandatory `npc_conversation` is satisfied, three Power Cells may still come from Inventory, the Annex, or Bix's shop — nothing glows anywhere until the player unambiguously carries the required quantity and only the turn-in remains.
+
+### No new persistence
+
+Guidance is derived entirely from existing Mission records and requirement progress (§2, §5) on every projection — no visited-location, reached-objective, or turn-in-readiness row is added anywhere. A World Location or Local Place target disappears the instant the character's authoritative current location/placement matches it, and the turn-in phase begins the instant `requirementsSatisfied` holds (§7); both are computed fresh on every read, never latched client- or server-side.
 
 ### Teaching intent (`recommendedActionId`)
 
@@ -407,9 +419,18 @@ Each consumer answers "am I that target?":
 
 Not every technically possible acquisition path should be highlighted. Only the authored `recommendedActionId` on the current unmet carried requirement is highlighted. Cut Your Teeth recommends `ferrite_shale_mining` — Scavenge also yields Ferrite Shale, but has no `ActionId` to author there and is never highlighted merely because it can produce the same item.
 
-- **Local Place Enter** — `guidance.localPlaceIds.has(place.id)` on an open place's Enter control (green, via `MissionActionLink`).
+### Consumers
 
-`MissionGuidanceTargets` is the union across all missions: `availableNpcIds`, `npcIds`, `localPlaceIds`, `equipmentItemIds`, `actionIds`, `cargoRepair`.
+Each consumer answers "am I that target, and with which meaning?":
+
+- **NPC Talk** — `npcGuidanceMeaning(targets, npc.id)` resolves `"active"` (`guidance.npcIds`), `"turn_in"` (`guidance.turnInNpcIds`), or `"available"` (`guidance.availableNpcIds`), with active-over-turn-in-over-available precedence. Each Mission entry inside the conversation hub reuses the same projected guidance (`docs/npc-conversations.md` §4), so the control and the entry can never disagree.
+- **Cutter Inventory tile / Equipment "Equip in slot"** — `guidance.equipmentItemIds.has(itemId)` (green only; the turn-in phase never targets equipment).
+- **Start Mining / Start Refining** — `guidance.actionIds.has(actionId)` while the action is currently relevant/available (green only). An action highlights only when its `ActionId` is the authored `recommendedActionId` on the current unmet carried requirement.
+- **Cargo Hold repair** — `guidance.cargoRepair` while an accepted mission's current objective observes Cargo repair completion (green only). The Cargo panel owns the repair/material/Welding substate and guides exactly one advancing affordance: CONTRIBUTE MATERIALS while materials are still needed (and a contribution is possible), START WELDING once materials are complete and Welding is idle. STOP WELDING is never guided — stopping does not advance the mission. Completed repair clears the flag and the generic projection moves guidance to the turn-in handoff.
+- **Local Place Enter** — `localPlaceGuidanceMeaning(targets, place.id)` resolves `"active"` (`guidance.localPlaceIds`) or `"turn_in"` (`guidance.turnInLocalPlaceIds`) on an open place's Enter control, via `MissionActionLink`.
+- **Map hexes** (`features/travel/LocalMapPanel.tsx`) — a World Location hex in `guidance.locationIds` shows a green MISSION plate and ring; one in `guidance.turnInLocationIds` shows a blue TURN IN plate and ring; a hex in both shows both plate texts, with the ring following the same active-over-turn-in precedence. See `docs/travel-map-design.md` for the presentation contract; this document owns only the semantics.
+
+`MissionGuidanceTargets` is the union across all missions: `availableNpcIds`, `npcIds`, `turnInNpcIds`, `localPlaceIds`, `turnInLocalPlaceIds`, `locationIds`, `turnInLocationIds`, `equipmentItemIds`, `actionIds`, `cargoRepair`.
 
 ## 11. Explorer-first behavior
 

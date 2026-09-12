@@ -11,7 +11,11 @@ import { getMerchant } from "@/game/content/merchants";
 import { getResidentNpc } from "@/game/content/npcs";
 import { resolveNpcConversation } from "@/game/domain/conversation";
 import { resolveActiveLocalPlace } from "@/game/domain/local-places";
-import { deriveCompletedMissionIds, deriveMissionGuidanceTargets } from "@/game/domain/missions";
+import {
+  deriveCompletedMissionIds,
+  deriveMissionGuidanceTargets,
+  npcGuidanceMeaning,
+} from "@/game/domain/missions";
 import { usePlay } from "@/features/play/PlayContext";
 
 /**
@@ -68,17 +72,12 @@ export function NpcInteractionPanel({ localPlaceId }: { localPlaceId?: string })
   const merchant = npc && placeMerchant?.npcId === npc.id ? placeMerchant : undefined;
   const stationary = !state.activeAction && !state.travelState;
   const entries = npc ? resolveNpcConversation(npc.id, state.missions) : [];
-  const guidance = deriveMissionGuidanceTargets(state.missions);
-  // Available (blue) vs active (green) — distinct semantic sets. If the
-  // same NPC is ever in both (e.g. offers a new mission while also being the
-  // turn-in for an active one), active green wins.
-  const hasActiveGuidance = npc ? guidance.npcIds.has(npc.id) : false;
-  const hasAvailableGuidance = npc ? guidance.availableNpcIds.has(npc.id) : false;
-  const guidanceValue = hasActiveGuidance
-    ? "active"
-    : hasAvailableGuidance
-      ? "available"
-      : undefined;
+  // Active (green), turn-in (blue), and available (blue) are distinct semantic
+  // sets; when one NPC is several targets at once the shared precedence picks
+  // the one meaning its Talk control presents.
+  const guidanceValue = npc
+    ? npcGuidanceMeaning(deriveMissionGuidanceTargets(state.missions), npc.id)
+    : undefined;
   if (!npc || (entries.length === 0 && !merchant)) return null;
   // The Talk control reads as a turn-in exactly when one of the currently
   // available conversations drives a completion command right now.

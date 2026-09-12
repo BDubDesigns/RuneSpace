@@ -270,8 +270,11 @@ describe("Keep the Change objectives and guidance", () => {
     expect(carrying.currentObjective).toContain("Bix");
     expect(carrying.stage?.nextObjectiveKind).toBe("npc_conversation");
     expect(carrying.stage?.requirementsSatisfied).toBe(false);
-    // Green guidance points at the person to go and meet.
-    expect(deriveMissionGuidanceTargets([carrying]).npcIds).toContain(NPC_IDS.bixWeller);
+    // Green guidance points at the person to go and meet, and at the town they
+    // are in while the player is elsewhere.
+    const targets = deriveMissionGuidanceTargets([carrying]);
+    expect(targets.npcIds).toContain(NPC_IDS.bixWeller);
+    expect(targets.locationIds).toEqual(new Set([LOCATION_IDS.holoHollow]));
   });
 
   it("advances to the Cells and then to Tansy", () => {
@@ -280,11 +283,29 @@ describe("Keep the Change objectives and guidance", () => {
     expect(metBix.stage?.nextObjectiveKind).toBe("carried_stack");
     expect(metBix.requirements?.map((requirement) => requirement.satisfied)).toEqual([true, false]);
     expect(metBix.requirements?.[1]?.progress).toEqual({ current: 0, target: 3 });
+    // The Cells may come from Inventory, the Annex, or Bix: no source is invented.
+    expect(metBix.guidance).toBeUndefined();
+
+    // Every requirement holds while still in Holo Hollow: the turn-in phase has
+    // begun, so The Jag is the blue TURN IN destination before arrival.
+    const remote = projectionFor(accepted(), LOCATION_IDS.holoHollow, { cells: 3, metBix: true });
+    expect(remote.state).toBe("active");
+    expect(remote.stage?.requirementsSatisfied).toBe(true);
+    expect(remote.guidance).toEqual({
+      npcId: NPC_IDS.tansyRusk,
+      locationId: LOCATION_IDS.theJag,
+      turnIn: true,
+    });
+    expect(deriveMissionGuidanceTargets([remote]).turnInLocationIds).toEqual(
+      new Set([LOCATION_IDS.theJag]),
+    );
 
     const ready = projectionFor(accepted(), LOCATION_IDS.theJag, { cells: 3, metBix: true });
     expect(ready.state).toBe("ready_for_completion");
     expect(ready.stage?.turnInAvailable).toBe(true);
-    expect(deriveMissionGuidanceTargets([ready]).npcIds).toContain(NPC_IDS.tansyRusk);
+    const readyTargets = deriveMissionGuidanceTargets([ready]);
+    expect(readyTargets.turnInNpcIds).toContain(NPC_IDS.tansyRusk);
+    expect(readyTargets.turnInLocationIds.size).toBe(0);
   });
 
   it("counts extra Cells toward the requirement without asking for them", () => {

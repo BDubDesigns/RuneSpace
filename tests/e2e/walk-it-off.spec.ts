@@ -134,6 +134,13 @@ test("walks from Wade to Tansy, presents approved dialogue, and claims one carri
   await expect(wadeActiveFollowUp).toBeHidden();
 
   await openMapSurface(page);
+  // Map guidance (#143): the accepted Mission's destination is The Jag — green,
+  // with an explicit MISSION plate and accessible meaning, and nothing else.
+  const jagHex = page.locator(`[data-map-location="${LOCATION_IDS.theJag}"]`);
+  await expect(jagHex).toHaveAttribute("data-mission-guidance", "active");
+  await expect(jagHex.locator("[data-map-mission-marker]")).toHaveText(/^Mission$/i);
+  await expect(jagHex).toHaveAttribute("aria-label", /Mission destination\./);
+  await expect(page.locator("[data-map-location][data-mission-guidance]")).toHaveCount(1);
   await page
     .getByRole("button", { name: /The Long Scramble/ })
     .first()
@@ -159,19 +166,19 @@ test("walks from Wade to Tansy, presents approved dialogue, and claims one carri
     "data-npc-turn-in",
     "true",
   );
-  // Mission guidance: the required NPC interaction now receives the active
-  // (green) treatment.
-  await expect(page.getByRole("button", { name: /Talk to Tansy Rusk/ })).toHaveAttribute(
-    "data-mission-guidance",
-    "active",
+  // Mission guidance: the work is done, so Tansy is the blue TURN IN handoff —
+  // a distinct meaning from a new offer, with its own exterior halo.
+  await expectExteriorMissionHalo(
+    page.getByRole("button", { name: /Talk to Tansy Rusk/ }),
+    "turn_in",
   );
-  // ...and keyboard focus still paints its own ring on top of the green (#173).
+  // ...and keyboard focus still paints its own ring on top of the blue (#173).
   await expectKeyboardFocusRingPaints(page.getByRole("button", { name: /Talk to Tansy Rusk/ }));
   await page.emulateMedia({ reducedMotion: "reduce" });
   const tansyDialogue = await openNpcConversation(page, "Tansy Rusk");
   const turnInEntry = tansyDialogue.getByRole("button", { name: /Walk It Off/ });
   await expect(turnInEntry).toContainText("Turn in");
-  await expect(turnInEntry).toHaveAttribute("data-mission-guidance", "active");
+  await expect(turnInEntry).toHaveAttribute("data-mission-guidance", "turn_in");
   await openConversationEntry(tansyDialogue, /Walk It Off/);
   for (let index = 0; index < 8; index += 1) {
     await tansyDialogue.getByRole("button", { name: "Next" }).click();

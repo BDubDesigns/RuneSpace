@@ -279,9 +279,10 @@ function ConversationSection({
 }
 
 /**
- * One selectable conversation. Mission entries keep the existing semantic
+ * One selectable conversation. Mission entries keep the shared semantic
  * guidance treatment — blue "there is a new mission here", green "this advances
- * the mission you accepted" — so the hub cannot invent its own colour meaning.
+ * the mission you accepted", blue "hand in the finished work" — so the hub
+ * cannot invent its own colour meaning.
  * A topic label is a subject, never a line the silent player character speaks.
  */
 function ConversationEntryButton({
@@ -292,10 +293,11 @@ function ConversationEntryButton({
   onSelect: () => void;
 }) {
   const guidance = entry.kind === "mission" ? entry.guidance : undefined;
+  // Available and turn-in are distinct meanings sharing the blue treatment.
   const guidanceClass =
     guidance === "active"
       ? "rs-mission-guidance"
-      : guidance === "available"
+      : guidance === "available" || guidance === "turn_in"
         ? "rs-mission-available"
         : "";
   const roleLabel = entry.kind === "mission" ? entry.roleLabel : undefined;

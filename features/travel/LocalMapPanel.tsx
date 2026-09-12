@@ -10,6 +10,7 @@ import { getEffectiveGameBalance } from "@/game/config/balance";
 import { areLocationsAdjacent, getLocation } from "@/game/content/locations";
 import { beginTravelAction } from "@/server/actions";
 import { usePlay } from "@/features/play/PlayContext";
+import { deriveMissionGuidanceTargets, type MissionGuidanceTargets } from "@/game/domain/missions";
 import {
   buildLocalMapGeometry,
   LOCAL_MAP_GEOMETRY,
@@ -87,6 +88,27 @@ function hexInsetVertices(
 // Hex button layer (native <button> for semantics, transparent over the SVG)
 // ---------------------------------------------------------------------------
 
+/**
+ * The Mission facts for one World Location hex: an accepted Mission's next
+ * work is there (MISSION) and/or a Mission's final handoff is there (TURN IN).
+ * Both facts are kept; the ring colour follows the shared precedence (active
+ * green over turn-in blue) while the plate text and accessible label name both.
+ */
+type HexMissionMarker = { mission: boolean; turnIn: boolean };
+
+function missionMarkerFor(
+  targets: MissionGuidanceTargets,
+  locationId: string,
+): HexMissionMarker | undefined {
+  const mission = targets.locationIds.has(locationId);
+  const turnIn = targets.turnInLocationIds.has(locationId);
+  return mission || turnIn ? { mission, turnIn } : undefined;
+}
+
+function missionMarkerTone(marker: HexMissionMarker): "active" | "turn_in" {
+  return marker.mission ? "active" : "turn_in";
+}
+
 type HexButtonProps = {
   locationId: string;
   name: string;
@@ -99,6 +121,7 @@ type HexButtonProps = {
   disabled: boolean;
   /** Whether this tile is directly reachable from the current location (adjacent). */
   directlyReachable: boolean;
+  missionMarker?: HexMissionMarker;
   onSelect: () => void;
   style: CSSProperties;
 };
@@ -114,6 +137,7 @@ function HexButton({
   transitRole,
   disabled,
   directlyReachable,
+  missionMarker,
   onSelect,
   style,
 }: HexButtonProps) {
@@ -137,10 +161,17 @@ function HexButton({
         ? "Reachable destination."
         : "Visible, not directly reachable.",
     selected && !youAreHere ? "Selected." : "",
+    missionMarker?.mission ? "Mission destination." : "",
+    missionMarker?.turnIn ? "Mission turn-in." : "",
     disabled ? "Travel in progress; map is read-only." : "",
   ]
     .filter(Boolean)
     .join(" ");
+  const missionLabel = missionMarker
+    ? [missionMarker.mission ? "Mission" : "", missionMarker.turnIn ? "Turn in" : ""]
+        .filter(Boolean)
+        .join(" · ")
+    : undefined;
 
   return (
     <button
@@ -150,6 +181,9 @@ function HexButton({
       aria-label={accessibleLabel}
       aria-describedby={`loc-desc-${locationId}`}
       data-map-location={locationId}
+      data-mission-guidance={missionMarker ? missionMarkerTone(missionMarker) : undefined}
+      data-map-mission={missionMarker?.mission ? "true" : undefined}
+      data-map-turn-in={missionMarker?.turnIn ? "true" : undefined}
       disabled={disabled}
       onClick={onSelect}
       style={style}
@@ -166,7 +200,24 @@ function HexButton({
       </span>
       {/* Dedicated artwork zone spacer — keeps state high and nameplate low so
           the SVG identifier (Layer 2) has a clear middle band to occupy */}
-      <span aria-hidden="true" className="block h-[44px] w-full shrink-0" data-map-artwork-spacer />
+      <span
+        aria-hidden="true"
+        className="relative block h-[44px] w-full shrink-0"
+        data-map-artwork-spacer
+      >
+        {/* Mission marker overlays the artwork band so no hex zone moves. The
+            wrapper positions it: .rs-map-plate sets its own position. */}
+        {missionMarker && missionLabel ? (
+          <span className="absolute inset-x-0 bottom-0.5 z-10 flex justify-center">
+            <span
+              className="rs-map-plate rs-map-plate--mission inline-flex items-center justify-center whitespace-nowrap px-1.5 py-0.5 font-display text-[8px] font-bold uppercase leading-none tracking-[0.12em]"
+              data-map-mission-marker={missionMarkerTone(missionMarker)}
+            >
+              {missionLabel}
+            </span>
+          </span>
+        ) : null}
+      </span>
       {/* Lower cluster: nameplate toward lower portion + status */}
       <span className="flex w-full flex-col items-center gap-0.5">
         <span
@@ -205,6 +256,7 @@ function HexMapSvg({
   transitProgress,
   travelOriginLocationId,
   travelDestinationLocationId,
+  missionTargets,
 }: {
   geometry: LocalMapGeometry;
   currentLocationId: string;
@@ -213,6 +265,7 @@ function HexMapSvg({
   transitProgress: number;
   travelOriginLocationId?: (typeof LOCATION_IDS)[keyof typeof LOCATION_IDS];
   travelDestinationLocationId?: (typeof LOCATION_IDS)[keyof typeof LOCATION_IDS];
+  missionTargets: MissionGuidanceTargets;
 }) {
   const hexWidth = geometry.hexWidth;
   const hexHeight = geometry.hexHeight;
@@ -276,9 +329,21 @@ function HexMapSvg({
         const identifierY = cy - identifierH / 2 - hexHeight * 0.06;
         const rivets = hexInsetVertices(cx, cy, hexWidth, 0.91);
         const clipId = `hex-clip-${layout.locationId.replace(/[^a-zA-Z0-9_-]/g, "-")}`;
+        const missionMarker = missionMarkerFor(missionTargets, layout.locationId);
 
         return (
           <g key={layout.locationId}>
+            {/* Mission ring: outside the chassis stroke, so current/selected
+                stay legible; shared green/blue Mission tokens and glow. */}
+            {missionMarker ? (
+              <polygon
+                className="rs-map-mission-ring"
+                data-map-mission-ring={missionMarkerTone(missionMarker)}
+                fill="none"
+                points={hexPoints(cx, cy, hexWidth + 12)}
+                strokeWidth="3"
+              />
+            ) : null}
             {/* Layer 1: shared plated chassis — outer hex fill unchanged */}
             <polygon
               data-map-hex={layout.locationId}
@@ -439,6 +504,8 @@ export function LocalMapPanel({
     useLocalMapScrollAffordances(true);
 
   const currentLocationId = state.location.currentLocationId;
+  // Accepted Missions only: available offers never reach the map.
+  const missionTargets = deriveMissionGuidanceTargets(state.missions);
   const travel = state.travelState;
   const inTransit = Boolean(travel);
   const workActive = Boolean(state.activeAction);
@@ -574,6 +641,7 @@ export function LocalMapPanel({
               transitProgress={transitProgress}
               travelOriginLocationId={travel?.originLocationId}
               travelDestinationLocationId={travel?.destinationLocationId}
+              missionTargets={missionTargets}
             />
             {mapGeometry.layouts.map((layout) => {
               const location = getLocation(layout.locationId);
@@ -600,6 +668,7 @@ export function LocalMapPanel({
                   directlyReachable={
                     areLocationsAdjacent(currentLocationId, location.id) || isCurrent
                   }
+                  missionMarker={missionMarkerFor(missionTargets, location.id)}
                   onSelect={() => !inTransit && setSelected(location.id)}
                   style={hexButtonStyle(location.id)}
                 />

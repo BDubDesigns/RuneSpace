@@ -100,8 +100,17 @@ than duplicating it in map tiles.
   actionable control, a missed window may leave a subdued after-the-fact entry, and a claimed outcome
   is concise result copy. The reveal overlay remains the owner of reward presentation; the Journey
   feed does not render a second claimed control.
-- Map does not render MISSION or TURN IN guidance markers. Issue #143 is the later owner of those
-  destination and turn-in marker semantics.
+- A hex that is a Mission destination and/or turn-in (Issue #143) shows one text plate overlaid on
+  the artwork band — `MISSION`, `TURN IN`, or `MISSION · TURN IN` when both facts apply — so no zone
+  moves and no state/nameplate/status plate is displaced, plus a glowing ring polygon just outside
+  the hex chassis so `current` / `selected` / `reachable` / origin/destination treatment stay
+  legible underneath it. The plate and ring colour follow the shared active-over-turn-in precedence
+  (green, else blue) while the plate text and `aria-label` ("Mission destination." / "Mission
+  turn-in.") always name every fact. Touch targets, polygon bounds, and existing state/route
+  rendering are unchanged, and colour is never the only signal (`data-mission-guidance`,
+  `data-map-mission`, `data-map-turn-in`, `data-map-mission-marker`, `data-map-mission-ring`).
+  `docs/missions.md` §10 is the authoritative semantic model for what qualifies as MISSION or TURN
+  IN; this document owns presentation only.
 - Flat-top six-hex local map, `LOCAL_MAP_HEX_WIDTH=140` unified (no mobile/desktop branching, one `buildLocalMapGeometry` path), `hexButtonStyle` overlay,
   `LOCAL_MAP_PADDING`, `LOCAL_MAP_ROUTE_GAP=30` (~30px edge-to-edge at the unified 140), and single-path `buildLocalMapGeometry` remain authoritative.
 

@@ -288,13 +288,15 @@ export async function openNpcDialogue(page: Page, npcName: string, entryName: st
  */
 export async function expectExteriorMissionHalo(
   control: import("@playwright/test").Locator,
-  guidance: "available" | "active",
+  guidance: "available" | "active" | "turn_in",
 ) {
   await expect(control).toHaveAttribute("data-mission-guidance", guidance);
   const halo = control.locator("xpath=..");
   await expect(halo).toHaveAttribute(
     "data-halo",
-    guidance === "active" ? "mission-active" : "mission-available",
+    { active: "mission-active", available: "mission-available", turn_in: "mission-turn-in" }[
+      guidance
+    ],
   );
   const paint = await halo.evaluate((element) => {
     const haloStyle = getComputedStyle(element);

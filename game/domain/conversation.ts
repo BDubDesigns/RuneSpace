@@ -68,6 +68,7 @@ export type NpcConversationProjection = {
   guidance?: {
     npcId?: string;
     availableNpcIds?: readonly string[];
+    turnIn?: true;
   };
 };
 
@@ -109,7 +110,7 @@ export type NpcConversationEntry =
       dialogueId: DialogueId;
       missionId: string;
       /** Semantic Mission guidance for this entry, reused from the projection. */
-      guidance?: "available" | "active";
+      guidance?: "available" | "active" | "turn_in";
       action?: MissionConversationAction;
       acceptedContinuation?: MissionConversationContinuation;
     }
@@ -372,8 +373,10 @@ function completionAction(definition: MissionDefinition): MissionConversationAct
 function guidanceFor(
   npcId: string,
   projection: NpcConversationProjection,
-): "available" | "active" | undefined {
-  if (projection.guidance?.npcId === npcId) return "active";
+): "available" | "active" | "turn_in" | undefined {
+  if (projection.guidance?.npcId === npcId) {
+    return projection.guidance.turnIn ? "turn_in" : "active";
+  }
   if (projection.guidance?.availableNpcIds?.includes(npcId)) return "available";
   return undefined;
 }
