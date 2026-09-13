@@ -451,7 +451,7 @@ const authoredWikiArticles = [
       {
         heading: "In town",
         paragraphs: [
-          "Standing in Holo Hollow, you can step into the places that are open. Going inside is instant: it isn't a journey, it doesn't interrupt anything, and the map still shows you in Holo Hollow.",
+          "Standing in Holo Hollow, you can step into the places that are open. Going inside is instant: it isn't a journey, it doesn't interrupt anything, and the map still shows you in Holo Hollow. Inside, the Back to Holo Hollow button under the description takes you straight back out to the town.",
         ],
         list: [
           [

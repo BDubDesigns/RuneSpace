@@ -396,6 +396,35 @@ test("presents Holo Hollow's places, keeps HH B&B visible but locked, and enters
   await expect(
     page.locator(`[data-local-place-surface="${LOCAL_PLACE_IDS.holoHollowSouvenirs}"]`),
   ).toBeVisible();
+
+  // Inside, the way back is a real control rather than a breadcrumb (#175):
+  // the parent location still names it, its arrow is decorative, and it is a
+  // full-size tappable target rather than the old 12px text link.
+  const exit = page.locator("[data-local-place-exit]");
+  await expect(exit).toHaveAccessibleName("Back to Holo Hollow");
+  await expect(exit.locator("svg")).toHaveAttribute("aria-hidden", "true");
+  const exitBox = (await exit.boundingBox())!;
+  expect(exitBox.height).toBeGreaterThanOrEqual(44);
+  expect(
+    await exit.evaluate((element) => Number.parseFloat(getComputedStyle(element).fontSize)),
+  ).toBeGreaterThanOrEqual(14);
+  // It sits inside the phone viewport and adds no horizontal overflow.
+  expect(exitBox.x).toBeGreaterThanOrEqual(0);
+  expect(exitBox.x + exitBox.width).toBeLessThanOrEqual(390);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(
+    true,
+  );
+  // A beveled ActionLink still paints its keyboard focus ring, and only its
+  // keyboard one (#173).
+  await expectKeyboardFocusRingPaints(exit);
+  await expectPointerFocusWithoutRing(exit);
+
+  // Activating it returns to the town surface, with no place left in the route
+  // and no journey begun.
+  await exit.click();
+  await expect(page).toHaveURL((url) => !url.searchParams.has("place"));
+  await expect(page.locator("[data-local-place-directory]")).toBeVisible();
+  await expect(page.getByText("In transit", { exact: true })).toHaveCount(0);
 });
 
 test("scopes each resident to their own Local Place", async ({ page, testCharacter }) => {
