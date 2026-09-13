@@ -43,7 +43,7 @@ import {
 import { grantCharacterSkillXp } from "@/server/progression";
 import { applyStackRemovalPlan, loadOwnedItemInstances } from "@/server/carried-inventory";
 import { ensureMissionProgressRows, recordMissionConversation } from "@/server/mission-progress";
-import { completedRepairTargetIds } from "@/server/mission-state";
+import { repairMaterialItemIds, repairTargetObservations } from "@/server/mission-state";
 import { loadRepairTargetStates } from "@/server/welding";
 
 export type MissionAcceptance =
@@ -573,7 +573,7 @@ async function completeMissionForDefinition(input: {
       continue;
     }
     if (requirement.kind === "repair_target_complete") {
-      if (observation.completedRepairTargetIds?.has(requirement.targetId) !== true) {
+      if (observation.repairTargets?.get(requirement.targetId)?.complete !== true) {
         return stateFor({
           status: "refused",
           reason: "repair_target_complete",
@@ -851,6 +851,7 @@ function buildCompletionObservation(
   }
   const stackLimits = new Map<string, number>();
   const itemNames = new Map<string, string>();
+  const repairTargets = repairTargetObservations(repairStates, balance);
   const observedItemIds = new Set<string>([
     ...equippedCarriedIds,
     ...carriedQuantities.keys(),
@@ -862,6 +863,7 @@ function buildCompletionObservation(
         )
         .map((requirement) => requirement.itemId),
     ),
+    ...repairMaterialItemIds(repairTargets),
   ]);
   for (const itemId of observedItemIds) {
     const displayName = resolveItemPresentation(itemId, itemId).displayName;
@@ -875,7 +877,7 @@ function buildCompletionObservation(
     stackLimits,
     itemNames,
     trackedProgress,
-    completedRepairTargetIds: completedRepairTargetIds(repairStates),
+    repairTargets,
   };
 }
 

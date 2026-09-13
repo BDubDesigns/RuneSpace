@@ -694,6 +694,88 @@ test("shows the Crew Stop before the Mission, and its repair work only after", a
   );
 });
 
+test("tracks the repair's real phases in the Mission Log and its guidance", async ({
+  page,
+  testCharacter,
+}) => {
+  const characterId = testCharacter.id;
+  await page.setViewportSize({ width: 390, height: 844 });
+  await completeChainThroughHoldItTogether(characterId);
+  await db.insert(characterMissions).values({
+    characterId,
+    missionId: MISSION_IDS.outOfTheWeather,
+    acceptedAt: new Date(),
+  });
+  // Ten of the twenty are durably installed; six more are carried and have
+  // deliberately not been handed over.
+  await db.insert(characterRepairTargets).values({
+    characterId,
+    targetId: REPAIR_TARGET_IDS.crewStop,
+    refinedFerriteContributed: 10,
+    slagContributed: 0,
+    weldingProgress: 0,
+  });
+  await arriveInHoloHollow(characterId);
+  await db
+    .insert(inventoryStacks)
+    .values({ characterId, itemId: ITEM_IDS.refinedFerrite, quantity: 6 });
+  await openTestCharacter(page, characterId);
+  await page.emulateMedia({ reducedMotion: "reduce" });
+
+  // The objective is the installed count, and the carried six are a separate
+  // subordinate line: 10 / 20, never 16 / 20.
+  await expect(page.locator("[data-mission-strip-objective]")).toHaveText(
+    "Install Refined Ferrite at the Crew Stop — 10 / 20",
+  );
+  await page.getByRole("button", { name: "Missions" }).click();
+  const log = page.getByRole("dialog", { name: "Mission Log" });
+  const entry = log.locator(`[data-mission-log-entry="${MISSION_IDS.outOfTheWeather}"]`);
+  await expect(entry.locator("[data-mission-log-requirements]")).toContainText(
+    "Install Refined Ferrite at the Crew Stop — 10 / 20",
+  );
+  await expect(entry.locator("[data-mission-requirement-detail]")).toHaveText(
+    "Carrying: 6 Refined Ferrite",
+  );
+  await expect(entry.locator("[data-mission-log-requirements]")).not.toContainText("16 / 20");
+  await page.keyboard.press("Escape");
+
+  // Carrying something useful, the shelter is worth walking to, so it is guided.
+  await expect(
+    page
+      .locator(`[data-local-place="${LOCAL_PLACE_IDS.holoHollowCrewStop}"]`)
+      .locator("[data-local-place-enter]"),
+  ).toHaveAttribute("data-mission-guidance", "active");
+
+  // Hand nothing over, carry nothing: the Log still states the objective, and
+  // the framework invents no destination for material with several sources.
+  await db.delete(inventoryStacks).where(eq(inventoryStacks.characterId, characterId));
+  await page.reload();
+  await expect(page.locator("[data-mission-strip-objective]")).toHaveText(
+    "Install Refined Ferrite at the Crew Stop — 10 / 20",
+  );
+  await expect(
+    page
+      .locator(`[data-local-place="${LOCAL_PLACE_IDS.holoHollowCrewStop}"]`)
+      .locator("[data-local-place-enter]"),
+  ).not.toHaveAttribute("data-mission-guidance", "active");
+
+  // Every unit installed: the objective becomes the welding, and the shelter is
+  // the one place the work can happen, so guidance returns.
+  await db
+    .update(characterRepairTargets)
+    .set({ refinedFerriteContributed: 20, weldingProgress: 3 })
+    .where(eq(characterRepairTargets.characterId, characterId));
+  await page.reload();
+  await expect(page.locator("[data-mission-strip-objective]")).toHaveText(
+    "Weld the Crew Stop — 3 / 10 welds",
+  );
+  await expect(
+    page
+      .locator(`[data-local-place="${LOCAL_PLACE_IDS.holoHollowCrewStop}"]`)
+      .locator("[data-local-place-enter]"),
+  ).toHaveAttribute("data-mission-guidance", "active");
+});
+
 test("keeps the repaired shelter and the ride apart until Renn is told", async ({
   page,
   testCharacter,
@@ -754,7 +836,7 @@ test("keeps the repaired shelter and the ride apart until Renn is told", async (
   expect(gap).toBeLessThanOrEqual(24);
 });
 
-test("presents the repaired Crew Stop and its 5-Credit ride in both directions", async ({
+test("presents the repaired Crew Stop and its one-way 5-Credit ride out to The Jag", async ({
   page,
   testCharacter,
 }) => {
@@ -817,17 +899,22 @@ test("presents the repaired Crew Stop and its 5-Credit ride in both directions",
     "The fare is 5 Credits. You have 4.",
   );
 
-  // The return leg needs no second Local Place and no driver: it is offered at
-  // The Jag itself.
+  // The ride is outbound only: the hauler goes back loaded with shale, and the
+  // shelter says so rather than leaving the absence to be discovered.
+  await expect(page.locator("[data-crew-stop-panel]")).toContainText("full of shale");
+
+  // At The Jag there is no ride home at all — no control, no disabled
+  // placeholder, and no empty space where one used to be.
   await db
     .update(characters)
-    .set({ currentLocationId: LOCATION_IDS.theJag, credits: 5 })
+    .set({ currentLocationId: LOCATION_IDS.theJag, credits: 50 })
     .where(eq(characters.id, characterId));
   await page.reload();
-  const returnRide = page.locator(`[data-crew-hauler-ride="${LOCATION_IDS.holoHollow}"]`);
-  await expect(returnRide).toContainText("Ride to Holo Hollow");
-  await expect(returnRide).toContainText("5 Credits");
-  // The Jag needs no Local Place of its own for it: the control is right there
-  // on the location surface.
-  await expect(page.locator("[data-location-surface] [data-crew-hauler-rides]")).toBeVisible();
+  await expect(page.locator("[data-location-surface]")).toBeVisible();
+  await expect(page.locator("[data-crew-hauler-rides]")).toHaveCount(0);
+  await expect(page.locator("[data-crew-hauler-ride]")).toHaveCount(0);
+  await expect(page.locator("[data-location-surface]")).not.toContainText("Ride to Holo Hollow");
+  // The walk home is the ordinary Travel control, untouched by any of this.
+  await openMapSurface(page);
+  await expect(page.locator(`[data-map-location="${LOCATION_IDS.theLongScramble}"]`)).toBeVisible();
 });

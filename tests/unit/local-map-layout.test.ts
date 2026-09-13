@@ -58,9 +58,10 @@ describe("five-cell flat-top local map layout (issue #83)", () => {
     // Holo Hollow (#159) adds three edges: Crash Site, Power Annex, Long Scramble.
     // The authored Crew Hauler route (#172) contributes in-transit geometry but
     // deliberately no walkable edge, so `undirectedRoutes` is unchanged while
-    // `routeSegments` gains exactly that one route's two directions.
+    // `routeSegments` gains exactly one entry: the route is one-way, and there
+    // is no ride back to draw.
     expect(geometry.undirectedRoutes).toHaveLength(8);
-    expect(Object.keys(geometry.routeSegments)).toHaveLength(18);
+    expect(Object.keys(geometry.routeSegments)).toHaveLength(17);
     expect(
       geometry.undirectedRoutes.every(
         (route) =>

@@ -416,7 +416,7 @@ A Journey records **how** it is being made (`character_travel_state.mode`), and
 that mode owns the two things that differ:
 
 - **duration** — a `walk` is the ordinary 40-tick adjacent leg; the Crew Hauler
-  covers the whole authored Holo Hollow ↔ The Jag route in **20 ticks / 12
+  covers the whole authored Holo Hollow → The Jag route in **20 ticks / 12
   seconds**, where walking it is two 40-tick legs through The Long Scramble plus
   a second explicit Travel command at the stop in between;
 - **Scavenge eligibility** — only a walk has a Scavenge window. A ride has none
@@ -427,24 +427,34 @@ that mode owns the two things that differ:
 A paid route is **not map adjacency**. Holo Hollow and The Jag remain
 non-adjacent: walking between them is unchanged, the map draws no new walkable
 edge, and `planTravel` still refuses the direct walk. The route is authored
-content (`game/content/transport-routes`) carrying its endpoints, its mode, its
-fare, and the completed Mission that unlocks it. The server resolves all of
+content (`game/content/transport-routes`) carrying its origin, its destination,
+its mode, its fare, and the completed Mission that unlocks it. The server resolves all of
 that from the character's own authoritative position — the browser supplies a
 destination and nothing else — and the fare commits in the same transaction as
 the Journey under the character row lock, so a retry or concurrent request can
 never charge twice and a refusal never charges at all.
 
-A route also authors **where each end is boarded from**
-(`boardingLocalPlaceIds`). An end with an authored Local Place is offered inside
-that place and nowhere else — the Crew Hauler is boarded at the repaired Crew
-Stop, never from Holo Hollow's town surface, because the ride is the crews who
-use that shelter rather than a service the town runs. An end with no authored
-place is offered on the World Location surface, which is how The Jag presents
-the return leg without a second Local Place or a driver NPC. This is
-presentation authority only: where the player clicks changes nothing the server
-checks. A surface asks the same authored question before it lays out space
-(`availableCrewHaulerRides`), so a location with no ride shows no gap where one
-would have been.
+A route is **one-way and authored as such**: `originLocationId` and
+`destinationLocationId`, never an unordered pair. The Crew Hauler runs Holo
+Hollow → The Jag because the crews can make room for a passenger heading out
+and cannot on the way back, when the hauler is loaded with shale. Direction is
+therefore server-authoritative rather than a hidden button: `getTransportRoute`
+answers only for the authored direction, so a The Jag → Holo Hollow request
+refuses with `unknown_route` even if it is forged. An opposite direction, if a
+later feature genuinely earns one, is a second authored route — never a flag
+that makes an existing one reversible. Walking is untouched and remains
+available both ways through ordinary adjacency, with its Scavenge windows.
+
+A route also authors **where it is boarded** (`boardingLocalPlaceId`). With an
+authored Local Place it is offered inside that place and nowhere else — the
+Crew Hauler is boarded at the repaired Crew Stop, never from Holo Hollow's town
+surface, because the ride is the crews who use that shelter rather than a
+service the town runs. A location that is only some route's destination offers
+nothing at all: The Jag has no control to disable and no placeholder explaining
+the ride it cannot give. This is presentation authority only: where the player
+clicks changes nothing the server checks. A surface asks the same authored
+question before it lays out space (`availableCrewHaulerRides`), so a place with
+no ride shows no gap where one would have been.
 
 The ride is also not the repair. A finished repair changes the world
 immediately — the repaired artwork and copy derive from the repair record

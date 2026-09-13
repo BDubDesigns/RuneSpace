@@ -1212,6 +1212,11 @@ const dialogue = {
         "So: the shift hauler runs out to The Jag most of the day. They'll squeeze you on for five Credits.",
       ),
       rennLocal(
+        EXPRESSION_IDS.sardonic,
+        "Out only. Coming back it's stacked to the rails with shale, and shale doesn't move over for anybody.",
+      ),
+      rennLocal(EXPRESSION_IDS.neutral, "You walk home like the rest of us."),
+      rennLocal(
         EXPRESSION_IDS.guarded,
         "Not a favour, exactly. They just don't mind you now, and that's worth more here than it sounds.",
       ),

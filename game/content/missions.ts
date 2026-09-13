@@ -129,7 +129,36 @@ export type MissionRequirement =
        */
       kind: "repair_target_complete";
       targetId: RepairTargetId;
+      /** Player-facing copy for the job as a whole, and the fallback for any phase. */
       objective: string;
+      /**
+       * Optional phase copy (#172). A repair has real stages — install the
+       * recipe's materials, then weld — and a Mission may author what each one
+       * reads as. The framework picks the live phase from the authoritative
+       * repair record, never from the Mission's identity.
+       *
+       * `{item}`, `{contributed}`, and `{required}` are substituted from the
+       * first authored material still short of its requirement. Contributed
+       * means durably installed: carried and stored material never appear here.
+       */
+      materialObjective?: string;
+      /** Optional Welding-phase copy; `{current}` and `{target}` are substituted. */
+      weldingObjective?: string;
+      /**
+       * When this repair's material phase should guide the player to the
+       * target at all (#172).
+       *
+       * `"always"` (the default) keeps the ordinary behavior: the target is the
+       * guidance destination for the whole job. `"when_carrying"` withholds
+       * guidance while the player carries none of an outstanding material —
+       * the same principle a carried requirement with several legitimate
+       * sources already follows, since walking to the shelter with empty hands
+       * accomplishes nothing and the framework must not invent which of
+       * refining, buying, or scavenging the player should do. The Mission Log's
+       * "{contributed} / {required}" carries the objective on its own until
+       * they pick something up.
+       */
+      materialGuidance?: "always" | "when_carrying";
     }
   | {
       /**
@@ -611,6 +640,9 @@ export const OUT_OF_THE_WEATHER: MissionDefinition = {
       kind: "repair_target_complete",
       targetId: REPAIR_TARGET_IDS.crewStop,
       objective: "Repair the Crew Stop in Holo Hollow",
+      materialObjective: "Install {item} at the Crew Stop — {contributed} / {required}",
+      weldingObjective: "Weld the Crew Stop — {current} / {target} welds",
+      materialGuidance: "when_carrying",
     },
   ],
   turnIn: {

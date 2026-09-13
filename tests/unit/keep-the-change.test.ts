@@ -30,6 +30,7 @@ import {
   type MissionObservation,
   type MissionProjection,
 } from "@/game/domain/missions";
+import { cargoRepaired } from "./repair-observation";
 
 /**
  * Issue #170 — Keep the Change.
@@ -52,7 +53,7 @@ function observation(input: { cells?: number; metBix?: boolean } = {}): MissionO
     stackLimits: new Map([[ITEM_IDS.powerCell, POWER_CELL_STACK_LIMIT]]),
     itemNames: new Map([[ITEM_IDS.powerCell, "Power Cell"]]),
     trackedProgress: new Map(input.metBix ? [["bix-introduction", 1]] : []),
-    completedRepairTargetIds: new Set([REPAIR_TARGET_IDS.cargoHold]),
+    repairTargets: cargoRepaired(),
   };
 }
 

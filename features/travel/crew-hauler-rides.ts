@@ -1,22 +1,20 @@
 import { getTransportRoutesFrom } from "@/game/content/transport-routes";
-import type { LocalPlaceId, LocationId } from "@/game/config/foundations";
+import type { LocalPlaceId } from "@/game/config/foundations";
 import type { TransportRouteDefinition } from "@/game/content/transport-routes";
-
-export type AvailableRide = {
-  route: TransportRouteDefinition;
-  destinationLocationId: LocationId;
-};
 
 /**
  * The rides one surface may offer (#172).
  *
- * Two authored facts decide it, and nothing else: the completed Mission that
- * unlocks the route, and where that end of the route is boarded from. A route
- * boarding at a Local Place belongs to that place's surface alone — Holo
- * Hollow's Crew Hauler is offered inside the repaired Crew Stop, never on the
- * town surface — while a route with no authored boarding place belongs to the
- * World Location surface, which is how The Jag offers the return leg without a
- * second Local Place or a driver NPC.
+ * Three authored facts decide it, and nothing else: the route runs FROM here,
+ * the completed Mission that unlocks it, and where it is boarded from. A route
+ * boarding at a Local Place belongs to that place's surface alone — the Crew
+ * Hauler is offered inside the repaired Crew Stop, never on the town surface —
+ * while a route with no authored boarding place belongs to the World Location
+ * surface.
+ *
+ * Because routes are directional, a location that is only some route's
+ * DESTINATION offers nothing: The Jag has no ride home to hide, disable, or
+ * explain away, because none is authored.
  *
  * Presentation shares this with the composition layer so a surface can ask
  * whether it has any ride to show before it lays out space for one. It is not
@@ -28,12 +26,10 @@ export function availableCrewHaulerRides(input: {
   /** The Local Place being rendered, or undefined for the World Location surface. */
   localPlaceId?: LocalPlaceId | string;
   completedMissionIds: ReadonlySet<string>;
-}): readonly AvailableRide[] {
-  return getTransportRoutesFrom(input.locationId)
-    .filter(
-      ({ route, boardingLocalPlaceId }) =>
-        boardingLocalPlaceId === input.localPlaceId &&
-        input.completedMissionIds.has(route.unlockMissionId),
-    )
-    .map(({ route, destinationLocationId }) => ({ route, destinationLocationId }));
+}): readonly TransportRouteDefinition[] {
+  return getTransportRoutesFrom(input.locationId).filter(
+    (route) =>
+      route.boardingLocalPlaceId === input.localPlaceId &&
+      input.completedMissionIds.has(route.unlockMissionId),
+  );
 }

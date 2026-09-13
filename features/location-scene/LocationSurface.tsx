@@ -11,8 +11,6 @@ import { deriveCompletedMissionIds } from "@/game/domain/missions";
 import { deriveCompletedRepairTargetIds } from "@/game/domain/welding-repair";
 import { LOCAL_PLACE_IDS } from "@/game/config/foundations";
 import { CrewStopPanel } from "@/features/local-places/CrewStopPanel";
-import { CrewHaulerRideControl } from "@/features/travel/CrewHaulerRideControl";
-import { availableCrewHaulerRides } from "@/features/travel/crew-hauler-rides";
 import { CargoHoldPanel } from "@/features/cargo/CargoHoldPanel";
 import { LocalPlaceDirectory } from "@/features/local-places/LocalPlaceDirectory";
 import { LocalPlaceSurface } from "@/features/local-places/LocalPlaceSurface";
@@ -24,6 +22,11 @@ import { LocationPopulationPanel } from "./LocationPopulationPanel";
 import { LocationSceneHeader } from "./LocationSceneHeader";
 
 /**
+ * A World Location surface offers no paid ride of its own (#172). The one
+ * authored route boards inside a Local Place, and The Jag — which the route
+ * only ever arrives at — offers nothing, because the crews cannot make room on
+ * the way back. The walk home is the ordinary Travel control, unchanged.
+ *
  * The activity a Local Place hosts, when it hosts one.
  *
  * The same shape as this surface's existing per-location activity selection —
@@ -102,16 +105,6 @@ export function LocationSurface({
         {localPlaces.length > 0 ? (
           <div className="mt-5">
             <LocalPlaceDirectory locationId={locationId} />
-          </div>
-        ) : null}
-        {/* A route that boards from a Local Place belongs to that place, not to
-            the town surface; what remains here is a route with no boarding place
-            of its own, which is how The Jag offers the return leg without a
-            second Local Place or a driver. Asking first keeps a location with no
-            ride from laying out space for one. */}
-        {availableCrewHaulerRides({ locationId, completedMissionIds }).length > 0 ? (
-          <div className="mt-5">
-            <CrewHaulerRideControl />
           </div>
         ) : null}
         {locationId === LOCATION_IDS.theLongScramble || localPlaces.length > 0 ? null : (

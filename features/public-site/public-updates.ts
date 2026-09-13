@@ -19,7 +19,7 @@ const authoredUpdates = [
     body: [
       "The Crew Stop has been standing out on the haul road the whole time. It's where the mining crews wait for the shift hauler out to The Jag, and it's in a bad way — the canopy sags at one corner, the bench leans with it, and most mornings the crews stand in the weather instead. Everybody complains about it. Nobody owns it enough to fix it.",
       "Once you've finished Hold It Together, Renn Calder will mention it. Taking the job is entirely your call: it isn't part of the main story, nothing is waiting on it, and ignoring it forever closes nothing off. It also isn't free. Twenty Refined Ferrite and ten welding passes come out of your own pocket and your own afternoon. You can put in some of the ferrite, go and get more, and come back — the shelter isn't going anywhere.",
-      "What you get back is the point. The Crew Stop stays repaired, permanently and visibly. And because the crews use it every workday and know exactly who fixed it, they'll squeeze you onto the shift hauler between town and The Jag for five Credits a trip, in either direction — a ride you can take from the repaired Crew Stop itself, or from The Jag for the way back.",
+      "What you get back is the point. The Crew Stop stays repaired, permanently and visibly. And because the crews use it every workday and know exactly who fixed it, they'll squeeze you onto the shift hauler out to The Jag for five Credits — a ride you board at the repaired Crew Stop itself. Only on the way out, mind: coming back the hauler is loaded with shale and there is no room for a passenger, so the walk home is still yours.",
       "Walking hasn't changed at all. It's still free, still goes through The Long Scramble, and still gives you a chance to scavenge on the way. There's nothing to find on the back of a hauler, so the trade is the same every time you make it: spend the time and maybe turn something up, or spend the Credits and get there.",
       "This is the first thing in RuneSpace you can choose to do purely because it makes the place better, and have the world stay that way afterwards. It won't be the last.",
     ],
@@ -30,7 +30,7 @@ const authoredUpdates = [
           "Out of the Weather, an optional side job offered by Renn Calder in Holo Hollow once you've finished Hold It Together. Keep the Change is not required, and taking or skipping this job never affects the main story.",
           "The Crew Stop, a new place in Holo Hollow. It's visible from the start, and it visibly stays repaired once you fix it.",
           "Welding now has a second job to do. The Crew Stop repair needs 20 Refined Ferrite, no Slag, and ten welding passes, using the same Welding skill you already have.",
-          "The Crew Hauler: a 5-Credit ride between Holo Hollow and The Jag, in either direction, unlocked by finishing Out of the Weather. It's charged every trip, and it's a real journey rather than a teleport.",
+          "The Crew Hauler: a 5-Credit ride from Holo Hollow out to The Jag, unlocked by finishing Out of the Weather. Outbound only, charged every trip, and a real journey rather than a teleport — the walk back is unchanged.",
           "Finishing Out of the Weather earns 250 Welding XP on top of what the welding itself paid you.",
         ],
       },

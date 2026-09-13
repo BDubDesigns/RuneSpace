@@ -5,13 +5,18 @@ import {
   equippedItems,
   inventoryStacks,
 } from "@/db/rune-space";
-import { getEffectiveGameBalance, getItemDefinition } from "@/game/config/balance";
+import {
+  getEffectiveGameBalance,
+  getItemDefinition,
+  getRepairTargetBalance,
+} from "@/game/config/balance";
 import { CONVERSATION_TOPICS } from "@/game/content/conversation-topics";
 import { LOCAL_PLACES } from "@/game/content/local-places";
 import { MISSIONS, type MissionDefinition } from "@/game/content/missions";
 import { REPAIR_TARGETS } from "@/game/content/repair-targets";
 import { validateRepairTargets } from "@/game/domain/repair-targets";
 import { repairComplete, type RepairTargetState } from "@/game/domain/welding-repair";
+import type { RepairTargetObservation } from "@/game/domain/missions";
 import { validateConversationTopics } from "@/game/domain/conversation";
 import { validateLocalPlaceAccess } from "@/game/domain/local-places";
 import {
@@ -196,11 +201,15 @@ function buildObservation(
   // unique items (an unequipped Cutter still appears in objective copy), plus
   // every canonical item any authored requirement references (zero carried
   // Ferrite Shale must still resolve its authoritative stack limit).
+  const repairTargets = repairTargetObservations(repairStates, balance);
   const observedItemIds = new Set<string>([
     ...equippedCarriedIds,
     ...carriedInstances.map((instance) => instance.itemId),
     ...carriedQuantities.keys(),
     ...requirementItemIds(MISSIONS),
+    // Repair recipes name their own materials, and a repair objective must read
+    // "Refined Ferrite" whether or not the player happens to be carrying any.
+    ...repairMaterialItemIds(repairTargets),
   ]);
   for (const itemId of observedItemIds) {
     const displayName = resolveItemPresentation(itemId, itemId).displayName;
@@ -213,17 +222,58 @@ function buildObservation(
     carriedQuantities,
     stackLimits,
     itemNames,
-    completedRepairTargetIds: completedRepairTargetIds(repairStates),
+    repairTargets,
   };
 }
 
-/** The repair targets this character has actually finished. */
-export function completedRepairTargetIds(
+/** Every item any authored repair recipe consumes, for authoritative naming. */
+export function repairMaterialItemIds(
+  repairTargets: ReadonlyMap<string, RepairTargetObservation>,
+): readonly string[] {
+  return [...repairTargets.values()].flatMap((target) =>
+    target.materials.map((material) => material.itemId),
+  );
+}
+
+/**
+ * Every authored repair target as the Mission projection may observe it: the
+ * recipe from balance, the progress from the durable repair record (#172).
+ *
+ * A target with no row has never been worked on, which is zero progress rather
+ * than a missing observation — so a Mission reads the same whether or not the
+ * player has touched the job yet. Nothing here can report carried or stored
+ * material as progress, because nothing here reads inventory.
+ */
+export function repairTargetObservations(
   repairStates: ReadonlyMap<string, RepairTargetState>,
-): ReadonlySet<string> {
-  return new Set(
-    [...repairStates.entries()]
-      .filter(([, repair]) => repairComplete(repair))
-      .map(([targetId]) => targetId),
+  balance = getEffectiveGameBalance(),
+): ReadonlyMap<string, RepairTargetObservation> {
+  return new Map(
+    REPAIR_TARGETS.map((target) => {
+      const recipe = getRepairTargetBalance(target.id, balance);
+      const repair = repairStates.get(target.id);
+      return [
+        target.id,
+        {
+          complete: repair ? repairComplete(repair) : false,
+          materials: [
+            {
+              itemId: balance.items.refinedFerrite.itemId,
+              contributed: repair?.refinedFerriteContributed ?? 0,
+              required: recipe.refinedFerriteRequired,
+            },
+            {
+              itemId: balance.items.slag.itemId,
+              contributed: repair?.slagContributed ?? 0,
+              required: recipe.slagRequired,
+            },
+          ].filter((material) => material.required > 0),
+          welding: {
+            completed: repair?.weldingProgress ?? 0,
+            required: recipe.repairIncrements,
+          },
+        } satisfies RepairTargetObservation,
+      ];
+    }),
   );
 }

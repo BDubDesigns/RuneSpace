@@ -103,10 +103,10 @@ const authoredWikiArticles = [
           [
             "Once you've repaired the Crew Stop for Renn Calder in ",
             { text: "Out of the Weather", articleSlug: "missions" },
-            ", the mining crews will let you ride their shift hauler between the town of Holo Hollow and The Jag.",
+            ", the mining crews will let you ride their shift hauler out from Holo Hollow to The Jag.",
           ],
-          "It costs 5 Credits every ride, in either direction — it isn't a one-time unlock that makes travel free. The ride takes about 12 seconds, where walking the same trip is two legs through The Long Scramble plus the stop in between.",
-          "You can board it at the repaired Crew Stop in town, or at The Jag for the trip back. It's a real journey, not a teleport: you arrive when it gets there. There's nothing to scavenge on the back of a hauler, so the walk is still the only way to find something along the route.",
+          "It costs 5 Credits every ride — it isn't a one-time unlock that makes travel free. The ride takes about 12 seconds, where walking the same trip is two legs through The Long Scramble plus the stop in between.",
+          "It runs one way: out to The Jag only. There is room for you heading out, but the hauler comes back loaded with shale, so you walk home through The Long Scramble like everybody else. You board it at the repaired Crew Stop in town. It's a real journey, not a teleport: you arrive when it gets there. There's nothing to scavenge on the back of a hauler, so walking is still the only way to find something along the route.",
         ],
       },
       {
@@ -403,9 +403,9 @@ const authoredWikiArticles = [
         paragraphs: [
           "This one costs you rather than paying you up front: the materials and the time are yours. Renn won't chase you about it, and the Crew Stop stays where it is however long you take — you can put in some of the Refined Ferrite, go and get more, and come back.",
           [
-            "What you get is worth having. The shelter stays repaired for good, and because the crews use it every workday and know who fixed it, they'll let you ride the shift hauler between town and The Jag for ",
+            "What you get is worth having. The shelter stays repaired for good, and because the crews use it every workday and know who fixed it, they'll let you ride the shift hauler out to The Jag for ",
             { text: "5 Credits a trip", articleSlug: "travel-and-scavenging" },
-            ". Renn also passes on 250 Welding XP on top of what the welding itself earned you.",
+            ". Only on the way out, though — the hauler comes back loaded with shale, so you walk home. Renn also passes on 250 Welding XP on top of what the welding itself earned you.",
           ],
         ],
       },

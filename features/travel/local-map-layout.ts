@@ -153,17 +153,18 @@ export function buildLocalMapGeometry(
   // Authored transport routes get in-transit geometry so the Map can draw a
   // ride's progress, but they are deliberately NOT added to `undirectedRoutes`:
   // the map's walkable edges still come from adjacency alone, so the Crew
-  // Hauler never appears as a route you could walk (#172).
+  // Hauler never appears as a route you could walk (#172). Only the authored
+  // direction gets geometry — there is no ride the other way to draw.
   for (const route of TRANSPORT_ROUTES) {
-    const [originId, destinationId] = route.endpoints;
+    const { originLocationId: originId, destinationLocationId: destinationId } = route;
     const origin = layoutById.get(originId);
     const destination = layoutById.get(destinationId);
     if (!origin || !destination) continue;
     if (routeSegments[routeSegmentKey(originId, destinationId)]) continue;
-    addSegments(
-      deriveRouteEndpoints(origin.center, destination.center, hexHeight),
-      originId,
-      destinationId,
+    routeSegments[routeSegmentKey(originId, destinationId)] = deriveRouteEndpoints(
+      origin.center,
+      destination.center,
+      hexHeight,
     );
   }
 

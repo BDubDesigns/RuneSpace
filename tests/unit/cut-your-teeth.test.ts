@@ -32,6 +32,7 @@ import {
   type MissionProjection,
 } from "@/game/domain/missions";
 import { getItemBeatQuantityRange } from "@/game/content/item-presentation";
+import { cargoRepaired, repairObservation } from "./repair-observation";
 
 function observation(overrides: Partial<MissionObservation> = {}): MissionObservation {
   return {
@@ -42,6 +43,7 @@ function observation(overrides: Partial<MissionObservation> = {}): MissionObserv
       [ITEM_IDS.salvageCutter, "Salvage Cutter"],
       [ITEM_IDS.ferriteShale, "Ferrite Shale"],
     ]),
+    repairTargets: repairObservation(),
     ...overrides,
   };
 }
@@ -216,7 +218,7 @@ describe("issue #148 Hold It Together authored and observed repair boundary", ()
         accepted(),
         CRASH_SITE,
         true,
-        observation({ completedRepairTargetIds: new Set([REPAIR_TARGET_IDS.cargoHold]) }),
+        observation({ repairTargets: cargoRepaired() }),
       ),
     ).toMatchObject({
       state: "ready_for_completion",
@@ -506,13 +508,40 @@ describe("issue #124 semantic mission guidance projection", () => {
     expect([...targets.actionIds]).toEqual([]);
   });
 
+  it("leaves Hold It Together's objective and guidance untouched by repair phases (#172)", () => {
+    // The Cargo Hold uses the same generic requirement as the Crew Stop, but
+    // authors no phase copy and no carrying-based guidance rule, so it reads
+    // and guides exactly as it always has at every stage of the job.
+    for (const progress of [
+      repairObservation(),
+      repairObservation({ [REPAIR_TARGET_IDS.cargoHold]: { contributed: 9 } }),
+      repairObservation({ [REPAIR_TARGET_IDS.cargoHold]: { contributed: 15, welded: 4 } }),
+    ]) {
+      const active = projectMission(
+        HOLD_IT_TOGETHER,
+        accepted(),
+        CRASH_SITE,
+        true,
+        observation({ repairTargets: progress }),
+      );
+      expect(active.currentObjective).toBe("Repair the Cargo Hold at the Crash Site");
+      expect(active.requirements?.[0]).toMatchObject({
+        objective: "Repair the Cargo Hold at the Crash Site",
+        satisfied: false,
+      });
+      expect(active.requirements?.[0]?.detail).toBeUndefined();
+      // Carrying nothing never withholds the Cargo Hold's guidance.
+      expect(active.guidance).toMatchObject({ repairTargetId: REPAIR_TARGET_IDS.cargoHold });
+    }
+  });
+
   it("clears Cargo guidance on repair completion and moves turn-in guidance to Wade", () => {
     const ready = projectMission(
       HOLD_IT_TOGETHER,
       accepted(),
       CRASH_SITE,
       true,
-      observation({ completedRepairTargetIds: new Set([REPAIR_TARGET_IDS.cargoHold]) }),
+      observation({ repairTargets: cargoRepaired() }),
     );
     expect(ready).toMatchObject({
       state: "ready_for_completion",

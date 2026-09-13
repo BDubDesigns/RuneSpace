@@ -582,6 +582,157 @@ suite("issue #172 Out of the Weather (real PostgreSQL)", () => {
     });
   });
 
+  describe("the Mission Log tracks the real phases of the job", () => {
+    async function materialsInstalled() {
+      const { userId, character } = await makeCharacter();
+      await completeChainThroughHoldItTogether(character.id);
+      await acceptSideMission(userId, character.id);
+      await seedRepairTarget(db, rune, character.id, REPAIR_TARGET_IDS.crewStop, {
+        refinedFerriteContributed: crewStop.refinedFerriteRequired,
+        slagContributed: 0,
+        weldingProgress: 0,
+        completedAt: null,
+        updatedAt: now,
+      });
+      return { userId, character };
+    }
+
+    async function crewStopObjective(userId: string, characterId: string) {
+      const state = await play.getPlayGameplayState(
+        userId,
+        characterId,
+        now,
+        deterministicRandom(),
+      );
+      const mission = state.missions.find(
+        (entry) => entry.missionId === MISSION_IDS.outOfTheWeather,
+      );
+      return { mission, requirement: mission?.requirements?.[0] };
+    }
+
+    it("counts only durably installed material, never what is carried or stored", async () => {
+      const { userId, character } = await makeCharacter();
+      await completeChainThroughHoldItTogether(character.id);
+      await acceptSideMission(userId, character.id);
+      await addRefinedFerrite(character.id, [10]);
+      await contribute(userId, character.id, 10);
+      // Carried afterwards, and deliberately never contributed.
+      await addRefinedFerrite(character.id, [6]);
+
+      const { mission, requirement } = await crewStopObjective(userId, character.id);
+      expect(requirement?.objective).toBe("Install Refined Ferrite at the Crew Stop — 10 / 20");
+      expect(requirement?.progress).toEqual({ current: 10, target: 20 });
+      // Six carried on top of ten installed is 10 / 20 — never 16 / 20.
+      expect(requirement?.detail).toBe("Carrying: 6 Refined Ferrite");
+      expect(mission?.currentObjective).toBe("Install Refined Ferrite at the Crew Stop — 10 / 20");
+    });
+
+    it("counts nothing stored in the Cargo Hold either", async () => {
+      const { userId, character } = await makeCharacter();
+      await completeChainThroughHoldItTogether(character.id);
+      await acceptSideMission(userId, character.id);
+      await addRefinedFerrite(character.id, [10]);
+      await contribute(userId, character.id, 10);
+      // Stored at the Crash Site, not installed in the brace and not carried.
+      await db.insert(rune.cargoHoldStacks).values({
+        characterId: character.id,
+        itemId: ITEM_IDS.refinedFerrite,
+        quantity: 40,
+      });
+
+      const { mission, requirement } = await crewStopObjective(userId, character.id);
+      expect(requirement?.objective).toBe("Install Refined Ferrite at the Crew Stop — 10 / 20");
+      expect(requirement?.progress).toEqual({ current: 10, target: 20 });
+      expect(requirement?.detail).toBeUndefined();
+      // Storage is not carrying, so it does not restore guidance either.
+      expect(mission?.guidance).toBeUndefined();
+    });
+
+    it("gives no destination while the player carries none of what is missing", async () => {
+      const { userId, character } = await makeCharacter();
+      await completeChainThroughHoldItTogether(character.id);
+      await acceptSideMission(userId, character.id);
+      await addRefinedFerrite(character.id, [10]);
+      await contribute(userId, character.id, 10);
+
+      const empty = await crewStopObjective(userId, character.id);
+      expect(empty.mission?.guidance).toBeUndefined();
+      // The objective still names the material properly with none carried: the
+      // recipe's own items are named from the item registry, not from what
+      // happens to be in the player's hands.
+      expect(empty.requirement?.objective).toBe(
+        "Install Refined Ferrite at the Crew Stop — 10 / 20",
+      );
+      expect(empty.requirement?.detail).toBeUndefined();
+
+      // One useful unit is enough to make the shelter worth walking to again.
+      await addRefinedFerrite(character.id, [1]);
+      const carrying = await crewStopObjective(userId, character.id);
+      expect(carrying.mission?.guidance).toMatchObject({
+        repairTargetId: REPAIR_TARGET_IDS.crewStop,
+      });
+    });
+
+    it("turns to Welding progress once the last unit is installed", async () => {
+      const { userId, character } = await materialsInstalled();
+      const beforeWelding = await crewStopObjective(userId, character.id);
+      expect(beforeWelding.requirement?.objective).toBe("Weld the Crew Stop — 0 / 10 welds");
+      expect(beforeWelding.mission?.guidance).toMatchObject({
+        repairTargetId: REPAIR_TARGET_IDS.crewStop,
+      });
+
+      await repairs.startWelding(
+        userId,
+        character.id,
+        REPAIR_TARGET_IDS.crewStop,
+        now,
+        deterministicRandom(),
+      );
+      await play.getPlayGameplayState(
+        userId,
+        character.id,
+        tick(now, balance.welding.attemptDurationTicks * 3),
+        deterministicRandom(),
+      );
+      const state = await play.getPlayGameplayState(
+        userId,
+        character.id,
+        tick(now, balance.welding.attemptDurationTicks * 3),
+        deterministicRandom(),
+      );
+      const requirement = state.missions.find(
+        (entry) => entry.missionId === MISSION_IDS.outOfTheWeather,
+      )?.requirements?.[0];
+      expect(requirement?.objective).toBe("Weld the Crew Stop — 3 / 10 welds");
+      expect(requirement?.progress).toEqual({ current: 3, target: 10 });
+      expect(requirement?.detail).toBeUndefined();
+    });
+
+    it("hands off to Renn, and to nothing else, the moment the tenth weld lands", async () => {
+      const { userId, character } = await materialsInstalled();
+      await repairs.startWelding(
+        userId,
+        character.id,
+        REPAIR_TARGET_IDS.crewStop,
+        now,
+        deterministicRandom(),
+      );
+      const state = await play.getPlayGameplayState(
+        userId,
+        character.id,
+        tick(now, balance.welding.attemptDurationTicks * crewStop.repairIncrements),
+        deterministicRandom(),
+      );
+      const mission = state.missions.find(
+        (entry) => entry.missionId === MISSION_IDS.outOfTheWeather,
+      );
+      expect(mission?.state).toBe("ready_for_completion");
+      expect(mission?.guidance).toMatchObject({ npcId: NPC_IDS.rennCalder, turnIn: true });
+      expect(mission?.guidance?.repairTargetId).toBeUndefined();
+      expect(state.repairs[REPAIR_TARGET_IDS.crewStop]).toMatchObject({ complete: true });
+    });
+  });
+
   describe("the Crew Hauler fare and Journey", () => {
     async function riderAt(locationId: string, credits = 10) {
       const { userId, character } = await makeCharacter();
@@ -615,37 +766,80 @@ suite("issue #172 Out of the Weather (real PostgreSQL)", () => {
       expect(await creditsOf(character.id)).toBe(10);
     });
 
-    it("charges exactly 5 Credits and starts a real Journey, in both directions", async () => {
-      for (const [origin, destination] of [
-        [LOCATION_IDS.holoHollow, LOCATION_IDS.theJag],
-        [LOCATION_IDS.theJag, LOCATION_IDS.holoHollow],
-      ]) {
-        const { userId, character } = await riderAt(origin!, 10);
-        const started = await play.beginTransportTravel(
-          userId,
-          character.id,
-          destination!,
-          now,
-          deterministicRandom(),
-        );
-        expect(await creditsOf(character.id)).toBe(5);
-        expect(started.travelState).toMatchObject({
-          originLocationId: origin,
-          destinationLocationId: destination,
-          mode: "crew_hauler",
-        });
-        // A real Journey, not a teleport: still at the origin until arrival.
-        expect(started.location.currentLocationId).toBe(origin);
+    it("charges exactly 5 Credits and starts a real Journey out to The Jag", async () => {
+      const { userId, character } = await riderAt(LOCATION_IDS.holoHollow, 10);
+      const started = await play.beginTransportTravel(
+        userId,
+        character.id,
+        LOCATION_IDS.theJag,
+        now,
+        deterministicRandom(),
+      );
+      expect(await creditsOf(character.id)).toBe(5);
+      expect(started.travelState).toMatchObject({
+        originLocationId: LOCATION_IDS.holoHollow,
+        destinationLocationId: LOCATION_IDS.theJag,
+        mode: "crew_hauler",
+      });
+      // A real Journey, not a teleport: still at the origin until arrival.
+      expect(started.location.currentLocationId).toBe(LOCATION_IDS.holoHollow);
 
-        const arrived = await play.getPlayGameplayState(
-          userId,
-          character.id,
-          tick(now, balance.travel.crewHaulerDurationTicks),
-          deterministicRandom(),
-        );
-        expect(arrived.location.currentLocationId).toBe(destination);
-        expect(arrived.travelState).toBeUndefined();
-      }
+      const arrived = await play.getPlayGameplayState(
+        userId,
+        character.id,
+        tick(now, balance.travel.crewHaulerDurationTicks),
+        deterministicRandom(),
+      );
+      expect(arrived.location.currentLocationId).toBe(LOCATION_IDS.theJag);
+      expect(arrived.travelState).toBeUndefined();
+    });
+
+    it("refuses the ride home outright, even for a rider who just paid to come out", async () => {
+      // The hauler goes back loaded with shale. No route is authored, so the
+      // refusal is the server's, not a hidden button's — and it costs nothing.
+      const { userId, character } = await riderAt(LOCATION_IDS.theJag, 10);
+      const refused = await play.beginTransportTravel(
+        userId,
+        character.id,
+        LOCATION_IDS.holoHollow,
+        now,
+        deterministicRandom(),
+      );
+      expect(refused.travelError).toBe("unknown_route");
+      expect(refused.travelState).toBeUndefined();
+      expect(await creditsOf(character.id)).toBe(10);
+      expect(
+        await db
+          .select()
+          .from(rune.characterTravelState)
+          .where(eq(rune.characterTravelState.characterId, character.id)),
+      ).toHaveLength(0);
+    });
+
+    it("leaves the walk home exactly as it was: free, two legs, and scavengeable", async () => {
+      const { userId, character } = await riderAt(LOCATION_IDS.theJag, 10);
+      const walking = await play.beginTravel(
+        userId,
+        character.id,
+        LOCATION_IDS.theLongScramble,
+        now,
+        deterministicRandom(),
+      );
+      expect(walking.travelState).toMatchObject({
+        originLocationId: LOCATION_IDS.theJag,
+        destinationLocationId: LOCATION_IDS.theLongScramble,
+        mode: "walk",
+      });
+      expect(await creditsOf(character.id)).toBe(10);
+      expect(walking.travelState?.scavenge).toBeDefined();
+
+      const arrived = await play.getPlayGameplayState(
+        userId,
+        character.id,
+        tick(now, 40),
+        deterministicRandom(),
+      );
+      expect(arrived.location.currentLocationId).toBe(LOCATION_IDS.theLongScramble);
     });
 
     it("arrives in 20 ticks, where the same trip on foot is two 40-tick legs", async () => {

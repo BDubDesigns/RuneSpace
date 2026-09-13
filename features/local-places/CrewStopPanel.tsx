@@ -124,7 +124,8 @@ export function CrewStopPanel() {
       <div className="mt-5" data-crew-stop-panel data-crew-stop-state="boarding">
         <SectionHeader eyebrow="Crew Stop">Shift hauler</SectionHeader>
         <p className="mt-4 max-w-2xl text-sm leading-relaxed text-[color:var(--rs-text-secondary)]">
-          The crews run out to The Jag through the day and will squeeze you on.
+          The crews run out to The Jag through the day and will squeeze you on. Coming back the
+          hauler is full of shale, so the walk home is yours.
         </p>
         <div className="mt-4">
           <CrewHaulerRideControl localPlaceId={PLACE_ID} />

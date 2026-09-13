@@ -13,11 +13,11 @@ import { travelErrorMessage } from "./travel-errors";
 /**
  * The narrow ride affordance for one authored transport route (#172).
  *
- * The same control serves both ends of the Crew Hauler route: it reads the
- * routes boarding at the surface it was rendered on, so The Jag needs no
- * duplicate Local Place and no driver NPC standing around to operate one
- * button, and Holo Hollow's end belongs to the repaired Crew Stop rather than
- * the town directory. Every rule it presents — that the route exists, that the
+ * It renders the authored rides that board at the surface it was placed on, so
+ * the Crew Hauler belongs to the repaired Crew Stop rather than the town
+ * directory — and The Jag, which is only the route's destination, renders
+ * nothing at all rather than a disabled control explaining the ride home the
+ * crews cannot give. Every rule it presents — that the route exists, that the
  * Mission unlocked it, what the fare is — is re-derived server-side when the
  * ride actually starts.
  *
@@ -73,7 +73,8 @@ export function CrewHaulerRideControl({ localPlaceId }: { localPlaceId?: string 
 
   return (
     <div className="space-y-3" data-crew-hauler-rides>
-      {rides.map(({ route, destinationLocationId }) => {
+      {rides.map((route) => {
+        const destinationLocationId = route.destinationLocationId;
         const destination = getLocation(destinationLocationId);
         const affordable = state.credits >= route.fareCredits;
         const busy = Boolean(state.activeAction) || Boolean(state.travelState);

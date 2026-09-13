@@ -36,9 +36,48 @@ export type MissionObservation = {
   itemNames: ReadonlyMap<string, string>;
   /** Durable current progress by authored tracked-requirement key. */
   trackedProgress?: ReadonlyMap<string, number>;
-  /** Authoritative completion state by repair-target ID (#172). */
-  completedRepairTargetIds?: ReadonlySet<string>;
+  /** Authoritative repair state by repair-target ID (#172). */
+  repairTargets?: ReadonlyMap<string, RepairTargetObservation>;
 };
+
+/**
+ * One repair target exactly as the Mission projection is allowed to see it
+ * (#172): its authored recipe and its durable progress against that recipe.
+ *
+ * A repair job has real phases — install the materials, then weld — and the
+ * Mission Log should say which one the player is in without any Mission ever
+ * being special-cased. That is derived from these numbers alone, so the
+ * generic requirement works for the Cargo Hold, the Crew Stop, and whatever
+ * comes next.
+ *
+ * `contributed` is **durably installed** material and nothing else. Carried
+ * material is not progress, Cargo Hold contents are not progress, and material
+ * the player could go and get is certainly not progress: the observation is
+ * built from the repair record, so there is nowhere for those to leak in.
+ */
+export type RepairTargetObservation = {
+  complete: boolean;
+  /** Each authored material: how much is installed, and how much the recipe needs. */
+  materials: readonly { itemId: string; contributed: number; required: number }[];
+  /** Whole Welding increments resolved, against the recipe's total. */
+  welding: { completed: number; required: number };
+};
+
+/** Which phase of a repair job the player is actually in. */
+export type RepairPhase = "materials" | "welding" | "complete";
+
+export function repairPhase(target: RepairTargetObservation | undefined): RepairPhase {
+  if (!target) return "materials";
+  if (target.complete) return "complete";
+  return target.materials.some((material) => material.contributed < material.required)
+    ? "materials"
+    : "welding";
+}
+
+/** The first authored material still short, which is the one to act on. */
+function outstandingMaterial(target: RepairTargetObservation | undefined) {
+  return target?.materials.find((material) => material.contributed < material.required);
+}
 
 /**
  * Semantic mission-guidance targets projected from mission state. UI consumers
@@ -130,6 +169,13 @@ export type MissionRequirementStatus = {
   npcId?: string;
   /** The repair target this requirement observes, when it observes one. */
   repairTargetId?: string;
+  /**
+   * Secondary context for this objective, rendered as its own subordinate
+   * line. Never progress and never part of `progress` — it exists so a player
+   * can see what they are carrying without that quantity ever appearing to
+   * advance a durable objective.
+   */
+  detail?: string;
 };
 
 /**
@@ -205,7 +251,9 @@ function renderRequirementObjective(
       .replace("{current}", String(current))
       .replace("{target}", String(requirement.target));
   }
-  if (requirement.kind === "repair_target_complete") return requirement.objective;
+  if (requirement.kind === "repair_target_complete") {
+    return renderRepairObjective(requirement, observation);
+  }
   if (requirement.kind === "npc_conversation") return requirement.objective;
   const itemName = observation?.itemNames.get(requirement.itemId) ?? requirement.itemId;
   if (requirement.kind === "equipped_item") {
@@ -217,6 +265,38 @@ function renderRequirementObjective(
     .replace("{item}", itemName)
     .replace("{carried}", String(carried))
     .replace("{required}", String(required));
+}
+
+/**
+ * The repair objective for the phase the player is actually in (#172).
+ *
+ * The requirement may author copy for the material phase and the Welding
+ * phase; whichever phase is live renders with authoritative names and durable
+ * numbers substituted, and anything unauthored falls back to the requirement's
+ * plain objective. No Mission ID is consulted: the phase comes from the repair
+ * record, so a Mission that authors no phase copy — the Cargo Hold's — reads
+ * exactly as it always has.
+ */
+function renderRepairObjective(
+  requirement: Extract<MissionRequirement, { kind: "repair_target_complete" }>,
+  observation: MissionObservation | undefined,
+): string {
+  const target = observation?.repairTargets?.get(requirement.targetId);
+  const phase = repairPhase(target);
+  if (phase === "materials") {
+    const material = outstandingMaterial(target);
+    if (!requirement.materialObjective || !material) return requirement.objective;
+    return requirement.materialObjective
+      .replace("{item}", observation?.itemNames.get(material.itemId) ?? material.itemId)
+      .replace("{contributed}", String(material.contributed))
+      .replace("{required}", String(material.required));
+  }
+  if (phase === "welding" && requirement.weldingObjective && target) {
+    return requirement.weldingObjective
+      .replace("{current}", String(Math.min(target.welding.completed, target.welding.required)))
+      .replace("{target}", String(target.welding.required));
+  }
+  return requirement.objective;
 }
 
 /** Full-stack requirement resolves from the authoritative stack limit, not mission data. */
@@ -247,7 +327,7 @@ function requirementSatisfied(
         (observation?.trackedProgress?.get(requirement.progressKey) ?? 0) >= requirement.target
       );
     case "repair_target_complete":
-      return observation?.completedRepairTargetIds?.has(requirement.targetId) === true;
+      return observation?.repairTargets?.get(requirement.targetId)?.complete === true;
     case "npc_conversation":
       // The durable mission-progress row for this authored key is the only
       // evidence; the conversation itself is never replayed as proof.
@@ -383,7 +463,9 @@ function deriveGuidance(
     };
   }
   if (firstUnsatisfied.kind === "repair_target_complete") {
-    return repairTargetGuidance(firstUnsatisfied.targetId, currentLocationId);
+    const guidance = repairTargetGuidance(firstUnsatisfied, currentLocationId, observation);
+    // Nothing to point at is absence of guidance, not empty guidance.
+    return Object.keys(guidance).length > 0 ? guidance : undefined;
   }
   if (firstUnsatisfied.kind === "npc_conversation") {
     // The person to go and meet is the target, exactly as the turn-in NPC is
@@ -404,10 +486,33 @@ function deriveGuidance(
  * elsewhere, then — once they have arrived — the Local Place entrance hosting
  * it, if it lives inside one, and finally the repair surface itself. Derived
  * purely from the authored repair-target registry.
+ *
+ * A repair may author one exception (`materialGuidance: "when_carrying"`),
+ * which is the same principle a carried requirement with several legitimate
+ * sources already follows (#172): while the recipe still needs material the
+ * player is not carrying any of, going to the repair target accomplishes
+ * nothing, and the framework has no business inventing where to get it.
+ * Refined Ferrite can be refined, bought, or scavenged — so guidance stays
+ * silent and the Mission Log's "{contributed} / {required}" says the rest.
+ * Carry even one useful unit, or finish the materials, and the target becomes
+ * worth walking to again.
  */
-function repairTargetGuidance(targetId: string, currentLocationId: string): MissionGuidance {
+function repairTargetGuidance(
+  requirement: Extract<MissionRequirement, { kind: "repair_target_complete" }>,
+  currentLocationId: string,
+  observation: MissionObservation | undefined,
+): MissionGuidance {
+  const targetId = requirement.targetId;
   const target = getRepairTarget(targetId);
   if (!target) return {};
+  const observed = observation?.repairTargets?.get(targetId);
+  if (
+    requirement.materialGuidance === "when_carrying" &&
+    repairPhase(observed) === "materials" &&
+    !carriesUsefulRepairMaterial(observed, observation)
+  ) {
+    return {};
+  }
   if (target.locationId !== currentLocationId) {
     return { repairTargetId: targetId, locationId: target.locationId };
   }
@@ -417,6 +522,22 @@ function repairTargetGuidance(targetId: string, currentLocationId: string): Miss
   return place
     ? { repairTargetId: targetId, localPlaceId: place.id }
     : { repairTargetId: targetId };
+}
+
+/**
+ * Whether the player carries anything that would immediately advance this
+ * repair — carried quantity capped by what the recipe still needs, so a
+ * satchel full of an already-complete material counts for nothing.
+ */
+function carriesUsefulRepairMaterial(
+  target: RepairTargetObservation | undefined,
+  observation: MissionObservation | undefined,
+): boolean {
+  return (target?.materials ?? []).some((material) => {
+    const outstanding = material.required - material.contributed;
+    if (outstanding <= 0) return false;
+    return (observation?.carriedQuantities.get(material.itemId) ?? 0) > 0;
+  });
 }
 
 /**
@@ -548,11 +669,32 @@ function projectRequirement(
     };
   }
   if (requirement.kind === "repair_target_complete") {
+    const target = observation?.repairTargets?.get(requirement.targetId);
+    const phase = repairPhase(target);
+    const material = outstandingMaterial(target);
+    const carried = material ? (observation?.carriedQuantities.get(material.itemId) ?? 0) : 0;
     return {
       kind: requirement.kind,
-      objective: requirement.objective,
+      objective: renderRequirementObjective(requirement, observation),
       satisfied,
       repairTargetId: requirement.targetId,
+      ...(phase === "materials" && material
+        ? { progress: { current: material.contributed, target: material.required } }
+        : phase === "welding" && target
+          ? {
+              progress: {
+                current: Math.min(target.welding.completed, target.welding.required),
+                target: target.welding.required,
+              },
+            }
+          : {}),
+      // Carried material is context, never progress: it is reported on its own
+      // line so it can never be mistaken for — or added to — what is installed.
+      ...(phase === "materials" && material && carried > 0
+        ? {
+            detail: `Carrying: ${carried} ${observation?.itemNames.get(material.itemId) ?? material.itemId}`,
+          }
+        : {}),
     };
   }
   if (requirement.kind === "npc_conversation") {

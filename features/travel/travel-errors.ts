@@ -14,7 +14,7 @@ export function travelErrorMessage(reason: NonNullable<PlayGameplayState["travel
     not_adjacent: "You can only travel to a directly adjacent location.",
     already_traveling: "You are already traveling. Arrival must complete first.",
     mining_unavailable_here: "Mining is not available at this location.",
-    unknown_route: "There is no ride between those two places.",
+    unknown_route: "No ride runs that way.",
     route_locked: "The crew do not know you well enough for that yet.",
     insufficient_credits: "You cannot cover the fare.",
   }[reason];

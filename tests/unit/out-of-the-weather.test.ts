@@ -61,17 +61,54 @@ import { isTravelReplaceableAction } from "@/game/domain/travel-replacement";
 const balance = getEffectiveGameBalance();
 const crewStop = getRepairTargetBalance(REPAIR_TARGET_IDS.crewStop, balance);
 
-function observation(repaired: boolean): MissionObservation {
+/**
+ * One observation of the world, built the way the server builds it: the repair
+ * targets' durable state plus what the character is carrying. The Cargo Hold is
+ * always finished here — Out of the Weather comes after Hold It Together.
+ */
+function observation(
+  options: {
+    repaired?: boolean;
+    contributed?: number;
+    welded?: number;
+    carriedRefinedFerrite?: number;
+  } = {},
+): MissionObservation {
+  const repaired = options.repaired ?? false;
+  const contributed = repaired ? crewStop.refinedFerriteRequired : (options.contributed ?? 0);
+  const welded = repaired ? crewStop.repairIncrements : (options.welded ?? 0);
+  const refinedFerrite = balance.items.refinedFerrite.itemId;
   return {
     equippedItemIds: new Set<string>(),
-    carriedQuantities: new Map(),
-    stackLimits: new Map(),
-    itemNames: new Map(),
-    completedRepairTargetIds: new Set(
-      repaired
-        ? [REPAIR_TARGET_IDS.cargoHold, REPAIR_TARGET_IDS.crewStop]
-        : [REPAIR_TARGET_IDS.cargoHold],
+    carriedQuantities: new Map(
+      options.carriedRefinedFerrite ? [[refinedFerrite, options.carriedRefinedFerrite]] : [],
     ),
+    stackLimits: new Map(),
+    itemNames: new Map([[refinedFerrite, "Refined Ferrite"]]),
+    repairTargets: new Map([
+      [
+        REPAIR_TARGET_IDS.cargoHold,
+        {
+          complete: true,
+          materials: [{ itemId: refinedFerrite, contributed: 15, required: 15 }],
+          welding: { completed: 12, required: 12 },
+        },
+      ],
+      [
+        REPAIR_TARGET_IDS.crewStop,
+        {
+          complete: repaired,
+          materials: [
+            {
+              itemId: refinedFerrite,
+              contributed,
+              required: crewStop.refinedFerriteRequired,
+            },
+          ],
+          welding: { completed: welded, required: crewStop.repairIncrements },
+        },
+      ],
+    ]),
   };
 }
 
@@ -84,14 +121,21 @@ const completed = () => ({
 function project(
   definition: MissionDefinition,
   mission: { acceptedAt?: Date; completedAt?: Date } | undefined,
-  options: { at?: string; repaired?: boolean; prerequisiteCompleted?: boolean } = {},
+  options: {
+    at?: string;
+    repaired?: boolean;
+    contributed?: number;
+    welded?: number;
+    carriedRefinedFerrite?: number;
+    prerequisiteCompleted?: boolean;
+  } = {},
 ): MissionProjection {
   return projectMission(
     definition,
     mission,
     options.at ?? LOCATION_IDS.holoHollow,
     true,
-    observation(options.repaired ?? false),
+    observation(options),
     options.prerequisiteCompleted ?? true,
   );
 }
@@ -183,13 +227,58 @@ describe("the repair is the Mission's only work", () => {
         kind: "repair_target_complete",
         targetId: REPAIR_TARGET_IDS.crewStop,
         objective: "Repair the Crew Stop in Holo Hollow",
+        materialObjective: "Install {item} at the Crew Stop — {contributed} / {required}",
+        weldingObjective: "Weld the Crew Stop — {current} / {target} welds",
+        materialGuidance: "when_carrying",
       },
     ]);
   });
 
-  it("guides the player to the Crew Stop's Local Place while the repair is unfinished", () => {
-    const active = project(OUT_OF_THE_WEATHER, accepted());
-    expect(active.state).toBe("active");
+  it("shows durably installed material as the objective, and carried material only as context", () => {
+    const partway = project(OUT_OF_THE_WEATHER, accepted(), {
+      contributed: 10,
+      carriedRefinedFerrite: 6,
+    });
+    const [requirement] = partway.requirements ?? [];
+    expect(requirement?.objective).toBe("Install Refined Ferrite at the Crew Stop — 10 / 20");
+    expect(requirement?.progress).toEqual({ current: 10, target: 20 });
+    // Carried material is a separate line and never moves the numerator: six
+    // carried on top of ten installed is 10 / 20, not 16 / 20.
+    expect(requirement?.detail).toBe("Carrying: 6 Refined Ferrite");
+    expect(requirement?.objective).not.toContain("16");
+    expect(partway.currentObjective).toBe("Install Refined Ferrite at the Crew Stop — 10 / 20");
+  });
+
+  it("counts nothing but installed material, however much is carried", () => {
+    const carryingPlenty = project(OUT_OF_THE_WEATHER, accepted(), {
+      contributed: 0,
+      carriedRefinedFerrite: 40,
+    });
+    expect(carryingPlenty.requirements?.[0]?.progress).toEqual({ current: 0, target: 20 });
+    expect(carryingPlenty.requirements?.[0]?.objective).toBe(
+      "Install Refined Ferrite at the Crew Stop — 0 / 20",
+    );
+  });
+
+  it("stays silent about where to find material the player is not carrying", () => {
+    // Refined Ferrite can be refined, bought, or scavenged. The framework picks
+    // none of them, and does not send the player to the shelter to do nothing.
+    const empty = project(OUT_OF_THE_WEATHER, accepted(), { contributed: 10 });
+    expect(empty.state).toBe("active");
+    expect(empty.guidance).toBeUndefined();
+    const targets = deriveMissionGuidanceTargets([empty]);
+    expect(targets.repairTargetIds.has(REPAIR_TARGET_IDS.crewStop)).toBe(false);
+    expect([...targets.locationIds]).toEqual([]);
+
+    const away = project(OUT_OF_THE_WEATHER, accepted(), {
+      at: LOCATION_IDS.theJag,
+      contributed: 10,
+    });
+    expect(away.guidance).toBeUndefined();
+  });
+
+  it("guides to the Crew Stop as soon as the player carries something useful", () => {
+    const active = project(OUT_OF_THE_WEATHER, accepted(), { carriedRefinedFerrite: 1 });
     expect(active.guidance).toEqual({
       repairTargetId: REPAIR_TARGET_IDS.crewStop,
       localPlaceId: LOCAL_PLACE_IDS.holoHollowCrewStop,
@@ -197,13 +286,31 @@ describe("the repair is the Mission's only work", () => {
     const targets = deriveMissionGuidanceTargets([active]);
     expect(targets.repairTargetIds.has(REPAIR_TARGET_IDS.crewStop)).toBe(true);
     expect([...targets.localPlaceIds]).toEqual([LOCAL_PLACE_IDS.holoHollowCrewStop]);
-  });
 
-  it("guides toward Holo Hollow while the player is elsewhere", () => {
-    const away = project(OUT_OF_THE_WEATHER, accepted(), { at: LOCATION_IDS.theJag });
+    const away = project(OUT_OF_THE_WEATHER, accepted(), {
+      at: LOCATION_IDS.theJag,
+      carriedRefinedFerrite: 3,
+    });
     expect(away.guidance).toEqual({
       repairTargetId: REPAIR_TARGET_IDS.crewStop,
       locationId: LOCATION_IDS.holoHollow,
+    });
+  });
+
+  it("turns to Welding progress once every unit is installed, carrying nothing", () => {
+    const welding = project(OUT_OF_THE_WEATHER, accepted(), {
+      contributed: crewStop.refinedFerriteRequired,
+      welded: 3,
+    });
+    const [requirement] = welding.requirements ?? [];
+    expect(requirement?.objective).toBe("Weld the Crew Stop — 3 / 10 welds");
+    expect(requirement?.progress).toEqual({ current: 3, target: 10 });
+    expect(requirement?.detail).toBeUndefined();
+    // There is now exactly one place the work can happen, so guidance returns
+    // even though the player carries nothing.
+    expect(welding.guidance).toEqual({
+      repairTargetId: REPAIR_TARGET_IDS.crewStop,
+      localPlaceId: LOCAL_PLACE_IDS.holoHollowCrewStop,
     });
   });
 
@@ -328,15 +435,16 @@ describe("the Crew Stop as a place and as a repair target", () => {
   });
 });
 
-describe("where the ride is boarded, and when it exists at all", () => {
+describe("the Crew Hauler runs one way, and is boarded at the shelter", () => {
   const unlocked = new Set<string>([MISSION_IDS.outOfTheWeather]);
 
-  it("offers Holo Hollow's ride inside the Crew Stop and nowhere else in town", () => {
-    const town = availableCrewHaulerRides({
-      locationId: LOCATION_IDS.holoHollow,
-      completedMissionIds: unlocked,
-    });
-    expect(town).toEqual([]);
+  it("offers the outbound ride inside the Crew Stop and nowhere else in town", () => {
+    expect(
+      availableCrewHaulerRides({
+        locationId: LOCATION_IDS.holoHollow,
+        completedMissionIds: unlocked,
+      }),
+    ).toEqual([]);
 
     const shelter = availableCrewHaulerRides({
       locationId: LOCATION_IDS.holoHollow,
@@ -345,24 +453,18 @@ describe("where the ride is boarded, and when it exists at all", () => {
     });
     expect(shelter).toHaveLength(1);
     expect(shelter[0]?.destinationLocationId).toBe(LOCATION_IDS.theJag);
+    expect(shelter[0]?.fareCredits).toBe(5);
   });
 
-  it("offers The Jag's return leg on the location surface, with no place of its own", () => {
-    const jag = availableCrewHaulerRides({
-      locationId: LOCATION_IDS.theJag,
-      completedMissionIds: unlocked,
-    });
-    expect(jag).toHaveLength(1);
-    expect(jag[0]?.destinationLocationId).toBe(LOCATION_IDS.holoHollow);
-    // The Crew Stop belongs to Holo Hollow: asking for it from The Jag offers
-    // nothing, so a hand-edited URL cannot move the boarding point.
-    expect(
-      availableCrewHaulerRides({
-        locationId: LOCATION_IDS.theJag,
-        localPlaceId: LOCAL_PLACE_IDS.holoHollowCrewStop,
-        completedMissionIds: unlocked,
-      }),
-    ).toEqual([]);
+  it("offers nothing at all at The Jag: there is no ride home to hide", () => {
+    for (const surface of [
+      { locationId: LOCATION_IDS.theJag },
+      // Not even by naming Holo Hollow's place from the wrong location.
+      { locationId: LOCATION_IDS.theJag, localPlaceId: LOCAL_PLACE_IDS.holoHollowCrewStop },
+    ]) {
+      expect(availableCrewHaulerRides({ ...surface, completedMissionIds: unlocked })).toEqual([]);
+    }
+    expect(getTransportRoutesFrom(LOCATION_IDS.theJag)).toEqual([]);
   });
 
   it("offers nothing anywhere until the Mission is genuinely completed", () => {
@@ -372,45 +474,46 @@ describe("where the ride is boarded, and when it exists at all", () => {
       { locationId: LOCATION_IDS.theJag },
     ]) {
       // A repaired shelter is not a completed Mission: an accepted or
-      // ready-for-turn-in Out of the Weather unlocks no ride at either end.
+      // ready-for-turn-in Out of the Weather unlocks no ride.
       expect(availableCrewHaulerRides({ ...surface, completedMissionIds: new Set() })).toEqual([]);
     }
   });
 
-  it("authors the boarding place on the route, not in a component", () => {
-    expect(TRANSPORT_ROUTES[0]?.boardingLocalPlaceIds).toEqual({
-      [LOCATION_IDS.holoHollow]: LOCAL_PLACE_IDS.holoHollowCrewStop,
+  it("authors direction and boarding place on the route, not in a component", () => {
+    expect(TRANSPORT_ROUTES).toHaveLength(1);
+    expect(TRANSPORT_ROUTES[0]).toMatchObject({
+      originLocationId: LOCATION_IDS.holoHollow,
+      destinationLocationId: LOCATION_IDS.theJag,
+      boardingLocalPlaceId: LOCAL_PLACE_IDS.holoHollowCrewStop,
     });
   });
 
-  it("rejects a boarding place that is not in one of the route's endpoints", () => {
+  it("rejects a boarding place that is not in the route's own origin", () => {
     const [route] = TRANSPORT_ROUTES;
     expect(() =>
       validateTransportRoutes([
         {
           ...route!,
-          boardingLocalPlaceIds: { [LOCATION_IDS.crashSite]: LOCAL_PLACE_IDS.holoHollowCrewStop },
+          boardingLocalPlaceId: LOCAL_PLACE_IDS.holoHollowCrewStop,
+          originLocationId: LOCATION_IDS.crashSite,
         },
       ]),
-    ).toThrow(/not one of its endpoints/);
+    ).toThrow(/not in its origin/);
     expect(() =>
-      validateTransportRoutes([
-        { ...route!, boardingLocalPlaceIds: { [LOCATION_IDS.holoHollow]: LOCAL_PLACE_IDS.hhBnb } },
-      ]),
+      validateTransportRoutes([{ ...route!, boardingLocalPlaceId: LOCAL_PLACE_IDS.hhBnb }]),
     ).not.toThrow();
   });
 });
 
 describe("the Crew Hauler is a paid route, not map adjacency", () => {
-  it("connects Holo Hollow and The Jag without making them walk-adjacent", () => {
+  it("runs Holo Hollow to The Jag and nowhere back, without making them walk-adjacent", () => {
     expect(areLocationsAdjacent(LOCATION_IDS.holoHollow, LOCATION_IDS.theJag)).toBe(false);
     expect(areLocationsAdjacent(LOCATION_IDS.theJag, LOCATION_IDS.holoHollow)).toBe(false);
     expect(getTransportRoute(LOCATION_IDS.holoHollow, LOCATION_IDS.theJag)?.id).toBe(
       TRANSPORT_ROUTE_IDS.crewHaulerHoloHollowTheJag,
     );
-    expect(getTransportRoute(LOCATION_IDS.theJag, LOCATION_IDS.holoHollow)?.id).toBe(
-      TRANSPORT_ROUTE_IDS.crewHaulerHoloHollowTheJag,
-    );
+    // Direction is content, not presentation: the route home does not exist.
+    expect(getTransportRoute(LOCATION_IDS.theJag, LOCATION_IDS.holoHollow)).toBeUndefined();
   });
 
   it("still refuses to WALK between them", () => {
@@ -423,14 +526,13 @@ describe("the Crew Hauler is a paid route, not map adjacency", () => {
     ).toEqual({ ok: false, reason: "not_adjacent" });
   });
 
-  it("costs exactly 5 Credits per ride, in both directions", () => {
+  it("costs exactly 5 Credits for the one ride it authors", () => {
     expect(TRANSPORT_ROUTES).toHaveLength(1);
     expect(TRANSPORT_ROUTES[0]).toMatchObject({ fareCredits: 5, mode: "crew_hauler" });
-    for (const origin of [LOCATION_IDS.holoHollow, LOCATION_IDS.theJag]) {
-      const [ride, ...others] = getTransportRoutesFrom(origin);
-      expect(others).toEqual([]);
-      expect(ride?.route.fareCredits).toBe(5);
-    }
+    const [ride, ...others] = getTransportRoutesFrom(LOCATION_IDS.holoHollow);
+    expect(others).toEqual([]);
+    expect(ride?.fareCredits).toBe(5);
+    expect(getTransportRoutesFrom(LOCATION_IDS.theJag)).toEqual([]);
   });
 
   it("takes 20 ticks / 12 seconds while walking the same trip stays two 40-tick legs", () => {
@@ -479,12 +581,20 @@ describe("the Crew Hauler is a paid route, not map adjacency", () => {
         destinationLocationId: LOCATION_IDS.theJag,
       }),
     ).toBe(true);
-    // A forged ride along a route nobody authored never commits an arrival.
+    // A forged ride along a route nobody authored never commits an arrival —
+    // including the ride home, which is exactly such a route.
     expect(
       isTravelRouteValid({
         mode: "crew_hauler",
         originLocationId: LOCATION_IDS.crashSite,
         destinationLocationId: LOCATION_IDS.theJag,
+      }),
+    ).toBe(false);
+    expect(
+      isTravelRouteValid({
+        mode: "crew_hauler",
+        originLocationId: LOCATION_IDS.theJag,
+        destinationLocationId: LOCATION_IDS.holoHollow,
       }),
     ).toBe(false);
     // And a forged WALK along the Crew Hauler route is still not adjacent.
@@ -518,6 +628,18 @@ describe("boarding is server-decided", () => {
       ok: false,
       reason: "route_locked",
     });
+  });
+
+  it("refuses the ride home outright: no such route is authored", () => {
+    expect(
+      planTransportTravel({
+        currentLocationId: LOCATION_IDS.theJag,
+        destinationLocationId: LOCATION_IDS.holoHollow,
+        alreadyTraveling: false,
+        completedMissionIds: new Set([MISSION_IDS.outOfTheWeather]),
+        credits: 1_000,
+      }),
+    ).toEqual({ ok: false, reason: "unknown_route" });
   });
 
   it("refuses a route nobody authored, whatever the client asks for", () => {

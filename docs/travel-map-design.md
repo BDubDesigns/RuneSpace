@@ -101,12 +101,17 @@ than duplicating it in map tiles.
   says "Riding the Crew Hauler" rather than "Walking", from the authoritative travel mode.
 
 ## Authored transport routes are not map adjacency (issue #172)
-- The Crew Hauler connects Holo Hollow and The Jag, which are **two walking legs apart** through The
+- The Crew Hauler runs Holo Hollow → The Jag, which are **two walking legs apart** through The
   Long Scramble. Adding it changed no adjacency: walking between them still refuses (`not_adjacent`),
   the walking route and its two Scavenge windows are untouched, and the map draws no new walkable edge.
+- A transport route is **directional**: it authors an origin and a destination, not an unordered pair.
+  The Crew Hauler is outbound only — the crews can make room heading out, and the hauler comes back
+  loaded with shale — so a The Jag → Holo Hollow ride refuses server-side with `unknown_route` because
+  no such route is authored. The walk home is an ordinary two-leg walk and is entirely unaffected.
 - `undirectedRoutes` — the map's walkable edges and their rendered lines — still come from adjacency
-  alone. Authored transport routes contribute **only** `routeSegments`, the in-transit progress geometry,
-  so opening the Map during a ride draws that Journey's progress instead of throwing on missing geometry.
+  alone. Authored transport routes contribute **only** `routeSegments`, the in-transit progress geometry
+  for the authored direction, so opening the Map during a ride draws that Journey's progress instead of
+  throwing on missing geometry.
 - Arrival validation follows the same split: a walk is validated against adjacency, a ride against its
   authored route (`isTravelRouteValid`). Neither an unrecognised route nor a forged mode commits an arrival.
 - Waiting Scavenge is not presented as a forecast event. An available window renders the existing

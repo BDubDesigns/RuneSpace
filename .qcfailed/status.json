@@ -2,9 +2,9 @@
   "schemaVersion": 1,
   "projectSlug": "runespace",
   "workState": "active",
-  "currentFocus": "Out of the Weather, RuneSpace's first optional side Mission: repair Holo Hollow's Crew Stop with Welding, and the mining crews start letting you ride between town and The Jag for 5 Credits.",
+  "currentFocus": "Out of the Weather, RuneSpace's first optional side Mission: repair Holo Hollow's Crew Stop with Welding, and the mining crews start letting you ride out to The Jag for 5 Credits.",
   "currentChange": {
-    "summary": "Adds the optional side Mission Out of the Weather, the repairable Crew Stop, the 5-Credit Crew Hauler ride between Holo Hollow and The Jag, and one generic repair-target persistence boundary shared with the Cargo Hold.",
+    "summary": "Adds the optional side Mission Out of the Weather, the repairable Crew Stop, the one-way 5-Credit Crew Hauler ride out to The Jag, and one generic repair-target persistence boundary shared with the Cargo Hold.",
     "stage": "review",
     "pullRequestNumber": 183
   },

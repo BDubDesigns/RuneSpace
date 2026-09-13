@@ -130,7 +130,7 @@ The currently supported live-state requirement kinds (`MissionRequirement`) are 
 | `equipped_item` | `itemId`, `objective` | the item genuinely occupies its authoritative compatible slot (carried instance + `equippedItems` assignment; a stored instance does not count) |
 | `tracked_activity` | `progressKey`, `activity`, `metric: "attempts"`, `target`, `objective`, `recommendedActionId?` | current persisted progress for the stable key reaches the authored target; resolved attempts count whether the activity succeeds or fails |
 | `carried_stack` | `itemId`, `quantity?`, `turnIn`, `objective`, `recommendedActionId?` | current carried quantity for `itemId` ≥ resolved required quantity (§6) |
-| `repair_target_complete` | `targetId`, `objective` | that repair target's authoritative completion (`completed_at` is present in `character_repair_targets`); no mission-progress row is created. Hold It Together observes the Cargo Hold, Out of the Weather the Crew Stop |
+| `repair_target_complete` | `targetId`, `objective`, optional `materialObjective` / `weldingObjective` | that repair target's authoritative completion (`completed_at` is present in `character_repair_targets`); no mission-progress row is created. Hold It Together observes the Cargo Hold, Out of the Weather the Crew Stop. The optional phase copy renders the live phase — see §5.1 |
 | `npc_conversation` | `npcId`, `locationId`, `dialogueId`, `progressKey`, `objective`, `actionLabel?` | the durable marker for that authored key is set, which only the generic `acknowledgeMissionConversation` command does (§12.3). Trade, arrival, or reading prose never satisfy it |
 
 **Ordering owns the objective.** The first unmet requirement in authored order becomes the current semantic objective / guidance step. `requirements` order is gameplay — changing it changes the player's progression and guidance.
@@ -400,7 +400,7 @@ Derived from the **first unmet requirement in authored order** on each accepted-
 | `at_location` | `locationId: requirement.locationId` — unsatisfied means the player is elsewhere, so the location itself is the target; once satisfied it stops being a target anywhere |
 | `equipped_item` | `equipmentItemId: requirement.itemId` — the equipment affordance / inventory tile for that item |
 | `tracked_activity` / `carried_stack` (with `recommendedActionId`) | `actionId: requirement.recommendedActionId`, plus `locationId` naming the single World Location offering that action (`actionDestination`) when it cannot currently be done — none when the current location already offers it, none when zero or several World Locations do |
-| `repair_target_complete` | `repairTargetId` — that repair surface is the current target, plus the World Location while the player is elsewhere and then the Local Place entrance hosting it, if it has one. The repair surface selects the advancing affordance (contribute materials vs start Welding) from authoritative repair/material/Welding substate |
+| `repair_target_complete` | `repairTargetId` — that repair surface is the current target, plus the World Location while the player is elsewhere and then the Local Place entrance hosting it, if it has one. The repair surface selects the advancing affordance (contribute materials vs start Welding) from authoritative repair/material/Welding substate. **Exception:** while the recipe still needs material the player carries none of, there is no guidance at all — see §5.1 |
 | `npc_conversation` | `npcId: requirement.npcId` — the person to go and meet, reusing the same NPC-boundary guidance (`npcBoundaryGuidance`) the turn-in NPC uses. While the character is elsewhere, `locationId: requirement.locationId` is the target instead; arriving hands off to the NPC |
 | *(carried requirement with no `recommendedActionId`)* | no guidance at all (see Ambiguous acquisition, below) |
 
@@ -511,6 +511,35 @@ Every other rule is **re-read and revalidated server-side inside the character t
 - for item rewards, a **post-consumption preflight**: plans are applied cumulatively to an in-memory candidate inventory and the reward's capacity is checked against that post-consumption candidate — consumption may legitimately free the slot or mass the reward needs;
 - only after the complete plan is valid, consumption through the authoritative carried-stack boundary, the single declared reward, the guarded `completedAt` stamp, and the authored continuation acceptance (if any, idempotent via `onConflictDoNothing`) commit in the same transaction; any failure (insufficient quantity, capacity still blocked, reward application error) leaves the whole transaction uncommitted;
 - resolved Mining and Refining attempts are handed from the activity resolver to generic mission progress in the same transaction, after activity persistence and before the action cursor advances. Attempts before acceptance reconcile while no mission progress row is active and receive no credit; no per-attempt timestamp or event ledger is added;
+### 5.1 Repair phases (issue #172)
+
+A repair job has real stages, and the generic requirement projects the one the
+player is actually in, from the authoritative repair record and the target's
+authored recipe — never from the Mission's identity:
+
+| Phase | Condition | Objective | Guidance |
+| --- | --- | --- | --- |
+| materials | some authored material is short | `materialObjective`, with `{item}` / `{contributed}` / `{required}` | the repair target **only if the player carries a useful unit of an outstanding material**; otherwise none |
+| welding | every material installed, welds outstanding | `weldingObjective`, with `{current}` / `{target}` | the repair target |
+| complete | `completed_at` present | the requirement holds; the Mission is in its turn-in phase | the turn-in NPC |
+
+`{contributed}` is **durably installed material**. Carried stacks, Cargo Hold
+contents, and material the player could go and acquire are never counted: the
+observation is built from the repair record, which has no access to inventory.
+Carried quantity may appear as a `detail` line ("Carrying: 6 Refined Ferrite")
+— rendered subordinate to the objective precisely so it can never read as
+progress or be added to it.
+
+The silent-guidance case follows the same principle as a carried requirement
+with several legitimate sources: Refined Ferrite can be refined, bought, or
+scavenged, so the framework refuses to invent one of them as a destination, and
+the Mission Log's `{contributed} / {required}` carries the objective on its own.
+Carrying even one useful unit makes the repair target worth walking to again,
+and guidance returns.
+
+A Mission that authors no phase copy — Hold It Together — renders its plain
+`objective` in every phase, exactly as before.
+
 - Repair completion is read from `character_repair_targets.completed_at` for `repair_target_complete`; the mission framework does not consume repair materials, advance Welding, or maintain a second repair-progress representation;
 - the durable conversation marker is read for `npc_conversation`; the completion command never satisfies it as a side effect;
 - the character lock (`withResolvedOwnedCharacter` / `runMissionCommand`) plus the `completedAt` `isNull` guard make acceptance and completion — and therefore consumption, reward, acceptance effect, and continuation — exactly-once under retries and concurrent first completions.
@@ -657,6 +686,6 @@ Short concrete examples that demonstrate the framework vocabulary. Do not copy m
 - **Acceptance:** `prerequisiteMissionId: holdItTogether`, the same prerequisite Keep the Change has, so the two branch in parallel. One offer route: Renn Calder at Holo Hollow, `actionLabel: "I'LL FIX IT"`. It names no continuation, nothing continues into it, and nothing lists it as a prerequisite — so it is **never** on any main-story path and completing or ignoring it changes nothing upstream (§3.1, §11).
 - **Optionality is structural, not documented.** Availability is local discovery through Renn only (§10), and the Mission Log renders accepted/completed Missions, so a satisfied prerequisite alone puts nothing in front of the player. No framework change was needed for any of that.
 - **Acceptance effect:** none. This Mission costs the player rather than funding them.
-- **Requirement:** one `repair_target_complete` observing the Crew Stop (§5). Guidance therefore runs Holo Hollow → the Crew Stop's Local Place entrance → the repair surface, and hands off to Renn's turn-in the moment the repair completes.
+- **Requirement:** one `repair_target_complete` observing the Crew Stop (§5), with authored phase copy (§5.1): "Install Refined Ferrite at the Crew Stop — {contributed} / {required}", then "Weld the Crew Stop — {current} / {target} welds". Guidance runs Holo Hollow → the Crew Stop's Local Place entrance → the repair surface once the player carries useful Refined Ferrite, stays silent while they carry none, and hands off to Renn's turn-in the moment the repair completes.
 - **Reward:** `{ kind: "skill_xp", skillId: welding, amount: 250 }` (§8), on top of the 500 Welding XP the ten genuine increments already paid through the ordinary Welding path. No synthetic work XP and no Credit payout: the durable reward is the repaired shelter and the Crew Hauler ride it earns (`docs/gameplay-foundations.md`, travel modes).
 - **Dialogue:** Renn authors the offer, the repair reminder, busy, the turn-in, the completion presentation (which carries the authored skill-XP beat), and post-completion story dialogue. The player stays silent throughout.
