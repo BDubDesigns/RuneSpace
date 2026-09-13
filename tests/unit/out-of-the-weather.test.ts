@@ -24,7 +24,9 @@ import {
   getTransportRoute,
   getTransportRoutesFrom,
   TRANSPORT_ROUTES,
+  validateTransportRoutes,
 } from "@/game/content/transport-routes";
+import { availableCrewHaulerRides } from "@/features/travel/crew-hauler-rides";
 import { resolveNpcConversation } from "@/game/domain/conversation";
 import { deriveLocalPlaceAccess, deriveLocalPlaceSurface } from "@/game/domain/local-places";
 import {
@@ -231,6 +233,50 @@ describe("the repair is the Mission's only work", () => {
   });
 });
 
+describe("Renn's voice and the silent protagonist", () => {
+  const authoredLabels = [
+    OUT_OF_THE_WEATHER.offers[0]?.actionLabel,
+    OUT_OF_THE_WEATHER.turnIn?.actionLabel,
+  ];
+
+  it("never puts first-person speech in the player's controls", () => {
+    expect(authoredLabels).toEqual(["TAKE THE JOB", "TELL RENN"]);
+    for (const label of authoredLabels) {
+      // The player never speaks: a control is an instruction to the game, not a
+      // line of dialogue, exactly as every other authored Mission label is.
+      expect(label).not.toMatch(/\b(I|I'M|I'LL|I'VE|MY|ME)\b/);
+    }
+  });
+
+  it("says nothing that needs time to have passed", () => {
+    // The tenth weld and the turn-in can be seconds apart. Renn may notice the
+    // shelter and speak for the crews; he may not remember a week of it.
+    const spoken = [
+      DIALOGUE_IDS.rennOutOfTheWeatherTurnIn,
+      DIALOGUE_IDS.rennOutOfTheWeatherCompletion,
+      DIALOGUE_IDS.rennPostOutOfTheWeather,
+    ].flatMap((dialogueId) =>
+      (getDialogue(dialogueId)?.beats ?? []).flatMap((beat) =>
+        "text" in beat && typeof beat.text === "string" ? [beat.text] : [],
+      ),
+    );
+    expect(spoken.length).toBeGreaterThan(0);
+    for (const line of spoken) {
+      expect(line).not.toMatch(
+        /this morning|all week|yesterday|last night|for days|since you left/i,
+      );
+    }
+  });
+
+  it("still lets the crews notice, and still offers the ride, in Renn's own voice", () => {
+    const completion = (getDialogue(DIALOGUE_IDS.rennOutOfTheWeatherCompletion)?.beats ?? [])
+      .flatMap((beat) => ("text" in beat && typeof beat.text === "string" ? [beat.text] : []))
+      .join(" ");
+    expect(completion).toMatch(/crews/i);
+    expect(completion).toMatch(/five Credits/i);
+  });
+});
+
 describe("the Crew Stop as a place and as a repair target", () => {
   it("is an ordinary open Holo Hollow Local Place, visible from the start", () => {
     const place = getLocalPlace(LOCAL_PLACE_IDS.holoHollowCrewStop);
@@ -279,6 +325,79 @@ describe("the Crew Stop as a place and as a repair target", () => {
 
   it("makes Crew Stop Welding ordinary interruptible work", () => {
     expect(isTravelReplaceableAction(crewStop.actionId)).toBe(true);
+  });
+});
+
+describe("where the ride is boarded, and when it exists at all", () => {
+  const unlocked = new Set<string>([MISSION_IDS.outOfTheWeather]);
+
+  it("offers Holo Hollow's ride inside the Crew Stop and nowhere else in town", () => {
+    const town = availableCrewHaulerRides({
+      locationId: LOCATION_IDS.holoHollow,
+      completedMissionIds: unlocked,
+    });
+    expect(town).toEqual([]);
+
+    const shelter = availableCrewHaulerRides({
+      locationId: LOCATION_IDS.holoHollow,
+      localPlaceId: LOCAL_PLACE_IDS.holoHollowCrewStop,
+      completedMissionIds: unlocked,
+    });
+    expect(shelter).toHaveLength(1);
+    expect(shelter[0]?.destinationLocationId).toBe(LOCATION_IDS.theJag);
+  });
+
+  it("offers The Jag's return leg on the location surface, with no place of its own", () => {
+    const jag = availableCrewHaulerRides({
+      locationId: LOCATION_IDS.theJag,
+      completedMissionIds: unlocked,
+    });
+    expect(jag).toHaveLength(1);
+    expect(jag[0]?.destinationLocationId).toBe(LOCATION_IDS.holoHollow);
+    // The Crew Stop belongs to Holo Hollow: asking for it from The Jag offers
+    // nothing, so a hand-edited URL cannot move the boarding point.
+    expect(
+      availableCrewHaulerRides({
+        locationId: LOCATION_IDS.theJag,
+        localPlaceId: LOCAL_PLACE_IDS.holoHollowCrewStop,
+        completedMissionIds: unlocked,
+      }),
+    ).toEqual([]);
+  });
+
+  it("offers nothing anywhere until the Mission is genuinely completed", () => {
+    for (const surface of [
+      { locationId: LOCATION_IDS.holoHollow },
+      { locationId: LOCATION_IDS.holoHollow, localPlaceId: LOCAL_PLACE_IDS.holoHollowCrewStop },
+      { locationId: LOCATION_IDS.theJag },
+    ]) {
+      // A repaired shelter is not a completed Mission: an accepted or
+      // ready-for-turn-in Out of the Weather unlocks no ride at either end.
+      expect(availableCrewHaulerRides({ ...surface, completedMissionIds: new Set() })).toEqual([]);
+    }
+  });
+
+  it("authors the boarding place on the route, not in a component", () => {
+    expect(TRANSPORT_ROUTES[0]?.boardingLocalPlaceIds).toEqual({
+      [LOCATION_IDS.holoHollow]: LOCAL_PLACE_IDS.holoHollowCrewStop,
+    });
+  });
+
+  it("rejects a boarding place that is not in one of the route's endpoints", () => {
+    const [route] = TRANSPORT_ROUTES;
+    expect(() =>
+      validateTransportRoutes([
+        {
+          ...route!,
+          boardingLocalPlaceIds: { [LOCATION_IDS.crashSite]: LOCAL_PLACE_IDS.holoHollowCrewStop },
+        },
+      ]),
+    ).toThrow(/not one of its endpoints/);
+    expect(() =>
+      validateTransportRoutes([
+        { ...route!, boardingLocalPlaceIds: { [LOCATION_IDS.holoHollow]: LOCAL_PLACE_IDS.hhBnb } },
+      ]),
+    ).not.toThrow();
   });
 });
 

@@ -1,12 +1,15 @@
 import {
+  LOCAL_PLACE_IDS,
   LOCATION_IDS,
   MISSION_IDS,
   TRANSPORT_ROUTE_IDS,
+  type LocalPlaceId,
   type LocationId,
   type MissionId,
   type TransportRouteId,
   type TravelMode,
 } from "@/game/config/foundations";
+import { getLocalPlaceInLocation } from "@/game/content/local-places";
 import { getLocation } from "@/game/content/locations";
 
 /**
@@ -37,6 +40,22 @@ export type TransportRouteDefinition = {
   unlockMissionId: MissionId;
   /** Player-facing name of the ride, used by the ride controls and the Journey. */
   displayName: string;
+  /**
+   * Where an endpoint is boarded from, when boarding belongs to a Local Place
+   * rather than the World Location surface.
+   *
+   * The Crew Hauler is not a service the town offers: it is the crews who use
+   * the Crew Stop deciding they do not mind the player. Boarding in Holo Hollow
+   * therefore happens at the repaired shelter itself, not from the town
+   * directory. The Jag, which has no Local Places, keeps a narrow control on
+   * the location surface, so the route needs no second Local Place and no
+   * driver NPC to operate one button.
+   *
+   * This is presentation authority only. Where the player clicks changes
+   * nothing the server checks: `beginTransportTravel` re-derives the route,
+   * fare, and unlock from the character's own authoritative position.
+   */
+  boardingLocalPlaceIds?: Readonly<Record<string, LocalPlaceId>>;
 };
 
 export const TRANSPORT_ROUTES: readonly TransportRouteDefinition[] = [
@@ -47,6 +66,9 @@ export const TRANSPORT_ROUTES: readonly TransportRouteDefinition[] = [
     fareCredits: 5,
     unlockMissionId: MISSION_IDS.outOfTheWeather,
     displayName: "Crew Hauler",
+    boardingLocalPlaceIds: {
+      [LOCATION_IDS.holoHollow]: LOCAL_PLACE_IDS.holoHollowCrewStop,
+    },
   },
 ] as const satisfies readonly TransportRouteDefinition[];
 
@@ -72,6 +94,18 @@ export function validateTransportRoutes(routes: readonly TransportRouteDefinitio
     if (!Number.isInteger(route.fareCredits) || route.fareCredits <= 0) {
       throw new Error(`Transport route "${route.id}" fare must be a positive integer.`);
     }
+    for (const [locationId, localPlaceId] of Object.entries(route.boardingLocalPlaceIds ?? {})) {
+      if (locationId !== origin && locationId !== destination) {
+        throw new Error(
+          `Transport route "${route.id}" boards at "${locationId}", which is not one of its endpoints.`,
+        );
+      }
+      if (!getLocalPlaceInLocation(locationId, localPlaceId)) {
+        throw new Error(
+          `Transport route "${route.id}" boards at unknown Local Place "${localPlaceId}" in "${locationId}".`,
+        );
+      }
+    }
   }
 }
 
@@ -92,14 +126,24 @@ export function getTransportRoute(
   );
 }
 
-/** Every authored route with one end at this location, for the ride affordances. */
-export function getTransportRoutesFrom(
-  locationId: string,
-): readonly { route: TransportRouteDefinition; destinationLocationId: LocationId }[] {
+/**
+ * Every authored route with one end at this location, for the ride affordances.
+ *
+ * Each entry carries the Local Place this end is boarded from, when the route
+ * authors one, so a surface can render exactly the rides that belong to it.
+ */
+export function getTransportRoutesFrom(locationId: string): readonly {
+  route: TransportRouteDefinition;
+  destinationLocationId: LocationId;
+  boardingLocalPlaceId?: LocalPlaceId;
+}[] {
   return TRANSPORT_ROUTES.flatMap((route) => {
     const [first, second] = route.endpoints;
-    if (first === locationId) return [{ route, destinationLocationId: second }];
-    if (second === locationId) return [{ route, destinationLocationId: first }];
+    const boardingLocalPlaceId = route.boardingLocalPlaceIds?.[locationId];
+    if (first === locationId)
+      return [{ route, destinationLocationId: second, boardingLocalPlaceId }];
+    if (second === locationId)
+      return [{ route, destinationLocationId: first, boardingLocalPlaceId }];
     return [];
   });
 }

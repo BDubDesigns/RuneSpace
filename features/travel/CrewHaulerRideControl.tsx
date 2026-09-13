@@ -4,35 +4,38 @@ import { useState, useTransition } from "react";
 import { ActionButton } from "@/components/ui/ActionButton";
 import { Feedback } from "@/components/ui/Feedback";
 import { getLocation } from "@/game/content/locations";
-import { getTransportRoutesFrom } from "@/game/content/transport-routes";
 import { deriveCompletedMissionIds } from "@/game/domain/missions";
 import { usePlay } from "@/features/play/PlayContext";
 import { beginTransportTravelAction } from "@/server/actions";
+import { availableCrewHaulerRides } from "./crew-hauler-rides";
 import { travelErrorMessage } from "./travel-errors";
 
 /**
  * The narrow ride affordance for one authored transport route (#172).
  *
  * The same control serves both ends of the Crew Hauler route: it reads the
- * routes touching the player's current location, so The Jag needs no duplicate
- * Local Place and no driver NPC standing around to operate one button. Every
- * rule it presents — that the route exists, that the Mission unlocked it, what
- * the fare is — is re-derived server-side when the ride actually starts.
+ * routes boarding at the surface it was rendered on, so The Jag needs no
+ * duplicate Local Place and no driver NPC standing around to operate one
+ * button, and Holo Hollow's end belongs to the repaired Crew Stop rather than
+ * the town directory. Every rule it presents — that the route exists, that the
+ * Mission unlocked it, what the fare is — is re-derived server-side when the
+ * ride actually starts.
  *
  * Unavailability is always stated, never merely implied by a greyed control:
  * the button says where it goes and what it costs, and the reason it cannot be
  * used right now is written out underneath.
  */
-export function CrewHaulerRideControl() {
+export function CrewHaulerRideControl({ localPlaceId }: { localPlaceId?: string }) {
   const { acceptState, enqueueForeground, foregroundBusy, releaseCommand, state } = usePlay();
   const [message, setMessage] = useState<string>();
   const [pending, setPending] = useState<string>();
   const [, startTransition] = useTransition();
 
-  const completedMissionIds = deriveCompletedMissionIds(state.missions);
-  const rides = getTransportRoutesFrom(state.location.currentLocationId).filter(({ route }) =>
-    completedMissionIds.has(route.unlockMissionId),
-  );
+  const rides = availableCrewHaulerRides({
+    locationId: state.location.currentLocationId,
+    localPlaceId,
+    completedMissionIds: deriveCompletedMissionIds(state.missions),
+  });
   if (rides.length === 0) return null;
 
   function board(destinationLocationId: string) {

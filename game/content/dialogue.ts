@@ -1183,24 +1183,30 @@ const dialogue = {
       rennLocal(EXPRESSION_IDS.neutral, "Finish it. I'll be here."),
     ],
   },
+  // Nothing Renn says here may assume time has passed: the player can finish
+  // the tenth weld and walk straight back. He reports the state of the shelter,
+  // which is true a minute later and true a week later.
   [DIALOGUE_IDS.rennOutOfTheWeatherTurnIn]: {
     id: DIALOGUE_IDS.rennOutOfTheWeatherTurnIn,
     npcId: NPC_IDS.rennCalder,
     beats: [
-      rennLocal(EXPRESSION_IDS.neutral, "Walked past it this morning."),
-      rennLocal(EXPRESSION_IDS.guarded, "Somebody had actually fixed it."),
-      rennLocal(EXPRESSION_IDS.neutral, "Took me a second to work out that it was you."),
+      rennLocal(EXPRESSION_IDS.neutral, "The Crew Stop's fixed."),
+      rennLocal(
+        EXPRESSION_IDS.guarded,
+        "Canopy square. Bench bolted down. No sky coming through it.",
+      ),
+      rennLocal(EXPRESSION_IDS.neutral, "Didn't take me long to work out who."),
     ],
   },
   [DIALOGUE_IDS.rennOutOfTheWeatherCompletion]: {
     id: DIALOGUE_IDS.rennOutOfTheWeatherCompletion,
     npcId: NPC_IDS.rennCalder,
     beats: [
+      rennLocal(EXPRESSION_IDS.neutral, "It's been leaking a long time. It isn't now."),
       rennLocal(
-        EXPRESSION_IDS.neutral,
-        "Crew noticed. They've been standing under it all week arguing about who finally got round to it.",
+        EXPRESSION_IDS.sardonic,
+        "The crews will assume one of their own finally got round to it. I'll correct them.",
       ),
-      rennLocal(EXPRESSION_IDS.sardonic, "I told them. Repeatedly."),
       rennLocal(
         EXPRESSION_IDS.neutral,
         "So: the shift hauler runs out to The Jag most of the day. They'll squeeze you on for five Credits.",

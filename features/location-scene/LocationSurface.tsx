@@ -12,6 +12,7 @@ import { deriveCompletedRepairTargetIds } from "@/game/domain/welding-repair";
 import { LOCAL_PLACE_IDS } from "@/game/config/foundations";
 import { CrewStopPanel } from "@/features/local-places/CrewStopPanel";
 import { CrewHaulerRideControl } from "@/features/travel/CrewHaulerRideControl";
+import { availableCrewHaulerRides } from "@/features/travel/crew-hauler-rides";
 import { CargoHoldPanel } from "@/features/cargo/CargoHoldPanel";
 import { LocalPlaceDirectory } from "@/features/local-places/LocalPlaceDirectory";
 import { LocalPlaceSurface } from "@/features/local-places/LocalPlaceSurface";
@@ -43,6 +44,7 @@ export function LocationSurface({
   const { state } = usePlay();
   const locationId = state.location.currentLocationId;
   const location = getLocation(locationId);
+  const completedMissionIds = deriveCompletedMissionIds(state.missions);
   if (!location || state.travelState) return null;
 
   // The shared interpretation: a hand-edited URL naming an unknown,
@@ -51,7 +53,7 @@ export function LocationSurface({
   const activePlace = resolveActiveLocalPlace({
     locationId,
     requestedLocalPlaceId: localPlaceId,
-    completedMissionIds: deriveCompletedMissionIds(state.missions),
+    completedMissionIds,
   });
   if (activePlace) {
     return (
@@ -102,12 +104,16 @@ export function LocationSurface({
             <LocalPlaceDirectory locationId={locationId} />
           </div>
         ) : null}
-        {/* The return leg of an authored transport route needs no Local Place
-            and no driver of its own: the ride control reads the routes touching
-            this location and renders nothing where none are unlocked. */}
-        <div className="mt-5">
-          <CrewHaulerRideControl />
-        </div>
+        {/* A route that boards from a Local Place belongs to that place, not to
+            the town surface; what remains here is a route with no boarding place
+            of its own, which is how The Jag offers the return leg without a
+            second Local Place or a driver. Asking first keeps a location with no
+            ride from laying out space for one. */}
+        {availableCrewHaulerRides({ locationId, completedMissionIds }).length > 0 ? (
+          <div className="mt-5">
+            <CrewHaulerRideControl />
+          </div>
+        ) : null}
         {locationId === LOCATION_IDS.theLongScramble || localPlaces.length > 0 ? null : (
           <div className="mt-5" data-location-activity>
             {locationId === LOCATION_IDS.abandonedProcessingYard ? (

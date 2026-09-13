@@ -177,18 +177,15 @@ suite("issue #128 Cargo Hold repair gate and existing Welding mechanics (real Po
         .where(eq(rune.activeActions.characterId, character.id)),
     ).toHaveLength(0);
     expect(await inventoryAndCargoRows(character.id)).toEqual(before);
-    const repair = (
+    // A refused command creates nothing. An untouched repair target is an
+    // absent row, not a row of zeroes, so persistence after a refusal is
+    // indistinguishable from never having tried (#172).
+    expect(
       await db
         .select()
         .from(rune.characterRepairTargets)
-        .where(eq(rune.characterRepairTargets.characterId, character.id))
-    )[0]!;
-    expect(repair).toMatchObject({
-      refinedFerriteContributed: 0,
-      slagContributed: 0,
-      weldingProgress: 0,
-      completedAt: null,
-    });
+        .where(eq(rune.characterRepairTargets.characterId, character.id)),
+    ).toEqual([]);
   });
 
   it("preserves non-zero incomplete legacy progress without unlocking either command", async () => {

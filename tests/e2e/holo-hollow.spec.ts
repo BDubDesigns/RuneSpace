@@ -694,6 +694,66 @@ test("shows the Crew Stop before the Mission, and its repair work only after", a
   );
 });
 
+test("keeps the repaired shelter and the ride apart until Renn is told", async ({
+  page,
+  testCharacter,
+}) => {
+  const characterId = testCharacter.id;
+  await page.setViewportSize({ width: 390, height: 844 });
+  const now = new Date();
+  await completeChainThroughHoldItTogether(characterId);
+  // Accepted and physically repaired, but not turned in: the Mission is ready
+  // for completion, not completed.
+  await db.insert(characterMissions).values({
+    characterId,
+    missionId: MISSION_IDS.outOfTheWeather,
+    acceptedAt: now,
+  });
+  await db.insert(characterRepairTargets).values({
+    characterId,
+    targetId: REPAIR_TARGET_IDS.crewStop,
+    refinedFerriteContributed: 20,
+    slagContributed: 0,
+    weldingProgress: 10,
+    completedAt: now,
+  });
+  await arriveInHoloHollow(characterId, { credits: 50 });
+  await openTestCharacter(page, characterId);
+  await page.emulateMedia({ reducedMotion: "reduce" });
+
+  // The blue guidance is the thing that leads the player back to Renn.
+  const strip = page.locator(`[data-mission-strip="${MISSION_IDS.outOfTheWeather}"]`);
+  await expect(strip).toHaveAttribute("data-mission-phase", "turn_in");
+  await expect(strip.locator("[data-mission-strip-objective]")).toContainText("Renn Calder");
+
+  await page
+    .locator("[data-local-place-directory]")
+    .locator(`[data-local-place="${LOCAL_PLACE_IDS.holoHollowCrewStop}"]`)
+    .locator("[data-local-place-enter]")
+    .click();
+
+  // The world change is immediate: the shelter already reads as repaired ...
+  const description = page.locator("[data-local-place-description]");
+  await expect(description).toHaveAttribute("data-local-place-repaired", "true");
+  // ... while the ride, which is a relationship rather than a repair, does not
+  // exist yet and is not hinted at.
+  await expect(page.locator('[data-crew-stop-state="repaired"]')).toHaveCount(1);
+  await expect(page.locator('[data-crew-stop-state="boarding"]')).toHaveCount(0);
+  await expect(page.locator("[data-crew-hauler-rides]")).toHaveCount(0);
+  // The place's own prose may say what the shelter is for; the activity must not
+  // offer the ride.
+  await expect(page.locator("[data-local-place-activity]")).not.toContainText("Shift hauler");
+
+  // A silent activity leaves no gap: the way out follows the description by the
+  // ordinary single step, not by two.
+  const gap = await page.evaluate(() => {
+    const body = document.querySelector("[data-local-place-description]")!.getBoundingClientRect();
+    const exit = document.querySelector("[data-local-place-exit]")!.getBoundingClientRect();
+    return exit.top - body.bottom;
+  });
+  expect(gap).toBeLessThanOrEqual(24);
+});
+
 test("presents the repaired Crew Stop and its 5-Credit ride in both directions", async ({
   page,
   testCharacter,
@@ -720,6 +780,11 @@ test("presents the repaired Crew Stop and its 5-Credit ride in both directions",
   await openTestCharacter(page, characterId);
   await page.emulateMedia({ reducedMotion: "reduce" });
 
+  // Holo Hollow's ride belongs to the shelter, not to the town: the town surface
+  // offers no boarding control at all, and lays out no space for one.
+  await expect(page.locator("[data-crew-hauler-rides]")).toHaveCount(0);
+  await expect(page.locator("[data-crew-hauler-ride]")).toHaveCount(0);
+
   await page
     .locator("[data-local-place-directory]")
     .locator(`[data-local-place="${LOCAL_PLACE_IDS.holoHollowCrewStop}"]`)
@@ -731,7 +796,7 @@ test("presents the repaired Crew Stop and its 5-Credit ride in both directions",
   await expect(description).toHaveAttribute("data-local-place-repaired", "true");
   await expect(description).toContainText("welded");
   await expect(
-    page.locator('[data-crew-stop-panel][data-crew-stop-state="repaired"]'),
+    page.locator('[data-crew-stop-panel][data-crew-stop-state="boarding"]'),
   ).toBeVisible();
   await expect(page.locator("[data-crew-stop-contribute]")).toHaveCount(0);
 
@@ -762,4 +827,7 @@ test("presents the repaired Crew Stop and its 5-Credit ride in both directions",
   const returnRide = page.locator(`[data-crew-hauler-ride="${LOCATION_IDS.holoHollow}"]`);
   await expect(returnRide).toContainText("Ride to Holo Hollow");
   await expect(returnRide).toContainText("5 Credits");
+  // The Jag needs no Local Place of its own for it: the control is right there
+  // on the location surface.
+  await expect(page.locator("[data-location-surface] [data-crew-hauler-rides]")).toBeVisible();
 });

@@ -203,10 +203,19 @@ suite("issue #172 Out of the Weather (real PostgreSQL)", () => {
       const refused = await contribute(userId, character.id, 10);
       expect(refused.repair).toMatchObject({ status: "refused", reason: "repair_locked" });
       expect(await carriedRefinedFerrite(character.id)).toBe(10);
-      expect(await crewStopRow(character.id)).toMatchObject({
-        refinedFerriteContributed: 0,
-        weldingProgress: 0,
-      });
+      // A refusal changes nothing, and that includes creating the row: a target
+      // nobody has legitimately worked on stays genuinely untouched.
+      expect(await crewStopRow(character.id)).toBeUndefined();
+
+      const refusedWelding = await repairs.startWelding(
+        userId,
+        character.id,
+        REPAIR_TARGET_IDS.crewStop,
+        now,
+        deterministicRandom(),
+      );
+      expect(refusedWelding.weldingError).toBe("welding_locked");
+      expect(await crewStopRow(character.id)).toBeUndefined();
 
       const welding = await play.getPlayGameplayState(
         userId,

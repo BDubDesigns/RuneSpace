@@ -186,7 +186,10 @@ export async function contributeRepairMaterials(
       );
       if (preflight) return refused(preflight);
 
-      await ensureRepairTargetState(transaction, context.character.id, request.targetId);
+      // Reading never creates: a target nobody has legitimately worked on stays
+      // an absent row, so a refusal here leaves persistence exactly as it found
+      // it. The row is created below, in the same transaction as the first
+      // contribution that earns it.
       const row = await loadRepairTargetRow(transaction, context.character.id, request.targetId);
       const repair = repairStateFromRow(row);
       const access = await loadRepairAccess(
@@ -247,6 +250,7 @@ export async function contributeRepairMaterials(
         });
       }
 
+      await ensureRepairTargetState(transaction, context.character.id, request.targetId);
       const refinedResult = await consumeStackableItem(transaction, {
         characterId: context.character.id,
         itemId: balance.items.refinedFerrite.itemId,
@@ -327,7 +331,10 @@ export async function startWelding(
         );
       }
 
-      await ensureRepairTargetState(transaction, context.character.id, targetId);
+      // As with contribution: a refused start must not leave a row behind, so
+      // the state is read without being created and only materialized once the
+      // work is genuinely starting. Welding cannot begin before the materials
+      // are in, so a target with no row always refuses here anyway.
       const row = await loadRepairTargetRow(transaction, context.character.id, targetId);
       const repair = repairStateFromRow(row);
       const access = await loadRepairAccess(transaction, context.character.id, targetId, repair);
@@ -337,6 +344,8 @@ export async function startWelding(
       if (!access.repairAvailable || !repairMaterialsComplete(repair, target)) {
         return stateAfterRepairCommand(transaction, context.character.id, now, "welding_locked");
       }
+      // The Welding resolver requires the row, so it exists before the action.
+      await ensureRepairTargetState(transaction, context.character.id, targetId);
       await transaction.insert(activeActions).values({
         characterId: context.character.id,
         actionId: target.actionId,

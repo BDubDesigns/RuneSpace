@@ -301,7 +301,9 @@ a second geography.
 - A place may host **gameplay of its own** (issue #172): Holo Hollow's Crew Stop
   is the first. That arrives as an activity slot the composition boundary fills,
   exactly as it already selects a World Location's activity — not a plugin
-  registry built for one case. The place itself stays presentation.
+  registry built for one case. The place itself stays presentation. An activity
+  owns its own leading spacing, because only it knows whether it has anything to
+  show right now; a place whose activity is currently silent leaves no gap.
 - A place that something inside it can permanently change authors **both
   states** (`presentation.repaired`), and which one the player sees is derived
   from authoritative repair completion. As with the mission-gated door, the
@@ -431,6 +433,24 @@ that from the character's own authoritative position — the browser supplies a
 destination and nothing else — and the fare commits in the same transaction as
 the Journey under the character row lock, so a retry or concurrent request can
 never charge twice and a refusal never charges at all.
+
+A route also authors **where each end is boarded from**
+(`boardingLocalPlaceIds`). An end with an authored Local Place is offered inside
+that place and nowhere else — the Crew Hauler is boarded at the repaired Crew
+Stop, never from Holo Hollow's town surface, because the ride is the crews who
+use that shelter rather than a service the town runs. An end with no authored
+place is offered on the World Location surface, which is how The Jag presents
+the return leg without a second Local Place or a driver NPC. This is
+presentation authority only: where the player clicks changes nothing the server
+checks. A surface asks the same authored question before it lays out space
+(`availableCrewHaulerRides`), so a location with no ride shows no gap where one
+would have been.
+
+The ride is also not the repair. A finished repair changes the world
+immediately — the repaired artwork and copy derive from the repair record
+alone — but the route unlocks on the **completed Mission**, so between the last
+weld and Renn's turn-in the shelter is visibly fixed and offers no boarding at
+all; the ordinary Mission guidance is what leads the player back to Renn.
 
 This is deliberately one fixed route earned by one real feature. There are no
 schedules, timetables, waiting queues, transfers, tickets, vehicle ownership,

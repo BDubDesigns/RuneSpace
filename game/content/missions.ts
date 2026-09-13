@@ -603,7 +603,7 @@ export const OUT_OF_THE_WEATHER: MissionDefinition = {
       npcId: NPC_IDS.rennCalder,
       locationId: LOCATION_IDS.holoHollow,
       dialogueId: DIALOGUE_IDS.rennOutOfTheWeatherOffer,
-      actionLabel: "I'LL FIX IT",
+      actionLabel: "TAKE THE JOB",
     },
   ],
   requirements: [
@@ -619,7 +619,7 @@ export const OUT_OF_THE_WEATHER: MissionDefinition = {
     requiresStationary: true,
     objective: "Tell Renn Calder the Crew Stop is fixed",
     dialogueId: DIALOGUE_IDS.rennOutOfTheWeatherTurnIn,
-    actionLabel: "IT'S DONE",
+    actionLabel: "TELL RENN",
   },
   reward: { kind: "skill_xp", skillId: SKILL_IDS.welding, amount: 250 },
   dialogue: {

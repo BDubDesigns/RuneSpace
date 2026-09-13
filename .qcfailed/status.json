@@ -10,11 +10,11 @@
   },
   "latestCompleted": {
     "summary": "Made the way out of a Local Place an obvious Back control instead of a small text link.",
-    "date": "2026-09-13",
+    "date": "2026-09-12",
     "url": "https://github.com/BDubDesigns/RuneSpace/pull/182"
   },
-  "nextStep": "Integrate the approved damaged and repaired Crew Stop artwork, then complete human review of PR #183 before it is merged to main.",
-  "lastMeaningfulUpdate": "2026-09-13",
+  "nextStep": "Complete human review of PR #183 before it is merged to main.",
+  "lastMeaningfulUpdate": "2026-09-12",
   "highlights": [
     {
       "summary": "Extracted generic Play orchestration from the Mining feature into its own server and client boundary.",

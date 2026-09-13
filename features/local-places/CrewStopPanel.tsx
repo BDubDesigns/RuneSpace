@@ -7,10 +7,11 @@ import { MissionActionButton } from "@/components/ui/MissionActionButton";
 import { SectionHeader } from "@/components/ui/SectionHeader";
 import { StatusMeter } from "@/components/ui/StatusMeter";
 import { getEffectiveGameBalance, getRepairTargetBalance } from "@/game/config/balance";
-import { GAME_TICK_MS, REPAIR_TARGET_IDS } from "@/game/config/foundations";
-import { deriveMissionGuidanceTargets } from "@/game/domain/missions";
+import { GAME_TICK_MS, LOCAL_PLACE_IDS, REPAIR_TARGET_IDS } from "@/game/config/foundations";
+import { deriveCompletedMissionIds, deriveMissionGuidanceTargets } from "@/game/domain/missions";
 import { usePlay } from "@/features/play/PlayContext";
 import { CrewHaulerRideControl } from "@/features/travel/CrewHaulerRideControl";
+import { availableCrewHaulerRides } from "@/features/travel/crew-hauler-rides";
 import {
   contributeRepairMaterialsAction,
   startWeldingAction,
@@ -21,6 +22,7 @@ import {
 import type { PlayGameplayState } from "@/server/play";
 
 const TARGET_ID = REPAIR_TARGET_IDS.crewStop;
+const PLACE_ID = LOCAL_PLACE_IDS.holoHollowCrewStop;
 
 function weldingMessage(state: PlayGameplayState): string | undefined {
   if (state.weldingError === "welding_unavailable_here")
@@ -49,8 +51,15 @@ function resultError(result: PlayActionResult | RepairMaterialContributionAction
  * The place is visible from the start; this surface is where the repair work
  * lives, and it appears only once the repair is genuinely available — which the
  * server decides from the accepted Mission, not from the player having clicked
- * the location. Once the Mission is turned in it becomes the boarding point for
- * the crew hauler instead.
+ * the location.
+ *
+ * Finishing the tenth weld and turning the Mission in are two different events,
+ * and this surface keeps them apart. The repair completing is a physical fact:
+ * the shelter's repaired artwork and copy change immediately, from the repair
+ * record alone. The ride is a relationship, and it exists only once Renn has
+ * actually been told — so nothing here mentions the hauler, and no boarding
+ * control appears, until Out of the Weather is authoritatively completed. In
+ * between, the blue Mission guidance is what points the player back to Renn.
  *
  * Everything rendered here comes from the generic repair projection, so the
  * material recipe and increment count are never a second copy of balance.
@@ -67,6 +76,13 @@ export function CrewStopPanel() {
   const repair = state.repairs[TARGET_ID];
   const activeWelding = state.activeAction?.actionId === target.actionId;
   const guided = deriveMissionGuidanceTargets(state.missions).repairTargetIds.has(TARGET_ID);
+  // The same authored rule the town surface asks: this place's rides are the
+  // ones boarding here, and only once their unlocking Mission is completed.
+  const rides = availableCrewHaulerRides({
+    locationId: state.location.currentLocationId,
+    localPlaceId: PLACE_ID,
+    completedMissionIds: deriveCompletedMissionIds(state.missions),
+  });
   const contribution = repair?.availableContribution.refinedFerrite ?? 0;
   const previousCompletion = useRef(repair?.complete ?? false);
   const [completionAnnouncement, setCompletionAnnouncement] = useState("");
@@ -89,17 +105,29 @@ export function CrewStopPanel() {
   if (!repair) return null;
 
   // A finished Crew Stop keeps no quest chrome: the repaired artwork and the
-  // repaired description are the persistent world change, and what remains here
-  // is the ride the crews now let the player take.
+  // repaired description are the persistent world change.
   if (repair.complete) {
+    // Repaired, but Renn has not been told yet. The shelter already looks
+    // fixed; claiming the crews will carry the player would be claiming a
+    // relationship that does not exist yet, so this renders nothing visible at
+    // all and leaves the turn-in to the Mission guidance.
+    if (rides.length === 0) {
+      return (
+        <div data-crew-stop-panel data-crew-stop-state="repaired">
+          <span aria-live="polite" className="sr-only">
+            {completionAnnouncement}
+          </span>
+        </div>
+      );
+    }
     return (
-      <div data-crew-stop-panel data-crew-stop-state="repaired">
+      <div className="mt-5" data-crew-stop-panel data-crew-stop-state="boarding">
         <SectionHeader eyebrow="Crew Stop">Shift hauler</SectionHeader>
         <p className="mt-4 max-w-2xl text-sm leading-relaxed text-[color:var(--rs-text-secondary)]">
           The crews run out to The Jag through the day and will squeeze you on.
         </p>
         <div className="mt-4">
-          <CrewHaulerRideControl />
+          <CrewHaulerRideControl localPlaceId={PLACE_ID} />
         </div>
         <span aria-live="polite" className="sr-only">
           {completionAnnouncement}
@@ -160,7 +188,7 @@ export function CrewStopPanel() {
             acceptState(result.state);
             setMessage(
               result.repair.status === "committed"
-                ? `${result.repair.refinedFerrite} Refined Ferrite welded into the brace.`
+                ? `${result.repair.refinedFerrite} Refined Ferrite added to the brace.`
                 : result.repair.message,
             );
           }
@@ -184,7 +212,7 @@ export function CrewStopPanel() {
     : 0;
 
   return (
-    <div className="space-y-4" data-crew-stop-panel data-crew-stop-state="damaged">
+    <div className="mt-5 space-y-4" data-crew-stop-panel data-crew-stop-state="damaged">
       <SectionHeader eyebrow="Crew Stop">Repair</SectionHeader>
 
       <StatusMeter

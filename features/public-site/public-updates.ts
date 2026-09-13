@@ -7,7 +7,7 @@ const authoredUpdates = [
   {
     slug: "out-of-the-weather",
     title: "Out of the Weather",
-    publishedAt: "2026-09-13T09:00:00-07:00",
+    publishedAt: "2026-09-12T20:30:00-07:00",
     summary:
       "Renn Calder has an optional job nobody else wanted: fix the Crew Stop on the haul road. Do it, and the mining crews start letting you ride along.",
     hero: {

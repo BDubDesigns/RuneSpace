@@ -31,7 +31,10 @@ import type { LocalPlaceSurface as LocalPlaceSurfaceState } from "@/game/domain/
  * first (#172). That arrives as an `activity` slot rather than anything this
  * component knows how to build: the composition boundary picks the activity the
  * same way it already picks a World Location's, so this stays presentation and
- * no plugin framework is invented for one real case.
+ * no plugin framework is invented for one real case. An activity owns its own
+ * leading spacing, because only it knows whether it has anything to show right
+ * now — a place whose activity is currently silent must not leave a gap where
+ * the activity would have been.
  */
 export function LocalPlaceSurface({
   activity,
@@ -60,11 +63,7 @@ export function LocalPlaceSurface({
         >
           {surface.description}
         </p>
-        {activity ? (
-          <div className="mt-5" data-local-place-activity>
-            {activity}
-          </div>
-        ) : null}
+        {activity ? <div data-local-place-activity>{activity}</div> : null}
         <div className="mt-5">
           <ActionLink
             className="max-w-full gap-2 text-left"
