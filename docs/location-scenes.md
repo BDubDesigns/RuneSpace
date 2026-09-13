@@ -141,9 +141,26 @@ only difference is the thing the player fixed. The art cookbook's
 spot; a before/after pair of one place is the opposite requirement, and a change
 of angle would read as a different location rather than as repair.
 
-Because the pair is authored in one content entry, replacing temporary imagery
-with approved final art is a content-only change to those asset paths, their
-intrinsic dimensions, and their alt text.
+Because the pair is authored in one content entry, the asset paths, intrinsic
+dimensions, and alt text are the whole contract — swapping art is a
+content-only change.
+
+Alt text must differ between the two states and describe what actually changed.
+The repaired/damaged distinction is meant to be carried by more than the
+picture, so "canopy torn open, bench collapsed in the mud" versus "canopy whole
+and squared on welded bracing, bench remounted" is the part a screen-reader
+user relies on.
+
+| Crew Stop state (#172) | Supplied master | Delivered | Dimensions | Bytes |
+|---|---|---|---|---|
+| Damaged | 2048×512 PNG (2.4 MB) | `holo-hollow-crew-stop-damaged.webp` | 1536×384 | ~107 kB |
+| Repaired | 2048×512 PNG (2.4 MB) | `holo-hollow-crew-stop-repaired.webp` | 1536×384 | ~109 kB |
+
+Both were downsampled with Lanczos and encoded at libwebp quality 80 — the same
+derivation as the issue #78 set above — and flattened, since environment art is
+opaque. 1536×384 matches the Holo Hollow Local Place set rather than upscaling
+to the older 1920×480 convention. The repaired scene is also committed under
+`public/updates/` as the Update hero, per `docs/public-updates.md`.
 
 **Known art follow-up (non-blocking).** The three Holo Hollow Local Place
 exteriors (`holo-hollow-souvenirs-exterior.webp`,

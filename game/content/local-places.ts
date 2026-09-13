@@ -94,28 +94,26 @@ const localPlaceDefinitions = [
     description:
       "A covered roadside shelter on the haul road, where mining crews wait for the shift hauler out to The Jag. The canopy sags at one corner and the bench leans with it, so most mornings the crews stand in the weather instead.",
     presentation: {
+      // The approved damaged/repaired pair (#172). Both scenes share one camera,
+      // framing, and time of day so the only thing that changes is the thing the
+      // player fixed — see docs/location-scenes.md on before/after pairs.
       scene: {
-        // TEMPORARY imagery (#172): the approved damaged/repaired Crew Stop art
-        // is being produced separately. Both states point at an existing
-        // committed Holo Hollow scene so builds and previews contain no broken
-        // images. Swapping in the final assets is a change to these two asset
-        // paths and their dimensions/alt text — nothing else.
-        asset: "/location-scenes/holo-hollow.webp" as const,
+        asset: "/location-scenes/holo-hollow-crew-stop-damaged.webp" as const,
         width: 1536,
         height: 384,
-        alt: "Weathered main street of a small mining settlement, faded holo-tourism signage above working shopfronts under an overcast sky",
-        focal: { x: 50, y: 45 } as const,
+        alt: "Roadside crew shelter at dusk with its corrugated canopy torn open to the sky and its bench collapsed face-down in the mud, mine workings lit beyond",
+        focal: { x: 42, y: 50 } as const,
       },
       repaired: {
         repairTargetId: REPAIR_TARGET_IDS.crewStop,
         description:
           "A covered roadside shelter on the haul road, where mining crews wait for the shift hauler out to The Jag. The canopy sits square on a welded brace now, and the bench takes a full shift's worth of people without complaint.",
         scene: {
-          asset: "/location-scenes/holo-hollow.webp" as const,
+          asset: "/location-scenes/holo-hollow-crew-stop-repaired.webp" as const,
           width: 1536,
           height: 384,
-          alt: "Weathered main street of a small mining settlement, faded holo-tourism signage above working shopfronts under an overcast sky",
-          focal: { x: 50, y: 45 } as const,
+          alt: "The same roadside crew shelter at dusk, its canopy whole and squared on welded bracing with the bench remounted along the back wall, mine workings lit beyond",
+          focal: { x: 42, y: 50 } as const,
         },
       },
     },
