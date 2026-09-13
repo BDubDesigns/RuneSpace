@@ -69,7 +69,7 @@ One `LocationSceneHeader` renders the same asset at both breakpoints; only the v
 - **`sm` (≥640px)** — `h-[168px]` (~35%). Slightly taller so the wide composition breathes.
 - **Desktop / `lg` (≥1024px)** — `h-[252px]` (~52.5%) — noticeably taller to genuinely reveal more top/bottom environmental context on the wide desktop column. GameShell is `max-w-7xl` with a `20rem` aside (~890px usable column vs 4:1 source), so ~890×252 is ~3.5:1 and `object-cover` keeps sides while revealing sky + foreground rather than cropping them (the prior ~890×196 = ~4.5:1 cropped top/bottom; mobile already showed the full height). Same asset, same `object-position` focal, no per-location branches.
 
-Cropping is via `object-cover` + `object-position: focal.x% focal.y%`. The scene itself is not zoomed aggressively into its center; mobile preserves a strong horizontal sense of place. `sizes="(max-width: 640px) 100vw, (max-width: 1024px) 92vw, 890px"` reflects the real desktop column (~890px usable, not a 640px guess) so `next/image` picks a correctly-sized derivative and does not stretch a 640w source on 1× desktop. The 1920 masters have headroom. No lazy/eager mis-wiring: the current-location scene loads immediately with its panel; the other two locations' scenes are not eagerly fetched on the current page.
+Cropping is via `object-cover` + `object-position: focal.x% focal.y%`. The scene itself is not zoomed aggressively into its center; mobile preserves a strong horizontal sense of place. `sizes="(max-width: 640px) 100vw, (max-width: 1024px) 92vw, 890px"` reflects the real desktop column (~890px usable, not a 640px guess) so `next/image` picks a correctly-sized derivative and does not stretch a 640w source on 1× desktop. The 1920 masters have headroom. The current-location scene is the surface's above-the-fold hero and is authored `priority` (issue #117), so it is preloaded rather than lazily discovered after layout; the other locations' scenes are not fetched on the current page at all.
 
 ## Scene-header composition (real UI, not baked pixels)
 
@@ -110,7 +110,7 @@ latch is used.
 
 - Correct intrinsic `width`/`height` + responsive `sizes` on `next/image`.
 - Local, compressed WebP (~95–150 kB per scene, ~348 kB total). No image CDN, no remote runtime imagery.
-- Current-location scene loads with the panel; non-visible future-location scenes are not eagerly fetched (they only load when the character is actually there).
+- The current-location scene is a `priority` image: it is the measured LCP element of the Location and Local Place surfaces, so `next/image` preloads it instead of authoring `loading="lazy"` and discovering it after layout. Exactly one scene renders per surface, so this is one preload, not a page of eager artwork. Non-visible future-location scenes are still not fetched (they only load when the character is actually there), and the Local Place directory thumbnails below the hero stay lazy. Measured before/after evidence is in `docs/audits/issue-117-image-delivery-evidence.md`.
 - Meaningful `alt` per scene, concise and useful; decorative gradient/scrim layers are `aria-hidden`.
 - Focus order, action controls, alerts, and `prefers-reduced-motion` are preserved (the scene has no motion of its own; plates use `rs-map-plate` which respects the global `* { animation-duration: 0.01ms }` reduced-motion rule).
 
