@@ -1,7 +1,7 @@
 import { and, eq } from "drizzle-orm";
 import pg from "pg";
 import { afterEach, beforeAll, describe, expect, it } from "vitest";
-import { ITEM_IDS, MISSION_IDS, SKILL_IDS } from "@/game/config/foundations";
+import { ITEM_IDS, MISSION_IDS, REPAIR_TARGET_IDS, SKILL_IDS } from "@/game/config/foundations";
 import {
   EXECUTION_CONFIRMATION,
   executeBackfill,
@@ -88,16 +88,20 @@ suite("Issue #148 Hold It Together backfill (real PostgreSQL)", () => {
       now,
       deterministicRandom,
     );
+    // Repair rows are created lazily by the repair commands (#172), so a
+    // mid-repair fixture inserts the row rather than updating one that play
+    // provisioning no longer creates.
     const seeded = await db
-      .update(rune.characterRepairTargets)
-      .set({
+      .insert(rune.characterRepairTargets)
+      .values({
+        characterId: eligible.character.id,
+        targetId: REPAIR_TARGET_IDS.cargoHold,
         refinedFerriteContributed: 15,
         slagContributed: 6,
         weldingProgress: 4,
         completedAt: null,
         updatedAt: now,
       })
-      .where(eq(rune.characterRepairTargets.characterId, eligible.character.id))
       .returning();
     expect(seeded).toHaveLength(1);
     expect(seeded[0]).toMatchObject({

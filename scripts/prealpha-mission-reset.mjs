@@ -321,9 +321,9 @@ async function captureUnchangedState(client, characterIds) {
       `SELECT * FROM character_refining_state WHERE character_id = ANY($1::text[])`,
       [textArray(characterIds)],
     ),
-    character_cargo_hold_repair: await selectRows(
+    character_repair_targets: await selectRows(
       client,
-      `SELECT * FROM character_cargo_hold_repair WHERE character_id = ANY($1::text[])`,
+      `SELECT * FROM character_repair_targets WHERE character_id = ANY($1::text[])`,
       [textArray(characterIds)],
     ),
     cargo_hold_stacks: await selectRows(
