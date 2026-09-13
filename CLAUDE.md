@@ -1,9 +1,15 @@
 # CLAUDE.md — RuneSpace with Claude Code
 
-@AGENTS.md is this repository's normative agent-behavior contract and applies in
-full, unchanged. Everything below is **additional**, and exists only because
-Claude Code's remote/web sessions have failure modes other harnesses do not.
-Do not move any of it into `AGENTS.md`.
+**Read `AGENTS.md` in full before planning any change.** It is this repository's
+normative agent-behavior contract and applies unchanged; this file never
+replaces or overrides it. It is imported here as @AGENTS.md, but read it
+yourself rather than assuming the import resolved — until recently this file
+*was* `AGENTS.md`, by symlink, and losing it silently would be worse than any
+problem the section below solves.
+
+Everything below is **additional**, and exists only because Claude Code's
+remote/web sessions have failure modes other harnesses do not. Do not move any
+of it into `AGENTS.md`.
 
 ## Never self-schedule wake-ups
 
