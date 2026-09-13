@@ -54,7 +54,12 @@ export function LocationSceneHeader({
           sizes="(max-width: 640px) 100vw, (max-width: 1024px) 92vw, 890px"
           className="h-full w-full object-cover"
           style={{ objectPosition: `${focalX}% ${focalY}%` }}
-          priority={false}
+          // Issue #117: the current surface renders exactly one scene, it is
+          // above the fold, and it measured as the LCP element. Without
+          // `priority` Next authors it `loading="lazy"` with no preload, so the
+          // browser only discovers it after layout. Local Place directory
+          // thumbnails further down the page stay lazy.
+          priority
         />
         {/* Subtle dark blend + top/bottom scrim so plates feel mounted, and scene
             fades into the surrounding raised panel without a hard edge.

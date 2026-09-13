@@ -97,6 +97,11 @@ export function DialogueScene({
             sizes="min(60vw, 24rem)"
             className="rs-dialogue-scene__npc absolute inset-x-1/2 bottom-0 z-20 h-[92%] w-auto -translate-x-1/2 object-contain"
             data-portrait-transition="fade-in"
+            // Issue #117: the speaking NPC is the subject of the frame, but it
+            // was the only lazy image in a scene whose background already had
+            // priority — measured starting ~470 ms after that background on the
+            // deployed site at 390 px DPR 3. One portrait renders per beat.
+            priority
           />
         ) : null}
         {resolvedItem && beat.kind === "item" ? (

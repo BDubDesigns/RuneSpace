@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { ACTION_IDS, LOCATION_IDS } from "@/game/config/foundations";
 import { LOCATIONS, getLocation } from "@/game/content/locations";
@@ -111,6 +112,23 @@ describe("location scene registry (issue #78)", () => {
         expect(Object.keys(focal).sort()).toEqual(["x", "y"]);
       }
     }
+  });
+
+  it("the current-surface hero scene is a priority image while directory thumbnails stay lazy (issue #117)", () => {
+    // Measured on the deployed site: without `priority` next/image authors the
+    // hero `loading="lazy"` with no preload, so the browser only discovers the
+    // LCP element after layout. The guard is structural because the repository
+    // has no DOM test environment; it protects the loading contract, not style.
+    const header = readFileSync("features/location-scene/LocationSceneHeader.tsx", "utf8");
+    expect(header).toMatch(/\n\s+priority\n/);
+    expect(header).not.toContain("priority={false}");
+    // Exactly one scene image exists in the header, so exactly one preload is added.
+    expect(header.match(/<Image\b/g) ?? []).toHaveLength(1);
+
+    // The Local Place directory renders several below-the-fold thumbnails; they
+    // must not become eager downloads competing with the hero.
+    const directory = readFileSync("features/local-places/LocalPlaceDirectory.tsx", "utf8");
+    expect(directory).not.toMatch(/\n\s+priority\b/);
   });
 
   it("scene assets are local, non-remote, and follow repository conventions", () => {
