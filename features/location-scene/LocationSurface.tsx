@@ -6,8 +6,11 @@ import { Feedback } from "@/components/ui/Feedback";
 import { LOCATION_IDS } from "@/game/config/foundations";
 import { getLocalPlacesForLocation } from "@/game/content/local-places";
 import { getLocation } from "@/game/content/locations";
-import { resolveActiveLocalPlace } from "@/game/domain/local-places";
+import { deriveLocalPlaceSurface, resolveActiveLocalPlace } from "@/game/domain/local-places";
 import { deriveCompletedMissionIds } from "@/game/domain/missions";
+import { deriveCompletedRepairTargetIds } from "@/game/domain/welding-repair";
+import { LOCAL_PLACE_IDS } from "@/game/config/foundations";
+import { CrewStopPanel } from "@/features/local-places/CrewStopPanel";
 import { CargoHoldPanel } from "@/features/cargo/CargoHoldPanel";
 import { LocalPlaceDirectory } from "@/features/local-places/LocalPlaceDirectory";
 import { LocalPlaceSurface } from "@/features/local-places/LocalPlaceSurface";
@@ -17,6 +20,22 @@ import { RefiningConsole } from "@/features/refining/RefiningConsole";
 import { usePlay } from "@/features/play/PlayContext";
 import { LocationPopulationPanel } from "./LocationPopulationPanel";
 import { LocationSceneHeader } from "./LocationSceneHeader";
+
+/**
+ * A World Location surface offers no paid ride of its own (#172). The one
+ * authored route boards inside a Local Place, and The Jag — which the route
+ * only ever arrives at — offers nothing, because the crews cannot make room on
+ * the way back. The walk home is the ordinary Travel control, unchanged.
+ *
+ * The activity a Local Place hosts, when it hosts one.
+ *
+ * The same shape as this surface's existing per-location activity selection —
+ * one narrow mapping from an authored place to the component that owns its
+ * gameplay, rather than a generic plugin registry built for a single case.
+ */
+function localPlaceActivity(localPlaceId: string) {
+  return localPlaceId === LOCAL_PLACE_IDS.holoHollowCrewStop ? <CrewStopPanel /> : undefined;
+}
 
 export function LocationSurface({
   characterName,
@@ -28,6 +47,7 @@ export function LocationSurface({
   const { state } = usePlay();
   const locationId = state.location.currentLocationId;
   const location = getLocation(locationId);
+  const completedMissionIds = deriveCompletedMissionIds(state.missions);
   if (!location || state.travelState) return null;
 
   // The shared interpretation: a hand-edited URL naming an unknown,
@@ -36,14 +56,18 @@ export function LocationSurface({
   const activePlace = resolveActiveLocalPlace({
     locationId,
     requestedLocalPlaceId: localPlaceId,
-    completedMissionIds: deriveCompletedMissionIds(state.missions),
+    completedMissionIds,
   });
   if (activePlace) {
     return (
       <LocalPlaceSurface
+        activity={localPlaceActivity(activePlace.id)}
         characterName={characterName}
         parentDisplayName={location.displayName}
-        place={activePlace}
+        surface={deriveLocalPlaceSurface(
+          activePlace,
+          deriveCompletedRepairTargetIds(Object.values(state.repairs)),
+        )}
       />
     );
   }

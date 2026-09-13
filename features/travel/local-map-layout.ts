@@ -1,4 +1,5 @@
 import { LOCATIONS, LOCAL_MAP_LOCATION_IDS } from "@/game/content/locations";
+import { TRANSPORT_ROUTES } from "@/game/content/transport-routes";
 import type { LocationDefinition } from "@/game/schemas/locations";
 import { routeSegmentKey, type RoutePoint, type RouteSegmentEndpoints } from "./route-progress";
 
@@ -134,13 +135,37 @@ export function buildLocalMapGeometry(
   }
 
   const routeSegments: Record<string, RouteSegmentEndpoints> = {};
-  for (const route of undirectedRoutes) {
-    routeSegments[routeSegmentKey(route.originLocationId, route.destinationLocationId)] =
-      route.endpoints;
-    routeSegments[routeSegmentKey(route.destinationLocationId, route.originLocationId)] = {
-      start: route.endpoints.end,
-      end: route.endpoints.start,
+  const addSegments = (
+    endpoints: RouteSegmentEndpoints,
+    originId: string,
+    destinationId: string,
+  ) => {
+    routeSegments[routeSegmentKey(originId, destinationId)] = endpoints;
+    routeSegments[routeSegmentKey(destinationId, originId)] = {
+      start: endpoints.end,
+      end: endpoints.start,
     };
+  };
+  for (const route of undirectedRoutes) {
+    addSegments(route.endpoints, route.originLocationId, route.destinationLocationId);
+  }
+
+  // Authored transport routes get in-transit geometry so the Map can draw a
+  // ride's progress, but they are deliberately NOT added to `undirectedRoutes`:
+  // the map's walkable edges still come from adjacency alone, so the Crew
+  // Hauler never appears as a route you could walk (#172). Only the authored
+  // direction gets geometry — there is no ride the other way to draw.
+  for (const route of TRANSPORT_ROUTES) {
+    const { originLocationId: originId, destinationLocationId: destinationId } = route;
+    const origin = layoutById.get(originId);
+    const destination = layoutById.get(destinationId);
+    if (!origin || !destination) continue;
+    if (routeSegments[routeSegmentKey(originId, destinationId)]) continue;
+    routeSegments[routeSegmentKey(originId, destinationId)] = deriveRouteEndpoints(
+      origin.center,
+      destination.center,
+      hexHeight,
+    );
   }
 
   return {

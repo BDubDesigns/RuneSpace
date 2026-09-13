@@ -185,6 +185,10 @@ function wadeSkillXpBeat(skillId: SkillId, amount: number): DialogueBeat {
   return { kind: "skill_xp", skillId, amount, backgroundId: crash, text: "" };
 }
 
+function rennSkillXpBeat(skillId: SkillId, amount: number): DialogueBeat {
+  return { kind: "skill_xp", skillId, amount, backgroundId: assistanceCenter, text: "" };
+}
+
 const dialogue = {
   [DIALOGUE_IDS.wadeOffer]: {
     id: DIALOGUE_IDS.wadeOffer,
@@ -1127,6 +1131,109 @@ const dialogue = {
       rennLocal(EXPRESSION_IDS.neutral, "Sometimes staying is loyalty."),
       rennLocal(EXPRESSION_IDS.guarded, "Sometimes it's just being afraid to go."),
       rennLocal(EXPRESSION_IDS.neutral, "Those aren't the same thing."),
+    ],
+  },
+  // Out of the Weather (#172). Renn can be worn out by Holo Hollow and still
+  // notice the small things that make other people's mornings worse. The offer
+  // is a complaint, not an assignment — nobody owns the Crew Stop enough to fix
+  // it, which is exactly why it never gets fixed. The player stays silent.
+  [DIALOGUE_IDS.rennOutOfTheWeatherOffer]: {
+    id: DIALOGUE_IDS.rennOutOfTheWeatherOffer,
+    npcId: NPC_IDS.rennCalder,
+    beats: [
+      rennLocal(EXPRESSION_IDS.neutral, "Heard you put Wade's Cargo Hold back together."),
+      rennLocal(EXPRESSION_IDS.sardonic, "So you can weld. Good for you."),
+      rennLocal(
+        EXPRESSION_IDS.neutral,
+        "Then here's one nobody's going to thank you for. The Crew Stop out on the haul road.",
+      ),
+      rennLocal(EXPRESSION_IDS.neutral, "Roof leaks. Bench leans. Everybody complains about it."),
+      rennLocal(
+        EXPRESSION_IDS.guarded,
+        "Nobody fixes it, because nobody owns it enough to fix it.",
+      ),
+      rennLocal(
+        EXPRESSION_IDS.neutral,
+        "So every morning a handful of people stand in the weather pretending it doesn't bother them.",
+      ),
+      rennLocal(
+        EXPRESSION_IDS.sardonic,
+        "It's twenty Refined Ferrite and an afternoon of your life. I'm not pretending that's nothing.",
+      ),
+      rennLocal(EXPRESSION_IDS.neutral, "But it'd be fixed. That's the whole pitch."),
+    ],
+  },
+  [DIALOGUE_IDS.rennOutOfTheWeatherRepairReminder]: {
+    id: DIALOGUE_IDS.rennOutOfTheWeatherRepairReminder,
+    npcId: NPC_IDS.rennCalder,
+    beats: [
+      rennLocal(EXPRESSION_IDS.neutral, "Still standing, still leaning."),
+      rennLocal(
+        EXPRESSION_IDS.sardonic,
+        "Twenty Refined Ferrite and however long the welding takes you. Nobody's holding a clock.",
+      ),
+      rennLocal(EXPRESSION_IDS.neutral, "Put in what you've got. Come back with the rest."),
+    ],
+  },
+  [DIALOGUE_IDS.rennOutOfTheWeatherBusy]: {
+    id: DIALOGUE_IDS.rennOutOfTheWeatherBusy,
+    npcId: NPC_IDS.rennCalder,
+    beats: [
+      rennLocal(EXPRESSION_IDS.sardonic, "You're in the middle of something."),
+      rennLocal(EXPRESSION_IDS.neutral, "Finish it. I'll be here."),
+    ],
+  },
+  // Nothing Renn says here may assume time has passed: the player can finish
+  // the tenth weld and walk straight back. He reports the state of the shelter,
+  // which is true a minute later and true a week later.
+  [DIALOGUE_IDS.rennOutOfTheWeatherTurnIn]: {
+    id: DIALOGUE_IDS.rennOutOfTheWeatherTurnIn,
+    npcId: NPC_IDS.rennCalder,
+    beats: [
+      rennLocal(EXPRESSION_IDS.neutral, "The Crew Stop's fixed."),
+      rennLocal(
+        EXPRESSION_IDS.guarded,
+        "Canopy square. Bench bolted down. No sky coming through it.",
+      ),
+      rennLocal(EXPRESSION_IDS.neutral, "Didn't take me long to work out who."),
+    ],
+  },
+  [DIALOGUE_IDS.rennOutOfTheWeatherCompletion]: {
+    id: DIALOGUE_IDS.rennOutOfTheWeatherCompletion,
+    npcId: NPC_IDS.rennCalder,
+    beats: [
+      rennLocal(EXPRESSION_IDS.neutral, "It's been leaking a long time. It isn't now."),
+      rennLocal(
+        EXPRESSION_IDS.sardonic,
+        "The crews will assume one of their own finally got round to it. I'll correct them.",
+      ),
+      rennLocal(
+        EXPRESSION_IDS.neutral,
+        "So: the shift hauler runs out to The Jag most of the day. They'll squeeze you on for five Credits.",
+      ),
+      rennLocal(
+        EXPRESSION_IDS.sardonic,
+        "Out only. Coming back it's stacked to the rails with shale, and shale doesn't move over for anybody.",
+      ),
+      rennLocal(EXPRESSION_IDS.neutral, "You walk home like the rest of us."),
+      rennLocal(
+        EXPRESSION_IDS.guarded,
+        "Not a favour, exactly. They just don't mind you now, and that's worth more here than it sounds.",
+      ),
+      rennSkillXpBeat(SKILL_IDS.welding, 250),
+      rennLocal(EXPRESSION_IDS.neutral, "You also got better at it. That's how that works."),
+    ],
+  },
+  [DIALOGUE_IDS.rennPostOutOfTheWeather]: {
+    id: DIALOGUE_IDS.rennPostOutOfTheWeather,
+    npcId: NPC_IDS.rennCalder,
+    beats: [
+      rennLocal(EXPRESSION_IDS.neutral, "Bench is holding."),
+      rennLocal(
+        EXPRESSION_IDS.sardonic,
+        "Give it a year and somebody'll swear it was always like that.",
+      ),
+      rennLocal(EXPRESSION_IDS.guarded, "I'll know it wasn't."),
     ],
   },
   [DIALOGUE_IDS.maraTheBnbTopic]: {

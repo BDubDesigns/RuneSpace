@@ -73,7 +73,7 @@ const authoredWikiArticles = [
     sections: [
       {
         paragraphs: [
-          "Holo Hollow currently has six connected locations. You can only walk between locations that are directly connected — there's no fast travel or shortcut.",
+          "Holo Hollow currently has six connected locations. You can only walk between locations that are directly connected — there's no fast travel or shortcut. There is one paid ride, on a single fixed route, once you've earned it.",
         ],
       },
       {
@@ -98,9 +98,21 @@ const authoredWikiArticles = [
         ],
       },
       {
+        heading: "The Crew Hauler",
+        paragraphs: [
+          [
+            "Once you've repaired the Crew Stop for Renn Calder in ",
+            { text: "Out of the Weather", articleSlug: "missions" },
+            ", the mining crews will let you ride their shift hauler out from Holo Hollow to The Jag.",
+          ],
+          "It costs 5 Credits every ride — it isn't a one-time unlock that makes travel free. The ride takes about 12 seconds, where walking the same trip is two legs through The Long Scramble plus the stop in between.",
+          "It runs one way: out to The Jag only. There is room for you heading out, but the hauler comes back loaded with shale, so you walk home through The Long Scramble like everybody else. You board it at the repaired Crew Stop in town. It's a real journey, not a teleport: you arrive when it gets there. There's nothing to scavenge on the back of a hauler, so walking is still the only way to find something along the route.",
+        ],
+      },
+      {
         heading: "Scavenging while you walk",
         paragraphs: [
-          "Every ordinary walk gives you one chance to scavenge along the way. The opportunity opens at some point during the walk and stays open for a few seconds before it's gone for good — there's no way to trigger it early or get a second chance on the same leg.",
+          "Every ordinary walk gives you one chance to scavenge along the way. The opportunity opens at some point during the walk and stays open for a few seconds before it's gone for good — there's no way to trigger it early or get a second chance on the same leg. Riding the Crew Hauler gives you none at all.",
           [
             "Claiming it can turn up a little Ferrite Shale, a ",
             { text: "Power Cell", articleSlug: "power-cells" },
@@ -279,7 +291,8 @@ const authoredWikiArticles = [
   {
     slug: "cargo-hold-and-welding",
     title: "Cargo Hold & Welding",
-    summary: "Repairing the ship's Cargo Hold and what it gives you once it's welded shut.",
+    summary:
+      "Repairing the ship's Cargo Hold, what it gives you once it's welded shut, and what else you can weld.",
     sections: [
       {
         paragraphs: [
@@ -318,12 +331,24 @@ const authoredWikiArticles = [
           "A repaired Cargo Hold gives you 32 slots of on-site storage at the Crash Site. You can deposit or withdraw a single item or a whole stack while you're stationary there — it's separate from what you're carrying in Inventory.",
         ],
       },
+      {
+        heading: "Welding other things",
+        paragraphs: [
+          [
+            "Welding isn't a one-off button for your ship. Once you've learned it, it's something your character knows how to do, and there are other jobs that need it — starting with the Crew Stop in town, which you can repair during ",
+            { text: "Out of the Weather", articleSlug: "missions" },
+            ".",
+          ],
+          "Every welding job works the same way and uses the same skill: install its materials, then weld it in passes of about three seconds each, with each finished pass earning the same Welding XP. What changes from job to job is how much material it needs and how many passes it takes. The Crew Stop needs 20 Refined Ferrite, no Slag, and ten passes.",
+        ],
+      },
     ],
   },
   {
     slug: "missions",
     title: "Missions",
-    summary: "The jobs Wade Rusk and Tansy Rusk hand out, and how the Mission Log tracks them.",
+    summary:
+      "The jobs Wade Rusk, Tansy Rusk and Renn Calder hand out, and how the Mission Log tracks them.",
     sections: [
       {
         paragraphs: [
@@ -357,6 +382,30 @@ const authoredWikiArticles = [
             "Keep the Change — Wade makes you his apprentice and hands you 24 Credits to get Tansy three ",
             { text: "Power Cells", articleSlug: "power-cells" },
             ". Meet Bix Weller in town, then take the cells to Tansy at The Jag.",
+          ],
+        ],
+      },
+      {
+        heading: "Side jobs",
+        paragraphs: [
+          "Not every job is part of the chain. A side job is entirely optional: nothing hands it to you, nothing is waiting on it, and you can ignore it forever without closing anything off.",
+        ],
+        list: [
+          [
+            "Out of the Weather — Renn Calder mentions that the Crew Stop out on the haul road is falling apart and nobody owns it enough to fix it. Repairing it takes 20 Refined Ferrite and ten ",
+            { text: "welding passes", articleSlug: "cargo-hold-and-welding" },
+            ". Renn offers it in town once you've finished Hold It Together; you don't need Keep the Change first, and it never blocks it.",
+          ],
+        ],
+      },
+      {
+        heading: "Out of the Weather in detail",
+        paragraphs: [
+          "This one costs you rather than paying you up front: the materials and the time are yours. Renn won't chase you about it, and the Crew Stop stays where it is however long you take — you can put in some of the Refined Ferrite, go and get more, and come back.",
+          [
+            "What you get is worth having. The shelter stays repaired for good, and because the crews use it every workday and know who fixed it, they'll let you ride the shift hauler out to The Jag for ",
+            { text: "5 Credits a trip", articleSlug: "travel-and-scavenging" },
+            ". Only on the way out, though — the hauler comes back loaded with shale, so you walk home. Renn also passes on 250 Welding XP on top of what the welding itself earned you.",
           ],
         ],
       },
@@ -460,6 +509,15 @@ const authoredWikiArticles = [
             ".",
           ],
           "Holo Hollow Community Assistance Center — the old Visitor Center, now handling local assistance and rations. Renn Calder is usually here.",
+          [
+            "Crew Stop — a covered roadside shelter on the haul road where the mining crews wait for the shift hauler out to The Jag. It starts out falling apart; you can ",
+            { text: "repair it", articleSlug: "missions" },
+            " with ",
+            { text: "Welding", articleSlug: "cargo-hold-and-welding" },
+            ", and afterwards the crews will give you a ",
+            { text: "ride", articleSlug: "travel-and-scavenging" },
+            ".",
+          ],
           [
             "HH B&B — a family bed-and-breakfast from the tourism years, now the town's working inn. Its rooms are held for locals and regular working crews, so the door stays shut to you until you've finished ",
             { text: "Keep the Change", articleSlug: "missions" },

@@ -126,6 +126,42 @@ Local Place scenes (`game/content/local-places.ts`, issue #159) use the same
 `LocationSceneHeader`, which takes any subject carrying an id, a display name,
 and scene metadata.
 
+### Before / after scene pairs (issue #172)
+
+A Local Place that something inside it can permanently change authors a second
+scene plus a second description under `presentation.repaired`, and the derived
+surface (`deriveLocalPlaceSurface`) picks between them from authoritative repair
+completion. The header is unchanged: it receives whichever subject the
+derivation returned.
+
+The two scenes in such a pair are the one case where **identical composition is
+required**. Same camera, same framing, same lighting, same time of day — the
+only difference is the thing the player fixed. The art cookbook's
+"same-background syndrome" warning is about distinct places reading as the same
+spot; a before/after pair of one place is the opposite requirement, and a change
+of angle would read as a different location rather than as repair.
+
+Because the pair is authored in one content entry, the asset paths, intrinsic
+dimensions, and alt text are the whole contract — swapping art is a
+content-only change.
+
+Alt text must differ between the two states and describe what actually changed.
+The repaired/damaged distinction is meant to be carried by more than the
+picture, so "canopy torn open, bench collapsed in the mud" versus "canopy whole
+and squared on welded bracing, bench remounted" is the part a screen-reader
+user relies on.
+
+| Crew Stop state (#172) | Supplied master | Delivered | Dimensions | Bytes |
+|---|---|---|---|---|
+| Damaged | 2048×512 PNG (2.4 MB) | `holo-hollow-crew-stop-damaged.webp` | 1536×384 | ~107 kB |
+| Repaired | 2048×512 PNG (2.4 MB) | `holo-hollow-crew-stop-repaired.webp` | 1536×384 | ~109 kB |
+
+Both were downsampled with Lanczos and encoded at libwebp quality 80 — the same
+derivation as the issue #78 set above — and flattened, since environment art is
+opaque. 1536×384 matches the Holo Hollow Local Place set rather than upscaling
+to the older 1920×480 convention. The repaired scene is also committed under
+`public/updates/` as the Update hero, per `docs/public-updates.md`.
+
 **Known art follow-up (non-blocking).** The three Holo Hollow Local Place
 exteriors (`holo-hollow-souvenirs-exterior.webp`,
 `holo-hollow-assistance-center-exterior.webp`, `hh-bnb-exterior.webp`) are

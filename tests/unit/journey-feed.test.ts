@@ -14,6 +14,7 @@ const startedAt = new Date("2026-01-01T00:00:00.000Z");
 
 function makeTravel(overrides: Partial<TravelState> = {}): TravelState {
   return {
+    mode: "walk" as const,
     originLocationId: LOCATION_IDS.crashSite,
     destinationLocationId: LOCATION_IDS.abandonedProcessingYard,
     startedAt: startedAt.toISOString(),

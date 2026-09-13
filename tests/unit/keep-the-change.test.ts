@@ -7,6 +7,7 @@ import {
   LOCATION_IDS,
   MISSION_IDS,
   NPC_IDS,
+  REPAIR_TARGET_IDS,
 } from "@/game/config/foundations";
 import { getDialogue } from "@/game/content/dialogue";
 import {
@@ -29,6 +30,7 @@ import {
   type MissionObservation,
   type MissionProjection,
 } from "@/game/domain/missions";
+import { cargoRepaired } from "./repair-observation";
 
 /**
  * Issue #170 — Keep the Change.
@@ -51,7 +53,7 @@ function observation(input: { cells?: number; metBix?: boolean } = {}): MissionO
     stackLimits: new Map([[ITEM_IDS.powerCell, POWER_CELL_STACK_LIMIT]]),
     itemNames: new Map([[ITEM_IDS.powerCell, "Power Cell"]]),
     trackedProgress: new Map(input.metBix ? [["bix-introduction", 1]] : []),
-    cargoHoldRepairComplete: true,
+    repairTargets: cargoRepaired(),
   };
 }
 
@@ -352,7 +354,7 @@ describe("Keep the Change local availability guidance", () => {
     expect(targets.npcIds.size).toBe(0);
     expect(targets.actionIds.size).toBe(0);
     expect(targets.equipmentItemIds.size).toBe(0);
-    expect(targets.cargoRepair).toBe(false);
+    expect(targets.repairTargetIds.has(REPAIR_TARGET_IDS.cargoHold)).toBe(false);
     // Away from Wade's offer location nothing advertises at all.
     for (const locationId of [LOCATION_IDS.holoHollow, LOCATION_IDS.theJag]) {
       expect(

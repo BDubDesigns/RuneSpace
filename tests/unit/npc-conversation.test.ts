@@ -303,7 +303,7 @@ describe("issue #164 preserved Wade/Tansy Mission conversations", () => {
         hold("active", {
           requirementsSatisfied: false,
           turnInAvailable: false,
-          nextObjectiveKind: "cargo_hold_repaired",
+          nextObjectiveKind: "repair_target_complete",
         }),
       ])?.dialogueId,
     ).toBe(DIALOGUE_IDS.wadeHoldItTogetherRepairReminder);
@@ -326,7 +326,7 @@ describe("issue #164 preserved Wade/Tansy Mission conversations", () => {
       hold("active", {
         requirementsSatisfied: false,
         turnInAvailable: false,
-        nextObjectiveKind: "cargo_hold_repaired",
+        nextObjectiveKind: "repair_target_complete",
       }),
     ]);
     expect(tansyDuringHold?.dialogueId).toBe(DIALOGUE_IDS.tansyHoldItTogetherActive);
@@ -472,7 +472,7 @@ describe("issue #164 replayable social topics", () => {
       hold("active", {
         requirementsSatisfied: false,
         turnInAvailable: false,
-        nextObjectiveKind: "cargo_hold_repaired",
+        nextObjectiveKind: "repair_target_complete",
       }),
     ]);
     expect(beforeCompletion.map((entry) => entry.id)).toEqual([CONVERSATION_TOPIC_IDS.tansyMining]);

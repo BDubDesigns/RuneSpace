@@ -2,7 +2,7 @@ import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { getEffectiveGameBalance, getItemDefinition } from "@/game/config/balance";
-import { ITEM_IDS } from "@/game/config/foundations";
+import { ITEM_IDS, REPAIR_TARGET_IDS } from "@/game/config/foundations";
 import { formatMassGrams } from "@/game/domain/mass";
 import { carriedItemMassGrams } from "@/game/domain/equipment";
 import type { PlayGameplayState } from "@/server/play";
@@ -33,6 +33,7 @@ function baseState(inventory: PlayGameplayState["inventory"]): PlayGameplayState
     characterId: "character-1",
     missions: [],
     location: { currentLocationId: "crash_site" },
+    repairs: {},
     credits: 0,
     mining: { totalXp: 0, level: 1, xpIntoLevel: 0 },
     refining: { totalXp: 0, level: 1, xpIntoLevel: 0 },
@@ -64,6 +65,7 @@ function baseState(inventory: PlayGameplayState["inventory"]): PlayGameplayState
     },
     cargoHold: {
       repair: {
+        targetId: REPAIR_TARGET_IDS.cargoHold,
         refinedFerriteContributed: 0,
         refinedFerriteRequired: 15,
         slagContributed: 0,

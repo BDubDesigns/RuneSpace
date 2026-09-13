@@ -22,7 +22,7 @@ The framework deliberately does not attempt to support every future mission shap
 | --- | --- | --- |
 | Mission definitions / content | `game/content/missions.ts` — `MissionDefinition`, `MissionOffer`, `MissionRequirement`, `MissionTurnIn`, `MissionDialogue`, `MissionReward`, `MissionAcceptEffect`, `MISSIONS` registry, `WALK_IT_OFF` / `CUT_YOUR_TEETH` / `WASTE_NOT` / `HOLD_IT_TOGETHER` / `KEEP_THE_CHANGE` | `getMission(id)` is the content accessor. |
 | Generic mission projection | `game/domain/missions.ts` — `projectMission`, `deriveMissionState`, `deriveMissionGuidanceTargets`, `validateMissionDefinitions`; `server/mission-state.ts` — `loadMissionProjections` | Projection combines live authoritative state with current generic tracked progress; targets and activity definitions remain content-owned. |
-| Tracked activity progress | `db/rune-space.ts` — `characterMissionProgress`; `server/mission-progress.ts` — row initialization, capped attempt consumption, and the mandatory-conversation marker | One row per character, mission, and stable authored `progressKey`; only current progress is persisted. `tracked_activity` and `npc_conversation` requirements share that one row shape and one progress-key space. There is no event history, provenance, lifetime counter, or acceptance-time slicing. Cargo repair completion is observed separately from its authoritative repair row and never creates mission progress. |
+| Tracked activity progress | `db/rune-space.ts` — `characterMissionProgress`; `server/mission-progress.ts` — row initialization, capped attempt consumption, and the mandatory-conversation marker | One row per character, mission, and stable authored `progressKey`; only current progress is persisted. `tracked_activity` and `npc_conversation` requirements share that one row shape and one progress-key space. There is no event history, provenance, lifetime counter, or acceptance-time slicing. Repair completion is observed separately from its authoritative `character_repair_targets` row and never creates mission progress. |
 | Generic acceptance / completion boundary | `server/missions.ts` — `acceptMission`, `completeMission`, `acknowledgeMissionConversation` (+ `completeMissionWithDefinition` test seam); `server/actions.ts` — `acceptMissionAction` / `completeMissionAction` / `acknowledgeMissionConversationAction`; `game/schemas/gameplay.ts` — `AcceptMissionRequestSchema` / `CompleteMissionRequestSchema` / `AcknowledgeMissionConversationRequestSchema` | Shared `runMissionCommand` character lock / reconciliation wrapper. See §12. |
 | Authored dialogue | `game/content/dialogue.ts` — `DIALOGUE_SEQUENCES` / `getDialogue` | Sequences are pure presentation content (no `action`). |
 | NPC conversation resolution | `game/domain/conversation.ts` — `resolveNpcConversation`, `NpcConversationEntry`, `getMissionCapacityRefusalDialogue`, `getMissionCompletionPresentation`; authored topics in `game/content/conversation-topics.ts` | The one canonical conversation model (§9); see `docs/npc-conversations.md`. |
@@ -130,7 +130,7 @@ The currently supported live-state requirement kinds (`MissionRequirement`) are 
 | `equipped_item` | `itemId`, `objective` | the item genuinely occupies its authoritative compatible slot (carried instance + `equippedItems` assignment; a stored instance does not count) |
 | `tracked_activity` | `progressKey`, `activity`, `metric: "attempts"`, `target`, `objective`, `recommendedActionId?` | current persisted progress for the stable key reaches the authored target; resolved attempts count whether the activity succeeds or fails |
 | `carried_stack` | `itemId`, `quantity?`, `turnIn`, `objective`, `recommendedActionId?` | current carried quantity for `itemId` ≥ resolved required quantity (§6) |
-| `cargo_hold_repaired` | `objective` | authoritative Cargo Hold repair completion (`completed_at` is present); no mission-progress row is created |
+| `repair_target_complete` | `targetId`, `objective`, optional `materialObjective` / `weldingObjective` | that repair target's authoritative completion (`completed_at` is present in `character_repair_targets`); no mission-progress row is created. Hold It Together observes the Cargo Hold, Out of the Weather the Crew Stop. The optional phase copy renders the live phase — see §5.1 |
 | `npc_conversation` | `npcId`, `locationId`, `dialogueId`, `progressKey`, `objective`, `actionLabel?` | the durable marker for that authored key is set, which only the generic `acknowledgeMissionConversation` command does (§12.3). Trade, arrival, or reading prose never satisfy it |
 
 **Ordering owns the objective.** The first unmet requirement in authored order becomes the current semantic objective / guidance step. `requirements` order is gameplay — changing it changes the player's progression and guidance.
@@ -205,6 +205,13 @@ type MissionReward =
 
 - **Item** — granted as **one new unique item instance** through the generic completion boundary (capacity-preflighted, guarded by the `completedAt` exactly-once stamp). Registry validation rejects stackable item rewards at definition time because there is no authorized execution path for them yet. Reward initialization derives from `getItemMaximumCharge`: chargeable items arrive depleted (`currentCharge: 0`), others get the schema's `null` — no silent claim of arbitrary charge semantics.
 - **Skill XP** — granted through the authoritative progression boundary (`grantCharacterSkillXp`). `amount` must be a positive integer and `skillId` must have a progression curve (`skillLevelThresholds`).
+
+Out of the Weather (#172) uses the skill-XP shape for the one thing it does pay:
+**250 Welding XP** on turn-in, on top of the 500 the ten genuine Welding
+increments already awarded through the ordinary Welding path. The Mission adds
+no synthetic work XP of its own — the work pays for the work — and deliberately
+adds no Credit payout, because the reward the Mission is actually about is that
+the Crew Stop stays fixed and the crews will give the player a ride.
 
 **No reward is a valid authored choice.** `reward` is optional. A mission whose
 real outcome is world or social state — Keep the Change opens HH B&B and pays
@@ -304,7 +311,7 @@ persistent idle dialogue — it is immediate one-shot presentation after success
 | Active (turn-in NPC) | **Equipment reminder** | `MissionDialogue.equipmentReminderDialogueId` | first unmet requirement `kind === "equipped_item"` |
 | Active (turn-in NPC) | **Carried-item reminder** | `MissionDialogue.carriedReminderDialogueId` | first unmet requirement `kind === "carried_stack"` |
 | Active (turn-in NPC) | **Tracked-activity reminder** | `MissionDialogue.trackedActivityReminderDialogueId` | first unmet requirement `kind === "tracked_activity"` |
-| Active (turn-in NPC) | **Cargo repair reminder** | `MissionDialogue.cargoRepairReminderDialogueId` | first unmet requirement `kind === "cargo_hold_repaired"` |
+| Active (turn-in NPC) | **Repair reminder** | `MissionDialogue.repairReminderDialogueId` | first unmet requirement `kind === "repair_target_complete"` |
 | Active (turn-in NPC) | **Conversation reminder** | `MissionDialogue.conversationReminderDialogueId` | first unmet requirement `kind === "npc_conversation"` — e.g. Tansy telling the player to go and see Bix first |
 | Active (conversation NPC) | **Mandatory conversation** | the `npc_conversation` requirement's own `dialogueId` | the requirement is authored for this NPC and is **not yet satisfied**; carries `acknowledge_conversation`. Once satisfied the entry disappears (§9.2) |
 | Active (other offer NPC) | **Active follow-up** | `MissionOffer.activeDialogueId` | the offer NPC while the mission is active — e.g. Wade while Walk It Off is active |
@@ -393,7 +400,7 @@ Derived from the **first unmet requirement in authored order** on each accepted-
 | `at_location` | `locationId: requirement.locationId` — unsatisfied means the player is elsewhere, so the location itself is the target; once satisfied it stops being a target anywhere |
 | `equipped_item` | `equipmentItemId: requirement.itemId` — the equipment affordance / inventory tile for that item |
 | `tracked_activity` / `carried_stack` (with `recommendedActionId`) | `actionId: requirement.recommendedActionId`, plus `locationId` naming the single World Location offering that action (`actionDestination`) when it cannot currently be done — none when the current location already offers it, none when zero or several World Locations do |
-| `cargo_hold_repaired` | `cargoRepair: true` — the Cargo Hold repair surface is the current target; the Cargo panel selects the advancing affordance (contribute materials vs start Welding) from authoritative repair/material/Welding substate |
+| `repair_target_complete` | `repairTargetId` — that repair surface is the current target, plus the World Location while the player is elsewhere and then the Local Place entrance hosting it, if it has one. The repair surface selects the advancing affordance (contribute materials vs start Welding) from authoritative repair/material/Welding substate. **Exception:** while the recipe still needs material the player carries none of, there is no guidance at all — see §5.1 |
 | `npc_conversation` | `npcId: requirement.npcId` — the person to go and meet, reusing the same NPC-boundary guidance (`npcBoundaryGuidance`) the turn-in NPC uses. While the character is elsewhere, `locationId: requirement.locationId` is the target instead; arriving hands off to the NPC |
 | *(carried requirement with no `recommendedActionId`)* | no guidance at all (see Ambiguous acquisition, below) |
 
@@ -426,7 +433,7 @@ Each consumer answers "am I that target, and with which meaning?":
 - **NPC Talk** — `npcGuidanceMeaning(targets, npc.id)` resolves `"active"` (`guidance.npcIds`), `"turn_in"` (`guidance.turnInNpcIds`), or `"available"` (`guidance.availableNpcIds`), with active-over-turn-in-over-available precedence. Each Mission entry inside the conversation hub reuses the same projected guidance (`docs/npc-conversations.md` §4), so the control and the entry can never disagree.
 - **Cutter Inventory tile / Equipment "Equip in slot"** — `guidance.equipmentItemIds.has(itemId)` (green only; the turn-in phase never targets equipment).
 - **Start Mining / Start Refining** — `guidance.actionIds.has(actionId)` while the action is currently relevant/available (green only). An action highlights only when its `ActionId` is the authored `recommendedActionId` on the current unmet carried requirement.
-- **Cargo Hold repair** — `guidance.cargoRepair` while an accepted mission's current objective observes Cargo repair completion (green only). The Cargo panel owns the repair/material/Welding substate and guides exactly one advancing affordance: CONTRIBUTE MATERIALS while materials are still needed (and a contribution is possible), START WELDING once materials are complete and Welding is idle. STOP WELDING is never guided — stopping does not advance the mission. Completed repair clears the flag and the generic projection moves guidance to the turn-in handoff.
+- **Repair targets** — `guidance.repairTargetId` while an accepted mission's current objective observes that repair's completion (green only). The repair surface owns the repair/material/Welding substate and guides exactly one advancing affordance: CONTRIBUTE MATERIALS while materials are still needed (and a contribution is possible), START WELDING once materials are complete and Welding is idle. STOP WELDING is never guided — stopping does not advance the mission. A target inside a Local Place also guides that place's entrance until the player steps inside, exactly as an NPC resident does. Completed repair clears the target and the generic projection moves guidance to the turn-in handoff.
 - **Local Place Enter** — `localPlaceGuidanceMeaning(targets, place.id)` resolves `"active"` (`guidance.localPlaceIds`) or `"turn_in"` (`guidance.turnInLocalPlaceIds`) on an open place's Enter control, via `MissionActionLink`.
 - **Map hexes** (`features/travel/LocalMapPanel.tsx`) — a World Location hex in `guidance.locationIds` shows a green MISSION plate and ring; one in `guidance.turnInLocationIds` shows a blue TURN IN plate and ring; a hex in both shows both plate texts, with the ring following the same active-over-turn-in precedence. See `docs/travel-map-design.md` for the presentation contract; this document owns only the semantics.
 
@@ -504,7 +511,36 @@ Every other rule is **re-read and revalidated server-side inside the character t
 - for item rewards, a **post-consumption preflight**: plans are applied cumulatively to an in-memory candidate inventory and the reward's capacity is checked against that post-consumption candidate — consumption may legitimately free the slot or mass the reward needs;
 - only after the complete plan is valid, consumption through the authoritative carried-stack boundary, the single declared reward, the guarded `completedAt` stamp, and the authored continuation acceptance (if any, idempotent via `onConflictDoNothing`) commit in the same transaction; any failure (insufficient quantity, capacity still blocked, reward application error) leaves the whole transaction uncommitted;
 - resolved Mining and Refining attempts are handed from the activity resolver to generic mission progress in the same transaction, after activity persistence and before the action cursor advances. Attempts before acceptance reconcile while no mission progress row is active and receive no credit; no per-attempt timestamp or event ledger is added;
-- Cargo Hold repair completion is read from `character_cargo_hold_repair.completed_at` for `cargo_hold_repaired`; the mission framework does not consume repair materials, advance Welding, or maintain a second repair-progress representation;
+### 5.1 Repair phases (issue #172)
+
+A repair job has real stages, and the generic requirement projects the one the
+player is actually in, from the authoritative repair record and the target's
+authored recipe — never from the Mission's identity:
+
+| Phase | Condition | Objective | Guidance |
+| --- | --- | --- | --- |
+| materials | some authored material is short | `materialObjective`, with `{item}` / `{contributed}` / `{required}` | the repair target **only if the player carries a useful unit of an outstanding material**; otherwise none |
+| welding | every material installed, welds outstanding | `weldingObjective`, with `{current}` / `{target}` | the repair target |
+| complete | `completed_at` present | the requirement holds; the Mission is in its turn-in phase | the turn-in NPC |
+
+`{contributed}` is **durably installed material**. Carried stacks, Cargo Hold
+contents, and material the player could go and acquire are never counted: the
+observation is built from the repair record, which has no access to inventory.
+Carried quantity may appear as a `detail` line ("Carrying: 6 Refined Ferrite")
+— rendered subordinate to the objective precisely so it can never read as
+progress or be added to it.
+
+The silent-guidance case follows the same principle as a carried requirement
+with several legitimate sources: Refined Ferrite can be refined, bought, or
+scavenged, so the framework refuses to invent one of them as a destination, and
+the Mission Log's `{contributed} / {required}` carries the objective on its own.
+Carrying even one useful unit makes the repair target worth walking to again,
+and guidance returns.
+
+A Mission that authors no phase copy — Hold It Together — renders its plain
+`objective` in every phase, exactly as before.
+
+- Repair completion is read from `character_repair_targets.completed_at` for `repair_target_complete`; the mission framework does not consume repair materials, advance Welding, or maintain a second repair-progress representation;
 - the durable conversation marker is read for `npc_conversation`; the completion command never satisfies it as a side effect;
 - the character lock (`withResolvedOwnedCharacter` / `runMissionCommand`) plus the `completedAt` `isNull` guard make acceptance and completion — and therefore consumption, reward, acceptance effect, and continuation — exactly-once under retries and concurrent first completions.
 
@@ -632,7 +668,7 @@ Short concrete examples that demonstrate the framework vocabulary. Do not copy m
 ### Hold It Together — continuation-only Cargo repair
 
 - **Acceptance:** `offers: []` is valid because Waste Not authors `continuationMissionId: holdItTogether`; completion of Waste Not accepts Hold It Together atomically with no second acceptance click. The Issue #148 pre-beta repair accepts the same mission row only for characters with completed Waste Not and no existing Hold It Together row.
-- **Requirement:** one generic `cargo_hold_repaired` requirement observes `character_cargo_hold_repair.completed_at`. It has no `characterMissionProgress` row, Welding counter, material requirement, provenance rule, or historical backfill.
+- **Requirement:** one generic `repair_target_complete` requirement observes the Cargo Hold's `character_repair_targets.completed_at`. It has no `characterMissionProgress` row, Welding counter, material requirement, provenance rule, or historical backfill.
 - **Repair boundary:** an accepted Hold It Together unlocks incomplete repair contribution and Welding start. Completed Cargo Holds remain usable regardless of mission state, while Cargo storage still requires authoritative repair completion. Cargo owns the 15 Refined Ferrite + 6 Slag recipe, consumption, Welding timing, per-increment XP, and capacity.
 - **Turn-in / reward:** the repaired Hold makes the mission ready for Wade at the stationary Crash Site turn-in. Completion grants a separate +100 Welding XP exactly once; existing repair XP is never replayed.
 
@@ -644,3 +680,12 @@ Short concrete examples that demonstrate the framework vocabulary. Do not copy m
 - **Reward:** none (§8). The outcome is world/social state — HH B&B becomes enterable because the Mission is completed, derived from that record rather than a second persisted unlock flag (`docs/gameplay-foundations.md`, Local Places).
 - **Dialogue:** Wade's offer scene carries the post-repair beat and the apprenticeship itself, with Tansy interrupting over comms from the seam (per-beat `speakerNpcId` + `presentationMode: "comms"`); Bix's required scene hosts Mara as an authored guest speaker in his own sequence; Tansy authors `conversationReminder` → `carriedReminder` → `busy` → turn-in → completion presentation.
 - **One-time encounter:** the Bix/Mara scene disappears from Bix's hub once the requirement holds and is never replayable (§9.2), while Bix's ordinary topics continue as normal.
+
+### Out of the Weather — the first optional side Mission
+
+- **Acceptance:** `prerequisiteMissionId: holdItTogether`, the same prerequisite Keep the Change has, so the two branch in parallel. One offer route: Renn Calder at Holo Hollow, `actionLabel: "I'LL FIX IT"`. It names no continuation, nothing continues into it, and nothing lists it as a prerequisite — so it is **never** on any main-story path and completing or ignoring it changes nothing upstream (§3.1, §11).
+- **Optionality is structural, not documented.** Availability is local discovery through Renn only (§10), and the Mission Log renders accepted/completed Missions, so a satisfied prerequisite alone puts nothing in front of the player. No framework change was needed for any of that.
+- **Acceptance effect:** none. This Mission costs the player rather than funding them.
+- **Requirement:** one `repair_target_complete` observing the Crew Stop (§5), with authored phase copy (§5.1): "Install Refined Ferrite at the Crew Stop — {contributed} / {required}", then "Weld the Crew Stop — {current} / {target} welds". Guidance runs Holo Hollow → the Crew Stop's Local Place entrance → the repair surface once the player carries useful Refined Ferrite, stays silent while they carry none, and hands off to Renn's turn-in the moment the repair completes.
+- **Reward:** `{ kind: "skill_xp", skillId: welding, amount: 250 }` (§8), on top of the 500 Welding XP the ten genuine increments already paid through the ordinary Welding path. No synthetic work XP and no Credit payout: the durable reward is the repaired shelter and the Crew Hauler ride it earns (`docs/gameplay-foundations.md`, travel modes).
+- **Dialogue:** Renn authors the offer, the repair reminder, busy, the turn-in, the completion presentation (which carries the authored skill-XP beat), and post-completion story dialogue. The player stays silent throughout.

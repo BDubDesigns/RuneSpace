@@ -399,8 +399,8 @@ function turnInStageDialogueId(
   if (stage.nextObjectiveKind === "tracked_activity") {
     return dialogueOr(definition.dialogue.trackedActivityReminderDialogueId, turnIn);
   }
-  if (stage.nextObjectiveKind === "cargo_hold_repaired") {
-    return dialogueOr(definition.dialogue.cargoRepairReminderDialogueId, turnIn);
+  if (stage.nextObjectiveKind === "repair_target_complete") {
+    return dialogueOr(definition.dialogue.repairReminderDialogueId, turnIn);
   }
   if (stage.nextObjectiveKind === "npc_conversation") {
     return dialogueOr(definition.dialogue.conversationReminderDialogueId, turnIn);

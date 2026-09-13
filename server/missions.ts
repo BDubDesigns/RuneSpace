@@ -1,7 +1,6 @@
 import { and, eq, isNull, sql } from "drizzle-orm";
 import type { DatabaseTransaction, ResolvedCharacterContext } from "@/server/action-resolution";
 import {
-  characterCargoHoldRepair,
   characterMissionProgress,
   characterMissions,
   characters,
@@ -26,7 +25,7 @@ import {
 import { resolveItemPresentation } from "@/game/content/item-presentation";
 import { getNpc } from "@/game/content/npcs";
 import { deriveEquipmentLoadout, isCompatibleEquipmentAssignment } from "@/game/domain/equipment";
-import { cargoHoldRepairComplete } from "@/game/domain/cargo-hold";
+import { type RepairTargetState } from "@/game/domain/welding-repair";
 import {
   planExactStackRemoval,
   planUniqueItemAddition,
@@ -44,6 +43,8 @@ import {
 import { grantCharacterSkillXp } from "@/server/progression";
 import { applyStackRemovalPlan, loadOwnedItemInstances } from "@/server/carried-inventory";
 import { ensureMissionProgressRows, recordMissionConversation } from "@/server/mission-progress";
+import { repairMaterialItemIds, repairTargetObservations } from "@/server/mission-state";
+import { loadRepairTargetStates } from "@/server/welding";
 
 export type MissionAcceptance =
   | { status: "accepted" | "already_accepted" | "already_completed" }
@@ -72,7 +73,7 @@ export type MissionCompletion =
         | "prerequisite"
         | "equipment"
         | "tracked_activity"
-        | "cargo_hold_repaired"
+        | "repair_target_complete"
         | "npc_conversation"
         | "insufficient_items"
         | "capacity";
@@ -505,7 +506,7 @@ async function completeMissionForDefinition(input: {
   }
 
   const balance = getEffectiveGameBalance();
-  const [itemState, assignments, stacks, progressRows, repairRows] = await Promise.all([
+  const [itemState, assignments, stacks, progressRows, repairStates] = await Promise.all([
     loadOwnedItemInstances(transaction, context.character.id),
     transaction
       .select()
@@ -527,18 +528,14 @@ async function completeMissionForDefinition(input: {
         ),
       )
       .for("update"),
-    transaction
-      .select()
-      .from(characterCargoHoldRepair)
-      .where(eq(characterCargoHoldRepair.characterId, context.character.id))
-      .for("update"),
+    loadRepairTargetStates(transaction, context.character.id),
   ]);
   const carriedById = new Map(itemState.carriedInstances.map((i) => [i.id, i.itemId]));
   const observation = buildCompletionObservation(
     assignmentCarriedItemIds(assignments, carriedById),
     stacks,
     new Map(progressRows.map((row) => [row.progressKey, row.progress])),
-    repairRows[0],
+    repairStates,
   );
 
   // Re-evaluate every authored requirement against live authoritative
@@ -575,11 +572,11 @@ async function completeMissionForDefinition(input: {
       }
       continue;
     }
-    if (requirement.kind === "cargo_hold_repaired") {
-      if (observation.cargoHoldRepairComplete !== true) {
+    if (requirement.kind === "repair_target_complete") {
+      if (observation.repairTargets?.get(requirement.targetId)?.complete !== true) {
         return stateFor({
           status: "refused",
-          reason: "cargo_hold_repaired",
+          reason: "repair_target_complete",
           message: `Objective not met: ${requirement.objective}.`,
         });
       }
@@ -783,7 +780,7 @@ function renderRequirementCopy(
       .replace("{current}", String(current))
       .replace("{target}", String(requirement.target));
   }
-  if (requirement.kind === "cargo_hold_repaired") return requirement.objective;
+  if (requirement.kind === "repair_target_complete") return requirement.objective;
   if (requirement.kind === "npc_conversation") return requirement.objective;
   const itemName = observation.itemNames.get(requirement.itemId) ?? requirement.itemId;
   if (requirement.kind === "equipped_item") {
@@ -842,14 +839,7 @@ function buildCompletionObservation(
   equippedCarriedIds: ReadonlySet<string>,
   stacks: readonly { itemId: string; quantity: number }[],
   trackedProgress: ReadonlyMap<string, number> = new Map(),
-  repairRow:
-    | {
-        refinedFerriteContributed: number;
-        slagContributed: number;
-        weldingProgress: number;
-        completedAt: Date | null;
-      }
-    | undefined,
+  repairStates: ReadonlyMap<string, RepairTargetState>,
 ): MissionObservation {
   const balance = getEffectiveGameBalance();
   const carriedQuantities = new Map<string, number>();
@@ -861,6 +851,7 @@ function buildCompletionObservation(
   }
   const stackLimits = new Map<string, number>();
   const itemNames = new Map<string, string>();
+  const repairTargets = repairTargetObservations(repairStates, balance);
   const observedItemIds = new Set<string>([
     ...equippedCarriedIds,
     ...carriedQuantities.keys(),
@@ -872,6 +863,7 @@ function buildCompletionObservation(
         )
         .map((requirement) => requirement.itemId),
     ),
+    ...repairMaterialItemIds(repairTargets),
   ]);
   for (const itemId of observedItemIds) {
     const displayName = resolveItemPresentation(itemId, itemId).displayName;
@@ -885,15 +877,7 @@ function buildCompletionObservation(
     stackLimits,
     itemNames,
     trackedProgress,
-    cargoHoldRepairComplete: cargoHoldRepairComplete(
-      repairRow ?? {
-        refinedFerriteContributed: 0,
-        slagContributed: 0,
-        weldingProgress: 0,
-        completedAt: null,
-      },
-      balance,
-    ),
+    repairTargets,
   };
 }
 

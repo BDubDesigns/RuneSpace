@@ -21,6 +21,7 @@ import {
   LOCATION_IDS,
   MISSION_IDS,
   NPC_IDS,
+  REPAIR_TARGET_IDS,
   SKILL_IDS,
 } from "@/game/config/foundations";
 import type { ContentId } from "@/game/schemas/ids";
@@ -31,6 +32,7 @@ import {
   type MissionProjection,
 } from "@/game/domain/missions";
 import { getItemBeatQuantityRange } from "@/game/content/item-presentation";
+import { cargoRepaired, repairObservation } from "./repair-observation";
 
 function observation(overrides: Partial<MissionObservation> = {}): MissionObservation {
   return {
@@ -41,6 +43,7 @@ function observation(overrides: Partial<MissionObservation> = {}): MissionObserv
       [ITEM_IDS.salvageCutter, "Salvage Cutter"],
       [ITEM_IDS.ferriteShale, "Ferrite Shale"],
     ]),
+    repairTargets: repairObservation(),
     ...overrides,
   };
 }
@@ -191,7 +194,7 @@ describe("issue #148 Hold It Together authored and observed repair boundary", ()
       id: MISSION_IDS.holdItTogether,
       prerequisiteMissionId: MISSION_IDS.wasteNot,
       offers: [],
-      requirements: [{ kind: "cargo_hold_repaired" }],
+      requirements: [{ kind: "repair_target_complete" }],
       reward: { kind: "skill_xp", skillId: SKILL_IDS.welding, amount: 100 },
     });
   });
@@ -202,11 +205,11 @@ describe("issue #148 Hold It Together authored and observed repair boundary", ()
     ).toMatchObject({
       state: "active",
       currentObjective: "Repair the Cargo Hold at the Crash Site",
-      requirements: [{ kind: "cargo_hold_repaired", satisfied: false }],
+      requirements: [{ kind: "repair_target_complete", satisfied: false }],
       stage: {
         requirementsSatisfied: false,
         turnInAvailable: false,
-        nextObjectiveKind: "cargo_hold_repaired",
+        nextObjectiveKind: "repair_target_complete",
       },
     });
     expect(
@@ -215,12 +218,12 @@ describe("issue #148 Hold It Together authored and observed repair boundary", ()
         accepted(),
         CRASH_SITE,
         true,
-        observation({ cargoHoldRepairComplete: true }),
+        observation({ repairTargets: cargoRepaired() }),
       ),
     ).toMatchObject({
       state: "ready_for_completion",
       currentObjective: "Report the repaired Cargo Hold to Wade Rusk",
-      requirements: [{ kind: "cargo_hold_repaired", satisfied: true }],
+      requirements: [{ kind: "repair_target_complete", satisfied: true }],
     });
   });
 
@@ -231,7 +234,7 @@ describe("issue #148 Hold It Together authored and observed repair boundary", ()
           stage: {
             requirementsSatisfied: false,
             turnInAvailable: false,
-            nextObjectiveKind: "cargo_hold_repaired",
+            nextObjectiveKind: "repair_target_complete",
           },
         }),
       ])?.dialogueId,
@@ -493,16 +496,43 @@ describe("issue #124 semantic mission guidance projection", () => {
     );
     expect(incomplete).toMatchObject({
       state: "active",
-      stage: { nextObjectiveKind: "cargo_hold_repaired" },
-      guidance: { cargoRepair: true },
+      stage: { nextObjectiveKind: "repair_target_complete" },
+      guidance: { repairTargetId: REPAIR_TARGET_IDS.cargoHold },
     });
     expect(incomplete.guidance?.npcId).toBeUndefined();
     expect(incomplete.guidance?.equipmentItemId).toBeUndefined();
     expect(incomplete.guidance?.actionId).toBeUndefined();
     const targets = deriveMissionGuidanceTargets([incomplete]);
-    expect(targets.cargoRepair).toBe(true);
+    expect(targets.repairTargetIds.has(REPAIR_TARGET_IDS.cargoHold)).toBe(true);
     expect([...targets.npcIds]).toEqual([]);
     expect([...targets.actionIds]).toEqual([]);
+  });
+
+  it("leaves Hold It Together's objective and guidance untouched by repair phases (#172)", () => {
+    // The Cargo Hold uses the same generic requirement as the Crew Stop, but
+    // authors no phase copy and no carrying-based guidance rule, so it reads
+    // and guides exactly as it always has at every stage of the job.
+    for (const progress of [
+      repairObservation(),
+      repairObservation({ [REPAIR_TARGET_IDS.cargoHold]: { contributed: 9 } }),
+      repairObservation({ [REPAIR_TARGET_IDS.cargoHold]: { contributed: 15, welded: 4 } }),
+    ]) {
+      const active = projectMission(
+        HOLD_IT_TOGETHER,
+        accepted(),
+        CRASH_SITE,
+        true,
+        observation({ repairTargets: progress }),
+      );
+      expect(active.currentObjective).toBe("Repair the Cargo Hold at the Crash Site");
+      expect(active.requirements?.[0]).toMatchObject({
+        objective: "Repair the Cargo Hold at the Crash Site",
+        satisfied: false,
+      });
+      expect(active.requirements?.[0]?.detail).toBeUndefined();
+      // Carrying nothing never withholds the Cargo Hold's guidance.
+      expect(active.guidance).toMatchObject({ repairTargetId: REPAIR_TARGET_IDS.cargoHold });
+    }
   });
 
   it("clears Cargo guidance on repair completion and moves turn-in guidance to Wade", () => {
@@ -511,15 +541,15 @@ describe("issue #124 semantic mission guidance projection", () => {
       accepted(),
       CRASH_SITE,
       true,
-      observation({ cargoHoldRepairComplete: true }),
+      observation({ repairTargets: cargoRepaired() }),
     );
     expect(ready).toMatchObject({
       state: "ready_for_completion",
       guidance: { npcId: NPC_IDS.wadeRusk, turnIn: true },
     });
-    expect(ready.guidance?.cargoRepair).toBeUndefined();
+    expect(ready.guidance?.repairTargetId).toBeUndefined();
     const targets = deriveMissionGuidanceTargets([ready]);
-    expect(targets.cargoRepair).toBe(false);
+    expect(targets.repairTargetIds.has(REPAIR_TARGET_IDS.cargoHold)).toBe(false);
     expect([...targets.turnInNpcIds]).toEqual([NPC_IDS.wadeRusk]);
     expect([...targets.npcIds]).toEqual([]);
   });
@@ -534,7 +564,7 @@ describe("issue #124 semantic mission guidance projection", () => {
     );
     expect(refining.guidance).toEqual({ actionId: ACTION_IDS.refining });
     const targets = deriveMissionGuidanceTargets([refining]);
-    expect(targets.cargoRepair).toBe(false);
+    expect(targets.repairTargetIds.has(REPAIR_TARGET_IDS.cargoHold)).toBe(false);
     expect([...targets.actionIds]).toEqual([ACTION_IDS.refining]);
   });
 });

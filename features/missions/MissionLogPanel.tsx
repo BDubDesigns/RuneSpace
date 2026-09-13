@@ -86,6 +86,16 @@ function MissionEntry({
                   </span>
                   <span className="text-[color:var(--rs-text-secondary)]">
                     {requirement.objective}
+                    {/* Secondary context (what is carried, for instance) is its
+                        own subordinate line so it can never read as progress. */}
+                    {requirement.detail ? (
+                      <span
+                        className="mt-0.5 block text-xs text-[color:var(--rs-text-muted)]"
+                        data-mission-requirement-detail
+                      >
+                        {requirement.detail}
+                      </span>
+                    ) : null}
                   </span>
                 </li>
               ))}

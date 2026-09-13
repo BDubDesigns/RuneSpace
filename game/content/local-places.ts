@@ -3,6 +3,7 @@ import {
   LOCATION_IDS,
   MERCHANT_IDS,
   MISSION_IDS,
+  REPAIR_TARGET_IDS,
 } from "@/game/config/foundations";
 import { LocalPlaceDefinitionSchema, type LocalPlaceDefinition } from "@/game/schemas/local-places";
 
@@ -79,6 +80,41 @@ const localPlaceDefinitions = [
         height: 384,
         alt: "Converted family bed-and-breakfast serving as a working inn, with a hand-lettered HH B&B sign",
         focal: { x: 50, y: 45 } as const,
+      },
+    },
+  },
+  {
+    id: LOCAL_PLACE_IDS.holoHollowCrewStop,
+    parentLocationId: LOCATION_IDS.holoHollow,
+    displayName: "Crew Stop",
+    // Open from the start: the player can walk up and see the state it is in
+    // long before anybody asks them to do anything about it. What the accepted
+    // Mission unlocks is the repair work, not the place (#172).
+    access: { kind: "open" as const },
+    description:
+      "A covered roadside shelter on the haul road, where mining crews wait for the shift hauler out to The Jag. The canopy sags at one corner and the bench leans with it, so most mornings the crews stand in the weather instead.",
+    presentation: {
+      // The approved damaged/repaired pair (#172). Both scenes share one camera,
+      // framing, and time of day so the only thing that changes is the thing the
+      // player fixed — see docs/location-scenes.md on before/after pairs.
+      scene: {
+        asset: "/location-scenes/holo-hollow-crew-stop-damaged.webp" as const,
+        width: 1536,
+        height: 384,
+        alt: "Roadside crew shelter at dusk with its corrugated canopy torn open to the sky and its bench collapsed face-down in the mud, mine workings lit beyond",
+        focal: { x: 42, y: 50 } as const,
+      },
+      repaired: {
+        repairTargetId: REPAIR_TARGET_IDS.crewStop,
+        description:
+          "A covered roadside shelter on the haul road, where mining crews wait for the shift hauler out to The Jag. The canopy sits square on a welded brace now, and the bench takes a full shift's worth of people without complaint.",
+        scene: {
+          asset: "/location-scenes/holo-hollow-crew-stop-repaired.webp" as const,
+          width: 1536,
+          height: 384,
+          alt: "The same roadside crew shelter at dusk, its canopy whole and squared on welded bracing with the bench remounted along the back wall, mine workings lit beyond",
+          focal: { x: 42, y: 50 } as const,
+        },
       },
     },
   },

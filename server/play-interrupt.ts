@@ -7,6 +7,7 @@ import {
   type ActiveAction,
   type Character,
 } from "@/db/rune-space";
+import { weldingActionIds } from "@/game/config/balance";
 import { ACTION_IDS } from "@/game/config/foundations";
 import type { DatabaseTransaction } from "@/server/action-resolution";
 
@@ -73,7 +74,10 @@ export async function forceIdleResolvedAction(
     return { interrupted: true, interruptedActionId: actionId };
   }
 
-  if (actionId === ACTION_IDS.cargoHoldWelding) {
+  // Welding on any repair target: the active action row is the only thing to
+  // clean up, because resolved increments are already committed and a partial
+  // pass never became progress.
+  if (weldingActionIds().includes(actionId)) {
     await transaction.delete(activeActions).where(eq(activeActions.characterId, character.id));
     return { interrupted: true, interruptedActionId: actionId };
   }

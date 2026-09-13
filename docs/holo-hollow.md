@@ -329,8 +329,15 @@ A depot, old parking/landing area, or hauler staging area may be visible in the
 first town slice. It can foreshadow later paid transport and reinforce the town's
 working economy.
 
-Functional paid rides are deferred. Do not add special travel timing or one-way
-rides in the foundation slice merely because the depot is visible.
+**Shipped in #172** as the Crew Stop and the Crew Hauler. The realized form is
+deliberately smaller than a depot: an old covered roadside pickup shelter on the
+haul road where mining crews wait for the shift hauler out to The Jag. It is a
+Local Place, not a World Location or a map hex, and there is no station, no
+timetable, no ticketing, and no named driver.
+
+The player can repair it through Renn's optional side Mission **Out of the
+Weather** using the Welding they learned from Wade, after which the crews let
+them ride out to the mine for 5 Credits. See "Out of the Weather" below.
 
 ### Future contract board
 
@@ -486,7 +493,41 @@ debt shipped afterwards in #170 (see "Keep the Change" below):
 - ~~Mara's portrait/expression set and the HH B&B conversation interior~~ —
   shipped in #170;
 - ~~the HH B&B unlock on that Mission's completion~~ — shipped in #170;
+- ~~the depot/hauler area and functional paid rides~~ — shipped in #172 as the
+  Crew Stop and the Crew Hauler;
 - replacing the similar Local Place exteriors (art debt above) — still open.
+
+### Out of the Weather (#172)
+
+RuneSpace's first deliberately optional side Mission, and the first permanent
+player-made improvement to the world.
+
+After **Hold It Together**, Renn Calder mentions the Crew Stop: the roof leaks,
+the bench leans, everybody complains, and nobody owns it enough to fix it. The
+player may choose to spend **20 Refined Ferrite** and **ten genuine Welding
+increments** repairing it. Nothing forces them to, and ignoring it forever
+blocks nothing — **Keep the Change is not a prerequisite and is not affected**.
+
+The point of the Mission is that the world stays changed. The repaired shelter
+keeps its repaired artwork and copy permanently, and because the crews use it
+every workday and know who fixed it, they will squeeze the player onto the shift
+hauler out to The Jag for **5 Credits a ride**. The ride is boarded at the
+shelter itself — it belongs to the people who wait there, not to the town — and
+it runs **one way only**: there is room for a passenger heading out, and none
+coming back with the hauler loaded with shale, so the player walks home through
+The Long Scramble like everybody else. It appears only once Renn has actually
+been told: the repair changes the world the moment it is finished, but the
+crews' willingness to carry the player arrives with the turn-in.
+
+The reward is deliberately not a pile of Credits. It is 250 Welding XP on top of
+the 500 the work already paid, plus a place that is better than it was and a
+town that is a little easier to live in. Walking stays free, keeps its route
+through The Long Scramble, and keeps its Scavenge opportunities — the ride is a
+recurring choice between time and money, not a replacement.
+
+The Mission establishes the pattern intended for later Holo Hollow restoration
+work such as the projector/Drive-In arc: optional side content may permanently
+make the world more useful without becoming a prerequisite for the main story.
 
 ### Still out of scope
 

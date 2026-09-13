@@ -164,8 +164,8 @@ export async function cleanupTestCharacter(db: Db, rune: Rune, characterId: stri
       .delete(rune.characterRefiningState)
       .where(eq(rune.characterRefiningState.characterId, characterId));
     await tx
-      .delete(rune.characterCargoHoldRepair)
-      .where(eq(rune.characterCargoHoldRepair.characterId, characterId));
+      .delete(rune.characterRepairTargets)
+      .where(eq(rune.characterRepairTargets.characterId, characterId));
     await tx
       .delete(rune.cargoHoldItemInstances)
       .where(eq(rune.cargoHoldItemInstances.characterId, characterId));
@@ -194,4 +194,40 @@ export async function cleanupTestCharacter(db: Db, rune: Rune, characterId: stri
     await tx.delete(rune.itemInstances).where(eq(rune.itemInstances.characterId, characterId));
     await tx.delete(rune.characters).where(eq(rune.characters.id, characterId));
   });
+}
+
+/**
+ * Seed one repair target's durable state for a character (#172).
+ *
+ * Repair rows are created lazily by the repair commands, so a suite that wants
+ * a character to already be mid-repair (or finished) inserts the row rather
+ * than updating a row that provisioning no longer creates.
+ */
+export async function seedRepairTarget(
+  db: Db,
+  rune: Rune,
+  characterId: string,
+  targetId: string,
+  values: {
+    refinedFerriteContributed?: number;
+    slagContributed?: number;
+    weldingProgress?: number;
+    completedAt?: Date | null;
+    updatedAt?: Date;
+  },
+): Promise<void> {
+  const row = {
+    refinedFerriteContributed: values.refinedFerriteContributed ?? 0,
+    slagContributed: values.slagContributed ?? 0,
+    weldingProgress: values.weldingProgress ?? 0,
+    completedAt: values.completedAt ?? null,
+    updatedAt: values.updatedAt ?? new Date(),
+  };
+  await db
+    .insert(rune.characterRepairTargets)
+    .values({ characterId, targetId, ...row })
+    .onConflictDoUpdate({
+      target: [rune.characterRepairTargets.characterId, rune.characterRepairTargets.targetId],
+      set: row,
+    });
 }

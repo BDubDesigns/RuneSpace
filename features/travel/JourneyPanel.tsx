@@ -5,6 +5,7 @@ import { Panel } from "@/components/ui/Panel";
 import { SectionHeader } from "@/components/ui/SectionHeader";
 import { StatusMeter } from "@/components/ui/StatusMeter";
 import { getLocation } from "@/game/content/locations";
+import { TRANSPORT_ROUTES } from "@/game/content/transport-routes";
 import { ScavengeControl } from "./ScavengeControl";
 import { deriveJourneyFeed } from "./journey-feed";
 import { usePlay } from "@/features/play/PlayContext";
@@ -31,14 +32,33 @@ export function JourneyPanel() {
 
   const origin = getLocation(travel.originLocationId)?.displayName ?? "origin";
   const destination = getLocation(travel.destinationLocationId)?.displayName ?? "destination";
+  // A ride is described as a ride. The mode is authoritative travel state, so
+  // the Journey surface can never claim the player is walking when they paid
+  // not to be.
+  const rideName =
+    travel.mode === "walk"
+      ? undefined
+      : (TRANSPORT_ROUTES.find((route) => route.mode === travel.mode)?.displayName ?? "transport");
   const remainingSeconds = Math.max(0, (new Date(travel.arrivesAt).getTime() - now) / 1_000);
   const feed = deriveJourneyFeed(travel, new Date(now));
 
   return (
     <Panel tone="raised" data-journey-surface>
       <SectionHeader eyebrow="In transit">Journey</SectionHeader>
-      <p className="mt-4 text-sm text-[color:var(--rs-text-primary)]">
-        Walking from <strong>{origin}</strong> to <strong>{destination}</strong>.
+      <p
+        className="mt-4 text-sm text-[color:var(--rs-text-primary)]"
+        data-journey-mode={travel.mode}
+      >
+        {rideName ? (
+          <>
+            Riding the <strong>{rideName}</strong> from <strong>{origin}</strong> to{" "}
+            <strong>{destination}</strong>.
+          </>
+        ) : (
+          <>
+            Walking from <strong>{origin}</strong> to <strong>{destination}</strong>.
+          </>
+        )}
       </p>
       <div className="mt-4" data-travel-progress>
         <StatusMeter
@@ -48,7 +68,9 @@ export function JourneyPanel() {
         />
       </div>
       <p className="mt-3 text-sm leading-relaxed text-[color:var(--rs-text-secondary)]">
-        The active work stopped before departure. No new activity can begin until you arrive.
+        {rideName
+          ? "Nothing to do but sit with the crew. No new activity can begin until you arrive."
+          : "The active work stopped before departure. No new activity can begin until you arrive."}
       </p>
 
       <ol aria-label="Journey events" className="mt-5 space-y-3" data-journey-feed>

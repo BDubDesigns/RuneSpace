@@ -2,18 +2,18 @@
   "schemaVersion": 1,
   "projectSlug": "runespace",
   "workState": "active",
-  "currentFocus": "Small navigation polish inside Local Places: the way back out of a shop or building is now an obvious Back control instead of a tiny text link.",
+  "currentFocus": "Out of the Weather, RuneSpace's first optional side Mission: repair Holo Hollow's Crew Stop with Welding, and the mining crews start letting you ride out to The Jag for 5 Credits.",
   "currentChange": {
-    "summary": "Replaces the tiny Back to <location> text link inside Local Places with the shared secondary control, so the way back out to town is obvious at phone width and on desktop.",
-    "stage": "preview",
-    "pullRequestNumber": 182
+    "summary": "Adds the optional side Mission Out of the Weather, the repairable Crew Stop, the one-way 5-Credit Crew Hauler ride out to The Jag, and one generic repair-target persistence boundary shared with the Cargo Hold.",
+    "stage": "review",
+    "pullRequestNumber": 183
   },
   "latestCompleted": {
-    "summary": "Added Map MISSION and TURN IN destinations, blue turn-in guidance, compact Mission strips at the top of Play, and visible keyboard focus on beveled controls.",
+    "summary": "Made the way out of a Local Place an obvious Back control instead of a small text link.",
     "date": "2026-09-12",
-    "url": "https://github.com/BDubDesigns/RuneSpace/pull/180"
+    "url": "https://github.com/BDubDesigns/RuneSpace/pull/182"
   },
-  "nextStep": "Complete human preview review of the Local Place Back control in PR #182 before it is merged to main.",
+  "nextStep": "Complete human review of PR #183 before it is merged to main.",
   "lastMeaningfulUpdate": "2026-09-12",
   "highlights": [
     {

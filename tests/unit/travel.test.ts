@@ -14,6 +14,7 @@ function travel(startedAt: Date): TravelState {
   return {
     originLocationId: LOCATION_IDS.crashSite,
     destinationLocationId: LOCATION_IDS.abandonedProcessingYard,
+    mode: "walk",
     startedAt,
     arrivesAt: new Date(startedAt.getTime() + DURATION_TICKS * TICK_MS),
   };
