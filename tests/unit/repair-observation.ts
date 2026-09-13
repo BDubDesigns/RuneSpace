@@ -10,10 +10,17 @@ import type { RepairTargetObservation } from "@/game/domain/missions";
  * Tests name only what they care about — "the Cargo Hold is finished", "ten of
  * the twenty are installed" — and every other target reports its honest zero.
  */
+export type RepairProgressInput = {
+  complete?: boolean;
+  /** Installed Refined Ferrite. */
+  contributed?: number;
+  /** Installed Slag, for a recipe that needs any. */
+  slag?: number;
+  welded?: number;
+};
+
 export function repairObservation(
-  progress: Partial<
-    Record<RepairTargetId, { complete?: boolean; contributed?: number; welded?: number }>
-  > = {},
+  progress: Partial<Record<RepairTargetId, RepairProgressInput>> = {},
 ): ReadonlyMap<string, RepairTargetObservation> {
   const balance = getEffectiveGameBalance();
   return new Map(
@@ -34,7 +41,7 @@ export function repairObservation(
             },
             {
               itemId: balance.items.slag.itemId,
-              contributed: complete ? recipe.slagRequired : 0,
+              contributed: complete ? recipe.slagRequired : (state.slag ?? 0),
               required: recipe.slagRequired,
             },
           ].filter((material) => material.required > 0),

@@ -394,7 +394,7 @@ const authoredWikiArticles = [
           [
             "Out of the Weather — Renn Calder mentions that the Crew Stop out on the haul road is falling apart and nobody owns it enough to fix it. Repairing it takes 20 Refined Ferrite and ten ",
             { text: "welding passes", articleSlug: "cargo-hold-and-welding" },
-            ". Renn offers it in town once you've finished Hold It Together; you don't need Keep the Change first, and it never blocks it.",
+            ". Renn brings it up in town once you've finished Hold It Together — he isn't asking you to do anything about it, and you can decide to pitch in. You don't need Keep the Change first, and it never blocks it.",
           ],
         ],
       },

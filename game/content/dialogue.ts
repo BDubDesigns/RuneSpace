@@ -871,10 +871,6 @@ const dialogue = {
         EXPRESSION_IDS.neutral,
         "And whatever's left of Wade's money stays in your pocket. That's how the job was supposed to work.",
       ),
-      tansyLocal(
-        EXPRESSION_IDS.smile,
-        "Word travels fast out here. Mara's expecting you at the B&B — try not to make it weird.",
-      ),
     ],
   },
   [DIALOGUE_IDS.wadePostKeepTheChange]: {
@@ -1141,38 +1137,27 @@ const dialogue = {
     id: DIALOGUE_IDS.rennOutOfTheWeatherOffer,
     npcId: NPC_IDS.rennCalder,
     beats: [
-      rennLocal(EXPRESSION_IDS.neutral, "Heard you put Wade's Cargo Hold back together."),
-      rennLocal(EXPRESSION_IDS.sardonic, "So you can weld. Good for you."),
+      rennLocal(EXPRESSION_IDS.neutral, "You seen the Crew Stop out on the haul road?"),
+      rennLocal(EXPRESSION_IDS.neutral, "Roof's full of holes. Bench is busted."),
+      rennLocal(EXPRESSION_IDS.guarded, "Everybody uses it, nobody owns it."),
       rennLocal(
         EXPRESSION_IDS.neutral,
-        "Then here's one nobody's going to thank you for. The Crew Stop out on the haul road.",
+        "Crews stand out there in the weather every morning, pretending it doesn't bother them.",
       ),
-      rennLocal(EXPRESSION_IDS.neutral, "Roof leaks. Bench leans. Everybody complains about it."),
-      rennLocal(
-        EXPRESSION_IDS.guarded,
-        "Nobody fixes it, because nobody owns it enough to fix it.",
-      ),
+      rennLocal(EXPRESSION_IDS.guarded, "I can assure you, it does."),
       rennLocal(
         EXPRESSION_IDS.neutral,
-        "So every morning a handful of people stand in the weather pretending it doesn't bother them.",
+        "No one 'round here can afford to spare 20 Refined Ferrite, otherwise it'd be patch-welded by now.",
       ),
-      rennLocal(
-        EXPRESSION_IDS.sardonic,
-        "It's twenty Refined Ferrite and an afternoon of your life. I'm not pretending that's nothing.",
-      ),
-      rennLocal(EXPRESSION_IDS.neutral, "But it'd be fixed. That's the whole pitch."),
     ],
   },
   [DIALOGUE_IDS.rennOutOfTheWeatherRepairReminder]: {
     id: DIALOGUE_IDS.rennOutOfTheWeatherRepairReminder,
     npcId: NPC_IDS.rennCalder,
     beats: [
-      rennLocal(EXPRESSION_IDS.neutral, "Still standing, still leaning."),
-      rennLocal(
-        EXPRESSION_IDS.sardonic,
-        "Twenty Refined Ferrite and however long the welding takes you. Nobody's holding a clock.",
-      ),
-      rennLocal(EXPRESSION_IDS.neutral, "Put in what you've got. Come back with the rest."),
+      rennLocal(EXPRESSION_IDS.neutral, "Still standing. Still leaking."),
+      rennLocal(EXPRESSION_IDS.guarded, "Nobody's holding a clock over it."),
+      rennLocal(EXPRESSION_IDS.neutral, "It's been like that a long time. It'll wait."),
     ],
   },
   [DIALOGUE_IDS.rennOutOfTheWeatherBusy]: {
@@ -1191,37 +1176,29 @@ const dialogue = {
     npcId: NPC_IDS.rennCalder,
     beats: [
       rennLocal(EXPRESSION_IDS.neutral, "The Crew Stop's fixed."),
-      rennLocal(
-        EXPRESSION_IDS.guarded,
-        "Canopy square. Bench bolted down. No sky coming through it.",
-      ),
-      rennLocal(EXPRESSION_IDS.neutral, "Didn't take me long to work out who."),
+      rennLocal(EXPRESSION_IDS.guarded, "Roof's whole. Bench is bolted down."),
+      rennLocal(EXPRESSION_IDS.neutral, "That was you."),
     ],
   },
   [DIALOGUE_IDS.rennOutOfTheWeatherCompletion]: {
     id: DIALOGUE_IDS.rennOutOfTheWeatherCompletion,
     npcId: NPC_IDS.rennCalder,
     beats: [
-      rennLocal(EXPRESSION_IDS.neutral, "It's been leaking a long time. It isn't now."),
+      rennLocal(EXPRESSION_IDS.neutral, "I didn't think anyone would."),
+      rennLocal(EXPRESSION_IDS.guarded, "The crews will notice. They notice everything out there."),
       rennLocal(
-        EXPRESSION_IDS.sardonic,
-        "The crews will assume one of their own finally got round to it. I'll correct them.",
+        EXPRESSION_IDS.neutral,
+        "The shift hauler runs out to The Jag most of the day. They'll squeeze you on for five Credits.",
       ),
       rennLocal(
         EXPRESSION_IDS.neutral,
-        "So: the shift hauler runs out to The Jag most of the day. They'll squeeze you on for five Credits.",
+        "Out only. It comes back loaded with shale — there's no room on it for you.",
       ),
-      rennLocal(
-        EXPRESSION_IDS.sardonic,
-        "Out only. Coming back it's stacked to the rails with shale, and shale doesn't move over for anybody.",
-      ),
-      rennLocal(EXPRESSION_IDS.neutral, "You walk home like the rest of us."),
       rennLocal(
         EXPRESSION_IDS.guarded,
-        "Not a favour, exactly. They just don't mind you now, and that's worth more here than it sounds.",
+        "It's not a favour. They just don't mind you now. That's worth more here than it sounds.",
       ),
       rennSkillXpBeat(SKILL_IDS.welding, 250),
-      rennLocal(EXPRESSION_IDS.neutral, "You also got better at it. That's how that works."),
     ],
   },
   [DIALOGUE_IDS.rennPostOutOfTheWeather]: {

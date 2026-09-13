@@ -74,11 +74,6 @@ export function repairPhase(target: RepairTargetObservation | undefined): Repair
     : "welding";
 }
 
-/** The first authored material still short, which is the one to act on. */
-function outstandingMaterial(target: RepairTargetObservation | undefined) {
-  return target?.materials.find((material) => material.contributed < material.required);
-}
-
 /**
  * Semantic mission-guidance targets projected from mission state. UI consumers
  * answer one common question — "is this entity/control currently a
@@ -176,6 +171,21 @@ export type MissionRequirementStatus = {
    * advance a durable objective.
    */
   detail?: string;
+  /**
+   * One row per authored material of a repair recipe, during its material
+   * phase (#172). Present only when the recipe has more than one material, so
+   * unlike materials are never aggregated into a single fake total: the Cargo
+   * Hold reports Refined Ferrite and Slag as two legible requirements the
+   * player can read at once. `current` is durably installed material; `carried`
+   * is subordinate context and is never added to it.
+   */
+  materials?: readonly {
+    itemId: string;
+    label: string;
+    current: number;
+    target: number;
+    carried?: number;
+  }[];
 };
 
 /**
@@ -270,31 +280,35 @@ function renderRequirementObjective(
 /**
  * The repair objective for the phase the player is actually in (#172).
  *
- * The requirement may author copy for the material phase and the Welding
- * phase; whichever phase is live renders with authoritative names and durable
- * numbers substituted, and anything unauthored falls back to the requirement's
- * plain objective. No Mission ID is consulted: the phase comes from the repair
- * record, so a Mission that authors no phase copy — the Cargo Hold's — reads
- * exactly as it always has.
+ * Generated from the repair target's own authored identity and recipe, so a
+ * requirement that supplies nothing but `kind` and `targetId` still reads
+ * correctly through every phase. A Mission author cannot forget to opt in,
+ * because there is nothing to opt into: the phase comes from the repair
+ * record, the names from the item and repair-target registries.
+ *
+ * A recipe with one material states it inline ("Install Refined Ferrite at the
+ * Crew Stop — 10 / 20"). A recipe with several never invents a combined total:
+ * the line names the job and `materials` carries one legible row per material.
  */
 function renderRepairObjective(
   requirement: Extract<MissionRequirement, { kind: "repair_target_complete" }>,
   observation: MissionObservation | undefined,
 ): string {
+  const definition = getRepairTarget(requirement.targetId);
   const target = observation?.repairTargets?.get(requirement.targetId);
   const phase = repairPhase(target);
+  if (!definition || !target) return requirement.objective;
   if (phase === "materials") {
-    const material = outstandingMaterial(target);
-    if (!requirement.materialObjective || !material) return requirement.objective;
-    return requirement.materialObjective
-      .replace("{item}", observation?.itemNames.get(material.itemId) ?? material.itemId)
-      .replace("{contributed}", String(material.contributed))
-      .replace("{required}", String(material.required));
+    const [only] = target.materials;
+    if (target.materials.length === 1 && only) {
+      const name = observation?.itemNames.get(only.itemId) ?? only.itemId;
+      return `Install ${name} at the ${definition.displayName} — ${only.contributed} / ${only.required}`;
+    }
+    return `Install repair materials at the ${definition.displayName}`;
   }
-  if (phase === "welding" && requirement.weldingObjective && target) {
-    return requirement.weldingObjective
-      .replace("{current}", String(Math.min(target.welding.completed, target.welding.required)))
-      .replace("{target}", String(target.welding.required));
+  if (phase === "welding") {
+    const welds = Math.min(target.welding.completed, target.welding.required);
+    return `Weld the ${definition.displayName} — ${welds} / ${target.welding.required} welds`;
   }
   return requirement.objective;
 }
@@ -487,15 +501,14 @@ function deriveGuidance(
  * it, if it lives inside one, and finally the repair surface itself. Derived
  * purely from the authored repair-target registry.
  *
- * A repair may author one exception (`materialGuidance: "when_carrying"`),
- * which is the same principle a carried requirement with several legitimate
- * sources already follows (#172): while the recipe still needs material the
- * player is not carrying any of, going to the repair target accomplishes
- * nothing, and the framework has no business inventing where to get it.
- * Refined Ferrite can be refined, bought, or scavenged — so guidance stays
- * silent and the Mission Log's "{contributed} / {required}" says the rest.
- * Carry even one useful unit, or finish the materials, and the target becomes
- * worth walking to again.
+ * While the recipe still needs material the player carries none of, there is
+ * no guidance at all — the same principle a carried requirement with several
+ * legitimate sources already follows (#172). Going to the repair target
+ * accomplishes nothing then, and the framework has no business inventing
+ * where to get the material: Refined Ferrite can be refined, bought, or
+ * scavenged, and the Mission Log's own numbers say what is missing. Carry one
+ * useful unit, or finish the materials, and the target is worth walking to
+ * again. This is ordinary repair behavior, not an authored opt-in.
  */
 function repairTargetGuidance(
   requirement: Extract<MissionRequirement, { kind: "repair_target_complete" }>,
@@ -507,7 +520,6 @@ function repairTargetGuidance(
   if (!target) return {};
   const observed = observation?.repairTargets?.get(targetId);
   if (
-    requirement.materialGuidance === "when_carrying" &&
     repairPhase(observed) === "materials" &&
     !carriesUsefulRepairMaterial(observed, observation)
   ) {
@@ -671,28 +683,46 @@ function projectRequirement(
   if (requirement.kind === "repair_target_complete") {
     const target = observation?.repairTargets?.get(requirement.targetId);
     const phase = repairPhase(target);
-    const material = outstandingMaterial(target);
-    const carried = material ? (observation?.carriedQuantities.get(material.itemId) ?? 0) : 0;
+    const materials = target?.materials ?? [];
+    const [only] = materials;
+    const carriedOf = (itemId: string) => observation?.carriedQuantities.get(itemId) ?? 0;
+    const nameOf = (itemId: string) => observation?.itemNames.get(itemId) ?? itemId;
     return {
       kind: requirement.kind,
       objective: renderRequirementObjective(requirement, observation),
       satisfied,
       repairTargetId: requirement.targetId,
-      ...(phase === "materials" && material
-        ? { progress: { current: material.contributed, target: material.required } }
-        : phase === "welding" && target
-          ? {
-              progress: {
-                current: Math.min(target.welding.completed, target.welding.required),
-                target: target.welding.required,
-              },
-            }
-          : {}),
-      // Carried material is context, never progress: it is reported on its own
-      // line so it can never be mistaken for — or added to — what is installed.
-      ...(phase === "materials" && material && carried > 0
+      ...(phase === "welding" && target
         ? {
-            detail: `Carrying: ${carried} ${observation?.itemNames.get(material.itemId) ?? material.itemId}`,
+            progress: {
+              current: Math.min(target.welding.completed, target.welding.required),
+              target: target.welding.required,
+            },
+          }
+        : {}),
+      // One material states itself on the objective line; several get a row
+      // each, because adding Refined Ferrite to Slag would be a number that
+      // means nothing. Either way the value is installed material alone —
+      // carried stacks and stored cargo never reach it.
+      ...(phase === "materials" && materials.length === 1 && only
+        ? {
+            progress: { current: only.contributed, target: only.required },
+            ...(carriedOf(only.itemId) > 0
+              ? { detail: `Carrying: ${carriedOf(only.itemId)} ${nameOf(only.itemId)}` }
+              : {}),
+          }
+        : {}),
+      ...(phase === "materials" && materials.length > 1
+        ? {
+            materials: materials.map((material) => ({
+              itemId: material.itemId,
+              label: nameOf(material.itemId),
+              current: material.contributed,
+              target: material.required,
+              ...(carriedOf(material.itemId) > 0 && material.contributed < material.required
+                ? { carried: carriedOf(material.itemId) }
+                : {}),
+            })),
           }
         : {}),
     };

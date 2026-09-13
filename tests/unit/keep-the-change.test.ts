@@ -418,6 +418,17 @@ describe("Keep the Change conversations", () => {
     });
   });
 
+  it("ends Tansy's completion on the Credits, inventing no Mara appointment", () => {
+    // Mara met the player herself in Bix's shop and invited them then; the B&B
+    // unlock is already world state. Tansy sending them off to a meeting that
+    // does not exist only manufactured awkwardness.
+    const beats = (getDialogue(DIALOGUE_IDS.tansyKeepTheChangeCompletion)?.beats ?? []).flatMap(
+      (beat) => ("text" in beat && typeof beat.text === "string" ? [beat.text] : []),
+    );
+    expect(beats.join(" ")).not.toMatch(/Mara|make it weird|B&B/i);
+    expect(beats.at(-1)).toMatch(/stays in your pocket/);
+  });
+
   it("stops offering the Bix/Mara encounter once it has actually happened", () => {
     // The one-time story event must not replay: Mara walking in and meeting the
     // player is a specific occurrence, not idle dialogue. Satisfaction comes

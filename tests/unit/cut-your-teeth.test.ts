@@ -32,6 +32,7 @@ import {
   type MissionProjection,
 } from "@/game/domain/missions";
 import { getItemBeatQuantityRange } from "@/game/content/item-presentation";
+import { getRepairTargetBalance } from "@/game/config/balance";
 import { cargoRepaired, repairObservation } from "./repair-observation";
 
 function observation(overrides: Partial<MissionObservation> = {}): MissionObservation {
@@ -42,6 +43,8 @@ function observation(overrides: Partial<MissionObservation> = {}): MissionObserv
     itemNames: new Map<string, string>([
       [ITEM_IDS.salvageCutter, "Salvage Cutter"],
       [ITEM_IDS.ferriteShale, "Ferrite Shale"],
+      [ITEM_IDS.refinedFerrite, "Refined Ferrite"],
+      [ITEM_IDS.slag, "Slag"],
     ]),
     repairTargets: repairObservation(),
     ...overrides,
@@ -204,7 +207,7 @@ describe("issue #148 Hold It Together authored and observed repair boundary", ()
       projectMission(HOLD_IT_TOGETHER, accepted(), CRASH_SITE, true, observation()),
     ).toMatchObject({
       state: "active",
-      currentObjective: "Repair the Cargo Hold at the Crash Site",
+      currentObjective: "Install repair materials at the Cargo Hold",
       requirements: [{ kind: "repair_target_complete", satisfied: false }],
       stage: {
         requirementsSatisfied: false,
@@ -485,14 +488,16 @@ describe("issue #124 semantic mission guidance projection", () => {
   });
 
   it("projects the Cargo repair surface while Hold It Together is the current objective", () => {
-    // Repair incomplete: the generic projection flags the Cargo surface, with
-    // no NPC/equipment/action target competing for green guidance.
+    // Repair incomplete and a needed material in hand: the generic projection
+    // flags the Cargo surface, with no NPC/equipment/action target competing
+    // for green guidance. (Carrying nothing useful is covered by the generic
+    // repair suite, which proves guidance stays silent then.)
     const incomplete = projectMission(
       HOLD_IT_TOGETHER,
       accepted(),
       CRASH_SITE,
       true,
-      observation(),
+      observation({ carriedQuantities: new Map([[ITEM_IDS.refinedFerrite, 5]]) }),
     );
     expect(incomplete).toMatchObject({
       state: "active",
@@ -508,31 +513,54 @@ describe("issue #124 semantic mission guidance projection", () => {
     expect([...targets.actionIds]).toEqual([]);
   });
 
-  it("leaves Hold It Together's objective and guidance untouched by repair phases (#172)", () => {
-    // The Cargo Hold uses the same generic requirement as the Crew Stop, but
-    // authors no phase copy and no carrying-based guidance rule, so it reads
-    // and guides exactly as it always has at every stage of the job.
-    for (const progress of [
-      repairObservation(),
-      repairObservation({ [REPAIR_TARGET_IDS.cargoHold]: { contributed: 9 } }),
-      repairObservation({ [REPAIR_TARGET_IDS.cargoHold]: { contributed: 15, welded: 4 } }),
-    ]) {
-      const active = projectMission(
-        HOLD_IT_TOGETHER,
-        accepted(),
-        CRASH_SITE,
-        true,
-        observation({ repairTargets: progress }),
-      );
-      expect(active.currentObjective).toBe("Repair the Cargo Hold at the Crash Site");
-      expect(active.requirements?.[0]).toMatchObject({
-        objective: "Repair the Cargo Hold at the Crash Site",
-        satisfied: false,
-      });
-      expect(active.requirements?.[0]?.detail).toBeUndefined();
-      // Carrying nothing never withholds the Cargo Hold's guidance.
-      expect(active.guidance).toMatchObject({ repairTargetId: REPAIR_TARGET_IDS.cargoHold });
-    }
+  it("reads the Cargo Hold's two materials as two requirements, never one total (#172)", () => {
+    // Hold It Together authors no phase copy at all and still gets the staged
+    // repair UX, because it is ordinary behavior of the requirement. Refined
+    // Ferrite and Slag stay individually legible: 8 and 3 are never summed into
+    // an "11 / 21" that would mean nothing, and Slag is not hidden until
+    // Refined Ferrite happens to finish.
+    const materialPhase = projectMission(
+      HOLD_IT_TOGETHER,
+      accepted(),
+      CRASH_SITE,
+      true,
+      observation({
+        repairTargets: repairObservation({
+          [REPAIR_TARGET_IDS.cargoHold]: { contributed: 8, slag: 3 },
+        }),
+      }),
+    );
+    expect(materialPhase.currentObjective).toBe("Install repair materials at the Cargo Hold");
+    expect(materialPhase.requirements?.[0]?.progress).toBeUndefined();
+    expect(materialPhase.requirements?.[0]?.materials).toEqual([
+      { itemId: ITEM_IDS.refinedFerrite, label: "Refined Ferrite", current: 8, target: 15 },
+      { itemId: ITEM_IDS.slag, label: "Slag", current: 3, target: 6 },
+    ]);
+
+    // Materials in, welding outstanding: the objective becomes the welding.
+    const weldingPhase = projectMission(
+      HOLD_IT_TOGETHER,
+      accepted(),
+      CRASH_SITE,
+      true,
+      observation({
+        repairTargets: repairObservation({
+          [REPAIR_TARGET_IDS.cargoHold]: { contributed: 15, slag: 6, welded: 4 },
+        }),
+      }),
+    );
+    expect(weldingPhase.currentObjective).toBe("Weld the Cargo Hold — 4 / 12 welds");
+    expect(weldingPhase.requirements?.[0]?.progress).toEqual({ current: 4, target: 12 });
+    expect(weldingPhase.guidance).toMatchObject({ repairTargetId: REPAIR_TARGET_IDS.cargoHold });
+  });
+
+  it("keeps the Cargo Hold's authored recipe exactly as it was (#172)", () => {
+    const recipe = getRepairTargetBalance(REPAIR_TARGET_IDS.cargoHold);
+    expect(recipe).toMatchObject({
+      refinedFerriteRequired: 15,
+      slagRequired: 6,
+      repairIncrements: 12,
+    });
   });
 
   it("clears Cargo guidance on repair completion and moves turn-in guidance to Wade", () => {

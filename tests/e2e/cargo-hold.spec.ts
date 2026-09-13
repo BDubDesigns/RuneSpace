@@ -113,6 +113,29 @@ test("keeps damaged Cargo Hold locked and transfers completed storage on mobile 
   await expect(lockedStatus).toHaveCount(0);
   await expect(cargoPanel.locator("[data-cargo-repair-materials]")).toContainText("0 / 15");
   await expect(cargoPanel.locator("[data-cargo-repair-materials]")).toContainText("0 / 6");
+
+  // The Mission Log reports the two materials as two requirements (#172): the
+  // Cargo Hold gets the same staged repair objective as any other repair job,
+  // with nothing authored on the Mission to ask for it, and the fifteen and the
+  // six are never summed into a total that would mean nothing.
+  await page.getByRole("button", { name: "Missions" }).click();
+  const log = page.getByRole("dialog", { name: "Mission Log" });
+  const holdEntry = log.locator(`[data-mission-log-entry="${MISSION_IDS.holdItTogether}"]`);
+  await expect(holdEntry.locator("[data-mission-log-requirements]")).toContainText(
+    "Install repair materials at the Cargo Hold",
+  );
+  await expect(
+    holdEntry.locator(`[data-mission-requirement-material="${ITEM_IDS.refinedFerrite}"]`),
+  ).toContainText("Refined Ferrite — 0 / 15");
+  await expect(
+    holdEntry.locator(`[data-mission-requirement-material="${ITEM_IDS.slag}"]`),
+  ).toContainText("Slag — 0 / 6");
+  await expect(holdEntry.locator("[data-mission-log-requirements]")).not.toContainText("/ 21");
+  // Both are carried, so both rows say so — subordinate to the installed count.
+  await expect(
+    holdEntry.locator(`[data-mission-requirement-material="${ITEM_IDS.slag}"]`),
+  ).toContainText("Carrying: 6");
+  await page.keyboard.press("Escape");
   // Mission guidance: Hold It Together is active with materials still needed,
   // so CONTRIBUTE MATERIALS carries the generic green treatment and its
   // exterior halo.

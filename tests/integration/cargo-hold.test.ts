@@ -445,7 +445,7 @@ suite("issue #128 Cargo Hold repair gate and existing Welding mechanics (real Po
     expect(afterRetry.welding.totalXp).toBe(42 + 100);
   });
 
-  it("withholds Cargo repair guidance when no useful contribution is available", async () => {
+  it("withholds Cargo repair guidance until a still-needed material is carried (#172)", async () => {
     const { userId, character, now } = await makeCharacter();
     await db.insert(rune.characterMissions).values([
       {
@@ -460,17 +460,51 @@ suite("issue #128 Cargo Hold repair gate and existing Welding mechanics (real Po
         acceptedAt: now,
       },
     ]);
-    // No carried Refined Ferrite or Slag: the mission still targets Cargo
-    // repair, but CONTRIBUTE MATERIALS is disabled and must not be guided.
-    const guided = await play.getPlayGameplayState(userId, character.id, now, deterministicRandom);
-    expect(guided.cargoHold.repair).toMatchObject({
-      repairAvailable: true,
-      complete: false,
-      materialComplete: false,
-      availableContribution: { refinedFerrite: 0, slag: 0 },
+    // Eight Refined Ferrite and three Slag are durably installed; the player
+    // also has forty of each stored in the Cargo Hold, which is not carrying.
+    await seedRepairTarget(db, rune, character.id, REPAIR_TARGET_IDS.cargoHold, {
+      refinedFerriteContributed: 8,
+      slagContributed: 3,
     });
+    await db.insert(rune.cargoHoldStacks).values([
+      { characterId: character.id, itemId: ITEM_IDS.refinedFerrite, quantity: 40 },
+      { characterId: character.id, itemId: ITEM_IDS.slag, quantity: 40 },
+    ]);
+
+    const stored = await play.getPlayGameplayState(userId, character.id, now, deterministicRandom);
+    const requirementOf = (state: typeof stored) =>
+      state.missions
+        .find((entry) => entry.missionId === MISSION_IDS.holdItTogether)
+        ?.requirements?.find((entry) => entry.repairTargetId === REPAIR_TARGET_IDS.cargoHold);
+    // Both materials are individually legible and come only from the repair
+    // record: stored cargo never reaches the installed numbers, and the two
+    // are never summed into a single meaningless total.
+    expect(requirementOf(stored)?.objective).toBe("Install repair materials at the Cargo Hold");
+    expect(requirementOf(stored)?.progress).toBeUndefined();
+    expect(requirementOf(stored)?.materials).toEqual([
+      { itemId: ITEM_IDS.refinedFerrite, label: "Refined Ferrite", current: 8, target: 15 },
+      { itemId: ITEM_IDS.slag, label: "Slag", current: 3, target: 6 },
+    ]);
+    // Nothing useful in hand: the framework invents no destination.
     expect(
-      deriveMissionGuidanceTargets(guided.missions).repairTargetIds.has(
+      deriveMissionGuidanceTargets(stored.missions).repairTargetIds.has(
+        REPAIR_TARGET_IDS.cargoHold,
+      ),
+    ).toBe(false);
+
+    // Carrying Slag the recipe still needs makes the Cargo Hold worth visiting.
+    await db
+      .insert(rune.inventoryStacks)
+      .values({ characterId: character.id, itemId: ITEM_IDS.slag, quantity: 2 });
+    const carrying = await play.getPlayGameplayState(
+      userId,
+      character.id,
+      now,
+      deterministicRandom,
+    );
+    expect(requirementOf(carrying)?.materials?.[1]).toMatchObject({ current: 3, carried: 2 });
+    expect(
+      deriveMissionGuidanceTargets(carrying.missions).repairTargetIds.has(
         REPAIR_TARGET_IDS.cargoHold,
       ),
     ).toBe(true);

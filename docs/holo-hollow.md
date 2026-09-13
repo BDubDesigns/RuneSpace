@@ -502,10 +502,12 @@ debt shipped afterwards in #170 (see "Keep the Change" below):
 RuneSpace's first deliberately optional side Mission, and the first permanent
 player-made improvement to the world.
 
-After **Hold It Together**, Renn Calder mentions the Crew Stop: the roof leaks,
-the bench leans, everybody complains, and nobody owns it enough to fix it. The
-player may choose to spend **20 Refined Ferrite** and **ten genuine Welding
-increments** repairing it. Nothing forces them to, and ignoring it forever
+After **Hold It Together**, Renn Calder mentions the Crew Stop: the roof is full
+of holes, the bench is busted, everybody uses it and nobody owns it. He is
+complaining about a neglected thing, not handing out work — he never asks the
+player to fix it, and the accept control ("PITCH IN") is the player deciding to
+involve themselves. They may then choose to spend **20 Refined Ferrite** and
+**ten genuine Welding increments** repairing it. Nothing forces them to, and ignoring it forever
 blocks nothing — **Keep the Change is not a prerequisite and is not affected**.
 
 The point of the Mission is that the world stays changed. The repaired shelter

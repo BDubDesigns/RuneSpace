@@ -227,11 +227,10 @@ describe("the repair is the Mission's only work", () => {
         kind: "repair_target_complete",
         targetId: REPAIR_TARGET_IDS.crewStop,
         objective: "Repair the Crew Stop in Holo Hollow",
-        materialObjective: "Install {item} at the Crew Stop — {contributed} / {required}",
-        weldingObjective: "Weld the Crew Stop — {current} / {target} welds",
-        materialGuidance: "when_carrying",
       },
     ]);
+    // Nothing is authored to make the staged repair UX work: it is ordinary
+    // behavior of the requirement (tests/unit/repair-missions.test.ts).
   });
 
   it("shows durably installed material as the objective, and carried material only as context", () => {
@@ -347,12 +346,49 @@ describe("Renn's voice and the silent protagonist", () => {
   ];
 
   it("never puts first-person speech in the player's controls", () => {
-    expect(authoredLabels).toEqual(["TAKE THE JOB", "TELL RENN"]);
+    expect(authoredLabels).toEqual(["PITCH IN", "TELL RENN"]);
     for (const label of authoredLabels) {
       // The player never speaks: a control is an instruction to the game, not a
       // line of dialogue, exactly as every other authored Mission label is.
       expect(label).not.toMatch(/\b(I|I'M|I'LL|I'VE|MY|ME)\b/);
     }
+  });
+
+  it("offers the Crew Stop as a complaint, never as a job", () => {
+    const beats = (getDialogue(DIALOGUE_IDS.rennOutOfTheWeatherOffer)?.beats ?? []).flatMap(
+      (beat) => ("text" in beat && typeof beat.text === "string" ? [beat.text] : []),
+    );
+    // The approved offer, in order. Renn describes a neglected thing everybody
+    // has normalized; the player decides on their own to get involved.
+    expect(beats).toEqual([
+      "You seen the Crew Stop out on the haul road?",
+      "Roof's full of holes. Bench is busted.",
+      "Everybody uses it, nobody owns it.",
+      "Crews stand out there in the weather every morning, pretending it doesn't bother them.",
+      "I can assure you, it does.",
+      "No one 'round here can afford to spare 20 Refined Ferrite, otherwise it'd be patch-welded by now.",
+    ]);
+    // No request, no assignment, no reward dangled at offer time.
+    const spoken = beats.join(" ");
+    expect(spoken).not.toMatch(/\bpitch\b|\bjob\b|would you|can you|fix it for|I need you/i);
+    expect(spoken).not.toMatch(/hauler|Credits|XP/i);
+  });
+
+  it("never claims afterwards that Renn asked for the repair", () => {
+    const later = [
+      DIALOGUE_IDS.rennOutOfTheWeatherRepairReminder,
+      DIALOGUE_IDS.rennOutOfTheWeatherTurnIn,
+      DIALOGUE_IDS.rennOutOfTheWeatherCompletion,
+    ].flatMap((dialogueId) =>
+      (getDialogue(dialogueId)?.beats ?? []).flatMap((beat) =>
+        "text" in beat && typeof beat.text === "string" ? [beat.text] : [],
+      ),
+    );
+    for (const line of later) {
+      expect(line).not.toMatch(/the pitch|asked you|I told you to|the job I|like I asked/i);
+    }
+    // The XP tile speaks for itself; Renn does not narrate game mechanics.
+    expect(later.join(" ")).not.toMatch(/That's how that works/i);
   });
 
   it("says nothing that needs time to have passed", () => {
