@@ -5,6 +5,7 @@ import {
   LOCATION_IDS,
   MISSION_IDS,
   NPC_IDS,
+  REPAIR_TARGET_IDS,
   SKILL_IDS,
   type ActionId,
   type DialogueId,
@@ -12,6 +13,7 @@ import {
   type LocationId,
   type MissionId,
   type NpcId,
+  type RepairTargetId,
   type SkillId,
 } from "@/game/config/foundations";
 
@@ -117,8 +119,16 @@ export type MissionRequirement =
       recommendedActionId?: ActionId;
     }
   | {
-      kind: "cargo_hold_repaired";
-      /** The authoritative Cargo Hold completion state satisfies this requirement. */
+      /**
+       * One authoritative repair target is finished (#172).
+       *
+       * Generic over every Welding job: Hold It Together observes the Crash
+       * Site Cargo Hold, Out of the Weather observes Holo Hollow's Crew Stop.
+       * The mission observes completion; it never owns material consumption or
+       * Welding progress, which belong to the repair target itself.
+       */
+      kind: "repair_target_complete";
+      targetId: RepairTargetId;
       objective: string;
     }
   | {
@@ -248,8 +258,8 @@ export type MissionDialogue = {
   carriedReminderDialogueId?: DialogueId;
   /** First unmet requirement is a tracked activity. */
   trackedActivityReminderDialogueId?: DialogueId;
-  /** First unmet requirement is the Cargo Hold repair. */
-  cargoRepairReminderDialogueId?: DialogueId;
+  /** First unmet requirement is an unfinished repair target. */
+  repairReminderDialogueId?: DialogueId;
   /** First unmet requirement is a mandatory authored NPC conversation. */
   conversationReminderDialogueId?: DialogueId;
   /** Requirements satisfied but the turn-in is not performable (busy). */
@@ -474,7 +484,8 @@ export const HOLD_IT_TOGETHER: MissionDefinition = {
   offers: [],
   requirements: [
     {
-      kind: "cargo_hold_repaired",
+      kind: "repair_target_complete",
+      targetId: REPAIR_TARGET_IDS.cargoHold,
       objective: "Repair the Cargo Hold at the Crash Site",
     },
   ],
@@ -488,7 +499,7 @@ export const HOLD_IT_TOGETHER: MissionDefinition = {
   },
   reward: { kind: "skill_xp", skillId: SKILL_IDS.welding, amount: 100 },
   dialogue: {
-    cargoRepairReminderDialogueId: DIALOGUE_IDS.wadeHoldItTogetherRepairReminder,
+    repairReminderDialogueId: DIALOGUE_IDS.wadeHoldItTogetherRepairReminder,
     busyDialogueId: DIALOGUE_IDS.wadeHoldItTogetherBusy,
     completionPresentationDialogueId: DIALOGUE_IDS.wadeHoldItTogetherCompletion,
   },
@@ -567,6 +578,60 @@ export const KEEP_THE_CHANGE: MissionDefinition = {
   ],
 };
 
+/**
+ * Out of the Weather — RuneSpace's first deliberately optional side Mission (#172).
+ *
+ * It hangs off Hold It Together rather than continuing from it: Welding was not
+ * a quest-specific button, so the capability Wade taught is now simply something
+ * the character knows how to do. Renn offers it; nothing offers it automatically,
+ * and it names no continuation, so ignoring it forever costs the player nothing.
+ * Keep the Change shares the same prerequisite and is entirely unaffected.
+ *
+ * The completion reward is 250 Welding XP on top of the 500 the ten genuine
+ * Welding increments already paid — the work is the work, and Renn's is
+ * recognition for it. There is deliberately no Credit payout: the reward the
+ * issue actually cares about is that the Crew Stop stays fixed and the crews
+ * will let the player ride along.
+ */
+export const OUT_OF_THE_WEATHER: MissionDefinition = {
+  id: MISSION_IDS.outOfTheWeather,
+  title: "Out of the Weather",
+  summary: "Repair the Crew Stop on Holo Hollow's haul road, then tell Renn Calder.",
+  prerequisiteMissionId: MISSION_IDS.holdItTogether,
+  offers: [
+    {
+      npcId: NPC_IDS.rennCalder,
+      locationId: LOCATION_IDS.holoHollow,
+      dialogueId: DIALOGUE_IDS.rennOutOfTheWeatherOffer,
+      actionLabel: "I'LL FIX IT",
+    },
+  ],
+  requirements: [
+    {
+      kind: "repair_target_complete",
+      targetId: REPAIR_TARGET_IDS.crewStop,
+      objective: "Repair the Crew Stop in Holo Hollow",
+    },
+  ],
+  turnIn: {
+    npcId: NPC_IDS.rennCalder,
+    locationId: LOCATION_IDS.holoHollow,
+    requiresStationary: true,
+    objective: "Tell Renn Calder the Crew Stop is fixed",
+    dialogueId: DIALOGUE_IDS.rennOutOfTheWeatherTurnIn,
+    actionLabel: "IT'S DONE",
+  },
+  reward: { kind: "skill_xp", skillId: SKILL_IDS.welding, amount: 250 },
+  dialogue: {
+    repairReminderDialogueId: DIALOGUE_IDS.rennOutOfTheWeatherRepairReminder,
+    busyDialogueId: DIALOGUE_IDS.rennOutOfTheWeatherBusy,
+    completionPresentationDialogueId: DIALOGUE_IDS.rennOutOfTheWeatherCompletion,
+  },
+  completedNpcDialogue: [
+    { npcId: NPC_IDS.rennCalder, dialogueId: DIALOGUE_IDS.rennPostOutOfTheWeather },
+  ],
+};
+
 /** Ordered chain of authored missions; later entries may require earlier ones. */
 export const MISSIONS: readonly MissionDefinition[] = [
   WALK_IT_OFF,
@@ -574,6 +639,9 @@ export const MISSIONS: readonly MissionDefinition[] = [
   WASTE_NOT,
   HOLD_IT_TOGETHER,
   KEEP_THE_CHANGE,
+  // The optional branch sits after the main chain: it is never a prerequisite
+  // for anything, and completing or ignoring it changes nothing upstream.
+  OUT_OF_THE_WEATHER,
 ];
 
 const missions = new Map<string, MissionDefinition>(

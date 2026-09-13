@@ -38,6 +38,36 @@ export const HOLO_HOLLOW_TRAVEL_FLAVOR = [
 ] as const satisfies readonly TravelFlavorLine[];
 
 /**
+ * Lines for a paid Crew Hauler ride (#172).
+ *
+ * A ride is not a walk, so it never draws from the walking pools: nothing here
+ * describes boots, stride, or footing. The player is a passenger on somebody
+ * else's working vehicle, which is the whole point of the fare.
+ */
+export const CREW_HAULER_TRAVEL_FLAVOR = [
+  {
+    id: "crew-hauler-bench",
+    text: "The bench seat is somebody's spare coat and a folded tarp. Nobody moves it for you.",
+  },
+  {
+    id: "crew-hauler-shift-talk",
+    text: "Two of the crew argue about a seam grade the whole way. Neither asks your opinion.",
+  },
+  {
+    id: "crew-hauler-road-noise",
+    text: "The haul road comes up through the frame, steady and unlovely.",
+  },
+  {
+    id: "crew-hauler-window",
+    text: "The route slides past the window faster than your boots have ever managed it.",
+  },
+  {
+    id: "crew-hauler-nod",
+    text: "Somebody nods at you without looking up. That is the whole conversation.",
+  },
+] as const satisfies readonly TravelFlavorLine[];
+
+/**
  * Optional directed beats for a specifically authored route. Reverse travel
  * must have its own entry; the presentation layer never mirrors one silently.
  */

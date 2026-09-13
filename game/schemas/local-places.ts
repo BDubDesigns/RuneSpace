@@ -39,6 +39,41 @@ export const LocalPlaceAccessRuleSchema = z.discriminatedUnion("kind", [
  * Travel destination and never a second persisted character position. Nesting
  * is one level only — a Local Place cannot contain another.
  */
+const LocalPlaceSceneSchema = z
+  .object({
+    asset: z.string().regex(/^\/location-scenes\/.+\.(webp|png)$/),
+    width: z.number().int().positive(),
+    height: z.number().int().positive(),
+    alt: z.string().min(1),
+    focal: z
+      .object({
+        x: z.number().min(0).max(100),
+        y: z.number().min(0).max(100),
+      })
+      .strict()
+      .optional(),
+  })
+  .strict();
+
+/**
+ * How one Local Place looks and reads once a repair target inside it is
+ * finished (#172).
+ *
+ * This is the whole contract for a persistent visible world change: the place
+ * authors both states, and presentation picks between them from authoritative
+ * repair completion. There is no world-state scripting here and no second
+ * persisted flag — and deliberately no generic "variant" system, because the
+ * only thing that changes a place today is a repair the player performed.
+ */
+const LocalPlaceRepairedPresentationSchema = z
+  .object({
+    /** The repair target whose completion switches this place over. */
+    repairTargetId: ContentId,
+    description: z.string().min(1),
+    scene: LocalPlaceSceneSchema,
+  })
+  .strict();
+
 export const LocalPlaceDefinitionSchema = z
   .object({
     id: LocalPlaceIdSchema,
@@ -48,27 +83,18 @@ export const LocalPlaceDefinitionSchema = z
     access: LocalPlaceAccessRuleSchema,
     /** The merchant this place owns, when it hosts one. Server-validated. */
     merchantId: ContentId.optional(),
-    presentation: z.object({
-      scene: z
-        .object({
-          asset: z.string().regex(/^\/location-scenes\/.+\.(webp|png)$/),
-          width: z.number().int().positive(),
-          height: z.number().int().positive(),
-          alt: z.string().min(1),
-          focal: z
-            .object({
-              x: z.number().min(0).max(100),
-              y: z.number().min(0).max(100),
-            })
-            .strict()
-            .optional(),
-        })
-        .strict(),
-    }),
+    presentation: z
+      .object({
+        scene: LocalPlaceSceneSchema,
+        /** Authored only by a place something inside it can permanently change. */
+        repaired: LocalPlaceRepairedPresentationSchema.optional(),
+      })
+      .strict(),
   })
   .strict();
 
 export type LocalPlaceAccessRule = z.infer<typeof LocalPlaceAccessRuleSchema>;
+export type LocalPlaceScene = z.infer<typeof LocalPlaceSceneSchema>;
 export type LocalPlaceDefinition = z.infer<typeof LocalPlaceDefinitionSchema>;
 
 export const LOCAL_PLACE_ID_VALUES = Object.values(LOCAL_PLACE_IDS) as [

@@ -1,15 +1,25 @@
 import { eq } from "drizzle-orm";
 import { characters, characterTravelState, type CharacterTravelState } from "@/db/rune-space";
-import { ACTION_IDS } from "@/game/config/foundations";
-import { areLocationsAdjacent, getLocation } from "@/game/content/locations";
-import { adjacentWalkDurationTicks, resolveTravel, type TravelState } from "@/game/domain/travel";
+import { ACTION_IDS, type TravelMode } from "@/game/config/foundations";
+import { getLocation } from "@/game/content/locations";
+import {
+  isTravelRouteValid,
+  resolveTravel,
+  travelDurationTicks,
+  type TravelState,
+} from "@/game/domain/travel";
 import { ticksToMilliseconds } from "@/game/domain/timing";
 import type { ActionResolver } from "@/server/action-resolution";
 
 export class TravelRuleError extends Error {
   constructor(
     message: string,
-    readonly reason: "unknown_destination" | "same_location" | "not_adjacent" | "already_traveling",
+    readonly reason:
+      | "unknown_destination"
+      | "same_location"
+      | "not_adjacent"
+      | "already_traveling"
+      | "unknown_route",
   ) {
     super(message);
     this.name = "TravelRuleError";
@@ -59,12 +69,14 @@ export function createTravelResolver(): ActionResolver<TravelSnapshot, TravelRes
       // The active action's startedAt is the sole authoritative Travel start
       // time; the travel row stores route data and the optional Scavenge state.
       const startedAt = new Date(action.startedAt.getTime());
+      const mode = snapshot.travel.mode as TravelMode;
       const travel: TravelState = {
         originLocationId: snapshot.travel.originLocationId as TravelState["originLocationId"],
         destinationLocationId: snapshot.travel
           .destinationLocationId as TravelState["destinationLocationId"],
+        mode,
         startedAt,
-        arrivesAt: new Date(startedAt.getTime() + ticksToMilliseconds(adjacentWalkDurationTicks())),
+        arrivesAt: new Date(startedAt.getTime() + ticksToMilliseconds(travelDurationTicks(mode))),
       };
       const result = resolveTravel({
         travel,
@@ -102,7 +114,11 @@ export function createTravelResolver(): ActionResolver<TravelSnapshot, TravelRes
         );
       }
 
-      const { originLocationId: storedOrigin, destinationLocationId: storedDestination } = travel;
+      const {
+        originLocationId: storedOrigin,
+        destinationLocationId: storedDestination,
+        mode: storedMode,
+      } = travel;
 
       // Validate all persisted state against the authoritative location
       // registry before committing. Any inconsistency is an integrity failure:
@@ -128,10 +144,19 @@ export function createTravelResolver(): ActionResolver<TravelSnapshot, TravelRes
           "same_location",
         );
       }
-      if (!areLocationsAdjacent(storedOrigin, storedDestination)) {
+      // Walking is validated against map adjacency; an authored transport ride
+      // is validated against its own route, which is deliberately not an
+      // adjacency. Either way, an unrecognised route never commits an arrival.
+      if (
+        !isTravelRouteValid({
+          mode: storedMode as TravelMode,
+          originLocationId: storedOrigin,
+          destinationLocationId: storedDestination,
+        })
+      ) {
         throw new TravelRuleError(
-          `Persisted route is not adjacent: ${storedOrigin} -> ${storedDestination}`,
-          "not_adjacent",
+          `Persisted ${storedMode} route is not valid: ${storedOrigin} -> ${storedDestination}`,
+          storedMode === "walk" ? "not_adjacent" : "unknown_route",
         );
       }
       // The character row was locked FOR UPDATE at the top of this transaction.

@@ -3,6 +3,7 @@ import {
   LOCATION_IDS,
   MERCHANT_IDS,
   MISSION_IDS,
+  REPAIR_TARGET_IDS,
 } from "@/game/config/foundations";
 import { LocalPlaceDefinitionSchema, type LocalPlaceDefinition } from "@/game/schemas/local-places";
 
@@ -79,6 +80,43 @@ const localPlaceDefinitions = [
         height: 384,
         alt: "Converted family bed-and-breakfast serving as a working inn, with a hand-lettered HH B&B sign",
         focal: { x: 50, y: 45 } as const,
+      },
+    },
+  },
+  {
+    id: LOCAL_PLACE_IDS.holoHollowCrewStop,
+    parentLocationId: LOCATION_IDS.holoHollow,
+    displayName: "Crew Stop",
+    // Open from the start: the player can walk up and see the state it is in
+    // long before anybody asks them to do anything about it. What the accepted
+    // Mission unlocks is the repair work, not the place (#172).
+    access: { kind: "open" as const },
+    description:
+      "A covered roadside shelter on the haul road, where mining crews wait for the shift hauler out to The Jag. The canopy sags at one corner and the bench leans with it, so most mornings the crews stand in the weather instead.",
+    presentation: {
+      scene: {
+        // TEMPORARY imagery (#172): the approved damaged/repaired Crew Stop art
+        // is being produced separately. Both states point at an existing
+        // committed Holo Hollow scene so builds and previews contain no broken
+        // images. Swapping in the final assets is a change to these two asset
+        // paths and their dimensions/alt text — nothing else.
+        asset: "/location-scenes/holo-hollow.webp" as const,
+        width: 1536,
+        height: 384,
+        alt: "Weathered main street of a small mining settlement, faded holo-tourism signage above working shopfronts under an overcast sky",
+        focal: { x: 50, y: 45 } as const,
+      },
+      repaired: {
+        repairTargetId: REPAIR_TARGET_IDS.crewStop,
+        description:
+          "A covered roadside shelter on the haul road, where mining crews wait for the shift hauler out to The Jag. The canopy sits square on a welded brace now, and the bench takes a full shift's worth of people without complaint.",
+        scene: {
+          asset: "/location-scenes/holo-hollow.webp" as const,
+          width: 1536,
+          height: 384,
+          alt: "Weathered main street of a small mining settlement, faded holo-tourism signage above working shopfronts under an overcast sky",
+          focal: { x: 50, y: 45 } as const,
+        },
       },
     },
   },

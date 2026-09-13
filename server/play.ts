@@ -1,10 +1,9 @@
-import { and, asc, eq, isNull } from "drizzle-orm";
+import { and, asc, eq, isNull, sql } from "drizzle-orm";
 import { db } from "@/db";
 import {
   activeActions,
   cargoHoldItemInstances,
   cargoHoldStacks,
-  characterCargoHoldRepair,
   characterMiningState,
   characterPowerCellDailyClaims,
   characterRefiningState,
@@ -20,17 +19,29 @@ import {
 import {
   getEffectiveGameBalance,
   getItemDefinition,
+  getRepairTargetBalance,
   miningLevelThresholds,
+  repairTargetBalances,
   standardSkillLevelThresholds,
+  weldingActionIds,
 } from "@/game/config/balance";
 import { resolveItemPresentation } from "@/game/content/item-presentation";
-import { ACTION_IDS, ITEM_IDS, LOCATION_IDS, SKILL_IDS } from "@/game/config/foundations";
+import {
+  ACTION_IDS,
+  ITEM_IDS,
+  LOCATION_IDS,
+  REPAIR_TARGET_IDS,
+  SKILL_IDS,
+  type RepairTargetId,
+  type TravelMode,
+} from "@/game/config/foundations";
 import { isTravelReplaceableAction } from "@/game/domain/travel-replacement";
 import {
-  cargoHoldMaterialsComplete,
-  cargoHoldRepairComplete,
-  planCargoHoldMaterialContribution,
-} from "@/game/domain/cargo-hold";
+  planRepairMaterialContribution,
+  repairComplete,
+  repairMaterialsComplete,
+  type RepairTargetState,
+} from "@/game/domain/welding-repair";
 import { POWER_ANNEX_REWARD_SOURCE_ID, pacificResetDate } from "@/game/domain/power-annex";
 import { powerAnnexNow } from "@/server/power-annex-clock";
 import {
@@ -52,7 +63,12 @@ import {
 } from "@/game/domain/mining";
 import { refiningSuccessChanceBps, type RefiningStopReason } from "@/game/domain/refining";
 import { skillLevelProgress } from "@/game/domain/progression";
-import { adjacentWalkDurationTicks, planTravel } from "@/game/domain/travel";
+import {
+  planTransportTravel,
+  planTravel,
+  travelDurationTicks,
+  travelOffersScavenge,
+} from "@/game/domain/travel";
 import {
   resolveScavengeOutcome,
   resolvedScavengeOutcome,
@@ -79,7 +95,8 @@ import {
 } from "@/server/refining";
 import {
   createWeldingResolver,
-  ensureCargoHoldRepairState,
+  loadRepairTargetStates,
+  UNSTARTED_REPAIR,
   type PersistedWeldingOutcome,
   type WeldingSnapshot,
 } from "@/server/welding";
@@ -90,8 +107,8 @@ import {
   type MiningRunState,
   type PersistedMiningOutcome,
 } from "@/server/mining";
-import { loadMissionProjections } from "@/server/mission-state";
-import { loadCargoRepairAccess } from "@/server/cargo-repair-access";
+import { loadCompletedMissionIds, loadMissionProjections } from "@/server/mission-state";
+import { loadRepairAccess } from "@/server/repair-access";
 import { recordTrackedActivity } from "@/server/mission-progress";
 import type { MissionProjection } from "@/game/domain/missions";
 import { loadPlaySnapshot } from "@/server/play-state";
@@ -117,20 +134,30 @@ export type CargoHoldUniqueItemState = {
   currentCharge?: number;
 };
 
+/**
+ * One repair target's authoritative projection (#172).
+ *
+ * Identical for every target: the Crash Site Cargo Hold and Holo Hollow's Crew
+ * Stop are the same shape with different recipes, so a repair surface renders
+ * from this rather than from its own bespoke state.
+ */
+export type RepairProjection = {
+  targetId: string;
+  refinedFerriteContributed: number;
+  refinedFerriteRequired: number;
+  slagContributed: number;
+  slagRequired: number;
+  weldingProgress: number;
+  weldingIncrements: number;
+  materialComplete: boolean;
+  complete: boolean;
+  repairAvailable: boolean;
+  completedAt?: string;
+  availableContribution: { refinedFerrite: number; slag: number };
+};
+
 export type CargoHoldState = {
-  repair: {
-    refinedFerriteContributed: number;
-    refinedFerriteRequired: number;
-    slagContributed: number;
-    slagRequired: number;
-    weldingProgress: number;
-    weldingIncrements: number;
-    materialComplete: boolean;
-    complete: boolean;
-    repairAvailable: boolean;
-    completedAt?: string;
-    availableContribution: { refinedFerrite: number; slag: number };
-  };
+  repair: RepairProjection;
   stacks: readonly CargoHoldStackState[];
   uniqueItems: readonly CargoHoldUniqueItemState[];
   slotsUsed: number;
@@ -152,7 +179,13 @@ export type ScavengeClaimStatus =
   | { status: "claimed"; outcome: ScavengeResolvedOutcome }
   | {
       status: "refused";
-      reason: "no_travel" | "not_open" | "missed" | "already_claimed" | "capacity_blocked";
+      reason:
+        | "no_travel"
+        | "no_scavenge_on_this_journey"
+        | "not_open"
+        | "missed"
+        | "already_claimed"
+        | "capacity_blocked";
       message: string;
     };
 
@@ -239,6 +272,12 @@ export type PlayGameplayState = {
   };
   run: MiningRunState;
   refiningRun: RefiningRunState;
+  /**
+   * Every repair target's authoritative projection, keyed by target ID (#172).
+   * A repair surface reads its own entry here; nothing reconstructs recipes,
+   * progress, or availability on the client.
+   */
+  repairs: Readonly<Record<string, RepairProjection>>;
   cargoHold: CargoHoldState;
   recentResult: { successes: number; failures: number; awardedXp: number };
   refiningRecentResult: { successes: number; failures: number; awardedXp: number };
@@ -260,9 +299,12 @@ export type PlayGameplayState = {
   travelState?: {
     originLocationId: string;
     destinationLocationId: string;
+    /** How this Journey is being made; a ride is never a walk (#172). */
+    mode: TravelMode;
     startedAt: string;
     arrivesAt: string;
-    scavenge: {
+    /** Present only for an ordinary walk. A paid ride offers nothing to scavenge. */
+    scavenge?: {
       opportunityStartTick: number;
       opensAt: string;
       expiresAt: string;
@@ -279,7 +321,10 @@ export type PlayGameplayState = {
     | "same_location"
     | "not_adjacent"
     | "already_traveling"
-    | "mining_unavailable_here";
+    | "mining_unavailable_here"
+    | "unknown_route"
+    | "route_locked"
+    | "insufficient_credits";
   /** Set when a Start Refining command was refused outside the Processing Yard. */
   refiningError?: "refining_unavailable_here";
   /** Set when the finite Crash Site Welding command cannot begin. */
@@ -398,10 +443,13 @@ export function createPlayResolver(
       actionId: ACTION_IDS.travel,
       resolver: createTravelResolver() as PlayResolver,
     },
-    {
-      actionId: ACTION_IDS.cargoHoldWelding,
+    // One Welding resolver, registered under every repair target's own action
+    // ID. The resolver reads the target from that ID, so `active_actions` keeps
+    // its narrow shape and a new repair target adds no new resolution logic.
+    ...weldingActionIds().map((actionId) => ({
+      actionId,
       resolver: createWeldingResolver(onWeldingOutcome) as PlayResolver,
-    },
+    })),
   ];
   return composePlayResolvers(entries);
 }
@@ -409,7 +457,12 @@ export function createPlayResolver(
 /**
  * Provisions the full shared play state for a character on first play: skill
  * rows (Mining/Refining/Welding/Strength), Mining/Refining persistence rows,
- * Cargo Hold repair state, and the starter container/equipment assignment.
+ * and the starter container/equipment assignment.
+ *
+ * Repair-target state is deliberately NOT provisioned here (#172): an untouched
+ * repair target is simply an absent row, so a character who has never welded
+ * anything is already in its correct state and a new repair target needs no
+ * backfill for existing characters.
  *
  * This is application-level play provisioning, not a Mining concern — Mining
  * was simply the first vertical to need it.
@@ -434,7 +487,6 @@ export async function ensurePlayProvisioning(
       .insert(characterSkillXp)
       .values({ characterId, skillId: SKILL_IDS.welding, totalXp: 0 })
       .onConflictDoNothing();
-    await ensureCargoHoldRepairState(transaction, characterId);
     return;
   }
 
@@ -451,7 +503,6 @@ export async function ensurePlayProvisioning(
     .insert(characterRefiningState)
     .values({ characterId })
     .onConflictDoNothing({ target: characterRefiningState.characterId });
-  await ensureCargoHoldRepairState(transaction, characterId);
   await transaction
     .insert(characterMiningState)
     .values({ characterId })
@@ -539,6 +590,42 @@ function recentFrom(
  * owned-character transaction. This is the generic state assembly — no
  * activity owns it.
  */
+/**
+ * Project one repair target from its authoritative state plus the character's
+ * carried materials. Recipe values are read from the target's balance spec, so
+ * no surface ever hardcodes a second copy of them.
+ */
+async function projectRepairTarget(
+  transaction: DatabaseTransaction,
+  characterId: string,
+  targetId: RepairTargetId,
+  repair: RepairTargetState,
+  carriedRefinedFerrite: number,
+  carriedSlag: number,
+): Promise<RepairProjection> {
+  const target = getRepairTargetBalance(targetId);
+  const access = await loadRepairAccess(transaction, characterId, targetId, repair);
+  return {
+    targetId,
+    refinedFerriteContributed: repair.refinedFerriteContributed,
+    refinedFerriteRequired: target.refinedFerriteRequired,
+    slagContributed: repair.slagContributed,
+    slagRequired: target.slagRequired,
+    weldingProgress: repair.weldingProgress,
+    weldingIncrements: target.repairIncrements,
+    materialComplete: repairMaterialsComplete(repair, target),
+    complete: repairComplete(repair),
+    repairAvailable: access.repairAvailable,
+    completedAt: repair.completedAt?.toISOString(),
+    availableContribution: planRepairMaterialContribution({
+      repair,
+      carriedRefinedFerrite,
+      carriedSlag,
+      target,
+    }),
+  };
+}
+
 export async function stateFromTransaction(
   transaction: DatabaseTransaction,
   characterId: string,
@@ -566,7 +653,7 @@ export async function stateFromTransaction(
     actionRows,
     miningStateRows,
     refiningStateRows,
-    cargoRepairRows,
+    repairStates,
     cargoStackRows,
     cargoItemRows,
     travelRows,
@@ -592,10 +679,7 @@ export async function stateFromTransaction(
       .select()
       .from(characterRefiningState)
       .where(eq(characterRefiningState.characterId, characterId)),
-    transaction
-      .select()
-      .from(characterCargoHoldRepair)
-      .where(eq(characterCargoHoldRepair.characterId, characterId)),
+    loadRepairTargetStates(transaction, characterId),
     transaction
       .select()
       .from(cargoHoldStacks)
@@ -671,28 +755,25 @@ export async function stateFromTransaction(
     xpGained: refiningState?.runXpGained ?? 0,
     recentAttempts: (refiningState?.recentAttempts as RefiningRunAttempt[] | undefined) ?? [],
   };
-  const cargoRepair = cargoRepairRows[0];
-  const repairState = {
-    refinedFerriteContributed: cargoRepair?.refinedFerriteContributed ?? 0,
-    slagContributed: cargoRepair?.slagContributed ?? 0,
-    weldingProgress: cargoRepair?.weldingProgress ?? 0,
-    completedAt: cargoRepair?.completedAt ?? null,
-  };
-  const materialComplete = cargoHoldMaterialsComplete(repairState, balance);
-  const repairComplete = cargoHoldRepairComplete(repairState, balance);
-  const cargoRepairAccess = await loadCargoRepairAccess(transaction, characterId, repairState);
   const carriedRefinedFerrite = stacks
     .filter((stack) => stack.itemId === ITEM_IDS.refinedFerrite)
     .reduce((total, stack) => total + stack.quantity, 0);
   const carriedSlag = stacks
     .filter((stack) => stack.itemId === ITEM_IDS.slag)
     .reduce((total, stack) => total + stack.quantity, 0);
-  const availableContribution = planCargoHoldMaterialContribution({
-    repair: repairState,
-    carriedRefinedFerrite,
-    carriedSlag,
-    balance,
-  });
+  // Every repair target projects identically; only its recipe differs.
+  const repairs: Record<string, RepairProjection> = {};
+  for (const target of repairTargetBalances(balance)) {
+    repairs[target.targetId] = await projectRepairTarget(
+      transaction,
+      characterId,
+      target.targetId,
+      repairStates.get(target.targetId) ?? UNSTARTED_REPAIR,
+      carriedRefinedFerrite,
+      carriedSlag,
+    );
+  }
+  const cargoRepairProjection = repairs[REPAIR_TARGET_IDS.cargoHold]!;
   const cargoUniqueItems = cargoItemRows
     .map((row) => snapshot.allItemInstances.find((instance) => instance.id === row.itemInstanceId))
     .filter((instance): instance is (typeof snapshot.allItemInstances)[number] => Boolean(instance))
@@ -712,42 +793,50 @@ export async function stateFromTransaction(
     currentLocationId,
     activeActionId: action?.actionId,
   });
+  const travelMode = (travel?.mode ?? "walk") as TravelMode;
   const travelState =
     travel && action?.actionId === ACTION_IDS.travel
       ? {
           originLocationId: travel.originLocationId,
           destinationLocationId: travel.destinationLocationId,
+          mode: travelMode,
           startedAt: action.startedAt.toISOString(),
           arrivesAt: new Date(
-            action.startedAt.getTime() + ticksToMilliseconds(adjacentWalkDurationTicks()),
+            action.startedAt.getTime() + ticksToMilliseconds(travelDurationTicks(travelMode)),
           ).toISOString(),
-          scavenge: (() => {
-            const timing = scavengeWindowAt({
-              travelStartedAt: action.startedAt,
-              opportunityStartTick: travel.scavengeOpportunityStartTick,
-              now,
-              claimed: travel.scavengeOutcomeId !== null,
-            });
-            const outcome = travel.scavengeOutcomeId
-              ? resolvedScavengeOutcome({
-                  outcomeId: travel.scavengeOutcomeId,
-                  quantity: travel.scavengeAwardQuantity,
-                })
-              : undefined;
-            return {
-              opportunityStartTick: travel.scavengeOpportunityStartTick,
-              opensAt: timing.opensAt.toISOString(),
-              expiresAt: timing.expiresAt.toISOString(),
-              outcome: outcome
-                ? {
-                    outcomeId: outcome.outcomeId,
-                    label: outcome.label,
-                    itemId: outcome.itemId,
-                    quantity: outcome.quantity,
-                  }
-                : undefined,
-            };
-          })(),
+          // A paid ride offers no Scavenge opportunity at all, so the Journey
+          // exposes none rather than a window nobody may claim.
+          scavenge:
+            travelOffersScavenge(travelMode) && travel.scavengeOpportunityStartTick !== null
+              ? (() => {
+                  const opportunityStartTick = travel.scavengeOpportunityStartTick;
+                  const timing = scavengeWindowAt({
+                    travelStartedAt: action.startedAt,
+                    opportunityStartTick,
+                    now,
+                    claimed: travel.scavengeOutcomeId !== null,
+                  });
+                  const outcome = travel.scavengeOutcomeId
+                    ? resolvedScavengeOutcome({
+                        outcomeId: travel.scavengeOutcomeId,
+                        quantity: travel.scavengeAwardQuantity,
+                      })
+                    : undefined;
+                  return {
+                    opportunityStartTick,
+                    opensAt: timing.opensAt.toISOString(),
+                    expiresAt: timing.expiresAt.toISOString(),
+                    outcome: outcome
+                      ? {
+                          outcomeId: outcome.outcomeId,
+                          label: outcome.label,
+                          itemId: outcome.itemId,
+                          quantity: outcome.quantity,
+                        }
+                      : undefined,
+                  };
+                })()
+              : undefined,
         }
       : undefined;
   const cutterAssignment = snapshot.equipmentLoadout.assignments.find(
@@ -761,7 +850,8 @@ export async function stateFromTransaction(
   const cutterCharge = normalizeCutterCharge(cutterInstance?.currentCharge, balance);
   const isMiningAction = action?.actionId === ACTION_IDS.ferriteShaleMining;
   const isRefiningAction = action?.actionId === ACTION_IDS.refining;
-  const isWeldingAction = action?.actionId === ACTION_IDS.cargoHoldWelding;
+  const isWeldingAction =
+    action !== undefined && weldingActionIds(balance).includes(action.actionId);
   const nextAttemptBoosted = isMiningAction && cutterCharge > 0;
   const nextAttemptDurationTicks = isWeldingAction
     ? balance.welding.attemptDurationTicks
@@ -787,7 +877,7 @@ export async function stateFromTransaction(
     activeAction:
       action?.actionId === ACTION_IDS.ferriteShaleMining ||
       action?.actionId === ACTION_IDS.refining ||
-      action?.actionId === ACTION_IDS.cargoHoldWelding
+      isWeldingAction
         ? {
             actionId: action.actionId,
             resolvedThroughAt: action.resolvedThroughAt.toISOString(),
@@ -922,20 +1012,11 @@ export async function stateFromTransaction(
     },
     run,
     refiningRun,
+    repairs,
     cargoHold: {
-      repair: {
-        refinedFerriteContributed: repairState.refinedFerriteContributed,
-        refinedFerriteRequired: balance.cargoHold.refinedFerriteRequired,
-        slagContributed: repairState.slagContributed,
-        slagRequired: balance.cargoHold.slagRequired,
-        weldingProgress: repairState.weldingProgress,
-        weldingIncrements: balance.welding.repairIncrements,
-        materialComplete,
-        complete: repairComplete,
-        repairAvailable: cargoRepairAccess.repairAvailable,
-        completedAt: repairState.completedAt?.toISOString(),
-        availableContribution,
-      },
+      // The Cargo Hold keeps its own presentation identity while reading the
+      // same generic repair projection every target does.
+      repair: cargoRepairProjection,
       stacks: cargoStackRows.map((stack) => ({
         id: stack.id,
         itemId: stack.itemId,
@@ -1190,6 +1271,7 @@ export async function beginTravel(
         characterId: context.character.id,
         originLocationId: currentLocationId,
         destinationLocationId,
+        mode: "walk",
         scavengeOpportunityStartTick: scavengeOpportunityStartTick(random.nextBasisPoints()),
       });
 
@@ -1204,6 +1286,133 @@ export async function beginTravel(
         now,
         refiningRecentFrom(refiningOutcome),
         refiningOutcome?.stopReason,
+      );
+    },
+    now,
+  );
+}
+
+/**
+ * Begin a paid Crew Hauler ride along an authored transport route (#172).
+ *
+ * The browser supplies only a destination. The route, its mode, its duration,
+ * its fare, and the Mission that unlocks it are all resolved server-side from
+ * authored content and this character's own authoritative state.
+ *
+ * Exactly-once fare: `withResolvedOwnedCharacter` takes the character row FOR
+ * UPDATE before anything else runs, so the Credit debit, the Travel action, and
+ * the travel row all commit together in one transaction, and any concurrent or
+ * retried request blocks on that lock and then finds the ride already underway.
+ * A repeat of the same in-flight ride is idempotent and charges nothing; every
+ * refusal returns before any mutation at all.
+ */
+export async function beginTransportTravel(
+  userId: string,
+  characterId: string,
+  destinationLocationId: string,
+  now = new Date(),
+  random: MiningRandom = defaultMiningRandom(),
+): Promise<PlayGameplayState> {
+  return withResolvedOwnedCharacter(
+    userId,
+    characterId,
+    createPlayResolver(random),
+    async (transaction, context) => {
+      await ensurePlayProvisioning(transaction, context.character.id);
+
+      // Reload after lazy resolution so origin reflects an arrival that may
+      // have committed earlier in this same transaction.
+      const [reloaded] = await transaction
+        .select()
+        .from(characters)
+        .where(eq(characters.id, context.character.id))
+        .limit(1);
+      const currentLocationId = reloaded?.currentLocationId ?? LOCATION_IDS.crashSite;
+      const credits = reloaded?.credits ?? 0;
+
+      const refuse = async (
+        travelError: PlayGameplayState["travelError"],
+        commandError?: PlayGameplayState["commandError"],
+      ): Promise<PlayGameplayState> =>
+        stateFromTransaction(
+          transaction,
+          context.character.id,
+          { successes: 0, failures: 0, awardedXp: 0 },
+          undefined,
+          commandError,
+          travelError,
+          undefined,
+          now,
+        );
+
+      const travelRows = await transaction
+        .select()
+        .from(characterTravelState)
+        .where(eq(characterTravelState.characterId, context.character.id))
+        .for("update");
+      const travel = travelRows[0];
+
+      if (context.action?.actionId === ACTION_IDS.travel) {
+        // Idempotent retry of the ride already underway: never a second fare.
+        return travel?.destinationLocationId === destinationLocationId
+          ? stateFromTransaction(
+              transaction,
+              context.character.id,
+              { successes: 0, failures: 0, awardedXp: 0 },
+              undefined,
+              undefined,
+              undefined,
+              undefined,
+              now,
+            )
+          : refuse("already_traveling");
+      }
+
+      // A ride is boarded, not begun mid-task: unlike walking it never replaces
+      // an active work action.
+      if (context.action) return refuse(undefined, "another_action_active");
+
+      const plan = planTransportTravel({
+        currentLocationId,
+        destinationLocationId,
+        alreadyTraveling: false,
+        completedMissionIds: await loadCompletedMissionIds(transaction, context.character.id),
+        credits,
+      });
+      if (!plan.ok) {
+        return refuse(plan.reason === "route_locked" ? "route_locked" : plan.reason);
+      }
+
+      // The fare and the Journey commit together. The balance is decremented in
+      // SQL from the locked row rather than written from a read value.
+      await transaction
+        .update(characters)
+        .set({ credits: sql`${characters.credits} - ${plan.fareCredits}` })
+        .where(eq(characters.id, context.character.id));
+      await transaction.insert(activeActions).values({
+        characterId: context.character.id,
+        actionId: ACTION_IDS.travel,
+        startedAt: now,
+        resolvedThroughAt: now,
+      });
+      await transaction.insert(characterTravelState).values({
+        characterId: context.character.id,
+        originLocationId: currentLocationId,
+        destinationLocationId,
+        mode: plan.mode,
+        // A ride has no Scavenge window at all, not an unused one.
+        scavengeOpportunityStartTick: null,
+      });
+
+      return stateFromTransaction(
+        transaction,
+        context.character.id,
+        { successes: 0, failures: 0, awardedXp: 0 },
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        now,
       );
     },
     now,
@@ -1265,6 +1474,21 @@ export async function claimScavenge(
         });
       }
 
+      // Riding offers nothing to scavenge. This is the authoritative refusal:
+      // a forged claim during a paid ride is rejected here regardless of what
+      // the client believes it can see.
+      if (
+        !travelOffersScavenge(travel.mode as TravelMode) ||
+        travel.scavengeOpportunityStartTick === null
+      ) {
+        return stateFor({
+          status: "refused",
+          reason: "no_scavenge_on_this_journey",
+          message: "There is nothing to scavenge from the back of a hauler.",
+        });
+      }
+      const opportunityStartTick = travel.scavengeOpportunityStartTick;
+
       if (travel.scavengeOutcomeId !== null) {
         return stateFor({
           status: "refused",
@@ -1276,7 +1500,7 @@ export async function claimScavenge(
       const balance = getEffectiveGameBalance();
       const timing = scavengeWindowAt({
         travelStartedAt: context.action.startedAt,
-        opportunityStartTick: travel.scavengeOpportunityStartTick,
+        opportunityStartTick,
         now,
         claimed: false,
       });

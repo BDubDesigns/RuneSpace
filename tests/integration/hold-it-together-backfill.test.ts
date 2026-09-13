@@ -89,7 +89,7 @@ suite("Issue #148 Hold It Together backfill (real PostgreSQL)", () => {
       deterministicRandom,
     );
     const seeded = await db
-      .update(rune.characterCargoHoldRepair)
+      .update(rune.characterRepairTargets)
       .set({
         refinedFerriteContributed: 15,
         slagContributed: 6,
@@ -97,7 +97,7 @@ suite("Issue #148 Hold It Together backfill (real PostgreSQL)", () => {
         completedAt: null,
         updatedAt: now,
       })
-      .where(eq(rune.characterCargoHoldRepair.characterId, eligible.character.id))
+      .where(eq(rune.characterRepairTargets.characterId, eligible.character.id))
       .returning();
     expect(seeded).toHaveLength(1);
     expect(seeded[0]).toMatchObject({
@@ -113,8 +113,8 @@ suite("Issue #148 Hold It Together backfill (real PostgreSQL)", () => {
         .where(eq(rune.inventoryStacks.characterId, eligible.character.id)),
       repair: await db
         .select()
-        .from(rune.characterCargoHoldRepair)
-        .where(eq(rune.characterCargoHoldRepair.characterId, eligible.character.id)),
+        .from(rune.characterRepairTargets)
+        .where(eq(rune.characterRepairTargets.characterId, eligible.character.id)),
       weldingXp: await db
         .select()
         .from(rune.characterSkillXp)
@@ -177,8 +177,8 @@ suite("Issue #148 Hold It Together backfill (real PostgreSQL)", () => {
           .where(eq(rune.inventoryStacks.characterId, eligible.character.id)),
         repair: await db
           .select()
-          .from(rune.characterCargoHoldRepair)
-          .where(eq(rune.characterCargoHoldRepair.characterId, eligible.character.id)),
+          .from(rune.characterRepairTargets)
+          .where(eq(rune.characterRepairTargets.characterId, eligible.character.id)),
         weldingXp: await db
           .select()
           .from(rune.characterSkillXp)

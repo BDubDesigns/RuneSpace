@@ -5,15 +5,42 @@ import {
   activeActions,
   cargoHoldItemInstances,
   cargoHoldStacks,
-  characterCargoHoldRepair,
+  characterRepairTargets,
   characterMissions,
   characters,
   inventoryStacks,
   itemInstances,
 } from "@/db/rune-space";
-import { getEffectiveGameBalance } from "@/game/config/balance";
-import { ITEM_IDS, LOCATION_IDS, MISSION_IDS } from "@/game/config/foundations";
+import { getEffectiveGameBalance, getRepairTargetBalance } from "@/game/config/balance";
+import { ITEM_IDS, LOCATION_IDS, MISSION_IDS, REPAIR_TARGET_IDS } from "@/game/config/foundations";
 import { captureReviewScreenshot } from "./review-screenshot";
+
+/**
+ * Seed an already-finished Cargo Hold repair (#172).
+ *
+ * Repair rows are created lazily by the repair commands rather than at play
+ * provisioning, so a fixture that needs a character to be already repaired
+ * inserts the row instead of updating one that may not exist yet.
+ */
+async function seedRepairedCargoHold(
+  characterId: string,
+  cargoTarget: ReturnType<typeof getRepairTargetBalance>,
+) {
+  const repaired = {
+    refinedFerriteContributed: cargoTarget.refinedFerriteRequired,
+    slagContributed: cargoTarget.slagRequired,
+    weldingProgress: cargoTarget.repairIncrements,
+    completedAt: new Date(),
+    updatedAt: new Date(),
+  };
+  await db
+    .insert(characterRepairTargets)
+    .values({ characterId, targetId: REPAIR_TARGET_IDS.cargoHold, ...repaired })
+    .onConflictDoUpdate({
+      target: [characterRepairTargets.characterId, characterRepairTargets.targetId],
+      set: repaired,
+    });
+}
 
 test.beforeEach(async ({ page, testCharacter }) => {
   await openTestCharacter(page, testCharacter.id);
@@ -24,7 +51,10 @@ test("keeps damaged Cargo Hold locked and transfers completed storage on mobile 
 }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   const characterId = page.url().split("/").at(-1)!;
-  const balance = getEffectiveGameBalance();
+  const cargoTarget = getRepairTargetBalance(
+    REPAIR_TARGET_IDS.cargoHold,
+    getEffectiveGameBalance(),
+  );
 
   const cargoPanel = page.locator("[data-cargo-hold]");
   const selection = cargoPanel.locator("[data-cargo-selection]");
@@ -75,9 +105,9 @@ test("keeps damaged Cargo Hold locked and transfers completed storage on mobile 
     {
       characterId,
       itemId: ITEM_IDS.refinedFerrite,
-      quantity: balance.cargoHold.refinedFerriteRequired,
+      quantity: cargoTarget.refinedFerriteRequired,
     },
-    { characterId, itemId: ITEM_IDS.slag, quantity: balance.cargoHold.slagRequired },
+    { characterId, itemId: ITEM_IDS.slag, quantity: cargoTarget.slagRequired },
   ]);
   await page.reload();
   await expect(lockedStatus).toHaveCount(0);
@@ -116,7 +146,7 @@ test("keeps damaged Cargo Hold locked and transfers completed storage on mobile 
 
   const completedAgo = new Date(
     Date.now() -
-      balance.welding.repairIncrements * balance.welding.attemptDurationTicks * 600 -
+      cargoTarget.repairIncrements * getEffectiveGameBalance().welding.attemptDurationTicks * 600 -
       100,
   );
   await db
@@ -196,17 +226,11 @@ test("keeps damaged Cargo Hold locked and transfers completed storage on mobile 
 
 test("keeps a previously repaired Cargo Hold usable without mission state", async ({ page }) => {
   const characterId = page.url().split("/").at(-1)!;
-  const balance = getEffectiveGameBalance();
-  await db
-    .update(characterCargoHoldRepair)
-    .set({
-      refinedFerriteContributed: balance.cargoHold.refinedFerriteRequired,
-      slagContributed: balance.cargoHold.slagRequired,
-      weldingProgress: balance.welding.repairIncrements,
-      completedAt: new Date(),
-      updatedAt: new Date(),
-    })
-    .where(eq(characterCargoHoldRepair.characterId, characterId));
+  const cargoTarget = getRepairTargetBalance(
+    REPAIR_TARGET_IDS.cargoHold,
+    getEffectiveGameBalance(),
+  );
+  await seedRepairedCargoHold(characterId, cargoTarget);
   await page.reload();
 
   const cargoPanel = page.locator("[data-cargo-hold]");
@@ -218,18 +242,12 @@ test("keeps a previously repaired Cargo Hold usable without mission state", asyn
 test("renders a dense Cargo Hold as a compact selectable grid (Issue #151)", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   const characterId = page.url().split("/").at(-1)!;
-  const balance = getEffectiveGameBalance();
+  const cargoTarget = getRepairTargetBalance(
+    REPAIR_TARGET_IDS.cargoHold,
+    getEffectiveGameBalance(),
+  );
 
-  await db
-    .update(characterCargoHoldRepair)
-    .set({
-      refinedFerriteContributed: balance.cargoHold.refinedFerriteRequired,
-      slagContributed: balance.cargoHold.slagRequired,
-      weldingProgress: balance.welding.repairIncrements,
-      completedAt: new Date(),
-      updatedAt: new Date(),
-    })
-    .where(eq(characterCargoHoldRepair.characterId, characterId));
+  await seedRepairedCargoHold(characterId, cargoTarget);
 
   // Narrow authoritative fixture: seed a dense, mixed stack/unique occupied
   // Cargo Hold directly rather than reconstructing mining/refining/Welding

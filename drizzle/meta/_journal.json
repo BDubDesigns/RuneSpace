@@ -134,6 +134,13 @@
       "when": 1789096050180,
       "tag": "0018_character_credits",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1789262248064,
+      "tag": "0019_crew_stop_repair_targets_and_travel_modes",
+      "breakpoints": true
     }
   ]
 }

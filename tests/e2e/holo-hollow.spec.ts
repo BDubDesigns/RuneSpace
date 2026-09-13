@@ -3,10 +3,17 @@ import { db } from "@/db";
 import {
   characterMissionProgress,
   characterMissions,
+  characterRepairTargets,
   characters,
   inventoryStacks,
 } from "@/db/rune-space";
-import { ITEM_IDS, LOCAL_PLACE_IDS, LOCATION_IDS, MISSION_IDS } from "@/game/config/foundations";
+import {
+  ITEM_IDS,
+  LOCAL_PLACE_IDS,
+  LOCATION_IDS,
+  MISSION_IDS,
+  REPAIR_TARGET_IDS,
+} from "@/game/config/foundations";
 import {
   expect,
   expectExteriorMissionHalo,
@@ -339,7 +346,7 @@ test("presents Holo Hollow's places, keeps HH B&B visible but locked, and enters
   // The town presents its places rather than a production activity.
   const directory = page.locator("[data-local-place-directory]");
   await expect(directory).toBeVisible();
-  await expect(directory.locator("[data-local-place]")).toHaveCount(3);
+  await expect(directory.locator("[data-local-place]")).toHaveCount(4);
   // A fresh character's unaccepted Walk It Off advertises no place in town.
   await expect(directory.locator("[data-mission-guidance]")).toHaveCount(0);
 
@@ -355,7 +362,7 @@ test("presents Holo Hollow's places, keeps HH B&B visible but locked, and enters
 
   // Every open place offers an explicit Enter control; the card-sized link
   // beneath it stays out of the tab order and the accessibility tree.
-  await expect(directory.getByRole("link", { name: /^Enter / })).toHaveCount(2);
+  await expect(directory.getByRole("link", { name: /^Enter / })).toHaveCount(3);
   // An unguided beveled ActionLink still paints a visible keyboard focus ring (#173).
   await expectKeyboardFocusRingPaints(directory.getByRole("link", { name: /^Enter / }).first());
   await expect(directory.locator("[data-local-place-card-link]").first()).toHaveAttribute(
@@ -610,4 +617,149 @@ test("opening Trade reveals the Trade surface above the bottom navigation", asyn
   await trade.click();
   await expect(region).toHaveCount(0);
   await expect(trade).toBeFocused();
+});
+
+/**
+ * Issue #172 — the Crew Stop, at the canonical 390px mobile width.
+ *
+ * What the browser proves that the server suites cannot: the place is visible
+ * and legible before anybody asks the player to fix it, the repair surface
+ * appears only once the Mission is accepted, the damaged/repaired state is
+ * carried by words rather than by colour alone, and the ride control states its
+ * destination, its fare, and why it cannot be used.
+ */
+async function completeChainThroughHoldItTogether(characterId: string) {
+  const now = new Date();
+  await db
+    .insert(characterMissions)
+    .values(
+      [
+        MISSION_IDS.walkItOff,
+        MISSION_IDS.cutYourTeeth,
+        MISSION_IDS.wasteNot,
+        MISSION_IDS.holdItTogether,
+      ].map((missionId) => ({ characterId, missionId, acceptedAt: now, completedAt: now })),
+    );
+}
+
+test("shows the Crew Stop before the Mission, and its repair work only after", async ({
+  page,
+  testCharacter,
+}) => {
+  const characterId = testCharacter.id;
+  await page.setViewportSize({ width: 390, height: 844 });
+  await completeChainThroughHoldItTogether(characterId);
+  await arriveInHoloHollow(characterId);
+  await openTestCharacter(page, characterId);
+  await page.emulateMedia({ reducedMotion: "reduce" });
+
+  // Visible, enterable, and describing itself as run-down — in words.
+  const crewStop = page
+    .locator("[data-local-place-directory]")
+    .locator(`[data-local-place="${LOCAL_PLACE_IDS.holoHollowCrewStop}"]`);
+  await expect(crewStop).toBeVisible();
+  await expect(crewStop).toHaveAttribute("data-local-place-access", "available");
+  await crewStop.locator("[data-local-place-enter]").click();
+
+  const surface = page.locator(
+    `[data-local-place-surface="${LOCAL_PLACE_IDS.holoHollowCrewStop}"]`,
+  );
+  await expect(surface).toBeVisible();
+  const description = surface.locator("[data-local-place-description]");
+  await expect(description).toHaveAttribute("data-local-place-repaired", "false");
+  await expect(description).toContainText("sags");
+  // Nothing to repair yet: Renn has not mentioned it.
+  await expect(page.locator("[data-crew-stop-panel]")).toHaveCount(0);
+  await expect(page.locator("[data-crew-hauler-ride]")).toHaveCount(0);
+
+  // The place never scrolls the page sideways at phone width.
+  const overflow = await page.evaluate(
+    () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+  );
+  expect(overflow).toBeLessThanOrEqual(0);
+
+  // Accepting the Mission is what reveals the work.
+  await db.insert(characterMissions).values({
+    characterId,
+    missionId: MISSION_IDS.outOfTheWeather,
+    acceptedAt: new Date(),
+  });
+  await page.reload();
+  await expect(
+    page.locator('[data-crew-stop-panel][data-crew-stop-state="damaged"]'),
+  ).toBeVisible();
+  await expect(page.locator("[data-crew-stop-contribute]")).toBeVisible();
+  await expect(page.locator("[data-crew-stop-contribute]")).toContainText(
+    "No useful Refined Ferrite carried",
+  );
+});
+
+test("presents the repaired Crew Stop and its 5-Credit ride in both directions", async ({
+  page,
+  testCharacter,
+}) => {
+  const characterId = testCharacter.id;
+  await page.setViewportSize({ width: 390, height: 844 });
+  const now = new Date();
+  await completeChainThroughHoldItTogether(characterId);
+  await db.insert(characterMissions).values({
+    characterId,
+    missionId: MISSION_IDS.outOfTheWeather,
+    acceptedAt: now,
+    completedAt: now,
+  });
+  await db.insert(characterRepairTargets).values({
+    characterId,
+    targetId: REPAIR_TARGET_IDS.crewStop,
+    refinedFerriteContributed: 20,
+    slagContributed: 0,
+    weldingProgress: 10,
+    completedAt: now,
+  });
+  await arriveInHoloHollow(characterId, { credits: 5 });
+  await openTestCharacter(page, characterId);
+  await page.emulateMedia({ reducedMotion: "reduce" });
+
+  await page
+    .locator("[data-local-place-directory]")
+    .locator(`[data-local-place="${LOCAL_PLACE_IDS.holoHollowCrewStop}"]`)
+    .locator("[data-local-place-enter]")
+    .click();
+
+  // The world change is carried by the copy, with no lingering quest badge.
+  const description = page.locator("[data-local-place-description]");
+  await expect(description).toHaveAttribute("data-local-place-repaired", "true");
+  await expect(description).toContainText("welded");
+  await expect(
+    page.locator('[data-crew-stop-panel][data-crew-stop-state="repaired"]'),
+  ).toBeVisible();
+  await expect(page.locator("[data-crew-stop-contribute]")).toHaveCount(0);
+
+  // The ride states where it goes and what it costs, and is keyboard reachable.
+  const ride = page.locator(`[data-crew-hauler-ride="${LOCATION_IDS.theJag}"]`);
+  await expect(ride).toContainText("Ride to The Jag");
+  await expect(ride).toContainText("5 Credits");
+  await expect(ride).toBeEnabled();
+  await ride.focus();
+  await expect(ride).toBeFocused();
+
+  // Insufficient funds is stated, not merely implied by a dimmed control.
+  await db.update(characters).set({ credits: 4 }).where(eq(characters.id, characterId));
+  await page.reload();
+  const unaffordable = page.locator(`[data-crew-hauler-ride="${LOCATION_IDS.theJag}"]`);
+  await expect(unaffordable).toBeDisabled();
+  await expect(page.locator("[data-crew-hauler-rides]")).toContainText(
+    "The fare is 5 Credits. You have 4.",
+  );
+
+  // The return leg needs no second Local Place and no driver: it is offered at
+  // The Jag itself.
+  await db
+    .update(characters)
+    .set({ currentLocationId: LOCATION_IDS.theJag, credits: 5 })
+    .where(eq(characters.id, characterId));
+  await page.reload();
+  const returnRide = page.locator(`[data-crew-hauler-ride="${LOCATION_IDS.holoHollow}"]`);
+  await expect(returnRide).toContainText("Ride to Holo Hollow");
+  await expect(returnRide).toContainText("5 Credits");
 });

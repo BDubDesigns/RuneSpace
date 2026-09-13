@@ -5,6 +5,7 @@ import { getDialogue } from "@/game/content/dialogue";
 import { getLocalPlaceInLocation } from "@/game/content/local-places";
 import { getLocation, isActionAvailableAtLocation, LOCATIONS } from "@/game/content/locations";
 import { getNpc } from "@/game/content/npcs";
+import { getRepairTarget } from "@/game/content/repair-targets";
 import { resolveItemPresentation } from "@/game/content/item-presentation";
 import { getSkillPresentation } from "@/game/content/skill-presentation";
 import type {
@@ -35,8 +36,8 @@ export type MissionObservation = {
   itemNames: ReadonlyMap<string, string>;
   /** Durable current progress by authored tracked-requirement key. */
   trackedProgress?: ReadonlyMap<string, number>;
-  /** Authoritative completion state for the Cargo Hold repair. */
-  cargoHoldRepairComplete?: boolean;
+  /** Authoritative completion state by repair-target ID (#172). */
+  completedRepairTargetIds?: ReadonlySet<string>;
 };
 
 /**
@@ -80,13 +81,13 @@ export type MissionGuidance = {
   /** The authored recommended acquisition action for the first unmet carried requirement. */
   actionId?: string;
   /**
-   * The Cargo Hold repair surface is the current progression target: the
-   * first unmet requirement observes authoritative Cargo repair completion.
-   * The Cargo panel owns the repair/material/Welding substate and selects
-   * the advancing affordance (contribute materials vs start Welding) from
-   * this single semantic flag — never from a mission ID or objective prose.
+   * The repair surface that is the current progression target: the first unmet
+   * requirement observes authoritative completion of this repair target. That
+   * surface owns the repair/material/Welding substate and selects the advancing
+   * affordance (contribute materials vs start Welding) from this single
+   * semantic ID — never from a mission ID or objective prose.
    */
-  cargoRepair?: true;
+  repairTargetId?: string;
   /**
    * The NPC(s) whose authored offer interaction is currently a local
    * mission-availability target: every offer at the player's current location
@@ -95,7 +96,7 @@ export type MissionGuidance = {
    * only — "this person has work for you" — and never a global signal: it
    * reveals nothing in the Mission Log and contributes no map, route, or
    * destination guidance. Progression after acceptance is separate (`npcId`,
-   * `equipmentItemId`, `actionId`, `cargoRepair`).
+   * `equipmentItemId`, `actionId`, `repairTargetId`).
    */
   availableNpcIds?: readonly string[];
 };
@@ -127,6 +128,8 @@ export type MissionRequirementStatus = {
    * offered without inspecting mission IDs.
    */
   npcId?: string;
+  /** The repair target this requirement observes, when it observes one. */
+  repairTargetId?: string;
 };
 
 /**
@@ -202,7 +205,7 @@ function renderRequirementObjective(
       .replace("{current}", String(current))
       .replace("{target}", String(requirement.target));
   }
-  if (requirement.kind === "cargo_hold_repaired") return requirement.objective;
+  if (requirement.kind === "repair_target_complete") return requirement.objective;
   if (requirement.kind === "npc_conversation") return requirement.objective;
   const itemName = observation?.itemNames.get(requirement.itemId) ?? requirement.itemId;
   if (requirement.kind === "equipped_item") {
@@ -243,8 +246,8 @@ function requirementSatisfied(
       return (
         (observation?.trackedProgress?.get(requirement.progressKey) ?? 0) >= requirement.target
       );
-    case "cargo_hold_repaired":
-      return observation?.cargoHoldRepairComplete === true;
+    case "repair_target_complete":
+      return observation?.completedRepairTargetIds?.has(requirement.targetId) === true;
     case "npc_conversation":
       // The durable mission-progress row for this authored key is the only
       // evidence; the conversation itself is never replayed as proof.
@@ -379,8 +382,8 @@ function deriveGuidance(
       ...actionDestination(firstUnsatisfied.recommendedActionId, currentLocationId),
     };
   }
-  if (firstUnsatisfied.kind === "cargo_hold_repaired") {
-    return { cargoRepair: true as const };
+  if (firstUnsatisfied.kind === "repair_target_complete") {
+    return repairTargetGuidance(firstUnsatisfied.targetId, currentLocationId);
   }
   if (firstUnsatisfied.kind === "npc_conversation") {
     // The person to go and meet is the target, exactly as the turn-in NPC is
@@ -394,6 +397,26 @@ function deriveGuidance(
   // A carried requirement with no authored route (several legitimate
   // sources) gets no guidance: the framework never picks one for the player.
   return undefined;
+}
+
+/**
+ * Guidance toward one repair target: its World Location while the player is
+ * elsewhere, then — once they have arrived — the Local Place entrance hosting
+ * it, if it lives inside one, and finally the repair surface itself. Derived
+ * purely from the authored repair-target registry.
+ */
+function repairTargetGuidance(targetId: string, currentLocationId: string): MissionGuidance {
+  const target = getRepairTarget(targetId);
+  if (!target) return {};
+  if (target.locationId !== currentLocationId) {
+    return { repairTargetId: targetId, locationId: target.locationId };
+  }
+  const place = target.localPlaceId
+    ? getLocalPlaceInLocation(currentLocationId, target.localPlaceId)
+    : undefined;
+  return place
+    ? { repairTargetId: targetId, localPlaceId: place.id }
+    : { repairTargetId: targetId };
 }
 
 /**
@@ -524,11 +547,12 @@ function projectRequirement(
       progress: { current, target: requirement.target },
     };
   }
-  if (requirement.kind === "cargo_hold_repaired") {
+  if (requirement.kind === "repair_target_complete") {
     return {
       kind: requirement.kind,
       objective: requirement.objective,
       satisfied,
+      repairTargetId: requirement.targetId,
     };
   }
   if (requirement.kind === "npc_conversation") {
@@ -603,8 +627,8 @@ export type MissionGuidanceTargets = {
   turnInLocationIds: ReadonlySet<string>;
   equipmentItemIds: ReadonlySet<string>;
   actionIds: ReadonlySet<string>;
-  /** True while an accepted mission's current target is the Cargo Hold repair surface. */
-  cargoRepair: boolean;
+  /** Repair target(s) whose surface is an accepted Mission's current work (#172). */
+  repairTargetIds: ReadonlySet<string>;
 };
 
 /** The one Mission meaning a guided control presents. */
@@ -680,7 +704,7 @@ export function deriveMissionGuidanceTargets(
   const turnInLocationIds = new Set<string>();
   const equipmentItemIds = new Set<string>();
   const actionIds = new Set<string>();
-  let cargoRepair = false;
+  const repairTargetIds = new Set<string>();
   for (const projection of projections) {
     const guidance = projection.guidance;
     if (!guidance) continue;
@@ -695,7 +719,7 @@ export function deriveMissionGuidanceTargets(
     if (guidance.locationId) (turnIn ? turnInLocationIds : locationIds).add(guidance.locationId);
     if (guidance.equipmentItemId) equipmentItemIds.add(guidance.equipmentItemId);
     if (guidance.actionId) actionIds.add(guidance.actionId);
-    if (guidance.cargoRepair) cargoRepair = true;
+    if (guidance.repairTargetId) repairTargetIds.add(guidance.repairTargetId);
   }
   return {
     availableNpcIds,
@@ -707,7 +731,7 @@ export function deriveMissionGuidanceTargets(
     turnInLocationIds,
     equipmentItemIds,
     actionIds,
-    cargoRepair,
+    repairTargetIds,
   };
 }
 
@@ -860,7 +884,14 @@ export function validateMissionDefinitions(definitions: readonly MissionDefiniti
         }
         continue;
       }
-      if (requirement.kind === "cargo_hold_repaired") continue;
+      if (requirement.kind === "repair_target_complete") {
+        if (!getRepairTarget(requirement.targetId)) {
+          throw new Error(
+            `${where} repair requirement references unknown repair target "${requirement.targetId}".`,
+          );
+        }
+        continue;
+      }
       if (requirement.kind === "npc_conversation") {
         if (!getNpc(requirement.npcId)) {
           throw new Error(
@@ -961,12 +992,8 @@ export function validateMissionDefinitions(definitions: readonly MissionDefiniti
         dialogue.trackedActivityReminderDialogueId,
         "tracked activity reminder",
       );
-    if (dialogue.cargoRepairReminderDialogueId)
-      assertDialogue(
-        definition.id,
-        dialogue.cargoRepairReminderDialogueId,
-        "cargo repair reminder",
-      );
+    if (dialogue.repairReminderDialogueId)
+      assertDialogue(definition.id, dialogue.repairReminderDialogueId, "repair reminder");
     if (dialogue.conversationReminderDialogueId) {
       assertDialogue(
         definition.id,

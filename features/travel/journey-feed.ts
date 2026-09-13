@@ -1,5 +1,7 @@
+import type { TravelMode } from "@/game/config/foundations";
 import type { PlayGameplayState } from "@/server/play";
 import {
+  CREW_HAULER_TRAVEL_FLAVOR,
   DIRECTED_ROUTE_TRAVEL_FLAVOR,
   GENERAL_TRAVEL_FLAVOR,
   HOLO_HOLLOW_TRAVEL_FLAVOR,
@@ -29,7 +31,12 @@ export type JourneyFlavorBeat = {
 export function getEligibleTravelFlavorPool(
   originLocationId: string,
   destinationLocationId: string,
+  mode: TravelMode = "walk",
 ): readonly TravelFlavorLine[] {
+  // A ride is not a walk. Every walking-flavored line describes boots, stride,
+  // and footing, so a paid Journey draws from its own pool instead.
+  if (mode !== "walk") return CREW_HAULER_TRAVEL_FLAVOR;
+
   const origin = getLocation(originLocationId);
   const destination = getLocation(destinationLocationId);
   const lines: TravelFlavorLine[] = [...GENERAL_TRAVEL_FLAVOR];
@@ -75,7 +82,7 @@ export function deriveJourneyFlavorBeats(travel: TravelState): readonly JourneyF
     ].join("|"),
   );
   const lines = selectDistinctFlavorLines(
-    getEligibleTravelFlavorPool(travel.originLocationId, travel.destinationLocationId),
+    getEligibleTravelFlavorPool(travel.originLocationId, travel.destinationLocationId, travel.mode),
     seed,
   );
 
@@ -89,7 +96,9 @@ export function deriveJourneyFlavorBeats(travel: TravelState): readonly JourneyF
   });
 }
 
-function scavengeResultDetail(outcome: NonNullable<TravelState["scavenge"]["outcome"]>): string {
+type ScavengeState = NonNullable<TravelState["scavenge"]>;
+
+function scavengeResultDetail(outcome: NonNullable<ScavengeState["outcome"]>): string {
   const label = outcome.label.replace(/\s+x\d+$/i, "");
   return outcome.quantity > 0
     ? `Found ${outcome.quantity} ${label}.`
@@ -100,12 +109,17 @@ export function deriveJourneyFeed(travel: TravelState, now: Date): readonly Jour
   const origin = getLocation(travel.originLocationId)?.displayName ?? "origin";
   const nowAt = now.getTime();
   const startedAt = new Date(travel.startedAt).getTime();
-  const timing = scavengeWindowAt({
-    claimed: Boolean(travel.scavenge.outcome),
-    now,
-    opportunityStartTick: travel.scavenge.opportunityStartTick,
-    travelStartedAt: new Date(travel.startedAt),
-  });
+  // A paid ride has no Scavenge window at all, so the feed simply has no
+  // Scavenge beats rather than a permanently missed one.
+  const scavenge = travel.scavenge;
+  const timing = scavenge
+    ? scavengeWindowAt({
+        claimed: Boolean(scavenge.outcome),
+        now,
+        opportunityStartTick: scavenge.opportunityStartTick,
+        travelStartedAt: new Date(travel.startedAt),
+      })
+    : undefined;
   const candidates: Array<JourneyFeedEvent & { presentationAt: number; sequence: number }> = [];
   let sequence = 0;
   const addIfReached = (event: JourneyFeedEvent, presentationAt: number) => {
@@ -135,17 +149,17 @@ export function deriveJourneyFeed(travel: TravelState, now: Date): readonly Jour
     );
   }
 
-  if (travel.scavenge.outcome) {
+  if (scavenge?.outcome && timing) {
     addIfReached(
       {
-        detail: scavengeResultDetail(travel.scavenge.outcome),
+        detail: scavengeResultDetail(scavenge.outcome),
         id: "scavenge-claimed",
         kind: "scavenge",
         title: "Scavenge result",
       },
       timing.opensAt.getTime(),
     );
-  } else if (timing.lifecycle === "available") {
+  } else if (timing?.lifecycle === "available") {
     addIfReached(
       {
         detail: "You notice something off the route worth checking out.",
@@ -156,7 +170,7 @@ export function deriveJourneyFeed(travel: TravelState, now: Date): readonly Jour
       },
       timing.opensAt.getTime(),
     );
-  } else if (timing.lifecycle === "missed") {
+  } else if (timing?.lifecycle === "missed") {
     addIfReached(
       {
         detail: "The optional find passed by. Travel continues normally.",

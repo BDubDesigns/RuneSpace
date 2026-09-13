@@ -101,37 +101,63 @@ signal: it reveals the existing material and Welding controls and authorizes
 repair commands. A completed repair remains available even if no Mission #4
 row exists, so already repaired Holds and their storage are never invalidated.
 
-The authoritative guards live at the player commands in `server/cargo-hold.ts`
-and share the same derived access predicate as the play-state presentation.
-Incomplete repair contribution and Welding start require Mission #4 acceptance;
-Cargo storage still requires the repair completion signal (`completedAt` via
-`cargoHoldRepairComplete`). Row existence, material progress, and preserved
-pre-beta partial progress are not unlock signals. No schema or generic unlock
-registry is introduced.
+The authoritative guards live at the generic repair commands in
+`server/repair-commands.ts` and share the same derived access predicate
+(`server/repair-access.ts`) as the play-state presentation. Incomplete repair
+contribution and Welding start require Mission #4 acceptance; Cargo storage
+still requires the repair completion signal (`completedAt`). Row existence,
+material progress, and preserved pre-beta partial progress are not unlock
+signals. No generic unlock registry is introduced.
 
 Mission #4 observes authoritative Cargo Hold repair completion rather than
-owning material consumption or Welding progress. The existing Cargo Hold
-repair system owns the **15 Refined Ferrite + 6 Slag** recipe and material
-consumption; Welding remains five ticks per increment with **50 Welding XP**
-per increment and twelve increments for **600 total Welding XP**. Mission #4
-adds a separate **100 Welding XP** turn-in reward exactly once.
+owning material consumption or Welding progress. The repair target owns the
+**15 Refined Ferrite + 6 Slag** recipe and material consumption; Welding
+remains five ticks per increment with **50 Welding XP** per increment and
+twelve increments for **600 total Welding XP**. Mission #4 adds a separate
+**100 Welding XP** turn-in reward exactly once.
 
-- Once the Hold It Together introduction gate permits repair, the exact recipe is **15
-  Refined Ferrite and 6 Slag**. A contribution command locks the character and
-  carried stacks, caps each material to the useful outstanding amount, removes
-  only that exact amount, and commits the progress atomically. Contributions
-  may be partial across commands. The player must confirm the exact quantities;
-  installed materials cannot be recovered.
-- Once unlocked, Welding is a standard server-authoritative skill and the only
-  repair activity in this slice. It is available only while stationary at Crash
-  Site after both material requirements are complete. Each increment is one
-  whole **5-tick / 3 second** pass, grants **1 repair progress and 50 Welding
-  XP**, and resolves deterministically with no roll. Twelve increments complete
-  the repair for **600 total Welding XP**. A partial pass consumes no progress
-  or XP.
+### Repair targets: one Welding system, several jobs (issue #172)
+
+Welding is one skill with one set of global rules — the attempt duration, the
+XP per completed increment, and the whole-pass resolution behavior
+(`game/config/balance` `welding`). **How much of a particular thing there is to
+weld belongs to that thing**, as a per-target recipe under `repairTargets`:
+
+| Repair target | Materials | Increments | Welding XP from the work |
+| --- | --- | --- | --- |
+| Cargo Hold (Crash Site) | 15 Refined Ferrite + 6 Slag | 12 | 600 |
+| Crew Stop (Holo Hollow) | 20 Refined Ferrite | 10 | 500 |
+
+Every target shares one persistence boundary (`character_repair_targets`, keyed
+by character and target), one domain (`game/domain/welding-repair`), one
+resolver (`server/welding`), and one set of commands
+(`server/repair-commands`). A target is identified at runtime by its own action
+ID, so `active_actions` keeps its narrow shape and carries no per-action
+payload. Which accepted Mission authorizes an incomplete repair, and where the
+work physically happens, are authored content
+(`game/content/repair-targets`).
+
+An untouched repair target is simply an absent row, so adding a target needs no
+backfill: play provisioning creates nothing, and the first repair command
+inserts the row idempotently. A completed repair stays completed and usable
+regardless of Mission state.
+
+- Once the authorizing Mission permits repair, the exact recipe is the target's
+  own. A contribution command locks the character and carried stacks, caps each
+  material to the useful outstanding amount, removes only that exact amount, and
+  commits the progress atomically. **Contributions are deliberately partial and
+  incremental**: a player may hand over what they carry, leave, gather more, and
+  come back, which is what makes the Crew Stop's twenty Refined Ferrite an
+  investment made over several trips. The player must confirm the exact
+  quantities; installed materials cannot be recovered.
+- Once unlocked, Welding is a standard server-authoritative skill. It is
+  available only while stationary at the target's own location, after its
+  material requirement is complete. Each increment is one whole **5-tick /
+  3 second** pass, grants **1 repair progress and 50 Welding XP**, and resolves
+  deterministically with no roll. A partial pass consumes no progress or XP.
 - Welding uses the normal one-active-action, lazy-resolution, stop, and Travel
-  replacement contracts. Completion is a hard stop at 12/12; no further action
-  or XP can be generated. Travel and other commands resolve only completed
+  replacement contracts. Completion is a hard stop at the target's increment
+  count; no further action or XP can be generated. Travel and other commands resolve only completed
   passes before applying their own transition.
 - Once restored, Cargo Hold storage is available only while stationary at Crash
   Site. It has **32 occupied slots** and no aggregate mass limit. Stack deposits
@@ -272,6 +298,16 @@ a second geography.
 - Nesting is one level only. There is no recursive place-within-place engine and
   no generic requirement-expression language; the mission-gated kind above is
   the smallest additional condition #170's real unlock proved necessary.
+- A place may host **gameplay of its own** (issue #172): Holo Hollow's Crew Stop
+  is the first. That arrives as an activity slot the composition boundary fills,
+  exactly as it already selects a World Location's activity — not a plugin
+  registry built for one case. The place itself stays presentation.
+- A place that something inside it can permanently change authors **both
+  states** (`presentation.repaired`), and which one the player sees is derived
+  from authoritative repair completion. As with the mission-gated door, the
+  visible world change stores nothing of its own: the Crew Stop reads repaired
+  because `character_repair_targets` says its repair is finished. Module-load
+  validation rejects a place presenting a repair target that does not exist.
 - Ordinary World Locations are unaffected: a location with no authored Local
   Places renders and behaves exactly as before.
 
@@ -371,6 +407,34 @@ lines from the same authoritative adjacency.
 - A separate explicit confirmation control ("Walk to … — 24 sec") invokes the
   server-authoritative begin-travel command. The same interaction works in
   reverse after arrival.
+
+### Travel modes and paid transport (issue #172)
+
+A Journey records **how** it is being made (`character_travel_state.mode`), and
+that mode owns the two things that differ:
+
+- **duration** — a `walk` is the ordinary 40-tick adjacent leg; the Crew Hauler
+  covers the whole authored Holo Hollow ↔ The Jag route in **20 ticks / 12
+  seconds**, where walking it is two 40-tick legs through The Long Scramble plus
+  a second explicit Travel command at the stop in between;
+- **Scavenge eligibility** — only a walk has a Scavenge window. A ride has none
+  at all: the travel row stores `NULL`, the projection exposes nothing, and
+  `claimScavenge` refuses. A database CHECK ties the two together so the
+  invariant cannot be violated by any command.
+
+A paid route is **not map adjacency**. Holo Hollow and The Jag remain
+non-adjacent: walking between them is unchanged, the map draws no new walkable
+edge, and `planTravel` still refuses the direct walk. The route is authored
+content (`game/content/transport-routes`) carrying its endpoints, its mode, its
+fare, and the completed Mission that unlocks it. The server resolves all of
+that from the character's own authoritative position — the browser supplies a
+destination and nothing else — and the fare commits in the same transaction as
+the Journey under the character row lock, so a retry or concurrent request can
+never charge twice and a refusal never charges at all.
+
+This is deliberately one fixed route earned by one real feature. There are no
+schedules, timetables, waiting queues, transfers, tickets, vehicle ownership,
+or pathfinding, and nothing computes "the best way to get somewhere".
 
 ### Optional walking Scavenge window (issue #88)
 

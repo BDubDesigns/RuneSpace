@@ -126,6 +126,25 @@ Local Place scenes (`game/content/local-places.ts`, issue #159) use the same
 `LocationSceneHeader`, which takes any subject carrying an id, a display name,
 and scene metadata.
 
+### Before / after scene pairs (issue #172)
+
+A Local Place that something inside it can permanently change authors a second
+scene plus a second description under `presentation.repaired`, and the derived
+surface (`deriveLocalPlaceSurface`) picks between them from authoritative repair
+completion. The header is unchanged: it receives whichever subject the
+derivation returned.
+
+The two scenes in such a pair are the one case where **identical composition is
+required**. Same camera, same framing, same lighting, same time of day — the
+only difference is the thing the player fixed. The art cookbook's
+"same-background syndrome" warning is about distinct places reading as the same
+spot; a before/after pair of one place is the opposite requirement, and a change
+of angle would read as a different location rather than as repair.
+
+Because the pair is authored in one content entry, replacing temporary imagery
+with approved final art is a content-only change to those asset paths, their
+intrinsic dimensions, and their alt text.
+
 **Known art follow-up (non-blocking).** The three Holo Hollow Local Place
 exteriors (`holo-hollow-souvenirs-exterior.webp`,
 `holo-hollow-assistance-center-exterior.webp`, `hh-bnb-exterior.webp`) are

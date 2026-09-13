@@ -6,8 +6,12 @@ import { Feedback } from "@/components/ui/Feedback";
 import { LOCATION_IDS } from "@/game/config/foundations";
 import { getLocalPlacesForLocation } from "@/game/content/local-places";
 import { getLocation } from "@/game/content/locations";
-import { resolveActiveLocalPlace } from "@/game/domain/local-places";
+import { deriveLocalPlaceSurface, resolveActiveLocalPlace } from "@/game/domain/local-places";
 import { deriveCompletedMissionIds } from "@/game/domain/missions";
+import { deriveCompletedRepairTargetIds } from "@/game/domain/welding-repair";
+import { LOCAL_PLACE_IDS } from "@/game/config/foundations";
+import { CrewStopPanel } from "@/features/local-places/CrewStopPanel";
+import { CrewHaulerRideControl } from "@/features/travel/CrewHaulerRideControl";
 import { CargoHoldPanel } from "@/features/cargo/CargoHoldPanel";
 import { LocalPlaceDirectory } from "@/features/local-places/LocalPlaceDirectory";
 import { LocalPlaceSurface } from "@/features/local-places/LocalPlaceSurface";
@@ -17,6 +21,17 @@ import { RefiningConsole } from "@/features/refining/RefiningConsole";
 import { usePlay } from "@/features/play/PlayContext";
 import { LocationPopulationPanel } from "./LocationPopulationPanel";
 import { LocationSceneHeader } from "./LocationSceneHeader";
+
+/**
+ * The activity a Local Place hosts, when it hosts one.
+ *
+ * The same shape as this surface's existing per-location activity selection —
+ * one narrow mapping from an authored place to the component that owns its
+ * gameplay, rather than a generic plugin registry built for a single case.
+ */
+function localPlaceActivity(localPlaceId: string) {
+  return localPlaceId === LOCAL_PLACE_IDS.holoHollowCrewStop ? <CrewStopPanel /> : undefined;
+}
 
 export function LocationSurface({
   characterName,
@@ -41,9 +56,13 @@ export function LocationSurface({
   if (activePlace) {
     return (
       <LocalPlaceSurface
+        activity={localPlaceActivity(activePlace.id)}
         characterName={characterName}
         parentDisplayName={location.displayName}
-        place={activePlace}
+        surface={deriveLocalPlaceSurface(
+          activePlace,
+          deriveCompletedRepairTargetIds(Object.values(state.repairs)),
+        )}
       />
     );
   }
@@ -83,6 +102,12 @@ export function LocationSurface({
             <LocalPlaceDirectory locationId={locationId} />
           </div>
         ) : null}
+        {/* The return leg of an authored transport route needs no Local Place
+            and no driver of its own: the ride control reads the routes touching
+            this location and renders nothing where none are unlocked. */}
+        <div className="mt-5">
+          <CrewHaulerRideControl />
+        </div>
         {locationId === LOCATION_IDS.theLongScramble || localPlaces.length > 0 ? null : (
           <div className="mt-5" data-location-activity>
             {locationId === LOCATION_IDS.abandonedProcessingYard ? (
