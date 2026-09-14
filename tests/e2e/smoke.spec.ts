@@ -100,6 +100,12 @@ test("public header shows the compact emblem, not the full lockup, below 390px",
   await expect(images).toHaveCount(2);
   await expect(images.first()).toBeHidden();
   await expect(images.last()).toBeVisible();
+
+  // Issue #117: only the displayed mark may cost bytes. Neither is `priority`,
+  // so the hidden one has no layout box, is never lazily revealed, and is never
+  // fetched — `currentSrc` stays empty.
+  await expect(images.first()).toHaveJSProperty("currentSrc", "");
+  await expect(images.last()).not.toHaveJSProperty("currentSrc", "");
 });
 
 test("public header shows the full RuneSpace lockup at 390px and above", async ({ page }) => {
@@ -111,4 +117,9 @@ test("public header shows the full RuneSpace lockup at 390px and above", async (
   await expect(images).toHaveCount(2);
   await expect(images.first()).toBeVisible();
   await expect(images.last()).toBeHidden();
+
+  // Issue #117: the emblem is hidden at this width and must not be downloaded
+  // (measured at 9,218 B before the header identity stopped being preloaded).
+  await expect(images.last()).toHaveJSProperty("currentSrc", "");
+  await expect(images.first()).not.toHaveJSProperty("currentSrc", "");
 });

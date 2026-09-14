@@ -29,7 +29,7 @@ describe("item presentation content", () => {
   it("resolves Power Cell to the approved artwork path", () => {
     expect(getItemPresentation(ITEM_IDS.powerCell)).toMatchObject({
       displayName: "Power Cell",
-      artworkSrc: "/item-art/power-cell.png",
+      artworkSrc: "/item-art/power-cell.webp",
     });
   });
 
