@@ -1,5 +1,6 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
+import { readImageHeader } from "./image-header";
 import { ACTION_IDS, LOCATION_IDS } from "@/game/config/foundations";
 import { LOCATIONS, getLocation } from "@/game/content/locations";
 import { resolveLocationScene } from "@/features/location-scene/LocationSceneHeader";
@@ -129,6 +130,21 @@ describe("location scene registry (issue #78)", () => {
     // must not become eager downloads competing with the hero.
     const directory = readFileSync("features/local-places/LocalPlaceDirectory.tsx", "utf8");
     expect(directory).not.toMatch(/\n\s+priority\b/);
+  });
+
+  it("declared scene dimensions match the committed image files (issue #117)", () => {
+    // The Jag and The Long Scramble were declared 1920x480 while the committed
+    // files are 2508x627. The ratio assertion above could not catch it because
+    // both are 4:1. Reading the real header keeps metadata from drifting again.
+    for (const location of LOCATIONS) {
+      const scene = location.presentation.scene;
+      const { width, height } = readImageHeader(`public${scene.asset}`);
+      expect({ id: location.id, width, height }).toEqual({
+        id: location.id,
+        width: scene.width,
+        height: scene.height,
+      });
+    }
   });
 
   it("scene assets are local, non-remote, and follow repository conventions", () => {
