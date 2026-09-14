@@ -5,7 +5,7 @@
   "currentFocus": "Measuring how RuneSpace artwork is actually delivered on the live site, then fixing what the measurements found: artwork that loaded last instead of first, and Map location identifiers that were sent as oversized files.",
   "currentChange": {
     "summary": "The location scene and the speaking character's portrait now load first instead of last, and the Map's location identifiers are far smaller files, so artwork arrives noticeably sooner on a phone.",
-    "stage": "preview",
+    "stage": "merge-ready",
     "pullRequestNumber": 188
   },
   "latestCompleted": {
