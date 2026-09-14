@@ -1,4 +1,6 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
+import { readImageHeader } from "./image-header";
 import { ACTION_IDS, LOCATION_IDS } from "@/game/config/foundations";
 import { LOCATIONS, getLocation } from "@/game/content/locations";
 import { resolveLocationScene } from "@/features/location-scene/LocationSceneHeader";
@@ -110,6 +112,38 @@ describe("location scene registry (issue #78)", () => {
       if (focal) {
         expect(Object.keys(focal).sort()).toEqual(["x", "y"]);
       }
+    }
+  });
+
+  it("the current-surface hero scene is a priority image while directory thumbnails stay lazy (issue #117)", () => {
+    // Measured on the deployed site: without `priority` next/image authors the
+    // hero `loading="lazy"` with no preload, so the browser only discovers the
+    // LCP element after layout. The guard is structural because the repository
+    // has no DOM test environment; it protects the loading contract, not style.
+    const header = readFileSync("features/location-scene/LocationSceneHeader.tsx", "utf8");
+    expect(header).toMatch(/\n\s+priority\n/);
+    expect(header).not.toContain("priority={false}");
+    // Exactly one scene image exists in the header, so exactly one preload is added.
+    expect(header.match(/<Image\b/g) ?? []).toHaveLength(1);
+
+    // The Local Place directory renders several below-the-fold thumbnails; they
+    // must not become eager downloads competing with the hero.
+    const directory = readFileSync("features/local-places/LocalPlaceDirectory.tsx", "utf8");
+    expect(directory).not.toMatch(/\n\s+priority\b/);
+  });
+
+  it("declared scene dimensions match the committed image files (issue #117)", () => {
+    // The Jag and The Long Scramble were declared 1920x480 while the committed
+    // files are 2508x627. The ratio assertion above could not catch it because
+    // both are 4:1. Reading the real header keeps metadata from drifting again.
+    for (const location of LOCATIONS) {
+      const scene = location.presentation.scene;
+      const { width, height } = readImageHeader(`public${scene.asset}`);
+      expect({ id: location.id, width, height }).toEqual({
+        id: location.id,
+        width: scene.width,
+        height: scene.height,
+      });
     }
   });
 

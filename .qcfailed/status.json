@@ -2,20 +2,25 @@
   "schemaVersion": 1,
   "projectSlug": "runespace",
   "workState": "active",
-  "currentFocus": "Out of the Weather, RuneSpace's first optional side Mission: repair Holo Hollow's Crew Stop with Welding, and the mining crews start letting you ride out to The Jag for 5 Credits.",
+  "currentFocus": "Measuring how RuneSpace artwork is actually delivered on the live site, then fixing what the measurements found: artwork that loaded last instead of first, and Map location identifiers that were sent as oversized files.",
   "currentChange": {
-    "summary": "Adds the optional side Mission Out of the Weather, the repairable Crew Stop, the one-way 5-Credit Crew Hauler ride out to The Jag, and one generic repair-target persistence boundary shared with the Cargo Hold.",
-    "stage": "review",
-    "pullRequestNumber": 183
+    "summary": "The location scene and the speaking character's portrait now load first instead of last, and the Map's location identifiers are far smaller files, so artwork arrives noticeably sooner on a phone.",
+    "stage": "merge-ready",
+    "pullRequestNumber": 188
   },
   "latestCompleted": {
-    "summary": "Made the way out of a Local Place an obvious Back control instead of a small text link.",
-    "date": "2026-09-12",
-    "url": "https://github.com/BDubDesigns/RuneSpace/pull/182"
+    "summary": "Added the optional side Mission Out of the Weather: repair Holo Hollow's Crew Stop with Welding, and the mining crews start letting you ride out to The Jag for 5 Credits.",
+    "date": "2026-09-13",
+    "url": "https://github.com/BDubDesigns/RuneSpace/pull/183"
   },
-  "nextStep": "Complete human review of PR #183 before it is merged to main.",
-  "lastMeaningfulUpdate": "2026-09-12",
+  "nextStep": "Human review of PR #188, including loading RuneSpace on a real phone to judge whether the artwork actually feels faster.",
+  "lastMeaningfulUpdate": "2026-09-13",
   "highlights": [
+    {
+      "summary": "Added Map MISSION and TURN IN destinations, blue turn-in guidance, compact Mission strips at the top of Play, and visible keyboard focus on beveled controls.",
+      "date": "2026-09-12",
+      "url": "https://github.com/BDubDesigns/RuneSpace/pull/180"
+    },
     {
       "summary": "Extracted generic Play orchestration from the Mining feature into its own server and client boundary.",
       "date": "2026-09-01",
@@ -25,11 +30,6 @@
       "summary": "Made dialogue lifecycle aware of active versus completed state and one-shot presentation.",
       "date": "2026-08-30",
       "url": "https://github.com/BDubDesigns/RuneSpace/pull/130"
-    },
-    {
-      "summary": "Added the authoritative declarative mission framework with semantic quest guidance.",
-      "date": "2026-08-29",
-      "url": "https://github.com/BDubDesigns/RuneSpace/pull/125"
     }
   ]
 }

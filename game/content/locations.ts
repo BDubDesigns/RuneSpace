@@ -111,9 +111,12 @@ const locationDefinitions = [
       layout: "the_long_scramble" as const,
       localMap: { axial: { q: -1, r: 2 }, label: "Long Scramble" },
       scene: {
+        // Delivered at its native 2508x627 4:1 resolution: the metadata must
+        // describe the committed file (#117), and approved art is never
+        // resampled merely to match the older 1920x480 convention.
         asset: "/location-scenes/the-long-scramble.png" as const,
-        width: 1920,
-        height: 480,
+        width: 2508,
+        height: 627,
         alt: "Steep fractured stone and loose hardpan climbing toward a high ridge, rough switchback route through barren mountain approach",
         focal: { x: 50, y: 44 } as const,
       },
@@ -133,9 +136,12 @@ const locationDefinitions = [
       layout: "the_jag" as const,
       localMap: { axial: { q: -2, r: 3 }, label: "The Jag" },
       scene: {
+        // Delivered at its native 2508x627 4:1 resolution: the metadata must
+        // describe the committed file (#117), and approved art is never
+        // resampled merely to match the older 1920x480 convention.
         asset: "/location-scenes/the-jag.png" as const,
-        width: 1920,
-        height: 480,
+        width: 2508,
+        height: 627,
         alt: "Exposed jagged Ferrite Shale outcrop with cut faces, rough improvised mine entrance and disturbed ground with loose shale",
         focal: { x: 50, y: 43 } as const,
       },

@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { readImageHeader } from "./image-header";
 import { LOCATION_IDS } from "@/game/config/foundations";
 import { LOCATIONS } from "@/game/content/locations";
 import {
@@ -14,7 +15,7 @@ describe("local map identifier asset boundary (issue #53)", () => {
       MAP_IDENTIFIER_ASSET_BY_KEY,
     ) as (keyof typeof MAP_IDENTIFIER_ASSET_BY_KEY)[]) {
       const asset = resolveMapIdentifierAsset(key);
-      expect(asset).toMatch(/^\/map-icons\/.+\.(webp|png)$/);
+      expect(asset).toMatch(/^\/map-icons\/.+\.webp$/);
       expect(asset).not.toMatch(/^https?:\/\//);
       expect(asset).not.toContain("..");
     }
@@ -40,6 +41,19 @@ describe("local map identifier asset boundary (issue #53)", () => {
     expect(
       resolveMapIdentifierAssetForLocation(getLocation, "unknown_location_id"),
     ).toBeUndefined();
+  });
+
+  it("every committed identifier meets the runtime contract: lossless WebP, long edge <= 512 (issue #117)", () => {
+    // The map paints identifiers as SVG `<image href>`, which cannot pass
+    // through next/image, so the committed file is exactly what a player
+    // downloads. The Jag and The Long Scramble used to be 1254x1254 PNGs worth
+    // 1,059,937 B between them; both are now derivatives of the same approved
+    // silhouettes produced through the `docs/art-cookbook.md` pipeline.
+    for (const asset of Object.values(MAP_IDENTIFIER_ASSET_BY_KEY)) {
+      const { width, height, container } = readImageHeader(`public${asset}`);
+      expect(container, `${asset} must be lossless WebP`).toBe("VP8L");
+      expect(Math.max(width, height), `${asset} long edge`).toBeLessThanOrEqual(512);
+    }
   });
 
   it("visibly painted width is 55–65% of hex width at both mobile (108) and desktop (128)", () => {

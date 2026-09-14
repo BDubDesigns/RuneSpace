@@ -151,9 +151,11 @@ version and new byte sizes in the PR.
 
 ## Validation and delivery boundaries
 
-- Masters are excluded from the Docker build context by the narrow
-  `.dockerignore` rule `assets/character-portraits`; the Dockerfile asserts the
-  directory is absent after `COPY . .`.
+- Masters are excluded from the Docker build context by the `.dockerignore`
+  rule `assets`, which covers every art-master category (issue #117 widened the
+  earlier `assets/character-portraits` rule when map-identifier masters joined
+  the directory); the Dockerfile asserts the directory is absent after
+  `COPY . .`.
 - Deployment mechanism (Coolify/Nixpacks): the live Coolify deployment uses
   Nixpacks (nixpacks.toml), not the repository Dockerfile. Whether the masters
   are copied into the Nixpacks runtime filesystem **could not be verified from

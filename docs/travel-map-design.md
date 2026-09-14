@@ -140,8 +140,8 @@ than duplicating it in map tiles.
   `public/map-icons/<slug>.webp` asset (lossless transparent, tightly cropped, ≤512 long edge); no baked text/status
   in art; respect the hex zones, artwork viewport, and opacity described above; report tight bbox + derived painted
   width at 140. Generation, background keying, grayscale, trim, and export follow `docs/art-cookbook.md`.
-- `the-long-scramble.png` and `the-jag.png` are legacy 1254×1254 grayscale-alpha PNG identifiers that predate that
-  pipeline. They remain follow-up optimization/art debt, not the pattern for new identifiers.
+- Every committed identifier now meets that contract; `tests/unit/local-map-identifiers.test.ts` asserts it by reading
+  the real image headers (lossless WebP, long edge ≤ 512), so a fat PNG cannot come back unnoticed.
 
 ## Assets (approved, local-only, optimized for raw <image> delivery)
 | File | Source (staging provenance) | BBox-cropped size | Delivered | Bytes | Saving |
@@ -152,7 +152,28 @@ than duplicating it in map tiles.
 | **Total** |  |  |  | **355,602** | **92% vs 4,291,045 raw** |
 
 This table records the original issue #53 set. `public/map-icons/holo-hollow.webp` (512×430 lossless transparent
-WebP) was added by issue #159; the two legacy PNG identifiers are noted in the metadata contract above.
+WebP) was added by issue #159.
+
+### Issue #117 — the last two legacy identifiers
+
+`the-jag` and `the-long-scramble` were still the original 1254×1254 grayscale-alpha PNGs. Issue #117 put the same
+approved silhouettes through the pipeline above — tight alpha-bbox crop, Lanczos downsample to a 512 px long edge,
+lossless transparent WebP. No art was regenerated, redesigned, recoloured or re-keyed; both masters were already
+grayscale on clean transparency, so only steps 6–9 of the cookbook workflow applied. The 1254² sources are retained
+under `assets/map-icons/` and excluded from the Docker build context.
+
+| File | Master (retained) | BBox-cropped size | Delivered | Before | After | Saving |
+|---|---|---|---|---|---|---|
+| `public/map-icons/the-jag.webp` | `assets/map-icons/the-jag.png` 1254×1254 | 916×1030 | 455×512 lossless WebP, RGBA | 408,929 | **95,972** | 76.5% |
+| `public/map-icons/the-long-scramble.webp` | `assets/map-icons/the-long-scramble.png` 1254×1254 | 1154×1055 | 512×468 lossless WebP, RGBA | 651,008 | **120,316** | 81.5% |
+| **All six identifiers** |  |  |  | 1,512,471 | **668,822** | **55.8%** |
+
+Because the identifiers are painted with `xMidYMid meet` inside the artwork viewport, tight cropping also changes how
+large the silhouette paints: the transparent margin the two PNGs carried was being scaled as if it were art. At the
+unified `hexWidth` 140 the viewport is 100.8×82.44 CSS px, so The Jag now paints 73.3×82.4 (52.3% of hex width,
+portrait-oriented, height-limited) and The Long Scramble 90.2×82.4 (64.4%) — previously 60.2×67.7 and 75.9×69.3. Both
+move *toward* the 61.8–71.6% the issue #53 set already paints, which is the intended consistency, and both were
+verified in the real map at 390 px DPR 3 (`docs/audits/issue-117-image-delivery-evidence.md` §8.3).
 
 Derived from the three 1536² RGBA PNGs at 30e0c0a via tight alpha-bbox crop + Lanczos downsample to 512 long-edge +
 lossless WebP (method 4, Pillow). Transparent treatment preserved (RGBA, no opaque fill); no remote URL, no placeholder,

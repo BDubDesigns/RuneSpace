@@ -36,7 +36,7 @@ const itemPresentations = {
     displayName: "Power Cell",
     accessibleDescription: "Salvaged DeWhat? power cell with QC FAILED marking and visible repairs",
     textFallback: "PC",
-    artworkSrc: "/item-art/power-cell.png",
+    artworkSrc: "/item-art/power-cell.webp",
   },
   [ITEM_IDS.refinedFerrite]: {
     displayName: "Refined Ferrite",

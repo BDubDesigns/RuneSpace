@@ -27,11 +27,11 @@ ENV DATABASE_URL=$DATABASE_URL
 # application runs.
 ARG BUILD_ONLY_BETTER_AUTH_SECRET=insecure-ci-build-only-secret-do-not-use-in-prod-0000000000
 ENV NODE_ENV=production
-# Issue #70: the canonical portrait master directory must never enter the
+# Issues #70 and #117: the canonical art-master directory must never enter the
 # Docker build context (.dockerignore) — this assertion fails the build if it
 # does, proving the production image ships only the committed derivatives.
-RUN test ! -e assets/character-portraits \
-  && echo "portrait masters correctly excluded from the Docker build context"
+RUN test ! -e assets \
+  && echo "art masters correctly excluded from the Docker build context"
 RUN BETTER_AUTH_SECRET="$BUILD_ONLY_BETTER_AUTH_SECRET" pnpm build
 
 # ---- runner ----
