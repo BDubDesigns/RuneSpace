@@ -324,9 +324,18 @@ export const characterTravelState = pgTable(
       .references(() => characters.id, { onDelete: "restrict" }),
     originLocationId: text("origin_location_id").notNull(),
     destinationLocationId: text("destination_location_id").notNull(),
-    // One stable optional Scavenge window belongs to this ordinary walking leg.
+    /**
+     * How this Journey is being made (#172). `walk` is ordinary free adjacent
+     * travel; `crew_hauler` is the authored paid Holo Hollow <-> The Jag route,
+     * which is deliberately NOT map adjacency. The mode owns the Journey's
+     * duration and its Scavenge eligibility.
+     */
+    mode: text("mode").notNull().default("walk"),
+    // One stable optional Scavenge window belongs to an ordinary walking leg.
+    // A paid ride has no Scavenge opportunity at all, so the column is NULL
+    // there rather than carrying an unused window nobody may claim.
     // The outcome fields stay null until an authoritative claim commits.
-    scavengeOpportunityStartTick: integer("scavenge_opportunity_start_tick").notNull().default(3),
+    scavengeOpportunityStartTick: integer("scavenge_opportunity_start_tick"),
     scavengeOutcomeId: text("scavenge_outcome_id"),
     scavengeAwardQuantity: integer("scavenge_award_quantity").notNull().default(0),
   },
@@ -335,9 +344,17 @@ export const characterTravelState = pgTable(
       "character_travel_state_distinct_ends",
       sql`${table.originLocationId} <> ${table.destinationLocationId}`,
     ),
+    check("character_travel_state_mode", sql`${table.mode} IN ('walk', 'crew_hauler')`),
+    // The structural invariant behind "riding offers nothing to scavenge":
+    // a walk always has an authored window, and no other mode ever does.
     check(
-      "character_travel_state_scavenge_start_tick",
-      sql`${table.scavengeOpportunityStartTick} >= 3 AND ${table.scavengeOpportunityStartTick} <= 30`,
+      "character_travel_state_scavenge_window_matches_mode",
+      sql`(${table.mode} = 'walk' AND ${table.scavengeOpportunityStartTick} IS NOT NULL AND ${table.scavengeOpportunityStartTick} >= 3 AND ${table.scavengeOpportunityStartTick} <= 30) OR (${table.mode} <> 'walk' AND ${table.scavengeOpportunityStartTick} IS NULL)`,
+    ),
+    // Only a walk can ever have claimed a Scavenge outcome.
+    check(
+      "character_travel_state_scavenge_outcome_requires_walk",
+      sql`${table.scavengeOutcomeId} IS NULL OR ${table.mode} = 'walk'`,
     ),
     check(
       "character_travel_state_scavenge_award_quantity_non_negative",
@@ -471,13 +488,28 @@ export const characterRefiningState = pgTable("character_refining_state", {
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
-/** Issue #89 — the character-scoped Crash Site Cargo Hold repair state. */
-export const characterCargoHoldRepair = pgTable(
-  "character_cargo_hold_repair",
+/**
+ * Issue #172 — the generic character-scoped repair-target state.
+ *
+ * One row per (character, repair target). This replaced the specialized
+ * `character_cargo_hold_repair` table so the Crash Site Cargo Hold and Holo
+ * Hollow's Crew Stop share one authoritative persistence boundary instead of
+ * each owning a private one. `target_id` is a content ID from
+ * `game/config/foundations` (REPAIR_TARGET_IDS).
+ *
+ * Per-target recipes (how much material, how many Welding increments) are
+ * balance, not schema: this layer imports no game content, so the bounds here
+ * are only the structural ones that hold for every target. The exact recipe
+ * caps are enforced by the domain, which clamps every contribution and every
+ * Welding increment against the target's authoritative spec.
+ */
+export const characterRepairTargets = pgTable(
+  "character_repair_targets",
   {
     characterId: text("character_id")
-      .primaryKey()
+      .notNull()
       .references(() => characters.id, { onDelete: "restrict" }),
+    targetId: text("target_id").notNull(),
     refinedFerriteContributed: integer("refined_ferrite_contributed").notNull().default(0),
     slagContributed: integer("slag_contributed").notNull().default(0),
     weldingProgress: integer("welding_progress").notNull().default(0),
@@ -485,29 +517,18 @@ export const characterCargoHoldRepair = pgTable(
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [
+    primaryKey({ columns: [table.characterId, table.targetId] }),
     check(
-      "character_cargo_hold_repair_refined_ferrite_range",
-      sql`${table.refinedFerriteContributed} >= 0 AND ${table.refinedFerriteContributed} <= 15`,
+      "character_repair_targets_refined_ferrite_non_negative",
+      sql`${table.refinedFerriteContributed} >= 0`,
     ),
+    check("character_repair_targets_slag_non_negative", sql`${table.slagContributed} >= 0`),
+    check("character_repair_targets_welding_non_negative", sql`${table.weldingProgress} >= 0`),
+    // A completed repair always has resolved Welding work behind it. The exact
+    // increment count is the target's own recipe and is enforced in the domain.
     check(
-      "character_cargo_hold_repair_slag_range",
-      sql`${table.slagContributed} >= 0 AND ${table.slagContributed} <= 6`,
-    ),
-    check(
-      "character_cargo_hold_repair_welding_range",
-      sql`${table.weldingProgress} >= 0 AND ${table.weldingProgress} <= 12`,
-    ),
-    check(
-      "character_cargo_hold_repair_progress_requires_materials",
-      sql`${table.weldingProgress} = 0 OR (${table.refinedFerriteContributed} = 15 AND ${table.slagContributed} = 6)`,
-    ),
-    check(
-      "character_cargo_hold_repair_completion_requires_full_state",
-      sql`${table.completedAt} IS NULL OR (${table.refinedFerriteContributed} = 15 AND ${table.slagContributed} = 6 AND ${table.weldingProgress} = 12)`,
-    ),
-    check(
-      "character_cargo_hold_repair_progress_requires_completion_timestamp",
-      sql`${table.weldingProgress} < 12 OR ${table.completedAt} IS NOT NULL`,
+      "character_repair_targets_completion_requires_progress",
+      sql`${table.completedAt} IS NULL OR ${table.weldingProgress} > 0`,
     ),
   ],
 );
@@ -639,7 +660,7 @@ export type CharacterScavengeReveal = typeof characterScavengeReveals.$inferSele
 export type CharacterMission = typeof characterMissions.$inferSelect;
 export type CharacterMissionProgress = typeof characterMissionProgress.$inferSelect;
 export type CharacterPowerCellDailyClaim = typeof characterPowerCellDailyClaims.$inferSelect;
-export type CharacterCargoHoldRepair = typeof characterCargoHoldRepair.$inferSelect;
+export type CharacterRepairTarget = typeof characterRepairTargets.$inferSelect;
 export type CargoHoldStack = typeof cargoHoldStacks.$inferSelect;
 export type CargoHoldItemInstance = typeof cargoHoldItemInstances.$inferSelect;
 export type OperatorAuditLog = typeof operatorAuditLogs.$inferSelect;

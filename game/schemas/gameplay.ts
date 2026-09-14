@@ -2,8 +2,10 @@ import { z } from "zod";
 import {
   EQUIPMENT_ASSIGNMENT_KINDS,
   ITEM_IDS,
+  REPAIR_TARGET_IDS,
   SKILL_IDS,
   type ItemId,
+  type RepairTargetId,
   type SkillId,
 } from "@/game/config/foundations";
 import { ContentId } from "./ids";
@@ -11,9 +13,15 @@ import { LocationIdSchema } from "./locations";
 
 const skillIdValues = Object.values(SKILL_IDS) as [SkillId, ...SkillId[]];
 const itemIdValues = Object.values(ITEM_IDS) as [ItemId, ...ItemId[]];
+const repairTargetIdValues = Object.values(REPAIR_TARGET_IDS) as [
+  RepairTargetId,
+  ...RepairTargetId[],
+];
 
 export const SkillIdSchema = z.enum(skillIdValues);
 export const ItemIdSchema = z.enum(itemIdValues);
+/** A repair target the client may name; every rule about it stays server-side. */
+export const RepairTargetIdSchema = z.enum(repairTargetIdValues);
 
 /**
  * Suit slot identities are stable content IDs supplied by future equipment
@@ -99,11 +107,22 @@ export const DiscardInventoryStackRequestSchema = z.object({
   expectedQuantity: z.number().int().positive(),
 });
 
-/** The confirmed, exact useful quantities for one irreversible Cargo repair commit. */
-export const CargoHoldMaterialContributionRequestSchema = z.object({
+/**
+ * The confirmed, exact useful quantities for one irreversible repair commit,
+ * plus which repair target is being worked on. The target's recipe, its
+ * location, and the Mission that authorizes it are all revalidated server-side.
+ */
+export const RepairMaterialContributionRequestSchema = z.object({
   characterId: z.string().uuid(),
+  targetId: RepairTargetIdSchema,
   expectedRefinedFerrite: z.number().int().nonnegative(),
   expectedSlag: z.number().int().nonnegative(),
+});
+
+/** Starting or stopping Welding names only the character and the repair target. */
+export const WeldingCommandRequestSchema = z.object({
+  characterId: z.string().uuid(),
+  targetId: RepairTargetIdSchema,
 });
 
 const CargoHoldStackTransferFields = {

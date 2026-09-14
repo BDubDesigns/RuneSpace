@@ -9,13 +9,17 @@ import { MissionActionLink } from "@/components/ui/MissionActionLink";
 import { SectionHeader } from "@/components/ui/SectionHeader";
 import { usePlay } from "@/features/play/PlayContext";
 import { getLocalPlacesForLocation } from "@/game/content/local-places";
-import { deriveLocalPlaceAccess } from "@/game/domain/local-places";
+import {
+  deriveLocalPlaceAccess,
+  deriveLocalPlaceSurface,
+  type LocalPlaceSurface,
+} from "@/game/domain/local-places";
+import { deriveCompletedRepairTargetIds } from "@/game/domain/welding-repair";
 import {
   deriveCompletedMissionIds,
   deriveMissionGuidanceTargets,
   localPlaceGuidanceMeaning,
 } from "@/game/domain/missions";
-import type { LocalPlaceDefinition } from "@/game/schemas/local-places";
 import { localPlaceHref } from "./navigation";
 
 /**
@@ -44,6 +48,9 @@ export function LocalPlaceDirectory({ locationId }: { locationId: string }) {
   // guides that place's entrance — green for remaining work, blue when that NPC
   // is the turn-in; the NPC takes over once the player is inside.
   const guidance = deriveMissionGuidanceTargets(state.missions);
+  // A place something inside it can permanently change shows its repaired copy
+  // and artwork here too, so the town listing never disagrees with the place.
+  const completedRepairTargetIds = deriveCompletedRepairTargetIds(Object.values(state.repairs));
 
   return (
     <div data-local-place-directory>
@@ -51,6 +58,7 @@ export function LocalPlaceDirectory({ locationId }: { locationId: string }) {
       <ul className="mt-4 grid gap-3 sm:grid-cols-2">
         {places.map((place) => {
           const access = deriveLocalPlaceAccess(place, completedMissionIds);
+          const surface = deriveLocalPlaceSurface(place, completedRepairTargetIds);
           const href = localPlaceHref(pathname, place.id);
           const reasonId = `local-place-reason-${place.id}`;
           const guided = localPlaceGuidanceMeaning(guidance, place.id);
@@ -72,11 +80,11 @@ export function LocalPlaceDirectory({ locationId }: { locationId: string }) {
                   />
                   {/* Pointer events fall through the summary to the card link. */}
                   <div className="pointer-events-none">
-                    <PlaceSummary place={place} />
+                    <PlaceSummary surface={surface} />
                   </div>
                   <div className="relative mt-auto p-3 pt-0">
                     <MissionActionLink
-                      aria-label={`Enter ${place.displayName}`}
+                      aria-label={`Enter ${surface.displayName}`}
                       data-local-place-enter
                       guidance={guided}
                       haloClassName="w-full"
@@ -93,7 +101,7 @@ export function LocalPlaceDirectory({ locationId }: { locationId: string }) {
                   data-local-place={place.id}
                   data-local-place-access="locked"
                 >
-                  <PlaceSummary dimmed place={place} />
+                  <PlaceSummary dimmed surface={surface} />
                   <p
                     className="px-3 pb-3 text-xs leading-relaxed text-[color:var(--rs-text-muted)]"
                     data-local-place-locked-reason
@@ -124,13 +132,13 @@ export function LocalPlaceDirectory({ locationId }: { locationId: string }) {
 }
 
 function PlaceSummary({
-  place,
+  surface,
   dimmed = false,
 }: {
-  place: LocalPlaceDefinition;
+  surface: LocalPlaceSurface;
   dimmed?: boolean;
 }) {
-  const scene = place.presentation.scene;
+  const scene = surface.presentation.scene;
   return (
     <>
       <div className="relative h-[72px] w-full overflow-hidden sm:h-[84px]">
@@ -153,10 +161,10 @@ function PlaceSummary({
       </div>
       <div className="p-3">
         <p className="font-display text-sm font-bold text-[color:var(--rs-text-primary)]">
-          {place.displayName}
+          {surface.displayName}
         </p>
         <p className="mt-1 text-xs leading-relaxed text-[color:var(--rs-text-secondary)]">
-          {place.description}
+          {surface.description}
         </p>
       </div>
     </>

@@ -6,6 +6,7 @@ import {
   LOCATION_IDS,
   MISSION_IDS,
   NPC_IDS,
+  REPAIR_TARGET_IDS,
 } from "@/game/config/foundations";
 import {
   LOCAL_PLACES,
@@ -99,6 +100,7 @@ describe("issue #159 Local Place registry", () => {
       LOCAL_PLACE_IDS.holoHollowSouvenirs,
       LOCAL_PLACE_IDS.holoHollowAssistanceCenter,
       LOCAL_PLACE_IDS.hhBnb,
+      LOCAL_PLACE_IDS.holoHollowCrewStop,
     ]);
     expect(places).toHaveLength(LOCAL_PLACES.length);
     for (const place of LOCAL_PLACES) {
@@ -318,8 +320,20 @@ describe("issue #170 mission-derived Local Place access", () => {
 
   it("fails fast when an authored place gates on a Mission that does not exist", () => {
     expect(() =>
-      validateLocalPlaceAccess(LOCAL_PLACES, new Set([MISSION_IDS.keepTheChange])),
+      validateLocalPlaceAccess(
+        LOCAL_PLACES,
+        new Set([MISSION_IDS.keepTheChange]),
+        new Set([REPAIR_TARGET_IDS.crewStop]),
+      ),
     ).not.toThrow();
-    expect(() => validateLocalPlaceAccess(LOCAL_PLACES, new Set())).toThrow(/unknown mission/i);
+    expect(() =>
+      validateLocalPlaceAccess(LOCAL_PLACES, new Set(), new Set([REPAIR_TARGET_IDS.crewStop])),
+    ).toThrow(/unknown mission/i);
+  });
+
+  it("fails fast when an authored place presents a repair target that does not exist", () => {
+    expect(() =>
+      validateLocalPlaceAccess(LOCAL_PLACES, new Set([MISSION_IDS.keepTheChange]), new Set()),
+    ).toThrow(/unknown repair target/i);
   });
 });

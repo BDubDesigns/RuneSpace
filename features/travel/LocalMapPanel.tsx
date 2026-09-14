@@ -9,6 +9,7 @@ import { ACTION_IDS, GAME_TICK_MS, LOCATION_IDS } from "@/game/config/foundation
 import { getEffectiveGameBalance } from "@/game/config/balance";
 import { areLocationsAdjacent, getLocation } from "@/game/content/locations";
 import { beginTravelAction } from "@/server/actions";
+import { travelErrorMessage } from "./travel-errors";
 import { usePlay } from "@/features/play/PlayContext";
 import { deriveMissionGuidanceTargets, type MissionGuidanceTargets } from "@/game/domain/missions";
 import {
@@ -560,16 +561,6 @@ export function LocalMapPanel({
       });
     };
     enqueueForeground(execute);
-  }
-
-  function travelErrorMessage(reason: NonNullable<typeof state.travelError>): string {
-    return {
-      unknown_destination: "That destination is not a known location.",
-      same_location: "You are already at that location.",
-      not_adjacent: "You can only travel to a directly adjacent location.",
-      already_traveling: "You are already traveling. Arrival must complete first.",
-      mining_unavailable_here: "Mining is not available at this location.",
-    }[reason];
   }
 
   const transitProgress =

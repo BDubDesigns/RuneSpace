@@ -7,6 +7,7 @@ import { createCharacter, changeCharacterPortrait, CharacterError } from "@/serv
 import { acknowledgeNews } from "@/server/account-news";
 import {
   getPlayGameplayState,
+  beginTransportTravel,
   beginTravel,
   claimScavenge,
   acknowledgeScavengeReveal,
@@ -22,17 +23,20 @@ import { startRefining, stopRefining } from "@/server/refining-commands";
 import { changeEquipment } from "@/server/equipment";
 import { discardInventoryStack, type DiscardInventoryStackResult } from "@/server/inventory";
 import {
-  contributeCargoHoldMaterials,
   depositCargoStack,
   depositCargoUniqueItem,
-  startCargoHoldWelding,
-  stopCargoHoldWelding,
   withdrawCargoStack,
   withdrawCargoUniqueItem,
-  type CargoHoldContributionStatus,
   type CargoHoldStateResult,
   type CargoHoldTransferStatus,
 } from "@/server/cargo-hold";
+import {
+  contributeRepairMaterials,
+  startWelding,
+  stopWelding,
+  type RepairContributionStatus,
+  type RepairStateResult,
+} from "@/server/repair-commands";
 import { EquipmentRuleError } from "@/game/domain/equipment";
 import { TravelRuleError } from "@/server/travel";
 import { claimPowerCells, type PowerAnnexClaimResult } from "@/server/power-annex";
@@ -55,7 +59,8 @@ import {
   TradeRequestSchema,
   LoadPowerCellRequestSchema,
   DiscardInventoryStackRequestSchema,
-  CargoHoldMaterialContributionRequestSchema,
+  RepairMaterialContributionRequestSchema,
+  WeldingCommandRequestSchema,
   DepositCargoStackRequestSchema,
   WithdrawCargoStackRequestSchema,
   DepositCargoUniqueItemRequestSchema,
@@ -253,26 +258,47 @@ export async function stopRefiningAction(characterId: string): Promise<PlayActio
   return runPlayAction(characterId, stopRefining);
 }
 
-export async function startWeldingAction(characterId: string): Promise<PlayActionResult> {
-  return runPlayAction(characterId, startCargoHoldWelding);
-}
-
-export async function stopWeldingAction(characterId: string): Promise<PlayActionResult> {
-  return runPlayAction(characterId, stopCargoHoldWelding);
-}
-
-export type CargoHoldMaterialContributionActionResult =
-  | CargoHoldStateResult<CargoHoldContributionStatus>
-  | { error: string };
-
-export async function contributeCargoHoldMaterialsAction(
-  input: unknown,
-): Promise<CargoHoldMaterialContributionActionResult> {
-  const request = CargoHoldMaterialContributionRequestSchema.safeParse(input);
-  if (!request.success) return { error: "Invalid Cargo Hold contribution command." };
+export async function startWeldingAction(input: unknown): Promise<PlayActionResult> {
+  const request = WeldingCommandRequestSchema.safeParse(input);
+  if (!request.success) return { error: "Invalid Welding command." };
   try {
     const user = await requireCurrentUser(await headers());
-    return await contributeCargoHoldMaterials(user.id, request.data.characterId, {
+    return {
+      state: await startWelding(user.id, request.data.characterId, request.data.targetId),
+    };
+  } catch (error) {
+    if (error instanceof OwnershipError) return { error: error.message };
+    throw error;
+  }
+}
+
+export async function stopWeldingAction(input: unknown): Promise<PlayActionResult> {
+  const request = WeldingCommandRequestSchema.safeParse(input);
+  if (!request.success) return { error: "Invalid Welding command." };
+  try {
+    const user = await requireCurrentUser(await headers());
+    return {
+      state: await stopWelding(user.id, request.data.characterId, request.data.targetId),
+    };
+  } catch (error) {
+    if (error instanceof OwnershipError) return { error: error.message };
+    throw error;
+  }
+}
+
+export type RepairMaterialContributionActionResult =
+  | RepairStateResult<RepairContributionStatus>
+  | { error: string };
+
+export async function contributeRepairMaterialsAction(
+  input: unknown,
+): Promise<RepairMaterialContributionActionResult> {
+  const request = RepairMaterialContributionRequestSchema.safeParse(input);
+  if (!request.success) return { error: "Invalid repair contribution command." };
+  try {
+    const user = await requireCurrentUser(await headers());
+    return await contributeRepairMaterials(user.id, request.data.characterId, {
+      targetId: request.data.targetId,
       expectedRefinedFerrite: request.data.expectedRefinedFerrite,
       expectedSlag: request.data.expectedSlag,
     });
@@ -396,6 +422,26 @@ export async function beginTravelAction(input: unknown): Promise<PlayActionResul
     const user = await requireCurrentUser(await headers());
     return {
       state: await beginTravel(
+        user.id,
+        request.data.characterId,
+        request.data.destinationLocationId,
+      ),
+    };
+  } catch (error) {
+    if (error instanceof OwnershipError) return { error: error.message };
+    if (error instanceof TravelRuleError) return { error: error.message };
+    throw error;
+  }
+}
+
+/** Board a paid transport ride. The fare and route are resolved server-side. */
+export async function beginTransportTravelAction(input: unknown): Promise<PlayActionResult> {
+  const request = BeginTravelRequestSchema.safeParse(input);
+  if (!request.success) return { error: "Invalid ride command." };
+  try {
+    const user = await requireCurrentUser(await headers());
+    return {
+      state: await beginTransportTravel(
         user.id,
         request.data.characterId,
         request.data.destinationLocationId,

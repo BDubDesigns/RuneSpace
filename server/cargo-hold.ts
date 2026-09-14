@@ -1,22 +1,14 @@
 import { and, asc, eq } from "drizzle-orm";
 import {
-  activeActions,
   cargoHoldItemInstances,
   cargoHoldStacks,
-  characterCargoHoldRepair,
   characters,
   equippedItems,
   inventoryStacks,
   itemInstances,
 } from "@/db/rune-space";
 import { getEffectiveGameBalance, getItemDefinition } from "@/game/config/balance";
-import { ACTION_IDS, LOCATION_IDS } from "@/game/config/foundations";
-import { isActionAvailableAtLocation } from "@/game/content/locations";
-import {
-  cargoHoldMaterialsComplete,
-  planCargoHoldMaterialContribution,
-  type CargoHoldRepairState,
-} from "@/game/domain/cargo-hold";
+import { ACTION_IDS, LOCATION_IDS, REPAIR_TARGET_IDS } from "@/game/config/foundations";
 import {
   deriveEquipmentLoadout,
   type EquipmentAssignmentState,
@@ -27,7 +19,6 @@ import type { MiningRandom } from "@/game/domain/mining";
 import { type DatabaseTransaction, withResolvedOwnedCharacter } from "@/server/action-resolution";
 import {
   addStackableItem,
-  consumeStackableItem,
   loadOwnedItemInstances,
   removeFromSelectedStack,
 } from "@/server/carried-inventory";
@@ -37,12 +28,8 @@ import {
   stateFromTransaction,
   type PlayGameplayState,
 } from "@/server/play";
-import { loadCargoRepairAccess } from "@/server/cargo-repair-access";
-
-export type CargoHoldMaterialContributionRequest = {
-  expectedRefinedFerrite: number;
-  expectedSlag: number;
-};
+import { loadRepairAccess } from "@/server/repair-access";
+import { loadRepairTargetRow, repairStateFromRow } from "@/server/welding";
 
 export type CargoHoldStackTransferRequest = {
   stackId: string;
@@ -58,8 +45,6 @@ export type CargoHoldRefusalReason =
   | "not_at_crash_site"
   | "in_transit"
   | "repair_incomplete"
-  | "materials_changed"
-  | "nothing_to_contribute"
   | "stack_changed"
   | "stack_not_found"
   | "unsupported_stack"
@@ -76,14 +61,6 @@ export type CargoHoldRefusal = {
   message: string;
 };
 
-export type CargoHoldContributionStatus =
-  | {
-      status: "committed";
-      refinedFerrite: number;
-      slag: number;
-    }
-  | CargoHoldRefusal;
-
 export type CargoHoldTransferStatus =
   | {
       status: "transferred";
@@ -99,35 +76,16 @@ export type CargoHoldStateResult<T> = {
 
 const EMPTY_RECENT_RESULT = { successes: 0, failures: 0, awardedXp: 0 } as const;
 
-function repairState(row: typeof characterCargoHoldRepair.$inferSelect): CargoHoldRepairState {
-  return {
-    refinedFerriteContributed: row.refinedFerriteContributed,
-    slagContributed: row.slagContributed,
-    weldingProgress: row.weldingProgress,
-    completedAt: row.completedAt,
-  };
-}
-
-async function loadRepair(
-  transaction: DatabaseTransaction,
-  characterId: string,
-): Promise<typeof characterCargoHoldRepair.$inferSelect> {
-  const rows = await transaction
-    .select()
-    .from(characterCargoHoldRepair)
-    .where(eq(characterCargoHoldRepair.characterId, characterId))
-    .for("update");
-  const row = rows[0];
-  if (!row) throw new Error("Cargo Hold repair state must exist before a Cargo command");
-  return row;
-}
-
+/**
+ * Cargo Hold STORAGE access. The Hold's repair work itself is an ordinary
+ * Welding job and lives with every other repair target in
+ * `server/repair-commands`; what remains here is the storage the finished Hold
+ * provides, which is genuinely Cargo-specific.
+ */
 async function accessRefusal(
   transaction: DatabaseTransaction,
   characterId: string,
   action: { actionId: string } | undefined,
-  repair: typeof characterCargoHoldRepair.$inferSelect,
-  operation: "repair" | "storage" = "storage",
 ): Promise<CargoHoldRefusal | undefined> {
   if (action?.actionId === ACTION_IDS.travel) {
     return {
@@ -155,16 +113,22 @@ async function accessRefusal(
       message: "Cargo Hold access is only available while stationary at Crash Site.",
     };
   }
-  const access = await loadCargoRepairAccess(transaction, characterId, repairState(repair));
-  const allowed = operation === "repair" ? access.repairAvailable : access.complete;
-  if (!allowed) {
+  const repairRow = await loadRepairTargetRow(
+    transaction,
+    characterId,
+    REPAIR_TARGET_IDS.cargoHold,
+  );
+  const access = await loadRepairAccess(
+    transaction,
+    characterId,
+    REPAIR_TARGET_IDS.cargoHold,
+    repairStateFromRow(repairRow),
+  );
+  if (!access.complete) {
     return {
       status: "refused",
       reason: "repair_incomplete",
-      message:
-        operation === "repair"
-          ? "Accept Hold It Together before repairing the Cargo Hold."
-          : "Restore the Cargo Hold before using its storage.",
+      message: "Restore the Cargo Hold before using its storage.",
     };
   }
   return undefined;
@@ -221,118 +185,12 @@ async function loadCarriedCapacity(
   };
 }
 
-export async function contributeCargoHoldMaterials(
-  userId: string,
-  characterId: string,
-  request: CargoHoldMaterialContributionRequest,
-  now = new Date(),
-  random: MiningRandom = {
-    nextBasisPoints: () => 0,
-    nextUnit: () => 0,
-  },
-): Promise<CargoHoldStateResult<CargoHoldContributionStatus>> {
-  return withResolvedOwnedCharacter(
-    userId,
-    characterId,
-    createPlayResolver(random),
-    async (transaction, context) => {
-      await ensurePlayProvisioning(transaction, context.character.id);
-      const balance = getEffectiveGameBalance();
-      const repair = await loadRepair(transaction, context.character.id);
-      const access = await accessRefusal(
-        transaction,
-        context.character.id,
-        context.action,
-        repair,
-        "repair",
-      );
-      if (access) {
-        return {
-          state: await stateAfterCargoCommand(transaction, context.character.id, now),
-          cargo: access,
-        };
-      }
-      const stacks = await transaction
-        .select()
-        .from(inventoryStacks)
-        .where(eq(inventoryStacks.characterId, context.character.id))
-        .orderBy(asc(inventoryStacks.createdAt), asc(inventoryStacks.id))
-        .for("update");
-      const carriedRefinedFerrite = stacks
-        .filter((stack) => stack.itemId === balance.items.refinedFerrite.itemId)
-        .reduce((total, stack) => total + stack.quantity, 0);
-      const carriedSlag = stacks
-        .filter((stack) => stack.itemId === balance.items.slag.itemId)
-        .reduce((total, stack) => total + stack.quantity, 0);
-      const useful = planCargoHoldMaterialContribution({
-        repair: repairState(repair),
-        carriedRefinedFerrite,
-        carriedSlag,
-        balance,
-      });
-      if (
-        useful.refinedFerrite !== request.expectedRefinedFerrite ||
-        useful.slag !== request.expectedSlag
-      ) {
-        return {
-          state: await stateAfterCargoCommand(transaction, context.character.id, now),
-          cargo: {
-            status: "refused",
-            reason: "materials_changed",
-            message: "Repair materials changed. Review the useful quantities and try again.",
-          },
-        };
-      }
-      if (useful.refinedFerrite === 0 && useful.slag === 0) {
-        return {
-          state: await stateAfterCargoCommand(transaction, context.character.id, now),
-          cargo: {
-            status: "refused",
-            reason: "nothing_to_contribute",
-            message: "No carried Refined Ferrite or Slag is still needed for this repair.",
-          },
-        };
-      }
-
-      const refinedResult = await consumeStackableItem(transaction, {
-        characterId: context.character.id,
-        itemId: balance.items.refinedFerrite.itemId,
-        quantity: useful.refinedFerrite,
-        now,
-      });
-      const slagResult = await consumeStackableItem(transaction, {
-        characterId: context.character.id,
-        itemId: balance.items.slag.itemId,
-        quantity: useful.slag,
-        now,
-      });
-      if (!refinedResult.ok || !slagResult.ok)
-        throw new Error("Contribution removal became invalid");
-      await transaction
-        .update(characterCargoHoldRepair)
-        .set({
-          refinedFerriteContributed: repair.refinedFerriteContributed + useful.refinedFerrite,
-          slagContributed: repair.slagContributed + useful.slag,
-          updatedAt: now,
-        })
-        .where(eq(characterCargoHoldRepair.characterId, context.character.id));
-      return {
-        state: await stateAfterCargoCommand(transaction, context.character.id, now),
-        cargo: { status: "committed", ...useful },
-      };
-    },
-    now,
-  );
-}
-
 async function cargoStackAccess(
   transaction: DatabaseTransaction,
   characterId: string,
   action: { actionId: string } | undefined,
 ) {
-  const repair = await loadRepair(transaction, characterId);
-  const access = await accessRefusal(transaction, characterId, action, repair);
-  return { repair, access };
+  return { access: await accessRefusal(transaction, characterId, action) };
 }
 
 export async function depositCargoStack(
@@ -768,166 +626,6 @@ export async function withdrawCargoUniqueItem(
         state: await stateAfterCargoCommand(transaction, context.character.id, now),
         cargo: { status: "transferred", itemInstanceId: instance.id },
       };
-    },
-    now,
-  );
-}
-
-export async function startCargoHoldWelding(
-  userId: string,
-  characterId: string,
-  now = new Date(),
-  random: MiningRandom = {
-    nextBasisPoints: () => 0,
-    nextUnit: () => 0,
-  },
-): Promise<PlayGameplayState> {
-  return withResolvedOwnedCharacter(
-    userId,
-    characterId,
-    createPlayResolver(random),
-    async (transaction, context) => {
-      await ensurePlayProvisioning(transaction, context.character.id);
-      const balance = getEffectiveGameBalance();
-      const repair = await loadRepair(transaction, context.character.id);
-      if (context.action?.actionId === ACTION_IDS.cargoHoldWelding) {
-        return stateAfterCargoCommand(transaction, context.character.id, now);
-      }
-      if (context.action) {
-        return stateFromTransaction(
-          transaction,
-          context.character.id,
-          EMPTY_RECENT_RESULT,
-          undefined,
-          "another_action_active",
-          undefined,
-          undefined,
-          now,
-        );
-      }
-      const characterRows = await transaction
-        .select({ currentLocationId: characters.currentLocationId })
-        .from(characters)
-        .where(eq(characters.id, context.character.id))
-        .limit(1);
-      if (
-        !isActionAvailableAtLocation(
-          characterRows[0]?.currentLocationId ?? "",
-          ACTION_IDS.cargoHoldWelding,
-        )
-      ) {
-        return stateFromTransaction(
-          transaction,
-          context.character.id,
-          EMPTY_RECENT_RESULT,
-          undefined,
-          undefined,
-          undefined,
-          undefined,
-          now,
-          EMPTY_RECENT_RESULT,
-          undefined,
-          undefined,
-          "welding_unavailable_here",
-        );
-      }
-      const repairProjection = repairState(repair);
-      const access = await loadCargoRepairAccess(
-        transaction,
-        context.character.id,
-        repairProjection,
-      );
-      if (access.complete) {
-        return stateFromTransaction(
-          transaction,
-          context.character.id,
-          EMPTY_RECENT_RESULT,
-          undefined,
-          undefined,
-          undefined,
-          undefined,
-          now,
-          EMPTY_RECENT_RESULT,
-          undefined,
-          undefined,
-          "repair_complete",
-        );
-      }
-      if (!access.repairAvailable) {
-        return stateFromTransaction(
-          transaction,
-          context.character.id,
-          EMPTY_RECENT_RESULT,
-          undefined,
-          undefined,
-          undefined,
-          undefined,
-          now,
-          EMPTY_RECENT_RESULT,
-          undefined,
-          undefined,
-          "welding_locked",
-        );
-      }
-      if (!cargoHoldMaterialsComplete(repairProjection, balance)) {
-        return stateFromTransaction(
-          transaction,
-          context.character.id,
-          EMPTY_RECENT_RESULT,
-          undefined,
-          undefined,
-          undefined,
-          undefined,
-          now,
-          EMPTY_RECENT_RESULT,
-          undefined,
-          undefined,
-          "welding_locked",
-        );
-      }
-      await transaction.insert(activeActions).values({
-        characterId: context.character.id,
-        actionId: ACTION_IDS.cargoHoldWelding,
-        startedAt: now,
-        resolvedThroughAt: now,
-      });
-      return stateAfterCargoCommand(transaction, context.character.id, now);
-    },
-    now,
-  );
-}
-
-export async function stopCargoHoldWelding(
-  userId: string,
-  characterId: string,
-  now = new Date(),
-  random: MiningRandom = {
-    nextBasisPoints: () => 0,
-    nextUnit: () => 0,
-  },
-): Promise<PlayGameplayState> {
-  return withResolvedOwnedCharacter(
-    userId,
-    characterId,
-    createPlayResolver(random),
-    async (transaction, context) => {
-      await ensurePlayProvisioning(transaction, context.character.id);
-      if (context.action?.actionId === ACTION_IDS.cargoHoldWelding) {
-        await transaction
-          .delete(activeActions)
-          .where(eq(activeActions.characterId, context.character.id));
-        return stateAfterCargoCommand(transaction, context.character.id, now);
-      }
-      return stateFromTransaction(
-        transaction,
-        context.character.id,
-        EMPTY_RECENT_RESULT,
-        undefined,
-        context.action ? "another_action_active" : undefined,
-        undefined,
-        undefined,
-        now,
-      );
     },
     now,
   );

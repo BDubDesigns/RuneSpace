@@ -9,14 +9,14 @@ import { StatusMeter } from "@/components/ui/StatusMeter";
 import { ItemVisual } from "@/components/items/ItemVisual";
 import { InventoryStackVisual } from "@/components/items/InventoryStackVisual";
 import { getEffectiveGameBalance } from "@/game/config/balance";
-import { ACTION_IDS, GAME_TICK_MS } from "@/game/config/foundations";
+import { ACTION_IDS, GAME_TICK_MS, REPAIR_TARGET_IDS } from "@/game/config/foundations";
 import type {
-  CargoHoldMaterialContributionActionResult,
   CargoHoldTransferActionResult,
   PlayActionResult,
+  RepairMaterialContributionActionResult,
 } from "@/server/actions";
 import {
-  contributeCargoHoldMaterialsAction,
+  contributeRepairMaterialsAction,
   depositCargoStackAction,
   depositCargoUniqueItemAction,
   startWeldingAction,
@@ -54,15 +54,17 @@ function transferMessage(result: CargoHoldTransferActionResult): string | undefi
 function weldingMessage(state: PlayGameplayState): string | undefined {
   if (state.weldingError === "welding_unavailable_here")
     return "Welding is available only while stationary at Crash Site.";
-  if (state.weldingError === "welding_locked")
-    return "Install 15 Refined Ferrite and 6 Slag before Welding.";
+  if (state.weldingError === "welding_locked") {
+    const repair = state.repairs[REPAIR_TARGET_IDS.cargoHold];
+    return `Install ${repair?.refinedFerriteRequired ?? 0} Refined Ferrite and ${repair?.slagRequired ?? 0} Slag before Welding.`;
+  }
   if (state.weldingError === "repair_complete") return "The Cargo Hold is already operational.";
   if (state.commandError === "another_action_active")
     return "Another activity is active. Finish it before starting Welding.";
   return undefined;
 }
 
-function resultError(result: PlayActionResult | CargoHoldMaterialContributionActionResult) {
+function resultError(result: PlayActionResult | RepairMaterialContributionActionResult) {
   return "error" in result ? result.error : undefined;
 }
 
@@ -101,12 +103,14 @@ export function CargoHoldPanel() {
   const previousCompletion = useRef(repair.complete);
   const activeWelding = state.activeAction?.actionId === ACTION_IDS.cargoHoldWelding;
   // Mission guidance consumes the ONE derived target set: an accepted mission
-  // whose current objective observes Cargo repair completion projects the
-  // generic cargoRepair flag, and this panel — which owns the authoritative
+  // whose current objective observes this repair target's completion projects
+  // its target ID, and this panel — which owns the authoritative
   // repair/material/Welding substate — selects the advancing affordance
   // without any mission-ID branching. Stopping active Welding never advances
   // the mission, so it is never guided.
-  const cargoRepairGuided = deriveMissionGuidanceTargets(state.missions).cargoRepair;
+  const cargoRepairGuided = deriveMissionGuidanceTargets(state.missions).repairTargetIds.has(
+    REPAIR_TARGET_IDS.cargoHold,
+  );
   const contributionAvailable =
     repair.availableContribution.refinedFerrite > 0 || repair.availableContribution.slag > 0;
   const contributeGuided =
@@ -165,8 +169,14 @@ export function CargoHoldPanel() {
         try {
           const result =
             intent === "start"
-              ? await startWeldingAction(state.characterId)
-              : await stopWeldingAction(state.characterId);
+              ? await startWeldingAction({
+                  characterId: state.characterId,
+                  targetId: REPAIR_TARGET_IDS.cargoHold,
+                })
+              : await stopWeldingAction({
+                  characterId: state.characterId,
+                  targetId: REPAIR_TARGET_IDS.cargoHold,
+                });
           applyStateResult(result);
         } catch {
           setMessage("Comms interruption. Welding status could not be confirmed.");
@@ -184,8 +194,9 @@ export function CargoHoldPanel() {
       setPending("materials");
       startTransition(async () => {
         try {
-          const result = await contributeCargoHoldMaterialsAction({
+          const result = await contributeRepairMaterialsAction({
             characterId: state.characterId,
+            targetId: REPAIR_TARGET_IDS.cargoHold,
             expectedRefinedFerrite: confirmation.refinedFerrite,
             expectedSlag: confirmation.slag,
           });
@@ -193,9 +204,9 @@ export function CargoHoldPanel() {
           else {
             acceptState(result.state);
             setMessage(
-              result.cargo.status === "committed"
+              result.repair.status === "committed"
                 ? "Repair materials installed permanently."
-                : result.cargo.message,
+                : result.repair.message,
             );
           }
         } catch {

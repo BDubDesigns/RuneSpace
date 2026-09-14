@@ -6,6 +6,7 @@ import {
   activeActions,
   characterScavengeReveals,
   characterTravelState,
+  characters,
   inventoryStacks,
 } from "@/db/rune-space";
 import { ACTION_IDS, ITEM_IDS, LOCATION_IDS } from "@/game/config/foundations";
@@ -424,6 +425,9 @@ test("automatically reconciles arrival without refresh or reload", async ({
     characterId,
     originLocationId: LOCATION_IDS.crashSite,
     destinationLocationId: LOCATION_IDS.abandonedProcessingYard,
+    // A walking leg always carries its Scavenge window (#172).
+    mode: "walk",
+    scavengeOpportunityStartTick: 3,
   });
   await page.goto(`/play/${characterId}`);
   await page.waitForURL(/\/play\/[^/]+$/);
@@ -1046,4 +1050,62 @@ test("a capacity refusal keeps the Power Annex allotment available", async ({
   await expect(page.getByText(/full five-cell allotment will not fit/)).toBeVisible();
   await expect(availableTile.getByText("x5", { exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: "Claim Power Cells" })).toBeVisible();
+});
+
+/**
+ * Issue #172 — a Crew Hauler ride is a Journey, not a teleport, and the Map
+ * survives a route that is deliberately not map adjacency.
+ */
+test("rides the Crew Hauler as a real Journey with no Scavenge, and opens the Map mid-ride", async ({
+  page,
+  testCharacter,
+}) => {
+  const characterId = testCharacter.id;
+  const startedAt = new Date(Date.now() - 6_000);
+  await db.insert(activeActions).values({
+    characterId,
+    actionId: ACTION_IDS.travel,
+    startedAt,
+    resolvedThroughAt: startedAt,
+  });
+  await db.insert(characterTravelState).values({
+    characterId,
+    originLocationId: LOCATION_IDS.holoHollow,
+    destinationLocationId: LOCATION_IDS.theJag,
+    mode: "crew_hauler",
+    // A paid ride carries no Scavenge window at all.
+    scavengeOpportunityStartTick: null,
+  });
+  await db
+    .update(characters)
+    .set({ currentLocationId: LOCATION_IDS.holoHollow })
+    .where(eq(characters.id, characterId));
+
+  await page.goto(`/play/${characterId}`);
+  await page.waitForURL(/\/play\/[^/]+$/);
+
+  // The Journey describes riding, and the character is still at the origin.
+  await expect(page.getByText("Journey progress")).toBeVisible();
+  const summary = page.locator("[data-journey-mode]");
+  await expect(summary).toHaveAttribute("data-journey-mode", "crew_hauler");
+  await expect(summary).toContainText("Riding the Crew Hauler");
+  await expect(summary).not.toContainText("Walking");
+  // Nothing to scavenge on a hauler: no Scavenge beat, no Scavenge control.
+  await expect(page.locator('[data-journey-event="scavenge"]')).toHaveCount(0);
+
+  // The Map renders the in-transit route even though the two ends are not
+  // walk-adjacent, and never offers the ride as a walkable destination.
+  await openMapSurface(page);
+  await expect(page.getByRole("button", { name: /Holo Hollow/ }).first()).toHaveAttribute(
+    "aria-current",
+    "true",
+  );
+  await expect(page.getByRole("button", { name: /The Jag/ }).first()).toBeDisabled();
+
+  // Arrival commits through the ordinary authoritative Journey path.
+  await expect(page.getByRole("button", { name: /The Jag/ }).first()).toHaveAttribute(
+    "aria-current",
+    "true",
+    { timeout: 15_000 },
+  );
 });

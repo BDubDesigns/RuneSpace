@@ -1,6 +1,12 @@
 import { eq } from "drizzle-orm";
 import { afterEach, beforeAll, describe, expect, it } from "vitest";
-import { ACTION_IDS, ITEM_IDS, LOCATION_IDS, SKILL_IDS } from "@/game/config/foundations";
+import {
+  ACTION_IDS,
+  ITEM_IDS,
+  LOCATION_IDS,
+  REPAIR_TARGET_IDS,
+  SKILL_IDS,
+} from "@/game/config/foundations";
 import type { LevelThreshold } from "@/game/domain/progression";
 import type { DatabaseTransaction } from "@/server/action-resolution";
 import { grantCharacterSkillXp } from "@/server/progression";
@@ -81,11 +87,15 @@ suite("gameplay foundations (real PostgreSQL)", () => {
       }),
     ).rejects.toThrow();
     await expect(
-      db.insert(rune.characterCargoHoldRepair).values({
+      // A completed repair must have resolved Welding work behind it; the
+      // generic repair table refuses a completion with zero progress.
+      db.insert(rune.characterRepairTargets).values({
         characterId: character.id,
+        targetId: REPAIR_TARGET_IDS.cargoHold,
         refinedFerriteContributed: 15,
         slagContributed: 6,
-        weldingProgress: 12,
+        weldingProgress: 0,
+        completedAt: new Date(),
       }),
     ).rejects.toThrow();
 

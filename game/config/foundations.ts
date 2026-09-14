@@ -40,6 +40,7 @@ const missionIds = {
   wasteNot: asContentId("waste_not"),
   holdItTogether: asContentId("hold_it_together"),
   keepTheChange: asContentId("keep_the_change"),
+  outOfTheWeather: asContentId("out_of_the_weather"),
 } as const satisfies Record<string, ContentId>;
 
 const dialogueIds = {
@@ -95,6 +96,15 @@ const dialogueIds = {
   tansyKeepTheChangeCompletion: asContentId("tansy_rusk_keep_the_change_completion"),
   wadePostKeepTheChange: asContentId("wade_rusk_post_keep_the_change"),
   tansyPostKeepTheChange: asContentId("tansy_rusk_post_keep_the_change"),
+  // Out of the Weather (#172): Renn's optional Crew Stop side Mission. The
+  // player learns Welding from Wade, then chooses to spend their own materials
+  // and time on something ordinary that makes Holo Hollow's mornings better.
+  rennOutOfTheWeatherOffer: asContentId("renn_calder_out_of_the_weather_offer"),
+  rennOutOfTheWeatherRepairReminder: asContentId("renn_calder_out_of_the_weather_repair_reminder"),
+  rennOutOfTheWeatherBusy: asContentId("renn_calder_out_of_the_weather_busy"),
+  rennOutOfTheWeatherTurnIn: asContentId("renn_calder_out_of_the_weather_turn_in"),
+  rennOutOfTheWeatherCompletion: asContentId("renn_calder_out_of_the_weather_completion"),
+  rennPostOutOfTheWeather: asContentId("renn_calder_post_out_of_the_weather"),
   // Replayable social/worldbuilding topics (#164). These are ordinary NPC
   // conversations: they never carry a Mission action and never gate progression.
   wadeRecoveryWorkTopic: asContentId("wade_rusk_topic_recovery_work"),
@@ -161,6 +171,10 @@ export const ACTION_IDS = {
   ferriteShaleMining: asContentId("ferrite_shale_mining"),
   refining: asContentId("processing_yard_refining"),
   cargoHoldWelding: asContentId("cargo_hold_welding"),
+  // Welding is one skill with one set of rules; a repair target is identified
+  // by its own action ID because `active_actions` deliberately carries no
+  // per-action payload (#172).
+  crewStopWelding: asContentId("crew_stop_welding"),
   travel: asContentId("travel"),
 } as const satisfies Record<string, ContentId>;
 
@@ -185,12 +199,49 @@ export const LOCAL_PLACE_IDS = {
   holoHollowSouvenirs: asContentId("holo_hollow_souvenirs"),
   holoHollowAssistanceCenter: asContentId("holo_hollow_assistance_center"),
   hhBnb: asContentId("hh_bnb"),
+  holoHollowCrewStop: asContentId("holo_hollow_crew_stop"),
 } as const satisfies Record<string, ContentId>;
 
 /** Stable merchant identities (#159). A Local Place authors which one it owns. */
 export const MERCHANT_IDS = {
   bixWeller: asContentId("bix_weller_shop"),
 } as const satisfies Record<string, ContentId>;
+
+/**
+ * Stable identities for the things Welding can repair (#172).
+ *
+ * A repair target owns durable per-character repair state (contributed
+ * materials, Welding progress, completion) in one generic persistence
+ * boundary. Its material recipe and increment count are balance
+ * (`game/config/balance`); where it lives and how it presents is content.
+ */
+export const REPAIR_TARGET_IDS = {
+  cargoHold: asContentId("cargo_hold"),
+  crewStop: asContentId("crew_stop"),
+} as const satisfies Record<string, ContentId>;
+
+/**
+ * Stable identities for authored transport routes (#172).
+ *
+ * A transport route is paid, authored point-to-point travel. It is NOT map
+ * adjacency: the Crew Hauler connects Holo Hollow and The Jag without making
+ * them walk-adjacent, and walking keeps its existing route through The Long
+ * Scramble. See game/content/transport-routes.
+ */
+export const TRANSPORT_ROUTE_IDS = {
+  crewHaulerHoloHollowTheJag: asContentId("crew_hauler_holo_hollow_the_jag"),
+} as const satisfies Record<string, ContentId>;
+
+/**
+ * How one Journey is being made (#172).
+ *
+ * `walk` is ordinary free adjacent travel with its Scavenge window. Every other
+ * mode is authored paid transport: a real Journey with its own duration and no
+ * Scavenge opportunity at all.
+ */
+export const TRAVEL_MODES = ["walk", "crew_hauler"] as const;
+
+export type TravelMode = (typeof TRAVEL_MODES)[number];
 
 /**
  * Stable portrait identities (issue #70). The authoritative catalog with
@@ -247,5 +298,7 @@ export type ConversationBackgroundId =
 export type LocationId = (typeof LOCATION_IDS)[keyof typeof LOCATION_IDS];
 export type LocalPlaceId = (typeof LOCAL_PLACE_IDS)[keyof typeof LOCAL_PLACE_IDS];
 export type MerchantId = (typeof MERCHANT_IDS)[keyof typeof MERCHANT_IDS];
+export type RepairTargetId = (typeof REPAIR_TARGET_IDS)[keyof typeof REPAIR_TARGET_IDS];
+export type TransportRouteId = (typeof TRANSPORT_ROUTE_IDS)[keyof typeof TRANSPORT_ROUTE_IDS];
 export type ActionId = (typeof ACTION_IDS)[keyof typeof ACTION_IDS];
 export type PortraitId = (typeof PORTRAIT_IDS)[keyof typeof PORTRAIT_IDS];

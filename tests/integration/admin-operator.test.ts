@@ -6,9 +6,15 @@ import {
   ITEM_IDS,
   LOCATION_IDS,
   MISSION_IDS,
+  REPAIR_TARGET_IDS,
   SKILL_IDS,
 } from "@/game/config/foundations";
-import { cleanupTestUser, createCharacterForUser, createTestUser } from "./fixtures";
+import {
+  cleanupTestUser,
+  createCharacterForUser,
+  createTestUser,
+  seedRepairTarget,
+} from "./fixtures";
 
 const DATABASE_URL = process.env.DATABASE_URL;
 const suite = DATABASE_URL ? describe : describe.skip;
@@ -121,18 +127,20 @@ suite("issue #113 admin operator console (real PostgreSQL)", () => {
 
   /** Seed the already-unlocked repair state and active Welding action as a test fixture. */
   async function seedWeldingAction(characterId: string, at: Date) {
-    const { getEffectiveGameBalance } = await import("@/game/config/balance");
-    const balance = getEffectiveGameBalance();
-    await db
-      .update(rune.characterCargoHoldRepair)
-      .set({
-        refinedFerriteContributed: balance.cargoHold.refinedFerriteRequired,
-        slagContributed: balance.cargoHold.slagRequired,
-        weldingProgress: 0,
-        completedAt: null,
-        updatedAt: at,
-      })
-      .where(eq(rune.characterCargoHoldRepair.characterId, characterId));
+    const { getEffectiveGameBalance, getRepairTargetBalance } = await import(
+      "@/game/config/balance"
+    );
+    const cargoTarget = getRepairTargetBalance(
+      REPAIR_TARGET_IDS.cargoHold,
+      getEffectiveGameBalance(),
+    );
+    await seedRepairTarget(db, rune, characterId, REPAIR_TARGET_IDS.cargoHold, {
+      refinedFerriteContributed: cargoTarget.refinedFerriteRequired,
+      slagContributed: cargoTarget.slagRequired,
+      weldingProgress: 0,
+      completedAt: null,
+      updatedAt: at,
+    });
     await db.insert(rune.activeActions).values({
       characterId,
       actionId: ACTION_IDS.cargoHoldWelding,
@@ -1060,8 +1068,13 @@ suite("issue #113 admin operator console (real PostgreSQL)", () => {
     const persistedRepair = (
       await db
         .select()
-        .from(rune.characterCargoHoldRepair)
-        .where(eq(rune.characterCargoHoldRepair.characterId, character.id))
+        .from(rune.characterRepairTargets)
+        .where(
+          and(
+            eq(rune.characterRepairTargets.characterId, character.id),
+            eq(rune.characterRepairTargets.targetId, REPAIR_TARGET_IDS.cargoHold),
+          ),
+        )
     )[0]!;
     expect(persistedRepair.weldingProgress).toBe(1);
     const weldingXp = (

@@ -1,5 +1,12 @@
 import { z } from "zod";
-import { ACTION_IDS, ITEM_IDS, SKILL_IDS, type SkillId } from "@/game/config/foundations";
+import {
+  ACTION_IDS,
+  ITEM_IDS,
+  REPAIR_TARGET_IDS,
+  SKILL_IDS,
+  type RepairTargetId,
+  type SkillId,
+} from "@/game/config/foundations";
 import type { LevelThreshold } from "@/game/domain/progression";
 
 const balanceSchema = z.object({
@@ -33,22 +40,52 @@ const balanceSchema = z.object({
     failureXp: z.literal(3),
     inputFerriteShale: z.literal(2),
   }),
+  /**
+   * The genuinely global Welding rules: one skill, one attempt duration, one
+   * XP award per completed increment, one resolution behavior. How much of a
+   * particular thing there is to weld belongs to that repair target's spec
+   * below, never here (#172).
+   */
   welding: z.object({
-    actionId: z.literal(ACTION_IDS.cargoHoldWelding),
     skillId: z.literal(SKILL_IDS.welding),
     attemptDurationTicks: z.literal(5),
-    repairIncrements: z.literal(12),
     xpPerIncrement: z.literal(50),
   }),
+  /**
+   * Per-repair-target recipes. Each target owns its own material requirement
+   * and increment count so a second Welding job never rebalances the first.
+   */
+  repairTargets: z.object({
+    cargoHold: z.object({
+      targetId: z.literal(REPAIR_TARGET_IDS.cargoHold),
+      actionId: z.literal(ACTION_IDS.cargoHoldWelding),
+      refinedFerriteRequired: z.literal(15),
+      slagRequired: z.literal(6),
+      repairIncrements: z.literal(12),
+    }),
+    crewStop: z.object({
+      targetId: z.literal(REPAIR_TARGET_IDS.crewStop),
+      actionId: z.literal(ACTION_IDS.crewStopWelding),
+      refinedFerriteRequired: z.literal(20),
+      slagRequired: z.literal(0),
+      repairIncrements: z.literal(10),
+    }),
+  }),
   cargoHold: z.object({
-    refinedFerriteRequired: z.literal(15),
-    slagRequired: z.literal(6),
     capacitySlots: z.literal(32),
   }),
   travel: z.object({
     actionId: z.literal(ACTION_IDS.travel),
     /** Approved initial adjacent walking duration (issue #40): 40 ticks / 24s. */
     adjacentWalkDurationTicks: z.literal(40),
+    /**
+     * Approved Crew Hauler ride duration (#172): 20 ticks / 12s for the whole
+     * authored Holo Hollow <-> The Jag route, which walking covers in two
+     * 40-tick legs through The Long Scramble. It is deliberately much faster
+     * because the route is fixed, every ride is paid, and a ride offers no
+     * Scavenge opportunity at all.
+     */
+    crewHaulerDurationTicks: z.literal(20),
     scavenge: z.object({
       opportunityStartMinTick: z.literal(3),
       opportunityStartMaxTick: z.literal(30),
@@ -149,20 +186,33 @@ const defaults = balanceSchema.parse({
     inputFerriteShale: 2,
   },
   welding: {
-    actionId: ACTION_IDS.cargoHoldWelding,
     skillId: SKILL_IDS.welding,
     attemptDurationTicks: 5,
-    repairIncrements: 12,
     xpPerIncrement: 50,
   },
+  repairTargets: {
+    cargoHold: {
+      targetId: REPAIR_TARGET_IDS.cargoHold,
+      actionId: ACTION_IDS.cargoHoldWelding,
+      refinedFerriteRequired: 15,
+      slagRequired: 6,
+      repairIncrements: 12,
+    },
+    crewStop: {
+      targetId: REPAIR_TARGET_IDS.crewStop,
+      actionId: ACTION_IDS.crewStopWelding,
+      refinedFerriteRequired: 20,
+      slagRequired: 0,
+      repairIncrements: 10,
+    },
+  },
   cargoHold: {
-    refinedFerriteRequired: 15,
-    slagRequired: 6,
     capacitySlots: 32,
   },
   travel: {
     actionId: ACTION_IDS.travel,
     adjacentWalkDurationTicks: 40,
+    crewHaulerDurationTicks: 20,
     scavenge: {
       opportunityStartMinTick: 3,
       opportunityStartMaxTick: 30,
@@ -197,6 +247,44 @@ const defaults = balanceSchema.parse({
 /** The sole effective-balance boundary until Issue #19 introduces approved overrides. */
 export function getEffectiveGameBalance(): EffectiveGameBalance {
   return defaults;
+}
+
+/** One repair target's authoritative recipe. Never reconstruct these values. */
+export type RepairTargetBalance =
+  EffectiveGameBalance["repairTargets"][keyof EffectiveGameBalance["repairTargets"]];
+
+/** Every authored repair target's recipe, in a stable order. */
+export function repairTargetBalances(
+  balance = getEffectiveGameBalance(),
+): readonly RepairTargetBalance[] {
+  return Object.values(balance.repairTargets);
+}
+
+/**
+ * The authoritative recipe for one repair target. Every Welding rule that is
+ * specific to a target (materials, increments, its action identity) is read
+ * through here so no caller can hardcode a second copy.
+ */
+export function getRepairTargetBalance(
+  targetId: RepairTargetId,
+  balance = getEffectiveGameBalance(),
+): RepairTargetBalance {
+  const target = repairTargetBalances(balance).find((entry) => entry.targetId === targetId);
+  if (!target) throw new Error(`Unknown repair target "${targetId}"`);
+  return target;
+}
+
+/** Resolve a repair target from the action currently being performed. */
+export function repairTargetForActionId(
+  actionId: string,
+  balance = getEffectiveGameBalance(),
+): RepairTargetId | undefined {
+  return repairTargetBalances(balance).find((target) => target.actionId === actionId)?.targetId;
+}
+
+/** Every welding action ID the repair-target registry authorizes. */
+export function weldingActionIds(balance = getEffectiveGameBalance()): readonly string[] {
+  return repairTargetBalances(balance).map((target) => target.actionId);
 }
 
 /** Returns the authoritative inventory representation for a valid item ID. */

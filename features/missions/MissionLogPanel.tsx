@@ -86,6 +86,36 @@ function MissionEntry({
                   </span>
                   <span className="text-[color:var(--rs-text-secondary)]">
                     {requirement.objective}
+                    {/* Secondary context (what is carried, for instance) is its
+                        own subordinate line so it can never read as progress. */}
+                    {requirement.detail ? (
+                      <span
+                        className="mt-0.5 block text-xs text-[color:var(--rs-text-muted)]"
+                        data-mission-requirement-detail
+                      >
+                        {requirement.detail}
+                      </span>
+                    ) : null}
+                    {/* A recipe needing several materials reports each one on
+                        its own line: unlike materials are never summed into a
+                        single total that would mean nothing. */}
+                    {requirement.materials?.map((material) => (
+                      <span
+                        className="mt-0.5 block text-xs text-[color:var(--rs-text-secondary)]"
+                        data-mission-requirement-material={material.itemId}
+                        key={material.itemId}
+                      >
+                        {`${material.label} — ${material.current} / ${material.target}`}
+                        {material.carried !== undefined ? (
+                          <span
+                            className="pl-2 text-[color:var(--rs-text-muted)]"
+                            data-mission-requirement-detail
+                          >
+                            {`Carrying: ${material.carried}`}
+                          </span>
+                        ) : null}
+                      </span>
+                    ))}
                   </span>
                 </li>
               ))}

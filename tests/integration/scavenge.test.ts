@@ -71,7 +71,7 @@ suite("issue #88 authoritative Scavenge claims (real PostgreSQL)", () => {
       status: "claimed",
       outcome: { outcomeId: "ferrite_shale_1", quantity: 1 },
     });
-    expect(claimed.state.travelState?.scavenge.outcome?.outcomeId).toBe("ferrite_shale_1");
+    expect(claimed.state.travelState?.scavenge?.outcome?.outcomeId).toBe("ferrite_shale_1");
     expect(claimed.state.scavengeReveals).toHaveLength(1);
 
     const revealRows = await db

@@ -268,6 +268,9 @@ suite("issue #159 Credits and the Bix merchant loop (real PostgreSQL)", () => {
       characterId,
       originLocationId: LOCATION_IDS.holoHollow,
       destinationLocationId: LOCATION_IDS.crashSite,
+      // A walking leg always carries its Scavenge window (#172).
+      mode: "walk",
+      scavengeOpportunityStartTick: 3,
     });
 
     const result = await buy(userId, characterId, ITEM_IDS.powerCell, 1);

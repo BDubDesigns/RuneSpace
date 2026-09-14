@@ -1,15 +1,21 @@
 import { and, eq } from "drizzle-orm";
 import { afterEach, beforeAll, describe, expect, it } from "vitest";
-import { getEffectiveGameBalance } from "@/game/config/balance";
+import { getEffectiveGameBalance, getRepairTargetBalance } from "@/game/config/balance";
 import {
   ACTION_IDS,
   ITEM_IDS,
   LOCATION_IDS,
   MISSION_IDS,
   NPC_IDS,
+  REPAIR_TARGET_IDS,
   SKILL_IDS,
 } from "@/game/config/foundations";
-import { cleanupTestUser, createCharacterForUser, createTestUser } from "./fixtures";
+import {
+  cleanupTestUser,
+  createCharacterForUser,
+  createTestUser,
+  seedRepairTarget,
+} from "./fixtures";
 import { deriveMissionGuidanceTargets } from "@/game/domain/missions";
 
 const DATABASE_URL = process.env.DATABASE_URL;
@@ -23,10 +29,12 @@ suite("issue #128 Cargo Hold repair gate and existing Welding mechanics (real Po
   let characters: typeof import("@/server/characters");
   let play: typeof import("@/server/play");
   let cargo: typeof import("@/server/cargo-hold");
+  let repairs: typeof import("@/server/repair-commands");
   let equipment: typeof import("@/server/equipment");
   let missions: typeof import("@/server/missions");
   const createdUsers: string[] = [];
   const balance = getEffectiveGameBalance();
+  const cargoTarget = getRepairTargetBalance(REPAIR_TARGET_IDS.cargoHold, balance);
   const deterministicRandom = {
     nextBasisPoints: () => 0,
     nextUnit: () => 0,
@@ -40,6 +48,7 @@ suite("issue #128 Cargo Hold repair gate and existing Welding mechanics (real Po
     characters = await import("@/server/characters");
     play = await import("@/server/play");
     cargo = await import("@/server/cargo-hold");
+    repairs = await import("@/server/repair-commands");
     equipment = await import("@/server/equipment");
     missions = await import("@/server/missions");
   });
@@ -66,16 +75,13 @@ suite("issue #128 Cargo Hold repair gate and existing Welding mechanics (real Po
   }
 
   async function seedUnlockedRepair(characterId: string, now: Date) {
-    await db
-      .update(rune.characterCargoHoldRepair)
-      .set({
-        refinedFerriteContributed: balance.cargoHold.refinedFerriteRequired,
-        slagContributed: balance.cargoHold.slagRequired,
-        weldingProgress: 0,
-        completedAt: null,
-        updatedAt: now,
-      })
-      .where(eq(rune.characterCargoHoldRepair.characterId, characterId));
+    await seedRepairTarget(db, rune, characterId, REPAIR_TARGET_IDS.cargoHold, {
+      refinedFerriteContributed: cargoTarget.refinedFerriteRequired,
+      slagContributed: cargoTarget.slagRequired,
+      weldingProgress: 0,
+      completedAt: null,
+      updatedAt: now,
+    });
   }
 
   async function seedActiveWelding(characterId: string, now: Date) {
@@ -89,22 +95,18 @@ suite("issue #128 Cargo Hold repair gate and existing Welding mechanics (real Po
   }
 
   async function restoreCargoHold(userId: string, characterId: string, now: Date) {
-    await db
-      .update(rune.characterCargoHoldRepair)
-      .set({
-        refinedFerriteContributed: balance.cargoHold.refinedFerriteRequired,
-        slagContributed: balance.cargoHold.slagRequired,
-        weldingProgress: balance.welding.repairIncrements,
-        completedAt: now,
-        updatedAt: now,
-      })
-      .where(eq(rune.characterCargoHoldRepair.characterId, characterId));
+    await seedRepairTarget(db, rune, characterId, REPAIR_TARGET_IDS.cargoHold, {
+      refinedFerriteContributed: cargoTarget.refinedFerriteRequired,
+      slagContributed: cargoTarget.slagRequired,
+      weldingProgress: cargoTarget.repairIncrements,
+      completedAt: now,
+      updatedAt: now,
+    });
     return play.getPlayGameplayState(
       userId,
       characterId,
       new Date(
-        now.getTime() +
-          balance.welding.repairIncrements * balance.welding.attemptDurationTicks * 600,
+        now.getTime() + cargoTarget.repairIncrements * balance.welding.attemptDurationTicks * 600,
       ),
       deterministicRandom,
     );
@@ -138,31 +140,32 @@ suite("issue #128 Cargo Hold repair gate and existing Welding mechanics (real Po
     const before = await inventoryAndCargoRows(character.id);
 
     const requests = await Promise.all([
-      cargo.contributeCargoHoldMaterials(
+      repairs.contributeRepairMaterials(
         userId,
         character.id,
-        { expectedRefinedFerrite: 15, expectedSlag: 6 },
+        { targetId: REPAIR_TARGET_IDS.cargoHold, expectedRefinedFerrite: 15, expectedSlag: 6 },
         now,
         deterministicRandom,
       ),
-      cargo.contributeCargoHoldMaterials(
+      repairs.contributeRepairMaterials(
         userId,
         character.id,
-        { expectedRefinedFerrite: 15, expectedSlag: 6 },
+        { targetId: REPAIR_TARGET_IDS.cargoHold, expectedRefinedFerrite: 15, expectedSlag: 6 },
         now,
         deterministicRandom,
       ),
     ]);
 
-    expect(requests.every((request) => request.cargo.status === "refused")).toBe(true);
+    expect(requests.every((request) => request.repair.status === "refused")).toBe(true);
     expect(
       requests.map((request) =>
-        request.cargo.status === "refused" ? request.cargo.reason : undefined,
+        request.repair.status === "refused" ? request.repair.reason : undefined,
       ),
-    ).toEqual(["repair_incomplete", "repair_incomplete"]);
-    const welding = await cargo.startCargoHoldWelding(
+    ).toEqual(["repair_locked", "repair_locked"]);
+    const welding = await repairs.startWelding(
       userId,
       character.id,
+      REPAIR_TARGET_IDS.cargoHold,
       now,
       deterministicRandom,
     );
@@ -174,18 +177,15 @@ suite("issue #128 Cargo Hold repair gate and existing Welding mechanics (real Po
         .where(eq(rune.activeActions.characterId, character.id)),
     ).toHaveLength(0);
     expect(await inventoryAndCargoRows(character.id)).toEqual(before);
-    const repair = (
+    // A refused command creates nothing. An untouched repair target is an
+    // absent row, not a row of zeroes, so persistence after a refusal is
+    // indistinguishable from never having tried (#172).
+    expect(
       await db
         .select()
-        .from(rune.characterCargoHoldRepair)
-        .where(eq(rune.characterCargoHoldRepair.characterId, character.id))
-    )[0]!;
-    expect(repair).toMatchObject({
-      refinedFerriteContributed: 0,
-      slagContributed: 0,
-      weldingProgress: 0,
-      completedAt: null,
-    });
+        .from(rune.characterRepairTargets)
+        .where(eq(rune.characterRepairTargets.characterId, character.id)),
+    ).toEqual([]);
   });
 
   it("preserves non-zero incomplete legacy progress without unlocking either command", async () => {
@@ -194,41 +194,40 @@ suite("issue #128 Cargo Hold repair gate and existing Welding mechanics (real Po
       { characterId: character.id, itemId: ITEM_IDS.refinedFerrite, quantity: 20 },
       { characterId: character.id, itemId: ITEM_IDS.slag, quantity: 10 },
     ]);
-    await db
-      .update(rune.characterCargoHoldRepair)
-      .set({
-        refinedFerriteContributed: balance.cargoHold.refinedFerriteRequired,
-        slagContributed: balance.cargoHold.slagRequired,
-        weldingProgress: 3,
-        completedAt: null,
-        updatedAt: now,
-      })
-      .where(eq(rune.characterCargoHoldRepair.characterId, character.id));
+    await seedRepairTarget(db, rune, character.id, REPAIR_TARGET_IDS.cargoHold, {
+      refinedFerriteContributed: cargoTarget.refinedFerriteRequired,
+      slagContributed: cargoTarget.slagRequired,
+      weldingProgress: 3,
+      completedAt: null,
+      updatedAt: now,
+    });
 
     const before = await inventoryAndCargoRows(character.id);
     const visible = await play.getPlayGameplayState(userId, character.id, now, deterministicRandom);
     expect(visible.cargoHold.repair).toMatchObject({
-      refinedFerriteContributed: balance.cargoHold.refinedFerriteRequired,
-      slagContributed: balance.cargoHold.slagRequired,
+      refinedFerriteContributed: cargoTarget.refinedFerriteRequired,
+      slagContributed: cargoTarget.slagRequired,
       weldingProgress: 3,
       complete: false,
       repairAvailable: false,
     });
 
-    const contribution = await cargo.contributeCargoHoldMaterials(
+    const contribution = await repairs.contributeRepairMaterials(
       userId,
       character.id,
       {
-        expectedRefinedFerrite: balance.cargoHold.refinedFerriteRequired,
-        expectedSlag: balance.cargoHold.slagRequired,
+        targetId: REPAIR_TARGET_IDS.cargoHold,
+        expectedRefinedFerrite: cargoTarget.refinedFerriteRequired,
+        expectedSlag: cargoTarget.slagRequired,
       },
       now,
       deterministicRandom,
     );
-    expect(contribution.cargo).toMatchObject({ status: "refused", reason: "repair_incomplete" });
-    const welding = await cargo.startCargoHoldWelding(
+    expect(contribution.repair).toMatchObject({ status: "refused", reason: "repair_locked" });
+    const welding = await repairs.startWelding(
       userId,
       character.id,
+      REPAIR_TARGET_IDS.cargoHold,
       now,
       deterministicRandom,
     );
@@ -273,8 +272,8 @@ suite("issue #128 Cargo Hold repair gate and existing Welding mechanics (real Po
     const repair = (
       await db
         .select()
-        .from(rune.characterCargoHoldRepair)
-        .where(eq(rune.characterCargoHoldRepair.characterId, character.id))
+        .from(rune.characterRepairTargets)
+        .where(eq(rune.characterRepairTargets.characterId, character.id))
     )[0]!;
     expect(repair).toMatchObject({
       refinedFerriteContributed: 15,
@@ -284,9 +283,10 @@ suite("issue #128 Cargo Hold repair gate and existing Welding mechanics (real Po
     });
 
     const startAt = new Date(now.getTime() + 3_000);
-    const started = await cargo.startCargoHoldWelding(
+    const started = await repairs.startWelding(
       userId,
       character.id,
+      REPAIR_TARGET_IDS.cargoHold,
       startAt,
       deterministicRandom,
     );
@@ -310,16 +310,13 @@ suite("issue #128 Cargo Hold repair gate and existing Welding mechanics (real Po
     const { userId, character, now } = await makeCharacter();
     // Completed repair plus stored Cargo from before the Mission existed.
     const completedAt = new Date(now.getTime() - 60_000);
-    await db
-      .update(rune.characterCargoHoldRepair)
-      .set({
-        refinedFerriteContributed: balance.cargoHold.refinedFerriteRequired,
-        slagContributed: balance.cargoHold.slagRequired,
-        weldingProgress: balance.welding.repairIncrements,
-        completedAt,
-        updatedAt: now,
-      })
-      .where(eq(rune.characterCargoHoldRepair.characterId, character.id));
+    await seedRepairTarget(db, rune, character.id, REPAIR_TARGET_IDS.cargoHold, {
+      refinedFerriteContributed: cargoTarget.refinedFerriteRequired,
+      slagContributed: cargoTarget.slagRequired,
+      weldingProgress: cargoTarget.repairIncrements,
+      completedAt,
+      updatedAt: now,
+    });
     await db.insert(rune.cargoHoldStacks).values({
       characterId: character.id,
       itemId: ITEM_IDS.ferriteShale,
@@ -370,7 +367,7 @@ suite("issue #128 Cargo Hold repair gate and existing Welding mechanics (real Po
     expect(ready.cargoHold.repair).toMatchObject({
       repairAvailable: true,
       complete: true,
-      weldingProgress: balance.welding.repairIncrements,
+      weldingProgress: cargoTarget.repairIncrements,
     });
     expect(
       ready.missions.find((mission) => mission.missionId === MISSION_IDS.holdItTogether),
@@ -408,13 +405,13 @@ suite("issue #128 Cargo Hold repair gate and existing Welding mechanics (real Po
     const repair = (
       await db
         .select()
-        .from(rune.characterCargoHoldRepair)
-        .where(eq(rune.characterCargoHoldRepair.characterId, character.id))
+        .from(rune.characterRepairTargets)
+        .where(eq(rune.characterRepairTargets.characterId, character.id))
     )[0]!;
     expect(repair).toMatchObject({
-      refinedFerriteContributed: balance.cargoHold.refinedFerriteRequired,
-      slagContributed: balance.cargoHold.slagRequired,
-      weldingProgress: balance.welding.repairIncrements,
+      refinedFerriteContributed: cargoTarget.refinedFerriteRequired,
+      slagContributed: cargoTarget.slagRequired,
+      weldingProgress: cargoTarget.repairIncrements,
       completedAt,
     });
     expect(
@@ -448,7 +445,7 @@ suite("issue #128 Cargo Hold repair gate and existing Welding mechanics (real Po
     expect(afterRetry.welding.totalXp).toBe(42 + 100);
   });
 
-  it("withholds Cargo repair guidance when no useful contribution is available", async () => {
+  it("withholds Cargo repair guidance until a still-needed material is carried (#172)", async () => {
     const { userId, character, now } = await makeCharacter();
     await db.insert(rune.characterMissions).values([
       {
@@ -463,16 +460,54 @@ suite("issue #128 Cargo Hold repair gate and existing Welding mechanics (real Po
         acceptedAt: now,
       },
     ]);
-    // No carried Refined Ferrite or Slag: the mission still targets Cargo
-    // repair, but CONTRIBUTE MATERIALS is disabled and must not be guided.
-    const guided = await play.getPlayGameplayState(userId, character.id, now, deterministicRandom);
-    expect(guided.cargoHold.repair).toMatchObject({
-      repairAvailable: true,
-      complete: false,
-      materialComplete: false,
-      availableContribution: { refinedFerrite: 0, slag: 0 },
+    // Eight Refined Ferrite and three Slag are durably installed; the player
+    // also has forty of each stored in the Cargo Hold, which is not carrying.
+    await seedRepairTarget(db, rune, character.id, REPAIR_TARGET_IDS.cargoHold, {
+      refinedFerriteContributed: 8,
+      slagContributed: 3,
     });
-    expect(deriveMissionGuidanceTargets(guided.missions).cargoRepair).toBe(true);
+    await db.insert(rune.cargoHoldStacks).values([
+      { characterId: character.id, itemId: ITEM_IDS.refinedFerrite, quantity: 40 },
+      { characterId: character.id, itemId: ITEM_IDS.slag, quantity: 40 },
+    ]);
+
+    const stored = await play.getPlayGameplayState(userId, character.id, now, deterministicRandom);
+    const requirementOf = (state: typeof stored) =>
+      state.missions
+        .find((entry) => entry.missionId === MISSION_IDS.holdItTogether)
+        ?.requirements?.find((entry) => entry.repairTargetId === REPAIR_TARGET_IDS.cargoHold);
+    // Both materials are individually legible and come only from the repair
+    // record: stored cargo never reaches the installed numbers, and the two
+    // are never summed into a single meaningless total.
+    expect(requirementOf(stored)?.objective).toBe("Install repair materials at the Cargo Hold");
+    expect(requirementOf(stored)?.progress).toBeUndefined();
+    expect(requirementOf(stored)?.materials).toEqual([
+      { itemId: ITEM_IDS.refinedFerrite, label: "Refined Ferrite", current: 8, target: 15 },
+      { itemId: ITEM_IDS.slag, label: "Slag", current: 3, target: 6 },
+    ]);
+    // Nothing useful in hand: the framework invents no destination.
+    expect(
+      deriveMissionGuidanceTargets(stored.missions).repairTargetIds.has(
+        REPAIR_TARGET_IDS.cargoHold,
+      ),
+    ).toBe(false);
+
+    // Carrying Slag the recipe still needs makes the Cargo Hold worth visiting.
+    await db
+      .insert(rune.inventoryStacks)
+      .values({ characterId: character.id, itemId: ITEM_IDS.slag, quantity: 2 });
+    const carrying = await play.getPlayGameplayState(
+      userId,
+      character.id,
+      now,
+      deterministicRandom,
+    );
+    expect(requirementOf(carrying)?.materials?.[1]).toMatchObject({ current: 3, carried: 2 });
+    expect(
+      deriveMissionGuidanceTargets(carrying.missions).repairTargetIds.has(
+        REPAIR_TARGET_IDS.cargoHold,
+      ),
+    ).toBe(true);
   });
 
   it("unlocks the existing repair flow after Hold It Together acceptance", async () => {
@@ -507,14 +542,14 @@ suite("issue #128 Cargo Hold repair gate and existing Welding mechanics (real Po
       materialComplete: false,
     });
 
-    const contribution = await cargo.contributeCargoHoldMaterials(
+    const contribution = await repairs.contributeRepairMaterials(
       userId,
       character.id,
-      { expectedRefinedFerrite: 15, expectedSlag: 6 },
+      { targetId: REPAIR_TARGET_IDS.cargoHold, expectedRefinedFerrite: 15, expectedSlag: 6 },
       now,
       deterministicRandom,
     );
-    expect(contribution.cargo).toEqual({ status: "committed", refinedFerrite: 15, slag: 6 });
+    expect(contribution.repair).toEqual({ status: "committed", refinedFerrite: 15, slag: 6 });
     expect(contribution.state.cargoHold.repair.materialComplete).toBe(true);
     expect(
       await db
@@ -526,33 +561,33 @@ suite("issue #128 Cargo Hold repair gate and existing Welding mechanics (real Po
       expect.objectContaining({ itemId: ITEM_IDS.slag, quantity: 4 }),
     ]);
 
-    const started = await cargo.startCargoHoldWelding(
+    const started = await repairs.startWelding(
       userId,
       character.id,
+      REPAIR_TARGET_IDS.cargoHold,
       now,
       deterministicRandom,
     );
     expect(started.activeAction?.actionId).toBe(ACTION_IDS.cargoHoldWelding);
 
     const repairCompletedAt = new Date(
-      now.getTime() + balance.welding.repairIncrements * balance.welding.attemptDurationTicks * 600,
+      now.getTime() + cargoTarget.repairIncrements * balance.welding.attemptDurationTicks * 600,
     );
     const completed = await play.getPlayGameplayState(
       userId,
       character.id,
       new Date(
-        now.getTime() +
-          balance.welding.repairIncrements * balance.welding.attemptDurationTicks * 600,
+        now.getTime() + cargoTarget.repairIncrements * balance.welding.attemptDurationTicks * 600,
       ),
       deterministicRandom,
     );
     expect(completed.cargoHold.repair).toMatchObject({
       repairAvailable: true,
-      weldingProgress: balance.welding.repairIncrements,
+      weldingProgress: cargoTarget.repairIncrements,
       complete: true,
     });
     expect(completed.welding.totalXp).toBe(
-      balance.welding.repairIncrements * balance.welding.xpPerIncrement,
+      cargoTarget.repairIncrements * balance.welding.xpPerIncrement,
     );
     expect(
       completed.missions.find((mission) => mission.missionId === MISSION_IDS.holdItTogether),
@@ -574,7 +609,7 @@ suite("issue #128 Cargo Hold repair gate and existing Welding mechanics (real Po
       deterministicRandom,
     );
     expect(afterMission.welding.totalXp).toBe(
-      balance.welding.repairIncrements * balance.welding.xpPerIncrement + 100,
+      cargoTarget.repairIncrements * balance.welding.xpPerIncrement + 100,
     );
 
     const repeated = await missions.completeMission(
@@ -612,9 +647,10 @@ suite("issue #128 Cargo Hold repair gate and existing Welding mechanics (real Po
     expect(partial.welding.totalXp).toBe(0);
     expect(partial.activeAction?.actionId).toBe(ACTION_IDS.cargoHoldWelding);
 
-    const stopped = await cargo.stopCargoHoldWelding(
+    const stopped = await repairs.stopWelding(
       userId,
       character.id,
+      REPAIR_TARGET_IDS.cargoHold,
       partialAt,
       deterministicRandom,
     );
@@ -659,9 +695,10 @@ suite("issue #128 Cargo Hold repair gate and existing Welding mechanics (real Po
     );
     expect(repeated.welding.totalXp).toBe(600);
     expect(repeated.cargoHold.repair.weldingProgress).toBe(12);
-    const refusedRestart = await cargo.startCargoHoldWelding(
+    const refusedRestart = await repairs.startWelding(
       userId,
       character.id,
+      REPAIR_TARGET_IDS.cargoHold,
       new Date(restartAt.getTime() + 60 * 600),
       deterministicRandom,
     );

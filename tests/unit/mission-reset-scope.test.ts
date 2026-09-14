@@ -47,12 +47,18 @@ describe("missionChainResetScope", () => {
       "waste_not",
       "hold_it_together",
       "keep_the_change",
+      // Out of the Weather hangs off Hold It Together, so resetting the chain
+      // from the start necessarily clears the optional branch with it (#172).
+      "out_of_the_weather",
     ]);
     expect(missionChainResetScope(cyt, ids)).toEqual([
       cyt,
       "waste_not",
       "hold_it_together",
       "keep_the_change",
+      // Out of the Weather hangs off Hold It Together, so resetting the chain
+      // from the start necessarily clears the optional branch with it (#172).
+      "out_of_the_weather",
     ]);
     expect(missionChainResetScope("keep_the_change", ids)).toEqual(["keep_the_change"]);
   });
