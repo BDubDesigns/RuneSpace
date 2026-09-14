@@ -333,9 +333,16 @@ recognizable at map scale.
 
 The current proven pipeline produces local `public/map-icons/<slug>.webp` files
 that are tightly cropped, transparent, lossless, and no more than 512 px on the
-long edge. New or reprocessed map identifiers should follow it. `the-jag.png`
-and `the-long-scramble.png` are legacy identifiers that predate this pipeline;
-they remain follow-up optimization/art debt, not the pattern for new work.
+long edge. New or reprocessed map identifiers should follow it. Every committed
+identifier now does: The Jag and The Long Scramble were the last two legacy
+1254x1254 PNGs, and issue #117 re-prepared the same approved silhouettes through
+this workflow rather than regenerating them. Their sources are kept as masters
+under `assets/map-icons/`.
+
+The map paints identifiers as raw SVG `<image href>`, so the committed file is
+exactly what a player downloads — there is no request-time optimizer between the
+repository and the phone. That is why the size and encoding rules here are a
+delivery contract rather than a preference.
 
 The proven raster workflow is:
 

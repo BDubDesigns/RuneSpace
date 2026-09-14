@@ -9,6 +9,12 @@ change, and remaining recommendations.
 Nothing in the delivery path was changed until the unchanged deployed behaviour
 had been reproduced and the dominant cause isolated.
 
+It covers two passes. The first isolated and fixed the loading-priority cause
+(§7.1, §8.1–8.2). The second, after review, took the measured byte findings
+through the same discipline: the Map identifiers (§8.3), the Power Cell reveal
+(§8.4) and the hidden public-site header mark (§8.5). Every "after" number below
+was measured, not projected.
+
 ## 1. Measurement environment
 
 | Item | Value |
@@ -56,10 +62,10 @@ Intrinsic dimensions and byte sizes were read from the committed files
 | NPC portrait | `public/npc-art/wade-concerned.png` | 1086×1448 | PNG | 2,495,668 | 155×206 CSS | `next/image` |
 | NPC portrait (set of 15) | `public/npc-art/*.png` | ~1086–1122 × ~1402–1450 | PNG | 2.24–2.59 MB each, **35 MB total** | as above | `next/image` |
 | Character portrait | `public/character-portraits/portrait-baker-01.webp` | 512×512 | lossy WebP | 51,288 | 80×80 / 112×112 CSS | `next/image` |
-| Item art | `public/item-art/power-cell.png` | 1286×1247 | PNG | 2,542,601 | 80×80 CSS tile; ~273 CSS px dialogue reveal | `next/image` |
+| Item art | `public/item-art/power-cell.png` *(now `assets/item-art/power-cell.png`, §8.4)* | 1286×1247 | PNG | 2,542,601 | 80×80 CSS tile; 157×170 CSS dialogue reveal | `next/image` |
 | Item art | `public/item-art/ferrite-shale.webp` | 512×512 | lossy WebP | 45,556 | 80×80 CSS | `next/image` |
-| Map identifier | `public/map-icons/the-long-scramble.png` | 1254×1254 | PNG | **651,008** | ~101×95 CSS inside a ~140 px hex | **raw static** — SVG `<image href>` |
-| Map identifier | `public/map-icons/the-jag.png` | 1254×1254 | PNG | **408,929** | as above | **raw static** |
+| Map identifier | `public/map-icons/the-long-scramble.png` *(replaced, §8.3)* | 1254×1254 | PNG | **651,008** | ~101×95 CSS inside a ~140 px hex | **raw static** — SVG `<image href>` |
+| Map identifier | `public/map-icons/the-jag.png` *(replaced, §8.3)* | 1254×1254 | PNG | **408,929** | as above | **raw static** |
 | Map identifier | `public/map-icons/crash-site.webp` | 512×421 | lossless WebP | 113,128 | as above | **raw static** |
 | Brand lockup | `public/branding/runespace-header-lockup.png` | 1455×376 | PNG | 935,524 | 162×42 CSS (authenticated header) | `next/image` (`priority`) |
 | Brand emblem | `public/branding/runespace-emblem.png` | 1292×1340 | PNG | 3,183,923 | 0×0 at ≥390 px (hidden) | `next/image` |
@@ -188,6 +194,18 @@ Captured at the network layer so SVG-referenced images are included:
 The Location surface is *light*. The Map surface ships 1.51 MB of raw map
 identifiers — 24× the Location surface — for six hexes drawn at ~140 CSS px.
 
+Both surfaces were re-measured with the same harness after the second pass; the
+request counts below exclude favicons, which the earlier count included, and the
+byte totals are identical for the overlapping requests:
+
+| Surface | Requests | Before | After | Δ |
+| --- | ---: | ---: | ---: | ---: |
+| Location (Crash Site) | 2 | 64,636 | 64,636 | 0 |
+| **Map (`?surface=map`)** | 7 | **1,544,805** | **701,156** | **−843,649 (−54.6 %)** |
+
+The Map total reconciles exactly: six identifiers plus the one `/_next/image`
+header-lockup derivative (32,334 B). See §8.3.
+
 ## 5. Measured facts — request scheduling
 
 `features/location-scene/LocationSceneHeader.tsx` passed `priority={false}`, so
@@ -264,10 +282,9 @@ cold view, even though the bytes themselves are small.
 `<image href>`, which cannot pass through `next/image`. The committed files are
 therefore delivered verbatim: 651,008 B and 408,929 B for the two legacy PNG
 identifiers, plus four lossless WebPs of 96–121 KB, for hexes drawn at ~140 CSS
-px. `docs/art-cookbook.md` already records `the-jag.png` and
-`the-long-scramble.png` as legacy files that predate the map-identifier pipeline
-and remain "follow-up optimization/art debt". This measurement quantifies that
-debt; it is an art-contract change and is **not** made here.
+px. `docs/art-cookbook.md` recorded `the-jag.png` and `the-long-scramble.png` as
+legacy files that predate the map-identifier pipeline and remained "follow-up
+optimization/art debt". **Fixed in the second pass — see §8.3.**
 
 ### 7.3 Secondary — 60-second cache ceiling on every optimized image
 
@@ -282,19 +299,24 @@ play. Raising the TTL is a genuine improvement but carries a real tradeoff (see
 ### 7.4 Tertiary observations
 
 - `game/content/locations.ts` declares The Jag and The Long Scramble as
-  1920×480 while the committed files are 2508×627 (§2).
+  1920×480 while the committed files are 2508×627 (§2). **Fixed (§8.6).**
 - The dialogue item reveal requests `w=828` of `power-cell.png` → **325,412 B**,
   the largest single optimized response measured anywhere in the game.
+  **Fixed (§8.4).**
 - `components/public-site/PublicSiteShell.tsx` fetches the emblem derivative
-  (9,243 B) at viewports ≥390 px where CSS has hidden it (`0×0`). Public-site
-  only.
+  (9,218 B on the local production build, 9,243 B deployed) at viewports ≥390 px
+  where CSS has hidden it (`0×0`). Public-site only. **Fixed (§8.5)**, along with
+  the symmetric waste the first pass missed: below 390 px the *lockup* is hidden
+  and was still preloaded, at 32,334 B.
 - The public landing screenshots are 892 px sources rendered at up to 1102 CSS
-  px on a DPR-2 desktop, so they are delivered soft there.
+  px on a DPR-2 desktop, so they are delivered soft there. Not changed.
 
 ## 8. Implemented change and before/after evidence
 
-**Implemented — exactly one correction, the smallest maintainable response to
-§7.1:** give the currently-visible primary artwork real loading priority.
+**First pass — exactly one correction, the smallest maintainable response to
+§7.1:** give the currently-visible primary artwork real loading priority. The
+byte findings were left as recommendations until the product owner decided; §8A
+records the second pass that acted on them.
 
 - `features/location-scene/LocationSceneHeader.tsx`: `priority={false}` → `priority`.
 - `features/dialogue/DialogueScene.tsx`: the NPC portrait gains `priority`.
@@ -360,6 +382,154 @@ acceptance. An earlier 5-run sample showed noticeably more scatter than the
 preview-database reason in §10. Its before/after is §8.1 (local production
 build), and the same scheduling mechanism is demonstrated deployed here.
 
+## 8A. Second pass — the measured byte findings
+
+Measurement method for everything in §8.3–§8.6: two local production builds of
+the same repository (`next build` + `next start`, Node 22.23.2, disposable
+`issue-117` database, port 3320) — one at `d2e2410` (this branch before the
+asset work) and one at `f0dc9de` (after) — driven by Playwright/Chromium at
+390 × 844 DPR 3 with a real registered account and character, plus direct
+`/_next/image` probes. Both builds were measured with the identical harness.
+
+Two independent cross-checks say the numbers are sound: the *before* run
+reproduced the previously recorded deployed figures exactly (Map surface
+1,544,805 B; `power-cell.png&w=828` 325,412 B; Location surface 64,636 B), and an
+offline re-encode of the same transforms predicted the *after* optimizer output
+byte-for-byte (188,244 B and 32,936 B).
+
+### 8.3 Map identifiers — the largest byte finding, now fixed
+
+The review's correction is adopted: the earlier report described "~1.06 MB" as a
+saving, but 1,059,937 B was the **combined size of the two files**, not a
+measured reduction. The measured reduction is smaller, because the replacements
+are not free — they are 95,972 B and 120,316 B.
+
+Both identifiers were re-prepared from the approved art, not regenerated: tight
+alpha-bbox crop → Lanczos downsample to a 512 px long edge → lossless
+transparent WebP, exactly the `docs/art-cookbook.md` pipeline. Both masters were
+already grayscale on clean transparency (max channel chroma delta 0 over every
+non-transparent pixel), so the pink-key and grayscale steps did not apply. The
+1254² sources are retained under `assets/map-icons/`.
+
+| File | Before | After | Δ |
+| --- | ---: | ---: | ---: |
+| `the-jag` (455×512) | 408,929 | **95,972** | −312,957 (−76.5 %) |
+| `the-long-scramble` (512×468) | 651,008 | **120,316** | −530,692 (−81.5 %) |
+| `crash-site` (512×421) | 113,128 | 113,128 | 0 — already compliant |
+| `processing-yard` (512×488) | 121,046 | 121,046 | 0 — already compliant |
+| `power-annex` (512×470) | 121,428 | 121,428 | 0 — already compliant |
+| `holo-hollow` (512×430) | 96,932 | 96,932 | 0 — already compliant |
+| **Six identifiers** | **1,512,471** | **668,822** | **−843,649 (−55.8 %)** |
+| **Whole Map surface** (7 requests) | **1,544,805** | **701,156** | **−843,649 (−54.6 %)** |
+
+**Every other identifier was inspected, and none was re-encoded.** The four
+remaining files were read at the pixel level: all are lossless WebP (`VP8L`),
+RGBA with a real alpha channel, grayscale (max chroma delta 0), 512 px on the
+long edge, and their alpha bounding box already equals the full canvas — i.e.
+tightly cropped. They meet the documented contract, so they were left untouched.
+
+**Visual QA at real phone/map scale.** Verified in the actual Map surface at
+390 × 844 DPR 3 (screenshots compared at 3× device pixels, before/after):
+transparency intact, no pink or grey halo, no fringe on the alpha edge, the
+silhouettes identical in shape, and both noticeably crisper — a 455×512 source
+painted at ~73×82 CSS px is still supersampled. Tight cropping also removes the
+transparent margin the two PNGs were scaling as if it were art, so both now
+paint larger: The Jag 60.2×67.7 → 73.3×82.4 CSS, The Long Scramble 75.9×69.3 →
+90.2×82.4. That moves both toward the 61.8–71.6 % hex-width the compliant set
+already paints, and neither leaves the artwork zone (the SVG uses
+`preserveAspectRatio="xMidYMid meet"` inside a clipped hex). Nameplate,
+state-label and mission-plate zones are unchanged.
+
+`tests/unit/local-map-identifiers.test.ts` now reads the committed image headers
+and asserts lossless WebP with a ≤512 px long edge for every identifier, so the
+contract cannot silently regress.
+
+### 8.4 Power Cell — the largest single optimized response, now 42 % smaller
+
+`power-cell.png` was a 1286×1247 transparent render at 2,542,601 B, and
+`next/image` was resampling that master on every request. Measured in a real
+browser rather than assumed, the reveal is much smaller than the `sizes`
+contract implies:
+
+| Use | Painted CSS | Painted device px | Candidate requested |
+| --- | --- | ---: | --- |
+| Inventory tile | 80×80 | 240 | `w=256` |
+| Dialogue reveal, 390 px DPR 3 | 157.0×170.2 | **471×511** | `w=828` |
+| Dialogue reveal, 1440 px DPR 2 (QC Studio panel) | 264.8×257.0 | 530×514 | `w=828` |
+| Dialogue reveal, in-game desktop column (56 rem frame, DPR 2) | ~374×363 | ~750 | `w=828` |
+
+So the largest genuinely useful size anywhere is ~750 device px, and the phone
+needs 511. A **640 px long-edge lossless WebP** derivative of the same approved
+render covers both at full sharpness and caps what the optimizer can be asked
+for. The master moved to `assets/item-art/power-cell.png`.
+
+| Response | Before | After | Δ |
+| --- | ---: | ---: | ---: |
+| Dialogue reveal (`w=828`, capped to 640) | **325,412** | **188,244** | **−137,168 (−42.2 %)** |
+| Inventory tile (`w=256`) | 33,478 | 32,936 | −542 (−1.6 %) |
+| Committed repository file | 2,542,601 | 416,176 | −2,126,425 |
+
+**Visual QA.** Compared as the player sees them — the two optimizer outputs
+decoded, composited on the panel background and painted at the real sizes:
+
+| Painted at | PSNR vs the pre-change delivery |
+| --- | ---: |
+| 240 device px (inventory tile) | 36.7 dB |
+| 511 device px (phone reveal) | 35.2 dB |
+| 750 device px (in-game desktop reveal, worst case) | 25.9 dB |
+
+At the two sizes a player actually sees on the canonical profile the difference
+is not visible. At the desktop worst case a side-by-side at 750 px keeps every
+piece of the joke legible — "DEWHAT?", the QC FAILED stamp, the derated-capacity
+list, and the handwritten note — with the grunge texture intact; the 1.17×
+upscale is what the PSNR figure is measuring. A 512 px derivative was tested
+first and rejected: it saves more (122,566 B) but visibly flattens the texture at
+750 px, which the review's "keep it crisp in the larger reveal" constraint
+forbids.
+
+**The two other raw item PNGs were measured and deliberately left alone.**
+`salvage-cutter.png` returns 78,442 B and `mykea-schleppraum-8.png` 48,838 B at
+`w=828` — a quarter and a sixth of the Power Cell's response. Their art is flatter
+and compresses well, so there is no measured problem to fix, and changing
+approved art without one is not warranted.
+
+### 8.5 The public-site header fetched the mark it was hiding
+
+`PublicSiteShell` renders both header marks and lets a CSS breakpoint choose,
+but both were `priority`. A preload is unconditional, so every visitor paid for
+the one they could not see. The first pass recorded the ≥390 px half of this;
+measurement of the other breakpoint showed the symmetric waste is larger.
+
+| Landing page | Requests | Before | After | Δ |
+| --- | ---: | ---: | ---: | ---: |
+| 390 px DPR 3 (emblem hidden) | 6 → 5 | 163,480 | **154,262** | −9,218 |
+| 360 px DPR 3 (lockup hidden) | 6 → 5 | 163,480 | **131,146** | −32,334 |
+
+The fix is to stop preloading either mark — no viewport JavaScript, no hydration
+branch, no new asset, no `<picture>` hand-rolling around `next/image`. Verified
+in Chromium: the hidden mark has no layout box, is therefore never revealed to
+the lazy-loading algorithm, and its `currentSrc` stays empty — it is not
+requested at all. The displayed mark is in the initial viewport, so it is still
+requested immediately; it is simply discovered at layout instead of at preload
+scan. Measured LCP on the landing page: 304 → 324 ms at 390 px and 288 → 244 ms
+at 360 px — the landing LCP element is not the header mark, and a ±20 ms
+single-sample difference on an unthrottled local build is inside run-to-run
+noise. The landing hero lockup keeps its own `priority`, and the authenticated
+game header is untouched.
+
+`tests/e2e/smoke.spec.ts` now asserts the hidden mark's `currentSrc` is empty at
+both breakpoints, so this cannot regress silently.
+
+### 8.6 Scene metadata now describes the committed files
+
+`game/content/locations.ts` declared The Jag and The Long Scramble as 1920×480;
+the committed scene files are 2508×627. Identical 4:1 ratio, which is why the
+existing ratio assertion could not catch it. Both entries now record 2508×627,
+and `tests/unit/location-scene.test.ts` compares every declared scene dimension
+against the real PNG/WebP header. No scene art was resampled, and no candidate
+width or delivered byte count changed (the Location surface total is 64,636 B
+before and after).
+
 
 ## 9. Recommendations not implemented here
 
@@ -367,33 +537,32 @@ Each is evidence-backed but carries a product, art-contract or deployment
 tradeoff that belongs to the product owner, so per Issue #117's decision
 boundary they stop at a recommendation.
 
-1. **Re-prepare the two legacy map identifiers** (`the-jag.png`,
-   `the-long-scramble.png`) through the existing map-identifier pipeline in
-   `docs/art-cookbook.md` (transparent, tightly trimmed, ≤512 px long edge,
-   lossless WebP). Measured saving: ~1.06 MB of the Map surface's 1.51 MB. This
-   is an approved-artwork change and the cookbook already flags it as pending
-   art debt.
-2. **Revisit the map-identifier size contract.** Even the compliant WebPs are
-   96–121 KB lossless at 512 px for a ~140 px render. A smaller long edge or a
-   lossy/alpha-preserving encode would cut the remaining ~450 KB, but that
-   changes the documented pipeline and needs visual QA at map scale.
-3. **Set `images.minimumCacheTTL`** in `next.config.ts` to remove the 60 s
-   ceiling (§7.3). Tradeoff: `/_next/image` URLs carry no `?dpl=` deploy id, so
-   artwork replaced at the same path would stay cached in browsers for the whole
-   TTL. A moderate TTL (days, not a year) plus a path change whenever art is
-   replaced is the safer shape. This also makes the container-local optimizer
-   cache worth preserving across deployments, which is a separate deployment
-   decision.
-4. **Correct the two scene metadata entries** in `game/content/locations.ts` to
-   the real 2508×627, and consider extending
-   `tests/unit/location-scene.test.ts` to compare declared dimensions against
-   the committed file headers so metadata cannot drift again.
-5. **Reconsider the dialogue item reveal size** (325 KB for `power-cell.png` at
-   `w=828`). The item masters are 1.1–1.8 MP PNGs with alpha; a prepared
-   derivative or a tighter `sizes` for the reveal would cut this materially.
-6. **Stop fetching the hidden public-site emblem** above the 390 px breakpoint,
-   and consider whether the authenticated header lockup still deserves
-   `priority` now that the hero scene is preloaded alongside it.
+1. **Revisit the map-identifier size contract.** The four already-compliant
+   WebPs are still 96–121 KB lossless at 512 px for a ~140 px render, and after
+   §8.3 they are the whole remaining 668,822 B. A smaller long edge, or a
+   near-lossless/lossy alpha-preserving encode, could cut that substantially —
+   but it changes the documented pipeline for every identifier including four
+   that are currently correct, and it needs its own visual QA pass at map scale.
+   Not the same thing as bringing two legacy files into the existing contract.
+2. **Set `images.minimumCacheTTL`** in `next.config.ts` to remove the 60 s
+   ceiling (§7.3). **Deliberately still not implemented.** Caching is working —
+   a repeat view costs one `304` per image, not a re-download — and
+   `/_next/image` URLs carry no `?dpl=` deploy id, so artwork replaced at the
+   same path would stay cached in browsers for the whole TTL. That invalidation
+   problem is real and this pass found no isolated user-facing symptom that a
+   longer TTL fixes, so changing cache policy here would be optimizing a metric
+   rather than a measured problem.
+3. **The two remaining raw item PNGs.** `salvage-cutter.png` (78,442 B at
+   `w=828`) and `mykea-schleppraum-8.png` (48,838 B) are the same shape of asset
+   as the Power Cell was, but their measured responses are a quarter and a sixth
+   of its 325 KB, so no art change is justified on this evidence (§8.4).
+4. **The public landing screenshots** are 892 px sources rendered at up to
+   1102 CSS px on a DPR-2 desktop, so they are delivered soft there. A larger
+   source would be an art-capture change, not an optimization.
+5. **Consider whether the authenticated header lockup still deserves
+   `priority`** now that the hero scene is preloaded alongside it. The
+   public-site header is handled (§8.5); the game header was left alone because
+   nothing measured implicates it.
 
 Explicitly **not** recommended on this evidence: adding a CDN, converting assets
 to a new codec wholesale, re-encoding source masters, adding LQIP/blur
@@ -420,6 +589,20 @@ placeholders, or prefetching map artwork. None of them address a measured cause.
   asset and by `sizes` contract, not by walking a character to Holo Hollow in a
   browser; they use the same `LocationSceneHeader` and the same `/_next/image`
   boundary as Crash Site.
+- The second pass's before/after totals (§8A) are from **local production
+  builds**, for the same preview-database reason: the Map and the dialogue item
+  reveal are authenticated surfaces. What they measure — committed file bytes,
+  optimizer output bytes at a given candidate width, which candidate the browser
+  picks, and painted geometry — does not depend on where the server runs, and
+  the *before* run reproduced the previously recorded deployed figures exactly.
+- The in-game desktop dialogue reveal size (~750 device px) is derived from the
+  `56rem` frame and the `h-[76%]` reveal box, not directly measured; the
+  directly measured desktop figure (530 device px) is QC Studio's narrower
+  authoring panel. The derived figure is the one the Power Cell derivative was
+  sized against, so it is deliberately the conservative choice.
+- Landing-page LCP in §8.5 is a single sample per configuration on an
+  unthrottled local build. It is reported to show the header change did not
+  move LCP materially, not as a performance claim.
 - No production account, character, or row was created; no Coolify, Docker,
   proxy, or database state was modified anywhere except the disposable local
   `issue-117` database and the disposable preview review account.
