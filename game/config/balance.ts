@@ -84,7 +84,7 @@ const balanceSchema = z.object({
     sectionsPerWeld: z.literal(10),
     scrapPerWeld: z.literal(2),
     slagPerWeld: z.literal(2),
-    xpShareBps: z.literal(5_000),
+    xpShareBps: z.literal(2_000),
   }),
   /**
    * Per-repair-target recipes. Each target owns its own material requirement
@@ -256,7 +256,7 @@ const defaults = balanceSchema.parse({
     sectionsPerWeld: 10,
     scrapPerWeld: 2,
     slagPerWeld: 2,
-    xpShareBps: 5_000,
+    xpShareBps: 2_000,
   },
   repairTargets: {
     cargoHold: {
@@ -358,8 +358,12 @@ export function repairTargetForActionId(
  * The XP one completed Practice Welding section awards.
  *
  * Derived from the global Welding XP and the authored Practice share, so the
- * balance rule stays "half of normal" rather than a second frozen constant
+ * balance rule stays a share of normal rather than a second frozen constant
  * that could silently drift from the Welding value it is a share of (#190).
+ *
+ * The share is 20% — 10 XP of the global 50 — after the #191 playtest pass.
+ * Practice is the only thing it reduces: authored repairs, and the Work Orders
+ * to come, pay full Welding XP per increment.
  */
 export function practiceSectionXp(balance = getEffectiveGameBalance()): number {
   return Math.floor((balance.welding.xpPerIncrement * balance.practiceWelding.xpShareBps) / 10_000);

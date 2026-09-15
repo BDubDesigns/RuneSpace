@@ -400,7 +400,7 @@ const authoredWikiArticles = [
         list: [
           "Each fresh weld takes 2 Scrap Metal, spent the moment it starts.",
           "A weld is ten sections, each about three seconds, the same cadence as any other welding.",
-          "Each finished section pays half the Welding XP a repair section pays, because nothing is actually being repaired.",
+          "Each finished section pays 10 Welding XP — a fraction of what a repair section pays, because nothing is actually being repaired — so a whole weld is worth 100.",
           "Finishing a weld produces up to 2 Slag.",
         ],
       },

@@ -182,7 +182,7 @@ of the Welding XP and can be done forever.
 | --- | --- | --- |
 | Input per weld | 2 Scrap Metal, consumed when the weld begins | `balance.practiceWelding` |
 | Sections per weld | 10 | `balance.practiceWelding` |
-| XP per section | authored share of the global Welding XP (50% → 25) | `practiceSectionXp()` |
+| XP per section | authored share of the global Welding XP (20% → 10, so 100 per weld) | `practiceSectionXp()` |
 | Output per weld | up to 2 Slag, at completion time | `balance.practiceWelding` |
 | Scrap Metal | `stackLimit: 1`, so one piece per inventory slot | `balance.items.scrapMetal` |
 | Where, and what opens it | Rusk Recovery; accepting 10,000 Hours | `game/content/rusk-recovery` |
