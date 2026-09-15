@@ -57,18 +57,52 @@ globally.
 
 | Tag | Meaning |
 | --- | --- |
-| `PUBLIC-SAFE` | Safe on a globally visible Wiki read by a brand-new player. |
-| `SPOILER-SENSITIVE` | True and possibly shipped, but revealing it early damages intended discovery. Usable in internal work and in later authored content; never in public copy. |
+| `PUBLIC-SAFE` | Safe to publish on a globally visible Wiki. Includes anything established by the mandatory Holo Hollow tutorial arc — see **The publishing test** below. |
+| `SPOILER-SENSITIVE` | True, possibly shipped, but publishing it would materially damage an intended discovery. Usable in internal work and in later authored content; never in public copy. |
 | `INTERNAL-ONLY` | Writers and agents only. Never public, and not to be leaked through implication or cross-link either. |
 
 So a fact is written as, for example,
 `SHIPPED / SPOILER-SENSITIVE` or `APPROVED — NOT SHIPPED / INTERNAL-ONLY`.
 
-Two rules that follow from the split and are easy to get wrong:
+### The publishing test
 
-- **Shipped does not mean publishable.** Tansy's `Beyond Holo Hollow` topic is
-  fully shipped and reachable, and it is `SPOILER-SENSITIVE`, because it is the
-  seed of her arc and it is gated behind a Mission a new reader has not done.
+The test for `PUBLIC-SAFE` is **not** "could a brand-new character know this
+yet?" — that reading would hide the whole game. The test is:
+
+> **Would publishing this materially damage an intended discovery?**
+
+RuneSpace's mandatory opening arc **is** its tutorial and onboarding. The public
+Wiki may describe the full mandatory path — **Walk It Off → Cut Your Teeth →
+Waste Not → Hold It Together → Keep the Change → 10,000 Hours** — and the
+durable world and character facts it establishes. Every player takes that route;
+documenting it is a manual, not a spoiler.
+
+So ordinary tutorial-era facts are `PUBLIC-SAFE` even though a fresh character
+has not reached them yet: Mining, Refining and Welding; Wade taking the player
+on as apprentice and teaching them to weld; Rusk Recovery and Wade coming to
+work from his own yard; Practice Welding and the bench; and the ordinary
+relationships, businesses, and world facts the mandatory Missions establish.
+
+Keep protecting what is genuinely worth discovering:
+
+- optional conversations whose value is in finding them in play;
+- optional Missions and their outcomes, judged case by case;
+- private motivations and secrets;
+- emotionally significant backstory;
+- unrevealed relationships and history;
+- approved-but-unshipped future story;
+- post-tutorial story and progression outcomes;
+- anything whose early disclosure would undercut a later authored reveal.
+
+Two rules that are still easy to get wrong:
+
+- **Shipped does not automatically mean publishable.** Tansy's
+  `Beyond Holo Hollow` topic is fully shipped and reachable and is still
+  `SPOILER-SENSITIVE` — not because it is gated, but because it is optional
+  character material and the emotional seed of her longer arc.
+- **Gated does not automatically mean protected, either.** Do not strip a fact
+  from public copy merely because a Mission stands in front of it. If it is on
+  the mandatory path and revealing it damages nothing, publish it.
 - **`UNKNOWN` is a valid, final answer.** Do not convert it into a fact because
   a bible field or a Work Order would read better filled in. If content needs
   an answer, that is a decision for Brandon, and it belongs in
@@ -90,7 +124,10 @@ content; prefer writing `UNKNOWN` over silence, so a later writer can tell the
 difference between "nobody decided" and "nobody wrote it down".
 
 - **Stable identity** — NPC ID, display name, aliases, pronouns.
-- **Visual identity** — approved portrait set and durable appearance facts.
+- **Visual identity** — the currently authored expression assets, any
+  expression semantics that code or content states explicitly, and durable
+  appearance facts where they are actually established. **Read the rule below
+  before writing this field.**
 - **Role / occupation**
 - **Home / work / usual locations** — including progression-dependent placement.
 - **Personality and values**
@@ -109,6 +146,34 @@ difference between "nobody decided" and "nobody wrote it down".
 - **Open canon questions**
 - **Source references**
 
+### The Visual identity field does not establish character
+
+`EXPRESSION_IDS` is a deliberately generic shared vocabulary, and each NPC maps
+it to whatever art has actually been drawn for them
+(`game/config/foundations.ts`). The roster of expression files an NPC has today
+is **the set drawn so far, and nothing more**.
+
+So this field may record:
+
+- the expression keys and asset paths currently authored for that NPC;
+- expression semantics that code or content states **explicitly** — Mara's
+  `firm` is the production example, defined in both `foundations.ts` and
+  `npcs.ts` as composed and matter-of-fact rather than wary or displeased;
+- durable appearance facts, where prose or approved art direction actually
+  establishes one.
+
+It must **not** treat a missing asset as a fact about the person. That an NPC
+has no `smile` file does not establish that they never smile, are incapable of
+warmth, or must not be written warmly; it establishes that nobody has drawn
+that portrait yet. Absence of art is a production state, and `docs/art-cookbook.md`
+plus `docs/holo-hollow.md` both record real art debt in this cast — treating a
+gap as characterization would freeze an accident into canon, which #192
+explicitly forbids.
+
+**Voice and personality come from dialogue and approved narrative direction**,
+never from reverse-engineering the portrait inventory. A future beat that needs
+an expression nobody has drawn is an art request, not a canon violation.
+
 ---
 
 ## Wade Rusk
@@ -117,11 +182,12 @@ difference between "nobody decided" and "nobody wrote it down".
 (`SHIPPED / PUBLIC-SAFE` — self-introduction plus third-person reference
 throughout `dialogue.ts` and the shipped Updates).
 
-**Visual identity.** Three approved expressions: `neutral`
-(`/npc-art/wade-neutral.png`), `concerned`, `scowl`. He has no `smile` or
-`amused` asset, and that absence is characterization, not art debt — content
-must not ask him for a warmth he has no face for.
-`SHIPPED / PUBLIC-SAFE`.
+**Visual identity.** Currently authored expression assets: `neutral`
+(`/npc-art/wade-neutral.png`), `concerned` (`wade-concerned.png`), `scowl`
+(`wade-scowl.png`). `SHIPPED / PUBLIC-SAFE`. No durable appearance facts are
+established in prose; the portraits are the only visual reference. Nothing
+about this set constrains how Wade may be written — see **The Visual identity
+field does not establish character**.
 
 **Role / occupation.** Recovery, salvage, and field repairs, out of his own
 yard, Rusk Recovery. His own summary, given verbatim on first meeting and
@@ -241,11 +307,18 @@ parents' deaths (above). `APPROVED — NOT SHIPPED / INTERNAL-ONLY`.
 - Never yet: anything about Tansy's parents, the movie tradition, his age, his
   own history, or his home.
 
-**Public-Wiki-safe facts.** Name; runs recovery, salvage and field repairs;
-Tansy's uncle; found at the Crash Site to begin with and at Rusk Recovery after
-Keep the Change; takes the player on as apprentice; teaches Welding; sells Scrap
-Metal at his yard; blunt, dry, hard to impress, and openly unimpressed about the
-crash. Nothing about Tansy's parents, the movie tradition, or his age.
+**Public-Wiki-safe facts.** All of the following are established by the
+mandatory tutorial arc and are safe to publish: his name; that he runs recovery,
+salvage and field repairs; that he is Tansy's uncle; that he is found at the
+Crash Site to begin with and works from Rusk Recovery afterwards; that he takes
+the player on as his apprentice; that he teaches Welding; the yard itself, its
+workbench and Practice Welding; and that he sells Scrap Metal there. His
+manner — blunt, dry, hard to impress, and openly unimpressed about the crash —
+is equally publishable, and is most of what makes a page about him worth
+reading.
+
+Withhold: Tansy's parents, the Friday movie tradition, his age, his home, and
+anything about future client work beyond what the game already says out loud.
 
 **Future hooks / approved direction.** He is the client-work gateway: the Work
 Orders terminal is his, in his yard, and the first paying jobs arrive through
@@ -257,6 +330,14 @@ anecdote Tansy promises but never tells (`UNKNOWN` — the *tease* is shipped, t
 story is not written). Whether a Work Order may come from Wade himself, given
 that he is the person posting the board — see **Open canon questions** at the
 end of this file.
+
+Note that the Work Orders terminal's provenance is **not** an open question.
+`docs/holo-hollow.md` records that tourism-era ticket/information infrastructure
+*may* later support a contract board — an explicitly speculative possibility,
+never an assertion that RuneSpace's Work Orders terminal must reuse it. The
+shipped terminal is authored independently as scenery in Wade's yard
+(`game/content/rusk-recovery.ts`, `features/practice/WorkOrdersTerminal.tsx`).
+The two statements do not conflict, and no reconciliation should be invented.
 
 **Source references.** `game/content/npcs.ts`; `game/content/dialogue.ts`
 (`wadeOffer`, `wadeKeepTheChangeOffer`, `wadeTenThousandHours*`,
@@ -274,10 +355,11 @@ end of this file.
 (`SHIPPED / PUBLIC-SAFE` — Wade's *"My niece Tansy... She knows ferrite"*, and
 consistent reference throughout).
 
-**Visual identity.** Three approved expressions: `neutral`, `concerned`,
-`smile`. She is the only early NPC with a `smile` asset, which matters: she is
-the warm one, and content should let her use it.
-`SHIPPED / PUBLIC-SAFE`.
+**Visual identity.** Currently authored expression assets: `neutral`
+(`/npc-art/tansy-neutral.png`), `concerned` (`tansy-concerned.png`), `smile`
+(`tansy-smile.png`). `SHIPPED / PUBLIC-SAFE`. No durable appearance facts are
+established in prose. Her warmth is established by her dialogue, not by which
+files exist.
 
 **Role / occupation.** Field mechanic and miner. She works the ferrite seam at
 **The Jag** and builds working tools out of salvage.
@@ -365,12 +447,17 @@ the player.
   everything in the paragraph above.
 - Never yet: her parents, the movie tradition, the projector arc, her age.
 
-**Public-Wiki-safe facts.** Name; field mechanic and miner; Wade's niece; based
-at The Jag; built the Salvage Cutter out of spare parts; teaches Mining and the
-Refining loop; warm, funny, safety-first. **Nothing** about wanting to leave,
-her sense of obligation to Wade or the town, the projector arc, or the player's
-own lost history — all of which are shipped but gated, and none of which are
-safe on a globally visible page.
+**Public-Wiki-safe facts.** Established by the mandatory arc and safe to
+publish: her name; that she is a field mechanic and miner; that she is Wade's
+niece; that she is based at The Jag; that she built the Salvage Cutter out of
+spare parts; that she teaches the player Mining and the Refining loop; and her
+manner — warm, funny, and cheerfully safety-first.
+
+Withhold **all** of the `Beyond Holo Hollow` material: wanting to leave, her
+sense of obligation to Wade and the town, the projector arc, and the player's
+own lost history. Not because it is gated — plenty of gated tutorial facts are
+publishable — but because it is optional character material whose whole value is
+finding it in play, and it seeds her longer arc.
 
 **Future hooks / approved direction.** She carries RuneSpace's first long
 character arc. Later content should establish the recurring Wade/Tansy movie
@@ -395,9 +482,12 @@ story she promises to tell.
 (`SHIPPED / PUBLIC-SAFE` — Wade's *"He's the one who keeps Cells on a shelf"*,
 Mara's topic, and shipped Update copy).
 
-**Visual identity.** Three approved expressions, named for his register rather
-than a generic mood: `neutral` = dry (`bix-neutral-dry.png`), `amused` = knowing,
-`concerned` = skeptical. `SHIPPED / PUBLIC-SAFE`.
+**Visual identity.** Currently authored expression assets, whose filenames
+record the intended reading of each generic key for him: `neutral` =
+`bix-neutral-dry.png`, `amused` = `bix-amused-knowing.png`, `concerned` =
+`bix-skeptical-concerned.png`. `SHIPPED / PUBLIC-SAFE`. Those readings are
+authored asset names, not inferences. No durable appearance facts are
+established in prose.
 
 **Role / occupation.** Runs **Holo Hollow Souvenirs + Mining Supplies**, the
 town's shop. `SHIPPED / PUBLIC-SAFE`.
@@ -489,11 +579,17 @@ no INTERNAL-ONLY row, and that is itself useful: Bix is safe to write about.
 Change introduction and his three always-on topics. There is no gated Bix
 content.
 
-**Public-Wiki-safe facts.** Name; runs Holo Hollow Souvenirs + Mining Supplies;
-his parents ran it during the tourism years; still stocks souvenirs that do not
-sell; buys and sells the town's materials and Power Cells; explains the Annex's
-free daily allotment even though he sells Cells himself; dry, honest, good
-company.
+**Public-Wiki-safe facts.** Bix is the most straightforwardly publishable
+character in the cast: everything shipped about him is either mandatory-arc
+content or an always-available topic, and none of it is authored as a later
+reveal. Safe to publish: his name; that he runs Holo Hollow Souvenirs + Mining
+Supplies; that his parents ran it through the tourism years; that he still
+stocks souvenirs that do not sell; what he buys and sells; the Annex's history
+and why free and paid Power Cells coexist; and his dry, honest, good-company
+manner.
+
+Withhold only the `APPROVED — NOT SHIPPED` material: his age, and the shared
+childhood with Wade.
 
 **Future hooks / approved direction.** He believes the town may yet recover its
 tourism identity — the hopeful corner of the Bix / Mara / Renn triangle
@@ -522,9 +618,11 @@ Out of the Weather section — *"He is complaining about a neglected thing, not
 handing out work — he never asks the player to fix it"* — with no contradicting
 source anywhere in the repo. Treat it as settled; no further decision is needed.
 
-**Visual identity.** Three approved expressions, named for his register:
-`neutral` = tired (`renn-neutral-tired.png`), `sardonic` = dry, `guarded` =
-serious. He has no `smile` and no `amused` asset. `SHIPPED / PUBLIC-SAFE`.
+**Visual identity.** Currently authored expression assets, whose filenames
+record the intended reading of each key for him: `neutral` =
+`renn-neutral-tired.png`, `sardonic` = `renn-dry-sardonic.png`, `guarded` =
+`renn-serious-guarded.png`. `SHIPPED / PUBLIC-SAFE`. No durable appearance
+facts are established in prose.
 
 **Role / occupation.** Ferrite miner. `SHIPPED / PUBLIC-SAFE`. Which seam or
 crew he works is `UNKNOWN` — he is never shown at work, and The Jag is
@@ -611,23 +709,42 @@ itself. The Assistance Center's history as the Visitor Center. Ferrite's market
 and the yearly cycle of promised recovery. The crews' routines and what they
 notice.
 
-**Secrets and unrevealed canon.** No secrets established. The
-`APPROVED — NOT SHIPPED / INTERNAL-ONLY` material is demographic and structural:
-he is roughly **late 20s to early 30s**, grew up after the tourism boom was
-already mostly gone, and exists to supply the third view of Holo Hollow — Bix
-says the old town can come back, Mara says stop waiting and make this one work,
-Renn says neither version has much future, so leave while you still can.
+**Secrets and unrevealed canon.** No secrets established. The remaining
+material is `APPROVED — NOT SHIPPED`, demographic and structural rather than
+confidential: he is roughly **late 20s to early 30s**, grew up after the tourism
+boom was already mostly gone, and exists to supply the third view of Holo
+Hollow — Bix says the old town can come back, Mara says stop waiting and make
+this one work, Renn says neither version has much future, so leave while you
+still can. It stays out of public copy because it is **unshipped design**, not
+because it is a secret; if it ships, it becomes publishable.
 
 **Player-knowledge boundaries.** Everything shipped about Renn is available from
 his three always-on topics and the optional Mission — but **only to a player who
 walks into the Assistance Center**. A player who never does knows he exists only
 from the public Wiki.
 
-**Public-Wiki-safe facts.** Name; Ferrite miner; found at the Community
-Assistance Center; has an optional job involving the Crew Stop on the haul road;
-dry, tired, straight-talking; well-informed about the town's history and its
-present. His age range is approved but not shipped, so leave it out. Nothing
-about his own circumstances, which canon has not established.
+**Public-Wiki-safe facts.** Safe to publish: his name; that he is a Ferrite
+miner; that he is found at the Community Assistance Center; that the Center is
+the old Visitor Center, now handling local assistance and rations; and his
+manner — dry, tired, straight-talking, and clear-eyed about the town.
+
+**Out of the Weather, evaluated separately.** It is optional, so it does not
+inherit the tutorial arc's publishability. Judged on its own evidence it is
+nonetheless `SHIPPED / PUBLIC-SAFE` **as a matter of record**: the shipped
+`out-of-the-weather` Update names Renn as offering it, and the existing
+`holo-hollow` Wiki article already documents the Crew Stop repair and the ride
+that follows. Nothing on a character page could leak it — it is published.
+
+That said, publishing it and *foregrounding* it are different choices. The value
+of this Mission is largely in Renn mentioning a neglected thing and the player
+deciding to involve themselves, so **a character page should not lead with it,
+and should not narrate its outcome.** Omitting it entirely is a legitimate
+editorial call for Phase 4. This is an editorial preference, not a visibility
+restriction — do not record it as a spoiler.
+
+Withhold: his age range (unshipped design), and anything about his own
+circumstances, home, family, or standing at the Assistance Center, none of which
+canon has established.
 
 **Future hooks / approved direction.** He is the dissenting voice in the town's
 argument with itself, and that argument is the settlement's core theme
@@ -654,11 +771,16 @@ the Weather); `docs/missions.md`;
 **Stable identity.** `mara_kells` / "Mara Kells". No aliases. She/her
 (`SHIPPED / PUBLIC-SAFE`).
 
-**Visual identity.** Three approved expressions: `neutral` = pragmatic,
-`amused` = warm and wry, `firm` = no-nonsense. `firm` exists specifically for
-her: composed and matter-of-fact, rather than wary (`guarded`) or displeased
-(`scowl`). Content must not reach for `scowl` when she is simply being direct —
-she has no `scowl` asset. `SHIPPED / PUBLIC-SAFE`.
+**Visual identity.** Currently authored expression assets: `neutral` =
+`mara-neutral-pragmatic.png`, `amused` = `mara-warm-wry.png`, `firm` =
+`mara-firm-no-nonsense.png`. `SHIPPED / PUBLIC-SAFE`.
+
+`firm` is the one expression key in the cast with **explicitly authored
+semantics**: both `game/config/foundations.ts` and `game/content/npcs.ts` define
+it as composed and matter-of-fact rather than wary (`guarded`) or displeased
+(`scowl`), added for her set in #170. Use `firm` for her directness because that
+is what the key was authored to mean — not because any other expression is
+forbidden to her. No durable appearance facts are established in prose.
 
 **Role / occupation.** Owns and runs **HH B&B**, the town's working inn.
 `SHIPPED / PUBLIC-SAFE`.
@@ -747,10 +869,21 @@ years first-hand.
 - Only if the player goes in: the B&B's family history and her verdict on Bix.
 - Never established: her age, her family beyond her parents, where she lives.
 
-**Public-Wiki-safe facts.** Name; owns HH B&B; the family business became the
-town's working inn when tourism ended; rooms are for locals and working crews;
-the player meets her in Bix's shop and can visit the B&B once it is open to
-them; warm, direct, practical; a long-standing friend of Bix.
+**Public-Wiki-safe facts.** Safe to publish: her name; that she owns HH B&B;
+that the family business became the town's working inn when tourism ended; that
+the rooms are for locals and working crews; that she is a long-standing friend
+of Bix; and her warm, direct, practical manner. That she becomes part of the
+player's Holo Hollow during the tutorial is **not** a spoiler — she is
+introduced on the mandatory path, and the B&B opening to the player is already
+published in a shipped Update and the existing `holo-hollow` article.
+
+An article need not narrate exact Mission chronology unless doing so genuinely
+helps the page; "you will meet her in town, and the B&B opens to you once you
+are working here" carries it without a walkthrough.
+
+Withhold: her affectionate verdict on Bix from her own optional topic (worth
+finding in play), her age, where she lives, and her family beyond the fact that
+her parents ran the business.
 
 **Future hooks / approved direction.** `APPROVED — NOT SHIPPED`: HH B&B is the
 intended long-term home for rest/healing, food, lodging, travellers, rumours,
@@ -858,30 +991,44 @@ calculation.
 ## Public-Wiki projection rules
 
 A public character article is written **from the `Public-Wiki-safe facts` field
-of that NPC's entry and from nothing else.** These rules exist because the Wiki
-is globally visible: assume every article is read by somebody who has just
-started, and see `docs/public-wiki.md`.
+of that NPC's entry and from nothing else.** Apply **The publishing test**
+above: the mandatory tutorial arc is documentable, and the question for
+everything else is whether publishing it would materially damage an intended
+discovery. See also `docs/public-wiki.md`.
 
-Never publish, for any NPC:
+**Publishable, and worth saying plainly.** The mandatory arc's world and
+character facts: what these people do, where they are found, the businesses they
+run, the skills they teach, the apprenticeship, and the ordinary relationships
+the tutorial establishes. Wade's move to Rusk Recovery is already published in
+the `holo-hollow` Wiki article and in a shipped Update — state it as where he is
+found, not as a twist, but do state it.
+
+**Never publish, for any NPC:**
 
 - anything tagged `INTERNAL-ONLY` or `SPOILER-SENSITIVE`;
 - **Tansy's `Beyond Holo Hollow` material** — that she wants to leave Holo
   Hollow, her sense of obligation to Wade or the town, or the projector /
-  leaving-with-the-player arc. It is shipped, gated, and not public-safe;
+  leaving-with-the-player arc. It is optional character material carrying her
+  longer arc, and publishing it would spend a discovery the game means to make
+  in play;
 - **Tansy's parents, or the Friday movie tradition**, in any form;
 - **the player character's amnesia or former delivery-running life.** It is
-  shipped only inside gated dialogue and is not public-safe merely because it
-  ships. It must not appear on these pages even as background;
-- progression-dependent relocation stated as a surprise. Wade's move to Rusk
-  Recovery is already documented publicly in the `holo-hollow` article and in a
-  shipped Update, so it may be stated plainly — but phrase it as where he is
-  found, not as a twist;
+  reachable only inside optional gated dialogue, and is not public-safe merely
+  because it ships. It must not appear on these pages even as background;
 - approved-but-unshipped design as current fact — including Renn's age range,
   the Wade/Bix shared childhood, and anything about the Drive-In;
 - implementation terminology: NPC IDs, Local Place IDs, Mission IDs, flags,
   requirement kinds, or registry names;
 - a fact reached only by cross-link implication. A safe sentence that links to
   an unsafe page is not safe.
+
+**Judge optional content case by case.** Optional Missions and topics are not
+automatically publishable because they happen during the tutorial period, and
+not automatically protected because they are optional. Ask what the discovery is
+worth. Where a fact is already published in a shipped Update or an existing Wiki
+article, it is public as a matter of record — but a character page may still
+choose not to foreground it, which is an editorial decision rather than a
+visibility classification. Mark that distinction explicitly when it applies.
 
 Also: **`UNKNOWN` never becomes prose.** If a public article would read better
 with a fact RuneSpace has not established, the article gets shorter, not
@@ -912,10 +1059,6 @@ Nothing below should be silently settled by content.
    tell younger residents *such as Tansy* not to give the town their whole
    lives, which implies acquaintance without establishing it. No shipped content
    places them together. `UNRESOLVED`.
-7. **The Work Orders terminal's provenance.** `docs/holo-hollow.md` suggests
-   tourism-era ticket/information infrastructure may later support a contract or
-   job board, but the shipped terminal is in Wade's yard. The two are not
-   reconciled. `UNRESOLVED`.
-8. **Tansy's promised anecdote** — Wade repairing a coolant manifold with a
+7. **Tansy's promised anecdote** — Wade repairing a coolant manifold with a
    serving spoon. The tease is shipped; the story has never been written.
    `UNKNOWN`.
