@@ -95,6 +95,17 @@ export type PracticeResolution = {
   /** The durable state to persist, including any freshly rolled Clean Pass. */
   practice: PracticeWeldState;
   resolvedWelds: readonly PracticeResolvedWeld[];
+  /**
+   * The aggregate capacity this resolution decided its Slag against: what was
+   * free at the start plus everything the consumed Scrap freed along the way.
+   *
+   * Persistence plans the kept Slag against exactly this, so the write places
+   * what resolution decided rather than re-deciding it against a snapshot taken
+   * after the Scrap rows are already gone. Placing the total against this
+   * aggregate can never exceed the per-weld budget resolution actually used,
+   * because consuming Scrap only ever frees capacity.
+   */
+  slagBudget: { slots: number; massGrams: number };
   stopReason?: PracticeStopReason;
 };
 
@@ -240,6 +251,10 @@ export function resolvePracticeWelding(input: {
     awardedXp: sectionsResolved * sectionXp,
     practice: { sectionsCompleted, cycleActive, cleanPass },
     resolvedWelds,
+    slagBudget: {
+      slots: snapshot.slotsAvailable + scrapConsumed,
+      massGrams: snapshot.massAvailableGrams + scrapConsumed * items.scrapMetal.massGrams,
+    },
     ...(stopReason ? { stopReason } : {}),
   };
 }

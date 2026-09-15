@@ -67,6 +67,8 @@ export type PersistedPracticeOutcome = {
   resolvedWelds: readonly PracticeResolvedWeld[];
   weldResolvedAt: readonly string[];
   consumedTicks: number;
+  /** The capacity resolution decided its Slag against; persistence places it there. */
+  slagBudget: { slots: number; massGrams: number };
   stopReason?: PracticeStopReason;
 };
 
@@ -279,6 +281,7 @@ export function createPracticeWeldingResolver(
         resolvedWelds: resolved.resolvedWelds,
         weldResolvedAt,
         consumedTicks: resolved.consumedTicks,
+        slagBudget: resolved.slagBudget,
         ...(resolved.stopReason ? { stopReason: resolved.stopReason } : {}),
       };
       return {
@@ -305,37 +308,24 @@ export function createPracticeWeldingResolver(
       }
 
       if (outcome.slagKept > 0) {
-        // Resolution already decided how much Slag fits, weld by weld, against
-        // a running budget no larger than the inventory now has — the Scrap it
-        // consumed has since freed its slots. Planning against the REAL current
-        // capacity rather than asserting the answer means a disagreement fails
-        // loudly here instead of quietly overfilling the player's inventory.
-        const [stacks, assignments, itemState] = await Promise.all([
-          transaction
-            .select()
-            .from(inventoryStacks)
-            .where(eq(inventoryStacks.characterId, outcome.characterId))
-            .for("update"),
-          transaction
-            .select()
-            .from(equippedItems)
-            .where(eq(equippedItems.characterId, outcome.characterId))
-            .for("update"),
-          loadOwnedItemInstances(transaction, outcome.characterId),
-        ]);
-        const loadout = deriveEquipmentLoadout({
-          assignments,
-          instances: itemState.carriedInstances,
-          stacks,
-          balance,
-        });
+        // Resolution already decided how much Slag fits, weld by weld, and
+        // carried the aggregate budget it decided against — what was free when
+        // the window opened plus everything the consumed Scrap freed. Planning
+        // against that, rather than against a snapshot taken after those Scrap
+        // rows are already gone, places exactly what was decided; the assertion
+        // below then checks resolution's own arithmetic rather than re-deciding.
+        const stacks = await transaction
+          .select()
+          .from(inventoryStacks)
+          .where(eq(inventoryStacks.characterId, outcome.characterId))
+          .for("update");
         const plan = planStackAddition(
           stacks,
           ITEM_IDS.slag,
           outcome.slagKept,
           balance.items.slag.stackLimit,
-          Math.max(0, loadout.containerSlotCapacity - loadout.inventorySlotsUsed),
-          Math.max(0, loadout.maximumCarryCapacityGrams - loadout.carriedMassGrams),
+          outcome.slagBudget.slots,
+          outcome.slagBudget.massGrams,
           balance.items.slag.massGrams,
         );
         if (plan.remainingQuantity !== 0) {

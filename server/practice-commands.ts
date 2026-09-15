@@ -118,9 +118,12 @@ export async function startPracticeWelding(
         return stateWith(transaction, context.character.id, now, "practice_locked");
       }
 
-      await ensurePracticeState(transaction, context.character.id);
-      const row = await loadPracticeRow(transaction, context.character.id);
-      const practice = practiceStateFromRow(row);
+      // As with a repair start: a refused start must leave no row behind, so
+      // the Practice row is read without being created and is materialized only
+      // once the work is genuinely starting.
+      const practice = practiceStateFromRow(
+        await loadPracticeRow(transaction, context.character.id),
+      );
 
       if (!practice.cycleActive) {
         const scrapAvailable = await carriedScrap(transaction, context.character.id);
@@ -136,6 +139,7 @@ export async function startPracticeWelding(
         if (!consumption.ok) {
           return stateWith(transaction, context.character.id, now, "insufficient_scrap");
         }
+        await ensurePracticeState(transaction, context.character.id);
         await writePracticeState(transaction, {
           characterId: context.character.id,
           practice: {
