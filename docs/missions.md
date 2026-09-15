@@ -213,6 +213,15 @@ no synthetic work XP of its own — the work pays for the work — and deliberat
 adds no Credit payout, because the reward the Mission is actually about is that
 the Crew Stop stays fixed and the crews will give the player a ride.
 
+- **Credits** (#190) — paid by the same transaction that stamps the mission
+  complete, incremented in SQL rather than from a read value. The stamp is
+  guarded by `completedAt IS NULL` and an `already_completed` short-circuit, so
+  the payout is exactly-once under retries and concurrency without a second
+  mechanism. 10,000 Hours pays **50 Credits** and deliberately no Welding XP:
+  the three genuine Practice welds already paid their own through the ordinary
+  Welding path, and paying twice for one piece of work would be inventing
+  progression the player did not earn.
+
 **No reward is a valid authored choice.** `reward` is optional. A mission whose
 real outcome is world or social state — Keep the Change opens HH B&B and pays
 its budget up front — authors none, and the completion transaction then commits
@@ -222,10 +231,10 @@ validation skips reward checks for such a mission, and projection reports no
 have one.
 
 **Not currently supported as a completion reward:** stackable item rewards,
-bundles, multi-reward missions, credits, reputation, generic effects, or
-similar. A real mission that genuinely needs one of these earns an explicit,
-narrow framework extension — do not add a mission-specific transaction or widen
-the reward union speculatively.
+bundles, multi-reward missions, reputation, generic effects, or similar. A real
+mission that genuinely needs one of these earns an explicit, narrow framework
+extension — do not add a mission-specific transaction or widen the reward union
+speculatively.
 
 ### 8.1 Acceptance effects (`MissionOffer.acceptEffect`)
 
@@ -233,14 +242,18 @@ An offer route may author **one** effect applied when acceptance at that route
 commits:
 
 ```ts
-type MissionAcceptEffect = { kind: "credits"; amount: number };
+type MissionAcceptEffect =
+  | { kind: "credits"; amount: number }
+  | { kind: "stack_item"; itemId: ItemId; quantity: number };
 ```
 
-This exists for an **up-front job budget**, which is a different thing from a
-reward: Wade hands his new apprentice 24 Credits — the retail price of the three
-Power Cells the job needs — before any work happens, and whatever the player
-does not spend stays theirs. There is deliberately no reimbursement, no
-completion payout, and no provenance tracking on what they buy.
+This is what the person offering the job hands over so the work can start — a
+different thing from a reward for finishing it. Wade hands his new apprentice 24
+Credits for Keep the Change — the retail price of the three Power Cells the job
+needs — and six Scrap Metal for 10,000 Hours, which is exactly the three
+practice welds it asks for. Whatever the player does not spend stays theirs.
+There is deliberately no reimbursement, no completion payout, and no provenance
+tracking on what they buy or what they weld.
 
 - Authored on the **offer**, not the mission, because the giver and the amount
   belong to that route.
@@ -248,8 +261,21 @@ completion payout, and no provenance tracking on what they buy.
   already proven this is a genuinely fresh acceptance, so the existing
   acceptance guard makes it exactly-once (§12.3). The balance is incremented in
   SQL rather than from a read value.
-- Validated as a positive integer at module load.
-- Deliberately a closed one-kind union — not a generic effect list. Another real
+- Validated at module load: a positive integer amount, and for `stack_item` a
+  known **stackable** item, because the acceptance boundary grants through the
+  authoritative carried-stack path and has no execution path for a unique item.
+- A `stack_item` grant is **all-or-nothing**, preflighted with
+  `planExactStackAddition` against ordinary carrying capacity **before anything
+  is written**. A player without room leaves with no items, no partial stack,
+  no accepted Mission, and no progress rows — only the authored refusal — and
+  the ordinary offer runs again cleanly once they have made room. The refusal
+  reports `reason: "capacity"` with its `capacityReason`, the same shape the
+  turn-in reward refusal already reports, so the conversation surface presents
+  the mission's authored refusal beat through one path (§9). A mission may point
+  both `capacitySlotsDialogueId` and `capacityMassDialogueId` at one shared
+  sequence when the person refusing has nothing different to say about slots
+  than about mass, as 10,000 Hours does.
+- Deliberately a closed two-kind union — not a generic effect list. Another real
   need earns another explicit kind.
 
 ## 9. Conversations and dialogue
@@ -702,3 +728,14 @@ Short concrete examples that demonstrate the framework vocabulary. Do not copy m
 - **Requirement:** one `repair_target_complete` observing the Crew Stop (§5), authoring nothing but its target. The generic phases (§5.1) read "Install Refined Ferrite at the Crew Stop — 10 / 20", then "Weld the Crew Stop — 3 / 10 welds". Guidance runs Holo Hollow → the Crew Stop's Local Place entrance → the repair surface once the player carries useful Refined Ferrite, stays silent while they carry none, and hands off to Renn's turn-in the moment the repair completes.
 - **Reward:** `{ kind: "skill_xp", skillId: welding, amount: 250 }` (§8), on top of the 500 Welding XP the ten genuine increments already paid through the ordinary Welding path. No synthetic work XP and no Credit payout: the durable reward is the repaired shelter and the Crew Hauler ride it earns (`docs/gameplay-foundations.md`, travel modes).
 - **Dialogue:** Renn authors the offer, the repair reminder, busy, the turn-in, the completion presentation (which carries the authored skill-XP beat), and post-completion story dialogue. The player stays silent throughout.
+
+### 10,000 Hours — Wade's yard, Wade's offer, and acceptance as the unlock
+
+- **The handoff is not the assignment.** Keep the Change's completion beat ends with Tansy calling Wade over comms (per-beat `speakerNpcId` + `presentationMode: "comms"`, against his own yard's background) and Wade telling the player to come by Rusk Recovery. That is the whole of the guidance: availability stays local discovery only (§10), Rusk Recovery has been on the map since the beginning, and nothing reveals a destination before acceptance.
+- **Acceptance:** `prerequisiteMissionId: keepTheChange`; one offer route, **Wade at Rusk Recovery**, `actionLabel: "PICK UP THE TORCH"`. No `continuationMissionId` anywhere in the chain reaches it, so it is never auto-accepted. It is his business, his apprentice, his training, his Scrap, and his future client work — Tansy neither offers it nor turns it in.
+- **Acceptance effect:** `acceptEffect: { kind: "stack_item", itemId: scrapMetal, quantity: 6 }` (§8.1) — exactly three welds' worth, all-or-nothing against ordinary carrying capacity. A player without room for all six leaves with nothing at all and hears Wade's one shared "make room and come back" refusal, authored at both `capacitySlotsDialogueId` and `capacityMassDialogueId`.
+- **The offer conversation IS the onboarding.** It establishes his actual shop, the Workbench, and that he will not yet let the player touch a client's property. There is deliberately **no** `npc_conversation` requirement: a requirement whose only purpose would be meeting a man the player is standing in front of is not a requirement, and everything it would have committed commits with the ordinary acceptance instead.
+- **Requirement:** one `tracked_activity` — `practice_welding`, `target: 3`, `progressKey: "practice-welds"`, `recommendedActionId: practiceWelding`. It observes real completed Practice welds through the generic path (§6): any genuine weld counts whatever Scrap paid for it, welds resolved lazily while the player was away count, and losing the free Scrap dead-ends nothing because Wade sells more.
+- **Reward:** `{ kind: "credits", amount: 50 }` (§8) and deliberately no Welding XP — the three welds already paid their own.
+- **One accepted record, two things opened.** The Workbench and Wade's Trade counter both derive from that acceptance and stay open after completion; there is no `practice_unlocked` or `trade_unlocked` flag. See `docs/gameplay-foundations.md` (Practice Welding, World Location merchants).
+- **Completion reveals the Work Orders terminal** as a real but empty surface; this slice ships zero playable Work Orders, and future ones will need Welding level 5 as well.

@@ -53,7 +53,7 @@ separate actions (`docs/holo-hollow.md`).
 | Content validation at module load | `server/mission-state.ts` — `validateMissionDefinitions` + `validateConversationTopics` |
 | Player-facing surfaces | `features/npc/NpcInteractionPanel.tsx` (Talk control + guidance), `features/npc/NpcConversation.tsx` (hub + command execution), `features/dialogue/DialoguePlayer.tsx` / `DialogueScene.tsx` (beat presentation) |
 | Server authority | `server/missions.ts` — `acceptMission` / `completeMission` (unchanged by #164) |
-| Which resident is present | `game/content/npcs.ts` — `getResidentNpc({ locationId, localPlaceId })` |
+| Which resident is present | `game/content/npcs.ts` — `getResidentNpc({ locationId, localPlaceId, completedMissionIds })`, `resolveNpcPlacement` |
 
 **Where a resident stands (#159).** `getResidentNpc` resolves one NPC from a
 spatial context. An NPC with no `localPlaceId` is present at their World
@@ -63,6 +63,32 @@ how Bix and Renn share Holo Hollow without either appearing merely because the
 player is standing in town. It stays a single-resident lookup: there is no
 simultaneous multi-NPC interaction system, and an NPC whose conversation
 content is not authored yet simply has no expression art or background.
+
+**When a resident moves (#190).** An NPC may author **one** Mission-derived
+relocation: `relocation: { afterCompletedMissionId, homeLocationId }`. Wade is
+at the Crash Site until Keep the Change completes and at Rusk Recovery
+afterwards, resolved per NPC by `resolveNpcPlacement` from the character's own
+completed Missions. That is one person in two places over time — never a second
+"shop Wade", and never a persisted relocation flag that could disagree with the
+Mission record. Where a conversation happened stays authored per beat, so his
+Crash Site beats keep the Crash Site behind them and his yard beats use the
+yard: a person moving is new beats in a new place, not a dynamic-background
+system that retroactively relocates what they already said.
+
+Deliberately one authored move per NPC, in completion order. This is not an NPC
+schedule or movement engine; a future story beat that moves somebody again earns
+its own explicit entry.
+
+**Authored capacity refusals (#170, #190).** A Mission command that refuses
+because a grant will not fit reports `reason: "capacity"` with its
+`capacityReason`, and the conversation surface swaps to that Mission's authored
+refusal beat (`getMissionCapacityRefusalDialogue`) instead of showing a generic
+message. Since #190 this covers both ends of a Mission: the turn-in's item
+reward (Walk It Off) and an offer's `stack_item` acceptance effect (10,000
+Hours). The surface branches on the refusal shape, not on which command it was,
+so both paths present through one code path. A Mission may point both authored
+slots at one shared sequence when the person refusing has nothing different to
+say about slots than about mass.
 
 ## 3. Ownership rule: sequences are presentation, Missions own action semantics
 

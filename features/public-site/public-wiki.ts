@@ -243,7 +243,7 @@ const authoredWikiArticles = [
     slug: "credits-and-trading",
     title: "Credits & Trading",
     summary:
-      "Your character's Credits, and buying and selling at Bix Weller's shop in Holo Hollow.",
+      "Your character's Credits, buying and selling at Bix Weller's shop, and Wade's scrap counter at Rusk Recovery.",
     sections: [
       {
         paragraphs: [
@@ -284,6 +284,17 @@ const authoredWikiArticles = [
             " cost 8 Credits each. That's more than he pays for them, which he'll explain if you ask him about Power Cells. He doesn't stock anything else at the moment.",
           ],
           "A purchase has to fit: if your Inventory doesn't have room for the whole amount, or you can't afford it, nothing is bought and nothing is charged.",
+        ],
+      },
+      {
+        heading: "Trading with Wade",
+        paragraphs: [
+          [
+            "Wade Rusk sells Scrap Metal at 2 Credits a piece out of his own yard at Rusk Recovery, once he has put you on the ",
+            { text: "workbench", articleSlug: "practice-welding" },
+            ". It works exactly like Bix's counter, out in the yard rather than inside a shop.",
+          ],
+          "He never runs out and he doesn't buy anything back — what limits you is your Credits and your room. Scrap doesn't stack, so every piece takes an inventory slot of its own.",
         ],
       },
     ],
@@ -340,6 +351,86 @@ const authoredWikiArticles = [
             ".",
           ],
           "Every welding job works the same way and uses the same skill: install its materials, then weld it in passes of about three seconds each, with each finished pass earning the same Welding XP. What changes from job to job is how much material it needs and how many passes it takes. The Crew Stop needs 20 Refined Ferrite, no Slag, and ten passes.",
+          [
+            "You can also weld with nothing at stake at all. Wade's workbench at Rusk Recovery lets you ",
+            { text: "practice as much as you like", articleSlug: "practice-welding" },
+            ", for scrap rather than for a repair.",
+          ],
+        ],
+      },
+      {
+        heading: "Clean Pass",
+        paragraphs: [
+          "Twice during any welding job — a repair or practice — a moment opens up where the bead is running clean and you can lay one in. A Clean Pass control appears next to the normal controls for about three seconds.",
+          "Take it in time and the work jumps forward a whole extra pass, and pays that pass's XP. Miss it and absolutely nothing happens: it costs no material, no progress, and no time, so there is never a reason not to let one go by. The two moments are decided when the work unit starts, and stopping and resuming never moves them or gives you another go at one you were in the middle of.",
+        ],
+      },
+    ],
+  },
+  {
+    slug: "practice-welding",
+    title: "Practice Welding",
+    summary:
+      "Wade's workbench at Rusk Recovery, the scrap it runs on, and how practising Welding actually works.",
+    sections: [
+      {
+        paragraphs: [
+          [
+            "Rusk Recovery is Wade Rusk's recovery yard, one ordinary walk northwest of Holo Hollow. Once he has put you on the bench there, you can practise ",
+            { text: "Welding", articleSlug: "cargo-hold-and-welding" },
+            " as much as you have scrap for — no job, no client, and nothing that has to be finished.",
+          ],
+        ],
+      },
+      {
+        heading: "Getting on the bench",
+        paragraphs: [
+          [
+            "Finish ",
+            { text: "Keep the Change", articleSlug: "missions" },
+            " and Wade moves back to his own yard. Walk in and he will offer you ",
+            { text: "10,000 Hours", articleSlug: "missions" },
+            "; accepting it hands you six Scrap Metal and opens the workbench.",
+          ],
+          "He hands over all six pieces or none. Scrap does not stack, so each piece takes an inventory slot — if you have not got room for all six he will tell you to make room and come back, and nothing is handed over or started until you do.",
+        ],
+      },
+      {
+        heading: "How a practice weld works",
+        list: [
+          "Each fresh weld takes 2 Scrap Metal, spent the moment it starts.",
+          "A weld is ten sections, each about three seconds, the same cadence as any other welding.",
+          "Each finished section pays half the Welding XP a repair section pays, because nothing is actually being repaired.",
+          "Finishing a weld produces up to 2 Slag.",
+        ],
+      },
+      {
+        heading: "Starting, stopping, and coming back",
+        paragraphs: [
+          "One Start keeps the bench going: as each weld finishes the next one begins, taking two more scrap, until there is not enough left for another. It keeps going while you are away from the screen, the same as any other work.",
+          "Stop whenever you like. The half-finished weld stays exactly as it is, and so does the scrap you already spent on it — resuming continues that same weld and costs nothing, even with no scrap left at all. Walking away from the yard stops the bench the same way; you cannot weld from the road.",
+          "When the scrap runs out the bench finishes the weld in progress and stops on its own, saying so. Buying more does not start it again — that is your call.",
+        ],
+      },
+      {
+        heading: "Scrap and slag",
+        paragraphs: [
+          [
+            "Wade sells Scrap Metal at 2 Credits a piece out of the yard, with no limit but your ",
+            { text: "Credits and your inventory", articleSlug: "credits-and-trading" },
+            ". He does not buy anything back.",
+          ],
+          [
+            "Slag is yours to keep or throw out: the bench has a setting for it, applied as each weld finishes. Bix pays 1 Credit apiece for ",
+            { text: "Slag", articleSlug: "mining-and-refining" },
+            " in town, so a 4-Credit weld can return 2 if you keep both and sell them. If you keep Slag and run out of room for it, the overflow is thrown out rather than stopping the weld.",
+          ],
+        ],
+      },
+      {
+        heading: "Work Orders",
+        paragraphs: [
+          "There is a beaten-up terminal in the corner of the yard. Finishing 10,000 Hours makes it yours to look at, and it is empty: paying client work is not in the game yet, and when it arrives it will need Welding level 5 as well.",
         ],
       },
     ],
@@ -382,6 +473,11 @@ const authoredWikiArticles = [
             "Keep the Change — Wade makes you his apprentice and hands you 24 Credits to get Tansy three ",
             { text: "Power Cells", articleSlug: "power-cells" },
             ". Meet Bix Weller in town, then take the cells to Tansy at The Jag.",
+          ],
+          [
+            "10,000 Hours — Wade moves back to his own yard at Rusk Recovery and offers you bench time. Accepting it hands you six Scrap Metal; complete three ",
+            { text: "practice welds", articleSlug: "practice-welding" },
+            " and show him the work.",
           ],
         ],
       },
@@ -436,6 +532,18 @@ const authoredWikiArticles = [
         ],
       },
       {
+        heading: "10,000 Hours in detail",
+        paragraphs: [
+          "Turning in Keep the Change ends with Tansy calling Wade to tell him you did the job properly, and Wade telling you to come by the shop. Nothing is accepted for you and nothing lights up on the map: Rusk Recovery has been walkable from the start, and the job is there when you walk in and talk to him.",
+          [
+            "Accepting it is the whole of the onboarding. He hands over six Scrap Metal — three welds' worth — and opens the ",
+            { text: "workbench", articleSlug: "practice-welding" },
+            " and his scrap counter at the same time. He will not let you near real client property yet.",
+          ],
+          "Any three genuine practice welds count, whatever scrap you used: his, scrap you already had, or scrap you bought back from him. Losing his scrap does not dead-end anything — buy two more and carry on. Showing him the finished work pays 50 Credits. The three welds already paid their own Welding XP, so there is no second helping.",
+        ],
+      },
+      {
         heading: "Talking to people",
         paragraphs: [
           "Talk opens a list of the conversations you can have with that person right now, rather than a single fixed exchange.",
@@ -452,12 +560,12 @@ const authoredWikiArticles = [
     slug: "holo-hollow",
     title: "Holo Hollow",
     summary:
-      "The six connected locations that make up the current playable world, the town itself, and who you'll meet there.",
+      "The seven connected locations that make up the current playable world, the town itself, and who you'll meet there.",
     sections: [
       {
         paragraphs: [
           [
-            "Holo Hollow is the wrecked stretch of ground you're stranded in, and also the name of the settlement at the middle of it. It currently has six connected locations — see ",
+            "Holo Hollow is the wrecked stretch of ground you're stranded in, and also the name of the settlement at the middle of it. It currently has seven connected locations — see ",
             { text: "Travel & Scavenging", articleSlug: "travel-and-scavenging" },
             " for how they connect.",
           ],
@@ -491,9 +599,14 @@ const authoredWikiArticles = [
             " and Tansy Rusk.",
           ],
           [
-            "Holo Hollow — the town itself, a declining mining settlement built on the remains of a holo-tourism economy. It connects to the Crash Site, the Power Annex, and The Long Scramble, and it's where you can ",
+            "Holo Hollow — the town itself, a declining mining settlement built on the remains of a holo-tourism economy. It connects to the Crash Site, the Power Annex, The Long Scramble, and Rusk Recovery, and it's where you can ",
             { text: "spend Credits", articleSlug: "credits-and-trading" },
             ".",
+          ],
+          [
+            "Rusk Recovery — Wade Rusk's recovery yard on the northwest edge of town: racked salvage, stripped components, damaged work vehicles, and a workbench you can ",
+            { text: "practise Welding", articleSlug: "practice-welding" },
+            " at once he puts you on it.",
           ],
         ],
       },
@@ -528,7 +641,11 @@ const authoredWikiArticles = [
       {
         heading: "Who's here",
         paragraphs: [
-          "Wade Rusk, a Holo Hollow recovery and salvage operator, is based at the Crash Site. Tansy Rusk, a field mechanic and miner, is based at The Jag.",
+          [
+            "Wade Rusk, a Holo Hollow recovery and salvage operator, is at the Crash Site to begin with. Once you finish ",
+            { text: "Keep the Change", articleSlug: "missions" },
+            " he goes back to running his own yard at Rusk Recovery, and that is where you will find him from then on. Tansy Rusk, a field mechanic and miner, is based at The Jag.",
+          ],
           [
             "In town, Bix Weller runs the souvenir and mining-supply shop, and Renn Calder, a Ferrite miner, is found at the Community Assistance Center. Mara Kells owns the HH B&B — you'll meet her in Bix's shop during ",
             { text: "Keep the Change", articleSlug: "missions" },
