@@ -593,6 +593,10 @@ As shipped, the Mission:
 
 The player character stays silent throughout, as everywhere else in RuneSpace.
 
+The board's settled rules, its client-eligibility rules, and the first authored
+pool of eight level-5 jobs now live in `docs/work-orders.md`. That document is
+content and product rules only; Work Orders remain unimplemented.
+
 ## Contracts and economic progression
 
 Later contracts should generally **buy outcomes**, while Missions may require

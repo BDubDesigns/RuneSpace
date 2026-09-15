@@ -331,6 +331,10 @@ story is not written). Whether a Work Order may come from Wade himself, given
 that he is the person posting the board — see **Open canon questions** at the
 end of this file.
 
+Whether a Work Order may come from Wade himself is **settled: no**, for the
+initial pool. It is a framing decision — he owns the shop the work arrives
+through — and not a statement that he can never be a repair client later.
+
 Note that the Work Orders terminal's provenance is **not** an open question.
 `docs/holo-hollow.md` records that tourism-era ticket/information infrastructure
 *may* later support a contract board — an explicitly speculative possibility,
@@ -675,13 +679,18 @@ fixes the Crew Stop his whole acknowledgement is *"That was you."*
   met.** Do not write them as acquainted.
 - **Bix / Mara** — no established relationship in either direction. `UNKNOWN`.
 
-**Player encounter chronology.** **NOT guaranteed.** This is the single most
-important chronology fact in this file for Work Orders purposes. The Assistance
-Center is open from the start, but nothing requires the player to enter it, and
-**Out of the Weather is optional** — it hangs off Hold It Together, is never a
+**Player encounter chronology.** **NOT guaranteed.** The Assistance Center is
+open from the start, but nothing requires the player to enter it, and **Out of
+the Weather is optional** — it hangs off Hold It Together, is never a
 prerequisite for anything, names no continuation, and ignoring it forever costs
 the player nothing. A player can complete the entire current main story, reach
 Rusk Recovery, and finish 10,000 Hours without ever having met Renn.
+
+This constrains **copy, not eligibility**. Renn can be a Work Order client like
+anybody else in town; what his job must not do is assume the player knows him,
+or lean on the Crew Stop and the Crew Hauler, which would foreground an optional
+Mission the player may never have found. See **Encounter chronology does not
+decide who can be a Work Order client**.
 
 **Mission / story involvement.** Offers and turns in **Out of the Weather**,
 RuneSpace's first deliberately optional side Mission and its first permanent
@@ -950,12 +959,48 @@ Hold It Together → Keep the Change → 10,000 Hours.
 | Mara Kells | **Guaranteed as an introduction only** | Speaks inside Bix's required scene. The player has met her; they may never have entered HH B&B or heard a single one of her topics |
 | Renn Calder | **NOT guaranteed** | Out of the Weather is optional and the Assistance Center is never required |
 
-**What this means for authored client work.** Wade, Tansy, Bix, and Mara are
-chronology-safe as named Work Order clients. **Renn is not** — a job from him
-could be offered to a player who has never met him. That encounter-chronology
-fact is the whole reason, and it is sufficient on its own: do **not** additionally
-reason that Renn owns nothing. Canon has not established his possessions either
-way, and absence of evidence is not a characterization.
+**Encounter chronology does not decide who can be a Work Order client.**
+
+> **Durable rule.** Work Order clients do not need to have been met, and do not
+> need to be interactable NPCs. A named client may be an established NPC or a
+> background resident introduced through authored job fiction. Player encounter
+> chronology does not determine whether that person can use Rusk Recovery.
+
+Holo Hollow exists independently of the order the player walks through it. A
+resident's cart is broken whether or not the player has shaken their hand, and a
+repair shop with a real local business would have customers the player has never
+met. It is fine — arguably good — for a player to recognise a name from the board
+and meet that person later.
+
+What the table above is actually for is **dialogue and copy assumptions**. A job
+naming somebody the player may not have met must not assume familiarity: no
+"your friend", no "you remember", no callback to a conversation that may never
+have happened. Renn is the live case — he is eligible as a client, and his job
+copy must read as a work order rather than a favour between acquaintances.
+
+Two further constraints on client choice, neither of which is about chronology:
+
+- **Wade is excluded from the initial pool** — a framing decision, not a
+  chronology one. He owns the yard, the bench and the terminal the paying work
+  arrives through, so making him one of the first customers would blur *Wade
+  assigning work around his own shop* with *customers bringing paying work in*.
+  Direct apprentice or shop work from Wade stays available later.
+- **Do not reason that Renn owns nothing.** Canon has not established his
+  possessions either way, and absence of evidence is not a characterization. An
+  ordinary working miner's own kit is a reasonable floor; a vehicle, a business,
+  or a home is not.
+
+### Background Work Order clients are not roster NPCs
+
+A named background client introduced through job fiction is deliberately *not* an
+entry in this bible. It gets no portrait, no dialogue, no map presence, no Wiki
+page, and no biography — a name, an occupation, and the one possession the job
+needs. That restraint is the point: it makes the town bigger without promising
+five more characters.
+
+The authored background clients and the minimal canon each one introduces live in
+`docs/work-orders.md`. Do not expand them here, and do not promote one into this
+roster without a deliberate decision to make them a real NPC.
 
 ### Welding level 5 — the paper arithmetic
 
@@ -1039,26 +1084,22 @@ invented. A concise, truthful page is the standard.
 Unresolved items, for a product decision rather than an agent's judgement.
 Nothing below should be silently settled by content.
 
-1. **Can a Work Order come from Wade himself?** He owns the yard and the
-   terminal, so a Wade job is the man posting the board handing work to his own
-   apprentice. That could read as warm and characteristic, or it could undercut
-   the board's premise that these are outside clients. `UNRESOLVED`.
-2. **Renn's standing at the Assistance Center** — receiving help, or helping?
+1. **Renn's standing at the Assistance Center** — receiving help, or helping?
    Deliberately unstated in shipped dialogue, and currently unresolvable from
    sources. Should stay open unless a story beat needs it. `UNRESOLVED`.
-3. **Ages.** Only Renn has an approved range (late 20s–early 30s). Wade and Bix
+2. **Ages.** Only Renn has an approved range (late 20s–early 30s). Wade and Bix
    are "roughly the same age" with no number; Tansy and Mara have nothing.
    `UNKNOWN`.
-4. **Where these people live.** Not established for any of the five. Mara living
+3. **Where these people live.** Not established for any of the five. Mara living
    at the B&B and Wade living at the yard are both plausible and both currently
    unwritten. `UNKNOWN`.
-5. **Parents and wider family.** Bix's parents and Mara's parents are referenced
+4. **Parents and wider family.** Bix's parents and Mara's parents are referenced
    but unnamed, and whether either pair is living is unestablished. Tansy's
    parents are dead, unnamed, cause unstated. `UNKNOWN`.
-6. **Do Renn and Tansy know each other?** `docs/holo-hollow.md` says Renn would
+5. **Do Renn and Tansy know each other?** `docs/holo-hollow.md` says Renn would
    tell younger residents *such as Tansy* not to give the town their whole
    lives, which implies acquaintance without establishing it. No shipped content
    places them together. `UNRESOLVED`.
-7. **Tansy's promised anecdote** — Wade repairing a coolant manifold with a
+6. **Tansy's promised anecdote** — Wade repairing a coolant manifold with a
    serving spoon. The tease is shipped; the story has never been written.
    `UNKNOWN`.
