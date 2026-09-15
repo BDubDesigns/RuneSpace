@@ -52,10 +52,10 @@ export function NpcInteractionPanel({
   className?: string;
   localPlaceId?: string;
   /**
-   * Place-level context that shares the row's second line — today, who else is
+   * Place-level context rendered in the resident's block — today, who else is
    * at this location (#193). It rides along here purely to spend one line
-   * instead of two on a phone; it is not about this resident, so whatever is
-   * passed states its own subject ("Only you here", not "alone").
+   * instead of a row of its own on a phone; it is not about this resident, so
+   * whatever is passed states its own subject ("Only you here", not "alone").
    */
   meta?: ReactNode;
 }) {
@@ -117,25 +117,36 @@ export function NpcInteractionPanel({
 
   return (
     <div className={className.trim()} data-npc-resident>
-      {/* A row, not a card (#193). The person and what they offer is one line
-          with the role beneath it, which is ~90px instead of the 163–215px the
-          stacked card cost — enough, at 390px, to decide whether the place's
-          activity starts above the fold or below it.
+      {/* Part of the place, not a card inside it (#193).
 
-          Deliberately not a `Panel`: `rs-bevel`'s clip-path cuts anything
+          This was briefly a bordered box, and it was the only surface on the
+          screen with no bevel, no chamfer and no shadow — a second card sitting
+          inside the Location panel's own raised surface, which read as a
+          settings row rather than as somebody standing in the room. The fix is
+          not a fancier nested panel: it is no panel. A hairline separates the
+          resident from the place's description, and the person and their
+          actions sit directly on the Location surface.
+
+          Deliberately still not a `Panel`: `rs-bevel`'s clip-path cuts anything
           painted outside the element's box, and a Mission-guided Talk paints a
-          12px exterior halo. The old card cleared it on 16px of padding; this
-          row is tighter, so it uses a plain bordered surface with nothing to
-          clip the glow. Same reason there is no `overflow: hidden` here. */}
+          12px exterior halo. Nothing here clips, and nothing sets
+          `overflow: hidden`, so that glow survives.
+
+          Name and role are one identity block so they read as one person, and
+          the actions sit beside it rather than competing with the name for the
+          same baseline. */}
       <section
         aria-label={`Local contact: ${npc.displayName}`}
-        className="border border-[color:var(--rs-border-structural)] bg-[color:var(--rs-surface-panel)] p-3"
+        className="border-t border-[color:var(--rs-border-structural)] pt-3"
         data-npc-interaction
       >
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-          <h2 className="min-w-0 flex-1 basis-28 font-display text-base font-bold leading-tight">
-            {npc.displayName}
-          </h2>
+        <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-3">
+          <div className="min-w-0 flex-1 basis-36">
+            <h2 className="font-display text-base font-bold leading-tight">{npc.displayName}</h2>
+            <p className="mt-0.5 text-xs leading-snug text-[color:var(--rs-text-secondary)]">
+              {npc.role}
+            </p>
+          </div>
           <div className="flex shrink-0 items-center gap-2" data-npc-actions>
             {entries.length > 0 ? (
               <MissionActionButton
@@ -166,13 +177,9 @@ export function NpcInteractionPanel({
             ) : null}
           </div>
         </div>
-        <div className="mt-1.5 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
-          <p className="text-xs leading-snug text-[color:var(--rs-text-secondary)]">{npc.role}</p>
-          {/* Hugs the right edge even when the role's length pushes it onto its
-              own line, so place-level context never reads as a third line of
-              this person's description. */}
-          {meta ? <div className="ml-auto">{meta}</div> : null}
-        </div>
+        {/* Place-level context, right-aligned on its own line so it never reads
+            as another line of this person's description. */}
+        {meta ? <div className="mt-2 flex justify-end">{meta}</div> : null}
         {!stationary ? (
           <Feedback tone="muted">
             Conversations with gameplay actions require a stationary character.

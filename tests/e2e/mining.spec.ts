@@ -76,11 +76,14 @@ test("owned character can start, observe, stop, and restore Ferrite Mining at Th
   await expect(page.getByLabel("Mining attempt history", { exact: true })).toHaveCount(0);
   await page.getByRole("button", { name: "History", exact: true }).click();
   const history = page.getByLabel("Mining attempt history", { exact: true });
-  await expect(history).toContainText("Attempt 2 - Failed");
+  // History is the attempts *before* the current one: attempt 2 is the latest
+  // and is already presented in full above, so opening History must not put it
+  // on the screen a second time.
   await expect(history).toContainText("Attempt 1 - Success");
-  await expect(history).toContainText("Roll 35.00 | Needed below 35.00");
-  await expect(history).toContainText("Missed by 0.01");
   await expect(history).toContainText("Roll 0.00 | Needed below 35.00");
+  await expect(history).not.toContainText("Attempt 2");
+  await expect(history).not.toContainText("Missed by 0.01");
+  await expect(latestResult).toContainText("Missed by 0.01");
   await captureReviewScreenshot(page, "mining-mobile-active-viewport.png");
   await page.getByText("This mining run").scrollIntoViewIfNeeded();
   await captureReviewScreenshot(page, "mining-mobile-run-history-viewport.png");
@@ -660,14 +663,12 @@ test("Power Cell loading boosts Mining attempts and falls back after depletion",
     .where(eq(activeActions.characterId, characterId));
   await page.getByRole("button", { name: "Refresh status" }).click();
   await expect(page.getByText(/POWER CELL BOOST · [89] \/ 10/)).toBeVisible();
-  await expect(page.getByRole("region", { name: "Latest mining attempt" })).toContainText(
-    "Power Cell charge consumed",
-  );
-  await page.getByRole("button", { name: "History", exact: true }).click();
-  await expect(page.getByLabel("Mining attempt history", { exact: true })).toContainText(
-    "Boosted · 5 ticks",
-  );
-  await page.getByRole("button", { name: "Hide history", exact: true }).click();
+  // The boost is reported on the attempt itself. Asserted on the visible
+  // latest-attempt block rather than in History, which since #193 holds only
+  // the attempts before this one and so depends on how many resolved.
+  const latestBoosted = page.getByRole("region", { name: "Latest mining attempt" });
+  await expect(latestBoosted).toContainText("Power Cell charge consumed");
+  await expect(latestBoosted).toContainText("5 ticks");
 
   // Stop/start preserves the Cutter instance charge while avoiding the client
   // refresh timer racing the deterministic depletion boundary below.

@@ -42,7 +42,7 @@ const authoredUpdates = [
       {
         heading: "Fixed",
         items: [
-          "A run's most recent attempt is no longer shown twice on the same screen.",
+          "A run's most recent attempt is no longer shown twice on the same screen. The History list holds the attempts before it.",
           "The Refining run no longer repeats the carried Refined Ferrite and Slag shown directly above it.",
           "Attempt history no longer scrolls inside the page; it opens in the page itself.",
         ],

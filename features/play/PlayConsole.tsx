@@ -92,7 +92,12 @@ export function PlayConsole({
   });
 
   return (
-    <div className="space-y-4">
+    // 12px between surfaces, matching the rhythm inside an activity panel
+    // (#193). The stack used to be 16px, which read as a page of separate
+    // documents rather than one screen — and at Rusk Recovery, where two
+    // Mission strips push everything down, those pixels are clearance under
+    // the Workbench's Start control.
+    <div className="space-y-3">
       {/* Mission guidance leads every Play surface, directly under the header. */}
       <MissionGuidanceStrips state={state} />
       {surface === "map" ? (

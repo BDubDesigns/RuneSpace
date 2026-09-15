@@ -13,8 +13,13 @@ function percentage(bps: number) {
  * It no longer restates the carried Refined Ferrite and Slag: the activity's
  * context row directly above shows both, and showing them twice on one phone
  * screen was one of the duplications this issue set out to remove.
+ *
+ * For the same reason History holds the attempts *before* the current one: the
+ * Refining console above already presents the newest attempt in full.
  */
 export function RefiningRunPanel({ run }: { run: RefiningRunState }) {
+  // Everything except the newest, which the console itself is showing.
+  const priorAttempts = run.recentAttempts.slice(0, -1);
   return (
     <RunSummary
       historyLabel="Refining attempt history"
@@ -26,9 +31,9 @@ export function RefiningRunPanel({ run }: { run: RefiningRunState }) {
         { label: "Refining XP", value: run.xpGained },
       ]}
       title="This refining run"
-      {...(run.recentAttempts.length > 0
+      {...(priorAttempts.length > 0
         ? {
-            history: [...run.recentAttempts]
+            history: [...priorAttempts]
               .reverse()
               .map((attempt) => <RefiningAttemptRow attempt={attempt} key={attempt.sequence} />),
           }

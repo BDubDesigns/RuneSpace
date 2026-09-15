@@ -13,6 +13,12 @@ function percentage(bps: number) {
  * Mining's run totals and its bounded attempt history, in the shared run
  * summary (#193). It renders inside the Mining activity panel rather than as a
  * panel of its own, so the numbers sit with the controls that produced them.
+ *
+ * History holds the attempts *before* the current one. The newest attempt is
+ * already presented in full, with its rewards and its result animation, by the
+ * activity above (`MiningActivity`'s latest-attempt block), so repeating it
+ * here would put the same attempt on screen twice the moment a player opened
+ * the disclosure — which is exactly the duplication this issue removed.
  */
 export function MiningRunPanel({
   run,
@@ -21,6 +27,8 @@ export function MiningRunPanel({
   run: MiningRunState;
   balance: EffectiveGameBalance;
 }) {
+  // Everything except the newest, which the activity itself is showing.
+  const priorAttempts = run.recentAttempts.slice(0, -1);
   return (
     <RunSummary
       historyLabel="Mining attempt history"
@@ -32,9 +40,9 @@ export function MiningRunPanel({
         { label: "Mining XP", value: run.xpGained },
       ]}
       title="This mining run"
-      {...(run.recentAttempts.length > 0
+      {...(priorAttempts.length > 0
         ? {
-            history: [...run.recentAttempts]
+            history: [...priorAttempts]
               .reverse()
               .map((attempt) => (
                 <MiningAttemptRow attempt={attempt} balance={balance} key={attempt.sequence} />
