@@ -178,8 +178,11 @@ async function expectNoMiningDashboards(page: import("@playwright/test").Page) {
 async function expectMiningDashboardsVisible(page: import("@playwright/test").Page) {
   await expect(page.getByRole("button", { name: "Start Mining" })).toBeVisible();
   await expect(page.getByText("Success chance:", { exact: false })).toBeVisible();
-  await expect(page.getByText("Mining progression", { exact: true })).toBeVisible();
-  await expect(page.getByText("Cargo readout", { exact: true })).toBeVisible();
+  // Since #193 the skill, the carried shale and the run totals are compact rows
+  // inside Mining's own panel rather than three standalone cards.
+  await expect(page.getByRole("progressbar", { name: "Mining progression XP" })).toBeVisible();
+  await expect(page.locator("[data-activity-context]")).toContainText("Ferrite Shale");
+  await expect(page.locator("[data-activity-context]")).toContainText("slots");
   await expect(page.getByText("This mining run", { exact: true })).toBeVisible();
 }
 
@@ -188,7 +191,7 @@ async function expectMiningDashboardsHidden(page: import("@playwright/test").Pag
   await expect(page.getByRole("button", { name: "Stop Mining" })).toHaveCount(0);
   await expect(page.getByText("Mining attempt", { exact: true })).toHaveCount(0);
   await expect(page.getByText("Latest attempt:", { exact: false })).toHaveCount(0);
-  await expect(page.getByText("Mining progression", { exact: true })).toHaveCount(0);
+  await expect(page.getByRole("progressbar", { name: "Mining progression XP" })).toHaveCount(0);
   await expect(page.getByText("This mining run", { exact: true })).toHaveCount(0);
 }
 
@@ -602,8 +605,8 @@ test("the full journey walks, arrives, and returns between the original location
   // Refining is available at the Yard (issue #81): the activity panel shows
   // the Refining console, not the old "offline" message.
   await expect(page.getByRole("button", { name: "Start Refining" })).toBeVisible();
-  await expect(page.getByText("Refining progression", { exact: true })).toBeVisible();
-  await expect(page.getByText("Cargo readout", { exact: true })).toBeVisible();
+  await expect(page.getByRole("progressbar", { name: "Refining progression XP" })).toBeVisible();
+  await expect(page.locator("[data-activity-context]")).toContainText("Refined Ferrite");
   await expect(page.getByText("This refining run", { exact: true })).toBeVisible();
   await expectMiningDashboardsHidden(page);
   await expect(page.getByText(/Metallurgy progression/i)).toHaveCount(0);

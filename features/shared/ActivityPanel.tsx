@@ -2,7 +2,6 @@
 
 import type { ReactNode } from "react";
 import { Panel } from "@/components/ui/Panel";
-import { SectionHeader } from "@/components/ui/SectionHeader";
 
 /**
  * The frame a place's primary activity sits in (#193).
@@ -23,6 +22,12 @@ import { SectionHeader } from "@/components/ui/SectionHeader";
  * ever needs to know which activity it is holding, the abstraction is wrong and
  * the caller should compose a `Panel` directly instead.
  *
+ * The frame is a little tighter than a page-level `Panel` — 16px of padding
+ * and a 12px rhythm rather than 20px and 16px. That is not decoration: at
+ * Rusk Recovery, with 10,000 Hours' two-line Mission strip on screen, those
+ * eight pixels are the difference between the Workbench's Start control being
+ * fully visible on a 390x844 phone and being clipped by the bottom navigation.
+ *
  * Content order inside the frame is the grammar's, and callers follow it:
  * controls first, then active progress, then the compact context and run
  * summary. Explanatory copy goes below the control it explains, not above it —
@@ -42,10 +47,21 @@ export function ActivityPanel({
   title: string;
 } & Omit<React.HTMLAttributes<HTMLElement>, "title" | "children">) {
   return (
-    <Panel className="space-y-4" data-activity-panel tone="raised" {...rest}>
-      <SectionHeader level={2} {...(eyebrow ? { eyebrow } : {})}>
-        {title}
-      </SectionHeader>
+    <Panel className="space-y-3 !p-4" data-activity-panel tone="raised" {...rest}>
+      {/* One line, not the page-level `SectionHeader` stack: the place owns the
+          screen's `h1` and its full-size heading, and an activity is a section
+          under it. Two lines of heading above every activity cost 18px each
+          that the primary control needs on a 390px screen. */}
+      <h2 className="flex flex-wrap items-baseline gap-x-2 font-display leading-tight">
+        {eyebrow ? (
+          <span className="text-xs uppercase tracking-[0.16em] text-[color:var(--rs-accent-primary)]">
+            {eyebrow}
+          </span>
+        ) : null}
+        <span className="text-xl font-bold tracking-tight text-[color:var(--rs-text-primary)]">
+          {title}
+        </span>
+      </h2>
       {children}
     </Panel>
   );

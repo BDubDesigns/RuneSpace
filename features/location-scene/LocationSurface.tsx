@@ -87,7 +87,11 @@ export function LocationSurface({
         location={location}
         resourceLabels={resourceLabels}
       />
-      <div className="p-5">
+      {/* Slightly less padding below the resident than above the description:
+          what follows this panel is the place's activity, and the two panels
+          plus the stack gap otherwise put 56px of gutter between the person
+          standing here and the thing to do here. */}
+      <div className="p-5 pb-4">
         {/* No heading line here (#193): the scene plate above already names the
             place and carries the surface's `h1`. A second copy of the name over
             the literal word "Location" cost 68px of a 844px-tall phone screen
@@ -98,15 +102,12 @@ export function LocationSurface({
         >
           {location.description}
         </p>
-        {/* Who is here is part of the place, so it sits with the place's own
-            description rather than below the person standing in it (#193) —
-            which also stops it reading as a fact about that person. The
-            resident follows immediately, still above everything the place
-            hosts, so Talk and Trade never fall below the activity on a phone. */}
-        <div className="mt-3">
-          <LocationPopulationPanel />
-        </div>
-        <NpcInteractionPanel className="mt-3" />
+        {/* Who is here rides on the resident row's second line rather than
+            taking a row of its own (#193) — 32px on a phone, which is the
+            difference between the Workbench starting above the fold at Rusk
+            Recovery and starting below it. It states its own subject so it
+            still reads as the place's, not the resident's. */}
+        <NpcInteractionPanel className="mt-3" meta={<LocationPopulationPanel />} />
         {localPlaces.length > 0 ? (
           <div className="mt-5">
             <LocalPlaceDirectory locationId={locationId} />

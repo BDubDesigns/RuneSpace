@@ -71,6 +71,10 @@ test("owned character can start, observe, stop, and restore Ferrite Mining at Th
   await expect(page.getByText("1 failed", { exact: true })).toBeVisible();
   await expect(page.getByText("1 shale gained", { exact: true })).toBeVisible();
   await expect(page.getByText("15 Mining XP", { exact: true })).toBeVisible();
+  // Prior attempts sit behind History since #193 — the run's own totals stay
+  // visible, the bounded list is opened when the player wants it.
+  await expect(page.getByLabel("Mining attempt history", { exact: true })).toHaveCount(0);
+  await page.getByRole("button", { name: "History", exact: true }).click();
   const history = page.getByLabel("Mining attempt history", { exact: true });
   await expect(history).toContainText("Attempt 2 - Failed");
   await expect(history).toContainText("Attempt 1 - Success");
@@ -655,9 +659,11 @@ test("Power Cell loading boosts Mining attempts and falls back after depletion",
   await expect(page.getByRole("region", { name: "Latest mining attempt" })).toContainText(
     "Power Cell charge consumed",
   );
+  await page.getByRole("button", { name: "History", exact: true }).click();
   await expect(page.getByLabel("Mining attempt history", { exact: true })).toContainText(
     "Boosted · 5 ticks",
   );
+  await page.getByRole("button", { name: "Hide history", exact: true }).click();
 
   // Stop/start preserves the Cutter instance charge while avoiding the client
   // refresh timer racing the deterministic depletion boundary below.

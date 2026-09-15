@@ -6,6 +6,7 @@ import { Feedback } from "@/components/ui/Feedback";
 import { MissionActionButton } from "@/components/ui/MissionActionButton";
 import { StatusMeter } from "@/components/ui/StatusMeter";
 import { ActivityPanel } from "@/features/shared/ActivityPanel";
+import { ActivityContextRow, SkillProgressRow } from "@/features/shared/activity-context";
 import { ItemVisual } from "@/components/items/ItemVisual";
 import { InventoryStackVisual } from "@/components/items/InventoryStackVisual";
 import { getEffectiveGameBalance } from "@/game/config/balance";
@@ -726,6 +727,26 @@ export function CargoHoldPanel() {
             Restore the damaged Cargo Hold with replacement plating and packed bulkhead filler.
             Refined Ferrite is structural material; Slag is thermal packing, not a welding tool.
           </p>
+          {/* Every weld pass here grants Welding XP, and until #193 this
+              surface showed no sign of it — while the Wiki already told
+              players that every skill shows its level where it is used. The
+              compact row makes that true, using the same projection the
+              Workbench reads; nothing about the award changes. */}
+          <SkillProgressRow
+            level={state.welding.level}
+            skill="Welding"
+            tone="welding"
+            xpIntoLevel={state.welding.xpIntoLevel}
+            {...(state.welding.xpToNextLevel === undefined
+              ? {}
+              : { xpToNextLevel: state.welding.xpToNextLevel })}
+          />
+          <ActivityContextRow
+            items={[
+              { label: "Refined Ferrite carried", quantity: state.refinedFerriteQuantity },
+              { label: "Slag carried", quantity: state.slagQuantity },
+            ]}
+          />
         </>
       ) : (
         <p

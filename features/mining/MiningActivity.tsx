@@ -3,6 +3,8 @@
 import { useEffect, useRef, useState, useTransition } from "react";
 import { ActionButton } from "@/components/ui/ActionButton";
 import { ActivityPanel } from "@/features/shared/ActivityPanel";
+import { ActivityContextRow, SkillProgressRow } from "@/features/shared/activity-context";
+import { MiningRunPanel } from "@/features/mining/MiningRunPanel";
 import { Feedback } from "@/components/ui/Feedback";
 import { MissionActionButton } from "@/components/ui/MissionActionButton";
 import { StatusMeter } from "@/components/ui/StatusMeter";
@@ -385,6 +387,27 @@ export function MiningActivity({ characterName }: { characterName: string }) {
           Retry status check
         </ActionButton>
       ) : null}
+      {/* The context Mining is actually working against: the skill the attempts
+          raise, the shale they produce, and the two limits that stop a run. */}
+      <SkillProgressRow
+        level={state.mining.level}
+        skill="Mining"
+        tone="mining"
+        xpIntoLevel={state.mining.xpIntoLevel}
+        {...(state.mining.xpToNextLevel === undefined
+          ? {}
+          : { xpToNextLevel: state.mining.xpToNextLevel })}
+      />
+      <ActivityContextRow
+        carry={{
+          slotsUsed: state.inventory.slotsUsed,
+          slotsAvailable: state.inventory.slotsAvailable,
+          massGrams: state.inventory.massGrams,
+          capacityGrams: state.inventory.capacityGrams,
+        }}
+        items={[{ label: "Ferrite Shale", quantity: state.ferriteShaleQuantity }]}
+      />
+      <MiningRunPanel balance={balance} run={state.run} />
     </ActivityPanel>
   );
 }

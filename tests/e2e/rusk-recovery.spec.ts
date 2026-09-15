@@ -188,22 +188,27 @@ test("offers 10,000 Hours only at Wade's yard, and only once there is room for t
   await expect(page.locator("[data-practice-panel]")).toBeVisible();
   await expect(page.locator('[data-npc-action="trade"]')).toBeVisible();
 
-  // The yard is composed as separate panels rather than one giant location
-  // panel: Wade stands inside the Location panel directly under its
-  // description, and the bench, the Welding progression, and the run history
-  // are each their own panel below it.
+  // The yard follows the stationary-Location grammar (#193): the Location
+  // panel is the place and Wade in it, the bench is its own activity panel
+  // below, and the bench carries its own Welding progression and run summary
+  // rather than each being a panel of its own.
   const locationPanel = page.locator("[data-location-surface]");
   await expect(locationPanel.locator("[data-npc-interaction]")).toBeVisible();
   await expect(locationPanel.locator("[data-practice-panel]")).toHaveCount(0);
-  await expect(
-    page.locator("[data-practice-panel] [aria-label='Practice weld history']"),
-  ).toHaveCount(0);
-  await expect(page.getByRole("progressbar", { name: "Welding progression XP" })).toBeVisible();
+  const bench = page.locator("[data-practice-panel]");
+  await expect(bench.getByRole("progressbar", { name: "Welding progression XP" })).toBeVisible();
+  await expect(bench.locator("[data-run-summary]")).toContainText("This practice run");
+  // The prior welds are behind History, not permanently on screen.
+  await expect(page.getByLabel("Practice weld history", { exact: true })).toHaveCount(0);
   // On a phone, Wade's own controls are reachable without scrolling past the
-  // shop UI: his card starts above the bench.
+  // shop UI: his row starts above the bench, and the bench's Start control is
+  // itself above the fold rather than under the bottom navigation.
   const wadeBox = (await page.locator("[data-npc-interaction]").boundingBox())!;
-  const benchBox = (await page.locator("[data-practice-panel]").boundingBox())!;
+  const benchBox = (await bench.boundingBox())!;
   expect(wadeBox.y).toBeLessThan(benchBox.y);
+  const startBox = (await page.locator("[data-practice-start]").boundingBox())!;
+  const navTop = (await page.getByRole("navigation", { name: "Primary" }).boundingBox())!.y;
+  expect(startBox.y + startBox.height).toBeLessThanOrEqual(navTop);
   // The terminal is still scenery: that waits on the work being done.
   await expect(page.locator("[data-work-orders-terminal]")).toHaveCount(0);
   // And the objective is the welds themselves.

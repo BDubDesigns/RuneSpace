@@ -61,7 +61,7 @@ test("Processing Yard Refining journey — Ferrite and Slag both branches, artwo
   // 3. Yard is active; the Location surface exposes the Refining activity and
   // its level/progress supporting panels.
   await expect(page.getByRole("button", { name: "Start Refining" })).toBeVisible();
-  await expect(page.getByText("Refining progression")).toBeVisible();
+  await expect(page.getByRole("progressbar", { name: "Refining progression XP" })).toBeVisible();
   await expect(page.getByText(/Success chance: 40\.00%/)).toBeVisible();
   // Crash Site has no production-status plate after Mining moved to The Jag, so
   // check the activity panel rather than treating the whole page as inactive.

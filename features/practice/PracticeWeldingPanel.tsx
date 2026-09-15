@@ -6,6 +6,8 @@ import { Feedback } from "@/components/ui/Feedback";
 import { MissionActionButton } from "@/components/ui/MissionActionButton";
 import { StatusMeter } from "@/components/ui/StatusMeter";
 import { ActivityPanel } from "@/features/shared/ActivityPanel";
+import { ActivityContextRow, SkillProgressRow } from "@/features/shared/activity-context";
+import { PracticeRunPanel } from "@/features/practice/PracticeRunPanel";
 import { getEffectiveGameBalance, practiceSectionXp } from "@/game/config/balance";
 import { ACTION_IDS } from "@/game/config/foundations";
 import { deriveMissionGuidanceTargets } from "@/game/domain/missions";
@@ -167,10 +169,6 @@ export function PracticeWeldingPanel() {
 
       <CleanPassControl cleanPass={practice.cleanPass} />
 
-      <p className="text-sm text-[color:var(--rs-text-secondary)]" data-practice-scrap>
-        <strong>{practice.scrapAvailable}</strong> Scrap Metal loose for later welds
-      </p>
-
       <p className="max-w-2xl text-sm leading-relaxed text-[color:var(--rs-text-secondary)]">
         {`${practice.scrapPerWeld} Scrap Metal, ${practice.sectionsPerWeld} sections, nominal up to ${balance.practiceWelding.slagPerWeld} Slag. Each section is worth ${practiceSectionXp(balance)} Welding XP.`}
       </p>
@@ -195,6 +193,21 @@ export function PracticeWeldingPanel() {
         <Feedback tone="muted">Out of Scrap Metal</Feedback>
       ) : null}
       {message ? <Feedback tone="danger">{message}</Feedback> : null}
+      {/* Welding progression belongs with the welding, and the loose Scrap is
+          what decides whether there is another weld after this one. */}
+      <SkillProgressRow
+        level={state.welding.level}
+        skill="Welding"
+        tone="welding"
+        xpIntoLevel={state.welding.xpIntoLevel}
+        {...(state.welding.xpToNextLevel === undefined
+          ? {}
+          : { xpToNextLevel: state.welding.xpToNextLevel })}
+      />
+      <div data-practice-scrap>
+        <ActivityContextRow items={[{ label: "Scrap Metal", quantity: practice.scrapAvailable }]} />
+      </div>
+      <PracticeRunPanel run={practice.run} />
     </ActivityPanel>
   );
 }

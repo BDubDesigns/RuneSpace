@@ -609,22 +609,22 @@ test("opening Trade reveals the Trade surface above the bottom navigation", asyn
     .click();
   const trade = page.locator('[data-npc-action="trade"]');
   await expect(trade).toBeVisible();
-  const navTop = (await page.getByRole("navigation", { name: "Primary" }).boundingBox())!.y;
 
+  // Trade is its own surface since #193: it opens in the shared Drawer that
+  // Talk already used, rather than unfolding ~390px inside the place panel and
+  // pushing everything the place hosts below it.
   await trade.click();
-  const region = page.locator("[data-npc-trade]");
-  // Focus moves into the surface the player just opened ...
-  await expect(region).toBeFocused();
-  // ... and the surface, which fits this viewport in Buy mode, is scrolled
-  // fully clear of the fixed bottom navigation rather than clipped by it.
-  const box = (await region.boundingBox())!;
-  expect(box.y).toBeGreaterThanOrEqual(0);
-  expect(box.y + box.height).toBeLessThanOrEqual(navTop + 1);
-  await expect(region.getByRole("heading", { name: "Buy and sell" })).toBeInViewport();
+  const counter = page.getByRole("dialog", { name: "Trade with Bix Weller" });
+  await expect(counter).toBeVisible();
+  await expect(counter.getByRole("heading", { name: "Buy and sell" })).toBeInViewport();
+  await expect(counter.locator("[data-npc-trade]")).toBeVisible();
+  // The place itself did not grow to accommodate the shop: the whole surface
+  // still fits this phone viewport with the counter open.
+  expect(await page.evaluate(() => document.documentElement.scrollHeight)).toBeLessThanOrEqual(844);
 
   // Closing Trade leaves focus on the control the player used.
-  await trade.click();
-  await expect(region).toHaveCount(0);
+  await counter.getByRole("button", { name: /^Close trade with Bix Weller$/i }).click();
+  await expect(counter).toHaveCount(0);
   await expect(trade).toBeFocused();
 });
 

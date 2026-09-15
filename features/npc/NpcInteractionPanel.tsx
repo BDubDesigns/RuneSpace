@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useRef, useState, type ReactNode } from "react";
 import { ActionButton } from "@/components/ui/ActionButton";
 import { Feedback } from "@/components/ui/Feedback";
 import { Drawer } from "@/components/ui/Drawer";
@@ -46,10 +46,18 @@ import { usePlay } from "@/features/play/PlayContext";
 export function NpcInteractionPanel({
   className = "",
   localPlaceId,
+  meta,
 }: {
   /** Spacing supplied by whichever place surface the resident stands in. */
   className?: string;
   localPlaceId?: string;
+  /**
+   * Place-level context that shares the row's second line — today, who else is
+   * at this location (#193). It rides along here purely to spend one line
+   * instead of two on a phone; it is not about this resident, so whatever is
+   * passed states its own subject ("Only you here", not "alone").
+   */
+  meta?: ReactNode;
 }) {
   const { foregroundBusy, state } = usePlay();
   const [open, setOpen] = useState(false);
@@ -148,9 +156,13 @@ export function NpcInteractionPanel({
             ) : null}
           </div>
         </div>
-        <p className="mt-1.5 text-xs leading-snug text-[color:var(--rs-text-secondary)]">
-          {npc.role}
-        </p>
+        <div className="mt-1.5 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+          <p className="text-xs leading-snug text-[color:var(--rs-text-secondary)]">{npc.role}</p>
+          {/* Hugs the right edge even when the role's length pushes it onto its
+              own line, so place-level context never reads as a third line of
+              this person's description. */}
+          {meta ? <div className="ml-auto">{meta}</div> : null}
+        </div>
         {!stationary ? (
           <Feedback tone="muted">
             Conversations with gameplay actions require a stationary character.

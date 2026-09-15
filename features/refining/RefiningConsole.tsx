@@ -3,6 +3,8 @@
 import { useEffect, useRef, useState, useTransition } from "react";
 import { ActionButton } from "@/components/ui/ActionButton";
 import { ActivityPanel } from "@/features/shared/ActivityPanel";
+import { ActivityContextRow, SkillProgressRow } from "@/features/shared/activity-context";
+import { RefiningRunPanel } from "@/features/refining/RefiningRunPanel";
 import { ItemVisual } from "@/components/items/ItemVisual";
 import { VisualTile } from "@/components/items/VisualTile";
 import { Feedback } from "@/components/ui/Feedback";
@@ -321,6 +323,29 @@ export function RefiningConsole() {
           Retry status check
         </ActionButton>
       ) : null}
+      {/* Both outputs and the shale that feeds them: refining stops on carried
+          capacity as readily as it stops on running out of input. */}
+      <SkillProgressRow
+        level={refining.level}
+        skill="Refining"
+        tone="refining"
+        xpIntoLevel={refining.xpIntoLevel}
+        {...(refining.xpToNextLevel === undefined ? {} : { xpToNextLevel: refining.xpToNextLevel })}
+      />
+      <ActivityContextRow
+        carry={{
+          slotsUsed: state.inventory.slotsUsed,
+          slotsAvailable: state.inventory.slotsAvailable,
+          massGrams: state.inventory.massGrams,
+          capacityGrams: state.inventory.capacityGrams,
+        }}
+        items={[
+          { label: "Ferrite Shale", quantity: state.ferriteShaleQuantity },
+          { label: "Refined Ferrite", quantity: state.refinedFerriteQuantity },
+          { label: "Slag", quantity: state.slagQuantity },
+        ]}
+      />
+      <RefiningRunPanel run={refiningRun} />
     </ActivityPanel>
   );
 }

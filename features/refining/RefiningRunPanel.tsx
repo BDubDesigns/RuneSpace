@@ -1,9 +1,6 @@
 "use client";
 
-import { Panel } from "@/components/ui/Panel";
-import { SectionHeader } from "@/components/ui/SectionHeader";
-import { COLLAPSE_KEYS, useSyncedCollapse } from "@/features/shared/use-synced-collapse";
-import { CollapseButton } from "@/features/shared/CollapseButton";
+import { RunSummary } from "@/features/shared/RunSummary";
 import type { RefiningRunAttempt, RefiningRunState } from "@/server/refining";
 
 function percentage(bps: number) {
@@ -11,71 +8,32 @@ function percentage(bps: number) {
 }
 
 /**
- * Bounded Refining run history + summary, shown beneath the Processing Yard
- * activity (mirrors Mining's "This mining run" panel). Server-resolved data
- * only — no client-side computation.
+ * Refining's run totals and bounded history, in the shared run summary (#193).
+ *
+ * It no longer restates the carried Refined Ferrite and Slag: the activity's
+ * context row directly above shows both, and showing them twice on one phone
+ * screen was one of the duplications this issue set out to remove.
  */
-export function RefiningRunPanel({
-  run,
-  ferriteQuantity,
-  slagQuantity,
-}: {
-  run: RefiningRunState;
-  ferriteQuantity: number;
-  slagQuantity: number;
-}) {
-  const { collapsed, toggle } = useSyncedCollapse(COLLAPSE_KEYS.runHistory);
+export function RefiningRunPanel({ run }: { run: RefiningRunState }) {
   return (
-    <Panel>
-      <div className="flex items-start justify-between gap-2">
-        <SectionHeader eyebrow="Server-resolved" level={2}>
-          This refining run
-        </SectionHeader>
-        <CollapseButton collapsed={collapsed} label="refining run" onToggle={toggle} />
-      </div>
-      {!collapsed ? (
-        <>
-          <div className="mt-4 grid grid-cols-2 gap-3 text-sm sm:grid-cols-4">
-            <p>
-              <strong>{run.attempts}</strong> attempts
-            </p>
-            <p>
-              <strong>{run.successes}</strong> Refined Ferrite
-            </p>
-            <p>
-              <strong>{run.failures}</strong> Slag
-            </p>
-            <p>
-              <strong>{run.xpGained}</strong> Refining XP
-            </p>
-          </div>
-          <div className="mt-3 grid grid-cols-2 gap-3 text-sm sm:grid-cols-3">
-            <p>
-              <strong>{run.shaleConsumed}</strong> shale consumed
-            </p>
-            <p>
-              <strong>{ferriteQuantity}</strong> Refined Ferrite carried
-            </p>
-            <p>
-              <strong>{slagQuantity}</strong> Slag carried
-            </p>
-          </div>
-          <div
-            className="mt-5 max-h-72 space-y-2 overflow-y-auto pr-1"
-            aria-label="Refining attempt history"
-          >
-            {[...run.recentAttempts].reverse().map((attempt) => (
-              <RefiningAttemptRow attempt={attempt} key={attempt.sequence} />
-            ))}
-            {run.recentAttempts.length === 0 ? (
-              <p className="text-sm text-[color:var(--rs-text-muted)]">
-                No resolved attempts in this run yet.
-              </p>
-            ) : null}
-          </div>
-        </>
-      ) : null}
-    </Panel>
+    <RunSummary
+      historyLabel="Refining attempt history"
+      stats={[
+        { label: "attempts", value: run.attempts },
+        { label: "Refined Ferrite", value: run.successes },
+        { label: "Slag", value: run.failures },
+        { label: "shale used", value: run.shaleConsumed },
+        { label: "Refining XP", value: run.xpGained },
+      ]}
+      title="This refining run"
+      {...(run.recentAttempts.length > 0
+        ? {
+            history: [...run.recentAttempts]
+              .reverse()
+              .map((attempt) => <RefiningAttemptRow attempt={attempt} key={attempt.sequence} />),
+          }
+        : {})}
+    />
   );
 }
 

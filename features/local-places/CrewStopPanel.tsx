@@ -6,6 +6,7 @@ import { Feedback } from "@/components/ui/Feedback";
 import { MissionActionButton } from "@/components/ui/MissionActionButton";
 import { StatusMeter } from "@/components/ui/StatusMeter";
 import { ActivityPanel } from "@/features/shared/ActivityPanel";
+import { ActivityContextRow, SkillProgressRow } from "@/features/shared/activity-context";
 import { getEffectiveGameBalance, getRepairTargetBalance } from "@/game/config/balance";
 import { GAME_TICK_MS, LOCAL_PLACE_IDS, REPAIR_TARGET_IDS } from "@/game/config/foundations";
 import { deriveCompletedMissionIds, deriveMissionGuidanceTargets } from "@/game/domain/missions";
@@ -295,6 +296,21 @@ export function CrewStopPanel() {
             ? 0
             : (repair.weldingProgress / repair.weldingIncrements) * 100
         }
+      />
+
+      {/* The same Welding the Workbench trains, so it reports the same way
+          (#193): the welds here grant Welding XP and used to show none. */}
+      <SkillProgressRow
+        level={state.welding.level}
+        skill="Welding"
+        tone="welding"
+        xpIntoLevel={state.welding.xpIntoLevel}
+        {...(state.welding.xpToNextLevel === undefined
+          ? {}
+          : { xpToNextLevel: state.welding.xpToNextLevel })}
+      />
+      <ActivityContextRow
+        items={[{ label: "Refined Ferrite carried", quantity: state.refinedFerriteQuantity }]}
       />
 
       {message ? <Feedback>{message}</Feedback> : null}
