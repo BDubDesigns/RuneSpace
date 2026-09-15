@@ -45,10 +45,10 @@ test.describe("public Wiki", () => {
     );
 
     for (const title of articleTitles) {
-      await expect(page.getByRole("link", { name: title, exact: true })).toBeVisible();
+      await expect(page.getByRole("link", { name: title, exact: true }).first()).toBeVisible();
     }
 
-    await page.getByRole("link", { name: articleTitle, exact: true }).click();
+    await page.getByRole("link", { name: articleTitle, exact: true }).first().click();
     await expect(page).toHaveURL(`/wiki/${articleSlug}`);
     await expect(page).toHaveTitle(`${articleTitle} — RuneSpace Wiki`);
     await expect(page.getByRole("heading", { name: articleTitle, level: 1 })).toBeVisible();
@@ -59,15 +59,44 @@ test.describe("public Wiki", () => {
     );
   });
 
-  test("groups the index under its category headings, in order", async ({ page }) => {
+  test("reads as a landing page: an intro, one way in, and compact category panels", async ({
+    page,
+  }) => {
     await page.goto("/wiki");
 
-    const headings = page.getByRole("heading", { level: 2 });
-    await expect(headings).toHaveText(categoryHeadings);
+    // Two sections, not sixteen article cards.
+    await expect(page.getByRole("heading", { level: 2 })).toHaveText([
+      "Start here",
+      "Browse by category",
+    ]);
 
-    // Every article the index lists sits inside one of those category groups.
-    const grouped = page.locator("section", { has: page.getByRole("heading", { level: 2 }) });
-    await expect(grouped.getByRole("listitem")).toHaveCount(articleTitles.length);
+    // The spotlight points at the existing Getting Started article, not a new one.
+    const startHere = page.locator("section", {
+      has: page.getByRole("heading", { name: "Start here", level: 2 }),
+    });
+    await expect(
+      startHere.getByRole("link", { name: "Getting Started", exact: true }),
+    ).toHaveAttribute("href", "/wiki/getting-started");
+
+    // The five categories are the page's navigation, each with its own copy.
+    await expect(page.getByRole("heading", { level: 3 })).toHaveText(categoryHeadings);
+
+    const browse = page.locator("section", {
+      has: page.getByRole("heading", { name: "Browse by category", level: 2 }),
+    });
+    await expect(browse.getByRole("listitem")).toHaveCount(articleTitles.length);
+
+    // Every article is still one tap away — no category route in between.
+    for (const title of articleTitles) {
+      await expect(browse.getByRole("link", { name: title, exact: true })).toHaveCount(1);
+    }
+  });
+
+  test("keeps the landing page free of per-article summary cards", async ({ page }) => {
+    await page.goto("/wiki");
+
+    // The old index repeated every article's summary; only the spotlight has one now.
+    await expect(page.getByRole("link", { name: "Read article" })).toHaveCount(0);
   });
 
   test("renders a character article from the People category", async ({ page }) => {

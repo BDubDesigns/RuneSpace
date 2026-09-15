@@ -1033,6 +1033,7 @@ export function getWikiArticles(): readonly WikiArticle[] {
 export type WikiArticleGroup = {
   id: WikiCategoryId;
   label: string;
+  description: string;
   articles: readonly WikiArticle[];
 };
 
@@ -1045,8 +1046,25 @@ export function getWikiArticleGroups(): readonly WikiArticleGroup[] {
   return WIKI_CATEGORIES.map((category) => ({
     id: category.id,
     label: category.label,
+    description: category.description,
     articles: wikiArticles.filter((article) => article.category === category.id),
   }));
+}
+
+/**
+ * The article the index spotlights for a player who does not yet know what to
+ * read. It is an ordinary authored article, deliberately not a second
+ * quick-start page that would duplicate it, and it still appears in its own
+ * category list below the spotlight.
+ */
+export const WIKI_START_HERE_SLUG = "getting-started";
+
+export function getWikiStartHereArticle(): WikiArticle {
+  const article = getWikiArticle(WIKI_START_HERE_SLUG);
+  if (!article) {
+    throw new Error(`Wiki start-here article is missing: ${WIKI_START_HERE_SLUG}`);
+  }
+  return article;
 }
 
 export function getWikiArticle(slug: string): WikiArticle | undefined {

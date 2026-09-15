@@ -77,13 +77,42 @@ export const WIKI_CATEGORY_IDS = [
 
 export type WikiCategoryId = (typeof WIKI_CATEGORY_IDS)[number];
 
-/** Player-facing heading for each category, in index order. */
-export const WIKI_CATEGORIES: readonly { id: WikiCategoryId; label: string }[] = [
-  { id: "getting-started", label: "Getting Started" },
-  { id: "work", label: "Work" },
-  { id: "gear-and-credits", label: "Gear & Credits" },
-  { id: "places-and-travel", label: "Places & Travel" },
-  { id: "people", label: "People" },
+/**
+ * Player-facing heading and one-line description for each category, in index
+ * order. The description tells a player what belongs in a category before they
+ * open anything, which is what lets the Wiki index be a landing page rather
+ * than a catalog of every article.
+ */
+export const WIKI_CATEGORIES: readonly {
+  id: WikiCategoryId;
+  label: string;
+  description: string;
+}[] = [
+  {
+    id: "getting-started",
+    label: "Getting Started",
+    description: "What RuneSpace is right now, the jobs people hand you, and how your skills grow.",
+  },
+  {
+    id: "work",
+    label: "Work",
+    description: "The trades you actually perform: cutting shale, running the hopper, and welding.",
+  },
+  {
+    id: "gear-and-credits",
+    label: "Gear & Credits",
+    description: "What you carry, what powers it, and how money changes hands out here.",
+  },
+  {
+    id: "places-and-travel",
+    label: "Places & Travel",
+    description: "Holo Hollow's locations, and how you get between them on foot or otherwise.",
+  },
+  {
+    id: "people",
+    label: "People",
+    description: "The residents of Holo Hollow: what they do, and where you will run into them.",
+  },
 ];
 
 const wikiCategoryId = z.enum(WIKI_CATEGORY_IDS);

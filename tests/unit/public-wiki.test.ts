@@ -5,7 +5,9 @@ import {
   getWikiArticleGroups,
   getWikiArticlePath,
   getWikiArticles,
+  getWikiStartHereArticle,
   validatePublicWikiArticles,
+  WIKI_START_HERE_SLUG,
 } from "@/features/public-site/public-wiki";
 import { WIKI_CATEGORIES } from "@/game/schemas/public-wiki";
 
@@ -190,6 +192,27 @@ describe("public Wiki content boundary", () => {
     const grouped = getWikiArticleGroups().flatMap((group) => group.articles.map((a) => a.slug));
 
     expect([...grouped].sort()).toEqual([...getWikiArticles().map((a) => a.slug)].sort());
+  });
+
+  it("resolves the index's start-here spotlight to a real authored article", () => {
+    const startHere = getWikiStartHereArticle();
+
+    expect(startHere.slug).toBe(WIKI_START_HERE_SLUG);
+    expect(getWikiArticle(WIKI_START_HERE_SLUG)).toEqual(startHere);
+  });
+
+  it("keeps the spotlighted article inside its own category rather than removing it", () => {
+    const startHere = getWikiStartHereArticle();
+    const group = getWikiArticleGroups().find((g) => g.id === startHere.category);
+
+    expect(group?.articles.map((article) => article.slug)).toContain(startHere.slug);
+  });
+
+  it("gives every category a player-facing description for the index panels", () => {
+    for (const group of getWikiArticleGroups()) {
+      expect(group.description.trim().length).toBeGreaterThan(0);
+      expect(group.description).not.toBe(group.label);
+    }
   });
 
   it("gives every named NPC a character article under People", () => {

@@ -1,10 +1,14 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { PublicSiteShell } from "@/components/public-site/PublicSiteShell";
-import { ActionLink } from "@/components/ui/ActionLink";
 import { Panel } from "@/components/ui/Panel";
 import type { WikiParagraph } from "@/game/schemas/public-wiki";
-import { getWikiArticleGroups, getWikiArticlePath, type WikiArticle } from "./public-wiki";
+import {
+  getWikiArticleGroups,
+  getWikiArticlePath,
+  getWikiStartHereArticle,
+  type WikiArticle,
+} from "./public-wiki";
 
 const wikiLinkClassName =
   "rs-focus rounded-sm underline decoration-[color:var(--rs-accent-primary)] decoration-2 underline-offset-2 hover:text-[color:var(--rs-accent-primary)]";
@@ -32,8 +36,18 @@ function WikiParagraphText({ paragraph }: { paragraph: WikiParagraph }) {
 }
 import { publicSiteNavigation } from "./public-site-content";
 
+/**
+ * The Wiki landing page.
+ *
+ * Deliberately navigational rather than a catalog: an intro, one prominent way
+ * in for somebody who does not know what to read, and the five categories as
+ * compact panels of direct article links. Every article stays one tap from
+ * here, so there are no category routes to click through and no second table
+ * of contents above the panels — the panels are the contents.
+ */
 export function PublicWikiIndexPage() {
   const groups = getWikiArticleGroups();
+  const startHere = getWikiStartHereArticle();
 
   return (
     <PublicWikiFrame>
@@ -50,40 +64,61 @@ export function PublicWikiIndexPage() {
         </p>
       </header>
 
-      <div className="mt-10 space-y-10">
-        {groups.map((group) => (
-          <section key={group.id}>
-            <h2
-              className="font-display text-xs font-bold uppercase tracking-[0.18em] text-[color:var(--rs-accent-primary)]"
-              id={`category-${group.id}`}
-            >
-              {group.label}
-            </h2>
-            <ol className="mt-4 grid gap-5" aria-labelledby={`category-${group.id}`}>
-              {group.articles.map((article) => (
-                <li key={article.slug}>
-                  <Panel className="min-w-0" tone="raised">
-                    <h3 className="font-display text-2xl font-bold tracking-tight text-[color:var(--rs-text-primary)] sm:text-3xl">
-                      <Link
-                        className="rs-focus rounded-sm text-[color:var(--rs-text-primary)] underline decoration-[color:var(--rs-accent-primary)] decoration-2 underline-offset-4 hover:text-[color:var(--rs-accent-primary)]"
-                        href={getWikiArticlePath(article)}
-                      >
-                        {article.title}
-                      </Link>
-                    </h3>
-                    <p className="mt-4 max-w-3xl text-sm leading-6 text-[color:var(--rs-text-secondary)] sm:text-base">
-                      {article.summary}
-                    </p>
-                    <ActionLink className="mt-6" href={getWikiArticlePath(article)}>
-                      Read article
-                    </ActionLink>
-                  </Panel>
-                </li>
-              ))}
-            </ol>
-          </section>
-        ))}
-      </div>
+      <section aria-labelledby="wiki-start-here" className="mt-10">
+        <h2
+          className="font-display text-xs font-bold uppercase tracking-[0.18em] text-[color:var(--rs-accent-primary)]"
+          id="wiki-start-here"
+        >
+          Start here
+        </h2>
+        <Panel className="mt-4 min-w-0" tone="raised">
+          <Link
+            className="rs-focus inline-flex min-h-[var(--rs-touch-target)] items-center rounded-sm font-display text-2xl font-bold tracking-tight text-[color:var(--rs-text-primary)] underline decoration-[color:var(--rs-accent-primary)] decoration-2 underline-offset-4 hover:text-[color:var(--rs-accent-primary)] sm:text-3xl"
+            href={getWikiArticlePath(startHere)}
+          >
+            {startHere.title}
+          </Link>
+          <p className="mt-3 max-w-3xl text-sm leading-6 text-[color:var(--rs-text-secondary)] sm:text-base">
+            {startHere.summary}
+          </p>
+        </Panel>
+      </section>
+
+      <section aria-labelledby="wiki-browse" className="mt-10">
+        <h2
+          className="font-display text-xs font-bold uppercase tracking-[0.18em] text-[color:var(--rs-accent-primary)]"
+          id="wiki-browse"
+        >
+          Browse by category
+        </h2>
+        <div className="mt-4 grid gap-4 sm:grid-cols-2">
+          {groups.map((group) => (
+            <Panel className="min-w-0" key={group.id} tone="raised">
+              <h3
+                className="font-display text-lg font-bold tracking-tight text-[color:var(--rs-text-primary)] sm:text-xl"
+                id={`category-${group.id}`}
+              >
+                {group.label}
+              </h3>
+              <p className="mt-2 text-sm leading-6 text-[color:var(--rs-text-secondary)]">
+                {group.description}
+              </p>
+              <ul aria-labelledby={`category-${group.id}`} className="mt-3">
+                {group.articles.map((article) => (
+                  <li key={article.slug}>
+                    <Link
+                      className="rs-focus inline-flex min-h-[var(--rs-touch-target)] items-center rounded-sm text-sm font-semibold text-[color:var(--rs-accent-primary)] underline underline-offset-4"
+                      href={getWikiArticlePath(article)}
+                    >
+                      {article.title}
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </Panel>
+          ))}
+        </div>
+      </section>
     </PublicWikiFrame>
   );
 }
