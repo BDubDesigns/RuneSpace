@@ -4,15 +4,25 @@ const articleSlug = "getting-started";
 const articleTitle = "Getting Started";
 const articleTitles = [
   "Getting Started",
-  "Travel & Scavenging",
+  "Missions",
+  "Skills & Progression",
   "Mining & Refining",
+  "Cargo Hold & Welding",
+  "Practice Welding",
   "Inventory & Equipment",
   "Power Cells",
-  "Cargo Hold & Welding",
-  "Missions",
+  "Credits & Trading",
+  "Travel & Scavenging",
   "Holo Hollow",
-  "Skills & Progression",
+  "Wade Rusk",
+  "Tansy Rusk",
+  "Bix Weller",
+  "Renn Calder",
+  "Mara Kells",
 ];
+
+/** The index's category headings, in the order the page renders them. */
+const categoryHeadings = ["Getting Started", "Work", "Gear & Credits", "Places & Travel", "People"];
 
 test.describe("public Wiki", () => {
   test("lists every article and renders one with its sections", async ({ page }) => {
@@ -47,6 +57,28 @@ test.describe("public Wiki", () => {
       "href",
       `/wiki/${articleSlug}`,
     );
+  });
+
+  test("groups the index under its category headings, in order", async ({ page }) => {
+    await page.goto("/wiki");
+
+    const headings = page.getByRole("heading", { level: 2 });
+    await expect(headings).toHaveText(categoryHeadings);
+
+    // Every article the index lists sits inside one of those category groups.
+    const grouped = page.locator("section", { has: page.getByRole("heading", { level: 2 }) });
+    await expect(grouped.getByRole("listitem")).toHaveCount(articleTitles.length);
+  });
+
+  test("renders a character article from the People category", async ({ page }) => {
+    await page.goto("/wiki");
+    await page.getByRole("link", { name: "Wade Rusk", exact: true }).click();
+
+    await expect(page).toHaveURL("/wiki/wade-rusk");
+    await expect(page).toHaveTitle("Wade Rusk — RuneSpace Wiki");
+    await expect(page.getByRole("heading", { name: "Wade Rusk", level: 1 })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Where to find him", level: 2 })).toBeVisible();
+    await expect(page.getByRole("link", { name: "Tansy Rusk" })).toBeVisible();
   });
 
   test("returns a normal 404 for an unknown Wiki slug", async ({ page }) => {

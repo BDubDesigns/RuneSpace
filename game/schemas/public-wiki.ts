@@ -54,11 +54,46 @@ export const WikiArticleSectionSchema = z
     message: "A Wiki section needs at least one paragraph or list item",
   });
 
+/**
+ * The closed set of Wiki categories, in the order the index renders them.
+ *
+ * Categories exist to group an index that outgrew a single flat list, and they
+ * are deliberately semantic rather than page-size slices: each one names a kind
+ * of thing a player is looking for. The set is closed and every article must
+ * name one, so the index can never be half-migrated and a typo can never
+ * quietly create a new heading.
+ *
+ * Adding a category is a content decision, not a mechanism: add it here, in
+ * order, and give it real articles. `validatePublicWikiArticles` rejects a
+ * category with no articles, which is what stops a speculative empty heading.
+ */
+export const WIKI_CATEGORY_IDS = [
+  "getting-started",
+  "work",
+  "gear-and-credits",
+  "places-and-travel",
+  "people",
+] as const;
+
+export type WikiCategoryId = (typeof WIKI_CATEGORY_IDS)[number];
+
+/** Player-facing heading for each category, in index order. */
+export const WIKI_CATEGORIES: readonly { id: WikiCategoryId; label: string }[] = [
+  { id: "getting-started", label: "Getting Started" },
+  { id: "work", label: "Work" },
+  { id: "gear-and-credits", label: "Gear & Credits" },
+  { id: "places-and-travel", label: "Places & Travel" },
+  { id: "people", label: "People" },
+];
+
+const wikiCategoryId = z.enum(WIKI_CATEGORY_IDS);
+
 /** The complete repository-authored Wiki article contract. */
 export const WikiArticleSchema = z
   .object({
     slug: wikiSlug,
     title: wikiText,
+    category: wikiCategoryId,
     summary: wikiText,
     sections: z.array(WikiArticleSectionSchema).min(1),
   })

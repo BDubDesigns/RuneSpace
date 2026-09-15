@@ -1,14 +1,18 @@
 import { describe, expect, it } from "vitest";
 import {
+  assertWikiCategoriesArePopulated,
   getWikiArticle,
+  getWikiArticleGroups,
   getWikiArticlePath,
   getWikiArticles,
   validatePublicWikiArticles,
 } from "@/features/public-site/public-wiki";
+import { WIKI_CATEGORIES } from "@/game/schemas/public-wiki";
 
 const baseArticle = {
   slug: "first-article",
   title: "First Article",
+  category: "getting-started" as const,
   summary: "A short summary.",
   sections: [{ paragraphs: ["A complete paragraph."] }],
 };
@@ -143,6 +147,61 @@ describe("public Wiki content boundary", () => {
         },
       ]),
     ).toThrow('Wiki article "first-article" links to unknown article slug: not-a-real-article');
+  });
+
+  it("requires a category on every article", () => {
+    const { category: _category, ...withoutCategory } = baseArticle;
+
+    expect(() => validatePublicWikiArticles([withoutCategory])).toThrow();
+  });
+
+  it("rejects a category outside the declared set", () => {
+    expect(() =>
+      validatePublicWikiArticles([{ ...baseArticle, category: "lore-and-legends" }]),
+    ).toThrow();
+  });
+
+  it("rejects a declared category that no article is filed under", () => {
+    expect(() =>
+      assertWikiCategoriesArePopulated(validatePublicWikiArticles([baseArticle])),
+    ).toThrow(/^Wiki category has no articles: /);
+  });
+
+  it("files every real article under a declared category, leaving none empty", () => {
+    expect(() => assertWikiCategoriesArePopulated(getWikiArticles())).not.toThrow();
+  });
+
+  it("groups the index by category in declared order, preserving authored order within each", () => {
+    const groups = getWikiArticleGroups();
+
+    expect(groups.map((group) => group.id)).toEqual(WIKI_CATEGORIES.map((category) => category.id));
+
+    for (const group of groups) {
+      expect(group.articles.length).toBeGreaterThan(0);
+
+      const authoredOrder = getWikiArticles()
+        .filter((article) => article.category === group.id)
+        .map((article) => article.slug);
+      expect(group.articles.map((article) => article.slug)).toEqual(authoredOrder);
+    }
+  });
+
+  it("groups every article exactly once, losing none", () => {
+    const grouped = getWikiArticleGroups().flatMap((group) => group.articles.map((a) => a.slug));
+
+    expect([...grouped].sort()).toEqual([...getWikiArticles().map((a) => a.slug)].sort());
+  });
+
+  it("gives every named NPC a character article under People", () => {
+    const people = getWikiArticleGroups().find((group) => group.id === "people");
+
+    expect(people?.articles.map((article) => article.slug)).toEqual([
+      "wade-rusk",
+      "tansy-rusk",
+      "bix-weller",
+      "renn-calder",
+      "mara-kells",
+    ]);
   });
 
   it("resolves the real Wiki collection's authored internal links (paragraphs and lists) to known articles", () => {
