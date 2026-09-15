@@ -3,6 +3,11 @@
   "projectSlug": "runespace",
   "workState": "active",
   "currentFocus": "Giving Holo Hollow's people a place in the player Wiki: a character page for everyone you meet, and a Wiki that still scans on a phone once they are all in it.",
+  "currentChange": {
+    "summary": "Added a Wiki page for everyone you meet in Holo Hollow, grouped the Wiki into five categories, and turned its index into a compact landing page.",
+    "stage": "review",
+    "pullRequestNumber": 197
+  },
   "latestCompleted": {
     "summary": "Standardised how every stationary location composes, so the primary activity is on screen when you arrive instead of below the fold.",
     "date": "2026-09-15",
