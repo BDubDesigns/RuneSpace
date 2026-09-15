@@ -47,6 +47,8 @@ describe("missionChainResetScope", () => {
       "waste_not",
       "hold_it_together",
       "keep_the_change",
+      // 10,000 Hours hangs off Keep the Change (#190).
+      "ten_thousand_hours",
       // Out of the Weather hangs off Hold It Together, so resetting the chain
       // from the start necessarily clears the optional branch with it (#172).
       "out_of_the_weather",
@@ -56,10 +58,15 @@ describe("missionChainResetScope", () => {
       "waste_not",
       "hold_it_together",
       "keep_the_change",
+      // 10,000 Hours hangs off Keep the Change (#190).
+      "ten_thousand_hours",
       // Out of the Weather hangs off Hold It Together, so resetting the chain
       // from the start necessarily clears the optional branch with it (#172).
       "out_of_the_weather",
     ]);
-    expect(missionChainResetScope("keep_the_change", ids)).toEqual(["keep_the_change"]);
+    expect(missionChainResetScope("keep_the_change", ids)).toEqual([
+      "keep_the_change",
+      "ten_thousand_hours",
+    ]);
   });
 });

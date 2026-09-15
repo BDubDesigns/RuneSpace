@@ -69,6 +69,7 @@ const jag = CONVERSATION_BACKGROUND_IDS.theJagExterior;
 const bixShop = CONVERSATION_BACKGROUND_IDS.holoHollowSouvenirsInterior;
 const assistanceCenter = CONVERSATION_BACKGROUND_IDS.holoHollowAssistanceCenterInterior;
 const bnb = CONVERSATION_BACKGROUND_IDS.hhBnbInterior;
+const ruskYard = CONVERSATION_BACKGROUND_IDS.ruskRecoveryYard;
 
 function wadeLocal(expressionId: ExpressionId, text: string): DialogueBeat {
   return {
@@ -87,6 +88,35 @@ function wadeComms(expressionId: ExpressionId, text: string): DialogueBeat {
     speakerNpcId: NPC_IDS.wadeRusk,
     expressionId,
     backgroundId: crash,
+    presentationMode: "comms",
+    text,
+  };
+}
+
+/**
+ * Wade at his own yard (#190). His Crash Site beats keep the Crash Site
+ * background: where a conversation happened is authored per beat, so a person
+ * moving is simply new beats in the new place — never a dynamic background
+ * system that would retroactively relocate the beats he already spoke.
+ */
+function wadeAtYard(expressionId: ExpressionId, text: string): DialogueBeat {
+  return {
+    kind: "npc",
+    speakerNpcId: NPC_IDS.wadeRusk,
+    expressionId,
+    backgroundId: ruskYard,
+    presentationMode: "local",
+    text,
+  };
+}
+
+/** Wade calling in from the yard, shown against his own place. */
+function wadeCommsFromYard(expressionId: ExpressionId, text: string): DialogueBeat {
+  return {
+    kind: "npc",
+    speakerNpcId: NPC_IDS.wadeRusk,
+    expressionId,
+    backgroundId: ruskYard,
     presentationMode: "comms",
     text,
   };
@@ -871,6 +901,24 @@ const dialogue = {
         EXPRESSION_IDS.neutral,
         "And whatever's left of Wade's money stays in your pocket. That's how the job was supposed to work.",
       ),
+      // The handoff (#190): Tansy makes the call, Wade names the next place.
+      // Presentation only — it points the player at a yard that has been on the
+      // map since the beginning and offers nothing until they walk in.
+      tansyLocal(EXPRESSION_IDS.neutral, "Hold on. He should hear this from me."),
+      tansyLocal(
+        EXPRESSION_IDS.smile,
+        "Wade. Your apprentice carried three Cells up the Scramble and put my seam back on line.",
+      ),
+      wadeCommsFromYard(EXPRESSION_IDS.neutral, "...Hm."),
+      wadeCommsFromYard(
+        EXPRESSION_IDS.neutral,
+        "Took the job. Did the job. That's the whole of it.",
+      ),
+      wadeCommsFromYard(
+        EXPRESSION_IDS.neutral,
+        "Come by the shop when you're back this way. Rusk Recovery, northwest edge of the Hollow. There's bench time in it for you.",
+      ),
+      tansyLocal(EXPRESSION_IDS.smile, "That was him being proud, in case it went past you."),
     ],
   },
   [DIALOGUE_IDS.wadePostKeepTheChange]: {
@@ -1211,6 +1259,119 @@ const dialogue = {
         "Give it a year and somebody'll swear it was always like that.",
       ),
       rennLocal(EXPRESSION_IDS.guarded, "I'll know it wasn't."),
+    ],
+  },
+  // 10,000 Hours (#190) — Wade's own shop, in his own voice. The offer scene IS
+  // the onboarding: it establishes the place, what the player may touch, what
+  // they may not, and hands over the scrap the first three welds will burn.
+  [DIALOGUE_IDS.wadeTenThousandHoursOffer]: {
+    id: DIALOGUE_IDS.wadeTenThousandHoursOffer,
+    npcId: NPC_IDS.wadeRusk,
+    beats: [
+      wadeAtYard(
+        EXPRESSION_IDS.neutral,
+        "So. Rusk Recovery. Everything this valley gives up on comes through that gate first.",
+      ),
+      wadeAtYard(
+        EXPRESSION_IDS.neutral,
+        "That bench is a real workbench. You can put time in on it. That's what it's for.",
+      ),
+      wadeAtYard(
+        EXPRESSION_IDS.neutral,
+        "What you're not doing yet is laying a torch on somebody's property. People bring me things they can't afford to lose twice.",
+      ),
+      wadeAtYard(
+        EXPRESSION_IDS.neutral,
+        "Six pieces of scrap. Cut down, clean enough to run a bead on. Two pieces a weld, so that's three.",
+      ),
+      wadeAtYard(
+        EXPRESSION_IDS.neutral,
+        "Burn through them properly and we'll talk about what comes after.",
+      ),
+    ],
+  },
+  [DIALOGUE_IDS.wadeTenThousandHoursAccepted]: {
+    id: DIALOGUE_IDS.wadeTenThousandHoursAccepted,
+    npcId: NPC_IDS.wadeRusk,
+    beats: [
+      wadeAtYard(
+        EXPRESSION_IDS.neutral,
+        "Ten sections to a weld. Take them one at a time and you'll feel where the bead wants to go.",
+      ),
+      wadeAtYard(
+        EXPRESSION_IDS.neutral,
+        "Slag's yours to keep. Bix pays a credit for it, which is about what it's worth.",
+      ),
+      wadeAtYard(EXPRESSION_IDS.neutral, "Three welds. Then come find me."),
+    ],
+  },
+  // One shared refusal for both capacity causes: Wade has nothing different to
+  // say about slots than about mass. Nothing was granted and nothing was
+  // accepted when this plays — coming back runs the ordinary offer again.
+  [DIALOGUE_IDS.wadeTenThousandHoursCapacityRefusal]: {
+    id: DIALOGUE_IDS.wadeTenThousandHoursCapacityRefusal,
+    npcId: NPC_IDS.wadeRusk,
+    beats: [
+      wadeAtYard(EXPRESSION_IDS.scowl, "You're loaded like you're moving house."),
+      wadeAtYard(
+        EXPRESSION_IDS.neutral,
+        "All six or none. I'm not handing you scrap to drop in my own yard.",
+      ),
+      wadeAtYard(EXPRESSION_IDS.neutral, "Make room. Come back. It'll still be here."),
+    ],
+  },
+  [DIALOGUE_IDS.wadeTenThousandHoursPracticeReminder]: {
+    id: DIALOGUE_IDS.wadeTenThousandHoursPracticeReminder,
+    npcId: NPC_IDS.wadeRusk,
+    beats: [
+      wadeAtYard(EXPRESSION_IDS.neutral, "Bench is right there. Three welds."),
+      wadeAtYard(
+        EXPRESSION_IDS.neutral,
+        "Run out of scrap, I sell it. Two credits a piece, same as anybody pays.",
+      ),
+    ],
+  },
+  [DIALOGUE_IDS.wadeTenThousandHoursBusy]: {
+    id: DIALOGUE_IDS.wadeTenThousandHoursBusy,
+    npcId: NPC_IDS.wadeRusk,
+    beats: [
+      wadeAtYard(EXPRESSION_IDS.neutral, "Finish what you've got going. I'm not going anywhere."),
+    ],
+  },
+  [DIALOGUE_IDS.wadeTenThousandHoursTurnIn]: {
+    id: DIALOGUE_IDS.wadeTenThousandHoursTurnIn,
+    npcId: NPC_IDS.wadeRusk,
+    beats: [wadeAtYard(EXPRESSION_IDS.neutral, "Three welds, then. Let's see them.")],
+  },
+  [DIALOGUE_IDS.wadeTenThousandHoursCompletion]: {
+    id: DIALOGUE_IDS.wadeTenThousandHoursCompletion,
+    npcId: NPC_IDS.wadeRusk,
+    beats: [
+      wadeAtYard(EXPRESSION_IDS.neutral, "Hm. Not pretty. Wasn't going to be."),
+      wadeAtYard(
+        EXPRESSION_IDS.neutral,
+        "But the last one's better than the first, and you stayed on it. That's the only thing I was watching for.",
+      ),
+      wadeAtYard(EXPRESSION_IDS.neutral, "Fifty credits. Shop time is still work."),
+      wadeAtYard(
+        EXPRESSION_IDS.neutral,
+        "Bench stays open. Scrap's two credits when you want more of it.",
+      ),
+      wadeAtYard(
+        EXPRESSION_IDS.neutral,
+        "And that terminal in the corner is where the paying jobs come in. Not yet. But that's where they come in.",
+      ),
+    ],
+  },
+  [DIALOGUE_IDS.wadePostTenThousandHours]: {
+    id: DIALOGUE_IDS.wadePostTenThousandHours,
+    npcId: NPC_IDS.wadeRusk,
+    beats: [
+      wadeAtYard(EXPRESSION_IDS.neutral, "Bench is open. Scrap's two credits."),
+      wadeAtYard(
+        EXPRESSION_IDS.neutral,
+        "Ten thousand hours, the old hands say. You've got a few of them behind you now.",
+      ),
     ],
   },
   [DIALOGUE_IDS.maraTheBnbTopic]: {

@@ -7,7 +7,12 @@ import {
 } from "@/game/content/missions";
 import type { DatabaseTransaction } from "@/server/action-resolution";
 
-export type TrackedActivity = "mining" | "refining";
+/**
+ * The closed activity vocabulary Mission progress observes. Practice Welding
+ * counts completed welds through this same generic path (#190) — there is no
+ * Practice-specific Mission table, attempt history, or provenance tracking.
+ */
+export type TrackedActivity = "mining" | "refining" | "practice_welding";
 
 /** Return the narrow durable requirements authored by one mission. */
 export function trackedActivityRequirements(

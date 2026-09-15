@@ -14,6 +14,17 @@ import type {
   MissionRequirementKind,
 } from "@/game/content/missions";
 
+/**
+ * The authoritative action each tracked activity is performed through. Mission
+ * guidance may only recommend the action that genuinely produces the tracked
+ * fact, so a new activity adds one entry here rather than a new conditional.
+ */
+const TRACKED_ACTIVITY_ACTION_IDS = {
+  mining: ACTION_IDS.ferriteShaleMining,
+  refining: ACTION_IDS.refining,
+  practice_welding: ACTION_IDS.practiceWelding,
+} as const;
+
 export type MissionState = "not_accepted" | "active" | "ready_for_completion" | "completed";
 
 export type MissionRecordState = {
@@ -1057,7 +1068,7 @@ export function validateMissionDefinitions(definitions: readonly MissionDefiniti
           );
         }
         progressKeys.add(requirement.progressKey);
-        if (requirement.activity !== "mining" && requirement.activity !== "refining") {
+        if (!(requirement.activity in TRACKED_ACTIVITY_ACTION_IDS)) {
           throw new Error(`${where} references unsupported tracked activity.`);
         }
         if (requirement.metric !== "attempts") {
@@ -1067,8 +1078,7 @@ export function validateMissionDefinitions(definitions: readonly MissionDefiniti
           throw new Error(`${where} tracked activity target must be a positive integer.`);
         }
         if (requirement.recommendedActionId) {
-          const expectedActionId =
-            requirement.activity === "mining" ? ACTION_IDS.ferriteShaleMining : ACTION_IDS.refining;
+          const expectedActionId = TRACKED_ACTIVITY_ACTION_IDS[requirement.activity];
           if (requirement.recommendedActionId !== expectedActionId) {
             throw new Error(
               `${where} tracked activity guidance must target its authoritative activity action.`,

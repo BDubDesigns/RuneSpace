@@ -123,8 +123,13 @@ export type MissionRequirement =
       /** Stable identity for this requirement's durable progress row. */
       progressKey: string;
       /** Closed production activity vocabulary owned by the gameplay boundary. */
-      activity: "mining" | "refining";
-      /** Closed production metric vocabulary; both activities count attempts. */
+      activity: "mining" | "refining" | "practice_welding";
+      /**
+       * Closed production metric vocabulary: one resolved unit of that
+       * activity. For Mining and Refining that is a resolved attempt; for
+       * Practice Welding it is a completed weld — never a section, a start, or
+       * a button press (#190).
+       */
       metric: "attempts";
       /** Positive authored target; current progress is persisted separately. */
       target: number;
@@ -659,12 +664,97 @@ export const OUT_OF_THE_WEATHER: MissionDefinition = {
 };
 
 /** Ordered chain of authored missions; later entries may require earlier ones. */
+/**
+ * 10,000 Hours — Wade's apprentice earns bench time (#190).
+ *
+ * The Mission chain's next main step, and deliberately not a continuation:
+ * Keep the Change ends with Tansy calling Wade on comms and Wade telling the
+ * player to come by the shop, and that is all the guidance the framework
+ * gives. Rusk Recovery has been on the map since the beginning, so the player
+ * walks there because a person they work for asked them to — not because an
+ * accepted Mission revealed a destination.
+ *
+ * Wade owns the offer because it is his business, his apprentice, his
+ * training, his Scrap, and his future client work. Tansy's part is the
+ * handoff, not the assignment.
+ *
+ * The offer conversation IS the onboarding scene, so there is no mandatory
+ * `npc_conversation` requirement whose only purpose would be meeting a man the
+ * player is already standing in front of. Everything that scene establishes —
+ * the shop, the bench, the six pieces of Scrap, and the line about client
+ * property — commits with the ordinary acceptance: the authored
+ * `stack_item` acceptance effect is preflighted all-or-nothing, so a player
+ * without room leaves with no Scrap and no accepted Mission, hears Wade's
+ * one shared refusal, and simply comes back when they have room.
+ *
+ * That same accepted state is the single source of truth for what the shop
+ * opens up: the Workbench and Wade's Trade both read it, and it stays true
+ * after completion, so there is no second `practice_unlocked` flag to drift.
+ */
+export const TEN_THOUSAND_HOURS: MissionDefinition = {
+  id: MISSION_IDS.tenThousandHours,
+  title: "10,000 Hours",
+  summary: "Put real bench time in at Wade Rusk's Workbench in Rusk Recovery.",
+  prerequisiteMissionId: MISSION_IDS.keepTheChange,
+  offers: [
+    {
+      npcId: NPC_IDS.wadeRusk,
+      locationId: LOCATION_IDS.ruskRecovery,
+      dialogueId: DIALOGUE_IDS.wadeTenThousandHoursOffer,
+      actionLabel: "PICK UP THE TORCH",
+      // Six pieces, all at once or not at all: Practice consumes two per weld
+      // and the Mission asks for three (§5, #190).
+      acceptEffect: { kind: "stack_item", itemId: ITEM_IDS.scrapMetal, quantity: 6 },
+      acceptedContinuation: { dialogueId: DIALOGUE_IDS.wadeTenThousandHoursAccepted },
+    },
+  ],
+  requirements: [
+    {
+      // The Mission observes the real activity. Any genuine Practice weld
+      // completed while this is active counts — Wade's free Scrap, Scrap the
+      // player already had, and Scrap bought back from him are identical, and
+      // a weld resolved by the ordinary background/offline path counts too.
+      kind: "tracked_activity",
+      progressKey: "practice-welds",
+      activity: "practice_welding",
+      metric: "attempts",
+      target: 3,
+      objective: "Complete 3 Practice Welds — {current} / {target}",
+      recommendedActionId: ACTION_IDS.practiceWelding,
+    },
+  ],
+  turnIn: {
+    npcId: NPC_IDS.wadeRusk,
+    locationId: LOCATION_IDS.ruskRecovery,
+    requiresStationary: true,
+    objective: "Show Wade Rusk the work at Rusk Recovery",
+    dialogueId: DIALOGUE_IDS.wadeTenThousandHoursTurnIn,
+    actionLabel: "SHOW HIM THE WORK",
+  },
+  // Credits, not Welding XP: the three real welds already paid their own XP
+  // through the ordinary Welding path, and paying a second time for the same
+  // work would be inventing progression the player did not earn.
+  reward: { kind: "credits", amount: 50 },
+  dialogue: {
+    trackedActivityReminderDialogueId: DIALOGUE_IDS.wadeTenThousandHoursPracticeReminder,
+    busyDialogueId: DIALOGUE_IDS.wadeTenThousandHoursBusy,
+    completionPresentationDialogueId: DIALOGUE_IDS.wadeTenThousandHoursCompletion,
+    // One authored refusal for both capacity causes (#190).
+    capacitySlotsDialogueId: DIALOGUE_IDS.wadeTenThousandHoursCapacityRefusal,
+    capacityMassDialogueId: DIALOGUE_IDS.wadeTenThousandHoursCapacityRefusal,
+  },
+  completedNpcDialogue: [
+    { npcId: NPC_IDS.wadeRusk, dialogueId: DIALOGUE_IDS.wadePostTenThousandHours },
+  ],
+};
+
 export const MISSIONS: readonly MissionDefinition[] = [
   WALK_IT_OFF,
   CUT_YOUR_TEETH,
   WASTE_NOT,
   HOLD_IT_TOGETHER,
   KEEP_THE_CHANGE,
+  TEN_THOUSAND_HOURS,
   // The optional branch sits after the main chain: it is never a prerequisite
   // for anything, and completing or ignoring it changes nothing upstream.
   OUT_OF_THE_WEATHER,
