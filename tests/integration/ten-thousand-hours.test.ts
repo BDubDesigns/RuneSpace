@@ -70,22 +70,20 @@ suite("issue #190 10,000 Hours acceptance (real PostgreSQL)", () => {
       { seedLegacyStarterCutter: false },
     );
     await play.getPlayGameplayState(userId, character.id, now, deterministicRandom());
-    await db
-      .insert(rune.characterMissions)
-      .values(
-        [
-          MISSION_IDS.walkItOff,
-          MISSION_IDS.cutYourTeeth,
-          MISSION_IDS.wasteNot,
-          MISSION_IDS.holdItTogether,
-          MISSION_IDS.keepTheChange,
-        ].map((missionId) => ({
-          characterId: character.id,
-          missionId,
-          acceptedAt: now,
-          completedAt: now,
-        })),
-      );
+    await db.insert(rune.characterMissions).values(
+      [
+        MISSION_IDS.walkItOff,
+        MISSION_IDS.cutYourTeeth,
+        MISSION_IDS.wasteNot,
+        MISSION_IDS.holdItTogether,
+        MISSION_IDS.keepTheChange,
+      ].map((missionId) => ({
+        characterId: character.id,
+        missionId,
+        acceptedAt: now,
+        completedAt: now,
+      })),
+    );
     await db
       .update(rune.characters)
       .set({ currentLocationId: LOCATION_IDS.ruskRecovery })
