@@ -26,6 +26,7 @@ import {
 } from "@/server/actions";
 import type { PlayGameplayState } from "@/server/play";
 import { deriveMissionGuidanceTargets } from "@/game/domain/missions";
+import { CleanPassControl } from "@/features/welding/CleanPassControl";
 import { usePlay } from "@/features/play/PlayContext";
 import {
   resolveCargoSelection,
@@ -726,6 +727,8 @@ export function CargoHoldPanel() {
                 label="Current welding pass"
                 value={weldingAttemptProgress}
               />
+              {/* Clean Pass is general Welding, not a Practice feature (#190). */}
+              <CleanPassControl cleanPass={repair.cleanPass} />
             </div>
           ) : null}
         </>

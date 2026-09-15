@@ -33,6 +33,7 @@ function baseState(inventory: PlayGameplayState["inventory"]): PlayGameplayState
     missions: [],
     location: { currentLocationId: "crash_site" },
     repairs: {},
+    workOrders: { revealed: false, requiredWeldingLevel: 5, meetsWeldingLevel: false },
     practice: {
       unlocked: false,
       active: false,

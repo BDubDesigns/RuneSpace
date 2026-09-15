@@ -109,6 +109,14 @@ const balanceSchema = z.object({
   cargoHold: z.object({
     capacitySlots: z.literal(32),
   }),
+  /**
+   * Work Orders (#190). This slice ships none of them: the only authored fact
+   * is the Welding level real client work will require, which the revealed
+   * terminal states plainly instead of leaving the player guessing.
+   */
+  workOrders: z.object({
+    requiredWeldingLevel: z.literal(5),
+  }),
   travel: z.object({
     actionId: z.literal(ACTION_IDS.travel),
     /** Approved initial adjacent walking duration (issue #40): 40 ticks / 24s. */
@@ -268,6 +276,9 @@ const defaults = balanceSchema.parse({
   },
   cargoHold: {
     capacitySlots: 32,
+  },
+  workOrders: {
+    requiredWeldingLevel: 5,
   },
   travel: {
     actionId: ACTION_IDS.travel,

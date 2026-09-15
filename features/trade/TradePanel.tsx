@@ -37,7 +37,8 @@ export function TradePanel({
   localPlaceId,
   merchant,
 }: {
-  localPlaceId: string;
+  /** Absent for a merchant the World Location itself hosts, such as Wade's yard (#190). */
+  localPlaceId?: string;
   merchant: MerchantDefinition;
 }) {
   const {
@@ -92,7 +93,7 @@ export function TradePanel({
         try {
           const result = await tradeWithMerchantAction({
             characterId: state.characterId,
-            localPlaceId,
+            ...(localPlaceId ? { localPlaceId } : {}),
             itemId,
             direction: mode,
             quantity,

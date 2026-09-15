@@ -879,6 +879,24 @@ export function deriveCompletedMissionIds(
   );
 }
 
+/**
+ * The Missions the character has accepted, which stays true once they complete.
+ *
+ * What an accepted Mission opens up — repair work, Wade's Workbench, Wade's
+ * Trade — stays open afterwards, so "accepted" is every state except
+ * not-accepted. Surfaces derive this instead of persisting a second unlock flag
+ * (#190).
+ */
+export function deriveAcceptedMissionIds(
+  projections: readonly { missionId: string; state: MissionState }[],
+): ReadonlySet<string> {
+  return new Set(
+    projections
+      .filter((projection) => projection.state !== "not_accepted")
+      .map((projection) => projection.missionId),
+  );
+}
+
 export function deriveMissionGuidanceTargets(
   projections: readonly MissionProjection[],
 ): MissionGuidanceTargets {

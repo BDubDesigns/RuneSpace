@@ -7,7 +7,7 @@ import {
 } from "@/db/rune-space";
 import { getEffectiveGameBalance } from "@/game/config/balance";
 import { ACTION_IDS, ITEM_IDS } from "@/game/config/foundations";
-import { PRACTICE_WELDING_CONTENT } from "@/game/content/practice-welding";
+import { RUSK_RECOVERY_CONTENT } from "@/game/content/rusk-recovery";
 import { rolledCleanPass } from "@/game/domain/clean-pass";
 import { canBeginPracticeWeld } from "@/game/domain/practice-welding";
 import type { MiningRandom } from "@/game/domain/mining";
@@ -110,7 +110,7 @@ export async function startPracticeWelding(
       }
       if (
         (await currentLocationId(transaction, context.character.id)) !==
-        PRACTICE_WELDING_CONTENT.locationId
+        RUSK_RECOVERY_CONTENT.locationId
       ) {
         return stateWith(transaction, context.character.id, now, "practice_unavailable_here");
       }

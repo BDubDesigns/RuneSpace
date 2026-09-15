@@ -205,7 +205,14 @@ export const AcknowledgeMissionConversationRequestSchema = z.object({
  */
 export const TradeRequestSchema = z.object({
   characterId: z.string().uuid(),
-  localPlaceId: ContentId,
+  /**
+   * The Local Place the player is trading in, when the merchant lives inside
+   * one. Omitted for a merchant the World Location itself hosts (#190) — Wade
+   * trades out of his yard, which is not a room in a town. Either way the
+   * venue is a request, never proof: the server resolves the merchant from the
+   * character's own authoritative position.
+   */
+  localPlaceId: ContentId.optional(),
   itemId: ItemIdSchema,
   direction: z.enum(["buy", "sell"]),
   quantity: z.number().int().positive(),

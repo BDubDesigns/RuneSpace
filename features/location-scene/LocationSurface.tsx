@@ -17,6 +17,8 @@ import { LocalPlaceSurface } from "@/features/local-places/LocalPlaceSurface";
 import { MiningActivity } from "@/features/mining/MiningActivity";
 import { PowerAnnexClaimPanel } from "@/features/power-annex/PowerAnnexClaimPanel";
 import { RefiningConsole } from "@/features/refining/RefiningConsole";
+import { PracticeWeldingPanel } from "@/features/practice/PracticeWeldingPanel";
+import { WorkOrdersTerminal } from "@/features/practice/WorkOrdersTerminal";
 import { usePlay } from "@/features/play/PlayContext";
 import { LocationPopulationPanel } from "./LocationPopulationPanel";
 import { LocationSceneHeader } from "./LocationSceneHeader";
@@ -35,6 +37,21 @@ import { LocationSceneHeader } from "./LocationSceneHeader";
  */
 function localPlaceActivity(localPlaceId: string) {
   return localPlaceId === LOCAL_PLACE_IDS.holoHollowCrewStop ? <CrewStopPanel /> : undefined;
+}
+
+/**
+ * Wade's yard (#190): the Workbench, and the Work Orders terminal that becomes
+ * a real surface once 10,000 Hours is done. Both render nothing at all until
+ * they are genuinely the player's to use — the scene art is the whole of the
+ * place until then.
+ */
+function RuskRecoverySurface() {
+  return (
+    <>
+      <PracticeWeldingPanel />
+      <WorkOrdersTerminal />
+    </>
+  );
 }
 
 export function LocationSurface({
@@ -117,6 +134,8 @@ export function LocationSurface({
               <CargoHoldPanel />
             ) : locationId === LOCATION_IDS.emergencyPowerAnnex ? (
               <PowerAnnexClaimPanel />
+            ) : locationId === LOCATION_IDS.ruskRecovery ? (
+              <RuskRecoverySurface />
             ) : (
               <Feedback tone="muted">No production activity is available here.</Feedback>
             )}

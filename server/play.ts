@@ -120,7 +120,7 @@ import {
   type PersistedPracticeOutcome,
   type PracticeRunState,
 } from "@/server/practice-welding";
-import { PRACTICE_WELDING_CONTENT } from "@/game/content/practice-welding";
+import { RUSK_RECOVERY_CONTENT } from "@/game/content/rusk-recovery";
 import { cleanPassOutcome, cleanPassSection, type CleanPassState } from "@/game/domain/clean-pass";
 import { loadRepairAccess } from "@/server/repair-access";
 import { recordTrackedActivity, type TrackedActivity } from "@/server/mission-progress";
@@ -169,6 +169,21 @@ export type CargoHoldUniqueItemState = {
 export type CleanPassProjection = {
   opportunities: readonly { section: number; outcome: "claimed" | "missed" | null }[];
   sectionsCompleted: number;
+};
+
+/**
+ * The Work Orders terminal at Rusk Recovery (#190).
+ *
+ * Scenery until 10,000 Hours is turned in, and this slice ships zero playable
+ * Work Orders — so the revealed surface is a real but empty one. The reveal is
+ * derived here from the Mission record and the required level is authored
+ * balance, which keeps the surface free of Mission IDs and level literals.
+ */
+export type WorkOrdersProjection = {
+  revealed: boolean;
+  requiredWeldingLevel: number;
+  /** Whether the player meets the level real client work will require. */
+  meetsWeldingLevel: boolean;
 };
 
 /** Repeatable Practice Welding at Wade's Workbench (#190). */
@@ -337,6 +352,8 @@ export type PlayGameplayState = {
   repairs: Readonly<Record<string, RepairProjection>>;
   /** Repeatable Practice Welding state (#190). */
   practice: PracticeProjection;
+  /** The Work Orders terminal's authoritative visibility and state (#190). */
+  workOrders: WorkOrdersProjection;
   cargoHold: CargoHoldState;
   recentResult: { successes: number; failures: number; awardedXp: number };
   refiningRecentResult: { successes: number; failures: number; awardedXp: number };
@@ -882,6 +899,13 @@ export async function stateFromTransaction(
     practiceState.sectionsCompleted,
     practiceActive,
   );
+  const workOrders: WorkOrdersProjection = {
+    revealed: (await loadCompletedMissionIds(transaction, characterId)).has(
+      RUSK_RECOVERY_CONTENT.workOrdersRevealMissionId,
+    ),
+    requiredWeldingLevel: balance.workOrders.requiredWeldingLevel,
+    meetsWeldingLevel: weldingProgress.level >= balance.workOrders.requiredWeldingLevel,
+  };
   const practice: PracticeProjection = {
     unlocked: await loadPracticeUnlocked(transaction, characterId),
     active: practiceActive,
@@ -1142,6 +1166,7 @@ export async function stateFromTransaction(
     refiningRun,
     repairs,
     practice,
+    workOrders,
     practiceError,
     cargoHold: {
       // The Cargo Hold keeps its own presentation identity while reading the

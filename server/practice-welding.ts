@@ -12,7 +12,7 @@ import {
   standardSkillLevelThresholds,
 } from "@/game/config/balance";
 import { ACTION_IDS, ITEM_IDS, SKILL_IDS } from "@/game/config/foundations";
-import { PRACTICE_WELDING_CONTENT } from "@/game/content/practice-welding";
+import { RUSK_RECOVERY_CONTENT } from "@/game/content/rusk-recovery";
 import {
   withOpenCleanPassMissed,
   type CleanPassOutcome,
@@ -126,7 +126,11 @@ export async function loadPracticeUnlocked(
   transaction: DatabaseTransaction,
   characterId: string,
 ): Promise<boolean> {
-  return isMissionAccepted(transaction, characterId, PRACTICE_WELDING_CONTENT.authorizingMissionId);
+  return isMissionAccepted(
+    transaction,
+    characterId,
+    RUSK_RECOVERY_CONTENT.practiceAuthorizingMissionId,
+  );
 }
 
 async function loadPracticeSnapshot(

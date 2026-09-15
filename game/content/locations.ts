@@ -1,4 +1,4 @@
-import { ACTION_IDS, LOCATION_IDS } from "@/game/config/foundations";
+import { ACTION_IDS, LOCATION_IDS, MERCHANT_IDS } from "@/game/config/foundations";
 import {
   assertBidirectionalAdjacency,
   LocationDefinitionSchema,
@@ -192,6 +192,7 @@ const locationDefinitions = [
     region: "holo_hollow" as const,
     adjacentLocationIds: [LOCATION_IDS.holoHollow],
     availableActionIds: [ACTION_IDS.practiceWelding],
+    merchantId: MERCHANT_IDS.wadeRusk,
     dormantActivities: [],
     presentation: {
       mapIconKey: "rusk_recovery" as const,

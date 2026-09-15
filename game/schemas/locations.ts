@@ -26,6 +26,12 @@ export const LocationDefinitionSchema = z
     region: z.enum(["holo_hollow"]),
     adjacentLocationIds: z.array(LocationIdSchema),
     availableActionIds: z.array(z.string()),
+    /**
+     * The merchant this World Location hosts, when it hosts one (#190). The
+     * same relationship a Local Place already authors: the venue names the
+     * merchant, and the merchant owns its own prices and its own unlock.
+     */
+    merchantId: ContentId.optional(),
     dormantActivities: z.array(LocationDormantActivitySchema),
     presentation: z.object({
       mapIconKey: z.enum([
