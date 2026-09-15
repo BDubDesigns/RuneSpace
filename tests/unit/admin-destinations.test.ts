@@ -20,6 +20,7 @@ describe("ADMIN_DESTINATIONS canonical resolution", () => {
         "the_long_scramble",
         "the_jag",
         "holo_hollow",
+        "rusk_recovery",
       ].sort(),
     );
   });

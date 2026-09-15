@@ -62,12 +62,15 @@ export function NpcInteractionPanel({ localPlaceId }: { localPlaceId?: string })
   }, [tradeOpen]);
 
   const locationId = state.location.currentLocationId;
+  const completedMissionIds = deriveCompletedMissionIds(state.missions);
   const activePlace = resolveActiveLocalPlace({
     locationId,
     requestedLocalPlaceId: localPlaceId,
-    completedMissionIds: deriveCompletedMissionIds(state.missions),
+    completedMissionIds,
   });
-  const npc = getResidentNpc({ locationId, localPlaceId: activePlace?.id });
+  // Who is standing here is Mission-derived for an NPC who authored a move
+  // (#190); for everybody else it is the same static placement as before.
+  const npc = getResidentNpc({ locationId, localPlaceId: activePlace?.id, completedMissionIds });
   const placeMerchant = activePlace?.merchantId ? getMerchant(activePlace.merchantId) : undefined;
   const merchant = npc && placeMerchant?.npcId === npc.id ? placeMerchant : undefined;
   const stationary = !state.activeAction && !state.travelState;

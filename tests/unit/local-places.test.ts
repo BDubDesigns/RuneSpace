@@ -55,13 +55,15 @@ describe("issue #159 Holo Hollow world placement", () => {
     expect(axialOf(LOCATION_IDS.holoHollow)).toEqual({ q: -1, r: 1 });
   });
 
-  it("directly connects only to Crash Site, the Power Annex, and The Long Scramble", () => {
+  it("directly connects only to Crash Site, the Power Annex, The Long Scramble, and Rusk Recovery", () => {
     const holoHollow = getLocation(LOCATION_IDS.holoHollow);
     expect([...(holoHollow?.adjacentLocationIds ?? [])].sort()).toEqual(
       [
         LOCATION_IDS.crashSite,
         LOCATION_IDS.emergencyPowerAnnex,
         LOCATION_IDS.theLongScramble,
+        // Wade's yard is one ordinary walking edge off town (#190).
+        LOCATION_IDS.ruskRecovery,
       ].sort(),
     );
     // Deliberately not a universal hub: The Jag stays behind The Long Scramble

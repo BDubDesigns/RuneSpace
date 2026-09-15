@@ -56,6 +56,14 @@ export const CONVERSATION_BACKGROUNDS = [
     asset: "/location-scenes/hh-bnb-interior.webp",
     alt: "Working inn interior with a worn bar, mismatched seating, and tourism-era fittings kept in service",
   },
+  {
+    // Wade's yard has its own approved dialogue art (#190): the 4:1 location
+    // scene is the place, this is the surface a conversation happens against.
+    id: CONVERSATION_BACKGROUND_IDS.ruskRecoveryYard,
+    locationId: LOCATION_IDS.ruskRecovery,
+    asset: "/location-scenes/rusk-recovery-dialogue.webp",
+    alt: "Recovery yard working area with racked salvage, stripped components, and a welding bench",
+  },
 ] as const satisfies readonly ConversationBackgroundDefinition[];
 
 const backgroundById = new Map<string, ConversationBackgroundDefinition>(

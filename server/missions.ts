@@ -27,6 +27,7 @@ import { getNpc } from "@/game/content/npcs";
 import { deriveEquipmentLoadout, isCompatibleEquipmentAssignment } from "@/game/domain/equipment";
 import { type RepairTargetState } from "@/game/domain/welding-repair";
 import {
+  planExactStackAddition,
   planExactStackRemoval,
   planUniqueItemAddition,
   type ExactStackRemovalPlan,
@@ -41,14 +42,30 @@ import {
   type PlayGameplayState,
 } from "@/server/play";
 import { grantCharacterSkillXp } from "@/server/progression";
-import { applyStackRemovalPlan, loadOwnedItemInstances } from "@/server/carried-inventory";
+import {
+  addStackableItem,
+  applyStackRemovalPlan,
+  loadOwnedItemInstances,
+} from "@/server/carried-inventory";
 import { ensureMissionProgressRows, recordMissionConversation } from "@/server/mission-progress";
 import { repairMaterialItemIds, repairTargetObservations } from "@/server/mission-state";
 import { loadRepairTargetStates } from "@/server/welding";
 
 export type MissionAcceptance =
   | { status: "accepted" | "already_accepted" | "already_completed" }
-  | { status: "refused"; message: string };
+  | {
+      status: "refused";
+      message: string;
+      /**
+       * Present only for an acceptance refused because an authored
+       * `stack_item` grant will not fit (#190). It carries the same shape the
+       * turn-in reward refusal already carries, so the conversation surface
+       * presents the mission's authored refusal beat through one path rather
+       * than learning a second one.
+       */
+      reason?: "capacity";
+      capacityReason?: "slots" | "mass";
+    };
 
 /**
  * The outcome of the generic mandatory-conversation command. `acknowledged` and
@@ -180,6 +197,69 @@ async function runMissionCommand<
 }
 
 /**
+ * Preflight one authored `stack_item` acceptance grant against ordinary
+ * carrying capacity (#190).
+ *
+ * All-or-nothing by construction: this reuses the same exact-addition planner
+ * the Power Annex allotment and Trade purchases use, so a grant that does not
+ * wholly fit produces no plan at all rather than a partial one. It locks the
+ * inventory rows it reads, so the plan it returns is still valid for the write
+ * later in the same transaction.
+ */
+async function planAcceptanceItemGrant(
+  transaction: DatabaseTransaction,
+  characterId: string,
+  grant: { itemId: string; quantity: number },
+): Promise<
+  | { ok: true; plan: Parameters<typeof addStackableItem>[1]["plan"] }
+  | { ok: false; reason: "slots" | "mass"; message: string }
+> {
+  const balance = getEffectiveGameBalance();
+  const itemDefinition = getItemDefinition(grant.itemId, balance);
+  if (!itemDefinition || itemDefinition.kind !== "stack") {
+    throw new Error(`Mission acceptance grant references a non-stackable item "${grant.itemId}"`);
+  }
+  const [stacks, itemState, assignments] = await Promise.all([
+    transaction
+      .select()
+      .from(inventoryStacks)
+      .where(eq(inventoryStacks.characterId, characterId))
+      .for("update"),
+    loadOwnedItemInstances(transaction, characterId),
+    transaction
+      .select()
+      .from(equippedItems)
+      .where(eq(equippedItems.characterId, characterId))
+      .for("update"),
+  ]);
+  const loadout = deriveEquipmentLoadout({
+    assignments,
+    instances: itemState.carriedInstances,
+    stacks,
+    balance,
+  });
+  const plan = planExactStackAddition(
+    stacks,
+    grant.itemId,
+    grant.quantity,
+    itemDefinition.stackLimit,
+    Math.max(0, loadout.containerSlotCapacity - loadout.inventorySlotsUsed),
+    Math.max(0, loadout.maximumCarryCapacityGrams - loadout.carriedMassGrams),
+    itemDefinition.massGrams,
+  );
+  if (plan.ok) return { ok: true, plan: plan.plan };
+  const itemName = resolveItemPresentation(grant.itemId, grant.itemId).displayName;
+  return {
+    ok: false,
+    reason: plan.reason,
+    message:
+      plan.reason === "mass"
+        ? `All ${grant.quantity} ${itemName} will not fit within your carried-mass capacity. Free capacity and try again.`
+        : `All ${grant.quantity} ${itemName} will not fit in your available inventory slots. Free capacity and try again.`,
+  };
+}
+
+/**
  * Generic mission acceptance. The browser supplies only narrow command
  * identity/intent (character, mission, NPC); every rule is revalidated
  * server-side inside the character lock from the authored definition:
@@ -241,6 +321,24 @@ export async function acceptMission(
         });
       }
 
+      // An authored item grant is preflighted BEFORE anything is written, so a
+      // player without room for the whole grant leaves with no items, no
+      // partial stack, and no accepted Mission — only the authored refusal.
+      // Making room and coming back runs this same path again from a clean
+      // state (#190).
+      const itemGrant =
+        offer.acceptEffect?.kind === "stack_item"
+          ? await planAcceptanceItemGrant(transaction, context.character.id, offer.acceptEffect)
+          : undefined;
+      if (itemGrant && !itemGrant.ok) {
+        return stateFor({
+          status: "refused",
+          reason: "capacity",
+          capacityReason: itemGrant.reason,
+          message: itemGrant.message,
+        });
+      }
+
       await transaction
         .insert(characterMissions)
         .values({
@@ -257,11 +355,20 @@ export async function acceptMission(
       // concurrent request, which blocks on that same lock and then sees the
       // accepted row. The balance is incremented in SQL rather than from a
       // read value, so no in-memory total can go stale.
-      if (offer.acceptEffect) {
+      if (offer.acceptEffect?.kind === "credits") {
         await transaction
           .update(characters)
           .set({ credits: sql`${characters.credits} + ${offer.acceptEffect.amount}` })
           .where(eq(characters.id, context.character.id));
+      } else if (itemGrant?.ok) {
+        // The same inventory rows were locked FOR UPDATE by the preflight
+        // inside this transaction, so the plan it produced still describes the
+        // inventory this write lands on.
+        await addStackableItem(transaction, {
+          characterId: context.character.id,
+          plan: itemGrant.plan,
+          now,
+        });
       }
       return stateFor({ status: "accepted" });
     },
@@ -707,6 +814,17 @@ async function completeMissionForDefinition(input: {
     const instance = created[0];
     if (!instance) throw new Error(`${definition.id} item reward was not created`);
     rewardInfo = { itemId: definition.reward.itemId, quantity: 1, itemInstanceId: instance.id };
+  } else if (definition.reward.kind === "credits") {
+    // Paid by the same transaction that stamps the mission complete, below.
+    // The stamp is guarded by `completedAt IS NULL`, and this command already
+    // returned `already_completed` for a mission that holds one, so the payout
+    // is exactly-once under retries and concurrency without a second mechanism.
+    // The balance is incremented in SQL rather than from a read value, so no
+    // in-memory total can go stale (#190).
+    await transaction
+      .update(characters)
+      .set({ credits: sql`${characters.credits} + ${definition.reward.amount}` })
+      .where(eq(characters.id, context.character.id));
   } else {
     const thresholds = skillLevelThresholds(definition.reward.skillId);
     if (!thresholds) {

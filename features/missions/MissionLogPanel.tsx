@@ -137,7 +137,9 @@ function MissionEntry({
               Reward earned:{" "}
               {mission.earnedReward.kind === "item"
                 ? mission.earnedReward.itemName
-                : `+${mission.earnedReward.amount} ${mission.earnedReward.skillName} XP`}
+                : mission.earnedReward.kind === "credits"
+                  ? `+${mission.earnedReward.amount} Credits`
+                  : `+${mission.earnedReward.amount} ${mission.earnedReward.skillName} XP`}
             </p>
           ) : null}
         </div>

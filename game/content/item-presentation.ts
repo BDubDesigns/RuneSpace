@@ -44,6 +44,12 @@ const itemPresentations = {
     textFallback: "RF",
     artworkSrc: "/item-art/refined-ferrite.webp",
   },
+  [ITEM_IDS.scrapMetal]: {
+    displayName: "Scrap Metal",
+    accessibleDescription: "Cut-down piece of salvaged scrap metal kept for welding practice",
+    textFallback: "SM",
+    artworkSrc: "/item-art/scrap-metal.webp",
+  },
   [ITEM_IDS.slag]: {
     displayName: "Slag",
     accessibleDescription: "Vesicular slag byproduct from the refining process",

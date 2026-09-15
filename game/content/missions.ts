@@ -18,32 +18,47 @@ import {
 } from "@/game/config/foundations";
 
 /**
- * The two real completion reward shapes proven by production content. A
- * mission grants at most one reward: an inventory item (Walk It Off) or skill
- * XP through the authoritative progression boundary (Cut Your Teeth).
- * Deliberately narrow — no credits, reputation, bundles, or effect lists.
+ * The real completion reward shapes proven by production content. A mission
+ * grants at most one reward: an inventory item (Walk It Off), skill XP through
+ * the authoritative progression boundary (Cut Your Teeth), or Credits
+ * (10,000 Hours). Deliberately narrow — no reputation, bundles, or effect
+ * lists.
  *
  * Item rewards are granted as ONE new unique item instance (the generic
  * completion boundary's sole item execution path); registry validation
  * rejects stackable item rewards until a real mission earns that path.
+ *
+ * Credits are paid by the same exactly-once completion transaction that stamps
+ * the mission complete, so Wade's fifty for a first day of shop time is never
+ * granted by NPC-specific code and never granted twice (#190).
  */
 export type MissionReward =
   | { kind: "item"; itemId: ItemId }
-  | { kind: "skill_xp"; skillId: SkillId; amount: number };
+  | { kind: "skill_xp"; skillId: SkillId; amount: number }
+  | { kind: "credits"; amount: number };
 
 /**
  * An authored effect applied when one offer route's acceptance commits.
  *
- * This is an up-front job budget, not a reward: Keep the Change hands the
- * player Wade's Credits at acceptance so they can go buy what the job needs.
- * It is applied inside the generic acceptance transaction, in the branch that
- * has already proven this is a genuinely fresh acceptance, so the existing
+ * This is what the person offering the job hands over so the work can start,
+ * not a reward for finishing it: Keep the Change hands the player Wade's
+ * Credits so they can go buy what the job needs, and 10,000 Hours hands them
+ * the six pieces of Scrap his first three practice welds will consume. It is
+ * applied inside the generic acceptance transaction, in the branch that has
+ * already proven this is a genuinely fresh acceptance, so the existing
  * acceptance guard makes it exactly-once without a second mechanism.
  *
- * Deliberately narrow: one closed shape, authored per offer route, never a
- * generic effect list.
+ * A `stack_item` grant is all-or-nothing against ordinary carrying capacity:
+ * the acceptance is preflighted before anything is written, so a player without
+ * room for the whole grant gets no items, no partial stack, and no accepted
+ * Mission — just the authored refusal and an open invitation to come back.
+ *
+ * Deliberately narrow: two closed shapes, authored per offer route, never a
+ * generic effect list or a scripting language.
  */
-export type MissionAcceptEffect = { kind: "credits"; amount: number };
+export type MissionAcceptEffect =
+  | { kind: "credits"; amount: number }
+  | { kind: "stack_item"; itemId: ItemId; quantity: number };
 
 /**
  * Explicit turn-in disposition for a carried-stack requirement. Requirement
@@ -275,7 +290,12 @@ export type MissionDialogue = {
    * success (item / skill-XP beats). Never mutates state.
    */
   completionPresentationDialogueId?: DialogueId;
-  /** Item-reward capacity refusal branches. */
+  /**
+   * Capacity refusal branches, for a grant that will not fit: an item reward at
+   * the turn-in, or an authored `stack_item` acceptance effect at the offer
+   * (#190). A mission may point both at one shared sequence when the person
+   * refusing has nothing different to say about slots than about mass.
+   */
   capacitySlotsDialogueId?: DialogueId;
   capacityMassDialogueId?: DialogueId;
 };
