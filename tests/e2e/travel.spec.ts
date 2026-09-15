@@ -144,30 +144,28 @@ async function expectPowerAnnexRewardLayout(
   const leftBox = await left.boundingBox();
   expect(tileBox).not.toBeNull();
   expect(leftBox).not.toBeNull();
+  // The tile is the whole left column: since #193 the claim leads the panel
+  // rather than sitting under the artwork, so what is left beside the
+  // allotment's detail is the Power Cell itself.
+  expect(Math.abs((leftBox?.height ?? 0) - (tileBox?.height ?? 0))).toBeLessThanOrEqual(2);
+  await expect(left.getByRole("button")).toHaveCount(0);
 
+  const claim = page.getByRole("button", { name: "Claim Power Cells" });
   if (claimed) {
-    await expect(left.getByRole("button")).toHaveCount(0);
-    expect(Math.abs((leftBox?.height ?? 0) - (tileBox?.height ?? 0))).toBeLessThanOrEqual(2);
+    await expect(claim).toHaveCount(0);
   } else {
-    const claimButton = left.getByRole("button", { name: "Claim Power Cells" });
-    const buttonBox = await claimButton.boundingBox();
-    expect(buttonBox).not.toBeNull();
-    const tileCenter = (tileBox?.x ?? 0) + (tileBox?.width ?? 0) / 2;
-    const buttonCenter = (buttonBox?.x ?? 0) + (buttonBox?.width ?? 0) / 2;
-    expect(Math.abs(tileCenter - buttonCenter)).toBeLessThanOrEqual(2);
+    // The claim is the activity's primary control, so it is above everything
+    // that describes it.
+    const claimBox = (await claim.boundingBox())!;
+    expect(claimBox.y + claimBox.height).toBeLessThanOrEqual((tileBox?.y ?? 0) + 1);
   }
 
+  // The allotment's detail stays vertically centred against the artwork.
   const infoBox = await page.locator("[data-power-annex-reward-info]").boundingBox();
   expect(infoBox).not.toBeNull();
-  const buttonBox = claimed
-    ? undefined
-    : await left.getByRole("button", { name: "Claim Power Cells" }).boundingBox();
-  const combinedBottom = claimed
-    ? (tileBox?.y ?? 0) + (tileBox?.height ?? 0)
-    : (buttonBox?.y ?? 0) + (buttonBox?.height ?? 0);
-  const combinedCenter = ((tileBox?.y ?? 0) + combinedBottom) / 2;
+  const tileCenter = (tileBox?.y ?? 0) + (tileBox?.height ?? 0) / 2;
   const infoCenter = (infoBox?.y ?? 0) + (infoBox?.height ?? 0) / 2;
-  expect(Math.abs(combinedCenter - infoCenter)).toBeLessThanOrEqual(4);
+  expect(Math.abs(tileCenter - infoCenter)).toBeLessThanOrEqual(4);
 }
 
 async function expectNoMiningDashboards(page: import("@playwright/test").Page) {

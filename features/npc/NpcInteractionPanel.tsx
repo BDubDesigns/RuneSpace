@@ -98,7 +98,17 @@ export function NpcInteractionPanel({
   const guidanceValue = npc
     ? npcGuidanceMeaning(deriveMissionGuidanceTargets(state.missions), npc.id)
     : undefined;
-  if (!npc || (entries.length === 0 && !merchant)) return null;
+  // Nobody to talk to here. The place's own context still has to render: the
+  // Long Scramble and the Processing Yard have no resident, and who else is
+  // standing there is the place's information, not the resident's. It renders
+  // bare rather than in an empty contact row.
+  if (!npc || (entries.length === 0 && !merchant)) {
+    return meta ? (
+      <div className={className.trim()} data-place-meta>
+        {meta}
+      </div>
+    ) : null;
+  }
   // The Talk control reads as a turn-in exactly when one of the currently
   // available conversations drives a completion command right now.
   const turnInAvailable =

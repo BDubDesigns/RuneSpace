@@ -272,7 +272,10 @@ test("owned character can start, observe, stop, and restore Ferrite Mining at Th
   await expect(page.getByRole("button", { name: "Stop Mining" })).toBeVisible();
   await expect(page.getByText("Mining stopped.")).toBeHidden();
   await expect(page.getByText("0 attempts", { exact: true })).toBeVisible();
-  await expect(history).toContainText("No resolved attempts in this run yet.");
+  // A run with nothing resolved in it has nothing to disclose, so it offers no
+  // History control at all rather than an empty list behind one (#193).
+  await expect(page.getByRole("button", { name: "History", exact: true })).toHaveCount(0);
+  await expect(history).toHaveCount(0);
   const oneAttemptAgo = new Date(Date.now() - 6_100);
   await db
     .update(activeActions)
@@ -466,11 +469,12 @@ test("shell reserves the fixed footer once and keeps the global background fixed
       yardGeometry.expectedClearance - yardGeometry.expectedBoxHeight - yardGeometry.expectedGap,
     ),
   ).toBeLessThanOrEqual(2);
-  // The Yard hosts the full Refining activity stack, so it scrolls like the
-  // Crash Site. The real layout contract is enforced below: the bottom nav
-  // stays fixed with the shared space-3 gap, and the global background stays
-  // fixed.
-  expect(yardGeometry.scrollHeight - yardGeometry.clientHeight).toBeGreaterThan(10);
+  // The Yard used to be assumed taller than the viewport; since #193 compacted
+  // the Refining stack it very nearly fits one. The footer contract does not
+  // depend on that either way — what follows scrolls to the end of whatever
+  // the document is and checks the nav stays fixed with the shared space-3
+  // gap, and the global background stays fixed.
+  expect(yardGeometry.scrollHeight).toBeGreaterThanOrEqual(yardGeometry.clientHeight);
   await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
   const yardBottomGeometry = await page.evaluate(() => {
     const content = document.querySelector("main");
