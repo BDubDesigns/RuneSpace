@@ -11,7 +11,9 @@ import { LocationSurface } from "@/features/location-scene/LocationSurface";
 import { InventoryEquipmentPanel } from "@/features/inventory/InventoryEquipmentPanel";
 import { MissionLogPanel } from "@/features/missions/MissionLogPanel";
 import { MissionGuidanceStrips } from "@/features/missions/MissionGuidanceStrips";
-import { NpcInteractionPanel } from "@/features/npc/NpcInteractionPanel";
+import { PracticeRunPanel } from "@/features/practice/PracticeRunPanel";
+import { PracticeWeldingPanel } from "@/features/practice/PracticeWeldingPanel";
+import { WorkOrdersTerminal } from "@/features/practice/WorkOrdersTerminal";
 import { JourneyPanel } from "@/features/travel/JourneyPanel";
 import { LocalMapPanel } from "@/features/travel/LocalMapPanel";
 import { ScavengeRevealOverlay } from "@/features/travel/ScavengeRevealOverlay";
@@ -63,6 +65,12 @@ export function PlayConsole({
   const showMiningActivity = stationaryPrimary && currentLocationId === LOCATION_IDS.theJag;
   const showRefiningActivity =
     stationaryPrimary && currentLocationId === LOCATION_IDS.abandonedProcessingYard;
+  // Wade's yard composes as siblings of the location panel rather than inside
+  // it (#190): the Workbench, Welding progression, the run history, and the
+  // Work Orders terminal are each their own panel, and each decides for itself
+  // whether it has anything to show yet.
+  const showRuskRecoveryActivity =
+    stationaryPrimary && currentLocationId === LOCATION_IDS.ruskRecovery;
   const [, startTransition] = useTransition();
 
   function applyReconciliation(result: Awaited<ReturnType<typeof refreshPlayAction>>) {
@@ -108,10 +116,24 @@ export function PlayConsole({
 
       {surface === "primary" ? (
         <>
-          {!inTransit ? (
-            // Keyed by the requested place so a contact's opened Trade surface
-            // never survives leaving the place and reappears on return.
-            <NpcInteractionPanel key={localPlaceId ?? ""} localPlaceId={localPlaceId} />
+          {showRuskRecoveryActivity ? (
+            <>
+              <PracticeWeldingPanel />
+              {state.practice.unlocked ? (
+                <>
+                  <SkillProgressCard
+                    level={state.welding.level}
+                    title="Welding progression"
+                    tone="welding"
+                    totalXp={state.welding.totalXp}
+                    xpIntoLevel={state.welding.xpIntoLevel}
+                    xpToNextLevel={state.welding.xpToNextLevel}
+                  />
+                  <PracticeRunPanel run={state.practice.run} />
+                </>
+              ) : null}
+              <WorkOrdersTerminal />
+            </>
           ) : null}
           {showMiningActivity || showRefiningActivity ? (
             <>

@@ -56,12 +56,13 @@ describe("five-cell flat-top local map layout (issue #83)", () => {
   it("derives one route per undirected registry edge and animates both directions", () => {
     const geometry = buildLocalMapGeometry();
     // Holo Hollow (#159) adds three edges: Crash Site, Power Annex, Long Scramble.
-    // The authored Crew Hauler route (#172) contributes in-transit geometry but
-    // deliberately no walkable edge, so `undirectedRoutes` is unchanged while
-    // `routeSegments` gains exactly one entry: the route is one-way, and there
-    // is no ride back to draw.
-    expect(geometry.undirectedRoutes).toHaveLength(8);
-    expect(Object.keys(geometry.routeSegments)).toHaveLength(17);
+    // Rusk Recovery (#190) adds exactly one more: the reciprocal Holo Hollow
+    // walk. The authored Crew Hauler route (#172) contributes in-transit
+    // geometry but deliberately no walkable edge, so it adds nothing to
+    // `undirectedRoutes` while `routeSegments` gains exactly one entry: the
+    // route is one-way, and there is no ride back to draw.
+    expect(geometry.undirectedRoutes).toHaveLength(9);
+    expect(Object.keys(geometry.routeSegments)).toHaveLength(19);
     expect(
       geometry.undirectedRoutes.every(
         (route) =>

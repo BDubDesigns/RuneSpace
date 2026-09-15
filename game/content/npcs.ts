@@ -3,11 +3,13 @@ import {
   EXPRESSION_IDS,
   LOCAL_PLACE_IDS,
   LOCATION_IDS,
+  MISSION_IDS,
   NPC_IDS,
   type ConversationBackgroundId,
   type ExpressionId,
   type LocalPlaceId,
   type LocationId,
+  type MissionId,
   type NpcId,
 } from "@/game/config/foundations";
 
@@ -25,6 +27,29 @@ export type NpcDefinition = {
    * share one World Location without a multi-NPC interaction system.
    */
   localPlaceId?: LocalPlaceId;
+  /**
+   * Authored, Mission-derived placement (#190).
+   *
+   * Wade is at the Crash Site until Keep the Change completes and at his own
+   * yard afterwards. That is one NPC in two places over time, derived from the
+   * Mission record that already decides it — never a second "shop Wade", and
+   * never a persisted relocation flag that could disagree with the Mission.
+   *
+   * Deliberately one authored move per NPC, in completion order. This is not an
+   * NPC schedule or movement engine: a future story beat that moves somebody
+   * again earns its own explicit entry.
+   */
+  relocation?: {
+    afterCompletedMissionId: MissionId;
+    homeLocationId: LocationId;
+    localPlaceId?: LocalPlaceId;
+    /**
+     * The venue a present-tense local conversation with this person plays
+     * against once they have moved. Authored scenes keep their own authored
+     * backgrounds; only a sequence marked `presentsAtCurrentVenue` reads this.
+     */
+    conversationBackgroundId?: ConversationBackgroundId;
+  };
   /** Present once the NPC has authored conversation content. */
   conversationBackgroundId?: ConversationBackgroundId;
   /** Expression art is content-selected per authored beat, never inferred from text. */
@@ -38,6 +63,14 @@ export const NPCS: readonly NpcDefinition[] = [
     displayName: "Wade Rusk",
     role: "Holo Hollow recovery & salvage operator",
     homeLocationId: LOCATION_IDS.crashSite,
+    // Wade has a business to run; he was only ever at the wreck because
+    // somebody had to be. Once Keep the Change is done he is back at Rusk
+    // Recovery and no longer at the Crash Site (#190).
+    relocation: {
+      afterCompletedMissionId: MISSION_IDS.keepTheChange,
+      homeLocationId: LOCATION_IDS.ruskRecovery,
+      conversationBackgroundId: CONVERSATION_BACKGROUND_IDS.ruskRecoveryYard,
+    },
     conversationBackgroundId: CONVERSATION_BACKGROUND_IDS.crashSiteExterior,
     expressionAssets: {
       [EXPRESSION_IDS.neutral]: "/npc-art/wade-neutral.png",
@@ -108,6 +141,45 @@ export function getNpc(npcId: string): NpcDefinition | undefined {
   return npcById.get(npcId);
 }
 
+/** Where one NPC is right now, given the character's completed Missions (#190). */
+export function resolveNpcPlacement(
+  npc: NpcDefinition,
+  completedMissionIds: ReadonlySet<string> = new Set(),
+): { locationId: LocationId; localPlaceId?: LocalPlaceId } {
+  const relocation = npc.relocation;
+  if (relocation && completedMissionIds.has(relocation.afterCompletedMissionId)) {
+    return {
+      locationId: relocation.homeLocationId,
+      ...(relocation.localPlaceId ? { localPlaceId: relocation.localPlaceId } : {}),
+    };
+  }
+  return {
+    locationId: npc.homeLocationId,
+    ...(npc.localPlaceId ? { localPlaceId: npc.localPlaceId } : {}),
+  };
+}
+
+/**
+ * The background a present-tense local conversation with one NPC plays against.
+ *
+ * Only sequences authored as `presentsAtCurrentVenue` — replayable topics and
+ * post-Mission follow-ups — consult this, and it is derived from the same
+ * completed-Mission set that decides where the person is standing, so there is
+ * no second source of truth and nothing new is persisted. An NPC who has not
+ * moved resolves the background they were already authored against, which is
+ * why this changes nothing for everybody else.
+ */
+export function resolveNpcVenueBackgroundId(
+  npc: NpcDefinition,
+  completedMissionIds: ReadonlySet<string> = new Set(),
+): ConversationBackgroundId | undefined {
+  const relocation = npc.relocation;
+  if (relocation && completedMissionIds.has(relocation.afterCompletedMissionId)) {
+    return relocation.conversationBackgroundId ?? npc.conversationBackgroundId;
+  }
+  return npc.conversationBackgroundId;
+}
+
 /**
  * Resolve the persistent resident for a spatial context.
  *
@@ -117,16 +189,26 @@ export function getNpc(npcId: string): NpcDefinition | undefined {
  * resident instead, which is how Bix and Renn occupy one shared World Location
  * without either being exposed merely for standing in town.
  *
+ * Placement is resolved per NPC through `resolveNpcPlacement`, so an authored
+ * Mission-derived move is simply where that person is now. The caller supplies
+ * the character's completed Missions; omitting them resolves the pre-story
+ * placement, which is the correct answer for a character who has completed
+ * nothing.
+ *
  * This is deliberately still a single-resident lookup: nothing here returns or
  * presents multiple simultaneously talkable NPCs.
  */
 export function getResidentNpc(input: {
   locationId: string;
   localPlaceId?: string;
+  completedMissionIds?: ReadonlySet<string>;
 }): NpcDefinition | undefined {
-  return NPCS.find(
-    (npc) => npc.homeLocationId === input.locationId && npc.localPlaceId === input.localPlaceId,
-  );
+  return NPCS.find((npc) => {
+    const placement = resolveNpcPlacement(npc, input.completedMissionIds);
+    return (
+      placement.locationId === input.locationId && placement.localPlaceId === input.localPlaceId
+    );
+  });
 }
 
 export function resolveNpcExpression(npcId: string, expressionId: string): string | undefined {

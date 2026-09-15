@@ -23,7 +23,13 @@ import {
   type PlayGameplayState,
 } from "@/server/play";
 import { loadRepairAccess } from "@/server/repair-access";
-import { ensureRepairTargetState, loadRepairTargetRow, repairStateFromRow } from "@/server/welding";
+import {
+  ensureRepairCleanPassRoll,
+  ensureRepairTargetState,
+  loadRepairTargetRow,
+  missOpenRepairCleanPass,
+  repairStateFromRow,
+} from "@/server/welding";
 
 export type RepairMaterialContributionRequest = {
   targetId: RepairTargetId;
@@ -346,6 +352,14 @@ export async function startWelding(
       }
       // The Welding resolver requires the row, so it exists before the action.
       await ensureRepairTargetState(transaction, context.character.id, targetId);
+      // This repair's two Clean Pass opportunities are rolled the first time
+      // anybody welds on it, and never again (#190).
+      await ensureRepairCleanPassRoll(transaction, {
+        characterId: context.character.id,
+        targetId,
+        random,
+        now,
+      });
       await transaction.insert(activeActions).values({
         characterId: context.character.id,
         actionId: target.actionId,
@@ -374,6 +388,13 @@ export async function stopWelding(
       await ensurePlayProvisioning(transaction, context.character.id);
       const target = getRepairTargetBalance(targetId);
       if (context.action?.actionId === target.actionId) {
+        // An open Clean Pass window is spent by stopping, so resuming this same
+        // repair later cannot resurrect it (#190).
+        await missOpenRepairCleanPass(transaction, {
+          characterId: context.character.id,
+          targetId,
+          now,
+        });
         await transaction
           .delete(activeActions)
           .where(eq(activeActions.characterId, context.character.id));

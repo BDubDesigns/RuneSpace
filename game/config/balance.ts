@@ -50,6 +50,41 @@ const balanceSchema = z.object({
     skillId: z.literal(SKILL_IDS.welding),
     attemptDurationTicks: z.literal(5),
     xpPerIncrement: z.literal(50),
+    /**
+     * Clean Pass (#190) is a general Welding mechanic, not a Practice feature:
+     * every current Welding work unit — Practice welds and both authored
+     * repairs — rolls exactly two optional opportunity sections once.
+     *
+     * The first is `first` sections in; the second is that many sections later
+     * again, so the pair lands at 2-4 and 4-8. The two-section minimum spacing
+     * is what stops a claimed first opportunity from stepping over the second.
+     * The window is deliberately not a value of its own: an opportunity lasts
+     * exactly one ordinary Welding section.
+     */
+    cleanPass: z.object({
+      firstOpportunityMinSection: z.literal(2),
+      firstOpportunityMaxSection: z.literal(4),
+      secondOpportunityMinOffset: z.literal(2),
+      secondOpportunityMaxOffset: z.literal(4),
+      /** Server-only network grace; the client-visible window stays one section. */
+      claimGraceMs: z.literal(1_000),
+    }),
+  }),
+  /**
+   * Repeatable Welding practice at Wade's Workbench (#190).
+   *
+   * Practice is genuine Welding — same skill, same section cadence, same Clean
+   * Pass — at a reduced XP share, because nothing is actually being repaired.
+   * The share is the balance rule; the per-section value is derived from it and
+   * from the global Welding XP, never frozen as a second constant.
+   */
+  practiceWelding: z.object({
+    actionId: z.literal(ACTION_IDS.practiceWelding),
+    skillId: z.literal(SKILL_IDS.welding),
+    sectionsPerWeld: z.literal(10),
+    scrapPerWeld: z.literal(2),
+    slagPerWeld: z.literal(2),
+    xpShareBps: z.literal(2_000),
   }),
   /**
    * Per-repair-target recipes. Each target owns its own material requirement
@@ -73,6 +108,14 @@ const balanceSchema = z.object({
   }),
   cargoHold: z.object({
     capacitySlots: z.literal(32),
+  }),
+  /**
+   * Work Orders (#190). This slice ships none of them: the only authored fact
+   * is the Welding level real client work will require, which the revealed
+   * terminal states plainly instead of leaving the player guessing.
+   */
+  workOrders: z.object({
+    requiredWeldingLevel: z.literal(5),
   }),
   travel: z.object({
     actionId: z.literal(ACTION_IDS.travel),
@@ -109,6 +152,16 @@ const balanceSchema = z.object({
       itemId: z.literal(ITEM_IDS.slag),
       massGrams: z.literal(150),
       stackLimit: z.literal(10),
+    }),
+    /**
+     * Practice stock (#190). Fungible but non-stacking: `stackLimit: 1` is the
+     * authored fact that makes one piece occupy one ordinary inventory slot, so
+     * six of them is a real carrying decision rather than a rounding error.
+     */
+    scrapMetal: z.object({
+      itemId: z.literal(ITEM_IDS.scrapMetal),
+      massGrams: z.literal(300),
+      stackLimit: z.literal(1),
     }),
     salvageCutter: z.object({
       itemId: z.literal(ITEM_IDS.salvageCutter),
@@ -189,6 +242,21 @@ const defaults = balanceSchema.parse({
     skillId: SKILL_IDS.welding,
     attemptDurationTicks: 5,
     xpPerIncrement: 50,
+    cleanPass: {
+      firstOpportunityMinSection: 2,
+      firstOpportunityMaxSection: 4,
+      secondOpportunityMinOffset: 2,
+      secondOpportunityMaxOffset: 4,
+      claimGraceMs: 1_000,
+    },
+  },
+  practiceWelding: {
+    actionId: ACTION_IDS.practiceWelding,
+    skillId: SKILL_IDS.welding,
+    sectionsPerWeld: 10,
+    scrapPerWeld: 2,
+    slagPerWeld: 2,
+    xpShareBps: 2_000,
   },
   repairTargets: {
     cargoHold: {
@@ -209,6 +277,9 @@ const defaults = balanceSchema.parse({
   cargoHold: {
     capacitySlots: 32,
   },
+  workOrders: {
+    requiredWeldingLevel: 5,
+  },
   travel: {
     actionId: ACTION_IDS.travel,
     adjacentWalkDurationTicks: 40,
@@ -224,6 +295,7 @@ const defaults = balanceSchema.parse({
     ferriteShale: { itemId: ITEM_IDS.ferriteShale, massGrams: 100, stackLimit: 10 },
     refinedFerrite: { itemId: ITEM_IDS.refinedFerrite, massGrams: 150, stackLimit: 5 },
     slag: { itemId: ITEM_IDS.slag, massGrams: 150, stackLimit: 10 },
+    scrapMetal: { itemId: ITEM_IDS.scrapMetal, massGrams: 300, stackLimit: 1 },
     salvageCutter: {
       itemId: ITEM_IDS.salvageCutter,
       massGrams: 5_000,
@@ -280,6 +352,21 @@ export function repairTargetForActionId(
   balance = getEffectiveGameBalance(),
 ): RepairTargetId | undefined {
   return repairTargetBalances(balance).find((target) => target.actionId === actionId)?.targetId;
+}
+
+/**
+ * The XP one completed Practice Welding section awards.
+ *
+ * Derived from the global Welding XP and the authored Practice share, so the
+ * balance rule stays a share of normal rather than a second frozen constant
+ * that could silently drift from the Welding value it is a share of (#190).
+ *
+ * The share is 20% — 10 XP of the global 50 — after the #191 playtest pass.
+ * Practice is the only thing it reduces: authored repairs, and the Work Orders
+ * to come, pay full Welding XP per increment.
+ */
+export function practiceSectionXp(balance = getEffectiveGameBalance()): number {
+  return Math.floor((balance.welding.xpPerIncrement * balance.practiceWelding.xpShareBps) / 10_000);
 }
 
 /** Every welding action ID the repair-target registry authorizes. */

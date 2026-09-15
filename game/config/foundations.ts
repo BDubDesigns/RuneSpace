@@ -22,6 +22,9 @@ const itemIds = {
   salvageCutter: asContentId("salvage_cutter"),
   powerCell: asContentId("power_cell"),
   mykeaSchleppraum8: asContentId("mykea_schleppraum_8"),
+  // Practice Welding stock (#190). Fungible but non-stacking: one piece per
+  // inventory slot, so six of them is a real carrying decision.
+  scrapMetal: asContentId("scrap_metal"),
 } as const satisfies Record<string, ContentId>;
 
 const npcIds = {
@@ -41,6 +44,7 @@ const missionIds = {
   holdItTogether: asContentId("hold_it_together"),
   keepTheChange: asContentId("keep_the_change"),
   outOfTheWeather: asContentId("out_of_the_weather"),
+  tenThousandHours: asContentId("ten_thousand_hours"),
 } as const satisfies Record<string, ContentId>;
 
 const dialogueIds = {
@@ -105,6 +109,22 @@ const dialogueIds = {
   rennOutOfTheWeatherTurnIn: asContentId("renn_calder_out_of_the_weather_turn_in"),
   rennOutOfTheWeatherCompletion: asContentId("renn_calder_out_of_the_weather_completion"),
   rennPostOutOfTheWeather: asContentId("renn_calder_post_out_of_the_weather"),
+  // 10,000 Hours (#190): Wade's own shop, his own apprentice, his own Scrap.
+  // Tansy's Keep the Change completion beat hands the player off over comms;
+  // the Mission itself is offered and turned in by Wade at Rusk Recovery.
+  wadeTenThousandHoursOffer: asContentId("wade_rusk_ten_thousand_hours_offer"),
+  wadeTenThousandHoursAccepted: asContentId("wade_rusk_ten_thousand_hours_accepted"),
+  // One shared "make room and come back" refusal: both capacity causes present
+  // the same beat, because Wade has nothing different to say about slots than
+  // about mass (#190).
+  wadeTenThousandHoursCapacityRefusal: asContentId("wade_rusk_ten_thousand_hours_capacity_refusal"),
+  wadeTenThousandHoursPracticeReminder: asContentId(
+    "wade_rusk_ten_thousand_hours_practice_reminder",
+  ),
+  wadeTenThousandHoursBusy: asContentId("wade_rusk_ten_thousand_hours_busy"),
+  wadeTenThousandHoursTurnIn: asContentId("wade_rusk_ten_thousand_hours_turn_in"),
+  wadeTenThousandHoursCompletion: asContentId("wade_rusk_ten_thousand_hours_completion"),
+  wadePostTenThousandHours: asContentId("wade_rusk_post_ten_thousand_hours"),
   // Replayable social/worldbuilding topics (#164). These are ordinary NPC
   // conversations: they never carry a Mission action and never gate progression.
   wadeRecoveryWorkTopic: asContentId("wade_rusk_topic_recovery_work"),
@@ -165,6 +185,9 @@ const conversationBackgroundIds = {
   holoHollowSouvenirsInterior: asContentId("holo_hollow_souvenirs_interior"),
   holoHollowAssistanceCenterInterior: asContentId("holo_hollow_assistance_center_interior"),
   hhBnbInterior: asContentId("hh_bnb_interior"),
+  // Wade's own yard (#190). Dedicated approved dialogue art rather than the
+  // reused 4:1 location scene.
+  ruskRecoveryYard: asContentId("rusk_recovery_yard"),
 } as const satisfies Record<string, ContentId>;
 
 export const ACTION_IDS = {
@@ -175,6 +198,10 @@ export const ACTION_IDS = {
   // by its own action ID because `active_actions` deliberately carries no
   // per-action payload (#172).
   crewStopWelding: asContentId("crew_stop_welding"),
+  // Repeatable Welding practice at Wade's Workbench (#190). It is the same
+  // skill and the same section cadence as a repair, but it is not a repair
+  // target: nothing is permanently fixed by it.
+  practiceWelding: asContentId("practice_welding"),
   travel: asContentId("travel"),
 } as const satisfies Record<string, ContentId>;
 
@@ -186,6 +213,7 @@ export const LOCATION_IDS = {
   theLongScramble: asContentId("the_long_scramble"),
   theJag: asContentId("the_jag"),
   holoHollow: asContentId("holo_hollow"),
+  ruskRecovery: asContentId("rusk_recovery"),
 } as const satisfies Record<string, ContentId>;
 
 /**
@@ -205,6 +233,9 @@ export const LOCAL_PLACE_IDS = {
 /** Stable merchant identities (#159). A Local Place authors which one it owns. */
 export const MERCHANT_IDS = {
   bixWeller: asContentId("bix_weller_shop"),
+  // Wade sells practice stock out of his own yard (#190) — a World Location
+  // merchant, not a Local Place one.
+  wadeRusk: asContentId("wade_rusk_yard"),
 } as const satisfies Record<string, ContentId>;
 
 /**

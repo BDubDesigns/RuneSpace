@@ -78,6 +78,8 @@ async function expectMapNameplatesInsideHex(page: import("@playwright/test").Pag
     "Long Scramble",
     "Power Annex",
     "Processing Yard",
+    // Wade's yard joins the map from the start of the game (#190).
+    "Rusk Recovery",
     "The Jag",
   ]);
   expect(geometry.allInside).toBe(true);
@@ -97,15 +99,17 @@ async function expectMapStateLabelsInsideHex(
   expect(geometry.routeOverlaps).toEqual([]);
 }
 
-// Six hexes from the Crash Site: it is "You are here", the Processing Yard,
+// Seven hexes from the Crash Site: it is "You are here", the Processing Yard,
 // Power Annex, Long Scramble, and Holo Hollow are all directly reachable, and
-// The Jag is only visible behind the Scramble.
+// The Jag and Rusk Recovery (#190) are visible behind the Scramble and behind
+// Holo Hollow respectively.
 const STATIONARY_STATE_LABELS = [
   "You are here",
   "Reachable",
   "Reachable",
   "Reachable",
   "Reachable",
+  "Visible",
   "Visible",
 ] as const;
 const SELECTED_STATE_LABELS = [
@@ -115,6 +119,7 @@ const SELECTED_STATE_LABELS = [
   "Reachable",
   "Reachable",
   "Visible",
+  "Visible",
 ] as const;
 const IN_TRANSIT_STATE_LABELS = [
   "Origin",
@@ -122,6 +127,7 @@ const IN_TRANSIT_STATE_LABELS = [
   "Reachable",
   "Reachable",
   "Reachable",
+  "Visible",
   "Visible",
 ] as const;
 

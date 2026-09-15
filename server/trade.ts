@@ -9,12 +9,12 @@ import {
 import { getEffectiveGameBalance, getItemDefinition } from "@/game/config/balance";
 import { ACTION_IDS } from "@/game/config/foundations";
 import { getLocalPlaceInLocation } from "@/game/content/local-places";
-import { getMerchant } from "@/game/content/merchants";
+import { getLocationMerchant, getMerchant } from "@/game/content/merchants";
 import { deriveEquipmentLoadout } from "@/game/domain/equipment";
 import { planExactStackAddition } from "@/game/domain/inventory";
 import { deriveLocalPlaceAccess } from "@/game/domain/local-places";
 import { quoteTrade, type TradeDirection } from "@/game/domain/trade";
-import { loadCompletedMissionIds } from "@/server/mission-state";
+import { isMissionAccepted, loadCompletedMissionIds } from "@/server/mission-state";
 import { withLockedOwnedCharacter, type DatabaseTransaction } from "@/server/action-resolution";
 import {
   addStackableItem,
@@ -28,7 +28,8 @@ import {
 } from "@/server/play";
 
 export type TradeRequest = {
-  localPlaceId: string;
+  /** Absent for a merchant hosted by the World Location itself (#190). */
+  localPlaceId?: string;
   itemId: string;
   direction: TradeDirection;
   quantity: number;
@@ -134,23 +135,38 @@ export async function tradeWithMerchant(
         : refuse("active_action", "Finish the active activity before trading.");
     }
 
-    // The authoritative position decides which Local Places are reachable at
-    // all; a requested place belonging to any other World Location resolves to
-    // nothing here regardless of what the client asked for.
-    const place = getLocalPlaceInLocation(character.currentLocationId, request.localPlaceId);
-    if (!place) return refuse("unknown_place", "That place is not open to you from here.");
+    // The merchant is resolved from the character's authoritative position,
+    // never from what the browser had on screen. Two venues, one rule: a Local
+    // Place the player is inside, or the World Location they are standing in.
+    let merchant;
+    if (request.localPlaceId === undefined) {
+      merchant = getLocationMerchant(character.currentLocationId);
+    } else {
+      // A requested place belonging to any other World Location resolves to
+      // nothing here regardless of what the client asked for.
+      const place = getLocalPlaceInLocation(character.currentLocationId, request.localPlaceId);
+      if (!place) return refuse("unknown_place", "That place is not open to you from here.");
 
-    // Access is revalidated from the character's own completed Missions, so a
-    // mission-gated place cannot be traded in merely because the browser had it
-    // on screen.
-    const access = deriveLocalPlaceAccess(
-      place,
-      await loadCompletedMissionIds(transaction, character.id),
-    );
-    if (!access.available) return refuse("place_locked", access.reason);
-
-    const merchant = place.merchantId ? getMerchant(place.merchantId) : undefined;
+      // Access is revalidated from the character's own completed Missions, so a
+      // mission-gated place cannot be traded in merely because the browser had
+      // it on screen.
+      const access = deriveLocalPlaceAccess(
+        place,
+        await loadCompletedMissionIds(transaction, character.id),
+      );
+      if (!access.available) return refuse("place_locked", access.reason);
+      merchant = place.merchantId ? getMerchant(place.merchantId) : undefined;
+    }
     if (!merchant) return refuse("no_merchant", "Nobody trades here.");
+
+    // A merchant that authors an unlock is revalidated against this character's
+    // own accepted Mission record — the same record the Workbench reads (#190).
+    if (
+      merchant.authorizingMissionId !== undefined &&
+      !(await isMissionAccepted(transaction, character.id, merchant.authorizingMissionId))
+    ) {
+      return refuse("no_merchant", "Nobody trades here.");
+    }
 
     const quoted = quoteTrade({
       merchant,

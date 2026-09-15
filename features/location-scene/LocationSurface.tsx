@@ -17,6 +17,7 @@ import { LocalPlaceSurface } from "@/features/local-places/LocalPlaceSurface";
 import { MiningActivity } from "@/features/mining/MiningActivity";
 import { PowerAnnexClaimPanel } from "@/features/power-annex/PowerAnnexClaimPanel";
 import { RefiningConsole } from "@/features/refining/RefiningConsole";
+import { NpcInteractionPanel } from "@/features/npc/NpcInteractionPanel";
 import { usePlay } from "@/features/play/PlayContext";
 import { LocationPopulationPanel } from "./LocationPopulationPanel";
 import { LocationSceneHeader } from "./LocationSceneHeader";
@@ -64,6 +65,15 @@ export function LocationSurface({
         activity={localPlaceActivity(activePlace.id)}
         characterName={characterName}
         parentDisplayName={location.displayName}
+        resident={
+          // Keyed by the requested place so a contact's opened Trade surface
+          // never survives moving to another place and reappears there.
+          <NpcInteractionPanel
+            className="mt-4"
+            key={localPlaceId ?? ""}
+            localPlaceId={localPlaceId}
+          />
+        }
         surface={deriveLocalPlaceSurface(
           activePlace,
           deriveCompletedRepairTargetIds(Object.values(state.repairs)),
@@ -99,6 +109,9 @@ export function LocationSurface({
         >
           {location.description}
         </p>
+        {/* The person standing here comes before the place's own context, so a
+            phone shows Talk and Trade without scrolling past the shop UI. */}
+        <NpcInteractionPanel className="mt-4" />
         <div className="mt-4">
           <LocationPopulationPanel />
         </div>
@@ -107,7 +120,12 @@ export function LocationSurface({
             <LocalPlaceDirectory locationId={locationId} />
           </div>
         ) : null}
-        {locationId === LOCATION_IDS.theLongScramble || localPlaces.length > 0 ? null : (
+        {/* Rusk Recovery's Workbench, Welding progression, Practice run, and
+            Work Orders are composed as sibling panels rather than one giant
+            location panel (#190), so this surface hosts no activity block. */}
+        {locationId === LOCATION_IDS.theLongScramble ||
+        locationId === LOCATION_IDS.ruskRecovery ||
+        localPlaces.length > 0 ? null : (
           <div className="mt-5" data-location-activity>
             {locationId === LOCATION_IDS.abandonedProcessingYard ? (
               <RefiningConsole showDescription={false} />

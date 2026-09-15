@@ -7,9 +7,11 @@ import {
   type ActiveAction,
   type Character,
 } from "@/db/rune-space";
-import { weldingActionIds } from "@/game/config/balance";
+import { repairTargetForActionId, weldingActionIds } from "@/game/config/balance";
 import { ACTION_IDS } from "@/game/config/foundations";
 import type { DatabaseTransaction } from "@/server/action-resolution";
+import { interruptPracticeWelding } from "@/server/practice-welding";
+import { missOpenRepairCleanPass } from "@/server/welding";
 
 /**
  * The smallest Play-owned "safely interrupt whatever remains" primitive
@@ -24,8 +26,12 @@ import type { DatabaseTransaction } from "@/server/action-resolution";
  *             state semantics (as `stopMining`).
  * - Refining: delete remaining active action + existing `manually_stopped`
  *             state semantics (as `stopRefining`).
- * - Welding:  delete the remaining active action only (as `stopCargoHoldWelding`).
- *             No Welding stop reason/state field is invented.
+ * - Welding:  close an open Clean Pass window, then delete the remaining active
+ *             action (as `stopCargoHoldWelding`). No Welding stop reason/state
+ *             field is invented.
+ * - Practice: the shared Practice interruption — close an open Clean Pass
+ *             window and delete the action, preserving the partial weld and the
+ *             Scrap already spent on it.
  * - Travel:   delete the remaining active action + `characterTravelState` only;
  *             committed `characterScavengeReveals` are preserved untouched, and
  *             the character's authoritative origin row is not relocated here.
@@ -74,11 +80,22 @@ export async function forceIdleResolvedAction(
     return { interrupted: true, interruptedActionId: actionId };
   }
 
-  // Welding on any repair target: the active action row is the only thing to
-  // clean up, because resolved increments are already committed and a partial
-  // pass never became progress.
+  // Welding on any repair target: resolved increments are already committed and
+  // a partial pass never became progress, so the only durable extra is closing
+  // an open Clean Pass window (#190) before the action row goes.
   if (weldingActionIds().includes(actionId)) {
+    const targetId = repairTargetForActionId(actionId);
+    if (targetId) {
+      await missOpenRepairCleanPass(transaction, { characterId: character.id, targetId, now });
+    }
     await transaction.delete(activeActions).where(eq(activeActions.characterId, character.id));
+    return { interrupted: true, interruptedActionId: actionId };
+  }
+
+  // Practice Welding: the one shared interruption, so an operator force-idle,
+  // the player's own Stop, and Travel cannot drift apart (#190).
+  if (actionId === ACTION_IDS.practiceWelding) {
+    await interruptPracticeWelding(transaction, character.id, now);
     return { interrupted: true, interruptedActionId: actionId };
   }
 

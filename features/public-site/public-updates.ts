@@ -5,6 +5,48 @@ export type { PublicUpdate } from "@/game/schemas/public-updates";
 
 const authoredUpdates = [
   {
+    slug: "ten-thousand-hours",
+    title: "10,000 Hours",
+    publishedAt: "2026-09-15T09:00:00-07:00",
+    summary:
+      "Wade Rusk has a yard, a workbench, and six pieces of scrap with your name on them. Welding stops being something two jobs needed and starts being something you can just go and get better at.",
+    hero: {
+      src: "/updates/rusk-recovery-yard.webp",
+      alt: "Working recovery yard with racked salvage, stripped components, damaged work vehicles, and a welding bench under an overcast sky",
+      width: 1536,
+      height: 384,
+    },
+    body: [
+      "Wade has been standing at your crash site since the first day, which was never where he actually worked. Finish Keep the Change and Tansy will call him from The Jag to tell him his apprentice did a proper job — and he'll tell you, in about as many words as he ever uses, to come by the shop.",
+      "The shop is Rusk Recovery, a recovery yard on the northwest edge of Holo Hollow, one ordinary walk from town. It has been on your map from the beginning. What's different is that Wade is in it now, and that he has something to offer when you walk in.",
+      "That something is bench time. Take 10,000 Hours from him and he hands over six pieces of scrap metal on the spot — three welds' worth — and opens the workbench. He is not letting you near a client's property yet. People bring him things they cannot afford to lose twice, and you have not earned that.",
+      "Practice welding is the real thing, not a tutorial. Two pieces of scrap go in, ten sections of welding come out, and you get a reduced share of the usual Welding XP because nothing is actually being repaired. Keep the slag or set the bench to throw it out; Bix still pays a Credit apiece if you keep it. Start once and the bench keeps going, weld after weld, until the scrap runs out — including while you are away from the screen. Stop whenever you like: the half-finished weld and the scrap you already spent are waiting when you come back.",
+      "Welding also picked up something new, everywhere it happens. Twice in any weld — practice, the Cargo Hold, the Crew Stop — a moment opens up where the bead is running clean and you can lay one in. Take it in time and you get a whole extra section of progress and the XP that goes with it. Miss it and nothing at all happens; it costs nothing to let one go. You will know when you catch one.",
+      "Three practice welds and Wade will look at your hands, tell you the last one is better than the first, and pay you fifty Credits for the day. Out of scrap? He sells it, two Credits a piece, same as he'd charge anybody. And the beaten-up terminal in the corner of the yard — the one you have been walking past — is where the paying work comes in. Not yet. But that is where it comes in.",
+    ],
+    patchNotes: [
+      {
+        heading: "Added",
+        items: [
+          "Rusk Recovery, Wade's recovery yard northwest of Holo Hollow. Visible and walkable from the start of the game, one ordinary 24-second walk from town.",
+          "10,000 Hours, the next main-story job. Wade offers it at his own yard once Keep the Change is finished; accepting it hands you six Scrap Metal and opens the workbench.",
+          "Practice Welding at the workbench: 2 Scrap Metal per weld, ten sections, up to 2 Slag out, and 10 Welding XP a section. One Start keeps welding until the scrap runs out, including while you are offline.",
+          "Scrap Metal, sold by Wade at 2 Credits a piece. It is fungible but does not stack, so each piece takes an inventory slot.",
+          "Clean Pass, on every kind of Welding. Two moments in each weld where a well-timed pass is worth an extra section and its XP; missing one costs nothing.",
+          "A persistent Keep Slag / Auto-discard Slag setting for the bench, applied when each weld finishes.",
+          "Finishing 10,000 Hours pays 50 Credits and reveals the Work Orders terminal at Rusk Recovery. There are no Work Orders to take yet; real client work will need Welding level 5.",
+        ],
+      },
+      {
+        heading: "Changed",
+        items: [
+          "Wade Rusk now works out of Rusk Recovery once Keep the Change is finished, and is no longer found at the Crash Site.",
+          "Turning in Keep the Change ends with Tansy calling Wade, and Wade telling you where to find him.",
+        ],
+      },
+    ],
+  },
+  {
     slug: "out-of-the-weather",
     title: "Out of the Weather",
     publishedAt: "2026-09-12T20:30:00-07:00",

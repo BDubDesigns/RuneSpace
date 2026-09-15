@@ -7,11 +7,12 @@ import { MissionActionButton } from "@/components/ui/MissionActionButton";
 import { Panel } from "@/components/ui/Panel";
 import { NpcConversation } from "@/features/npc/NpcConversation";
 import { TradePanel } from "@/features/trade/TradePanel";
-import { getMerchant } from "@/game/content/merchants";
+import { getLocationMerchant, getMerchant, isMerchantOpen } from "@/game/content/merchants";
 import { getResidentNpc } from "@/game/content/npcs";
 import { resolveNpcConversation } from "@/game/domain/conversation";
 import { resolveActiveLocalPlace } from "@/game/domain/local-places";
 import {
+  deriveAcceptedMissionIds,
   deriveCompletedMissionIds,
   deriveMissionGuidanceTargets,
   npcGuidanceMeaning,
@@ -32,12 +33,23 @@ import { usePlay } from "@/features/play/PlayContext";
  * this resident fronts, which is read from content rather than from who the
  * resident is, and it opens the Trade surface directly beneath this card.
  *
+ * The card stands inside the panel for the place the player is in, directly
+ * under its description, rather than after the whole surface: on a phone the
+ * person in front of you must not sit below the place's activity UI (#190).
+ *
  * `localPlaceId` is the Local Place the route requests. It is navigation state,
  * not authoritative position, so it passes through the same validated
  * interpretation the place surface uses before it counts as resident context.
  * Every gameplay command still revalidates its own location server-side.
  */
-export function NpcInteractionPanel({ localPlaceId }: { localPlaceId?: string }) {
+export function NpcInteractionPanel({
+  className = "",
+  localPlaceId,
+}: {
+  /** Spacing supplied by whichever place surface the resident stands in. */
+  className?: string;
+  localPlaceId?: string;
+}) {
   const { foregroundBusy, state } = usePlay();
   const [open, setOpen] = useState(false);
   const [tradeOpen, setTradeOpen] = useState(false);
@@ -62,14 +74,30 @@ export function NpcInteractionPanel({ localPlaceId }: { localPlaceId?: string })
   }, [tradeOpen]);
 
   const locationId = state.location.currentLocationId;
+  const completedMissionIds = deriveCompletedMissionIds(state.missions);
   const activePlace = resolveActiveLocalPlace({
     locationId,
     requestedLocalPlaceId: localPlaceId,
-    completedMissionIds: deriveCompletedMissionIds(state.missions),
+    completedMissionIds,
   });
-  const npc = getResidentNpc({ locationId, localPlaceId: activePlace?.id });
-  const placeMerchant = activePlace?.merchantId ? getMerchant(activePlace.merchantId) : undefined;
-  const merchant = npc && placeMerchant?.npcId === npc.id ? placeMerchant : undefined;
+  // Who is standing here is Mission-derived for an NPC who authored a move
+  // (#190); for everybody else it is the same static placement as before.
+  const npc = getResidentNpc({ locationId, localPlaceId: activePlace?.id, completedMissionIds });
+  // Two venues, one rule: the merchant the open Local Place owns, or — when the
+  // player is standing in the World Location itself — the one that location
+  // hosts (#190). Either way it is only offered when this resident is the
+  // person who fronts it and its authored unlock is satisfied.
+  const venueMerchant = activePlace
+    ? activePlace.merchantId
+      ? getMerchant(activePlace.merchantId)
+      : undefined
+    : getLocationMerchant(locationId);
+  const merchant =
+    npc &&
+    venueMerchant?.npcId === npc.id &&
+    isMerchantOpen(venueMerchant, deriveAcceptedMissionIds(state.missions))
+      ? venueMerchant
+      : undefined;
   const stationary = !state.activeAction && !state.travelState;
   const entries = npc ? resolveNpcConversation(npc.id, state.missions) : [];
   // Active (green), turn-in (blue), and available (blue) are distinct semantic
@@ -84,10 +112,10 @@ export function NpcInteractionPanel({ localPlaceId }: { localPlaceId?: string })
   const turnInAvailable =
     stationary &&
     entries.some((entry) => entry.kind === "mission" && entry.action?.kind === "complete_mission");
-  const tradeRegionId = activePlace ? `npc-trade-${activePlace.id}` : undefined;
+  const tradeRegionId = `npc-trade-${activePlace?.id ?? locationId}`;
 
   return (
-    <>
+    <div className={`space-y-4 ${className}`.trim()} data-npc-resident>
       <Panel className="!p-4" data-npc-interaction>
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
@@ -141,7 +169,7 @@ export function NpcInteractionPanel({ localPlaceId }: { localPlaceId?: string })
           </Feedback>
         ) : null}
       </Panel>
-      {merchant && activePlace && tradeOpen ? (
+      {merchant && tradeOpen ? (
         <section
           aria-label={`Trade with ${npc.displayName}`}
           className="rs-focus scroll-mb-[var(--rs-bottom-nav-clearance)] scroll-mt-3"
@@ -150,7 +178,10 @@ export function NpcInteractionPanel({ localPlaceId }: { localPlaceId?: string })
           ref={tradeRegionRef}
           tabIndex={-1}
         >
-          <TradePanel localPlaceId={activePlace.id} merchant={merchant} />
+          <TradePanel
+            {...(activePlace ? { localPlaceId: activePlace.id } : {})}
+            merchant={merchant}
+          />
         </section>
       ) : null}
       {open ? (
@@ -162,6 +193,6 @@ export function NpcInteractionPanel({ localPlaceId }: { localPlaceId?: string })
           triggerRef={triggerRef}
         />
       ) : null}
-    </>
+    </div>
   );
 }

@@ -125,6 +125,25 @@ export const WeldingCommandRequestSchema = z.object({
   targetId: RepairTargetIdSchema,
 });
 
+/**
+ * Practice Welding commands name only the character: which bench, which weld,
+ * and what it costs are all server-authoritative (#190).
+ */
+export const PracticeCommandRequestSchema = z.object({
+  characterId: z.string().uuid(),
+});
+
+/** The persistent per-character Slag preference. */
+export const PracticeSlagPreferenceRequestSchema = z.object({
+  characterId: z.string().uuid(),
+  autoDiscardSlag: z.boolean(),
+});
+
+/** A Clean Pass claim names only the character; the open window is derived. */
+export const CleanPassClaimRequestSchema = z.object({
+  characterId: z.string().uuid(),
+});
+
 const CargoHoldStackTransferFields = {
   characterId: z.string().uuid(),
   stackId: z.string().uuid(),
@@ -186,7 +205,14 @@ export const AcknowledgeMissionConversationRequestSchema = z.object({
  */
 export const TradeRequestSchema = z.object({
   characterId: z.string().uuid(),
-  localPlaceId: ContentId,
+  /**
+   * The Local Place the player is trading in, when the merchant lives inside
+   * one. Omitted for a merchant the World Location itself hosts (#190) — Wade
+   * trades out of his yard, which is not a room in a town. Either way the
+   * venue is a request, never proof: the server resolves the merchant from the
+   * character's own authoritative position.
+   */
+  localPlaceId: ContentId.optional(),
   itemId: ItemIdSchema,
   direction: z.enum(["buy", "sell"]),
   quantity: z.number().int().positive(),

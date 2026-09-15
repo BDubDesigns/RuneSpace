@@ -10,6 +10,7 @@ import { getEffectiveGameBalance, getRepairTargetBalance } from "@/game/config/b
 import { GAME_TICK_MS, LOCAL_PLACE_IDS, REPAIR_TARGET_IDS } from "@/game/config/foundations";
 import { deriveCompletedMissionIds, deriveMissionGuidanceTargets } from "@/game/domain/missions";
 import { usePlay } from "@/features/play/PlayContext";
+import { CleanPassControl } from "@/features/welding/CleanPassControl";
 import { CrewHaulerRideControl } from "@/features/travel/CrewHaulerRideControl";
 import { availableCrewHaulerRides } from "@/features/travel/crew-hauler-rides";
 import {
@@ -259,6 +260,8 @@ export function CrewStopPanel() {
             label="Current weld"
             value={attemptProgress}
           />
+          {/* Clean Pass is general Welding, not a Practice feature (#190). */}
+          <CleanPassControl cleanPass={repair.cleanPass} />
           <ActionButton
             data-crew-stop-stop-welding
             disabled={foregroundBusy}

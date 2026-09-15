@@ -12,6 +12,14 @@ import {
   type RepairTargetState,
   type WeldingResolution,
 } from "@/game/domain/welding-repair";
+import {
+  rolledCleanPass,
+  UNROLLED_CLEAN_PASS,
+  withOpenCleanPassMissed,
+  type CleanPassOutcome,
+  type CleanPassRandom,
+  type CleanPassState,
+} from "@/game/domain/clean-pass";
 import { ticksToMilliseconds } from "@/game/domain/timing";
 import type { ActionResolver, DatabaseTransaction } from "@/server/action-resolution";
 import { grantCharacterSkillXp } from "@/server/progression";
@@ -32,8 +40,51 @@ export const UNSTARTED_REPAIR: RepairTargetState = {
   refinedFerriteContributed: 0,
   slagContributed: 0,
   weldingProgress: 0,
+  cleanPass: UNROLLED_CLEAN_PASS,
   completedAt: null,
 };
+
+/** One repair row's Clean Pass state (#190). */
+export function repairCleanPassFromRow(
+  row: typeof characterRepairTargets.$inferSelect | undefined,
+): CleanPassState {
+  if (!row) return UNROLLED_CLEAN_PASS;
+  return {
+    firstSection: row.cleanPassFirstSection,
+    firstOutcome: row.cleanPassFirstOutcome as CleanPassOutcome | null,
+    secondSection: row.cleanPassSecondSection,
+    secondOutcome: row.cleanPassSecondOutcome as CleanPassOutcome | null,
+  };
+}
+
+/** Persist one repair's Clean Pass state (roll, claim, or interruption miss). */
+export async function writeRepairCleanPass(
+  transaction: DatabaseTransaction,
+  input: {
+    characterId: string;
+    targetId: RepairTargetId;
+    cleanPass: CleanPassState;
+    weldingProgress?: number;
+    now: Date;
+  },
+): Promise<void> {
+  await transaction
+    .update(characterRepairTargets)
+    .set({
+      cleanPassFirstSection: input.cleanPass.firstSection,
+      cleanPassFirstOutcome: input.cleanPass.firstOutcome,
+      cleanPassSecondSection: input.cleanPass.secondSection,
+      cleanPassSecondOutcome: input.cleanPass.secondOutcome,
+      ...(input.weldingProgress === undefined ? {} : { weldingProgress: input.weldingProgress }),
+      updatedAt: input.now,
+    })
+    .where(
+      and(
+        eq(characterRepairTargets.characterId, input.characterId),
+        eq(characterRepairTargets.targetId, input.targetId),
+      ),
+    );
+}
 
 export function repairStateFromRow(
   row: typeof characterRepairTargets.$inferSelect | undefined,
@@ -43,6 +94,7 @@ export function repairStateFromRow(
     refinedFerriteContributed: row.refinedFerriteContributed,
     slagContributed: row.slagContributed,
     weldingProgress: row.weldingProgress,
+    cleanPass: repairCleanPassFromRow(row),
     completedAt: row.completedAt,
   };
 }
@@ -96,6 +148,56 @@ export async function loadRepairTargetStates(
     .from(characterRepairTargets)
     .where(eq(characterRepairTargets.characterId, characterId));
   return new Map(rows.map((row) => [row.targetId, repairStateFromRow(row)]));
+}
+
+/**
+ * Roll this repair's Clean Pass opportunities, once, when Welding first starts
+ * on it (#190).
+ *
+ * A repair is ONE Welding work unit, so a roll that already exists is left
+ * exactly as it is: Stop and Resume must never reroll, or a player could shop
+ * for a better placement by restarting.
+ */
+export async function ensureRepairCleanPassRoll(
+  transaction: DatabaseTransaction,
+  input: {
+    characterId: string;
+    targetId: RepairTargetId;
+    random: CleanPassRandom;
+    now: Date;
+  },
+): Promise<void> {
+  const row = await loadRepairTargetRow(transaction, input.characterId, input.targetId);
+  if (!row || row.cleanPassFirstSection !== null) return;
+  await writeRepairCleanPass(transaction, {
+    characterId: input.characterId,
+    targetId: input.targetId,
+    cleanPass: rolledCleanPass(input.random),
+    now: input.now,
+  });
+}
+
+/**
+ * Close an open Clean Pass window on a repair, for Stop and for Travel alike.
+ *
+ * An opportunity the player was in the middle of is spent; one still ahead of
+ * the work stays scheduled, because the work itself has not moved.
+ */
+export async function missOpenRepairCleanPass(
+  transaction: DatabaseTransaction,
+  input: { characterId: string; targetId: RepairTargetId; now: Date },
+): Promise<void> {
+  const row = await loadRepairTargetRow(transaction, input.characterId, input.targetId);
+  if (!row) return;
+  const repair = repairStateFromRow(row);
+  const cleanPass = withOpenCleanPassMissed(repair.cleanPass, repair.weldingProgress);
+  if (cleanPass === repair.cleanPass) return;
+  await writeRepairCleanPass(transaction, {
+    characterId: input.characterId,
+    targetId: input.targetId,
+    cleanPass,
+    now: input.now,
+  });
 }
 
 /**

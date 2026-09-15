@@ -171,6 +171,94 @@ regardless of Mission state.
   abstraction, and no trading of its own: the approved NPC merchant loop
   (below) operates on carried Inventory only.
 
+### Practice Welding: the indefinite training loop (issue #190)
+
+Wade's Workbench at Rusk Recovery is genuine Welding that repeats. It shares the
+skill, the **5-tick / 3 second** section cadence, and Clean Pass with every
+repair; what differs is that nothing is being fixed, so it pays a reduced share
+of the Welding XP and can be done forever.
+
+| Fact | Value | Home |
+| --- | --- | --- |
+| Input per weld | 2 Scrap Metal, consumed when the weld begins | `balance.practiceWelding` |
+| Sections per weld | 10 | `balance.practiceWelding` |
+| XP per section | authored share of the global Welding XP (20% → 10, so 100 per weld) | `practiceSectionXp()` |
+| Output per weld | up to 2 Slag, at completion time | `balance.practiceWelding` |
+| Scrap Metal | `stackLimit: 1`, so one piece per inventory slot | `balance.items.scrapMetal` |
+| Where, and what opens it | Rusk Recovery; accepting 10,000 Hours | `game/content/rusk-recovery` |
+
+Practice is deliberately **not** a repair target: a repair target is one finite
+physical job that permanently completes. Its durable state
+(`character_practice_welds`, one row per character) carries only Practice-owned
+facts — the partial weld, whether that weld's two Scrap are already spent, the
+persistent Slag preference, the bounded `This Run` totals, and that weld's Clean
+Pass roll. An untouched bench is an absent row, so nothing needs backfilling.
+
+- **Availability** derives from the accepted `10,000 Hours` record, exactly as
+  repair availability derives from its authorizing Mission, and stays true after
+  that Mission completes. There is no `practice_unlocked` flag. Before it holds,
+  the bench is scenery: no control, no disabled state, no teaser.
+- **A continuous run.** One Start begins a weld and each completed weld begins
+  the next, consuming its two Scrap at that instant, through the ordinary lazy
+  resolution and the standard one-hour offline cap. When fewer than two Scrap
+  remain, the weld in progress finishes and the run stops itself
+  (`out_of_scrap`); adding Scrap later never auto-restarts it.
+- **Stop and Resume** preserve the real partial weld: the completed sections,
+  the two Scrap already spent, and the rolled Clean Pass positions. Resuming
+  costs nothing and works with no Scrap at all. Stop never refunds, never
+  produces Slag early, and never rerolls.
+- **Travel** stops the bench through the same Practice interruption helper the
+  player's own Stop uses (`interruptPracticeWelding`), and Practice is on the
+  explicit travel-replaceable action list. There is no remote Welding.
+- **Slag at completion time** honours the persistent per-character setting:
+  Keep Slag adds as much as ordinary capacity allows and discards only the
+  overflow; Auto-discard discards both. Output capacity can never block or fail
+  a completed weld.
+- **The Mission counts completed welds**, through the same generic
+  `tracked_activity` path Mining and Refining use — never sections, starts, or
+  Scrap provenance, and including welds resolved lazily while the player was
+  away.
+- **The yard reads as several panels, not one.** The Location panel carries the
+  scene, the description, and Wade himself; the Workbench, the Welding
+  progression card (the shared `SkillProgressCard`, as Mining and Refining use),
+  the `This practice run` history, and the Work Orders terminal are each their
+  own sibling panel below it, composed in `PlayConsole`. On a phone that keeps
+  Wade's Talk and Trade controls above the shop UI instead of below it.
+
+### Clean Pass: a general Welding opportunity (issue #190)
+
+Every current Welding work unit — a Practice weld, the Cargo Hold repair, the
+Crew Stop repair — rolls exactly two optional opportunity sections **once**: the
+first 2-4 sections in, the second an independent 2-4 sections after that (so
+2-4 and 4-8). The two-section minimum spacing is why the second roll is an
+offset: a claimed first opportunity advances the work one section and therefore
+can never step over the second. Both current section counts leave an ordinary
+tail after the last possible opportunity, so a claim can never complete a work
+unit.
+
+The roll is persisted by the work unit itself (`character_repair_targets` and
+`character_practice_welds` carry the same four columns) and is never rerolled by
+Stop or Resume. An opportunity is open during exactly one ordinary Welding
+section, which makes the open window purely positional: after reconciliation,
+`sectionsCompleted + 1` is the section in progress, and that is what the claim
+validates against, plus the same small network grace Scavenge allows.
+
+- A valid claim advances the work **one additional section immediately** and
+  pays exactly that section's ordinary XP for the activity — reduced Practice XP
+  at the bench, full Welding XP on a repair. It changes no material cost and
+  creates no special per-section value.
+- Missing one costs nothing. An opportunity welded past, including while the
+  player is away, is simply missed and needs no durable write; the work's own
+  progress says so.
+- Stop and Travel durably close an open window as missed, so resuming the same
+  partial work cannot resurrect it. An opportunity still ahead of the work stays
+  scheduled.
+
+Clean Pass is deliberately not a generic timed-opportunity engine. Scavenge
+stays entirely separate: its window belongs to a Travel leg and resolves against
+a loot table. Only conventions are shared — a server-derived window and a small
+claim grace.
+
 ## Inventory and equipment
 
 - Fungible items are carried as positive-quantity stacks. Unique items are
@@ -256,6 +344,25 @@ approved price table, merchant personality, and Trade UX — belong to
   all-or-nothing: a partial fill is never delivered.
 - There is no merchant wallet, finite merchant stock, restock timer, dynamic
   pricing, buy limit, or player-to-player exchange.
+
+### World Location merchants (issue #190)
+
+A merchant is authored once and referenced by its venue. A Local Place names the
+merchant it hosts (#159); a World Location may do the same, which is how Wade
+trades out of his own yard rather than a room in a town. The merchant itself
+owns its prices and its authored unlock: `authorizingMissionId` names the
+Mission whose **acceptance** opens the counter, revalidated server-side against
+the character's own accepted record, and it stays open after that Mission
+completes. Wade sells Scrap Metal at 2 Credits with no stock row, restock timer,
+or day cap, and buys nothing; Bix's Local Place path is unchanged.
+
+The Trade surface presents only the directions the authored price table
+supports, derived generically by `merchantTradeDirections`: a merchant with no
+purchase prices is Sell-only, one with no buy prices is Buy-only, and a merchant
+who does both keeps the Buy/Sell toggle. With one direction there is no toggle
+at all and the heading names it, so Wade's counter never opens an empty Sell
+tab. This is read from content, never from which merchant it is, and it is not a
+reason to author a price merely to fill a tab.
 
 ## Local Places (issue #159)
 
@@ -354,7 +461,7 @@ of war, fuel, hauling, and transportation upgrades build.
   dormant (future) activities. Adjacency is validated as bidirectional so a
   one-way edge can never silently ship.
 
-### The five-location local world (issue #83)
+### The local world (issues #83, #159, #190)
 
 - **Crash Site** (`crash_site`): the wreck / starting location after issue #83.
   Cargo Hold Welding is available here after its material gate; no Mining is
@@ -371,10 +478,19 @@ of war, fuel, hauling, and transportation upgrades build.
   of activity is intentional, as is Crash Site's, and neither has a fake Offline status.
 - **The Jag** (`the_jag`, `{q:-2,r:3}`): Ferrite Shale Mining location (Mining moved
   out of Crash Site). Mining is available only here while stationary.
+- **Holo Hollow** (`holo_hollow`, `{q:-1,r:1}`): the first settlement (issue
+  #159). Its town places are Local Places, not World Locations.
+- **Rusk Recovery** (`rusk_recovery`, `{q:-2,r:1}`): Wade's recovery yard
+  (issue #190), immediately northwest of Holo Hollow. Visible and visitable from
+  the beginning of the game; it hosts Practice Welding and, once its Mission is
+  accepted, Wade's own merchant counter. One static scene before and after
+  progression — no locked/unlocked scene swap.
 
 Adjacency after issue #83 (bidirectional, no second graph): Crash Site ↔
 Processing Yard, Crash Site ↔ Power Annex, Processing Yard ↔ Power Annex,
-**Crash Site ↔ The Long Scramble**, **The Long Scramble ↔ The Jag**. No direct
+**Crash Site ↔ The Long Scramble**, **The Long Scramble ↔ The Jag**, plus Holo
+Hollow's edges (#159) and, from issue #190, **Holo Hollow ↔ Rusk Recovery** at
+the standard adjacent walk duration. No direct
 Crash Site ↔ Jag, Jag ↔ Yard/Annex, or Long Scramble ↔ Yard/Annex edge exists.
 Reaching The Jag from anywhere except The Long Scramble requires explicit
 completed legs (for example Annex → Crash Site → Long Scramble → Jag). No queued
@@ -405,7 +521,7 @@ lines from the same authoritative adjacency.
 
 ### Selecting vs. confirming travel
 
-- Selecting a hex on the five-location local map only inspects/selects it.
+- Selecting a hex on the local map only inspects/selects it.
 - A separate explicit confirmation control ("Walk to … — 24 sec") invokes the
   server-authoritative begin-travel command. The same interaction works in
   reverse after arrival.

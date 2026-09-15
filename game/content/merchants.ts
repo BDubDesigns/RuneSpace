@@ -1,5 +1,6 @@
-import { ITEM_IDS, MERCHANT_IDS, NPC_IDS } from "@/game/config/foundations";
+import { ITEM_IDS, MERCHANT_IDS, MISSION_IDS, NPC_IDS } from "@/game/config/foundations";
 import { MerchantDefinitionSchema, type MerchantDefinition } from "@/game/schemas/merchants";
+import { getLocation } from "@/game/content/locations";
 
 /**
  * The authoritative merchant catalog (single source of truth).
@@ -12,6 +13,11 @@ import { MerchantDefinitionSchema, type MerchantDefinition } from "@/game/schema
  * Bix's initial stock is deliberately one line deep. He sells Power Cells only,
  * and buys exactly the four approved materials — no rotating stock, no
  * simulated finite inventory, no merchant wallet, no dynamic pricing.
+ *
+ * Wade sells practice stock out of his own yard (#190) — the same shape, at a
+ * World Location rather than inside a Local Place. His Scrap is effectively
+ * unlimited on purpose: no stock row, no restock timer, no day cap. What limits
+ * a player is Credits and what they can carry.
  */
 const merchantDefinitions = [
   {
@@ -23,6 +29,14 @@ const merchantDefinitions = [
       { itemId: ITEM_IDS.ferriteShale, buyPrice: 2 },
       { itemId: ITEM_IDS.slag, buyPrice: 1 },
     ],
+  },
+  {
+    id: MERCHANT_IDS.wadeRusk,
+    npcId: NPC_IDS.wadeRusk,
+    authorizingMissionId: MISSION_IDS.tenThousandHours,
+    // Two Credits a piece, the same as he would charge anybody. He does not buy
+    // Slag back: Bix already does, and one buyer for it is the economy.
+    prices: [{ itemId: ITEM_IDS.scrapMetal, sellPrice: 2 }],
   },
 ] as const satisfies readonly MerchantDefinition[];
 
@@ -37,4 +51,30 @@ const merchantById = new Map<string, MerchantDefinition>(
 /** Resolve a merchant from the authoritative registry by stable ID. */
 export function getMerchant(merchantId: string): MerchantDefinition | undefined {
   return merchantById.get(merchantId);
+}
+
+/**
+ * The merchant a World Location itself hosts, when it hosts one (#190).
+ *
+ * A Local Place merchant is resolved through that place; this is the same
+ * relationship one level up, for a yard that is a World Location in its own
+ * right rather than a room in a town.
+ */
+export function getLocationMerchant(locationId: string): MerchantDefinition | undefined {
+  const merchantId = getLocation(locationId)?.merchantId;
+  return merchantId ? getMerchant(merchantId) : undefined;
+}
+
+/**
+ * Whether this merchant is currently open to the character, given the Missions
+ * they have accepted. A merchant that authors no unlock is open to anybody.
+ */
+export function isMerchantOpen(
+  merchant: MerchantDefinition,
+  acceptedMissionIds: ReadonlySet<string>,
+): boolean {
+  return (
+    merchant.authorizingMissionId === undefined ||
+    acceptedMissionIds.has(merchant.authorizingMissionId)
+  );
 }

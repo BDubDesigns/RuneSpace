@@ -137,6 +137,34 @@ export async function loadCompletedMissionIds(
 }
 
 /**
+ * Whether this character has accepted one Mission, which stays true after that
+ * Mission completes.
+ *
+ * This is the authoritative read for anything an accepted Mission opens up and
+ * never closes again — Practice Welding and Wade's Trade both hang off
+ * accepting 10,000 Hours (#190), the same way an accepted Mission authorizes
+ * repair work (`server/repair-access.ts`). Deriving it from the Mission record
+ * is what keeps a second `practice_unlocked` flag from existing to drift.
+ */
+export async function isMissionAccepted(
+  transaction: DatabaseTransaction,
+  characterId: string,
+  missionId: string,
+): Promise<boolean> {
+  const rows = await transaction
+    .select({ acceptedAt: characterMissions.acceptedAt })
+    .from(characterMissions)
+    .where(
+      and(
+        eq(characterMissions.characterId, characterId),
+        eq(characterMissions.missionId, missionId),
+      ),
+    )
+    .limit(1);
+  return rows[0]?.acceptedAt != null;
+}
+
+/**
  * True when the mission's authored prerequisite (if any) is completed for the
  * character. A mission with no prerequisite is always available.
  */

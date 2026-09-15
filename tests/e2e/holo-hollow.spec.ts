@@ -463,8 +463,11 @@ test("scopes each resident to their own Local Place", async ({ page, testCharact
   await expect(page.getByRole("button", { name: /Talk to Bix Weller/ })).toBeVisible();
   await expect(page.getByRole("button", { name: /Talk to Renn Calder/ })).toHaveCount(0);
   // Trade belongs to Bix's card, not the shop description, and is offered
-  // rather than unfolded on arrival.
-  await expect(page.locator("[data-local-place-surface] [data-npc-action]")).toHaveCount(0);
+  // rather than unfolded on arrival. Since #190 that card is composed inside
+  // the place panel, directly under its description, so every NPC control the
+  // panel hosts is one of the card's own two.
+  await expect(page.locator("[data-local-place-surface] [data-npc-interaction]")).toHaveCount(1);
+  await expect(page.locator("[data-local-place-surface] [data-npc-action]")).toHaveCount(2);
   await expect(page.locator("[data-trade-panel]")).toHaveCount(0);
   // On a phone the actions stack vertically at full card width.
   const talkBox = (await actions.nth(0).boundingBox())!;
@@ -474,6 +477,12 @@ test("scopes each resident to their own Local Place", async ({ page, testCharact
   expect(Math.abs(tradeBox.x - talkBox.x)).toBeLessThanOrEqual(1);
   expect(Math.abs(tradeBox.width - talkBox.width)).toBeLessThanOrEqual(1);
   expect(talkBox.width).toBeGreaterThan(contactBox.width * 0.8);
+  // Bix stands under the shop's description and above the way out, rather than
+  // below the whole surface where a phone would hide him (#190).
+  const descriptionBox = (await page.locator("[data-local-place-description]").boundingBox())!;
+  const exitBox = (await page.locator("[data-local-place-exit]").boundingBox())!;
+  expect(contactBox.y).toBeGreaterThan(descriptionBox.y);
+  expect(contactBox.y).toBeLessThan(exitBox.y);
 
   // Talk stays the canonical conversation hub and carries no merchant command.
   const conversation = await openNpcConversation(page, "Bix Weller");

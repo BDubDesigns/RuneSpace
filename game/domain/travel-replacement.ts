@@ -8,11 +8,14 @@ import { ACTION_IDS } from "@/game/config/foundations";
  *
  * Welding contributes every repair target's action, because Welding anywhere is
  * the same interruptible work: a partial pass is simply never resolved.
+ * Practice Welding joins them for the same reason — leaving Wade's yard stops
+ * the bench, and the partial weld is waiting when the player comes back (#190).
  */
 const TRAVEL_REPLACEABLE_ACTION_IDS = new Set<string>([
   ACTION_IDS.ferriteShaleMining,
   ACTION_IDS.refining,
   ...weldingActionIds(),
+  ACTION_IDS.practiceWelding,
 ]);
 
 export function isTravelReplaceableAction(actionId: string): boolean {

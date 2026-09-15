@@ -162,6 +162,22 @@ opaque. 1536×384 matches the Holo Hollow Local Place set rather than upscaling
 to the older 1920×480 convention. The repaired scene is also committed under
 `public/updates/` as the Update hero, per `docs/public-updates.md`.
 
+| Rusk Recovery (#190) | Delivered | Dimensions | Bytes |
+|---|---|---|---|
+| Location scene | `rusk-recovery.webp` | 1536×384 | ~227 kB |
+| Conversation background | `rusk-recovery-dialogue.webp` | 1710×912 | ~466 kB |
+| Map identifier | `map-icons/rusk-recovery.webp` | 512×230, transparent lossless | ~71 kB |
+| Scrap Metal item art | `item-art/scrap-metal.webp` | transparent lossless | ~980 kB |
+
+Wade's yard ships **one static scene**, not a before/after pair: what changes
+with progression is who is standing in it and what they will let the player
+touch, never the place itself. The Workbench and the beaten-up Work Orders
+terminal are physically in the art from the first visit, so their player-facing
+surfaces can appear later without the picture changing. The yard also ships its
+own conversation background rather than reusing the 4:1 scene, the same choice
+the Holo Hollow interiors made. Its scene is committed a second time under
+`public/updates/` as that release's Update hero, per `docs/public-updates.md`.
+
 **Known art follow-up (non-blocking).** The three Holo Hollow Local Place
 exteriors (`holo-hollow-souvenirs-exterior.webp`,
 `holo-hollow-assistance-center-exterior.webp`, `hh-bnb-exterior.webp`) are

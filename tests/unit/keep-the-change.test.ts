@@ -418,15 +418,22 @@ describe("Keep the Change conversations", () => {
     });
   });
 
-  it("ends Tansy's completion on the Credits, inventing no Mara appointment", () => {
+  it("hands off to Wade on comms without inventing a Mara appointment", () => {
     // Mara met the player herself in Bix's shop and invited them then; the B&B
     // unlock is already world state. Tansy sending them off to a meeting that
     // does not exist only manufactured awkwardness.
+    //
+    // What she does do (#190) is call Wade, who names the next place himself.
+    // That is the whole of the guidance: Rusk Recovery has been visible since
+    // the beginning and 10,000 Hours reveals nothing until the player walks in.
     const beats = (getDialogue(DIALOGUE_IDS.tansyKeepTheChangeCompletion)?.beats ?? []).flatMap(
       (beat) => ("text" in beat && typeof beat.text === "string" ? [beat.text] : []),
     );
     expect(beats.join(" ")).not.toMatch(/Mara|make it weird|B&B/i);
-    expect(beats.at(-1)).toMatch(/stays in your pocket/);
+    expect(beats.join(" ")).toMatch(/stays in your pocket/);
+    expect(beats.join(" ")).toMatch(/Rusk Recovery/);
+    // Tansy gets the last word; Wade's part is the invitation, not a briefing.
+    expect(beats.at(-1)).toMatch(/being proud/);
   });
 
   it("stops offering the Bix/Mara encounter once it has actually happened", () => {
@@ -577,6 +584,15 @@ describe("Keep the Change authored content", () => {
     ]) {
       for (const beat of getDialogue(dialogueId)!.beats) {
         if (beat.kind !== "npc") continue;
+        // Wade is the one authored exception (#190): he joins the completion
+        // beat over comms from his own yard, exactly the way Tansy interrupts
+        // his offer scene from The Jag.
+        if (beat.speakerNpcId === NPC_IDS.wadeRusk) {
+          expect(dialogueId).toBe(DIALOGUE_IDS.tansyKeepTheChangeCompletion);
+          expect(beat.presentationMode).toBe("comms");
+          expect(beat.backgroundId).toBe(CONVERSATION_BACKGROUND_IDS.ruskRecoveryYard);
+          continue;
+        }
         expect(beat.speakerNpcId, dialogueId).toBe(NPC_IDS.tansyRusk);
         expect(beat.presentationMode, dialogueId).toBe("local");
         expect(beat.backgroundId, dialogueId).toBe(CONVERSATION_BACKGROUND_IDS.theJagExterior);

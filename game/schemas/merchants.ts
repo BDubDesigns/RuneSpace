@@ -26,6 +26,16 @@ export const MerchantDefinitionSchema = z
     id: ContentId,
     /** The resident who fronts this merchant, for player-facing presentation. */
     npcId: ContentId,
+    /**
+     * The Mission whose ACCEPTANCE opens this merchant, when one does (#190).
+     *
+     * Wade sells practice stock only once he has taken the player on at the
+     * bench; Bix sells to anyone who walks in and authors nothing here. The
+     * same accepted-Mission record that opens the Workbench opens this, so
+     * there is no second trade-unlock flag, and it stays true after the Mission
+     * completes.
+     */
+    authorizingMissionId: ContentId.optional(),
     prices: z.array(MerchantPriceSchema).min(1),
   })
   .strict()

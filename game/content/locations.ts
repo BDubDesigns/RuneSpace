@@ -1,4 +1,4 @@
-import { ACTION_IDS, LOCATION_IDS } from "@/game/config/foundations";
+import { ACTION_IDS, LOCATION_IDS, MERCHANT_IDS } from "@/game/config/foundations";
 import {
   assertBidirectionalAdjacency,
   LocationDefinitionSchema,
@@ -20,6 +20,8 @@ import {
  * - Holo Hollow (#159): the first settlement. Its town places are Local Places
  *   (game/content/local-places), not separate World Locations, so they own no
  *   map coordinate, adjacency, or Travel semantics.
+ * - Rusk Recovery (#190): Wade's recovery yard, one ordinary walking edge
+ *   northwest of Holo Hollow. Practice Welding happens here.
  */
 const locationDefinitions = [
   {
@@ -157,6 +159,7 @@ const locationDefinitions = [
       LOCATION_IDS.crashSite,
       LOCATION_IDS.emergencyPowerAnnex,
       LOCATION_IDS.theLongScramble,
+      LOCATION_IDS.ruskRecovery,
     ],
     availableActionIds: [],
     dormantActivities: [],
@@ -171,6 +174,37 @@ const locationDefinitions = [
         width: 1536,
         height: 384,
         alt: "Weathered main street of a small mining settlement, faded holo-tourism signage above working shopfronts under an overcast sky",
+        focal: { x: 50, y: 45 } as const,
+      },
+    },
+  },
+  {
+    // Wade's recovery yard on the northwest edge of town (#190). It is a full
+    // World Location, not one of Holo Hollow's Local Places: it owns a map
+    // coordinate, an ordinary walking edge, and its own activity. It is visible
+    // and visitable from the beginning of the game — what changes with
+    // progression is who is standing in it and what they will let the player
+    // touch, never the place itself.
+    id: LOCATION_IDS.ruskRecovery,
+    displayName: "Rusk Recovery",
+    description:
+      "Wade's recovery yard: salvaged machinery and stripped components racked in rows, damaged speeders waiting their turn, and a welding bench somebody actually works at. Messy, and organized by somebody who knows exactly where everything is.",
+    region: "holo_hollow" as const,
+    adjacentLocationIds: [LOCATION_IDS.holoHollow],
+    availableActionIds: [ACTION_IDS.practiceWelding],
+    merchantId: MERCHANT_IDS.wadeRusk,
+    dormantActivities: [],
+    presentation: {
+      mapIconKey: "rusk_recovery" as const,
+      layout: "rusk_recovery" as const,
+      localMap: { axial: { q: -2, r: 1 }, label: "Rusk Recovery" },
+      scene: {
+        // Delivered at its native 1536x384 4:1 resolution (#190): one static
+        // scene before and after progression, never a locked/unlocked swap.
+        asset: "/location-scenes/rusk-recovery.webp" as const,
+        width: 1536,
+        height: 384,
+        alt: "Working recovery yard with racked salvage, stripped components, damaged work vehicles, and a welding bench under an overcast sky",
         focal: { x: 50, y: 45 } as const,
       },
     },
@@ -210,4 +244,5 @@ export const LOCAL_MAP_LOCATION_IDS: readonly LocationDefinition["id"][] = [
   LOCATION_IDS.theLongScramble,
   LOCATION_IDS.theJag,
   LOCATION_IDS.holoHollow,
+  LOCATION_IDS.ruskRecovery,
 ];

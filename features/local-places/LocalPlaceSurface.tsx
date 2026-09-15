@@ -26,6 +26,9 @@ import type { LocalPlaceSurface as LocalPlaceSurfaceState } from "@/game/domain/
  * place's merchant is offered as Trade on its resident's Local Contact card
  * (features/npc/NpcInteractionPanel), beside Talk, so the player meets one
  * person with several interactions rather than a shop that unfolds on arrival.
+ * That card arrives as a `resident` slot and sits directly under the
+ * description, above whatever gameplay the place hosts, so the person in front
+ * of the player is never pushed below the place's activity UI on a phone.
  *
  * A place may also host gameplay of its own — Holo Hollow's Crew Stop is the
  * first (#172). That arrives as an `activity` slot rather than anything this
@@ -40,11 +43,13 @@ export function LocalPlaceSurface({
   activity,
   characterName,
   parentDisplayName,
+  resident,
   surface,
 }: {
   activity?: ReactNode;
   characterName: string;
   parentDisplayName: string;
+  resident?: ReactNode;
   surface: LocalPlaceSurfaceState;
 }) {
   const pathname = usePathname();
@@ -63,6 +68,7 @@ export function LocalPlaceSurface({
         >
           {surface.description}
         </p>
+        {resident}
         {activity ? <div data-local-place-activity>{activity}</div> : null}
         <div className="mt-5">
           <ActionLink

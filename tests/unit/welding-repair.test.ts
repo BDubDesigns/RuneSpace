@@ -7,6 +7,7 @@ import {
   weldingActionIds,
 } from "@/game/config/balance";
 import { ACTION_IDS, REPAIR_TARGET_IDS, SKILL_IDS } from "@/game/config/foundations";
+import { UNROLLED_CLEAN_PASS } from "@/game/domain/clean-pass";
 import {
   deriveCompletedRepairTargetIds,
   planRepairMaterialContribution,
@@ -27,6 +28,7 @@ function repair(overrides: Partial<RepairTargetState> = {}): RepairTargetState {
     refinedFerriteContributed: 0,
     slagContributed: 0,
     weldingProgress: 0,
+    cleanPass: UNROLLED_CLEAN_PASS,
     completedAt: null,
     ...overrides,
   };

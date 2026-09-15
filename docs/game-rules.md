@@ -23,16 +23,17 @@ The following are live on `main` as server-authoritative, Play-orchestrated syst
 - **Travel & Scavenging** — walking between locations, scavenging yields, and Power Annex / Power Cell claims.
 - **Mining** — Ferrite Shale Mining at The Jag (Power Cell boosting, run history).
 - **Refining** — Ferrite Shale refining at the Abandoned Processing Yard.
-- **Welding & Cargo Hold** — ship Cargo Hold repair at Crash Site and Welding progression.
+- **Welding & Cargo Hold** — ship Cargo Hold repair at Crash Site, the Crew Stop repair in Holo Hollow, and Welding progression.
+- **Practice Welding & Clean Pass** — the indefinite Welding training loop at Wade's Workbench in Rusk Recovery, and the two optional Clean Pass opportunities every Welding work unit rolls (`docs/gameplay-foundations.md`).
 - **Inventory & Equipment** — carried stacks/unique items, slot/mass capacity, containers, and Equipment.
 - **Locations & presentation** — location scenes and the local world map.
 - **Holo Hollow, Local Places & Credits** — the first settlement, one-level Local Places inside it, character-scoped Credits, and Bix's authored merchant Trade (`docs/gameplay-foundations.md`, `docs/holo-hollow.md`).
-- **Missions & NPC conversations** — declarative mission framework (`docs/missions.md`), authored missions (Walk It Off / Cut Your Teeth / Waste Not / Hold It Together), the one canonical NPC conversation model with replayable topics (`docs/npc-conversations.md`), and dialogue authoring (`docs/qc-studio.md`).
+- **Missions & NPC conversations** — declarative mission framework (`docs/missions.md`), authored missions (Walk It Off / Cut Your Teeth / Waste Not / Hold It Together / Keep the Change / 10,000 Hours, plus the optional Out of the Weather), the one canonical NPC conversation model with replayable topics (`docs/npc-conversations.md`), and dialogue authoring (`docs/qc-studio.md`).
 
 ## World & skills
 
 - The opening direction is a **one-way crash-site tutorial planet**.
-- **Mining** is the first core skill direction; **Refining** is the second (at the Abandoned Processing Yard); **Welding** repairs the crashed ship's Cargo Hold at Crash Site.
+- **Mining** is the first core skill direction; **Refining** is the second (at the Abandoned Processing Yard); **Welding** repairs the crashed ship's Cargo Hold at Crash Site, and is practised indefinitely at Wade's Workbench in Rusk Recovery.
 - Planetary maps use **hexes** with **local fog-of-war** exploration.
 - **Explore** consumes **limited fuel**.
 - **Speeder Piloting** and **Ship Piloting** are separate skill directions.

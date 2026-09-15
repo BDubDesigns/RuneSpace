@@ -1,6 +1,7 @@
 import { relations, sql } from "drizzle-orm";
 import {
   bigint,
+  boolean,
   check,
   date,
   foreignKey,
@@ -513,6 +514,18 @@ export const characterRepairTargets = pgTable(
     refinedFerriteContributed: integer("refined_ferrite_contributed").notNull().default(0),
     slagContributed: integer("slag_contributed").notNull().default(0),
     weldingProgress: integer("welding_progress").notNull().default(0),
+    /**
+     * Clean Pass (#190). A repair is ONE Welding work unit, so its two
+     * opportunity sections are rolled once, when Welding first starts on it,
+     * and never rerolled by Stop or Resume. A null outcome on a rolled section
+     * is not a miss by itself — a section the work has already passed reads as
+     * missed from the progress above. The outcome column exists for the one
+     * case progress cannot express: an open window closed by Stop or Travel.
+     */
+    cleanPassFirstSection: integer("clean_pass_first_section"),
+    cleanPassFirstOutcome: text("clean_pass_first_outcome"),
+    cleanPassSecondSection: integer("clean_pass_second_section"),
+    cleanPassSecondOutcome: text("clean_pass_second_outcome"),
     completedAt: timestamp("completed_at", { withTimezone: true }),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
@@ -529,6 +542,58 @@ export const characterRepairTargets = pgTable(
     check(
       "character_repair_targets_completion_requires_progress",
       sql`${table.completedAt} IS NULL OR ${table.weldingProgress} > 0`,
+    ),
+  ],
+);
+
+/**
+ * Issue #190 — repeatable Practice Welding state, one row per character.
+ *
+ * Practice is deliberately NOT modelled as a repair target: a repair target is
+ * one finite physical job that permanently completes, while Practice repeats
+ * forever. This row therefore carries only Practice-owned facts — the partial
+ * weld the player has already paid two Scrap for, that weld's Clean Pass roll,
+ * the persistent Slag preference, and the bounded `This Run` totals that mirror
+ * Mining and Refining.
+ *
+ * Nothing here duplicates an unlock: whether Practice is available at all is
+ * derived from the accepted 10,000 Hours Mission, not from this table. A
+ * character who has never practised simply has no row.
+ */
+export const characterPracticeWelds = pgTable(
+  "character_practice_welds",
+  {
+    characterId: text("character_id")
+      .primaryKey()
+      .references(() => characters.id, { onDelete: "restrict" }),
+    /** Whole sections resolved for the weld currently in progress. */
+    sectionsCompleted: integer("sections_completed").notNull().default(0),
+    /** The current weld's two Scrap are already spent; Resume continues it free. */
+    cycleActive: boolean("cycle_active").notNull().default(false),
+    /** Persistent per-character preference, read at each weld's completion. */
+    autoDiscardSlag: boolean("auto_discard_slag").notNull().default(false),
+    cleanPassFirstSection: integer("clean_pass_first_section"),
+    cleanPassFirstOutcome: text("clean_pass_first_outcome"),
+    cleanPassSecondSection: integer("clean_pass_second_section"),
+    cleanPassSecondOutcome: text("clean_pass_second_outcome"),
+    lastStopReason: text("last_stop_reason"),
+    runWelds: integer("run_welds").notNull().default(0),
+    runScrapConsumed: integer("run_scrap_consumed").notNull().default(0),
+    runSlagKept: integer("run_slag_kept").notNull().default(0),
+    runSlagDiscarded: integer("run_slag_discarded").notNull().default(0),
+    runXpGained: integer("run_xp_gained").notNull().default(0),
+    /** Latest ten immutable server-resolved weld summaries for the current run. */
+    recentWelds: jsonb("recent_welds").notNull().default([]),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    check("character_practice_welds_sections_non_negative", sql`${table.sectionsCompleted} >= 0`),
+    check("character_practice_welds_run_welds_non_negative", sql`${table.runWelds} >= 0`),
+    // A weld that is not in progress cannot hold partial sections: the pair is
+    // written together by one resolution, so a split state is corruption.
+    check(
+      "character_practice_welds_sections_require_active_cycle",
+      sql`${table.cycleActive} OR ${table.sectionsCompleted} = 0`,
     ),
   ],
 );

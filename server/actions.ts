@@ -37,6 +37,12 @@ import {
   type RepairContributionStatus,
   type RepairStateResult,
 } from "@/server/repair-commands";
+import {
+  setPracticeSlagPreference,
+  startPracticeWelding,
+  stopPracticeWelding,
+} from "@/server/practice-commands";
+import { claimCleanPass, type CleanPassClaimResult } from "@/server/clean-pass";
 import { EquipmentRuleError } from "@/game/domain/equipment";
 import { TravelRuleError } from "@/server/travel";
 import { claimPowerCells, type PowerAnnexClaimResult } from "@/server/power-annex";
@@ -61,6 +67,9 @@ import {
   DiscardInventoryStackRequestSchema,
   RepairMaterialContributionRequestSchema,
   WeldingCommandRequestSchema,
+  PracticeCommandRequestSchema,
+  PracticeSlagPreferenceRequestSchema,
+  CleanPassClaimRequestSchema,
   DepositCargoStackRequestSchema,
   WithdrawCargoStackRequestSchema,
   DepositCargoUniqueItemRequestSchema,
@@ -266,6 +275,62 @@ export async function startWeldingAction(input: unknown): Promise<PlayActionResu
     return {
       state: await startWelding(user.id, request.data.characterId, request.data.targetId),
     };
+  } catch (error) {
+    if (error instanceof OwnershipError) return { error: error.message };
+    throw error;
+  }
+}
+
+export async function startPracticeWeldingAction(input: unknown): Promise<PlayActionResult> {
+  const request = PracticeCommandRequestSchema.safeParse(input);
+  if (!request.success) return { error: "Invalid Practice command." };
+  try {
+    const user = await requireCurrentUser(await headers());
+    return { state: await startPracticeWelding(user.id, request.data.characterId) };
+  } catch (error) {
+    if (error instanceof OwnershipError) return { error: error.message };
+    throw error;
+  }
+}
+
+export async function stopPracticeWeldingAction(input: unknown): Promise<PlayActionResult> {
+  const request = PracticeCommandRequestSchema.safeParse(input);
+  if (!request.success) return { error: "Invalid Practice command." };
+  try {
+    const user = await requireCurrentUser(await headers());
+    return { state: await stopPracticeWelding(user.id, request.data.characterId) };
+  } catch (error) {
+    if (error instanceof OwnershipError) return { error: error.message };
+    throw error;
+  }
+}
+
+export async function setPracticeSlagPreferenceAction(input: unknown): Promise<PlayActionResult> {
+  const request = PracticeSlagPreferenceRequestSchema.safeParse(input);
+  if (!request.success) return { error: "Invalid Practice setting." };
+  try {
+    const user = await requireCurrentUser(await headers());
+    return {
+      state: await setPracticeSlagPreference(
+        user.id,
+        request.data.characterId,
+        request.data.autoDiscardSlag,
+      ),
+    };
+  } catch (error) {
+    if (error instanceof OwnershipError) return { error: error.message };
+    throw error;
+  }
+}
+
+export type CleanPassClaimActionResult = CleanPassClaimResult | { error: string };
+
+export async function claimCleanPassAction(input: unknown): Promise<CleanPassClaimActionResult> {
+  const request = CleanPassClaimRequestSchema.safeParse(input);
+  if (!request.success) return { error: "Invalid Clean Pass claim." };
+  try {
+    const user = await requireCurrentUser(await headers());
+    return await claimCleanPass(user.id, request.data.characterId);
   } catch (error) {
     if (error instanceof OwnershipError) return { error: error.message };
     throw error;

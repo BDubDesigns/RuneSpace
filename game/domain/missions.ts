@@ -14,6 +14,17 @@ import type {
   MissionRequirementKind,
 } from "@/game/content/missions";
 
+/**
+ * The authoritative action each tracked activity is performed through. Mission
+ * guidance may only recommend the action that genuinely produces the tracked
+ * fact, so a new activity adds one entry here rather than a new conditional.
+ */
+const TRACKED_ACTIVITY_ACTION_IDS = {
+  mining: ACTION_IDS.ferriteShaleMining,
+  refining: ACTION_IDS.refining,
+  practice_welding: ACTION_IDS.practiceWelding,
+} as const;
+
 export type MissionState = "not_accepted" | "active" | "ready_for_completion" | "completed";
 
 export type MissionRecordState = {
@@ -194,7 +205,8 @@ export type MissionRequirementStatus = {
  */
 export type MissionEarnedReward =
   | { kind: "item"; itemId: string; itemName: string }
-  | { kind: "skill_xp"; skillId: string; skillName: string; amount: number };
+  | { kind: "skill_xp"; skillId: string; skillName: string; amount: number }
+  | { kind: "credits"; amount: number };
 
 export type MissionProjection = {
   missionId: string;
@@ -760,6 +772,9 @@ function projectEarnedReward(definition: MissionDefinition): MissionEarnedReward
         .displayName,
     };
   }
+  if (definition.reward.kind === "credits") {
+    return { kind: "credits", amount: definition.reward.amount };
+  }
   return {
     kind: "skill_xp",
     skillId: definition.reward.skillId,
@@ -860,6 +875,24 @@ export function deriveCompletedMissionIds(
   return new Set(
     projections
       .filter((projection) => projection.state === "completed")
+      .map((projection) => projection.missionId),
+  );
+}
+
+/**
+ * The Missions the character has accepted, which stays true once they complete.
+ *
+ * What an accepted Mission opens up — repair work, Wade's Workbench, Wade's
+ * Trade — stays open afterwards, so "accepted" is every state except
+ * not-accepted. Surfaces derive this instead of persisting a second unlock flag
+ * (#190).
+ */
+export function deriveAcceptedMissionIds(
+  projections: readonly { missionId: string; state: MissionState }[],
+): ReadonlySet<string> {
+  return new Set(
+    projections
+      .filter((projection) => projection.state !== "not_accepted")
       .map((projection) => projection.missionId),
   );
 }
@@ -970,13 +1003,30 @@ export function validateMissionDefinitions(definitions: readonly MissionDefiniti
         assertDialogue(definition.id, offer.activeDialogueId, "active");
         assertDialogueNpc(definition.id, offer.activeDialogueId, offer.npcId, "active");
       }
-      if (offer.acceptEffect) {
-        if (offer.acceptEffect.kind !== "credits") {
-          throw new Error(`${where} offer references an unsupported acceptance effect.`);
-        }
+      if (offer.acceptEffect?.kind === "credits") {
         if (!Number.isInteger(offer.acceptEffect.amount) || offer.acceptEffect.amount <= 0) {
           throw new Error(`${where} offer Credit grant must be a positive integer.`);
         }
+      } else if (offer.acceptEffect?.kind === "stack_item") {
+        if (!Number.isInteger(offer.acceptEffect.quantity) || offer.acceptEffect.quantity <= 0) {
+          throw new Error(`${where} offer item grant quantity must be a positive integer.`);
+        }
+        const grantDefinition = getItemDefinition(offer.acceptEffect.itemId);
+        if (!grantDefinition) {
+          throw new Error(
+            `${where} offer grant references unknown item "${offer.acceptEffect.itemId}".`,
+          );
+        }
+        // Definition validation and runtime capability must agree, exactly as
+        // they do for item rewards: the acceptance boundary grants through the
+        // authoritative carried-stack path, which only executes stack items.
+        if (grantDefinition.kind !== "stack") {
+          throw new Error(
+            `${where} offer grant item "${offer.acceptEffect.itemId}" must be a stackable item; the acceptance boundary does not execute unique item grants.`,
+          );
+        }
+      } else if (offer.acceptEffect) {
+        throw new Error(`${where} offer references an unsupported acceptance effect.`);
       }
     }
     if (definition.completedNpcDialogue) {
@@ -1036,7 +1086,7 @@ export function validateMissionDefinitions(definitions: readonly MissionDefiniti
           );
         }
         progressKeys.add(requirement.progressKey);
-        if (requirement.activity !== "mining" && requirement.activity !== "refining") {
+        if (!(requirement.activity in TRACKED_ACTIVITY_ACTION_IDS)) {
           throw new Error(`${where} references unsupported tracked activity.`);
         }
         if (requirement.metric !== "attempts") {
@@ -1046,8 +1096,7 @@ export function validateMissionDefinitions(definitions: readonly MissionDefiniti
           throw new Error(`${where} tracked activity target must be a positive integer.`);
         }
         if (requirement.recommendedActionId) {
-          const expectedActionId =
-            requirement.activity === "mining" ? ACTION_IDS.ferriteShaleMining : ACTION_IDS.refining;
+          const expectedActionId = TRACKED_ACTIVITY_ACTION_IDS[requirement.activity];
           if (requirement.recommendedActionId !== expectedActionId) {
             throw new Error(
               `${where} tracked activity guidance must target its authoritative activity action.`,
@@ -1203,6 +1252,10 @@ export function validateMissionDefinitions(definitions: readonly MissionDefiniti
         throw new Error(
           `${where} reward item "${definition.reward.itemId}" must be a unique item; the generic completion boundary does not execute stackable item rewards.`,
         );
+      }
+    } else if (definition.reward.kind === "credits") {
+      if (!Number.isInteger(definition.reward.amount) || definition.reward.amount <= 0) {
+        throw new Error(`${where} reward Credit amount must be a positive integer.`);
       }
     } else {
       if (!Number.isInteger(definition.reward.amount) || definition.reward.amount <= 0) {
