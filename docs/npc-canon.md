@@ -425,6 +425,16 @@ Hollow** (after Hold It Together).
 - She runs out of Power Cells mid-shift and would rather not lose an afternoon
   walking back for them — the premise of Keep the Change.
 
+`APPROVED — NOT SHIPPED` — the authored Work Order `tansy_cutter_housing`
+introduces **one** further possession: a separate working cutter of her own,
+whose housing is built with the same mismatched-spares approach as her
+established style. Note carefully that the Salvage Cutter in shipped dialogue is
+the one she **builds and gives to the player**, and shipped content does not
+establish a second one; this is new canon, not a restatement. Do not expand it
+with a model name, age, history, or a wider inventory of her tools, and do not
+publish it as current fact while Work Orders are unimplemented
+(`docs/work-orders.md`).
+
 **Knowledge.** Ferrite, shale, cutting, and improvised repair. Knows the hopper
 at the Abandoned Processing Yard and how Refining behaves. Knows Wade well
 enough to predict him. Knows the Cutter's charge economy. Knows Bix sells Cells
@@ -709,9 +719,16 @@ Established:
 - **The Assistance Center's fixtures** — forms, notices, stacked ration crates.
   Municipal, not his.
 
-Nothing establishes tools, a vehicle, a home, or equipment of his own. That is
-an absence of evidence, not an established fact of poverty — **do not write him
-as owning nothing**; simply do not give him possessions that canon has not.
+Shipped content establishes no tools, vehicle, home, or equipment of his own.
+That is an absence of evidence, not an established fact of poverty — **do not
+write him as owning nothing**; simply do not give him possessions canon has not.
+
+`APPROVED — NOT SHIPPED` — the authored Work Order `renn_carry_frame` introduces
+exactly one: an ore carry frame used in his mining work. His occupation made that
+plausible, but plausible was never established, and this job is what establishes
+it. Nothing further follows from it — no other tools, no vehicle, no home, no
+circumstances — and it is not publishable as current fact while Work Orders are
+unimplemented (`docs/work-orders.md`).
 
 **Knowledge.** The town's actual condition, as opposed to its story about
 itself. The Assistance Center's history as the Visitor Center. Ferrite's market

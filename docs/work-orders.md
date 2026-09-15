@@ -51,6 +51,26 @@ issue.
 - Exact section counts, material quantities, and payouts are **balance-sensitive
   and remain provisional** pending Practice playtesting and economy evidence.
 
+### Completion is a transaction, not a scene
+
+> **Repeatable Work Orders are shop jobs, not miniature Missions. Their normal
+> completion does not require bespoke client dialogue.**
+
+None of the eight jobs below authors a completion scene, and none should. A
+finished Work Order should eventually give a clear, **generic** transactional
+acknowledgement of the result — the repair is done, the Welding XP earned, the
+Credits paid, and whatever material or result state applies. One acknowledgement
+serves every job in the pool.
+
+The exact copy and UI belong to the implementation issue; nothing here
+prescribes them, and nothing here is implemented. What is settled is the
+product rule: a client does not appear and talk to the player because a bracket
+got welded.
+
+A later special contract may deliberately carry authored dialogue or a narrative
+completion beat, but that is outside this system and has to be earned by a
+specific content need rather than assumed as the default shape.
+
 ## Choosing a client
 
 > **Work Order clients do not need to have been met, and do not need to be
@@ -117,6 +137,36 @@ Common to all eight, and therefore not repeated per job:
   complete, Welding level 5). No job below needs a prerequisite of its own,
   which means **no per-job gating mechanism has to be built**.
 
+### Possession provenance — the standard for every job
+
+An occupation making a possession *plausible* is not the same as canon having
+*established* it. Every job below therefore separates the two:
+
+- **Established canon** — what shipped content already says about this person.
+- **New Work Order canon** — the possession, or the state of it, that this job
+  introduces.
+
+Do not describe a newly introduced possession as previously established merely
+because the client's job makes owning one obvious. A miner plausibly owns a
+carry frame; that is not the same as RuneSpace having said he does. Keep each
+expansion to the one object the job needs, with no model name, age, history,
+extra features, or second inventory of that person's tools.
+
+### `short` / `standard` / `long` are authoring guidance only
+
+The length category on each job is **planning intent for authors**, recorded so
+the eight jobs are not accidentally all the same size before playtesting says
+what a size is.
+
+It is explicitly **not** a runtime concept. It requires no enum, no schema
+property, no database field, and no persisted category. The implementation may
+express job length purely through tuned Welding section counts, or through
+whatever concrete balance values are approved after Practice playtesting. If the
+labels turn out to be redundant once real counts exist, they may stay docs-only
+or disappear entirely.
+
+A planning adjective must not become a mandatory implementation abstraction.
+
 ### 1. Cracked Cutter Housing
 
 - **ID:** `tansy_cutter_housing`
@@ -126,12 +176,22 @@ Common to all eight, and therefore not repeated per job:
 - **Terminal description:** One of the mismatched joints in Tansy Rusk's cutter
   housing has finally let go. She built the thing out of spares, and she is not
   walking off the seam mid-shift to fix it, so it comes to the bench.
-- **Why it is hers:** The cutter is the single object canon ties to Tansy
-  unambiguously. She built it "from spare parts and stubbornness", and says
-  herself that nothing on it matches — a weld failing at a mismatched joint is
-  the most consistent possible failure for it. She works The Jag, not a bench,
-  and Keep the Change already established that she does not leave the seam
-  mid-shift for a part she needs.
+- **Established canon:** Tansy is a field mechanic and miner who works The Jag,
+  and she builds functional equipment out of mismatched salvage and spares — she
+  says of the cutter she made that nothing on it matches and that she threw it
+  together from parts she had lying around. Keep the Change established that she
+  does not leave the seam mid-shift for a part she needs.
+- **New Work Order canon:** Tansy owns and uses a **separate working cutter**,
+  whose housing is built with the same practical mismatched-spares approach as
+  her established engineering style. That is the whole expansion.
+- **Why the pairing works:** her established engineering style predicts exactly
+  this failure — a weld letting go at a joint between two parts that were never
+  meant to meet — and her established working life explains why it reaches
+  Wade's bench instead of her own hands.
+- **Provenance caution:** the Salvage Cutter in shipped dialogue is the one Tansy
+  **builds and gives to the player**. It is not this cutter, and shipped content
+  does not establish that she keeps a second one. Do not cite the player's
+  Cutter as evidence that this one already existed.
 - **Canon notes:** `game/content/dialogue.ts` (`tansyCompletion`,
   `tansyAfterRemoteAcceptance`, `tansyMiningTopic`), `game/content/npcs.ts`,
   `docs/npc-canon.md` (Tansy → Work, business, and equipment context).
@@ -145,10 +205,15 @@ Common to all eight, and therefore not repeated per job:
 - **Terminal description:** A shelf bay in Holo Hollow Souvenirs is bowing under
   a load it was never built for. Bix Weller wants the brackets reinforced before
   the whole run of it comes down on somebody.
-- **Why it is his:** His shop is the clearest case in town of fixtures outliving
-  their purpose — tourism-era shelving built for shirts, mugs and projector toys,
-  now carrying the mining supplies that are the only thing that sells. The repair
-  *is* his characterization.
+- **Established canon:** the shop, and its shelving — shipped content describes
+  shelves of tourist-era trinkets sitting beside the mining supplies that
+  actually sell, and Bix's own account of the place is that his parents filled it
+  with shirts, mugs and little projector toys.
+- **New Work Order canon:** that one bay of that established shelving is bowing
+  and its brackets need reinforcing. No new fixture, and no new stock.
+- **Why the pairing works:** his shop is the clearest case in town of fixtures
+  outliving their purpose. Tourism-era shelving failing under ferrite-grade stock
+  *is* his characterization, in one object.
 - **Canon notes:** `game/content/local-places.ts`
   (`holo_hollow_souvenirs` description), `game/content/dialogue.ts`
   (`bixTheShopTopic`), `docs/holo-hollow.md` (Bix Weller).
@@ -161,9 +226,16 @@ Common to all eight, and therefore not repeated per job:
 - **Length:** `short`
 - **Terminal description:** A carry frame has split along the weld at the strap
   mount. Renn Calder works ferrite and needs it whole before his next shift.
-- **Why it is his:** He is established as a working ferrite miner, and a working
-  miner's own kit is the reasonable floor of what he owns. The job is
-  deliberately unglamorous and understated, which is his register.
+- **Established canon:** Renn is a working Ferrite miner. That is all shipped
+  content establishes about his work.
+- **New Work Order canon:** Renn owns an ore carry frame used in his mining work.
+  That is the whole expansion — no other tools, no vehicle, no home, no
+  circumstances.
+- **Why the pairing works:** the job is deliberately unglamorous and
+  understated, which is his register, and a carry frame is the plainest possible
+  piece of a working miner's own kit.
+- **Provenance caution:** his occupation makes owning a carry frame obvious, but
+  obvious is not established. This job is what establishes it.
 - **Copy constraint:** Renn is **not** guaranteed to have been met. This job must
   read as a work order rather than a favour between acquaintances, and must not
   reference the Crew Stop or the Crew Hauler — that would foreground an optional
@@ -182,10 +254,14 @@ Common to all eight, and therefore not repeated per job:
   joints. The beds date from the years the rooms held families; they now hold
   miners and haulers, which is a different sort of weight. Mara Kells would
   rather it were welded than replaced.
-- **Why it is hers:** She owns the inn, and her own account of it is that the
-  rooms and their contents did not change when the clientele did — "same beds,
-  fewer complaints about the pillows". A tourism-era bed frame failing under
-  working crews is her whole business model in one object.
+- **Established canon:** she owns HH B&B, the rooms date from the tourism years,
+  and her own account is that their contents did not change when the clientele
+  did — "same beds, fewer complaints about the pillows". The beds themselves are
+  established.
+- **New Work Order canon:** one of those established bed frames has failed at the
+  corner joints. Nothing else.
+- **Why the pairing works:** a tourism-era bed frame giving out under working
+  crews is her whole business model in one object.
 - **Canon notes:** `game/content/local-places.ts` (`hh_bnb`),
   `game/content/dialogue.ts` (`maraTheBnbTopic`), `docs/holo-hollow.md`
   (Mara Kells — HH B&B).
@@ -199,13 +275,15 @@ Common to all eight, and therefore not repeated per job:
 - **Terminal description:** The bed frame on Otis Mott's cargo dolly is buckled
   and the load will not sit square on it any more. He hauls freight around the
   valley and cannot work without it.
-- **Why it is his:** Hauling is part of Holo Hollow's adapted economy, and the
-  town's inn explicitly serves haulers. A dolly is the most ordinary possible
-  possession for one.
-- **New canon introduced:** Otis Mott is a local hauler and owns a cargo dolly.
+- **Established canon:** hauling is part of Holo Hollow's adapted economy, and
+  the town's inn explicitly serves haulers. The occupation exists; this person
+  does not yet.
+- **New Work Order canon:** Otis Mott is a local hauler and owns a cargo dolly.
   He/him. Nothing else.
+- **Why the pairing works:** a dolly is the most ordinary possible possession for
+  somebody who moves freight for a living.
 
-### 6. Seized Hand Winch
+### 6. Binding Hand Winch
 
 - **ID:** `larkin_hand_winch`
 - **Client:** Pell Larkin — *background resident*
@@ -214,10 +292,13 @@ Common to all eight, and therefore not repeated per job:
 - **Terminal description:** The drum mount on Pell Larkin's hand winch is bent
   out of true, so the cable binds the moment there is any weight on it. It wants
   the mount cut back and re-laid straight.
-- **Why it is his:** Mining crews are established in Holo Hollow, and a hand
-  winch is ordinary worksite equipment a crew hand would own and use most days.
-- **New canon introduced:** Pell Larkin works a mining crew and owns a hand
+- **Established canon:** mining crews are established in Holo Hollow, and they
+  work a haul road and a shift. The crews exist; this person does not yet.
+- **New Work Order canon:** Pell Larkin works a mining crew and owns a hand
   winch. He/him. Nothing else.
+- **Why the pairing works:** a hand winch is ordinary worksite equipment a crew
+  hand would own and use most days, and a bent drum mount is a wear failure
+  rather than a dramatic one.
 
 ### 7. Speeder Cargo Rack
 
@@ -228,13 +309,15 @@ Common to all eight, and therefore not repeated per job:
 - **Terminal description:** The cargo rack on Juno Stemp's speeder has cracked at
   both frame mounts. She runs deliveries out of Holo Hollow, and the rack carries
   the entire load.
-- **Why it is hers:** Gig and delivery work is part of the town's adapted economy,
-  and speeders are already established in the world — Rusk Recovery's own yard has
-  damaged ones waiting their turn, so a speeder fitting arriving for a weld needs
-  no new worldbuilding.
-- **New canon introduced:** Juno Stemp runs local deliveries and owns a speeder
-  with a cargo rack. She/her. Nothing else. The speeder is deliberately
+- **Established canon:** gig and delivery work is part of the town's adapted
+  economy, and speeders already exist in the world — Rusk Recovery's own yard has
+  damaged ones waiting their turn. The occupation and the vehicle class exist;
+  this person and her speeder do not yet.
+- **New Work Order canon:** Juno Stemp runs local deliveries and owns a speeder
+  with a cargo rack. She/her. Nothing else. The speeder stays deliberately
   unnamed and unmodelled.
+- **Why the pairing works:** a rack that carries the whole load is the part of a
+  delivery runner's kit that fails first, and it needs no new worldbuilding.
 
 ### 8. Cracked Heater Housing
 
@@ -245,13 +328,15 @@ Common to all eight, and therefore not repeated per job:
 - **Terminal description:** The housing on Greta Voss's room heater has cracked
   through at a seam, and it will not hold a Power Cell safely until it is closed
   up again.
-- **Why it is hers:** A Power-Cell heater is the most ordinary domestic object in
-  Holo Hollow — the Annex's whole public purpose is keeping "heat, comms, or a
-  tool alive". This job is the one on the board that is not about somebody's
-  trade, which is deliberate: the shop serves the town, not only its workers.
-- **New canon introduced:** Greta Voss is a resident of Holo Hollow and owns a
-  Power-Cell room heater. She/her. Nothing else — no occupation, because the job
-  does not need one.
+- **Established canon:** the Annex's whole public purpose is keeping "heat,
+  comms, or a tool alive", so Power-Cell heating is established as an ordinary
+  domestic need out here. This person does not yet exist.
+- **New Work Order canon:** Greta Voss is a resident of Holo Hollow and owns a
+  Power-Cell room heater. She/her. Nothing else — **no occupation**, because the
+  job does not need one.
+- **Why the pairing works:** this is the one job on the board that is not about
+  somebody's trade, which is deliberate: the shop serves the town, not only its
+  workers.
 
 ## Background residents introduced by this pool
 
