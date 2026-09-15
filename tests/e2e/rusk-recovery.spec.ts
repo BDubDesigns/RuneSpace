@@ -269,8 +269,12 @@ test("welds for real at the bench, takes a live Clean Pass, and turns the work i
   await expect(page.locator("[data-mission-strip-objective]").first()).toContainText(/1 \/ 3/, {
     timeout: 40_000,
   });
-  // The server-resolved run summary records that weld, in its own sibling panel.
+  // The server-resolved run summary records that weld: its totals are visible
+  // in the bench panel, and the weld itself is one History click away (#193).
+  await expect(panel.locator("[data-run-summary]")).toContainText("1 welds");
+  await panel.getByRole("button", { name: "History", exact: true }).click();
   await expect(page.locator("[aria-label='Practice weld history']")).toContainText("Weld 1");
+  await panel.getByRole("button", { name: "Hide history", exact: true }).click();
 
   // The run carried straight on into the next weld with the Scrap that is left,
   // which is what a continuous run means. Trade is an instantaneous interaction

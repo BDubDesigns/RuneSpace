@@ -32,6 +32,62 @@ and TURN IN Mission-guidance markers (Issue #143); see `docs/missions.md` §10
 for guidance semantics and `docs/travel-map-design.md` for the marker/ring
 presentation contract.
 
+## Stationary Location composition (Issue #193)
+
+Every stationary Play surface — World Location and Local Place alike — composes
+in one order. This is the authoritative home for that grammar;
+`docs/architecture.md` owns which surfaces exist, and each feature owns its own
+gameplay.
+
+1. **The place.** One raised panel: scene, description, the resident's row, and
+   who else is here. `features/location-scene/LocationSurface.tsx` and
+   `features/local-places/LocalPlaceSurface.tsx`.
+2. **The primary activity.** A sibling panel, never nested inside the place —
+   `features/shared/ActivityPanel.tsx`, selected by the one narrow switch in
+   `features/location-scene/LocationActivity.tsx`.
+3. **Compact context**, inside the activity panel: `SkillProgressRow` and
+   `ActivityContextRow` from `features/shared/activity-context.tsx`.
+4. **This Run**, inside the activity panel: `features/shared/RunSummary.tsx`.
+5. **Secondary systems**, as their own panels — Work Orders, Cargo Hold storage
+   once repaired, the Crew Stop's hauler.
+
+Rules that follow from it:
+
+- **The place owns the screen's one `h1`**, and it is the scene plate that
+  already displays the place's name (`LocationSceneHeader`). Panels beneath it
+  pass `level={2}` to `SectionHeader`; blocks inside those panels pass
+  `level={3}`. `SectionHeader` still defaults to `1` for the non-Play surfaces
+  that are their own page.
+- **Inside an activity, the control comes first**, then active progress, then
+  the compact context and run summary. Copy that explains a control goes below
+  it. This ordering is most of what keeps a primary control above the fold.
+- **The fold is the acceptance criterion.** At the canonical 390×844 viewport,
+  with ordinary Mission state and nothing manually expanded, an activity's
+  primary control is fully visible without scrolling — above 783px, which is the
+  viewport less the 61px fixed navigation (`--rs-bottom-nav-box-height`). This
+  is a default-state target: it does not extend to 200% text scaling, opened
+  disclosures, or unusually long Mission content.
+- **Compact means compact, not hidden.** Skill progression, the activity's
+  materials and the current run stay visible by default. Only reference detail —
+  a bounded attempt history, a merchant's counter — sits behind a control.
+- **A deep interaction opens its own surface.** Talk and Trade both use
+  `components/ui/Drawer`; an inline expansion that pushes the place's activity
+  down the page does not.
+- **Empty slots render nothing at all** — no empty frame, no "nothing here yet"
+  placeholder.
+- **Activities stay feature-owned.** `ActivityPanel`, the context rows and
+  `RunSummary` are presentation: no gameplay props, no `server/` imports, no
+  location or action IDs. There is no universal activity framework, no shared
+  run state, and the location-to-activity mapping is a switch rather than a
+  registry.
+
+Legitimate exceptions, all deliberate: Holo Hollow's town surface has no
+activity (its Places directory is the interaction, and is out of scope for
+#193); the Long Scramble, the Assistance Center and the B&B are place-only; the
+Power Annex has no skill or run; the Crew Stop has an activity and no resident;
+and the Crash Site's Cargo Hold is the primary activity while it is a repair and
+a secondary system once it is storage.
+
 ## Overlay motion
 
 Shared overlay panels (`components/ui/Drawer.tsx`, including the tabbed

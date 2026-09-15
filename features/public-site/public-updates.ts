@@ -5,6 +5,51 @@ export type { PublicUpdate } from "@/game/schemas/public-updates";
 
 const authoredUpdates = [
   {
+    slug: "where-to-look",
+    title: "Where to Look",
+    publishedAt: "2026-09-15T16:00:00-07:00",
+    summary:
+      "Every place in the game now lays itself out the same way, and the thing you came to do is on screen when you get there instead of three scrolls down.",
+    body: [
+      "RuneSpace has been picking up places faster than it picked up a way to lay one out. The Jag put mining controls in the middle of the location panel with nothing naming them. The Crash Site put the Cargo Hold in a panel inside a panel. Rusk Recovery put the workbench underneath everything. Each screen was fine on its own and none of them agreed with any other, and on a phone the thing you actually walked there to do was usually below the fold.",
+      "So every location now reads the same way. The place is at the top: its artwork, what it is, who else is standing there, and the person you can talk to. Underneath that, in its own panel with its own name, is what you can do here — Mining, Refining, Practice Welding, a repair, the Annex claim. Then the things that activity needs you to know, and then the run you are in the middle of.",
+      'The place used to introduce itself three times before it said anything: its name on the artwork, its name again underneath, and the word "Location" over the top of that. It says it once now. Bix, Wade, Tansy, Renn and Mara are a row rather than a card — name, what they do, Talk, and Trade where there is trading — which keeps them near the top of the screen without taking a third of it.',
+      "The numbers that follow an activity got a lot smaller. Your level and the XP to the next one is a line. What you are carrying that matters here — the shale, the scrap, your slots, your weight — is a line. The run you are in is a line of totals with a History button beside it, instead of a permanent list of your last ten attempts. Nothing was taken away; it just stopped taking up half the screen to say it.",
+      "Two repairs were quietly not telling you something. Welding the Cargo Hold and welding the Crew Stop both earn Welding XP, and neither showed your Welding level while you did it. They do now, the same way the workbench does.",
+      "Trade opens as its own panel over the top of the screen, the way conversations already did, rather than unfolding the whole shop between you and the room you are standing in.",
+    ],
+    patchNotes: [
+      {
+        heading: "Changed",
+        items: [
+          "Every stationary location now composes the same way: the place and its people first, then the activity in its own named panel, then that activity's context and current run, then anything that is genuinely a separate system.",
+          "Mining and Refining are named on screen. Both were previously unlabelled controls in the middle of the location panel.",
+          'Removed the duplicate location name and the "Location" / "Local place" heading above every place\'s description.',
+          "The resident is a compact row rather than a card, keeping the person and their Talk and Trade controls high on the screen.",
+          "Who else is at a location moved up beside the resident and reads as the place's own information.",
+          "Skill progression, carried materials and the current run are compact rows inside the activity's panel instead of three standalone cards below it.",
+          "Trade opens in a panel over the screen instead of expanding inline inside the place.",
+          "Inside every activity the controls come first and the text explaining them follows, so the primary control is on screen when you arrive.",
+        ],
+      },
+      {
+        heading: "Added",
+        items: [
+          "Welding progression is now shown on the Cargo Hold repair and the Crew Stop repair, both of which award Welding XP.",
+          "A History control on Mining, Refining and Practice run summaries, which opens that run's previous attempts.",
+        ],
+      },
+      {
+        heading: "Fixed",
+        items: [
+          "A run's most recent attempt is no longer shown twice on the same screen.",
+          "The Refining run no longer repeats the carried Refined Ferrite and Slag shown directly above it.",
+          "Attempt history no longer scrolls inside the page; it opens in the page itself.",
+        ],
+      },
+    ],
+  },
+  {
     slug: "ten-thousand-hours",
     title: "10,000 Hours",
     publishedAt: "2026-09-15T09:00:00-07:00",

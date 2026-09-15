@@ -692,7 +692,7 @@ const authoredWikiArticles = [
       {
         heading: "What leveling up does",
         paragraphs: [
-          "Higher Mining and Refining levels raise your chance of success on each attempt, up to a level where success is guaranteed. Levels have a cap, and every skill shows its current level and XP right where you use it — open Mining, Refining, or the Cargo Hold repair to see your current progress.",
+          "Higher Mining and Refining levels raise your chance of success on each attempt, up to a level where success is guaranteed. Levels have a cap, and every skill shows its current level and XP right where you use it — Mining at The Jag, Refining at the Processing Yard, and Welding at the Workbench, the Cargo Hold repair, and the Crew Stop repair.",
         ],
       },
     ],
