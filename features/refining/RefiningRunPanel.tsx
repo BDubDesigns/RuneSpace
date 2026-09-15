@@ -28,7 +28,9 @@ export function RefiningRunPanel({
   return (
     <Panel>
       <div className="flex items-start justify-between gap-2">
-        <SectionHeader eyebrow="Server-resolved">This refining run</SectionHeader>
+        <SectionHeader eyebrow="Server-resolved" level={2}>
+          This refining run
+        </SectionHeader>
         <CollapseButton collapsed={collapsed} label="refining run" onToggle={toggle} />
       </div>
       {!collapsed ? (

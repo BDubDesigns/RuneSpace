@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, useTransition } from "react";
 import { ActionButton } from "@/components/ui/ActionButton";
+import { ActivityPanel } from "@/features/shared/ActivityPanel";
 import { Feedback } from "@/components/ui/Feedback";
 import { MissionActionButton } from "@/components/ui/MissionActionButton";
 import { StatusMeter } from "@/components/ui/StatusMeter";
@@ -83,7 +84,7 @@ function LatestAttemptResult({
   return (
     <section
       aria-label="Latest mining attempt"
-      className={`mt-4 border border-[color:var(--rs-border-structural)] bg-[color:var(--rs-surface-panel)] p-3 ${feedback ? `rs-result-feedback-${feedbackTone}` : ""}`}
+      className={`border border-[color:var(--rs-border-structural)] bg-[color:var(--rs-surface-panel)] p-3 ${feedback ? `rs-result-feedback-${feedbackTone}` : ""}`}
       data-feedback-state={feedback ? "new" : "calm"}
       data-result-outcome={attempt.success ? "success" : "no-yield"}
     >
@@ -146,10 +147,16 @@ function LatestAttemptResult({
 }
 
 /**
- * The Mining-specific activity card: Start/Stop/Refresh Mining, success chance,
- * power-cell boost, progress meter, and latest-attempt result presentation.
- * This is genuinely Mining-owned; the generic play shell (PlayConsole) composes
- * it alongside Refining, Travel, Cargo, missions, and the other shared panels.
+ * The Mining-specific activity surface: Start/Stop/Refresh Mining, success
+ * chance, power-cell boost, progress meter, and latest-attempt result
+ * presentation. This is genuinely Mining-owned; the generic play shell
+ * (PlayConsole) composes it alongside Refining, Travel, Cargo, missions, and
+ * the other shared panels.
+ *
+ * It sits in the shared activity frame (#193) rather than appearing as bare
+ * controls in the middle of the location panel, which is also how it finally
+ * says what it is: before this, the player arrived at The Jag and found two
+ * buttons under the population line with nothing naming them Mining.
  */
 export function MiningActivity({ characterName }: { characterName: string }) {
   const {
@@ -287,8 +294,8 @@ export function MiningActivity({ characterName }: { characterName: string }) {
   if (!showMiningActivity) return null;
 
   return (
-    <>
-      <div className="mt-5 flex flex-wrap gap-3">
+    <ActivityPanel title="Mining" data-mining-activity>
+      <div className="flex flex-wrap gap-3">
         {active || pendingCommand === "stop" ? (
           <ActionButton
             intent="danger"
@@ -316,15 +323,15 @@ export function MiningActivity({ characterName }: { characterName: string }) {
           Refresh status
         </ActionButton>
       </div>
-      <p className="mt-3 font-display text-sm uppercase tracking-wide text-[color:var(--rs-accent-mining)]">
+      <p className="font-display text-sm uppercase tracking-wide text-[color:var(--rs-accent-mining)]">
         Success chance: {percentage(state.successChanceBps)}%
       </p>
       {active && !active.nextAttemptBoosted ? (
-        <p className="mt-3 font-display text-sm uppercase tracking-wide text-[color:var(--rs-text-secondary)]">
+        <p className="font-display text-sm uppercase tracking-wide text-[color:var(--rs-text-secondary)]">
           NORMAL TIMING · Next attempt: {active.nextAttemptDurationTicks} ticks
         </p>
       ) : cutter && cutter.currentCharge > 0 ? (
-        <p className="mt-3 font-display text-sm uppercase tracking-wide text-[color:var(--rs-accent-mining)]">
+        <p className="font-display text-sm uppercase tracking-wide text-[color:var(--rs-accent-mining)]">
           POWER CELL BOOST · {cutter.currentCharge} / {cutter.maximumCharge}
           <span className="ml-2 text-[color:var(--rs-text-secondary)]">
             Next attempt: {nextMiningDurationTicks} ticks
@@ -332,7 +339,7 @@ export function MiningActivity({ characterName }: { characterName: string }) {
         </p>
       ) : null}
       {active ? (
-        <div className="mt-5">
+        <div>
           <StatusMeter
             label="Mining attempt"
             value={progress}
@@ -374,15 +381,10 @@ export function MiningActivity({ characterName }: { characterName: string }) {
         </Feedback>
       ) : null}
       {recovery ? (
-        <ActionButton
-          className="mt-3"
-          disabled={foregroundBusy}
-          intent="secondary"
-          onClick={recovery}
-        >
+        <ActionButton disabled={foregroundBusy} intent="secondary" onClick={recovery}>
           Retry status check
         </ActionButton>
       ) : null}
-    </>
+    </ActivityPanel>
   );
 }

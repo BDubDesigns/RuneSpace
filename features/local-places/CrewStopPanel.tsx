@@ -4,8 +4,8 @@ import { useEffect, useRef, useState, useTransition } from "react";
 import { ActionButton } from "@/components/ui/ActionButton";
 import { Feedback } from "@/components/ui/Feedback";
 import { MissionActionButton } from "@/components/ui/MissionActionButton";
-import { SectionHeader } from "@/components/ui/SectionHeader";
 import { StatusMeter } from "@/components/ui/StatusMeter";
+import { ActivityPanel } from "@/features/shared/ActivityPanel";
 import { getEffectiveGameBalance, getRepairTargetBalance } from "@/game/config/balance";
 import { GAME_TICK_MS, LOCAL_PLACE_IDS, REPAIR_TARGET_IDS } from "@/game/config/foundations";
 import { deriveCompletedMissionIds, deriveMissionGuidanceTargets } from "@/game/domain/missions";
@@ -122,19 +122,21 @@ export function CrewStopPanel() {
       );
     }
     return (
-      <div className="mt-5" data-crew-stop-panel data-crew-stop-state="boarding">
-        <SectionHeader eyebrow="Crew Stop">Shift hauler</SectionHeader>
-        <p className="mt-4 max-w-2xl text-sm leading-relaxed text-[color:var(--rs-text-secondary)]">
+      <ActivityPanel
+        eyebrow="Crew Stop"
+        title="Shift hauler"
+        data-crew-stop-panel
+        data-crew-stop-state="boarding"
+      >
+        <CrewHaulerRideControl localPlaceId={PLACE_ID} />
+        <p className="max-w-2xl text-sm leading-relaxed text-[color:var(--rs-text-secondary)]">
           The crews run out to The Jag through the day and will squeeze you on. Coming back the
           hauler is full of shale, so the walk home is yours.
         </p>
-        <div className="mt-4">
-          <CrewHaulerRideControl localPlaceId={PLACE_ID} />
-        </div>
         <span aria-live="polite" className="sr-only">
           {completionAnnouncement}
         </span>
-      </div>
+      </ActivityPanel>
     );
   }
 
@@ -214,9 +216,68 @@ export function CrewStopPanel() {
     : 0;
 
   return (
-    <div className="mt-5 space-y-4" data-crew-stop-panel data-crew-stop-state="damaged">
-      <SectionHeader eyebrow="Crew Stop">Repair</SectionHeader>
+    <ActivityPanel
+      eyebrow="Crew Stop"
+      title="Repair"
+      data-crew-stop-panel
+      data-crew-stop-state="damaged"
+    >
+      {!repair.materialComplete ? (
+        <>
+          <MissionActionButton
+            data-crew-stop-contribute
+            disabled={contribution === 0 || foregroundBusy || Boolean(state.activeAction)}
+            guidance={guided && contribution > 0 ? "active" : undefined}
+            loading={pending === "materials"}
+            onClick={contribute}
+          >
+            {contribution > 0
+              ? `Add ${contribution} Refined Ferrite`
+              : "No useful Refined Ferrite carried"}
+          </MissionActionButton>
+          <p className="max-w-2xl text-sm leading-relaxed text-[color:var(--rs-text-secondary)]">
+            {`The canopy needs ${repair.refinedFerriteRequired} Refined Ferrite of bracing before any of it is worth welding. Hand over what you are carrying; the rest can wait until you come back.`}
+          </p>
+        </>
+      ) : activeWelding ? (
+        <>
+          <ActionButton
+            data-crew-stop-stop-welding
+            disabled={foregroundBusy}
+            intent="secondary"
+            loading={pending === "stop"}
+            onClick={() => runWeldingCommand("stop")}
+          >
+            Stop Welding
+          </ActionButton>
+          <StatusMeter
+            detail={`${secondsRemaining.toFixed(1)}s`}
+            label="Current weld"
+            value={attemptProgress}
+          />
+          {/* Clean Pass is general Welding, not a Practice feature (#190). */}
+          <CleanPassControl cleanPass={repair.cleanPass} />
+        </>
+      ) : (
+        <>
+          <MissionActionButton
+            data-crew-stop-start-welding
+            disabled={foregroundBusy || Boolean(state.activeAction)}
+            guidance={guided ? "active" : undefined}
+            loading={pending === "start"}
+            onClick={() => runWeldingCommand("start")}
+          >
+            Start Welding
+          </MissionActionButton>
+          <p className="max-w-2xl text-sm leading-relaxed text-[color:var(--rs-text-secondary)]">
+            The bracing is all here. What is left is the welding.
+          </p>
+        </>
+      )}
 
+      {/* The repair's own progress sits under the control that advances it
+          (#193), not above it: the player came here to hand over ferrite or to
+          weld, and the two meters are how they read the result. */}
       <StatusMeter
         detail={`${repair.refinedFerriteContributed} / ${repair.refinedFerriteRequired}`}
         label="Refined Ferrite in the brace"
@@ -236,63 +297,10 @@ export function CrewStopPanel() {
         }
       />
 
-      {!repair.materialComplete ? (
-        <>
-          <p className="max-w-2xl text-sm leading-relaxed text-[color:var(--rs-text-secondary)]">
-            {`The canopy needs ${repair.refinedFerriteRequired} Refined Ferrite of bracing before any of it is worth welding. Hand over what you are carrying; the rest can wait until you come back.`}
-          </p>
-          <MissionActionButton
-            data-crew-stop-contribute
-            disabled={contribution === 0 || foregroundBusy || Boolean(state.activeAction)}
-            guidance={guided && contribution > 0 ? "active" : undefined}
-            loading={pending === "materials"}
-            onClick={contribute}
-          >
-            {contribution > 0
-              ? `Add ${contribution} Refined Ferrite`
-              : "No useful Refined Ferrite carried"}
-          </MissionActionButton>
-        </>
-      ) : activeWelding ? (
-        <>
-          <StatusMeter
-            detail={`${secondsRemaining.toFixed(1)}s`}
-            label="Current weld"
-            value={attemptProgress}
-          />
-          {/* Clean Pass is general Welding, not a Practice feature (#190). */}
-          <CleanPassControl cleanPass={repair.cleanPass} />
-          <ActionButton
-            data-crew-stop-stop-welding
-            disabled={foregroundBusy}
-            intent="secondary"
-            loading={pending === "stop"}
-            onClick={() => runWeldingCommand("stop")}
-          >
-            Stop Welding
-          </ActionButton>
-        </>
-      ) : (
-        <>
-          <p className="max-w-2xl text-sm leading-relaxed text-[color:var(--rs-text-secondary)]">
-            The bracing is all here. What is left is the welding.
-          </p>
-          <MissionActionButton
-            data-crew-stop-start-welding
-            disabled={foregroundBusy || Boolean(state.activeAction)}
-            guidance={guided ? "active" : undefined}
-            loading={pending === "start"}
-            onClick={() => runWeldingCommand("start")}
-          >
-            Start Welding
-          </MissionActionButton>
-        </>
-      )}
-
       {message ? <Feedback>{message}</Feedback> : null}
       <span aria-live="polite" className="sr-only">
         {completionAnnouncement}
       </span>
-    </div>
+    </ActivityPanel>
   );
 }

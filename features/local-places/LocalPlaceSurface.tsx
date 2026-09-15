@@ -5,7 +5,6 @@ import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
 import { ActionLink } from "@/components/ui/ActionLink";
 import { Panel } from "@/components/ui/Panel";
-import { SectionHeader } from "@/components/ui/SectionHeader";
 import { LocationSceneHeader } from "@/features/location-scene/LocationSceneHeader";
 import type { LocalPlaceSurface as LocalPlaceSurfaceState } from "@/game/domain/local-places";
 
@@ -31,22 +30,18 @@ import type { LocalPlaceSurface as LocalPlaceSurfaceState } from "@/game/domain/
  * of the player is never pushed below the place's activity UI on a phone.
  *
  * A place may also host gameplay of its own — Holo Hollow's Crew Stop is the
- * first (#172). That arrives as an `activity` slot rather than anything this
- * component knows how to build: the composition boundary picks the activity the
- * same way it already picks a World Location's, so this stays presentation and
- * no plugin framework is invented for one real case. An activity owns its own
- * leading spacing, because only it knows whether it has anything to show right
- * now — a place whose activity is currently silent must not leave a gap where
- * the activity would have been.
+ * first (#172). That is no longer composed inside this panel: since #193 a
+ * place's activity is a sibling panel (`features/location-scene/
+ * LocationActivity`), exactly like a World Location's, so the two kinds of
+ * place present their gameplay identically and the player meets the same
+ * layout wherever they stand.
  */
 export function LocalPlaceSurface({
-  activity,
   characterName,
   parentDisplayName,
   resident,
   surface,
 }: {
-  activity?: ReactNode;
   characterName: string;
   parentDisplayName: string;
   resident?: ReactNode;
@@ -58,9 +53,10 @@ export function LocalPlaceSurface({
     <Panel tone="raised" className="overflow-hidden !p-0" data-local-place-surface={surface.id}>
       <LocationSceneHeader characterName={characterName} location={surface} />
       <div className="p-5">
-        <SectionHeader eyebrow={surface.displayName}>Local place</SectionHeader>
+        {/* No heading line here (#193) — same reason as the World Location
+            surface: the scene plate names the place and owns the `h1`. */}
         <p
-          className="mt-4 max-w-2xl text-sm leading-relaxed text-[color:var(--rs-text-secondary)]"
+          className="max-w-2xl text-sm leading-relaxed text-[color:var(--rs-text-secondary)]"
           data-local-place-description
           data-local-place-repaired={
             surface.repaired === undefined ? undefined : String(surface.repaired)
@@ -69,7 +65,6 @@ export function LocalPlaceSurface({
           {surface.description}
         </p>
         {resident}
-        {activity ? <div data-local-place-activity>{activity}</div> : null}
         <div className="mt-5">
           <ActionLink
             className="max-w-full gap-2 text-left"

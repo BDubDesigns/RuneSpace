@@ -19,7 +19,9 @@ export function PracticeRunPanel({ run }: { run: PracticeRunState }) {
   return (
     <Panel>
       <div className="flex items-start justify-between gap-2">
-        <SectionHeader eyebrow="Server-resolved">This practice run</SectionHeader>
+        <SectionHeader eyebrow="Server-resolved" level={2}>
+          This practice run
+        </SectionHeader>
         <CollapseButton collapsed={collapsed} label="practice run" onToggle={toggle} />
       </div>
       {!collapsed ? (

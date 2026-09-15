@@ -3,9 +3,8 @@
 import { useState, useTransition } from "react";
 import { ItemVisual } from "@/components/items/ItemVisual";
 import { ActionButton } from "@/components/ui/ActionButton";
+import { ActivityPanel } from "@/features/shared/ActivityPanel";
 import { Feedback } from "@/components/ui/Feedback";
-import { Panel } from "@/components/ui/Panel";
-import { SectionHeader } from "@/components/ui/SectionHeader";
 import { ITEM_IDS, LOCATION_IDS } from "@/game/config/foundations";
 import { POWER_ANNEX_RESET_TIME_ZONE, POWER_CELL_DAILY_ALLOTMENT } from "@/game/domain/power-annex";
 import { claimPowerCellsAction } from "@/server/actions";
@@ -70,16 +69,20 @@ export function PowerAnnexClaimPanel() {
   }
 
   return (
-    <Panel tone="raised">
-      <SectionHeader eyebrow="Daily emergency allotment">
-        DeWhat? Emergency Power Annex
-      </SectionHeader>
-      <p className="mt-3 max-w-2xl text-sm leading-relaxed text-[color:var(--rs-text-secondary)]">
-        The depot dispenses one emergency allotment per person, per RuneSpace reset day. Eligibility
-        belongs to this character and requires being stationary at the Annex.
-      </p>
+    // The title is the allotment, not the place: the scene plate above already
+    // names the Annex, and repeating it here was one of the duplications #193
+    // set out to remove.
+    <ActivityPanel eyebrow="Daily emergency allotment" title="Power Cells" data-power-annex>
+      {/* The claim comes before the depot explains itself (#193): the control
+          is why the player walked in, and the eligibility rules are what they
+          read only if the answer surprises them. */}
+      {!claimed ? (
+        <ActionButton disabled={busy} intent="primary" loading={busy} onClick={claim}>
+          Claim Power Cells
+        </ActionButton>
+      ) : null}
       <div
-        className="mt-4 grid min-w-0 grid-cols-[7rem_minmax(0,1fr)] items-center gap-3"
+        className="grid min-w-0 grid-cols-[7rem_minmax(0,1fr)] items-center gap-3"
         data-power-annex-reward-grid
       >
         <div className="flex min-w-0 flex-col items-center" data-power-annex-reward-left>
@@ -92,17 +95,6 @@ export function PowerAnnexClaimPanel() {
             name="Power Cell"
             quantity={availableQuantity}
           />
-          {!claimed ? (
-            <ActionButton
-              className="mt-3 w-full max-w-full px-2 text-xs leading-tight"
-              disabled={busy}
-              intent="primary"
-              loading={busy}
-              onClick={claim}
-            >
-              Claim Power Cells
-            </ActionButton>
-          ) : null}
         </div>
         <div
           className="min-w-0 self-center text-sm text-[color:var(--rs-text-secondary)]"
@@ -128,11 +120,11 @@ export function PowerAnnexClaimPanel() {
           ) : null}
         </div>
       </div>
-      {message ? (
-        <div className="mt-4">
-          <Feedback tone={messageTone}>{message}</Feedback>
-        </div>
-      ) : null}
-    </Panel>
+      <p className="max-w-2xl text-sm leading-relaxed text-[color:var(--rs-text-secondary)]">
+        The depot dispenses one emergency allotment per person, per RuneSpace reset day. Eligibility
+        belongs to this character and requires being stationary at the Annex.
+      </p>
+      {message ? <Feedback tone={messageTone}>{message}</Feedback> : null}
+    </ActivityPanel>
   );
 }

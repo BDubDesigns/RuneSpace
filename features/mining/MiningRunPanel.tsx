@@ -28,7 +28,9 @@ export function MiningRunPanel({
   return (
     <Panel>
       <div className="flex items-start justify-between gap-2">
-        <SectionHeader eyebrow="Server-resolved">This mining run</SectionHeader>
+        <SectionHeader eyebrow="Server-resolved" level={2}>
+          This mining run
+        </SectionHeader>
         <CollapseButton collapsed={collapsed} label="mining run" onToggle={toggle} />
       </div>
       {!collapsed ? (

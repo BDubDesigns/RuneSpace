@@ -4,7 +4,6 @@ import { useState, useTransition } from "react";
 import { ItemVisual } from "@/components/items/ItemVisual";
 import { ActionButton } from "@/components/ui/ActionButton";
 import { Feedback } from "@/components/ui/Feedback";
-import { Panel } from "@/components/ui/Panel";
 import { SectionHeader } from "@/components/ui/SectionHeader";
 import { usePlay } from "@/features/play/PlayContext";
 import { resolveItemPresentation } from "@/game/content/item-presentation";
@@ -141,9 +140,12 @@ export function TradePanel({
   }
 
   return (
-    <Panel tone="raised" data-trade-panel>
+    // The Drawer that opens this (features/npc/NpcInteractionPanel, #193)
+    // already supplies the raised surface, padding and scrolling, so the
+    // counter itself adds no second panel around them.
+    <div className="mt-4" data-trade-panel>
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <SectionHeader eyebrow="Trade">
+        <SectionHeader level={3}>
           {availableModes.length > 1 ? "Buy and sell" : mode === "buy" ? "Buy" : "Sell"}
         </SectionHeader>
         <p
@@ -272,6 +274,6 @@ export function TradePanel({
           <Feedback tone={messageTone}>{message}</Feedback>
         </div>
       ) : null}
-    </Panel>
+    </div>
   );
 }

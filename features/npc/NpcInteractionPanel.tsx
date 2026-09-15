@@ -1,10 +1,10 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { ActionButton } from "@/components/ui/ActionButton";
 import { Feedback } from "@/components/ui/Feedback";
+import { Drawer } from "@/components/ui/Drawer";
 import { MissionActionButton } from "@/components/ui/MissionActionButton";
-import { Panel } from "@/components/ui/Panel";
 import { NpcConversation } from "@/features/npc/NpcConversation";
 import { TradePanel } from "@/features/trade/TradePanel";
 import { getLocationMerchant, getMerchant, isMerchantOpen } from "@/game/content/merchants";
@@ -20,8 +20,8 @@ import {
 import { usePlay } from "@/features/play/PlayContext";
 
 /**
- * The resident's Local Contact card: one person, with every interaction they
- * currently offer stacked beneath them.
+ * The resident's Local Contact row: one person, with every interaction they
+ * currently offer alongside them.
  *
  * Talk opens the canonical conversation hub. Its conversations come from ONE
  * generic resolver over authoritative mission projections and authored topics,
@@ -31,11 +31,12 @@ import { usePlay } from "@/features/play/PlayContext";
  * Trade is a separate action — never a conversation topic and never a command
  * inside the hub. It appears when the active Local Place owns a merchant that
  * this resident fronts, which is read from content rather than from who the
- * resident is, and it opens the Trade surface directly beneath this card.
+ * resident is, and it opens the merchant's counter in the shared Drawer (#193).
  *
- * The card stands inside the panel for the place the player is in, directly
- * under its description, rather than after the whole surface: on a phone the
- * person in front of you must not sit below the place's activity UI (#190).
+ * The row stands inside the panel for the place the player is in, directly
+ * under its description and the place's own population, rather than after the
+ * whole surface: on a phone the person in front of you must not sit below the
+ * place's activity UI (#190).
  *
  * `localPlaceId` is the Local Place the route requests. It is navigation state,
  * not authoritative position, so it passes through the same validated
@@ -54,24 +55,7 @@ export function NpcInteractionPanel({
   const [open, setOpen] = useState(false);
   const [tradeOpen, setTradeOpen] = useState(false);
   const triggerRef = useRef<HTMLButtonElement>(null);
-  const tradeRegionRef = useRef<HTMLElement>(null);
-  // Set only when the player opens Trade, so the first render, closing Trade,
-  // and authoritative refreshes never scroll the page or move focus.
-  const revealTradeRef = useRef(false);
-
-  // Reveal the Trade surface the player just opened, the same way player-opened
-  // details are revealed elsewhere: scroll it into view — its scroll margins
-  // keep its start clear of the fixed bottom navigation — and move focus into
-  // it, yielding to reduced motion.
-  useEffect(() => {
-    if (!revealTradeRef.current) return;
-    revealTradeRef.current = false;
-    const region = tradeRegionRef.current;
-    if (!tradeOpen || !region) return;
-    const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    region.scrollIntoView({ block: "nearest", behavior: reduceMotion ? "auto" : "smooth" });
-    region.focus({ preventScroll: true });
-  }, [tradeOpen]);
+  const tradeTriggerRef = useRef<HTMLButtonElement>(null);
 
   const locationId = state.location.currentLocationId;
   const completedMissionIds = deriveCompletedMissionIds(state.missions);
@@ -112,20 +96,29 @@ export function NpcInteractionPanel({
   const turnInAvailable =
     stationary &&
     entries.some((entry) => entry.kind === "mission" && entry.action?.kind === "complete_mission");
-  const tradeRegionId = `npc-trade-${activePlace?.id ?? locationId}`;
 
   return (
-    <div className={`space-y-4 ${className}`.trim()} data-npc-resident>
-      <Panel className="!p-4" data-npc-interaction>
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <p className="font-display text-[11px] uppercase tracking-[0.18em] text-[color:var(--rs-accent-primary)]">
-              Local contact
-            </p>
-            <h2 className="mt-1 font-display text-lg font-bold">{npc.displayName}</h2>
-            <p className="mt-1 text-sm text-[color:var(--rs-text-secondary)]">{npc.role}</p>
-          </div>
-          <div className="flex flex-col gap-2 sm:w-44 sm:shrink-0" data-npc-actions>
+    <div className={className.trim()} data-npc-resident>
+      {/* A row, not a card (#193). The person and what they offer is one line
+          with the role beneath it, which is ~90px instead of the 163–215px the
+          stacked card cost — enough, at 390px, to decide whether the place's
+          activity starts above the fold or below it.
+
+          Deliberately not a `Panel`: `rs-bevel`'s clip-path cuts anything
+          painted outside the element's box, and a Mission-guided Talk paints a
+          12px exterior halo. The old card cleared it on 16px of padding; this
+          row is tighter, so it uses a plain bordered surface with nothing to
+          clip the glow. Same reason there is no `overflow: hidden` here. */}
+      <section
+        aria-label={`Local contact: ${npc.displayName}`}
+        className="border border-[color:var(--rs-border-structural)] bg-[color:var(--rs-surface-panel)] p-3"
+        data-npc-interaction
+      >
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+          <h2 className="min-w-0 flex-1 basis-28 font-display text-base font-bold leading-tight">
+            {npc.displayName}
+          </h2>
+          <div className="flex shrink-0 items-center gap-2" data-npc-actions>
             {entries.length > 0 ? (
               <MissionActionButton
                 aria-label={`Talk to ${npc.displayName}`}
@@ -143,46 +136,49 @@ export function NpcInteractionPanel({
             ) : null}
             {merchant ? (
               <ActionButton
-                aria-controls={tradeOpen ? tradeRegionId : undefined}
-                aria-expanded={tradeOpen}
-                aria-label={
-                  tradeOpen
-                    ? `Close trade with ${npc.displayName}`
-                    : `Trade with ${npc.displayName}`
-                }
-                className="w-full"
+                aria-haspopup="dialog"
+                aria-label={`Trade with ${npc.displayName}`}
                 data-npc-action="trade"
                 intent="secondary"
-                onClick={() => {
-                  revealTradeRef.current = !tradeOpen;
-                  setTradeOpen(!tradeOpen);
-                }}
+                onClick={() => setTradeOpen(true)}
+                ref={tradeTriggerRef}
               >
-                {tradeOpen ? "Close trade" : "Trade"}
+                Trade
               </ActionButton>
             ) : null}
           </div>
         </div>
+        <p className="mt-1.5 text-xs leading-snug text-[color:var(--rs-text-secondary)]">
+          {npc.role}
+        </p>
         {!stationary ? (
           <Feedback tone="muted">
             Conversations with gameplay actions require a stationary character.
           </Feedback>
         ) : null}
-      </Panel>
+      </section>
       {merchant && tradeOpen ? (
-        <section
-          aria-label={`Trade with ${npc.displayName}`}
-          className="rs-focus scroll-mb-[var(--rs-bottom-nav-clearance)] scroll-mt-3"
-          data-npc-trade
-          id={tradeRegionId}
-          ref={tradeRegionRef}
-          tabIndex={-1}
+        // Trade is its own surface rather than an inline expansion (#193): the
+        // counter is ~390px tall, and unfolding it here pushed the place's own
+        // activity that far down the page and put the whole shop between the
+        // player and the person they are shopping with. Talk already opens a
+        // Drawer; this is the same interaction, so it uses the same one, which
+        // also brings the focus trap and the return-to-trigger behaviour that
+        // the hand-rolled inline reveal had to approximate.
+        <Drawer
+          eyebrow="Trade"
+          label={`Trade with ${npc.displayName}`}
+          onClose={() => setTradeOpen(false)}
+          title={npc.displayName}
+          triggerRef={tradeTriggerRef}
         >
-          <TradePanel
-            {...(activePlace ? { localPlaceId: activePlace.id } : {})}
-            merchant={merchant}
-          />
-        </section>
+          <div data-npc-trade>
+            <TradePanel
+              {...(activePlace ? { localPlaceId: activePlace.id } : {})}
+              merchant={merchant}
+            />
+          </div>
+        </Drawer>
       ) : null}
       {open ? (
         <NpcConversation
