@@ -241,7 +241,11 @@ Bix's **Trade** action is deliberately separate from **Talk** (see
 `docs/holo-hollow.md`): the conversation hub never carries a merchant command,
 so Keep the Change requires the conversation with Bix while never requiring a
 purchase — opening Trade satisfies nothing.
-Renn is a social NPC only — no merchant function and no Mission.
+Renn has no merchant function. He is no longer social-only: #172 gave him
+**Out of the Weather**, which he both offers and turns in (`docs/missions.md`).
+His three topics remain ordinary replayable conversation and still carry no
+Mission command — the Mission is resolved by Mission content, not by the topic
+hub, exactly as for every other NPC.
 
 Mara's topics carry no availability gate of their own because she is only
 reachable inside HH B&B, and that Local Place's access already derives from Keep
