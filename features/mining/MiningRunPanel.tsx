@@ -1,9 +1,6 @@
 "use client";
 
-import { Panel } from "@/components/ui/Panel";
-import { SectionHeader } from "@/components/ui/SectionHeader";
-import { COLLAPSE_KEYS, useSyncedCollapse } from "@/features/shared/use-synced-collapse";
-import { CollapseButton } from "@/features/shared/CollapseButton";
+import { RunSummary } from "@/features/shared/RunSummary";
 import { miningNearMissBasisPoints } from "@/game/domain/mining";
 import type { MiningRunAttempt, MiningRunState } from "@/server/mining";
 import type { EffectiveGameBalance } from "@/game/config/balance";
@@ -13,9 +10,15 @@ function percentage(bps: number) {
 }
 
 /**
- * Bounded Mining run history + summary, shown beneath the Ferrite Shale Mining activity.
- * Collapse state is synced with the Refining run panel (and any future run
- * panels) via a single localStorage key — collapsing one collapses all.
+ * Mining's run totals and its bounded attempt history, in the shared run
+ * summary (#193). It renders inside the Mining activity panel rather than as a
+ * panel of its own, so the numbers sit with the controls that produced them.
+ *
+ * History holds the attempts *before* the current one. The newest attempt is
+ * already presented in full, with its rewards and its result animation, by the
+ * activity above (`MiningActivity`'s latest-attempt block), so repeating it
+ * here would put the same attempt on screen twice the moment a player opened
+ * the disclosure — which is exactly the duplication this issue removed.
  */
 export function MiningRunPanel({
   run,
@@ -24,48 +27,29 @@ export function MiningRunPanel({
   run: MiningRunState;
   balance: EffectiveGameBalance;
 }) {
-  const { collapsed, toggle } = useSyncedCollapse(COLLAPSE_KEYS.runHistory);
+  // Everything except the newest, which the activity itself is showing.
+  const priorAttempts = run.recentAttempts.slice(0, -1);
   return (
-    <Panel>
-      <div className="flex items-start justify-between gap-2">
-        <SectionHeader eyebrow="Server-resolved">This mining run</SectionHeader>
-        <CollapseButton collapsed={collapsed} label="mining run" onToggle={toggle} />
-      </div>
-      {!collapsed ? (
-        <>
-          <div className="mt-4 grid grid-cols-2 gap-3 text-sm sm:grid-cols-5">
-            <p>
-              <strong>{run.attempts}</strong> attempts
-            </p>
-            <p>
-              <strong>{run.successes}</strong> successful
-            </p>
-            <p>
-              <strong>{run.failures}</strong> failed
-            </p>
-            <p>
-              <strong>{run.shaleGained}</strong> shale gained
-            </p>
-            <p>
-              <strong>{run.xpGained}</strong> Mining XP
-            </p>
-          </div>
-          <div
-            className="mt-5 max-h-72 space-y-2 overflow-y-auto pr-1"
-            aria-label="Mining attempt history"
-          >
-            {[...run.recentAttempts].reverse().map((attempt) => (
-              <MiningAttemptRow attempt={attempt} balance={balance} key={attempt.sequence} />
-            ))}
-            {run.recentAttempts.length === 0 ? (
-              <p className="text-sm text-[color:var(--rs-text-muted)]">
-                No resolved attempts in this run yet.
-              </p>
-            ) : null}
-          </div>
-        </>
-      ) : null}
-    </Panel>
+    <RunSummary
+      historyLabel="Mining attempt history"
+      stats={[
+        { label: "attempts", value: run.attempts },
+        { label: "successful", value: run.successes },
+        { label: "failed", value: run.failures },
+        { label: "shale gained", value: run.shaleGained },
+        { label: "Mining XP", value: run.xpGained },
+      ]}
+      title="This mining run"
+      {...(priorAttempts.length > 0
+        ? {
+            history: [...priorAttempts]
+              .reverse()
+              .map((attempt) => (
+                <MiningAttemptRow attempt={attempt} balance={balance} key={attempt.sequence} />
+              )),
+          }
+        : {})}
+    />
   );
 }
 

@@ -61,7 +61,7 @@ test("Processing Yard Refining journey — Ferrite and Slag both branches, artwo
   // 3. Yard is active; the Location surface exposes the Refining activity and
   // its level/progress supporting panels.
   await expect(page.getByRole("button", { name: "Start Refining" })).toBeVisible();
-  await expect(page.getByText("Refining progression")).toBeVisible();
+  await expect(page.getByRole("progressbar", { name: "Refining progression XP" })).toBeVisible();
   await expect(page.getByText(/Success chance: 40\.00%/)).toBeVisible();
   // Crash Site has no production-status plate after Mining moved to The Jag, so
   // check the activity panel rather than treating the whole page as inactive.
@@ -100,6 +100,15 @@ test("Processing Yard Refining journey — Ferrite and Slag both branches, artwo
   await expect(latestRefining.getByLabel("1 Slag produced")).toBeVisible();
   await expect(latestRefining.getByLabel("3 Refining XP earned")).toBeVisible();
   await expect(page.getByText("2 attempts", { exact: true })).toBeVisible();
+
+  // History holds the attempts *before* this one (#193): attempt 2 is the
+  // latest and is presented in full directly above, so opening History must
+  // not put the same attempt on the screen twice.
+  await page.getByRole("button", { name: "History", exact: true }).click();
+  const refiningHistory = page.getByLabel("Refining attempt history", { exact: true });
+  await expect(refiningHistory).toContainText("Attempt 1");
+  await expect(refiningHistory).not.toContainText("Attempt 2");
+  await page.getByRole("button", { name: "Hide history", exact: true }).click();
 
   // 7. Artwork loads for both outputs — explicitly verify each image loads via naturalWidth
   await page.getByRole("button", { name: /Inventory/ }).click();

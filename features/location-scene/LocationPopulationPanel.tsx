@@ -223,9 +223,10 @@ export function LocationPopulationPanel() {
   return (
     <section aria-label="Characters at this location" data-location-population>
       {count === 0 ? (
-        <p className="text-sm text-[color:var(--rs-text-secondary)]">
-          You&apos;re the only one here.
-        </p>
+        // Location-level, and worded as such (#193): this is who is at the
+        // place, not a fact about whoever the player happens to be talking to,
+        // even though it shares a line with them to save a phone 32px.
+        <p className="text-xs text-[color:var(--rs-text-secondary)]">Only you here</p>
       ) : (
         <LocationPopulationTrigger
           count={count}

@@ -1,18 +1,11 @@
 "use client";
 
 import { useEffect, useTransition } from "react";
-import { CargoReadout } from "@/features/shared/CargoReadout";
-import { SkillProgressCard } from "@/features/shared/run-presentation";
-import { RefiningRunPanel } from "@/features/refining/RefiningRunPanel";
-import { MiningRunPanel } from "@/features/mining/MiningRunPanel";
-import { getEffectiveGameBalance } from "@/game/config/balance";
-import { LOCATION_IDS } from "@/game/config/foundations";
+import { LocationActivity } from "@/features/location-scene/LocationActivity";
 import { LocationSurface } from "@/features/location-scene/LocationSurface";
 import { InventoryEquipmentPanel } from "@/features/inventory/InventoryEquipmentPanel";
 import { MissionLogPanel } from "@/features/missions/MissionLogPanel";
 import { MissionGuidanceStrips } from "@/features/missions/MissionGuidanceStrips";
-import { PracticeRunPanel } from "@/features/practice/PracticeRunPanel";
-import { PracticeWeldingPanel } from "@/features/practice/PracticeWeldingPanel";
 import { WorkOrdersTerminal } from "@/features/practice/WorkOrdersTerminal";
 import { JourneyPanel } from "@/features/travel/JourneyPanel";
 import { LocalMapPanel } from "@/features/travel/LocalMapPanel";
@@ -27,6 +20,14 @@ export type PlaySurface = "primary" | "map";
  * Generic player-facing composition. The primary surface is derived from the
  * authoritative Travel state; Map is the only explicitly routed surface.
  * Activities and overlays remain feature-owned and server-authoritative.
+ *
+ * Since #193 this shell composes whole surfaces and nothing smaller. It used to
+ * assemble Mining's, Refining's and Practice's skill cards, cargo readouts and
+ * run panels itself, from `currentLocationId` branches — which meant the parts
+ * of one activity were owned by three different files and a seventh activity
+ * would have meant another branch here. Each activity now renders its own
+ * context and run summary inside its own frame, and the shell decides only the
+ * order they appear in.
  */
 export function PlayConsole({
   characterName,
@@ -58,19 +59,7 @@ export function PlayConsole({
     setRefreshCallback,
     state,
   } = usePlay();
-  const balance = getEffectiveGameBalance();
   const inTransit = Boolean(state.travelState);
-  const currentLocationId = state.location.currentLocationId;
-  const stationaryPrimary = surface === "primary" && !inTransit;
-  const showMiningActivity = stationaryPrimary && currentLocationId === LOCATION_IDS.theJag;
-  const showRefiningActivity =
-    stationaryPrimary && currentLocationId === LOCATION_IDS.abandonedProcessingYard;
-  // Wade's yard composes as siblings of the location panel rather than inside
-  // it (#190): the Workbench, Welding progression, the run history, and the
-  // Work Orders terminal are each their own panel, and each decides for itself
-  // whether it has anything to show yet.
-  const showRuskRecoveryActivity =
-    stationaryPrimary && currentLocationId === LOCATION_IDS.ruskRecovery;
   const [, startTransition] = useTransition();
 
   function applyReconciliation(result: Awaited<ReturnType<typeof refreshPlayAction>>) {
@@ -103,7 +92,12 @@ export function PlayConsole({
   });
 
   return (
-    <div className="space-y-4">
+    // 12px between surfaces, matching the rhythm inside an activity panel
+    // (#193). The stack used to be 16px, which read as a page of separate
+    // documents rather than one screen — and at Rusk Recovery, where two
+    // Mission strips push everything down, those pixels are clearance under
+    // the Workbench's Start control.
+    <div className="space-y-3">
       {/* Mission guidance leads every Play surface, directly under the header. */}
       <MissionGuidanceStrips state={state} />
       {surface === "map" ? (
@@ -111,80 +105,17 @@ export function PlayConsole({
       ) : inTransit ? (
         <JourneyPanel />
       ) : (
-        <LocationSurface characterName={characterName} localPlaceId={localPlaceId} />
-      )}
-
-      {surface === "primary" ? (
         <>
-          {showRuskRecoveryActivity ? (
-            <>
-              <PracticeWeldingPanel />
-              {state.practice.unlocked ? (
-                <>
-                  <SkillProgressCard
-                    level={state.welding.level}
-                    title="Welding progression"
-                    tone="welding"
-                    totalXp={state.welding.totalXp}
-                    xpIntoLevel={state.welding.xpIntoLevel}
-                    xpToNextLevel={state.welding.xpToNextLevel}
-                  />
-                  <PracticeRunPanel run={state.practice.run} />
-                </>
-              ) : null}
-              <WorkOrdersTerminal />
-            </>
-          ) : null}
-          {showMiningActivity || showRefiningActivity ? (
-            <>
-              <div className="grid gap-4 sm:grid-cols-2">
-                {showMiningActivity ? (
-                  <SkillProgressCard
-                    level={state.mining.level}
-                    title="Mining progression"
-                    tone="mining"
-                    totalXp={state.mining.totalXp}
-                    xpIntoLevel={state.mining.xpIntoLevel}
-                    xpToNextLevel={state.mining.xpToNextLevel}
-                  />
-                ) : (
-                  <SkillProgressCard
-                    level={state.refining.level}
-                    title="Refining progression"
-                    tone="refining"
-                    totalXp={state.refining.totalXp}
-                    xpIntoLevel={state.refining.xpIntoLevel}
-                    xpToNextLevel={state.refining.xpToNextLevel}
-                  />
-                )}
-                {showMiningActivity ? (
-                  <CargoReadout
-                    state={state}
-                    items={[{ label: "Ferrite Shale", quantity: state.ferriteShaleQuantity }]}
-                  />
-                ) : (
-                  <CargoReadout
-                    state={state}
-                    items={[
-                      { label: "Refined Ferrite", quantity: state.refinedFerriteQuantity },
-                      { label: "Slag", quantity: state.slagQuantity },
-                    ]}
-                  />
-                )}
-              </div>
-              {showMiningActivity ? (
-                <MiningRunPanel run={state.run} balance={balance} />
-              ) : (
-                <RefiningRunPanel
-                  ferriteQuantity={state.refinedFerriteQuantity}
-                  run={state.refiningRun}
-                  slagQuantity={state.slagQuantity}
-                />
-              )}
-            </>
-          ) : null}
+          {/* The grammar, in order (#193): the place, then the one thing you
+              came here to do, then the systems that are their own thing.
+              Each activity owns its own controls, context and run summary, so
+              this shell composes surfaces rather than assembling any one
+              activity's parts from a location branch. */}
+          <LocationSurface characterName={characterName} localPlaceId={localPlaceId} />
+          <LocationActivity characterName={characterName} localPlaceId={localPlaceId} />
+          <WorkOrdersTerminal />
         </>
-      ) : null}
+      )}
 
       <ScavengeRevealOverlay />
 

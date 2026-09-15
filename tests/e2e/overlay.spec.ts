@@ -292,7 +292,12 @@ test("focus returns to the trigger after Escape, Close, and backdrop dismissal",
 });
 
 test("document scroll is locked while overlay is open and restored on close", async ({ page }) => {
-  await page.setViewportSize({ width: 390, height: 844 });
+  // Deliberately shorter than the canonical phone: this test is about the lock
+  // recording and restoring a real scroll offset, so the document has to have
+  // somewhere to scroll. Since #193 compacted the Play surfaces, the Crash Site
+  // fits 844px exactly, and a viewport-height assumption is a fragile way to
+  // guarantee overflow.
+  await page.setViewportSize({ width: 390, height: 520 });
   const nav = page.getByRole("navigation", { name: "Primary" });
 
   // Record original scroll styles.
@@ -311,7 +316,9 @@ test("document scroll is locked while overlay is open and restored on close", as
   const lockedOverflow = await page.evaluate(() => document.body.style.overflow);
   expect(lockedOverflow).toBe("hidden");
   const lockedBodyTop = await page.evaluate(() => document.body.style.top);
-  expect(lockedBodyTop).toBe(`-${scrollBefore}px`);
+  // The lock records the offset it took the document from.
+  expect(scrollBefore).toBeGreaterThan(0);
+  expect(Number.parseFloat(lockedBodyTop)).toBeCloseTo(-scrollBefore, 1);
 
   // Try scrolling the document.
   const scrollAfter = await page.evaluate(() => window.scrollY);

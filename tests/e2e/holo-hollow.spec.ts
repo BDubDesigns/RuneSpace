@@ -462,21 +462,23 @@ test("scopes each resident to their own Local Place", async ({ page, testCharact
   await expectPointerFocusWithoutRing(actions.nth(1));
   await expect(page.getByRole("button", { name: /Talk to Bix Weller/ })).toBeVisible();
   await expect(page.getByRole("button", { name: /Talk to Renn Calder/ })).toHaveCount(0);
-  // Trade belongs to Bix's card, not the shop description, and is offered
-  // rather than unfolded on arrival. Since #190 that card is composed inside
+  // Trade belongs to Bix's row, not the shop description, and is offered
+  // rather than unfolded on arrival. Since #190 that row is composed inside
   // the place panel, directly under its description, so every NPC control the
-  // panel hosts is one of the card's own two.
+  // panel hosts is one of the row's own two.
   await expect(page.locator("[data-local-place-surface] [data-npc-interaction]")).toHaveCount(1);
   await expect(page.locator("[data-local-place-surface] [data-npc-action]")).toHaveCount(2);
   await expect(page.locator("[data-trade-panel]")).toHaveCount(0);
-  // On a phone the actions stack vertically at full card width.
+  // Since #193 the two actions share one line beside the resident's name
+  // rather than stacking at full width, and both keep the 44px target.
   const talkBox = (await actions.nth(0).boundingBox())!;
   const tradeBox = (await actions.nth(1).boundingBox())!;
   const contactBox = (await contact.boundingBox())!;
-  expect(tradeBox.y).toBeGreaterThanOrEqual(talkBox.y + talkBox.height);
-  expect(Math.abs(tradeBox.x - talkBox.x)).toBeLessThanOrEqual(1);
-  expect(Math.abs(tradeBox.width - talkBox.width)).toBeLessThanOrEqual(1);
-  expect(talkBox.width).toBeGreaterThan(contactBox.width * 0.8);
+  expect(Math.abs(tradeBox.y - talkBox.y)).toBeLessThanOrEqual(1);
+  expect(tradeBox.x).toBeGreaterThanOrEqual(talkBox.x + talkBox.width);
+  expect(talkBox.height).toBeGreaterThanOrEqual(44);
+  expect(tradeBox.height).toBeGreaterThanOrEqual(44);
+  expect(tradeBox.x + tradeBox.width).toBeLessThanOrEqual(contactBox.x + contactBox.width + 1);
   // Bix stands under the shop's description and above the way out, rather than
   // below the whole surface where a phone would hide him (#190).
   const descriptionBox = (await page.locator("[data-local-place-description]").boundingBox())!;
@@ -491,15 +493,17 @@ test("scopes each resident to their own Local Place", async ({ page, testCharact
   await expect(conversation.getByRole("button", { name: /Trade/ })).toHaveCount(0);
   await page.keyboard.press("Escape");
 
-  // Choosing Trade opens the Buy/Sell surface beneath Bix's card, and it can
-  // be closed again.
+  // Choosing Trade opens the Buy/Sell counter over the place (#193), and it
+  // can be dismissed the same way every other overlay is.
   const trade = contact.locator('[data-npc-action="trade"]');
   await trade.click();
   await expect(page.locator("[data-trade-panel]")).toBeVisible();
-  await trade.click();
+  await page.keyboard.press("Escape");
   await expect(page.locator("[data-trade-panel]")).toHaveCount(0);
   await trade.click();
   await expect(page.locator("[data-trade-panel]")).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(page.locator("[data-trade-panel]")).toHaveCount(0);
 
   // Renn is the contact at the Assistance Center: Talk only, no merchant.
   await page.locator("[data-local-place-exit]").click();
@@ -513,7 +517,7 @@ test("scopes each resident to their own Local Place", async ({ page, testCharact
   await expect(page.locator("[data-trade-panel]")).toHaveCount(0);
   await expect(page.getByRole("button", { name: /Talk to Bix Weller/ })).toHaveCount(0);
 
-  // Trade left open in Bix's shop does not reappear on return.
+  // Trade does not reappear on return to Bix's shop.
   await page.locator("[data-local-place-exit]").click();
   await page
     .locator("[data-local-place-directory]")
@@ -589,7 +593,9 @@ test("buys and sells against the authoritative balance without leaving the shop"
     .where(eq(characters.id, characterId));
   expect(row?.credits).toBe(14);
 
-  // The same balance is available from Inventory.
+  // The same balance is available from Inventory, once the counter is closed —
+  // Trade is a modal surface since #193, so the footer is behind it.
+  await page.getByRole("button", { name: /^Close trade with Bix Weller$/i }).click();
   await page.getByRole("button", { name: /Inventory/ }).click();
   await expect(page.locator("[data-inventory-credits]")).toContainText("14 Credits");
 });
@@ -609,22 +615,22 @@ test("opening Trade reveals the Trade surface above the bottom navigation", asyn
     .click();
   const trade = page.locator('[data-npc-action="trade"]');
   await expect(trade).toBeVisible();
-  const navTop = (await page.getByRole("navigation", { name: "Primary" }).boundingBox())!.y;
 
+  // Trade is its own surface since #193: it opens in the shared Drawer that
+  // Talk already used, rather than unfolding ~390px inside the place panel and
+  // pushing everything the place hosts below it.
   await trade.click();
-  const region = page.locator("[data-npc-trade]");
-  // Focus moves into the surface the player just opened ...
-  await expect(region).toBeFocused();
-  // ... and the surface, which fits this viewport in Buy mode, is scrolled
-  // fully clear of the fixed bottom navigation rather than clipped by it.
-  const box = (await region.boundingBox())!;
-  expect(box.y).toBeGreaterThanOrEqual(0);
-  expect(box.y + box.height).toBeLessThanOrEqual(navTop + 1);
-  await expect(region.getByRole("heading", { name: "Buy and sell" })).toBeInViewport();
+  const counter = page.getByRole("dialog", { name: "Trade with Bix Weller" });
+  await expect(counter).toBeVisible();
+  await expect(counter.getByRole("heading", { name: "Buy and sell" })).toBeInViewport();
+  await expect(counter.locator("[data-npc-trade]")).toBeVisible();
+  // The place itself did not grow to accommodate the shop: the whole surface
+  // still fits this phone viewport with the counter open.
+  expect(await page.evaluate(() => document.documentElement.scrollHeight)).toBeLessThanOrEqual(844);
 
   // Closing Trade leaves focus on the control the player used.
-  await trade.click();
-  await expect(region).toHaveCount(0);
+  await counter.getByRole("button", { name: /^Close trade with Bix Weller$/i }).click();
+  await expect(counter).toHaveCount(0);
   await expect(trade).toBeFocused();
 });
 
@@ -832,8 +838,10 @@ test("keeps the repaired shelter and the ride apart until Renn is told", async (
   await expect(page.locator('[data-crew-stop-state="boarding"]')).toHaveCount(0);
   await expect(page.locator("[data-crew-hauler-rides]")).toHaveCount(0);
   // The place's own prose may say what the shelter is for; the activity must not
-  // offer the ride.
-  await expect(page.locator("[data-local-place-activity]")).not.toContainText("Shift hauler");
+  // offer the ride. Since #193 that activity is a sibling panel rather than a
+  // slot inside the place surface, so it renders nothing at all here.
+  await expect(page.locator("[data-activity-panel]")).toHaveCount(0);
+  await expect(page.getByRole("main")).not.toContainText("Shift hauler");
 
   // A silent activity leaves no gap: the way out follows the description by the
   // ordinary single step, not by two.

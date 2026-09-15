@@ -346,7 +346,7 @@ export function ScavengeRevealOverlay() {
           </label>
         ) : null}
         {message ? <Feedback tone="danger">{message}</Feedback> : null}
-        <SectionHeader eyebrow="Presentation only">
+        <SectionHeader eyebrow="Presentation only" level={3}>
           No timing or reward choice is made here.
         </SectionHeader>
         <p className="text-xs text-[color:var(--rs-text-muted)]">

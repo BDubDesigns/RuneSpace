@@ -78,12 +78,20 @@ export function LocationSceneHeader({
           aria-hidden="true"
           className="pointer-events-none absolute inset-x-0 bottom-0 h-px bg-[var(--rs-scene-hairline-amber)] opacity-60"
         />
-        {/* Upper plate: location eyebrow. Real UI over scene. Resource pill now lives
-            bottom-right so long names (e.g. DeWhat? Emergency Power Annex) never
-            get clipped by a top-row sibling. Eyebrow translucency is token-owned. */}
+        {/* Upper plate: the place's name. Real UI over scene. Resource pill now
+            lives bottom-right so long names (e.g. DeWhat? Emergency Power Annex)
+            never get clipped by a top-row sibling. Plate translucency is
+            token-owned.
+
+            This plate is the surface's `h1` (#193). The panel below used to
+            repeat the same name as an eyebrow and title it "Location", which
+            cost 68px of a phone's screen to say what this plate already says.
+            Removing that line left the screen with no primary heading, so the
+            name that was always the real one carries the rank. The plate keeps
+            its existing appearance exactly — rank is not size. */}
         <div className="pointer-events-none absolute inset-x-0 top-0 flex items-start justify-start p-2 sm:p-2.5">
-          <span
-            className="rs-map-plate rs-map-plate--state inline-flex max-w-[92%] items-center whitespace-nowrap px-2 py-0.5 font-display text-[10px] font-bold uppercase tracking-[0.14em] sm:px-2.5 sm:text-[11px]"
+          <h1
+            className="rs-map-plate rs-map-plate--state m-0 inline-flex max-w-[92%] items-center whitespace-nowrap px-2 py-0.5 font-display text-[10px] font-bold uppercase tracking-[0.14em] sm:px-2.5 sm:text-[11px]"
             style={
               {
                 ["--rs-plate-surface-top" as unknown as string]: "var(--rs-scene-plate-top)",
@@ -93,7 +101,7 @@ export function LocationSceneHeader({
             data-scene-eyebrow
           >
             {location.displayName.toUpperCase()}
-          </span>
+          </h1>
         </div>
         {/* Character name — opaque plate over the bottom-left of the image, right edge
             angled to match concept art. Truncates if the player chose an insanely

@@ -54,7 +54,9 @@ export function LocalPlaceDirectory({ locationId }: { locationId: string }) {
 
   return (
     <div data-local-place-directory>
-      <SectionHeader eyebrow="Around town">Places</SectionHeader>
+      <SectionHeader eyebrow="Around town" level={2}>
+        Places
+      </SectionHeader>
       <ul className="mt-4 grid gap-3 sm:grid-cols-2">
         {places.map((place) => {
           const access = deriveLocalPlaceAccess(place, completedMissionIds);

@@ -219,11 +219,13 @@ Pass roll. An untouched bench is an absent row, so nothing needs backfilling.
   Scrap provenance, and including welds resolved lazily while the player was
   away.
 - **The yard reads as several panels, not one.** The Location panel carries the
-  scene, the description, and Wade himself; the Workbench, the Welding
-  progression card (the shared `SkillProgressCard`, as Mining and Refining use),
-  the `This practice run` history, and the Work Orders terminal are each their
-  own sibling panel below it, composed in `PlayConsole`. On a phone that keeps
-  Wade's Talk and Trade controls above the shop UI instead of below it.
+  scene, the description, and Wade himself; the Workbench and the Work Orders
+  terminal are sibling panels below it. Since issue #193 the Welding
+  progression and `This practice run` are compact rows *inside* the Workbench
+  panel rather than panels of their own, and every other location composes the
+  same way — see the stationary-Location grammar in `docs/design-system.md`.
+  On a phone that keeps Wade's Talk and Trade controls above the shop UI
+  instead of below it.
 
 ### Clean Pass: a general Welding opportunity (issue #190)
 

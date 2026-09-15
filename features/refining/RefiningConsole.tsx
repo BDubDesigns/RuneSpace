@@ -2,6 +2,9 @@
 
 import { useEffect, useRef, useState, useTransition } from "react";
 import { ActionButton } from "@/components/ui/ActionButton";
+import { ActivityPanel } from "@/features/shared/ActivityPanel";
+import { ActivityContextRow, SkillProgressRow } from "@/features/shared/activity-context";
+import { RefiningRunPanel } from "@/features/refining/RefiningRunPanel";
 import { ItemVisual } from "@/components/items/ItemVisual";
 import { VisualTile } from "@/components/items/VisualTile";
 import { Feedback } from "@/components/ui/Feedback";
@@ -78,7 +81,7 @@ function latestAnnouncement(attempt: RefiningRunAttempt, batch: number): string 
     : `${catchUp}Slag produced. ${roll} ${attempt.xpAwarded} Refining XP earned.`;
 }
 
-export function RefiningConsole({ showDescription = true }: { showDescription?: boolean }) {
+export function RefiningConsole() {
   const {
     acquireCommand,
     enqueueForeground,
@@ -205,14 +208,8 @@ export function RefiningConsole({ showDescription = true }: { showDescription?: 
   const isActive = Boolean(active);
 
   return (
-    <>
-      {showDescription ? (
-        <p className="mt-4 max-w-2xl text-sm leading-relaxed text-[color:var(--rs-text-secondary)]">
-          Rusted conveyors and a refurbished hopper stand ready. Feed 2 Ferrite Shale to refine it
-          into Refined Ferrite or Slag.
-        </p>
-      ) : null}
-      <div className="mt-5 flex flex-wrap gap-3">
+    <ActivityPanel title="Refining" data-refining-activity>
+      <div className="flex flex-wrap gap-3">
         {isActive || pendingCommand === "stop" ? (
           <ActionButton
             intent="danger"
@@ -240,16 +237,16 @@ export function RefiningConsole({ showDescription = true }: { showDescription?: 
           Refresh status
         </ActionButton>
       </div>
-      <p className="mt-3 font-display text-sm uppercase tracking-wide text-[color:var(--rs-accent-arcane)]">
+      <p className="font-display text-sm uppercase tracking-wide text-[color:var(--rs-accent-arcane)]">
         Success chance: {percentage(state.refiningSuccessChanceBps)}%
       </p>
-      <p className="mt-2 text-xs uppercase tracking-wide text-[color:var(--rs-text-muted)]">
+      <p className="!mt-2 text-xs uppercase tracking-wide text-[color:var(--rs-text-muted)]">
         {balance.refining.attemptDurationTicks} ticks /{" "}
         {(balance.refining.attemptDurationTicks * GAME_TICK_MS) / 1000}s per attempt &middot; 2
         Ferrite Shale &rarr; 1 output
       </p>
       {isActive ? (
-        <div className="mt-5">
+        <div>
           <StatusMeter
             label="Refining attempt"
             value={progress}
@@ -264,7 +261,7 @@ export function RefiningConsole({ showDescription = true }: { showDescription?: 
       {latestAttempt ? (
         <section
           aria-label="Latest refining attempt"
-          className={`mt-4 border border-[color:var(--rs-border-structural)] bg-[color:var(--rs-surface-panel)] p-3 ${feedback?.sequence === latestAttempt.sequence ? (latestAttempt.success ? "rs-result-feedback-success" : "rs-result-feedback-danger") : ""}`}
+          className={`border border-[color:var(--rs-border-structural)] bg-[color:var(--rs-surface-panel)] p-3 ${feedback?.sequence === latestAttempt.sequence ? (latestAttempt.success ? "rs-result-feedback-success" : "rs-result-feedback-danger") : ""}`}
           data-feedback-state={feedback?.sequence === latestAttempt.sequence ? "new" : "calm"}
           data-result-outcome={latestAttempt.success ? "success" : "slag"}
         >
@@ -322,15 +319,33 @@ export function RefiningConsole({ showDescription = true }: { showDescription?: 
         </Feedback>
       ) : null}
       {recovery ? (
-        <ActionButton
-          className="mt-3"
-          disabled={foregroundBusy}
-          intent="secondary"
-          onClick={recovery}
-        >
+        <ActionButton disabled={foregroundBusy} intent="secondary" onClick={recovery}>
           Retry status check
         </ActionButton>
       ) : null}
-    </>
+      {/* Both outputs and the shale that feeds them: refining stops on carried
+          capacity as readily as it stops on running out of input. */}
+      <SkillProgressRow
+        level={refining.level}
+        skill="Refining"
+        tone="refining"
+        xpIntoLevel={refining.xpIntoLevel}
+        {...(refining.xpToNextLevel === undefined ? {} : { xpToNextLevel: refining.xpToNextLevel })}
+      />
+      <ActivityContextRow
+        carry={{
+          slotsUsed: state.inventory.slotsUsed,
+          slotsAvailable: state.inventory.slotsAvailable,
+          massGrams: state.inventory.massGrams,
+          capacityGrams: state.inventory.capacityGrams,
+        }}
+        items={[
+          { label: "Ferrite Shale", quantity: state.ferriteShaleQuantity },
+          { label: "Refined Ferrite", quantity: state.refinedFerriteQuantity },
+          { label: "Slag", quantity: state.slagQuantity },
+        ]}
+      />
+      <RefiningRunPanel run={refiningRun} />
+    </ActivityPanel>
   );
 }

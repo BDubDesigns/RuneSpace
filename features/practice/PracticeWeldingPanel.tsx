@@ -4,9 +4,10 @@ import { useEffect, useState, useTransition } from "react";
 import { ActionButton } from "@/components/ui/ActionButton";
 import { Feedback } from "@/components/ui/Feedback";
 import { MissionActionButton } from "@/components/ui/MissionActionButton";
-import { Panel } from "@/components/ui/Panel";
-import { SectionHeader } from "@/components/ui/SectionHeader";
 import { StatusMeter } from "@/components/ui/StatusMeter";
+import { ActivityPanel } from "@/features/shared/ActivityPanel";
+import { ActivityContextRow, SkillProgressRow } from "@/features/shared/activity-context";
+import { PracticeRunPanel } from "@/features/practice/PracticeRunPanel";
 import { getEffectiveGameBalance, practiceSectionXp } from "@/game/config/balance";
 import { ACTION_IDS } from "@/game/config/foundations";
 import { deriveMissionGuidanceTargets } from "@/game/domain/missions";
@@ -115,37 +116,16 @@ export function PracticeWeldingPanel() {
       : 0;
 
   return (
-    <Panel
-      className="space-y-4"
-      tone="raised"
+    <ActivityPanel
+      eyebrow="Workbench"
+      title="Practice Welding"
       data-practice-panel
       data-practice-active={String(active)}
     >
-      <SectionHeader eyebrow="Workbench">Practice Welding</SectionHeader>
-
-      <p className="max-w-2xl text-sm leading-relaxed text-[color:var(--rs-text-secondary)]">
-        {`${practice.scrapPerWeld} Scrap Metal, ${practice.sectionsPerWeld} sections, nominal up to ${balance.practiceWelding.slagPerWeld} Slag. Each section is worth ${practiceSectionXp(balance)} Welding XP.`}
-      </p>
-
-      <StatusMeter
-        detail={`${practice.sectionsCompleted} / ${practice.sectionsPerWeld}`}
-        label="Current weld"
-        value={(practice.sectionsCompleted / practice.sectionsPerWeld) * 100}
-      />
-      {active ? (
-        <StatusMeter
-          detail={`${(sectionRemaining / 1_000).toFixed(1)}s`}
-          label="Current section"
-          value={
-            sectionMs === 0 ? 0 : Math.min(100, ((sectionMs - sectionRemaining) / sectionMs) * 100)
-          }
-        />
-      ) : null}
-
-      <p className="text-sm text-[color:var(--rs-text-secondary)]" data-practice-scrap>
-        <strong>{practice.scrapAvailable}</strong> Scrap Metal loose for later welds
-      </p>
-
+      {/* Start or stop first (#193). The recipe, the meters and the loose scrap
+          all describe what this control does, so they follow it — which is what
+          moves the bench above the fold on a phone while Wade's Mission strip is
+          on screen. */}
       {active ? (
         <ActionButton
           data-practice-stop
@@ -172,7 +152,26 @@ export function PracticeWeldingPanel() {
         </MissionActionButton>
       )}
 
+      <StatusMeter
+        detail={`${practice.sectionsCompleted} / ${practice.sectionsPerWeld}`}
+        label="Current weld"
+        value={(practice.sectionsCompleted / practice.sectionsPerWeld) * 100}
+      />
+      {active ? (
+        <StatusMeter
+          detail={`${(sectionRemaining / 1_000).toFixed(1)}s`}
+          label="Current section"
+          value={
+            sectionMs === 0 ? 0 : Math.min(100, ((sectionMs - sectionRemaining) / sectionMs) * 100)
+          }
+        />
+      ) : null}
+
       <CleanPassControl cleanPass={practice.cleanPass} />
+
+      <p className="max-w-2xl text-sm leading-relaxed text-[color:var(--rs-text-secondary)]">
+        {`${practice.scrapPerWeld} Scrap Metal, ${practice.sectionsPerWeld} sections, nominal up to ${balance.practiceWelding.slagPerWeld} Slag. Each section is worth ${practiceSectionXp(balance)} Welding XP.`}
+      </p>
 
       <div className="flex flex-wrap items-center gap-3">
         <ActionButton
@@ -194,6 +193,21 @@ export function PracticeWeldingPanel() {
         <Feedback tone="muted">Out of Scrap Metal</Feedback>
       ) : null}
       {message ? <Feedback tone="danger">{message}</Feedback> : null}
-    </Panel>
+      {/* Welding progression belongs with the welding, and the loose Scrap is
+          what decides whether there is another weld after this one. */}
+      <SkillProgressRow
+        level={state.welding.level}
+        skill="Welding"
+        tone="welding"
+        xpIntoLevel={state.welding.xpIntoLevel}
+        {...(state.welding.xpToNextLevel === undefined
+          ? {}
+          : { xpToNextLevel: state.welding.xpToNextLevel })}
+      />
+      <div data-practice-scrap>
+        <ActivityContextRow items={[{ label: "Scrap Metal", quantity: practice.scrapAvailable }]} />
+      </div>
+      <PracticeRunPanel run={practice.run} />
+    </ActivityPanel>
   );
 }

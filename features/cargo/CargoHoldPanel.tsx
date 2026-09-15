@@ -4,8 +4,9 @@ import { useEffect, useRef, useState, useTransition } from "react";
 import { ActionButton } from "@/components/ui/ActionButton";
 import { Feedback } from "@/components/ui/Feedback";
 import { MissionActionButton } from "@/components/ui/MissionActionButton";
-import { Panel } from "@/components/ui/Panel";
 import { StatusMeter } from "@/components/ui/StatusMeter";
+import { ActivityPanel } from "@/features/shared/ActivityPanel";
+import { ActivityContextRow, SkillProgressRow } from "@/features/shared/activity-context";
 import { ItemVisual } from "@/components/items/ItemVisual";
 import { InventoryStackVisual } from "@/components/items/InventoryStackVisual";
 import { getEffectiveGameBalance } from "@/game/config/balance";
@@ -507,31 +508,24 @@ export function CargoHoldPanel() {
   }
 
   return (
-    <Panel data-cargo-hold>
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <p className="font-display text-xs uppercase tracking-[0.16em] text-[color:var(--rs-accent-mining)]">
-            CRASH SITE INFRASTRUCTURE
-          </p>
-          <h2
-            className="mt-1 font-display text-xl font-bold uppercase tracking-wide"
-            data-cargo-hold-status={
-              repair.complete || repair.repairAvailable ? undefined : "locked"
-            }
-          >
-            {repair.complete
-              ? "CARGO HOLD"
-              : repair.repairAvailable
-                ? "CARGO HOLD REPAIR"
-                : "Damaged Cargo Hold"}
-          </h2>
-        </div>
-        {repair.complete ? (
-          <span className="border border-[color:var(--rs-accent-mining)] px-2 py-1 font-display text-xs uppercase tracking-wide">
-            OPERATIONAL
-          </span>
-        ) : null}
-      </div>
+    // No "CRASH SITE INFRASTRUCTURE" eyebrow any more (#193): the scene plate
+    // above this panel already says Crash Site, and the hold naming its own
+    // location was one of the repetitions that made the screen this long.
+    <ActivityPanel
+      title={
+        repair.complete
+          ? "CARGO HOLD"
+          : repair.repairAvailable
+            ? "CARGO HOLD REPAIR"
+            : "Damaged Cargo Hold"
+      }
+      data-cargo-hold
+    >
+      {repair.complete ? (
+        <span className="inline-block border border-[color:var(--rs-accent-mining)] px-2 py-1 font-display text-xs uppercase tracking-wide">
+          OPERATIONAL
+        </span>
+      ) : null}
 
       {repair.complete ? (
         <>
@@ -627,10 +621,58 @@ export function CargoHoldPanel() {
         </>
       ) : repair.repairAvailable ? (
         <>
-          <p className="mt-3 max-w-2xl text-sm leading-relaxed text-[color:var(--rs-text-secondary)]">
-            Restore the damaged Cargo Hold with replacement plating and packed bulkhead filler.
-            Refined Ferrite is structural material; Slag is thermal packing, not a welding tool.
-          </p>
+          {/* The control the player came for is first (#193). What it needs,
+              what it unlocks and what it is for follow it — the same order
+              every other activity now uses. */}
+          {repair.materialComplete ? (
+            <div className="flex flex-wrap items-center gap-3">
+              {activeWelding || pending === "stop" ? (
+                <ActionButton
+                  disabled={Boolean(pending)}
+                  intent="danger"
+                  loading={pending === "stop"}
+                  onClick={() => runWeldingCommand("stop")}
+                >
+                  STOP WELDING
+                </ActionButton>
+              ) : repair.weldingProgress < repair.weldingIncrements ? (
+                <MissionActionButton
+                  guidance={startWeldingGuided ? "active" : undefined}
+                  disabled={Boolean(pending)}
+                  intent="mining"
+                  loading={pending === "start"}
+                  onClick={() => runWeldingCommand("start")}
+                >
+                  START WELDING
+                </MissionActionButton>
+              ) : null}
+              <span className="text-xs uppercase tracking-wide text-[color:var(--rs-text-secondary)]">
+                {balance.welding.attemptDurationTicks} ticks /{" "}
+                {(balance.welding.attemptDurationTicks * GAME_TICK_MS) / 1000}s per weld pass · +
+                {balance.welding.xpPerIncrement} Welding XP
+              </span>
+            </div>
+          ) : (
+            <MissionActionButton
+              guidance={contributeGuided ? "active" : undefined}
+              disabled={Boolean(pending) || !contributionAvailable}
+              intent="mining"
+              onClick={() => setConfirmation(repair.availableContribution)}
+            >
+              CONTRIBUTE MATERIALS
+            </MissionActionButton>
+          )}
+          {activeWelding ? (
+            <div className="mt-4">
+              <StatusMeter
+                detail={`${secondsRemaining.toFixed(1)}s to next weld pass`}
+                label="Current welding pass"
+                value={weldingAttemptProgress}
+              />
+              {/* Clean Pass is general Welding, not a Practice feature (#190). */}
+              <CleanPassControl cleanPass={repair.cleanPass} />
+            </div>
+          ) : null}
           <div className="mt-4 grid gap-2 sm:grid-cols-2" data-cargo-repair-materials>
             <div className="border border-[color:var(--rs-border-structural)] bg-[color:var(--rs-surface-panel)] p-3">
               <p className="font-display text-xs uppercase tracking-wide">Refined Ferrite</p>
@@ -681,59 +723,36 @@ export function CargoHoldPanel() {
               No aggregate Cargo mass limit.
             </p>
           </div>
-          {repair.materialComplete ? (
-            <div className="mt-4 flex flex-wrap items-center gap-3">
-              {activeWelding || pending === "stop" ? (
-                <ActionButton
-                  disabled={Boolean(pending)}
-                  intent="danger"
-                  loading={pending === "stop"}
-                  onClick={() => runWeldingCommand("stop")}
-                >
-                  STOP WELDING
-                </ActionButton>
-              ) : repair.weldingProgress < repair.weldingIncrements ? (
-                <MissionActionButton
-                  guidance={startWeldingGuided ? "active" : undefined}
-                  disabled={Boolean(pending)}
-                  intent="mining"
-                  loading={pending === "start"}
-                  onClick={() => runWeldingCommand("start")}
-                >
-                  START WELDING
-                </MissionActionButton>
-              ) : null}
-              <span className="text-xs uppercase tracking-wide text-[color:var(--rs-text-secondary)]">
-                {balance.welding.attemptDurationTicks} ticks /{" "}
-                {(balance.welding.attemptDurationTicks * GAME_TICK_MS) / 1000}s per weld pass · +
-                {balance.welding.xpPerIncrement} Welding XP
-              </span>
-            </div>
-          ) : (
-            <MissionActionButton
-              guidance={contributeGuided ? "active" : undefined}
-              haloClassName="mt-4"
-              disabled={Boolean(pending) || !contributionAvailable}
-              intent="mining"
-              onClick={() => setConfirmation(repair.availableContribution)}
-            >
-              CONTRIBUTE MATERIALS
-            </MissionActionButton>
-          )}
-          {activeWelding ? (
-            <div className="mt-4">
-              <StatusMeter
-                detail={`${secondsRemaining.toFixed(1)}s to next weld pass`}
-                label="Current welding pass"
-                value={weldingAttemptProgress}
-              />
-              {/* Clean Pass is general Welding, not a Practice feature (#190). */}
-              <CleanPassControl cleanPass={repair.cleanPass} />
-            </div>
-          ) : null}
+          <p className="mt-4 max-w-2xl text-sm leading-relaxed text-[color:var(--rs-text-secondary)]">
+            Restore the damaged Cargo Hold with replacement plating and packed bulkhead filler.
+            Refined Ferrite is structural material; Slag is thermal packing, not a welding tool.
+          </p>
+          {/* Every weld pass here grants Welding XP, and until #193 this
+              surface showed no sign of it — while the Wiki already told
+              players that every skill shows its level where it is used. The
+              compact row makes that true, using the same projection the
+              Workbench reads; nothing about the award changes. */}
+          <SkillProgressRow
+            level={state.welding.level}
+            skill="Welding"
+            tone="welding"
+            xpIntoLevel={state.welding.xpIntoLevel}
+            {...(state.welding.xpToNextLevel === undefined
+              ? {}
+              : { xpToNextLevel: state.welding.xpToNextLevel })}
+          />
+          <ActivityContextRow
+            items={[
+              { label: "Refined Ferrite carried", quantity: state.refinedFerriteQuantity },
+              { label: "Slag carried", quantity: state.slagQuantity },
+            ]}
+          />
         </>
       ) : (
-        <p className="mt-3 max-w-2xl text-sm leading-relaxed text-[color:var(--rs-text-secondary)]">
+        <p
+          className="max-w-2xl text-sm leading-relaxed text-[color:var(--rs-text-secondary)]"
+          data-cargo-hold-status="locked"
+        >
           The Cargo Hold is buckled from the crash and still inaccessible.
         </p>
       )}
@@ -791,6 +810,6 @@ export function CargoHoldPanel() {
           </div>
         </div>
       ) : null}
-    </Panel>
+    </ActivityPanel>
   );
 }

@@ -109,9 +109,12 @@ below.
   guidance semantics belong to Issue #143.
 
 The composition is therefore `PlayConsole → Location | Map | Journey`, with
-activity-specific controls and overlays remaining feature-owned. See
-`docs/location-scenes.md`, `docs/travel-map-design.md`, and
-`docs/design-system.md` for their surface-specific presentation rules.
+activity-specific controls and overlays remaining feature-owned. Since issue
+#193 a stationary Location composes as the place, then its primary activity as
+a sibling panel, then secondary systems; the activity carries its own compact
+context and run summary. That grammar is owned by `docs/design-system.md`
+("Stationary Location composition"). See also `docs/location-scenes.md` and
+`docs/travel-map-design.md` for their surface-specific presentation rules.
 
 ## Where minigames fit
 

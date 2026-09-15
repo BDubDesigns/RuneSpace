@@ -3,6 +3,7 @@
 import { ActionButton } from "@/components/ui/ActionButton";
 import { Panel } from "@/components/ui/Panel";
 import { SectionHeader } from "@/components/ui/SectionHeader";
+import { LOCATION_IDS } from "@/game/config/foundations";
 import { usePlay } from "@/features/play/PlayContext";
 
 /**
@@ -21,6 +22,14 @@ import { usePlay } from "@/features/play/PlayContext";
  */
 export function WorkOrdersTerminal() {
   const { state } = usePlay();
+  // The terminal is a physical thing in Wade's yard, so it shows where it
+  // stands and nowhere else. The Play shell used to apply this gate from
+  // outside; since #193 composes secondary systems generically, the surface
+  // that knows where it lives asserts it — the same way the Power Annex claim
+  // panel always has.
+  if (state.location.currentLocationId !== LOCATION_IDS.ruskRecovery || state.travelState) {
+    return null;
+  }
   // Both the reveal and the level requirement are authoritative projection: this
   // surface never learns a Mission ID or a balance literal of its own.
   const { revealed, meetsWeldingLevel, requiredWeldingLevel } = state.workOrders;
@@ -32,7 +41,9 @@ export function WorkOrdersTerminal() {
       data-work-orders-terminal
       data-work-orders-state={meetsWeldingLevel ? "empty" : "locked"}
     >
-      <SectionHeader eyebrow="Rusk Recovery">Work Orders</SectionHeader>
+      <SectionHeader eyebrow="Rusk Recovery" level={2}>
+        Work Orders
+      </SectionHeader>
       <p className="mt-4 max-w-2xl text-sm leading-relaxed text-[color:var(--rs-text-secondary)]">
         The terminal in the corner is where paying jobs come in off the wire.
       </p>

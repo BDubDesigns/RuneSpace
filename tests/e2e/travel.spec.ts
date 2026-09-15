@@ -144,30 +144,28 @@ async function expectPowerAnnexRewardLayout(
   const leftBox = await left.boundingBox();
   expect(tileBox).not.toBeNull();
   expect(leftBox).not.toBeNull();
+  // The tile is the whole left column: since #193 the claim leads the panel
+  // rather than sitting under the artwork, so what is left beside the
+  // allotment's detail is the Power Cell itself.
+  expect(Math.abs((leftBox?.height ?? 0) - (tileBox?.height ?? 0))).toBeLessThanOrEqual(2);
+  await expect(left.getByRole("button")).toHaveCount(0);
 
+  const claim = page.getByRole("button", { name: "Claim Power Cells" });
   if (claimed) {
-    await expect(left.getByRole("button")).toHaveCount(0);
-    expect(Math.abs((leftBox?.height ?? 0) - (tileBox?.height ?? 0))).toBeLessThanOrEqual(2);
+    await expect(claim).toHaveCount(0);
   } else {
-    const claimButton = left.getByRole("button", { name: "Claim Power Cells" });
-    const buttonBox = await claimButton.boundingBox();
-    expect(buttonBox).not.toBeNull();
-    const tileCenter = (tileBox?.x ?? 0) + (tileBox?.width ?? 0) / 2;
-    const buttonCenter = (buttonBox?.x ?? 0) + (buttonBox?.width ?? 0) / 2;
-    expect(Math.abs(tileCenter - buttonCenter)).toBeLessThanOrEqual(2);
+    // The claim is the activity's primary control, so it is above everything
+    // that describes it.
+    const claimBox = (await claim.boundingBox())!;
+    expect(claimBox.y + claimBox.height).toBeLessThanOrEqual((tileBox?.y ?? 0) + 1);
   }
 
+  // The allotment's detail stays vertically centred against the artwork.
   const infoBox = await page.locator("[data-power-annex-reward-info]").boundingBox();
   expect(infoBox).not.toBeNull();
-  const buttonBox = claimed
-    ? undefined
-    : await left.getByRole("button", { name: "Claim Power Cells" }).boundingBox();
-  const combinedBottom = claimed
-    ? (tileBox?.y ?? 0) + (tileBox?.height ?? 0)
-    : (buttonBox?.y ?? 0) + (buttonBox?.height ?? 0);
-  const combinedCenter = ((tileBox?.y ?? 0) + combinedBottom) / 2;
+  const tileCenter = (tileBox?.y ?? 0) + (tileBox?.height ?? 0) / 2;
   const infoCenter = (infoBox?.y ?? 0) + (infoBox?.height ?? 0) / 2;
-  expect(Math.abs(combinedCenter - infoCenter)).toBeLessThanOrEqual(4);
+  expect(Math.abs(tileCenter - infoCenter)).toBeLessThanOrEqual(4);
 }
 
 async function expectNoMiningDashboards(page: import("@playwright/test").Page) {
@@ -178,8 +176,11 @@ async function expectNoMiningDashboards(page: import("@playwright/test").Page) {
 async function expectMiningDashboardsVisible(page: import("@playwright/test").Page) {
   await expect(page.getByRole("button", { name: "Start Mining" })).toBeVisible();
   await expect(page.getByText("Success chance:", { exact: false })).toBeVisible();
-  await expect(page.getByText("Mining progression", { exact: true })).toBeVisible();
-  await expect(page.getByText("Cargo readout", { exact: true })).toBeVisible();
+  // Since #193 the skill, the carried shale and the run totals are compact rows
+  // inside Mining's own panel rather than three standalone cards.
+  await expect(page.getByRole("progressbar", { name: "Mining progression XP" })).toBeVisible();
+  await expect(page.locator("[data-activity-context]")).toContainText("Ferrite Shale");
+  await expect(page.locator("[data-activity-context]")).toContainText("slots");
   await expect(page.getByText("This mining run", { exact: true })).toBeVisible();
 }
 
@@ -188,7 +189,7 @@ async function expectMiningDashboardsHidden(page: import("@playwright/test").Pag
   await expect(page.getByRole("button", { name: "Stop Mining" })).toHaveCount(0);
   await expect(page.getByText("Mining attempt", { exact: true })).toHaveCount(0);
   await expect(page.getByText("Latest attempt:", { exact: false })).toHaveCount(0);
-  await expect(page.getByText("Mining progression", { exact: true })).toHaveCount(0);
+  await expect(page.getByRole("progressbar", { name: "Mining progression XP" })).toHaveCount(0);
   await expect(page.getByText("This mining run", { exact: true })).toHaveCount(0);
 }
 
@@ -602,8 +603,8 @@ test("the full journey walks, arrives, and returns between the original location
   // Refining is available at the Yard (issue #81): the activity panel shows
   // the Refining console, not the old "offline" message.
   await expect(page.getByRole("button", { name: "Start Refining" })).toBeVisible();
-  await expect(page.getByText("Refining progression", { exact: true })).toBeVisible();
-  await expect(page.getByText("Cargo readout", { exact: true })).toBeVisible();
+  await expect(page.getByRole("progressbar", { name: "Refining progression XP" })).toBeVisible();
+  await expect(page.locator("[data-activity-context]")).toContainText("Refined Ferrite");
   await expect(page.getByText("This refining run", { exact: true })).toBeVisible();
   await expectMiningDashboardsHidden(page);
   await expect(page.getByText(/Metallurgy progression/i)).toHaveCount(0);

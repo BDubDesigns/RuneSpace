@@ -243,7 +243,9 @@ export function Drawer({
         tabIndex={-1}
       >
         <div className="flex items-start justify-between gap-3">
-          <SectionHeader eyebrow={eyebrow}>{title}</SectionHeader>
+          <SectionHeader eyebrow={eyebrow} level={2}>
+            {title}
+          </SectionHeader>
           {dismissible ? (
             <ActionButton
               ref={closeButton}

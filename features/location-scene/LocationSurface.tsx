@@ -1,22 +1,14 @@
 "use client";
 
 import { Panel } from "@/components/ui/Panel";
-import { SectionHeader } from "@/components/ui/SectionHeader";
-import { Feedback } from "@/components/ui/Feedback";
 import { LOCATION_IDS } from "@/game/config/foundations";
 import { getLocalPlacesForLocation } from "@/game/content/local-places";
 import { getLocation } from "@/game/content/locations";
 import { deriveLocalPlaceSurface, resolveActiveLocalPlace } from "@/game/domain/local-places";
 import { deriveCompletedMissionIds } from "@/game/domain/missions";
 import { deriveCompletedRepairTargetIds } from "@/game/domain/welding-repair";
-import { LOCAL_PLACE_IDS } from "@/game/config/foundations";
-import { CrewStopPanel } from "@/features/local-places/CrewStopPanel";
-import { CargoHoldPanel } from "@/features/cargo/CargoHoldPanel";
 import { LocalPlaceDirectory } from "@/features/local-places/LocalPlaceDirectory";
 import { LocalPlaceSurface } from "@/features/local-places/LocalPlaceSurface";
-import { MiningActivity } from "@/features/mining/MiningActivity";
-import { PowerAnnexClaimPanel } from "@/features/power-annex/PowerAnnexClaimPanel";
-import { RefiningConsole } from "@/features/refining/RefiningConsole";
 import { NpcInteractionPanel } from "@/features/npc/NpcInteractionPanel";
 import { usePlay } from "@/features/play/PlayContext";
 import { LocationPopulationPanel } from "./LocationPopulationPanel";
@@ -28,16 +20,11 @@ import { LocationSceneHeader } from "./LocationSceneHeader";
  * only ever arrives at — offers nothing, because the crews cannot make room on
  * the way back. The walk home is the ordinary Travel control, unchanged.
  *
- * The activity a Local Place hosts, when it hosts one.
- *
- * The same shape as this surface's existing per-location activity selection —
- * one narrow mapping from an authored place to the component that owns its
- * gameplay, rather than a generic plugin registry built for a single case.
+ * This surface is the place: its scene, its description, who is here, and the
+ * resident standing in it. What the player can *do* here is a sibling panel
+ * (`LocationActivity`, #193), so that every location presents its activity in
+ * the same frame at the same depth instead of four different ways.
  */
-function localPlaceActivity(localPlaceId: string) {
-  return localPlaceId === LOCAL_PLACE_IDS.holoHollowCrewStop ? <CrewStopPanel /> : undefined;
-}
-
 export function LocationSurface({
   characterName,
   localPlaceId,
@@ -62,7 +49,6 @@ export function LocationSurface({
   if (activePlace) {
     return (
       <LocalPlaceSurface
-        activity={localPlaceActivity(activePlace.id)}
         characterName={characterName}
         parentDisplayName={location.displayName}
         resident={
@@ -101,45 +87,36 @@ export function LocationSurface({
         location={location}
         resourceLabels={resourceLabels}
       />
-      <div className="p-5">
-        <SectionHeader eyebrow={location.displayName}>Location</SectionHeader>
+      {/* Slightly less padding below the resident than above the description:
+          what follows this panel is the place's activity, and the two panels
+          plus the stack gap otherwise put 56px of gutter between the person
+          standing here and the thing to do here. */}
+      <div className="p-5 pb-4">
+        {/* No heading line here (#193): the scene plate above already names the
+            place and carries the surface's `h1`. A second copy of the name over
+            the literal word "Location" cost 68px of a 844px-tall phone screen
+            and told the player nothing the artwork had not. */}
         <p
-          className="mt-4 max-w-2xl text-sm leading-relaxed text-[color:var(--rs-text-secondary)]"
+          className="max-w-2xl text-sm leading-relaxed text-[color:var(--rs-text-secondary)]"
           data-location-description
         >
           {location.description}
         </p>
-        {/* The person standing here comes before the place's own context, so a
-            phone shows Talk and Trade without scrolling past the shop UI. */}
-        <NpcInteractionPanel className="mt-4" />
-        <div className="mt-4">
-          <LocationPopulationPanel />
-        </div>
+        {/* Who is here rides on the resident row's second line rather than
+            taking a row of its own (#193) — 32px on a phone, which is the
+            difference between the Workbench starting above the fold at Rusk
+            Recovery and starting below it. It states its own subject so it
+            still reads as the place's, not the resident's. */}
+        <NpcInteractionPanel className="mt-3" meta={<LocationPopulationPanel />} />
         {localPlaces.length > 0 ? (
           <div className="mt-5">
             <LocalPlaceDirectory locationId={locationId} />
           </div>
         ) : null}
-        {/* Rusk Recovery's Workbench, Welding progression, Practice run, and
-            Work Orders are composed as sibling panels rather than one giant
-            location panel (#190), so this surface hosts no activity block. */}
-        {locationId === LOCATION_IDS.theLongScramble ||
-        locationId === LOCATION_IDS.ruskRecovery ||
-        localPlaces.length > 0 ? null : (
-          <div className="mt-5" data-location-activity>
-            {locationId === LOCATION_IDS.abandonedProcessingYard ? (
-              <RefiningConsole showDescription={false} />
-            ) : locationId === LOCATION_IDS.theJag ? (
-              <MiningActivity characterName={characterName} />
-            ) : locationId === LOCATION_IDS.crashSite ? (
-              <CargoHoldPanel />
-            ) : locationId === LOCATION_IDS.emergencyPowerAnnex ? (
-              <PowerAnnexClaimPanel />
-            ) : (
-              <Feedback tone="muted">No production activity is available here.</Feedback>
-            )}
-          </div>
-        )}
+        {/* No activity block here (#193). Every place's activity is a sibling
+            panel composed by `LocationActivity`, the way Rusk Recovery's
+            Workbench already was (#190), so this panel is the place itself:
+            where you are, who is here, and who you can talk to. */}
       </div>
     </Panel>
   );

@@ -2,18 +2,18 @@
   "schemaVersion": 1,
   "projectSlug": "runespace",
   "workState": "active",
-  "currentFocus": "Making Welding something a player can go and get better at: Wade's recovery yard, a workbench that practises Welding indefinitely, and the Clean Pass moments every weld now rolls.",
+  "currentFocus": "Giving every Play location one layout: the place and its people first, the thing you came to do next, and the numbers that explain it compact enough to read on a phone.",
   "currentChange": {
-    "summary": "Added Rusk Recovery and 10,000 Hours: Wade's own yard, a workbench that practises Welding indefinitely for scrap, and the Clean Pass moment every weld now rolls.",
+    "summary": "Standardised how every stationary location composes, so the primary activity is on screen when you arrive instead of below the fold.",
     "stage": "review",
-    "pullRequestNumber": 191
+    "pullRequestNumber": 195
   },
   "latestCompleted": {
-    "summary": "Fixed late-loading gameplay artwork: location scenes and speaking portraits now load first, and Map identifiers ship as far smaller files.",
-    "date": "2026-09-14",
-    "url": "https://github.com/BDubDesigns/RuneSpace/pull/188"
+    "summary": "Added Rusk Recovery and 10,000 Hours: Wade's own yard, a workbench that practises Welding indefinitely for scrap, and the Clean Pass moment every weld now rolls.",
+    "date": "2026-09-15",
+    "url": "https://github.com/BDubDesigns/RuneSpace/pull/191"
   },
-  "nextStep": "Human review and preview of the Rusk Recovery slice, including playtesting Practice Welding and Clean Pass on a phone.",
+  "nextStep": "Human mobile playtest across several locations to confirm the game reads as one interface rather than a collection of feature screens.",
   "lastMeaningfulUpdate": "2026-09-15",
   "highlights": [
     {

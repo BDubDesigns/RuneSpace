@@ -71,12 +71,19 @@ test("owned character can start, observe, stop, and restore Ferrite Mining at Th
   await expect(page.getByText("1 failed", { exact: true })).toBeVisible();
   await expect(page.getByText("1 shale gained", { exact: true })).toBeVisible();
   await expect(page.getByText("15 Mining XP", { exact: true })).toBeVisible();
+  // Prior attempts sit behind History since #193 — the run's own totals stay
+  // visible, the bounded list is opened when the player wants it.
+  await expect(page.getByLabel("Mining attempt history", { exact: true })).toHaveCount(0);
+  await page.getByRole("button", { name: "History", exact: true }).click();
   const history = page.getByLabel("Mining attempt history", { exact: true });
-  await expect(history).toContainText("Attempt 2 - Failed");
+  // History is the attempts *before* the current one: attempt 2 is the latest
+  // and is already presented in full above, so opening History must not put it
+  // on the screen a second time.
   await expect(history).toContainText("Attempt 1 - Success");
-  await expect(history).toContainText("Roll 35.00 | Needed below 35.00");
-  await expect(history).toContainText("Missed by 0.01");
   await expect(history).toContainText("Roll 0.00 | Needed below 35.00");
+  await expect(history).not.toContainText("Attempt 2");
+  await expect(history).not.toContainText("Missed by 0.01");
+  await expect(latestResult).toContainText("Missed by 0.01");
   await captureReviewScreenshot(page, "mining-mobile-active-viewport.png");
   await page.getByText("This mining run").scrollIntoViewIfNeeded();
   await captureReviewScreenshot(page, "mining-mobile-run-history-viewport.png");
@@ -268,7 +275,10 @@ test("owned character can start, observe, stop, and restore Ferrite Mining at Th
   await expect(page.getByRole("button", { name: "Stop Mining" })).toBeVisible();
   await expect(page.getByText("Mining stopped.")).toBeHidden();
   await expect(page.getByText("0 attempts", { exact: true })).toBeVisible();
-  await expect(history).toContainText("No resolved attempts in this run yet.");
+  // A run with nothing resolved in it has nothing to disclose, so it offers no
+  // History control at all rather than an empty list behind one (#193).
+  await expect(page.getByRole("button", { name: "History", exact: true })).toHaveCount(0);
+  await expect(history).toHaveCount(0);
   const oneAttemptAgo = new Date(Date.now() - 6_100);
   await db
     .update(activeActions)
@@ -462,11 +472,12 @@ test("shell reserves the fixed footer once and keeps the global background fixed
       yardGeometry.expectedClearance - yardGeometry.expectedBoxHeight - yardGeometry.expectedGap,
     ),
   ).toBeLessThanOrEqual(2);
-  // The Yard hosts the full Refining activity stack, so it scrolls like the
-  // Crash Site. The real layout contract is enforced below: the bottom nav
-  // stays fixed with the shared space-3 gap, and the global background stays
-  // fixed.
-  expect(yardGeometry.scrollHeight - yardGeometry.clientHeight).toBeGreaterThan(10);
+  // The Yard used to be assumed taller than the viewport; since #193 compacted
+  // the Refining stack it very nearly fits one. The footer contract does not
+  // depend on that either way — what follows scrolls to the end of whatever
+  // the document is and checks the nav stays fixed with the shared space-3
+  // gap, and the global background stays fixed.
+  expect(yardGeometry.scrollHeight).toBeGreaterThanOrEqual(yardGeometry.clientHeight);
   await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
   const yardBottomGeometry = await page.evaluate(() => {
     const content = document.querySelector("main");
@@ -652,12 +663,12 @@ test("Power Cell loading boosts Mining attempts and falls back after depletion",
     .where(eq(activeActions.characterId, characterId));
   await page.getByRole("button", { name: "Refresh status" }).click();
   await expect(page.getByText(/POWER CELL BOOST · [89] \/ 10/)).toBeVisible();
-  await expect(page.getByRole("region", { name: "Latest mining attempt" })).toContainText(
-    "Power Cell charge consumed",
-  );
-  await expect(page.getByLabel("Mining attempt history", { exact: true })).toContainText(
-    "Boosted · 5 ticks",
-  );
+  // The boost is reported on the attempt itself. Asserted on the visible
+  // latest-attempt block rather than in History, which since #193 holds only
+  // the attempts before this one and so depends on how many resolved.
+  const latestBoosted = page.getByRole("region", { name: "Latest mining attempt" });
+  await expect(latestBoosted).toContainText("Power Cell charge consumed");
+  await expect(latestBoosted).toContainText("5 ticks");
 
   // Stop/start preserves the Cutter instance charge while avoiding the client
   // refresh timer racing the deterministic depletion boundary below.
