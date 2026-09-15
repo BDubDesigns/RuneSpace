@@ -22,6 +22,7 @@ import {
   getRepairTargetBalance,
   miningLevelThresholds,
   repairTargetBalances,
+  repairTargetForActionId,
   standardSkillLevelThresholds,
   weldingActionIds,
 } from "@/game/config/balance";
@@ -108,8 +109,21 @@ import {
   type PersistedMiningOutcome,
 } from "@/server/mining";
 import { loadCompletedMissionIds, loadMissionProjections } from "@/server/mission-state";
+import { missOpenRepairCleanPass } from "@/server/welding";
+import {
+  createPracticeWeldingResolver,
+  interruptPracticeWelding,
+  loadPracticeRow,
+  loadPracticeUnlocked,
+  practiceRunStateFromRow,
+  practiceStateFromRow,
+  type PersistedPracticeOutcome,
+  type PracticeRunState,
+} from "@/server/practice-welding";
+import { PRACTICE_WELDING_CONTENT } from "@/game/content/practice-welding";
+import { cleanPassOutcome, cleanPassSection, type CleanPassState } from "@/game/domain/clean-pass";
 import { loadRepairAccess } from "@/server/repair-access";
-import { recordTrackedActivity } from "@/server/mission-progress";
+import { recordTrackedActivity, type TrackedActivity } from "@/server/mission-progress";
 import type { MissionProjection } from "@/game/domain/missions";
 import { loadPlaySnapshot } from "@/server/play-state";
 
@@ -141,6 +155,47 @@ export type CargoHoldUniqueItemState = {
  * Stop are the same shape with different recipes, so a repair surface renders
  * from this rather than from its own bespoke state.
  */
+/**
+ * The Clean Pass opportunities of the Welding work unit currently in progress
+ * (#190).
+ *
+ * Present only while that work unit's Welding action is the active action.
+ * `sectionsCompleted + 1` is the section being welded right now, so a surface
+ * knows a window is open when an unresolved opportunity names that section —
+ * the same positional truth the authoritative claim is validated against. The
+ * live countdown is the ordinary `activeAction.nextAttemptAt` every Welding
+ * surface already renders, so there is no second timing channel to drift.
+ */
+export type CleanPassProjection = {
+  opportunities: readonly { section: number; outcome: "claimed" | "missed" | null }[];
+  sectionsCompleted: number;
+};
+
+/** Repeatable Practice Welding at Wade's Workbench (#190). */
+export type PracticeProjection = {
+  /**
+   * The Workbench is the player's to use: 10,000 Hours is accepted, which stays
+   * true after it completes. Before that the bench is scenery — no control, no
+   * disabled state, no teaser.
+   */
+  unlocked: boolean;
+  /** The Practice action is the character's current active action. */
+  active: boolean;
+  /** Whole sections resolved for the weld in progress. */
+  sectionsCompleted: number;
+  sectionsPerWeld: number;
+  /** A partial weld whose two Scrap are already spent, waiting to be resumed. */
+  cycleActive: boolean;
+  /** Loose carried Scrap Metal available for the NEXT fresh weld. */
+  scrapAvailable: number;
+  scrapPerWeld: number;
+  autoDiscardSlag: boolean;
+  /** Why the last run stopped on its own, for the ordinary run presentation. */
+  lastStopReason?: string;
+  run: PracticeRunState;
+  cleanPass?: CleanPassProjection;
+};
+
 export type RepairProjection = {
   targetId: string;
   refinedFerriteContributed: number;
@@ -152,6 +207,8 @@ export type RepairProjection = {
   materialComplete: boolean;
   complete: boolean;
   repairAvailable: boolean;
+  /** Present only while this repair's Welding action is active (#190). */
+  cleanPass?: CleanPassProjection;
   completedAt?: string;
   availableContribution: { refinedFerrite: number; slag: number };
 };
@@ -278,6 +335,8 @@ export type PlayGameplayState = {
    * progress, or availability on the client.
    */
   repairs: Readonly<Record<string, RepairProjection>>;
+  /** Repeatable Practice Welding state (#190). */
+  practice: PracticeProjection;
   cargoHold: CargoHoldState;
   recentResult: { successes: number; failures: number; awardedXp: number };
   refiningRecentResult: { successes: number; failures: number; awardedXp: number };
@@ -287,6 +346,8 @@ export type PlayGameplayState = {
    */
   stop?: ActivityStop;
   commandError?: "another_action_active";
+  /** One current Practice Welding refusal, for the Workbench surface (#190). */
+  practiceError?: "practice_unavailable_here" | "practice_locked" | "insufficient_scrap";
   /** Authoritative persistent current location (stable ID from the registry). */
   location: { currentLocationId: string };
   /**
@@ -340,7 +401,7 @@ type PlayResolverEntry = {
 
 function withTrackedActivityProgress<Snapshot, Outcome extends { characterId: string }>(
   resolver: ActionResolver<Snapshot, Outcome>,
-  activity: "mining" | "refining",
+  activity: TrackedActivity,
   attemptCount: (outcome: Outcome) => number,
 ): ActionResolver<Snapshot, Outcome> {
   return {
@@ -418,6 +479,7 @@ export function createPlayResolver(
   onTravelArrival?: (outcome: TravelResolution) => void,
   onRefiningOutcome?: (outcome: PersistedRefiningOutcome) => void,
   onWeldingOutcome?: (outcome: PersistedWeldingOutcome) => void,
+  onPracticeOutcome?: (outcome: PersistedPracticeOutcome) => void,
 ): PlayResolver {
   const refiningRandom = isCanonicalE2EMiningOverride()
     ? e2eRefiningRandom()
@@ -450,6 +512,17 @@ export function createPlayResolver(
       actionId,
       resolver: createWeldingResolver(onWeldingOutcome) as PlayResolver,
     })),
+    {
+      // Practice Welding counts COMPLETED welds through the same generic
+      // tracked-activity path Mining and Refining use — never sections, never
+      // starts, and with no Practice-specific Mission bookkeeping (#190).
+      actionId: ACTION_IDS.practiceWelding,
+      resolver: withTrackedActivityProgress(
+        createPracticeWeldingResolver(random, onPracticeOutcome),
+        "practice_welding",
+        (outcome) => outcome.completedWelds,
+      ) as PlayResolver,
+    },
   ];
   return composePlayResolvers(entries);
 }
@@ -595,6 +668,26 @@ function recentFrom(
  * carried materials. Recipe values are read from the target's balance spec, so
  * no surface ever hardcodes a second copy of them.
  */
+/**
+ * The Clean Pass projection for the work unit currently being welded (#190).
+ *
+ * Absent unless that unit's Welding action is active: an opportunity belongs to
+ * work in progress, and a surface must never show one for work nobody is doing.
+ */
+function projectCleanPass(
+  cleanPass: CleanPassState,
+  sectionsCompleted: number,
+  weldingActive: boolean,
+): CleanPassProjection | undefined {
+  if (!weldingActive) return undefined;
+  const opportunities = ([0, 1] as const).flatMap((index) => {
+    const section = cleanPassSection(cleanPass, index);
+    return section === null ? [] : [{ section, outcome: cleanPassOutcome(cleanPass, index) }];
+  });
+  if (opportunities.length === 0) return undefined;
+  return { opportunities, sectionsCompleted };
+}
+
 async function projectRepairTarget(
   transaction: DatabaseTransaction,
   characterId: string,
@@ -602,10 +695,13 @@ async function projectRepairTarget(
   repair: RepairTargetState,
   carriedRefinedFerrite: number,
   carriedSlag: number,
+  weldingActive = false,
 ): Promise<RepairProjection> {
   const target = getRepairTargetBalance(targetId);
   const access = await loadRepairAccess(transaction, characterId, targetId, repair);
+  const cleanPass = projectCleanPass(repair.cleanPass, repair.weldingProgress, weldingActive);
   return {
+    ...(cleanPass ? { cleanPass } : {}),
     targetId,
     refinedFerriteContributed: repair.refinedFerriteContributed,
     refinedFerriteRequired: target.refinedFerriteRequired,
@@ -643,6 +739,7 @@ export async function stateFromTransaction(
   refiningStopReason?: RefiningStopReason | null,
   refiningError?: PlayGameplayState["refiningError"],
   weldingError?: PlayGameplayState["weldingError"],
+  practiceError?: PlayGameplayState["practiceError"],
 ): Promise<PlayGameplayState> {
   const balance = getEffectiveGameBalance();
   const snapshot = await loadPlaySnapshot(transaction, characterId);
@@ -771,8 +868,35 @@ export async function stateFromTransaction(
       repairStates.get(target.targetId) ?? UNSTARTED_REPAIR,
       carriedRefinedFerrite,
       carriedSlag,
+      action?.actionId === target.actionId,
     );
   }
+  // Practice Welding (#190). The bench is the player's to use from the moment
+  // 10,000 Hours is accepted, and stays so forever after — there is no second
+  // unlock flag, only that Mission record.
+  const practiceRow = await loadPracticeRow(transaction, characterId);
+  const practiceState = practiceStateFromRow(practiceRow);
+  const practiceActive = action?.actionId === ACTION_IDS.practiceWelding;
+  const practiceCleanPass = projectCleanPass(
+    practiceState.cleanPass,
+    practiceState.sectionsCompleted,
+    practiceActive,
+  );
+  const practice: PracticeProjection = {
+    unlocked: await loadPracticeUnlocked(transaction, characterId),
+    active: practiceActive,
+    sectionsCompleted: practiceState.sectionsCompleted,
+    sectionsPerWeld: balance.practiceWelding.sectionsPerWeld,
+    cycleActive: practiceState.cycleActive,
+    scrapAvailable: stacks
+      .filter((stack) => stack.itemId === ITEM_IDS.scrapMetal)
+      .reduce((total, stack) => total + stack.quantity, 0),
+    scrapPerWeld: balance.practiceWelding.scrapPerWeld,
+    autoDiscardSlag: practiceRow?.autoDiscardSlag ?? false,
+    ...(practiceRow?.lastStopReason ? { lastStopReason: practiceRow.lastStopReason } : {}),
+    run: practiceRunStateFromRow(practiceRow),
+    ...(practiceCleanPass ? { cleanPass: practiceCleanPass } : {}),
+  };
   const cargoRepairProjection = repairs[REPAIR_TARGET_IDS.cargoHold]!;
   const cargoUniqueItems = cargoItemRows
     .map((row) => snapshot.allItemInstances.find((instance) => instance.id === row.itemInstanceId))
@@ -852,14 +976,17 @@ export async function stateFromTransaction(
   const isRefiningAction = action?.actionId === ACTION_IDS.refining;
   const isWeldingAction =
     action !== undefined && weldingActionIds(balance).includes(action.actionId);
+  // Practice is Welding: same section cadence, same live attempt window (#190).
+  const isPracticeAction = action?.actionId === ACTION_IDS.practiceWelding;
   const nextAttemptBoosted = isMiningAction && cutterCharge > 0;
-  const nextAttemptDurationTicks = isWeldingAction
-    ? balance.welding.attemptDurationTicks
-    : isRefiningAction
-      ? balance.refining.attemptDurationTicks
-      : nextAttemptBoosted
-        ? boostedMiningAttemptDurationTicks(balance)
-        : balance.mining.attemptDurationTicks;
+  const nextAttemptDurationTicks =
+    isWeldingAction || isPracticeAction
+      ? balance.welding.attemptDurationTicks
+      : isRefiningAction
+        ? balance.refining.attemptDurationTicks
+        : nextAttemptBoosted
+          ? boostedMiningAttemptDurationTicks(balance)
+          : balance.mining.attemptDurationTicks;
   const carriedPowerCellQuantity = stacks
     .filter((stack) => stack.itemId === ITEM_IDS.powerCell)
     .reduce((total, stack) => total + stack.quantity, 0);
@@ -877,7 +1004,8 @@ export async function stateFromTransaction(
     activeAction:
       action?.actionId === ACTION_IDS.ferriteShaleMining ||
       action?.actionId === ACTION_IDS.refining ||
-      isWeldingAction
+      isWeldingAction ||
+      isPracticeAction
         ? {
             actionId: action.actionId,
             resolvedThroughAt: action.resolvedThroughAt.toISOString(),
@@ -1013,6 +1141,8 @@ export async function stateFromTransaction(
     run,
     refiningRun,
     repairs,
+    practice,
+    practiceError,
     cargoHold: {
       // The Cargo Hold keeps its own presentation identity while reading the
       // same generic repair projection every target does.
@@ -1240,6 +1370,19 @@ export async function beginTravel(
       // Replace active travel-replaceable work action atomically, resolving only
       // already-completed work exactly once before Travel begins.
       if (context.action) {
+        // Welding leaves the yard mid-bead: an open Clean Pass window is spent
+        // by walking away, through the SAME interruption the player's own Stop
+        // uses, so the two can never disagree (#190).
+        const replacedWeldingTargetId = repairTargetForActionId(context.action.actionId);
+        if (replacedWeldingTargetId) {
+          await missOpenRepairCleanPass(transaction, {
+            characterId: context.character.id,
+            targetId: replacedWeldingTargetId,
+            now,
+          });
+        } else if (context.action.actionId === ACTION_IDS.practiceWelding) {
+          await interruptPracticeWelding(transaction, context.character.id, now);
+        }
         await transaction
           .delete(activeActions)
           .where(eq(activeActions.characterId, context.character.id));

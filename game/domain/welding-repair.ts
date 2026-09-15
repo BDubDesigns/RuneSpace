@@ -1,4 +1,5 @@
 import type { EffectiveGameBalance, RepairTargetBalance } from "@/game/config/balance";
+import { UNROLLED_CLEAN_PASS, type CleanPassState } from "@/game/domain/clean-pass";
 
 /**
  * The durable state of one repair target for one character (#172).
@@ -14,8 +15,17 @@ export type RepairTargetState = {
   refinedFerriteContributed: number;
   slagContributed: number;
   weldingProgress: number;
+  /**
+   * This repair's two Clean Pass opportunities (#190). A repair is ONE Welding
+   * work unit, so they are rolled once when Welding first starts on it and are
+   * never rerolled by Stop or Resume.
+   */
+  cleanPass: CleanPassState;
   completedAt?: Date | null;
 };
+
+/** A repair nobody has welded yet has no opportunities rolled. */
+export const UNROLLED_REPAIR_CLEAN_PASS: CleanPassState = UNROLLED_CLEAN_PASS;
 
 export type RepairMaterialContribution = {
   refinedFerrite: number;

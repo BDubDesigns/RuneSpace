@@ -125,6 +125,25 @@ export const WeldingCommandRequestSchema = z.object({
   targetId: RepairTargetIdSchema,
 });
 
+/**
+ * Practice Welding commands name only the character: which bench, which weld,
+ * and what it costs are all server-authoritative (#190).
+ */
+export const PracticeCommandRequestSchema = z.object({
+  characterId: z.string().uuid(),
+});
+
+/** The persistent per-character Slag preference. */
+export const PracticeSlagPreferenceRequestSchema = z.object({
+  characterId: z.string().uuid(),
+  autoDiscardSlag: z.boolean(),
+});
+
+/** A Clean Pass claim names only the character; the open window is derived. */
+export const CleanPassClaimRequestSchema = z.object({
+  characterId: z.string().uuid(),
+});
+
 const CargoHoldStackTransferFields = {
   characterId: z.string().uuid(),
   stackId: z.string().uuid(),
