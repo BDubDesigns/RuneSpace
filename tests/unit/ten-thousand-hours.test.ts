@@ -10,10 +10,15 @@ import {
   MISSION_IDS,
   NPC_IDS,
 } from "@/game/config/foundations";
-import { getDialogue } from "@/game/content/dialogue";
+import { DIALOGUE_SEQUENCES, getDialogue } from "@/game/content/dialogue";
 import { areLocationsAdjacent, getLocation } from "@/game/content/locations";
 import { getLocationMerchant, getMerchant, isMerchantOpen } from "@/game/content/merchants";
-import { getResidentNpc, resolveNpcPlacement, getNpc } from "@/game/content/npcs";
+import {
+  getResidentNpc,
+  resolveNpcPlacement,
+  resolveNpcVenueBackgroundId,
+  getNpc,
+} from "@/game/content/npcs";
 import { KEEP_THE_CHANGE, MISSIONS, TEN_THOUSAND_HOURS } from "@/game/content/missions";
 import { RUSK_RECOVERY_CONTENT } from "@/game/content/rusk-recovery";
 import { resolveNpcConversation } from "@/game/domain/conversation";
@@ -304,7 +309,10 @@ describe("Wade's conversations at the yard", () => {
     }
   });
 
-  it("keeps his older Crash Site beats at the Crash Site", () => {
+  it("leaves the authored background of his older beats alone", () => {
+    // Authoring is never rewritten: a person moving must not retroactively
+    // relocate the beats they already spoke. Where a present-tense topic is
+    // *presented* is a separate question, proven below.
     const sequence = getDialogue(DIALOGUE_IDS.wadePostKeepTheChange)!;
     for (const beat of sequence.beats) {
       expect(beat.backgroundId).toBe(CONVERSATION_BACKGROUND_IDS.crashSiteExterior);
@@ -316,6 +324,61 @@ describe("Wade's conversations at the yard", () => {
       .beats.map((beat) => beat.text)
       .join(" ");
     expect(text).not.toMatch(/level|XP|experience|tick/i);
+  });
+});
+
+describe("a present-tense local conversation follows the speaker", () => {
+  const wade = getNpc(NPC_IDS.wadeRusk)!;
+
+  it("resolves Wade's venue from the same Mission record that moves him", () => {
+    expect(resolveNpcVenueBackgroundId(wade, new Set())).toBe(
+      CONVERSATION_BACKGROUND_IDS.crashSiteExterior,
+    );
+    expect(resolveNpcVenueBackgroundId(wade, new Set([MISSION_IDS.keepTheChange]))).toBe(
+      CONVERSATION_BACKGROUND_IDS.ruskRecoveryYard,
+    );
+  });
+
+  it("leaves an NPC who has never moved on their authored background", () => {
+    const tansy = getNpc(NPC_IDS.tansyRusk)!;
+    expect(tansy.relocation).toBeUndefined();
+    expect(resolveNpcVenueBackgroundId(tansy, new Set([MISSION_IDS.keepTheChange]))).toBe(
+      tansy.conversationBackgroundId,
+    );
+  });
+
+  it("marks his replayable topic and post-Mission follow-ups as present tense", () => {
+    for (const dialogueId of [
+      DIALOGUE_IDS.wadeRecoveryWorkTopic,
+      DIALOGUE_IDS.wadePostCutYourTeeth,
+      DIALOGUE_IDS.wadePostWasteNot,
+      DIALOGUE_IDS.wadePostHoldItTogether,
+      DIALOGUE_IDS.wadePostKeepTheChange,
+    ]) {
+      expect(getDialogue(dialogueId)?.presentsAtCurrentVenue, dialogueId).toBe(true);
+    }
+  });
+
+  it("leaves authored scenes and comms calls fixed where they happened", () => {
+    for (const dialogueId of [
+      DIALOGUE_IDS.wadeOffer,
+      DIALOGUE_IDS.wadeKeepTheChangeOffer,
+      DIALOGUE_IDS.wadeTenThousandHoursOffer,
+      DIALOGUE_IDS.tansyKeepTheChangeCompletion,
+    ]) {
+      expect(getDialogue(dialogueId)?.presentsAtCurrentVenue, dialogueId).toBeUndefined();
+    }
+  });
+
+  it("never lets a present-tense sequence carry a comms beat", () => {
+    // The override applies to local beats only, so a sequence that mixes the
+    // two would silently keep half its authored framing.
+    for (const sequence of DIALOGUE_SEQUENCES) {
+      if (!sequence.presentsAtCurrentVenue) continue;
+      for (const beat of sequence.beats) {
+        expect(beat.kind === "npc" && beat.presentationMode, sequence.id).toBe("local");
+      }
+    }
   });
 });
 

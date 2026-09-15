@@ -53,7 +53,14 @@ separate actions (`docs/holo-hollow.md`).
 | Content validation at module load | `server/mission-state.ts` — `validateMissionDefinitions` + `validateConversationTopics` |
 | Player-facing surfaces | `features/npc/NpcInteractionPanel.tsx` (Talk control + guidance), `features/npc/NpcConversation.tsx` (hub + command execution), `features/dialogue/DialoguePlayer.tsx` / `DialogueScene.tsx` (beat presentation) |
 | Server authority | `server/missions.ts` — `acceptMission` / `completeMission` (unchanged by #164) |
-| Which resident is present | `game/content/npcs.ts` — `getResidentNpc({ locationId, localPlaceId, completedMissionIds })`, `resolveNpcPlacement` |
+| Which resident is present | `game/content/npcs.ts` — `getResidentNpc({ locationId, localPlaceId, completedMissionIds })`, `resolveNpcPlacement`, `resolveNpcVenueBackgroundId` |
+
+**Where the card renders (#190).** The Local Contact card is composed *inside*
+the panel for the place the player is in — directly under the World Location's
+description, or under a Local Place's, above whatever gameplay that place hosts
+(`LocalPlaceSurface`'s `resident` slot). It is one shared rule for every venue,
+not a per-location arrangement: the person in front of the player must never sit
+below the place's activity UI on a phone.
 
 **Where a resident stands (#159).** `getResidentNpc` resolves one NPC from a
 spatial context. An NPC with no `localPlaceId` is present at their World
@@ -74,6 +81,22 @@ Mission record. Where a conversation happened stays authored per beat, so his
 Crash Site beats keep the Crash Site behind them and his yard beats use the
 yard: a person moving is new beats in a new place, not a dynamic-background
 system that retroactively relocates what they already said.
+
+**Scenes stay put; present-tense conversation follows the speaker (#190).**
+Two different things share the word "background". A scene or a comms call
+happened somewhere specific, and its authored `backgroundId` is the truth
+forever. A replayable topic or a post-Mission follow-up is not a scene at all —
+it is the person standing in front of the player today, and after a relocation
+it would otherwise be presented in a place neither of them is in. Such a
+sequence opts in with `presentsAtCurrentVenue: true`, and its **local** beats
+are presented against `resolveNpcVenueBackgroundId(npc, completedMissionIds)`:
+`relocation.conversationBackgroundId` once the move has happened, and the NPC's
+ordinary `conversationBackgroundId` before it. Comms beats are never overridden,
+authored content is never rewritten, no topic is duplicated per venue, and
+nothing new is persisted — the venue comes from the same completed-Mission set
+that decides where the person is standing. An NPC who never moves resolves the
+background they were already authored against, so this changes nothing for
+anybody else.
 
 Deliberately one authored move per NPC, in completion order. This is not an NPC
 schedule or movement engine; a future story beat that moves somebody again earns

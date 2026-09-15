@@ -43,6 +43,12 @@ export type NpcDefinition = {
     afterCompletedMissionId: MissionId;
     homeLocationId: LocationId;
     localPlaceId?: LocalPlaceId;
+    /**
+     * The venue a present-tense local conversation with this person plays
+     * against once they have moved. Authored scenes keep their own authored
+     * backgrounds; only a sequence marked `presentsAtCurrentVenue` reads this.
+     */
+    conversationBackgroundId?: ConversationBackgroundId;
   };
   /** Present once the NPC has authored conversation content. */
   conversationBackgroundId?: ConversationBackgroundId;
@@ -63,6 +69,7 @@ export const NPCS: readonly NpcDefinition[] = [
     relocation: {
       afterCompletedMissionId: MISSION_IDS.keepTheChange,
       homeLocationId: LOCATION_IDS.ruskRecovery,
+      conversationBackgroundId: CONVERSATION_BACKGROUND_IDS.ruskRecoveryYard,
     },
     conversationBackgroundId: CONVERSATION_BACKGROUND_IDS.crashSiteExterior,
     expressionAssets: {
@@ -150,6 +157,27 @@ export function resolveNpcPlacement(
     locationId: npc.homeLocationId,
     ...(npc.localPlaceId ? { localPlaceId: npc.localPlaceId } : {}),
   };
+}
+
+/**
+ * The background a present-tense local conversation with one NPC plays against.
+ *
+ * Only sequences authored as `presentsAtCurrentVenue` — replayable topics and
+ * post-Mission follow-ups — consult this, and it is derived from the same
+ * completed-Mission set that decides where the person is standing, so there is
+ * no second source of truth and nothing new is persisted. An NPC who has not
+ * moved resolves the background they were already authored against, which is
+ * why this changes nothing for everybody else.
+ */
+export function resolveNpcVenueBackgroundId(
+  npc: NpcDefinition,
+  completedMissionIds: ReadonlySet<string> = new Set(),
+): ConversationBackgroundId | undefined {
+  const relocation = npc.relocation;
+  if (relocation && completedMissionIds.has(relocation.afterCompletedMissionId)) {
+    return relocation.conversationBackgroundId ?? npc.conversationBackgroundId;
+  }
+  return npc.conversationBackgroundId;
 }
 
 /**

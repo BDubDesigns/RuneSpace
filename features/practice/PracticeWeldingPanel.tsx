@@ -12,7 +12,6 @@ import { ACTION_IDS } from "@/game/config/foundations";
 import { deriveMissionGuidanceTargets } from "@/game/domain/missions";
 import { CleanPassControl } from "@/features/welding/CleanPassControl";
 import { usePlay } from "@/features/play/PlayContext";
-import { PracticeRunPanel } from "@/features/practice/PracticeRunPanel";
 import {
   setPracticeSlagPreferenceAction,
   startPracticeWeldingAction,
@@ -41,7 +40,8 @@ function practiceMessage(state: PlayGameplayState): string | undefined {
  * Scrap is consumed by starting a weld, never by looking.
  *
  * Every number here is the authoritative projection: the recipe, the section
- * count, the run totals, and how much loose Scrap is left for the next weld.
+ * count, and how much loose Scrap is left for the next weld. The run history is
+ * its own sibling panel, so the bench stays the controls the player is using.
  */
 export function PracticeWeldingPanel() {
   const { acceptState, enqueueForeground, foregroundBusy, releaseCommand, state } = usePlay();
@@ -115,7 +115,12 @@ export function PracticeWeldingPanel() {
       : 0;
 
   return (
-    <div className="mt-5 space-y-4" data-practice-panel data-practice-active={String(active)}>
+    <Panel
+      className="space-y-4"
+      tone="raised"
+      data-practice-panel
+      data-practice-active={String(active)}
+    >
       <SectionHeader eyebrow="Workbench">Practice Welding</SectionHeader>
 
       <p className="max-w-2xl text-sm leading-relaxed text-[color:var(--rs-text-secondary)]">
@@ -189,10 +194,6 @@ export function PracticeWeldingPanel() {
         <Feedback tone="muted">Out of Scrap Metal</Feedback>
       ) : null}
       {message ? <Feedback tone="danger">{message}</Feedback> : null}
-
-      <Panel className="!p-0">
-        <PracticeRunPanel run={practice.run} />
-      </Panel>
-    </div>
+    </Panel>
   );
 }

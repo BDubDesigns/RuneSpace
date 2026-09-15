@@ -2,7 +2,8 @@
 
 import { useEffect, useRef, useState } from "react";
 import { ActionButton } from "@/components/ui/ActionButton";
-import type { DialogueSequence } from "@/game/content/dialogue";
+import type { ConversationBackgroundId } from "@/game/config/foundations";
+import type { DialogueBeat, DialogueSequence } from "@/game/content/dialogue";
 import { resolveDialogueItem, resolveDialogueSpeaker } from "@/game/content/dialogue";
 import { DialogueScene } from "./DialogueScene";
 
@@ -18,6 +19,12 @@ const CHARACTER_REVEAL_MS = 20;
  *
  * `onBack` from the first beat and `onFinish` on the last beat both return to
  * the conversation hub; dismissing the surface is the hosting drawer's job.
+ *
+ * `venueBackgroundId` is the one presentation detail this player resolves: a
+ * sequence authored as a present-tense local conversation is shown against the
+ * venue the speaker is standing in now. It is applied to local NPC beats only,
+ * so an authored comms call and every scene that happened somewhere specific
+ * keep the background they were written against (#190).
  */
 export function DialoguePlayer({
   sequence,
@@ -27,6 +34,7 @@ export function DialoguePlayer({
   actionMessage,
   onBack,
   onFinish,
+  venueBackgroundId,
 }: {
   sequence: DialogueSequence;
   /** Present only when this conversation genuinely drives a Mission command now. */
@@ -36,6 +44,8 @@ export function DialoguePlayer({
   actionMessage?: string;
   onBack: () => void;
   onFinish: () => void;
+  /** Where this NPC is standing now; only read by `presentsAtCurrentVenue`. */
+  venueBackgroundId?: ConversationBackgroundId;
 }) {
   const [beatIndex, setBeatIndex] = useState(0);
   const [revealedChars, setRevealedChars] = useState(0);
@@ -127,11 +137,19 @@ export function DialoguePlayer({
     setBeatIndex((index) => index + 1);
   }
 
+  const presentedBeat: DialogueBeat =
+    sequence.presentsAtCurrentVenue &&
+    venueBackgroundId &&
+    beat.kind === "npc" &&
+    beat.presentationMode === "local"
+      ? { ...beat, backgroundId: venueBackgroundId }
+      : beat;
+
   return (
     <div className="mt-4" data-dialogue-player={sequence.id}>
       <DialogueScene
         actionMessage={actionMessage}
-        beat={beat}
+        beat={presentedBeat}
         controls={
           <>
             <ActionButton

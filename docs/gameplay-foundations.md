@@ -218,6 +218,12 @@ Pass roll. An untouched bench is an absent row, so nothing needs backfilling.
   `tracked_activity` path Mining and Refining use — never sections, starts, or
   Scrap provenance, and including welds resolved lazily while the player was
   away.
+- **The yard reads as several panels, not one.** The Location panel carries the
+  scene, the description, and Wade himself; the Workbench, the Welding
+  progression card (the shared `SkillProgressCard`, as Mining and Refining use),
+  the `This practice run` history, and the Work Orders terminal are each their
+  own sibling panel below it, composed in `PlayConsole`. On a phone that keeps
+  Wade's Talk and Trade controls above the shop UI instead of below it.
 
 ### Clean Pass: a general Welding opportunity (issue #190)
 
@@ -349,6 +355,14 @@ Mission whose **acceptance** opens the counter, revalidated server-side against
 the character's own accepted record, and it stays open after that Mission
 completes. Wade sells Scrap Metal at 2 Credits with no stock row, restock timer,
 or day cap, and buys nothing; Bix's Local Place path is unchanged.
+
+The Trade surface presents only the directions the authored price table
+supports, derived generically by `merchantTradeDirections`: a merchant with no
+purchase prices is Sell-only, one with no buy prices is Buy-only, and a merchant
+who does both keeps the Buy/Sell toggle. With one direction there is no toggle
+at all and the heading names it, so Wade's counter never opens an empty Sell
+tab. This is read from content, never from which merchant it is, and it is not a
+reason to author a price merely to fill a tab.
 
 ## Local Places (issue #159)
 

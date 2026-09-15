@@ -54,6 +54,21 @@ export function merchantSellableItemIds(merchant: MerchantDefinition): readonly 
 }
 
 /**
+ * The directions this merchant actually trades in, in Buy-then-Sell order.
+ *
+ * A merchant whose authored price table only names sell prices has nothing to
+ * buy from the player, and offering that direction would open an empty surface.
+ * Deriving it here keeps the rule with the catalog rather than in a panel, so
+ * every merchant — Wade's Scrap counter included — is presented from content.
+ */
+export function merchantTradeDirections(merchant: MerchantDefinition): readonly TradeDirection[] {
+  const directions: TradeDirection[] = [];
+  if (merchantPurchasableItemIds(merchant).length > 0) directions.push("buy");
+  if (merchantSellableItemIds(merchant).length > 0) directions.push("sell");
+  return directions;
+}
+
+/**
  * Price one complete transaction against the authoritative catalog.
  *
  * Both the Trade surface and the authoritative command quote through this same

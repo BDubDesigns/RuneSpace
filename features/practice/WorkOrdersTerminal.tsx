@@ -1,6 +1,7 @@
 "use client";
 
 import { ActionButton } from "@/components/ui/ActionButton";
+import { Panel } from "@/components/ui/Panel";
 import { SectionHeader } from "@/components/ui/SectionHeader";
 import { usePlay } from "@/features/play/PlayContext";
 
@@ -26,8 +27,8 @@ export function WorkOrdersTerminal() {
   if (!revealed) return null;
 
   return (
-    <div
-      className="mt-6"
+    <Panel
+      tone="raised"
       data-work-orders-terminal
       data-work-orders-state={meetsWeldingLevel ? "empty" : "locked"}
     >
@@ -42,6 +43,6 @@ export function WorkOrdersTerminal() {
             : `Requires Welding Level ${requiredWeldingLevel}`}
         </ActionButton>
       </div>
-    </div>
+    </Panel>
   );
 }

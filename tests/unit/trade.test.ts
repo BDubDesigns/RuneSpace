@@ -8,6 +8,7 @@ import {
   maximumPurchasableQuantity,
   merchantPurchasableItemIds,
   merchantSellableItemIds,
+  merchantTradeDirections,
   merchantUnitPrice,
   quoteTrade,
 } from "@/game/domain/trade";
@@ -169,5 +170,30 @@ describe("issue #159 Buy Max respects what the player can carry", () => {
     expect(maxPurchase({ credits: 16, availableWeight: itemWeight * 4 })).toBe(2);
     // Affordable 4, mass allows 1 — mass wins.
     expect(maxPurchase({ credits: 32, availableWeight: itemWeight })).toBe(1);
+  });
+});
+
+describe("issue #190 Trade presents only the directions a merchant supports", () => {
+  it("offers both directions for a merchant who buys and sells", () => {
+    expect(merchantTradeDirections(bix)).toEqual(["buy", "sell"]);
+  });
+
+  it("offers Buy only for a merchant with nothing to buy from the player", () => {
+    const wade = getMerchant(MERCHANT_IDS.wadeRusk)!;
+    // Wade supplies Scrap for Practice and buys nothing in this slice, so his
+    // counter must not open an empty Sell surface.
+    expect(merchantSellableItemIds(wade)).toEqual([]);
+    expect(merchantTradeDirections(wade)).toEqual(["buy"]);
+  });
+
+  it("offers Sell only for a merchant who posts no purchase price", () => {
+    const buyerOnly = {
+      ...bix,
+      prices: bix.prices
+        .filter((price) => price.buyPrice !== undefined)
+        .map((price) => ({ itemId: price.itemId, buyPrice: price.buyPrice })),
+    };
+    expect(merchantPurchasableItemIds(buyerOnly)).toEqual([]);
+    expect(merchantTradeDirections(buyerOnly)).toEqual(["sell"]);
   });
 });

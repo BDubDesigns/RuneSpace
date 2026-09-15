@@ -8,6 +8,8 @@ import { DialoguePlayer } from "@/features/dialogue/DialoguePlayer";
 import { usePlay } from "@/features/play/PlayContext";
 import { getDialogue } from "@/game/content/dialogue";
 import type { NpcDefinition } from "@/game/content/npcs";
+import { resolveNpcVenueBackgroundId } from "@/game/content/npcs";
+import { deriveCompletedMissionIds } from "@/game/domain/missions";
 import {
   getMissionCapacityRefusalDialogue,
   getMissionCompletionPresentation,
@@ -73,6 +75,12 @@ export function NpcConversation({
   const previousView = useRef<string | undefined>(undefined);
 
   const sequence = open ? getDialogue(open.dialogueId) : undefined;
+  // Where this person is standing now, for the sequences authored as a
+  // present-tense local conversation rather than a scene (#190).
+  const venueBackgroundId = resolveNpcVenueBackgroundId(
+    npc,
+    deriveCompletedMissionIds(state.missions),
+  );
 
   // Selecting an entry (or returning to the hub) replaces the control the
   // player just activated. Move focus into the new view so the drawer's focus
@@ -225,6 +233,7 @@ export function NpcConversation({
             onBack={returnToHub}
             onFinish={returnToHub}
             sequence={sequence}
+            {...(venueBackgroundId ? { venueBackgroundId } : {})}
           />
         ) : (
           <div className="mt-4" data-conversation-hub={npc.id}>

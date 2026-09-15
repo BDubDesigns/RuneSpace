@@ -33,12 +33,23 @@ import { usePlay } from "@/features/play/PlayContext";
  * this resident fronts, which is read from content rather than from who the
  * resident is, and it opens the Trade surface directly beneath this card.
  *
+ * The card stands inside the panel for the place the player is in, directly
+ * under its description, rather than after the whole surface: on a phone the
+ * person in front of you must not sit below the place's activity UI (#190).
+ *
  * `localPlaceId` is the Local Place the route requests. It is navigation state,
  * not authoritative position, so it passes through the same validated
  * interpretation the place surface uses before it counts as resident context.
  * Every gameplay command still revalidates its own location server-side.
  */
-export function NpcInteractionPanel({ localPlaceId }: { localPlaceId?: string }) {
+export function NpcInteractionPanel({
+  className = "",
+  localPlaceId,
+}: {
+  /** Spacing supplied by whichever place surface the resident stands in. */
+  className?: string;
+  localPlaceId?: string;
+}) {
   const { foregroundBusy, state } = usePlay();
   const [open, setOpen] = useState(false);
   const [tradeOpen, setTradeOpen] = useState(false);
@@ -104,7 +115,7 @@ export function NpcInteractionPanel({ localPlaceId }: { localPlaceId?: string })
   const tradeRegionId = `npc-trade-${activePlace?.id ?? locationId}`;
 
   return (
-    <>
+    <div className={`space-y-4 ${className}`.trim()} data-npc-resident>
       <Panel className="!p-4" data-npc-interaction>
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
@@ -182,6 +193,6 @@ export function NpcInteractionPanel({ localPlaceId }: { localPlaceId?: string })
           triggerRef={triggerRef}
         />
       ) : null}
-    </>
+    </div>
   );
 }

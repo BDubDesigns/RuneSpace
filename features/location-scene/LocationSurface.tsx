@@ -17,8 +17,7 @@ import { LocalPlaceSurface } from "@/features/local-places/LocalPlaceSurface";
 import { MiningActivity } from "@/features/mining/MiningActivity";
 import { PowerAnnexClaimPanel } from "@/features/power-annex/PowerAnnexClaimPanel";
 import { RefiningConsole } from "@/features/refining/RefiningConsole";
-import { PracticeWeldingPanel } from "@/features/practice/PracticeWeldingPanel";
-import { WorkOrdersTerminal } from "@/features/practice/WorkOrdersTerminal";
+import { NpcInteractionPanel } from "@/features/npc/NpcInteractionPanel";
 import { usePlay } from "@/features/play/PlayContext";
 import { LocationPopulationPanel } from "./LocationPopulationPanel";
 import { LocationSceneHeader } from "./LocationSceneHeader";
@@ -37,21 +36,6 @@ import { LocationSceneHeader } from "./LocationSceneHeader";
  */
 function localPlaceActivity(localPlaceId: string) {
   return localPlaceId === LOCAL_PLACE_IDS.holoHollowCrewStop ? <CrewStopPanel /> : undefined;
-}
-
-/**
- * Wade's yard (#190): the Workbench, and the Work Orders terminal that becomes
- * a real surface once 10,000 Hours is done. Both render nothing at all until
- * they are genuinely the player's to use — the scene art is the whole of the
- * place until then.
- */
-function RuskRecoverySurface() {
-  return (
-    <>
-      <PracticeWeldingPanel />
-      <WorkOrdersTerminal />
-    </>
-  );
 }
 
 export function LocationSurface({
@@ -81,6 +65,15 @@ export function LocationSurface({
         activity={localPlaceActivity(activePlace.id)}
         characterName={characterName}
         parentDisplayName={location.displayName}
+        resident={
+          // Keyed by the requested place so a contact's opened Trade surface
+          // never survives moving to another place and reappears there.
+          <NpcInteractionPanel
+            className="mt-4"
+            key={localPlaceId ?? ""}
+            localPlaceId={localPlaceId}
+          />
+        }
         surface={deriveLocalPlaceSurface(
           activePlace,
           deriveCompletedRepairTargetIds(Object.values(state.repairs)),
@@ -116,6 +109,9 @@ export function LocationSurface({
         >
           {location.description}
         </p>
+        {/* The person standing here comes before the place's own context, so a
+            phone shows Talk and Trade without scrolling past the shop UI. */}
+        <NpcInteractionPanel className="mt-4" />
         <div className="mt-4">
           <LocationPopulationPanel />
         </div>
@@ -124,7 +120,12 @@ export function LocationSurface({
             <LocalPlaceDirectory locationId={locationId} />
           </div>
         ) : null}
-        {locationId === LOCATION_IDS.theLongScramble || localPlaces.length > 0 ? null : (
+        {/* Rusk Recovery's Workbench, Welding progression, Practice run, and
+            Work Orders are composed as sibling panels rather than one giant
+            location panel (#190), so this surface hosts no activity block. */}
+        {locationId === LOCATION_IDS.theLongScramble ||
+        locationId === LOCATION_IDS.ruskRecovery ||
+        localPlaces.length > 0 ? null : (
           <div className="mt-5" data-location-activity>
             {locationId === LOCATION_IDS.abandonedProcessingYard ? (
               <RefiningConsole showDescription={false} />
@@ -134,8 +135,6 @@ export function LocationSurface({
               <CargoHoldPanel />
             ) : locationId === LOCATION_IDS.emergencyPowerAnnex ? (
               <PowerAnnexClaimPanel />
-            ) : locationId === LOCATION_IDS.ruskRecovery ? (
-              <RuskRecoverySurface />
             ) : (
               <Feedback tone="muted">No production activity is available here.</Feedback>
             )}

@@ -187,6 +187,23 @@ test("offers 10,000 Hours only at Wade's yard, and only once there is room for t
   // The bench and the Trade counter are open from that one acceptance.
   await expect(page.locator("[data-practice-panel]")).toBeVisible();
   await expect(page.locator('[data-npc-action="trade"]')).toBeVisible();
+
+  // The yard is composed as separate panels rather than one giant location
+  // panel: Wade stands inside the Location panel directly under its
+  // description, and the bench, the Welding progression, and the run history
+  // are each their own panel below it.
+  const locationPanel = page.locator("[data-location-surface]");
+  await expect(locationPanel.locator("[data-npc-interaction]")).toBeVisible();
+  await expect(locationPanel.locator("[data-practice-panel]")).toHaveCount(0);
+  await expect(
+    page.locator("[data-practice-panel] [aria-label='Practice weld history']"),
+  ).toHaveCount(0);
+  await expect(page.getByRole("progressbar", { name: "Welding progression XP" })).toBeVisible();
+  // On a phone, Wade's own controls are reachable without scrolling past the
+  // shop UI: his card starts above the bench.
+  const wadeBox = (await page.locator("[data-npc-interaction]").boundingBox())!;
+  const benchBox = (await page.locator("[data-practice-panel]").boundingBox())!;
+  expect(wadeBox.y).toBeLessThan(benchBox.y);
   // The terminal is still scenery: that waits on the work being done.
   await expect(page.locator("[data-work-orders-terminal]")).toHaveCount(0);
   // And the objective is the welds themselves.
@@ -247,8 +264,8 @@ test("welds for real at the bench, takes a live Clean Pass, and turns the work i
   await expect(page.locator("[data-mission-strip-objective]").first()).toContainText(/1 \/ 3/, {
     timeout: 40_000,
   });
-  // The server-resolved run summary records that weld.
-  await expect(panel.locator("[aria-label='Practice weld history']")).toContainText("Weld 1");
+  // The server-resolved run summary records that weld, in its own sibling panel.
+  await expect(page.locator("[aria-label='Practice weld history']")).toContainText("Weld 1");
 
   // The run carried straight on into the next weld with the Scrap that is left,
   // which is what a continuous run means. Trade is an instantaneous interaction
@@ -262,6 +279,10 @@ test("welds for real at the bench, takes a live Clean Pass, and turns the work i
   const trade = page.locator("[data-trade-panel]");
   const scrapRow = trade.locator(`[data-trade-row="${ITEM_IDS.scrapMetal}"]`);
   await expect(scrapRow.locator("[data-trade-unit-price]")).toHaveText("2");
+  // Wade buys nothing here, so Trade offers no direction to choose and no
+  // empty Sell surface behind a tab.
+  await expect(trade.locator("[data-trade-mode]")).toHaveCount(0);
+  await expect(trade.getByRole("heading", { name: "Buy", exact: true })).toBeVisible();
   await scrapRow.getByRole("button", { name: /Increase Scrap Metal quantity/ }).click();
   await expect(scrapRow.locator("[data-trade-total]")).toHaveText("4");
   await scrapRow.locator(`[data-trade-commit="${ITEM_IDS.scrapMetal}"]`).click();
@@ -287,6 +308,13 @@ test("welds for real at the bench, takes a live Clean Pass, and turns the work i
   )[0]!.credits;
 
   const conversation = await openNpcConversation(page, "Wade Rusk");
+
+  // A present-tense conversation happens where Wade is now. His older Crash
+  // Site beats are unchanged as authoring; what moved is the man speaking them.
+  await conversation.getByRole("button", { name: /Recovery work/ }).click();
+  await expect(conversation.locator("[data-dialogue-scene-location]")).toHaveText("RUSK RECOVERY");
+  await conversation.locator("[data-dialogue-back]").click();
+
   await conversation.getByRole("button", { name: /10,000 Hours/ }).click();
   const turnIn = await playToAction(conversation, "SHOW HIM THE WORK");
   await turnIn.click();

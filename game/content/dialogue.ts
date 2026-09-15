@@ -61,6 +61,20 @@ export type DialogueBeat =
 export type DialogueSequence = {
   id: DialogueId;
   npcId: NpcId;
+  /**
+   * Set when this conversation is the NPC standing in front of the player right
+   * now rather than a scene that happened somewhere specific (#190).
+   *
+   * An authored beat always carries the background it was written against, and
+   * that stays true for every scene and every comms call: a person moving must
+   * never retroactively relocate the beats they already spoke. But a replayable
+   * topic or a post-Mission follow-up is a conversation the player is having
+   * here, today — so when the speaker has moved, its local beats present against
+   * the venue that person is actually in. Nothing is persisted: the venue is
+   * resolved from the same Mission-derived placement that decides where they
+   * stand (`resolveNpcVenueBackgroundId`).
+   */
+  presentsAtCurrentVenue?: true;
   beats: readonly DialogueBeat[];
 };
 
@@ -287,6 +301,8 @@ const dialogue = {
   [DIALOGUE_IDS.wadePostCutYourTeeth]: {
     id: DIALOGUE_IDS.wadePostCutYourTeeth,
     npcId: NPC_IDS.wadeRusk,
+    // Wade says this wherever Wade currently is (#190).
+    presentsAtCurrentVenue: true,
     beats: [
       wadeLocal(EXPRESSION_IDS.neutral, "So Tansy taught you how to run the Cutter. Good."),
       wadeLocal(
@@ -327,6 +343,8 @@ const dialogue = {
   [DIALOGUE_IDS.wadePostWasteNot]: {
     id: DIALOGUE_IDS.wadePostWasteNot,
     npcId: NPC_IDS.wadeRusk,
+    // Wade says this wherever Wade currently is (#190).
+    presentsAtCurrentVenue: true,
     beats: [
       wadeLocal(
         EXPRESSION_IDS.neutral,
@@ -701,6 +719,8 @@ const dialogue = {
   [DIALOGUE_IDS.wadePostHoldItTogether]: {
     id: DIALOGUE_IDS.wadePostHoldItTogether,
     npcId: NPC_IDS.wadeRusk,
+    // Wade says this wherever Wade currently is (#190).
+    presentsAtCurrentVenue: true,
     beats: [
       wadeLocal(EXPRESSION_IDS.neutral, "The Cargo Hold is holding. That gives us room to work."),
       wadeLocal(
@@ -924,6 +944,8 @@ const dialogue = {
   [DIALOGUE_IDS.wadePostKeepTheChange]: {
     id: DIALOGUE_IDS.wadePostKeepTheChange,
     npcId: NPC_IDS.wadeRusk,
+    // Wade says this wherever Wade currently is (#190).
+    presentsAtCurrentVenue: true,
     beats: [
       wadeLocal(EXPRESSION_IDS.neutral, "Tansy's cutting again. That's the job done."),
       wadeLocal(
@@ -953,6 +975,8 @@ const dialogue = {
   [DIALOGUE_IDS.wadeRecoveryWorkTopic]: {
     id: DIALOGUE_IDS.wadeRecoveryWorkTopic,
     npcId: NPC_IDS.wadeRusk,
+    // Wade says this wherever Wade currently is (#190).
+    presentsAtCurrentVenue: true,
     beats: [
       wadeLocal(EXPRESSION_IDS.neutral, "Recovery work. That's the polite name for it."),
       wadeLocal(

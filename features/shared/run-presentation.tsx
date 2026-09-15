@@ -4,7 +4,7 @@ export function percentageBps(bps: number): string {
   return (bps / 100).toFixed(2);
 }
 
-export type SkillProgressTone = "mining" | "refining";
+export type SkillProgressTone = "mining" | "refining" | "welding";
 
 export function SkillProgressCard({
   title,
@@ -21,7 +21,14 @@ export function SkillProgressCard({
   xpToNextLevel?: number;
   tone: SkillProgressTone;
 }) {
-  const accent = tone === "refining" ? "var(--rs-accent-arcane)" : "var(--rs-accent-mining)";
+  // One accent per skill, drawn from the shared palette rather than a
+  // per-surface colour: Welding reads as arc light (#190).
+  const accent =
+    tone === "refining"
+      ? "var(--rs-accent-arcane)"
+      : tone === "welding"
+        ? "var(--rs-accent-primary)"
+        : "var(--rs-accent-mining)";
   return (
     <div className="rounded border border-[color:var(--rs-border-structural)] bg-[color:var(--rs-surface-panel)] p-4">
       <p className="font-display text-xs uppercase tracking-[0.16em]" style={{ color: accent }}>

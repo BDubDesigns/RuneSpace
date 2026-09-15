@@ -13,6 +13,7 @@ import {
   maximumPurchasableQuantity,
   merchantPurchasableItemIds,
   merchantSellableItemIds,
+  merchantTradeDirections,
   merchantUnitPrice,
   type TradeDirection,
 } from "@/game/domain/trade";
@@ -50,13 +51,24 @@ export function TradePanel({
     state,
   } = usePlay();
   const [, startTransition] = useTransition();
-  const [mode, setMode] = useState<TradeDirection>("buy");
+  const [requestedMode, setMode] = useState<TradeDirection>("buy");
   const [quantities, setQuantities] = useState<Record<string, number>>({});
   const [message, setMessage] = useState<string>();
   const [messageTone, setMessageTone] = useState<"danger" | "muted">("muted");
 
-  const itemIds =
-    mode === "buy" ? merchantPurchasableItemIds(merchant) : merchantSellableItemIds(merchant);
+  const purchasableItemIds = merchantPurchasableItemIds(merchant);
+  const sellableItemIds = merchantSellableItemIds(merchant);
+  // A direction the authored price table does not support is not a mode at
+  // all: offering it would open an empty surface. Wade only sells Scrap, so
+  // his yard is Buy-only, and this stays generic merchant behaviour read from
+  // the catalog rather than a per-merchant special case.
+  const directions = merchantTradeDirections(merchant);
+  const availableModes = MODES.filter((option) => directions.includes(option.id));
+  const mode: TradeDirection = availableModes.some((option) => option.id === requestedMode)
+    ? requestedMode
+    : (availableModes[0]?.id ?? "buy");
+
+  const itemIds = mode === "buy" ? purchasableItemIds : sellableItemIds;
   const quantityFor = (itemId: string) => quantities[itemId] ?? 1;
   const ownedQuantity = (itemId: string) =>
     state.inventory.stacks
@@ -131,7 +143,9 @@ export function TradePanel({
   return (
     <Panel tone="raised" data-trade-panel>
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <SectionHeader eyebrow="Trade">Buy and sell</SectionHeader>
+        <SectionHeader eyebrow="Trade">
+          {availableModes.length > 1 ? "Buy and sell" : mode === "buy" ? "Buy" : "Sell"}
+        </SectionHeader>
         <p
           className="font-display text-sm font-bold text-[color:var(--rs-accent-primary)]"
           data-trade-credits
@@ -140,25 +154,27 @@ export function TradePanel({
         </p>
       </div>
 
-      <div className="mt-4 flex gap-2" role="group" aria-label="Trade mode">
-        {MODES.map((option) => (
-          <ActionButton
-            aria-pressed={mode === option.id}
-            data-trade-mode={option.id}
-            data-trade-mode-active={mode === option.id ? "true" : "false"}
-            intent={mode === option.id ? "primary" : "secondary"}
-            key={option.id}
-            onClick={() => {
-              setMode(option.id);
-              // Every transaction starts at one, including after switching mode.
-              setQuantities({});
-              setMessage(undefined);
-            }}
-          >
-            {option.label}
-          </ActionButton>
-        ))}
-      </div>
+      {availableModes.length > 1 ? (
+        <div className="mt-4 flex gap-2" role="group" aria-label="Trade mode">
+          {availableModes.map((option) => (
+            <ActionButton
+              aria-pressed={mode === option.id}
+              data-trade-mode={option.id}
+              data-trade-mode-active={mode === option.id ? "true" : "false"}
+              intent={mode === option.id ? "primary" : "secondary"}
+              key={option.id}
+              onClick={() => {
+                setMode(option.id);
+                // Every transaction starts at one, including after switching mode.
+                setQuantities({});
+                setMessage(undefined);
+              }}
+            >
+              {option.label}
+            </ActionButton>
+          ))}
+        </div>
+      ) : null}
 
       <ul className="mt-4 space-y-3">
         {itemIds.map((itemId) => {
