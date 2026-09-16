@@ -242,8 +242,8 @@ export function RefiningConsole() {
       </p>
       <p className="!mt-2 text-xs uppercase tracking-wide text-[color:var(--rs-text-muted)]">
         {balance.refining.attemptDurationTicks} ticks /{" "}
-        {(balance.refining.attemptDurationTicks * GAME_TICK_MS) / 1000}s per attempt &middot; 2
-        Ferrite Shale &rarr; 1 output
+        {(balance.refining.attemptDurationTicks * GAME_TICK_MS) / 1000}s per attempt &middot;{" "}
+        {balance.refining.inputFerriteShale} Ferrite Shale &rarr; 1 output
       </p>
       {isActive ? (
         <div>
@@ -255,7 +255,9 @@ export function RefiningConsole() {
         </div>
       ) : (
         <Feedback>
-          Refining is idle. Each attempt takes 7 ticks / 4.2 seconds and resolves on the server.
+          Refining is idle. Each attempt takes {balance.refining.attemptDurationTicks} ticks /{" "}
+          {(balance.refining.attemptDurationTicks * GAME_TICK_MS) / 1000} seconds and resolves on
+          the server.
         </Feedback>
       )}
       {latestAttempt ? (
@@ -280,7 +282,8 @@ export function RefiningConsole() {
             {percentage(latestAttempt.thresholdBasisPoints)}
           </p>
           <p className="mt-2 text-xs uppercase tracking-wide text-[color:var(--rs-text-muted)]">
-            7 ticks &middot; 2 Ferrite Shale consumed
+            {latestAttempt.durationTicks} ticks &middot; {latestAttempt.shaleConsumed} Ferrite Shale
+            consumed
           </p>
           <div className="mt-3 grid max-w-sm grid-cols-2 gap-2 sm:grid-cols-3">
             <ItemVisual

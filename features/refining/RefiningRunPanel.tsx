@@ -53,7 +53,7 @@ function RefiningAttemptRow({ attempt }: { attempt: RefiningRunAttempt }) {
         {percentage(attempt.thresholdBasisPoints)}
       </p>
       <p className="text-xs uppercase tracking-wide text-[color:var(--rs-text-muted)]">
-        7 ticks &middot; 2 Ferrite Shale consumed
+        {attempt.durationTicks} ticks &middot; {attempt.shaleConsumed} Ferrite Shale consumed
       </p>
       <p className="text-xs text-[color:var(--rs-text-muted)]">
         Resolved {new Date(attempt.resolvedAt).toLocaleTimeString()}
