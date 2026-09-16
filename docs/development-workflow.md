@@ -65,7 +65,9 @@ repeat the audit and update this record with measured evidence.
 `AGENTS.md` defines *which* transitions agents own — `Ready` → `In Progress`
 when substantive work starts, and `In Progress` → `Review` when implementation
 is finished and the final self-review pass begins. This section is the
-mechanical procedure for performing them.
+mechanical procedure for performing them. Two paths are documented: the `gh`
+CLI procedure, and `scripts/project-status.mjs` for environments that have no
+`gh` binary.
 
 The reference values below were read back from the live board on 2026-09-16.
 Run the discovery commands anyway rather than trusting a document that a rename
@@ -146,6 +148,102 @@ old for name-based selection is the only option. Those opaque node IDs are the
 brittle values worth avoiding: they are board-specific, unreadable at a glance,
 and go stale silently. Discover them in the same session rather than recording
 them here.
+
+### Environments without `gh` — `scripts/project-status.mjs`
+
+Some harnesses have no `gh` binary and no way to complete an interactive auth
+flow. Claude Code's cloud containers are the current example: `command -v gh`
+finds nothing, the GitHub MCP server covers issues, pull requests, comments, and
+Actions but exposes no Projects v2 tooling, and the `GH_TOKEN`/`GITHUB_TOKEN`
+values present there are short placeholders rather than credentials. Projects v2
+is GraphQL-only, so the `gh` procedure above cannot run at all.
+
+`scripts/project-status.mjs` is the second path, for exactly those environments.
+It is plain Node with no dependencies and performs the same two transitions
+against the same board, selecting the project, the `Status` field, the target
+option, and the issue's card by name and number at runtime — no `PVT_…`,
+`PVTSSF_…`, or `PVTI_…` node ID is recorded anywhere.
+
+It is deliberately narrower than `gh`:
+
+- **Only the two agent-owned transitions are accepted**, source *and* target:
+  `Ready` → `In Progress` and `In Progress` → `Review`. Restricting the
+  destination alone would not be enough — it would still permit
+  `Done` → `In Progress`, dragging a card the merge/close automation owns back
+  into the working columns. Forbidden source→target pairs are rejected after
+  reading the current status but before any mutation, and an illegal transition
+  is never presented as a valid dry run — that covers every other pair,
+  including phase skips like `Ready` → `Review`. A forbidden *target* such as
+  `Done` is rejected earlier still, during argument parsing, before any network
+  call. Either way this path cannot perform a transition `AGENTS.md` reserves
+  for the product owner or for automation. A card already at the requested
+  status is reported and left alone, so a re-run is harmless.
+- **The board is pinned** to project 5, owner `BDubDesigns`, repository
+  `BDubDesigns/RuneSpace`, and the title is checked after resolution. A mistyped
+  argument cannot reach project 3 (`QC Failed! Roadmap`), and a same-numbered
+  issue belonging to another repository's card is not a match.
+- **The default is a read-only dry run**, like the repository's other
+  maintenance scripts. `--execute` performs the update and then reads the value
+  back, because the mutation reports success without echoing what it stored.
+
+#### Credentials
+
+The script reads `RUNESPACE_PROJECT_TOKEN` from the environment at call time. It
+is a **classic** PAT carrying the `project` scope and deliberately no `repo`
+scope, so it can move cards and nothing else. A fine-grained PAT cannot replace
+it: fine-grained tokens expose a Projects permission only for
+*organization*-owned boards, and this board belongs to the personal account
+`BDubDesigns`.
+
+Never print, log, echo, commit, or interpolate that token into a file — read it
+from the environment only. If it ever appears in command output, say so
+immediately so it can be rotated.
+
+#### Usage
+
+```bash
+# Read the card's current status, changing nothing.
+node scripts/project-status.mjs --issue 186
+
+# Preview a transition. This is the default mode and writes nothing.
+node scripts/project-status.mjs --issue 186 --status "In Progress"
+
+# Apply it.
+node scripts/project-status.mjs --issue 186 --status "Review" --execute
+```
+
+On success the script prints the transition it made, for example
+`[project-status] #186 on project 5 (Runespace): "In Progress" -> "Review"`. A
+card already at the target status is reported as such and left alone, so a
+re-run is harmless.
+
+#### Failure modes
+
+Every refusal exits non-zero and names the actual cause rather than failing
+silently:
+
+- **Missing token** — `RUNESPACE_PROJECT_TOKEN is not set.` `GH_TOKEN` and
+  `GITHUB_TOKEN` are not substitutes and are never consulted.
+- **Missing Projects scope** — the `INSUFFICIENT_SCOPES` GraphQL error is
+  reported as such. As with `gh`, *every* Project call fails without the scope,
+  read and write alike, and granting it is an account-owner action.
+- **Forbidden target** — `refusing to set Status to "Done"`, with the two
+  permitted names and who owns the rest. Raised during argument parsing, before
+  any network call.
+- **Forbidden transition** — `refusing to move Status from "Done" to
+  "In Progress"`, naming the current status, the requested one, and the two
+  permitted pairs. Raised after the current status is read and before any
+  mutation, so a dry run refuses it too rather than reporting it as a valid
+  plan.
+- **Unknown option name** — the available options are listed, mirroring `gh`'s
+  own rejection. A renamed board option means this document is out of date:
+  correct it rather than guessing.
+- **Issue not on the board** — reported as a blocker. Adding or triaging cards
+  is the product owner's call; report it and continue the issue.
+
+The pure argument, option, and lookup logic is covered by
+`tests/unit/project-status.test.ts`, which runs in the ordinary `pnpm test`
+suite and makes no network calls.
 
 ### What agents must not do
 
