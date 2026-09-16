@@ -267,8 +267,11 @@ loyalty with denial. Renn believes Ferrite has little long-term future and would
 tell younger residents such as Tansy not to sacrifice their whole lives to the
 town.
 
-Renn should initially exist primarily for social/worldbuilding conversation, not
-as a merchant or Mission dispenser. Renn provides an important third view of
+Renn was introduced in #167 purely for social/worldbuilding conversation, and
+has no merchant function. That framing was superseded in part by #172, which
+gave him **Out of the Weather** — see that section below. He remains a resident
+with a point of view rather than a Mission dispenser: one optional side job is
+the whole of his Mission involvement. Renn provides an important third view of
 Holo Hollow:
 
 - Bix: the old Holo Hollow can come back;
@@ -589,6 +592,10 @@ As shipped, the Mission:
   §8.1, §9.2, §12.3).
 
 The player character stays silent throughout, as everywhere else in RuneSpace.
+
+The board's settled rules, its client-eligibility rules, and the first authored
+pool of eight level-5 jobs now live in `docs/work-orders.md`. That document is
+content and product rules only; Work Orders remain unimplemented.
 
 ## Contracts and economic progression
 

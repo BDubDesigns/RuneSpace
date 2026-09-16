@@ -54,11 +54,75 @@ export const WikiArticleSectionSchema = z
     message: "A Wiki section needs at least one paragraph or list item",
   });
 
+/**
+ * The closed set of Wiki categories, in the order the index renders them.
+ *
+ * Categories exist to group an index that outgrew a single flat list, and they
+ * are deliberately semantic rather than page-size slices: each one names a kind
+ * of thing a player is looking for. The set is closed and every article must
+ * name one, so the index can never be half-migrated and a typo can never
+ * quietly create a new heading.
+ *
+ * Adding a category is a content decision, not a mechanism: add it here, in
+ * order, and give it real articles. `validatePublicWikiArticles` rejects a
+ * category with no articles, which is what stops a speculative empty heading.
+ */
+export const WIKI_CATEGORY_IDS = [
+  "getting-started",
+  "work",
+  "gear-and-credits",
+  "places-and-travel",
+  "people",
+] as const;
+
+export type WikiCategoryId = (typeof WIKI_CATEGORY_IDS)[number];
+
+/**
+ * Player-facing heading and one-line description for each category, in index
+ * order. The description tells a player what belongs in a category before they
+ * open anything, which is what lets the Wiki index be a landing page rather
+ * than a catalog of every article.
+ */
+export const WIKI_CATEGORIES: readonly {
+  id: WikiCategoryId;
+  label: string;
+  description: string;
+}[] = [
+  {
+    id: "getting-started",
+    label: "Getting Started",
+    description: "What RuneSpace is right now, the jobs people hand you, and how your skills grow.",
+  },
+  {
+    id: "work",
+    label: "Work",
+    description: "The trades you actually perform: cutting shale, running the hopper, and welding.",
+  },
+  {
+    id: "gear-and-credits",
+    label: "Gear & Credits",
+    description: "What you carry, what powers it, and how money changes hands out here.",
+  },
+  {
+    id: "places-and-travel",
+    label: "Places & Travel",
+    description: "Holo Hollow's locations, and how you get between them on foot or otherwise.",
+  },
+  {
+    id: "people",
+    label: "People",
+    description: "The residents of Holo Hollow: what they do, and where you will run into them.",
+  },
+];
+
+const wikiCategoryId = z.enum(WIKI_CATEGORY_IDS);
+
 /** The complete repository-authored Wiki article contract. */
 export const WikiArticleSchema = z
   .object({
     slug: wikiSlug,
     title: wikiText,
+    category: wikiCategoryId,
     summary: wikiText,
     sections: z.array(WikiArticleSectionSchema).min(1),
   })

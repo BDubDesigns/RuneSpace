@@ -1,18 +1,27 @@
-import { WikiArticleSchema } from "@/game/schemas/public-wiki";
-import type { WikiArticle, WikiParagraph } from "@/game/schemas/public-wiki";
+import { WIKI_CATEGORIES, WikiArticleSchema } from "@/game/schemas/public-wiki";
+import type { WikiArticle, WikiCategoryId, WikiParagraph } from "@/game/schemas/public-wiki";
 
-export type { WikiArticle } from "@/game/schemas/public-wiki";
+export type { WikiArticle, WikiCategoryId } from "@/game/schemas/public-wiki";
 
 /**
- * The initial player manual. Articles are authored in the order the index
- * displays them — a small, deliberately grouped set rather than a per-topic
- * encyclopedia. Every fact here must match currently shipped behavior; do not
- * publish approved-but-unshipped design (see docs/public-wiki.md).
+ * The player manual. Every fact here must match currently shipped behavior; do
+ * not publish approved-but-unshipped design (see docs/public-wiki.md).
+ *
+ * Authored order is still the only ordering mechanism — there is no sort key
+ * and no second ordering source. The index groups articles under their
+ * `category` in the category order declared by `WIKI_CATEGORIES`, and within a
+ * category articles keep the exact order they appear in below. Reorder this
+ * array to reorder a category.
+ *
+ * Character articles are written only from the `Public-Wiki-safe facts` field
+ * of that NPC's entry in docs/npc-canon.md, which is internal and
+ * spoiler-complete. Do not copy from the rest of it.
  */
 const authoredWikiArticles = [
   {
     slug: "getting-started",
     title: "Getting Started",
+    category: "getting-started",
     summary:
       "What RuneSpace is right now, and how Location, Map, Journey, Inventory, and Missions fit together.",
     sections: [
@@ -69,11 +78,12 @@ const authoredWikiArticles = [
   {
     slug: "travel-and-scavenging",
     title: "Travel & Scavenging",
+    category: "places-and-travel",
     summary: "How to move between Holo Hollow's locations, and what you can find along the way.",
     sections: [
       {
         paragraphs: [
-          "Holo Hollow currently has six connected locations. You can only walk between locations that are directly connected — there's no fast travel or shortcut. There is one paid ride, on a single fixed route, once you've earned it.",
+          "Holo Hollow currently has seven connected locations. You can only walk between locations that are directly connected — there's no fast travel or shortcut. There is one paid ride, on a single fixed route, once you've earned it.",
         ],
       },
       {
@@ -87,7 +97,12 @@ const authoredWikiArticles = [
           [
             "Holo Hollow — the ",
             { text: "town", articleSlug: "holo-hollow" },
-            " connects to Crash Site, the Power Annex, and The Long Scramble. There's no direct route between the town and The Jag or the Processing Yard.",
+            " connects to Crash Site, the Power Annex, The Long Scramble, and Rusk Recovery. There's no direct route between the town and The Jag or the Processing Yard.",
+          ],
+          [
+            "Rusk Recovery — ",
+            { text: "Wade Rusk's", articleSlug: "wade-rusk" },
+            " own yard, on the northwest edge of town. It only connects to Holo Hollow, so the town is the way in and the way out.",
           ],
         ],
       },
@@ -125,6 +140,7 @@ const authoredWikiArticles = [
   {
     slug: "mining-and-refining",
     title: "Mining & Refining",
+    category: "work",
     summary: "Turning Holo Hollow's exposed ferrite into Refined Ferrite, one attempt at a time.",
     sections: [
       {
@@ -161,6 +177,7 @@ const authoredWikiArticles = [
   {
     slug: "inventory-and-equipment",
     title: "Inventory & Equipment",
+    category: "gear-and-credits",
     summary: "What you're carrying, what you're wearing, and how much room you have for more.",
     sections: [
       {
@@ -196,6 +213,7 @@ const authoredWikiArticles = [
   {
     slug: "power-cells",
     title: "Power Cells",
+    category: "gear-and-credits",
     summary: "Claiming Power Cells at the Annex and using one to charge your Salvage Cutter.",
     sections: [
       {
@@ -242,6 +260,7 @@ const authoredWikiArticles = [
   {
     slug: "credits-and-trading",
     title: "Credits & Trading",
+    category: "gear-and-credits",
     summary:
       "Your character's Credits, buying and selling at Bix Weller's shop, and Wade's scrap counter at Rusk Recovery.",
     sections: [
@@ -302,6 +321,7 @@ const authoredWikiArticles = [
   {
     slug: "cargo-hold-and-welding",
     title: "Cargo Hold & Welding",
+    category: "work",
     summary:
       "Repairing the ship's Cargo Hold, what it gives you once it's welded shut, and what else you can weld.",
     sections: [
@@ -370,6 +390,7 @@ const authoredWikiArticles = [
   {
     slug: "practice-welding",
     title: "Practice Welding",
+    category: "work",
     summary:
       "Wade's workbench at Rusk Recovery, the scrap it runs on, and how practising Welding actually works.",
     sections: [
@@ -438,6 +459,7 @@ const authoredWikiArticles = [
   {
     slug: "missions",
     title: "Missions",
+    category: "getting-started",
     summary:
       "The jobs Wade Rusk, Tansy Rusk and Renn Calder hand out, and how the Mission Log tracks them.",
     sections: [
@@ -559,6 +581,7 @@ const authoredWikiArticles = [
   {
     slug: "holo-hollow",
     title: "Holo Hollow",
+    category: "places-and-travel",
     summary:
       "The seven connected locations that make up the current playable world, the town itself, and who you'll meet there.",
     sections: [
@@ -642,15 +665,23 @@ const authoredWikiArticles = [
         heading: "Who's here",
         paragraphs: [
           [
-            "Wade Rusk, a Holo Hollow recovery and salvage operator, is at the Crash Site to begin with. Once you finish ",
+            { text: "Wade Rusk", articleSlug: "wade-rusk" },
+            ", who runs recovery and salvage, is at the Crash Site to begin with and at his own yard at Rusk Recovery once you finish ",
             { text: "Keep the Change", articleSlug: "missions" },
-            " he goes back to running his own yard at Rusk Recovery, and that is where you will find him from then on. Tansy Rusk, a field mechanic and miner, is based at The Jag.",
+            ". His niece ",
+            { text: "Tansy Rusk", articleSlug: "tansy-rusk" },
+            ", a field mechanic and miner, is based out at The Jag.",
           ],
           [
-            "In town, Bix Weller runs the souvenir and mining-supply shop, and Renn Calder, a Ferrite miner, is found at the Community Assistance Center. Mara Kells owns the HH B&B — you'll meet her in Bix's shop during ",
-            { text: "Keep the Change", articleSlug: "missions" },
-            ", and you can find her at the B&B once it's open to you. Each of them is only there when you're actually inside their building — you won't find them standing in the street. Other player characters can also be around.",
+            "In town, ",
+            { text: "Bix Weller", articleSlug: "bix-weller" },
+            " runs the souvenir and mining-supply shop, and ",
+            { text: "Renn Calder", articleSlug: "renn-calder" },
+            ", a ferrite miner, is usually at the Community Assistance Center. ",
+            { text: "Mara Kells", articleSlug: "mara-kells" },
+            " owns the HH B&B, and you'll meet her in town before its door is open to you.",
           ],
+          "Each of them is only there when you're actually inside their building — you won't find them standing in the street. Other player characters can also be around.",
           "This is an early, playable build — check the Updates page for what's new in Holo Hollow.",
         ],
       },
@@ -659,6 +690,7 @@ const authoredWikiArticles = [
   {
     slug: "skills-and-progression",
     title: "Skills & Progression",
+    category: "getting-started",
     summary:
       "How Mining, Refining, and Welding track your progress, and what leveling them up gets you.",
     sections: [
@@ -672,20 +704,24 @@ const authoredWikiArticles = [
         list: [
           "Mining — a successful Mining attempt at The Jag grants Mining XP.",
           "Refining — a Refining attempt at the Abandoned Processing Yard grants Refining XP, whether it succeeds or not.",
-          "Welding — each completed welding pass on the Cargo Hold repair grants Welding XP.",
+          "Welding — each completed welding pass grants Welding XP, whether you are repairing the Cargo Hold, repairing the Crew Stop, or practising at Wade's workbench. A practice pass pays a reduced share, because nothing is actually being repaired.",
         ],
       },
       {
         heading: "Mission rewards",
         paragraphs: [
           [
-            "The current missions also grant skill XP when you complete them: ",
+            "Some missions also grant skill XP when you complete them: ",
             { text: "Cut Your Teeth", articleSlug: "missions" },
             " grants +100 Mining XP, ",
             { text: "Waste Not", articleSlug: "missions" },
-            " grants +100 Refining XP, and ",
+            " grants +100 Refining XP, ",
             { text: "Hold It Together", articleSlug: "missions" },
-            " grants +100 Welding XP.",
+            " grants +100 Welding XP, and ",
+            { text: "Out of the Weather", articleSlug: "missions" },
+            " grants +250 Welding XP on top of what the welding itself paid. Not every mission pays in XP — ",
+            { text: "10,000 Hours", articleSlug: "missions" },
+            " pays 50 Credits instead, because its practice welds already earned their own Welding XP as you did them.",
           ],
         ],
       },
@@ -693,6 +729,236 @@ const authoredWikiArticles = [
         heading: "What leveling up does",
         paragraphs: [
           "Higher Mining and Refining levels raise your chance of success on each attempt, up to a level where success is guaranteed. Levels have a cap, and every skill shows its current level and XP right where you use it — Mining at The Jag, Refining at the Processing Yard, and Welding at the Workbench, the Cargo Hold repair, and the Crew Stop repair.",
+        ],
+      },
+    ],
+  },
+  {
+    slug: "wade-rusk",
+    title: "Wade Rusk",
+    category: "people",
+    summary:
+      "The recovery and salvage man who meets you at the wreck, decides you are his apprentice, and teaches you to weld.",
+    sections: [
+      {
+        paragraphs: [
+          "Wade Rusk does recovery, salvage and field repairs. His own summary is shorter: if something around here quits moving, he either makes it move again or sells the parts that still do.",
+          "He is the first person you meet after the crash, and he is not thrilled about it. You came down on what he describes as the nicest salvage claim Holo Hollow had seen in years, and then climbed out of it alive. He mentions this. He goes on mentioning it, and has said outright that he does not intend to stop.",
+        ],
+      },
+      {
+        heading: "Where to find him",
+        paragraphs: [
+          [
+            "To begin with, Wade is at the Crash Site, standing over your ship and revising his estimate downward. Once you finish ",
+            { text: "Keep the Change", articleSlug: "missions" },
+            " he goes back to running his own yard at Rusk Recovery on the northwest edge of town, and that is where you will find him from then on.",
+          ],
+        ],
+      },
+      {
+        heading: "Working for him",
+        paragraphs: [
+          [
+            "Wade hands out most of the early ",
+            { text: "jobs", articleSlug: "missions" },
+            ", starting by sending you to his niece ",
+            { text: "Tansy Rusk", articleSlug: "tansy-rusk" },
+            " out at The Jag. Once the Cargo Hold is holding he decides you are his apprentice — not a question, and not much of a ceremony either. By his account it mostly means you get the jobs he would rather not do twice.",
+          ],
+          [
+            "He is the one who teaches you ",
+            { text: "Welding", articleSlug: "cargo-hold-and-welding" },
+            ", and he is deliberate about what he will let you put a torch to. People bring him things they cannot afford to lose twice, so you spend a long time on his own scrap before you go anywhere near anybody else's property.",
+          ],
+        ],
+      },
+      {
+        heading: "At the yard",
+        paragraphs: [
+          [
+            "Rusk Recovery is racked salvage, stripped components, damaged work vehicles waiting their turn, and a workbench somebody genuinely uses — messy, and organised by a man who knows exactly where everything is. You can ",
+            { text: "practise Welding", articleSlug: "practice-welding" },
+            " there for as long as you have scrap, and he sells the scrap at two Credits a piece, the same as he would charge anybody.",
+          ],
+        ],
+      },
+      {
+        heading: "Talking to him",
+        paragraphs: [
+          "Ask him about recovery work and you get the nearest thing he has to a philosophy: most of it is patience, a wreck will eventually tell you which half of it is still worth something, and he does not build anything from scratch — he makes what is already lying around work again, or work as something else.",
+          "Praise is rationed. Do a job properly and he will acknowledge it in about eight words and then move on to the next thing.",
+        ],
+      },
+    ],
+  },
+  {
+    slug: "tansy-rusk",
+    title: "Tansy Rusk",
+    category: "people",
+    summary:
+      "Wade's niece, the field mechanic working the seam at The Jag, and the person who hands you your first real tool.",
+    sections: [
+      {
+        paragraphs: [
+          "Tansy Rusk works the ferrite seam at The Jag, out past The Long Scramble. She is a field mechanic first and a miner second, and the difference shows — she is at her happiest explaining why something works.",
+          "She is Wade Rusk's niece, and she reads him fluently. When he is being impossible, she translates. When he is quietly pleased with you and has no intention of saying so, she says it for him.",
+        ],
+      },
+      {
+        heading: "The Salvage Cutter",
+        paragraphs: [
+          [
+            "The tool the whole early game runs on is hers. She built it out of spare parts and stubbornness and is entirely cheerful about its faults: nothing matches, it is not very fast, and she suspects half of it violates a regulation ",
+            { text: "Wade", articleSlug: "wade-rusk" },
+            " already hates. It cuts shale perfectly well.",
+          ],
+          "It comes with the only safety briefing you are going to get, which is to keep your fingers out of the moving bits and avoid pointing the hot end at anything you are emotionally attached to.",
+        ],
+      },
+      {
+        heading: "What she teaches",
+        paragraphs: [
+          [
+            "Tansy runs the part of your education that keeps everything else supplied: ",
+            { text: "Mining at The Jag, and the Refining", articleSlug: "mining-and-refining" },
+            " that turns what you pull out of the hardpan into something Wade can actually work with.",
+          ],
+          "She is unbothered by failure and expects you to be too. Some days the shale comes out clean, some days you swing eleven times for nothing, and she will point out that this is you rather than the tool — the more you work it, the more often it bites.",
+        ],
+      },
+      {
+        heading: "Out at the seam",
+        paragraphs: [
+          [
+            "The Jag is a seam, not a mine, and Tansy would like that distinction observed. Whoever got here first carved it out of the hardpan; calling it a mine is generous. Her Cutter runs on ",
+            { text: "Power Cells", articleSlug: "power-cells" },
+            " like yours does, and running dry at the far end of a shift is a real problem out there — a dead Cutter, in her words, is a very heavy stick.",
+          ],
+        ],
+      },
+    ],
+  },
+  {
+    slug: "bix-weller",
+    title: "Bix Weller",
+    category: "people",
+    summary:
+      "The man behind the counter at Holo Hollow Souvenirs + Mining Supplies, and the best-informed person in town.",
+    sections: [
+      {
+        paragraphs: [
+          "Bix Weller runs Holo Hollow Souvenirs + Mining Supplies, which is one shop with two names and a firm opinion about which of them counts.",
+          "His parents opened it when people still came to Holo Hollow on purpose, and filled it with shirts, mugs and little projector toys — anything a child could talk a parent into buying on the way home. Bix grew up in it and took it over. The original Souvenirs sign is still up; the + Mining Supplies board is bolted on underneath, rougher and newer. That is the shop's entire history in one piece of signage.",
+          "He still stocks the souvenirs. They do not move. The mining gear does. He does not accept that this makes it a mining store.",
+        ],
+      },
+      {
+        heading: "Over the counter",
+        paragraphs: [
+          [
+            "Bix sells Power Cells, and buys Ferrite Shale, Refined Ferrite, Slag and any spare cells you are carrying — see ",
+            { text: "Credits & Trading", articleSlug: "credits-and-trading" },
+            " for what each is worth. Talking to him and trading with him are separate things, and you can do either without the other.",
+          ],
+        ],
+      },
+      {
+        heading: "Ask him about Power Cells",
+        paragraphs: [
+          [
+            "Bix will talk you out of a sale. Before you spend anything he will point out that the ",
+            { text: "DeWhat? Emergency Power Annex", articleSlug: "power-cells" },
+            " up the road issues five cells a day to anyone who walks up, for nothing.",
+          ],
+          "He also knows why, which is more than most of the town does. Back when projector nights filled every room out here, Settled Systems required a public emergency power depot; DeWhat? won the contract and installed it; the tourists left and the contract did not. He will sell you a cell anyway, and explain the arithmetic without being asked — five a day for him and five a day for you is not what stocks a shop.",
+        ],
+      },
+      {
+        heading: "Ask him about the town",
+        paragraphs: [
+          [
+            "He remembers ",
+            { text: "Holo Hollow", articleSlug: "holo-hollow" },
+            " busy. Whole families, projector nights, full rooms, children trying to spend every Credit they had before their parents got them back into the speeder. Then the new releases stopped working here, and everybody discovered somewhere else to be.",
+          ],
+          "He is dry about all of it rather than bitter, and he is one of the few people out here who will give you a straight answer even when a vaguer one would make him money.",
+        ],
+      },
+    ],
+  },
+  {
+    slug: "renn-calder",
+    title: "Renn Calder",
+    category: "people",
+    summary:
+      "A ferrite miner at the Community Assistance Center, and the most clear-eyed person in Holo Hollow.",
+    sections: [
+      {
+        paragraphs: [
+          "Renn Calder mines ferrite and has no illusions about it. It is rock — useful rock, for exactly as long as somebody still wants enough of it.",
+          "You will usually find him at the Holo Hollow Community Assistance Center, which used to be the Visitor Center and now handles local assistance and ration distribution. The old lettering is still legible underneath the newer signage, which is true of a lot of things around here.",
+        ],
+      },
+      {
+        heading: "What he makes of the place",
+        paragraphs: [
+          [
+            "Renn is the youngest of the people you will meet in ",
+            { text: "Holo Hollow", articleSlug: "holo-hollow" },
+            " and the least interested in the story the town tells about itself. Every year, he will tell you, somebody says ferrite demand is about to turn around — and every year that turns into one more reason to wait one more year.",
+          ],
+          "He is not sneering at anyone for staying. He knows everybody here, he knows which roof leaks, and he knows exactly who turns out at two in the morning when something breaks. That is the point, as far as he is concerned: if he hated the place, leaving would be easy. Caring about somewhere does not mean you owe it your whole life, and staying can be loyalty or it can be fear, and those are not the same thing.",
+        ],
+      },
+      {
+        heading: "The Assistance Center",
+        paragraphs: [
+          "Ask him about the building and you get the one subject he is firm about. It used to be brochures, maps, and somebody behind a counter telling tourists what they absolutely could not leave without seeing. Now it is forms, notices, stacked ration crates, and whoever needs a hand that week.",
+          "People talk about needing the place as though it were embarrassing. Renn does not think it is, and he will say so plainly.",
+          "He also notices the things around town that everyone else has stopped seeing, and he will mention them — not as a request, and not expecting anybody to do anything about it. Just as a fact about the place.",
+        ],
+      },
+    ],
+  },
+  {
+    slug: "mara-kells",
+    title: "Mara Kells",
+    category: "people",
+    summary:
+      "The owner of HH B&B, who stopped waiting for the tourists and turned the family business into the inn the town actually needed.",
+    sections: [
+      {
+        paragraphs: [
+          "Mara Kells owns HH B&B, the bed-and-breakfast her parents ran back when families drove out to Holo Hollow to watch a projector show. Every room in it was decorated for them.",
+          "The tourists stopped coming. The rooms did not stop existing. So Mara stopped waiting and made it what the town actually needed — a working inn for miners, haulers, contractors and anyone out here on a long stretch of work. Same beds, as she puts it. Fewer complaints about the pillows.",
+          "She is warm first and direct second, usually in the same breath: she will tease you thoroughly and then tell you exactly what you ought to go and do next.",
+        ],
+      },
+      {
+        heading: "Getting through the door",
+        paragraphs: [
+          [
+            "The rooms are held for locals and regular working crews rather than passing guests, so the B&B is shut to you at first. You meet Mara well before you get inside — she comes into ",
+            { text: "Bix's shop", articleSlug: "bix-weller" },
+            " while you are running an errand for Wade, takes one look at the arrangement, and concludes that you might not be a tourist any more.",
+          ],
+          [
+            "Finish ",
+            { text: "Keep the Change", articleSlug: "missions" },
+            " and the door is open to you.",
+          ],
+        ],
+      },
+      {
+        heading: "Her and Bix",
+        paragraphs: [
+          [
+            "Mara and ",
+            { text: "Bix Weller", articleSlug: "bix-weller" },
+            " have known each other since they were children running between their two buildings, and it shows in about four seconds of conversation.",
+          ],
+          "She is the practical half of that pair. It was never the business her parents built — she is clear about that — but it is the one this town needed, and she would rather run that than keep a museum.",
         ],
       },
     ],
@@ -739,11 +1005,66 @@ export function validatePublicWikiArticles(input: readonly unknown[]): readonly 
   return articles;
 }
 
+/**
+ * Every declared category must actually have articles.
+ *
+ * A category with nothing in it would render an empty heading on the index, and
+ * a category nobody authored into is a half-finished migration. This is a
+ * property of the shipped corpus rather than of any collection, so it is
+ * checked here at import time instead of inside `validatePublicWikiArticles`.
+ */
+export function assertWikiCategoriesArePopulated(articles: readonly WikiArticle[]): void {
+  for (const category of WIKI_CATEGORIES) {
+    if (!articles.some((article) => article.category === category.id)) {
+      throw new Error(`Wiki category has no articles: ${category.id}`);
+    }
+  }
+}
+
 /** The single validated repository-authored source for Wiki articles, in index order. */
 export const wikiArticles = validatePublicWikiArticles(authoredWikiArticles);
 
+assertWikiCategoriesArePopulated(wikiArticles);
+
 export function getWikiArticles(): readonly WikiArticle[] {
   return wikiArticles;
+}
+
+export type WikiArticleGroup = {
+  id: WikiCategoryId;
+  label: string;
+  description: string;
+  articles: readonly WikiArticle[];
+};
+
+/**
+ * The validated collection grouped for the index: categories in declared
+ * order, each holding its articles in authored order. Every category is
+ * guaranteed non-empty by `validatePublicWikiArticles`.
+ */
+export function getWikiArticleGroups(): readonly WikiArticleGroup[] {
+  return WIKI_CATEGORIES.map((category) => ({
+    id: category.id,
+    label: category.label,
+    description: category.description,
+    articles: wikiArticles.filter((article) => article.category === category.id),
+  }));
+}
+
+/**
+ * The article the index spotlights for a player who does not yet know what to
+ * read. It is an ordinary authored article, deliberately not a second
+ * quick-start page that would duplicate it, and it still appears in its own
+ * category list below the spotlight.
+ */
+export const WIKI_START_HERE_SLUG = "getting-started";
+
+export function getWikiStartHereArticle(): WikiArticle {
+  const article = getWikiArticle(WIKI_START_HERE_SLUG);
+  if (!article) {
+    throw new Error(`Wiki start-here article is missing: ${WIKI_START_HERE_SLUG}`);
+  }
+  return article;
 }
 
 export function getWikiArticle(slug: string): WikiArticle | undefined {
