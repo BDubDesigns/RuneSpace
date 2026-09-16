@@ -108,7 +108,8 @@ boundary.** This file is the repository's normative agent-behavior contract;
    `scripts/runespace-db.mjs` after creating a validated disposable database.
    Run the full local CI-parity sequence before marking a PR ready when the
    environment is available; report unavailable checks as unexecuted.
-7. Open or update exactly one Draft PR. Include `closes #<issue>`, branch and
+7. Open or update exactly one Draft PR, only after completing the final
+   self-review and validation pass. Include `closes #<issue>`, branch and
    PR identity, local and remote validation, architectural decisions,
    limitations, unresolved questions, and whether gameplay, persistence, or
    player-facing behavior changed. Stop for human review; do not merge without
@@ -117,6 +118,32 @@ boundary.** This file is the repository's normative agent-behavior contract;
    PostgreSQL/canonical jobs unless `full-ci` is applied, and the draft-only
    Merge gate is expected to remain unsatisfied. Inspect failed logs, repair on
    the same branch, push, and follow replacement runs.
+
+## Project board status
+
+The GitHub Project board is a live signal of where an issue actually is. Agents
+own exactly two transitions and must keep both truthful:
+
+- **`Ready` → `In Progress`** when substantive work begins — the first real
+  code, content, or documentation change, not reading or planning. Ordinary
+  iterative testing, debugging, and repair *during* implementation stay
+  `In Progress`; running tests never by itself means the work reached `Review`.
+- **`In Progress` → `Review`** when implementation is complete and the
+  deliberate final self-review pass begins: inspecting the full diff, checking
+  every acceptance criterion, running the proportional checks, and fixing
+  whatever that pass finds.
+
+Finish the `Review` pass **before** opening the Draft PR, so the existing
+`Pull request linked to issue` Project workflow can truthfully move the issue to
+`Preview / Playtest`.
+
+Agents set no other status. `Backlog` and `Ready` selection stays with the
+product owner, `Preview / Playtest` belongs to the linked-PR workflow, and
+`Done` belongs to the existing merge/close automation — never set `Done` by
+hand. Do not reconfigure the Project's own workflows or fields. If a transition
+cannot be performed — missing Projects scope, an issue absent from the board, an
+ambiguous project — report the exact blocker and continue the issue rather than
+inventing a workaround. `docs/development-workflow.md` has the `gh` procedure.
 
 ## QC Failed status manifest
 
