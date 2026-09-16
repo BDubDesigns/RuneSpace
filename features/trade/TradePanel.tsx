@@ -194,18 +194,28 @@ export function TradePanel({
 
           return (
             <li
-              className="grid grid-cols-[4.5rem_minmax(0,1fr)] items-center gap-3 border border-[color:var(--rs-border-structural)] bg-[color:var(--rs-surface-control)] p-3"
+              // Identity gets a 7rem column because that is the width
+              // VisualTile is actually built for: its own `min-h-28` floor and
+              // `h-20 w-20` artwork only resolve to a square, full-size tile at
+              // 7rem. The narrower column this row used before starved the art
+              // and left the tile a portrait rectangle (#184). Quantity keeps
+              // the remaining space, and at phone width it takes the row's full
+              // inner width on its own line rather than wrapping inside the
+              // ~222px left over beside the tile.
+              className="grid grid-cols-[7rem_minmax(0,1fr)] items-start gap-3 border border-[color:var(--rs-border-structural)] bg-[color:var(--rs-surface-control)] p-3"
               data-trade-row={itemId}
               key={itemId}
             >
-              <ItemVisual
-                accessibleLabel={`${presentation.displayName}, ${unitPrice} Credits each, ${owned} carried`}
-                badge={`x${owned}`}
-                className="w-full"
-                itemId={itemId}
-                name={presentation.displayName}
-                quantity={owned}
-              />
+              <div className="sm:row-span-2 sm:self-center" data-trade-item-visual>
+                <ItemVisual
+                  accessibleLabel={`${presentation.displayName}, ${unitPrice} Credits each, ${owned} carried`}
+                  badge={`x${owned}`}
+                  className="w-full"
+                  itemId={itemId}
+                  name={presentation.displayName}
+                  quantity={owned}
+                />
+              </div>
               <div className="min-w-0">
                 <p className="font-display text-sm font-bold text-[color:var(--rs-text-primary)]">
                   {presentation.displayName}
@@ -214,7 +224,15 @@ export function TradePanel({
                   <span data-trade-unit-price>{unitPrice}</span> Credits each · carried{" "}
                   <span data-trade-owned>{owned}</span>
                 </p>
-                <div className="mt-2 flex flex-wrap items-center gap-2">
+                {/* The committed number reads with the price it comes from, which
+                    also keeps it out of the quantity cluster so that cluster fits
+                    one line at 390px. */}
+                <p className="mt-0.5 font-display text-xs font-bold text-[color:var(--rs-text-primary)]">
+                  Total <span data-trade-total>{total}</span> Credits
+                </p>
+              </div>
+              <div className="col-span-2 flex flex-wrap items-center justify-between gap-2 sm:col-span-1 sm:col-start-2">
+                <div className="flex items-center gap-2" data-trade-quantity-controls>
                   <ActionButton
                     aria-label={`Decrease ${presentation.displayName} quantity`}
                     className="px-2.5"
@@ -250,19 +268,16 @@ export function TradePanel({
                   >
                     Max
                   </ActionButton>
-                  <span className="text-xs text-[color:var(--rs-text-secondary)]">
-                    Total <span data-trade-total>{total}</span> Credits
-                  </span>
-                  <ActionButton
-                    data-trade-commit={itemId}
-                    disabled={busy || !affordable}
-                    intent="primary"
-                    loading={busy}
-                    onClick={() => commit(itemId, quantity)}
-                  >
-                    {mode === "buy" ? "Buy" : "Sell"}
-                  </ActionButton>
                 </div>
+                <ActionButton
+                  data-trade-commit={itemId}
+                  disabled={busy || !affordable}
+                  intent="primary"
+                  loading={busy}
+                  onClick={() => commit(itemId, quantity)}
+                >
+                  {mode === "buy" ? "Buy" : "Sell"}
+                </ActionButton>
               </div>
             </li>
           );

@@ -634,6 +634,99 @@ test("opening Trade reveals the Trade surface above the bottom navigation", asyn
   await expect(trade).toBeFocused();
 });
 
+test("composes the Trade row so identity and quantity both fit the phone", async ({
+  page,
+  testCharacter,
+}) => {
+  const characterId = testCharacter.id;
+  await page.setViewportSize({ width: 390, height: 844 });
+  // Sell is the busier surface, and carries the long item names that made the
+  // identity column look starved on a phone (#184).
+  await arriveInHoloHollow(characterId, { credits: 200, shale: 5 });
+  await openTestCharacter(page, characterId);
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page
+    .locator("[data-local-place-directory]")
+    .locator(`[data-local-place="${LOCAL_PLACE_IDS.holoHollowSouvenirs}"]`)
+    .click();
+  await page.locator('[data-npc-action="trade"]').click();
+
+  const counter = page.getByRole("dialog", { name: "Trade with Bix Weller" });
+  await expect(counter).toBeVisible();
+  await counter.locator('[data-trade-mode="sell"]').click();
+
+  /**
+   * The row's own responsive contract, asserted from geometry rather than
+   * class names: a square identity tile, one unwrapped line of quantity
+   * controls that keep their 44px target, and no surface that overflows the
+   * phone sideways.
+   */
+  async function expectRowComposes(itemId: string) {
+    const row = counter.locator(`[data-trade-row="${itemId}"]`);
+    // Each representative row settles on its own terms, so this spec never
+    // depends on how many items the merchant happens to trade.
+    await expect(row).toBeVisible();
+    const rowBox = (await row.boundingBox())!;
+
+    // Item identity reads as a strong square tile, not a starved sliver.
+    const tileBox = (await row.locator("[data-trade-item-visual]").boundingBox())!;
+    expect(Math.abs(tileBox.width - tileBox.height)).toBeLessThanOrEqual(2);
+    expect(tileBox.width).toBeGreaterThanOrEqual(96);
+
+    // −, quantity, + and Max stay on one line together, each a real target.
+    const controls = row.locator("[data-trade-quantity-controls]");
+    const controlsBox = (await controls.boundingBox())!;
+    expect(controlsBox.height).toBeLessThanOrEqual(56);
+    for (const label of [/Decrease /, /Increase /, /Maximum /]) {
+      const button = row.getByRole("button", { name: label });
+      const box = (await button.boundingBox())!;
+      expect(box.height).toBeGreaterThanOrEqual(44);
+      // Every quantity control shares the single control line.
+      expect(Math.abs(box.y - controlsBox.y)).toBeLessThanOrEqual(1);
+    }
+
+    // The commit sits on that same line and stays inside the row.
+    const commitBox = (await row.locator(`[data-trade-commit="${itemId}"]`).boundingBox())!;
+    expect(commitBox.height).toBeGreaterThanOrEqual(44);
+    expect(Math.abs(commitBox.y - controlsBox.y)).toBeLessThanOrEqual(1);
+    expect(commitBox.x + commitBox.width).toBeLessThanOrEqual(rowBox.x + rowBox.width + 1);
+
+    // The name is spelled out in the row itself rather than being clipped.
+    const name = row.locator("p").first();
+    await expect(name).toHaveText(/\S/);
+    expect(
+      await name.evaluate((element) => element.scrollWidth - element.clientWidth),
+    ).toBeLessThanOrEqual(1);
+  }
+
+  for (const itemId of [ITEM_IDS.powerCell, ITEM_IDS.refinedFerrite, ITEM_IDS.ferriteShale]) {
+    await expectRowComposes(itemId);
+  }
+
+  // Nothing in the counter pushes the phone sideways.
+  const overflow = await page.evaluate(() => ({
+    document: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+    dialog: (() => {
+      const panel = document.querySelector('[role="dialog"]')!;
+      return panel.scrollWidth - panel.clientWidth;
+    })(),
+  }));
+  expect(overflow.document).toBeLessThanOrEqual(0);
+  expect(overflow.dialog).toBeLessThanOrEqual(0);
+
+  // Desktop keeps the same row contract rather than being degraded to win the
+  // phone: there the quantity line sits beside the tile instead of under it.
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await expect(counter).toBeVisible();
+  await expectRowComposes(ITEM_IDS.refinedFerrite);
+  const desktopRow = counter.locator(`[data-trade-row="${ITEM_IDS.refinedFerrite}"]`);
+  const desktopTile = (await desktopRow.locator("[data-trade-item-visual]").boundingBox())!;
+  const desktopControls = (await desktopRow
+    .locator("[data-trade-quantity-controls]")
+    .boundingBox())!;
+  expect(desktopControls.x).toBeGreaterThanOrEqual(desktopTile.x + desktopTile.width);
+});
+
 /**
  * Issue #172 — the Crew Stop, at the canonical 390px mobile width.
  *
