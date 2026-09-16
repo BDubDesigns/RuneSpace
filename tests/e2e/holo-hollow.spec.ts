@@ -640,7 +640,7 @@ test("composes the Trade row so identity and quantity both fit the phone", async
 }) => {
   const characterId = testCharacter.id;
   await page.setViewportSize({ width: 390, height: 844 });
-  // Sell carries Bix's four materials, including the long names that made the
+  // Sell is the busier surface, and carries the long item names that made the
   // identity column look starved on a phone (#184).
   await arriveInHoloHollow(characterId, { credits: 200, shale: 5 });
   await openTestCharacter(page, characterId);
@@ -654,7 +654,6 @@ test("composes the Trade row so identity and quantity both fit the phone", async
   const counter = page.getByRole("dialog", { name: "Trade with Bix Weller" });
   await expect(counter).toBeVisible();
   await counter.locator('[data-trade-mode="sell"]').click();
-  await expect(counter.locator("[data-trade-row]")).toHaveCount(4);
 
   /**
    * The row's own responsive contract, asserted from geometry rather than
@@ -664,6 +663,9 @@ test("composes the Trade row so identity and quantity both fit the phone", async
    */
   async function expectRowComposes(itemId: string) {
     const row = counter.locator(`[data-trade-row="${itemId}"]`);
+    // Each representative row settles on its own terms, so this spec never
+    // depends on how many items the merchant happens to trade.
+    await expect(row).toBeVisible();
     const rowBox = (await row.boundingBox())!;
 
     // Item identity reads as a strong square tile, not a starved sliver.
