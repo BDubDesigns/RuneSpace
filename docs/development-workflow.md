@@ -170,11 +170,14 @@ It is deliberately narrower than `gh`:
   `Ready` → `In Progress` and `In Progress` → `Review`. Restricting the
   destination alone would not be enough — it would still permit
   `Done` → `In Progress`, dragging a card the merge/close automation owns back
-  into the working columns. Every other pair is refused before any network call,
-  including phase skips like `Ready` → `Review`, so this path cannot perform a
-  transition `AGENTS.md` reserves for the product owner or for automation. A
-  card already at the requested status is reported and left alone, so a re-run
-  is harmless.
+  into the working columns. Forbidden source→target pairs are rejected after
+  reading the current status but before any mutation, and an illegal transition
+  is never presented as a valid dry run — that covers every other pair,
+  including phase skips like `Ready` → `Review`. A forbidden *target* such as
+  `Done` is rejected earlier still, during argument parsing, before any network
+  call. Either way this path cannot perform a transition `AGENTS.md` reserves
+  for the product owner or for automation. A card already at the requested
+  status is reported and left alone, so a re-run is harmless.
 - **The board is pinned** to project 5, owner `BDubDesigns`, repository
   `BDubDesigns/RuneSpace`, and the title is checked after resolution. A mistyped
   argument cannot reach project 3 (`QC Failed! Roadmap`), and a same-numbered
@@ -225,10 +228,13 @@ silently:
   reported as such. As with `gh`, *every* Project call fails without the scope,
   read and write alike, and granting it is an account-owner action.
 - **Forbidden target** — `refusing to set Status to "Done"`, with the two
-  permitted names and who owns the rest.
+  permitted names and who owns the rest. Raised during argument parsing, before
+  any network call.
 - **Forbidden transition** — `refusing to move Status from "Done" to
   "In Progress"`, naming the current status, the requested one, and the two
-  permitted pairs.
+  permitted pairs. Raised after the current status is read and before any
+  mutation, so a dry run refuses it too rather than reporting it as a valid
+  plan.
 - **Unknown option name** — the available options are listed, mirroring `gh`'s
   own rejection. A renamed board option means this document is out of date:
   correct it rather than guessing.

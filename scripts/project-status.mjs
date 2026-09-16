@@ -12,9 +12,12 @@
 //     `In Progress` and `In Progress` -> `Review`. Both the destination *and*
 //     the source are enforced, so the permitted pairs are the whole contract:
 //     `Done` and `Preview / Playtest` cannot be set, and a card already in one
-//     of them cannot be dragged back into the working columns either. Every
-//     refusal happens before any network call rather than being left to
-//     operator discipline.
+//     of them cannot be dragged back into the working columns either. A
+//     forbidden *target* is rejected during argument parsing, before any
+//     network call. A forbidden source->target *pair* cannot be known until
+//     the card's current status has been read, so it is rejected after that
+//     read but before any mutation, and an illegal transition is never
+//     presented as a valid dry run.
 //   - The project number, owner, and repository are pinned, so a mistyped
 //     argument cannot reach a different board (project 3, `QC Failed!
 //     Roadmap`, is a different board) or a same-numbered issue elsewhere.
