@@ -347,10 +347,17 @@ A planning adjective must not become a mandatory implementation abstraction.
 | Juno Stemp | she/her | Runs local deliveries | A speeder with a cargo rack |
 | Greta Voss | she/her | *None established* | A Power-Cell room heater |
 
-That table is the **complete** canon for these four people. It is not a
-placeholder to be filled in later. None of them is on the NPC roster, and none
-gets a portrait, dialogue, map presence, or Wiki page
+That table is the **complete current** canon for these four people. Nothing
+beyond the facts listed may be assumed, and it is not a placeholder for an agent
+to fill in while writing something else — if a job or a line seems to need more,
+it does not get invented here. None of them is on the NPC roster, and none gets a
+portrait, dialogue, map presence, or Wiki page
 (`docs/npc-canon.md`, "Background Work Order clients are not roster NPCs").
+
+They stay background residents unless somebody deliberately promotes one. Later
+authored content **may** establish new facts about them — that is a deliberate
+content decision, made on purpose and recorded, and it is the only way this table
+grows.
 
 ## Phase 8 — pool and anti-repeat validation
 
@@ -372,10 +379,33 @@ satisfy the rules.
 **Minimum viable pool size is 4** — three exclusions plus one drawable job. Eight
 leaves four jobs of headroom, so the rules never deadlock at this level.
 
-One property worth keeping: **all eight clients are distinct**, so no board can
-show the same person twice and nobody appears to have three broken things at
-once. At this pool size that falls out of the content, so no client-level
-distinctness rule needs building.
+**All eight clients happen to be distinct**, so no board drawn from *this* pool
+can show the same person twice. That is an incidental property of the initial
+authored eight, **not a board rule, and not something the implementation must
+enforce.**
+
+> **Job identity must be distinct. Client identity does not have to be.**
+
+The anti-repeat rules are job-based and stay that way: the same Work Order cannot
+occupy two visible slots, and the just-completed or just-abandoned Work Order
+should not immediately redraw while another eligible job exists. A **different**
+Work Order from the same client remains perfectly eligible, and two of one
+person's jobs appearing among the three visible postings at once is **not** a
+duplicate.
+
+So do not build any of the following:
+
+- a rule that visible postings must come from different clients;
+- a refill that avoids a client already on the board;
+- a cap of one posting per client;
+- weighting or normalizing selection by client;
+- compensation for one client having more authored jobs than another.
+
+Client imbalance is meaningful authored content rather than a distribution bug.
+If Bix eventually has four eligible repair jobs and another resident has one,
+that says Bix uses Wade's shop more often, and he should appear on the board more
+often as a result. Unless a future design explicitly adds weighting, **each
+eligible authored Work Order participates as its own job.**
 
 **Edge case to record for implementation.** If a future eligible pool is ever
 smaller than 4, the two exclusions conflict. The precedence should be: never

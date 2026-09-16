@@ -131,7 +131,11 @@ difference between "nobody decided" and "nobody wrote it down".
 - **Role / occupation**
 - **Home / work / usual locations** — including progression-dependent placement.
 - **Personality and values**
-- **Voice** — vocabulary, cadence, humor, and what they would not say.
+- **Voice** — vocabulary, cadence, humor, and what they would not say. Write it
+  at three different strengths: a character-defining behavior or value may be
+  stated firmly; an observed stylistic tendency is a strong default rather than a
+  law; and a lifetime absolute canon does not actually support should be softened
+  instead of recorded.
 - **Relationships**
 - **Player encounter chronology** — when the player meets them, and whether that
   encounter is guaranteed.
@@ -225,9 +229,11 @@ to let an untrained apprentice touch client property.
 **Voice.** Short declaratives. Sentence fragments. Dry, never cruel. Opens with
 a flat acknowledgement (*"Hm."*, *"All right."*) rather than a greeting. States
 a price or a quantity plainly and moves on. Deflects sentiment mid-sentence
-(*"Don't make a ceremony out of it."*). Will not use an exclamation mark, will
-not gush, will not explain a feeling, and will not call the player by an
-affectionate name.
+(*"Don't make a ceremony out of it."*). He does not gush, does not narrate a
+feeling, and does not call the player by an affectionate name; an exclamation
+mark would read as another man entirely. Treat those as extremely strong
+defaults rather than hard rules — an extraordinary scene could break one, and it
+would carry weight precisely because his register is otherwise so consistent.
 
 **Relationships.**
 
@@ -253,11 +259,13 @@ affectionate name.
   be demanding. But pay attention, and you will learn a lot from him."*
   `SHIPPED / PUBLIC-SAFE`.
 
-**Player encounter chronology.** **Guaranteed, and first.** He offers Walk It
-Off at the Crash Site; a player who walks to The Jag first instead still meets
-him, because he introduces himself over comms inside Tansy's scene. Keep the
-Change and 10,000 Hours both require him again. There is no route through the
-current game that avoids Wade.
+**Player encounter chronology.** **Guaranteed — and normally, but not
+necessarily, first.** On the intended Crash Site route he offers Walk It Off and
+is the first person the player speaks to. On the alternate route the player can
+reach The Jag and begin Tansy's scene before meeting him, and Wade introduces
+himself over comms partway through it — so Tansy may genuinely be encountered
+first. Either way Keep the Change and 10,000 Hours both require him again, so
+there is no route through the current game that avoids Wade.
 
 **Mission / story involvement.** Offers **Walk It Off**; takes the **Waste Not**
 turn-in; offers and turns in **Hold It Together**; offers **Keep the Change**
@@ -377,8 +385,8 @@ sleeps there.
 **Personality and values.** Generous with knowledge and blunt about safety.
 Teaches by handing someone a tool and telling them the one thing that will hurt
 them. Deflects her own competence (*"I threw it together from parts I had lying
-around"*) while being demonstrably the best engineer in the current cast — she
-built the Salvage Cutter the entire early game runs on. Reads Wade fluently and
+around"*) while being demonstrably capable and inventive — the Salvage Cutter
+the entire early game runs on is her work. Reads Wade fluently and
 translates him for people who cannot (*"That was him being proud, in case it
 went past you."*). `SHIPPED / PUBLIC-SAFE`.
 
@@ -655,9 +663,10 @@ committing. `UNRESOLVED / INTERNAL-ONLY` — this reads as authorial restraint
 rather than an oversight. **Do not resolve it in content**, and do not let a
 Work Order or a wiki article imply either answer.
 
-**Personality and values.** Tired, clear-eyed, and quietly principled. The
-youngest established resident and the one with the least patience for the town's
-self-mythology. He is not bitter about people, only about arithmetic: *"Every
+**Personality and values.** Tired, clear-eyed, and quietly principled, with
+the least patience in the cast for the town's self-mythology — he will not let
+comforting language stand in for what is actually true. He is not bitter about
+people, only about arithmetic: *"Every
 year somebody says demand's about to turn around. Every year we get another
 reason to wait one more year."* He notices small things that make other
 people's mornings worse, and says so without expecting anyone to act.
@@ -669,8 +678,11 @@ aren't the same thing."* He is the character who refuses to let a comfortable
 word stand in for a true one. `SHIPPED / PUBLIC-SAFE`.
 
 **Voice.** Flat, short, unhurried. Fragments. Understatement as default
-(*"Still standing. Still leaking."*). Never performs cheer, never pitches, never
-asks for anything. Sarcasm is dry and aimed at situations, not people. He would
+(*"Still standing. Still leaking."*). He does not perform cheer and does not
+pitch — strong defaults rather than hard rules. That he does not **ask** for
+anything is canon rather than style: he raises the Crew Stop without ever
+requesting that anybody fix it. Sarcasm is dry and aimed at situations, not
+people. He would
 not beg, would not guilt anyone, and would not claim credit — when the player
 fixes the Crew Stop his whole acknowledgement is *"That was you."*
 
