@@ -12,10 +12,23 @@ the end is a **proposal requiring separate product-owner approval**.
 
 | Item | Value |
 | --- | --- |
-| Audited revision | `1c44bd950e29f0d40f6093b268a7f5aa257bf7ad` (`main`, 2026-09-16) |
+| Originally audited revision | `1c44bd950e29f0d40f6093b268a7f5aa257bf7ad` (`main`, 2026-09-16) |
+| **Re-verified against** | **`2047c8fd3f8f23a80169edf683996b7e9e384319`** (`main`, 2026-09-16) |
 | Reproduction | `node --experimental-strip-types scripts/economy-audit-186.mjs --trials 20000` |
 | Trials behind each RNG figure | 20,000, seeded and deterministic |
 | Tick | `GAME_TICK_MS = 600` ms (`game/config/foundations.ts:4`) |
+
+**Freshness.** `main` moved while this audit was in review. The intervening
+merges are #201 (Trade row presentation and its E2E coverage) and #203 (agent
+workflow documentation). Neither touches the model: `git diff 1c44bd9..2047c8f`
+restricted to `game/`, `server/`, `db/`, `drizzle/` and `docs/work-orders.md` is
+**empty**, so no balance value, domain rule, content definition, merchant price,
+capacity rule, Scavenge outcome, travel timing, Mission grant or repair recipe
+changed. #201's `features/trade/TradePanel.tsx` edit is layout only and consumes
+the same `game/domain/trade.ts` values it always did. Re-running the script on
+the rebased tree reproduces the previous output byte-for-byte
+(`md5 ea414688cbbc42126219099c31e48a2e`, twice), so every figure below stands
+against the current baseline rather than only the original one.
 
 Every number below comes from the current implementation, not from prose. Where
 an outcome depends on RNG, capacity, or stack fragmentation, the figure was
