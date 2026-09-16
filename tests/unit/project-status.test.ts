@@ -1,9 +1,11 @@
 import { describe, expect, it } from "vitest";
 import {
   AGENT_SETTABLE_STATUSES,
+  ALLOWED_TRANSITIONS,
   AUTHORITY,
   ProjectStatusError,
   assertAgentSettableStatus,
+  assertAllowedTransition,
   describeGraphqlFailure,
   parseArguments,
   readToken,
@@ -169,6 +171,74 @@ describe("GraphQL failure messages", () => {
 
   it("reports a bare non-200 status", () => {
     expect(describeGraphqlFailure(502, {})).toMatch(/HTTP 502/);
+  });
+});
+
+describe("transition validation", () => {
+  // AGENTS.md grants exactly two transitions. Restricting the destination is
+  // not enough on its own, so every source/target pair on the board is pinned
+  // here: this matrix is the contract, and widening it has to be deliberate.
+  const EXPECTED: Record<string, Record<string, "apply" | "no-op" | "refuse">> = {
+    "In Progress": {
+      Backlog: "refuse",
+      Ready: "apply",
+      "In Progress": "no-op",
+      Review: "refuse",
+      "Preview / Playtest": "refuse",
+      Done: "refuse",
+    },
+    Review: {
+      Backlog: "refuse",
+      Ready: "refuse",
+      "In Progress": "apply",
+      Review: "no-op",
+      "Preview / Playtest": "refuse",
+      Done: "refuse",
+    },
+  };
+
+  for (const target of AGENT_SETTABLE_STATUSES) {
+    for (const source of BOARD_OPTIONS) {
+      const expected = EXPECTED[target]?.[source];
+
+      it(`${expected}s "${source}" -> "${target}"`, () => {
+        if (expected === "refuse") {
+          expect(() => assertAllowedTransition(source, target)).toThrow(ProjectStatusError);
+        } else {
+          expect(assertAllowedTransition(source, target)).toBe(expected);
+        }
+      });
+    }
+  }
+
+  it("refuses a card that carries no status at all", () => {
+    expect(() => assertAllowedTransition("(none)", "In Progress")).toThrow(ProjectStatusError);
+  });
+
+  it("names both the current and the requested status when refusing", () => {
+    expect(() => assertAllowedTransition("Done", "In Progress")).toThrow(
+      /from "Done" to "In Progress"/,
+    );
+  });
+
+  it("refuses a target outside the two agent-owned destinations", () => {
+    expect(() => assertAllowedTransition("Preview / Playtest", "Done")).toThrow(
+      /merge\/close automation/,
+    );
+  });
+
+  it("does not let the same-status no-op bypass source validation", () => {
+    // "Done" -> "Done" must not become a foothold for "Done" -> "In Progress".
+    expect(() => assertAllowedTransition("Done", "In Progress")).toThrow(ProjectStatusError);
+    expect(() => assertAllowedTransition("Preview / Playtest", "Review")).toThrow(
+      ProjectStatusError,
+    );
+  });
+
+  it("derives the accepted targets from the transition table so they cannot drift", () => {
+    expect([...AGENT_SETTABLE_STATUSES]).toEqual(Object.keys(ALLOWED_TRANSITIONS));
+    expect(ALLOWED_TRANSITIONS["In Progress"]).toEqual(["Ready"]);
+    expect(ALLOWED_TRANSITIONS["Review"]).toEqual(["In Progress"]);
   });
 });
 

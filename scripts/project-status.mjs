@@ -9,10 +9,12 @@
 // second path, and it is deliberately narrower than `gh`:
 //
 //   - `AGENTS.md` grants agents exactly two transitions, `Ready` ->
-//     `In Progress` and `In Progress` -> `Review`. Only those two option names
-//     are accepted as targets. `Done` and `Preview / Playtest` belong to the
-//     linked-PR and merge/close automation, so they are refused before any
-//     network call rather than left to operator discipline.
+//     `In Progress` and `In Progress` -> `Review`. Both the destination *and*
+//     the source are enforced, so the permitted pairs are the whole contract:
+//     `Done` and `Preview / Playtest` cannot be set, and a card already in one
+//     of them cannot be dragged back into the working columns either. Every
+//     refusal happens before any network call rather than being left to
+//     operator discipline.
 //   - The project number, owner, and repository are pinned, so a mistyped
 //     argument cannot reach a different board (project 3, `QC Failed!
 //     Roadmap`, is a different board) or a same-numbered issue elsewhere.
@@ -47,8 +49,17 @@ export const AUTHORITY = Object.freeze({
   statusFieldName: "Status",
 });
 
-// The only two transitions AGENTS.md gives agents. Everything else is refused.
-export const AGENT_SETTABLE_STATUSES = Object.freeze(["In Progress", "Review"]);
+// The only two transitions AGENTS.md gives agents, as target -> allowed sources.
+// Restricting the destination alone is not enough: without a source check this
+// script would accept `Done` -> `In Progress`, dragging a card owned by the
+// merge/close automation back into the working columns.
+export const ALLOWED_TRANSITIONS = Object.freeze({
+  "In Progress": Object.freeze(["Ready"]),
+  Review: Object.freeze(["In Progress"]),
+});
+
+// Derived, so the accepted targets and the transition table cannot drift apart.
+export const AGENT_SETTABLE_STATUSES = Object.freeze(Object.keys(ALLOWED_TRANSITIONS));
 
 const USAGE = `Usage:
   node scripts/project-status.mjs --issue <number> --status "<name>"
@@ -58,8 +69,9 @@ Reads or sets the ${AUTHORITY.statusFieldName} of an issue's card on project
 ${AUTHORITY.projectNumber} (${AUTHORITY.projectTitle}, owner ${AUTHORITY.ownerLogin}).
 
 The default mode is a read-only dry run; --execute performs the update.
---status accepts only ${AGENT_SETTABLE_STATUSES.map((name) => `"${name}"`).join(" and ")}.
-Omit --status to report the card's current status without changing anything.
+The only permitted transitions are ${describeAllowedTransitions()}; a card
+already at the requested status is left alone. Omit --status to report the
+card's current status without changing anything.
 
 Requires ${TOKEN_ENV_VAR}: a classic PAT with the \`project\` scope.`;
 
@@ -118,6 +130,33 @@ export function assertAgentSettableStatus(raw) {
     `refusing to set ${AUTHORITY.statusFieldName} to "${raw}". AGENTS.md gives agents ` +
       `only ${allowed}; "Preview / Playtest" belongs to the linked-PR workflow and ` +
       `"Done" to merge/close automation.`,
+  );
+}
+
+export function describeAllowedTransitions() {
+  return Object.entries(ALLOWED_TRANSITIONS)
+    .flatMap(([target, sources]) => sources.map((source) => `"${source}" -> "${target}"`))
+    .join(" and ");
+}
+
+export function assertAllowedTransition(currentStatus, targetStatus) {
+  if (!Object.hasOwn(ALLOWED_TRANSITIONS, targetStatus)) {
+    // Not an agent-owned destination at all; reuse the canonical refusal.
+    assertAgentSettableStatus(targetStatus);
+  }
+
+  // A card already at the target is an idempotent no-op, so a re-run is
+  // harmless. This shortcut applies only when the card is already where it is
+  // being asked to go; it never substitutes for source validation of a
+  // different target.
+  if (currentStatus === targetStatus) return "no-op";
+
+  if (ALLOWED_TRANSITIONS[targetStatus].includes(currentStatus)) return "apply";
+
+  fail(
+    `refusing to move ${AUTHORITY.statusFieldName} from "${currentStatus}" to ` +
+      `"${targetStatus}". AGENTS.md grants agents only ${describeAllowedTransitions()}; ` +
+      `every other transition belongs to the product owner or to automation.`,
   );
 }
 
@@ -334,7 +373,9 @@ export async function main(argv = process.argv.slice(2), environment = process.e
   const targetName = resolveStatusOption(optionNames, options.status);
   const targetOption = field.options.find((option) => option.name === targetName);
 
-  if (currentStatus === targetName) {
+  // The transition itself is validated before anything can mutate the board,
+  // and before a dry run can report an illegal plan as though it were legal.
+  if (assertAllowedTransition(currentStatus, targetName) === "no-op") {
     io.log(`[project-status] ${label}: already "${targetName}"; nothing to do`);
     return 0;
   }
