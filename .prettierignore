@@ -16,3 +16,4 @@ drizzle
 test-results.bak
 playwright-report
 playwright-report.bak
+.claude/settings.local.json

@@ -60,6 +60,101 @@ repeat the audit and update this record with measured evidence.
 - Work stops at a draft PR for human review. Do not merge unless the product owner
   explicitly instructs it to merge after review.
 
+## Project board status transitions
+
+`AGENTS.md` defines *which* transitions agents own — `Ready` → `In Progress`
+when substantive work starts, and `In Progress` → `Review` when implementation
+is finished and the final self-review pass begins. This section is the
+mechanical procedure for performing them.
+
+The reference values below were read back from the live board on 2026-09-16.
+Run the discovery commands anyway rather than trusting a document that a rename
+can outdate. A wrong name is at least safe: `gh` rejects an unknown field or
+option, changes nothing, and prints the valid ones, for example
+`option "Nonexistent Status" not found on field "Status"; available options:
+Backlog, Ready, In Progress, Review, Preview / Playtest, Done`.
+
+### Read-only discovery and auth check
+
+Project commands need a Projects scope that `repo` does **not** include. Check
+that first, because it is the most common failure:
+
+```bash
+gh auth status
+```
+
+`Token scopes` must contain `project` to change a status, or at least
+`read:project` for the read-only steps alone. Without it *every* Project
+command, read and write, fails with
+`INSUFFICIENT_SCOPES ... requires one of the following scopes: ['read:project']`.
+Granting it is an interactive, account-owner action; an agent cannot complete
+the browser flow and must ask Brandon to run:
+
+```bash
+gh auth refresh -s project
+```
+
+Confirm which project to touch, then the `Status` field and its exact options:
+
+```bash
+gh project list --owner BDubDesigns
+gh project field-list 5 --owner BDubDesigns --format json \
+  | jq '.fields[] | select(.name == "Status") | {name, type, options: [.options[].name]}'
+```
+
+RuneSpace is project number **5**, titled `Runespace`, owned by `BDubDesigns`
+(project 3, `QC Failed! Roadmap`, is a different board — do not edit it). `5` is
+the number verified on 2026-09-16, not a constant: if `gh project list` ever
+shows the RuneSpace board under a different number, use the number discovery
+reports and correct this document — never the stale one written here.
+
+`Status` is a single-select field whose options are, in board order: `Backlog`,
+`Ready`, `In Progress`, `Review`, `Preview / Playtest`, `Done`. Several contain
+spaces, so quote every value.
+
+Read the issue's current status before changing it. `item-list` defaults to 30
+items, so raise the limit or a present issue can look absent:
+
+```bash
+gh project item-list 5 --owner BDubDesigns --limit 100 --format json \
+  | jq -r '.items[] | select(.content.number == <issue>) | {status, url: .content.url}'
+```
+
+An empty result means the issue is not on the board. Report that and continue
+the issue; adding or triaging cards is the product owner's call.
+
+### Setting the status
+
+`gh` 2.100.0 selects the project by number, the item by issue URL, and both the
+field and the option by **name**. The project number and owner are deliberately
+concrete, because they are stable and verified; what this avoids is the brittle
+part — no opaque Project, field, item, or option node ID (`PVT_…`, `PVTSSF_…`,
+`PVTI_…`) appears anywhere. Substitute the issue number for `<issue>`:
+
+```bash
+gh project item-edit 5 --owner BDubDesigns \
+  --url https://github.com/BDubDesigns/RuneSpace/issues/<issue> \
+  --field Status --value "In Progress"
+```
+
+Use `--value "Review"` for the second transition. Note that `--url` is the issue
+URL, not a project URL. The command prints nothing on success, so confirm with
+the `item-list` query above instead of assuming it worked.
+
+Only fall back to `--id`/`--field-id`/`--single-select-option-id` if a CLI too
+old for name-based selection is the only option. Those opaque node IDs are the
+brittle values worth avoiding: they are board-specific, unreadable at a glance,
+and go stale silently. Discover them in the same session rather than recording
+them here.
+
+### What agents must not do
+
+Do not set `Preview / Playtest` or `Done` by hand. Linking the Draft PR with
+`closes #<issue>` lets the existing `Pull request linked to issue` Project
+workflow move the issue to `Preview / Playtest`, and merge/close automation owns
+`Done`. Do not edit the Project's workflow configuration, fields, or options as
+part of an issue.
+
 ## Validate locally and choose the confidence level
 
 ### Managed RuneSpace hosts
@@ -433,6 +528,8 @@ remote full gate rerun; do not repeat the complete local suite blindly after
 every small fix.
 
 ## Self-review the diff
+This pass is the `Review` phase on the Project board: move the issue there
+before starting it, and finish it before the draft PR exists.
 Before opening or updating the draft PR, inspect the final diff for scope,
 duplication, premature abstraction, unjustified dependencies, accidental game
 logic in UI, broken documentation links, and unsupported claims about repository
