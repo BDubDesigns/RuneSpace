@@ -103,7 +103,11 @@ gh project field-list 5 --owner BDubDesigns --format json \
 ```
 
 RuneSpace is project number **5**, titled `Runespace`, owned by `BDubDesigns`
-(project 3, `QC Failed! Roadmap`, is a different board — do not edit it).
+(project 3, `QC Failed! Roadmap`, is a different board — do not edit it). `5` is
+the number verified on 2026-09-16, not a constant: if `gh project list` ever
+shows the RuneSpace board under a different number, use the number discovery
+reports and correct this document — never the stale one written here.
+
 `Status` is a single-select field whose options are, in board order: `Backlog`,
 `Ready`, `In Progress`, `Review`, `Preview / Playtest`, `Done`. Several contain
 spaces, so quote every value.
@@ -122,8 +126,10 @@ the issue; adding or triaging cards is the product owner's call.
 ### Setting the status
 
 `gh` 2.100.0 selects the project by number, the item by issue URL, and both the
-field and the option by **name**, so no project, field, item, or option ID needs
-to be hard-coded:
+field and the option by **name**. The project number and owner are deliberately
+concrete, because they are stable and verified; what this avoids is the brittle
+part — no opaque Project, field, item, or option node ID (`PVT_…`, `PVTSSF_…`,
+`PVTI_…`) appears anywhere. Substitute the issue number for `<issue>`:
 
 ```bash
 gh project item-edit 5 --owner BDubDesigns \
@@ -136,9 +142,10 @@ URL, not a project URL. The command prints nothing on success, so confirm with
 the `item-list` query above instead of assuming it worked.
 
 Only fall back to `--id`/`--field-id`/`--single-select-option-id` if a CLI too
-old for name-based selection is the only option; those IDs are board-specific
-and go stale silently, so discover them in the same session rather than copying
-them out of this document.
+old for name-based selection is the only option. Those opaque node IDs are the
+brittle values worth avoiding: they are board-specific, unreadable at a glance,
+and go stale silently. Discover them in the same session rather than recording
+them here.
 
 ### What agents must not do
 
