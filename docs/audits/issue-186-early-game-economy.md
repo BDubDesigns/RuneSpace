@@ -138,32 +138,41 @@ A full load is always worth **160 Credits** (80 × 2). What differs is the loop
 time. Bix is two walking legs from The Jag (The Jag → The Long Scramble → Holo
 Hollow); entering his Local Place costs no time.
 
-| Mining level | Walk both ways (Cr/h) | Walk + Scavenge (Cr/h) | Ride out, walk back (Cr/h) | Ride + Scavenge (Cr/h) |
+| Mining level | Walk, no claim (Cr/h) | Walk + Scavenge (Cr/h) | Ride out, walk back (Cr/h) | Best route |
 | --- | --- | --- | --- | --- |
-| 1 | 567 | 598 | 570 | 586 |
-| 3 | 632 | 667 | 638 | 656 |
-| 5 | 696 | 734 | 705 | 725 |
-| 10 | 849 | 895 | 869 | 893 |
-| 15 | 993 | 1,047 | 1,025 | 1,054 |
-| 20 | 1,129 | 1,190 | 1,176 | 1,210 |
-| 25 | 1,258 | 1,327 | 1,322 | 1,360 |
-| 30 | 1,380 | 1,456 | 1,463 | 1,505 |
+| 1 | 567 | 597 | 570 | walk + claim |
+| 3 | 632 | 665 | 638 | walk + claim |
+| 5 | 696 | 731 | 705 | walk + claim |
+| 10 | 849 | 889 | 869 | walk + claim |
+| 15 | 993 | 1,037 | 1,025 | walk + claim |
+| 20 | 1,129 | 1,177 | 1,176 | walk + claim |
+| 25 | 1,258 | 1,309 | 1,322 | **ride** |
+| 30 | 1,380 | 1,433 | 1,463 | **ride** |
 
 Routes modelled honestly against their unlock state:
 
 - **Walk both ways** is the only route available until `Out of the Weather` —
-  an **optional** Mission — is complete. Two legs each way, 96 s of travel per
-  loop, two Scavenge opportunities.
+  an **optional** Mission — is complete. Two legs each way, 96 s of travel.
 - **Ride out, walk back** is the correct shape of the one-way Crew Hauler: the
   authored route runs Holo Hollow → The Jag, so it is the *outbound* leg of a
   sell loop and the *return to the merchant* is always the walk. Travel falls to
-  60 s and costs 5 Credits, and the ride leg offers **no Scavenge**.
+  60 s and costs 5 Credits.
 
-**The Crew Hauler is close to economically neutral.** It saves 36 s and costs 5
-Credits plus one forgone Scavenge opportunity worth ~4.38 Credits in expectation
-— roughly 9.4 Credits of value for 36 seconds. That only pays at high Mining
-level: at Mining 1 the ride is worth +3 Cr/h, at Mining 30 it is worth +83 Cr/h.
-Including Scavenge, riding is **worse** than walking below about Mining 15.
+**Scavenge is outbound-only on a mining loop, and that decides the Hauler.** The
+walk *to* The Jag is made with an empty inventory, so a claim is possible; the
+walk *back* carries a full 80-Shale load in 8 of 8 slots, and `claimScavenge`
+refuses it for capacity (§6.2). So the walking loop gets up to two opportunities,
+both outbound — and the ride replaces **exactly those legs**. Riding forfeits
+every Scavenge opportunity the loop had. That, not the 5-Credit fare, is the real
+price of the ticket.
+
+**The Crew Hauler does not pay until about Mining 20.** It saves 36 s, which is
+worth more the faster you mine, against a fixed 5 Credits plus the forgone
+outbound claims. Against a player who actually claims Scavenge, the ride is
+behind at every level up to and including Mining 20 (1,176 vs 1,177 — a dead
+heat) and only pulls clear from Mining 25. Against a player who never claims, the
+ride is marginally ahead throughout, which makes the Hauler most attractive to
+exactly the player getting least out of walking.
 
 > Note: `game/domain/travel.ts:53-57` describes the route with a bidirectional
 > arrow (`<->`) in prose. The route table authors exactly one direction and
@@ -248,27 +257,34 @@ One charge is spent per **boosted attempt, success or failure**, so one Cell buy
 exactly 10 boosted attempts. The boost halves attempt duration (6.0 s → 3.0 s)
 and changes **nothing** about success chance, yield, or XP.
 
-One Cell therefore saves a flat **30 seconds** of mining. Its worth is entirely a
-function of what 30 seconds of mining is worth at that level.
+One Cell therefore saves a flat **30 seconds**. What those 30 seconds are *worth*
+is the whole question, and it is easy to get wrong.
 
-| Mining level | Shale those 30 s yield | Credits created | vs selling the Cell (3 Cr) | vs buying one (8 Cr) |
-| --- | --- | --- | --- | --- |
-| 1 | 2.62 | 5.25 | +2.25 | −2.75 |
-| 5 | 3.30 | 6.59 | +3.59 | −1.41 |
-| 10 | 4.14 | 8.28 | +5.28 | **+0.28** |
-| 15 | 4.98 | 9.96 | +6.96 | +1.96 |
-| 20 | 5.82 | 11.64 | +8.64 | +3.64 |
-| 30 | 7.50 | 15.00 | +12.00 | +7.00 |
+**A Cell does not buy more Shale.** The load is capacity-capped at 80 either way
+(§3). It buys time — the loop finishes sooner and the next one starts sooner. So
+the saved seconds must be valued at the rate of the **whole loop**, including the
+fixed travel and sale overhead the Cell does not shorten. Valuing them at the
+Mining-face rate, as though they produced extra Shale, overstates the Cell.
+
+| Mining level | Mining-time value (overstated) | Raw-sell loop value | Refine loop value | vs selling (3 Cr) | vs buying (8 Cr), raw loop | vs buying (8 Cr), refine loop |
+| --- | --- | --- | --- | --- | --- | --- |
+| 1 | 5.25 | 4.72 | 6.54 | +1.72 | −3.28 | −1.46 |
+| 5 | 6.59 | 5.80 | 7.63 | +2.80 | −2.20 | −0.37 |
+| 10 | 8.28 | 7.08 | 8.81 | +4.08 | −0.92 | **+0.81** |
+| 15 | 9.96 | 8.28 | 9.79 | +5.28 | **+0.28** | +1.79 |
+| 20 | 11.64 | 9.41 | 10.64 | +6.41 | +1.41 | +2.64 |
+| 30 | 15.00 | 11.50 | 12.03 | +8.50 | +3.50 | +4.03 |
 
 Three separate decisions, with three different answers:
 
 - **Use a claimed Cell rather than sell it: always correct.** Even at Mining 1
-  the Cell creates 5.25 Credits of Shale against a 3-Credit buyback.
-- **Buy an extra Cell at 8 Credits: only from about Mining 10.** Below that it is
-  a net loss. This is a genuinely interesting decision rather than a trap, and it
-  gets stronger as the player levels.
+  the Cell is worth 4.72 Credits of loop time against a 3-Credit buyback.
+- **Buy an extra Cell at 8 Credits: loop-dependent.** On the raw-sell loop it
+  turns positive at about **Mining 14**; on the refine loop, where a second is
+  worth more, at about **Mining 9**. There is no single level threshold, and the
+  earlier figure of "about Mining 10" came from the overstated Mining-face basis.
 - **Sell a Cell: never optimal for a mining character.** The 3-Credit buyback is
-  below the Cell's use value at every level.
+  below the Cell's use value on either loop at every level.
 
 **Free supply, kept separate from repeatable income.** The DeWhat? Emergency
 Power Annex issues **5 Cells per character per Pacific calendar day**, free, one
@@ -294,16 +310,31 @@ Expected value of one claimed opportunity, at Bix's buyback:
 | Nothing (4 outcomes at 7.5% each) | — | — |
 | **Total** | | **4.38** |
 
-This is **economically meaningful, not noise**. At 4.38 Credits per leg, a
-four-leg raw-sell round trip yields ~17.5 Credits of Scavenge against 160
-Credits of Shale — about 11% of gross income, and it is the reason the Crew
-Hauler is close to neutral. Valued at Power Cell *replacement* cost (8 Cr)
-rather than buyback, the figure rises to 5.25 Credits per leg.
+**4.38 is the loot-table value, not the loop value.** Two shipped rules pull it
+down, and both have to be modelled rather than added around:
 
-Scavenge is the only early-game source of Refined Ferrite that does not require
-Refining, and at 2.50 Credits per leg it is the largest single contributor to
-that total. Claiming requires attention inside a 3-second window, so the realised
-rate for an inattentive player is lower — treat 4.38 as a ceiling.
+**A loaded leg cannot claim at all.** `claimScavenge` refuses with
+`capacity_blocked` unless *every* possible award branch still fits
+(`planPossibleAwardAdditions` over `scavengePossibleAwardSpecs`,
+`server/play.ts:1691-1711`). A full 80-Shale load occupies 8 of 8 slots with no
+partial stack, so the return walk to Bix is refused outright. On a mining loop
+Scavenge exists only on the **outbound** legs, made empty.
+
+**A non-Shale award costs a slot for the rest of the run.** Refined Ferrite and
+Power Cells each need a stack of their own, and a slot is worth a full 10-Shale
+stack — 20 Credits. So claiming 1 Refined Ferrite nets 10 Credits and costs 20;
+claiming a Power Cell nets 3 and costs 20. Scavenged *Shale* is the opposite: it
+lands in a stack Mining would have filled anyway, so it is pure saved mining time
+at no slot cost.
+
+Netting both effects across the two outbound legs, Scavenge is still worth
+claiming — it adds roughly **30-50 Cr/h** depending on Mining level (§4) — but
+that is well under the ~17.5 Credits per loop a flat 4.38/leg would imply, and it
+changes the Crew Hauler's break-even from about Mining 15 to about Mining 20.
+
+Scavenge remains the only early-game source of Refined Ferrite that does not
+require Refining. Claiming needs attention inside a 3-second window, so the
+modelled figures assume a perfect claim rate and are a **ceiling**.
 
 ## 7. One-time progression economy and material opportunity cost
 
@@ -359,9 +390,12 @@ entire Mission chain ever grants.
 
 The Cargo Hold's 15 Refined Ferrite also has a hidden production cost. At
 Refining 1 a 60-Shale load — the largest that refines at all (§5.1) — yields
-about 12 Refined Ferrite, so the mandatory first repair takes **at least two full
-mine-and-refine trips**, roughly 75 Shale, before it can even be started. That is
-the real gate on `Hold It Together`, not the welding.
+about 12 Refined Ferrite against the 15 required, so the mandatory first repair
+usually takes **two full mine-and-refine trips**, roughly 75 Shale, before it can
+even be started. Twelve is the mean, not a ceiling — a lucky 60-Shale load can
+clear 15 in one trip (roughly a 1-in-8 chance at Refining 1) — so treat two trips
+as the expected case rather than a floor. Either way the material, not the
+welding, is the real gate on `Hold It Together`.
 
 ## 8. Practice Welding and the real cost of Welding 5
 
@@ -453,7 +487,7 @@ Nothing below assumes a character has completed anything they have not.
 | **Keep the Change** | same | +3 Power Cells consumed | +24 Cr on accept, exactly the cost of buying the Cells |
 | **Out of the Weather** *(optional)* | same, plus ride-out option | +5 Cr per ride | Costs 200 Cr of Refined Ferrite; the Hauler is near-neutral below Mining 15 |
 | **10,000 Hours accepted** | same | +Scrap at 2 Cr | Wade's yard opens; Practice Welding begins; 6 free Scrap |
-| **10,000 Hours complete → Welding 5** | **849-1,477 Cr/h** typical at Mining 10 / Refining 5-10 | Practice Welding at 2 Cr/weld net | +50 Cr. Work Orders terminal revealed but empty until Welding 5. 28 Cr and 7 min of Practice remain |
+| **10,000 Hours complete → Welding 5** | **847-1,057 Cr/h** typical at Mining 10 / Refining 5-10 | Practice Welding at 2 Cr/weld net | +50 Cr. Work Orders terminal revealed but empty until Welding 5. 28 Cr and 7 min of Practice remain |
 
 By the time Work Orders become relevant, a character is earning roughly
 **850-1,200 Credits/hour** and has spent essentially all of it on repair
@@ -520,27 +554,41 @@ selling it? Above the floor, the answer is always yes.
 
 ### 10.2 Full-cycle scenarios — "is the Work Order loop worth running?"
 
-The honest denominator includes producing `M` Refined Ferrite. Measured at
-Mining 10 / Refining 10, one refine loop takes 731 s and yields 20.5 Refined
-Ferrite: **35.6 s per unit**.
+The honest denominator includes producing `M` Refined Ferrite **and travelling to
+the bench**. Measured at Mining 10 / Refining 10, one refine loop takes 731 s and
+yields 20.5 Refined Ferrite: **35.6 s per unit**.
 
-| M | S | P | Time to produce M | Full cycle | **Work Order Cr/h** | Selling that Ferrite instead |
-| --- | --- | --- | --- | --- | --- | --- |
-| 4 | 6 | 50 (+25%) | 143 s | 161 s | 1,121 | 1,010 |
-| 4 | 10 | 50 (+25%) | 143 s | 173 s | 1,043 | 1,010 |
-| 4 | 16 | 50 (+25%) | 143 s | 191 s | **945** | 1,010 |
-| 4 | 16 | 60 (+50%) | 143 s | 191 s | 1,134 | 1,010 |
-| 6 | 10 | 75 (+25%) | 214 s | 244 s | 1,107 | 1,010 |
-| 6 | 16 | 75 (+25%) | 214 s | 262 s | **1,031** | 1,010 |
-| 6 | 16 | 90 (+50%) | 214 s | 262 s | 1,237 | 1,010 |
-| 10 | 10 | 125 (+25%) | 356 s | 386 s | 1,165 | 1,010 |
-| 10 | 16 | 125 (+25%) | 356 s | 404 s | 1,113 | 1,010 |
-| 10 | 16 | 200 (+100%) | 356 s | 404 s | 1,780 | 1,010 |
+Rusk Recovery is one walking leg off Holo Hollow, where the refine loop already
+stops to sell, so a Work Order adds a **48 s round-trip detour** — a cost selling
+the material would not have incurred. Whether one job or several carry that
+detour is a real product choice, so both are shown:
 
-**A 25% labor premium is not automatically a raise.** At `S = 16`, `M = 4` it
-returns 945 Cr/h against 1,010 Cr/h for simply selling the Ferrite — the player
-is paid *less* for doing more work. The premium has to clear the section time it
-buys, and longer jobs need a larger premium to stay attractive at the same `M`.
+| M | S | P | Premium | Produce M | Cr/h (1 job/trip) | Cr/h (3 jobs/trip) | Selling that Ferrite instead |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| 4 | 10 | 50 | +25% | 142 s | **817** | **956** | 1,012 |
+| 4 | 10 | 60 | +50% | 142 s | 981 | 1,147 | 1,012 |
+| 4 | 10 | 80 | +100% | 142 s | 1,308 | 1,530 | 1,012 |
+| 4 | 16 | 50 | +25% | 142 s | **755** | **873** | 1,012 |
+| 4 | 16 | 60 | +50% | 142 s | **907** | 1,047 | 1,012 |
+| 6 | 10 | 75 | +25% | 213 s | **927** | 1,041 | 1,012 |
+| 6 | 16 | 75 | +25% | 213 s | **873** | **973** | 1,012 |
+| 6 | 16 | 90 | +50% | 213 s | 1,047 | 1,168 | 1,012 |
+| 10 | 10 | 125 | +25% | 356 s | 1,038 | 1,120 | 1,012 |
+| 10 | 16 | 125 | +25% | 356 s | **996** | 1,072 | 1,012 |
+| 10 | 16 | 200 | +100% | 356 s | 1,594 | 1,716 | 1,012 |
+
+**A 25% labor premium is a pay cut in most shapes.** Once the bench trip is
+charged, *every* 25% scenario run standalone trails the 1,012 Cr/h of simply
+selling the material, and several still trail when batched three to a trip. The
+player does strictly more work — mine, refine, walk to the yard, weld sixteen
+sections — to earn less than a merchant sale. Only at `M = 10` does a 25%
+premium approach parity, and only because the premium scales with `M` while the
+travel and welding do not.
+
+**Batching matters as much as the premium.** Spreading one trip over three jobs
+is worth roughly +100 to +180 Cr/h — comparable to a 25-point swing in the
+premium itself. If Work Orders are meant to be picked up one at a time, they need
+a larger premium than if players are expected to stockpile and clear several.
 
 Two structural properties fall out of the arithmetic:
 
@@ -558,15 +606,19 @@ Two structural properties fall out of the arithmetic:
 | Repeatable loop | Credits/hour |
 | --- | --- |
 | Mining 10, raw sell, walk both ways | 849 |
+| Mining 10, raw sell, claiming Scavenge outbound | 889 |
 | Mining 30, raw sell, walk both ways | 1,380 |
-| Mining 10 + Refining 10, sell refined | 1,057 |
+| Mining 10 + Refining 10, sell refined | 1,059 |
 | Mining 30 + Refining 20, sell refined | 2,017 |
 | Practice Welding | −240 (pure cost; earns no Credits) |
 
-A Work Order that should feel like *better* work than mining needs a full-cycle
-rate above ~1,050 Cr/h at the Mining 10 / Refining 10 profile; one that should
+A Work Order that should feel like *better* work than the loop that produced its
+material needs a full-cycle rate above **~1,012 Cr/h** at the Mining 10 /
+Refining 10 profile — the rate of simply selling that Ferrite. One that should
 feel like *specialist* work comparable to a well-levelled refiner needs to
-approach ~2,000 Cr/h. **This audit deliberately does not choose between those.**
+approach ~2,000 Cr/h. On the corrected numbers a +25% premium clears neither at
+most sizes, and a +50% premium clears the first only when batched or when `M` is
+large. **This audit deliberately does not choose the target.**
 
 ## 11. Assumptions and modelling choices
 
@@ -584,21 +636,26 @@ challenged:
    stores rather than buys and the return trip to Bix remains.
 3. **Travel is modelled as shortest-path walking** over the authored adjacency,
    with no stops. Local Place entry is free.
-4. **Scavenge is modelled at full claim rate.** Every opportunity claimed inside
-   its 3-second window. A realistic player claims fewer; treat 4.38 Cr/leg as a
-   ceiling.
+4. **Scavenge is modelled at full claim rate**, on outbound legs only, with the
+   slot cost of each award carried for the rest of the run. Every opportunity is
+   assumed claimed inside its 3-second window, so the figures are a **ceiling**.
+   The enumeration covers both outbound legs exactly rather than sampling.
 5. **Scavenge output is valued at Bix's buyback**, including Power Cells at 3
    rather than their 8-Credit replacement cost. This understates Scavenge for a
    mining character.
-6. **Credits/hour figures are continuous-play rates** with no idle time,
+6. **The Work Order bench trip is charged as a 48 s detour** off the Holo Hollow
+   stop the refine loop already makes, not as a fresh journey from The Jag. The
+   batched column assumes a stockpile cleared three jobs to a trip; neither is a
+   claim about how players will actually behave.
+7. **Credits/hour figures are continuous-play rates** with no idle time,
    inventory management, or UI interaction. They compare loops against each
    other; they are not a prediction of what a session earns.
-7. **Mining and Refining levels are varied independently.** In play they
+8. **Mining and Refining levels are varied independently.** In play they
    correlate, since refining consumes what mining produces.
-8. **Mission XP literals** (100/100/100/250 and the 24/50 Credit grants) are read
+9. **Mission XP literals** (100/100/100/250 and the 24/50 Credit grants) are read
    from `game/content/missions.ts` and cited, not re-derived; they are content,
    not balance config.
-9. **Work Order scenarios are illustrative grid points**, not authored
+10. **Work Order scenarios are illustrative grid points**, not authored
    candidates. `M ∈ {4, 6, 10}`, `S ∈ {6, 10, 16}` and premiums of 25/50/100%
    were chosen to span the plausible low-level space, nothing more.
 
@@ -617,9 +674,12 @@ implemented, and no balance value was changed by this audit.
 2. **Refining at low Refining level is a time loss, not a gain** (§5.3).
    Value-positive per attempt but Credits/hour-negative until roughly Refining 5.
    `Waste Not` teaches the loop at exactly the level where it is worst.
-3. **The Crew Hauler is near-neutral and can be negative** (§4). Fare plus the
-   forgone Scavenge opportunity roughly equals the time saved below about Mining
-   15. If it is meant to feel like a convenience upgrade, it currently is not one.
+3. **The Crew Hauler does not pay until about Mining 20** (§4). The ride replaces
+   exactly the outbound legs that Scavenge can be claimed on, so its real cost is
+   the fare *plus* every forgone opportunity. Against a claiming player it is
+   behind through Mining 20 and only clears from Mining 25. It is most attractive
+   to the player who never claims — i.e. least useful to the engaged one. If it is
+   meant to read as a convenience upgrade, it currently does not.
 4. **The authored Credit faucet is 84 Credits against 356 Credits of mandatory
    and optional repair material** (§7). The early economy is materials-denominated;
    Credits are almost vestigial until Wade's Scrap arrives.
@@ -641,17 +701,22 @@ implemented, and no balance value was changed by this audit.
 
 ### Questions for the product owner
 
-1. Should a low-level Work Order **beat, match, or trail** the refine-and-sell
-   loop on full-cycle Credits/hour? §10.2 shows a 25% premium can land *below*
-   it; the answer determines whether the premium should be a percentage of `10M`
-   or a per-section labor rate.
-2. Should the labor premium **scale with `S`**? A flat percentage of material
-   value pays nothing extra for a longer weld, so longer jobs are strictly worse
-   at equal `M`.
-3. Is the **Refined Ferrite quantity** meant to be a meaningful stockpiling
+1. Should a low-level Work Order **beat, match, or trail** simply selling the
+   material it consumes? On the corrected numbers this is no longer a close
+   call at the obvious premium: with the bench trip charged, **every +25%
+   scenario trails the 1,012 Cr/h of selling the Ferrite** when run standalone
+   (§10.2). A settled answer here sets the premium floor for the whole pool.
+2. Should the premium be a **percentage of `10M`, or a per-section labor rate**?
+   A flat percentage pays nothing extra for a longer weld, so at equal `M` a
+   16-section job is strictly worse than a 10-section one — the opposite of what
+   "long" ought to mean on the board.
+3. Are Work Orders meant to be taken **one at a time or stockpiled**? Batching
+   three jobs to one bench trip is worth +100 to +180 Cr/h, comparable to a
+   25-point premium swing. The intended play pattern changes the right payout.
+4. Is the **Refined Ferrite quantity** meant to be a meaningful stockpiling
    decision? At 35.6 s per unit, `M = 10` is about 6 minutes of production —
    substantial; `M = 4` is about 2.5 minutes.
-4. Should Clean Pass's 20% time saving be part of the payout calculus at all, or
+5. Should Clean Pass's time saving be part of the payout calculus at all, or
    treated as a skill bonus the balance ignores?
 
 ### Explicitly not done

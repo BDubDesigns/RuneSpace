@@ -131,8 +131,13 @@ const walkSeconds = (from, to) => walkingLegs(from, to) * walkLegSeconds;
 const HAULER = TRANSPORT_ROUTES[0];
 const haulerSeconds = seconds(balance.travel.crewHaulerDurationTicks);
 
-/** Expected Credits from one claimed Scavenge opportunity, valued at Bix's buyback. */
-function scavengeExpectedCredits() {
+/**
+ * Expected Credits from one claimed Scavenge opportunity, ignoring what holding
+ * the award costs. This is the raw loot-table value and NOT a loop figure — the
+ * loop model below is the one to quote, because a claim competes for the same
+ * slots the Shale load needs.
+ */
+function scavengeLootTableCredits() {
   const value = {
     [ITEM_IDS.ferriteShale]: PRICES.shale,
     [ITEM_IDS.refinedFerrite]: PRICES.refinedFerrite,
@@ -143,6 +148,61 @@ function scavengeExpectedCredits() {
     const probability = outcome.weightBps / SCAVENGE_TOTAL_WEIGHT_BPS;
     return total + probability * outcome.quantity * (value[outcome.itemId] ?? 0);
   }, 0);
+}
+
+/**
+ * How many legs of a sell loop can actually produce a Scavenge claim.
+ *
+ * `claimScavenge` refuses unless EVERY possible award branch still fits
+ * (`planPossibleAwardAdditions` over `scavengePossibleAwardSpecs`). A loaded
+ * return walk has no free slot and no partial Shale stack, so it is refused
+ * outright — which makes Scavenge an OUTBOUND-only phenomenon on a mining loop,
+ * and means a ride replaces exactly the legs that could have produced one.
+ */
+const OUTBOUND_LEGS = walkingLegs(LOCATION_IDS.holoHollow, LOCATION_IDS.theJag);
+
+/**
+ * Every outcome combination across the outbound legs, with its probability.
+ *
+ * What a flat per-leg figure misses: a non-Shale award occupies a slot for the
+ * rest of the run, and a slot is worth a whole Shale stack. Scavenged Shale
+ * instead lands in a stack Mining would have filled anyway, so it is pure saved
+ * Mining time. The two pull in opposite directions and have to be modelled apart.
+ */
+function scavengeOutboundCases() {
+  const outcomes = SCAVENGE_OUTCOMES.map((outcome) => ({
+    itemId: outcome.itemId ?? null,
+    quantity: outcome.quantity,
+    probability: outcome.weightBps / SCAVENGE_TOTAL_WEIGHT_BPS,
+  }));
+  let cases = [{ probability: 1, shale: 0, refinedFerrite: 0, powerCells: 0 }];
+  for (let leg = 0; leg < OUTBOUND_LEGS; leg += 1) {
+    const next = [];
+    for (const current of cases) {
+      for (const outcome of outcomes) {
+        next.push({
+          probability: current.probability * outcome.probability,
+          shale: current.shale + (outcome.itemId === ITEM_IDS.ferriteShale ? outcome.quantity : 0),
+          refinedFerrite:
+            current.refinedFerrite +
+            (outcome.itemId === ITEM_IDS.refinedFerrite ? outcome.quantity : 0),
+          powerCells:
+            current.powerCells + (outcome.itemId === ITEM_IDS.powerCell ? outcome.quantity : 0),
+        });
+      }
+    }
+    cases = next;
+  }
+  return cases;
+}
+
+/**
+ * Slots a Scavenge haul occupies for the rest of the run. Refined Ferrite and
+ * Power Cells each need a stack of their own; at these quantities one each is
+ * enough. Scavenged Shale shares the Mining stacks and costs nothing extra.
+ */
+function scavengeSlotCost(haul) {
+  return (haul.refinedFerrite > 0 ? 1 : 0) + (haul.powerCells > 0 ? 1 : 0);
 }
 
 // ---------------------------------------------------------------------------
@@ -362,8 +422,9 @@ out(
 );
 out();
 out(
-  `Expected Scavenge value per claimed walking leg: ${round(scavengeExpectedCredits())} Credits ` +
-    `(walking only; a ride offers none).`,
+  `Raw Scavenge loot-table value per claimed walking leg: ${round(scavengeLootTableCredits())} ` +
+    `Credits. This is NOT the loop value — see the raw-sell loop below, where holding an award ` +
+    `costs slots the Shale load needs. Walking only; a ride offers none.`,
 );
 out();
 
@@ -386,72 +447,78 @@ table(
 out("## Raw-Shale selling loop, by route");
 out();
 const jagToHollow = walkSeconds(LOCATION_IDS.theJag, LOCATION_IDS.holoHollow);
-const rawLoopRows = miningRuns.map((run) => {
-  const gross = run.shale * PRICES.shale;
-  const walkBoth = run.seconds + jagToHollow * 2;
-  // The authored ride runs Holo Hollow → The Jag, so it is the outbound leg of a
-  // sell loop; the return to the merchant is always the walk.
-  const haulerLoop = run.seconds + jagToHollow + haulerSeconds;
-  const scavengePerLeg = scavengeExpectedCredits();
-  return [
-    run.miningLevel,
-    perHour(gross, walkBoth),
-    perHour(gross + scavengePerLeg * 2, walkBoth),
-    perHour(gross - HAULER.fareCredits, haulerLoop),
-    perHour(gross - HAULER.fareCredits + scavengePerLeg, haulerLoop),
-  ];
-});
+
+// Mining runs are measured once per (level, slots) pair and reused, so the loop
+// models below stay cheap enough to enumerate every Scavenge combination.
+const miningRunCache = new Map();
+function miningRun(level, slotsForShale) {
+  const key = `${level}:${slotsForShale}`;
+  const cached = miningRunCache.get(key);
+  if (cached) return cached;
+  const measured = measureMiningRun(level, { slotsForShale });
+  miningRunCache.set(key, measured);
+  return measured;
+}
+
+const NO_SCAVENGE = [{ probability: 1, shale: 0, refinedFerrite: 0, powerCells: 0 }];
+
+/**
+ * One raw-sell loop's expected Credits/hour.
+ *
+ * Mining time scales with the Shale actually mined: anything Scavenged lands in
+ * a stack Mining would have filled, so it is time not spent at the face. A ride
+ * offers no Scavenge at all and the loaded return walk is refused for capacity,
+ * so riding forfeits every opportunity the loop had.
+ */
+function rawSellLoop(level, { ride = false, scavenge = false } = {}) {
+  const outboundSeconds = ride ? haulerSeconds : jagToHollow;
+  const fare = ride ? HAULER.fareCredits : 0;
+  const cases = scavenge && !ride ? scavengeOutboundCases() : NO_SCAVENGE;
+
+  let creditsPerHour = 0;
+  for (const haul of cases) {
+    const run = miningRun(level, STARTER_SLOTS - scavengeSlotCost(haul));
+    const capacity = run.shale;
+    const carriedFromScavenge = Math.min(haul.shale, capacity);
+    const miningSeconds = (run.seconds / capacity) * (capacity - carriedFromScavenge);
+    const credits =
+      capacity * PRICES.shale +
+      haul.refinedFerrite * PRICES.refinedFerrite +
+      haul.powerCells * PRICES.powerCellSell -
+      fare;
+    const loopSeconds = miningSeconds + outboundSeconds + jagToHollow;
+    creditsPerHour += haul.probability * (credits / loopSeconds) * 3_600;
+  }
+  return round(creditsPerHour, 0);
+}
+
 table(
   [
     "Mining level",
-    "Walk both ways (Cr/h)",
+    "Walk, no claim (Cr/h)",
     "Walk + Scavenge (Cr/h)",
     "Ride out, walk back (Cr/h)",
-    "Ride + Scavenge (Cr/h)",
-  ],
-  rawLoopRows,
-);
-
-out("## Power Cell boost");
-out();
-const cellCharges = balance.items.salvageCutter.maximumCharge;
-table(
-  [
-    "Mining level",
-    "Seconds saved by one Cell",
-    "Shale that time yields",
-    "Credits created",
-    "vs sell (3 Cr)",
-    "vs buy (8 Cr)",
+    "Best route",
   ],
   MINING_LEVELS.map((level) => {
-    const normal = seconds(balance.mining.attemptDurationTicks);
-    const boosted = seconds(
-      Math.max(
-        1,
-        Math.ceil(
-          balance.mining.attemptDurationTicks / balance.mining.powerCellBoost.speedMultiplier,
-        ),
-      ),
-    );
-    const saved = (normal - boosted) * cellCharges;
-    const chance = miningSuccessChanceBps(level, balance) / 10_000;
-    const shalePerSecond =
-      (chance * (balance.mining.yieldMinimum + balance.mining.yieldMaximum)) / 2 / normal;
-    const credits = saved * shalePerSecond * PRICES.shale;
+    const walkPlain = rawSellLoop(level);
+    const walkClaim = rawSellLoop(level, { scavenge: true });
+    const rideLoop = rawSellLoop(level, { ride: true });
+    const best = Math.max(walkPlain, walkClaim, rideLoop);
     return [
       level,
-      round(saved, 1),
-      round(saved * shalePerSecond, 2),
-      round(credits),
-      round(credits - PRICES.powerCellSell),
-      round(credits - PRICES.powerCellBuy),
+      walkPlain,
+      walkClaim,
+      rideLoop,
+      best === rideLoop ? "ride" : best === walkClaim ? "walk + claim" : "walk",
     ];
   }),
 );
 out(
-  `One Power Cell fills the Cutter to ${cellCharges} charges; one charge is spent per boosted ` +
-    `attempt, success or failure. The Annex issues 5 free Cells per character per Pacific day.`,
+  `Scavenge is outbound-only here: the ${OUTBOUND_LEGS}-leg walk to The Jag is made empty, while ` +
+    `the loaded return is refused for capacity. Riding replaces exactly those legs, so it forfeits ` +
+    `every opportunity the loop had — the real cost of the fare, on top of the ` +
+    `${HAULER.fareCredits} Credits.`,
 );
 out();
 
@@ -557,6 +624,71 @@ table(
     ),
   ]),
 );
+
+/** The refine-and-sell loop's rate, reused wherever the value of a second is needed. */
+function refineSellLoopCreditsPerHour(miningLevel, refiningLevel) {
+  const mine = miningRun(miningLevel, REFINE_STACKS);
+  const refine = measureRefiningRun(refiningLevel, refineLoad, STARTER_SLOTS - REFINE_STACKS);
+  return perHour(refine.credits, refineLoopSeconds(mine, refine));
+}
+
+out("## Power Cell boost");
+out();
+const cellCharges = balance.items.salvageCutter.maximumCharge;
+const normalAttemptSeconds = seconds(balance.mining.attemptDurationTicks);
+const boostedAttemptSeconds = seconds(
+  Math.max(
+    1,
+    Math.ceil(balance.mining.attemptDurationTicks / balance.mining.powerCellBoost.speedMultiplier),
+  ),
+);
+const secondsSavedPerCell = (normalAttemptSeconds - boostedAttemptSeconds) * cellCharges;
+
+out(
+  "A Cell does not buy more Shale — the load is capacity-capped either way. It buys **time**, " +
+    `${secondsSavedPerCell} seconds of it, so it is worth whatever a second of that loop is worth. ` +
+    "Valuing the saved time at the Mining-face rate, as if those seconds produced extra Shale, " +
+    "overstates it: the loop also carries fixed travel and sale overhead the Cell does not shorten.",
+);
+out();
+table(
+  [
+    "Mining level",
+    "Mining-time value (Cr)",
+    "Raw-sell loop value (Cr)",
+    "Refine loop value (Cr)",
+    "vs sell (3 Cr), raw loop",
+    "vs buy (8 Cr), raw loop",
+    "vs buy (8 Cr), refine loop",
+  ],
+  MINING_LEVELS.map((level) => {
+    const chance = miningSuccessChanceBps(level, balance) / 10_000;
+    const shalePerSecond =
+      (chance * (balance.mining.yieldMinimum + balance.mining.yieldMaximum)) /
+      2 /
+      normalAttemptSeconds;
+    // The overstated basis, kept visible so the correction is auditable.
+    const miningTimeValue = secondsSavedPerCell * shalePerSecond * PRICES.shale;
+    const rawLoopValue = (rawSellLoop(level) / 3_600) * secondsSavedPerCell;
+    const refineLoopValue = (refineSellLoopCreditsPerHour(level, 10) / 3_600) * secondsSavedPerCell;
+    return [
+      level,
+      round(miningTimeValue),
+      round(rawLoopValue),
+      round(refineLoopValue),
+      round(rawLoopValue - PRICES.powerCellSell),
+      round(rawLoopValue - PRICES.powerCellBuy),
+      round(refineLoopValue - PRICES.powerCellBuy),
+    ];
+  }),
+);
+out(
+  `One Power Cell fills the Cutter to ${cellCharges} charges; one charge is spent per boosted ` +
+    `attempt, success or failure. The Annex issues 5 free Cells per character per Pacific day. ` +
+    "Break-even for **buying** a Cell is loop-dependent — read it from the column for the loop " +
+    "actually being run, not from a single level threshold.",
+);
+out();
 
 out("## Welding levels and Practice Welding");
 out();
@@ -743,35 +875,54 @@ out("### Full-cycle view: producing the material is the real cost");
 out();
 out(
   "The marginal rate above answers 'weld this Ferrite or sell it'. It is not the loop rate, " +
-    "because the player must first mine and refine M units. The production time below is measured " +
-    "from the refine loop at Mining 10 / Refining 10.",
+    "because the player must first mine and refine M units — and then stand at Rusk Recovery to " +
+    "weld them. Production time is measured from the refine loop at Mining 10 / Refining 10.",
 );
 out();
 const productionLoadMine = measureMiningRun(10, { slotsForShale: REFINE_STACKS });
 const productionRefine = measureRefiningRun(10, refineLoad, STARTER_SLOTS - REFINE_STACKS);
 const productionLoopSeconds = refineLoopSeconds(productionLoadMine, productionRefine);
 const secondsPerRefinedFerrite = productionLoopSeconds / productionRefine.refinedFerrite;
+
+// The refine loop already stops at Holo Hollow to sell. Rusk Recovery is a detour
+// off that stop, so the honest travel charge is the round-trip detour rather than
+// a fresh journey from The Jag.
+const ruskDetourSeconds = walkSeconds(LOCATION_IDS.holoHollow, LOCATION_IDS.ruskRecovery) * 2;
+// How many jobs one trip to the yard serves. A stockpiling player amortizes it.
+const BATCH_SIZES = [1, 3];
+
 out(
   `One refine loop takes ${round(productionLoopSeconds, 0)} s and yields ` +
     `${round(productionRefine.refinedFerrite, 1)} Refined Ferrite, i.e. ` +
     `${round(secondsPerRefinedFerrite, 1)} s per unit.`,
 );
+out(
+  `Rusk Recovery is ${walkingLegs(LOCATION_IDS.holoHollow, LOCATION_IDS.ruskRecovery)} walking ` +
+    `leg off Holo Hollow, where that loop already stops to sell, so a Work Order adds a ` +
+    `${ruskDetourSeconds} s round-trip detour. Standalone charges the whole detour to one job; ` +
+    `batched spreads it over ${BATCH_SIZES[BATCH_SIZES.length - 1]} jobs from one stockpile.`,
+);
 out();
 const fullCycleRows = [];
 for (const M of [4, 6, 10]) {
-  for (const S of [6, 10, 16]) {
+  for (const S of [10, 16]) {
     const floor = M * PRICES.refinedFerrite;
     for (const premium of [1.25, 1.5, 2]) {
       const P = Math.round(floor * premium);
-      const cycleSeconds = M * secondsPerRefinedFerrite + S * sectionSeconds;
+      const productionSeconds = M * secondsPerRefinedFerrite;
+      const weldSecondsForJob = S * sectionSeconds;
+      const rates = BATCH_SIZES.map((batch) =>
+        perHour(P, productionSeconds + weldSecondsForJob + ruskDetourSeconds / batch),
+      );
       fullCycleRows.push([
         M,
         S,
         P,
-        `${round(M * secondsPerRefinedFerrite, 0)} s`,
-        `${round(cycleSeconds, 0)} s`,
-        perHour(P, cycleSeconds),
-        perHour(floor, M * secondsPerRefinedFerrite),
+        `${round((premium - 1) * 100, 0)}%`,
+        `${round(productionSeconds, 0)} s`,
+        `${round(ruskDetourSeconds, 0)} s`,
+        ...rates,
+        perHour(floor, productionSeconds),
       ]);
     }
   }
@@ -781,13 +932,20 @@ table(
     "M",
     "S",
     "P",
-    "Time to produce M",
-    "Full cycle time",
-    "Work Order Cr/h (full cycle)",
+    "Premium",
+    "Produce M",
+    "Rusk detour",
+    ...BATCH_SIZES.map((batch) => `Cr/h (${batch} job${batch > 1 ? "s" : ""}/trip)`),
     "Selling that Ferrite instead (Cr/h)",
   ],
   fullCycleRows,
 );
+out(
+  "The 'selling instead' column charges no Rusk detour, because selling happens at Bix on a stop " +
+    "the loop already makes. That asymmetry is the point: a Work Order must clear both the " +
+    "material's sale value and the travel selling would not have cost.",
+);
+out();
 
 out("### Benchmarks the model is measured against");
 out();
