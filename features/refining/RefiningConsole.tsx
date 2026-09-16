@@ -242,8 +242,8 @@ export function RefiningConsole() {
       </p>
       <p className="!mt-2 text-xs uppercase tracking-wide text-[color:var(--rs-text-muted)]">
         {balance.refining.attemptDurationTicks} ticks /{" "}
-        {(balance.refining.attemptDurationTicks * GAME_TICK_MS) / 1000}s per attempt &middot; 2
-        Ferrite Shale &rarr; 1 output
+        {(balance.refining.attemptDurationTicks * GAME_TICK_MS) / 1000}s per attempt &middot;{" "}
+        {balance.refining.inputFerriteShale} Ferrite Shale &rarr; 1 output
       </p>
       {isActive ? (
         <div>
