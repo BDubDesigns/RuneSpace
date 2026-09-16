@@ -393,7 +393,8 @@ Refining 1 a 60-Shale load — the largest that refines at all (§5.1) — yield
 about 12 Refined Ferrite against the 15 required, so the mandatory first repair
 usually takes **two full mine-and-refine trips**, roughly 75 Shale, before it can
 even be started. Twelve is the mean, not a ceiling — a lucky 60-Shale load can
-clear 15 in one trip (roughly a 1-in-8 chance at Refining 1) — so treat two trips
+clear 15 in one trip (about 17.5% at Refining 1, roughly 1 in 6 — `P(X >= 15)`
+for `X ~ Binomial(30, 0.4)`) — so treat two trips
 as the expected case rather than a floor. Either way the material, not the
 welding, is the real gate on `Hold It Together`.
 
@@ -433,6 +434,18 @@ XP or changes materials — it only removes up to 2 sections' worth of elapsed
 time**, a maximum saving of 20% (6 s of 30 s). Abandoning a weld forfeits the
 Scrap and any open window, but keeps completed sections' XP and the partial
 progress.
+
+> **Settled: a Practice weld is worth 100 XP, not 120.** #191's balance note
+> implied a 120 XP ceiling — 100 plus 10 for each of two Clean Passes — and the
+> implementation flagged that the shipped mechanic cannot reach it, since a claim
+> advances a section rather than stacking XP on top of the weld's fixed total.
+> Two options were offered for making 120 real (additive Clean Pass in Practice
+> only, or additive everywhere) and #191 merged without either. **That merge is
+> the decision: it stays at 100**, confirmed by the product owner on #200. Clean
+> Pass buys time, not XP, and it behaves identically at the bench and on an
+> authored repair. Recorded here so the question is not re-opened by the same
+> arithmetic later; the canonical rule still lives in
+> `game/domain/clean-pass.ts` and `docs/gameplay-foundations.md`.
 
 ### 8.3 Cost to reach the Work Order requirement
 
@@ -485,7 +498,7 @@ Nothing below assumes a character has completed anything they have not.
 | **Start → Walk It Off** | none | none | 10 Credits, no Cutter, no merchant met |
 | **Cut Your Teeth → Hold It Together** | Mining + raw sell, **567-696 Cr/h** at Mining 1-5; Refining unlocked at Waste Not | Power Cells (8 Cr) | Walk both ways only. Scavenge available on every leg. Must fund 156 Cr of Cargo Hold material out of production |
 | **Keep the Change** | same | +3 Power Cells consumed | +24 Cr on accept, exactly the cost of buying the Cells |
-| **Out of the Weather** *(optional)* | same, plus ride-out option | +5 Cr per ride | Costs 200 Cr of Refined Ferrite; the Hauler is near-neutral below Mining 15 |
+| **Out of the Weather** *(optional)* | same, plus ride-out option | +5 Cr per ride | Costs 200 Cr of Refined Ferrite; against a claiming player the Hauler is behind through Mining 20 and only clears from Mining 25 (§4) |
 | **10,000 Hours accepted** | same | +Scrap at 2 Cr | Wade's yard opens; Practice Welding begins; 6 free Scrap |
 | **10,000 Hours complete → Welding 5** | **847-1,057 Cr/h** typical at Mining 10 / Refining 5-10 | Practice Welding at 2 Cr/weld net | +50 Cr. Work Orders terminal revealed but empty until Welding 5. 28 Cr and 7 min of Practice remain |
 
@@ -578,12 +591,21 @@ detour is a real product choice, so both are shown:
 | 10 | 16 | 200 | +100% | 356 s | 1,594 | 1,716 | 1,012 |
 
 **A 25% labor premium is a pay cut in most shapes.** Once the bench trip is
-charged, *every* 25% scenario run standalone trails the 1,012 Cr/h of simply
-selling the material, and several still trail when batched three to a trip. The
-player does strictly more work — mine, refine, walk to the yard, weld sixteen
-sections — to earn less than a merchant sale. Only at `M = 10` does a 25%
-premium approach parity, and only because the premium scales with `M` while the
-travel and welding do not.
+charged, **5 of the 6 illustrated +25% scenarios trail** the 1,012 Cr/h of simply
+selling the material when run standalone. The player does strictly more work —
+mine, refine, walk to the yard, weld — to earn less than a merchant sale. The one
+exception is `M = 10, S = 10`, which narrowly clears parity at 1,038 Cr/h, and it
+clears only because the premium scales with `M` while the travel and welding do
+not: the same `M = 10` at `S = 16` falls back under, at 996.
+
+**What 1,012 Cr/h is, and why it is not the 1,059 in §10.3.** The two measure
+different things on purpose. 1,059 is the whole refine-and-sell loop, including
+the Slag that Refining also produces. 1,012 isolates the **Refined Ferrite
+component only** — `10M` over the time to produce `M` — because Refined Ferrite
+is the only thing a Work Order consumes. The Slag is produced and sold the same
+either way, so it nets out of *this* comparison; it just means neither number is
+the player's total income. Quote 1,012 for "weld this Ferrite or sell it", and
+1,059 for "is the refine loop worth running at all".
 
 **Batching matters as much as the premium.** Spreading one trip over three jobs
 is worth roughly +100 to +180 Cr/h — comparable to a 25-point swing in the
@@ -702,10 +724,11 @@ implemented, and no balance value was changed by this audit.
 ### Questions for the product owner
 
 1. Should a low-level Work Order **beat, match, or trail** simply selling the
-   material it consumes? On the corrected numbers this is no longer a close
-   call at the obvious premium: with the bench trip charged, **every +25%
-   scenario trails the 1,012 Cr/h of selling the Ferrite** when run standalone
-   (§10.2). A settled answer here sets the premium floor for the whole pool.
+   material it consumes? On the corrected numbers a +25% premium is mostly not
+   enough: with the bench trip charged, **5 of the 6 illustrated +25% scenarios
+   trail** the 1,012 Cr/h of selling the Ferrite when run standalone, the
+   exception being `M = 10, S = 10` at 1,038 (§10.2). A settled answer here sets
+   the premium floor for the whole pool.
 2. Should the premium be a **percentage of `10M`, or a per-section labor rate**?
    A flat percentage pays nothing extra for a longer weld, so at equal `M` a
    16-section job is strictly worse than a 10-section one — the opposite of what
