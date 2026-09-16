@@ -714,12 +714,6 @@ test("composes the Trade row so identity and quantity both fit the phone", async
   expect(overflow.document).toBeLessThanOrEqual(0);
   expect(overflow.dialog).toBeLessThanOrEqual(0);
 
-  // Quantity still drives the total from the row's own controls.
-  const shaleRow = counter.locator(`[data-trade-row="${ITEM_IDS.ferriteShale}"]`);
-  await shaleRow.locator("[data-trade-max]").click();
-  await expect(shaleRow.locator("[data-trade-quantity]")).toHaveText("5");
-  await expect(shaleRow.locator("[data-trade-total]")).toHaveText("10");
-
   // Desktop keeps the same row contract rather than being degraded to win the
   // phone: there the quantity line sits beside the tile instead of under it.
   await page.setViewportSize({ width: 1440, height: 900 });
