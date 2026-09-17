@@ -97,27 +97,41 @@ function stateWith(
 }
 
 /**
- * Everything acceptance and Welding both have to prove about where the player
- * is and whether the board is theirs at all.
+ * Whether the board is the player's to TAKE FROM at all.
  *
  * `10,001 Hours` being ACCEPTED is the permanent authorization — not its
  * completion. Turning the Mission in is Wade looking at the work, and a player
  * whose objective already reads 1/1 keeps a fully usable board while he waits.
+ *
+ * Deliberately asked only by acceptance. A job already on the bench was already
+ * paid for out of the player's own pocket, so the job itself is the
+ * authorization to finish it — exactly as a repair the player started stays
+ * theirs to finish whatever happens to the Mission that opened it. Gating
+ * Start on the Mission instead would strand a paid customer job on the one
+ * bench with no way to finish it and no way to clear it.
  */
+async function workOrdersUnlocked(
+  transaction: DatabaseTransaction,
+  characterId: string,
+): Promise<WorkOrderRefusal | undefined> {
+  if (
+    await isMissionAccepted(transaction, characterId, RUSK_RECOVERY_CONTENT.workOrdersMissionId)
+  ) {
+    return undefined;
+  }
+  return {
+    status: "refused",
+    reason: "work_orders_locked",
+    message: "Talk to Wade Rusk about Work Orders before taking client work.",
+  };
+}
+
+/** Where the player has to be standing, for acceptance and for Welding alike. */
 async function workOrderAccess(
   transaction: DatabaseTransaction,
   characterId: string,
   action: { actionId: string } | undefined,
 ): Promise<WorkOrderRefusal | undefined> {
-  if (
-    !(await isMissionAccepted(transaction, characterId, RUSK_RECOVERY_CONTENT.workOrdersMissionId))
-  ) {
-    return {
-      status: "refused",
-      reason: "work_orders_locked",
-      message: "Talk to Wade Rusk about Work Orders before taking client work.",
-    };
-  }
   if (action?.actionId === ACTION_IDS.travel) {
     return {
       status: "refused",
@@ -194,6 +208,8 @@ export async function acceptWorkOrder(
         });
       }
 
+      const locked = await workOrdersUnlocked(transaction, context.character.id);
+      if (locked) return stateWith(transaction, context.character.id, now, locked);
       const access = await workOrderAccess(transaction, context.character.id, context.action);
       if (access) return stateWith(transaction, context.character.id, now, access);
 

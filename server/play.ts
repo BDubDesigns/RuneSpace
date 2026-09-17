@@ -834,8 +834,6 @@ async function projectWorkOrders(
     // there is no work when there is.
     missionAvailable: meetsWeldingLevel && !unlocked,
   };
-  if (!unlocked) return { ...base, postings: [] };
-
   await ensureWorkOrderBoard(transaction, {
     characterId: input.characterId,
     unlocked,
@@ -859,48 +857,54 @@ async function projectWorkOrders(
   const atTheYard = input.currentLocationId === RUSK_RECOVERY_CONTENT.locationId;
   const benchBusy = input.action !== undefined;
 
-  const postings = board.postings.flatMap((posting): WorkOrderPostingProjection[] => {
-    const definition = getWorkOrder(posting.workOrderId);
-    if (!definition) return [];
-    const materials = definition.materials.map((material) => ({
-      itemId: material.itemId,
-      itemName: resolveItemPresentation(material.itemId, material.itemId).displayName,
-      quantity: material.quantity,
-      carried: carried.get(material.itemId) ?? 0,
-    }));
-    const inProgress = posting.acceptedAt !== null;
-    // Ordered most-actionable-last so the reason shown is the one the player
-    // can actually do something about first.
-    const blockedReason = inProgress
-      ? undefined
-      : !atTheYard
-        ? ("not_here" as const)
-        : input.weldingLevel < definition.requiredWeldingLevel
-          ? ("welding_level" as const)
-          : board.active
-            ? ("work_order_active" as const)
-            : benchOccupancy.kind !== "clear" || benchBusy
-              ? ("workbench_occupied" as const)
-              : materials.some((material) => material.carried < material.quantity)
-                ? ("materials" as const)
-                : undefined;
-    return [
-      {
-        slotIndex: posting.slotIndex,
-        workOrderId: definition.id,
-        title: definition.title,
-        clientName: definition.clientName,
-        description: definition.description,
-        requiredWeldingLevel: definition.requiredWeldingLevel,
-        materials,
-        sections: definition.sections,
-        payoutCredits: definition.payoutCredits,
-        inProgress,
-        acceptable: !inProgress && blockedReason === undefined,
-        ...(blockedReason ? { blockedReason } : {}),
-      },
-    ];
-  });
+  // The BOARD is gated on the unlock; a job already on the bench is not. It was
+  // paid for out of the player's own pocket, so it stays visible and finishable
+  // however the Mission that opened the board ends up — otherwise an operator
+  // reset would strand a customer's job on the one bench forever (#207).
+  const postings = (unlocked ? board.postings : []).flatMap(
+    (posting): WorkOrderPostingProjection[] => {
+      const definition = getWorkOrder(posting.workOrderId);
+      if (!definition) return [];
+      const materials = definition.materials.map((material) => ({
+        itemId: material.itemId,
+        itemName: resolveItemPresentation(material.itemId, material.itemId).displayName,
+        quantity: material.quantity,
+        carried: carried.get(material.itemId) ?? 0,
+      }));
+      const inProgress = posting.acceptedAt !== null;
+      // Ordered most-actionable-last so the reason shown is the one the player
+      // can actually do something about first.
+      const blockedReason = inProgress
+        ? undefined
+        : !atTheYard
+          ? ("not_here" as const)
+          : input.weldingLevel < definition.requiredWeldingLevel
+            ? ("welding_level" as const)
+            : board.active
+              ? ("work_order_active" as const)
+              : benchOccupancy.kind !== "clear" || benchBusy
+                ? ("workbench_occupied" as const)
+                : materials.some((material) => material.carried < material.quantity)
+                  ? ("materials" as const)
+                  : undefined;
+      return [
+        {
+          slotIndex: posting.slotIndex,
+          workOrderId: definition.id,
+          title: definition.title,
+          clientName: definition.clientName,
+          description: definition.description,
+          requiredWeldingLevel: definition.requiredWeldingLevel,
+          materials,
+          sections: definition.sections,
+          payoutCredits: definition.payoutCredits,
+          inProgress,
+          acceptable: !inProgress && blockedReason === undefined,
+          ...(blockedReason ? { blockedReason } : {}),
+        },
+      ];
+    },
+  );
 
   const activeDefinition = board.active ? getWorkOrder(board.active.workOrderId) : undefined;
   if (!board.active || !activeDefinition) return { ...base, postings };

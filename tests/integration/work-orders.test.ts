@@ -839,4 +839,77 @@ suite("issue #207 Work Orders (real PostgreSQL)", () => {
       expect(after.filter((row) => row.acceptedAt !== null)).toEqual([]);
     });
   });
+
+  describe("an accepted job outlives the Mission that opened the board", () => {
+    /**
+     * The adversarial case a review found: 10,001 Hours accepted, a real job
+     * taken with real materials, then the operator console's
+     * resetMissionChainAsAdmin un-accepts that Mission underneath it. Start
+     * used to be refused work_orders_locked, the bench stayed occupied because
+     * there is no abandon path, and the job — and the player's materials —
+     * were stranded for good. Reproduced here by deleting the
+     * character_missions row directly, which is all resetMissionChainAsAdmin
+     * actually does to it, rather than invoking the admin command itself.
+     */
+    it("keeps a paid-for job weldable to completion, while new acceptance stays locked", async () => {
+      const { userId, character } = await welder();
+      await giveMaterials(character.id, mixed.materials);
+      const accepted = await accept(userId, character.id, MIXED_JOB);
+      expect(accepted.workOrder).toEqual({ status: "accepted", workOrderId: MIXED_JOB });
+      const creditsBefore = await credits(character.id);
+      const xpBefore = await weldingXp(character.id);
+
+      // The operator reset, reproduced directly against the row it touches.
+      await db
+        .delete(rune.characterMissions)
+        .where(
+          and(
+            eq(rune.characterMissions.characterId, character.id),
+            eq(rune.characterMissions.missionId, MISSION_IDS.tenThousandOneHours),
+          ),
+        );
+
+      // The posting the player already paid for is untouched by the reset.
+      const afterReset = (await postings(character.id)).find(
+        (row) => row.workOrderId === MIXED_JOB,
+      )!;
+      expect(afterReset.acceptedAt).not.toBeNull();
+      expect(afterReset.workOrderId).toBe(MIXED_JOB);
+      expect(afterReset.sectionsCompleted).toBe(0);
+
+      // Taking NEW work still requires the unlock — this is the asymmetry that
+      // matters: finishing what you paid for is not the same permission as
+      // taking more.
+      const refusedNewJob = await accept(userId, character.id, WORK_ORDER_IDS.rennCarryFrame);
+      expect(refusedNewJob.workOrder).toMatchObject({
+        status: "refused",
+        reason: "work_orders_locked",
+      });
+
+      // But Start succeeds: a job already on the bench was paid for out of the
+      // player's own pocket, and is its own authorization to finish.
+      const started = await startWelding(userId, character.id);
+      expect(started.workOrder).toEqual({ status: "started" });
+
+      // It still welds, section by section, at the customer XP share — and
+      // while it does, the board reflects the lock exactly as designed: the
+      // active job stays projected, but there is nothing new to offer, so no
+      // postings are.
+      const midway = await refresh(userId, character.id, sectionMs * 2);
+      const midwayRow = (await postings(character.id)).find((row) => row.acceptedAt !== null)!;
+      expect(midwayRow.sectionsCompleted).toBe(2);
+      expect(await weldingXp(character.id)).toBe(xpBefore + 2 * sectionXp);
+      expect(midway.workOrders.active).toBeDefined();
+      expect(midway.workOrders.postings).toEqual([]);
+
+      // Welded through to completion, it pays, grants the rest of its XP,
+      // releases the bench and refills the slot exactly once — the player is
+      // never stranded.
+      await refresh(userId, character.id, sectionMs * mixed.sections + sectionMs * 3);
+      expect(await credits(character.id)).toBe(creditsBefore + mixed.payoutCredits);
+      expect(await weldingXp(character.id)).toBe(xpBefore + mixed.sections * sectionXp);
+      expect((await postings(character.id)).filter((row) => row.acceptedAt !== null)).toEqual([]);
+      expect(await activeAction(character.id)).toBeUndefined();
+    });
+  });
 });

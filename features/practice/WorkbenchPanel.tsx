@@ -39,6 +39,7 @@ export function WorkbenchPanel() {
   // job's identity rather than on a projection object that is new every render.
   const lastActive = useRef<{ title: string; payoutCredits: number }>(undefined);
 
+  const boardUnlocked = state.workOrders.unlocked;
   const activeWorkOrderId = active?.workOrderId;
   const activeTitle = active?.title;
   const activePayout = active?.payoutCredits;
@@ -48,11 +49,13 @@ export function WorkbenchPanel() {
       activeTitle !== undefined && activePayout !== undefined
         ? { title: activeTitle, payoutCredits: activePayout }
         : undefined;
-    // A job leaving the bench without another taking its place is a completion:
-    // nothing else clears it, because Work Orders have no abandonment.
-    if (previous && activeWorkOrderId === undefined) setCompleted(previous);
+    // A job leaving the bench is a completion — but only while the board is
+    // still the player's. An operator Mission reset also makes it disappear,
+    // and announcing a Credit payment that never happened is worse than saying
+    // nothing, so a locked board stays silent rather than guessing (#207).
+    if (previous && activeWorkOrderId === undefined && boardUnlocked) setCompleted(previous);
     if (activeWorkOrderId !== undefined) setCompleted(undefined);
-  }, [activeWorkOrderId, activeTitle, activePayout]);
+  }, [activeWorkOrderId, activeTitle, activePayout, boardUnlocked]);
 
   if (!state.practice.unlocked && !active) return null;
 

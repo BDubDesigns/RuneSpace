@@ -15,6 +15,8 @@ import { CONVERSATION_TOPICS } from "@/game/content/conversation-topics";
 import { LOCAL_PLACES } from "@/game/content/local-places";
 import { MISSIONS, type MissionDefinition } from "@/game/content/missions";
 import { REPAIR_TARGETS } from "@/game/content/repair-targets";
+import { WORK_ORDERS } from "@/game/content/work-orders";
+import { validateWorkOrderDefinitions } from "@/game/domain/work-orders";
 import { validateRepairTargets } from "@/game/domain/repair-targets";
 import { repairComplete, type RepairTargetState } from "@/game/domain/welding-repair";
 import type { RepairTargetObservation } from "@/game/domain/missions";
@@ -57,6 +59,13 @@ validateLocalPlaceAccess(
 // target naming an unknown location, Local Place, or authorizing Mission would
 // otherwise fail inside a player transaction rather than visibly at startup.
 validateRepairTargets(REPAIR_TARGETS, new Set(MISSIONS.map((mission) => mission.id)));
+
+// Authored Work Orders are validated on the same boundary (#207). This is the
+// check that makes the payout rule real rather than advisory: every authored
+// Credit value is recomputed from the balance formula and its material
+// replacement values, so a merchant price change or a formula tweak fails
+// visibly at startup instead of quietly paying a stale number for a job.
+validateWorkOrderDefinitions(WORK_ORDERS);
 
 /**
  * Authoritative mission projection for the play state. Persistence contains
