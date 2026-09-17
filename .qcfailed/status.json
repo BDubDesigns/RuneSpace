@@ -2,18 +2,17 @@
   "schemaVersion": 1,
   "projectSlug": "runespace",
   "workState": "active",
-  "currentFocus": "Polishing how carried and stored items read: item names that fit the tile, and a Cargo Hold that shows two inventories instead of one long grid.",
+  "currentFocus": "Making the Work Orders terminal at Rusk Recovery real: paying client jobs you take off a board, supply the materials for, and weld at Wade's bench.",
   "currentChange": {
-    "summary": "Item tiles now show names such as Refined Ferrite in full on two lines, and the desktop Cargo Hold reads as two separate inventories.",
-    "stage": "implementation",
-    "pullRequestNumber": 206
+    "summary": "Work Orders are playable: Wade hands the board over, three jobs are posted at a time, and you supply the materials and weld the job at his bench for Credits.",
+    "stage": "implementation"
   },
   "latestCompleted": {
-    "summary": "Added a Wiki page for everyone you meet in Holo Hollow, grouped the Wiki into five categories, and turned its index into a compact landing page.",
-    "date": "2026-09-16",
-    "url": "https://github.com/BDubDesigns/RuneSpace/pull/197"
+    "summary": "Item tiles now show names such as Refined Ferrite in full on two lines, and the desktop Cargo Hold reads as two separate inventories.",
+    "date": "2026-09-17",
+    "url": "https://github.com/BDubDesigns/RuneSpace/pull/206"
   },
-  "nextStep": "Human review and playtest of the item-tile labels and the desktop Cargo Hold grouping.",
+  "nextStep": "Human review and playtest of the Work Orders board, the client job on the bench, and 10,001 Hours.",
   "lastMeaningfulUpdate": "2026-09-17",
   "highlights": [
     {
