@@ -3,6 +3,11 @@
   "projectSlug": "runespace",
   "workState": "active",
   "currentFocus": "Polishing how carried and stored items read: item names that fit the tile, and a Cargo Hold that shows two inventories instead of one long grid.",
+  "currentChange": {
+    "summary": "Item tiles now show names such as Refined Ferrite in full on two lines, and the desktop Cargo Hold reads as two separate inventories.",
+    "stage": "implementation",
+    "pullRequestNumber": 206
+  },
   "latestCompleted": {
     "summary": "Added a Wiki page for everyone you meet in Holo Hollow, grouped the Wiki into five categories, and turned its index into a compact landing page.",
     "date": "2026-09-16",
