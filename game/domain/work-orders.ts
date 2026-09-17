@@ -225,15 +225,11 @@ export function validateWorkOrderDefinitions(
     if (!Number.isInteger(definition.sections) || definition.sections < 1) {
       throw new Error(`${definition.id} requires a positive integer section count`);
     }
-    // A job shorter than the Clean Pass minimum would ship a Welding work unit
-    // with no opportunities at all, which is a different mechanic wearing the
-    // same name. Catch it in authoring rather than in play.
-    if (definition.sections < balance.welding.cleanPass.minimumSectionsForOpportunity) {
-      throw new Error(
-        `${definition.id} is too short to host the Clean Pass cadence ` +
-          `(${definition.sections} sections)`,
-      );
-    }
+    // Deliberately NO minimum beyond one section. The generalized Clean Pass
+    // contract supports zero opportunities below the authored minimum length,
+    // so a short job simply has none — that is the cadence working, not a job
+    // that is malformed. Inventing a minimum here would be an authoring rule
+    // nobody approved.
 
     if (definition.materials.length === 0) {
       throw new Error(`${definition.id} must author at least one required material`);

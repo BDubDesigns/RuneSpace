@@ -6,7 +6,11 @@ import {
 } from "@/game/config/balance";
 import { ITEM_IDS, WORK_ORDER_IDS } from "@/game/config/foundations";
 import { WORK_ORDERS, type WorkOrderDefinition } from "@/game/content/work-orders";
-import { cleanPassOpportunityCount, type CleanPassRandom } from "@/game/domain/clean-pass";
+import {
+  cleanPassOpportunityCount,
+  cleanPassOpportunityWindows,
+  type CleanPassRandom,
+} from "@/game/domain/clean-pass";
 import {
   acceptedWorkOrderState,
   eligibleWorkOrders,
@@ -154,12 +158,20 @@ describe("Validation rejects every kind of authoring drift (#207)", () => {
     );
   });
 
-  it("rejects a section count below the Clean Pass minimum", () => {
+  it("accepts a job too short to host a Clean Pass opportunity", () => {
+    // The generalized cadence supports zero opportunities below the authored
+    // minimum length, so a short job simply gets none. Validation must not
+    // invent a Work Order minimum on top of that (#207).
     expect(balance.welding.cleanPass.minimumSectionsForOpportunity).toBe(6);
-    const job = syntheticJob({ sections: 5 });
-    expect(() => validateWorkOrderDefinitions([job])).toThrow(
-      /too short to host the Clean Pass cadence/,
-    );
+    const short = syntheticJob({ id: "short_job", sections: 5 });
+    const pool = [
+      short,
+      syntheticJob({ id: "a" }),
+      syntheticJob({ id: "b" }),
+      syntheticJob({ id: "c" }),
+    ];
+    expect(() => validateWorkOrderDefinitions(pool)).not.toThrow();
+    expect(cleanPassOpportunityWindows(short.sections, balance)).toEqual([]);
   });
 
   it("rejects a pool smaller than postedSlots + 1", () => {

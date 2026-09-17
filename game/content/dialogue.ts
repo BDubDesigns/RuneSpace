@@ -1425,9 +1425,12 @@ const dialogue = {
         EXPRESSION_IDS.neutral,
         "So you're ready. Or you're not, and you're what I've got. Take a job off the board. Do it properly.",
       ),
+      // Asks for the first finished job back for a look, and stops there. The
+      // board is the player's from the moment this is accepted, so nothing here
+      // may imply a second job waits on his approval.
       wadeAtYard(
         EXPRESSION_IDS.neutral,
-        "One. Then come back here and I'll look at it before you touch a second.",
+        "Bring the first one back here when it's done. My name's on the work, so I'll want a look at it.",
       ),
     ],
   },

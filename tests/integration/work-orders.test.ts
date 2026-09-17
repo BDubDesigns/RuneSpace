@@ -912,4 +912,155 @@ suite("issue #207 Work Orders (real PostgreSQL)", () => {
       expect(await activeAction(character.id)).toBeUndefined();
     });
   });
+
+  describe("the completion receipt", () => {
+    /**
+     * The regression a review found: the Workbench used to infer a completion
+     * from an active job disappearing between two CLIENT renders, so the one
+     * player who most needs telling — the one who was away while the job
+     * finished — was told nothing, because their first load after being away
+     * has no previous render to compare against. The receipt is now produced by
+     * the transaction that actually pays, and these prove the two things that
+     * makes true: it is present exactly once, on the response that discovered
+     * the completion, and it is never produced by a job merely going away.
+     */
+    async function onTheBench(ms = 0) {
+      const fixture = await welder();
+      await giveMaterials(fixture.character.id, mixed.materials);
+      await accept(fixture.userId, fixture.character.id, MIXED_JOB, ms);
+      return fixture;
+    }
+
+    const receiptFor = (job: typeof mixed) => ({
+      workOrderId: job.id,
+      title: job.title,
+      clientName: job.clientName,
+      payoutCredits: job.payoutCredits,
+    });
+
+    it("reports a job that finished while the player was away, on the load that discovers it", async () => {
+      const { userId, character } = await onTheBench();
+      const creditsBefore = await credits(character.id);
+      await startWelding(userId, character.id);
+
+      // Away for the whole job and well past it, in one step and with no state
+      // read while it ran: this is a fresh load that never saw the job running.
+      const rediscovered = await refresh(
+        userId,
+        character.id,
+        sectionMs * mixed.sections + sectionMs * 9,
+      );
+
+      expect(rediscovered.workOrders.recentCompletion).toEqual(receiptFor(mixed));
+      expect(rediscovered.workOrders.active).toBeUndefined();
+      // And the receipt describes something that genuinely happened.
+      expect(await credits(character.id)).toBe(creditsBefore + mixed.payoutCredits);
+      expect(await workOrdersCompleted(character.id)).toBe(1);
+    });
+
+    it("is consumed by that response: the next read is silent and the payout stays paid once", async () => {
+      const { userId, character } = await onTheBench();
+      const creditsBefore = await credits(character.id);
+      await startWelding(userId, character.id);
+
+      const completionMs = sectionMs * mixed.sections;
+      const discovered = await refresh(userId, character.id, completionMs);
+      expect(discovered.workOrders.recentCompletion).toEqual(receiptFor(mixed));
+
+      // A receipt, not a standing flag: the very next refresh says nothing,
+      // which is what lets the surface latch it instead of re-announcing it.
+      const next = await refresh(userId, character.id, completionMs + sectionMs * 4);
+      expect(next.workOrders.recentCompletion).toBeUndefined();
+      expect(await credits(character.id)).toBe(creditsBefore + mixed.payoutCredits);
+      expect(await workOrdersCompleted(character.id)).toBe(1);
+    });
+
+    it("reports a completion the player watched resolve, read by read", async () => {
+      const { userId, character } = await onTheBench();
+      const creditsBefore = await credits(character.id);
+      await startWelding(userId, character.id);
+
+      // The other path into the same boundary: several ordinary reads while the
+      // job is still running, none of which has anything to report.
+      for (const section of [2, 5, 9]) {
+        const midway = await refresh(userId, character.id, sectionMs * section);
+        expect(midway.workOrders.active?.workOrderId).toBe(MIXED_JOB);
+        expect(midway.workOrders.recentCompletion).toBeUndefined();
+      }
+
+      const finished = await refresh(userId, character.id, sectionMs * mixed.sections);
+      expect(finished.workOrders.recentCompletion).toEqual(receiptFor(mixed));
+      expect(await credits(character.id)).toBe(creditsBefore + mixed.payoutCredits);
+    });
+
+    it("says nothing on a read that completed nothing", async () => {
+      const { userId, character } = await welder();
+      const idle = await refresh(userId, character.id, sectionMs * 3);
+      expect(idle.workOrders.recentCompletion).toBeUndefined();
+
+      // Nor for a job accepted and sitting on the bench with no Welding on it.
+      await giveMaterials(character.id, mixed.materials);
+      await accept(userId, character.id, MIXED_JOB, sectionMs * 3);
+      const waiting = await refresh(userId, character.id, sectionMs * 20);
+      expect(waiting.workOrders.active?.workOrderId).toBe(MIXED_JOB);
+      expect(waiting.workOrders.recentCompletion).toBeUndefined();
+    });
+
+    it("goes to the one request that won a concurrent completion, and to no other", async () => {
+      const { userId, character } = await onTheBench();
+      const creditsBefore = await credits(character.id);
+      await startWelding(userId, character.id);
+
+      const completionMs = sectionMs * mixed.sections;
+      const both = await Promise.all([
+        refresh(userId, character.id, completionMs),
+        refresh(userId, character.id, completionMs),
+      ]);
+
+      // The completion that is refused pays nothing, so it reports nothing:
+      // exactly one of the two responses carries the receipt, and it is the one
+      // whose transaction actually paid.
+      expect(both.filter((state) => state.workOrders.recentCompletion !== undefined)).toEqual([
+        expect.objectContaining({
+          workOrders: expect.objectContaining({ recentCompletion: receiptFor(mixed) }),
+        }),
+      ]);
+      expect(await credits(character.id)).toBe(creditsBefore + mixed.payoutCredits);
+      expect(await workOrdersCompleted(character.id)).toBe(1);
+    });
+
+    it("never announces a payout for a job that only disappeared", async () => {
+      // The operator reset from the suite above, read for what the surface is
+      // told rather than for what the player can still weld: the Mission that
+      // opened the board is gone underneath an accepted job, and nothing about
+      // that is a completion.
+      const { userId, character } = await onTheBench();
+      const creditsBefore = await credits(character.id);
+      await db
+        .delete(rune.characterMissions)
+        .where(
+          and(
+            eq(rune.characterMissions.characterId, character.id),
+            eq(rune.characterMissions.missionId, MISSION_IDS.tenThousandOneHours),
+          ),
+        );
+
+      const locked = await refresh(userId, character.id, sectionMs * 2);
+      expect(locked.workOrders.recentCompletion).toBeUndefined();
+
+      // And with the job itself taken off the bench — an active job becoming no
+      // active job, the exact shape the old client-side inference mistook for a
+      // completion — there is still nothing to announce.
+      await db
+        .update(rune.characterWorkOrderPostings)
+        .set({ acceptedAt: null, sectionsCompleted: 0, cleanPass: null })
+        .where(eq(rune.characterWorkOrderPostings.characterId, character.id));
+
+      const vanished = await refresh(userId, character.id, sectionMs * 4);
+      expect(vanished.workOrders.active).toBeUndefined();
+      expect(vanished.workOrders.recentCompletion).toBeUndefined();
+      expect(await credits(character.id)).toBe(creditsBefore);
+      expect(await workOrdersCompleted(character.id)).toBe(0);
+    });
+  });
 });

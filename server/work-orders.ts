@@ -43,6 +43,47 @@ import { characterSkillLevel } from "@/server/skill-levels";
  * Order timer engine and no Work-Order-specific cap.
  */
 
+/**
+ * What one genuine completion pays, for the response that discovered it.
+ *
+ * Deliberately not persisted. A job's last section can resolve during any
+ * authoritative touch — a refresh the player is watching, or the first state
+ * load after an hour away — but either way the completion commits inside the
+ * SAME transaction whose state the client is about to render. The receipt only
+ * has to survive from reconciliation to projection, which is exactly the
+ * lifetime of one transaction, so a durable row would be storing forever what
+ * is needed for microseconds.
+ */
+export type WorkOrderCompletionReceipt = {
+  workOrderId: WorkOrderId;
+  title: string;
+  clientName: string;
+  payoutCredits: number;
+};
+
+/**
+ * Completions committed during the current transaction, keyed by it.
+ *
+ * Keyed by the transaction object rather than the character, so two concurrent
+ * requests can never read each other's receipt, and weak so nothing here
+ * outlives the request that created it.
+ */
+const completionsByTransaction = new WeakMap<object, WorkOrderCompletionReceipt>();
+
+/**
+ * Read and consume the completion this transaction committed, if any.
+ *
+ * Consuming it is what keeps the receipt a receipt: the first projection in
+ * this transaction reports the payout, and nothing afterwards repeats it.
+ */
+export function takeWorkOrderCompletion(
+  transaction: DatabaseTransaction,
+): WorkOrderCompletionReceipt | undefined {
+  const receipt = completionsByTransaction.get(transaction as object);
+  if (receipt) completionsByTransaction.delete(transaction as object);
+  return receipt;
+}
+
 export type WorkOrderPostingState = {
   slotIndex: number;
   workOrderId: WorkOrderId;
@@ -337,6 +378,17 @@ export async function completeActiveWorkOrder(
     justClearedWorkOrderId: input.definition.id,
     random: input.random,
     now: input.now,
+  });
+
+  // Recorded on the one request that won the completion, so the surface can say
+  // what was paid whether the player watched the last section resolve or walked
+  // back in an hour later and had it resolved for them. Without this the player
+  // who was away — the one who cannot know it finished — is told nothing.
+  completionsByTransaction.set(transaction as object, {
+    workOrderId: input.definition.id,
+    title: input.definition.title,
+    clientName: input.definition.clientName,
+    payoutCredits: input.definition.payoutCredits,
   });
   return true;
 }

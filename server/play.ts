@@ -137,6 +137,7 @@ import {
   ensureWorkOrderBoard,
   loadWorkOrderBoard,
   missOpenWorkOrderCleanPass,
+  takeWorkOrderCompletion,
 } from "@/server/work-orders";
 import { loadRepairAccess } from "@/server/repair-access";
 import { recordTrackedActivity, type TrackedActivity } from "@/server/mission-progress";
@@ -250,6 +251,23 @@ export type WorkOrdersProjection = {
   missionAvailable: boolean;
   postings: readonly WorkOrderPostingProjection[];
   active?: ActiveWorkOrderProjection;
+  /**
+   * A job that genuinely completed during THIS request's reconciliation, and
+   * what it paid (#207).
+   *
+   * Transient by design and present exactly once: on the response that
+   * discovered the completion, whether the player watched the last section
+   * resolve or the shared lazy path resolved it for them on their first load
+   * after being away. The surface must not infer a completion from the job
+   * disappearing — an operator Mission reset does that too, and a receipt for a
+   * payout that never happened is worse than no receipt at all.
+   */
+  recentCompletion?: {
+    workOrderId: string;
+    title: string;
+    clientName: string;
+    payoutCredits: number;
+  };
 };
 
 /** Repeatable Practice Welding at Wade's Workbench (#190). */
@@ -906,8 +924,13 @@ async function projectWorkOrders(
     },
   );
 
+  // Consumed once per transaction, so a completion is reported by the response
+  // that committed it and never repeated by the next refresh.
+  const completion = takeWorkOrderCompletion(transaction);
+  const withCompletion = completion ? { recentCompletion: completion } : {};
+
   const activeDefinition = board.active ? getWorkOrder(board.active.workOrderId) : undefined;
-  if (!board.active || !activeDefinition) return { ...base, postings };
+  if (!board.active || !activeDefinition) return { ...base, ...withCompletion, postings };
 
   const workOrderActive = input.action?.actionId === ACTION_IDS.workOrderWelding;
   const cleanPass = projectCleanPass(
@@ -917,6 +940,7 @@ async function projectWorkOrders(
   );
   return {
     ...base,
+    ...withCompletion,
     postings,
     active: {
       workOrderId: activeDefinition.id,

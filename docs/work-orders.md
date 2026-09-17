@@ -597,10 +597,16 @@ instead of reaching a player as a wrong payout or an unpayable recipe:
 | Unique `id` | Two jobs cannot silently collide |
 | Non-empty `title`, `clientName`, `description` | No blank board copy |
 | Positive integer `requiredWeldingLevel` and `sections` | No zero-length or negative job |
-| `sections >= welding.cleanPass.minimumSectionsForOpportunity` | No job too short to host even one Clean Pass opportunity |
 | At least one material, no item named twice, every item a known stackable | No unpayable or malformed recipe |
 | `payoutCredits` equals `workOrderPayoutCredits(definition)` | A stored payout can never drift from the rule that derives it |
 | Pool size `>= postedSlots + 1` (currently 4) | A board of 3 distinct postings plus one non-repeating refill is always possible |
 
 Eight jobs against a minimum pool of four leaves four jobs of headroom, so the
 selection rules never deadlock at the current pool size.
+
+There is deliberately **no minimum section count** beyond one. The generalized
+Clean Pass cadence supports zero opportunities below its own authored minimum
+length (`docs/gameplay-foundations.md`), so a job shorter than that simply has
+none — that is the cadence working as specified, not a malformed job. All eight
+current jobs are 8 sections or longer, which is authoring taste rather than a
+rule the validator enforces.

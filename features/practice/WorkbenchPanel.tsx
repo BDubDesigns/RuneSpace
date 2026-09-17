@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { Feedback } from "@/components/ui/Feedback";
 import { usePlay } from "@/features/play/PlayContext";
 import { PracticeWeldingPanel } from "@/features/practice/PracticeWeldingPanel";
@@ -27,35 +27,39 @@ export const WORKBENCH_ANCHOR_ID = "rusk-recovery-workbench";
  * comes to disagree with the rule it is presenting.
  *
  * It also owns the completion acknowledgement, because that beat spans the
- * switch: the job that finished is gone from the projection by the time there
- * is anything to say about it. One generic acknowledgement serves every job in
- * the pool — a repeatable shop job does not get a scene.
+ * switch: the job that finished is gone from the bench by the time there is
+ * anything to say about it. One generic acknowledgement serves every job in the
+ * pool — a repeatable shop job does not get a scene.
+ *
+ * The receipt is the server's, never inferred from the job disappearing. A job
+ * can vanish without being paid (an operator Mission reset), and — the case
+ * that matters most — a job can be paid without this component ever having seen
+ * it: the last section often resolves during the very state load that follows
+ * the player being away, so on that render there is no "before" to compare
+ * against. The player who was away is exactly the one who cannot know they were
+ * paid, so the payout has to arrive from the transaction that paid it.
  */
 export function WorkbenchPanel() {
   const { state } = usePlay();
   const active = state.workOrders.active;
   const [completed, setCompleted] = useState<{ title: string; payoutCredits: number }>();
-  // Only what the acknowledgement needs, so the effect below can depend on the
-  // job's identity rather than on a projection object that is new every render.
-  const lastActive = useRef<{ title: string; payoutCredits: number }>(undefined);
 
-  const boardUnlocked = state.workOrders.unlocked;
+  const receipt = state.workOrders.recentCompletion;
+  const receiptId = receipt?.workOrderId;
+  const receiptTitle = receipt?.title;
+  const receiptPayout = receipt?.payoutCredits;
   const activeWorkOrderId = active?.workOrderId;
-  const activeTitle = active?.title;
-  const activePayout = active?.payoutCredits;
   useEffect(() => {
-    const previous = lastActive.current;
-    lastActive.current =
-      activeTitle !== undefined && activePayout !== undefined
-        ? { title: activeTitle, payoutCredits: activePayout }
-        : undefined;
-    // A job leaving the bench is a completion — but only while the board is
-    // still the player's. An operator Mission reset also makes it disappear,
-    // and announcing a Credit payment that never happened is worse than saying
-    // nothing, so a locked board stays silent rather than guessing (#207).
-    if (previous && activeWorkOrderId === undefined && boardUnlocked) setCompleted(previous);
+    // Latched, because the receipt is present on exactly one response: the next
+    // ordinary refresh must not wipe what the player has just been told.
+    if (receiptTitle !== undefined && receiptPayout !== undefined) {
+      setCompleted({ title: receiptTitle, payoutCredits: receiptPayout });
+    }
+  }, [receiptId, receiptTitle, receiptPayout]);
+  useEffect(() => {
+    // Putting the next job on the bench is the player moving on from the last.
     if (activeWorkOrderId !== undefined) setCompleted(undefined);
-  }, [activeWorkOrderId, activeTitle, activePayout, boardUnlocked]);
+  }, [activeWorkOrderId]);
 
   if (!state.practice.unlocked && !active) return null;
 
