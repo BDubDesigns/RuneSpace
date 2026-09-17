@@ -2,19 +2,14 @@
   "schemaVersion": 1,
   "projectSlug": "runespace",
   "workState": "active",
-  "currentFocus": "Giving Holo Hollow's people a place in the player Wiki: a character page for everyone you meet, and a Wiki that still scans on a phone once they are all in it.",
-  "currentChange": {
-    "summary": "Added a Wiki page for everyone you meet in Holo Hollow, grouped the Wiki into five categories, and turned its index into a compact landing page.",
-    "stage": "review",
-    "pullRequestNumber": 197
-  },
+  "currentFocus": "Polishing how carried and stored items read: item names that fit the tile, and a Cargo Hold that shows two inventories instead of one long grid.",
   "latestCompleted": {
-    "summary": "Standardised how every stationary location composes, so the primary activity is on screen when you arrive instead of below the fold.",
-    "date": "2026-09-15",
-    "url": "https://github.com/BDubDesigns/RuneSpace/pull/195"
+    "summary": "Added a Wiki page for everyone you meet in Holo Hollow, grouped the Wiki into five categories, and turned its index into a compact landing page.",
+    "date": "2026-09-16",
+    "url": "https://github.com/BDubDesigns/RuneSpace/pull/197"
   },
-  "nextStep": "Human review of the five character Wiki pages and the internal/public canon boundary before the first Work Orders client pool is authored.",
-  "lastMeaningfulUpdate": "2026-09-15",
+  "nextStep": "Human review and playtest of the item-tile labels and the desktop Cargo Hold grouping.",
+  "lastMeaningfulUpdate": "2026-09-17",
   "highlights": [
     {
       "summary": "Added Rusk Recovery and 10,000 Hours: Wade's own yard, a workbench that practises Welding indefinitely for scrap, and the Clean Pass moment every weld now rolls.",

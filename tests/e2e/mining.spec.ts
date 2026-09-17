@@ -111,7 +111,7 @@ test("owned character can start, observe, stop, and restore Ferrite Mining at Th
   await expect(inventory.getByText("x10", { exact: true })).toBeVisible();
   await expect(inventory.getByText("x1", { exact: true })).toBeVisible();
   const firstSlot = inventory.locator("button[aria-pressed]").first();
-  const firstSlotName = firstSlot.getByText("Ferrite Shale", { exact: true });
+  const firstSlotName = firstSlot.locator("[data-nameplate]");
   const firstSlotQuantity = firstSlot.getByText("x10", { exact: true });
   // The nameplate and quantity plate must paint a real scrim so text stays
   // readable over artwork; the border must paint a visible delimiter. Exact
@@ -121,11 +121,14 @@ test("owned character can start, observe, stop, and restore Ferrite Mining at Th
   const plateStyles = await Promise.all([
     firstSlotName.evaluate((element) => {
       const style = getComputedStyle(element);
+      const label = element.firstElementChild as HTMLElement;
       return {
         backgroundColor: style.backgroundColor,
         borderTopColor: "",
-        textOverflow: style.textOverflow,
-        whiteSpace: style.whiteSpace,
+        // The name is given a reserved two-line label area (#199), so an
+        // ordinary item name is displayed in full rather than ellipsised.
+        labelClippedHorizontally: label.scrollWidth > label.clientWidth + 1,
+        labelClippedVertically: label.scrollHeight > label.clientHeight + 1,
       };
     }),
     firstSlotQuantity.evaluate((element) => {
@@ -133,8 +136,8 @@ test("owned character can start, observe, stop, and restore Ferrite Mining at Th
       return {
         backgroundColor: style.backgroundColor,
         borderTopColor: style.borderTopColor,
-        textOverflow: "",
-        whiteSpace: "",
+        labelClippedHorizontally: false,
+        labelClippedVertically: false,
       };
     }),
   ]);
@@ -144,27 +147,29 @@ test("owned character can start, observe, stop, and restore Ferrite Mining at Th
   }
   expect(plateStyles[1]!.borderTopColor).not.toBe("rgba(0, 0, 0, 0)");
   expect(plateStyles[1]!.borderTopColor).not.toBe("transparent");
-  expect(plateStyles[0]!.whiteSpace).toBe("nowrap");
-  expect(plateStyles[0]!.textOverflow).toBe("ellipsis");
-  const [slotBox, artworkBox] = await Promise.all([
+  expect(plateStyles[0]!.labelClippedHorizontally).toBe(false);
+  expect(plateStyles[0]!.labelClippedVertically).toBe(false);
+  await expect(inventory.locator("[data-stack-track]")).toHaveCount(2);
+  const [slotBox, artworkBox, nameBox, trackBox] = await Promise.all([
     firstSlot.boundingBox(),
     ferriteArtwork.first().boundingBox(),
-  ]);
-  expect(slotBox).not.toBeNull();
-  expect(artworkBox).not.toBeNull();
-  expect(
-    Math.abs(slotBox!.x + slotBox!.width / 2 - (artworkBox!.x + artworkBox!.width / 2)),
-  ).toBeLessThanOrEqual(1);
-  expect(
-    Math.abs(slotBox!.y + slotBox!.height / 2 - (artworkBox!.y + artworkBox!.height / 2)),
-  ).toBeLessThanOrEqual(1);
-  await expect(inventory.locator("[data-stack-track]")).toHaveCount(2);
-  const [nameBox, trackBox] = await Promise.all([
     firstSlotName.boundingBox(),
     inventory.locator("[data-stack-track]").first().boundingBox(),
   ]);
+  expect(slotBox).not.toBeNull();
+  expect(artworkBox).not.toBeNull();
   expect(nameBox).not.toBeNull();
   expect(trackBox).not.toBeNull();
+  expect(
+    Math.abs(slotBox!.x + slotBox!.width / 2 - (artworkBox!.x + artworkBox!.width / 2)),
+  ).toBeLessThanOrEqual(1);
+  // Artwork is centred in the zone the reserved label area leaves it, and
+  // never runs underneath the nameplate (#199).
+  const artworkZoneCentreY = slotBox!.y + (slotBox!.height - nameBox!.height) / 2;
+  expect(
+    Math.abs(artworkZoneCentreY - (artworkBox!.y + artworkBox!.height / 2)),
+  ).toBeLessThanOrEqual(1);
+  expect(artworkBox!.y + artworkBox!.height).toBeLessThanOrEqual(nameBox!.y + 1);
   expect(nameBox!.x - (trackBox!.x + trackBox!.width)).toBeGreaterThanOrEqual(4);
   expect(
     Math.abs(nameBox!.y + nameBox!.height - (slotBox!.y + slotBox!.height)),

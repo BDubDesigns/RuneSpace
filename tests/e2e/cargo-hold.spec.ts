@@ -1,4 +1,5 @@
 import { expect, expectExteriorMissionHalo, test, openTestCharacter } from "./fixtures";
+import type { Locator } from "@playwright/test";
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import {
@@ -41,6 +42,38 @@ async function seedRepairedCargoHold(
       set: repaired,
     });
 }
+
+/**
+ * Measure the shared item-tile label treatment inside one storage region
+ * (Issue #199). The tiles are fixed-size, so the durable contract is geometric:
+ * every tile in a region keeps the same outer size and the same reserved label
+ * area, and an ordinary item name is displayed within that area instead of
+ * being ellipsised after a few characters. No class name is asserted.
+ */
+async function measureRegionTiles(region: Locator) {
+  return region.evaluate((element) =>
+    [...element.querySelectorAll("button[aria-pressed]")].map((tile) => {
+      const plate = tile.querySelector("[data-nameplate]") as HTMLElement;
+      const label = plate.firstElementChild as HTMLElement;
+      const tileRect = tile.getBoundingClientRect();
+      const lineHeight = Number.parseFloat(getComputedStyle(label).lineHeight);
+      return {
+        name: (label.textContent ?? "").trim(),
+        tileWidth: Math.round(tileRect.width),
+        tileHeight: Math.round(tileRect.height),
+        labelAreaHeight: Math.round(plate.getBoundingClientRect().height),
+        // Lines the name actually needs, and whether the reserved area had to
+        // cut any of it off.
+        renderedLines: Math.round(label.scrollHeight / lineHeight),
+        clipped:
+          label.scrollWidth > label.clientWidth + 1 || label.scrollHeight > label.clientHeight + 1,
+      };
+    }),
+  );
+}
+
+/** The names the issue calls out: one short, one long, both in the fixture. */
+const REPRESENTATIVE_LABELS = ["Slag", "Power Cell", "Ferrite Shale", "Refined Ferrite"];
 
 test.beforeEach(async ({ page, testCharacter }) => {
   await openTestCharacter(page, testCharacter.id);
@@ -332,6 +365,27 @@ test("renders a dense Cargo Hold as a compact selectable grid (Issue #151)", asy
   await captureReviewScreenshot(page, "cargo-mobile-dense-grid.png");
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
 
+  // Issue #199: the tiles reserve a two-line label area, so a long name is
+  // readable at phone width instead of being cut to "FERRITE S...", and a
+  // short one leaves the tile exactly the same size.
+  const mobileTiles = await measureRegionTiles(cargoSection);
+  expect(mobileTiles.length).toBe(9);
+  for (const tile of mobileTiles) {
+    expect(tile.tileWidth).toBe(mobileTiles[0]!.tileWidth);
+    expect(tile.tileHeight).toBe(mobileTiles[0]!.tileHeight);
+    expect(tile.labelAreaHeight).toBe(mobileTiles[0]!.labelAreaHeight);
+  }
+  for (const name of REPRESENTATIVE_LABELS) {
+    const tile = mobileTiles.find((entry) => entry.name === name);
+    expect(tile, `${name} tile is present`).toBeDefined();
+    expect(tile!.clipped, `${name} is displayed in full`).toBe(false);
+    expect(tile!.renderedLines).toBeLessThanOrEqual(2);
+  }
+  // The long names are the ones that need the second line; the short one does
+  // not, and still occupies the identical reserved area.
+  expect(mobileTiles.find((entry) => entry.name === "Refined Ferrite")!.renderedLines).toBe(2);
+  expect(mobileTiles.find((entry) => entry.name === "Slag")!.renderedLines).toBe(1);
+
   // Keyboard selection: focusing and activating a Cargo stack tile exposes
   // its existing Withdraw actions.
   const cargoFerriteTile = cargoSection.getByRole("button", { name: /Ferrite Shale/ });
@@ -368,6 +422,51 @@ test("renders a dense Cargo Hold as a compact selectable grid (Issue #151)", asy
   await page.setViewportSize({ width: 1280, height: 800 });
   await expect(carriedSection).toBeVisible();
   await expect(cargoSection).toBeVisible();
+
+  // Issue #199: side by side, Carried and the Cargo Hold read as two separate
+  // inventories rather than one continuous grid — each is its own bounded
+  // region, they are separated by a real gap, and neither is coloured
+  // differently from the other (the separation is grouping, not state).
+  const regions = await Promise.all(
+    [carriedSection, cargoSection].map((section) =>
+      section.evaluate((element) => {
+        const style = getComputedStyle(element);
+        const rect = element.getBoundingClientRect();
+        return {
+          left: rect.left,
+          right: rect.right,
+          backgroundColor: style.backgroundColor,
+          borderTopWidth: Number.parseFloat(style.borderTopWidth),
+          borderColor: style.borderTopColor,
+        };
+      }),
+    ),
+  );
+  const [carriedRegion, cargoRegion] = regions;
+  for (const region of regions) {
+    expect(region.backgroundColor).not.toBe("rgba(0, 0, 0, 0)");
+    expect(region.backgroundColor).not.toBe("transparent");
+    expect(region.borderTopWidth).toBeGreaterThan(0);
+  }
+  expect(cargoRegion!.backgroundColor).toBe(carriedRegion!.backgroundColor);
+  expect(cargoRegion!.borderColor).toBe(carriedRegion!.borderColor);
+  expect(cargoRegion!.left - carriedRegion!.right).toBeGreaterThanOrEqual(16);
+  // Each region still names itself and its own occupancy.
+  await expect(carriedSection.getByRole("heading", { name: "CARRIED" })).toBeVisible();
+  await expect(carriedSection).toContainText("2 / 8");
+  await expect(cargoSection.getByRole("heading", { name: "CARGO", exact: true })).toBeVisible();
+  await expect(cargoSection).toContainText("9 / 32");
+  // The Cargo Hold panel keeps exactly one CARGO HOLD title (#193): the
+  // regions group the two inventories without repeating the panel's name.
+  await expect(cargoPanel.getByRole("heading", { name: "CARGO HOLD", exact: true })).toHaveCount(1);
+  const desktopTiles = await measureRegionTiles(carriedSection);
+  for (const tile of desktopTiles) {
+    expect(tile.tileWidth).toBe(desktopTiles[0]!.tileWidth);
+    expect(tile.tileHeight).toBe(desktopTiles[0]!.tileHeight);
+    expect(tile.labelAreaHeight).toBe(desktopTiles[0]!.labelAreaHeight);
+  }
+  expect(desktopTiles.find((entry) => entry.name === "Ferrite Shale")!.clipped).toBe(false);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(1280);
 
   // Selecting a carried stack moves the selection across areas and exposes
   // Deposit actions instead.

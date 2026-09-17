@@ -75,6 +75,13 @@ Rules that follow from it:
   down the page does not.
 - **Empty slots render nothing at all** — no empty frame, no "nothing here yet"
   placeholder.
+- **Two inventories look like two inventories** (#199). Where a surface shows
+  the carried inventory beside a stored one — the Cargo Hold's desktop
+  composition — each is its own bounded region carrying its own name and
+  occupancy, with a real gap between them. Both regions use the identical
+  surface and border: the separation comes from grouping and hierarchy, never
+  from a colour that would imply the items inside differ. Narrow widths keep
+  the existing switcher and show one region at a time.
 - **Activities stay feature-owned.** `ActivityPanel`, the context rows and
   `RunSummary` are presentation: no gameplay props, no `server/` imports, no
   location or action IDs. There is no universal activity framework, no shared
@@ -87,6 +94,23 @@ activity (its Places directory is the interaction, and is out of scope for
 Power Annex has no skill or run; the Crew Stop has an activity and no resident;
 and the Crash Site's Cargo Hold is the primary activity while it is a repair and
 a secondary system once it is storage.
+
+## Item tiles: the reserved label area (Issue #199)
+
+`components/items/VisualTile.tsx` is the one item-tile treatment, and every
+fixed-size tile reserves the same label area at its bottom edge:
+`--rs-item-label-block` tall, holding up to two lines of the uppercase name at
+`--rs-item-label-line-height`. Both tokens live in `app/globals.css`.
+
+- The band is the same height whether a name needs one line (`SLAG`) or two
+  (`REFINED FERRITE`), so a mixed inventory keeps one tile geometry and scans
+  as a grid rather than as cards of different heights.
+- The name wraps normally inside the band; `line-clamp-2` spends the ellipsis
+  only on a name that cannot fit the two lines it is given.
+- The artwork layer stops where the band starts, so a second line of name never
+  covers art that a single-line name leaves visible, and the `h-20 w-20`
+  artwork still resolves at full size inside a `min-h-28` tile. Changing either
+  token without re-checking that arithmetic will start shrinking item art.
 
 ## Overlay motion
 
