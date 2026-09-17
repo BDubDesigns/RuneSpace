@@ -133,6 +133,24 @@ export const PracticeCommandRequestSchema = z.object({
   characterId: z.string().uuid(),
 });
 
+/**
+ * Work Order commands name only the character and, for acceptance, which job
+ * (#207).
+ *
+ * Deliberately no slot index, no materials, no payout, and no section count:
+ * the server resolves which posting holds that job, what it costs, and what it
+ * pays from authored content, so a client can never submit a cheaper recipe or
+ * a larger payout.
+ */
+export const WorkOrderAcceptRequestSchema = z.object({
+  characterId: z.string().uuid(),
+  workOrderId: ContentId,
+});
+
+export const WorkOrderCommandRequestSchema = z.object({
+  characterId: z.string().uuid(),
+});
+
 /** The persistent per-character Slag preference. */
 export const PracticeSlagPreferenceRequestSchema = z.object({
   characterId: z.string().uuid(),

@@ -16,6 +16,9 @@ const TRAVEL_REPLACEABLE_ACTION_IDS = new Set<string>([
   ACTION_IDS.refining,
   ...weldingActionIds(),
   ACTION_IDS.practiceWelding,
+  // Walking out of the yard interrupts a customer job under the same shared
+  // Stop/Travel semantics, preserving its durable progress (#207).
+  ACTION_IDS.workOrderWelding,
 ]);
 
 export function isTravelReplaceableAction(actionId: string): boolean {

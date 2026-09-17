@@ -8,11 +8,17 @@ import {
 import type { DatabaseTransaction } from "@/server/action-resolution";
 
 /**
- * The closed activity vocabulary Mission progress observes. Practice Welding
- * counts completed welds through this same generic path (#190) — there is no
- * Practice-specific Mission table, attempt history, or provenance tracking.
+ * The closed activity vocabulary Mission progress observes.
+ *
+ * Practice Welding counts completed welds through this same generic path
+ * (#190), and a Work Order counts completed JOBS through it (#207) — there is
+ * no Practice-specific or Work-Order-specific Mission table, attempt history,
+ * or provenance tracking. `work_order` is credited only by the authoritative
+ * Work Order completion transaction, so opening the terminal, accepting a job,
+ * committing its materials, starting the weld, or finishing a single section
+ * can none of them advance a Mission.
  */
-export type TrackedActivity = "mining" | "refining" | "practice_welding";
+export type TrackedActivity = "mining" | "refining" | "practice_welding" | "work_order";
 
 /** Return the narrow durable requirements authored by one mission. */
 export function trackedActivityRequirements(

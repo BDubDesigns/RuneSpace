@@ -45,6 +45,10 @@ const missionIds = {
   keepTheChange: asContentId("keep_the_change"),
   outOfTheWeather: asContentId("out_of_the_weather"),
   tenThousandHours: asContentId("ten_thousand_hours"),
+  // The one-time onboarding Mission for playable Work Orders (#207). Its
+  // acceptance — not its turn-in — is the permanent authorization for customer
+  // client work.
+  tenThousandOneHours: asContentId("ten_thousand_one_hours"),
 } as const satisfies Record<string, ContentId>;
 
 const dialogueIds = {
@@ -125,6 +129,27 @@ const dialogueIds = {
   wadeTenThousandHoursTurnIn: asContentId("wade_rusk_ten_thousand_hours_turn_in"),
   wadeTenThousandHoursCompletion: asContentId("wade_rusk_ten_thousand_hours_completion"),
   wadePostTenThousandHours: asContentId("wade_rusk_post_ten_thousand_hours"),
+  // 10,001 Hours (#207): Wade putting real customer work in front of the
+  // apprentice for the first time.
+  wadeTenThousandOneHoursOffer: asContentId("wade_rusk_ten_thousand_one_hours_offer"),
+  wadeTenThousandOneHoursAccepted: asContentId("wade_rusk_ten_thousand_one_hours_accepted"),
+  wadeTenThousandOneHoursWorkOrderReminder: asContentId(
+    "wade_rusk_ten_thousand_one_hours_work_order_reminder",
+  ),
+  wadeTenThousandOneHoursBusy: asContentId("wade_rusk_ten_thousand_one_hours_busy"),
+  wadeTenThousandOneHoursTurnIn: asContentId("wade_rusk_ten_thousand_one_hours_turn_in"),
+  wadeTenThousandOneHoursCompletion: asContentId("wade_rusk_ten_thousand_one_hours_completion"),
+  // The reward is a real bundle — ten Refined Ferrite and five Power Cells —
+  // so unlike 10,000 Hours the two capacity causes get their own beat: shop
+  // stock that will not fit for want of a slot is a different problem from
+  // shop stock that will not fit for want of carrying strength (#207).
+  wadeTenThousandOneHoursCapacitySlotsRefusal: asContentId(
+    "wade_rusk_ten_thousand_one_hours_capacity_slots_refusal",
+  ),
+  wadeTenThousandOneHoursCapacityMassRefusal: asContentId(
+    "wade_rusk_ten_thousand_one_hours_capacity_mass_refusal",
+  ),
+  wadePostTenThousandOneHours: asContentId("wade_rusk_post_ten_thousand_one_hours"),
   // Replayable social/worldbuilding topics (#164). These are ordinary NPC
   // conversations: they never carry a Mission action and never gate progression.
   wadeRecoveryWorkTopic: asContentId("wade_rusk_topic_recovery_work"),
@@ -202,6 +227,10 @@ export const ACTION_IDS = {
   // skill and the same section cadence as a repair, but it is not a repair
   // target: nothing is permanently fixed by it.
   practiceWelding: asContentId("practice_welding"),
+  // Welding a customer Work Order on Wade's bench (#207). One action ID covers
+  // every job in the pool: which job is on the bench is durable Work Order
+  // state, so `active_actions` keeps its narrow no-payload shape.
+  workOrderWelding: asContentId("work_order_welding"),
   travel: asContentId("travel"),
 } as const satisfies Record<string, ContentId>;
 
@@ -250,6 +279,28 @@ export const REPAIR_TARGET_IDS = {
   cargoHold: asContentId("cargo_hold"),
   crewStop: asContentId("crew_stop"),
 } as const satisfies Record<string, ContentId>;
+
+/**
+ * Stable identities for authored Work Orders (#207).
+ *
+ * A Work Order is a repeatable paying client job, not a repair target and not a
+ * Mission: it has no permanent completion, no per-job gate, and no authored
+ * completion scene. The job's fiction, recipe, section count, and payout are
+ * content (`game/content/work-orders`); the board rules every job obeys are
+ * balance (`game/config/balance` `workOrders`).
+ */
+export const WORK_ORDER_IDS = {
+  rennCarryFrame: asContentId("renn_carry_frame"),
+  vossHeaterHousing: asContentId("voss_heater_housing"),
+  bixShopShelving: asContentId("bix_shop_shelving"),
+  tansyCutterHousing: asContentId("tansy_cutter_housing"),
+  maraBedFrame: asContentId("mara_bed_frame"),
+  stempSpeederRack: asContentId("stemp_speeder_rack"),
+  larkinHandWinch: asContentId("larkin_hand_winch"),
+  mottCargoDolly: asContentId("mott_cargo_dolly"),
+} as const satisfies Record<string, ContentId>;
+
+export type WorkOrderId = (typeof WORK_ORDER_IDS)[keyof typeof WORK_ORDER_IDS];
 
 /**
  * Stable identities for authored transport routes (#172).

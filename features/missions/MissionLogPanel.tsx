@@ -134,18 +134,32 @@ function MissionEntry({
               className="mt-3 border-t border-[color:var(--rs-border-subtle)] pt-3 text-sm text-[color:var(--rs-text-secondary)]"
               data-mission-log-reward
             >
-              Reward earned:{" "}
-              {mission.earnedReward.kind === "item"
-                ? mission.earnedReward.itemName
-                : mission.earnedReward.kind === "credits"
-                  ? `+${mission.earnedReward.amount} Credits`
-                  : `+${mission.earnedReward.amount} ${mission.earnedReward.skillName} XP`}
+              Reward earned: {earnedRewardSummary(mission.earnedReward)}
             </p>
           ) : null}
         </div>
       ) : null}
     </div>
   );
+}
+
+/**
+ * One line describing what a completed Mission actually paid.
+ *
+ * A bundle lists its items rather than collapsing to a count, because "Reward
+ * earned: 2 items" tells the player nothing they wanted to know.
+ */
+function earnedRewardSummary(reward: NonNullable<MissionProjection["earnedReward"]>): string {
+  switch (reward.kind) {
+    case "item":
+      return reward.itemName;
+    case "credits":
+      return `+${reward.amount} Credits`;
+    case "stack_bundle":
+      return reward.items.map((entry) => `${entry.itemName} x${entry.quantity}`).join(", ");
+    default:
+      return `+${reward.amount} ${reward.skillName} XP`;
+  }
 }
 
 export function MissionLogPanel({

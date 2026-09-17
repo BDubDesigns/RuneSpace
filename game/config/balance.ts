@@ -51,21 +51,33 @@ const balanceSchema = z.object({
     attemptDurationTicks: z.literal(5),
     xpPerIncrement: z.literal(50),
     /**
-     * Clean Pass (#190) is a general Welding mechanic, not a Practice feature:
-     * every current Welding work unit — Practice welds and both authored
-     * repairs — rolls exactly two optional opportunity sections once.
+     * Clean Pass (#190, generalized by #207) is a general Welding mechanic, not
+     * a Practice feature: every Welding work unit — Practice welds, both
+     * authored repairs, and every customer Work Order — rolls its opportunity
+     * sections once, from this one cadence.
      *
-     * The first is `first` sections in; the second is that many sections later
-     * again, so the pair lands at 2-4 and 4-8. The two-section minimum spacing
-     * is what stops a claimed first opportunity from stepping over the second.
-     * The window is deliberately not a value of its own: an opportunity lasts
-     * exactly one ordinary Welding section.
+     * The cadence is expressed as a rhythm rather than a fixed pair, because
+     * Work Orders are 8 to 19 sections long and two opportunities on the
+     * longest of them would have been the same mechanic stretched thin. One
+     * opportunity per `sectionsPerOpportunity`, each rolled inside a
+     * `windowLengthSections`-wide window starting at `windowStartSection` and
+     * repeating on the same period — 2-4, 7-9, 12-14, and so on.
+     *
+     * `trailingOrdinarySections` is the invariant that makes a claim safe on
+     * any length: the final window shifts left far enough that this many
+     * ordinary sections always remain behind the last possible opportunity, so
+     * a Clean Pass can never complete the work unit. `game/domain/clean-pass`
+     * derives the windows; nothing re-derives them per job.
+     *
+     * The open window is deliberately not a value of its own: an opportunity
+     * lasts exactly one ordinary Welding section.
      */
     cleanPass: z.object({
-      firstOpportunityMinSection: z.literal(2),
-      firstOpportunityMaxSection: z.literal(4),
-      secondOpportunityMinOffset: z.literal(2),
-      secondOpportunityMaxOffset: z.literal(4),
+      minimumSectionsForOpportunity: z.literal(6),
+      sectionsPerOpportunity: z.literal(5),
+      windowStartSection: z.literal(2),
+      windowLengthSections: z.literal(3),
+      trailingOrdinarySections: z.literal(2),
       /** Server-only network grace; the client-visible window stays one section. */
       claimGraceMs: z.literal(1_000),
     }),
@@ -110,12 +122,45 @@ const balanceSchema = z.object({
     capacitySlots: z.literal(32),
   }),
   /**
-   * Work Orders (#190). This slice ships none of them: the only authored fact
-   * is the Welding level real client work will require, which the revealed
-   * terminal states plainly instead of leaving the player guessing.
+   * Work Orders (#190, made playable by #207) — the paying client jobs that
+   * arrive through Wade's terminal.
+   *
+   * The authored pool itself is content (`game/content/work-orders`). What
+   * belongs here is the small set of genuinely global rules every job obeys:
+   * the Welding level client work requires, the board's shape, the XP share a
+   * customer job pays, and the payout rule the authored Credit values are
+   * validated against.
    */
   workOrders: z.object({
+    actionId: z.literal(ACTION_IDS.workOrderWelding),
+    skillId: z.literal(SKILL_IDS.welding),
     requiredWeldingLevel: z.literal(5),
+    /** Distinct jobs the board posts at once. */
+    postedSlots: z.literal(3),
+    /**
+     * A customer job pays 40% of the global Welding XP per section — twice
+     * Practice's share because something real is being repaired, and well under
+     * an authored story repair's full rate because a repeatable shop job should
+     * not out-earn the authored work. Derived, never a second frozen constant.
+     */
+    xpShareBps: z.literal(4_000),
+    /**
+     * The one payout rule (#207). `rawPayout = base + sections × perSection +
+     * materialReplacementValue × premium`, rounded up to the next
+     * `roundUpToCredits`.
+     *
+     * The fixed base is intentional: it keeps a short job attractive on a
+     * Credits-per-minute basis instead of every job collapsing to the same
+     * perfectly-scaled rate. Replacement value is what the player would pay to
+     * replace the material, derived from the merchant registry rather than
+     * restated here — see `workOrderMaterialReplacementValue`.
+     */
+    payout: z.object({
+      baseCredits: z.literal(25),
+      creditsPerSection: z.literal(3),
+      materialPremiumBps: z.literal(11_000),
+      roundUpToCredits: z.literal(5),
+    }),
   }),
   travel: z.object({
     actionId: z.literal(ACTION_IDS.travel),
@@ -243,10 +288,11 @@ const defaults = balanceSchema.parse({
     attemptDurationTicks: 5,
     xpPerIncrement: 50,
     cleanPass: {
-      firstOpportunityMinSection: 2,
-      firstOpportunityMaxSection: 4,
-      secondOpportunityMinOffset: 2,
-      secondOpportunityMaxOffset: 4,
+      minimumSectionsForOpportunity: 6,
+      sectionsPerOpportunity: 5,
+      windowStartSection: 2,
+      windowLengthSections: 3,
+      trailingOrdinarySections: 2,
       claimGraceMs: 1_000,
     },
   },
@@ -278,7 +324,17 @@ const defaults = balanceSchema.parse({
     capacitySlots: 32,
   },
   workOrders: {
+    actionId: ACTION_IDS.workOrderWelding,
+    skillId: SKILL_IDS.welding,
     requiredWeldingLevel: 5,
+    postedSlots: 3,
+    xpShareBps: 4_000,
+    payout: {
+      baseCredits: 25,
+      creditsPerSection: 3,
+      materialPremiumBps: 11_000,
+      roundUpToCredits: 5,
+    },
   },
   travel: {
     actionId: ACTION_IDS.travel,
@@ -367,6 +423,18 @@ export function repairTargetForActionId(
  */
 export function practiceSectionXp(balance = getEffectiveGameBalance()): number {
   return Math.floor((balance.welding.xpPerIncrement * balance.practiceWelding.xpShareBps) / 10_000);
+}
+
+/**
+ * The XP one completed Work Order Welding section awards.
+ *
+ * The same derivation as Practice, from the same global Welding XP, at the
+ * authored customer-work share — 40%, so 20 XP of the global 50. Keeping both
+ * as shares is what stops the three Welding activities from drifting into
+ * three unrelated numbers that nobody can compare (#207).
+ */
+export function workOrderSectionXp(balance = getEffectiveGameBalance()): number {
+  return Math.floor((balance.welding.xpPerIncrement * balance.workOrders.xpShareBps) / 10_000);
 }
 
 /** Every welding action ID the repair-target registry authorizes. */

@@ -20,9 +20,9 @@ import {
 /**
  * The real completion reward shapes proven by production content. A mission
  * grants at most one reward: an inventory item (Walk It Off), skill XP through
- * the authoritative progression boundary (Cut Your Teeth), or Credits
- * (10,000 Hours). Deliberately narrow — no reputation, bundles, or effect
- * lists.
+ * the authoritative progression boundary (Cut Your Teeth), Credits
+ * (10,000 Hours), or one all-or-nothing stackable bundle (10,001 Hours).
+ * Deliberately narrow — no reputation, multi-reward missions, or effect lists.
  *
  * Item rewards are granted as ONE new unique item instance (the generic
  * completion boundary's sole item execution path); registry validation
@@ -35,7 +35,23 @@ import {
 export type MissionReward =
   | { kind: "item"; itemId: ItemId }
   | { kind: "skill_xp"; skillId: SkillId; amount: number }
-  | { kind: "credits"; amount: number };
+  | { kind: "credits"; amount: number }
+  /**
+   * Several stackable items granted TOGETHER as one all-or-nothing bundle
+   * (#207).
+   *
+   * Deliberately its own kind rather than an array of rewards: everything in a
+   * bundle lands in one transaction or none of it does, and its capacity is
+   * preflighted as one combined grant against an evolving hypothetical
+   * inventory — never by proving each item fits independently from the same
+   * starting snapshot, which would wrongly accept two items that each fit alone
+   * but not together. 10,001 Hours' ten Refined Ferrite and five Power Cells
+   * are the first real need for it.
+   */
+  | { kind: "stack_bundle"; items: readonly MissionRewardStackItem[] };
+
+/** One stackable line of a `stack_bundle` reward. */
+export type MissionRewardStackItem = { itemId: ItemId; quantity: number };
 
 /**
  * An authored effect applied when one offer route's acceptance commits.
@@ -123,7 +139,7 @@ export type MissionRequirement =
       /** Stable identity for this requirement's durable progress row. */
       progressKey: string;
       /** Closed production activity vocabulary owned by the gameplay boundary. */
-      activity: "mining" | "refining" | "practice_welding";
+      activity: "mining" | "refining" | "practice_welding" | "work_order";
       /**
        * Closed production metric vocabulary: one resolved unit of that
        * activity. For Mining and Refining that is a resolved attempt; for
@@ -305,6 +321,13 @@ export type MissionDialogue = {
   capacityMassDialogueId?: DialogueId;
 };
 
+/** One authored minimum skill level a mission requires before it is offered. */
+export type MissionSkillPrerequisite = {
+  skillId: SkillId;
+  /** Positive integer level on that skill's approved progression curve. */
+  level: number;
+};
+
 export type MissionDefinition = {
   id: MissionId;
   title: string;
@@ -314,6 +337,21 @@ export type MissionDefinition = {
    * or accepted. Absent for the first mission in the chain.
    */
   prerequisiteMissionId?: MissionId;
+  /**
+   * An authored skill-level prerequisite (#207).
+   *
+   * Like `prerequisiteMissionId`, this is an eligibility rule and never a
+   * reveal mechanism: below the level the mission is simply not offered and
+   * cannot be accepted, at the offer NPC or anywhere else. Projection derives
+   * it and the authoritative acceptance command revalidates it from the same
+   * authored content, so no surface holds a level literal of its own and no
+   * Mission-specific check exists in a command.
+   *
+   * 10,001 Hours is the first use: Wade will not put customer property in front
+   * of an apprentice below Welding 5, which is a rule about the work rather
+   * than about Wade.
+   */
+  prerequisiteSkillLevel?: MissionSkillPrerequisite;
   /**
    * Explicitly authored automatic continuation: when this mission
    * successfully completes, the generic completion boundary atomically
@@ -748,6 +786,86 @@ export const TEN_THOUSAND_HOURS: MissionDefinition = {
   ],
 };
 
+/**
+ * 10,001 Hours — the one-time onboarding for playable Work Orders (#207).
+ *
+ * Two things make it unusual, and both are generic framework features rather
+ * than Mission-specific code. It is the first mission with an authored skill
+ * prerequisite, because Wade's refusal to hand an under-trained apprentice a
+ * customer's property is a rule about the work rather than about him. And its
+ * ACCEPTANCE — not its turn-in — is the permanent authorization for the Work
+ * Orders board, exactly as 10,000 Hours' acceptance opened the Workbench and
+ * the Trade counter. Turning it in is Wade looking at the work, not a second
+ * gate: the board stays usable with the objective already at 1/1 and Wade
+ * still waiting.
+ *
+ * The requirement observes real Work Order completions through the same generic
+ * tracked-activity path Mining, Refining and Practice use, so only the
+ * authoritative completion transaction can advance it — never opening the
+ * terminal, accepting a job, committing materials, or welding a section.
+ */
+export const TEN_THOUSAND_ONE_HOURS: MissionDefinition = {
+  id: MISSION_IDS.tenThousandOneHours,
+  title: "10,001 Hours",
+  summary: "Take a paying job off Wade Rusk's Work Orders terminal and finish it.",
+  prerequisiteMissionId: MISSION_IDS.tenThousandHours,
+  // The board's own authored requirement, expressed once, where projection and
+  // the acceptance command both read it.
+  prerequisiteSkillLevel: { skillId: SKILL_IDS.welding, level: 5 },
+  offers: [
+    {
+      npcId: NPC_IDS.wadeRusk,
+      locationId: LOCATION_IDS.ruskRecovery,
+      dialogueId: DIALOGUE_IDS.wadeTenThousandOneHoursOffer,
+      actionLabel: "TAKE THE WORK",
+      acceptedContinuation: { dialogueId: DIALOGUE_IDS.wadeTenThousandOneHoursAccepted },
+      // No acceptance effect: the player buys their own material for a client
+      // job, which is the whole point of the recipe being paid up front.
+    },
+  ],
+  requirements: [
+    {
+      kind: "tracked_activity",
+      progressKey: "work-orders-completed",
+      activity: "work_order",
+      metric: "attempts",
+      target: 1,
+      objective: "Complete 1 Work Order — {current} / {target}",
+      recommendedActionId: ACTION_IDS.workOrderWelding,
+    },
+  ],
+  turnIn: {
+    npcId: NPC_IDS.wadeRusk,
+    locationId: LOCATION_IDS.ruskRecovery,
+    requiresStationary: true,
+    objective: "Show Wade Rusk the finished job at Rusk Recovery",
+    dialogueId: DIALOGUE_IDS.wadeTenThousandOneHoursTurnIn,
+    actionLabel: "SHOW HIM THE JOB",
+  },
+  // Shop stock, handed over together or not at all. Deliberately not Credits:
+  // the job already paid those, and what Wade is solving is the apprentice
+  // stopping work to go shopping for their own material.
+  reward: {
+    kind: "stack_bundle",
+    items: [
+      { itemId: ITEM_IDS.refinedFerrite, quantity: 10 },
+      { itemId: ITEM_IDS.powerCell, quantity: 5 },
+    ],
+  },
+  dialogue: {
+    trackedActivityReminderDialogueId: DIALOGUE_IDS.wadeTenThousandOneHoursWorkOrderReminder,
+    busyDialogueId: DIALOGUE_IDS.wadeTenThousandOneHoursBusy,
+    completionPresentationDialogueId: DIALOGUE_IDS.wadeTenThousandOneHoursCompletion,
+    // The bundle is large enough that slots and mass are genuinely different
+    // problems, so unlike 10,000 Hours each cause gets its own authored beat.
+    capacitySlotsDialogueId: DIALOGUE_IDS.wadeTenThousandOneHoursCapacitySlotsRefusal,
+    capacityMassDialogueId: DIALOGUE_IDS.wadeTenThousandOneHoursCapacityMassRefusal,
+  },
+  completedNpcDialogue: [
+    { npcId: NPC_IDS.wadeRusk, dialogueId: DIALOGUE_IDS.wadePostTenThousandOneHours },
+  ],
+};
+
 export const MISSIONS: readonly MissionDefinition[] = [
   WALK_IT_OFF,
   CUT_YOUR_TEETH,
@@ -755,6 +873,7 @@ export const MISSIONS: readonly MissionDefinition[] = [
   HOLD_IT_TOGETHER,
   KEEP_THE_CHANGE,
   TEN_THOUSAND_HOURS,
+  TEN_THOUSAND_ONE_HOURS,
   // The optional branch sits after the main chain: it is never a prerequisite
   // for anything, and completing or ignoring it changes nothing upstream.
   OUT_OF_THE_WEATHER,

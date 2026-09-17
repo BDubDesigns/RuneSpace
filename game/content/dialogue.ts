@@ -229,6 +229,11 @@ function wadeSkillXpBeat(skillId: SkillId, amount: number): DialogueBeat {
   return { kind: "skill_xp", skillId, amount, backgroundId: crash, text: "" };
 }
 
+/** An item beat against Wade's own yard, for anything handed over at the bench. */
+function wadeYardItemBeat(itemId: ItemId, quantity: number, text = ""): DialogueBeat {
+  return { kind: "item", itemId, quantity, backgroundId: ruskYard, text };
+}
+
 function rennSkillXpBeat(skillId: SkillId, amount: number): DialogueBeat {
   return { kind: "skill_xp", skillId, amount, backgroundId: assistanceCenter, text: "" };
 }
@@ -1395,6 +1400,135 @@ const dialogue = {
       wadeAtYard(
         EXPRESSION_IDS.neutral,
         "Ten thousand hours, the old hands say. You've got a few of them behind you now.",
+      ),
+    ],
+  },
+  // 10,001 Hours (#207). Wade is plainly proud of the apprentice and says so
+  // by refusing to: the compliment arrives, gets undercut in the next sentence,
+  // and the actual reason he is handing over client work is that the terminal
+  // is beating him. Short declaratives, no exclamation marks, no ceremony.
+  [DIALOGUE_IDS.wadeTenThousandOneHoursOffer]: {
+    id: DIALOGUE_IDS.wadeTenThousandOneHoursOffer,
+    npcId: NPC_IDS.wadeRusk,
+    beats: [
+      wadeAtYard(EXPRESSION_IDS.neutral, "Hm. You're getting decent with that torch."),
+      wadeAtYard(EXPRESSION_IDS.scowl, "Decent. Don't write it down anywhere."),
+      wadeAtYard(
+        EXPRESSION_IDS.neutral,
+        "Normally I wouldn't put a customer's property in front of you yet. Not for a while.",
+      ),
+      wadeAtYard(
+        EXPRESSION_IDS.neutral,
+        "But that terminal's stacking orders faster than I'm clearing them, and there's one of me.",
+      ),
+      wadeAtYard(
+        EXPRESSION_IDS.neutral,
+        "So you're ready. Or you're not, and you're what I've got. Take a job off the board. Do it properly.",
+      ),
+      wadeAtYard(
+        EXPRESSION_IDS.neutral,
+        "One. Then come back here and I'll look at it before you touch a second.",
+      ),
+    ],
+  },
+  [DIALOGUE_IDS.wadeTenThousandOneHoursAccepted]: {
+    id: DIALOGUE_IDS.wadeTenThousandOneHoursAccepted,
+    npcId: NPC_IDS.wadeRusk,
+    beats: [
+      wadeAtYard(
+        EXPRESSION_IDS.neutral,
+        "Board's yours now. It stays yours. I'm not going to keep unlocking it for you.",
+      ),
+      wadeAtYard(
+        EXPRESSION_IDS.neutral,
+        "Bring the material yourself. A job doesn't start until it's paid for out of your own pocket.",
+      ),
+    ],
+  },
+  [DIALOGUE_IDS.wadeTenThousandOneHoursWorkOrderReminder]: {
+    id: DIALOGUE_IDS.wadeTenThousandOneHoursWorkOrderReminder,
+    npcId: NPC_IDS.wadeRusk,
+    beats: [
+      wadeAtYard(
+        EXPRESSION_IDS.neutral,
+        "Terminal's over there. Board's not going to read itself.",
+      ),
+      wadeAtYard(EXPRESSION_IDS.neutral, "Pick one. Finish it. Then we'll talk."),
+    ],
+  },
+  [DIALOGUE_IDS.wadeTenThousandOneHoursBusy]: {
+    id: DIALOGUE_IDS.wadeTenThousandOneHoursBusy,
+    npcId: NPC_IDS.wadeRusk,
+    beats: [
+      wadeAtYard(EXPRESSION_IDS.neutral, "You're in the middle of something. Finish that first."),
+    ],
+  },
+  [DIALOGUE_IDS.wadeTenThousandOneHoursTurnIn]: {
+    id: DIALOGUE_IDS.wadeTenThousandOneHoursTurnIn,
+    npcId: NPC_IDS.wadeRusk,
+    beats: [
+      wadeAtYard(EXPRESSION_IDS.neutral, "All right. Let's see it."),
+      wadeAtYard(EXPRESSION_IDS.neutral, "Hold still. I'm looking at the seam, not at you."),
+    ],
+  },
+  [DIALOGUE_IDS.wadeTenThousandOneHoursCompletion]: {
+    id: DIALOGUE_IDS.wadeTenThousandOneHoursCompletion,
+    npcId: NPC_IDS.wadeRusk,
+    beats: [
+      wadeAtYard(EXPRESSION_IDS.neutral, "Hm."),
+      wadeAtYard(
+        EXPRESSION_IDS.neutral,
+        "I've been at that for a minute and I can't find enough wrong with it to complain about.",
+      ),
+      wadeAtYard(EXPRESSION_IDS.scowl, "Don't make a thing out of that."),
+      wadeAtYard(
+        EXPRESSION_IDS.neutral,
+        "Shop stock. Ferrite and cells. You'll go through it, and I'd rather you didn't stop working to go shopping.",
+      ),
+      // One beat per stack, because an item beat presents a single stack and
+      // ten Refined Ferrite is two of them — which is also exactly how the
+      // bundle lands in the player's Inventory.
+      wadeYardItemBeat(ITEM_IDS.refinedFerrite, 5),
+      wadeYardItemBeat(ITEM_IDS.refinedFerrite, 5),
+      wadeYardItemBeat(ITEM_IDS.powerCell, 5),
+      wadeAtYard(EXPRESSION_IDS.neutral, "Board's still up. Take the next one when you want it."),
+    ],
+  },
+  // Unlike 10,000 Hours' one shared beat, the bundle is big enough that the two
+  // causes are genuinely different problems, and Wade has something separate to
+  // say about each.
+  [DIALOGUE_IDS.wadeTenThousandOneHoursCapacitySlotsRefusal]: {
+    id: DIALOGUE_IDS.wadeTenThousandOneHoursCapacitySlotsRefusal,
+    npcId: NPC_IDS.wadeRusk,
+    beats: [
+      wadeAtYard(EXPRESSION_IDS.scowl, "Where exactly were you planning to put it?"),
+      wadeAtYard(
+        EXPRESSION_IDS.neutral,
+        "Ten ferrite and five cells. All of it or none of it. I'm not splitting shop stock into a pile on the ground.",
+      ),
+      wadeAtYard(EXPRESSION_IDS.neutral, "Clear some space. Come back."),
+    ],
+  },
+  [DIALOGUE_IDS.wadeTenThousandOneHoursCapacityMassRefusal]: {
+    id: DIALOGUE_IDS.wadeTenThousandOneHoursCapacityMassRefusal,
+    npcId: NPC_IDS.wadeRusk,
+    beats: [
+      wadeAtYard(EXPRESSION_IDS.scowl, "You can barely stand up as it is."),
+      wadeAtYard(
+        EXPRESSION_IDS.neutral,
+        "Ten ferrite and five cells. That's weight. All of it or none of it.",
+      ),
+      wadeAtYard(EXPRESSION_IDS.neutral, "Put something down. Come back."),
+    ],
+  },
+  [DIALOGUE_IDS.wadePostTenThousandOneHours]: {
+    id: DIALOGUE_IDS.wadePostTenThousandOneHours,
+    npcId: NPC_IDS.wadeRusk,
+    beats: [
+      wadeAtYard(EXPRESSION_IDS.neutral, "Board's up. Bench is open. Scrap's still two credits."),
+      wadeAtYard(
+        EXPRESSION_IDS.neutral,
+        "You don't need me standing over the terminal. Take what you can finish.",
       ),
     ],
   },

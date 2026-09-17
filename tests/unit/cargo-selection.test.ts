@@ -47,7 +47,14 @@ function cargoState(): PlayGameplayState {
     missions: [],
     location: { currentLocationId: "crash_site" },
     repairs: {},
-    workOrders: { revealed: false, requiredWeldingLevel: 5, meetsWeldingLevel: false },
+    workOrders: {
+      revealed: false,
+      requiredWeldingLevel: 5,
+      meetsWeldingLevel: false,
+      unlocked: false,
+      missionAvailable: false,
+      postings: [],
+    },
     practice: {
       unlocked: false,
       active: false,

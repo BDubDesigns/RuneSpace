@@ -41,6 +41,7 @@ function snapshot(overrides: Partial<PracticeSnapshot> = {}): PracticeSnapshot {
     slotsAvailable: 8,
     massAvailableGrams: 50_000,
     autoDiscardSlag: false,
+    finishCurrentWeld: false,
     ...overrides,
   };
 }
@@ -239,13 +240,82 @@ describe("continuous runs", () => {
     expect(resolved.sectionsResolved).toBe(0);
     expect(resolved.consumedTicks).toBe(0);
   });
+
+  it("keeps starting fresh welds normally when finishCurrentWeld is explicitly false", () => {
+    // Passing the field through at all must not change ordinary continuous
+    // behaviour: this mirrors "begins the next weld the instant the last one
+    // finishes" above, with the field set instead of defaulted.
+    const resolved = resolve(practiceWelding.sectionsPerWeld * 3 * sectionTicks, {
+      scrapAvailable: 6,
+      finishCurrentWeld: false,
+    });
+    expect(resolved.completedWelds).toBe(3);
+    expect(resolved.scrapConsumed).toBe(6);
+    expect(resolved.stopReason).toBe("out_of_scrap");
+    expect(resolved.finishCurrentWeldHonoured).toBe(false);
+  });
+});
+
+/**
+ * "Finish Current Weld and Stop" (#207): the narrow third intent between
+ * ordinary Stop (preserves the partial weld) and letting the run continue
+ * (spends two more Scrap the instant this weld completes).
+ */
+describe("finishing the current weld and stopping", () => {
+  const partial = {
+    sectionsCompleted: practiceWelding.sectionsPerWeld - 4,
+    cycleActive: true,
+    cleanPass: UNROLLED_CLEAN_PASS,
+  };
+
+  it("lets the already-paid weld finish, spends no further Scrap, and starts no next one", () => {
+    const resolved = resolve(4 * sectionTicks, {
+      practice: partial,
+      scrapAvailable: 6,
+      finishCurrentWeld: true,
+    });
+    expect(resolved.completedWelds).toBe(1);
+    expect(resolved.scrapConsumed).toBe(0);
+    expect(resolved.stopReason).toBe("finished_current_weld");
+    expect(resolved.finishCurrentWeldHonoured).toBe(true);
+    expect(resolved.practice.cycleActive).toBe(false);
+    expect(resolved.practice.sectionsCompleted).toBe(0);
+  });
+
+  it("completes exactly one weld, however much time is left over afterwards", () => {
+    const resolved = resolve(practiceWelding.sectionsPerWeld * 5 * sectionTicks, {
+      practice: partial,
+      scrapAvailable: 20,
+      finishCurrentWeld: true,
+    });
+    expect(resolved.completedWelds).toBe(1);
+    expect(resolved.scrapConsumed).toBe(0);
+    expect(resolved.stopReason).toBe("finished_current_weld");
+    expect(resolved.practice.cycleActive).toBe(false);
+  });
+
+  it("stops immediately, with nothing to finish, when no weld was in progress", () => {
+    const resolved = resolve(practiceWelding.sectionsPerWeld * sectionTicks, {
+      scrapAvailable: 6,
+      finishCurrentWeld: true,
+    });
+    expect(resolved.completedWelds).toBe(0);
+    expect(resolved.scrapConsumed).toBe(0);
+    expect(resolved.stopReason).toBe("finished_current_weld");
+    expect(resolved.finishCurrentWeldHonoured).toBe(true);
+  });
 });
 
 describe("a partial weld the player already paid for", () => {
   const partial = {
     sectionsCompleted: 6,
     cycleActive: true,
-    cleanPass: { firstSection: 3, secondSection: 6, firstOutcome: null, secondOutcome: null },
+    cleanPass: {
+      opportunities: [
+        { section: 3, outcome: null },
+        { section: 6, outcome: null },
+      ],
+    },
   };
 
   it("resumes with no Scrap left at all", () => {
@@ -261,8 +331,8 @@ describe("a partial weld the player already paid for", () => {
 
   it("keeps its already-rolled Clean Pass placement across the resume", () => {
     const resolved = resolve(sectionTicks, { practice: partial, scrapAvailable: 0 });
-    expect(resolved.practice.cleanPass.firstSection).toBe(3);
-    expect(resolved.practice.cleanPass.secondSection).toBe(6);
+    expect(resolved.practice.cleanPass.opportunities![0]!.section).toBe(3);
+    expect(resolved.practice.cleanPass.opportunities![1]!.section).toBe(6);
   });
 
   it("clears the placement only when that weld is finished", () => {
@@ -286,7 +356,9 @@ describe("a partial weld the player already paid for", () => {
       random: varying,
       balance,
     });
-    expect(first.practice.cleanPass.firstSection).not.toBe(second.practice.cleanPass.firstSection);
+    expect(first.practice.cleanPass.opportunities![0]!.section).not.toBe(
+      second.practice.cleanPass.opportunities![0]!.section,
+    );
   });
 });
 

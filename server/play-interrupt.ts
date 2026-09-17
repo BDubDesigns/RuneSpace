@@ -11,6 +11,7 @@ import { repairTargetForActionId, weldingActionIds } from "@/game/config/balance
 import { ACTION_IDS } from "@/game/config/foundations";
 import type { DatabaseTransaction } from "@/server/action-resolution";
 import { interruptPracticeWelding } from "@/server/practice-welding";
+import { missOpenWorkOrderCleanPass } from "@/server/work-orders";
 import { missOpenRepairCleanPass } from "@/server/welding";
 
 /**
@@ -96,6 +97,15 @@ export async function forceIdleResolvedAction(
   // the player's own Stop, and Travel cannot drift apart (#190).
   if (actionId === ACTION_IDS.practiceWelding) {
     await interruptPracticeWelding(transaction, character.id, now);
+    return { interrupted: true, interruptedActionId: actionId };
+  }
+
+  // A customer Work Order: the accepted job, its paid materials, and its
+  // resolved sections all stay exactly where they are. Only an open Clean Pass
+  // window is spent, through the same helper Stop and Travel use (#207).
+  if (actionId === ACTION_IDS.workOrderWelding) {
+    await missOpenWorkOrderCleanPass(transaction, { characterId: character.id, now });
+    await transaction.delete(activeActions).where(eq(activeActions.characterId, character.id));
     return { interrupted: true, interruptedActionId: actionId };
   }
 

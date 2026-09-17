@@ -22,8 +22,15 @@ export const RUSK_RECOVERY_CONTENT: {
   locationId: LocationId;
   practiceAuthorizingMissionId: MissionId;
   workOrdersRevealMissionId: MissionId;
+  workOrdersMissionId: MissionId;
 } = {
   locationId: LOCATION_IDS.ruskRecovery,
   practiceAuthorizingMissionId: MISSION_IDS.tenThousandHours,
+  // Completing 10,000 Hours reveals the terminal as a real surface (#190)...
   workOrdersRevealMissionId: MISSION_IDS.tenThousandHours,
+  // ...and ACCEPTING 10,001 Hours is the permanent authorization for playable
+  // client work (#207). Deliberately two fields for two different moments: the
+  // terminal becomes visible long before it becomes the player's to use, and
+  // turning 10,001 Hours in is never a second gate.
+  workOrdersMissionId: MISSION_IDS.tenThousandOneHours,
 };

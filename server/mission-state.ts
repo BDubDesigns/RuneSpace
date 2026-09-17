@@ -9,6 +9,7 @@ import {
   getEffectiveGameBalance,
   getItemDefinition,
   getRepairTargetBalance,
+  standardSkillLevelThresholds,
 } from "@/game/config/balance";
 import { CONVERSATION_TOPICS } from "@/game/content/conversation-topics";
 import { LOCAL_PLACES } from "@/game/content/local-places";
@@ -26,6 +27,7 @@ import {
   type MissionProjection,
 } from "@/game/domain/missions";
 import type { DatabaseTransaction } from "@/server/action-resolution";
+import { characterSkillLevels } from "@/server/skill-levels";
 import { loadRepairTargetStates } from "@/server/welding";
 import { loadOwnedItemInstances } from "@/server/carried-inventory";
 import { resolveItemPresentation } from "@/game/content/item-presentation";
@@ -67,7 +69,7 @@ export async function loadMissionProjections(
   characterId: string,
   input: { currentLocationId: string; activeActionId?: string },
 ): Promise<readonly MissionProjection[]> {
-  const [rows, progressRows, itemState, stackRows, assignmentRows, repairStates] =
+  const [rows, progressRows, itemState, stackRows, assignmentRows, repairStates, skillLevels] =
     await Promise.all([
       transaction
         .select()
@@ -89,6 +91,17 @@ export async function loadMissionProjections(
         .where(eq(equippedItems.characterId, characterId))
         .for("update"),
       loadRepairTargetStates(transaction, characterId),
+      // Every skill an authored `prerequisiteSkillLevel` names, so projection
+      // derives the gate from the same authoritative level the player sees
+      // rather than from a literal on a surface (#207).
+      characterSkillLevels(
+        transaction,
+        characterId,
+        missionPrerequisiteSkills().map((skillId) => ({
+          skillId,
+          thresholds: standardSkillLevelThresholds(),
+        })),
+      ),
     ]);
   const byMissionId = new Map(rows.map((row) => [row.missionId, row]));
   const progressByMissionId = new Map<string, Map<string, number>>();
@@ -103,6 +116,7 @@ export async function loadMissionProjections(
     itemState.carriedInstances,
     stackRows,
     repairStates,
+    skillLevels,
   );
   return MISSIONS.map((mission) => {
     const trackedProgress = progressByMissionId.get(mission.id);
@@ -208,6 +222,7 @@ function buildObservation(
   carriedInstances: readonly { id: string; itemId: string }[],
   stackRows: readonly { itemId: string; quantity: number }[],
   repairStates: ReadonlyMap<string, RepairTargetState>,
+  skillLevels: ReadonlyMap<string, number>,
 ): MissionObservation {
   const balance = getEffectiveGameBalance();
   const carriedById = new Map(carriedInstances.map((instance) => [instance.id, instance.itemId]));
@@ -251,7 +266,21 @@ function buildObservation(
     stackLimits,
     itemNames,
     repairTargets,
+    skillLevels,
   };
+}
+
+/** Every skill any authored mission prerequisite names, deduplicated. */
+export function missionPrerequisiteSkills(
+  definitions: readonly MissionDefinition[] = MISSIONS,
+): readonly string[] {
+  return [
+    ...new Set(
+      definitions.flatMap((definition) =>
+        definition.prerequisiteSkillLevel ? [definition.prerequisiteSkillLevel.skillId] : [],
+      ),
+    ),
+  ];
 }
 
 /** Every item any authored repair recipe consumes, for authoritative naming. */
