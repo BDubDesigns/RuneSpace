@@ -270,13 +270,15 @@ there is no route through the current game that avoids Wade.
 **Mission / story involvement.** Offers **Walk It Off**; takes the **Waste Not**
 turn-in; offers and turns in **Hold It Together**; offers **Keep the Change**
 (handing over 24 Credits on acceptance); offers and turns in **10,000 Hours**
-(handing over six Scrap Metal on acceptance, paying 50 Credits on completion).
-Replayable topic: **Recovery work**, always available. Structure and exact
-values live in `game/content/missions.ts`.
+(handing over six Scrap Metal on acceptance, paying 50 Credits on completion);
+offers and turns in **10,001 Hours** (granting a bundle of 10 Refined Ferrite
++ 5 Power Cells on completion — shop stock so the apprentice does not have to
+stop working mid-shift to go and buy their own). Replayable topic: **Recovery
+work**, always available. Structure and exact values live in
+`game/content/missions.ts`.
 
 **Work, business, and equipment context.** The richest inventory of any NPC,
-and the most useful for later Work Orders. All `SHIPPED / PUBLIC-SAFE` unless
-noted:
+and the most useful for Work Orders. All `SHIPPED / PUBLIC-SAFE` unless noted:
 
 - **Rusk Recovery** itself — *"salvaged machinery and stripped components racked
   in rows, damaged speeders waiting their turn, and a welding bench somebody
@@ -287,8 +289,13 @@ noted:
 - **The workbench** — a real workbench, opened to the player by 10,000 Hours'
   acceptance; Practice Welding happens here.
 - **The Work Orders terminal** — *"that terminal in the corner is where the
-  paying jobs come in."* Revealed by 10,000 Hours' completion. Empty in the
-  current build.
+  paying jobs come in."* Revealed by 10,000 Hours' completion, still empty at
+  that point. **10,001 Hours' acceptance**, not its turn-in, is the permanent
+  authorization that makes the board stay usable from then on — the same
+  acceptance-as-unlock pattern as 10,000 Hours' Workbench and Trade counter, and
+  Wade says so plainly: *"Board's yours now. It stays yours. I'm not going to
+  keep unlocking it for you."* Requires Welding level 5
+  (`balance.workOrders.requiredWeldingLevel`) as well as the Mission itself.
 - **Scrap Metal stock** — sells at 2 Credits a piece, *"same as he would charge
   anybody"*. Deliberately unlimited; he does **not** buy Slag back, because Bix
   already does.
@@ -312,6 +319,9 @@ parents' deaths (above). `APPROVED — NOT SHIPPED / INTERNAL-ONLY`.
 - After Keep the Change: where his business actually is, and that he has one.
 - After 10,000 Hours: the bench, the Scrap trade, and that paying client work
   exists and is not yet theirs.
+- After 10,001 Hours: that paying client work is now theirs to keep — Wade
+  hands over standing responsibility for the board rather than continuing to
+  gate it job by job.
 - Never yet: anything about Tansy's parents, the movie tradition, his age, his
   own history, or his home.
 
@@ -325,12 +335,19 @@ manner — blunt, dry, hard to impress, and openly unimpressed about the crash �
 is equally publishable, and is most of what makes a page about him worth
 reading.
 
-Withhold: Tansy's parents, the Friday movie tradition, his age, his home, and
-anything about future client work beyond what the game already says out loud.
+Also safe, now that it is shipped: the Work Orders terminal is his, in his
+yard, revealed once the player finishes their first bench job for him; and that
+once the apprentice takes and finishes a job of their own off that board, the
+paying client work becomes theirs to keep rather than something Wade keeps
+handing out.
 
-**Future hooks / approved direction.** He is the client-work gateway: the Work
-Orders terminal is his, in his yard, and the first paying jobs arrive through
-him. `APPROVED — NOT SHIPPED`.
+Withhold: Tansy's parents, the Friday movie tradition, his age, his home, and
+any named client, job content, or Work Order specifics — those belong to
+`docs/work-orders.md`'s own publication rules, not this entry.
+
+**Future hooks / approved direction.** He was the client-work gateway while the
+board was speculative design; that design is now shipped (#207) — see Mission
+/ story involvement and Work, business, and equipment context above.
 
 **Open canon questions.** His age (no number established); where he lives;
 whether he has family besides Tansy; the coolant-manifold-and-serving-spoon
@@ -353,10 +370,13 @@ The two statements do not conflict, and no reconciliation should be invented.
 
 **Source references.** `game/content/npcs.ts`; `game/content/dialogue.ts`
 (`wadeOffer`, `wadeKeepTheChangeOffer`, `wadeTenThousandHours*`,
-`wadeRecoveryWorkTopic`, `tansyKeepTheChangeCompletion`);
-`game/content/missions.ts`; `game/content/locations.ts` (Rusk Recovery);
+`wadeTenThousandOneHours*`, `wadeRecoveryWorkTopic`,
+`tansyKeepTheChangeCompletion`); `game/content/missions.ts`
+(`TEN_THOUSAND_HOURS`, `TEN_THOUSAND_ONE_HOURS`); `game/content/work-orders.ts`;
+`server/work-orders.ts`; `game/content/locations.ts` (Rusk Recovery);
 `game/content/merchants.ts`; `game/content/rusk-recovery.ts`;
-`docs/holo-hollow.md` (Holo Drive-In and Tansy's longer arc);
+`docs/holo-hollow.md` (Holo Drive-In and Tansy's longer arc); `docs/missions.md`
+(10,001 Hours example); `docs/work-orders.md`;
 `features/public-site/public-updates.ts` (`ten-thousand-hours`).
 
 ---
@@ -433,15 +453,18 @@ Hollow** (after Hold It Together).
 - She runs out of Power Cells mid-shift and would rather not lose an afternoon
   walking back for them — the premise of Keep the Change.
 
-`APPROVED — NOT SHIPPED` — the authored Work Order `tansy_cutter_housing`
+`SHIPPED / PUBLIC-SAFE` (#207) — the authored Work Order `tansy_cutter_housing`
 introduces **one** further possession: a separate working cutter of her own,
 whose housing is built with the same mismatched-spares approach as her
-established style. Note carefully that the Salvage Cutter in shipped dialogue is
-the one she **builds and gives to the player**, and shipped content does not
-establish a second one; this is new canon, not a restatement. Do not expand it
-with a model name, age, history, or a wider inventory of her tools, and do not
-publish it as current fact while Work Orders are unimplemented
-(`docs/work-orders.md`).
+established style. A Cell cradle at one of its mismatched joints tore loose and
+took the loaded Cell with it, so the job re-lays the housing straight and fits
+a replacement Cell. Note carefully that the Salvage Cutter in shipped dialogue
+is the one she **builds and gives to the player**, and shipped content does not
+establish that one as a second cutter; this working cutter is new canon, not a
+restatement, and it is hers to keep and use, never the player's. Do not expand
+it with a model name, age, history, or a wider inventory of her tools, and do
+not add anything beyond what the job itself establishes
+(`game/content/work-orders.ts`, `docs/work-orders.md`).
 
 **Knowledge.** Ferrite, shale, cutting, and improvised repair. Knows the hopper
 at the Abandoned Processing Yard and how Refining behaves. Knows Wade well

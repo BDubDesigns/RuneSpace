@@ -40,6 +40,7 @@ type MissionDefinition = {
   title: string;
   summary: string;
   prerequisiteMissionId?: MissionId;     // absent for the first mission
+  prerequisiteSkillLevel?: MissionSkillPrerequisite; // optional authored skill-level gate, see below
   continuationMissionId?: MissionId;     // zero-or-one authored continuation, see §3.1
   offers: readonly MissionOffer[];       // ≥1, or [] for a linked continuation-only mission
   requirements: readonly MissionRequirement[]; // ordered live-state checks
@@ -52,6 +53,7 @@ type MissionDefinition = {
 - **Stable ID** — `MISSION_IDS` in `game/config/foundations.ts`. Referenced by persistence (`characterMissions`), projection, and dialogue routing. Never rename without a migration.
 - **`title` / `summary`** — player-facing names on the mission.
 - **`prerequisiteMissionId`** — when present, the referenced mission must be `completed` before this one is offered or accepted. An eligibility rule only — never a reveal mechanism (see §10–§11). Validated at module load (unknown ID or self-cycle fails fast).
+- **`prerequisiteSkillLevel`** (`{ skillId, level }`, #207) — an optional authored minimum skill level that must currently be met before the mission is offered or accepted. Exactly like `prerequisiteMissionId`, this is an **eligibility rule only, never a reveal mechanism**: below the level the mission is not advertised anywhere and cannot be accepted, including at its own offer NPC — there is no partial preview of a gated offer. Generic projection (`MissionProjection.prerequisiteSatisfied`) and the authoritative acceptance command (`acceptMission`) derive the identical answer from the identical authored content through one exported helper, `missionSkillPrerequisiteSatisfied` (`game/domain/missions.ts`) — no surface holds a level literal of its own, and no mission-specific check exists in a command. Registry validation rejects a skill that does not resolve to an approved progression curve (an unknown skill ID and a skill with no curve fail the same check), a level that is not a positive integer, and a level beyond that skill's own maximum authored level. 10,001 Hours is the first and, so far, only use (`prerequisiteSkillLevel: { skillId: welding, level: 5 }`; see the Examples section).
 - **`continuationMissionId`** — zero-or-one explicitly authored automatic continuation (§3.1).
 - **`offers[]`** — one or more authored offer routes (§4), except a continuation-only mission may use an empty array only when another authored mission points to it with `continuationMissionId`. An unlinked offerless definition fails validation.
 - **`requirements[]`** — ordered requirements (§5) evaluated against live authoritative state on every projection.
@@ -59,7 +61,7 @@ type MissionDefinition = {
 - **`reward`** — at most one narrow reward, and optional: a mission whose real outcome is world/social state authors none (§8).
 - **`dialogue`** — optional semantic mappings (§9).
 
-Registry validation (`validateMissionDefinitions`) runs at module load against content + authoritative balance (NPC/location/item/dialogue existence, prerequisite shape, continuation shape/cycles, stackable checks, stack limits, reward skill curve, and `recommendedActionId` capability). An authoring mistake never reaches a player as a silent runtime refusal.
+Registry validation (`validateMissionDefinitions`) runs at module load against content + authoritative balance (NPC/location/item/dialogue existence, prerequisite shape, skill-prerequisite shape, continuation shape/cycles, stackable checks, stack limits, reward skill curve, and `recommendedActionId` capability). An authoring mistake never reaches a player as a silent runtime refusal.
 
 ### 3.1 Authored mission continuation
 
@@ -144,6 +146,8 @@ For example, Cut Your Teeth authors:
 
 If the character is away from The Jag, (1) is the current objective even though (2) and (3) are also unmet.
 
+**The `tracked_activity` `activity` vocabulary is closed:** `"mining" | "refining" | "practice_welding" | "work_order"` — owned by `TRACKED_ACTIVITY_ACTION_IDS` in `game/domain/missions.ts` and mirrored by the persistence-layer `TrackedActivity` union in `server/mission-progress.ts`. A new activity is a deliberate framework extension, never an authoring choice. `work_order` (#207) is credited **only** by the authoritative Work Order completion transaction (`completeActiveWorkOrder` in `server/work-orders.ts`) — never by opening the Work Orders terminal, accepting a job, committing its materials, starting Welding, completing one section, stopping or resuming the activity, or a board refill. It works identically whether that completion resolves while the character is actively welding or through the same shared lazy/offline reconciliation that already resolves Mining, Refining, and Practice Welding away from the keyboard — the generic action-resolver boundary (`ActionResolver` / `resolve` + `persist`), not a Work-Order-specific timer or a second credit path.
+
 **Live-state observation, plus narrow current counters.** Location, equipment, and carried-stack requirements observe current authoritative state. Tracked activities use only the current capped progress value for their stable authored key; the framework does not create per-attempt timestamps, event history, provenance, or lifetime counters. Scavenged shale and mined shale are indistinguishable — carried `ferriteShale` counts regardless of how it was obtained. See §14 for what this boundary currently excludes.
 
 ## 6. Carried-stack quantity and disposition
@@ -195,12 +199,16 @@ Key rules:
 
 ## 8. Rewards and acceptance effects
 
-The framework currently supports **at most one reward per mission, and only these two shapes** (`MissionReward`):
+The framework currently supports **at most one reward per mission, and only these four shapes** (`MissionReward`):
 
 ```ts
 type MissionReward =
-  | { kind: "item"; itemId: ItemId }                 // Walk It Off: Salvage Cutter
-  | { kind: "skill_xp"; skillId: SkillId; amount: number }; // Cut Your Teeth: +100 Mining XP
+  | { kind: "item"; itemId: ItemId }                          // Walk It Off: Salvage Cutter
+  | { kind: "skill_xp"; skillId: SkillId; amount: number }    // Cut Your Teeth: +100 Mining XP
+  | { kind: "credits"; amount: number }                       // 10,000 Hours: 50 Credits
+  | { kind: "stack_bundle"; items: readonly MissionRewardStackItem[] }; // 10,001 Hours: 10 Refined Ferrite + 5 Power Cells
+
+type MissionRewardStackItem = { itemId: ItemId; quantity: number };
 ```
 
 - **Item** — granted as **one new unique item instance** through the generic completion boundary (capacity-preflighted, guarded by the `completedAt` exactly-once stamp). Registry validation rejects stackable item rewards at definition time because there is no authorized execution path for them yet. Reward initialization derives from `getItemMaximumCharge`: chargeable items arrive depleted (`currentCharge: 0`), others get the schema's `null` — no silent claim of arbitrary charge semantics.
@@ -222,6 +230,39 @@ the Crew Stop stays fixed and the crews will give the player a ride.
   Welding path, and paying twice for one piece of work would be inventing
   progression the player did not earn.
 
+- **Stack bundle** (#207) — several stackable items granted **together** as one
+  all-or-nothing completion reward: 10,001 Hours pays 10 Refined Ferrite + 5
+  Power Cells, the shop stock its own Work Order recipes will need next.
+  Deliberately its own reward kind rather than an array of `item`/`skill_xp`
+  rewards, because a bundle's whole point is that every entry lands in one
+  transaction or none of it does.
+
+  **Capacity is preflighted as ONE combined grant against an evolving
+  hypothetical inventory**, via `planExactStackAdditions` — never
+  `planPossibleAwardAdditions`. Each bundle entry is planned against whatever
+  slots and mass the *previous* entries in the same bundle have already
+  hypothetically placed, not against one shared starting snapshot. That
+  distinction is the entire reason the new planner exists:
+  `planPossibleAwardAdditions` proves several **mutually exclusive** outcomes
+  could each fit independently from the identical starting inventory — correct
+  for a roll that will produce exactly one of them — and reusing it for a
+  bundle would wrongly accept two items that each fit alone but not together,
+  because it never applies one branch's hypothetical placement before checking
+  the next. A bundle is the opposite case: every entry lands, so each one must
+  be planned against the state the ones before it left behind.
+
+  **All-or-nothing, exactly like every other authored grant in this
+  framework.** If the combined plan does not fit, nothing is inserted: no item
+  lands, there is no partial bundle, `completedAt` is not stamped, and no other
+  completion side effect (consumption, a different reward, the authored
+  continuation) commits — the refusal returns before the write phase begins.
+  The response distinguishes `capacityReason: "slots"` from `"mass"`, the same
+  shape every other capacity refusal in the framework reports, so the
+  mission's authored `capacitySlotsDialogueId` / `capacityMassDialogueId` beat
+  can be selected correctly (§9). Making room and coming back runs the same
+  clean preflight exactly once, from a clean state — there is no retry ledger,
+  partial credit, or second mechanism.
+
 **No reward is a valid authored choice.** `reward` is optional. A mission whose
 real outcome is world or social state — Keep the Change opens HH B&B and pays
 its budget up front — authors none, and the completion transaction then commits
@@ -230,11 +271,12 @@ validation skips reward checks for such a mission, and projection reports no
 `earnedReward`. Do **not** invent a token payout merely because missions usually
 have one.
 
-**Not currently supported as a completion reward:** stackable item rewards,
-bundles, multi-reward missions, reputation, generic effects, or similar. A real
-mission that genuinely needs one of these earns an explicit, narrow framework
-extension — do not add a mission-specific transaction or widen the reward union
-speculatively.
+**Not currently supported as a completion reward:** a stackable item via the
+`item` kind (still unique-item-only — a stackable grant is a `stack_bundle`,
+even a bundle of one), multi-reward missions that combine different reward
+kinds, reputation, generic effects, or similar. A real mission that genuinely
+needs one of these earns an explicit, narrow framework extension — do not add a
+mission-specific transaction or widen the reward union speculatively.
 
 ### 8.1 Acceptance effects (`MissionOffer.acceptEffect`)
 
@@ -739,3 +781,13 @@ Short concrete examples that demonstrate the framework vocabulary. Do not copy m
 - **Reward:** `{ kind: "credits", amount: 50 }` (§8) and deliberately no Welding XP — the three welds already paid their own.
 - **One accepted record, two things opened.** The Workbench and Wade's Trade counter both derive from that acceptance and stay open after completion; there is no `practice_unlocked` or `trade_unlocked` flag. See `docs/gameplay-foundations.md` (Practice Welding, World Location merchants).
 - **Completion reveals the Work Orders terminal** as a real but empty surface; this slice ships zero playable Work Orders, and future ones will need Welding level 5 as well.
+
+### 10,001 Hours — the first skill gate, acceptance as authorization, and a two-item bundle
+
+- **The first authored skill gate.** `prerequisiteSkillLevel: { skillId: welding, level: 5 }` (§3) sits alongside the ordinary `prerequisiteMissionId: tenThousandHours`. Below Welding 5 the mission is not offered anywhere, including at Wade himself — exactly the "not advertised, not acceptable" eligibility an unmet `prerequisiteMissionId` already gives, derived from the same authored field by the one exported `missionSkillPrerequisiteSatisfied` helper that both projection and the acceptance command call. It is a rule about the work — Wade will not put a customer's property in front of an under-trained apprentice — never a rule that hides content from the player.
+- **Acceptance is the unlock, again.** As with 10,000 Hours' Workbench and Trade counter, the Work Orders board's permanent, standing availability derives from this mission's own accepted row, not a second `board_unlocked` flag. One offer route, Wade at Rusk Recovery, `actionLabel: "TAKE THE WORK"`. **Turning the mission in is Wade looking at the finished job, not a second gate:** the board is already fully usable, with the single requirement sitting at 1/1, from the moment acceptance commits.
+- **Acceptance effect:** none. Unlike 10,000 Hours' free Scrap, the player buys their own material for a paying client job through the ordinary Work Order recipe — that the job pays for itself up front is the point.
+- **Requirement:** one `tracked_activity` — `work_order`, `progressKey: "work-orders-completed"`, `target: 1`, `recommendedActionId: workOrderWelding`. It is credited only by the authoritative Work Order completion transaction (§5) — opening the terminal, accepting a job, committing its materials, and every individual Welding section leave it untouched.
+- **Reward:** one `stack_bundle` (§8) — 10 Refined Ferrite + 5 Power Cells — deliberately not Credits: the job already paid those, and this reward solves the apprentice having to stop working mid-shift to go shopping for their own next batch of shop material.
+- **Two capacity-refusal beats, not one.** Unlike 10,000 Hours' single Scrap grant, small enough that slots and mass are practically the same problem and share one authored beat, ten Refined Ferrite and five Power Cells are large enough that the two failures are genuinely different situations, so Wade gets a separate line for each: `capacitySlotsDialogueId` ("Where exactly were you planning to put it?") and `capacityMassDialogueId` ("You can barely stand up as it is.") are two distinct sequences, not one shared refusal.
+- **Dialogue and tone:** Wade's offer keeps his ordinary register — a compliment arrives ("Hm. You're getting decent with that torch.") and is undercut in the very next line ("Decent. Don't write it down anywhere."), the real reason is stated plainly (the terminal is outpacing him, not that trust has been earned), and the scene ends on a flat instruction: one job, then come back before touching a second. No exclamation marks, no ceremony, and the pride — as always with Wade — arrives as a shorter sentence, not a warmer one.

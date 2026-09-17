@@ -7,7 +7,7 @@ import { CargoHoldPanel } from "@/features/cargo/CargoHoldPanel";
 import { CrewStopPanel } from "@/features/local-places/CrewStopPanel";
 import { MiningActivity } from "@/features/mining/MiningActivity";
 import { PowerAnnexClaimPanel } from "@/features/power-annex/PowerAnnexClaimPanel";
-import { PracticeWeldingPanel } from "@/features/practice/PracticeWeldingPanel";
+import { WorkbenchPanel } from "@/features/practice/WorkbenchPanel";
 import { RefiningConsole } from "@/features/refining/RefiningConsole";
 import { usePlay } from "@/features/play/PlayContext";
 
@@ -72,7 +72,10 @@ export function LocationActivity({
     case LOCATION_IDS.emergencyPowerAnnex:
       return <PowerAnnexClaimPanel />;
     case LOCATION_IDS.ruskRecovery:
-      return <PracticeWeldingPanel />;
+      // One bench, one component: which controls it shows follows the
+      // authoritative Workbench occupancy rather than each surface deciding
+      // independently whether to appear (#207).
+      return <WorkbenchPanel />;
     default:
       return null;
   }

@@ -1,0 +1,713 @@
+import { and, eq } from "drizzle-orm";
+import { afterEach, beforeAll, describe, expect, it } from "vitest";
+import {
+  getEffectiveGameBalance,
+  getItemDefinition,
+  standardSkillLevelThresholds,
+  workOrderSectionXp,
+} from "@/game/config/balance";
+import {
+  ACTION_IDS,
+  GAME_TICK_MS,
+  ITEM_IDS,
+  LOCATION_IDS,
+  MISSION_IDS,
+  NPC_IDS,
+  SKILL_IDS,
+  WORK_ORDER_IDS,
+  type WorkOrderId,
+} from "@/game/config/foundations";
+import { getWorkOrder } from "@/game/content/work-orders";
+import {
+  cleanPassFromPersisted,
+  cleanPassLifecycle,
+  type CleanPassOpportunity,
+} from "@/game/domain/clean-pass";
+import { cleanupTestUser, createCharacterForUser, createTestUser } from "./fixtures";
+
+const DATABASE_URL = process.env.DATABASE_URL;
+const suite = DATABASE_URL ? describe : describe.skip;
+
+/**
+ * Issue #207 — customer Work Orders, against real PostgreSQL.
+ *
+ * What only a database proves: that accepting a job removes its exact recipe
+ * and marks its posting In Progress in ONE transaction and never twice, that
+ * the board is durable rather than rerolled on every login, that a job's
+ * sections survive Stop and Travel, and that the single completion transaction
+ * pays, releases the bench, refills the slot and credits the Mission exactly
+ * once — including when the last section is discovered by lazy reconciliation
+ * long after it actually resolved.
+ */
+suite("issue #207 Work Orders (real PostgreSQL)", () => {
+  let db: (typeof import("@/db"))["db"];
+  let authSchema: typeof import("@/db/auth-schema");
+  let rune: typeof import("@/db/rune-space");
+  let ownership: typeof import("@/server/ownership");
+  let characters: typeof import("@/server/characters");
+  let play: typeof import("@/server/play");
+  let missions: typeof import("@/server/missions");
+  let workOrderCommands: typeof import("@/server/work-order-commands");
+  const createdUsers: string[] = [];
+  const start = new Date("2026-09-15T00:00:00.000Z");
+  const balance = getEffectiveGameBalance();
+  const sectionMs = balance.welding.attemptDurationTicks * GAME_TICK_MS;
+  const sectionXp = workOrderSectionXp(balance);
+
+  /**
+   * The board these suites weld against, seeded deterministically.
+   *
+   * Slot 0 is deliberately the one authored job with a mixed Ferrite-and-Cell
+   * recipe, because a single-material recipe cannot prove that a partial
+   * material list is refused as a whole.
+   */
+  const MIXED_JOB = WORK_ORDER_IDS.tansyCutterHousing;
+  const DEFAULT_BOARD: readonly WorkOrderId[] = [
+    MIXED_JOB,
+    WORK_ORDER_IDS.rennCarryFrame,
+    WORK_ORDER_IDS.vossHeaterHousing,
+  ];
+  const mixed = getWorkOrder(MIXED_JOB)!;
+
+  beforeAll(async () => {
+    db = (await import("@/db")).db;
+    authSchema = await import("@/db/auth-schema");
+    rune = await import("@/db/rune-space");
+    ownership = await import("@/server/ownership");
+    characters = await import("@/server/characters");
+    play = await import("@/server/play");
+    missions = await import("@/server/missions");
+    workOrderCommands = await import("@/server/work-order-commands");
+  });
+
+  afterEach(async () => {
+    for (const userId of createdUsers.splice(0))
+      await cleanupTestUser(db, authSchema, rune, userId);
+  });
+
+  /** Every roll lands on its window's minimum, so placements are predictable. */
+  function deterministicRandom() {
+    return { nextBasisPoints: () => 0, nextUnit: () => 0 };
+  }
+
+  const at = (msFromStart: number) => new Date(start.getTime() + msFromStart);
+
+  /**
+   * An apprentice who has finished 10,000 Hours, reached the board's Welding
+   * level, and taken 10,001 Hours off Wade — the state in which client work is
+   * genuinely the player's.
+   *
+   * The board is then re-seeded deterministically. Seeding itself draws from
+   * the authored pool with real randomness, which is right for a player and
+   * useless for a fixture, so the jobs under test are chosen here and the draw
+   * is proven separately below.
+   */
+  async function welder(
+    options: { unlocked?: boolean; weldingLevel?: number; naturalBoard?: boolean } = {},
+  ) {
+    const userId = await createTestUser(db, authSchema, "Work Orders Tester");
+    createdUsers.push(userId);
+    const character = await createCharacterForUser(
+      db,
+      rune,
+      ownership,
+      characters,
+      userId,
+      `Order ${userId.slice(0, 6)}`,
+      undefined,
+      { seedLegacyStarterCutter: false },
+    );
+    await play.getPlayGameplayState(userId, character.id, start, deterministicRandom());
+    await db.insert(rune.characterMissions).values(
+      [
+        MISSION_IDS.walkItOff,
+        MISSION_IDS.cutYourTeeth,
+        MISSION_IDS.wasteNot,
+        MISSION_IDS.holdItTogether,
+        MISSION_IDS.keepTheChange,
+        MISSION_IDS.tenThousandHours,
+      ].map((missionId) => ({
+        characterId: character.id,
+        missionId,
+        acceptedAt: start,
+        completedAt: start,
+      })),
+    );
+    await db
+      .update(rune.characters)
+      .set({ currentLocationId: LOCATION_IDS.ruskRecovery })
+      .where(eq(rune.characters.id, character.id));
+    await setWeldingLevel(
+      character.id,
+      options.weldingLevel ?? balance.workOrders.requiredWeldingLevel,
+    );
+
+    if (options.unlocked !== false) {
+      const accepted = await missions.acceptMission(
+        userId,
+        character.id,
+        MISSION_IDS.tenThousandOneHours,
+        NPC_IDS.wadeRusk,
+        start,
+        deterministicRandom(),
+      );
+      expect(accepted.mission.status).toBe("accepted");
+    }
+    if (!options.naturalBoard) await seedBoard(character.id, DEFAULT_BOARD);
+    return { userId, character };
+  }
+
+  /** Put the Welding skill exactly on one level's authored threshold. */
+  async function setWeldingLevel(characterId: string, level: number) {
+    const totalXp = standardSkillLevelThresholds(balance).find(
+      (threshold) => threshold.level === level,
+    )!.totalXp;
+    await db
+      .insert(rune.characterSkillXp)
+      .values({ characterId, skillId: SKILL_IDS.welding, totalXp })
+      .onConflictDoUpdate({
+        target: [rune.characterSkillXp.characterId, rune.characterSkillXp.skillId],
+        set: { totalXp },
+      });
+  }
+
+  /** Replace whatever the pool drew with the three jobs a test wants posted. */
+  async function seedBoard(characterId: string, workOrderIds: readonly WorkOrderId[]) {
+    await db
+      .delete(rune.characterWorkOrderPostings)
+      .where(eq(rune.characterWorkOrderPostings.characterId, characterId));
+    await db.insert(rune.characterWorkOrderPostings).values(
+      workOrderIds.map((workOrderId, slotIndex) => ({
+        characterId,
+        slotIndex,
+        workOrderId,
+        postedAt: start,
+        updatedAt: start,
+      })),
+    );
+  }
+
+  /** Carry a material list, split across stacks at the authored stack limit. */
+  async function giveMaterials(
+    characterId: string,
+    materials: readonly { itemId: string; quantity: number }[],
+  ) {
+    for (const material of materials) {
+      const definition = getItemDefinition(material.itemId, balance);
+      if (definition?.kind !== "stack") {
+        throw new Error(`${material.itemId} is not a stackable Work Order material`);
+      }
+      let remaining = material.quantity;
+      while (remaining > 0) {
+        const quantity = Math.min(remaining, definition.stackLimit);
+        remaining -= quantity;
+        await db
+          .insert(rune.inventoryStacks)
+          .values({ characterId, itemId: material.itemId, quantity });
+      }
+    }
+  }
+
+  async function postings(characterId: string) {
+    const rows = await db
+      .select()
+      .from(rune.characterWorkOrderPostings)
+      .where(eq(rune.characterWorkOrderPostings.characterId, characterId));
+    return rows.sort((a, b) => a.slotIndex - b.slotIndex);
+  }
+
+  async function carried(characterId: string, itemId: string) {
+    const rows = await db
+      .select({ quantity: rune.inventoryStacks.quantity })
+      .from(rune.inventoryStacks)
+      .where(
+        and(
+          eq(rune.inventoryStacks.characterId, characterId),
+          eq(rune.inventoryStacks.itemId, itemId),
+        ),
+      );
+    return rows.reduce((sum, row) => sum + row.quantity, 0);
+  }
+
+  async function activeAction(characterId: string) {
+    return (
+      await db
+        .select()
+        .from(rune.activeActions)
+        .where(eq(rune.activeActions.characterId, characterId))
+    )[0];
+  }
+
+  async function credits(characterId: string) {
+    return (
+      await db
+        .select({ credits: rune.characters.credits })
+        .from(rune.characters)
+        .where(eq(rune.characters.id, characterId))
+    )[0]!.credits;
+  }
+
+  async function weldingXp(characterId: string) {
+    return (
+      (
+        await db
+          .select({ totalXp: rune.characterSkillXp.totalXp })
+          .from(rune.characterSkillXp)
+          .where(
+            and(
+              eq(rune.characterSkillXp.characterId, characterId),
+              eq(rune.characterSkillXp.skillId, SKILL_IDS.welding),
+            ),
+          )
+      )[0]?.totalXp ?? 0
+    );
+  }
+
+  async function workOrdersCompleted(characterId: string) {
+    return (
+      (
+        await db
+          .select({ progress: rune.characterMissionProgress.progress })
+          .from(rune.characterMissionProgress)
+          .where(
+            and(
+              eq(rune.characterMissionProgress.characterId, characterId),
+              eq(rune.characterMissionProgress.missionId, MISSION_IDS.tenThousandOneHours),
+              eq(rune.characterMissionProgress.progressKey, "work-orders-completed"),
+            ),
+          )
+      )[0]?.progress ?? 0
+    );
+  }
+
+  /** The active job's rolled opportunities, straight off its posting row. */
+  function opportunitiesOf(row: { cleanPass: unknown }): readonly CleanPassOpportunity[] {
+    return cleanPassFromPersisted(row.cleanPass).opportunities ?? [];
+  }
+
+  const refresh = (userId: string, characterId: string, ms: number) =>
+    play.getPlayGameplayState(userId, characterId, at(ms), deterministicRandom());
+
+  const accept = (userId: string, characterId: string, workOrderId: string, ms = 0) =>
+    workOrderCommands.acceptWorkOrder(
+      userId,
+      characterId,
+      workOrderId,
+      at(ms),
+      deterministicRandom(),
+    );
+
+  const startWelding = (userId: string, characterId: string, ms = 0) =>
+    workOrderCommands.startWorkOrderWelding(userId, characterId, at(ms), deterministicRandom());
+
+  describe("acceptance and materials", () => {
+    it("refuses the whole recipe when only part of it is carried", async () => {
+      const { userId, character } = await welder();
+      // Every Refined Ferrite the job wants, and none of the Cells.
+      await giveMaterials(character.id, [
+        { itemId: ITEM_IDS.refinedFerrite, quantity: mixed.materials[0]!.quantity },
+      ]);
+
+      const refused = await accept(userId, character.id, MIXED_JOB);
+      expect(refused.workOrder).toMatchObject({
+        status: "refused",
+        reason: "insufficient_materials",
+      });
+      // Nothing taken, and no posting claimed for a job that never went on.
+      expect(await carried(character.id, ITEM_IDS.refinedFerrite)).toBe(
+        mixed.materials[0]!.quantity,
+      );
+      expect((await postings(character.id)).every((row) => row.acceptedAt === null)).toBe(true);
+    });
+
+    it("refuses while travelling and from anywhere but the yard, leaving the board untouched", async () => {
+      const { userId, character } = await welder();
+      await giveMaterials(character.id, mixed.materials);
+      const before = await postings(character.id);
+
+      await play.beginTravel(
+        userId,
+        character.id,
+        LOCATION_IDS.holoHollow,
+        start,
+        deterministicRandom(),
+      );
+      const inTransit = await accept(userId, character.id, MIXED_JOB, 100);
+      expect(inTransit.workOrder).toMatchObject({ status: "refused", reason: "in_transit" });
+
+      // Standing somewhere else entirely, with no action at all.
+      await db.delete(rune.activeActions).where(eq(rune.activeActions.characterId, character.id));
+      await db
+        .delete(rune.characterTravelState)
+        .where(eq(rune.characterTravelState.characterId, character.id));
+      await db
+        .update(rune.characters)
+        .set({ currentLocationId: LOCATION_IDS.holoHollow })
+        .where(eq(rune.characters.id, character.id));
+      const elsewhere = await accept(userId, character.id, MIXED_JOB, 200);
+      expect(elsewhere.workOrder).toMatchObject({ status: "refused", reason: "wrong_location" });
+
+      expect(await postings(character.id)).toEqual(before);
+      expect(await carried(character.id, ITEM_IDS.refinedFerrite)).toBe(
+        mixed.materials[0]!.quantity,
+      );
+    });
+
+    it("refuses before 10,001 Hours has been accepted", async () => {
+      const { userId, character } = await welder({ unlocked: false });
+      await giveMaterials(character.id, mixed.materials);
+
+      const refused = await accept(userId, character.id, MIXED_JOB);
+      expect(refused.workOrder).toMatchObject({
+        status: "refused",
+        reason: "work_orders_locked",
+      });
+      expect((await postings(character.id)).every((row) => row.acceptedAt === null)).toBe(true);
+      expect(await carried(character.id, ITEM_IDS.powerCell)).toBe(mixed.materials[1]!.quantity);
+    });
+
+    it("refuses below the job's required Welding level", async () => {
+      // Accepted with the level, then dropped below it: the level is rechecked
+      // by the acceptance command itself, not assumed from the Mission.
+      const { userId, character } = await welder();
+      await setWeldingLevel(character.id, mixed.requiredWeldingLevel - 1);
+      await giveMaterials(character.id, mixed.materials);
+
+      const refused = await accept(userId, character.id, MIXED_JOB);
+      expect(refused.workOrder).toMatchObject({ status: "refused", reason: "welding_level" });
+      expect((await postings(character.id)).every((row) => row.acceptedAt === null)).toBe(true);
+      expect(await carried(character.id, ITEM_IDS.refinedFerrite)).toBe(
+        mixed.materials[0]!.quantity,
+      );
+    });
+
+    it("removes the exact recipe and marks the posting In Progress together", async () => {
+      const { userId, character } = await welder();
+      // One spare of each material, so an over-removal is visible.
+      await giveMaterials(character.id, [
+        { itemId: ITEM_IDS.refinedFerrite, quantity: mixed.materials[0]!.quantity + 2 },
+        { itemId: ITEM_IDS.powerCell, quantity: mixed.materials[1]!.quantity + 1 },
+      ]);
+
+      const accepted = await accept(userId, character.id, MIXED_JOB);
+      expect(accepted.workOrder).toEqual({ status: "accepted", workOrderId: MIXED_JOB });
+
+      expect(await carried(character.id, ITEM_IDS.refinedFerrite)).toBe(2);
+      expect(await carried(character.id, ITEM_IDS.powerCell)).toBe(1);
+      const row = (await postings(character.id)).find((entry) => entry.workOrderId === MIXED_JOB);
+      expect(row?.acceptedAt).not.toBeNull();
+      expect(row?.sectionsCompleted).toBe(0);
+      expect(opportunitiesOf(row!).length).toBeGreaterThan(0);
+    });
+
+    it("does not start section timing: acceptance creates no active action", async () => {
+      const { userId, character } = await welder();
+      await giveMaterials(character.id, mixed.materials);
+      await accept(userId, character.id, MIXED_JOB);
+      expect(await activeAction(character.id)).toBeUndefined();
+    });
+
+    it("cannot double-remove materials or create two jobs under concurrent acceptance", async () => {
+      const { userId, character } = await welder();
+      await giveMaterials(character.id, [
+        { itemId: ITEM_IDS.refinedFerrite, quantity: mixed.materials[0]!.quantity * 2 },
+        { itemId: ITEM_IDS.powerCell, quantity: mixed.materials[1]!.quantity * 2 },
+      ]);
+
+      const [first, second] = await Promise.all([
+        accept(userId, character.id, MIXED_JOB),
+        accept(userId, character.id, MIXED_JOB),
+      ]);
+      const statuses = [first.workOrder.status, second.workOrder.status].sort();
+      expect(statuses).toEqual(["accepted", "refused"]);
+
+      // A third, sequential retry changes nothing either.
+      const retried = await accept(userId, character.id, MIXED_JOB, 100);
+      expect(retried.workOrder.status).toBe("refused");
+
+      const accepted = (await postings(character.id)).filter((row) => row.acceptedAt !== null);
+      expect(accepted).toHaveLength(1);
+      expect(await carried(character.id, ITEM_IDS.refinedFerrite)).toBe(
+        mixed.materials[0]!.quantity,
+      );
+      expect(await carried(character.id, ITEM_IDS.powerCell)).toBe(mixed.materials[1]!.quantity);
+    });
+  });
+
+  describe("the board", () => {
+    it("seeds exactly three distinct durable postings on the first touch", async () => {
+      const { character } = await welder({ naturalBoard: true });
+      const rows = await postings(character.id);
+
+      expect(rows).toHaveLength(balance.workOrders.postedSlots);
+      expect(rows.map((row) => row.slotIndex)).toEqual([0, 1, 2]);
+      expect(new Set(rows.map((row) => row.workOrderId)).size).toBe(rows.length);
+      for (const row of rows) {
+        expect(getWorkOrder(row.workOrderId)).toBeDefined();
+        expect(row.acceptedAt).toBeNull();
+        expect(row.sectionsCompleted).toBe(0);
+        expect(row.cleanPass).toBeNull();
+      }
+    });
+
+    it("does not reroll the board on repeated state reads", async () => {
+      const { userId, character } = await welder({ naturalBoard: true });
+      const seeded = await postings(character.id);
+
+      // Three separate "logins", hours apart.
+      await refresh(userId, character.id, 60 * 60 * 1_000);
+      await refresh(userId, character.id, 2 * 60 * 60 * 1_000);
+      await refresh(userId, character.id, 5 * 60 * 60 * 1_000);
+
+      const after = await postings(character.id);
+      expect(after.map((row) => [row.slotIndex, row.workOrderId])).toEqual(
+        seeded.map((row) => [row.slotIndex, row.workOrderId]),
+      );
+    });
+
+    it("marks one posting In Progress and leaves the other two alone", async () => {
+      const { userId, character } = await welder();
+      await giveMaterials(character.id, mixed.materials);
+      const before = await postings(character.id);
+
+      await accept(userId, character.id, MIXED_JOB);
+
+      const after = await postings(character.id);
+      expect(after.filter((row) => row.acceptedAt !== null).map((row) => row.workOrderId)).toEqual([
+        MIXED_JOB,
+      ]);
+      for (const row of after.filter((entry) => entry.workOrderId !== MIXED_JOB)) {
+        const original = before.find((entry) => entry.slotIndex === row.slotIndex)!;
+        expect(row).toEqual(original);
+      }
+    });
+
+    it("replaces only the completed slot, with a job nothing else on the board holds", async () => {
+      const { userId, character } = await welder();
+      await giveMaterials(character.id, mixed.materials);
+      await accept(userId, character.id, MIXED_JOB);
+      const untouched = (await postings(character.id)).filter(
+        (row) => row.workOrderId !== MIXED_JOB,
+      );
+
+      await startWelding(userId, character.id);
+      await refresh(userId, character.id, sectionMs * mixed.sections);
+
+      const after = await postings(character.id);
+      expect(after).toHaveLength(balance.workOrders.postedSlots);
+      for (const row of untouched) {
+        const same = after.find((entry) => entry.slotIndex === row.slotIndex)!;
+        expect(same.workOrderId).toBe(row.workOrderId);
+      }
+      const replacement = after.find((row) => row.slotIndex === 0)!;
+      expect(replacement.workOrderId).not.toBe(MIXED_JOB);
+      expect(untouched.map((row) => row.workOrderId)).not.toContain(replacement.workOrderId);
+      expect(getWorkOrder(replacement.workOrderId)).toBeDefined();
+      expect(replacement.acceptedAt).toBeNull();
+    });
+
+    it("ships no abandonment command, helper, or column anywhere", async () => {
+      // A posted job is either accepted and finished or never taken: there is
+      // deliberately no way to hand a client's property back half-welded.
+      const abandonment = /abandon|forfeit|relinquish|giveup/i;
+      const commandExports = Object.keys(await import("@/server/work-order-commands"));
+      const persistenceExports = Object.keys(await import("@/server/work-orders"));
+      const domainExports = Object.keys(await import("@/game/domain/work-orders"));
+
+      expect(commandExports.filter((name) => abandonment.test(name))).toEqual([]);
+      expect(persistenceExports.filter((name) => abandonment.test(name))).toEqual([]);
+      expect(domainExports.filter((name) => abandonment.test(name))).toEqual([]);
+      expect(
+        Object.keys(rune.characterWorkOrderPostings).filter((column) => abandonment.test(column)),
+      ).toEqual([]);
+    });
+  });
+
+  describe("welding and completion", () => {
+    async function onTheBench(ms = 0) {
+      const fixture = await welder();
+      await giveMaterials(fixture.character.id, mixed.materials);
+      await accept(fixture.userId, fixture.character.id, MIXED_JOB, ms);
+      return fixture;
+    }
+
+    it("resolves whole sections only, at the Work Order XP share", async () => {
+      const { userId, character } = await onTheBench();
+      const xpBefore = await weldingXp(character.id);
+
+      const started = await startWelding(userId, character.id);
+      expect(started.workOrder).toEqual({ status: "started" });
+      expect((await activeAction(character.id))?.actionId).toBe(ACTION_IDS.workOrderWelding);
+
+      // Three whole sections and most of a fourth: the partial one is not work.
+      await refresh(userId, character.id, sectionMs * 3 + sectionMs - 1);
+      const row = (await postings(character.id)).find((entry) => entry.acceptedAt !== null);
+      expect(row?.sectionsCompleted).toBe(3);
+      expect(await weldingXp(character.id)).toBe(xpBefore + 3 * sectionXp);
+    });
+
+    it("preserves the partial job across Stop, closing an open window as missed", async () => {
+      const { userId, character } = await onTheBench();
+      await startWelding(userId, character.id);
+      const rolled = opportunitiesOf(
+        (await postings(character.id)).find((row) => row.acceptedAt !== null)!,
+      );
+      // Deterministic rolls put the first opportunity at its window's minimum.
+      expect(rolled[0]!.section).toBe(balance.welding.cleanPass.windowStartSection);
+
+      // Stop while standing inside that very section.
+      const stopped = await workOrderCommands.stopWorkOrderWelding(
+        userId,
+        character.id,
+        at(sectionMs * (rolled[0]!.section - 1) + 100),
+        deterministicRandom(),
+      );
+      expect(stopped.workOrder).toEqual({ status: "stopped" });
+
+      const row = (await postings(character.id)).find((entry) => entry.acceptedAt !== null);
+      expect(row?.sectionsCompleted).toBe(rolled[0]!.section - 1);
+      const after = opportunitiesOf(row!);
+      expect(after[0]!.outcome).toBe("missed");
+      // The later opportunity is untouched and stays scheduled.
+      expect(after[1]!.outcome).toBeNull();
+      expect(await activeAction(character.id)).toBeUndefined();
+    });
+
+    it("interrupts the job on Travel, and welds nothing from the road", async () => {
+      const { userId, character } = await onTheBench();
+      await startWelding(userId, character.id);
+      await play.beginTravel(
+        userId,
+        character.id,
+        LOCATION_IDS.holoHollow,
+        at(sectionMs * 3 + 100),
+        deterministicRandom(),
+      );
+
+      const interrupted = (await postings(character.id)).find((row) => row.acceptedAt !== null);
+      expect(interrupted?.sectionsCompleted).toBe(3);
+      expect((await activeAction(character.id))?.actionId).toBe(ACTION_IDS.travel);
+
+      // Time spent elsewhere is not Welding time.
+      await refresh(userId, character.id, sectionMs * 20);
+      const later = (await postings(character.id)).find((row) => row.acceptedAt !== null);
+      expect(later?.sectionsCompleted).toBe(3);
+    });
+
+    it("resumes from durable progress without rerolling the Clean Pass", async () => {
+      const { userId, character } = await onTheBench();
+      await startWelding(userId, character.id);
+      await workOrderCommands.stopWorkOrderWelding(
+        userId,
+        character.id,
+        at(sectionMs * 4),
+        deterministicRandom(),
+      );
+      const partial = (await postings(character.id)).find((row) => row.acceptedAt !== null)!;
+      expect(partial.sectionsCompleted).toBe(4);
+
+      // A different roll source on Resume must change nothing about the job.
+      const resumed = await workOrderCommands.startWorkOrderWelding(
+        userId,
+        character.id,
+        at(sectionMs * 5),
+        { nextBasisPoints: () => 2, nextUnit: () => 0 },
+      );
+      expect(resumed.workOrder).toEqual({ status: "started" });
+      const afterResume = (await postings(character.id)).find((row) => row.acceptedAt !== null)!;
+      expect(opportunitiesOf(afterResume)).toEqual(opportunitiesOf(partial));
+      expect(afterResume.sectionsCompleted).toBe(4);
+
+      // And the work continues from four rather than from zero.
+      await refresh(userId, character.id, sectionMs * 7);
+      const continued = (await postings(character.id)).find((row) => row.acceptedAt !== null)!;
+      expect(continued.sectionsCompleted).toBe(6);
+    });
+
+    it("pays a job's whole XP from its section count, with every opportunity missed", async () => {
+      // A job's total is fixed by its length: the Clean Pass cadence moves work
+      // earlier, it never adds sections or invents a higher per-section value.
+      // Stop and Travel spend the two opportunities on this job without paying
+      // anything, and the finished job still pays exactly its section count.
+      const { userId, character } = await onTheBench();
+      const xpBefore = await weldingXp(character.id);
+      await startWelding(userId, character.id);
+
+      const opportunities = opportunitiesOf(
+        (await postings(character.id)).find((row) => row.acceptedAt !== null)!,
+      );
+      expect(opportunities.length).toBeGreaterThan(1);
+
+      // Weld the whole job straight through, missing every opportunity.
+      await refresh(userId, character.id, sectionMs * mixed.sections);
+
+      expect(await weldingXp(character.id)).toBe(xpBefore + mixed.sections * sectionXp);
+      expect(await workOrdersCompleted(character.id)).toBe(1);
+      // The completed job's slot was released, so its opportunities are gone
+      // with it rather than carried into the replacement posting.
+      expect(
+        opportunitiesOf((await postings(character.id)).find((row) => row.slotIndex === 0)!),
+      ).toEqual([]);
+    });
+
+    it("never auto-claims a Clean Pass the player welded straight past", async () => {
+      const { userId, character } = await onTheBench();
+      const xpBefore = await weldingXp(character.id);
+      await startWelding(userId, character.id);
+
+      await refresh(userId, character.id, sectionMs * 5);
+      const row = (await postings(character.id)).find((entry) => entry.acceptedAt !== null)!;
+      const state = cleanPassFromPersisted(row.cleanPass);
+      expect(row.sectionsCompleted).toBe(5);
+      // Nothing was written for it, and it reads as missed purely positionally.
+      expect(opportunitiesOf(row)[0]!.outcome).toBeNull();
+      expect(cleanPassLifecycle(state, 0, row.sectionsCompleted)).toBe("missed");
+      // Five sections of XP, not six: elapsed time never claims anything.
+      expect(await weldingXp(character.id)).toBe(xpBefore + 5 * sectionXp);
+    });
+
+    it("pays, releases the bench, refills the slot and credits the Mission exactly once", async () => {
+      const { userId, character } = await onTheBench();
+      const creditsBefore = await credits(character.id);
+      const xpBefore = await weldingXp(character.id);
+      await startWelding(userId, character.id);
+      expect(await workOrdersCompleted(character.id)).toBe(0);
+
+      // One command, long after the last section actually resolved.
+      await refresh(userId, character.id, sectionMs * mixed.sections + sectionMs * 3);
+
+      expect(await credits(character.id)).toBe(creditsBefore + mixed.payoutCredits);
+      expect(await weldingXp(character.id)).toBe(xpBefore + mixed.sections * sectionXp);
+      expect((await postings(character.id)).filter((row) => row.acceptedAt !== null)).toEqual([]);
+      const slot = (await postings(character.id)).find((row) => row.slotIndex === 0)!;
+      expect(slot.workOrderId).not.toBe(MIXED_JOB);
+      expect(slot.sectionsCompleted).toBe(0);
+      expect(slot.cleanPass).toBeNull();
+      expect(await workOrdersCompleted(character.id)).toBe(1);
+      expect(await activeAction(character.id)).toBeUndefined();
+    });
+
+    it("cannot pay, credit, or refill twice under a retried or concurrent completion", async () => {
+      const { userId, character } = await onTheBench();
+      const creditsBefore = await credits(character.id);
+      await startWelding(userId, character.id);
+
+      const completionMs = sectionMs * mixed.sections;
+      await Promise.all([
+        refresh(userId, character.id, completionMs),
+        refresh(userId, character.id, completionMs),
+      ]);
+      const refilled = (await postings(character.id)).find((row) => row.slotIndex === 0)!;
+
+      // And a later sequential retry adds nothing on top.
+      await refresh(userId, character.id, completionMs + sectionMs * 10);
+
+      expect(await credits(character.id)).toBe(creditsBefore + mixed.payoutCredits);
+      expect(await workOrdersCompleted(character.id)).toBe(1);
+      const after = await postings(character.id);
+      expect(after).toHaveLength(balance.workOrders.postedSlots);
+      expect(after.find((row) => row.slotIndex === 0)!.workOrderId).toBe(refilled.workOrderId);
+      expect(after.filter((row) => row.acceptedAt !== null)).toEqual([]);
+    });
+  });
+});

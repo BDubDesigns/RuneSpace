@@ -148,15 +148,23 @@ export async function ensureWorkOrderBoard(
   if (!input.unlocked) return;
   const balance = getEffectiveGameBalance();
   const existing = await transaction
-    .select({ slotIndex: characterWorkOrderPostings.slotIndex })
+    .select({
+      slotIndex: characterWorkOrderPostings.slotIndex,
+      workOrderId: characterWorkOrderPostings.workOrderId,
+    })
     .from(characterWorkOrderPostings)
     .where(eq(characterWorkOrderPostings.characterId, input.characterId))
     .for("update");
   if (existing.length >= balance.workOrders.postedSlots) return;
 
+  // Whatever is already posted is excluded from the draw, so filling the
+  // remaining slots of a partial board cannot pick a job the board already
+  // shows. A whole-board draw passes an empty list and behaves as before.
   const board = selectInitialWorkOrderBoard({
-    eligible: eligibleWorkOrders(input.weldingLevel),
-    slots: balance.workOrders.postedSlots,
+    eligible: eligibleWorkOrders(input.weldingLevel).filter(
+      (definition) => !existing.some((row) => row.workOrderId === definition.id),
+    ),
+    slots: balance.workOrders.postedSlots - existing.length,
     random: input.random,
   });
   if (board.length === 0) return;

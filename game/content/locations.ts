@@ -191,7 +191,10 @@ const locationDefinitions = [
       "Wade's recovery yard: salvaged machinery and stripped components racked in rows, damaged speeders waiting their turn, and a welding bench somebody actually works at. Messy, and organized by somebody who knows exactly where everything is.",
     region: "holo_hollow" as const,
     adjacentLocationIds: [LOCATION_IDS.holoHollow],
-    availableActionIds: [ACTION_IDS.practiceWelding],
+    // Both kinds of Welding the yard's one bench does. Listing the customer one
+    // is what lets Mission guidance point a player who is somewhere else back
+    // to the only place a Work Order can be welded (#207).
+    availableActionIds: [ACTION_IDS.practiceWelding, ACTION_IDS.workOrderWelding],
     merchantId: MERCHANT_IDS.wadeRusk,
     dormantActivities: [],
     presentation: {

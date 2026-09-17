@@ -198,11 +198,20 @@ Pass roll. An untouched bench is an absent row, so nothing needs backfilling.
   repair availability derives from its authorizing Mission, and stays true after
   that Mission completes. There is no `practice_unlocked` flag. Before it holds,
   the bench is scenery: no control, no disabled state, no teaser.
+- **One bench, shared.** Since issue #207, Wade's Workbench is also where
+  customer Work Orders are welded, and the two are mutually exclusive: a fresh
+  Practice weld cannot begin while a client job — or an unfinished Practice weld
+  the player has not resolved — already occupies the bench. See "Workbench
+  exclusivity" below for the shared rule and its refusal.
 - **A continuous run.** One Start begins a weld and each completed weld begins
   the next, consuming its two Scrap at that instant, through the ordinary lazy
-  resolution and the standard one-hour offline cap. When fewer than two Scrap
-  remain, the weld in progress finishes and the run stops itself
-  (`out_of_scrap`); adding Scrap later never auto-restarts it.
+  resolution and the standard one-hour offline cap. A run stops itself for one
+  of two authored reasons: `out_of_scrap`, when fewer than two Scrap remain
+  once the weld in progress finishes (adding Scrap later never auto-restarts
+  it), or `finished_current_weld`, when the player has asked the run to end
+  after the weld already on the bench — see "Finish Current Weld and Stop"
+  below. Every other way a run ends — the player's ordinary Stop, Travel — is
+  an interruption, not a resolution, and is recorded as neither.
 - **Stop and Resume** preserve the real partial weld: the completed sections,
   the two Scrap already spent, and the rolled Clean Pass positions. Resuming
   costs nothing and works with no Scrap at all. Stop never refunds, never
@@ -227,28 +236,49 @@ Pass roll. An untouched bench is an absent row, so nothing needs backfilling.
   On a phone that keeps Wade's Talk and Trade controls above the shop UI
   instead of below it.
 
-### Clean Pass: a general Welding opportunity (issue #190)
+### Clean Pass: a general Welding opportunity (issues #190 and #207)
 
 Every current Welding work unit — a Practice weld, the Cargo Hold repair, the
-Crew Stop repair — rolls exactly two optional opportunity sections **once**: the
-first 2-4 sections in, the second an independent 2-4 sections after that (so
-2-4 and 4-8). The two-section minimum spacing is why the second roll is an
-offset: a claimed first opportunity advances the work one section and therefore
-can never step over the second. Both current section counts leave an ordinary
-tail after the last possible opportunity, so a claim can never complete a work
-unit.
+Crew Stop repair, a customer Work Order — rolls its optional opportunity
+sections **once**. The cadence generalized in issue #207 from a fixed pair to a
+rule of the work unit's own length, because Work Orders introduced genuinely
+variable-length Welding (8 to 19 sections today) and two opportunities on the
+longest of them would have been the same mechanic stretched thin.
 
-The roll is persisted by the work unit itself (`character_repair_targets` and
-`character_practice_welds` carry the same four columns) and is never rerolled by
-Stop or Resume. An opportunity is open during exactly one ordinary Welding
-section, which makes the open window purely positional: after reconciliation,
-`sectionsCompleted + 1` is the section in progress, and that is what the claim
-validates against, plus the same small network grace Scavenge allows.
+The rule (`game/domain/clean-pass.ts`, balance in `welding.cleanPass`):
+
+- A work unit shorter than **6 sections** gets none at all — too short for the
+  mechanic to mean anything.
+- From 6 sections up, it gets **`floor(sections / 5)`** opportunities.
+- Nominal windows repeat on a fixed rhythm, each **3 sections** wide, starting 2
+  sections in: **2-4, 7-9, 12-14, 17-19**, and so on — one window per opportunity,
+  in order.
+- The **final** window is the only one that ever moves: it shifts left just far
+  enough that **2 ordinary sections** always remain behind the last possible
+  opportunity. That is what guarantees a claim can never complete the work
+  unit, on *any* length, rather than being an accident of two section counts
+  that happened to both leave a tail.
+
+Worked examples: 6 sections → 2-4. 8 → 2-4. 10 → 2-4, 6-8 (the second window
+shifted left one to leave two sections after it). 12 → 2-4, 7-9 (no shift
+needed). 15 → 2-4, 7-9, 11-13. 18 → 2-4, 7-9, 12-14. 20 → 2-4, 7-9, 12-14,
+16-18.
+
+The roll is persisted by the work unit itself, as one JSON array per work unit
+(`character_repair_targets.clean_pass`, `character_practice_welds.clean_pass`,
+and `character_work_order_postings.clean_pass` all carry the same
+`[{ section, outcome }]` shape, replacing the original fixed two-column pair),
+and is never rerolled by Stop or Resume. An opportunity is open during exactly
+one ordinary Welding section, which makes the open window purely positional:
+after reconciliation, `sectionsCompleted + 1` is the section in progress, and
+that is what the claim validates against, plus the same small network grace
+Scavenge allows.
 
 - A valid claim advances the work **one additional section immediately** and
-  pays exactly that section's ordinary XP for the activity — reduced Practice XP
-  at the bench, full Welding XP on a repair. It changes no material cost and
-  creates no special per-section value.
+  pays exactly that section's ordinary XP for the activity — reduced Practice
+  XP at the bench, the Work Order share on a customer job, or full Welding XP
+  on an authored repair (see "Work Orders" below for the exact shares). It
+  changes no material cost and creates no special per-section value.
 - Missing one costs nothing. An opportunity welded past, including while the
   player is away, is simply missed and needs no durable write; the work's own
   progress says so.
@@ -260,6 +290,71 @@ Clean Pass is deliberately not a generic timed-opportunity engine. Scavenge
 stays entirely separate: its window belongs to a Travel leg and resolves against
 a loot table. Only conventions are shared — a server-derived window and a small
 claim grace.
+
+### Workbench exclusivity and "Finish Current Weld and Stop" (issue #207)
+
+There is one Workbench in Wade's yard, and once a customer's property can sit
+on it, "is anything already on it?" has to have exactly one answer
+(`game/domain/workbench.ts`). Occupancy is derived, never a pair of independent
+flags that could disagree with each other or with the underlying rows:
+
+- **An accepted Work Order occupies the bench.** So does an **unfinished
+  Practice weld** — one whose two Scrap are already spent — even after the
+  player has Stopped it. A partial weld the player paid for is real work in
+  progress, not an idle bench, and starting something else over the top of it
+  would silently destroy what they paid for.
+- **A conflicting start is refused, never silently overwritten.** Beginning a
+  fresh Practice weld while a client job (or a different unfinished Practice
+  weld) holds the bench, or accepting a Work Order while an unfinished Practice
+  weld holds it, returns an explicit `workbench_occupied` refusal naming what is
+  in the way. Nothing is ever bumped off the bench by starting something else.
+- **Resuming the same unfinished unit is always allowed.** That unit already
+  holds the bench, so continuing it is a different question from claiming the
+  bench for something new, and it is never asked to prove the bench is clear.
+
+Because Practice is deliberately continuous — one Start begins a run that keeps
+consuming Scrap and rolling straight into the next weld — it otherwise gives the
+player no way to leave the bench clear on purpose: ordinary Stop preserves a
+partial weld, and simply waiting spends two more Scrap the instant the current
+weld completes. **"Finish Current Weld and Stop"** is the third intent that
+answers this. It applies only to the weld already on the bench, whether running
+or Stopped with partial progress: it records a durable intent
+(`character_practice_welds.finish_current_weld`), then starts or resumes so
+that weld can actually finish, and clears the bench for a customer job the
+instant it does. Resolution lets the weld complete with its ordinary XP,
+output, and Clean Pass semantics, starts no next weld, consumes no further
+Scrap, and leaves the Workbench clear. The durable intent survives the player
+going offline, exactly as the partial weld itself does, and is cleared the
+moment it is honoured or the player issues an ordinary Start again.
+
+### Work Orders: paying client jobs on the shared Workbench (issue #207)
+
+Work Orders are repeatable, paying Welding jobs from named clients, offered
+through the terminal at Rusk Recovery once **10,001 Hours** is **accepted** —
+turning that Mission in afterward changes nothing about the board's
+availability. `docs/work-orders.md` owns the board rules, the payout and XP
+formulas, the persistence shape, and the authored job pool; this is the
+gameplay-level summary of how a Work Order fits the same Welding foundation as
+every other kind.
+
+- A Work Order is genuine Welding on the shared Workbench, not a second skill
+  or a second timer engine: the same 5-tick section cadence, the same lazy
+  resolution and one-hour offline cap, and the same Clean Pass mechanic above,
+  scaled to each job's own length (8 to 19 sections in the current pool).
+- **Accepting a job is not starting it.** Accepting commits the job's exact
+  material recipe from carried Inventory and puts it on the bench, marked In
+  Progress; a separate Start/Resume command is the only thing that ever begins
+  or continues section timing.
+- **One bench, one job.** Accepting is refused while an unfinished Practice
+  weld already occupies the bench, under the same Workbench exclusivity rule
+  above — a customer's job cannot silently displace work the player already
+  paid for.
+- **Completion pays Credits and the job's Welding XP**, and immediately refills
+  the same board slot from the eligible pool. There is no Abandon: the only way
+  an accepted job leaves the bench is finishing it.
+- Stop and Travel interrupt a Work Order exactly as they interrupt Practice —
+  closing any open Clean Pass window as missed and preserving every resolved
+  section — never refunding materials and never completing the job early.
 
 ## Inventory and equipment
 

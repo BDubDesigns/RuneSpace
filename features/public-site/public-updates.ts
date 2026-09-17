@@ -5,6 +5,43 @@ export type { PublicUpdate } from "@/game/schemas/public-updates";
 
 const authoredUpdates = [
   {
+    slug: "ten-thousand-one-hours",
+    title: "10,001 Hours",
+    publishedAt: "2026-09-17T09:00:00-07:00",
+    summary:
+      "Wade's terminal stops being empty. Reach Welding level 5, take 10,001 Hours, and the Work Orders board is yours to keep — paying jobs, real Credits, and a Workbench that now has to mind its manners about sharing.",
+    hero: {
+      src: "/updates/rusk-recovery-yard.webp",
+      alt: "Wade Rusk's recovery yard, with the Workbench and a terminal reading WORK ORDERS beneath the yard's sign, racked salvage under an overcast sky",
+      width: 1536,
+      height: 384,
+    },
+    body: [
+      "Wade's terminal has been sitting in the corner of his yard since the day 10,000 Hours opened the Workbench, and it has stayed exactly as empty as he told you it would be. That changes now. Put in the Welding hours and he will hand you 10,001 Hours — the first real client job off that terminal, and the last thing standing between you and the whole board.",
+      "10,001 Hours needs two things: Welding level 5, and Wade deciding you have earned it. Accept the job and the terminal comes alive with three postings at once. Take one, weld it at the Workbench, and get paid. Finish it and Wade fills the empty slot with something new, so there are always three to choose from. Turning 10,001 Hours in afterward is just Wade looking at the work — accepting it is what actually unlocks the board, and it stays unlocked whether or not you have handed the mission in yet.",
+      "Taking a posting hands over its materials the moment you accept — no getting them back once you have. Weld it at the Workbench the same way you would a practice piece, and finishing it pays real Credits on top of Welding XP for every section you completed. There is no way to abandon a job partway through; the only way it leaves the bench is finishing it.",
+      "Because a client's property and your own practice now share one Workbench, the bench only ever holds one of them at a time. An unfinished practice weld counts as occupying it even after you have Stopped it, so a new Finish Weld & Stop control lets that weld run to its natural end without starting another one on your dime — the bench is clear the moment it is done.",
+      "Clean Pass grew up to match. It used to open exactly twice in any welding job; now how many chances you get depends on how long the job actually is — short jobs get none at all, and the longer client jobs on the board can turn up two or three. Catching one hasn't changed: time it right and the work jumps forward a whole extra section, for that section's XP, and missing one still costs nothing.",
+    ],
+    patchNotes: [
+      {
+        heading: "Added",
+        items: [
+          "Work Orders are playable at Rusk Recovery. Take a posting off the terminal, weld it at Wade's Workbench, and get paid in Credits and Welding XP.",
+          "10,001 Hours, the mission that opens the Work Orders board for good. Wade offers it at Rusk Recovery once you reach Welding level 5, and accepting it — not finishing it — is what unlocks the board.",
+          "Finish Weld & Stop, a control at the Workbench that lets the weld already on the bench finish without starting another one after it.",
+        ],
+      },
+      {
+        heading: "Changed",
+        items: [
+          "The Workbench now holds one piece of work at a time. A client's Work Order and an unfinished practice weld can't occupy it together — finish or clear one before starting the other.",
+          "Clean Pass now scales with a job's length instead of always offering exactly two chances: none under six sections of welding, and roughly one more for every five sections beyond that.",
+        ],
+      },
+    ],
+  },
+  {
     slug: "where-to-look",
     title: "Where to Look",
     publishedAt: "2026-09-15T16:00:00-07:00",

@@ -126,11 +126,26 @@ async function workOrderAccess(
     };
   }
   if (action) {
-    return {
-      status: "refused",
-      reason: "in_transit",
-      message: "Finish the active activity first.",
-    };
+    // Welding at the bench is the one active action the terminal is ever
+    // standing next to, and "the bench is busy" is the actionable truth there —
+    // not the generic "finish what you are doing" every other activity gets.
+    const atTheBench =
+      action.actionId === ACTION_IDS.practiceWelding ||
+      action.actionId === ACTION_IDS.workOrderWelding;
+    return atTheBench
+      ? {
+          status: "refused",
+          reason: "workbench_occupied",
+          message:
+            action.actionId === ACTION_IDS.practiceWelding
+              ? "The Workbench is part-way through a practice weld. Finish it before taking client work."
+              : "The Workbench already has a client job on it. Finish it before starting anything else.",
+        }
+      : {
+          status: "refused",
+          reason: "in_transit",
+          message: "Finish the active activity first.",
+        };
   }
   if ((await currentLocationId(transaction, characterId)) !== RUSK_RECOVERY_CONTENT.locationId) {
     return {

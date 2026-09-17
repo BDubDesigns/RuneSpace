@@ -14,6 +14,7 @@ import { deriveMissionGuidanceTargets } from "@/game/domain/missions";
 import { CleanPassControl } from "@/features/welding/CleanPassControl";
 import { usePlay } from "@/features/play/PlayContext";
 import {
+  finishCurrentPracticeWeldAction,
   setPracticeSlagPreferenceAction,
   startPracticeWeldingAction,
   stopPracticeWeldingAction,
@@ -27,6 +28,10 @@ function practiceMessage(state: PlayGameplayState): string | undefined {
   if (state.practiceError === "practice_locked") return "Wade has not put you on the bench yet.";
   if (state.practiceError === "insufficient_scrap")
     return `A fresh weld takes ${state.practice.scrapPerWeld} Scrap Metal.`;
+  if (state.practiceError === "workbench_occupied")
+    return "The Workbench already has a client job on it. Finish it before practising.";
+  if (state.practiceError === "no_weld_in_progress")
+    return "There is no weld on the bench to finish.";
   if (state.commandError === "another_action_active")
     return "Another activity is active. Finish it before starting a weld.";
   return undefined;
@@ -80,7 +85,7 @@ export function PracticeWeldingPanel() {
     setMessage(practiceMessage(result.state));
   }
 
-  function run(intent: "start" | "stop" | "slag", autoDiscardSlag?: boolean) {
+  function run(intent: "start" | "stop" | "finish" | "slag", autoDiscardSlag?: boolean) {
     enqueueForeground(() => {
       setPending(intent);
       startTransition(async () => {
@@ -90,10 +95,12 @@ export function PracticeWeldingPanel() {
               ? await startPracticeWeldingAction({ characterId: state.characterId })
               : intent === "stop"
                 ? await stopPracticeWeldingAction({ characterId: state.characterId })
-                : await setPracticeSlagPreferenceAction({
-                    characterId: state.characterId,
-                    autoDiscardSlag: Boolean(autoDiscardSlag),
-                  }),
+                : intent === "finish"
+                  ? await finishCurrentPracticeWeldAction({ characterId: state.characterId })
+                  : await setPracticeSlagPreferenceAction({
+                      characterId: state.characterId,
+                      autoDiscardSlag: Boolean(autoDiscardSlag),
+                    }),
           );
         } catch {
           setMessage("Comms interruption. The bench could not be confirmed.");
@@ -152,6 +159,23 @@ export function PracticeWeldingPanel() {
         </MissionActionButton>
       )}
 
+      {/* Practice repeats by design, which leaves no ordinary way to end a run
+          on a clear bench: Stop preserves a partial weld, and simply waiting
+          spends two more Scrap the instant this one finishes. Offered whenever
+          a paid weld exists — running or stopped — because that weld is what
+          stands between the player and a customer job (#207). */}
+      {resumable ? (
+        <ActionButton
+          data-practice-finish
+          disabled={foregroundBusy && pending !== "finish"}
+          intent="secondary"
+          loading={pending === "finish"}
+          onClick={() => run("finish")}
+        >
+          Finish Weld &amp; Stop
+        </ActionButton>
+      ) : null}
+
       <StatusMeter
         detail={`${practice.sectionsCompleted} / ${practice.sectionsPerWeld}`}
         label="Current weld"
@@ -191,6 +215,9 @@ export function PracticeWeldingPanel() {
 
       {practice.lastStopReason === "out_of_scrap" && !active ? (
         <Feedback tone="muted">Out of Scrap Metal</Feedback>
+      ) : null}
+      {practice.lastStopReason === "finished_current_weld" && !active ? (
+        <Feedback tone="muted">Weld finished. The Workbench is clear.</Feedback>
       ) : null}
       {message ? <Feedback tone="danger">{message}</Feedback> : null}
       {/* Welding progression belongs with the welding, and the loose Scrap is

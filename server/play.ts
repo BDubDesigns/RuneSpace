@@ -853,8 +853,11 @@ async function projectWorkOrders(
     practice: input.practice,
     activeWorkOrder: board.active,
   });
-  const stationaryHere =
-    input.currentLocationId === RUSK_RECOVERY_CONTENT.locationId && !input.action;
+  // The terminal only renders in the yard, so an active action here is always
+  // work at the bench — which the bench-occupancy reason below explains better
+  // than a generic "you are not standing still" ever could.
+  const atTheYard = input.currentLocationId === RUSK_RECOVERY_CONTENT.locationId;
+  const benchBusy = input.action !== undefined;
 
   const postings = board.postings.flatMap((posting): WorkOrderPostingProjection[] => {
     const definition = getWorkOrder(posting.workOrderId);
@@ -870,13 +873,13 @@ async function projectWorkOrders(
     // can actually do something about first.
     const blockedReason = inProgress
       ? undefined
-      : !stationaryHere
+      : !atTheYard
         ? ("not_here" as const)
         : input.weldingLevel < definition.requiredWeldingLevel
           ? ("welding_level" as const)
           : board.active
             ? ("work_order_active" as const)
-            : benchOccupancy.kind !== "clear"
+            : benchOccupancy.kind !== "clear" || benchBusy
               ? ("workbench_occupied" as const)
               : materials.some((material) => material.carried < material.quantity)
                 ? ("materials" as const)
