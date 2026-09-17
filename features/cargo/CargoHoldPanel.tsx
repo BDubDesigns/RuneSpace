@@ -47,6 +47,23 @@ type StorageMode = "carried" | "cargo";
 
 const COMPLETION_FEEDBACK_DURATION_MS = 3_600;
 
+/**
+ * The two storage regions are two inventories, so each one is drawn as its own
+ * bounded sub-panel rather than as a bare heading above a grid (#199). Both
+ * regions use the identical treatment — the separation comes from grouping and
+ * hierarchy, never from a colour that would imply the items inside differ.
+ * Panel surface over the activity's raised surface is the existing nesting step
+ * used by every other block inside an activity.
+ */
+const CARGO_REGION_CLASS =
+  "h-full border border-[color:var(--rs-border-structural)] bg-[color:var(--rs-surface-panel)] p-3";
+const CARGO_REGION_HEADER_CLASS =
+  "flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 border-b border-[color:var(--rs-border-subtle)] pb-2";
+const CARGO_REGION_TITLE_CLASS =
+  "font-display text-sm font-bold uppercase tracking-[0.16em] text-[color:var(--rs-text-primary)]";
+const CARGO_REGION_COUNT_CLASS =
+  "font-display text-xs uppercase tracking-wide text-[color:var(--rs-text-secondary)]";
+
 function transferMessage(result: CargoHoldTransferActionResult): string | undefined {
   if ("error" in result) return result.error;
   if (result.cargo.status === "transferred") return "Cargo Hold transfer complete.";
@@ -318,13 +335,14 @@ export function CargoHoldPanel() {
     return (
       <section
         aria-label="Carried Inventory"
+        className={CARGO_REGION_CLASS}
         data-cargo-mode="carried"
         ref={carriedGridRef}
         tabIndex={-1}
       >
-        <div className="flex items-baseline justify-between gap-2">
-          <h3 className="font-display text-sm uppercase tracking-wide">CARRIED</h3>
-          <span className="text-xs text-[color:var(--rs-text-secondary)]">
+        <div className={CARGO_REGION_HEADER_CLASS}>
+          <h3 className={CARGO_REGION_TITLE_CLASS}>CARRIED</h3>
+          <span className={CARGO_REGION_COUNT_CLASS}>
             {state.inventory.slotsUsed} / {totalSlots}
           </span>
         </div>
@@ -385,13 +403,14 @@ export function CargoHoldPanel() {
     return (
       <section
         aria-label="Cargo Hold storage"
+        className={CARGO_REGION_CLASS}
         data-cargo-mode="cargo"
         ref={cargoGridRef}
         tabIndex={-1}
       >
-        <div className="flex items-baseline justify-between gap-2">
-          <h3 className="font-display text-sm uppercase tracking-wide">CARGO</h3>
-          <span className="text-xs text-[color:var(--rs-text-secondary)]">
+        <div className={CARGO_REGION_HEADER_CLASS}>
+          <h3 className={CARGO_REGION_TITLE_CLASS}>CARGO</h3>
+          <span className={CARGO_REGION_COUNT_CLASS}>
             {state.cargoHold.slotsUsed} / {state.cargoHold.capacitySlots}
           </span>
         </div>
@@ -607,7 +626,12 @@ export function CargoHoldPanel() {
                   CARGO {state.cargoHold.slotsUsed} / {state.cargoHold.capacitySlots}
                 </ActionButton>
               </div>
-              <div className="grid gap-4 sm:grid-cols-2">
+              {/* Two inventories, not one continuous grid (#199): on desktop
+                  each region is its own bounded sub-panel with a real gap
+                  between them, so the boundary is obvious without colouring
+                  either side differently. Mobile keeps the switcher above and
+                  shows one region at a time. */}
+              <div className="grid gap-4 sm:grid-cols-2 sm:gap-6">
                 <div className={storageMode === "carried" ? "" : "hidden sm:block"}>
                   {renderCarried()}
                 </div>

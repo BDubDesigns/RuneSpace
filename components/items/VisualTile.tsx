@@ -61,11 +61,16 @@ export function VisualTile({
         </span>
       ) : null}
       {background}
-      <span className="absolute inset-0 z-10 flex items-center justify-center">
+      {/* The artwork zone stops where the reserved label band starts (#199), so
+          a name that wraps to its second line never covers art that a
+          single-line name leaves visible. The band is sized to leave the
+          `min-h-28` tile more room than the `h-20` artwork needs; `max-h-full`
+          keeps a shorter tile shrinking its art rather than overflowing. */}
+      <span className="absolute inset-x-0 bottom-[var(--rs-item-label-block)] top-0 z-10 flex items-center justify-center">
         {artworkSrc ? (
           <Image
             alt=""
-            className={`h-20 w-20 max-w-full object-contain ${mutedArtwork ? "opacity-50 grayscale" : ""}`}
+            className={`h-20 max-h-full w-20 max-w-full object-contain ${mutedArtwork ? "opacity-50 grayscale" : ""}`}
             data-testid="item-artwork"
             height={160}
             sizes="80px"
@@ -81,11 +86,15 @@ export function VisualTile({
           </span>
         )}
       </span>
+      {/* One reserved two-line label band for every item tile (#199): the band
+          is the same height whether the name needs one line or two, so tiles
+          stay aligned, and `line-clamp-2` spends the ellipsis only on a name
+          that cannot fit the two lines it is given. */}
       <span
         data-nameplate
-        className="absolute bottom-0 left-3 right-0 z-20 block truncate border-t border-[color:var(--rs-item-plate-border)] bg-[color:var(--rs-item-nameplate-surface)] px-2 py-0.5 font-display text-xs uppercase tracking-wide"
+        className="absolute bottom-0 left-3 right-0 z-20 flex min-h-[var(--rs-item-label-block)] items-center border-t border-[color:var(--rs-item-plate-border)] bg-[color:var(--rs-item-nameplate-surface)] px-2 font-display text-xs uppercase leading-[var(--rs-item-label-line-height)] tracking-wide"
       >
-        {name}
+        <span className="line-clamp-2 break-words">{name}</span>
       </span>
       {badge !== undefined ? (
         <span className="absolute right-2 top-2 z-20 border border-[color:var(--rs-item-plate-border)] bg-[color:var(--rs-item-plate-surface)] px-1.5 py-0.5 font-display text-xs">

@@ -46,6 +46,14 @@
   --rs-item-plate-surface: rgb(9 21 34 / 0.42);
   --rs-item-nameplate-surface: rgb(9 21 34 / 0.9);
   --rs-item-plate-border: rgb(75 216 245 / 0.2);
+  /* Item-tile label band (Issue #199). Fixed-size item tiles reserve one
+     label area tall enough for two lines of the uppercase nameplate, so a
+     wrapped long name such as REFINED FERRITE and a short one such as SLAG
+     leave every tile the same outer size and the same artwork zone. The
+     artwork layer reserves the identical band, so a second line of name never
+     covers art the first line did not. */
+  --rs-item-label-line-height: 0.9rem;
+  --rs-item-label-block: 1.875rem;
   /* Hybrid plated-signage: smoked industrial placard tokens (shared) */
   --rs-plate-surface-top: rgb(18 32 46 / 0.74);
   --rs-plate-surface-bottom: rgb(10 22 34 / 0.62);
