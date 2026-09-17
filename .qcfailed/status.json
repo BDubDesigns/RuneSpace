@@ -5,7 +5,8 @@
   "currentFocus": "Making the Work Orders terminal at Rusk Recovery real: paying client jobs you take off a board, supply the materials for, and weld at Wade's bench.",
   "currentChange": {
     "summary": "Work Orders are playable: Wade hands the board over, three jobs are posted at a time, and you supply the materials and weld the job at his bench for Credits.",
-    "stage": "implementation"
+    "stage": "implementation",
+    "pullRequestNumber": 208
   },
   "latestCompleted": {
     "summary": "Item tiles now show names such as Refined Ferrite in full on two lines, and the desktop Cargo Hold reads as two separate inventories.",
