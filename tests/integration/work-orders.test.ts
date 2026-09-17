@@ -3,6 +3,7 @@ import { afterEach, beforeAll, describe, expect, it } from "vitest";
 import {
   getEffectiveGameBalance,
   getItemDefinition,
+  practiceSectionXp,
   standardSkillLevelThresholds,
   workOrderSectionXp,
 } from "@/game/config/balance";
@@ -17,10 +18,11 @@ import {
   WORK_ORDER_IDS,
   type WorkOrderId,
 } from "@/game/config/foundations";
-import { getWorkOrder } from "@/game/content/work-orders";
+import { getWorkOrder, WORK_ORDERS } from "@/game/content/work-orders";
 import {
   cleanPassFromPersisted,
   cleanPassLifecycle,
+  cleanPassOpportunityWindows,
   type CleanPassOpportunity,
 } from "@/game/domain/clean-pass";
 import { cleanupTestUser, createCharacterForUser, createTestUser } from "./fixtures";
@@ -48,6 +50,7 @@ suite("issue #207 Work Orders (real PostgreSQL)", () => {
   let play: typeof import("@/server/play");
   let missions: typeof import("@/server/missions");
   let workOrderCommands: typeof import("@/server/work-order-commands");
+  let cleanPass: typeof import("@/server/clean-pass");
   const createdUsers: string[] = [];
   const start = new Date("2026-09-15T00:00:00.000Z");
   const balance = getEffectiveGameBalance();
@@ -78,6 +81,7 @@ suite("issue #207 Work Orders (real PostgreSQL)", () => {
     play = await import("@/server/play");
     missions = await import("@/server/missions");
     workOrderCommands = await import("@/server/work-order-commands");
+    cleanPass = await import("@/server/clean-pass");
   });
 
   afterEach(async () => {
@@ -650,6 +654,34 @@ suite("issue #207 Work Orders (real PostgreSQL)", () => {
       ).toEqual([]);
     });
 
+    it("pays that same whole XP when a Clean Pass is claimed along the way", async () => {
+      // The other half of the property above. A claim moves one section's work
+      // earlier and pays it through the claim rather than the resolver, so the
+      // job finishes a section sooner — and still pays exactly its section
+      // count, the same total as the job welded with every opportunity missed.
+      const { userId, character } = await onTheBench();
+      const xpBefore = await weldingXp(character.id);
+      await startWelding(userId, character.id);
+      const opportunity = opportunitiesOf(
+        (await postings(character.id)).find((row) => row.acceptedAt !== null)!,
+      )[0]!.section;
+
+      const claimed = await cleanPass.claimCleanPass(
+        userId,
+        character.id,
+        at(sectionMs * (opportunity - 1) + 100),
+        deterministicRandom(),
+      );
+      expect(claimed.cleanPass).toEqual({ status: "claimed", awardedXp: sectionXp });
+
+      // Weld out the rest of the job: one fewer ordinary section is left to do.
+      await refresh(userId, character.id, sectionMs * mixed.sections);
+
+      expect(await weldingXp(character.id)).toBe(xpBefore + mixed.sections * sectionXp);
+      expect(await workOrdersCompleted(character.id)).toBe(1);
+      expect((await postings(character.id)).filter((row) => row.acceptedAt !== null)).toEqual([]);
+    });
+
     it("never auto-claims a Clean Pass the player welded straight past", async () => {
       const { userId, character } = await onTheBench();
       const xpBefore = await weldingXp(character.id);
@@ -664,6 +696,103 @@ suite("issue #207 Work Orders (real PostgreSQL)", () => {
       expect(cleanPassLifecycle(state, 0, row.sectionsCompleted)).toBe("missed");
       // Five sections of XP, not six: elapsed time never claims anything.
       expect(await weldingXp(character.id)).toBe(xpBefore + 5 * sectionXp);
+    });
+
+    it("claims a Clean Pass for one extra section of the client's job", async () => {
+      const { userId, character } = await onTheBench();
+      await startWelding(userId, character.id);
+      const opportunity = opportunitiesOf(
+        (await postings(character.id)).find((row) => row.acceptedAt !== null)!,
+      )[0]!.section;
+
+      // Stand inside that very section: the sections before it have resolved.
+      const claimAt = sectionMs * (opportunity - 1) + 100;
+      await refresh(userId, character.id, claimAt);
+      const before = (await postings(character.id)).find((row) => row.acceptedAt !== null)!;
+      expect(before.sectionsCompleted).toBe(opportunity - 1);
+
+      const claimed = await cleanPass.claimCleanPass(
+        userId,
+        character.id,
+        at(claimAt),
+        deterministicRandom(),
+      );
+
+      expect(claimed.cleanPass).toEqual({ status: "claimed", awardedXp: sectionXp });
+      const after = (await postings(character.id)).find((row) => row.acceptedAt !== null)!;
+      // Exactly one extra section on the client's job, immediately.
+      expect(after.sectionsCompleted).toBe(before.sectionsCompleted + 1);
+      // Durably recorded on the posting's own Clean Pass column, so a Resume
+      // cannot reopen it...
+      expect(opportunitiesOf(after)[0]).toEqual({ section: opportunity, outcome: "claimed" });
+      // ...while the job's later opportunity is untouched and stays scheduled.
+      expect(opportunitiesOf(after)[1]!.outcome).toBeNull();
+    });
+
+    it("pays the Work Order share for a claimed section, not Practice's or a repair's", async () => {
+      const { userId, character } = await onTheBench();
+      await startWelding(userId, character.id);
+      const opportunity = opportunitiesOf(
+        (await postings(character.id)).find((row) => row.acceptedAt !== null)!,
+      )[0]!.section;
+      const claimAt = sectionMs * (opportunity - 1) + 100;
+      await refresh(userId, character.id, claimAt);
+      const xpBefore = await weldingXp(character.id);
+
+      await cleanPass.claimCleanPass(userId, character.id, at(claimAt), deterministicRandom());
+
+      // A claimed section is worth one ordinary section of this work and
+      // nothing more: the customer share, not the reduced Practice section and
+      // not an authored repair's full Welding increment.
+      expect(await weldingXp(character.id)).toBe(xpBefore + sectionXp);
+      expect(sectionXp).not.toBe(practiceSectionXp(balance));
+      expect(sectionXp).not.toBe(balance.welding.xpPerIncrement);
+    });
+
+    it("can never be the section that finishes an authored job", async () => {
+      // Proven against the authored pool rather than by forcing the server's
+      // fail-closed throw: the cadence shifts the last window left until it
+      // leaves the authored ordinary tail behind it, so on every authored
+      // length the latest claimable section is still short of the job's last.
+      const trailing = balance.welding.cleanPass.trailingOrdinarySections;
+      expect(trailing).toBeGreaterThanOrEqual(2);
+      for (const job of WORK_ORDERS) {
+        const windows = cleanPassOpportunityWindows(job.sections, balance);
+        expect(windows.length).toBeGreaterThan(0);
+        const last = windows[windows.length - 1]!;
+        // A claim on the latest section of the last window leaves the tail.
+        expect(job.sections - last.maxSection).toBeGreaterThanOrEqual(trailing);
+        expect(last.maxSection + 1).toBeLessThan(job.sections);
+      }
+    });
+
+    it("refuses a claim while welding with no window open", async () => {
+      const { userId, character } = await onTheBench();
+      await startWelding(userId, character.id);
+
+      // The job's first section: the earliest authored opportunity is still
+      // ahead of the work.
+      const refused = await cleanPass.claimCleanPass(
+        userId,
+        character.id,
+        at(100),
+        deterministicRandom(),
+      );
+      expect(refused.cleanPass).toMatchObject({ status: "refused", reason: "none_open" });
+      const row = (await postings(character.id)).find((entry) => entry.acceptedAt !== null)!;
+      expect(row.sectionsCompleted).toBe(0);
+      expect(opportunitiesOf(row).every((entry) => entry.outcome === null)).toBe(true);
+    });
+
+    it("refuses a claim with no client job on the bench at all", async () => {
+      const { userId, character } = await welder();
+      const refused = await cleanPass.claimCleanPass(
+        userId,
+        character.id,
+        start,
+        deterministicRandom(),
+      );
+      expect(refused.cleanPass).toMatchObject({ status: "refused", reason: "no_welding" });
     });
 
     it("pays, releases the bench, refills the slot and credits the Mission exactly once", async () => {

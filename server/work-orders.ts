@@ -57,8 +57,6 @@ export type WorkOrderBoardState = {
   active: ActiveWorkOrderState | undefined;
 };
 
-export const EMPTY_WORK_ORDER_BOARD: WorkOrderBoardState = { postings: [], active: undefined };
-
 type PostingRow = typeof characterWorkOrderPostings.$inferSelect;
 
 function postingFromRow(row: PostingRow): WorkOrderPostingState {
