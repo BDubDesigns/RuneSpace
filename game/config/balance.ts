@@ -442,6 +442,28 @@ export function weldingActionIds(balance = getEffectiveGameBalance()): readonly 
   return repairTargetBalances(balance).map((target) => target.actionId);
 }
 
+/**
+ * Every action that resolves on the global Welding section cadence (#207).
+ *
+ * Three different things weld — an authored repair target, a Practice weld at
+ * Wade's bench, and a customer Work Order. They differ in what is being fixed
+ * and what it pays; they do not differ in how a section is timed. This is the
+ * one list of "ticks like Welding", so the generic live-action projection and
+ * the shared boundary scheduler that reconciles each section cannot learn about
+ * one kind and silently omit another.
+ *
+ * Deliberately NOT `weldingActionIds`, whose contract is specifically the
+ * repair-target registry and which several callers rely on meaning exactly
+ * that.
+ */
+export function weldingCadenceActionIds(balance = getEffectiveGameBalance()): readonly string[] {
+  return [
+    ...weldingActionIds(balance),
+    balance.practiceWelding.actionId,
+    balance.workOrders.actionId,
+  ];
+}
+
 /** Returns the authoritative inventory representation for a valid item ID. */
 export function getItemDefinition(
   itemId: string,

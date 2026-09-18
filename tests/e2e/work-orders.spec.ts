@@ -170,7 +170,17 @@ test("tells the truth at every stage before the board is the player's", async ({
   // it is and what it pays — and none of them overflows a 390px screen.
   const first = terminal.locator("[data-work-order-posting]").first();
   await expect(first.locator("[data-work-order-materials]")).toContainText(/Refined Ferrite/);
-  await expect(first.locator("[data-work-order-payout]")).toContainText(/Credits/);
+  await expect(first.locator("[data-work-order-payout]")).toContainText(/\d+ Cr/);
+  // Every required material carries its own met/short state, so a mixed job
+  // says which half is the problem without the player recounting Inventory.
+  const materials = first.locator("[data-work-order-material]");
+  expect(await materials.count()).toBeGreaterThan(0);
+  for (const state of await materials.evaluateAll((nodes) =>
+    nodes.map((node) => node.getAttribute("data-work-order-material-met")),
+  )) {
+    // Carrying nothing yet, so every requirement reads short rather than blank.
+    expect(state).toBe("false");
+  }
   const scrollWidth = await page.evaluate(() => document.documentElement.scrollWidth);
   expect(scrollWidth).toBeLessThanOrEqual(PHONE.width);
 

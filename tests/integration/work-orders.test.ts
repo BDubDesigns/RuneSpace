@@ -3,6 +3,7 @@ import { afterEach, beforeAll, describe, expect, it } from "vitest";
 import {
   getEffectiveGameBalance,
   getItemDefinition,
+  getRepairTargetBalance,
   practiceSectionXp,
   standardSkillLevelThresholds,
   workOrderSectionXp,
@@ -18,6 +19,7 @@ import {
   WORK_ORDER_IDS,
   type WorkOrderId,
 } from "@/game/config/foundations";
+import { REPAIR_TARGETS } from "@/game/content/repair-targets";
 import { getWorkOrder, WORK_ORDERS } from "@/game/content/work-orders";
 import {
   cleanPassFromPersisted,
@@ -25,6 +27,7 @@ import {
   cleanPassOpportunityWindows,
   type CleanPassOpportunity,
 } from "@/game/domain/clean-pass";
+import type { PlayGameplayState } from "@/server/play";
 import { cleanupTestUser, createCharacterForUser, createTestUser } from "./fixtures";
 
 const DATABASE_URL = process.env.DATABASE_URL;
@@ -50,6 +53,8 @@ suite("issue #207 Work Orders (real PostgreSQL)", () => {
   let play: typeof import("@/server/play");
   let missions: typeof import("@/server/missions");
   let workOrderCommands: typeof import("@/server/work-order-commands");
+  let practiceCommands: typeof import("@/server/practice-commands");
+  let repairCommands: typeof import("@/server/repair-commands");
   let cleanPass: typeof import("@/server/clean-pass");
   const createdUsers: string[] = [];
   const start = new Date("2026-09-15T00:00:00.000Z");
@@ -81,6 +86,8 @@ suite("issue #207 Work Orders (real PostgreSQL)", () => {
     play = await import("@/server/play");
     missions = await import("@/server/missions");
     workOrderCommands = await import("@/server/work-order-commands");
+    practiceCommands = await import("@/server/practice-commands");
+    repairCommands = await import("@/server/repair-commands");
     cleanPass = await import("@/server/clean-pass");
   });
 
@@ -838,6 +845,175 @@ suite("issue #207 Work Orders (real PostgreSQL)", () => {
       expect(after.find((row) => row.slotIndex === 0)!.workOrderId).toBe(refilled.workOrderId);
       expect(after.filter((row) => row.acceptedAt !== null)).toEqual([]);
     });
+  });
+
+  /**
+   * The #207 playtest regression: a Work Order welded with no live progress.
+   *
+   * The Workbench said "Stop Welding", so the job genuinely was running, and
+   * the Job meter and the Current section meter both sat still until Stop
+   * reconciled the whole run at once. The generic live-action projection
+   * enumerated Mining, Refining, every repair target and Practice — and not
+   * `work_order_welding` — so a running customer job had no `activeAction` at
+   * all. With no `progressStartedAt` and no `nextAttemptAt` there is no
+   * boundary for the shared scheduler to wake on, which is what turned a
+   * running job into a still one.
+   */
+  describe("a welding job is a live action", () => {
+    /** A client job accepted and genuinely welding, from `ms`. */
+    async function welding(ms = 0) {
+      const fixture = await welder();
+      await giveMaterials(fixture.character.id, mixed.materials);
+      await accept(fixture.userId, fixture.character.id, MIXED_JOB, ms);
+      const started = await startWelding(fixture.userId, fixture.character.id, ms);
+      expect(started.workOrder).toEqual({ status: "started" });
+      return { ...fixture, started };
+    }
+
+    it("projects the running job as the active action", async () => {
+      const { started } = await welding();
+      expect(started.state.activeAction).toBeDefined();
+      expect(started.state.activeAction?.actionId).toBe(ACTION_IDS.workOrderWelding);
+    });
+
+    it("carries the global Welding section as that action's attempt window", async () => {
+      const { started } = await welding();
+      const timing = started.state.activeAction!;
+
+      // The authoritative pair every Welding surface reads its timing from:
+      // where the section in progress began, and when the next one lands.
+      expect(timing.progressStartedAt).toBe(at(0).toISOString());
+      expect(timing.nextAttemptAt).toBe(at(sectionMs).toISOString());
+      expect(Date.parse(timing.nextAttemptAt) - Date.parse(timing.progressStartedAt)).toBe(
+        balance.welding.attemptDurationTicks * GAME_TICK_MS,
+      );
+      expect(timing.nextAttemptDurationTicks).toBe(balance.welding.attemptDurationTicks);
+      // Nothing shortens a Welding section; the Cutter charge is Mining's.
+      expect(timing.nextAttemptBoosted).toBe(false);
+    });
+
+    it("advances its sections through ordinary reads, each read naming the next boundary", async () => {
+      // The regression as a client meets it: no Stop, no claim, no command of
+      // any kind — only state reads. The server has always reconciled sections
+      // on a read; what the missing projection took away was the timing that
+      // tells a client WHEN to read, so the reads stopped happening and the job
+      // sat at zero. A read that advances the work must also hand back the
+      // boundary the next section lands on, or nothing asks again.
+      const { userId, character } = await welding();
+
+      for (const sections of [0, 2, 4]) {
+        const read = await refresh(userId, character.id, sectionMs * sections + 100);
+        expect(read.workOrders.active?.sectionsCompleted).toBe(sections);
+        expect(read.activeAction?.actionId).toBe(ACTION_IDS.workOrderWelding);
+        expect(read.activeAction?.progressStartedAt).toBe(at(sectionMs * sections).toISOString());
+        expect(read.activeAction?.nextAttemptAt).toBe(at(sectionMs * (sections + 1)).toISOString());
+      }
+    });
+
+    it("carries the live section count into the Clean Pass projection", async () => {
+      const { userId, character } = await welding();
+      const read = await refresh(userId, character.id, sectionMs * 3 + 100);
+
+      const cleanPass = read.workOrders.active?.cleanPass;
+      expect(cleanPass?.opportunities.length).toBeGreaterThan(0);
+      // `sectionsCompleted + 1` is the section being welded right now, which is
+      // how the Clean Pass surface knows its window is open — so it has to be
+      // the same live count the job itself reports, not a stale copy.
+      expect(cleanPass?.sectionsCompleted).toBe(3);
+      expect(cleanPass?.sectionsCompleted).toBe(read.workOrders.active?.sectionsCompleted);
+    });
+
+    it("drops the timing on Stop, with the job still on the bench", async () => {
+      const { userId, character } = await welding();
+      const stopped = await workOrderCommands.stopWorkOrderWelding(
+        userId,
+        character.id,
+        at(sectionMs * 2),
+        deterministicRandom(),
+      );
+
+      expect(stopped.workOrder).toEqual({ status: "stopped" });
+      expect(stopped.state.activeAction).toBeUndefined();
+      // Stopped is not abandoned: the job and its resolved sections stay put,
+      // and only the live timing goes.
+      expect(stopped.state.workOrders.active).toMatchObject({
+        workOrderId: MIXED_JOB,
+        sectionsCompleted: 2,
+        active: false,
+      });
+      expect(stopped.state.workOrders.active?.cleanPass).toBeUndefined();
+    });
+  });
+
+  /**
+   * The fix generalized the projection's Welding classification rather than
+   * adding a third special case, so the two kinds of Welding that already had
+   * live timing must still have exactly the timing they had before (#172,
+   * #190). One global section, projected identically for all of them.
+   */
+  describe("Practice and the authored repairs keep the timing they already had", () => {
+    /** The one assertion every kind of Welding has to satisfy. */
+    function expectSectionTiming(state: PlayGameplayState, actionId: string) {
+      expect(state.activeAction?.actionId).toBe(actionId);
+      expect(state.activeAction?.progressStartedAt).toBe(at(0).toISOString());
+      expect(state.activeAction?.nextAttemptAt).toBe(at(sectionMs).toISOString());
+      expect(state.activeAction?.nextAttemptDurationTicks).toBe(
+        balance.welding.attemptDurationTicks,
+      );
+    }
+
+    it("projects Practice Welding on the global Welding section", async () => {
+      const { userId, character } = await welder();
+      await giveMaterials(character.id, [
+        { itemId: ITEM_IDS.scrapMetal, quantity: balance.practiceWelding.scrapPerWeld },
+      ]);
+
+      const started = await practiceCommands.startPracticeWelding(
+        userId,
+        character.id,
+        start,
+        deterministicRandom(),
+      );
+      expectSectionTiming(started, ACTION_IDS.practiceWelding);
+    });
+
+    // Driven off the repair-target registry, so a third authored target is
+    // covered here the moment it is authored.
+    for (const target of REPAIR_TARGETS) {
+      it(`projects ${target.displayName} Welding on that same section`, async () => {
+        const { userId, character } = await welder();
+        const recipe = getRepairTargetBalance(target.id, balance);
+        await db
+          .update(rune.characters)
+          .set({ currentLocationId: target.locationId })
+          .where(eq(rune.characters.id, character.id));
+        // Its authorizing Mission accepted and its recipe already in, which is
+        // all a repair needs before the Welding itself can start.
+        await db
+          .insert(rune.characterMissions)
+          .values({
+            characterId: character.id,
+            missionId: target.authorizingMissionId,
+            acceptedAt: start,
+          })
+          .onConflictDoNothing();
+        await db.insert(rune.characterRepairTargets).values({
+          characterId: character.id,
+          targetId: target.id,
+          refinedFerriteContributed: recipe.refinedFerriteRequired,
+          slagContributed: recipe.slagRequired,
+        });
+
+        const started = await repairCommands.startWelding(
+          userId,
+          character.id,
+          target.id,
+          start,
+          deterministicRandom(),
+        );
+        expectSectionTiming(started, recipe.actionId);
+      });
+    }
   });
 
   describe("an accepted job outlives the Mission that opened the board", () => {

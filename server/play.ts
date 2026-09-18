@@ -25,6 +25,7 @@ import {
   repairTargetForActionId,
   standardSkillLevelThresholds,
   weldingActionIds,
+  weldingCadenceActionIds,
   workOrderSectionXp,
   type EffectiveGameBalance,
 } from "@/game/config/balance";
@@ -1256,19 +1257,21 @@ export async function stateFromTransaction(
   const cutterCharge = normalizeCutterCharge(cutterInstance?.currentCharge, balance);
   const isMiningAction = action?.actionId === ACTION_IDS.ferriteShaleMining;
   const isRefiningAction = action?.actionId === ACTION_IDS.refining;
-  const isWeldingAction =
-    action !== undefined && weldingActionIds(balance).includes(action.actionId);
-  // Practice is Welding: same section cadence, same live attempt window (#190).
-  const isPracticeAction = action?.actionId === ACTION_IDS.practiceWelding;
+  // Every kind of Welding ticks the same way — an authored repair, a Practice
+  // weld, and a customer Work Order — so one classification covers all three.
+  // Enumerating them here is how a Work Order came to weld with no live
+  // section timing at all: the projection knew the job was running, and this
+  // boundary did not (#207).
+  const isWeldingCadenceAction =
+    action !== undefined && weldingCadenceActionIds(balance).includes(action.actionId);
   const nextAttemptBoosted = isMiningAction && cutterCharge > 0;
-  const nextAttemptDurationTicks =
-    isWeldingAction || isPracticeAction
-      ? balance.welding.attemptDurationTicks
-      : isRefiningAction
-        ? balance.refining.attemptDurationTicks
-        : nextAttemptBoosted
-          ? boostedMiningAttemptDurationTicks(balance)
-          : balance.mining.attemptDurationTicks;
+  const nextAttemptDurationTicks = isWeldingCadenceAction
+    ? balance.welding.attemptDurationTicks
+    : isRefiningAction
+      ? balance.refining.attemptDurationTicks
+      : nextAttemptBoosted
+        ? boostedMiningAttemptDurationTicks(balance)
+        : balance.mining.attemptDurationTicks;
   const carriedPowerCellQuantity = stacks
     .filter((stack) => stack.itemId === ITEM_IDS.powerCell)
     .reduce((total, stack) => total + stack.quantity, 0);
@@ -1286,8 +1289,7 @@ export async function stateFromTransaction(
     activeAction:
       action?.actionId === ACTION_IDS.ferriteShaleMining ||
       action?.actionId === ACTION_IDS.refining ||
-      isWeldingAction ||
-      isPracticeAction
+      isWeldingCadenceAction
         ? {
             actionId: action.actionId,
             resolvedThroughAt: action.resolvedThroughAt.toISOString(),

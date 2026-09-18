@@ -202,37 +202,72 @@ function WorkOrderPosting({
 }) {
   return (
     <li
-      className="flex flex-col gap-2 rounded border border-[color:var(--rs-border-subtle)] p-3"
+      className="flex flex-col gap-3 border border-[color:var(--rs-border-subtle)] bg-[color:var(--rs-surface-panel)] p-3"
       data-work-order-posting={posting.workOrderId}
       data-work-order-in-progress={String(posting.inProgress)}
     >
-      <div>
-        <p className="text-sm font-semibold text-[color:var(--rs-text-primary)]">{posting.title}</p>
-        <p className="text-xs uppercase tracking-wide text-[color:var(--rs-text-muted)]">
-          {posting.clientName}
+      {/* The job and who wants it, then the payout. A shop queue is read
+          "what is it, and what does it pay" — those are the two facts that
+          decide whether the rest is worth reading at all. */}
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="font-display text-sm font-semibold text-[color:var(--rs-text-primary)]">
+            {posting.title}
+          </p>
+          <p className="text-xs uppercase tracking-[0.12em] text-[color:var(--rs-text-muted)]">
+            {posting.clientName}
+          </p>
+        </div>
+        <p
+          className="shrink-0 whitespace-nowrap border border-[color:var(--rs-accent-primary)] bg-[color:var(--rs-accent-primary-subtle)] px-2 py-1 font-display text-sm font-bold text-[color:var(--rs-accent-primary)]"
+          data-work-order-payout
+        >
+          {`${posting.payoutCredits} Cr`}
         </p>
       </div>
+
       <p className="text-sm leading-relaxed text-[color:var(--rs-text-secondary)]">
         {posting.description}
       </p>
-      <dl className="grid grid-cols-2 gap-x-3 gap-y-1 text-xs text-[color:var(--rs-text-secondary)]">
-        <dt className="text-[color:var(--rs-text-muted)]">Materials</dt>
-        <dd data-work-order-materials>
-          {posting.materials
-            .map((material) => `${material.itemName} x${material.quantity}`)
-            .join(", ")}
-        </dd>
+
+      {/* Each material carries its own state, because a mixed job is two
+          separate questions: a player with the ferrite but not the cells needs
+          to see which one is the problem without recounting their Inventory.
+          Colour is never the rule — every row states carried / required, and
+          the shortage sentence below says it again in words. */}
+      <ul className="flex flex-col gap-1" data-work-order-materials>
+        {posting.materials.map((material) => {
+          const enough = material.carried >= material.quantity;
+          return (
+            <li
+              key={material.itemId}
+              className={`flex items-baseline justify-between gap-3 border-l-2 pl-2 text-xs ${
+                enough
+                  ? "border-[color:var(--rs-accent-success)] text-[color:var(--rs-accent-success)]"
+                  : "border-[color:var(--rs-accent-danger)] text-[color:var(--rs-accent-danger)]"
+              }`}
+              data-work-order-material={material.itemId}
+              data-work-order-material-met={String(enough)}
+            >
+              <span className="truncate">{material.itemName}</span>
+              <span className="shrink-0 font-semibold tabular-nums">
+                {`${Math.min(material.carried, material.quantity)} / ${material.quantity}`}
+              </span>
+            </li>
+          );
+        })}
+      </ul>
+
+      <dl className="grid grid-cols-2 gap-x-3 gap-y-1 border-t border-[color:var(--rs-border-subtle)] pt-2 text-xs text-[color:var(--rs-text-secondary)]">
         <dt className="text-[color:var(--rs-text-muted)]">Work</dt>
-        <dd>{`${posting.sections} sections`}</dd>
-        <dt className="text-[color:var(--rs-text-muted)]">Pays</dt>
-        <dd data-work-order-payout>{`${posting.payoutCredits} Credits`}</dd>
+        <dd className="tabular-nums">{`${posting.sections} sections`}</dd>
         <dt className="text-[color:var(--rs-text-muted)]">Welding</dt>
-        <dd>{`Level ${posting.requiredWeldingLevel}`}</dd>
+        <dd className="tabular-nums">{`Level ${posting.requiredWeldingLevel}`}</dd>
       </dl>
 
       {posting.inProgress ? (
         <p
-          className="text-xs font-semibold uppercase tracking-wide text-[color:var(--rs-text-primary)]"
+          className="border border-[color:var(--rs-accent-primary)] bg-[color:var(--rs-accent-primary-subtle)] px-2 py-1 text-center font-display text-xs font-semibold uppercase tracking-[0.16em] text-[color:var(--rs-accent-primary)]"
           data-work-order-status
         >
           In Progress
@@ -249,11 +284,14 @@ function WorkOrderPosting({
             Accept Job
           </ActionButton>
           {/* A disabled control on its own tells the player nothing they can
-              act on, so the reason is always in words beside it. */}
+              act on, so the reason is always in words beside it — and in the
+              danger treatment, because it is the actionable state of this card
+              rather than background helper text. */}
           {posting.blockedReason ? (
             <p
-              className="text-xs leading-relaxed text-[color:var(--rs-text-muted)]"
+              className="text-xs font-semibold leading-relaxed text-[color:var(--rs-accent-danger)]"
               data-work-order-blocked={posting.blockedReason}
+              role="status"
             >
               {blockedCopy(posting)}
             </p>
@@ -271,7 +309,12 @@ function blockedCopy(posting: WorkOrderPostingProjection): string {
     case "materials": {
       const short = posting.materials.filter((material) => material.carried < material.quantity);
       return `You are short ${short
-        .map((material) => `${material.quantity - material.carried} ${material.itemName}`)
+        .map((material) => {
+          const missing = material.quantity - material.carried;
+          // Item names are authored singular, so a shortage of more than one
+          // reads "3 Power Cells" rather than "3 Power Cell".
+          return `${missing} ${material.itemName}${missing === 1 ? "" : "s"}`;
+        })
         .join(" and ")}.`;
     }
     case "work_order_active":
