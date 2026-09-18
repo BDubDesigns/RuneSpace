@@ -38,10 +38,17 @@ import {
   type RepairStateResult,
 } from "@/server/repair-commands";
 import {
+  finishCurrentPracticeWeld,
   setPracticeSlagPreference,
   startPracticeWelding,
   stopPracticeWelding,
 } from "@/server/practice-commands";
+import {
+  acceptWorkOrder,
+  startWorkOrderWelding,
+  stopWorkOrderWelding,
+  type WorkOrderCommandState,
+} from "@/server/work-order-commands";
 import { claimCleanPass, type CleanPassClaimResult } from "@/server/clean-pass";
 import { EquipmentRuleError } from "@/game/domain/equipment";
 import { TravelRuleError } from "@/server/travel";
@@ -69,6 +76,8 @@ import {
   WeldingCommandRequestSchema,
   PracticeCommandRequestSchema,
   PracticeSlagPreferenceRequestSchema,
+  WorkOrderAcceptRequestSchema,
+  WorkOrderCommandRequestSchema,
   CleanPassClaimRequestSchema,
   DepositCargoStackRequestSchema,
   WithdrawCargoStackRequestSchema,
@@ -299,6 +308,56 @@ export async function stopPracticeWeldingAction(input: unknown): Promise<PlayAct
   try {
     const user = await requireCurrentUser(await headers());
     return { state: await stopPracticeWelding(user.id, request.data.characterId) };
+  } catch (error) {
+    if (error instanceof OwnershipError) return { error: error.message };
+    throw error;
+  }
+}
+
+export async function finishCurrentPracticeWeldAction(input: unknown): Promise<PlayActionResult> {
+  const request = PracticeCommandRequestSchema.safeParse(input);
+  if (!request.success) return { error: "Invalid Practice command." };
+  try {
+    const user = await requireCurrentUser(await headers());
+    return { state: await finishCurrentPracticeWeld(user.id, request.data.characterId) };
+  } catch (error) {
+    if (error instanceof OwnershipError) return { error: error.message };
+    throw error;
+  }
+}
+
+export type WorkOrderActionResult = WorkOrderCommandState | { error: string };
+
+export async function acceptWorkOrderAction(input: unknown): Promise<WorkOrderActionResult> {
+  const request = WorkOrderAcceptRequestSchema.safeParse(input);
+  if (!request.success) return { error: "Invalid Work Order command." };
+  try {
+    const user = await requireCurrentUser(await headers());
+    return await acceptWorkOrder(user.id, request.data.characterId, request.data.workOrderId);
+  } catch (error) {
+    if (error instanceof OwnershipError) return { error: error.message };
+    throw error;
+  }
+}
+
+export async function startWorkOrderWeldingAction(input: unknown): Promise<WorkOrderActionResult> {
+  const request = WorkOrderCommandRequestSchema.safeParse(input);
+  if (!request.success) return { error: "Invalid Work Order command." };
+  try {
+    const user = await requireCurrentUser(await headers());
+    return await startWorkOrderWelding(user.id, request.data.characterId);
+  } catch (error) {
+    if (error instanceof OwnershipError) return { error: error.message };
+    throw error;
+  }
+}
+
+export async function stopWorkOrderWeldingAction(input: unknown): Promise<WorkOrderActionResult> {
+  const request = WorkOrderCommandRequestSchema.safeParse(input);
+  if (!request.success) return { error: "Invalid Work Order command." };
+  try {
+    const user = await requireCurrentUser(await headers());
+    return await stopWorkOrderWelding(user.id, request.data.characterId);
   } catch (error) {
     if (error instanceof OwnershipError) return { error: error.message };
     throw error;

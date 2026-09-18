@@ -4,6 +4,7 @@ import {
   getEffectiveGameBalance,
   getRepairTargetBalance,
   practiceSectionXp,
+  workOrderSectionXp,
   repairTargetForActionId,
   standardSkillLevelThresholds,
 } from "@/game/config/balance";
@@ -23,7 +24,9 @@ import {
   practiceStateFromRow,
   writePracticeState,
 } from "@/server/practice-welding";
+import { getWorkOrder } from "@/game/content/work-orders";
 import { grantCharacterSkillXp } from "@/server/progression";
+import { loadActiveWorkOrder, writeActiveWorkOrderProgress } from "@/server/work-orders";
 import { loadRepairTargetRow, repairStateFromRow, writeRepairCleanPass } from "@/server/welding";
 
 /**
@@ -146,6 +149,56 @@ export async function claimCleanPass(
           .update(characterPracticeWelds)
           .set({ runXpGained: row.runXpGained + awardedXp, updatedAt: now })
           .where(eq(characterPracticeWelds.characterId, context.character.id));
+        return stateFor({ status: "claimed", awardedXp });
+      }
+
+      // A customer Work Order is the same mechanic again: the job holds its own
+      // rolled opportunities and pays its own section's XP (#207).
+      if (action.actionId === ACTION_IDS.workOrderWelding) {
+        const active = await loadActiveWorkOrder(transaction, context.character.id);
+        const definition = active ? getWorkOrder(active.workOrderId) : undefined;
+        if (!active || !definition) {
+          return stateFor({
+            status: "refused",
+            reason: "no_welding",
+            message: REFUSALS.no_welding,
+          });
+        }
+        const claim = cleanPassClaim({
+          state: active.cleanPass,
+          sectionsCompleted: active.sectionsCompleted,
+          startedAt: action.startedAt,
+          resolvedThroughAt: action.resolvedThroughAt,
+          now,
+          balance,
+        });
+        if (!claim.ok) {
+          return stateFor({
+            status: "refused",
+            reason: claim.reason,
+            message: REFUSALS[claim.reason],
+          });
+        }
+        // The authored cadence always leaves an ordinary tail after the last
+        // opportunity, whatever the job's length, so a claim can never be the
+        // section that finishes it. Fail closed rather than quietly completing
+        // a customer's job — and its payout — through this path.
+        if (active.sectionsCompleted + 1 >= definition.sections) {
+          throw new Error("A Clean Pass claim cannot complete a Work Order");
+        }
+        const awardedXp = workOrderSectionXp(balance);
+        await grantCharacterSkillXp(transaction, {
+          characterId: context.character.id,
+          skillId: SKILL_IDS.welding,
+          awardedXp,
+          thresholds: standardSkillLevelThresholds(balance),
+        });
+        await writeActiveWorkOrderProgress(transaction, {
+          characterId: context.character.id,
+          sectionsCompleted: active.sectionsCompleted + 1,
+          cleanPass: withCleanPassOutcome(active.cleanPass, claim.index, "claimed"),
+          now,
+        });
         return stateFor({ status: "claimed", awardedXp });
       }
 

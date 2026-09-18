@@ -20,9 +20,9 @@ boundary.** This file is the repository's normative agent-behavior contract;
     any dialogue, Mission, Work Order, Update, or Wiki copy involving a named
     NPC, and never copy from it into player-facing text.
   - Work Order board rules, client eligibility, and the authored job pool:
-    `docs/work-orders.md`. It is approved content and product rules only — Work
-    Orders are not implemented, and that document decides no persistence,
-    schema, command, or UI.
+    `docs/work-orders.md`. Work Orders shipped in #207, so that document now
+    describes shipped behaviour; `docs/gameplay-foundations.md` owns the
+    Welding, Clean Pass, and Workbench rules they share with Practice.
   - UI tokens and motion: `docs/design-system.md`.
   - Art generation, asset preparation, and visual QA: `docs/art-cookbook.md`.
   - Authentication and trusted hosts: `docs/authentication.md`.

@@ -97,6 +97,25 @@ async function indicatorCount(page: import("@playwright/test").Page): Promise<nu
   return Number(count);
 }
 
+/**
+ * Regression for #207 follow-up: a resident's `flex justify-end` meta wrapper
+ * once shrink-wrapped the *expanded* population list to the collapsed
+ * trigger's own narrow width, at any location with a resident NPC. This
+ * checks actual rendered layout (bounding boxes), not classes or attributes,
+ * the same way `expectExteriorMissionHalo` checks computed paint rather than
+ * trusting a class name.
+ */
+async function expectPopulationListFillsRow(
+  page: import("@playwright/test").Page,
+  rowSelector: string,
+) {
+  const row = page.locator(rowSelector);
+  const list = page.locator("#location-population-list");
+  const [rowBox, listBox] = await Promise.all([row.boundingBox(), list.boundingBox()]);
+  if (!rowBox || !listBox) throw new Error("Expected both the row and the list to be laid out");
+  expect(listBox.width).toBeGreaterThanOrEqual(rowBox.width - 2);
+}
+
 test("The Long Scramble shows its scene, description, and population without fake activity", async ({
   page,
   testCharacter,
@@ -149,8 +168,36 @@ populationTest(
     const badge = page.locator("[data-population-count]");
     await expect(badge).toBeVisible();
     expect(Number(await badge.getAttribute("data-population-count"))).toBe(before);
+
+    // Collapsed, at a location with a resident NPC (Wade Rusk, Crash Site):
+    // the trigger stays compact and right-aligned against the resident row,
+    // not stretched to the row's full width.
+    const residentRow = page.locator("[data-npc-interaction]");
+    const [residentRowBox, disclosureBox] = await Promise.all([
+      residentRow.boundingBox(),
+      disclosure.boundingBox(),
+    ]);
+    if (!residentRowBox || !disclosureBox) throw new Error("Expected both to be laid out");
+    // Not a fixed ratio: the label's own text length varies with the seeded
+    // count, and at a phone width it can already span most of the row. The
+    // regression this guards is the trigger stretching to fill the row, so a
+    // real (if small) gap is enough to prove it stayed shrink-wrapped.
+    expect(disclosureBox.width).toBeLessThan(residentRowBox.width - 8);
+    expect(disclosureBox.x + disclosureBox.width).toBeCloseTo(
+      residentRowBox.x + residentRowBox.width,
+      0,
+    );
+
     await disclosure.click();
     await expect(disclosure).toHaveAttribute("aria-expanded", "true");
+    // Expanded, the list (and any opened Character Profile, which mounts
+    // inside it) is free to use the full row instead of staying pinned to the
+    // collapsed trigger's narrow width.
+    await expectPopulationListFillsRow(page, "[data-npc-interaction]");
+    const expandedOverflow = await page.evaluate(
+      () => document.documentElement.scrollWidth - window.innerWidth,
+    );
+    expect(expandedOverflow).toBeLessThanOrEqual(0);
     await expect(
       page.getByRole("button", {
         name: `${population.radaOne}, Level 2, player ${population.radaOwnerName}`,
@@ -252,6 +299,14 @@ populationTest(
       yardCount === 1 ? "View 1 other character here" : /^View \d+ other characters here$/,
     );
     await yardDisclosure.click();
+    // The Processing Yard has no resident NPC, so its population never went
+    // through the resident row's meta wrapper — confirming it already renders
+    // full width, unregressed by the resident-row fix above.
+    await expectPopulationListFillsRow(page, "[data-place-meta]");
+    const yardOverflow = await page.evaluate(
+      () => document.documentElement.scrollWidth - window.innerWidth,
+    );
+    expect(yardOverflow).toBeLessThanOrEqual(0);
     await expect(
       page.getByRole("button", {
         name: `${population.yardGhost}, Level 1, player ${population.kaelOwnerName}`,

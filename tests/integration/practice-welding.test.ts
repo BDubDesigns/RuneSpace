@@ -10,6 +10,7 @@ import {
   REPAIR_TARGET_IDS,
   SKILL_IDS,
 } from "@/game/config/foundations";
+import type { CleanPassOpportunity } from "@/game/domain/clean-pass";
 import { cleanupTestUser, createCharacterForUser, createTestUser } from "./fixtures";
 
 const DATABASE_URL = process.env.DATABASE_URL;
@@ -366,30 +367,30 @@ suite("issue #190 Practice Welding (real PostgreSQL)", () => {
     const { userId, character } = await apprentice({ scrap: 2 });
     await startPractice(userId, character.id);
     const rolled = await practiceRow(character.id);
-    // Deterministic rolls put the first opportunity at the authored minimum.
-    expect(rolled?.cleanPassFirstSection).toBe(
-      balance.welding.cleanPass.firstOpportunityMinSection,
-    );
+    // Deterministic rolls put every opportunity at its window's minimum.
+    const opportunities = rolled?.cleanPass as CleanPassOpportunity[];
+    expect(opportunities[0]!.section).toBe(balance.welding.cleanPass.windowStartSection);
 
     // Walk away during that very section.
     await play.beginTravel(
       userId,
       character.id,
       LOCATION_IDS.holoHollow,
-      at(sectionMs * (rolled!.cleanPassFirstSection! - 1) + 100),
+      at(sectionMs * (opportunities[0]!.section - 1) + 100),
       deterministicRandom(),
     );
     const interrupted = await practiceRow(character.id);
-    expect(interrupted?.cleanPassFirstOutcome).toBe("missed");
+    const interruptedOpportunities = interrupted?.cleanPass as CleanPassOpportunity[];
+    expect(interruptedOpportunities[0]!.outcome).toBe("missed");
     // The later opportunity is untouched and stays scheduled.
-    expect(interrupted?.cleanPassSecondOutcome).toBeNull();
+    expect(interruptedOpportunities[1]!.outcome).toBeNull();
   });
 
   it("claims a Clean Pass for one extra section and its Practice XP", async () => {
     const { userId, character } = await apprentice({ scrap: 2 });
     await startPractice(userId, character.id);
     const rolled = await practiceRow(character.id);
-    const opportunity = rolled!.cleanPassFirstSection!;
+    const opportunity = (rolled?.cleanPass as CleanPassOpportunity[])[0]!.section;
 
     // Stand inside that section: the sections before it have resolved.
     const claimAt = sectionMs * (opportunity - 1) + 100;
@@ -405,7 +406,7 @@ suite("issue #190 Practice Welding (real PostgreSQL)", () => {
     // One extra section immediately: the sections that resolved on their own,
     // plus the claimed one.
     expect(after?.sectionsCompleted).toBe(opportunity);
-    expect(after?.cleanPassFirstOutcome).toBe("claimed");
+    expect((after?.cleanPass as CleanPassOpportunity[])[0]!.outcome).toBe("claimed");
     // The claim's own command reconciled the sections that had elapsed, so the
     // total is those sections plus the claimed one, all at Practice rates.
     expect(await weldingXp(character.id)).toBe(opportunity * sectionXp);
@@ -414,7 +415,8 @@ suite("issue #190 Practice Welding (real PostgreSQL)", () => {
   it("refuses a second claim on the same opportunity", async () => {
     const { userId, character } = await apprentice({ scrap: 2 });
     await startPractice(userId, character.id);
-    const opportunity = (await practiceRow(character.id))!.cleanPassFirstSection!;
+    const opportunity = ((await practiceRow(character.id))!.cleanPass as CleanPassOpportunity[])[0]!
+      .section;
     const claimAt = sectionMs * (opportunity - 1) + 100;
     await cleanPass.claimCleanPass(userId, character.id, at(claimAt), deterministicRandom());
 
@@ -470,7 +472,7 @@ suite("issue #190 Practice Welding (real PostgreSQL)", () => {
           ),
         )
     )[0];
-    const opportunity = repairRow!.cleanPassFirstSection!;
+    const opportunity = (repairRow!.cleanPass as CleanPassOpportunity[])[0]!.section;
     expect(opportunity).toBeGreaterThanOrEqual(2);
 
     const xpBefore = await weldingXp(character.id);
@@ -515,7 +517,8 @@ suite("issue #190 Practice Welding (real PostgreSQL)", () => {
             ),
           )
       )[0];
-      return [row?.cleanPassFirstSection, row?.cleanPassSecondSection];
+      const opportunities = row?.cleanPass as CleanPassOpportunity[] | null | undefined;
+      return opportunities?.map((entry) => entry.section);
     };
 
     await repairCommands.startWelding(

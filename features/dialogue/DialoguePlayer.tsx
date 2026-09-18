@@ -150,6 +150,7 @@ export function DialoguePlayer({
       <DialogueScene
         actionMessage={actionMessage}
         beat={presentedBeat}
+        beatIndex={beatIndex}
         controls={
           <>
             <ActionButton

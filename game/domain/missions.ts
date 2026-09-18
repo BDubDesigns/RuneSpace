@@ -23,6 +23,11 @@ const TRACKED_ACTIVITY_ACTION_IDS = {
   mining: ACTION_IDS.ferriteShaleMining,
   refining: ACTION_IDS.refining,
   practice_welding: ACTION_IDS.practiceWelding,
+  // A Work Order completion is observed through the same generic path (#207).
+  // The recommended action is the Welding a customer job actually takes, so
+  // guidance points at the bench and the terminal that feeds it rather than
+  // inventing a Work-Order-shaped guidance kind.
+  work_order: ACTION_IDS.workOrderWelding,
 } as const;
 
 export type MissionState = "not_accepted" | "active" | "ready_for_completion" | "completed";
@@ -49,6 +54,12 @@ export type MissionObservation = {
   trackedProgress?: ReadonlyMap<string, number>;
   /** Authoritative repair state by repair-target ID (#172). */
   repairTargets?: ReadonlyMap<string, RepairTargetObservation>;
+  /**
+   * Current authoritative level by skill ID, for `prerequisiteSkillLevel`
+   * (#207). Absent means "no level information", which reads as unmet — a
+   * projection that cannot see the level must not advertise the offer.
+   */
+  skillLevels?: ReadonlyMap<string, number>;
 };
 
 /**
@@ -206,7 +217,11 @@ export type MissionRequirementStatus = {
 export type MissionEarnedReward =
   | { kind: "item"; itemId: string; itemName: string }
   | { kind: "skill_xp"; skillId: string; skillName: string; amount: number }
-  | { kind: "credits"; amount: number };
+  | { kind: "credits"; amount: number }
+  | {
+      kind: "stack_bundle";
+      items: readonly { itemId: string; itemName: string; quantity: number }[];
+    };
 
 export type MissionProjection = {
   missionId: string;
@@ -606,6 +621,23 @@ function npcGuidance(npcId: string, currentLocationId: string): MissionGuidance 
   return place ? { npcId, localPlaceId: place.id } : { npcId };
 }
 
+/**
+ * Whether an authored skill-level prerequisite currently holds (#207).
+ *
+ * Exported because projection and the authoritative acceptance command must
+ * derive the identical answer from the identical authored content: a UI-only
+ * check would be bypassable, and a second server-side check would be a rule
+ * with two homes.
+ */
+export function missionSkillPrerequisiteSatisfied(
+  definition: MissionDefinition,
+  skillLevels: ReadonlyMap<string, number> | undefined,
+): boolean {
+  const prerequisite = definition.prerequisiteSkillLevel;
+  if (!prerequisite) return true;
+  return (skillLevels?.get(prerequisite.skillId) ?? 0) >= prerequisite.level;
+}
+
 export function projectMission(
   definition: MissionDefinition,
   mission: MissionRecordState | undefined,
@@ -623,7 +655,13 @@ export function projectMission(
   });
   const firstUnsatisfied = firstUnsatisfiedRequirement(definition, currentLocationId, observation);
   const requirementsSatisfied = requirementsHold(definition, currentLocationId, observation);
-  const prerequisiteSatisfied = !definition.prerequisiteMissionId || prerequisiteCompleted;
+  // One eligibility answer for both authored prerequisite kinds, so every
+  // consumer of `prerequisiteSatisfied` — the conversation hub, availability
+  // guidance, the acceptance command — treats a missing level exactly as it
+  // already treats an unfinished predecessor Mission.
+  const prerequisiteSatisfied =
+    (!definition.prerequisiteMissionId || prerequisiteCompleted) &&
+    missionSkillPrerequisiteSatisfied(definition, observation?.skillLevels);
   const active = state === "active" || state === "ready_for_completion";
   return {
     missionId: definition.id,
@@ -774,6 +812,16 @@ function projectEarnedReward(definition: MissionDefinition): MissionEarnedReward
   }
   if (definition.reward.kind === "credits") {
     return { kind: "credits", amount: definition.reward.amount };
+  }
+  if (definition.reward.kind === "stack_bundle") {
+    return {
+      kind: "stack_bundle",
+      items: definition.reward.items.map((entry) => ({
+        itemId: entry.itemId,
+        itemName: resolveItemPresentation(entry.itemId, entry.itemId).displayName,
+        quantity: entry.quantity,
+      })),
+    };
   }
   return {
     kind: "skill_xp",
@@ -964,6 +1012,27 @@ export function validateMissionDefinitions(definitions: readonly MissionDefiniti
       if (!knownIds.has(definition.prerequisiteMissionId)) {
         throw new Error(
           `${where} references unknown prerequisite "${definition.prerequisiteMissionId}".`,
+        );
+      }
+    }
+    if (definition.prerequisiteSkillLevel !== undefined) {
+      const { skillId, level } = definition.prerequisiteSkillLevel;
+      // The same standard the skill-XP reward is held to: a level is only
+      // meaningful against a skill that has an approved progression curve, so a
+      // typo becomes a module-load failure rather than a prerequisite that can
+      // never be met.
+      if (!skillLevelThresholds(skillId)) {
+        throw new Error(
+          `${where} requires skill "${skillId}" without an approved progression curve.`,
+        );
+      }
+      if (!Number.isInteger(level) || level <= 0) {
+        throw new Error(`${where} skill prerequisite level must be a positive integer.`);
+      }
+      const maximumLevel = skillLevelThresholds(skillId)?.at(-1)?.level ?? 0;
+      if (level > maximumLevel) {
+        throw new Error(
+          `${where} requires ${skillId} level ${level}, beyond that skill's maximum of ${maximumLevel}.`,
         );
       }
     }
@@ -1256,6 +1325,34 @@ export function validateMissionDefinitions(definitions: readonly MissionDefiniti
     } else if (definition.reward.kind === "credits") {
       if (!Number.isInteger(definition.reward.amount) || definition.reward.amount <= 0) {
         throw new Error(`${where} reward Credit amount must be a positive integer.`);
+      }
+    } else if (definition.reward.kind === "stack_bundle") {
+      // The mirror image of the unique-item rule above: the bundle path grants
+      // through the authoritative carried-stack boundary, which has no
+      // execution path for a unique item.
+      if (definition.reward.items.length === 0) {
+        throw new Error(`${where} reward bundle must contain at least one item.`);
+      }
+      const bundleItemIds = new Set<string>();
+      for (const entry of definition.reward.items) {
+        if (bundleItemIds.has(entry.itemId)) {
+          throw new Error(`${where} reward bundle names item "${entry.itemId}" twice.`);
+        }
+        bundleItemIds.add(entry.itemId);
+        const bundleItem = getItemDefinition(entry.itemId);
+        if (!bundleItem) {
+          throw new Error(`${where} reward bundle references unknown item "${entry.itemId}".`);
+        }
+        if (bundleItem.kind !== "stack") {
+          throw new Error(
+            `${where} reward bundle item "${entry.itemId}" must be stackable; the generic completion boundary grants a bundle through the carried-stack path.`,
+          );
+        }
+        if (!Number.isInteger(entry.quantity) || entry.quantity <= 0) {
+          throw new Error(
+            `${where} reward bundle quantity for "${entry.itemId}" must be a positive integer.`,
+          );
+        }
       }
     } else {
       if (!Number.isInteger(definition.reward.amount) || definition.reward.amount <= 0) {

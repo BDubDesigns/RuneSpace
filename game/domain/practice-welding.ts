@@ -64,6 +64,17 @@ export type PracticeSnapshot = {
   massAvailableGrams: number;
   /** The player's persistent per-character preference, read at completion time. */
   autoDiscardSlag: boolean;
+  /**
+   * The player asked for the weld they have already paid for to finish and the
+   * run to end there (#207).
+   *
+   * Practice is deliberately continuous, so "let the current one finish" is not
+   * something ordinary Stop can express: Stop preserves a partial weld, and
+   * waiting costs two more Scrap the moment the weld completes. This is the
+   * narrow third intent — finish this unit, charge nothing further, and leave
+   * the Workbench clear so a customer Work Order can claim it.
+   */
+  finishCurrentWeld: boolean;
 };
 
 /** One completed weld, as `This Run` shows it. */
@@ -77,14 +88,21 @@ export type PracticeResolvedWeld = {
 };
 
 /**
- * Why a continuous run stopped on its own. Practice has exactly one natural
- * stop: the bench is out of Scrap for another weld. Everything else that ends
- * a run — the player's Stop, Travel — is an interruption, not a resolution.
+ * Why a continuous run stopped on its own.
+ *
+ * `out_of_scrap` is the bench running dry: the weld in progress finishes and
+ * there is nothing to start another with. `finished_current_weld` is the player
+ * having asked for exactly that outcome in advance (#207) — the paid weld
+ * completes, no next recipe is consumed, and the bench is left clear. Everything
+ * else that ends a run — the player's ordinary Stop, Travel — is an
+ * interruption, not a resolution.
  */
-export type PracticeStopReason = "out_of_scrap";
+export type PracticeStopReason = "out_of_scrap" | "finished_current_weld";
 
 export type PracticeResolution = {
   consumedTicks: number;
+  /** The durable "finish and stop" intent was acted on and must now be cleared. */
+  finishCurrentWeldHonoured: boolean;
   /** Whole sections welded in this window, excluding any Clean Pass advance. */
   sectionsResolved: number;
   completedWelds: number;
@@ -190,6 +208,13 @@ export function resolvePracticeWelding(input: {
 
   for (;;) {
     if (!cycleActive) {
+      // An honoured "finish and stop" never starts the next weld, so it never
+      // spends the next weld's Scrap. Checked before the Scrap test so the run
+      // reports what the player asked for rather than an incidental shortage.
+      if (snapshot.finishCurrentWeld) {
+        stopReason = "finished_current_weld";
+        break;
+      }
       if (scrapAvailable < practiceWelding.scrapPerWeld) {
         stopReason = "out_of_scrap";
         break;
@@ -204,7 +229,7 @@ export function resolvePracticeWelding(input: {
       cycleActive = true;
       sectionsCompleted = 0;
       weldSections = 0;
-      cleanPass = rolledCleanPass(input.random, balance);
+      cleanPass = rolledCleanPass(input.random, practiceWelding.sectionsPerWeld, balance);
     }
 
     if (remainingTicks < sectionTicks) break;
@@ -243,6 +268,10 @@ export function resolvePracticeWelding(input: {
 
   return {
     consumedTicks,
+    // The intent is spent once resolution has acted on it, whether that means
+    // a weld finished under it or the bench was already clear. Leaving it set
+    // would silently refuse the player's next Start.
+    finishCurrentWeldHonoured: stopReason === "finished_current_weld",
     sectionsResolved,
     completedWelds: resolvedWelds.length,
     scrapConsumed,

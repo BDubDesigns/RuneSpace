@@ -515,17 +515,22 @@ export const characterRepairTargets = pgTable(
     slagContributed: integer("slag_contributed").notNull().default(0),
     weldingProgress: integer("welding_progress").notNull().default(0),
     /**
-     * Clean Pass (#190). A repair is ONE Welding work unit, so its two
-     * opportunity sections are rolled once, when Welding first starts on it,
-     * and never rerolled by Stop or Resume. A null outcome on a rolled section
-     * is not a miss by itself — a section the work has already passed reads as
-     * missed from the progress above. The outcome column exists for the one
-     * case progress cannot express: an open window closed by Stop or Travel.
+     * Clean Pass (#190, generalized by #207). A repair is ONE Welding work
+     * unit, so its opportunity sections are rolled once, when Welding first
+     * starts on it, and never rerolled by Stop or Resume.
+     *
+     * `[{ section, outcome }]` in rolled order; SQL `NULL` means the unit has
+     * not rolled yet, which is what makes the roll exactly-once. A null
+     * `outcome` on a rolled section is not a miss by itself — a section the
+     * work has already passed reads as missed from the progress above. The
+     * outcome exists for the one case progress cannot express: an open window
+     * closed by Stop or Travel.
+     *
+     * An array rather than the original fixed column pair, because the number
+     * of opportunities is now a function of the work unit's own length and a
+     * 19-section Work Order gets three of them.
      */
-    cleanPassFirstSection: integer("clean_pass_first_section"),
-    cleanPassFirstOutcome: text("clean_pass_first_outcome"),
-    cleanPassSecondSection: integer("clean_pass_second_section"),
-    cleanPassSecondOutcome: text("clean_pass_second_outcome"),
+    cleanPass: jsonb("clean_pass"),
     completedAt: timestamp("completed_at", { withTimezone: true }),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
@@ -572,10 +577,18 @@ export const characterPracticeWelds = pgTable(
     cycleActive: boolean("cycle_active").notNull().default(false),
     /** Persistent per-character preference, read at each weld's completion. */
     autoDiscardSlag: boolean("auto_discard_slag").notNull().default(false),
-    cleanPassFirstSection: integer("clean_pass_first_section"),
-    cleanPassFirstOutcome: text("clean_pass_first_outcome"),
-    cleanPassSecondSection: integer("clean_pass_second_section"),
-    cleanPassSecondOutcome: text("clean_pass_second_outcome"),
+    /** This weld's Clean Pass roll; see `characterRepairTargets.cleanPass`. */
+    cleanPass: jsonb("clean_pass"),
+    /**
+     * "Stop After Current Weld" (#207): the player asked for the weld they
+     * have already paid for to finish and the run to end there, rather than
+     * rolling straight into another weld and spending two more Scrap.
+     *
+     * Durable because the weld it applies to resolves lazily — the intent has
+     * to survive the player closing the game just as much as the partial weld
+     * does. Cleared by the resolution that honours it, and by any fresh Start.
+     */
+    finishCurrentWeld: boolean("finish_current_weld").notNull().default(false),
     lastStopReason: text("last_stop_reason"),
     runWelds: integer("run_welds").notNull().default(0),
     runScrapConsumed: integer("run_scrap_consumed").notNull().default(0),
@@ -594,6 +607,77 @@ export const characterPracticeWelds = pgTable(
     check(
       "character_practice_welds_sections_require_active_cycle",
       sql`${table.cycleActive} OR ${table.sectionsCompleted} = 0`,
+    ),
+  ],
+);
+
+/**
+ * Issue #207 — the durable Work Orders board, one row per posted slot.
+ *
+ * The board is persistent rather than re-rolled on render, refresh, or login,
+ * so a posting is a real row the player can walk away from and come back to.
+ * Accepting one does not move it: `accepted_at` marks that same row In
+ * Progress, which is why there is no second "active Work Order" table to keep
+ * in agreement with this one. Completion replaces the row's job in place, which
+ * is exactly the authored rule that only the completed slot refills.
+ *
+ * `sections_completed` and `clean_pass` are the accepted job's durable Welding
+ * progress, carried here for the same reason a repair target carries its own:
+ * the work unit owns its state, and `active_actions` stays payload-free.
+ *
+ * An untouched board is simply three absent rows; the board is seeded on the
+ * first authoritative touch after 10,001 Hours is accepted, so nothing needs
+ * backfilling and a locked character can never observe a half-seeded board.
+ */
+export const characterWorkOrderPostings = pgTable(
+  "character_work_order_postings",
+  {
+    characterId: text("character_id")
+      .notNull()
+      .references(() => characters.id, { onDelete: "restrict" }),
+    /** Which of the board's posted slots this row is, stable across refills. */
+    slotIndex: integer("slot_index").notNull(),
+    /** The authored Work Order currently posted in this slot. */
+    workOrderId: text("work_order_id").notNull(),
+    /**
+     * Set when the player accepted this posting and its materials were
+     * committed. Non-null is the single authoritative definition of "there is
+     * an active Work Order", enforced to at most one per character by the
+     * partial unique index below.
+     */
+    acceptedAt: timestamp("accepted_at", { withTimezone: true }),
+    /** Whole Welding sections resolved for the accepted job. */
+    sectionsCompleted: integer("sections_completed").notNull().default(0),
+    cleanPass: jsonb("clean_pass"),
+    postedAt: timestamp("posted_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    primaryKey({
+      columns: [table.characterId, table.slotIndex],
+      name: "character_work_order_postings_pk",
+    }),
+    // One active Work Order per character, enforced by the database rather than
+    // by every command remembering to check. A refill or a concurrent second
+    // acceptance cannot create a second active job.
+    uniqueIndex("character_work_order_postings_one_active_idx")
+      .on(table.characterId)
+      .where(sql`${table.acceptedAt} IS NOT NULL`),
+    // The board never posts the same job twice at once.
+    uniqueIndex("character_work_order_postings_distinct_jobs_idx").on(
+      table.characterId,
+      table.workOrderId,
+    ),
+    check("character_work_order_postings_slot_non_negative", sql`${table.slotIndex} >= 0`),
+    check(
+      "character_work_order_postings_sections_non_negative",
+      sql`${table.sectionsCompleted} >= 0`,
+    ),
+    // Progress belongs to an accepted job. An unaccepted posting is a listing,
+    // not a piece of work, so a split state is corruption.
+    check(
+      "character_work_order_postings_progress_requires_acceptance",
+      sql`${table.acceptedAt} IS NOT NULL OR (${table.sectionsCompleted} = 0 AND ${table.cleanPass} IS NULL)`,
     ),
   ],
 );
@@ -726,6 +810,7 @@ export type CharacterMission = typeof characterMissions.$inferSelect;
 export type CharacterMissionProgress = typeof characterMissionProgress.$inferSelect;
 export type CharacterPowerCellDailyClaim = typeof characterPowerCellDailyClaims.$inferSelect;
 export type CharacterRepairTarget = typeof characterRepairTargets.$inferSelect;
+export type CharacterWorkOrderPosting = typeof characterWorkOrderPostings.$inferSelect;
 export type CargoHoldStack = typeof cargoHoldStacks.$inferSelect;
 export type CargoHoldItemInstance = typeof cargoHoldItemInstances.$inferSelect;
 export type OperatorAuditLog = typeof operatorAuditLogs.$inferSelect;

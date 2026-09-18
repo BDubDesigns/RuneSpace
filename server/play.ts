@@ -25,6 +25,9 @@ import {
   repairTargetForActionId,
   standardSkillLevelThresholds,
   weldingActionIds,
+  weldingCadenceActionIds,
+  workOrderSectionXp,
+  type EffectiveGameBalance,
 } from "@/game/config/balance";
 import { resolveItemPresentation } from "@/game/content/item-presentation";
 import {
@@ -121,7 +124,22 @@ import {
   type PracticeRunState,
 } from "@/server/practice-welding";
 import { RUSK_RECOVERY_CONTENT } from "@/game/content/rusk-recovery";
-import { cleanPassOutcome, cleanPassSection, type CleanPassState } from "@/game/domain/clean-pass";
+import {
+  cleanPassOpportunities,
+  type CleanPassRandom,
+  type CleanPassState,
+} from "@/game/domain/clean-pass";
+import { getWorkOrder } from "@/game/content/work-orders";
+import { deriveWorkbenchOccupancy } from "@/game/domain/workbench";
+import type { PracticeWeldState } from "@/game/domain/practice-welding";
+import { isMissionAccepted } from "@/server/mission-state";
+import {
+  createWorkOrderWeldingResolver,
+  ensureWorkOrderBoard,
+  loadWorkOrderBoard,
+  missOpenWorkOrderCleanPass,
+  takeWorkOrderCompletion,
+} from "@/server/work-orders";
 import { loadRepairAccess } from "@/server/repair-access";
 import { recordTrackedActivity, type TrackedActivity } from "@/server/mission-progress";
 import type { MissionProjection } from "@/game/domain/missions";
@@ -179,11 +197,78 @@ export type CleanPassProjection = {
  * derived here from the Mission record and the required level is authored
  * balance, which keeps the surface free of Mission IDs and level literals.
  */
+/** One posting on the board, exactly as the terminal renders it. */
+export type WorkOrderPostingProjection = {
+  slotIndex: number;
+  workOrderId: string;
+  title: string;
+  clientName: string;
+  description: string;
+  requiredWeldingLevel: number;
+  materials: readonly { itemId: string; itemName: string; quantity: number; carried: number }[];
+  sections: number;
+  payoutCredits: number;
+  /** This posting is the character's active job. */
+  inProgress: boolean;
+  /** Every authoritative acceptance condition currently holds. */
+  acceptable: boolean;
+  /**
+   * Why acceptance would be refused right now, so the surface can say so in
+   * words instead of presenting a disabled control with no explanation.
+   */
+  blockedReason?:
+    | "welding_level"
+    | "materials"
+    | "workbench_occupied"
+    | "work_order_active"
+    | "not_here";
+};
+
+/** The accepted job on the bench, and its durable Welding progress. */
+export type ActiveWorkOrderProjection = {
+  workOrderId: string;
+  title: string;
+  clientName: string;
+  sections: number;
+  sectionsCompleted: number;
+  payoutCredits: number;
+  xpPerSection: number;
+  /** The Work Order Welding action is the character's current active action. */
+  active: boolean;
+  cleanPass?: CleanPassProjection;
+};
+
 export type WorkOrdersProjection = {
   revealed: boolean;
   requiredWeldingLevel: number;
   /** Whether the player meets the level real client work will require. */
   meetsWeldingLevel: boolean;
+  /**
+   * 10,001 Hours is accepted, so the board is the player's — permanently, and
+   * regardless of whether that Mission has been turned in yet (#207).
+   */
+  unlocked: boolean;
+  /** The Mission is offerable right now, so the terminal can point at Wade. */
+  missionAvailable: boolean;
+  postings: readonly WorkOrderPostingProjection[];
+  active?: ActiveWorkOrderProjection;
+  /**
+   * A job that genuinely completed during THIS request's reconciliation, and
+   * what it paid (#207).
+   *
+   * Transient by design and present exactly once: on the response that
+   * discovered the completion, whether the player watched the last section
+   * resolve or the shared lazy path resolved it for them on their first load
+   * after being away. The surface must not infer a completion from the job
+   * disappearing — an operator Mission reset does that too, and a receipt for a
+   * payout that never happened is worse than no receipt at all.
+   */
+  recentCompletion?: {
+    workOrderId: string;
+    title: string;
+    clientName: string;
+    payoutCredits: number;
+  };
 };
 
 /** Repeatable Practice Welding at Wade's Workbench (#190). */
@@ -205,6 +290,13 @@ export type PracticeProjection = {
   scrapAvailable: number;
   scrapPerWeld: number;
   autoDiscardSlag: boolean;
+  /**
+   * The durable "finish this weld, then stop" intent (#207 follow-up). The
+   * authoritative armed state for "Stop After Current Weld" — the UI reads
+   * this rather than faking the toggle with local React state, since the
+   * intent survives a reload exactly as the partial weld itself does.
+   */
+  finishCurrentWeld: boolean;
   /** Why the last run stopped on its own, for the ordinary run presentation. */
   lastStopReason?: string;
   run: PracticeRunState;
@@ -364,7 +456,14 @@ export type PlayGameplayState = {
   stop?: ActivityStop;
   commandError?: "another_action_active";
   /** One current Practice Welding refusal, for the Workbench surface (#190). */
-  practiceError?: "practice_unavailable_here" | "practice_locked" | "insufficient_scrap";
+  practiceError?:
+    | "practice_unavailable_here"
+    | "practice_locked"
+    | "insufficient_scrap"
+    /** The one bench already holds an unfinished customer Work Order (#207). */
+    | "workbench_occupied"
+    /** "Finish current weld and stop" was asked for with nothing on the bench. */
+    | "no_weld_in_progress";
   /** Authoritative persistent current location (stable ID from the registry). */
   location: { currentLocationId: string };
   /**
@@ -529,6 +628,14 @@ export function createPlayResolver(
       actionId,
       resolver: createWeldingResolver(onWeldingOutcome) as PlayResolver,
     })),
+    {
+      // A customer Work Order credits its Mission from its own authoritative
+      // completion transaction rather than from resolved sections, so it is
+      // deliberately NOT wrapped in `withTrackedActivityProgress`: a section is
+      // not a completed job, and only finishing the job counts (#207).
+      actionId: ACTION_IDS.workOrderWelding,
+      resolver: createWorkOrderWeldingResolver(random) as PlayResolver,
+    },
     {
       // Practice Welding counts COMPLETED welds through the same generic
       // tracked-activity path Mining and Refining use — never sections, never
@@ -697,12 +804,164 @@ function projectCleanPass(
   weldingActive: boolean,
 ): CleanPassProjection | undefined {
   if (!weldingActive) return undefined;
-  const opportunities = ([0, 1] as const).flatMap((index) => {
-    const section = cleanPassSection(cleanPass, index);
-    return section === null ? [] : [{ section, outcome: cleanPassOutcome(cleanPass, index) }];
-  });
+  const opportunities = cleanPassOpportunities(cleanPass).map((opportunity) => ({
+    section: opportunity.section,
+    outcome: opportunity.outcome,
+  }));
   if (opportunities.length === 0) return undefined;
   return { opportunities, sectionsCompleted };
+}
+
+/**
+ * Project the Work Orders terminal (#207).
+ *
+ * The board is seeded here, on the first authoritative touch after 10,001 Hours
+ * is accepted, rather than as a side effect of that Mission's acceptance — the
+ * generic Mission command has no business knowing that one Mission opens a
+ * board. This runs inside the same locked transaction every command already
+ * holds, and the insert is idempotent, so a refresh can never draw a second
+ * board and two requests can never half-seed one.
+ *
+ * Every refusal reason is derived here as well, so the terminal can explain
+ * itself in words rather than presenting three disabled controls.
+ */
+async function projectWorkOrders(
+  transaction: DatabaseTransaction,
+  input: {
+    characterId: string;
+    weldingLevel: number;
+    currentLocationId: string;
+    action: { actionId: string } | undefined;
+    practice: PracticeWeldState;
+    stacks: readonly { itemId: string; quantity: number }[];
+    balance: EffectiveGameBalance;
+    random: CleanPassRandom;
+    now: Date;
+  },
+): Promise<WorkOrdersProjection> {
+  const { balance } = input;
+  const revealed = (await loadCompletedMissionIds(transaction, input.characterId)).has(
+    RUSK_RECOVERY_CONTENT.workOrdersRevealMissionId,
+  );
+  const unlocked = await isMissionAccepted(
+    transaction,
+    input.characterId,
+    RUSK_RECOVERY_CONTENT.workOrdersMissionId,
+  );
+  const meetsWeldingLevel = input.weldingLevel >= balance.workOrders.requiredWeldingLevel;
+
+  const base = {
+    revealed,
+    requiredWeldingLevel: balance.workOrders.requiredWeldingLevel,
+    meetsWeldingLevel,
+    unlocked,
+    // At Welding 5 with the Mission not yet accepted, the terminal's honest
+    // message is "go and talk to Wade" — never an empty board, which would say
+    // there is no work when there is.
+    missionAvailable: meetsWeldingLevel && !unlocked,
+  };
+  await ensureWorkOrderBoard(transaction, {
+    characterId: input.characterId,
+    unlocked,
+    weldingLevel: input.weldingLevel,
+    random: input.random,
+    now: input.now,
+  });
+  const board = await loadWorkOrderBoard(transaction, input.characterId);
+
+  const carried = new Map<string, number>();
+  for (const stack of input.stacks) {
+    carried.set(stack.itemId, (carried.get(stack.itemId) ?? 0) + stack.quantity);
+  }
+  const benchOccupancy = deriveWorkbenchOccupancy({
+    practice: input.practice,
+    activeWorkOrder: board.active,
+  });
+  // The terminal only renders in the yard, so an active action here is always
+  // work at the bench — which the bench-occupancy reason below explains better
+  // than a generic "you are not standing still" ever could.
+  const atTheYard = input.currentLocationId === RUSK_RECOVERY_CONTENT.locationId;
+  const benchBusy = input.action !== undefined;
+
+  // The BOARD is gated on the unlock; a job already on the bench is not. It was
+  // paid for out of the player's own pocket, so it stays visible and finishable
+  // however the Mission that opened the board ends up — otherwise an operator
+  // reset would strand a customer's job on the one bench forever (#207).
+  const postings = (unlocked ? board.postings : []).flatMap(
+    (posting): WorkOrderPostingProjection[] => {
+      const definition = getWorkOrder(posting.workOrderId);
+      if (!definition) return [];
+      const materials = definition.materials.map((material) => ({
+        itemId: material.itemId,
+        itemName: resolveItemPresentation(material.itemId, material.itemId).displayName,
+        quantity: material.quantity,
+        carried: carried.get(material.itemId) ?? 0,
+      }));
+      const inProgress = posting.acceptedAt !== null;
+      // Ordered most-actionable-last so the reason shown is the one the player
+      // can actually do something about first.
+      const blockedReason = inProgress
+        ? undefined
+        : !atTheYard
+          ? ("not_here" as const)
+          : input.weldingLevel < definition.requiredWeldingLevel
+            ? ("welding_level" as const)
+            : board.active
+              ? ("work_order_active" as const)
+              : benchOccupancy.kind !== "clear" || benchBusy
+                ? ("workbench_occupied" as const)
+                : materials.some((material) => material.carried < material.quantity)
+                  ? ("materials" as const)
+                  : undefined;
+      return [
+        {
+          slotIndex: posting.slotIndex,
+          workOrderId: definition.id,
+          title: definition.title,
+          clientName: definition.clientName,
+          description: definition.description,
+          requiredWeldingLevel: definition.requiredWeldingLevel,
+          materials,
+          sections: definition.sections,
+          payoutCredits: definition.payoutCredits,
+          inProgress,
+          acceptable: !inProgress && blockedReason === undefined,
+          ...(blockedReason ? { blockedReason } : {}),
+        },
+      ];
+    },
+  );
+
+  // Consumed once per transaction, so a completion is reported by the response
+  // that committed it and never repeated by the next refresh.
+  const completion = takeWorkOrderCompletion(transaction);
+  const withCompletion = completion ? { recentCompletion: completion } : {};
+
+  const activeDefinition = board.active ? getWorkOrder(board.active.workOrderId) : undefined;
+  if (!board.active || !activeDefinition) return { ...base, ...withCompletion, postings };
+
+  const workOrderActive = input.action?.actionId === ACTION_IDS.workOrderWelding;
+  const cleanPass = projectCleanPass(
+    board.active.cleanPass,
+    board.active.sectionsCompleted,
+    workOrderActive,
+  );
+  return {
+    ...base,
+    ...withCompletion,
+    postings,
+    active: {
+      workOrderId: activeDefinition.id,
+      title: activeDefinition.title,
+      clientName: activeDefinition.clientName,
+      sections: activeDefinition.sections,
+      sectionsCompleted: board.active.sectionsCompleted,
+      payoutCredits: activeDefinition.payoutCredits,
+      xpPerSection: workOrderSectionXp(balance),
+      active: workOrderActive,
+      ...(cleanPass ? { cleanPass } : {}),
+    },
+  };
 }
 
 async function projectRepairTarget(
@@ -899,13 +1158,6 @@ export async function stateFromTransaction(
     practiceState.sectionsCompleted,
     practiceActive,
   );
-  const workOrders: WorkOrdersProjection = {
-    revealed: (await loadCompletedMissionIds(transaction, characterId)).has(
-      RUSK_RECOVERY_CONTENT.workOrdersRevealMissionId,
-    ),
-    requiredWeldingLevel: balance.workOrders.requiredWeldingLevel,
-    meetsWeldingLevel: weldingProgress.level >= balance.workOrders.requiredWeldingLevel,
-  };
   const practice: PracticeProjection = {
     unlocked: await loadPracticeUnlocked(transaction, characterId),
     active: practiceActive,
@@ -917,6 +1169,7 @@ export async function stateFromTransaction(
       .reduce((total, stack) => total + stack.quantity, 0),
     scrapPerWeld: balance.practiceWelding.scrapPerWeld,
     autoDiscardSlag: practiceRow?.autoDiscardSlag ?? false,
+    finishCurrentWeld: practiceRow?.finishCurrentWeld ?? false,
     ...(practiceRow?.lastStopReason ? { lastStopReason: practiceRow.lastStopReason } : {}),
     run: practiceRunStateFromRow(practiceRow),
     ...(practiceCleanPass ? { cleanPass: practiceCleanPass } : {}),
@@ -936,6 +1189,20 @@ export async function stateFromTransaction(
           : undefined,
     }));
   const currentLocationId = character[0]?.currentLocationId ?? LOCATION_IDS.crashSite;
+  // Work Orders (#207). Projected after the character's location is known,
+  // because every posting's acceptability depends on the player genuinely
+  // standing in Wade's yard.
+  const workOrders = await projectWorkOrders(transaction, {
+    characterId,
+    weldingLevel: weldingProgress.level,
+    currentLocationId,
+    action,
+    practice: practiceState,
+    stacks,
+    balance,
+    random: defaultMiningRandom(),
+    now,
+  });
   const credits = character[0]?.credits ?? 0;
   const missions = await loadMissionProjections(transaction, characterId, {
     currentLocationId,
@@ -998,19 +1265,21 @@ export async function stateFromTransaction(
   const cutterCharge = normalizeCutterCharge(cutterInstance?.currentCharge, balance);
   const isMiningAction = action?.actionId === ACTION_IDS.ferriteShaleMining;
   const isRefiningAction = action?.actionId === ACTION_IDS.refining;
-  const isWeldingAction =
-    action !== undefined && weldingActionIds(balance).includes(action.actionId);
-  // Practice is Welding: same section cadence, same live attempt window (#190).
-  const isPracticeAction = action?.actionId === ACTION_IDS.practiceWelding;
+  // Every kind of Welding ticks the same way — an authored repair, a Practice
+  // weld, and a customer Work Order — so one classification covers all three.
+  // Enumerating them here is how a Work Order came to weld with no live
+  // section timing at all: the projection knew the job was running, and this
+  // boundary did not (#207).
+  const isWeldingCadenceAction =
+    action !== undefined && weldingCadenceActionIds(balance).includes(action.actionId);
   const nextAttemptBoosted = isMiningAction && cutterCharge > 0;
-  const nextAttemptDurationTicks =
-    isWeldingAction || isPracticeAction
-      ? balance.welding.attemptDurationTicks
-      : isRefiningAction
-        ? balance.refining.attemptDurationTicks
-        : nextAttemptBoosted
-          ? boostedMiningAttemptDurationTicks(balance)
-          : balance.mining.attemptDurationTicks;
+  const nextAttemptDurationTicks = isWeldingCadenceAction
+    ? balance.welding.attemptDurationTicks
+    : isRefiningAction
+      ? balance.refining.attemptDurationTicks
+      : nextAttemptBoosted
+        ? boostedMiningAttemptDurationTicks(balance)
+        : balance.mining.attemptDurationTicks;
   const carriedPowerCellQuantity = stacks
     .filter((stack) => stack.itemId === ITEM_IDS.powerCell)
     .reduce((total, stack) => total + stack.quantity, 0);
@@ -1028,8 +1297,7 @@ export async function stateFromTransaction(
     activeAction:
       action?.actionId === ACTION_IDS.ferriteShaleMining ||
       action?.actionId === ACTION_IDS.refining ||
-      isWeldingAction ||
-      isPracticeAction
+      isWeldingCadenceAction
         ? {
             actionId: action.actionId,
             resolvedThroughAt: action.resolvedThroughAt.toISOString(),
@@ -1407,6 +1675,15 @@ export async function beginTravel(
           });
         } else if (context.action.actionId === ACTION_IDS.practiceWelding) {
           await interruptPracticeWelding(transaction, context.character.id, now);
+        } else if (context.action.actionId === ACTION_IDS.workOrderWelding) {
+          // Leaving Rusk Recovery interrupts a customer job exactly as it
+          // interrupts Practice: the job and every resolved section stay
+          // durable on the bench, an open window is spent, and time spent
+          // elsewhere welds nothing (#207).
+          await missOpenWorkOrderCleanPass(transaction, {
+            characterId: context.character.id,
+            now,
+          });
         }
         await transaction
           .delete(activeActions)

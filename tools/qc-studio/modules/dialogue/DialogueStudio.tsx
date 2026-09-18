@@ -42,6 +42,7 @@ export type DialoguePreviewProps = {
   isComplete: boolean;
   onTextClick: () => void;
   portraitGeneration: number;
+  beatIndex: number;
   actionMessage?: string;
   controls?: ReactNode;
 };
@@ -797,6 +798,7 @@ export function DialogueStudio({
                       ? "Preview only: this action was simulated visually. No mission, item, character, or database state changed."
                       : undefined,
                     beat: previewBeat,
+                    beatIndex: previewBeatIndex,
                     controls: previewControls,
                     fullText: previewBeat.text,
                     isComplete:

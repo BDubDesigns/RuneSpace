@@ -40,6 +40,16 @@ export type DialogueBeat =
       quantity: number;
       backgroundId: ConversationBackgroundId;
       text: string;
+      /**
+       * This beat presents a reward's full awarded total, aggregated across
+       * however many carried stacks Inventory's own stack limit actually split
+       * it into (#207 follow-up) — never one beat per persisted stack. Set only
+       * by `rewardItemBeats`. Inventory persistence still obeys the real stack
+       * limit exactly as before; this only relaxes the authoring-time sanity
+       * ceiling on displayed quantity, since the number here is a reward total
+       * rather than one physical stack's worth.
+       */
+      isRewardTotal?: true;
     }
   | {
       kind: "skill_xp";
@@ -227,6 +237,36 @@ function tansySkillXpBeat(skillId: SkillId, amount: number): DialogueBeat {
 
 function wadeSkillXpBeat(skillId: SkillId, amount: number): DialogueBeat {
   return { kind: "skill_xp", skillId, amount, backgroundId: crash, text: "" };
+}
+
+/**
+ * One item beat per distinct item in a reward, showing the true awarded
+ * total regardless of how many carried stacks Inventory's own stack limit
+ * actually split it into (#207 follow-up). A ten-Ferrite reward is one
+ * beat reading ×10, never two beats of ×5 because Refined Ferrite's stack
+ * limit happens to be five — that split is Inventory's business, and the
+ * player should never have to click through it twice for one reward.
+ *
+ * Reusable for any multi-item reward reveal, not a Wade-only special case:
+ * a future author lists what was actually granted and this aggregates it,
+ * rather than hand-splitting beats to match persistence.
+ */
+function rewardItemBeats(
+  backgroundId: ConversationBackgroundId,
+  items: readonly { itemId: ItemId; quantity: number }[],
+): DialogueBeat[] {
+  const totals = new Map<ItemId, number>();
+  for (const item of items) {
+    totals.set(item.itemId, (totals.get(item.itemId) ?? 0) + item.quantity);
+  }
+  return Array.from(totals, ([itemId, quantity]) => ({
+    kind: "item" as const,
+    itemId,
+    quantity,
+    backgroundId,
+    text: "",
+    isRewardTotal: true as const,
+  }));
 }
 
 function rennSkillXpBeat(skillId: SkillId, amount: number): DialogueBeat {
@@ -1395,6 +1435,140 @@ const dialogue = {
       wadeAtYard(
         EXPRESSION_IDS.neutral,
         "Ten thousand hours, the old hands say. You've got a few of them behind you now.",
+      ),
+    ],
+  },
+  // 10,001 Hours (#207). Wade is plainly proud of the apprentice and says so
+  // by refusing to: the compliment arrives, gets undercut in the next sentence,
+  // and the actual reason he is handing over client work is that the terminal
+  // is beating him. Short declaratives, no exclamation marks, no ceremony.
+  [DIALOGUE_IDS.wadeTenThousandOneHoursOffer]: {
+    id: DIALOGUE_IDS.wadeTenThousandOneHoursOffer,
+    npcId: NPC_IDS.wadeRusk,
+    beats: [
+      wadeAtYard(EXPRESSION_IDS.neutral, "Hm. You're getting decent with that torch."),
+      wadeAtYard(EXPRESSION_IDS.scowl, "Decent. Don't write it down anywhere."),
+      wadeAtYard(
+        EXPRESSION_IDS.neutral,
+        "Normally I wouldn't put a customer's property in front of you yet. Not for a while.",
+      ),
+      wadeAtYard(
+        EXPRESSION_IDS.neutral,
+        "But that terminal's stacking orders faster than I'm clearing them, and there's one of me.",
+      ),
+      wadeAtYard(
+        EXPRESSION_IDS.neutral,
+        "So you're ready. Or you're not, and you're what I've got. Take a job off the board. Do it properly.",
+      ),
+      // Asks for the first finished job back for a look, and stops there. The
+      // board is the player's from the moment this is accepted, so nothing here
+      // may imply a second job waits on his approval.
+      wadeAtYard(
+        EXPRESSION_IDS.neutral,
+        "Bring the first one back here when it's done. My name's on the work, so I'll want a look at it.",
+      ),
+    ],
+  },
+  [DIALOGUE_IDS.wadeTenThousandOneHoursAccepted]: {
+    id: DIALOGUE_IDS.wadeTenThousandOneHoursAccepted,
+    npcId: NPC_IDS.wadeRusk,
+    beats: [
+      wadeAtYard(
+        EXPRESSION_IDS.neutral,
+        "Board's yours now. It stays yours. I'm not going to keep unlocking it for you.",
+      ),
+      wadeAtYard(
+        EXPRESSION_IDS.neutral,
+        "Bring the material yourself. A job doesn't start until it's paid for out of your own pocket.",
+      ),
+    ],
+  },
+  [DIALOGUE_IDS.wadeTenThousandOneHoursWorkOrderReminder]: {
+    id: DIALOGUE_IDS.wadeTenThousandOneHoursWorkOrderReminder,
+    npcId: NPC_IDS.wadeRusk,
+    beats: [
+      wadeAtYard(
+        EXPRESSION_IDS.neutral,
+        "Terminal's over there. Board's not going to read itself.",
+      ),
+      wadeAtYard(EXPRESSION_IDS.neutral, "Pick one. Finish it. Then we'll talk."),
+    ],
+  },
+  [DIALOGUE_IDS.wadeTenThousandOneHoursBusy]: {
+    id: DIALOGUE_IDS.wadeTenThousandOneHoursBusy,
+    npcId: NPC_IDS.wadeRusk,
+    beats: [
+      wadeAtYard(EXPRESSION_IDS.neutral, "You're in the middle of something. Finish that first."),
+    ],
+  },
+  [DIALOGUE_IDS.wadeTenThousandOneHoursTurnIn]: {
+    id: DIALOGUE_IDS.wadeTenThousandOneHoursTurnIn,
+    npcId: NPC_IDS.wadeRusk,
+    beats: [
+      wadeAtYard(EXPRESSION_IDS.neutral, "All right. Let's see it."),
+      wadeAtYard(EXPRESSION_IDS.neutral, "Hold still. I'm looking at the seam, not at you."),
+    ],
+  },
+  [DIALOGUE_IDS.wadeTenThousandOneHoursCompletion]: {
+    id: DIALOGUE_IDS.wadeTenThousandOneHoursCompletion,
+    npcId: NPC_IDS.wadeRusk,
+    beats: [
+      wadeAtYard(EXPRESSION_IDS.neutral, "Hm."),
+      wadeAtYard(
+        EXPRESSION_IDS.neutral,
+        "I've been at that for a minute and I can't find enough wrong with it to complain about.",
+      ),
+      wadeAtYard(EXPRESSION_IDS.scowl, "Don't make a thing out of that."),
+      wadeAtYard(
+        EXPRESSION_IDS.neutral,
+        "Shop stock. Ferrite and cells. You'll go through it, and I'd rather you didn't stop working to go shopping.",
+      ),
+      // One beat per distinct item, showing the true awarded total — never
+      // one beat per persisted stack. Ten Refined Ferrite lands as two
+      // carried stacks of five, but that split is Inventory's business, not
+      // something the player clicks through twice (#207 follow-up).
+      ...rewardItemBeats(ruskYard, [
+        { itemId: ITEM_IDS.refinedFerrite, quantity: 10 },
+        { itemId: ITEM_IDS.powerCell, quantity: 5 },
+      ]),
+      wadeAtYard(EXPRESSION_IDS.neutral, "Board's still up. Take the next one when you want it."),
+    ],
+  },
+  // Unlike 10,000 Hours' one shared beat, the bundle is big enough that the two
+  // causes are genuinely different problems, and Wade has something separate to
+  // say about each.
+  [DIALOGUE_IDS.wadeTenThousandOneHoursCapacitySlotsRefusal]: {
+    id: DIALOGUE_IDS.wadeTenThousandOneHoursCapacitySlotsRefusal,
+    npcId: NPC_IDS.wadeRusk,
+    beats: [
+      wadeAtYard(EXPRESSION_IDS.scowl, "Where exactly were you planning to put it?"),
+      wadeAtYard(
+        EXPRESSION_IDS.neutral,
+        "Ten ferrite and five cells. All of it or none of it. I'm not splitting shop stock into a pile on the ground.",
+      ),
+      wadeAtYard(EXPRESSION_IDS.neutral, "Clear some space. Come back."),
+    ],
+  },
+  [DIALOGUE_IDS.wadeTenThousandOneHoursCapacityMassRefusal]: {
+    id: DIALOGUE_IDS.wadeTenThousandOneHoursCapacityMassRefusal,
+    npcId: NPC_IDS.wadeRusk,
+    beats: [
+      wadeAtYard(EXPRESSION_IDS.scowl, "You can barely stand up as it is."),
+      wadeAtYard(
+        EXPRESSION_IDS.neutral,
+        "Ten ferrite and five cells. That's weight. All of it or none of it.",
+      ),
+      wadeAtYard(EXPRESSION_IDS.neutral, "Put something down. Come back."),
+    ],
+  },
+  [DIALOGUE_IDS.wadePostTenThousandOneHours]: {
+    id: DIALOGUE_IDS.wadePostTenThousandOneHours,
+    npcId: NPC_IDS.wadeRusk,
+    beats: [
+      wadeAtYard(EXPRESSION_IDS.neutral, "Board's up. Bench is open. Scrap's still two credits."),
+      wadeAtYard(
+        EXPRESSION_IDS.neutral,
+        "You don't need me standing over the terminal. Take what you can finish.",
       ),
     ],
   },

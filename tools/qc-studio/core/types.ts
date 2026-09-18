@@ -28,6 +28,13 @@ export type StudioDialogueBeat =
       quantity: number;
       backgroundId: string;
       text: string;
+      /**
+       * This beat presents a reward's full awarded total, aggregated across
+       * however many carried stacks the adapter's own stack limit actually
+       * split it into — never one beat per persisted stack. Relaxes the
+       * quantity ceiling in `validateDialogueDraft` accordingly.
+       */
+      isRewardTotal?: true;
     }
   | {
       kind: "skill_xp";

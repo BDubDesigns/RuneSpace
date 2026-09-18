@@ -376,13 +376,22 @@ const authoredWikiArticles = [
             { text: "practice as much as you like", articleSlug: "practice-welding" },
             ", for scrap rather than for a repair.",
           ],
+          [
+            "Once you are good enough with a torch, there is paying work too. ",
+            { text: "Work Orders", articleSlug: "work-orders" },
+            " run on the same Workbench and the same welding, for real client jobs and Credits rather than practice.",
+          ],
         ],
       },
       {
         heading: "Clean Pass",
         paragraphs: [
-          "Twice during any welding job — a repair or practice — a moment opens up where the bead is running clean and you can lay one in. A Clean Pass control appears next to the normal controls for about three seconds.",
-          "Take it in time and the work jumps forward a whole extra pass, and pays that pass's XP. Miss it and absolutely nothing happens: it costs no material, no progress, and no time, so there is never a reason not to let one go by. The two moments are decided when the work unit starts, and stopping and resuming never moves them or gives you another go at one you were in the middle of.",
+          [
+            "During any welding job — a repair, a practice weld, or a ",
+            { text: "Work Order", articleSlug: "work-orders" },
+            " — moments open up where the bead is running clean and you can lay one in. How many you get depends on how long the job is: a short one might not get any at all, and a longer one can get more than one — roughly one for every five sections of welding, starting once a job reaches six sections. A Clean Pass control appears next to the normal controls for about three seconds when one comes up.",
+          ],
+          "Take it in time and the work jumps forward a whole extra pass, and pays that pass's XP. Miss it and absolutely nothing happens: it costs no material, no progress, and no time, so there is never a reason not to let one go by. Every chance is decided before the job starts, and stopping and resuming never moves them or gives you another go at one you were in the middle of.",
         ],
       },
     ],
@@ -431,6 +440,17 @@ const authoredWikiArticles = [
           "One Start keeps the bench going: as each weld finishes the next one begins, taking two more scrap, until there is not enough left for another. It keeps going while you are away from the screen, the same as any other work.",
           "Stop whenever you like. The half-finished weld stays exactly as it is, and so does the scrap you already spent on it — resuming continues that same weld and costs nothing, even with no scrap left at all. Walking away from the yard stops the bench the same way; you cannot weld from the road.",
           "When the scrap runs out the bench finishes the weld in progress and stops on its own, saying so. Buying more does not start it again — that is your call.",
+          "If you would rather the weld on the bench finish without another one starting after it, use Stop After Current Weld instead of an ordinary Stop. It lets that weld run to completion — full XP and output, same as always — then leaves the bench clear instead of spending scrap on the next one. It works whether the weld is currently running or already Stopped partway through.",
+        ],
+      },
+      {
+        heading: "One bench, one job",
+        paragraphs: [
+          [
+            "There is only one Workbench, and it holds one piece of work at a time. An unfinished practice weld — one whose scrap is already spent — counts as occupying it, even after you have Stopped it. Take on a paying ",
+            { text: "Work Order", articleSlug: "work-orders" },
+            " and you will be asked to finish that weld first, or to clear the bench with Stop After Current Weld. It works the other way too: a client's job on the bench means no fresh practice weld until that job is finished.",
+          ],
         ],
       },
       {
@@ -451,7 +471,71 @@ const authoredWikiArticles = [
       {
         heading: "Work Orders",
         paragraphs: [
-          "There is a beaten-up terminal in the corner of the yard. Finishing 10,000 Hours makes it yours to look at, and it is empty: paying client work is not in the game yet, and when it arrives it will need Welding level 5 as well.",
+          [
+            "There is a beaten-up terminal in the corner of the yard, and it is not just scenery any more. Once you are good enough with a torch, it is where the paying jobs come in — see ",
+            { text: "Work Orders", articleSlug: "work-orders" },
+            " for how the board works.",
+          ],
+        ],
+      },
+    ],
+  },
+  {
+    slug: "work-orders",
+    title: "Work Orders",
+    category: "work",
+    summary:
+      "The paying jobs on Wade Rusk's terminal at Rusk Recovery — how the board opens up, how a job works, and what it pays.",
+    sections: [
+      {
+        paragraphs: [
+          [
+            "There is a beaten-up terminal in the corner of ",
+            { text: "Wade Rusk's", articleSlug: "wade-rusk" },
+            " yard at Rusk Recovery, right beside the Workbench. Finishing 10,000 Hours turns it from scenery into something real — though at that point it is still empty. Paying work does not actually start coming through it until you are ready for it.",
+          ],
+        ],
+      },
+      {
+        heading: "Opening the board",
+        paragraphs: [
+          [
+            "Two things have to be true before Wade will put a customer's property in front of you: Welding level 5, and his own say-so. Once both hold, he offers you 10,001 Hours at Rusk Recovery. Accept it, and the board is yours for good — you do not need to turn the job in first. Turning it in afterward is just Wade looking at the finished work; the board keeps working the whole time either way. See ",
+            { text: "Missions", articleSlug: "missions" },
+            " for where this sits in the wider job chain.",
+          ],
+        ],
+      },
+      {
+        heading: "Three jobs, one at a time",
+        paragraphs: [
+          "The board always shows three jobs at once. You can only have one underway at a time, so pick whichever one you want and leave the other two — they will still be posted when you are free to look again.",
+        ],
+      },
+      {
+        heading: "Taking a job",
+        paragraphs: [
+          "Taking a job hands over its materials right away — Refined Ferrite, and sometimes a Power Cell or two — straight out of your Inventory. Make sure you are carrying everything it asks for before you accept, because the materials do not come back once you have. There is no way to abandon a job either: once it is on the bench, finishing it is the only way it leaves.",
+        ],
+      },
+      {
+        heading: "Working it at the Workbench",
+        paragraphs: [
+          [
+            "Accepting a job does not start the clock — it just puts the work on Wade's Workbench, waiting. Head over and start it yourself, the same way you would start a ",
+            { text: "practice weld", articleSlug: "practice-welding" },
+            ". If an unfinished practice weld is already sitting on the bench, you will need to finish that first — the bench only holds one piece of work at a time.",
+          ],
+        ],
+      },
+      {
+        heading: "Getting paid",
+        paragraphs: [
+          [
+            "Finish a job and it pays out immediately — real ",
+            { text: "Credits", articleSlug: "credits-and-trading" },
+            ", plus Welding XP for every section you completed. The moment it is done, a new job takes its place on the board, so there are always three to choose from.",
+          ],
         ],
       },
     ],
@@ -501,6 +585,11 @@ const authoredWikiArticles = [
             { text: "practice welds", articleSlug: "practice-welding" },
             " and show him the work.",
           ],
+          [
+            "10,001 Hours — once you are Welding level 5, Wade offers you a paying job off his ",
+            { text: "Work Orders", articleSlug: "work-orders" },
+            " terminal at Rusk Recovery. Accepting it is what makes the board yours for good; finishing the job and showing him the work is just the formality.",
+          ],
         ],
       },
       {
@@ -530,7 +619,7 @@ const authoredWikiArticles = [
       {
         heading: "How missions work in practice",
         paragraphs: [
-          "Objectives update live as you meet them. Every job you've accepted gets its own strip at the top of the screen, on the Map and while travelling too — green while there's still work to do, blue once it's ready to hand in — and the Mission Log keeps the full checklist. Finishing Walk It Off, Cut Your Teeth, or Waste Not hands you the next job in the chain automatically — there's nothing extra to accept. Keep the Change works differently: after Hold It Together, go back and talk to Wade to take it on. It's currently the last job in the chain. When every objective on a job is met, talk to the NPC named in it to turn it in.",
+          "Objectives update live as you meet them. Every job you've accepted gets its own strip at the top of the screen, on the Map and while travelling too — green while there's still work to do, blue once it's ready to hand in — and the Mission Log keeps the full checklist. Finishing Walk It Off, Cut Your Teeth, or Waste Not hands you the next job in the chain automatically — there's nothing extra to accept. Keep the Change works differently: after Hold It Together, go back and talk to Wade to take it on. 10,000 Hours and 10,001 Hours work the same way — Wade won't come find you, so walk out to Rusk Recovery and take each one on once it's available. 10,001 Hours is currently the last job in the chain. When every objective on a job is met, talk to the NPC named in it to turn it in.",
         ],
       },
       {
@@ -770,6 +859,11 @@ const authoredWikiArticles = [
             "He is the one who teaches you ",
             { text: "Welding", articleSlug: "cargo-hold-and-welding" },
             ", and he is deliberate about what he will let you put a torch to. People bring him things they cannot afford to lose twice, so you spend a long time on his own scrap before you go anywhere near anybody else's property.",
+          ],
+          [
+            "Get good enough and that changes. Once you can weld at a real level, Wade puts you on his ",
+            { text: "Work Orders", articleSlug: "work-orders" },
+            " board — paying jobs, off his own terminal, that stay yours to work whenever one is posted.",
           ],
         ],
       },

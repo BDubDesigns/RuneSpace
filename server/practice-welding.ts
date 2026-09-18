@@ -15,7 +15,8 @@ import { ACTION_IDS, ITEM_IDS, SKILL_IDS } from "@/game/config/foundations";
 import { RUSK_RECOVERY_CONTENT } from "@/game/content/rusk-recovery";
 import {
   withOpenCleanPassMissed,
-  type CleanPassOutcome,
+  cleanPassFromPersisted,
+  cleanPassToPersisted,
   type CleanPassState,
   UNROLLED_CLEAN_PASS,
 } from "@/game/domain/clean-pass";
@@ -69,6 +70,8 @@ export type PersistedPracticeOutcome = {
   consumedTicks: number;
   /** The capacity resolution decided its Slag against; persistence places it there. */
   slagBudget: { slots: number; massGrams: number };
+  /** The durable "finish and stop" intent was acted on and must be cleared. */
+  finishCurrentWeldHonoured: boolean;
   stopReason?: PracticeStopReason;
 };
 
@@ -76,12 +79,7 @@ type PracticeRow = typeof characterPracticeWelds.$inferSelect;
 
 export function practiceCleanPassFromRow(row: PracticeRow | undefined): CleanPassState {
   if (!row) return UNROLLED_CLEAN_PASS;
-  return {
-    firstSection: row.cleanPassFirstSection,
-    firstOutcome: row.cleanPassFirstOutcome as CleanPassOutcome | null,
-    secondSection: row.cleanPassSecondSection,
-    secondOutcome: row.cleanPassSecondOutcome as CleanPassOutcome | null,
-  };
+  return cleanPassFromPersisted(row.cleanPass);
 }
 
 export function practiceStateFromRow(row: PracticeRow | undefined): PracticeWeldState {
@@ -172,6 +170,7 @@ async function loadPracticeSnapshot(
     slotsAvailable: Math.max(0, loadout.containerSlotCapacity - loadout.inventorySlotsUsed),
     massAvailableGrams: Math.max(0, loadout.maximumCarryCapacityGrams - loadout.carriedMassGrams),
     autoDiscardSlag: row?.autoDiscardSlag ?? false,
+    finishCurrentWeld: row?.finishCurrentWeld ?? false,
   };
 }
 
@@ -195,14 +194,31 @@ export async function writePracticeState(
     .set({
       sectionsCompleted: input.practice.sectionsCompleted,
       cycleActive: input.practice.cycleActive,
-      cleanPassFirstSection: input.practice.cleanPass.firstSection,
-      cleanPassFirstOutcome: input.practice.cleanPass.firstOutcome,
-      cleanPassSecondSection: input.practice.cleanPass.secondSection,
-      cleanPassSecondOutcome: input.practice.cleanPass.secondOutcome,
+      cleanPass: cleanPassToPersisted(input.practice.cleanPass),
       ...(input.stopReason === undefined ? {} : { lastStopReason: input.stopReason }),
       updatedAt: input.now,
     })
     .where(eq(characterPracticeWelds.characterId, input.characterId));
+}
+
+/**
+ * Set or clear the durable "finish current weld and stop" intent (#207).
+ *
+ * Durable because the weld it applies to resolves lazily: the player can set it
+ * and close the game, and the weld they already paid for should still finish
+ * and still stop there. Cleared by the resolution that honours it and by any
+ * ordinary Start, which is a request for the continuous run again.
+ */
+export async function setPracticeFinishCurrentWeld(
+  transaction: DatabaseTransaction,
+  characterId: string,
+  finishCurrentWeld: boolean,
+  now: Date,
+): Promise<void> {
+  await transaction
+    .update(characterPracticeWelds)
+    .set({ finishCurrentWeld, updatedAt: now })
+    .where(eq(characterPracticeWelds.characterId, characterId));
 }
 
 /** Reset the bounded `This Run` totals when a new run begins. */
@@ -282,6 +298,7 @@ export function createPracticeWeldingResolver(
         weldResolvedAt,
         consumedTicks: resolved.consumedTicks,
         slagBudget: resolved.slagBudget,
+        finishCurrentWeldHonoured: resolved.finishCurrentWeldHonoured,
         ...(resolved.stopReason ? { stopReason: resolved.stopReason } : {}),
       };
       return {
@@ -388,6 +405,11 @@ export function createPracticeWeldingResolver(
         now,
         stopReason: outcome.stopReason ?? null,
       });
+      // Spent the moment resolution acts on it; leaving it set would silently
+      // refuse the player's next Start.
+      if (outcome.finishCurrentWeldHonoured) {
+        await setPracticeFinishCurrentWeld(transaction, outcome.characterId, false, now);
+      }
       onOutcome?.(outcome);
     },
   };

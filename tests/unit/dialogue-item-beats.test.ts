@@ -21,7 +21,12 @@ describe("dialogue item beats", () => {
           const range = getItemBeatQuantityRange(beat.itemId);
           expect(range).toBeDefined();
           expect(beat.quantity).toBeGreaterThanOrEqual(range!.min);
-          expect(beat.quantity).toBeLessThanOrEqual(range!.max);
+          // A reward-total beat presents the full awarded amount, which is
+          // deliberately allowed past one stack's worth (#207 follow-up); see
+          // "aggregates a reward's identical items into one beat" below.
+          if (!beat.isRewardTotal) {
+            expect(beat.quantity).toBeLessThanOrEqual(range!.max);
+          }
         } else {
           const resolved = resolveDialogueSkillXp(beat);
           expect(resolved).toBeDefined();
@@ -46,6 +51,25 @@ describe("dialogue item beats", () => {
       const sequence = getDialogue(dialogueId);
       expect(sequence?.beats.every((beat) => beat.kind === "npc")).toBe(true);
     }
+  });
+
+  it("aggregates 10,001 Hours' shop-stock bundle into one beat per item, not one per stack", () => {
+    const completion = getDialogue(DIALOGUE_IDS.wadeTenThousandOneHoursCompletion);
+    const itemBeats = completion!.beats.filter((beat) => beat.kind === "item");
+    // Ten Refined Ferrite lands as two carried stacks of five (its stack limit),
+    // but the player sees the true award once, not the storage split twice.
+    expect(itemBeats).toEqual([
+      expect.objectContaining({
+        itemId: ITEM_IDS.refinedFerrite,
+        quantity: 10,
+        isRewardTotal: true,
+      }),
+      expect.objectContaining({
+        itemId: ITEM_IDS.powerCell,
+        quantity: 5,
+        isRewardTotal: true,
+      }),
+    ]);
   });
 
   it("fails safe on unknown item IDs and NPC beats", () => {

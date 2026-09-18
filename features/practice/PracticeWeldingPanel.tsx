@@ -14,6 +14,7 @@ import { deriveMissionGuidanceTargets } from "@/game/domain/missions";
 import { CleanPassControl } from "@/features/welding/CleanPassControl";
 import { usePlay } from "@/features/play/PlayContext";
 import {
+  finishCurrentPracticeWeldAction,
   setPracticeSlagPreferenceAction,
   startPracticeWeldingAction,
   stopPracticeWeldingAction,
@@ -27,6 +28,10 @@ function practiceMessage(state: PlayGameplayState): string | undefined {
   if (state.practiceError === "practice_locked") return "Wade has not put you on the bench yet.";
   if (state.practiceError === "insufficient_scrap")
     return `A fresh weld takes ${state.practice.scrapPerWeld} Scrap Metal.`;
+  if (state.practiceError === "workbench_occupied")
+    return "The Workbench already has a client job on it. Finish it before practising.";
+  if (state.practiceError === "no_weld_in_progress")
+    return "There is no weld on the bench to finish.";
   if (state.commandError === "another_action_active")
     return "Another activity is active. Finish it before starting a weld.";
   return undefined;
@@ -80,7 +85,7 @@ export function PracticeWeldingPanel() {
     setMessage(practiceMessage(result.state));
   }
 
-  function run(intent: "start" | "stop" | "slag", autoDiscardSlag?: boolean) {
+  function run(intent: "start" | "stop" | "finish" | "slag", autoDiscardSlag?: boolean) {
     enqueueForeground(() => {
       setPending(intent);
       startTransition(async () => {
@@ -90,10 +95,12 @@ export function PracticeWeldingPanel() {
               ? await startPracticeWeldingAction({ characterId: state.characterId })
               : intent === "stop"
                 ? await stopPracticeWeldingAction({ characterId: state.characterId })
-                : await setPracticeSlagPreferenceAction({
-                    characterId: state.characterId,
-                    autoDiscardSlag: Boolean(autoDiscardSlag),
-                  }),
+                : intent === "finish"
+                  ? await finishCurrentPracticeWeldAction({ characterId: state.characterId })
+                  : await setPracticeSlagPreferenceAction({
+                      characterId: state.characterId,
+                      autoDiscardSlag: Boolean(autoDiscardSlag),
+                    }),
           );
         } catch {
           setMessage("Comms interruption. The bench could not be confirmed.");
@@ -122,35 +129,91 @@ export function PracticeWeldingPanel() {
       data-practice-panel
       data-practice-active={String(active)}
     >
-      {/* Start or stop first (#193). The recipe, the meters and the loose scrap
-          all describe what this control does, so they follow it — which is what
-          moves the bench above the fold on a phone while Wade's Mission strip is
-          on screen. */}
-      {active ? (
-        <ActionButton
-          data-practice-stop
-          disabled={foregroundBusy && pending !== "stop"}
-          intent="secondary"
-          loading={pending === "stop"}
-          onClick={() => run("stop")}
-        >
-          Stop Practice
-        </ActionButton>
-      ) : (
-        <MissionActionButton
-          data-practice-start
-          disabled={(!resumable && !canStartFresh) || Boolean(state.activeAction) || foregroundBusy}
-          guidance={guided ? "active" : undefined}
-          loading={pending === "start"}
-          onClick={() => run("start")}
-        >
-          {resumable
-            ? "Resume Practice"
-            : canStartFresh
-              ? "Start Practice"
-              : `Need ${practice.scrapPerWeld} Scrap Metal`}
-        </MissionActionButton>
-      )}
+      {/* Start or stop first (#193), together with the third "stop after
+          this one" intent, given room of its own rather than sitting flush
+          against Stop/Resume — two controls that both end the run otherwise
+          read as one segmented control on a phone (#207 follow-up). The
+          recipe, the meters and the loose scrap all describe what these
+          controls do, so they follow — which is what moves the bench above
+          the fold on a phone while Wade's Mission strip is on screen. */}
+      <div className="flex flex-wrap items-center gap-3">
+        {active ? (
+          <ActionButton
+            data-practice-stop
+            disabled={foregroundBusy && pending !== "stop"}
+            intent="secondary"
+            loading={pending === "stop"}
+            onClick={() => run("stop")}
+          >
+            Stop Practice
+          </ActionButton>
+        ) : (
+          <MissionActionButton
+            data-practice-start
+            disabled={
+              (!resumable && !canStartFresh) || Boolean(state.activeAction) || foregroundBusy
+            }
+            guidance={guided ? "active" : undefined}
+            loading={pending === "start"}
+            onClick={() => run("start")}
+          >
+            {resumable
+              ? "Resume Practice"
+              : canStartFresh
+                ? "Start Practice"
+                : `Need ${practice.scrapPerWeld} Scrap Metal`}
+          </MissionActionButton>
+        )}
+
+        {/* Practice repeats by design, which leaves no ordinary way to end a
+            run on a clear bench: Stop preserves a partial weld, and simply
+            waiting spends two more Scrap the instant this one finishes.
+            Offered whenever a paid weld exists — running or stopped —
+            because that weld is what stands between the player and a
+            customer job (#207). Once armed there is no way to disarm it
+            short of an ordinary Start, so the control disables itself rather
+            than inviting a second, pointless click, and reads the persisted
+            server intent rather than a local guess so a reload shows the
+            same armed state the server is actually holding.
+
+            Armed reuses the existing `--rs-glow-success` attention token as
+            an exterior halo, not a new one — the same token the success
+            flash animations already use, applied here as a steady glow
+            instead of a one-shot fade. Two things keep it from silently
+            doing nothing, exactly as `PlayScreen`'s `NewsControl` documents
+            for its own unread-news halo: `ActionButton` always carries
+            `rs-bevel`, whose clip-path would clip a shadow drawn outside the
+            element's own box, so the glow goes on this unclipped wrapper
+            span instead of the beveled button; and Tailwind's
+            `shadow-[var(...)]` arbitrary-value syntax only sets internal
+            `--tw-shadow-*` custom properties, not `box-shadow` itself,
+            unless a base `shadow` utility is also present — an inline style
+            sets `box-shadow` directly instead, avoiding that trap. */}
+        {resumable ? (
+          <span
+            className="inline-flex"
+            style={practice.finishCurrentWeld ? { boxShadow: "var(--rs-glow-success)" } : undefined}
+          >
+            <ActionButton
+              aria-pressed={practice.finishCurrentWeld}
+              data-practice-finish
+              data-practice-finish-armed={String(practice.finishCurrentWeld)}
+              disabled={practice.finishCurrentWeld || (foregroundBusy && pending !== "finish")}
+              intent={practice.finishCurrentWeld ? "success" : "secondary"}
+              loading={pending === "finish"}
+              onClick={() => run("finish")}
+            >
+              {practice.finishCurrentWeld
+                ? "Stopping After Current Weld"
+                : "Stop After Current Weld"}
+            </ActionButton>
+          </span>
+        ) : null}
+      </div>
+
+      {practice.finishCurrentWeld ? (
+        <Feedback tone="muted">Practice will stop when this weld finishes.</Feedback>
+      ) : null}
 
       <StatusMeter
         detail={`${practice.sectionsCompleted} / ${practice.sectionsPerWeld}`}
@@ -191,6 +254,9 @@ export function PracticeWeldingPanel() {
 
       {practice.lastStopReason === "out_of_scrap" && !active ? (
         <Feedback tone="muted">Out of Scrap Metal</Feedback>
+      ) : null}
+      {practice.lastStopReason === "finished_current_weld" && !active ? (
+        <Feedback tone="muted">Weld finished. The Workbench is clear.</Feedback>
       ) : null}
       {message ? <Feedback tone="danger">{message}</Feedback> : null}
       {/* Welding progression belongs with the welding, and the loose Scrap is

@@ -13,6 +13,7 @@ import {
   getItemDefinition,
   getItemMaximumCharge,
   skillLevelThresholds,
+  standardSkillLevelThresholds,
 } from "@/game/config/balance";
 import { LOCATION_IDS } from "@/game/config/foundations";
 import { getLocation } from "@/game/content/locations";
@@ -28,11 +29,15 @@ import { deriveEquipmentLoadout, isCompatibleEquipmentAssignment } from "@/game/
 import { type RepairTargetState } from "@/game/domain/welding-repair";
 import {
   planExactStackAddition,
+  planExactStackAdditions,
   planExactStackRemoval,
   planUniqueItemAddition,
   type ExactStackRemovalPlan,
+  type StackAdditionPlan,
 } from "@/game/domain/inventory";
-import type { MissionObservation } from "@/game/domain/missions";
+import { missionSkillPrerequisiteSatisfied, type MissionObservation } from "@/game/domain/missions";
+import { getSkillPresentation } from "@/game/content/skill-presentation";
+import { characterSkillLevel } from "@/server/skill-levels";
 import type { MiningRandom } from "@/game/domain/mining";
 import { withResolvedOwnedCharacter } from "@/server/action-resolution";
 import {
@@ -302,6 +307,31 @@ export async function acceptMission(
           return stateFor({
             status: "refused",
             message: `Complete ${prerequisiteDefinition?.title ?? "the prerequisite mission"} before this mission can begin.`,
+          });
+        }
+      }
+
+      // The authored skill gate, revalidated from the same content projection
+      // reads. A UI-only check would be bypassable and a second server-side
+      // rule would be the same rule with two homes (#207).
+      if (definition.prerequisiteSkillLevel) {
+        const { skillId, level } = definition.prerequisiteSkillLevel;
+        const currentLevel = await characterSkillLevel(
+          transaction,
+          context.character.id,
+          skillId,
+          standardSkillLevelThresholds(),
+        );
+        if (
+          !missionSkillPrerequisiteSatisfied(
+            definition,
+            new Map<string, number>([[skillId, currentLevel]]),
+          )
+        ) {
+          const skillName = getSkillPresentation(skillId)?.displayName ?? skillId;
+          return stateFor({
+            status: "refused",
+            message: `${definition.title} needs ${skillName} level ${level}.`,
           });
         }
       }
@@ -780,6 +810,56 @@ async function completeMissionForDefinition(input: {
     }
   }
 
+  // The same post-consumption preflight for a bundle, planned as ONE combined
+  // grant. Each entry is applied to an evolving hypothetical inventory before
+  // the next is planned, so two items that each fit alone but not together are
+  // correctly refused rather than half-granted (#207).
+  let bundlePlans: readonly StackAdditionPlan<string>[] | undefined;
+  if (definition.reward?.kind === "stack_bundle") {
+    const loadout = deriveEquipmentLoadout({
+      assignments,
+      instances: itemState.carriedInstances,
+      stacks: candidateStacks,
+      balance,
+    });
+    const entries = definition.reward.items.map((entry) => {
+      const itemDefinition = getItemDefinition(entry.itemId, balance);
+      if (!itemDefinition || itemDefinition.kind !== "stack") {
+        throw new Error(`${definition.id} reward bundle item ${entry.itemId} is not stackable`);
+      }
+      return {
+        itemId: entry.itemId,
+        quantity: entry.quantity,
+        stackLimit: itemDefinition.stackLimit,
+        itemWeight: itemDefinition.massGrams,
+      };
+    });
+    const bundle = planExactStackAdditions(
+      candidateStacks,
+      entries,
+      Math.max(0, loadout.containerSlotCapacity - loadout.inventorySlotsUsed),
+      Math.max(0, loadout.maximumCarryCapacityGrams - loadout.carriedMassGrams),
+    );
+    if (!bundle.ok) {
+      // Nothing is inserted, no partial bundle exists, `completedAt` is not
+      // stamped, and no other completion side effect commits: the refusal
+      // returns before the write phase below begins. The slot/mass distinction
+      // is what selects Wade's authored refusal beat.
+      const rewardName =
+        resolveItemPresentation(bundle.itemId, bundle.itemId).displayName ?? bundle.itemId;
+      return stateFor({
+        status: "refused",
+        reason: "capacity",
+        capacityReason: bundle.reason,
+        message:
+          bundle.reason === "slots"
+            ? `There is not enough room in your carried Inventory for ${rewardName} and the rest of the bundle. Free capacity and try again.`
+            : `The whole bundle is too heavy for your current carried-mass capacity. Free capacity and try again.`,
+      });
+    }
+    bundlePlans = bundle.plans;
+  }
+
   // The complete plan is valid — apply consumption through the
   // authoritative carried-stack boundary, then the reward, then the
   // guarded completion stamp, all inside this transaction. Any failure
@@ -814,6 +894,13 @@ async function completeMissionForDefinition(input: {
     const instance = created[0];
     if (!instance) throw new Error(`${definition.id} item reward was not created`);
     rewardInfo = { itemId: definition.reward.itemId, quantity: 1, itemInstanceId: instance.id };
+  } else if (definition.reward.kind === "stack_bundle") {
+    // Applying the plans the preflight already produced, in the order it
+    // planned them, so what is written is exactly what was proven to fit.
+    if (!bundlePlans) throw new Error(`${definition.id} reward bundle was not preflighted`);
+    for (const plan of bundlePlans) {
+      await addStackableItem(transaction, { characterId: context.character.id, plan, now });
+    }
   } else if (definition.reward.kind === "credits") {
     // Paid by the same transaction that stamps the mission complete, below.
     // The stamp is guarded by `completedAt IS NULL`, and this command already

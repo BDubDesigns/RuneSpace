@@ -13,10 +13,11 @@ import {
   type WeldingResolution,
 } from "@/game/domain/welding-repair";
 import {
+  cleanPassFromPersisted,
+  cleanPassToPersisted,
   rolledCleanPass,
   UNROLLED_CLEAN_PASS,
   withOpenCleanPassMissed,
-  type CleanPassOutcome,
   type CleanPassRandom,
   type CleanPassState,
 } from "@/game/domain/clean-pass";
@@ -49,12 +50,7 @@ export function repairCleanPassFromRow(
   row: typeof characterRepairTargets.$inferSelect | undefined,
 ): CleanPassState {
   if (!row) return UNROLLED_CLEAN_PASS;
-  return {
-    firstSection: row.cleanPassFirstSection,
-    firstOutcome: row.cleanPassFirstOutcome as CleanPassOutcome | null,
-    secondSection: row.cleanPassSecondSection,
-    secondOutcome: row.cleanPassSecondOutcome as CleanPassOutcome | null,
-  };
+  return cleanPassFromPersisted(row.cleanPass);
 }
 
 /** Persist one repair's Clean Pass state (roll, claim, or interruption miss). */
@@ -71,10 +67,7 @@ export async function writeRepairCleanPass(
   await transaction
     .update(characterRepairTargets)
     .set({
-      cleanPassFirstSection: input.cleanPass.firstSection,
-      cleanPassFirstOutcome: input.cleanPass.firstOutcome,
-      cleanPassSecondSection: input.cleanPass.secondSection,
-      cleanPassSecondOutcome: input.cleanPass.secondOutcome,
+      cleanPass: cleanPassToPersisted(input.cleanPass),
       ...(input.weldingProgress === undefined ? {} : { weldingProgress: input.weldingProgress }),
       updatedAt: input.now,
     })
@@ -168,11 +161,17 @@ export async function ensureRepairCleanPassRoll(
   },
 ): Promise<void> {
   const row = await loadRepairTargetRow(transaction, input.characterId, input.targetId);
-  if (!row || row.cleanPassFirstSection !== null) return;
+  if (!row || row.cleanPass !== null) return;
   await writeRepairCleanPass(transaction, {
     characterId: input.characterId,
     targetId: input.targetId,
-    cleanPass: rolledCleanPass(input.random),
+    // The target's own increment count is the work unit's length, so the
+    // cadence comes from the job rather than from a global assumption about
+    // how long a piece of Welding is (#207).
+    cleanPass: rolledCleanPass(
+      input.random,
+      getRepairTargetBalance(input.targetId).repairIncrements,
+    ),
     now: input.now,
   });
 }

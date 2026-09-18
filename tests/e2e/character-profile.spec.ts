@@ -119,6 +119,16 @@ profileTest(
     await radaTrigger.click();
     const panel = page.locator("[data-character-profile-panel]");
     await expect(panel).toBeVisible();
+    // Regression for #207 follow-up: at a location with a resident NPC (Wade
+    // Rusk, Crash Site) the profile used to inherit the collapsed trigger's
+    // shrink-wrapped width from the resident row's meta wrapper. It now sits
+    // in the same content column as the character rows above it, checked as
+    // actual layout rather than a class name — `radaTrigger` is a sibling row
+    // in the same list, so it is the row's true available width, unlike the
+    // outer resident row (which also includes the list's own border/padding).
+    const [rowBox, panelBox] = await Promise.all([radaTrigger.boundingBox(), panel.boundingBox()]);
+    if (!rowBox || !panelBox) throw new Error("Expected both to be laid out");
+    expect(panelBox.width).toBeGreaterThanOrEqual(rowBox.width - 4);
     // The profile belongs directly to the selected row so a later row does
     // not push the selected character's details below the full population.
     await expect(

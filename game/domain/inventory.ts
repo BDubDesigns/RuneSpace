@@ -275,6 +275,151 @@ export function planPossibleAwardAdditions<Id>(
   };
 }
 
+/** One item and quantity in a cumulative bundle, with its authoritative item rules. */
+export type StackBundleEntry = {
+  itemId: ItemId;
+  quantity: number;
+  stackLimit: number;
+  itemWeight: number;
+};
+
+export type ExactStackAdditionsPlan<Id> =
+  | { ok: true; plans: readonly StackAdditionPlan<Id>[] }
+  | { ok: false; reason: "slots" | "mass"; itemId: ItemId; missingQuantity: number };
+
+/**
+ * Plan an all-or-nothing addition of several stacks that are granted TOGETHER.
+ *
+ * This is the cumulative counterpart to `planPossibleAwardAdditions`, and the
+ * distinction is the whole reason it exists. That planner proves several
+ * *mutually exclusive* outcomes could each fit from the same starting snapshot,
+ * which is right for a roll that will produce exactly one of them. A bundle is
+ * the opposite case: every entry lands, so each one must be planned against the
+ * state the previous entries have already left behind — otherwise two entries
+ * that each fit alone are wrongly reported as fitting together (#207).
+ *
+ * The hypothetical inventory evolves entry by entry: created stacks become
+ * matchable rows for later entries of the same item, and both the slot and mass
+ * budgets are spent down as they are consumed. The result is either one
+ * complete combined plan or one actionable capacity failure naming the entry
+ * that could not be placed.
+ */
+export function planExactStackAdditions<Id>(
+  existingStacks: readonly StackState<Id>[],
+  entries: readonly StackBundleEntry[],
+  availableSlots: number,
+  availableWeight: number = Number.POSITIVE_INFINITY,
+): ExactStackAdditionsPlan<Id> {
+  if (!Number.isInteger(availableSlots) || availableSlots < 0) {
+    throw new RangeError("Available slots must be non-negative");
+  }
+
+  // Hypothetical rows carry a synthetic ID so a later entry can top them up.
+  // They are never returned: a created stack stays a `createdStacks` entry in
+  // the plan that created it, which is what the persistence boundary applies.
+  type Hypothetical = StackState<Id | string>;
+  let candidateStacks: Hypothetical[] = existingStacks.map((stack) => ({ ...stack }));
+  let slotsRemaining = availableSlots;
+  let weightRemaining = availableWeight;
+  const plans: StackAdditionPlan<Id>[] = [];
+
+  for (const [index, entry] of entries.entries()) {
+    const plan = planExactStackAddition(
+      candidateStacks,
+      entry.itemId,
+      entry.quantity,
+      entry.stackLimit,
+      slotsRemaining,
+      weightRemaining,
+      entry.itemWeight,
+    );
+    if (!plan.ok) {
+      return {
+        ok: false,
+        reason: plan.reason,
+        itemId: entry.itemId,
+        missingQuantity: plan.missingQuantity,
+      };
+    }
+
+    // Apply this entry's hypothetical result before planning the next one.
+    const updatedById = new Map(plan.plan.updatedStacks.map((update) => [update.id, update]));
+    candidateStacks = candidateStacks.map((stack) => {
+      const update = updatedById.get(stack.id as Id);
+      return update ? { ...stack, quantity: update.quantity } : stack;
+    });
+    plan.plan.createdStacks.forEach((created, createdIndex) => {
+      candidateStacks.push({
+        id: `bundle-${index}-${createdIndex}`,
+        itemId: created.itemId,
+        quantity: created.quantity,
+      });
+    });
+    slotsRemaining -= plan.plan.createdStacks.length;
+    if (weightRemaining !== Number.POSITIVE_INFINITY) {
+      weightRemaining -= entry.quantity * entry.itemWeight;
+    }
+    plans.push(plan.plan as StackAdditionPlan<Id>);
+  }
+
+  return { ok: true, plans };
+}
+
+/** One item and quantity a cumulative removal must take in full. */
+export type StackRemovalRequirement = { itemId: ItemId; quantity: number };
+
+export type ExactStackRemovalsPlan<Id> =
+  | {
+      ok: true;
+      updatedStacks: readonly StackUpdate<Id>[];
+      deletedStackIds: readonly Id[];
+    }
+  | { ok: false; itemId: ItemId; missingQuantity: number };
+
+/**
+ * Plan an all-or-nothing removal of several item types at once.
+ *
+ * A Work Order recipe may name Refined Ferrite and Power Cells together, and
+ * paying for it is one atomic commitment: either the whole recipe leaves the
+ * player's hands or none of it does. Composing `planExactStackRemoval` per item
+ * against the same untouched snapshot would be wrong for a recipe that ever
+ * named one item twice, so each requirement is planned against the state the
+ * previous ones already reduced, and the per-item diffs are merged into one.
+ */
+export function planExactStackRemovals<Id>(
+  existingStacks: readonly StackState<Id>[],
+  requirements: readonly StackRemovalRequirement[],
+): ExactStackRemovalsPlan<Id> {
+  let candidateStacks = existingStacks.map((stack) => ({ ...stack }));
+  const updatedById = new Map<Id, number>();
+  const deletedStackIds: Id[] = [];
+
+  for (const requirement of requirements) {
+    const plan = planExactStackRemoval(candidateStacks, requirement.itemId, requirement.quantity);
+    if (!plan.ok) {
+      return { ok: false, itemId: requirement.itemId, missingQuantity: plan.missingQuantity };
+    }
+    const deleted = new Set<Id>(plan.deletedStackIds);
+    for (const update of plan.updatedStacks) updatedById.set(update.id, update.quantity);
+    for (const id of plan.deletedStackIds) {
+      deletedStackIds.push(id);
+      updatedById.delete(id);
+    }
+    candidateStacks = candidateStacks
+      .filter((stack) => !deleted.has(stack.id))
+      .map((stack) => {
+        const quantity = plan.updatedStacks.find((update) => update.id === stack.id)?.quantity;
+        return quantity === undefined ? stack : { ...stack, quantity };
+      });
+  }
+
+  return {
+    ok: true,
+    updatedStacks: [...updatedById].map(([id, quantity]) => ({ id, quantity })),
+    deletedStackIds,
+  };
+}
+
 export function calculateCarriedWeight(weights: readonly number[]): number {
   return weights.reduce((total, weight) => {
     if (!Number.isFinite(weight) || weight < 0)

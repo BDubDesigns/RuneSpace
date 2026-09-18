@@ -10,6 +10,8 @@ import { ACTION_IDS, ITEM_IDS } from "@/game/config/foundations";
 import { RUSK_RECOVERY_CONTENT } from "@/game/content/rusk-recovery";
 import { rolledCleanPass } from "@/game/domain/clean-pass";
 import { canBeginPracticeWeld } from "@/game/domain/practice-welding";
+import { deriveWorkbenchOccupancy } from "@/game/domain/workbench";
+import { loadActiveWorkOrder } from "@/server/work-orders";
 import type { MiningRandom } from "@/game/domain/mining";
 import { defaultMiningRandom } from "@/server/mining";
 import { withResolvedOwnedCharacter, type DatabaseTransaction } from "@/server/action-resolution";
@@ -27,6 +29,7 @@ import {
   loadPracticeUnlocked,
   practiceStateFromRow,
   resetPracticeRun,
+  setPracticeFinishCurrentWeld,
   writePracticeState,
 } from "@/server/practice-welding";
 
@@ -42,7 +45,11 @@ export type PracticeCommandError =
   | "practice_unavailable_here"
   | "practice_locked"
   | "insufficient_scrap"
-  | "another_action_active";
+  | "another_action_active"
+  /** A customer Work Order holds the one bench (#207). */
+  | "workbench_occupied"
+  /** Nothing is on the bench to finish, so "finish and stop" has no subject. */
+  | "no_weld_in_progress";
 
 async function currentLocationId(
   transaction: DatabaseTransaction,
@@ -125,6 +132,20 @@ export async function startPracticeWelding(
         await loadPracticeRow(transaction, context.character.id),
       );
 
+      // One bench, one unfinished unit. Resuming the partial weld already on it
+      // is always allowed — that weld IS what occupies the bench — but a fresh
+      // weld has to prove nothing else is on it, which is the same question
+      // accepting a Work Order asks from the other side (#207).
+      if (!practice.cycleActive) {
+        const occupancy = deriveWorkbenchOccupancy({
+          practice,
+          activeWorkOrder: await loadActiveWorkOrder(transaction, context.character.id),
+        });
+        if (occupancy.kind !== "clear") {
+          return stateWith(transaction, context.character.id, now, "workbench_occupied");
+        }
+      }
+
       if (!practice.cycleActive) {
         const scrapAvailable = await carriedScrap(transaction, context.character.id);
         if (!canBeginPracticeWeld(scrapAvailable, balance)) {
@@ -145,7 +166,7 @@ export async function startPracticeWelding(
           practice: {
             sectionsCompleted: 0,
             cycleActive: true,
-            cleanPass: rolledCleanPass(random, balance),
+            cleanPass: rolledCleanPass(random, balance.practiceWelding.sectionsPerWeld, balance),
           },
           now,
           stopReason: null,
@@ -153,6 +174,9 @@ export async function startPracticeWelding(
       }
 
       await resetPracticeRun(transaction, context.character.id, now);
+      // An ordinary Start is a request for the continuous run, so it clears any
+      // "finish and stop" the player set and then changed their mind about.
+      await setPracticeFinishCurrentWeld(transaction, context.character.id, false, now);
       await transaction.insert(activeActions).values({
         characterId: context.character.id,
         actionId: ACTION_IDS.practiceWelding,
@@ -209,6 +233,77 @@ export async function stopPracticeWelding(
         );
       }
       await interruptPracticeWelding(transaction, context.character.id, now);
+      return stateWith(transaction, context.character.id, now);
+    },
+    now,
+  );
+}
+
+/**
+ * Finish the weld already on the bench, then stop (#207).
+ *
+ * Practice is deliberately continuous, which leaves the player no way to end a
+ * run on a clean bench: ordinary Stop preserves a partial weld, and simply
+ * waiting spends two more Scrap the instant the current weld completes. Neither
+ * is an answer when the bench has to be clear for customer work.
+ *
+ * So this is a third intent rather than a variant of Stop. It applies to the
+ * weld the player has ALREADY paid for, whether that weld is running or was
+ * stopped with partial progress: it marks the durable intent, then starts or
+ * resumes so the weld can actually finish. Resolution lets it complete with
+ * ordinary XP, output and Clean Pass semantics, starts no next weld, consumes
+ * no further Scrap, and leaves the Workbench clear.
+ */
+export async function finishCurrentPracticeWeld(
+  userId: string,
+  characterId: string,
+  now = new Date(),
+  random: MiningRandom = defaultMiningRandom(),
+): Promise<PlayGameplayState> {
+  return withResolvedOwnedCharacter(
+    userId,
+    characterId,
+    createPlayResolver(random),
+    async (transaction, context) => {
+      await ensurePlayProvisioning(transaction, context.character.id);
+      const practice = practiceStateFromRow(
+        await loadPracticeRow(transaction, context.character.id),
+      );
+      // Reconciliation above may have just completed the weld this command was
+      // about, which is a success rather than a refusal: the bench is clear,
+      // which is what the player asked for.
+      if (!practice.cycleActive) {
+        return stateWith(
+          transaction,
+          context.character.id,
+          now,
+          context.action?.actionId === ACTION_IDS.practiceWelding
+            ? undefined
+            : "no_weld_in_progress",
+        );
+      }
+      if (context.action && context.action.actionId !== ACTION_IDS.practiceWelding) {
+        return stateWith(transaction, context.character.id, now, "another_action_active");
+      }
+      if (
+        (await currentLocationId(transaction, context.character.id)) !==
+        RUSK_RECOVERY_CONTENT.locationId
+      ) {
+        return stateWith(transaction, context.character.id, now, "practice_unavailable_here");
+      }
+
+      await setPracticeFinishCurrentWeld(transaction, context.character.id, true, now);
+      // The weld cannot finish unless it is running, so a bench the player had
+      // stopped is resumed here. Resuming a paid weld consumes nothing and
+      // rerolls nothing.
+      if (!context.action) {
+        await transaction.insert(activeActions).values({
+          characterId: context.character.id,
+          actionId: ACTION_IDS.practiceWelding,
+          startedAt: now,
+          resolvedThroughAt: now,
+        });
+      }
       return stateWith(transaction, context.character.id, now);
     },
     now,

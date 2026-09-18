@@ -178,8 +178,18 @@ export function NpcInteractionPanel({
           </div>
         </div>
         {/* Place-level context, right-aligned on its own line so it never reads
-            as another line of this person's description. */}
-        {meta ? <div className="mt-2 flex justify-end">{meta}</div> : null}
+            as another line of this person's description. `text-right` rather
+            than `flex justify-end`: that flex wrapper shrink-wrapped its one
+            child to a max-content width, which was fine for the collapsed
+            trigger but then also boxed in the *expanded* population list and
+            Character Profile to that same narrow width instead of the full
+            Location panel (#207 follow-up). `text-align` only ever moves
+            inline-level content (the trigger button, "Only you here") to the
+            line's end; it never constrains a block box's own width, so the
+            expanded list stays free to fill the row. `LocationPopulationPanel`
+            resets the alignment back to `text-left` once content is meant to
+            fill the row, so the cascade stops there. */}
+        {meta ? <div className="mt-2 text-right">{meta}</div> : null}
         {!stationary ? (
           <Feedback tone="muted">
             Conversations with gameplay actions require a stationary character.
