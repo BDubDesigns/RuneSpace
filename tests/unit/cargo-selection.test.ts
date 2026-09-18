@@ -64,6 +64,7 @@ function cargoState(): PlayGameplayState {
       scrapAvailable: 0,
       scrapPerWeld: 2,
       autoDiscardSlag: false,
+      finishCurrentWeld: false,
       run: {
         welds: 0,
         scrapConsumed: 0,

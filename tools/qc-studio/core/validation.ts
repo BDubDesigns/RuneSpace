@@ -88,13 +88,24 @@ export function validateDialogueDraft(
         });
       } else {
         const { min, max } = getStudioItemQuantityRange(item);
-        if (!Number.isInteger(beat.quantity) || beat.quantity < min || beat.quantity > max) {
+        // A reward-total beat presents what was actually awarded, aggregated
+        // across however many carried stacks the adapter's own stack limit
+        // split it into — so its quantity is deliberately allowed past one
+        // stack's worth.
+        const effectiveMax = beat.isRewardTotal ? Number.POSITIVE_INFINITY : max;
+        if (
+          !Number.isInteger(beat.quantity) ||
+          beat.quantity < min ||
+          beat.quantity > effectiveMax
+        ) {
           issues.push({
             path: `${path}.quantity`,
             message:
               max === min
                 ? "This item is unique; its quantity must be exactly 1."
-                : `Quantity must be a whole number between ${min} and ${max}.`,
+                : beat.isRewardTotal
+                  ? `Quantity must be a whole number of at least ${min}.`
+                  : `Quantity must be a whole number between ${min} and ${max}.`,
           });
         }
       }

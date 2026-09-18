@@ -416,7 +416,7 @@ suite("issue #207 Workbench exclusivity (real PostgreSQL)", () => {
     });
   });
 
-  describe("Finish Current Weld and Stop", () => {
+  describe("Stop After Current Weld", () => {
     /**
      * The shared proof, from whichever state the bench was in: the paid weld
      * completes with ordinary semantics, no next cycle begins, the durable
@@ -455,10 +455,14 @@ suite("issue #207 Workbench exclusivity (real PostgreSQL)", () => {
 
       const intent = await finishCurrentWeld(userId, character.id, sectionMs * 3 + 100);
       expect(intent.practiceError).toBeUndefined();
+      // The projected client field, not just the row: this is what the
+      // Workbench UI actually reads to show the control as armed.
+      expect(intent.practice.finishCurrentWeld).toBe(true);
       expect((await practiceRow(character.id))?.finishCurrentWeld).toBe(true);
 
       // Long enough for a second weld, had one ever been started.
-      await refresh(userId, character.id, weldMs * 2);
+      const resolved = await refresh(userId, character.id, weldMs * 2);
+      expect(resolved.practice.finishCurrentWeld).toBe(false);
       await expectFinishedCleanly(userId, character.id);
     });
 
@@ -472,10 +476,12 @@ suite("issue #207 Workbench exclusivity (real PostgreSQL)", () => {
       const intent = await finishCurrentWeld(userId, character.id, sectionMs * 5);
       expect(intent.practiceError).toBeUndefined();
       expect((await activeAction(character.id))?.actionId).toBe(ACTION_IDS.practiceWelding);
+      expect(intent.practice.finishCurrentWeld).toBe(true);
       expect((await practiceRow(character.id))?.finishCurrentWeld).toBe(true);
       expect(await carried(character.id, ITEM_IDS.scrapMetal)).toBe(2);
 
-      await refresh(userId, character.id, weldMs * 3);
+      const resolved = await refresh(userId, character.id, weldMs * 3);
+      expect(resolved.practice.finishCurrentWeld).toBe(false);
       await expectFinishedCleanly(userId, character.id);
     });
   });

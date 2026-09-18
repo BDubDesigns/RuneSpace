@@ -327,7 +327,7 @@ test("finishes the current practice weld to clear the bench for client work", as
   );
   await expect(posting.locator(`[data-work-order-accept="${target.id}"]`)).toBeDisabled();
 
-  // "Finish Weld & Stop" resolves it without costing the next weld's Scrap.
+  // "Stop After Current Weld" resolves it without costing the next weld's Scrap.
   const scrapBefore = (
     await db
       .select()

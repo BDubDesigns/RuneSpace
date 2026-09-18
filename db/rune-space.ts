@@ -580,7 +580,7 @@ export const characterPracticeWelds = pgTable(
     /** This weld's Clean Pass roll; see `characterRepairTargets.cleanPass`. */
     cleanPass: jsonb("clean_pass"),
     /**
-     * "Finish Current Weld and Stop" (#207): the player asked for the weld they
+     * "Stop After Current Weld" (#207): the player asked for the weld they
      * have already paid for to finish and the run to end there, rather than
      * rolling straight into another weld and spending two more Scrap.
      *

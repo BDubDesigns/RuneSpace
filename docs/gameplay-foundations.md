@@ -209,7 +209,7 @@ Pass roll. An untouched bench is an absent row, so nothing needs backfilling.
   of two authored reasons: `out_of_scrap`, when fewer than two Scrap remain
   once the weld in progress finishes (adding Scrap later never auto-restarts
   it), or `finished_current_weld`, when the player has asked the run to end
-  after the weld already on the bench — see "Finish Current Weld and Stop"
+  after the weld already on the bench — see "Stop After Current Weld"
   below. Every other way a run ends — the player's ordinary Stop, Travel — is
   an interruption, not a resolution, and is recorded as neither.
 - **Stop and Resume** preserve the real partial weld: the completed sections,
@@ -291,7 +291,7 @@ stays entirely separate: its window belongs to a Travel leg and resolves against
 a loot table. Only conventions are shared — a server-derived window and a small
 claim grace.
 
-### Workbench exclusivity and "Finish Current Weld and Stop" (issue #207)
+### Workbench exclusivity and "Stop After Current Weld" (issue #207)
 
 There is one Workbench in Wade's yard, and once a customer's property can sit
 on it, "is anything already on it?" has to have exactly one answer
@@ -316,7 +316,7 @@ Because Practice is deliberately continuous — one Start begins a run that keep
 consuming Scrap and rolling straight into the next weld — it otherwise gives the
 player no way to leave the bench clear on purpose: ordinary Stop preserves a
 partial weld, and simply waiting spends two more Scrap the instant the current
-weld completes. **"Finish Current Weld and Stop"** is the third intent that
+weld completes. **"Stop After Current Weld"** is the third intent that
 answers this. It applies only to the weld already on the bench, whether running
 or Stopped with partial progress: it records a durable intent
 (`character_practice_welds.finish_current_weld`), then starts or resumes so

@@ -27,6 +27,7 @@ export function DialogueScene({
   isComplete = true,
   onTextClick,
   portraitGeneration = 0,
+  beatIndex = 0,
   actionMessage,
   controls,
 }: {
@@ -36,6 +37,14 @@ export function DialogueScene({
   isComplete?: boolean;
   onTextClick?: () => void;
   portraitGeneration?: number;
+  /**
+   * The beat's position in its sequence. An item reveal is a discrete
+   * moment — unlike an NPC's continued on-screen presence, showing the same
+   * item again is still a fresh reveal — so its artwork keys off this rather
+   * than off item identity, and always retriggers the fade-in even when two
+   * consecutive beats present the same item (#207 follow-up).
+   */
+  beatIndex?: number;
   actionMessage?: string;
   controls?: ReactNode;
 }) {
@@ -106,7 +115,12 @@ export function DialogueScene({
         ) : null}
         {resolvedItem && beat.kind === "item" ? (
           <span
-            key={`${beat.itemId}:${portraitGeneration}`}
+            // Keyed on position, not item identity: two consecutive reward
+            // beats for the same item (e.g. Refined Ferrite shown, then Power
+            // Cell, then — hypothetically — Refined Ferrite again) must each
+            // still read as a fresh reveal rather than reusing the outgoing
+            // beat's DOM node and silently skipping its fade-in.
+            key={`item:${beatIndex}`}
             aria-hidden="true"
             className="absolute bottom-[6%] left-1/2 z-20 flex h-[76%] max-w-[82%] -translate-x-1/2 items-center justify-center"
             data-dialogue-item-artwork

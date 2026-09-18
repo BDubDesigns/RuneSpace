@@ -440,7 +440,7 @@ const authoredWikiArticles = [
           "One Start keeps the bench going: as each weld finishes the next one begins, taking two more scrap, until there is not enough left for another. It keeps going while you are away from the screen, the same as any other work.",
           "Stop whenever you like. The half-finished weld stays exactly as it is, and so does the scrap you already spent on it — resuming continues that same weld and costs nothing, even with no scrap left at all. Walking away from the yard stops the bench the same way; you cannot weld from the road.",
           "When the scrap runs out the bench finishes the weld in progress and stops on its own, saying so. Buying more does not start it again — that is your call.",
-          "If you would rather the weld on the bench finish without another one starting after it, use Finish Weld & Stop instead of an ordinary Stop. It lets that weld run to completion — full XP and output, same as always — then leaves the bench clear instead of spending scrap on the next one. It works whether the weld is currently running or already Stopped partway through.",
+          "If you would rather the weld on the bench finish without another one starting after it, use Stop After Current Weld instead of an ordinary Stop. It lets that weld run to completion — full XP and output, same as always — then leaves the bench clear instead of spending scrap on the next one. It works whether the weld is currently running or already Stopped partway through.",
         ],
       },
       {
@@ -449,7 +449,7 @@ const authoredWikiArticles = [
           [
             "There is only one Workbench, and it holds one piece of work at a time. An unfinished practice weld — one whose scrap is already spent — counts as occupying it, even after you have Stopped it. Take on a paying ",
             { text: "Work Order", articleSlug: "work-orders" },
-            " and you will be asked to finish that weld first, or to clear the bench with Finish Weld & Stop. It works the other way too: a client's job on the bench means no fresh practice weld until that job is finished.",
+            " and you will be asked to finish that weld first, or to clear the bench with Stop After Current Weld. It works the other way too: a client's job on the bench means no fresh practice weld until that job is finished.",
           ],
         ],
       },

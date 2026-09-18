@@ -84,10 +84,10 @@ transaction (`completeActiveWorkOrder`): it pays the Credits, credits the
 Mission's generic `work_order` tracked-activity counter, and refills the slot,
 all under the guard of the same update that claims the completion — so a retry
 or a completion discovered by lazy reconciliation while the player was away
-pays exactly once. The client-facing acknowledgement is one generic line
-("*\<title\>* is finished and paid — *N* Credits."), the same shape for every
-job in the pool; a finished bracket does not summon its client for a
-conversation.
+pays exactly once. The client-facing acknowledgement is a compact success
+callout naming the job and the payout ("*\<title\>* complete" / "Paid *N*
+Credits"), the same shape for every job in the pool; a finished bracket does
+not summon its client for a conversation.
 
 A later special contract may deliberately carry authored dialogue or a
 narrative completion beat, but that is outside this system and has to be

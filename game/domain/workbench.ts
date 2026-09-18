@@ -15,7 +15,7 @@ import type { PracticeWeldState } from "@/game/domain/practice-welding";
  * weld the player stopped halfway through still occupies the bench: its two
  * Scrap are spent, its sections are real, and starting a customer job over the
  * top of it would silently destroy work the player paid for. That is exactly
- * what "Finish Current Weld and Stop" exists to resolve without costing them
+ * what "Stop After Current Weld" exists to resolve without costing them
  * another recipe.
  */
 

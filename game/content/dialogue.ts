@@ -40,6 +40,16 @@ export type DialogueBeat =
       quantity: number;
       backgroundId: ConversationBackgroundId;
       text: string;
+      /**
+       * This beat presents a reward's full awarded total, aggregated across
+       * however many carried stacks Inventory's own stack limit actually split
+       * it into (#207 follow-up) — never one beat per persisted stack. Set only
+       * by `rewardItemBeats`. Inventory persistence still obeys the real stack
+       * limit exactly as before; this only relaxes the authoring-time sanity
+       * ceiling on displayed quantity, since the number here is a reward total
+       * rather than one physical stack's worth.
+       */
+      isRewardTotal?: true;
     }
   | {
       kind: "skill_xp";
@@ -229,9 +239,34 @@ function wadeSkillXpBeat(skillId: SkillId, amount: number): DialogueBeat {
   return { kind: "skill_xp", skillId, amount, backgroundId: crash, text: "" };
 }
 
-/** An item beat against Wade's own yard, for anything handed over at the bench. */
-function wadeYardItemBeat(itemId: ItemId, quantity: number, text = ""): DialogueBeat {
-  return { kind: "item", itemId, quantity, backgroundId: ruskYard, text };
+/**
+ * One item beat per distinct item in a reward, showing the true awarded
+ * total regardless of how many carried stacks Inventory's own stack limit
+ * actually split it into (#207 follow-up). A ten-Ferrite reward is one
+ * beat reading ×10, never two beats of ×5 because Refined Ferrite's stack
+ * limit happens to be five — that split is Inventory's business, and the
+ * player should never have to click through it twice for one reward.
+ *
+ * Reusable for any multi-item reward reveal, not a Wade-only special case:
+ * a future author lists what was actually granted and this aggregates it,
+ * rather than hand-splitting beats to match persistence.
+ */
+function rewardItemBeats(
+  backgroundId: ConversationBackgroundId,
+  items: readonly { itemId: ItemId; quantity: number }[],
+): DialogueBeat[] {
+  const totals = new Map<ItemId, number>();
+  for (const item of items) {
+    totals.set(item.itemId, (totals.get(item.itemId) ?? 0) + item.quantity);
+  }
+  return Array.from(totals, ([itemId, quantity]) => ({
+    kind: "item" as const,
+    itemId,
+    quantity,
+    backgroundId,
+    text: "",
+    isRewardTotal: true as const,
+  }));
 }
 
 function rennSkillXpBeat(skillId: SkillId, amount: number): DialogueBeat {
@@ -1488,12 +1523,14 @@ const dialogue = {
         EXPRESSION_IDS.neutral,
         "Shop stock. Ferrite and cells. You'll go through it, and I'd rather you didn't stop working to go shopping.",
       ),
-      // One beat per stack, because an item beat presents a single stack and
-      // ten Refined Ferrite is two of them — which is also exactly how the
-      // bundle lands in the player's Inventory.
-      wadeYardItemBeat(ITEM_IDS.refinedFerrite, 5),
-      wadeYardItemBeat(ITEM_IDS.refinedFerrite, 5),
-      wadeYardItemBeat(ITEM_IDS.powerCell, 5),
+      // One beat per distinct item, showing the true awarded total — never
+      // one beat per persisted stack. Ten Refined Ferrite lands as two
+      // carried stacks of five, but that split is Inventory's business, not
+      // something the player clicks through twice (#207 follow-up).
+      ...rewardItemBeats(ruskYard, [
+        { itemId: ITEM_IDS.refinedFerrite, quantity: 10 },
+        { itemId: ITEM_IDS.powerCell, quantity: 5 },
+      ]),
       wadeAtYard(EXPRESSION_IDS.neutral, "Board's still up. Take the next one when you want it."),
     ],
   },

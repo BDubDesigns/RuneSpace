@@ -129,51 +129,69 @@ export function PracticeWeldingPanel() {
       data-practice-panel
       data-practice-active={String(active)}
     >
-      {/* Start or stop first (#193). The recipe, the meters and the loose scrap
-          all describe what this control does, so they follow it — which is what
-          moves the bench above the fold on a phone while Wade's Mission strip is
-          on screen. */}
-      {active ? (
-        <ActionButton
-          data-practice-stop
-          disabled={foregroundBusy && pending !== "stop"}
-          intent="secondary"
-          loading={pending === "stop"}
-          onClick={() => run("stop")}
-        >
-          Stop Practice
-        </ActionButton>
-      ) : (
-        <MissionActionButton
-          data-practice-start
-          disabled={(!resumable && !canStartFresh) || Boolean(state.activeAction) || foregroundBusy}
-          guidance={guided ? "active" : undefined}
-          loading={pending === "start"}
-          onClick={() => run("start")}
-        >
-          {resumable
-            ? "Resume Practice"
-            : canStartFresh
-              ? "Start Practice"
-              : `Need ${practice.scrapPerWeld} Scrap Metal`}
-        </MissionActionButton>
-      )}
+      {/* Start or stop first (#193), together with the third "stop after
+          this one" intent, given room of its own rather than sitting flush
+          against Stop/Resume — two controls that both end the run otherwise
+          read as one segmented control on a phone (#207 follow-up). The
+          recipe, the meters and the loose scrap all describe what these
+          controls do, so they follow — which is what moves the bench above
+          the fold on a phone while Wade's Mission strip is on screen. */}
+      <div className="flex flex-wrap items-center gap-3">
+        {active ? (
+          <ActionButton
+            data-practice-stop
+            disabled={foregroundBusy && pending !== "stop"}
+            intent="secondary"
+            loading={pending === "stop"}
+            onClick={() => run("stop")}
+          >
+            Stop Practice
+          </ActionButton>
+        ) : (
+          <MissionActionButton
+            data-practice-start
+            disabled={
+              (!resumable && !canStartFresh) || Boolean(state.activeAction) || foregroundBusy
+            }
+            guidance={guided ? "active" : undefined}
+            loading={pending === "start"}
+            onClick={() => run("start")}
+          >
+            {resumable
+              ? "Resume Practice"
+              : canStartFresh
+                ? "Start Practice"
+                : `Need ${practice.scrapPerWeld} Scrap Metal`}
+          </MissionActionButton>
+        )}
 
-      {/* Practice repeats by design, which leaves no ordinary way to end a run
-          on a clear bench: Stop preserves a partial weld, and simply waiting
-          spends two more Scrap the instant this one finishes. Offered whenever
-          a paid weld exists — running or stopped — because that weld is what
-          stands between the player and a customer job (#207). */}
-      {resumable ? (
-        <ActionButton
-          data-practice-finish
-          disabled={foregroundBusy && pending !== "finish"}
-          intent="secondary"
-          loading={pending === "finish"}
-          onClick={() => run("finish")}
-        >
-          Finish Weld &amp; Stop
-        </ActionButton>
+        {/* Practice repeats by design, which leaves no ordinary way to end a
+            run on a clear bench: Stop preserves a partial weld, and simply
+            waiting spends two more Scrap the instant this one finishes.
+            Offered whenever a paid weld exists — running or stopped —
+            because that weld is what stands between the player and a
+            customer job (#207). Once armed there is no way to disarm it
+            short of an ordinary Start, so the control disables itself rather
+            than inviting a second, pointless click, and reads the persisted
+            server intent rather than a local guess so a reload shows the
+            same armed state the server is actually holding. */}
+        {resumable ? (
+          <ActionButton
+            aria-pressed={practice.finishCurrentWeld}
+            data-practice-finish
+            data-practice-finish-armed={String(practice.finishCurrentWeld)}
+            disabled={practice.finishCurrentWeld || (foregroundBusy && pending !== "finish")}
+            intent={practice.finishCurrentWeld ? "success" : "secondary"}
+            loading={pending === "finish"}
+            onClick={() => run("finish")}
+          >
+            {practice.finishCurrentWeld ? "Stopping After Current Weld" : "Stop After Current Weld"}
+          </ActionButton>
+        ) : null}
+      </div>
+
+      {practice.finishCurrentWeld ? (
+        <Feedback tone="muted">Practice will stop when this weld finishes.</Feedback>
       ) : null}
 
       <StatusMeter

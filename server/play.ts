@@ -290,6 +290,13 @@ export type PracticeProjection = {
   scrapAvailable: number;
   scrapPerWeld: number;
   autoDiscardSlag: boolean;
+  /**
+   * The durable "finish this weld, then stop" intent (#207 follow-up). The
+   * authoritative armed state for "Stop After Current Weld" — the UI reads
+   * this rather than faking the toggle with local React state, since the
+   * intent survives a reload exactly as the partial weld itself does.
+   */
+  finishCurrentWeld: boolean;
   /** Why the last run stopped on its own, for the ordinary run presentation. */
   lastStopReason?: string;
   run: PracticeRunState;
@@ -1162,6 +1169,7 @@ export async function stateFromTransaction(
       .reduce((total, stack) => total + stack.quantity, 0),
     scrapPerWeld: balance.practiceWelding.scrapPerWeld,
     autoDiscardSlag: practiceRow?.autoDiscardSlag ?? false,
+    finishCurrentWeld: practiceRow?.finishCurrentWeld ?? false,
     ...(practiceRow?.lastStopReason ? { lastStopReason: practiceRow.lastStopReason } : {}),
     run: practiceRunStateFromRow(practiceRow),
     ...(practiceCleanPass ? { cleanPass: practiceCleanPass } : {}),

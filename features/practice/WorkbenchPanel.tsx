@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Feedback } from "@/components/ui/Feedback";
 import { usePlay } from "@/features/play/PlayContext";
 import { PracticeWeldingPanel } from "@/features/practice/PracticeWeldingPanel";
 import { WorkOrderBenchPanel } from "@/features/practice/WorkOrderBenchPanel";
@@ -69,9 +68,22 @@ export function WorkbenchPanel() {
     // here without adding a stop they then have to tab back out of.
     <div id={WORKBENCH_ANCHOR_ID} tabIndex={-1} data-workbench className="scroll-mt-4 outline-none">
       {completed ? (
-        <Feedback tone="success">
-          {`${completed.title} is finished and paid — ${completed.payoutCredits} Credits.`}
-        </Feedback>
+        // A contained callout, not bare text floating between panels (#207
+        // follow-up): the same semantic success tokens `Feedback` uses,
+        // reused here as a bordered panel because a receipt has two facts to
+        // show, not one inline sentence.
+        <div
+          className="border border-[color:var(--rs-accent-success)] bg-[color:var(--rs-accent-success-subtle)] p-3"
+          data-work-order-completion
+          role="status"
+        >
+          <p className="font-display text-sm font-bold text-[color:var(--rs-accent-success)]">
+            {`${completed.title} complete`}
+          </p>
+          <p className="mt-1 text-sm font-semibold text-[color:var(--rs-accent-success)]">
+            {`Paid ${completed.payoutCredits} Credits`}
+          </p>
+        </div>
       ) : null}
       {active ? <WorkOrderBenchPanel active={active} /> : <PracticeWeldingPanel />}
     </div>

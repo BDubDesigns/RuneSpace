@@ -257,7 +257,7 @@ describe("continuous runs", () => {
 });
 
 /**
- * "Finish Current Weld and Stop" (#207): the narrow third intent between
+ * "Stop After Current Weld" (#207): the narrow third intent between
  * ordinary Stop (preserves the partial weld) and letting the run continue
  * (spends two more Scrap the instant this weld completes).
  */
