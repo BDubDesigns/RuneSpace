@@ -174,19 +174,40 @@ export function PracticeWeldingPanel() {
             short of an ordinary Start, so the control disables itself rather
             than inviting a second, pointless click, and reads the persisted
             server intent rather than a local guess so a reload shows the
-            same armed state the server is actually holding. */}
+            same armed state the server is actually holding.
+
+            Armed reuses the existing `--rs-glow-success` attention token as
+            an exterior halo, not a new one — the same token the success
+            flash animations already use, applied here as a steady glow
+            instead of a one-shot fade. Two things keep it from silently
+            doing nothing, exactly as `PlayScreen`'s `NewsControl` documents
+            for its own unread-news halo: `ActionButton` always carries
+            `rs-bevel`, whose clip-path would clip a shadow drawn outside the
+            element's own box, so the glow goes on this unclipped wrapper
+            span instead of the beveled button; and Tailwind's
+            `shadow-[var(...)]` arbitrary-value syntax only sets internal
+            `--tw-shadow-*` custom properties, not `box-shadow` itself,
+            unless a base `shadow` utility is also present — an inline style
+            sets `box-shadow` directly instead, avoiding that trap. */}
         {resumable ? (
-          <ActionButton
-            aria-pressed={practice.finishCurrentWeld}
-            data-practice-finish
-            data-practice-finish-armed={String(practice.finishCurrentWeld)}
-            disabled={practice.finishCurrentWeld || (foregroundBusy && pending !== "finish")}
-            intent={practice.finishCurrentWeld ? "success" : "secondary"}
-            loading={pending === "finish"}
-            onClick={() => run("finish")}
+          <span
+            className="inline-flex"
+            style={practice.finishCurrentWeld ? { boxShadow: "var(--rs-glow-success)" } : undefined}
           >
-            {practice.finishCurrentWeld ? "Stopping After Current Weld" : "Stop After Current Weld"}
-          </ActionButton>
+            <ActionButton
+              aria-pressed={practice.finishCurrentWeld}
+              data-practice-finish
+              data-practice-finish-armed={String(practice.finishCurrentWeld)}
+              disabled={practice.finishCurrentWeld || (foregroundBusy && pending !== "finish")}
+              intent={practice.finishCurrentWeld ? "success" : "secondary"}
+              loading={pending === "finish"}
+              onClick={() => run("finish")}
+            >
+              {practice.finishCurrentWeld
+                ? "Stopping After Current Weld"
+                : "Stop After Current Weld"}
+            </ActionButton>
+          </span>
         ) : null}
       </div>
 

@@ -341,6 +341,25 @@ test("finishes the current practice weld to clear the bench for client work", as
   ).length;
   await page.locator("[data-practice-finish]").click();
 
+  // Armed reads back real server state, not a local guess, and actually
+  // paints the shared success glow rather than a data attribute nobody can
+  // see: `rs-bevel`'s clip-path would clip a shadow drawn on the button
+  // itself, so the glow lives on the unclipped wrapper span — checked as
+  // computed paint, not class names, the same class of bug
+  // `expectExteriorMissionHalo` already guards the Mission-guidance halo
+  // against.
+  const finishControl = page.locator("[data-practice-finish]");
+  await expect(finishControl).toHaveAttribute("data-practice-finish-armed", "true");
+  await expect(finishControl).toBeDisabled();
+  await expect(finishControl).toContainText("Stopping After Current Weld");
+  await expect(async () => {
+    const glow = await finishControl
+      .locator("xpath=..")
+      .evaluate((element) => getComputedStyle(element).boxShadow);
+    expect(glow).not.toBe("none");
+    expect(glow).toContain("136, 215, 99");
+  }).toPass();
+
   // It resumes the paid weld so it can actually finish — waiting for the run to
   // start before waiting for it to end, so the assertion below cannot pass
   // against the state from before the click.
