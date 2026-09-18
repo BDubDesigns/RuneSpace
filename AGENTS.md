@@ -89,6 +89,47 @@ boundary.** This file is the repository's normative agent-behavior contract;
 - Add no dependency without a concrete documented need. Prefer the existing
   Next.js, React, Tailwind, Drizzle, pg, Zod, Vitest, and Playwright stack.
 
+## Where things live
+
+Grep for these before re-deriving them from scratch; a recent session spent
+~16 minutes and ~90 tool calls rediscovering them before its first edit.
+
+- **Dialogue content has a shadow copy in QC Studio.** `game/content/dialogue.ts`
+  defines the authoritative `DialogueBeat` types and every authored beat.
+  `tools/qc-studio/` keeps a parallel mirror for its authoring/preview tool:
+  `core/types.ts` (beat type mirror), `core/validation.ts` (quantity/range
+  validation mirror), `adapters/runespace/dialogue-adapter.ts` (converts real
+  content into Studio's shape), and `modules/dialogue/DialogueStudio.tsx`
+  (preview rendering, with its own `DialoguePreviewProps` mirroring
+  `features/dialogue/DialogueScene.tsx` and `DialoguePlayer.tsx` props).
+  Changing a beat's shape, an item beat's quantity rule, or a
+  dialogue-rendering component's props needs the matching edit in QC Studio
+  too, or `tests/unit/qc-studio-adapter.test.ts` fails. Item-beat quantity
+  ranges specifically: `getItemBeatQuantityRange` in
+  `game/content/item-presentation.ts` (derived from an item's `stackLimit`)
+  is mirrored by `getStudioItemQuantityRange` in
+  `tools/qc-studio/core/validation.ts`.
+
+- **A named mechanic's display name fans out well past its component.** For
+  example, "Clean Pass" appears in `docs/architecture.md`,
+  `docs/game-rules.md`, `docs/gameplay-foundations.md`, `docs/npc-canon.md`,
+  `features/public-site/public-wiki.ts`, `features/public-site/public-updates.ts`,
+  several feature components, `game/domain/`, `game/config/balance.ts`, and
+  multiple test files — two dozen files for one name. When adding, renaming,
+  or reworking a player-facing mechanic, `grep -rn "<exact display name>"`
+  repo-wide before considering the change done; docs, public Wiki/Update
+  content, and tests drift silently and none of them will type-error if
+  missed.
+
+- **A "success" visual language already exists — check before inventing
+  one.** Completion/success visual treatment (color, glow, animation) is
+  centralized in `app/globals.css` (`--rs-accent-success*` custom properties,
+  `@keyframes rs-result-success`) and used by `components/ui/Feedback.tsx`,
+  `components/ui/ActionButton.tsx`, `components/ui/MissionGuidanceHalo.tsx`,
+  and feature-level examples like `features/welding/CleanPassControl.tsx`.
+  Check these for the existing pattern before designing a new completion
+  surface.
+
 ## Issue execution workflow
 
 1. Implement one approved issue only and stop after that issue is done.
