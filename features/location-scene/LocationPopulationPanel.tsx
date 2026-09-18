@@ -81,7 +81,12 @@ function LocationPopulationList({
   return (
     <div
       id="location-population-list"
-      className="mt-3 divide-y divide-[color:var(--rs-border-subtle)] border border-[color:var(--rs-border-structural)] bg-[color:var(--rs-surface-panel)] p-1.5"
+      // A resident's row right-aligns this whole panel's collapsed state
+      // (NpcInteractionPanel) via inherited `text-align`; once expanded, this
+      // list is meant to fill the row rather than stay pinned to the trigger's
+      // narrow width, so it resets the inherited alignment here rather than
+      // inheriting it into the character rows and the profile panel below.
+      className="mt-3 divide-y divide-[color:var(--rs-border-subtle)] border border-[color:var(--rs-border-structural)] bg-[color:var(--rs-surface-panel)] p-1.5 text-left"
       hidden={!open}
     >
       {error ? (
@@ -249,7 +254,7 @@ export function LocationPopulationPanel() {
           refreshKey={state}
         />
       ) : populationError ? (
-        <div className="mt-2">
+        <div className="mt-2 text-left">
           <Feedback tone="muted">{populationError}</Feedback>
         </div>
       ) : null}
