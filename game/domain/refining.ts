@@ -50,10 +50,7 @@ function stackFacts(balance: EffectiveGameBalance, itemId: string) {
  * a one-input-returned failure has one branch per input, because exactly one
  * of them comes back.
  */
-export function refiningAwardFacts(
-  balance: EffectiveGameBalance,
-  recipe: RefiningRecipeBalance,
-) {
+export function refiningAwardFacts(balance: EffectiveGameBalance, recipe: RefiningRecipeBalance) {
   const inputs = recipe.inputs.map((input) => ({
     ...stackFacts(balance, input.itemId),
     quantity: input.quantity,
@@ -77,11 +74,9 @@ export function refiningAwardFacts(
  * The success chance for one recipe at one Refining level, on the shared
  * whole-basis-point interpolation model.
  */
-export function refiningSuccessChanceBps(
-  level: number,
-  recipe: RefiningRecipeBalance,
-): number {
-  if (!Number.isInteger(level) || level < 1) throw new RangeError("Refining level must be positive");
+export function refiningSuccessChanceBps(level: number, recipe: RefiningRecipeBalance): number {
+  if (!Number.isInteger(level) || level < 1)
+    throw new RangeError("Refining level must be positive");
   return Math.min(
     10_000,
     recipe.successAtLevelOneBps +
@@ -393,7 +388,12 @@ export function resolveRefining<Id>(input: {
 
   while (true) {
     const stopReason = refiningPreflightStopReason(
-      { refiningLevel: snapshot.refiningLevel, existingStacks: stacks, slotsAvailable, massAvailableGrams },
+      {
+        refiningLevel: snapshot.refiningLevel,
+        existingStacks: stacks,
+        slotsAvailable,
+        massAvailableGrams,
+      },
       balance,
       recipe,
     );
@@ -402,7 +402,12 @@ export function resolveRefining<Id>(input: {
     remainingTicks -= durationTicks;
     consumedTicks += durationTicks;
 
-    const removal = planRecipeInputRemoval(stacks, slotsAvailable, massAvailableGrams, award.inputs);
+    const removal = planRecipeInputRemoval(
+      stacks,
+      slotsAvailable,
+      massAvailableGrams,
+      award.inputs,
+    );
     if (!removal) throw new Error("Refining consumed more input than available after preflight");
     stacks = removal.stacksAfter;
     slotsAvailable = removal.slotsAvailableAfter;
@@ -415,7 +420,12 @@ export function resolveRefining<Id>(input: {
     const rolledBasisPoints = random.nextBasisPoints();
     const success = rolledBasisPoints < thresholdBasisPoints;
 
-    let branch: readonly { itemId: string; quantity: number; stackLimit: number; massGrams: number }[];
+    let branch: readonly {
+      itemId: string;
+      quantity: number;
+      stackLimit: number;
+      massGrams: number;
+    }[];
     if (success) {
       branch = award.successOutputs;
     } else {

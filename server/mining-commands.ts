@@ -6,7 +6,7 @@ import {
   equippedItems,
   itemInstances,
 } from "@/db/rune-space";
-import { getEffectiveGameBalance, miningSources } from "@/game/config/balance";
+import { getEffectiveGameBalance, miningActionIds, miningSources } from "@/game/config/balance";
 import { ACTION_IDS, LOCATION_IDS } from "@/game/config/foundations";
 import { loadLocationState } from "@/server/location-state";
 import {
@@ -100,8 +100,7 @@ export async function startMining(
       const source = miningSources().find((candidate) =>
         locationState?.availableActionIds.includes(candidate.actionId),
       );
-      const unsupportedAction =
-        context.action && context.action.actionId !== source?.actionId;
+      const unsupportedAction = context.action && context.action.actionId !== source?.actionId;
       const traveling = context.action?.actionId === ACTION_IDS.travel;
       const miningBlockedHere = source === undefined;
       const snapshot = await loadMiningSnapshot(transaction, context.character.id);
@@ -178,7 +177,9 @@ export async function stopMining(
     }),
     async (transaction, context) => {
       await ensurePlayProvisioning(transaction, context.character.id);
-      const manuallyStopped = context.action?.actionId === ACTION_IDS.ferriteShaleMining;
+      // Any authored source's action, not just Ferrite Shale's (#209).
+      const manuallyStopped =
+        context.action !== undefined && miningActionIds().includes(context.action.actionId);
       if (manuallyStopped)
         await transaction
           .delete(activeActions)
@@ -196,7 +197,7 @@ export async function stopMining(
         context.character.id,
         recentFrom(outcome),
         manuallyStopped ? "manually_stopped" : outcome?.stopReason,
-        context.action && context.action.actionId !== ACTION_IDS.ferriteShaleMining
+        context.action && !miningActionIds().includes(context.action.actionId)
           ? "another_action_active"
           : undefined,
         undefined,

@@ -9,6 +9,7 @@ import {
 } from "@/db/rune-space";
 import {
   getEffectiveGameBalance,
+  miningActionIds,
   refiningActionIds,
   refiningRecipeForActionId,
   standardSkillLevelThresholds,
@@ -93,6 +94,9 @@ export async function startRefining(
         .limit(1);
       const currentLocationId = reloaded?.currentLocationId ?? LOCATION_IDS.crashSite;
       const recipe = refiningRecipeForActionId(recipeActionId);
+      // Refining is hosted by the location, not by the recipe: every authored
+      // recipe is worked at the same console, so the availability question stays
+      // the one the Yard already answers (#209).
       const refiningBlockedHere = !isActionAvailableAtLocation(
         currentLocationId,
         ACTION_IDS.refining,
@@ -278,7 +282,9 @@ export async function stopRefining(
     ),
     async (transaction, context) => {
       await ensurePlayProvisioning(transaction, context.character.id);
-      const manuallyStopped = context.action?.actionId === ACTION_IDS.refining;
+      // Any authored recipe's action, not just the original Ferrite one (#209).
+      const manuallyStopped =
+        context.action !== undefined && refiningActionIds().includes(context.action.actionId);
       if (manuallyStopped) {
         await transaction
           .delete(activeActions)
@@ -297,8 +303,8 @@ export async function stopRefining(
         miningRecentFrom(miningOutcome),
         miningOutcome?.stopReason,
         context.action &&
-          context.action.actionId !== ACTION_IDS.refining &&
-          context.action.actionId !== ACTION_IDS.ferriteShaleMining &&
+          !refiningActionIds().includes(context.action.actionId) &&
+          !miningActionIds().includes(context.action.actionId) &&
           context.action.actionId !== ACTION_IDS.travel
           ? "another_action_active"
           : undefined,

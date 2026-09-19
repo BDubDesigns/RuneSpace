@@ -69,7 +69,7 @@ export function resolveLocationState(
     ...(variant ? { variantId: variant.id } : {}),
     description: variant?.description ?? location.description,
     travelable: variant?.travelable ?? location.travelable,
-    ...(variant?.mapStatus ?? location.mapStatus
+    ...((variant?.mapStatus ?? location.mapStatus)
       ? { mapStatus: variant?.mapStatus ?? location.mapStatus }
       : {}),
     availableActionIds: variant?.availableActionIds ?? location.availableActionIds,
@@ -104,7 +104,9 @@ export function isActionAvailableInLocationState(
   actionId: string,
   facts: LocationStateFacts,
 ): boolean {
-  return resolveLocationStateById(locationId, facts)?.availableActionIds.includes(actionId) ?? false;
+  return (
+    resolveLocationStateById(locationId, facts)?.availableActionIds.includes(actionId) ?? false
+  );
 }
 
 /**

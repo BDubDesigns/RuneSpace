@@ -775,8 +775,10 @@ export function CargoHoldPanel() {
           />
           <ActivityContextRow
             items={[
-              { label: "Refined Ferrite carried", quantity: state.refinedFerriteQuantity },
-              { label: "Slag carried", quantity: state.slagQuantity },
+              ...repair.materials.map((material) => ({
+                label: `${material.name} carried`,
+                quantity: state.carriedByItemId[material.itemId] ?? 0,
+              })),
             ]}
           />
         </>

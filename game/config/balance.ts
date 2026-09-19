@@ -613,9 +613,7 @@ export type RefiningRecipeBalance =
   EffectiveGameBalance["refining"]["recipes"][keyof EffectiveGameBalance["refining"]["recipes"]];
 
 /** Every authored Mining source, in a stable authored order. */
-export function miningSources(
-  balance = getEffectiveGameBalance(),
-): readonly MiningSourceBalance[] {
+export function miningSources(balance = getEffectiveGameBalance()): readonly MiningSourceBalance[] {
   return Object.values(balance.mining.sources);
 }
 

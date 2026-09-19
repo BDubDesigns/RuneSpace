@@ -10,10 +10,12 @@ import { VisualTile } from "@/components/items/VisualTile";
 import { Feedback } from "@/components/ui/Feedback";
 import { MissionActionButton } from "@/components/ui/MissionActionButton";
 import { StatusMeter } from "@/components/ui/StatusMeter";
-import { getEffectiveGameBalance } from "@/game/config/balance";
-import { ACTION_IDS, GAME_TICK_MS, ITEM_IDS } from "@/game/config/foundations";
+import { refiningActionIds } from "@/game/config/balance";
+import { GAME_TICK_MS } from "@/game/config/foundations";
+import { resolveItemPresentation } from "@/game/content/item-presentation";
 import { deriveMissionGuidanceTargets } from "@/game/domain/missions";
 import type { RefiningRunAttempt } from "@/server/refining";
+import type { RefiningRecipeProjection } from "@/server/play";
 import { refreshPlayAction, startRefiningAction, stopRefiningAction } from "@/server/actions";
 import { reportClientDiagnostic } from "@/features/diagnostics/client";
 import { usePlay } from "@/features/play/PlayContext";
@@ -25,17 +27,19 @@ function percentage(bps: number) {
 }
 
 function refiningStopMessage(
-  reason: Extract<
-    import("@/server/play").ActivityStop,
-    { actionId: typeof ACTION_IDS.refining }
-  >["reason"],
+  reason: Extract<import("@/server/play").ActivityStop, { activity: "refining" }>["reason"],
+  recipe: RefiningRecipeProjection | undefined,
 ): string {
+  // The authoritative reason says the inputs ran out; the recipe says which
+  // ones and how many, so the copy is right for all three recipes (#209).
+  const inputs = recipe
+    ? recipe.inputs.map((input) => `${input.quantity} ${input.name}`).join(" + ")
+    : "the required inputs";
   return (
     (
       {
         manually_stopped: "Refining stopped.",
-        insufficient_ferrite_shale:
-          "Not enough Ferrite Shale \u2014 refining requires 2 per attempt.",
+        insufficient_inputs: `Not enough material \u2014 each attempt requires ${inputs}.`,
         inventory_slots_full:
           "Processing stopped \u2014 make room for the resulting material before refining more.",
         carried_mass_capacity_reached:
@@ -44,6 +48,20 @@ function refiningStopMessage(
       } as Record<string, string>
     )[reason] ?? `Refining stopped: ${reason}.`
   );
+}
+
+/** The item's authoritative display name, by its stable ID. */
+function itemName(itemId: string): string {
+  return resolveItemPresentation(itemId, itemId).displayName;
+}
+
+/** "2 Galvanite", "1 Refined Ferrite + 1 Galvanic Stock". */
+function describeQuantities(
+  quantities: readonly { itemId: string; quantity: number }[],
+  separator = " + ",
+): string {
+  if (quantities.length === 0) return "nothing";
+  return quantities.map((entry) => `${entry.quantity} ${itemName(entry.itemId)}`).join(separator);
 }
 
 function refiningCommandErrorMessage(error: string): string {
@@ -76,9 +94,12 @@ function latestRefiningAttempt(
 function latestAnnouncement(attempt: RefiningRunAttempt, batch: number): string {
   const catchUp = batch > 1 ? `${batch} attempts resolved while away. ` : "";
   const roll = `Roll ${percentage(attempt.rolledBasisPoints)}. Needed below ${percentage(attempt.thresholdBasisPoints)}.`;
+  const produced = describeQuantities(attempt.awarded, ", ");
+  // A failure is not always Slag: Galvaferrite hands one input back instead
+  // (#209), so the announcement reads the attempt's own awards.
   return attempt.success
-    ? `${catchUp}Refined Ferrite produced. ${roll} ${attempt.xpAwarded} Refining XP earned.`
-    : `${catchUp}Slag produced. ${roll} ${attempt.xpAwarded} Refining XP earned.`;
+    ? `${catchUp}${produced} produced. ${roll} ${attempt.xpAwarded} Refining XP earned.`
+    : `${catchUp}Attempt failed, ${produced} returned. ${roll} ${attempt.xpAwarded} Refining XP earned.`;
 }
 
 export function RefiningConsole() {
@@ -93,11 +114,11 @@ export function RefiningConsole() {
   } = usePlay();
   const refining = state.refining;
   const refiningRun = state.refiningRun;
-  const [message, setMessage] = useState<string | undefined>(
-    state.stop?.actionId === ACTION_IDS.refining
-      ? refiningStopMessage(state.stop.reason)
-      : undefined,
-  );
+  // The recipe the player has chosen. It defaults to whatever is already
+  // running, so a refresh mid-run lands back on the right recipe; otherwise it
+  // is the first authored one, and the authored order puts Refined Ferrite —
+  // the only recipe a new character can work — first.
+  const [selectedActionId, setSelectedActionId] = useState<string | undefined>();
   const [now, setNow] = useState(Date.now());
   const [, startTransition] = useTransition();
   const [recovery, setRecovery] = useState<(() => void) | undefined>();
@@ -105,15 +126,28 @@ export function RefiningConsole() {
   const observedAttempts = useRef(refiningRun.attempts);
   const observedSequence = useRef(latestRefiningAttempt(refiningRun.recentAttempts)?.sequence);
   const [feedback, setFeedback] = useState<{ sequence: number; attempts: number }>();
-  const balance = getEffectiveGameBalance();
+  const recipes = state.refiningRecipes;
   const active =
-    state.activeAction?.actionId === "processing_yard_refining" ? state.activeAction : undefined;
-  // Mission guidance consumes the ONE derived target set: a future Refining
-  // mission authors `recommendedActionId: ACTION_IDS.refining` and Start
-  // Refining receives the treatment here without any mission-ID branching.
+    state.activeAction && refiningActionIds().includes(state.activeAction.actionId)
+      ? state.activeAction
+      : undefined;
+  const activeRecipe = recipes.find((recipe) => recipe.actionId === active?.actionId);
+  const recipe =
+    activeRecipe ??
+    recipes.find((candidate) => candidate.actionId === selectedActionId) ??
+    recipes[0];
+  const [message, setMessage] = useState<string | undefined>(
+    state.stop?.activity === "refining"
+      ? refiningStopMessage(state.stop.reason, recipe)
+      : undefined,
+  );
+  // Mission guidance consumes the ONE derived target set: a Refining mission
+  // authors `recommendedActionId` naming one recipe's action, and only that
+  // recipe's Start receives the treatment — no mission-ID branching.
   const missionGuidanceTargets = deriveMissionGuidanceTargets(state.missions);
-  const startRefiningGuided = !active && missionGuidanceTargets.actionIds.has(ACTION_IDS.refining);
-  const durationTicks = active?.nextAttemptDurationTicks ?? balance.refining.attemptDurationTicks;
+  const startRefiningGuided =
+    !active && recipe !== undefined && missionGuidanceTargets.actionIds.has(recipe.actionId);
+  const durationTicks = active?.nextAttemptDurationTicks ?? recipe?.attemptDurationTicks ?? 0;
   const durationMs = durationTicks * GAME_TICK_MS;
   const elapsed = active ? Math.max(0, now - new Date(active.progressStartedAt).getTime()) : 0;
   const progress = active ? Math.min(100, (elapsed / durationMs) * 100) : 0;
@@ -131,8 +165,8 @@ export function RefiningConsole() {
       const next = result.state;
       if (next.refiningError) setMessage(refiningErrorMessage(next.refiningError));
       else if (next.commandError) setMessage(refiningCommandErrorMessage(next.commandError));
-      else if (next.stop?.actionId === ACTION_IDS.refining)
-        setMessage(refiningStopMessage(next.stop.reason));
+      else if (next.stop?.activity === "refining")
+        setMessage(refiningStopMessage(next.stop.reason, recipe));
       else setMessage(undefined);
     }
   }
@@ -220,10 +254,15 @@ export function RefiningConsole() {
           </ActionButton>
         ) : (
           <MissionActionButton
+            disabled={!recipe?.unlocked}
             guidance={startRefiningGuided ? "active" : undefined}
             intent="mining"
             loading={foregroundBusy && pendingCommand === "start"}
-            onClick={() => runForeground("start", startRefiningAction)}
+            onClick={() =>
+              runForeground("start", (characterId) =>
+                startRefiningAction({ characterId, recipeActionId: recipe?.actionId }),
+              )
+            }
           >
             Start Refining
           </MissionActionButton>
@@ -237,14 +276,63 @@ export function RefiningConsole() {
           Refresh status
         </ActionButton>
       </div>
-      <p className="font-display text-sm uppercase tracking-wide text-[color:var(--rs-accent-arcane)]">
-        Success chance: {percentage(state.refiningSuccessChanceBps)}%
-      </p>
-      <p className="!mt-2 text-xs uppercase tracking-wide text-[color:var(--rs-text-muted)]">
-        {balance.refining.attemptDurationTicks} ticks /{" "}
-        {(balance.refining.attemptDurationTicks * GAME_TICK_MS) / 1000}s per attempt &middot;{" "}
-        {balance.refining.inputFerriteShale} Ferrite Shale &rarr; 1 output
-      </p>
+      {/* Every authored recipe, locked ones included (#209): a player at
+          Refining 1 can see that Galvanic Stock and Galvaferrite exist and what
+          they will cost, which is the whole reason the locked rows render at
+          all. Selection is disabled while a run is active, because changing the
+          recipe mid-run is a stop, not a toggle. */}
+      <div className="grid gap-2 sm:grid-cols-2" data-refining-recipes>
+        {recipes.map((candidate) => {
+          const chosen = candidate.actionId === recipe?.actionId;
+          return (
+            <button
+              aria-pressed={chosen}
+              className={`border p-3 text-left ${
+                chosen
+                  ? "border-[color:var(--rs-accent-arcane)] bg-[color:var(--rs-surface-panel)]"
+                  : "border-[color:var(--rs-border-structural)] bg-[color:var(--rs-surface-panel)]"
+              } ${candidate.unlocked ? "" : "opacity-60"}`}
+              data-refining-recipe={candidate.actionId}
+              data-refining-recipe-locked={candidate.unlocked ? "false" : "true"}
+              disabled={Boolean(active) || !candidate.unlocked}
+              key={candidate.actionId}
+              onClick={() => setSelectedActionId(candidate.actionId)}
+              type="button"
+            >
+              <p className="font-display text-sm uppercase tracking-wide">
+                {candidate.outputQuantity} {candidate.outputName}
+              </p>
+              <p className="mt-1 text-xs text-[color:var(--rs-text-secondary)]">
+                {describeQuantities(candidate.inputs)} &rarr; {candidate.outputQuantity}{" "}
+                {candidate.outputName}
+              </p>
+              {candidate.unlocked ? (
+                <p className="mt-1 text-xs uppercase tracking-wide text-[color:var(--rs-text-muted)]">
+                  {candidate.attemptDurationTicks} ticks /{" "}
+                  {(candidate.attemptDurationTicks * GAME_TICK_MS) / 1000}s &middot;{" "}
+                  {percentage(candidate.successChanceBps)}% &middot; +{candidate.successXp} XP
+                </p>
+              ) : (
+                <p className="mt-1 font-display text-xs uppercase tracking-wide text-[color:var(--rs-accent-danger)]">
+                  Requires Refining {candidate.minimumLevel}
+                </p>
+              )}
+            </button>
+          );
+        })}
+      </div>
+      {recipe ? (
+        <>
+          <p className="font-display text-sm uppercase tracking-wide text-[color:var(--rs-accent-arcane)]">
+            Success chance: {percentage(recipe.successChanceBps)}%
+          </p>
+          <p className="!mt-2 text-xs uppercase tracking-wide text-[color:var(--rs-text-muted)]">
+            {recipe.attemptDurationTicks} ticks /{" "}
+            {(recipe.attemptDurationTicks * GAME_TICK_MS) / 1000}s per attempt &middot;{" "}
+            {describeQuantities(recipe.inputs)} &rarr; {recipe.outputQuantity} {recipe.outputName}
+          </p>
+        </>
+      ) : null}
       {isActive ? (
         <div>
           <StatusMeter
@@ -255,9 +343,10 @@ export function RefiningConsole() {
         </div>
       ) : (
         <Feedback>
-          Refining is idle. Each attempt takes {balance.refining.attemptDurationTicks} ticks /{" "}
-          {(balance.refining.attemptDurationTicks * GAME_TICK_MS) / 1000} seconds and resolves on
-          the server.
+          Refining is idle. Each {recipe?.outputName ?? "attempt"} attempt takes{" "}
+          {recipe?.attemptDurationTicks ?? 0} ticks /{" "}
+          {((recipe?.attemptDurationTicks ?? 0) * GAME_TICK_MS) / 1000} seconds and resolves on the
+          server.
         </Feedback>
       )}
       {latestAttempt ? (
@@ -265,11 +354,11 @@ export function RefiningConsole() {
           aria-label="Latest refining attempt"
           className={`border border-[color:var(--rs-border-structural)] bg-[color:var(--rs-surface-panel)] p-3 ${feedback?.sequence === latestAttempt.sequence ? (latestAttempt.success ? "rs-result-feedback-success" : "rs-result-feedback-danger") : ""}`}
           data-feedback-state={feedback?.sequence === latestAttempt.sequence ? "new" : "calm"}
-          data-result-outcome={latestAttempt.success ? "success" : "slag"}
+          data-result-outcome={latestAttempt.success ? "success" : "failed"}
         >
           <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
             <p className="font-display text-sm uppercase tracking-wide">
-              Latest attempt: {latestAttempt.success ? "Refined Ferrite" : "Slag"}
+              Latest attempt: {describeQuantities(latestAttempt.awarded, ", ")}
             </p>
             {feedback?.sequence === latestAttempt.sequence && feedback.attempts > 1 ? (
               <p className="text-xs text-[color:var(--rs-text-secondary)]">
@@ -282,19 +371,25 @@ export function RefiningConsole() {
             {percentage(latestAttempt.thresholdBasisPoints)}
           </p>
           <p className="mt-2 text-xs uppercase tracking-wide text-[color:var(--rs-text-muted)]">
-            {latestAttempt.durationTicks} ticks &middot; {latestAttempt.shaleConsumed} Ferrite Shale
-            consumed
+            {latestAttempt.durationTicks} ticks &middot;{" "}
+            {describeQuantities(latestAttempt.consumed, ", ")} consumed
           </p>
+          {/* One tile per awarded item, from the attempt's own awards: a
+              Galvaferrite failure hands back one input rather than producing
+              Slag, so nothing here may assume which item appears (#209). */}
           <div className="mt-3 grid max-w-sm grid-cols-2 gap-2 sm:grid-cols-3">
-            <ItemVisual
-              accessibleLabel={`${latestAttempt.success ? latestAttempt.ferriteAwarded : latestAttempt.slagAwarded} ${latestAttempt.success ? "Refined Ferrite" : "Slag"} produced`}
-              className={feedback?.sequence === latestAttempt.sequence ? "rs-reward-feedback" : ""}
-              itemId={latestAttempt.success ? ITEM_IDS.refinedFerrite : ITEM_IDS.slag}
-              name={latestAttempt.success ? "Refined Ferrite" : "Slag"}
-              quantity={
-                latestAttempt.success ? latestAttempt.ferriteAwarded : latestAttempt.slagAwarded
-              }
-            />
+            {latestAttempt.awarded.map((award) => (
+              <ItemVisual
+                accessibleLabel={`${award.quantity} ${itemName(award.itemId)} produced`}
+                className={
+                  feedback?.sequence === latestAttempt.sequence ? "rs-reward-feedback" : ""
+                }
+                itemId={award.itemId}
+                key={award.itemId}
+                name={itemName(award.itemId)}
+                quantity={award.quantity}
+              />
+            ))}
             <VisualTile
               accessibleLabel={`${latestAttempt.xpAwarded} Refining XP earned`}
               badge={`+${latestAttempt.xpAwarded}`}
@@ -315,9 +410,7 @@ export function RefiningConsole() {
           : ""}
       </p>
       {message ? (
-        <Feedback
-          tone={state.stop?.actionId === ACTION_IDS.refining && !active ? "danger" : "muted"}
-        >
+        <Feedback tone={state.stop?.activity === "refining" && !active ? "danger" : "muted"}>
           {message}
         </Feedback>
       ) : null}
@@ -326,8 +419,9 @@ export function RefiningConsole() {
           Retry status check
         </ActionButton>
       ) : null}
-      {/* Both outputs and the shale that feeds them: refining stops on carried
-          capacity as readily as it stops on running out of input. */}
+      {/* The selected recipe's own inputs and output: Refining stops on carried
+          capacity as readily as it stops on running out of input, and which
+          material that is depends on the recipe. */}
       <SkillProgressRow
         level={refining.level}
         skill="Refining"
@@ -342,11 +436,20 @@ export function RefiningConsole() {
           massGrams: state.inventory.massGrams,
           capacityGrams: state.inventory.capacityGrams,
         }}
-        items={[
-          { label: "Ferrite Shale", quantity: state.ferriteShaleQuantity },
-          { label: "Refined Ferrite", quantity: state.refinedFerriteQuantity },
-          { label: "Slag", quantity: state.slagQuantity },
-        ]}
+        items={
+          recipe
+            ? [
+                ...recipe.inputs.map((input) => ({
+                  label: input.name,
+                  quantity: input.carried,
+                })),
+                {
+                  label: recipe.outputName,
+                  quantity: state.carriedByItemId[recipe.outputItemId] ?? 0,
+                },
+              ]
+            : []
+        }
       />
       <RefiningRunPanel run={refiningRun} />
     </ActivityPanel>

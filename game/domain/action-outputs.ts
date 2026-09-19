@@ -1,8 +1,5 @@
 import { getEffectiveGameBalance } from "@/game/config/balance";
-import {
-  miningSourceForActionId,
-  refiningRecipeForActionId,
-} from "@/game/config/balance";
+import { miningSourceForActionId, refiningRecipeForActionId } from "@/game/config/balance";
 import { miningAwardFacts } from "@/game/domain/mining";
 import { refiningAwardFacts } from "@/game/domain/refining";
 

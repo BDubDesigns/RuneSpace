@@ -57,7 +57,8 @@ export const LocationStateVariantSchema = z
       })
       .strict()
       .refine(
-        (requires) => requires.acceptedMissionId != null || requires.completedRepairTargetId != null,
+        (requires) =>
+          requires.acceptedMissionId != null || requires.completedRepairTargetId != null,
         { message: "A location state variant must require at least one authoritative fact" },
       ),
     description: z.string().optional(),

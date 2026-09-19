@@ -250,9 +250,7 @@ export function createRefiningResolver(
           now,
         });
         if (!consumption.ok) {
-          throw new Error(
-            `Refining consumed more "${itemId}" than available at persistence time`,
-          );
+          throw new Error(`Refining consumed more "${itemId}" than available at persistence time`);
         }
       }
 

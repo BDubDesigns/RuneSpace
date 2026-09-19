@@ -20,9 +20,11 @@ import {
   getEffectiveGameBalance,
   getItemDefinition,
   getRepairTargetBalance,
+  miningActionIds,
   miningLevelThresholds,
   miningSourceForActionId,
   miningSources,
+  refiningActionIds,
   refiningRecipeForActionId,
   refiningRecipes,
   repairTargetBalances,
@@ -419,9 +421,19 @@ export type CargoHoldState = {
   capacitySlots: number;
 };
 
+/**
+ * Why an activity stopped on its own, for the surface that owns it (#209).
+ *
+ * Discriminated by the activity rather than by one hard-coded action ID: a run
+ * that stopped was a Mining run or a Refining run, and which source or recipe
+ * it was is the run state's business. The durable stop reason is stored per
+ * activity, so there is nothing here that could name the specific source
+ * honestly anyway — and pretending a Galvanite stop was a Ferrite Shale stop is
+ * exactly the lie this replaces.
+ */
 export type ActivityStop =
-  | { actionId: typeof ACTION_IDS.ferriteShaleMining; reason: MiningStopReason }
-  | { actionId: typeof ACTION_IDS.refining; reason: RefiningStopReason };
+  | { activity: "mining"; reason: MiningStopReason }
+  | { activity: "refining"; reason: RefiningStopReason };
 
 export type ScavengeResolvedOutcome = {
   outcomeId: import("@/game/content/scavenge").ScavengeOutcomeId;
@@ -492,8 +504,16 @@ export type PlayGameplayState = {
    * or reachability from Mission and repair rows themselves.
    */
   locationStates: Readonly<Record<string, LocationStateProjection>>;
-  refinedFerriteQuantity: number;
-  slagQuantity: number;
+  /**
+   * Everything the character is carrying, keyed by item ID (#209).
+   *
+   * Replaces the per-item `refinedFerriteQuantity` / `slagQuantity` tallies. A
+   * new material used to mean a new field on this state and a new line in every
+   * surface that read it; now a surface asks for the item it cares about, which
+   * is what lets the Mining panel show Galvanite at Deep Jag without knowing
+   * that Galvanite exists.
+   */
+  carriedByItemId: Readonly<Record<string, number>>;
   inventory: {
     slotsUsed: number;
     slotsAvailable: number;
@@ -709,22 +729,26 @@ export function createPlayResolver(
     ? e2eRefiningRandom()
     : (random as import("@/game/domain/refining").RefiningRandom);
   const entries: PlayResolverEntry[] = [
-    {
-      actionId: ACTION_IDS.ferriteShaleMining,
+    // One resolver per authored Mining source and per authored Refining recipe
+    // (#209). The resolver itself is generic — it reads the source or recipe
+    // back from the action ID it was invoked under — so a second ore and two
+    // more recipes add registry entries rather than branches.
+    ...miningActionIds().map((actionId) => ({
+      actionId,
       resolver: withTrackedActivityProgress(
         createMiningResolver(random, onMiningOutcome),
         "mining",
         (outcome) => outcome.attempts.length,
       ) as PlayResolver,
-    },
-    {
-      actionId: ACTION_IDS.refining,
+    })),
+    ...refiningActionIds().map((actionId) => ({
+      actionId,
       resolver: withTrackedActivityProgress(
         createRefiningResolver(refiningRandom, onRefiningOutcome),
         "refining",
         (outcome) => outcome.resolvedAttempts.length,
       ) as PlayResolver,
-    },
+    })),
     {
       actionId: ACTION_IDS.travel,
       resolver: createTravelResolver() as PlayResolver,
@@ -1523,12 +1547,7 @@ export async function stateFromTransaction(
       };
     }),
     locationStates,
-    refinedFerriteQuantity: stacks
-      .filter((stack) => stack.itemId === ITEM_IDS.refinedFerrite)
-      .reduce((total, stack) => total + stack.quantity, 0),
-    slagQuantity: stacks
-      .filter((stack) => stack.itemId === ITEM_IDS.slag)
-      .reduce((total, stack) => total + stack.quantity, 0),
+    carriedByItemId,
     inventory: {
       slotsUsed: snapshot.slotsUsed,
       slotsAvailable: snapshot.slotsAvailable,
@@ -1651,12 +1670,8 @@ export async function stateFromTransaction(
     refiningRecentResult,
     stop: (() => {
       if (refiningStopReason)
-        return { actionId: ACTION_IDS.refining, reason: refiningStopReason } as ActivityStop;
-      if (miningStopReason)
-        return {
-          actionId: ACTION_IDS.ferriteShaleMining,
-          reason: miningStopReason,
-        } as ActivityStop;
+        return { activity: "refining", reason: refiningStopReason } as ActivityStop;
+      if (miningStopReason) return { activity: "mining", reason: miningStopReason } as ActivityStop;
       if (action) return undefined;
       const miningPersisted = miningState?.lastStopReason as MiningStopReason | null | undefined;
       const refiningPersisted = refiningState?.lastStopReason as
@@ -1671,16 +1686,12 @@ export async function stateFromTransaction(
           ? new Date(refiningState.updatedAt as unknown as string | Date).getTime()
           : 0;
         if (refiningUpdated >= miningUpdated)
-          return { actionId: ACTION_IDS.refining, reason: refiningPersisted } as ActivityStop;
-        return {
-          actionId: ACTION_IDS.ferriteShaleMining,
-          reason: miningPersisted,
-        } as ActivityStop;
+          return { activity: "refining", reason: refiningPersisted } as ActivityStop;
+        return { activity: "mining", reason: miningPersisted } as ActivityStop;
       }
       if (refiningPersisted)
-        return { actionId: ACTION_IDS.refining, reason: refiningPersisted } as ActivityStop;
-      if (miningPersisted)
-        return { actionId: ACTION_IDS.ferriteShaleMining, reason: miningPersisted } as ActivityStop;
+        return { activity: "refining", reason: refiningPersisted } as ActivityStop;
+      if (miningPersisted) return { activity: "mining", reason: miningPersisted } as ActivityStop;
       return undefined;
     })(),
     commandError,
@@ -1835,7 +1846,7 @@ export async function beginTravel(
           context.character.id,
           recentFrom(miningOutcome),
           miningOutcome?.stopReason,
-          context.action && context.action.actionId !== ACTION_IDS.ferriteShaleMining
+          context.action && !miningActionIds().includes(context.action.actionId)
             ? "another_action_active"
             : undefined,
           plan.reason,
@@ -1888,7 +1899,7 @@ export async function beginTravel(
         await transaction
           .delete(activeActions)
           .where(eq(activeActions.characterId, context.character.id));
-        if (context.action.actionId === ACTION_IDS.ferriteShaleMining) {
+        if (miningActionIds().includes(context.action.actionId)) {
           await transaction
             .insert(characterMiningState)
             .values({ characterId: context.character.id, lastStopReason: "action_replaced" })
@@ -1896,7 +1907,7 @@ export async function beginTravel(
               target: characterMiningState.characterId,
               set: { lastStopReason: "action_replaced", updatedAt: now },
             });
-        } else if (context.action.actionId === ACTION_IDS.refining) {
+        } else if (refiningActionIds().includes(context.action.actionId)) {
           await transaction
             .insert(characterRefiningState)
             .values({ characterId: context.character.id, lastStopReason: "action_replaced" })

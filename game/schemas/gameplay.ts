@@ -124,6 +124,20 @@ export const RepairMaterialContributionRequestSchema = z.object({
   expectedMaterials: z.record(ContentId, z.number().int().nonnegative()),
 });
 
+/**
+ * Starting Refining names the character and which authored recipe (#209).
+ *
+ * The recipe is a stable action ID and nothing more: its inputs, outputs,
+ * duration, success curve and minimum Refining level are all resolved
+ * server-side from authored content, and the command refuses a recipe the
+ * character's level does not authorize. The client cannot describe a recipe,
+ * only choose among the authored ones.
+ */
+export const StartRefiningRequestSchema = z.object({
+  characterId: z.string().uuid(),
+  recipeActionId: ContentId,
+});
+
 /** Starting or stopping Welding names only the character and the repair target. */
 export const WeldingCommandRequestSchema = z.object({
   characterId: z.string().uuid(),

@@ -73,6 +73,7 @@ import {
   LoadPowerCellRequestSchema,
   DiscardInventoryStackRequestSchema,
   RepairMaterialContributionRequestSchema,
+  StartRefiningRequestSchema,
   WeldingCommandRequestSchema,
   PracticeCommandRequestSchema,
   PracticeSlagPreferenceRequestSchema,
@@ -268,8 +269,12 @@ export async function stopMiningAction(characterId: string): Promise<PlayActionR
   return runPlayAction(characterId, stopMining);
 }
 
-export async function startRefiningAction(characterId: string): Promise<PlayActionResult> {
-  return runPlayAction(characterId, startRefining);
+export async function startRefiningAction(input: unknown): Promise<PlayActionResult> {
+  const request = StartRefiningRequestSchema.safeParse(input);
+  if (!request.success) return { error: "Invalid Refining command." };
+  return runPlayAction(request.data.characterId, (userId, characterId) =>
+    startRefining(userId, characterId, request.data.recipeActionId),
+  );
 }
 
 export async function stopRefiningAction(characterId: string): Promise<PlayActionResult> {

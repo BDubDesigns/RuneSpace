@@ -25,11 +25,11 @@ export type MiningRandom = { nextBasisPoints(): number; nextUnit(): number };
  * Ferrite Shale and an opened Deep Jag yields Galvanite, from this one path.
  */
 export function miningAwardFacts(balance: EffectiveGameBalance, source: MiningSourceBalance) {
-  const item = Object.values(balance.items).find(
-    (candidate) => candidate.itemId === source.itemId,
-  );
+  const item = Object.values(balance.items).find((candidate) => candidate.itemId === source.itemId);
   if (!item || !("stackLimit" in item)) {
-    throw new Error(`Mining source "${source.actionId}" produces unstackable item "${source.itemId}"`);
+    throw new Error(
+      `Mining source "${source.actionId}" produces unstackable item "${source.itemId}"`,
+    );
   }
   return {
     itemId: source.itemId,

@@ -320,7 +320,10 @@ export function CrewStopPanel() {
           : { xpToNextLevel: state.welding.xpToNextLevel })}
       />
       <ActivityContextRow
-        items={[{ label: "Refined Ferrite carried", quantity: state.refinedFerriteQuantity }]}
+        items={repair.materials.map((material) => ({
+          label: `${material.name} carried`,
+          quantity: state.carriedByItemId[material.itemId] ?? 0,
+        }))}
       />
 
       {message ? <Feedback>{message}</Feedback> : null}
