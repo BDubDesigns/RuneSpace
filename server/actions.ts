@@ -14,7 +14,7 @@ import {
   type PlayGameplayState,
 } from "@/server/play";
 import {
-  startFerriteShaleMining,
+  startMining,
   stopMining,
   loadSalvageCutterPowerCell,
   type LoadPowerCellResult,
@@ -261,7 +261,7 @@ export async function acknowledgeMissionConversationAction(
 }
 
 export async function startMiningAction(characterId: string): Promise<PlayActionResult> {
-  return runPlayAction(characterId, startFerriteShaleMining);
+  return runPlayAction(characterId, startMining);
 }
 
 export async function stopMiningAction(characterId: string): Promise<PlayActionResult> {
@@ -423,8 +423,7 @@ export async function contributeRepairMaterialsAction(
     const user = await requireCurrentUser(await headers());
     return await contributeRepairMaterials(user.id, request.data.characterId, {
       targetId: request.data.targetId,
-      expectedRefinedFerrite: request.data.expectedRefinedFerrite,
-      expectedSlag: request.data.expectedSlag,
+      expectedMaterials: request.data.expectedMaterials,
     });
   } catch (error) {
     if (error instanceof OwnershipError) return { error: error.message };

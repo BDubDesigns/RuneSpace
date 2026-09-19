@@ -115,8 +115,13 @@ export const DiscardInventoryStackRequestSchema = z.object({
 export const RepairMaterialContributionRequestSchema = z.object({
   characterId: z.string().uuid(),
   targetId: RepairTargetIdSchema,
-  expectedRefinedFerrite: z.number().int().nonnegative(),
-  expectedSlag: z.number().int().nonnegative(),
+  /**
+   * The exact useful quantity per item ID the client believed it was
+   * committing (#209). Generic rather than a Refined-Ferrite/Slag pair, so a
+   * recipe wanting Power Cells needs no new request field. The server
+   * recomputes the useful plan and refuses on any mismatch.
+   */
+  expectedMaterials: z.record(ContentId, z.number().int().nonnegative()),
 });
 
 /** Starting or stopping Welding names only the character and the repair target. */

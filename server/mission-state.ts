@@ -18,7 +18,12 @@ import { REPAIR_TARGETS } from "@/game/content/repair-targets";
 import { WORK_ORDERS } from "@/game/content/work-orders";
 import { validateWorkOrderDefinitions } from "@/game/domain/work-orders";
 import { validateRepairTargets } from "@/game/domain/repair-targets";
-import { repairComplete, type RepairTargetState } from "@/game/domain/welding-repair";
+import {
+  repairComplete,
+  repairMaterialProgress,
+  type RepairTargetState,
+} from "@/game/domain/welding-repair";
+import { UNSTARTED_REPAIR } from "@/server/welding";
 import type { RepairTargetObservation } from "@/game/domain/missions";
 import { validateConversationTopics } from "@/game/domain/conversation";
 import { validateLocalPlaceAccess } from "@/game/domain/local-places";
@@ -322,18 +327,13 @@ export function repairTargetObservations(
         target.id,
         {
           complete: repair ? repairComplete(repair) : false,
-          materials: [
-            {
-              itemId: balance.items.refinedFerrite.itemId,
-              contributed: repair?.refinedFerriteContributed ?? 0,
-              required: recipe.refinedFerriteRequired,
-            },
-            {
-              itemId: balance.items.slag.itemId,
-              contributed: repair?.slagContributed ?? 0,
-              required: recipe.slagRequired,
-            },
-          ].filter((material) => material.required > 0),
+          // Derived generically from the authored recipe (#209), so a Mission
+          // observing Deep Jag's Power Cells needs no new observation field.
+          materials: repairMaterialProgress(repair ?? UNSTARTED_REPAIR, recipe).map((row) => ({
+            itemId: row.itemId,
+            contributed: row.contributed,
+            required: row.required,
+          })),
           welding: {
             completed: repair?.weldingProgress ?? 0,
             required: recipe.repairIncrements,

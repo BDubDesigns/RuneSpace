@@ -46,6 +46,14 @@ export const REPAIR_TARGETS: readonly RepairTargetDefinition[] = [
     localPlaceId: LOCAL_PLACE_IDS.holoHollowCrewStop,
     authorizingMissionId: MISSION_IDS.outOfTheWeather,
   },
+  {
+    // Deep Jag's cave-in (#209). Its completion is the authoritative fact the
+    // location-state boundary reads to open the mine; nothing else records it.
+    id: REPAIR_TARGET_IDS.deepJagCaveIn,
+    displayName: "Collapsed Passage",
+    locationId: LOCATION_IDS.deepJag,
+    authorizingMissionId: MISSION_IDS.braceYourself,
+  },
 ] as const satisfies readonly RepairTargetDefinition[];
 
 const byId = new Map<string, RepairTargetDefinition>(

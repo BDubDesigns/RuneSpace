@@ -465,7 +465,14 @@ export const characterMiningState = pgTable("character_mining_state", {
   lastStopReason: text("last_stop_reason"),
   runAttempts: integer("run_attempts").notNull().default(0),
   runSuccesses: integer("run_successes").notNull().default(0),
-  runShaleGained: integer("run_shale_gained").notNull().default(0),
+  /**
+   * What this run has produced, as `{ itemId: quantity }` (#209).
+   *
+   * Replaced `run_shale_gained`: Mining is source-driven now, so a run at Deep
+   * Jag produces Galvanite and a single Ferrite-shaped counter could not say
+   * so. A map rather than a second column keeps a third source free.
+   */
+  runItemsGained: jsonb("run_items_gained").notNull().default({}),
   runXpGained: integer("run_xp_gained").notNull().default(0),
   /** Latest ten immutable server-resolved attempt summaries for the current run. */
   recentAttempts: jsonb("recent_attempts").notNull().default([]),
@@ -480,9 +487,14 @@ export const characterRefiningState = pgTable("character_refining_state", {
   lastStopReason: text("last_stop_reason"),
   runAttempts: integer("run_attempts").notNull().default(0),
   runSuccesses: integer("run_successes").notNull().default(0),
-  runFerriteGained: integer("run_ferrite_gained").notNull().default(0),
-  runSlagGained: integer("run_slag_gained").notNull().default(0),
-  runShaleConsumed: integer("run_shale_consumed").notNull().default(0),
+  /**
+   * This run's totals, as `{ itemId: quantity }` maps (#209). Replaced the
+   * three Ferrite-specific counters: with three authored recipes, what a run
+   * consumed and produced depends on the recipe, and a Galvaferrite failure
+   * returns an input rather than producing Slag.
+   */
+  runOutputsGained: jsonb("run_outputs_gained").notNull().default({}),
+  runInputsConsumed: jsonb("run_inputs_consumed").notNull().default({}),
   runXpGained: integer("run_xp_gained").notNull().default(0),
   /** Latest ten immutable server-resolved refining attempt summaries for the current run. */
   recentAttempts: jsonb("recent_attempts").notNull().default([]),
@@ -511,8 +523,21 @@ export const characterRepairTargets = pgTable(
       .notNull()
       .references(() => characters.id, { onDelete: "restrict" }),
     targetId: text("target_id").notNull(),
-    refinedFerriteContributed: integer("refined_ferrite_contributed").notNull().default(0),
-    slagContributed: integer("slag_contributed").notNull().default(0),
+    /**
+     * Contributed material, as `{ itemId: quantity }` (#209).
+     *
+     * Replaced the `refined_ferrite_contributed` / `slag_contributed` pair.
+     * Deep Jag's brace wants Refined Ferrite and Power Cells, and adding a
+     * `power_cells_contributed` column would have meant a new column for every
+     * future recipe. A map on the same row also keeps a contribution a single
+     * atomic row update, which is what makes a retried or concurrent
+     * contribution unable to double-remove carried items.
+     *
+     * This layer still imports no game content: the recipe's caps are enforced
+     * by the domain, which clamps every contribution against the target's
+     * authoritative spec.
+     */
+    materials: jsonb("materials").notNull().default({}),
     weldingProgress: integer("welding_progress").notNull().default(0),
     /**
      * Clean Pass (#190, generalized by #207). A repair is ONE Welding work
@@ -536,11 +561,15 @@ export const characterRepairTargets = pgTable(
   },
   (table) => [
     primaryKey({ columns: [table.characterId, table.targetId] }),
+    // Structural only, as the two integer columns were. PostgreSQL forbids a
+    // subquery in a CHECK, so per-value non-negativity cannot be expressed here
+    // the way `>= 0` was on a plain column; the domain clamps every
+    // contribution against the target's authoritative recipe, and
+    // `tests/integration/deep-jag.test.ts` covers the bound directly.
     check(
-      "character_repair_targets_refined_ferrite_non_negative",
-      sql`${table.refinedFerriteContributed} >= 0`,
+      "character_repair_targets_materials_object",
+      sql`jsonb_typeof(${table.materials}) = 'object'`,
     ),
-    check("character_repair_targets_slag_non_negative", sql`${table.slagContributed} >= 0`),
     check("character_repair_targets_welding_non_negative", sql`${table.weldingProgress} >= 0`),
     // A completed repair always has resolved Welding work behind it. The exact
     // increment count is the target's own recipe and is enforced in the domain.

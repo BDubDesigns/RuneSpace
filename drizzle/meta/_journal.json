@@ -155,6 +155,20 @@
       "when": 1789675631346,
       "tag": "0021_work_orders_and_generalized_clean_pass",
       "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "7",
+      "when": 1789781072589,
+      "tag": "0022_deep_jag_generic_materials",
+      "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1789781073426,
+      "tag": "0023_deep_jag_drop_legacy_material_columns",
+      "breakpoints": true
     }
   ]
 }

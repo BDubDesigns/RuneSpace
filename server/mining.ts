@@ -8,14 +8,20 @@ import {
   inventoryStacks,
   itemInstances,
 } from "@/db/rune-space";
-import { getEffectiveGameBalance, miningLevelThresholds } from "@/game/config/balance";
-import { ACTION_IDS, SKILL_IDS } from "@/game/config/foundations";
+import {
+  getEffectiveGameBalance,
+  miningLevelThresholds,
+  miningActionIds,
+  miningSourceForActionId,
+  type MiningSourceBalance,
+} from "@/game/config/balance";
+import { SKILL_IDS } from "@/game/config/foundations";
 import {
   miningSuccessChanceBps,
   miningPreflightStopReason,
   normalizeCutterCharge,
   boostedMiningAttemptDurationTicks,
-  resolveFerriteShaleMining,
+  resolveMining,
   type MiningRandom,
   type MiningResolution,
   type MiningStopReason,
@@ -53,13 +59,19 @@ export function defaultMiningRandom(): MiningRandom {
     : systemRandom;
 }
 
+/**
+ * One durable run attempt. `itemId` / `quantityAwarded` replaced the original
+ * `shaleAwarded` (#209): a run at Deep Jag awards Galvanite, so neither this
+ * record nor the surface that renders it may assume Ferrite Shale.
+ */
 export type MiningRunAttempt = {
   sequence: number;
   resolvedAt: string;
   success: boolean;
   rolledBasisPoints: number;
   thresholdBasisPoints: number;
-  shaleAwarded: number;
+  itemId: string;
+  quantityAwarded: number;
   xpAwarded: number;
   boosted: boolean;
   durationTicks: number;
@@ -71,7 +83,8 @@ export type MiningRunState = {
   attempts: number;
   successes: number;
   failures: number;
-  shaleGained: number;
+  /** What this run has produced, keyed by item ID. */
+  itemsGained: Readonly<Record<string, number>>;
   xpGained: number;
   recentAttempts: readonly MiningRunAttempt[];
 };
@@ -103,6 +116,7 @@ export type MiningSnapshot = {
 
 export type PersistedMiningOutcome = MiningResolution<string> & {
   characterId: string;
+  source: MiningSourceBalance;
   cutterInstanceId?: string;
   cutterChargeBefore: number;
   attemptResolvedAt: readonly string[];
@@ -153,18 +167,24 @@ export function createMiningResolver(
   onOutcome?: (outcome: PersistedMiningOutcome) => void,
 ): ActionResolver<MiningSnapshot, PersistedMiningOutcome> {
   return {
-    supports: (action) => action.actionId === ACTION_IDS.ferriteShaleMining,
+    supports: (action) => miningActionIds().includes(action.actionId),
     load: async (transaction, { character }) => loadMiningSnapshot(transaction, character.id),
     resolve: ({ action, snapshot, window }) => {
-      const resolved = resolveFerriteShaleMining({
+      // The durable action row IS the source identity, so a lazily-resolved or
+      // offline run awards the ore the player actually started on (#209).
+      const source = miningSourceForActionId(action.actionId);
+      if (!source) throw new Error(`No Mining source authors action "${action.actionId}"`);
+      const resolved = resolveMining({
         elapsedTicks: window.elapsedTicks,
         snapshot,
         balance: getEffectiveGameBalance(),
+        source,
         random,
       });
       let cumulativeAttemptTicks = 0;
       const outcome: PersistedMiningOutcome = {
         characterId: action.characterId,
+        source,
         ...resolved,
         cutterInstanceId: snapshot.equippedCutterInstanceId,
         cutterChargeBefore: snapshot.cutterCharge,
@@ -232,14 +252,21 @@ export function createMiningResolver(
           ...attempt,
         }));
         const recentAttempts = [...existing, ...appended].slice(-10);
+        const itemsGained: Record<string, number> = {
+          ...((state.runItemsGained ?? {}) as Record<string, number>),
+        };
+        for (const attempt of appended) {
+          if (attempt.quantityAwarded > 0) {
+            itemsGained[attempt.itemId] =
+              (itemsGained[attempt.itemId] ?? 0) + attempt.quantityAwarded;
+          }
+        }
         await transaction
           .update(characterMiningState)
           .set({
             runAttempts: state.runAttempts + outcome.attempts.length,
             runSuccesses: state.runSuccesses + outcome.successes,
-            runShaleGained:
-              state.runShaleGained +
-              appended.reduce((total, attempt) => total + attempt.shaleAwarded, 0),
+            runItemsGained: itemsGained,
             runXpGained: state.runXpGained + outcome.awardedXp,
             recentAttempts,
             updatedAt: new Date(),

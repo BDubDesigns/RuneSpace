@@ -38,8 +38,7 @@ export type PersistedWeldingOutcome = WeldingResolution & {
 
 /** The zero state of a repair target that has never been worked on. */
 export const UNSTARTED_REPAIR: RepairTargetState = {
-  refinedFerriteContributed: 0,
-  slagContributed: 0,
+  materials: {},
   weldingProgress: 0,
   cleanPass: UNROLLED_CLEAN_PASS,
   completedAt: null,
@@ -84,8 +83,7 @@ export function repairStateFromRow(
 ): RepairTargetState {
   if (!row) return UNSTARTED_REPAIR;
   return {
-    refinedFerriteContributed: row.refinedFerriteContributed,
-    slagContributed: row.slagContributed,
+    materials: (row.materials ?? {}) as Record<string, number>,
     weldingProgress: row.weldingProgress,
     cleanPass: repairCleanPassFromRow(row),
     completedAt: row.completedAt,
