@@ -1,4 +1,4 @@
-import type { EffectiveGameBalance } from "@/game/config/balance";
+import type { EffectiveGameBalance, RefiningRecipeBalance } from "@/game/config/balance";
 import {
   planPossibleAwardAdditions,
   planStackAddition,
@@ -7,55 +7,89 @@ import {
 
 export const REFINING_STOP_REASONS = [
   "manually_stopped",
-  "insufficient_ferrite_shale",
+  /**
+   * Generalized from the original `insufficient_ferrite_shale` (#209). A recipe
+   * now authors its own inputs, so the reason names the situation and the
+   * surface names the actual missing material from the recipe.
+   */
+  "insufficient_inputs",
   "inventory_slots_full",
   "carried_mass_capacity_reached",
   "action_replaced",
 ] as const;
 export type RefiningStopReason = (typeof REFINING_STOP_REASONS)[number];
 
-export type RefiningRandom = { nextBasisPoints(): number };
-
 /**
- * The authoritative award facts for Refining: the input it consumes and the
- * two possible outputs one attempt can produce, authored success-output-first
- * (Refined Ferrite on success, Slag on failure). The resolver and mission-guidance
- * recommendation validation both read THIS function, so what Refining
- * authoritatively consumes/produces has exactly one home — changing the
- * resolver's award cannot leave guidance validation stale.
+ * `nextBasisPoints` decides success. `nextUnit` is consulted only by a recipe
+ * whose failure hands one input back, to choose which one — it is never rolled
+ * for a recipe with fixed failure outputs, so the shipped Refined Ferrite
+ * recipe's random stream is byte-for-byte what it was.
  */
-export function refiningAwardFacts(balance: EffectiveGameBalance) {
-  return {
-    inputItemId: balance.items.ferriteShale.itemId,
-    inputQuantity: balance.refining.inputFerriteShale,
-    inputMassGrams: balance.items.ferriteShale.massGrams,
-    outputs: [
-      {
-        itemId: balance.items.refinedFerrite.itemId,
-        stackLimit: balance.items.refinedFerrite.stackLimit,
-        massGrams: balance.items.refinedFerrite.massGrams,
-      },
-      {
-        itemId: balance.items.slag.itemId,
-        stackLimit: balance.items.slag.stackLimit,
-        massGrams: balance.items.slag.massGrams,
-      },
-    ],
-  } as const;
+export type RefiningRandom = { nextBasisPoints(): number; nextUnit?: () => number };
+
+export type RefiningItemQuantity = { itemId: string; quantity: number };
+
+/** The storage facts for one item, read from the authoritative item registry. */
+function stackFacts(balance: EffectiveGameBalance, itemId: string) {
+  const item = Object.values(balance.items).find((candidate) => candidate.itemId === itemId);
+  if (!item || !("stackLimit" in item)) {
+    throw new Error(`Refining references unstackable or unknown item "${itemId}"`);
+  }
+  return { itemId, stackLimit: item.stackLimit, massGrams: item.massGrams };
 }
 
-export function refiningSuccessChanceBps(level: number, balance: EffectiveGameBalance): number {
+/**
+ * The authoritative facts for one Refining recipe: what it consumes, what a
+ * success produces, and every mutually exclusive thing a failure can produce.
+ * The resolver, the preflight, and mission-guidance recommendation validation
+ * all read THIS function, so a recipe's inputs and outputs have exactly one
+ * home.
+ *
+ * `failureOutcomes` is a list of mutually exclusive branches, each itself a
+ * list of simultaneous awards. A fixed-output failure has one branch (Slag);
+ * a one-input-returned failure has one branch per input, because exactly one
+ * of them comes back.
+ */
+export function refiningAwardFacts(balance: EffectiveGameBalance, recipe: RefiningRecipeBalance) {
+  const inputs = recipe.inputs.map((input) => ({
+    ...stackFacts(balance, input.itemId),
+    quantity: input.quantity,
+  }));
+  const successOutputs = [
+    { ...stackFacts(balance, recipe.outputItemId), quantity: recipe.outputQuantity },
+  ];
+  const failureOutcomes =
+    recipe.failure.kind === "fixed_outputs"
+      ? [
+          recipe.failure.outputs.map((output) => ({
+            ...stackFacts(balance, output.itemId),
+            quantity: output.quantity,
+          })),
+        ]
+      : recipe.inputs.map((input) => [{ ...stackFacts(balance, input.itemId), quantity: 1 }]);
+  return { inputs, successOutputs, failureOutcomes } as const;
+}
+
+/**
+ * The success chance for one recipe at one Refining level, on the shared
+ * whole-basis-point interpolation model.
+ */
+export function refiningSuccessChanceBps(level: number, recipe: RefiningRecipeBalance): number {
   if (!Number.isInteger(level) || level < 1)
     throw new RangeError("Refining level must be positive");
-  const refining = balance.refining;
   return Math.min(
     10_000,
-    refining.successAtLevelOneBps +
+    recipe.successAtLevelOneBps +
       Math.floor(
-        ((Math.min(level, refining.guaranteedSuccessLevel) - 1) * refining.successRangeBps) /
-          (refining.guaranteedSuccessLevel - 1),
+        ((Math.min(level, recipe.guaranteedSuccessLevel) - 1) * recipe.successRangeBps) /
+          (recipe.guaranteedSuccessLevel - 1),
       ),
   );
+}
+
+/** Whether a character's Refining level authorizes this recipe at all. */
+export function refiningRecipeUnlocked(level: number, recipe: RefiningRecipeBalance): boolean {
+  return level >= recipe.minimumLevel;
 }
 
 export type RefiningSnapshot<Id = string> = {
@@ -65,13 +99,18 @@ export type RefiningSnapshot<Id = string> = {
   massAvailableGrams: number;
 };
 
+/**
+ * One resolved attempt. The original Ferrite-specific `ferriteAwarded` /
+ * `slagAwarded` / `shaleConsumed` fields became generic lists (#209), because
+ * a Galvaferrite failure returns an input rather than producing Slag and no
+ * fixed trio of counters could describe that.
+ */
 export type RefiningResolvedAttempt = {
   success: boolean;
   rolledBasisPoints: number;
   thresholdBasisPoints: number;
-  ferriteAwarded: number;
-  slagAwarded: number;
-  shaleConsumed: number;
+  consumed: readonly RefiningItemQuantity[];
+  awarded: readonly RefiningItemQuantity[];
   xpAwarded: number;
   durationTicks: number;
 };
@@ -81,9 +120,9 @@ export type RefiningResolution<Id = string> = {
   attempts: number;
   successes: number;
   failures: number;
-  shaleConsumed: number;
-  ferriteGained: number;
-  slagGained: number;
+  /** Totals for this resolution window, keyed by item ID. */
+  inputsConsumed: Readonly<Record<string, number>>;
+  outputsGained: Readonly<Record<string, number>>;
   awardedXp: number;
   stackUpdates: readonly { id: Id; quantity: number }[];
   /** Stacks whose quantity dropped to zero and must be deleted. */
@@ -100,52 +139,47 @@ function totalQuantityForItem<Id>(stacks: readonly StackState<Id>[], itemId: str
   );
 }
 
-type SimulatedRemoval<Id> = {
-  stacksAfter: StackState<Id>[];
+type WorkingStack<Id> = StackState<Id> & { persisted: boolean };
+
+type RemovalPlan<Id> = {
+  stacksAfter: WorkingStack<Id>[];
   slotsAvailableAfter: number;
   massAvailableAfter: number;
-  canConsume: boolean;
-};
-
-type ShaleRemovalDetail<Id> = {
-  simulated: SimulatedRemoval<Id>;
-  consumedStackIds: Id[];
-  partiallyReducedStack?: { id: Id; remainingQuantity: number };
 };
 
 /**
- * Deterministic shale removal plan reused by preflight and authoritative consumption.
- * When a slot must be freed for the output, prefer exhausting the smallest shale
- * stack so fragmentation order does not decide feasibility.
+ * Deterministic removal plan for ONE input item, reused by preflight and by
+ * authoritative consumption so the two can never disagree.
+ *
+ * When a slot must be freed for the output, prefer exhausting the smallest
+ * stack so fragmentation order does not decide feasibility. This is the
+ * shipped Ferrite Shale behaviour, unchanged — it simply takes the item as a
+ * parameter now.
  */
-function planShaleRemoval<Id>(
-  existingStacks: readonly StackState<Id>[],
+function planItemRemoval<Id>(
+  stacks: readonly WorkingStack<Id>[],
   slotsAvailable: number,
   massAvailableGrams: number,
-  shaleItemId: string,
+  itemId: string,
   quantityToConsume: number,
   massPerUnit: number,
-): ShaleRemovalDetail<Id> | undefined {
-  const shaleStacks = existingStacks.filter((s) => s.itemId === shaleItemId);
-  const total = shaleStacks.reduce((sum, s) => sum + s.quantity, 0);
+): RemovalPlan<Id> | undefined {
+  const matching = stacks.filter((stack) => stack.itemId === itemId);
+  const total = matching.reduce((sum, stack) => sum + stack.quantity, 0);
   if (total < quantityToConsume) return undefined;
 
-  const otherStacks = existingStacks.filter((s) => s.itemId !== shaleItemId);
-
-  // Two orderings: original input order, and capacity-aware (smallest first)
-  const orderings: Array<readonly StackState<Id>[]> = [
-    [...shaleStacks],
-    [...shaleStacks].sort(
+  const others = stacks.filter((stack) => stack.itemId !== itemId);
+  const orderings: Array<readonly WorkingStack<Id>[]> = [
+    [...matching],
+    [...matching].sort(
       (a, b) => a.quantity - b.quantity || String(a.id).localeCompare(String(b.id)),
     ),
   ];
 
-  const candidates: ShaleRemovalDetail<Id>[] = [];
+  const candidates: RemovalPlan<Id>[] = [];
   for (const ordering of orderings) {
     let remaining = quantityToConsume;
-    const kept: StackState<Id>[] = [];
-    const consumedIds: Id[] = [];
-    let partiallyReduced: { id: Id; remainingQuantity: number } | undefined;
+    const kept: WorkingStack<Id>[] = [];
     let freedSlots = 0;
     for (const stack of ordering) {
       if (remaining === 0) {
@@ -154,157 +188,213 @@ function planShaleRemoval<Id>(
       }
       if (stack.quantity <= remaining) {
         remaining -= stack.quantity;
-        consumedIds.push(stack.id);
         freedSlots += 1;
       } else {
-        const remainingQty = stack.quantity - remaining;
-        kept.push({ ...stack, quantity: remainingQty });
-        partiallyReduced = { id: stack.id, remainingQuantity: remainingQty };
+        kept.push({ ...stack, quantity: stack.quantity - remaining });
         remaining = 0;
       }
     }
     if (remaining !== 0) continue;
-    const stacksAfter: StackState<Id>[] = [...otherStacks.map((s) => ({ ...s })), ...kept];
     candidates.push({
-      simulated: {
-        stacksAfter,
-        slotsAvailableAfter: slotsAvailable + freedSlots,
-        massAvailableAfter: massAvailableGrams + quantityToConsume * massPerUnit,
-        canConsume: true,
-      },
-      consumedStackIds: consumedIds,
-      partiallyReducedStack: partiallyReduced,
+      stacksAfter: [...others.map((stack) => ({ ...stack })), ...kept],
+      slotsAvailableAfter: slotsAvailable + freedSlots,
+      massAvailableAfter: massAvailableGrams + quantityToConsume * massPerUnit,
     });
   }
 
   if (!candidates.length) return undefined;
-  // Prefer the plan that frees a slot; if both or neither do, prefer deterministic sorted order
-  const freeing = candidates.filter((c) => c.simulated.slotsAvailableAfter > slotsAvailable);
+  const freeing = candidates.filter((plan) => plan.slotsAvailableAfter > slotsAvailable);
   if (freeing.length === 1) return freeing[0];
-  if (freeing.length === 2) {
-    // Both free a slot — prefer the sorted (second) one for determinism
-    return candidates[1];
-  }
-  // Neither frees a slot — return the sorted plan for determinism
+  // Both free a slot, or neither does — prefer the sorted plan for determinism.
   return candidates[1] ?? candidates[0];
 }
 
-function simulateRemoval<Id>(
-  existingStacks: readonly StackState<Id>[],
+/** Remove every authored input of a recipe, in authored order. */
+function planRecipeInputRemoval<Id>(
+  stacks: readonly WorkingStack<Id>[],
   slotsAvailable: number,
   massAvailableGrams: number,
-  itemId: string,
-  quantityToConsume: number,
-  massPerUnit: number,
-): SimulatedRemoval<Id> {
-  let remaining = quantityToConsume;
-  const next: StackState<Id>[] = [];
-  let freedSlots = 0;
-  for (const stack of existingStacks) {
-    if (stack.itemId !== itemId || remaining === 0) {
-      next.push({ ...stack });
-      continue;
-    }
-    if (stack.quantity <= remaining) {
-      remaining -= stack.quantity;
-      freedSlots += 1;
-      // fully consumed — do not push
-    } else {
-      next.push({ ...stack, quantity: stack.quantity - remaining });
-      remaining = 0;
-    }
-  }
-  if (remaining > 0)
-    return {
-      stacksAfter: [...existingStacks.map((s) => ({ ...s }))],
-      slotsAvailableAfter: slotsAvailable,
-      massAvailableAfter: massAvailableGrams,
-      canConsume: false,
-    };
-  return {
-    stacksAfter: next,
-    slotsAvailableAfter: slotsAvailable + freedSlots,
-    massAvailableAfter: massAvailableGrams + quantityToConsume * massPerUnit,
-    canConsume: true,
+  inputs: readonly { itemId: string; quantity: number; massGrams: number }[],
+): RemovalPlan<Id> | undefined {
+  let current: RemovalPlan<Id> = {
+    stacksAfter: stacks.map((stack) => ({ ...stack })),
+    slotsAvailableAfter: slotsAvailable,
+    massAvailableAfter: massAvailableGrams,
   };
+  for (const input of inputs) {
+    const next = planItemRemoval(
+      current.stacksAfter,
+      current.slotsAvailableAfter,
+      current.massAvailableAfter,
+      input.itemId,
+      input.quantity,
+      input.massGrams,
+    );
+    if (!next) return undefined;
+    current = next;
+  }
+  return current;
 }
 
 /** Shared preflight for starting and resolving a Refining attempt. */
 export function refiningPreflightStopReason<Id>(
   snapshot: RefiningSnapshot<Id>,
   balance: EffectiveGameBalance,
+  recipe: RefiningRecipeBalance,
 ): RefiningStopReason | undefined {
-  const award = refiningAwardFacts(balance);
-  const shaleItemId = award.inputItemId;
-  const inputQty = award.inputQuantity;
+  const award = refiningAwardFacts(balance, recipe);
 
-  const totalShale = totalQuantityForItem(snapshot.existingStacks, shaleItemId);
-  if (totalShale < inputQty) return "insufficient_ferrite_shale";
+  for (const input of award.inputs) {
+    if (totalQuantityForItem(snapshot.existingStacks, input.itemId) < input.quantity) {
+      return "insufficient_inputs";
+    }
+  }
 
-  const plan = planShaleRemoval(
-    snapshot.existingStacks,
+  const working: WorkingStack<Id>[] = snapshot.existingStacks.map((stack) => ({
+    ...stack,
+    persisted: true,
+  }));
+  const removal = planRecipeInputRemoval(
+    working,
     snapshot.slotsAvailable,
     snapshot.massAvailableGrams,
-    shaleItemId,
-    inputQty,
-    award.inputMassGrams,
+    award.inputs,
   );
-  if (!plan) return "insufficient_ferrite_shale";
-  const removal = plan.simulated;
+  if (!removal) return "insufficient_inputs";
 
-  // After removing inputs, every mutually exclusive output branch must fit
-  // independently before the success roll is requested.
-  const possibleAwards = planPossibleAwardAdditions(
-    removal.stacksAfter,
-    award.outputs.map((output) => ({
-      itemId: output.itemId,
-      quantity: 1,
-      stackLimit: output.stackLimit,
-      itemWeight: output.massGrams,
-    })),
-    removal.slotsAvailableAfter,
-    removal.massAvailableAfter,
-  );
-  if (possibleAwards.ok) return undefined;
-  return possibleAwards.reason === "mass"
-    ? "carried_mass_capacity_reached"
-    : "inventory_slots_full";
+  // After removing inputs, every mutually exclusive outcome must fit
+  // independently before the success roll is requested. A branch that awards
+  // several items at once must fit all of them together.
+  let slotsShortfall = false;
+  for (const outcome of [award.successOutputs, ...award.failureOutcomes]) {
+    const possible = planPossibleAwardAdditions(
+      removal.stacksAfter,
+      [
+        outcome.map((output) => ({
+          itemId: output.itemId,
+          quantity: output.quantity,
+          stackLimit: output.stackLimit,
+          itemWeight: output.massGrams,
+        })),
+      ].flat(),
+      removal.slotsAvailableAfter,
+      removal.massAvailableAfter,
+    );
+    if (!possible.ok) {
+      if (possible.reason === "mass") return "carried_mass_capacity_reached";
+      slotsShortfall = true;
+    }
+  }
+  return slotsShortfall ? "inventory_slots_full" : undefined;
+}
+
+function addAwards<Id>(
+  stacks: WorkingStack<Id>[],
+  awards: readonly { itemId: string; quantity: number; stackLimit: number; massGrams: number }[],
+  slotsAvailable: number,
+  massAvailableGrams: number,
+  attemptIndex: number,
+): { slotsAvailable: number; massAvailableGrams: number } {
+  let slots = slotsAvailable;
+  let mass = massAvailableGrams;
+  for (const awarded of awards) {
+    const plan = planStackAddition(
+      stacks,
+      awarded.itemId,
+      awarded.quantity,
+      awarded.stackLimit,
+      slots,
+      mass,
+      awarded.massGrams,
+    );
+    if (plan.remainingQuantity !== 0) {
+      throw new Error(`Refining award plan for "${awarded.itemId}" failed after preflight`);
+    }
+    for (const update of plan.updatedStacks) {
+      const stack = stacks.find((candidate) => String(candidate.id) === String(update.id));
+      if (stack) stack.quantity = update.quantity;
+    }
+    for (const created of plan.createdStacks) {
+      stacks.push({
+        id: `refining-temp-${attemptIndex}-${stacks.length}-${created.itemId}` as unknown as Id,
+        ...created,
+        persisted: false,
+      });
+    }
+    slots -= plan.createdStacks.length;
+    mass -= awarded.quantity * awarded.massGrams;
+  }
+  return { slotsAvailable: slots, massAvailableGrams: mass };
 }
 
 export function resolveRefining<Id>(input: {
   elapsedTicks: number;
   snapshot: RefiningSnapshot<Id>;
   balance: EffectiveGameBalance;
+  recipe: RefiningRecipeBalance;
   random: RefiningRandom;
 }): RefiningResolution<Id> {
-  const { balance, snapshot, random } = input;
+  const { balance, snapshot, recipe, random } = input;
   if (!Number.isInteger(input.elapsedTicks) || input.elapsedTicks < 0)
     throw new RangeError("Elapsed ticks must be a non-negative integer");
 
-  const durationTicks = balance.refining.attemptDurationTicks;
-  // Award facts live in refiningAwardFacts; the resolver consumes them. The
-  // outputs are authored success-output-first (Refined Ferrite on success,
-  // Slag on failure).
-  const award = refiningAwardFacts(balance);
-  const shaleItemId = award.inputItemId;
-  const inputShale: number = award.inputQuantity;
-  const shaleMass = award.inputMassGrams;
-  const [refinedOutput, slagOutput] = award.outputs;
-  const refinedItemId = refinedOutput.itemId;
-  const slagItemId = slagOutput.itemId;
-  const refinedMass = refinedOutput.massGrams;
-  const slagMass = slagOutput.massGrams;
+  const durationTicks = recipe.attemptDurationTicks;
+  const award = refiningAwardFacts(balance, recipe);
 
-  const initialStop = refiningPreflightStopReason(snapshot, balance);
+  const inputsConsumed: Record<string, number> = {};
+  const outputsGained: Record<string, number> = {};
+  let stacks: WorkingStack<Id>[] = snapshot.existingStacks.map((stack) => ({
+    ...stack,
+    persisted: true,
+  }));
+  let slotsAvailable = snapshot.slotsAvailable;
+  let massAvailableGrams = snapshot.massAvailableGrams;
+  let consumedTicks = 0;
+  let remainingTicks = input.elapsedTicks;
+  let successes = 0;
+  let failures = 0;
+  const resolvedAttempts: RefiningResolvedAttempt[] = [];
+  const thresholdBasisPoints = refiningSuccessChanceBps(snapshot.refiningLevel, recipe);
+
+  const awardedXp = () => successes * recipe.successXp + failures * recipe.failureXp;
+  const finish = (stopReason?: RefiningStopReason): RefiningResolution<Id> => {
+    const remainingIds = new Set(
+      stacks.filter((stack) => stack.persisted).map((stack) => String(stack.id)),
+    );
+    return {
+      consumedTicks,
+      attempts: successes + failures,
+      successes,
+      failures,
+      inputsConsumed,
+      outputsGained,
+      awardedXp: awardedXp(),
+      stackUpdates: stacks
+        .filter((stack) => stack.persisted)
+        .map(({ id, quantity }) => ({ id, quantity })),
+      deletedStackIds: snapshot.existingStacks
+        .filter((stack) => !remainingIds.has(String(stack.id)))
+        .map((stack) => stack.id),
+      createdStacks: stacks
+        .filter((stack) => !stack.persisted)
+        .map(({ itemId, quantity }) => ({ itemId, quantity })),
+      resolvedAttempts,
+      ...(stopReason ? { stopReason } : {}),
+    };
+  };
+
+  // A run that cannot even start writes nothing. The loop's own stop echoes
+  // the stacks it has been working on, but there is no working copy yet here,
+  // so persisting one would be a no-op UPDATE per carried stack.
+  const initialStop = refiningPreflightStopReason(snapshot, balance, recipe);
   if (initialStop) {
     return {
       consumedTicks: 0,
       attempts: 0,
       successes: 0,
       failures: 0,
-      shaleConsumed: 0,
-      ferriteGained: 0,
-      slagGained: 0,
+      inputsConsumed: {},
+      outputsGained: {},
       awardedXp: 0,
       stackUpdates: [],
       deletedStackIds: [],
@@ -314,195 +404,90 @@ export function resolveRefining<Id>(input: {
     };
   }
 
-  // Mutable working state: track persisted flag for diffing.
-  type WorkingStack = StackState<Id> & { persisted: boolean };
-  let stacks: WorkingStack[] = snapshot.existingStacks.map((s) => ({ ...s, persisted: true }));
-  let slotsAvailable = snapshot.slotsAvailable;
-  let massAvailableGrams = snapshot.massAvailableGrams;
-  let consumedTicks = 0;
-  let remainingTicks = input.elapsedTicks;
-  let successes = 0;
-  let failures = 0;
-  let shaleConsumed = 0;
-  let ferriteGained = 0;
-  let slagGained = 0;
-  const resolvedAttempts: RefiningResolvedAttempt[] = [];
-  const thresholdBasisPoints = refiningSuccessChanceBps(snapshot.refiningLevel, balance);
-
   while (true) {
-    const currentSnapshot: RefiningSnapshot<Id> = {
-      refiningLevel: snapshot.refiningLevel,
-      existingStacks: stacks,
-      slotsAvailable,
-      massAvailableGrams,
-    };
-    const stopReason = refiningPreflightStopReason(currentSnapshot, balance);
-    if (stopReason) {
-      const persistedUpdates = stacks
-        .filter((s) => s.persisted)
-        .map(({ id, quantity }) => ({ id, quantity }));
-      // Identify deleted persisted stacks: those that were in snapshot but no longer present.
-      const snapshotIds = new Set(snapshot.existingStacks.map((s) => String(s.id)));
-      const remainingIds = new Set(stacks.filter((s) => s.persisted).map((s) => String(s.id)));
-      // Also persisted stacks that were removed entirely are deletions.
-      // To get accurate deleted IDs, compare original IDs not present in current stacks.
-      const deletedStackIds: Id[] = snapshot.existingStacks
-        .filter((s) => !remainingIds.has(String(s.id)))
-        .map((s) => s.id);
-      // But also stacks that were persisted and now filtered? Already covered.
-      // Filter snapshotIds vs remaining.
-      void snapshotIds;
-      return {
-        consumedTicks,
-        attempts: successes + failures,
-        successes,
-        failures,
-        shaleConsumed,
-        ferriteGained,
-        slagGained,
-        awardedXp: successes * balance.refining.successXp + failures * balance.refining.failureXp,
-        stackUpdates: persistedUpdates,
-        deletedStackIds,
-        createdStacks: stacks
-          .filter((s) => !s.persisted)
-          .map(({ itemId, quantity }) => ({ itemId, quantity })),
-        resolvedAttempts,
-        stopReason,
-      };
-    }
+    const stopReason = refiningPreflightStopReason(
+      {
+        refiningLevel: snapshot.refiningLevel,
+        existingStacks: stacks,
+        slotsAvailable,
+        massAvailableGrams,
+      },
+      balance,
+      recipe,
+    );
+    if (stopReason) return finish(stopReason);
     if (remainingTicks < durationTicks) break;
     remainingTicks -= durationTicks;
     consumedTicks += durationTicks;
 
-    // Consume 2 shale via deterministic plan (must match preflight's planShaleRemoval)
-    {
-      const detail = planShaleRemoval(
-        stacks,
-        slotsAvailable,
-        massAvailableGrams,
-        shaleItemId,
-        inputShale,
-        shaleMass,
-      );
-      if (!detail) throw new Error("Refining consumed more shale than available after preflight");
-      const { consumedStackIds, partiallyReducedStack } = detail;
-      const nextStacks: WorkingStack[] = [];
-      const consumedSet = new Set(consumedStackIds.map(String));
-      for (const stack of stacks) {
-        if (consumedSet.has(String(stack.id))) {
-          slotsAvailable += 1;
-          continue;
-        }
-        if (partiallyReducedStack && String(stack.id) === String(partiallyReducedStack.id)) {
-          nextStacks.push({ ...stack, quantity: partiallyReducedStack.remainingQuantity });
-          continue;
-        }
-        nextStacks.push(stack);
-      }
-      massAvailableGrams += inputShale * shaleMass;
-      stacks = nextStacks;
-      shaleConsumed += inputShale;
+    const removal = planRecipeInputRemoval(
+      stacks,
+      slotsAvailable,
+      massAvailableGrams,
+      award.inputs,
+    );
+    if (!removal) throw new Error("Refining consumed more input than available after preflight");
+    stacks = removal.stacksAfter;
+    slotsAvailable = removal.slotsAvailableAfter;
+    massAvailableGrams = removal.massAvailableAfter;
+    const consumed = award.inputs.map((item) => ({ itemId: item.itemId, quantity: item.quantity }));
+    for (const item of consumed) {
+      inputsConsumed[item.itemId] = (inputsConsumed[item.itemId] ?? 0) + item.quantity;
     }
 
     const rolledBasisPoints = random.nextBasisPoints();
     const success = rolledBasisPoints < thresholdBasisPoints;
+
+    let branch: readonly {
+      itemId: string;
+      quantity: number;
+      stackLimit: number;
+      massGrams: number;
+    }[];
     if (success) {
-      const plan = planStackAddition(
-        stacks,
-        refinedItemId,
-        1,
-        balance.items.refinedFerrite.stackLimit,
-        slotsAvailable,
-        massAvailableGrams,
-        refinedMass,
-      );
-      if (plan.remainingQuantity !== 0)
-        throw new Error("Refined Ferrite plan failed after preflight");
-      for (const update of plan.updatedStacks) {
-        const stack = stacks.find((candidate) => String(candidate.id) === String(update.id));
-        if (stack) stack.quantity = update.quantity;
-      }
-      for (const created of plan.createdStacks) {
-        stacks.push({
-          id: `refining-temp-${resolvedAttempts.length}-${stacks.length}-${created.itemId}` as unknown as Id,
-          ...created,
-          persisted: false,
-        });
-      }
-      slotsAvailable -= plan.createdStacks.length;
-      massAvailableGrams -= refinedMass;
-      successes += 1;
-      ferriteGained += 1;
-      resolvedAttempts.push({
-        success: true,
-        rolledBasisPoints,
-        thresholdBasisPoints,
-        ferriteAwarded: 1,
-        slagAwarded: 0,
-        shaleConsumed: inputShale,
-        xpAwarded: balance.refining.successXp,
-        durationTicks,
-      });
+      branch = award.successOutputs;
     } else {
-      const plan = planStackAddition(
-        stacks,
-        slagItemId,
-        1,
-        balance.items.slag.stackLimit,
-        slotsAvailable,
-        massAvailableGrams,
-        slagMass,
-      );
-      if (plan.remainingQuantity !== 0) throw new Error("Slag plan failed after preflight");
-      for (const update of plan.updatedStacks) {
-        const stack = stacks.find((candidate) => String(candidate.id) === String(update.id));
-        if (stack) stack.quantity = update.quantity;
-      }
-      for (const created of plan.createdStacks) {
-        stacks.push({
-          id: `refining-temp-${resolvedAttempts.length}-${stacks.length}-${created.itemId}` as unknown as Id,
-          ...created,
-          persisted: false,
-        });
-      }
-      slotsAvailable -= plan.createdStacks.length;
-      massAvailableGrams -= slagMass;
-      failures += 1;
-      slagGained += 1;
-      resolvedAttempts.push({
-        success: false,
-        rolledBasisPoints,
-        thresholdBasisPoints,
-        ferriteAwarded: 0,
-        slagAwarded: 1,
-        shaleConsumed: inputShale,
-        xpAwarded: balance.refining.failureXp,
-        durationTicks,
-      });
+      // A fixed-output failure has exactly one branch. A one-input-returned
+      // failure has one per input, and exactly one of them comes back — chosen
+      // uniformly, with the other lost.
+      const index =
+        award.failureOutcomes.length === 1
+          ? 0
+          : Math.min(
+              award.failureOutcomes.length - 1,
+              Math.floor((random.nextUnit?.() ?? 0) * award.failureOutcomes.length),
+            );
+      const chosen = award.failureOutcomes[index];
+      if (!chosen) throw new Error("Refining recipe authored no failure outcome");
+      branch = chosen;
     }
+
+    const applied = addAwards(
+      stacks,
+      branch,
+      slotsAvailable,
+      massAvailableGrams,
+      resolvedAttempts.length,
+    );
+    slotsAvailable = applied.slotsAvailable;
+    massAvailableGrams = applied.massAvailableGrams;
+    const awarded = branch.map((item) => ({ itemId: item.itemId, quantity: item.quantity }));
+    for (const item of awarded) {
+      outputsGained[item.itemId] = (outputsGained[item.itemId] ?? 0) + item.quantity;
+    }
+
+    if (success) successes += 1;
+    else failures += 1;
+    resolvedAttempts.push({
+      success,
+      rolledBasisPoints,
+      thresholdBasisPoints,
+      consumed,
+      awarded,
+      xpAwarded: success ? recipe.successXp : recipe.failureXp,
+      durationTicks,
+    });
   }
 
-  const persistedUpdates = stacks
-    .filter((s) => s.persisted)
-    .map(({ id, quantity }) => ({ id, quantity }));
-  const deletedStackIds: Id[] = snapshot.existingStacks
-    .filter((s) => !stacks.some((candidate) => String(candidate.id) === String(s.id)))
-    .map((s) => s.id);
-
-  return {
-    consumedTicks,
-    attempts: successes + failures,
-    successes,
-    failures,
-    shaleConsumed,
-    ferriteGained,
-    slagGained,
-    awardedXp: successes * balance.refining.successXp + failures * balance.refining.failureXp,
-    stackUpdates: persistedUpdates,
-    deletedStackIds,
-    createdStacks: stacks
-      .filter((s) => !s.persisted)
-      .map(({ itemId, quantity }) => ({ itemId, quantity })),
-    resolvedAttempts,
-  };
+  return finish();
 }

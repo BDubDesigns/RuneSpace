@@ -96,8 +96,7 @@ suite("Issue #148 Hold It Together backfill (real PostgreSQL)", () => {
       .values({
         characterId: eligible.character.id,
         targetId: REPAIR_TARGET_IDS.cargoHold,
-        refinedFerriteContributed: 15,
-        slagContributed: 6,
+        materials: { [ITEM_IDS.refinedFerrite]: 15, [ITEM_IDS.slag]: 6 },
         weldingProgress: 4,
         completedAt: null,
         updatedAt: now,
@@ -105,8 +104,7 @@ suite("Issue #148 Hold It Together backfill (real PostgreSQL)", () => {
       .returning();
     expect(seeded).toHaveLength(1);
     expect(seeded[0]).toMatchObject({
-      refinedFerriteContributed: 15,
-      slagContributed: 6,
+      materials: { [ITEM_IDS.refinedFerrite]: 15, [ITEM_IDS.slag]: 6 },
       weldingProgress: 4,
       completedAt: null,
     });

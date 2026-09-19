@@ -10,6 +10,8 @@ import {
 } from "@/game/domain/travel";
 import { ticksToMilliseconds } from "@/game/domain/timing";
 import type { ActionResolver } from "@/server/action-resolution";
+import { loadLocationStateFacts } from "@/server/location-state";
+import type { LocationStateFacts } from "@/game/domain/location-state";
 
 export class TravelRuleError extends Error {
   constructor(
@@ -28,6 +30,14 @@ export class TravelRuleError extends Error {
 
 export type TravelSnapshot = {
   travel: CharacterTravelState | undefined;
+  /**
+   * The destination's location-state facts, loaded with the travel row so
+   * arrival validation can refuse a Journey into somewhere the character may
+   * not currently enter (#209). Acceptance is permanent today, so this is a
+   * guard rather than a reachable regression — but it means reachability is
+   * checked at arrival by the same rule that checked it at departure.
+   */
+  locationStateFacts: LocationStateFacts;
 };
 
 export type TravelResolution = {
@@ -54,7 +64,10 @@ export function createTravelResolver(): ActionResolver<TravelSnapshot, TravelRes
         .from(characterTravelState)
         .where(eq(characterTravelState.characterId, character.id))
         .for("update");
-      return { travel: rows[0] };
+      return {
+        travel: rows[0],
+        locationStateFacts: await loadLocationStateFacts(transaction, character.id),
+      };
     },
     resolve: ({ action, snapshot, window }) => {
       // A Travel action without a travel state row is corrupted state.
@@ -152,6 +165,7 @@ export function createTravelResolver(): ActionResolver<TravelSnapshot, TravelRes
           mode: storedMode as TravelMode,
           originLocationId: storedOrigin,
           destinationLocationId: storedDestination,
+          locationStateFacts: await loadLocationStateFacts(transaction, context.character.id),
         })
       ) {
         throw new TravelRuleError(

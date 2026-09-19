@@ -20,7 +20,13 @@ import {
   getEffectiveGameBalance,
   getItemDefinition,
   getRepairTargetBalance,
+  miningActionIds,
   miningLevelThresholds,
+  miningSourceForActionId,
+  miningSources,
+  refiningActionIds,
+  refiningRecipeForActionId,
+  refiningRecipes,
   repairTargetBalances,
   repairTargetForActionId,
   standardSkillLevelThresholds,
@@ -41,11 +47,18 @@ import {
 } from "@/game/config/foundations";
 import { isTravelReplaceableAction } from "@/game/domain/travel-replacement";
 import {
+  contributionIsEmpty,
+  deriveCompletedRepairTargetIds,
   planRepairMaterialContribution,
   repairComplete,
+  repairMaterialProgress,
   repairMaterialsComplete,
   type RepairTargetState,
 } from "@/game/domain/welding-repair";
+import { resolveLocationState, type LocationStateFacts } from "@/game/domain/location-state";
+import { LOCATIONS } from "@/game/content/locations";
+import { getRepairTarget } from "@/game/content/repair-targets";
+import { loadLocationStateFacts } from "@/server/location-state";
 import { POWER_ANNEX_REWARD_SOURCE_ID, pacificResetDate } from "@/game/domain/power-annex";
 import { powerAnnexNow } from "@/server/power-annex-clock";
 import {
@@ -65,7 +78,12 @@ import {
   type MiningRandom,
   type MiningStopReason,
 } from "@/game/domain/mining";
-import { refiningSuccessChanceBps, type RefiningStopReason } from "@/game/domain/refining";
+import {
+  refiningAwardFacts,
+  refiningRecipeUnlocked,
+  refiningSuccessChanceBps,
+  type RefiningStopReason,
+} from "@/game/domain/refining";
 import { skillLevelProgress } from "@/game/domain/progression";
 import {
   planTransportTravel,
@@ -94,7 +112,6 @@ import {
   createRefiningResolver,
   e2eRefiningRandom,
   type PersistedRefiningOutcome,
-  type RefiningRunAttempt,
   type RefiningRunState,
 } from "@/server/refining";
 import {
@@ -107,10 +124,13 @@ import {
 import {
   createMiningResolver,
   defaultMiningRandom,
-  type MiningRunAttempt,
   type MiningRunState,
   type PersistedMiningOutcome,
 } from "@/server/mining";
+import {
+  normalizePersistedMiningAttempts,
+  normalizePersistedRefiningAttempts,
+} from "@/server/run-history";
 import { loadCompletedMissionIds, loadMissionProjections } from "@/server/mission-state";
 import { missOpenRepairCleanPass } from "@/server/welding";
 import {
@@ -303,12 +323,27 @@ export type PracticeProjection = {
   cleanPass?: CleanPassProjection;
 };
 
+/**
+ * One material row of a repair, derived generically from the authored recipe
+ * (#209). `name` is resolved here so no repair surface has to know which items
+ * a particular target wants.
+ */
+export type RepairMaterialProjection = {
+  itemId: string;
+  name: string;
+  required: number;
+  contributed: number;
+  remaining: number;
+  /** How much of this material the character could hand over right now. */
+  availableContribution: number;
+  /** The target's authored flavour for this row, when it authors one. */
+  note?: string;
+};
+
 export type RepairProjection = {
   targetId: string;
-  refinedFerriteContributed: number;
-  refinedFerriteRequired: number;
-  slagContributed: number;
-  slagRequired: number;
+  /** The recipe's material rows, in authored order. */
+  materials: readonly RepairMaterialProjection[];
   weldingProgress: number;
   weldingIncrements: number;
   materialComplete: boolean;
@@ -317,7 +352,67 @@ export type RepairProjection = {
   /** Present only while this repair's Welding action is active (#190). */
   cleanPass?: CleanPassProjection;
   completedAt?: string;
-  availableContribution: { refinedFerrite: number; slag: number };
+  /** True when at least one material row could receive something right now. */
+  canContribute: boolean;
+};
+
+/**
+ * The Mining source a location currently offers (#209).
+ *
+ * Exactly one source is reachable at a time — The Jag's Ferrite Shale, or an
+ * opened Deep Jag's Galvanite — so the Mining surface reads this instead of a
+ * single global `successChanceBps` that silently meant Ferrite.
+ */
+export type MiningSourceProjection = {
+  actionId: string;
+  itemId: string;
+  itemName: string;
+  attemptDurationTicks: number;
+  boostedAttemptDurationTicks: number;
+  successChanceBps: number;
+  successXp: number;
+  yieldMinimum: number;
+  yieldMaximum: number;
+};
+
+/** One authored Refining recipe as the console presents it (#209). */
+export type RefiningRecipeProjection = {
+  actionId: string;
+  outputItemId: string;
+  outputName: string;
+  outputQuantity: number;
+  minimumLevel: number;
+  /** Whether the character's Refining level authorizes starting it. */
+  unlocked: boolean;
+  attemptDurationTicks: number;
+  successChanceBps: number;
+  successXp: number;
+  failureXp: number;
+  inputs: readonly { itemId: string; name: string; quantity: number; carried: number }[];
+  /** Every mutually exclusive thing a failure can produce, already named. */
+  failureOutcomes: readonly (readonly { itemId: string; name: string; quantity: number }[])[];
+  /** True when the character is carrying enough of every input right now. */
+  inputsAvailable: boolean;
+};
+
+/**
+ * One World Location's derived player-facing state (#209), resolved through
+ * `game/domain/location-state` rather than by any surface's own conditionals.
+ */
+export type LocationStateProjection = {
+  locationId: string;
+  variantId?: string;
+  description: string;
+  travelable: boolean;
+  mapStatus?: string;
+  availableActionIds: readonly string[];
+  scene: {
+    asset: string;
+    width: number;
+    height: number;
+    alt: string;
+    focal?: { x: number; y: number };
+  };
 };
 
 export type CargoHoldState = {
@@ -328,9 +423,19 @@ export type CargoHoldState = {
   capacitySlots: number;
 };
 
+/**
+ * Why an activity stopped on its own, for the surface that owns it (#209).
+ *
+ * Discriminated by the activity rather than by one hard-coded action ID: a run
+ * that stopped was a Mining run or a Refining run, and which source or recipe
+ * it was is the run state's business. The durable stop reason is stored per
+ * activity, so there is nothing here that could name the specific source
+ * honestly anyway — and pretending a Galvanite stop was a Ferrite Shale stop is
+ * exactly the lie this replaces.
+ */
 export type ActivityStop =
-  | { actionId: typeof ACTION_IDS.ferriteShaleMining; reason: MiningStopReason }
-  | { actionId: typeof ACTION_IDS.refining; reason: RefiningStopReason };
+  | { activity: "mining"; reason: MiningStopReason }
+  | { activity: "refining"; reason: RefiningStopReason };
 
 export type ScavengeResolvedOutcome = {
   outcomeId: import("@/game/content/scavenge").ScavengeOutcomeId;
@@ -387,11 +492,30 @@ export type PlayGameplayState = {
   mining: { totalXp: number; level: number; xpToNextLevel?: number; xpIntoLevel: number };
   refining: { totalXp: number; level: number; xpToNextLevel?: number; xpIntoLevel: number };
   welding: { totalXp: number; level: number; xpToNextLevel?: number; xpIntoLevel: number };
-  successChanceBps: number;
-  refiningSuccessChanceBps: number;
-  ferriteShaleQuantity: number;
-  refinedFerriteQuantity: number;
-  slagQuantity: number;
+  /**
+   * The Mining source reachable where the character is standing, or undefined
+   * where none is (#209). Replaces the old global `successChanceBps`, which
+   * could only ever describe Ferrite Shale.
+   */
+  miningSource?: MiningSourceProjection;
+  /** Every authored Refining recipe, locked ones included (#209). */
+  refiningRecipes: readonly RefiningRecipeProjection[];
+  /**
+   * Every World Location's derived state, keyed by location ID (#209). The Map
+   * and the Location surface read this rather than re-deriving scene, status,
+   * or reachability from Mission and repair rows themselves.
+   */
+  locationStates: Readonly<Record<string, LocationStateProjection>>;
+  /**
+   * Everything the character is carrying, keyed by item ID (#209).
+   *
+   * Replaces the per-item `refinedFerriteQuantity` / `slagQuantity` tallies. A
+   * new material used to mean a new field on this state and a new line in every
+   * surface that read it; now a surface asks for the item it cares about, which
+   * is what lets the Mining panel show Galvanite at Deep Jag without knowing
+   * that Galvanite exists.
+   */
+  carriedByItemId: Readonly<Record<string, number>>;
   inventory: {
     slotsUsed: number;
     slotsAvailable: number;
@@ -494,6 +618,7 @@ export type PlayGameplayState = {
   powerAnnex?: { resetDate: string; claimed: boolean };
   /** Set when a begin-travel command was refused by the authoritative rules. */
   travelError?:
+    | "route_blocked"
     | "unknown_destination"
     | "same_location"
     | "not_adjacent"
@@ -503,7 +628,12 @@ export type PlayGameplayState = {
     | "route_locked"
     | "insufficient_credits";
   /** Set when a Start Refining command was refused outside the Processing Yard. */
-  refiningError?: "refining_unavailable_here";
+  /**
+   * Why a Refining start was refused. `refining_recipe_locked` is the
+   * server-authoritative answer for a recipe whose minimum Refining level the
+   * character has not reached (#209).
+   */
+  refiningError?: "refining_unavailable_here" | "refining_recipe_locked";
   /** Set when the finite Crash Site Welding command cannot begin. */
   weldingError?: "welding_unavailable_here" | "welding_locked" | "repair_complete";
 };
@@ -601,22 +731,26 @@ export function createPlayResolver(
     ? e2eRefiningRandom()
     : (random as import("@/game/domain/refining").RefiningRandom);
   const entries: PlayResolverEntry[] = [
-    {
-      actionId: ACTION_IDS.ferriteShaleMining,
+    // One resolver per authored Mining source and per authored Refining recipe
+    // (#209). The resolver itself is generic — it reads the source or recipe
+    // back from the action ID it was invoked under — so a second ore and two
+    // more recipes add registry entries rather than branches.
+    ...miningActionIds().map((actionId) => ({
+      actionId,
       resolver: withTrackedActivityProgress(
         createMiningResolver(random, onMiningOutcome),
         "mining",
         (outcome) => outcome.attempts.length,
       ) as PlayResolver,
-    },
-    {
-      actionId: ACTION_IDS.refining,
+    })),
+    ...refiningActionIds().map((actionId) => ({
+      actionId,
       resolver: withTrackedActivityProgress(
         createRefiningResolver(refiningRandom, onRefiningOutcome),
         "refining",
         (outcome) => outcome.resolvedAttempts.length,
       ) as PlayResolver,
-    },
+    })),
     {
       actionId: ACTION_IDS.travel,
       resolver: createTravelResolver() as PlayResolver,
@@ -969,32 +1103,31 @@ async function projectRepairTarget(
   characterId: string,
   targetId: RepairTargetId,
   repair: RepairTargetState,
-  carriedRefinedFerrite: number,
-  carriedSlag: number,
+  carried: Readonly<Record<string, number>>,
   weldingActive = false,
 ): Promise<RepairProjection> {
   const target = getRepairTargetBalance(targetId);
   const access = await loadRepairAccess(transaction, characterId, targetId, repair);
   const cleanPass = projectCleanPass(repair.cleanPass, repair.weldingProgress, weldingActive);
+  const contribution = planRepairMaterialContribution({ repair, carried, target });
+  const notes = getRepairTarget(targetId)?.materialNotes ?? {};
+  const materials = repairMaterialProgress(repair, target).map((row) => ({
+    ...row,
+    name: resolveItemPresentation(row.itemId, row.itemId).displayName,
+    availableContribution: contribution[row.itemId] ?? 0,
+    ...(notes[row.itemId] ? { note: notes[row.itemId] } : {}),
+  }));
   return {
     ...(cleanPass ? { cleanPass } : {}),
     targetId,
-    refinedFerriteContributed: repair.refinedFerriteContributed,
-    refinedFerriteRequired: target.refinedFerriteRequired,
-    slagContributed: repair.slagContributed,
-    slagRequired: target.slagRequired,
+    materials,
     weldingProgress: repair.weldingProgress,
     weldingIncrements: target.repairIncrements,
     materialComplete: repairMaterialsComplete(repair, target),
     complete: repairComplete(repair),
     repairAvailable: access.repairAvailable,
     completedAt: repair.completedAt?.toISOString(),
-    availableContribution: planRepairMaterialContribution({
-      repair,
-      carriedRefinedFerrite,
-      carriedSlag,
-      target,
-    }),
+    canContribute: !contributionIsEmpty(contribution),
   };
 }
 
@@ -1113,27 +1246,26 @@ export async function stateFromTransaction(
     attempts: miningState?.runAttempts ?? 0,
     successes: miningState?.runSuccesses ?? 0,
     failures: (miningState?.runAttempts ?? 0) - (miningState?.runSuccesses ?? 0),
-    shaleGained: miningState?.runShaleGained ?? 0,
+    itemsGained: (miningState?.runItemsGained as Record<string, number> | undefined) ?? {},
     xpGained: miningState?.runXpGained ?? 0,
-    recentAttempts: (miningState?.recentAttempts as MiningRunAttempt[] | undefined) ?? [],
+    recentAttempts: normalizePersistedMiningAttempts(miningState?.recentAttempts, balance),
   };
   const refiningState = refiningStateRows[0];
   const refiningRun: RefiningRunState = {
     attempts: refiningState?.runAttempts ?? 0,
     successes: refiningState?.runSuccesses ?? 0,
     failures: (refiningState?.runAttempts ?? 0) - (refiningState?.runSuccesses ?? 0),
-    ferriteGained: refiningState?.runFerriteGained ?? 0,
-    slagGained: refiningState?.runSlagGained ?? 0,
-    shaleConsumed: refiningState?.runShaleConsumed ?? 0,
+    outputsGained: (refiningState?.runOutputsGained as Record<string, number> | undefined) ?? {},
+    inputsConsumed: (refiningState?.runInputsConsumed as Record<string, number> | undefined) ?? {},
     xpGained: refiningState?.runXpGained ?? 0,
-    recentAttempts: (refiningState?.recentAttempts as RefiningRunAttempt[] | undefined) ?? [],
+    recentAttempts: normalizePersistedRefiningAttempts(refiningState?.recentAttempts, balance),
   };
-  const carriedRefinedFerrite = stacks
-    .filter((stack) => stack.itemId === ITEM_IDS.refinedFerrite)
-    .reduce((total, stack) => total + stack.quantity, 0);
-  const carriedSlag = stacks
-    .filter((stack) => stack.itemId === ITEM_IDS.slag)
-    .reduce((total, stack) => total + stack.quantity, 0);
+  // One carried-quantity map covers every authored repair material, so a
+  // recipe that wants Power Cells needs no new tally here (#209).
+  const carriedByItemId: Record<string, number> = {};
+  for (const stack of stacks) {
+    carriedByItemId[stack.itemId] = (carriedByItemId[stack.itemId] ?? 0) + stack.quantity;
+  }
   // Every repair target projects identically; only its recipe differs.
   const repairs: Record<string, RepairProjection> = {};
   for (const target of repairTargetBalances(balance)) {
@@ -1142,8 +1274,7 @@ export async function stateFromTransaction(
       characterId,
       target.targetId,
       repairStates.get(target.targetId) ?? UNSTARTED_REPAIR,
-      carriedRefinedFerrite,
-      carriedSlag,
+      carriedByItemId,
       action?.actionId === target.actionId,
     );
   }
@@ -1263,8 +1394,12 @@ export async function stateFromTransaction(
     ? snapshot.carriedInstances.find((instance) => instance.id === cutterAssignment.itemInstanceId)
     : undefined;
   const cutterCharge = normalizeCutterCharge(cutterInstance?.currentCharge, balance);
-  const isMiningAction = action?.actionId === ACTION_IDS.ferriteShaleMining;
-  const isRefiningAction = action?.actionId === ACTION_IDS.refining;
+  // Which ore or recipe is actually running, resolved from the durable action
+  // row rather than from a single hardcoded Ferrite/Refining identity (#209).
+  const activeMiningSource = action ? miningSourceForActionId(action.actionId, balance) : undefined;
+  const activeRefiningRecipe = action
+    ? refiningRecipeForActionId(action.actionId, balance)
+    : undefined;
   // Every kind of Welding ticks the same way — an authored repair, a Practice
   // weld, and a customer Work Order — so one classification covers all three.
   // Enumerating them here is how a Work Order came to weld with no live
@@ -1272,17 +1407,52 @@ export async function stateFromTransaction(
   // boundary did not (#207).
   const isWeldingCadenceAction =
     action !== undefined && weldingCadenceActionIds(balance).includes(action.actionId);
-  const nextAttemptBoosted = isMiningAction && cutterCharge > 0;
+  const nextAttemptBoosted = activeMiningSource !== undefined && cutterCharge > 0;
   const nextAttemptDurationTicks = isWeldingCadenceAction
     ? balance.welding.attemptDurationTicks
-    : isRefiningAction
-      ? balance.refining.attemptDurationTicks
-      : nextAttemptBoosted
-        ? boostedMiningAttemptDurationTicks(balance)
-        : balance.mining.attemptDurationTicks;
+    : activeRefiningRecipe
+      ? activeRefiningRecipe.attemptDurationTicks
+      : activeMiningSource
+        ? nextAttemptBoosted
+          ? boostedMiningAttemptDurationTicks(balance, activeMiningSource)
+          : activeMiningSource.attemptDurationTicks
+        : balance.welding.attemptDurationTicks;
   const carriedPowerCellQuantity = stacks
     .filter((stack) => stack.itemId === ITEM_IDS.powerCell)
     .reduce((total, stack) => total + stack.quantity, 0);
+  // The two authoritative facts the location-state boundary derives from.
+  // Neither is a flag of its own: acceptance lives on the Mission row and
+  // completion lives on the repair row (#209).
+  const locationStateFacts: LocationStateFacts = {
+    acceptedMissionIds: new Set(
+      missions
+        .filter((mission) => mission.state !== "not_accepted")
+        .map((mission) => mission.missionId),
+    ),
+    completedRepairTargetIds: deriveCompletedRepairTargetIds(
+      Object.values(repairs).map((projection) => ({
+        targetId: projection.targetId,
+        complete: projection.complete,
+      })),
+    ),
+  };
+  const locationStates: Record<string, LocationStateProjection> = {};
+  for (const location of LOCATIONS) {
+    const resolved = resolveLocationState(location, locationStateFacts);
+    locationStates[location.id] = {
+      locationId: resolved.locationId,
+      ...(resolved.variantId ? { variantId: resolved.variantId } : {}),
+      description: resolved.description,
+      travelable: resolved.travelable,
+      ...(resolved.mapStatus ? { mapStatus: resolved.mapStatus } : {}),
+      availableActionIds: resolved.availableActionIds,
+      scene: resolved.scene,
+    };
+  }
+  // Exactly one Mining source is reachable where the character is standing.
+  const locationMiningSource = miningSources(balance).find((source) =>
+    locationStates[currentLocationId]?.availableActionIds.includes(source.actionId),
+  );
   return {
     characterId,
     missions,
@@ -1295,9 +1465,10 @@ export async function stateFromTransaction(
         ? { resetDate, claimed: claimRows.length > 0 }
         : undefined,
     activeAction:
-      action?.actionId === ACTION_IDS.ferriteShaleMining ||
-      action?.actionId === ACTION_IDS.refining ||
-      isWeldingCadenceAction
+      action &&
+      (activeMiningSource !== undefined ||
+        activeRefiningRecipe !== undefined ||
+        isWeldingCadenceAction)
         ? {
             actionId: action.actionId,
             resolvedThroughAt: action.resolvedThroughAt.toISOString(),
@@ -1327,17 +1498,58 @@ export async function stateFromTransaction(
       xpToNextLevel: weldingProgress.xpToNextLevel,
       xpIntoLevel: weldingProgress.xpIntoLevel,
     },
-    successChanceBps: miningSuccessChanceBps(miningProgress.level, balance),
-    refiningSuccessChanceBps: refiningSuccessChanceBps(refiningProgress.level, balance),
-    ferriteShaleQuantity: stacks
-      .filter((stack) => stack.itemId === ITEM_IDS.ferriteShale)
-      .reduce((total, stack) => total + stack.quantity, 0),
-    refinedFerriteQuantity: stacks
-      .filter((stack) => stack.itemId === ITEM_IDS.refinedFerrite)
-      .reduce((total, stack) => total + stack.quantity, 0),
-    slagQuantity: stacks
-      .filter((stack) => stack.itemId === ITEM_IDS.slag)
-      .reduce((total, stack) => total + stack.quantity, 0),
+    miningSource: locationMiningSource
+      ? {
+          actionId: locationMiningSource.actionId,
+          itemId: locationMiningSource.itemId,
+          itemName: resolveItemPresentation(
+            locationMiningSource.itemId,
+            locationMiningSource.itemId,
+          ).displayName,
+          attemptDurationTicks: locationMiningSource.attemptDurationTicks,
+          boostedAttemptDurationTicks: boostedMiningAttemptDurationTicks(
+            balance,
+            locationMiningSource,
+          ),
+          successChanceBps: miningSuccessChanceBps(miningProgress.level, locationMiningSource),
+          successXp: locationMiningSource.successXp,
+          yieldMinimum: locationMiningSource.yieldMinimum,
+          yieldMaximum: locationMiningSource.yieldMaximum,
+        }
+      : undefined,
+    refiningRecipes: refiningRecipes(balance).map((recipe) => {
+      const award = refiningAwardFacts(balance, recipe);
+      return {
+        actionId: recipe.actionId,
+        outputItemId: recipe.outputItemId,
+        outputName: resolveItemPresentation(recipe.outputItemId, recipe.outputItemId).displayName,
+        outputQuantity: recipe.outputQuantity,
+        minimumLevel: recipe.minimumLevel,
+        unlocked: refiningRecipeUnlocked(refiningProgress.level, recipe),
+        attemptDurationTicks: recipe.attemptDurationTicks,
+        successChanceBps: refiningSuccessChanceBps(refiningProgress.level, recipe),
+        successXp: recipe.successXp,
+        failureXp: recipe.failureXp,
+        inputs: award.inputs.map((input) => ({
+          itemId: input.itemId,
+          name: resolveItemPresentation(input.itemId, input.itemId).displayName,
+          quantity: input.quantity,
+          carried: carriedByItemId[input.itemId] ?? 0,
+        })),
+        failureOutcomes: award.failureOutcomes.map((outcome) =>
+          outcome.map((output) => ({
+            itemId: output.itemId,
+            name: resolveItemPresentation(output.itemId, output.itemId).displayName,
+            quantity: output.quantity,
+          })),
+        ),
+        inputsAvailable: award.inputs.every(
+          (input) => (carriedByItemId[input.itemId] ?? 0) >= input.quantity,
+        ),
+      };
+    }),
+    locationStates,
+    carriedByItemId,
     inventory: {
       slotsUsed: snapshot.slotsUsed,
       slotsAvailable: snapshot.slotsAvailable,
@@ -1380,7 +1592,12 @@ export async function stateFromTransaction(
         ? {
             currentCharge: cutterCharge,
             maximumCharge: balance.items.salvageCutter.maximumCharge,
-            boostedAttemptDurationTicks: boostedMiningAttemptDurationTicks(balance),
+            // Describes the source the character can actually mine right now;
+            // with none in reach, the Cutter's own baseline source (#209).
+            boostedAttemptDurationTicks: boostedMiningAttemptDurationTicks(
+              balance,
+              locationMiningSource ?? balance.mining.sources.ferriteShale,
+            ),
           }
         : undefined,
       slots: [
@@ -1455,12 +1672,8 @@ export async function stateFromTransaction(
     refiningRecentResult,
     stop: (() => {
       if (refiningStopReason)
-        return { actionId: ACTION_IDS.refining, reason: refiningStopReason } as ActivityStop;
-      if (miningStopReason)
-        return {
-          actionId: ACTION_IDS.ferriteShaleMining,
-          reason: miningStopReason,
-        } as ActivityStop;
+        return { activity: "refining", reason: refiningStopReason } as ActivityStop;
+      if (miningStopReason) return { activity: "mining", reason: miningStopReason } as ActivityStop;
       if (action) return undefined;
       const miningPersisted = miningState?.lastStopReason as MiningStopReason | null | undefined;
       const refiningPersisted = refiningState?.lastStopReason as
@@ -1475,16 +1688,12 @@ export async function stateFromTransaction(
           ? new Date(refiningState.updatedAt as unknown as string | Date).getTime()
           : 0;
         if (refiningUpdated >= miningUpdated)
-          return { actionId: ACTION_IDS.refining, reason: refiningPersisted } as ActivityStop;
-        return {
-          actionId: ACTION_IDS.ferriteShaleMining,
-          reason: miningPersisted,
-        } as ActivityStop;
+          return { activity: "refining", reason: refiningPersisted } as ActivityStop;
+        return { activity: "mining", reason: miningPersisted } as ActivityStop;
       }
       if (refiningPersisted)
-        return { actionId: ACTION_IDS.refining, reason: refiningPersisted } as ActivityStop;
-      if (miningPersisted)
-        return { actionId: ACTION_IDS.ferriteShaleMining, reason: miningPersisted } as ActivityStop;
+        return { activity: "refining", reason: refiningPersisted } as ActivityStop;
+      if (miningPersisted) return { activity: "mining", reason: miningPersisted } as ActivityStop;
       return undefined;
     })(),
     commandError,
@@ -1624,10 +1833,14 @@ export async function beginTravel(
         );
       }
 
+      // The destination's current state is authoritative here, not merely in
+      // the Map's presentation: a forged request for a collapsed Deep Jag is
+      // refused server-side with `route_blocked` (#209).
       const plan = planTravel({
         currentLocationId,
         destinationLocationId,
         alreadyTraveling: false,
+        locationStateFacts: await loadLocationStateFacts(transaction, context.character.id),
       });
       if (!plan.ok) {
         return stateFromTransaction(
@@ -1635,7 +1848,7 @@ export async function beginTravel(
           context.character.id,
           recentFrom(miningOutcome),
           miningOutcome?.stopReason,
-          context.action && context.action.actionId !== ACTION_IDS.ferriteShaleMining
+          context.action && !miningActionIds().includes(context.action.actionId)
             ? "another_action_active"
             : undefined,
           plan.reason,
@@ -1688,7 +1901,7 @@ export async function beginTravel(
         await transaction
           .delete(activeActions)
           .where(eq(activeActions.characterId, context.character.id));
-        if (context.action.actionId === ACTION_IDS.ferriteShaleMining) {
+        if (miningActionIds().includes(context.action.actionId)) {
           await transaction
             .insert(characterMiningState)
             .values({ characterId: context.character.id, lastStopReason: "action_replaced" })
@@ -1696,7 +1909,7 @@ export async function beginTravel(
               target: characterMiningState.characterId,
               set: { lastStopReason: "action_replaced", updatedAt: now },
             });
-        } else if (context.action.actionId === ACTION_IDS.refining) {
+        } else if (refiningActionIds().includes(context.action.actionId)) {
           await transaction
             .insert(characterRefiningState)
             .values({ characterId: context.character.id, lastStopReason: "action_replaced" })

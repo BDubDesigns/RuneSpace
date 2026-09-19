@@ -1,19 +1,28 @@
-import type { EffectiveGameBalance, RepairTargetBalance } from "@/game/config/balance";
+import type {
+  EffectiveGameBalance,
+  RepairMaterialRequirement,
+  RepairTargetBalance,
+} from "@/game/config/balance";
 import { UNROLLED_CLEAN_PASS, type CleanPassState } from "@/game/domain/clean-pass";
 
 /**
  * The durable state of one repair target for one character (#172).
  *
  * Every Welding job in RuneSpace — the Crash Site Cargo Hold, Holo Hollow's
- * Crew Stop, and any later one — is this same shape: how much of each material
- * has been contributed, how many whole Welding increments have resolved, and
- * whether the job is finished. The numbers a particular target needs are its
- * authored recipe (`getRepairTargetBalance`), never values baked into this
- * module or duplicated by a caller.
+ * Crew Stop, Deep Jag's cave-in, and any later one — is this same shape: how
+ * much of each material has been contributed, how many whole Welding
+ * increments have resolved, and whether the job is finished. The numbers a
+ * particular target needs are its authored recipe (`getRepairTargetBalance`),
+ * never values baked into this module or duplicated by a caller.
+ *
+ * `materials` is keyed by item ID rather than carrying one field per material
+ * (#209). Deep Jag needs Refined Ferrite and Power Cells where the first two
+ * targets needed Refined Ferrite and Slag, so a fixed field pair would have
+ * meant a third specialized column for every future recipe. An item absent
+ * from the map has contributed nothing.
  */
 export type RepairTargetState = {
-  refinedFerriteContributed: number;
-  slagContributed: number;
+  materials: Readonly<Record<string, number>>;
   weldingProgress: number;
   /**
    * This repair's two Clean Pass opportunities (#190). A repair is ONE Welding
@@ -27,19 +36,56 @@ export type RepairTargetState = {
 /** A repair nobody has welded yet has no opportunities rolled. */
 export const UNROLLED_REPAIR_CLEAN_PASS: CleanPassState = UNROLLED_CLEAN_PASS;
 
-export type RepairMaterialContribution = {
-  refinedFerrite: number;
-  slag: number;
+/**
+ * A planned contribution, keyed by item ID. Only materials the recipe actually
+ * authors ever appear, and only with a positive quantity.
+ */
+export type RepairMaterialContribution = Readonly<Record<string, number>>;
+
+/** How much of one authored material has been contributed so far. */
+export function contributedQuantity(repair: RepairTargetState, itemId: string): number {
+  return repair.materials[itemId] ?? 0;
+}
+
+/** How much of one authored material the recipe still wants. */
+export function remainingQuantity(
+  repair: RepairTargetState,
+  requirement: RepairMaterialRequirement,
+): number {
+  return Math.max(0, requirement.quantity - contributedQuantity(repair, requirement.itemId));
+}
+
+/**
+ * One row of a repair's material list, derived generically from the recipe.
+ *
+ * Mission observations and the repair UI both read this rather than naming
+ * Refined Ferrite or Slag themselves, so a target with a different recipe
+ * needs no new observation field and no new UI branch (#209).
+ */
+export type RepairMaterialProgress = {
+  itemId: string;
+  required: number;
+  contributed: number;
+  remaining: number;
 };
+
+export function repairMaterialProgress(
+  repair: RepairTargetState,
+  target: RepairTargetBalance,
+): readonly RepairMaterialProgress[] {
+  return target.materials.map((requirement) => ({
+    itemId: requirement.itemId,
+    required: requirement.quantity,
+    contributed: Math.min(contributedQuantity(repair, requirement.itemId), requirement.quantity),
+    remaining: remainingQuantity(repair, requirement),
+  }));
+}
 
 export function repairMaterialsComplete(
   repair: RepairTargetState,
   target: RepairTargetBalance,
 ): boolean {
-  return (
-    repair.refinedFerriteContributed >= target.refinedFerriteRequired &&
-    repair.slagContributed >= target.slagRequired
-  );
+  return target.materials.every((requirement) => remainingQuantity(repair, requirement) === 0);
 }
 
 export function repairComplete(repair: RepairTargetState): boolean {
@@ -57,27 +103,39 @@ export function repairComplete(repair: RepairTargetState): boolean {
  */
 export function planRepairMaterialContribution(input: {
   repair: RepairTargetState;
-  carriedRefinedFerrite: number;
-  carriedSlag: number;
+  /** Carried quantity per item ID; anything the recipe does not want is ignored. */
+  carried: Readonly<Record<string, number>>;
   target: RepairTargetBalance;
 }): RepairMaterialContribution {
   const { repair, target } = input;
-  if (repairComplete(repair)) return { refinedFerrite: 0, slag: 0 };
-  if (
-    !Number.isInteger(input.carriedRefinedFerrite) ||
-    input.carriedRefinedFerrite < 0 ||
-    !Number.isInteger(input.carriedSlag) ||
-    input.carriedSlag < 0
-  ) {
-    throw new RangeError("Carried repair materials must be non-negative integers");
+  if (repairComplete(repair)) return {};
+  const contribution: Record<string, number> = {};
+  for (const requirement of target.materials) {
+    const carried = input.carried[requirement.itemId] ?? 0;
+    if (!Number.isInteger(carried) || carried < 0) {
+      throw new RangeError("Carried repair materials must be non-negative integers");
+    }
+    const planned = Math.min(carried, remainingQuantity(repair, requirement));
+    if (planned > 0) contribution[requirement.itemId] = planned;
   }
-  return {
-    refinedFerrite: Math.min(
-      input.carriedRefinedFerrite,
-      Math.max(0, target.refinedFerriteRequired - repair.refinedFerriteContributed),
-    ),
-    slag: Math.min(input.carriedSlag, Math.max(0, target.slagRequired - repair.slagContributed)),
-  };
+  return contribution;
+}
+
+/** Whether a planned contribution would actually move anything. */
+export function contributionIsEmpty(contribution: RepairMaterialContribution): boolean {
+  return Object.values(contribution).every((quantity) => quantity <= 0);
+}
+
+/** Apply a planned contribution to a repair's durable material map. */
+export function applyRepairMaterialContribution(
+  repair: RepairTargetState,
+  contribution: RepairMaterialContribution,
+): Readonly<Record<string, number>> {
+  const next: Record<string, number> = { ...repair.materials };
+  for (const [itemId, quantity] of Object.entries(contribution)) {
+    if (quantity > 0) next[itemId] = (next[itemId] ?? 0) + quantity;
+  }
+  return next;
 }
 
 export type WeldingSnapshot = RepairTargetState;

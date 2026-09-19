@@ -5,7 +5,7 @@ import {
   equippedItems,
   inventoryStacks,
 } from "@/db/rune-space";
-import { getEffectiveGameBalance } from "@/game/config/balance";
+import { getEffectiveGameBalance, miningActionIds } from "@/game/config/balance";
 import { planEquipmentChange, type EquipmentChange } from "@/game/domain/equipment";
 import { ACTION_IDS } from "@/game/config/foundations";
 import { withResolvedOwnedCharacter } from "@/server/action-resolution";
@@ -40,8 +40,11 @@ export async function invalidateMiningActionForChangedTool(
     now: Date;
   },
 ): Promise<void> {
+  // Any authored Mining source (#209): swapping the Cutter mid-run has to stop
+  // a Galvanite run exactly as it stops a Ferrite Shale one.
   const miningToolChanged =
-    input.action?.actionId === ACTION_IDS.ferriteShaleMining &&
+    input.action !== undefined &&
+    miningActionIds().includes(input.action.actionId) &&
     input.previousToolItemInstanceId !== input.currentToolItemInstanceId;
   if (!miningToolChanged) return;
   const reason: import("@/game/domain/mining").MiningStopReason = input.currentToolItemInstanceId
@@ -135,7 +138,8 @@ export async function changeEquipment(
         now,
       });
       if (
-        context.action?.actionId === ACTION_IDS.ferriteShaleMining &&
+        context.action !== undefined &&
+        miningActionIds().includes(context.action.actionId) &&
         previousToolAssignment?.itemInstanceId !== currentToolAssignment?.itemInstanceId
       ) {
         miningStopReason = currentToolAssignment

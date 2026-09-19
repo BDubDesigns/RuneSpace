@@ -11,7 +11,12 @@ import {
   SKILL_IDS,
 } from "@/game/config/foundations";
 import type { CleanPassOpportunity } from "@/game/domain/clean-pass";
-import { cleanupTestUser, createCharacterForUser, createTestUser } from "./fixtures";
+import {
+  cleanupTestUser,
+  createCharacterForUser,
+  createTestUser,
+  installedMaterials,
+} from "./fixtures";
 
 const DATABASE_URL = process.env.DATABASE_URL;
 const suite = DATABASE_URL ? describe : describe.skip;
@@ -450,8 +455,7 @@ suite("issue #190 Practice Welding (real PostgreSQL)", () => {
     await db.insert(rune.characterRepairTargets).values({
       characterId: character.id,
       targetId: REPAIR_TARGET_IDS.cargoHold,
-      refinedFerriteContributed: balance.repairTargets.cargoHold.refinedFerriteRequired,
-      slagContributed: balance.repairTargets.cargoHold.slagRequired,
+      materials: installedMaterials(balance.repairTargets.cargoHold),
     });
 
     await repairCommands.startWelding(
@@ -501,8 +505,7 @@ suite("issue #190 Practice Welding (real PostgreSQL)", () => {
     await db.insert(rune.characterRepairTargets).values({
       characterId: character.id,
       targetId: REPAIR_TARGET_IDS.cargoHold,
-      refinedFerriteContributed: balance.repairTargets.cargoHold.refinedFerriteRequired,
-      slagContributed: balance.repairTargets.cargoHold.slagRequired,
+      materials: installedMaterials(balance.repairTargets.cargoHold),
     });
 
     const rolls = async () => {

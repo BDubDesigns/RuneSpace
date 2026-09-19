@@ -69,7 +69,8 @@ test("owned character can start, observe, stop, and restore Ferrite Mining at Th
   await expect(page.getByText("2 attempts", { exact: true })).toBeVisible();
   await expect(page.getByText("1 successful", { exact: true })).toBeVisible();
   await expect(page.getByText("1 failed", { exact: true })).toBeVisible();
-  await expect(page.getByText("1 shale gained", { exact: true })).toBeVisible();
+  // The run names the real item since Mining has a second source (#209).
+  await expect(page.getByText("1 Ferrite Shale gained", { exact: true })).toBeVisible();
   await expect(page.getByText("15 Mining XP", { exact: true })).toBeVisible();
   // Prior attempts sit behind History since #193 — the run's own totals stay
   // visible, the bounded list is opened when the player wants it.

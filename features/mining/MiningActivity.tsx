@@ -11,21 +11,34 @@ import { StatusMeter } from "@/components/ui/StatusMeter";
 import { ItemVisual } from "@/components/items/ItemVisual";
 import { VisualTile } from "@/components/items/VisualTile";
 import { getEffectiveGameBalance } from "@/game/config/balance";
-import { ACTION_IDS, GAME_TICK_MS, ITEM_IDS, LOCATION_IDS } from "@/game/config/foundations";
-import {
-  boostedMiningAttemptDurationTicks,
-  miningNearMissBasisPoints,
-  type MiningStopReason,
-} from "@/game/domain/mining";
+import { GAME_TICK_MS } from "@/game/config/foundations";
+import { miningNearMissBasisPoints, type MiningStopReason } from "@/game/domain/mining";
 import { deriveMissionGuidanceTargets } from "@/game/domain/missions";
 import type { MiningRunAttempt } from "@/server/mining";
-import type { PlayGameplayState } from "@/server/play";
+import type { MiningSourceProjection, PlayGameplayState } from "@/server/play";
 import { refreshPlayAction, startMiningAction, stopMiningAction } from "@/server/actions";
+import { resolveItemPresentation } from "@/game/content/item-presentation";
 import { reportClientDiagnostic } from "@/features/diagnostics/client";
-import { latestMiningAttempt, resolvedAttemptCount } from "./latest-result";
+import { latestMiningAttempt, resolvedAttemptCount, runBelongsToSource } from "./latest-result";
 import { usePlay } from "@/features/play/PlayContext";
 
 const RESULT_FEEDBACK_DURATION_MS = 3_600;
+
+/**
+ * Whether an authoritative stop belongs to Mining at all (#209).
+ *
+ * The stop names the activity rather than one source's action, because the
+ * durable stop reason is stored per activity: a Galvanite run and a Ferrite
+ * Shale run stop the same way and this panel owns both.
+ */
+function isMiningStop(stop: NonNullable<PlayGameplayState["stop"]>): boolean {
+  return stop.activity === "mining";
+}
+
+/** The awarded item's authoritative display name, by its stable ID. */
+function itemName(itemId: string): string {
+  return resolveItemPresentation(itemId, itemId).displayName;
+}
 
 function secondsForTicks(ticks: number) {
   return (ticks * GAME_TICK_MS) / 1_000;
@@ -56,6 +69,7 @@ function latestAttemptAnnouncement(
   attempt: MiningRunAttempt,
   attemptsResolved: number,
   maximumCharge: number,
+  itemName: string,
 ) {
   const catchUp = attemptsResolved > 1 ? `${attemptsResolved} attempts resolved while away. ` : "";
   const roll = `Roll ${percentage(attempt.rolledBasisPoints)}. Needed below ${percentage(attempt.thresholdBasisPoints)}.`;
@@ -67,7 +81,7 @@ function latestAttemptAnnouncement(
       ? " Power Cell depleted · Mining continues at normal speed."
       : "";
   return attempt.success
-    ? `${catchUp}Success. ${roll} ${attempt.shaleAwarded} Ferrite Shale earned. ${attempt.xpAwarded} Mining XP earned. ${charge}${depleted}`
+    ? `${catchUp}Success. ${roll} ${attempt.quantityAwarded} ${itemName} earned. ${attempt.xpAwarded} Mining XP earned. ${charge}${depleted}`
     : `${catchUp}No yield. ${roll} Missed by ${percentage(miningNearMissBasisPoints(attempt.rolledBasisPoints, attempt.thresholdBasisPoints))}. ${charge}${depleted}`;
 }
 
@@ -75,11 +89,14 @@ function LatestAttemptResult({
   attempt,
   attemptsResolved,
   feedback,
+  itemName,
   maximumCharge,
 }: {
   attempt: MiningRunAttempt;
   attemptsResolved: number;
   feedback: boolean;
+  /** The awarded item's authoritative display name — never assumed to be Shale. */
+  itemName: string;
   maximumCharge: number;
 }) {
   const feedbackTone = feedback ? (attempt.success ? "success" : "danger") : "calm";
@@ -121,11 +138,11 @@ function LatestAttemptResult({
           </p>
           <div className="mt-2 grid max-w-sm grid-cols-2 gap-2 sm:grid-cols-3">
             <ItemVisual
-              accessibleLabel={`${attempt.shaleAwarded} Ferrite Shale earned`}
+              accessibleLabel={`${attempt.quantityAwarded} ${itemName} earned`}
               className={feedback ? "rs-reward-feedback" : ""}
-              itemId={ITEM_IDS.ferriteShale}
-              name="Ferrite Shale"
-              quantity={attempt.shaleAwarded}
+              itemId={attempt.itemId}
+              name={itemName}
+              quantity={attempt.quantityAwarded}
             />
             <VisualTile
               accessibleLabel={`${attempt.xpAwarded} Mining XP earned`}
@@ -171,7 +188,7 @@ export function MiningActivity({ characterName }: { characterName: string }) {
     state,
   } = usePlay();
   const [message, setMessage] = useState<string | undefined>(
-    state.stop?.actionId === ACTION_IDS.ferriteShaleMining
+    state.stop && isMiningStop(state.stop)
       ? miningStopMessage(state.stop.reason as MiningStopReason)
       : undefined,
   );
@@ -184,17 +201,19 @@ export function MiningActivity({ characterName }: { characterName: string }) {
   const [feedback, setFeedback] = useState<{ sequence: number; attempts: number }>();
   const balance = getEffectiveGameBalance();
   const active = state.activeAction;
-  const showMiningActivity =
-    state.location.currentLocationId === LOCATION_IDS.theJag && !state.travelState;
+  // Where Mining happens is the location state's answer, not this surface's
+  // (#209): The Jag offers Ferrite Shale, an opened Deep Jag offers Galvanite,
+  // and a collapsed one offers neither. The projection resolves which source is
+  // reachable, so this panel never names a location.
+  const source = state.miningSource;
+  const showMiningActivity = source !== undefined && !state.travelState;
   // Mission guidance is consumed from the ONE derived target set — this activity
   // never inspects mission IDs, objective prose, or drop tables to decide
   // whether Start Mining advances the active mission.
   const missionGuidanceTargets = deriveMissionGuidanceTargets(state.missions);
   const startMiningGuided =
-    showMiningActivity &&
-    !active &&
-    missionGuidanceTargets.actionIds.has(ACTION_IDS.ferriteShaleMining);
-  const durationTicks = active?.nextAttemptDurationTicks ?? balance.mining.attemptDurationTicks;
+    showMiningActivity && !active && missionGuidanceTargets.actionIds.has(source.actionId);
+  const durationTicks = active?.nextAttemptDurationTicks ?? source?.attemptDurationTicks ?? 0;
   const durationMs = durationTicks * GAME_TICK_MS;
   const elapsed = active ? Math.max(0, now - new Date(active.progressStartedAt).getTime()) : 0;
   const progress = active ? Math.min(100, (elapsed / durationMs) * 100) : 0;
@@ -205,8 +224,8 @@ export function MiningActivity({ characterName }: { characterName: string }) {
   const nextMiningDurationTicks =
     active?.nextAttemptDurationTicks ??
     (cutter && cutter.currentCharge > 0
-      ? boostedMiningAttemptDurationTicks(balance)
-      : balance.mining.attemptDurationTicks);
+      ? (source?.boostedAttemptDurationTicks ?? 0)
+      : (source?.attemptDurationTicks ?? 0));
 
   function apply(result: Awaited<ReturnType<typeof refreshPlayAction>>) {
     if (result.error) {
@@ -216,7 +235,7 @@ export function MiningActivity({ characterName }: { characterName: string }) {
     if (result.state) {
       acceptState(result.state);
       if (result.state.commandError) setMessage(commandErrorMessage(result.state.commandError));
-      else if (result.state.stop?.actionId === ACTION_IDS.ferriteShaleMining)
+      else if (result.state.stop && isMiningStop(result.state.stop))
         setMessage(miningStopMessage(result.state.stop.reason as MiningStopReason));
       else setMessage(undefined);
     }
@@ -271,7 +290,13 @@ export function MiningActivity({ characterName }: { characterName: string }) {
     };
   }, [Boolean(active), Boolean(state.travelState)]);
 
-  const latestAttempt = latestMiningAttempt(state.run.recentAttempts);
+  // A run survives travel by design, so the persisted one can belong to a
+  // source the player has since walked away from (#211 review). Its totals and
+  // its latest attempt are still true — they are simply not about what is being
+  // mined here, so this surface shows neither until a run at this source
+  // starts. Nothing is discarded: the run itself is untouched.
+  const runIsThisSource = source !== undefined && runBelongsToSource(state.run, source.itemId);
+  const latestAttempt = runIsThisSource ? latestMiningAttempt(state.run.recentAttempts) : undefined;
   const recentBatchCount = state.recentResult.successes + state.recentResult.failures;
   useEffect(() => {
     const previousAttempts = observedAttempts.current;
@@ -326,7 +351,7 @@ export function MiningActivity({ characterName }: { characterName: string }) {
         </ActionButton>
       </div>
       <p className="font-display text-sm uppercase tracking-wide text-[color:var(--rs-accent-mining)]">
-        Success chance: {percentage(state.successChanceBps)}%
+        Success chance: {percentage(source.successChanceBps)}%
       </p>
       {active && !active.nextAttemptBoosted ? (
         <p className="font-display text-sm uppercase tracking-wide text-[color:var(--rs-text-secondary)]">
@@ -350,8 +375,8 @@ export function MiningActivity({ characterName }: { characterName: string }) {
         </div>
       ) : (
         <Feedback>
-          Mining is idle. Normal attempts take {balance.mining.attemptDurationTicks} ticks /{" "}
-          {secondsForTicks(balance.mining.attemptDurationTicks)} seconds and resolve on the server.
+          Mining is idle. Normal {source.itemName} attempts take {source.attemptDurationTicks} ticks
+          / {secondsForTicks(source.attemptDurationTicks)} seconds and resolve on the server.
         </Feedback>
       )}
       {latestAttempt ? (
@@ -361,6 +386,7 @@ export function MiningActivity({ characterName }: { characterName: string }) {
             feedback?.sequence === latestAttempt.sequence ? feedback.attempts : recentBatchCount
           }
           feedback={feedback?.sequence === latestAttempt.sequence}
+          itemName={itemName(latestAttempt.itemId)}
           maximumCharge={balance.items.salvageCutter.maximumCharge}
         />
       ) : null}
@@ -370,15 +396,12 @@ export function MiningActivity({ characterName }: { characterName: string }) {
               latestAttempt,
               feedback.attempts,
               balance.items.salvageCutter.maximumCharge,
+              itemName(latestAttempt.itemId),
             )
           : ""}
       </p>
       {message ? (
-        <Feedback
-          tone={
-            state.stop?.actionId === ACTION_IDS.ferriteShaleMining && !active ? "danger" : "muted"
-          }
-        >
+        <Feedback tone={state.stop && isMiningStop(state.stop) && !active ? "danger" : "muted"}>
           {message}
         </Feedback>
       ) : null}
@@ -388,7 +411,8 @@ export function MiningActivity({ characterName }: { characterName: string }) {
         </ActionButton>
       ) : null}
       {/* The context Mining is actually working against: the skill the attempts
-          raise, the shale they produce, and the two limits that stop a run. */}
+          raise, whatever ore this source produces, and the two limits that stop
+          a run. */}
       <SkillProgressRow
         level={state.mining.level}
         skill="Mining"
@@ -405,9 +429,11 @@ export function MiningActivity({ characterName }: { characterName: string }) {
           massGrams: state.inventory.massGrams,
           capacityGrams: state.inventory.capacityGrams,
         }}
-        items={[{ label: "Ferrite Shale", quantity: state.ferriteShaleQuantity }]}
+        items={[{ label: source.itemName, quantity: state.carriedByItemId[source.itemId] ?? 0 }]}
       />
-      <MiningRunPanel balance={balance} run={state.run} />
+      {runIsThisSource ? (
+        <MiningRunPanel balance={balance} run={state.run} source={source} />
+      ) : null}
     </ActivityPanel>
   );
 }

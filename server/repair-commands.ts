@@ -10,6 +10,8 @@ import { ACTION_IDS, type RepairTargetId } from "@/game/config/foundations";
 import { getLocalPlaceInLocation } from "@/game/content/local-places";
 import { getRepairTarget } from "@/game/content/repair-targets";
 import {
+  applyRepairMaterialContribution,
+  contributionIsEmpty,
   planRepairMaterialContribution,
   repairMaterialsComplete,
 } from "@/game/domain/welding-repair";
@@ -33,8 +35,8 @@ import {
 
 export type RepairMaterialContributionRequest = {
   targetId: RepairTargetId;
-  expectedRefinedFerrite: number;
-  expectedSlag: number;
+  /** Expected useful quantity per item ID; any mismatch refuses (#209). */
+  expectedMaterials: Readonly<Record<string, number>>;
 };
 
 export type RepairRefusalReason =
@@ -53,7 +55,7 @@ export type RepairRefusal = {
 };
 
 export type RepairContributionStatus =
-  | { status: "committed"; refinedFerrite: number; slag: number }
+  | { status: "committed"; materials: Readonly<Record<string, number>> }
   | RepairRefusal;
 
 export type RepairStateResult<T> = {
@@ -226,57 +228,53 @@ export async function contributeRepairMaterials(
         .where(eq(inventoryStacks.characterId, context.character.id))
         .orderBy(asc(inventoryStacks.createdAt), asc(inventoryStacks.id))
         .for("update");
-      const carriedRefinedFerrite = stacks
-        .filter((stack) => stack.itemId === balance.items.refinedFerrite.itemId)
-        .reduce((total, stack) => total + stack.quantity, 0);
-      const carriedSlag = stacks
-        .filter((stack) => stack.itemId === balance.items.slag.itemId)
-        .reduce((total, stack) => total + stack.quantity, 0);
-      const useful = planRepairMaterialContribution({
-        repair,
-        carriedRefinedFerrite,
-        carriedSlag,
-        target,
-      });
-      if (
-        useful.refinedFerrite !== request.expectedRefinedFerrite ||
-        useful.slag !== request.expectedSlag
-      ) {
+      // One carried tally covers whatever this recipe wants, so a Power Cell
+      // requirement needs no second special-cased count (#209).
+      const carried: Record<string, number> = {};
+      for (const stack of stacks) {
+        carried[stack.itemId] = (carried[stack.itemId] ?? 0) + stack.quantity;
+      }
+      const useful = planRepairMaterialContribution({ repair, carried, target });
+      // The client's belief must match the recomputed plan exactly, in both
+      // directions, so a stale surface can never commit a different amount.
+      const expected = request.expectedMaterials;
+      const expectedKeys = Object.keys(expected).filter((itemId) => (expected[itemId] ?? 0) > 0);
+      const usefulKeys = Object.keys(useful);
+      const matches =
+        expectedKeys.length === usefulKeys.length &&
+        usefulKeys.every((itemId) => expected[itemId] === useful[itemId]);
+      if (!matches) {
         return refused({
           status: "refused",
           reason: "materials_changed",
           message: "Repair materials changed. Review the useful quantities and try again.",
         });
       }
-      if (useful.refinedFerrite === 0 && useful.slag === 0) {
+      if (contributionIsEmpty(useful)) {
         return refused({
           status: "refused",
           reason: "nothing_to_contribute",
-          message: "No carried Refined Ferrite or Slag is still needed for this repair.",
+          message: "Nothing you are carrying is still needed for this repair.",
         });
       }
 
       await ensureRepairTargetState(transaction, context.character.id, request.targetId);
-      const refinedResult = await consumeStackableItem(transaction, {
-        characterId: context.character.id,
-        itemId: balance.items.refinedFerrite.itemId,
-        quantity: useful.refinedFerrite,
-        now,
-      });
-      const slagResult = await consumeStackableItem(transaction, {
-        characterId: context.character.id,
-        itemId: balance.items.slag.itemId,
-        quantity: useful.slag,
-        now,
-      });
-      if (!refinedResult.ok || !slagResult.ok) {
-        throw new Error("Contribution removal became invalid");
+      for (const [itemId, quantity] of Object.entries(useful)) {
+        const removal = await consumeStackableItem(transaction, {
+          characterId: context.character.id,
+          itemId,
+          quantity,
+          now,
+        });
+        if (!removal.ok) throw new Error("Contribution removal became invalid");
       }
+      // One atomic row update for the whole contribution. The row was selected
+      // FOR UPDATE above, so a retried or concurrent contribution serializes
+      // behind this write rather than double-removing carried items.
       await transaction
         .update(characterRepairTargets)
         .set({
-          refinedFerriteContributed: repair.refinedFerriteContributed + useful.refinedFerrite,
-          slagContributed: repair.slagContributed + useful.slag,
+          materials: applyRepairMaterialContribution(repair, useful),
           updatedAt: now,
         })
         .where(
@@ -287,7 +285,7 @@ export async function contributeRepairMaterials(
         );
       return {
         state: await stateAfterRepairCommand(transaction, context.character.id, now),
-        repair: { status: "committed" as const, ...useful },
+        repair: { status: "committed" as const, materials: useful },
       };
     },
     now,

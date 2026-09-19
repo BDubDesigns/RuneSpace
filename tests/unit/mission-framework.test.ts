@@ -11,7 +11,7 @@ import {
   NPC_IDS,
   SKILL_IDS,
 } from "@/game/config/foundations";
-import { getEffectiveGameBalance } from "@/game/config/balance";
+import { getEffectiveGameBalance, miningSources, refiningRecipes } from "@/game/config/balance";
 import { getActionOutputItemIds } from "@/game/domain/action-outputs";
 import { miningAwardFacts } from "@/game/domain/mining";
 import { refiningAwardFacts } from "@/game/domain/refining";
@@ -287,16 +287,26 @@ describe("issue #124 mission registry validation", () => {
 describe("issue #124 action-output capability check shares the gameplay truth", () => {
   it("derives outputs from the resolvers' award facts, not a parallel table", () => {
     const balance = getEffectiveGameBalance();
-    // The capability check reads exactly what the resolvers award: Mining's
-    // single output item and Refining's two output items. Changing an
-    // action's authoritative award changes this automatically — there is no
-    // hand-maintained drop table to go stale.
-    expect(getActionOutputItemIds(ACTION_IDS.ferriteShaleMining)).toEqual([
-      miningAwardFacts(balance).itemId,
-    ]);
-    expect(getActionOutputItemIds(ACTION_IDS.refining)).toEqual(
-      refiningAwardFacts(balance).outputs.map((output) => output.itemId),
-    );
+    // The capability check reads exactly what the resolvers award, for every
+    // authored source and recipe (#209): each Mining source's single output,
+    // and each Refining recipe's success outputs plus every mutually exclusive
+    // thing its failure can produce. Changing an action's authoritative award
+    // changes this automatically — there is no hand-maintained drop table to go
+    // stale, and adding Galvanite needed no entry here.
+    for (const source of miningSources(balance)) {
+      expect(getActionOutputItemIds(source.actionId)).toEqual([
+        miningAwardFacts(balance, source).itemId,
+      ]);
+    }
+    for (const recipe of refiningRecipes(balance)) {
+      const award = refiningAwardFacts(balance, recipe);
+      expect(getActionOutputItemIds(recipe.actionId)).toEqual([
+        ...new Set([
+          ...award.successOutputs.map((output) => output.itemId),
+          ...award.failureOutcomes.flatMap((outcome) => outcome.map((output) => output.itemId)),
+        ]),
+      ]);
+    }
     // Actions with no material output resolve to undefined (e.g. Travel).
     expect(getActionOutputItemIds(ACTION_IDS.travel)).toBeUndefined();
   });

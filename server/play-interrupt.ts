@@ -7,7 +7,12 @@ import {
   type ActiveAction,
   type Character,
 } from "@/db/rune-space";
-import { repairTargetForActionId, weldingActionIds } from "@/game/config/balance";
+import {
+  miningActionIds,
+  refiningActionIds,
+  repairTargetForActionId,
+  weldingActionIds,
+} from "@/game/config/balance";
 import { ACTION_IDS } from "@/game/config/foundations";
 import type { DatabaseTransaction } from "@/server/action-resolution";
 import { interruptPracticeWelding } from "@/server/practice-welding";
@@ -67,10 +72,13 @@ export async function forceIdleResolvedAction(
 
   const actionId = action.actionId;
 
-  if (actionId === ACTION_IDS.ferriteShaleMining || actionId === ACTION_IDS.refining) {
+  // Every authored Mining source and Refining recipe, not the two original
+  // action IDs (#209): stopping Galvanite Mining has to write the same durable
+  // stop reason that stopping Ferrite Shale Mining does.
+  const isMining = miningActionIds().includes(actionId);
+  if (isMining || refiningActionIds().includes(actionId)) {
     await transaction.delete(activeActions).where(eq(activeActions.characterId, character.id));
-    const stateTable =
-      actionId === ACTION_IDS.ferriteShaleMining ? characterMiningState : characterRefiningState;
+    const stateTable = isMining ? characterMiningState : characterRefiningState;
     await transaction
       .insert(stateTable)
       .values({ characterId: character.id, lastStopReason: "manually_stopped" })

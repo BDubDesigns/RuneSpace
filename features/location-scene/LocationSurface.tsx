@@ -79,12 +79,25 @@ export function LocationSurface({
         : locationId === LOCATION_IDS.emergencyPowerAnnex
           ? ["Power Cell"]
           : undefined;
+  // The place's derived state, not its base content (#209): the collapsed and
+  // opened Deep Jag are one authored location, and which scene and description
+  // the player gets is the location-state boundary's answer. Every other
+  // location authors no variants, so this resolves to exactly what it always
+  // was.
+  const locationState = state.locationStates[locationId];
+  const presentedLocation = locationState
+    ? {
+        ...location,
+        description: locationState.description,
+        presentation: { scene: locationState.scene },
+      }
+    : location;
 
   return (
     <Panel tone="raised" className="overflow-hidden !p-0" data-location-surface>
       <LocationSceneHeader
         characterName={characterName}
-        location={location}
+        location={presentedLocation}
         resourceLabels={resourceLabels}
       />
       {/* Slightly less padding below the resident than above the description:
@@ -100,7 +113,7 @@ export function LocationSurface({
           className="max-w-2xl text-sm leading-relaxed text-[color:var(--rs-text-secondary)]"
           data-location-description
         >
-          {location.description}
+          {presentedLocation.description}
         </p>
         {/* Who is here rides on the resident row's second line rather than
             taking a row of its own (#193) — 32px on a phone, which is the

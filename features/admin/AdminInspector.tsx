@@ -345,10 +345,11 @@ export function AdminInspector({ initial }: { initial: AdminInspectorState }) {
           {play.cargoHold.repair.complete ? " · repair complete" : " · repair in progress"}
         </div>
         <div className="mt-2 text-xs text-[color:var(--rs-text-muted)]">
-          Repair: ferrite {play.cargoHold.repair.refinedFerriteContributed}/
-          {play.cargoHold.repair.refinedFerriteRequired} · slag{" "}
-          {play.cargoHold.repair.slagContributed}/{play.cargoHold.repair.slagRequired} · weld{" "}
-          {play.cargoHold.repair.weldingProgress}
+          Repair:{" "}
+          {play.cargoHold.repair.materials
+            .map((material) => `${material.name} ${material.contributed}/${material.required}`)
+            .join(" · ")}{" "}
+          · weld {play.cargoHold.repair.weldingProgress}
           {play.cargoHold.repair.completedAt
             ? ` · completed ${play.cargoHold.repair.completedAt}`
             : ""}

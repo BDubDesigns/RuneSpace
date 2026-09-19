@@ -30,6 +30,14 @@ export function validateRepairTargets(
       );
     }
     // Throws when the balance registry authors no recipe for this target.
-    getRepairTargetBalance(target.id);
+    const recipe = getRepairTargetBalance(target.id);
+    // A note for a material the recipe does not want would never render, so it
+    // is almost certainly a typo in an item ID or a leftover from a recipe
+    // change (#209). Failing here is how an author finds out.
+    for (const itemId of Object.keys(target.materialNotes ?? {})) {
+      if (!recipe.materials.some((material) => material.itemId === itemId)) {
+        throw new Error(`${where} notes material "${itemId}", which its recipe does not require.`);
+      }
+    }
   }
 }

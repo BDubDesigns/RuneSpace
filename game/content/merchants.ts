@@ -28,6 +28,10 @@ const merchantDefinitions = [
       { itemId: ITEM_IDS.refinedFerrite, buyPrice: 10 },
       { itemId: ITEM_IDS.ferriteShale, buyPrice: 2 },
       { itemId: ITEM_IDS.slag, buyPrice: 1 },
+      // Deep Jag materials (#209). Bix takes raw ore and rough stock; the
+      // finished alloy is Wade's trade, not his.
+      { itemId: ITEM_IDS.galvanite, buyPrice: 4 },
+      { itemId: ITEM_IDS.galvanicStock, buyPrice: 18 },
     ],
   },
   {
@@ -36,7 +40,15 @@ const merchantDefinitions = [
     authorizingMissionId: MISSION_IDS.tenThousandHours,
     // Two Credits a piece, the same as he would charge anybody. He does not buy
     // Slag back: Bix already does, and one buyer for it is the economy.
-    prices: [{ itemId: ITEM_IDS.scrapMetal, sellPrice: 2 }],
+    prices: [
+      { itemId: ITEM_IDS.scrapMetal, sellPrice: 2 },
+      // Wade starts buying structural material once the player is working at
+      // Deep Jag depth (#209). No specialist differential yet: where he and
+      // Bix both buy an item, the approved starting price is the same.
+      { itemId: ITEM_IDS.refinedFerrite, buyPrice: 10 },
+      { itemId: ITEM_IDS.galvanicStock, buyPrice: 18 },
+      { itemId: ITEM_IDS.galvaferrite, buyPrice: 45 },
+    ],
   },
 ] as const satisfies readonly MerchantDefinition[];
 

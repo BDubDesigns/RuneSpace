@@ -8,8 +8,14 @@ import {
   inventoryStacks,
   equippedItems,
 } from "@/db/rune-space";
-import { getEffectiveGameBalance, standardSkillLevelThresholds } from "@/game/config/balance";
-import { ACTION_IDS, SKILL_IDS } from "@/game/config/foundations";
+import {
+  getEffectiveGameBalance,
+  refiningActionIds,
+  refiningRecipeForActionId,
+  standardSkillLevelThresholds,
+  type RefiningRecipeBalance,
+} from "@/game/config/balance";
+import { SKILL_IDS } from "@/game/config/foundations";
 import { deriveEquipmentLoadout } from "@/game/domain/equipment";
 import type { StackState } from "@/game/domain/inventory";
 import {
@@ -47,15 +53,16 @@ export type RefiningRunState = {
   attempts: number;
   successes: number;
   failures: number;
-  ferriteGained: number;
-  slagGained: number;
-  shaleConsumed: number;
+  /** This run's totals, keyed by item ID (#209). */
+  outputsGained: Readonly<Record<string, number>>;
+  inputsConsumed: Readonly<Record<string, number>>;
   xpGained: number;
   recentAttempts: readonly RefiningRunAttempt[];
 };
 
 export type PersistedRefiningOutcome = RefiningResolution<string> & {
   characterId: string;
+  recipe: RefiningRecipeBalance;
   attemptResolvedAt: readonly string[];
 };
 
@@ -168,6 +175,18 @@ async function loadRefiningSnapshot(
   };
 }
 
+/** Add this window's per-item totals onto the durable run totals. */
+function mergeTotals(
+  existing: Record<string, number> | null,
+  addition: Readonly<Record<string, number>>,
+): Record<string, number> {
+  const merged: Record<string, number> = { ...(existing ?? {}) };
+  for (const [itemId, quantity] of Object.entries(addition)) {
+    if (quantity > 0) merged[itemId] = (merged[itemId] ?? 0) + quantity;
+  }
+  return merged;
+}
+
 export function createRefiningResolver(
   random: RefiningRandom,
   onOutcome?: (outcome: PersistedRefiningOutcome) => void,
@@ -176,19 +195,25 @@ export function createRefiningResolver(
     random as RefiningRandom & { setCharacterId?: (characterId: string) => void }
   ).setCharacterId;
   return {
-    supports: (action) => action.actionId === ACTION_IDS.refining,
+    supports: (action) => refiningActionIds().includes(action.actionId),
     load: async (transaction, { character }) => loadRefiningSnapshot(transaction, character.id),
     resolve: ({ action, snapshot, window }) => {
       setCharacterId?.(action.characterId);
+      // The durable action row IS the recipe selection, so a refresh or an
+      // offline window resolves the recipe the player actually started (#209).
+      const recipe = refiningRecipeForActionId(action.actionId);
+      if (!recipe) throw new Error(`No Refining recipe authors action "${action.actionId}"`);
       const resolved = resolveRefining({
         elapsedTicks: window.elapsedTicks,
         snapshot,
         balance: getEffectiveGameBalance(),
+        recipe,
         random,
       });
       let cumulativeAttemptTicks = 0;
       const outcome: PersistedRefiningOutcome = {
         characterId: action.characterId,
+        recipe,
         ...resolved,
         attemptResolvedAt: resolved.resolvedAttempts.map((_, index) =>
           new Date(
@@ -214,17 +239,28 @@ export function createRefiningResolver(
         .for("update");
       const itemIdByStackId = new Map(persistedStacks.map((stack) => [stack.id, stack.itemId]));
       const now = new Date();
-      const shaleConsumption = await consumeStackableItem(transaction, {
-        characterId: outcome.characterId,
-        itemId: getEffectiveGameBalance().items.ferriteShale.itemId,
-        quantity: outcome.shaleConsumed,
-        now,
-      });
-      if (!shaleConsumption.ok)
-        throw new Error("Refining consumed more shale than available at persistence time");
+      // Consume every authored input of the recipe, not a hardcoded Ferrite
+      // Shale line (#209).
+      for (const [itemId, quantity] of Object.entries(outcome.inputsConsumed)) {
+        if (quantity <= 0) continue;
+        const consumption = await consumeStackableItem(transaction, {
+          characterId: outcome.characterId,
+          itemId,
+          quantity,
+          now,
+        });
+        if (!consumption.ok) {
+          throw new Error(`Refining consumed more "${itemId}" than available at persistence time`);
+        }
+      }
 
-      const balance = getEffectiveGameBalance();
-      for (const itemId of [balance.items.refinedFerrite.itemId, balance.items.slag.itemId]) {
+      // Award every item this window actually produced. A Galvaferrite failure
+      // hands back an input, so the awarded set is not a fixed output pair.
+      const awardedItemIds = new Set<string>([
+        ...Object.keys(outcome.outputsGained),
+        ...outcome.createdStacks.map((stack) => stack.itemId),
+      ]);
+      for (const itemId of awardedItemIds) {
         await addStackableItem(transaction, {
           characterId: outcome.characterId,
           plan: {
@@ -267,9 +303,14 @@ export function createRefiningResolver(
           .set({
             runAttempts: state.runAttempts + outcome.resolvedAttempts.length,
             runSuccesses: state.runSuccesses + outcome.successes,
-            runFerriteGained: state.runFerriteGained + outcome.ferriteGained,
-            runSlagGained: state.runSlagGained + outcome.slagGained,
-            runShaleConsumed: state.runShaleConsumed + outcome.shaleConsumed,
+            runOutputsGained: mergeTotals(
+              state.runOutputsGained as Record<string, number> | null,
+              outcome.outputsGained,
+            ),
+            runInputsConsumed: mergeTotals(
+              state.runInputsConsumed as Record<string, number> | null,
+              outcome.inputsConsumed,
+            ),
             runXpGained: state.runXpGained + outcome.awardedXp,
             recentAttempts,
             updatedAt: new Date(),

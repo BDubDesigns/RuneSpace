@@ -25,6 +25,14 @@ const itemIds = {
   // Practice Welding stock (#190). Fungible but non-stacking: one piece per
   // inventory slot, so six of them is a real carrying decision.
   scrapMetal: asContentId("scrap_metal"),
+  // Deep Jag Tier-2 materials (#209). Galvanite is the raw ore Deep Jag
+  // produces once the cave-in is braced; the other two are what Refining makes
+  // of it. Mass conserves through the approved recipes: 2x400 g Galvanite ->
+  // 800 g Galvanic Stock, and 800 g + 150 g Refined Ferrite -> 950 g
+  // Galvaferrite.
+  galvanite: asContentId("galvanite"),
+  galvanicStock: asContentId("galvanic_stock"),
+  galvaferrite: asContentId("galvaferrite"),
 } as const satisfies Record<string, ContentId>;
 
 const npcIds = {
@@ -49,6 +57,10 @@ const missionIds = {
   // acceptance — not its turn-in — is the permanent authorization for customer
   // client work.
   tenThousandOneHours: asContentId("ten_thousand_one_hours"),
+  // Tansy's Deep Jag Mission (#209). A sibling branch to Work Orders, not a
+  // successor: it requires 10,000 Hours complete plus Mining 5 and Welding 5,
+  // and deliberately does NOT require 10,001 Hours.
+  braceYourself: asContentId("brace_yourself"),
 } as const satisfies Record<string, ContentId>;
 
 const dialogueIds = {
@@ -150,6 +162,17 @@ const dialogueIds = {
     "wade_rusk_ten_thousand_one_hours_capacity_mass_refusal",
   ),
   wadePostTenThousandOneHours: asContentId("wade_rusk_post_ten_thousand_one_hours"),
+  // Brace Yourself (#209): Tansy finally spending the brace hardware she has
+  // been sitting on, because someone she trusts can now both read the rock and
+  // run a torch. Her active beat points at Deep Jag; her turn-in beat is the
+  // mine being open, not the paperwork.
+  tansyBraceYourselfOffer: asContentId("tansy_rusk_brace_yourself_offer"),
+  tansyBraceYourselfAccepted: asContentId("tansy_rusk_brace_yourself_accepted"),
+  tansyBraceYourselfRepairReminder: asContentId("tansy_rusk_brace_yourself_repair_reminder"),
+  tansyBraceYourselfBusy: asContentId("tansy_rusk_brace_yourself_busy"),
+  tansyBraceYourselfTurnIn: asContentId("tansy_rusk_brace_yourself_turn_in"),
+  tansyBraceYourselfCompletion: asContentId("tansy_rusk_brace_yourself_completion"),
+  tansyPostBraceYourself: asContentId("tansy_rusk_post_brace_yourself"),
   // Replayable social/worldbuilding topics (#164). These are ordinary NPC
   // conversations: they never carry a Mission action and never gate progression.
   wadeRecoveryWorkTopic: asContentId("wade_rusk_topic_recovery_work"),
@@ -231,6 +254,19 @@ export const ACTION_IDS = {
   // every job in the pool: which job is on the bench is durable Work Order
   // state, so `active_actions` keeps its narrow no-payload shape.
   workOrderWelding: asContentId("work_order_welding"),
+  // Mining a second authored source (#209). A source is identified by its own
+  // action ID for the same reason a repair target is: `active_actions`
+  // deliberately carries no per-action payload, so the action IS the durable
+  // identity across refresh and offline resolution.
+  galvaniteMining: asContentId("galvanite_mining"),
+  // Refining recipes follow that same established rule. The existing Refined
+  // Ferrite recipe keeps its original action ID unchanged; the two new
+  // authored recipes get their own, which is what makes the selected recipe
+  // survive refresh and lazy/offline resolution without a new column.
+  galvanicStockRefining: asContentId("galvanic_stock_refining"),
+  galvaferriteRefining: asContentId("galvaferrite_refining"),
+  // Welding the brace/support assembly into the collapsed Deep Jag passage.
+  deepJagWelding: asContentId("deep_jag_welding"),
   travel: asContentId("travel"),
 } as const satisfies Record<string, ContentId>;
 
@@ -243,6 +279,9 @@ export const LOCATION_IDS = {
   theJag: asContentId("the_jag"),
   holoHollow: asContentId("holo_hollow"),
   ruskRecovery: asContentId("rusk_recovery"),
+  // The first World Location whose player-facing state changes durably (#209).
+  // One authored location, two presentations: see game/domain/location-state.
+  deepJag: asContentId("deep_jag"),
 } as const satisfies Record<string, ContentId>;
 
 /**
@@ -278,6 +317,10 @@ export const MERCHANT_IDS = {
 export const REPAIR_TARGET_IDS = {
   cargoHold: asContentId("cargo_hold"),
   crewStop: asContentId("crew_stop"),
+  // Bracing the collapsed Deep Jag passage (#209). Its completion is the
+  // authoritative fact that opens the location; there is no second
+  // `deep_jag_open` flag anywhere.
+  deepJagCaveIn: asContentId("deep_jag_cave_in"),
 } as const satisfies Record<string, ContentId>;
 
 /**

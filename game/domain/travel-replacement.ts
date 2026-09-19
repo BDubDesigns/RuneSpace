@@ -1,4 +1,4 @@
-import { weldingActionIds } from "@/game/config/balance";
+import { miningActionIds, refiningActionIds, weldingActionIds } from "@/game/config/balance";
 import { ACTION_IDS } from "@/game/config/foundations";
 
 /**
@@ -6,14 +6,19 @@ import { ACTION_IDS } from "@/game/config/foundations";
  * travel-replaceable. This is intentionally a small explicit set — not a
  * registry or plugin system. Adding a future work action is one entry here.
  *
- * Welding contributes every repair target's action, because Welding anywhere is
- * the same interruptible work: a partial pass is simply never resolved.
- * Practice Welding joins them for the same reason — leaving Wade's yard stops
- * the bench, and the partial weld is waiting when the player comes back (#190).
+ * Where an activity is a family of authored content, though, the entry is the
+ * family rather than one of its members. Mining contributes every authored
+ * source and Refining every authored recipe (#209), because walking away from
+ * Galvanite is the same interruptible work as walking away from Ferrite Shale
+ * — naming one source here would have quietly refused travel from the others.
+ * Welding contributes every repair target's action for the same reason: a
+ * partial pass is simply never resolved. Practice Welding joins them because
+ * leaving Wade's yard stops the bench, and the partial weld is waiting when the
+ * player comes back (#190).
  */
 const TRAVEL_REPLACEABLE_ACTION_IDS = new Set<string>([
-  ACTION_IDS.ferriteShaleMining,
-  ACTION_IDS.refining,
+  ...miningActionIds(),
+  ...refiningActionIds(),
   ...weldingActionIds(),
   ACTION_IDS.practiceWelding,
   // Walking out of the yard interrupts a customer job under the same shared

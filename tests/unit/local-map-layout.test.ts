@@ -61,8 +61,10 @@ describe("five-cell flat-top local map layout (issue #83)", () => {
     // geometry but deliberately no walkable edge, so it adds nothing to
     // `undirectedRoutes` while `routeSegments` gains exactly one entry: the
     // route is one-way, and there is no ride back to draw.
-    expect(geometry.undirectedRoutes).toHaveLength(9);
-    expect(Object.keys(geometry.routeSegments)).toHaveLength(19);
+    // Deep Jag (#209) adds exactly one more: the reciprocal walk to The Jag,
+    // which is the only place it connects to.
+    expect(geometry.undirectedRoutes).toHaveLength(10);
+    expect(Object.keys(geometry.routeSegments)).toHaveLength(21);
     expect(
       geometry.undirectedRoutes.every(
         (route) =>

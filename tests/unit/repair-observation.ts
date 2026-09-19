@@ -12,10 +12,8 @@ import type { RepairTargetObservation } from "@/game/domain/missions";
  */
 export type RepairProgressInput = {
   complete?: boolean;
-  /** Installed Refined Ferrite. */
-  contributed?: number;
-  /** Installed Slag, for a recipe that needs any. */
-  slag?: number;
+  /** Installed quantity per item ID; anything unnamed reports its honest zero. */
+  materials?: Readonly<Record<string, number>>;
   welded?: number;
 };
 
@@ -28,23 +26,20 @@ export function repairObservation(
       const recipe = getRepairTargetBalance(target.id, balance);
       const state = progress[target.id as RepairTargetId] ?? {};
       const complete = state.complete ?? false;
-      const contributed = complete ? recipe.refinedFerriteRequired : (state.contributed ?? 0);
       return [
         target.id,
         {
           complete,
-          materials: [
-            {
-              itemId: balance.items.refinedFerrite.itemId,
-              contributed,
-              required: recipe.refinedFerriteRequired,
-            },
-            {
-              itemId: balance.items.slag.itemId,
-              contributed: complete ? recipe.slagRequired : (state.slag ?? 0),
-              required: recipe.slagRequired,
-            },
-          ].filter((material) => material.required > 0),
+          // Every material the recipe authors, in recipe order (#209): a
+          // finished repair has all of them installed, and a partial one has
+          // whatever the caller named.
+          materials: recipe.materials.map((requirement) => ({
+            itemId: requirement.itemId,
+            contributed: complete
+              ? requirement.quantity
+              : (state.materials?.[requirement.itemId] ?? 0),
+            required: requirement.quantity,
+          })),
           welding: {
             completed: complete ? recipe.repairIncrements : (state.welded ?? 0),
             required: recipe.repairIncrements,

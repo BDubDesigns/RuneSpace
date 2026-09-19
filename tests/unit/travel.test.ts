@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
+import { miningActionIds, refiningActionIds } from "@/game/config/balance";
 import { LOCATION_IDS } from "@/game/config/foundations";
+import { isTravelReplaceableAction } from "@/game/domain/travel-replacement";
 import {
   adjacentWalkDurationTicks,
   planTravel,
@@ -90,5 +92,30 @@ describe("issue #40 travel domain", () => {
       alreadyConsumedTicks: 0,
     });
     expect(overdue).toEqual({ arrived: true, consumedTicks: 40 });
+  });
+});
+
+describe("every authored work action can be walked away from", () => {
+  /**
+   * Issue #211 review — the travel-replacement set named `ferriteShaleMining`
+   * and the original `refining` action by hand, so generalizing Mining to
+   * sources and Refining to recipes (#209) left Galvanite and both tier-2
+   * recipes out of it. Walking away from them refused instead of stopping
+   * them, reported as the bogus "Another activity is active."
+   *
+   * The fix is that the set is derived from the same registries every other
+   * surface reads. This states the property rather than the three names, so a
+   * fourth source or recipe is covered the moment it is authored.
+   */
+  it("covers every authored Mining source and Refining recipe", () => {
+    for (const actionId of [...miningActionIds(), ...refiningActionIds()]) {
+      expect(isTravelReplaceableAction(actionId)).toBe(true);
+    }
+    // A guard on the loop itself: this must be more than the two originals.
+    expect([...miningActionIds(), ...refiningActionIds()].length).toBeGreaterThan(2);
+  });
+
+  it("still refuses an action that never declared itself replaceable", () => {
+    expect(isTravelReplaceableAction("not_a_work_action")).toBe(false);
   });
 });

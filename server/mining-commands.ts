@@ -6,9 +6,9 @@ import {
   equippedItems,
   itemInstances,
 } from "@/db/rune-space";
-import { getEffectiveGameBalance } from "@/game/config/balance";
+import { getEffectiveGameBalance, miningActionIds, miningSources } from "@/game/config/balance";
 import { ACTION_IDS, LOCATION_IDS } from "@/game/config/foundations";
-import { isActionAvailableAtLocation } from "@/game/content/locations";
+import { loadLocationState } from "@/server/location-state";
 import {
   miningPreflightStopReason,
   normalizeCutterCharge,
@@ -57,11 +57,17 @@ function recentFrom(
 }
 
 /**
- * Begin a Mining run at the authoritative Ferrite location. The shared
- * owned-character lock first resolves any due active action work, then this
- * command starts Mining in the same transaction.
+ * Begin a Mining run at whichever source this location currently offers.
+ *
+ * The source is derived server-side from the location's resolved state (#209),
+ * never supplied by the client: The Jag offers Ferrite Shale, and Deep Jag
+ * offers Galvanite only once its brace is welded in. A location that offers no
+ * Mining source simply refuses.
+ *
+ * The shared owned-character lock first resolves any due active action work,
+ * then this command starts Mining in the same transaction.
  */
-export async function startFerriteShaleMining(
+export async function startMining(
   userId: string,
   characterId: string,
   now = new Date(),
@@ -76,8 +82,6 @@ export async function startFerriteShaleMining(
     }),
     async (transaction, context) => {
       await ensurePlayProvisioning(transaction, context.character.id);
-      const unsupportedAction =
-        context.action && context.action.actionId !== ACTION_IDS.ferriteShaleMining;
       // Reload the character after lazy resolution so location reflects any
       // travel arrival that just committed in this same transaction.
       const [reloaded] = await transaction
@@ -86,47 +90,46 @@ export async function startFerriteShaleMining(
         .where(eq(characters.id, context.character.id))
         .limit(1);
       const currentLocationId = reloaded?.currentLocationId ?? LOCATION_IDS.crashSite;
-      const traveling = context.action?.actionId === ACTION_IDS.travel;
-      // Mining may only start at the authoritative Ferrite location (The Jag after issue #83).
-      const miningBlockedHere = !isActionAvailableAtLocation(
+      // Which ore this place currently yields is derived state, not a client
+      // claim: a collapsed Deep Jag offers no Mining action at all.
+      const locationState = await loadLocationState(
+        transaction,
+        context.character.id,
         currentLocationId,
-        ACTION_IDS.ferriteShaleMining,
       );
+      const source = miningSources().find((candidate) =>
+        locationState?.availableActionIds.includes(candidate.actionId),
+      );
+      const unsupportedAction = context.action && context.action.actionId !== source?.actionId;
+      const traveling = context.action?.actionId === ACTION_IDS.travel;
+      const miningBlockedHere = source === undefined;
       const snapshot = await loadMiningSnapshot(transaction, context.character.id);
       const preflightStopReason =
-        context.action || traveling || miningBlockedHere
+        context.action || traveling || miningBlockedHere || !source
           ? undefined
-          : miningPreflightStopReason(snapshot, getEffectiveGameBalance());
-      if (!context.action && !preflightStopReason && !miningBlockedHere) {
+          : miningPreflightStopReason(snapshot, getEffectiveGameBalance(), source);
+      if (!context.action && !preflightStopReason && source) {
         await transaction.insert(activeActions).values({
           characterId: context.character.id,
-          actionId: ACTION_IDS.ferriteShaleMining,
+          actionId: source.actionId,
           startedAt: now,
           resolvedThroughAt: now,
         });
+        const freshRun = {
+          runAttempts: 0,
+          runSuccesses: 0,
+          runItemsGained: {},
+          runXpGained: 0,
+          recentAttempts: [],
+          lastStopReason: null,
+          updatedAt: now,
+        };
         await transaction
           .insert(characterMiningState)
-          .values({
-            characterId: context.character.id,
-            runAttempts: 0,
-            runSuccesses: 0,
-            runShaleGained: 0,
-            runXpGained: 0,
-            recentAttempts: [],
-            lastStopReason: null,
-            updatedAt: now,
-          })
+          .values({ characterId: context.character.id, ...freshRun })
           .onConflictDoUpdate({
             target: characterMiningState.characterId,
-            set: {
-              runAttempts: 0,
-              runSuccesses: 0,
-              runShaleGained: 0,
-              runXpGained: 0,
-              recentAttempts: [],
-              lastStopReason: null,
-              updatedAt: now,
-            },
+            set: freshRun,
           });
       }
       if (!unsupportedAction && !preflightStopReason)
@@ -174,7 +177,9 @@ export async function stopMining(
     }),
     async (transaction, context) => {
       await ensurePlayProvisioning(transaction, context.character.id);
-      const manuallyStopped = context.action?.actionId === ACTION_IDS.ferriteShaleMining;
+      // Any authored source's action, not just Ferrite Shale's (#209).
+      const manuallyStopped =
+        context.action !== undefined && miningActionIds().includes(context.action.actionId);
       if (manuallyStopped)
         await transaction
           .delete(activeActions)
@@ -192,7 +197,7 @@ export async function stopMining(
         context.character.id,
         recentFrom(outcome),
         manuallyStopped ? "manually_stopped" : outcome?.stopReason,
-        context.action && context.action.actionId !== ACTION_IDS.ferriteShaleMining
+        context.action && !miningActionIds().includes(context.action.actionId)
           ? "another_action_active"
           : undefined,
         undefined,

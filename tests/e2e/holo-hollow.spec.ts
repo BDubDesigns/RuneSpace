@@ -572,9 +572,10 @@ test("buys and sells against the authoritative balance without leaving the shop"
   await expect(trade.locator("[data-trade-credits]")).toContainText("4 Credits");
   await expect(cellRow.locator("[data-trade-owned]")).toHaveText("2");
 
-  // Sell: Bix buys the four approved materials, Shale at two Credits each.
+  // Sell: Bix buys the six approved materials — the original four plus the two
+  // Deep Jag ones (#209) — with Shale still at two Credits each.
   await trade.locator('[data-trade-mode="sell"]').click();
-  await expect(trade.locator("[data-trade-row]")).toHaveCount(4);
+  await expect(trade.locator("[data-trade-row]")).toHaveCount(6);
   const shaleRow = trade.locator(`[data-trade-row="${ITEM_IDS.ferriteShale}"]`);
   await expect(shaleRow.locator("[data-trade-unit-price]")).toHaveText("2");
   await expect(shaleRow.locator("[data-trade-owned]")).toHaveText("5");
@@ -819,8 +820,7 @@ test("tracks the repair's real phases in the Mission Log and its guidance", asyn
   await db.insert(characterRepairTargets).values({
     characterId,
     targetId: REPAIR_TARGET_IDS.crewStop,
-    refinedFerriteContributed: 10,
-    slagContributed: 0,
+    materials: { [ITEM_IDS.refinedFerrite]: 10 },
     weldingProgress: 0,
   });
   await arriveInHoloHollow(characterId);
@@ -871,7 +871,7 @@ test("tracks the repair's real phases in the Mission Log and its guidance", asyn
   // the one place the work can happen, so guidance returns.
   await db
     .update(characterRepairTargets)
-    .set({ refinedFerriteContributed: 20, weldingProgress: 3 })
+    .set({ materials: { [ITEM_IDS.refinedFerrite]: 20 }, weldingProgress: 3 })
     .where(eq(characterRepairTargets.characterId, characterId));
   await page.reload();
   await expect(page.locator("[data-mission-strip-objective]")).toHaveText(
@@ -902,8 +902,7 @@ test("keeps the repaired shelter and the ride apart until Renn is told", async (
   await db.insert(characterRepairTargets).values({
     characterId,
     targetId: REPAIR_TARGET_IDS.crewStop,
-    refinedFerriteContributed: 20,
-    slagContributed: 0,
+    materials: { [ITEM_IDS.refinedFerrite]: 20 },
     weldingProgress: 10,
     completedAt: now,
   });
@@ -963,8 +962,7 @@ test("presents the repaired Crew Stop and its one-way 5-Credit ride out to The J
   await db.insert(characterRepairTargets).values({
     characterId,
     targetId: REPAIR_TARGET_IDS.crewStop,
-    refinedFerriteContributed: 20,
-    slagContributed: 0,
+    materials: { [ITEM_IDS.refinedFerrite]: 20 },
     weldingProgress: 10,
     completedAt: now,
   });

@@ -49,7 +49,8 @@ async function expectMapStatusPlatesInsideHex(page: import("@playwright/test").P
     page.locator('[aria-label="Local map"]'),
     "data-map-status",
   );
-  expect(geometry.labels.sort()).toEqual(["Daily cells", "Mining", "Refining"]);
+  // Deep Jag carries CAVE-IN from the start of the game (#209).
+  expect(geometry.labels.sort()).toEqual(["CAVE-IN", "Daily cells", "Mining", "Refining"]);
   await expect(page.locator('[data-map-location="crash_site"] [data-map-status]')).toHaveCount(0);
   await expect(
     page.locator('[data-map-location="the_long_scramble"] [data-map-status]'),
@@ -63,6 +64,9 @@ async function expectMapStatusPlatesInsideHex(page: import("@playwright/test").P
   await expect(
     page.locator('[data-map-location="dewhat_emergency_power_annex"] [data-map-status]'),
   ).toHaveText("Daily cells");
+  await expect(page.locator('[data-map-location="deep_jag"] [data-map-status]')).toHaveText(
+    "CAVE-IN",
+  );
   expect(geometry.allInside).toBe(true);
   expect(geometry.routeOverlaps).toEqual([]);
 }
@@ -74,6 +78,8 @@ async function expectMapNameplatesInsideHex(page: import("@playwright/test").Pag
   );
   expect(geometry.labels.sort()).toEqual([
     "Crash Site",
+    // Visible from the start as a future-world tease, behind The Jag (#209).
+    "Deep Jag",
     "Holo Hollow",
     "Long Scramble",
     "Power Annex",
@@ -99,16 +105,17 @@ async function expectMapStateLabelsInsideHex(
   expect(geometry.routeOverlaps).toEqual([]);
 }
 
-// Seven hexes from the Crash Site: it is "You are here", the Processing Yard,
+// Eight hexes from the Crash Site: it is "You are here", the Processing Yard,
 // Power Annex, Long Scramble, and Holo Hollow are all directly reachable, and
-// The Jag and Rusk Recovery (#190) are visible behind the Scramble and behind
-// Holo Hollow respectively.
+// The Jag, Rusk Recovery (#190) and Deep Jag (#209) are visible behind the
+// Scramble, behind Holo Hollow, and behind The Jag respectively.
 const STATIONARY_STATE_LABELS = [
   "You are here",
   "Reachable",
   "Reachable",
   "Reachable",
   "Reachable",
+  "Visible",
   "Visible",
   "Visible",
 ] as const;
@@ -120,6 +127,7 @@ const SELECTED_STATE_LABELS = [
   "Reachable",
   "Visible",
   "Visible",
+  "Visible",
 ] as const;
 const IN_TRANSIT_STATE_LABELS = [
   "Origin",
@@ -127,6 +135,7 @@ const IN_TRANSIT_STATE_LABELS = [
   "Reachable",
   "Reachable",
   "Reachable",
+  "Visible",
   "Visible",
   "Visible",
 ] as const;

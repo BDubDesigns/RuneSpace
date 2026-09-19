@@ -215,16 +215,15 @@ export async function seedRepairTarget(
   characterId: string,
   targetId: string,
   values: {
-    refinedFerriteContributed?: number;
-    slagContributed?: number;
+    /** Installed material as `{ itemId: quantity }`; see `installedMaterials`. */
+    materials?: Readonly<Record<string, number>>;
     weldingProgress?: number;
     completedAt?: Date | null;
     updatedAt?: Date;
   },
 ): Promise<void> {
   const row = {
-    refinedFerriteContributed: values.refinedFerriteContributed ?? 0,
-    slagContributed: values.slagContributed ?? 0,
+    materials: values.materials ?? {},
     weldingProgress: values.weldingProgress ?? 0,
     completedAt: values.completedAt ?? null,
     updatedAt: values.updatedAt ?? new Date(),
@@ -236,4 +235,39 @@ export async function seedRepairTarget(
       target: [rune.characterRepairTargets.characterId, rune.characterRepairTargets.targetId],
       set: row,
     });
+}
+
+/**
+ * The `materials` JSON for a repair row, built from the target's authored
+ * recipe (#209).
+ *
+ * Suites that need a repair already paid for used to name the two columns the
+ * old schema had. A recipe is now an authored list, so they name the recipe
+ * instead and override only the quantity the test is actually about:
+ *
+ * ```ts
+ * materials: installedMaterials(crewStop)                                 // all of it
+ * materials: installedMaterials(crewStop, { [ITEM_IDS.refinedFerrite]: 19 }) // one short
+ * ```
+ */
+export function installedMaterials(
+  recipe: { materials: readonly { itemId: string; quantity: number }[] },
+  overrides: Readonly<Record<string, number>> = {},
+): Record<string, number> {
+  return Object.fromEntries(
+    recipe.materials.map((requirement) => [
+      requirement.itemId,
+      overrides[requirement.itemId] ?? requirement.quantity,
+    ]),
+  );
+}
+
+/** One authored material's required quantity, by item ID. */
+export function requiredQuantity(
+  recipe: { materials: readonly { itemId: string; quantity: number }[] },
+  itemId: string,
+): number {
+  const requirement = recipe.materials.find((candidate) => candidate.itemId === itemId);
+  if (!requirement) throw new Error(`Repair recipe authors no "${itemId}" requirement`);
+  return requirement.quantity;
 }

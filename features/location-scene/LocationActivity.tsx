@@ -1,6 +1,6 @@
 "use client";
 
-import { LOCAL_PLACE_IDS, LOCATION_IDS } from "@/game/config/foundations";
+import { LOCAL_PLACE_IDS, LOCATION_IDS, REPAIR_TARGET_IDS } from "@/game/config/foundations";
 import { deriveCompletedMissionIds } from "@/game/domain/missions";
 import { resolveActiveLocalPlace } from "@/game/domain/local-places";
 import { CargoHoldPanel } from "@/features/cargo/CargoHoldPanel";
@@ -9,6 +9,7 @@ import { MiningActivity } from "@/features/mining/MiningActivity";
 import { PowerAnnexClaimPanel } from "@/features/power-annex/PowerAnnexClaimPanel";
 import { WorkbenchPanel } from "@/features/practice/WorkbenchPanel";
 import { RefiningConsole } from "@/features/refining/RefiningConsole";
+import { RepairWorkPanel } from "@/features/welding/RepairWorkPanel";
 import { usePlay } from "@/features/play/PlayContext";
 
 /**
@@ -65,6 +66,22 @@ export function LocationActivity({
   switch (locationId) {
     case LOCATION_IDS.theJag:
       return <MiningActivity characterName={characterName} />;
+    case LOCATION_IDS.deepJag:
+      // One place, two jobs, and the repair's own completion decides which
+      // (#209). There is no Deep-Jag-specific repair surface and no second
+      // unlock flag: while the brace is unfinished this is a Welding job, and
+      // the moment the fifteenth section lands the same location is a mine.
+      return state.repairs[REPAIR_TARGET_IDS.deepJagCaveIn]?.complete ? (
+        <MiningActivity characterName={characterName} />
+      ) : (
+        <RepairWorkPanel
+          eyebrow="Collapsed Passage"
+          materialsPrompt="Tansy's brace and jack are already down here. What the support needs is the stock to build it out of; hand over what you are carrying and bring the rest when you come back."
+          targetId={REPAIR_TARGET_IDS.deepJagCaveIn}
+          title="Bracing"
+          weldingPrompt="Everything is set. What is left is welding the support together so it will take the roof's weight."
+        />
+      );
     case LOCATION_IDS.abandonedProcessingYard:
       return <RefiningConsole />;
     case LOCATION_IDS.crashSite:

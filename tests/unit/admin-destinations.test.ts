@@ -21,6 +21,7 @@ describe("ADMIN_DESTINATIONS canonical resolution", () => {
         "the_jag",
         "holo_hollow",
         "rusk_recovery",
+        "deep_jag",
       ].sort(),
     );
   });

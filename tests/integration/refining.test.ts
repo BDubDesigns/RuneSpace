@@ -80,7 +80,12 @@ suite("issue #81 Refining persistence and concurrency (real PostgreSQL)", () => 
     const now = new Date("2026-01-01T00:00:00.000Z");
     await play.getPlayGameplayState(userId, character.id, now);
     // Still at Crash Site — starting Refining must be refused via refiningError, not travelError
-    const refused = await refiningCommands.startRefining(userId, character.id, now);
+    const refused = await refiningCommands.startRefining(
+      userId,
+      character.id,
+      ACTION_IDS.refining,
+      now,
+    );
     expect(refused.refiningError).toBe("refining_unavailable_here");
     expect(refused.travelError).toBeUndefined();
     expect(refused.activeAction).toBeUndefined();
@@ -89,7 +94,12 @@ suite("issue #81 Refining persistence and concurrency (real PostgreSQL)", () => 
     ).resolves.toEqual([]);
 
     // A manipulated direct call is still server-authoritative: no active action is created
-    const stillRefused = await refiningCommands.startRefining(userId, character.id, now);
+    const stillRefused = await refiningCommands.startRefining(
+      userId,
+      character.id,
+      ACTION_IDS.refining,
+      now,
+    );
     expect(stillRefused.refiningError).toBe("refining_unavailable_here");
   });
 
@@ -113,10 +123,16 @@ suite("issue #81 Refining persistence and concurrency (real PostgreSQL)", () => 
       storedAt: now,
     });
 
-    const started = await refiningCommands.startRefining(userId, character.id, now, {
-      nextBasisPoints: () => 0,
-      nextUnit: () => 0,
-    });
+    const started = await refiningCommands.startRefining(
+      userId,
+      character.id,
+      ACTION_IDS.refining,
+      now,
+      {
+        nextBasisPoints: () => 0,
+        nextUnit: () => 0,
+      },
+    );
     expect(started.activeAction?.actionId).toBe(ACTION_IDS.refining);
   });
 
@@ -199,7 +215,7 @@ suite("issue #81 Refining persistence and concurrency (real PostgreSQL)", () => 
     await db
       .insert(rune.inventoryStacks)
       .values({ characterId: character.id, itemId: ITEM_IDS.ferriteShale, quantity: 5 });
-    await refiningCommands.startRefining(userId, character.id, now, {
+    await refiningCommands.startRefining(userId, character.id, ACTION_IDS.refining, now, {
       nextBasisPoints: () => 0,
       nextUnit: () => 0,
     });
@@ -220,7 +236,7 @@ suite("issue #81 Refining persistence and concurrency (real PostgreSQL)", () => 
       },
     );
     expect(resolved.refiningRun.attempts).toBe(1);
-    expect(resolved.refiningRun.ferriteGained).toBe(1);
+    expect(resolved.refiningRun.outputsGained[ITEM_IDS.refinedFerrite]).toBe(1);
     const afterSuccessXp = await db
       .select()
       .from(rune.characterSkillXp)
@@ -250,7 +266,7 @@ suite("issue #81 Refining persistence and concurrency (real PostgreSQL)", () => 
     const startedAt = new Date("2026-01-01T00:00:00.000Z");
     await provisionAtYard(userId, character.id, startedAt);
     await addShale(character.id, 10);
-    await refiningCommands.startRefining(userId, character.id, startedAt, {
+    await refiningCommands.startRefining(userId, character.id, ACTION_IDS.refining, startedAt, {
       nextBasisPoints: () => 0,
       nextUnit: () => 0,
     });
@@ -276,6 +292,7 @@ suite("issue #81 Refining persistence and concurrency (real PostgreSQL)", () => 
     const idempotent = await refiningCommands.startRefining(
       userId,
       character.id,
+      ACTION_IDS.refining,
       new Date("2026-01-01T00:00:04.200Z"),
       { nextBasisPoints: () => 0, nextUnit: () => 0 },
     );
@@ -297,7 +314,7 @@ suite("issue #81 Refining persistence and concurrency (real PostgreSQL)", () => 
     const startedAt = new Date("2026-01-01T00:00:00.000Z");
     await provisionAtYard(userId, character.id, startedAt);
     await addShale(character.id, 5);
-    await refiningCommands.startRefining(userId, character.id, startedAt, {
+    await refiningCommands.startRefining(userId, character.id, ACTION_IDS.refining, startedAt, {
       nextBasisPoints: () => 0,
       nextUnit: () => 0,
     });
@@ -313,19 +330,19 @@ suite("issue #81 Refining persistence and concurrency (real PostgreSQL)", () => 
       attempts: 1,
       successes: 1,
       failures: 0,
-      ferriteGained: 1,
-      slagGained: 0,
-      shaleConsumed: 2,
+      outputsGained: { [ITEM_IDS.refinedFerrite]: 1 },
+      inputsConsumed: { [ITEM_IDS.ferriteShale]: 2 },
       xpGained: 15,
     });
-    expect(resolved.refinedFerriteQuantity).toBe(1);
-    expect(resolved.slagQuantity).toBe(0);
-    expect(resolved.ferriteShaleQuantity).toBe(3);
+    expect(resolved.carriedByItemId[ITEM_IDS.refinedFerrite] ?? 0).toBe(1);
+    expect(resolved.carriedByItemId[ITEM_IDS.slag] ?? 0).toBe(0);
+    expect(resolved.carriedByItemId[ITEM_IDS.ferriteShale] ?? 0).toBe(3);
     expect(resolved.refining.totalXp).toBe(15);
     expect(resolved.refiningRun.recentAttempts).toHaveLength(1);
     expect(resolved.refiningRun.recentAttempts[0]).toMatchObject({
       success: true,
-      ferriteAwarded: 1,
+      awarded: [{ itemId: ITEM_IDS.refinedFerrite, quantity: 1 }],
+      consumed: [{ itemId: ITEM_IDS.ferriteShale, quantity: 2 }],
       xpAwarded: 15,
     });
     const action = await db
@@ -342,7 +359,7 @@ suite("issue #81 Refining persistence and concurrency (real PostgreSQL)", () => 
     const startedAt = new Date("2026-01-01T00:00:00.000Z");
     await provisionAtYard(userId, character.id, startedAt);
     await addShale(character.id, 5);
-    await refiningCommands.startRefining(userId, character.id, startedAt, {
+    await refiningCommands.startRefining(userId, character.id, ACTION_IDS.refining, startedAt, {
       nextBasisPoints: () => 9_999,
       nextUnit: () => 0,
     });
@@ -358,18 +375,18 @@ suite("issue #81 Refining persistence and concurrency (real PostgreSQL)", () => 
       attempts: 1,
       successes: 0,
       failures: 1,
-      ferriteGained: 0,
-      slagGained: 1,
-      shaleConsumed: 2,
+      outputsGained: { [ITEM_IDS.slag]: 1 },
+      inputsConsumed: { [ITEM_IDS.ferriteShale]: 2 },
       xpGained: 3,
     });
-    expect(resolved.slagQuantity).toBe(1);
-    expect(resolved.refinedFerriteQuantity).toBe(0);
-    expect(resolved.ferriteShaleQuantity).toBe(3);
+    expect(resolved.carriedByItemId[ITEM_IDS.slag] ?? 0).toBe(1);
+    expect(resolved.carriedByItemId[ITEM_IDS.refinedFerrite] ?? 0).toBe(0);
+    expect(resolved.carriedByItemId[ITEM_IDS.ferriteShale] ?? 0).toBe(3);
     expect(resolved.refining.totalXp).toBe(3);
     expect(resolved.refiningRun.recentAttempts[0]).toMatchObject({
       success: false,
-      slagAwarded: 1,
+      awarded: [{ itemId: ITEM_IDS.slag, quantity: 1 }],
+      consumed: [{ itemId: ITEM_IDS.ferriteShale, quantity: 2 }],
       xpAwarded: 3,
     });
   });
@@ -379,7 +396,7 @@ suite("issue #81 Refining persistence and concurrency (real PostgreSQL)", () => 
     const startedAt = new Date("2026-01-01T00:00:00.000Z");
     await provisionAtYard(userId, character.id, startedAt);
     await addShale(character.id, 5);
-    await refiningCommands.startRefining(userId, character.id, startedAt, {
+    await refiningCommands.startRefining(userId, character.id, ACTION_IDS.refining, startedAt, {
       nextBasisPoints: () => 0,
       nextUnit: () => 0,
     });
@@ -480,8 +497,8 @@ suite("issue #81 Refining persistence and concurrency (real PostgreSQL)", () => 
       .from(rune.characterRefiningState)
       .where(eq(rune.characterRefiningState.characterId, character.id));
     expect(afterState[0]?.runAttempts).toBe(beforeState[0]?.runAttempts ?? 0);
-    expect(afterState[0]?.runFerriteGained).toBe(beforeState[0]?.runFerriteGained ?? 0);
-    expect(afterState[0]?.runSlagGained).toBe(beforeState[0]?.runSlagGained ?? 0);
+    expect(afterState[0]?.runOutputsGained).toEqual(beforeState[0]?.runOutputsGained ?? {});
+    expect(afterState[0]?.runInputsConsumed).toEqual(beforeState[0]?.runInputsConsumed ?? {});
     expect(afterState[0]?.runXpGained).toBe(beforeState[0]?.runXpGained ?? 0);
     expect(afterState[0]?.recentAttempts).toEqual(beforeState[0]?.recentAttempts ?? []);
     const afterAction = await db
@@ -496,7 +513,7 @@ suite("issue #81 Refining persistence and concurrency (real PostgreSQL)", () => 
       nextUnit: () => 0,
     });
     expect(retried.refiningRun.attempts).toBe(1);
-    expect(retried.refinedFerriteQuantity).toBe(1);
+    expect(retried.carriedByItemId[ITEM_IDS.refinedFerrite] ?? 0).toBe(1);
   });
 
   it("retry/concurrent commands cannot duplicate output/XP or double-consume shale", async () => {
@@ -504,7 +521,7 @@ suite("issue #81 Refining persistence and concurrency (real PostgreSQL)", () => 
     const startedAt = new Date("2026-01-01T00:00:00.000Z");
     await provisionAtYard(userId, character.id, startedAt);
     await addShale(character.id, 10);
-    await refiningCommands.startRefining(userId, character.id, startedAt, {
+    await refiningCommands.startRefining(userId, character.id, ACTION_IDS.refining, startedAt, {
       nextBasisPoints: () => 0,
       nextUnit: () => 0,
     });
@@ -517,8 +534,8 @@ suite("issue #81 Refining persistence and concurrency (real PostgreSQL)", () => 
     ]);
     expect(a.refiningRun.attempts).toBe(1);
     expect(b.refiningRun.attempts).toBe(1);
-    expect(a.refinedFerriteQuantity).toBe(1);
-    expect(b.refinedFerriteQuantity).toBe(1);
+    expect(a.carriedByItemId[ITEM_IDS.refinedFerrite] ?? 0).toBe(1);
+    expect(b.carriedByItemId[ITEM_IDS.refinedFerrite] ?? 0).toBe(1);
     const stacks = await db
       .select()
       .from(rune.inventoryStacks)
@@ -540,7 +557,7 @@ suite("issue #81 Refining persistence and concurrency (real PostgreSQL)", () => 
     const startedAt = new Date("2026-01-01T00:00:00.000Z");
     await provisionAtYard(userId, character.id, startedAt);
     await addShale(character.id, 10);
-    await refiningCommands.startRefining(userId, character.id, startedAt, {
+    await refiningCommands.startRefining(userId, character.id, ACTION_IDS.refining, startedAt, {
       nextBasisPoints: () => 0,
       nextUnit: () => 0,
     });
@@ -551,7 +568,7 @@ suite("issue #81 Refining persistence and concurrency (real PostgreSQL)", () => 
       nextUnit: () => 0,
     });
     expect(first.refiningRun.attempts).toBe(0);
-    expect(first.ferriteShaleQuantity).toBe(10);
+    expect(first.carriedByItemId[ITEM_IDS.ferriteShale] ?? 0).toBe(10);
     const actionAfterPartial = await db
       .select()
       .from(rune.activeActions)
@@ -563,7 +580,7 @@ suite("issue #81 Refining persistence and concurrency (real PostgreSQL)", () => 
       nextUnit: () => 0,
     });
     expect(second.refiningRun.attempts).toBe(0);
-    expect(second.ferriteShaleQuantity).toBe(10);
+    expect(second.carriedByItemId[ITEM_IDS.ferriteShale] ?? 0).toBe(10);
   });
 
   it("starting Travel while Refining resolves only completed attempts, discards partial, records action_replaced, and begins Travel atomically", async () => {
@@ -571,7 +588,7 @@ suite("issue #81 Refining persistence and concurrency (real PostgreSQL)", () => 
     const startedAt = new Date("2026-01-01T00:00:00.000Z");
     await provisionAtYard(userId, character.id, startedAt);
     await addShale(character.id, 10);
-    await refiningCommands.startRefining(userId, character.id, startedAt, {
+    await refiningCommands.startRefining(userId, character.id, ACTION_IDS.refining, startedAt, {
       nextBasisPoints: () => 0,
       nextUnit: () => 0,
     });
@@ -586,8 +603,8 @@ suite("issue #81 Refining persistence and concurrency (real PostgreSQL)", () => 
       { nextBasisPoints: () => 0, nextUnit: () => 0 },
     );
     expect(traveled.refiningRun.attempts).toBe(1);
-    expect(traveled.ferriteShaleQuantity).toBe(8); // 10 -2 (only completed)
-    expect(traveled.refinedFerriteQuantity).toBe(1);
+    expect(traveled.carriedByItemId[ITEM_IDS.ferriteShale] ?? 0).toBe(8); // 10 -2 (only completed)
+    expect(traveled.carriedByItemId[ITEM_IDS.refinedFerrite] ?? 0).toBe(1);
     expect(traveled.travelState?.destinationLocationId).toBe(LOCATION_IDS.crashSite);
     // Travel is active (travelState present, DB action is travel); activeAction projection is mining/refining-only
     expect(traveled.travelState).toBeDefined();
@@ -609,7 +626,7 @@ suite("issue #81 Refining persistence and concurrency (real PostgreSQL)", () => 
     const startedAt = new Date("2026-01-01T00:00:00.000Z");
     await provisionAtYard(userId, character.id, startedAt);
     await addShale(character.id, 5);
-    await refiningCommands.startRefining(userId, character.id, startedAt);
+    await refiningCommands.startRefining(userId, character.id, ACTION_IDS.refining, startedAt);
     const traveled = await play.beginTravel(
       userId,
       character.id,
@@ -622,6 +639,7 @@ suite("issue #81 Refining persistence and concurrency (real PostgreSQL)", () => 
     const refused = await refiningCommands.startRefining(
       userId,
       character.id,
+      ACTION_IDS.refining,
       new Date("2026-01-01T00:00:04.200Z"),
     );
     expect(refused.commandError).toBe("another_action_active");
@@ -634,7 +652,7 @@ suite("issue #81 Refining persistence and concurrency (real PostgreSQL)", () => 
     const startedAt = new Date("2026-01-01T00:00:00.000Z");
     await provisionAtYard(userId, character.id, startedAt);
     await addShale(character.id, 50);
-    await refiningCommands.startRefining(userId, character.id, startedAt, {
+    await refiningCommands.startRefining(userId, character.id, ACTION_IDS.refining, startedAt, {
       nextBasisPoints: () => 0,
       nextUnit: () => 0,
     });
@@ -659,6 +677,7 @@ suite("issue #81 Refining persistence and concurrency (real PostgreSQL)", () => 
     const restarted = await refiningCommands.startRefining(
       userId,
       character.id,
+      ACTION_IDS.refining,
       new Date(far.getTime() + 600),
       { nextBasisPoints: () => 0, nextUnit: () => 0 },
     );
@@ -671,7 +690,7 @@ suite("issue #81 Refining persistence and concurrency (real PostgreSQL)", () => 
     const startedAt = new Date("2026-01-01T00:00:00.000Z");
     await provisionAtYard(userId, character.id, startedAt);
     await addShale(character.id, 5000);
-    await refiningCommands.startRefining(userId, character.id, startedAt, {
+    await refiningCommands.startRefining(userId, character.id, ACTION_IDS.refining, startedAt, {
       nextBasisPoints: () => 0,
       nextUnit: () => 0,
     });
@@ -714,7 +733,7 @@ suite("issue #81 Refining persistence and concurrency (real PostgreSQL)", () => 
       .update(rune.characters)
       .set({ currentLocationId: LOCATION_IDS.theJag })
       .where(eq(rune.characters.id, character.id));
-    await miningCommands.startFerriteShaleMining(userId, character.id, atJag, {
+    await miningCommands.startMining(userId, character.id, atJag, {
       nextBasisPoints: () => 0,
       nextUnit: () => 0,
     });
@@ -729,7 +748,7 @@ suite("issue #81 Refining persistence and concurrency (real PostgreSQL)", () => 
         nextUnit: () => 0,
       },
     );
-    expect(afterStop.stop?.actionId).toBe(ACTION_IDS.ferriteShaleMining);
+    expect(afterStop.stop?.activity).toBe("mining");
     // Travel from The Jag to Processing Yard requires via Long Scramble -> Crash -> Yard
     await play.beginTravel(
       userId,
@@ -780,8 +799,8 @@ suite("issue #81 Refining persistence and concurrency (real PostgreSQL)", () => 
     );
     expect(arrived.location.currentLocationId).toBe(LOCATION_IDS.abandonedProcessingYard);
     // Mining stop remains tagged as a mining stop — refining presentation must ignore it
-    expect(arrived.stop?.actionId).toBe(ACTION_IDS.ferriteShaleMining);
-    expect(arrived.stop?.reason).not.toBe("insufficient_ferrite_shale");
+    expect(arrived.stop?.activity).toBe("mining");
+    expect(arrived.stop?.reason).not.toBe("insufficient_inputs");
     // Prove refining UI helper does not interpret it: map mining reason through mining helper, not refining
     const miningReason = arrived.stop?.reason;
     expect([
@@ -806,7 +825,7 @@ suite("issue #81 Refining persistence and concurrency (real PostgreSQL)", () => 
       },
     );
     // Still the mining-tagged stop — refining ignore check
-    expect(atYard.stop?.actionId).toBe(ACTION_IDS.ferriteShaleMining);
+    expect(atYard.stop?.activity).toBe("mining");
   });
 
   it("Refining stop does not leak into Mining presentation", async () => {
@@ -816,7 +835,7 @@ suite("issue #81 Refining persistence and concurrency (real PostgreSQL)", () => 
     await db
       .insert(rune.inventoryStacks)
       .values({ characterId: character.id, itemId: ITEM_IDS.ferriteShale, quantity: 5 });
-    await refiningCommands.startRefining(userId, character.id, atYard, {
+    await refiningCommands.startRefining(userId, character.id, ACTION_IDS.refining, atYard, {
       nextBasisPoints: () => 0,
       nextUnit: () => 0,
     });
@@ -857,10 +876,12 @@ suite("issue #81 Refining persistence and concurrency (real PostgreSQL)", () => 
     expect(atCrash.location.currentLocationId).toBe(LOCATION_IDS.crashSite);
     // Refining stop remains tagged as refining — mining presentation must ignore it.
     // The latest refining stop is action_replaced (from the Travel replacement).
-    expect(atCrash.stop?.actionId).toBe(ACTION_IDS.refining);
+    expect(atCrash.stop?.activity).toBe("refining");
     expect(atCrash.stop?.reason).toBe("action_replaced");
-    // Mining presentation must ignore refining-tagged stops — prove via actionId discrimination.
-    // (action_replaced is shared by both activities, so reason alone cannot prove non-leak.)
-    expect(atCrash.stop?.actionId).not.toBe(ACTION_IDS.ferriteShaleMining);
+    // Mining presentation must ignore refining-tagged stops — prove via the
+    // activity the durable stop is recorded against (#209). The stop carries no
+    // action ID: its reason belongs to one activity's vocabulary, and
+    // action_replaced is shared by both, so reason alone cannot prove non-leak.
+    expect(atCrash.stop?.activity).not.toBe("mining");
   });
 });

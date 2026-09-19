@@ -30,14 +30,6 @@ const WALK_SECONDS = Math.round(
   (getEffectiveGameBalance().travel.adjacentWalkDurationTicks * GAME_TICK_MS) / 1000,
 );
 
-const MAP_STATUS_LABEL_BY_LOCATION: Partial<
-  Record<(typeof LOCATION_IDS)[keyof typeof LOCATION_IDS], string>
-> = {
-  [LOCATION_IDS.emergencyPowerAnnex]: "Daily cells",
-  [LOCATION_IDS.abandonedProcessingYard]: "Refining",
-  [LOCATION_IDS.theJag]: "Mining",
-};
-
 /** Flat-top hex vertex points as an SVG polygon string. */
 function hexPoints(cx: number, cy: number, w: number): string {
   const h = w * (Math.sqrt(3) / 2);
@@ -576,13 +568,26 @@ export function LocalMapPanel({
         )
       : 0;
   const selectedLocation = selected ? getLocation(selected) : undefined;
+  const selectedState = selected ? state.locationStates[selected] : undefined;
   const selectedIsDirectlyReachable =
     selectedLocation && !inTransit && areLocationsAdjacent(currentLocationId, selectedLocation.id);
-  const selectedIsDestination = selectedIsDirectlyReachable && selected !== currentLocationId;
-  function tileStatusLabel(
-    locationId: (typeof LOCATION_IDS)[keyof typeof LOCATION_IDS],
-  ): string | undefined {
-    return MAP_STATUS_LABEL_BY_LOCATION[locationId];
+  // An authored walking edge is necessary and no longer sufficient (#209): the
+  // destination's own derived state decides whether that edge is usable right
+  // now, which is what keeps a collapsed Deep Jag from offering a Walk control
+  // the server would only refuse.
+  const selectedIsBlocked = Boolean(
+    selectedIsDirectlyReachable &&
+      selected !== currentLocationId &&
+      selectedState &&
+      !selectedState.travelable,
+  );
+  const selectedIsDestination =
+    selectedIsDirectlyReachable && selected !== currentLocationId && !selectedIsBlocked;
+  // The tile's short gameplay status comes from the location's derived state, so
+  // Deep Jag reads CAVE-IN before the brace is in and MINING after it, from the
+  // same resolution the scene and the travel gate use.
+  function tileStatusLabel(locationId: string): string | undefined {
+    return state.locationStates[locationId]?.mapStatus;
   }
 
   // Button positions: each button is positioned to overlay its hex in the SVG.
@@ -613,11 +618,26 @@ export function LocalMapPanel({
         to walk there.
       </p>
 
-      {/* Five flat-top hexes form the local map. The SVG renders plated chassis,
+      {/* Flat-top hexes form the local map. The SVG renders plated chassis,
           decorative identifiers, and all approved routes; native buttons overlay
-          each hex for semantics and text labels. */}
+          each hex for semantics and text labels.
+
+          The viewport is bounded in both axes and pans natively (#209). Deep Jag
+          extended the geometry south as well as west, so the map is now taller
+          than a short window as well as wider than a phone. The height cap is
+          `dvh`-relative rather than a fixed pixel figure so it scales with the
+          screen instead of guessing at one: on a 390x844 phone the whole map
+          fits inside it and there is no cramped nested vertical scroller to
+          fight with the page, and on a short desktop window the cap engages and
+          the existing four-direction affordances start telling the truth about
+          a second axis. No zoom, no custom drag engine — the browser's own
+          scrolling, exactly as before. */}
       <div className="relative -mx-1">
-        <div ref={localMapViewportRef} className="overflow-auto px-1 pb-1" data-map-scroll-viewport>
+        <div
+          ref={localMapViewportRef}
+          className="max-h-[72dvh] overflow-auto px-1 pb-1"
+          data-map-scroll-viewport
+        >
           <div
             className="relative mx-auto"
             role="group"
@@ -676,8 +696,18 @@ export function LocalMapPanel({
             {selectedLocation.displayName}
           </p>
           <p className="mt-1 text-sm text-[color:var(--rs-text-secondary)]">
-            {selectedLocation.description}
+            {selectedState?.description ?? selectedLocation.description}
           </p>
+          {selectedIsBlocked ? (
+            <p
+              className="mt-3 font-display text-xs uppercase tracking-wide text-[color:var(--rs-accent-danger)]"
+              data-map-route-blocked={selectedLocation.id}
+            >
+              {selectedState?.mapStatus
+                ? `${selectedState.mapStatus} — the way through is blocked.`
+                : "The way through is blocked."}
+            </p>
+          ) : null}
           {selectedIsDestination ? (
             <div className="mt-3">
               <p className="text-xs uppercase tracking-wide text-[color:var(--rs-text-muted)]">

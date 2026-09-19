@@ -13,6 +13,7 @@ import {
   cleanupTestUser,
   createCharacterForUser,
   createTestUser,
+  installedMaterials,
   seedRepairTarget,
 } from "./fixtures";
 
@@ -135,8 +136,7 @@ suite("issue #113 admin operator console (real PostgreSQL)", () => {
       getEffectiveGameBalance(),
     );
     await seedRepairTarget(db, rune, characterId, REPAIR_TARGET_IDS.cargoHold, {
-      refinedFerriteContributed: cargoTarget.refinedFerriteRequired,
-      slagContributed: cargoTarget.slagRequired,
+      materials: installedMaterials(cargoTarget),
       weldingProgress: 0,
       completedAt: null,
       updatedAt: at,
@@ -164,7 +164,7 @@ suite("issue #113 admin operator console (real PostgreSQL)", () => {
     const { userId, character } = await makeCharacter();
     await moveToTheJag(character.id);
     const startedAt = new Date("2026-01-01T00:00:00.000Z");
-    await miningCommands.startFerriteShaleMining(userId, character.id, startedAt);
+    await miningCommands.startMining(userId, character.id, startedAt);
     const form = await adminCommands.stopCurrentActionAsAdmin(
       ADMIN,
       character.id,
@@ -196,7 +196,7 @@ suite("issue #113 admin operator console (real PostgreSQL)", () => {
     await moveToTheJag(character.id);
     const startedAt = new Date("2026-01-01T00:00:00.000Z");
     const random = { nextBasisPoints: () => 0, nextUnit: () => 0 };
-    await miningCommands.startFerriteShaleMining(userId, character.id, startedAt, random);
+    await miningCommands.startMining(userId, character.id, startedAt, random);
     // Bank deterministic mining progress before the admin STOP.
     const banked = await play.getPlayGameplayState(
       userId,
@@ -204,7 +204,7 @@ suite("issue #113 admin operator console (real PostgreSQL)", () => {
       new Date("2026-01-01T00:01:00.000Z"),
       random,
     );
-    expect(banked.ferriteShaleQuantity).toBeGreaterThan(0);
+    expect(banked.carriedByItemId[ITEM_IDS.ferriteShale] ?? 0).toBeGreaterThan(0);
     // Admin STOP at the same timestamp reconciles nothing new but must NOT
     // discard the already-earned balance.
     const result = await adminCommands.stopCurrentActionAsAdmin(
@@ -213,7 +213,9 @@ suite("issue #113 admin operator console (real PostgreSQL)", () => {
       new Date("2026-01-01T00:01:00.000Z"),
     );
     expect(result.outcome.kind).toBe("interrupted");
-    expect(result.state.ferriteShaleQuantity).toBe(banked.ferriteShaleQuantity);
+    expect(result.state.carriedByItemId[ITEM_IDS.ferriteShale] ?? 0).toBe(
+      banked.carriedByItemId[ITEM_IDS.ferriteShale],
+    );
   });
 
   it("STOP interrupts in-flight Travel without leaving travel state and audits it", async () => {
@@ -337,7 +339,7 @@ suite("issue #113 admin operator console (real PostgreSQL)", () => {
     await moveToTheJag(character.id);
     const random = { nextBasisPoints: () => 0, nextUnit: () => 0 };
     const startedAt = new Date("2026-01-01T01:00:00.000Z");
-    await miningCommands.startFerriteShaleMining(userId, character.id, startedAt, random);
+    await miningCommands.startMining(userId, character.id, startedAt, random);
     // Bank a deterministic Ferrite Shale stack, then remove at the same tick.
     const readyAt = new Date("2026-01-01T01:01:00.000Z");
     const ready = await play.getPlayGameplayState(userId, character.id, readyAt, random);
@@ -373,7 +375,7 @@ suite("issue #113 admin operator console (real PostgreSQL)", () => {
     await moveToTheJag(character.id);
     const random = { nextBasisPoints: () => 0, nextUnit: () => 0 };
     const startedAt = new Date("2026-01-01T00:00:00.000Z");
-    await miningCommands.startFerriteShaleMining(userId, character.id, startedAt, random);
+    await miningCommands.startMining(userId, character.id, startedAt, random);
     const readyAt = new Date("2026-01-01T00:01:00.000Z");
     const ready = await play.getPlayGameplayState(userId, character.id, readyAt, random);
     const stack = ready.inventory.stacks.find((s) => s.itemId === ITEM_IDS.ferriteShale);
@@ -545,7 +547,7 @@ suite("issue #113 admin operator console (real PostgreSQL)", () => {
     const { userId, character } = await makeCharacter();
     await moveToTheJag(character.id);
     const startedAt = new Date("2026-01-01T00:00:00.000Z");
-    await miningCommands.startFerriteShaleMining(userId, character.id, startedAt);
+    await miningCommands.startMining(userId, character.id, startedAt);
     const toolId = await equippedCutterId(character.id);
     expect(toolId).toBeTruthy();
     if (!toolId) return;
@@ -962,7 +964,7 @@ suite("issue #113 admin operator console (real PostgreSQL)", () => {
     const startedAt = new Date("2026-01-01T00:00:00.000Z");
     // Deliberately NO prior player refresh: the admin STOP itself is the first
     // reconcile boundary the due Mining work hits.
-    await miningCommands.startFerriteShaleMining(userId, character.id, startedAt, detRandom);
+    await miningCommands.startMining(userId, character.id, startedAt, detRandom);
     const stopAt = tick(startedAt, 10); // exactly one 10-tick attempt
     const result = await adminCommands.stopCurrentActionAsAdmin(
       ADMIN,
@@ -978,7 +980,7 @@ suite("issue #113 admin operator console (real PostgreSQL)", () => {
     expect(result.state.run.successes).toBe(1);
     expect(result.state.run.recentAttempts).toHaveLength(1);
     // Deterministic minimum yield => exactly 1 ferrite shale in exactly one stack.
-    expect(result.state.ferriteShaleQuantity).toBe(1);
+    expect(result.state.carriedByItemId[ITEM_IDS.ferriteShale] ?? 0).toBe(1);
     const ferriteStacks = result.state.inventory.stacks.filter(
       (s) => s.itemId === ITEM_IDS.ferriteShale,
     );
@@ -1016,7 +1018,13 @@ suite("issue #113 admin operator console (real PostgreSQL)", () => {
       itemId: ITEM_IDS.ferriteShale,
       quantity: 5,
     });
-    await refiningCommands.startRefining(userId, character.id, startedAt, detRandom);
+    await refiningCommands.startRefining(
+      userId,
+      character.id,
+      ACTION_IDS.refining,
+      startedAt,
+      detRandom,
+    );
     const stopAt = tick(startedAt, 7); // exactly one 7-tick attempt
     const result = await adminCommands.stopCurrentActionAsAdmin(
       ADMIN,
@@ -1030,10 +1038,10 @@ suite("issue #113 admin operator console (real PostgreSQL)", () => {
     // Exactly one attempt consumed exactly 2 shale and produced 1 refined ferrite.
     expect(result.state.refiningRun.attempts).toBe(1);
     expect(result.state.refiningRun.successes).toBe(1);
-    expect(result.state.refiningRun.ferriteGained).toBe(1);
-    expect(result.state.refiningRun.shaleConsumed).toBe(2);
-    expect(result.state.refinedFerriteQuantity).toBe(1);
-    expect(result.state.ferriteShaleQuantity).toBe(3); // 5 seeded − 2 consumed
+    expect(result.state.refiningRun.outputsGained[ITEM_IDS.refinedFerrite]).toBe(1);
+    expect(result.state.refiningRun.inputsConsumed[ITEM_IDS.ferriteShale]).toBe(2);
+    expect(result.state.carriedByItemId[ITEM_IDS.refinedFerrite] ?? 0).toBe(1);
+    expect(result.state.carriedByItemId[ITEM_IDS.ferriteShale] ?? 0).toBe(3); // 5 seeded − 2 consumed
     const refinedStacks = result.state.inventory.stacks.filter(
       (s) => s.itemId === ITEM_IDS.refinedFerrite,
     );
@@ -1099,12 +1107,12 @@ suite("issue #113 admin operator console (real PostgreSQL)", () => {
     const { userId, character } = await makeCharacter();
     await moveToTheJag(character.id);
     const startedAt = new Date("2026-01-01T00:00:00.000Z");
-    await miningCommands.startFerriteShaleMining(userId, character.id, startedAt, detRandom);
+    await miningCommands.startMining(userId, character.id, startedAt, detRandom);
     const partialAt = tick(startedAt, 5); // 5 ticks < 10-tick attempt
     const result = await adminCommands.stopCurrentActionAsAdmin(ADMIN, character.id, partialAt);
     expect(result.outcome.kind).toBe("interrupted");
     if (result.outcome.kind !== "interrupted") return;
-    expect(result.state.ferriteShaleQuantity).toBe(0);
+    expect(result.state.carriedByItemId[ITEM_IDS.ferriteShale] ?? 0).toBe(0);
     expect(result.state.run.attempts).toBe(0);
     expect(result.state.run.recentAttempts).toHaveLength(0);
     expect(result.state.activeAction).toBeUndefined();
@@ -1153,7 +1161,7 @@ suite("issue #113 admin operator console (real PostgreSQL)", () => {
     const { userId, character } = await makeCharacter();
     await moveToTheJag(character.id);
     const startedAt = new Date("2026-01-01T00:00:00.000Z");
-    await miningCommands.startFerriteShaleMining(userId, character.id, startedAt, detRandom);
+    await miningCommands.startMining(userId, character.id, startedAt, detRandom);
     const stopAt = tick(startedAt, 10); // due exactly one unit
     const first = await adminCommands.stopCurrentActionAsAdmin(
       ADMIN,
@@ -1163,7 +1171,7 @@ suite("issue #113 admin operator console (real PostgreSQL)", () => {
     );
     expect(first.outcome.kind).toBe("interrupted");
     if (first.outcome.kind !== "interrupted") return;
-    const banked = first.state.ferriteShaleQuantity;
+    const banked = first.state.carriedByItemId[ITEM_IDS.ferriteShale];
     const attempts = first.state.run.attempts;
 
     const second = await adminCommands.stopCurrentActionAsAdmin(
@@ -1173,7 +1181,7 @@ suite("issue #113 admin operator console (real PostgreSQL)", () => {
       detRandom,
     );
     expect(second.outcome.kind).toBe("already_idle");
-    expect(second.state.ferriteShaleQuantity).toBe(banked);
+    expect(second.state.carriedByItemId[ITEM_IDS.ferriteShale] ?? 0).toBe(banked);
     expect(second.state.run.attempts).toBe(attempts);
     const audit = await auditFor(character.id);
     expect(audit.filter((a) => a.operation === "stop_current_action")).toHaveLength(1);
@@ -1256,7 +1264,7 @@ suite("issue #113 admin operator console (real PostgreSQL)", () => {
     const { userId, character } = await makeCharacter();
     await moveToTheJag(character.id);
     const startedAt = new Date("2026-01-01T00:00:00.000Z");
-    await miningCommands.startFerriteShaleMining(userId, character.id, startedAt, detRandom);
+    await miningCommands.startMining(userId, character.id, startedAt, detRandom);
     const stopAt = tick(startedAt, 10); // due exactly one unit, both commands contend for it
 
     // Two concurrent admin STOPs against the SAME character must serialize on
@@ -1299,7 +1307,7 @@ suite("issue #113 admin operator console (real PostgreSQL)", () => {
     const { userId, character } = await makeCharacter();
     await moveToTheJag(character.id);
     const startedAt = new Date("2026-01-01T00:00:00.000Z");
-    await miningCommands.startFerriteShaleMining(userId, character.id, startedAt, detRandom);
+    await miningCommands.startMining(userId, character.id, startedAt, detRandom);
     const now = tick(startedAt, 10); // due exactly one unit; both commands contend
 
     // One command interrupts (STOP) while the other relocates (teleport to a

@@ -609,7 +609,9 @@ function CargoSection(props: AdminControlProps) {
         removed by exact identity.
         {play.cargoHold.repair.complete
           ? ` Repair complete${play.cargoHold.repair.completedAt ? ` (${play.cargoHold.repair.completedAt})` : ""}.`
-          : ` Repair in progress — ferrite ${play.cargoHold.repair.refinedFerriteContributed}/${play.cargoHold.repair.refinedFerriteRequired}, slag ${play.cargoHold.repair.slagContributed}/${play.cargoHold.repair.slagRequired}, weld ${play.cargoHold.repair.weldingProgress}.`}
+          : ` Repair in progress — ${play.cargoHold.repair.materials
+              .map((material) => `${material.name} ${material.contributed}/${material.required}`)
+              .join(", ")}, weld ${play.cargoHold.repair.weldingProgress}.`}
       </p>
 
       {play.cargoHold.stacks.length === 0 ? (

@@ -1,6 +1,7 @@
 import { and, eq } from "drizzle-orm";
 import { afterEach, beforeAll, describe, expect, it } from "vitest";
 import {
+  ACTION_IDS,
   GAME_TICK_MS,
   ITEM_IDS,
   LOCATION_IDS,
@@ -111,13 +112,17 @@ suite("issue #141 Waste Not tracked activity (real PostgreSQL)", () => {
   }
 
   async function completeMining(userId: string, characterId: string) {
-    await miningCommands.startFerriteShaleMining(
+    await miningCommands.startMining(
       userId,
       characterId,
       new Date(now.getTime() + 10_000),
       miningRandom(),
     );
-    const duration = getEffectiveGameBalance().mining.attemptDurationTicks * GAME_TICK_MS * 5 + 1;
+    const duration =
+      getEffectiveGameBalance().mining.sources.ferriteShale.attemptDurationTicks *
+        GAME_TICK_MS *
+        5 +
+      1;
     await miningCommands.stopMining(
       userId,
       characterId,
@@ -202,10 +207,12 @@ suite("issue #141 Waste Not tracked activity (real PostgreSQL)", () => {
     await refiningCommands.startRefining(
       userId,
       character.id,
+      ACTION_IDS.refining,
       new Date(now.getTime() + 20_000),
       refiningRandom([0, 9_000, 0, 9_000, 0]),
     );
-    const refiningDuration = getEffectiveGameBalance().refining.attemptDurationTicks;
+    const refiningDuration =
+      getEffectiveGameBalance().refining.recipes.refinedFerrite.attemptDurationTicks;
     const resolved = await refiningCommands.stopRefining(
       userId,
       character.id,

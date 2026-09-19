@@ -288,10 +288,10 @@ test("welds for real at the bench, takes a live Clean Pass, and turns the work i
   const trade = page.locator("[data-trade-panel]");
   const scrapRow = trade.locator(`[data-trade-row="${ITEM_IDS.scrapMetal}"]`);
   await expect(scrapRow.locator("[data-trade-unit-price]")).toHaveText("2");
-  // Wade buys nothing here, so Trade offers no direction to choose and no
-  // empty Sell surface behind a tab.
-  await expect(trade.locator("[data-trade-mode]")).toHaveCount(0);
-  await expect(trade.getByRole("heading", { name: "Buy", exact: true })).toBeVisible();
+  // Wade now buys structural material back as well as selling Scrap (#209), so
+  // his counter offers both directions the way Bix's does.
+  await expect(trade.locator("[data-trade-mode]")).toHaveCount(2);
+  await expect(trade.locator('[data-trade-mode="buy"]')).toHaveAttribute("aria-pressed", "true");
   await scrapRow.getByRole("button", { name: /Increase Scrap Metal quantity/ }).click();
   await expect(scrapRow.locator("[data-trade-total]")).toHaveText("4");
   await scrapRow.locator(`[data-trade-commit="${ITEM_IDS.scrapMetal}"]`).click();

@@ -1,6 +1,11 @@
 import { ACTION_IDS, type LocationId, type TravelMode } from "@/game/config/foundations";
 import { getEffectiveGameBalance } from "@/game/config/balance";
 import { areLocationsAdjacent, getLocation } from "@/game/content/locations";
+import {
+  isLocationTravelable,
+  NO_LOCATION_STATE_FACTS,
+  type LocationStateFacts,
+} from "@/game/domain/location-state";
 import { getTransportRoute, type TransportRouteDefinition } from "@/game/content/transport-routes";
 import { ticksToMilliseconds } from "./timing";
 
@@ -9,7 +14,14 @@ export type TravelPlanRejection =
   | "unknown_destination"
   | "same_location"
   | "not_adjacent"
-  | "already_traveling";
+  | "already_traveling"
+  /**
+   * The authored walking edge exists, but the destination's current state does
+   * not permit entry (#209) — a collapsed Deep Jag before Brace Yourself is
+   * accepted. Adjacency alone can never answer this, which is why it is a
+   * distinct refusal rather than a second meaning for `not_adjacent`.
+   */
+  | "route_blocked";
 
 export type TravelPlan =
   | { ok: true; durationTicks: number }
@@ -23,6 +35,12 @@ export function planTravel(input: {
   currentLocationId: string;
   destinationLocationId: string;
   alreadyTraveling: boolean;
+  /**
+   * The character's authoritative location-state facts. Omitted, the caller
+   * gets the base state of every location — which is why the server always
+   * passes real facts and a forged request cannot walk into a cave-in.
+   */
+  locationStateFacts?: LocationStateFacts;
 }): TravelPlan {
   if (!getLocation(input.destinationLocationId)) {
     return { ok: false, reason: "unknown_destination" };
@@ -32,6 +50,14 @@ export function planTravel(input: {
   }
   if (!areLocationsAdjacent(input.currentLocationId, input.destinationLocationId)) {
     return { ok: false, reason: "not_adjacent" };
+  }
+  if (
+    !isLocationTravelable(
+      input.destinationLocationId,
+      input.locationStateFacts ?? NO_LOCATION_STATE_FACTS,
+    )
+  ) {
+    return { ok: false, reason: "route_blocked" };
   }
   if (input.alreadyTraveling) {
     return { ok: false, reason: "already_traveling" };
@@ -141,8 +167,16 @@ export function isTravelRouteValid(input: {
   mode: TravelMode;
   originLocationId: string;
   destinationLocationId: string;
+  /** When supplied, a destination whose state blocks entry invalidates the route. */
+  locationStateFacts?: LocationStateFacts;
 }): boolean {
   if (input.originLocationId === input.destinationLocationId) return false;
+  if (
+    input.locationStateFacts &&
+    !isLocationTravelable(input.destinationLocationId, input.locationStateFacts)
+  ) {
+    return false;
+  }
   if (input.mode === "walk") {
     return areLocationsAdjacent(input.originLocationId, input.destinationLocationId);
   }

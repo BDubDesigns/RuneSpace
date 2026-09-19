@@ -390,9 +390,20 @@ describe("Wade's Scrap counter", () => {
     expect(getLocationMerchant(LOCATION_IDS.crashSite)).toBeUndefined();
   });
 
-  it("sells Scrap at two Credits and buys nothing", () => {
+  it("still sells Scrap at two Credits, and buys structural material but never Slag", () => {
     const wadeShop = getMerchant(MERCHANT_IDS.wadeRusk)!;
-    expect(wadeShop.prices).toEqual([{ itemId: ITEM_IDS.scrapMetal, sellPrice: 2 }]);
+    // His original catalog entry is untouched by the Deep Jag buybacks (#209).
+    expect(wadeShop.prices).toContainEqual({ itemId: ITEM_IDS.scrapMetal, sellPrice: 2 });
+    expect(wadeShop.prices.filter((price) => price.sellPrice !== undefined)).toEqual([
+      { itemId: ITEM_IDS.scrapMetal, sellPrice: 2 },
+    ]);
+    expect(wadeShop.prices.filter((price) => price.buyPrice !== undefined)).toEqual([
+      { itemId: ITEM_IDS.refinedFerrite, buyPrice: 10 },
+      { itemId: ITEM_IDS.galvanicStock, buyPrice: 18 },
+      { itemId: ITEM_IDS.galvaferrite, buyPrice: 45 },
+    ]);
+    // Bix remains the one buyer of Slag.
+    expect(wadeShop.prices.some((price) => price.itemId === ITEM_IDS.slag)).toBe(false);
   });
 
   it("leaves Bix's Slag price as the one place Slag is sold", () => {

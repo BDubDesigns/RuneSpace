@@ -28,7 +28,12 @@ import {
   type CleanPassOpportunity,
 } from "@/game/domain/clean-pass";
 import type { PlayGameplayState } from "@/server/play";
-import { cleanupTestUser, createCharacterForUser, createTestUser } from "./fixtures";
+import {
+  cleanupTestUser,
+  createCharacterForUser,
+  createTestUser,
+  installedMaterials,
+} from "./fixtures";
 
 const DATABASE_URL = process.env.DATABASE_URL;
 const suite = DATABASE_URL ? describe : describe.skip;
@@ -1000,8 +1005,7 @@ suite("issue #207 Work Orders (real PostgreSQL)", () => {
         await db.insert(rune.characterRepairTargets).values({
           characterId: character.id,
           targetId: target.id,
-          refinedFerriteContributed: recipe.refinedFerriteRequired,
-          slagContributed: recipe.slagRequired,
+          materials: installedMaterials(recipe),
         });
 
         const started = await repairCommands.startWelding(

@@ -93,6 +93,34 @@ The header is inside the generic play console `Panel tone="raised"` (`!p-0 overf
   the Power Annex feature.
 - No horizontal `overflow-x`, no fixed-footer collision, no push of primary actions excessively below the fold at 390px.
 
+## One place, more than one scene (issue #209)
+
+A location's scene is its **resolved state's** scene, not a constant. Deep Jag
+is the first location that needs this: the same place is a collapsed passage
+while its brace is unfinished and an open working mine once the brace is welded
+in, and both are the same World Location with the same identity, description
+field and map hex.
+
+The mechanism is the narrow location-state boundary
+(`game/domain/location-state.ts`), not a scene-specific one. A location may
+author `stateVariants`, each naming what it requires (an accepted Mission, a
+completed repair target) and overriding any of description, travelability, map
+status, available actions and scene. `LocationSurface` composes the location
+from `state.locationStates[locationId]`, so the scene, the description and the
+eyebrow all follow the same resolution and cannot disagree.
+
+Variants are authored most specific first and the first satisfied one wins.
+They derive from facts the game already owns authoritatively — Mission
+acceptance and repair completion — and never read or write a state flag of
+their own, which is why there is no `deep_jag_open` column to drift from the
+repair record. Startup validation rejects a variant naming an unknown Mission
+or repair target.
+
+Deep Jag's two scenes are an approved matched pair: same camera, same framing,
+same lighting, same delivered dimensions, differing only in the cleared rubble
+and the installed brace. Each carries its own `alt`, because what a screen
+reader should hear genuinely differs between the two states.
+
 ## Transit truthfulness
 
 While traveling, `state.travelState` is authoritative and the character's

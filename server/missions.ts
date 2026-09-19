@@ -35,7 +35,7 @@ import {
   type ExactStackRemovalPlan,
   type StackAdditionPlan,
 } from "@/game/domain/inventory";
-import { missionSkillPrerequisiteSatisfied, type MissionObservation } from "@/game/domain/missions";
+import { unmetMissionSkillPrerequisite, type MissionObservation } from "@/game/domain/missions";
 import { getSkillPresentation } from "@/game/content/skill-presentation";
 import { characterSkillLevel } from "@/server/skill-levels";
 import type { MiningRandom } from "@/game/domain/mining";
@@ -314,24 +314,30 @@ export async function acceptMission(
       // The authored skill gate, revalidated from the same content projection
       // reads. A UI-only check would be bypassable and a second server-side
       // rule would be the same rule with two homes (#207).
-      if (definition.prerequisiteSkillLevel) {
-        const { skillId, level } = definition.prerequisiteSkillLevel;
-        const currentLevel = await characterSkillLevel(
-          transaction,
-          context.character.id,
-          skillId,
-          standardSkillLevelThresholds(),
-        );
-        if (
-          !missionSkillPrerequisiteSatisfied(
-            definition,
-            new Map<string, number>([[skillId, currentLevel]]),
-          )
-        ) {
-          const skillName = getSkillPresentation(skillId)?.displayName ?? skillId;
+      //
+      // Every authored skill is read before any is judged, so a Mission naming
+      // several (Brace Yourself wants Mining 5 and Welding 5) is refused by the
+      // same conjunction the projection applied, and the refusal names the
+      // first one the player is actually short on (#209).
+      if (definition.prerequisiteSkillLevels?.length) {
+        const levels = new Map<string, number>();
+        for (const { skillId } of definition.prerequisiteSkillLevels) {
+          levels.set(
+            skillId,
+            await characterSkillLevel(
+              transaction,
+              context.character.id,
+              skillId,
+              standardSkillLevelThresholds(),
+            ),
+          );
+        }
+        const unmet = unmetMissionSkillPrerequisite(definition, levels);
+        if (unmet) {
+          const skillName = getSkillPresentation(unmet.skillId)?.displayName ?? unmet.skillId;
           return stateFor({
             status: "refused",
-            message: `${definition.title} needs ${skillName} level ${level}.`,
+            message: `${definition.title} needs ${skillName} level ${unmet.level}.`,
           });
         }
       }

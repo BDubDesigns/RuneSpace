@@ -51,6 +51,9 @@ describe("missionChainResetScope", () => {
       // off 10,000 Hours (#207).
       "ten_thousand_hours",
       "ten_thousand_one_hours",
+      // Brace Yourself is 10,001 Hours' sibling rather than its successor: it
+      // hangs off 10,000 Hours too, so the same reset reaches both (#209).
+      "brace_yourself",
       // Out of the Weather hangs off Hold It Together, so resetting the chain
       // from the start necessarily clears the optional branch with it (#172).
       "out_of_the_weather",
@@ -64,6 +67,9 @@ describe("missionChainResetScope", () => {
       // off 10,000 Hours (#207).
       "ten_thousand_hours",
       "ten_thousand_one_hours",
+      // Brace Yourself is 10,001 Hours' sibling rather than its successor: it
+      // hangs off 10,000 Hours too, so the same reset reaches both (#209).
+      "brace_yourself",
       // Out of the Weather hangs off Hold It Together, so resetting the chain
       // from the start necessarily clears the optional branch with it (#172).
       "out_of_the_weather",
@@ -72,6 +78,7 @@ describe("missionChainResetScope", () => {
       "keep_the_change",
       "ten_thousand_hours",
       "ten_thousand_one_hours",
+      "brace_yourself",
     ]);
   });
 });

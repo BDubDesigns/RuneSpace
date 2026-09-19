@@ -2,11 +2,18 @@
 
 import { RunSummary } from "@/features/shared/RunSummary";
 import { miningNearMissBasisPoints } from "@/game/domain/mining";
+import { resolveItemPresentation } from "@/game/content/item-presentation";
 import type { MiningRunAttempt, MiningRunState } from "@/server/mining";
+import type { MiningSourceProjection } from "@/server/play";
 import type { EffectiveGameBalance } from "@/game/config/balance";
 
 function percentage(bps: number) {
   return (bps / 100).toFixed(2);
+}
+
+/** The item's authoritative display name, by its stable ID. */
+function itemName(itemId: string): string {
+  return resolveItemPresentation(itemId, itemId).displayName;
 }
 
 /**
@@ -23,12 +30,23 @@ function percentage(bps: number) {
 export function MiningRunPanel({
   run,
   balance,
+  source,
 }: {
   run: MiningRunState;
   balance: EffectiveGameBalance;
+  /** The source being worked, so an empty run still names what it would yield. */
+  source: MiningSourceProjection;
 }) {
   // Everything except the newest, which the activity itself is showing.
   const priorAttempts = run.recentAttempts.slice(0, -1);
+  // A run's totals are keyed by item, so a Galvanite run reads as Galvanite
+  // without this panel knowing either ore exists (#209). An untouched run has
+  // no keys yet, so the current source stands in at zero rather than the row
+  // disappearing.
+  const gained = Object.entries(run.itemsGained);
+  const gainedRows = (gained.length > 0 ? gained : [[source.itemId, 0] as const]).map(
+    ([itemId, quantity]) => ({ label: `${itemName(itemId)} gained`, value: quantity }),
+  );
   return (
     <RunSummary
       historyLabel="Mining attempt history"
@@ -36,7 +54,7 @@ export function MiningRunPanel({
         { label: "attempts", value: run.attempts },
         { label: "successful", value: run.successes },
         { label: "failed", value: run.failures },
-        { label: "shale gained", value: run.shaleGained },
+        ...gainedRows,
         { label: "Mining XP", value: run.xpGained },
       ]}
       title="This mining run"
@@ -79,7 +97,7 @@ function MiningAttemptRow({
       </p>
       {attempt.success ? (
         <p>
-          {attempt.shaleAwarded} Ferrite Shale | {attempt.xpAwarded} Mining XP
+          {attempt.quantityAwarded} {itemName(attempt.itemId)} | {attempt.xpAwarded} Mining XP
         </p>
       ) : (
         <p>

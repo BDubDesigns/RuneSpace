@@ -1,8 +1,15 @@
-import { ACTION_IDS, LOCATION_IDS, MERCHANT_IDS } from "@/game/config/foundations";
+import {
+  ACTION_IDS,
+  LOCATION_IDS,
+  MERCHANT_IDS,
+  MISSION_IDS,
+  REPAIR_TARGET_IDS,
+} from "@/game/config/foundations";
 import {
   assertBidirectionalAdjacency,
   LocationDefinitionSchema,
   type LocationDefinition,
+  type LocationDefinitionInput,
 } from "@/game/schemas/locations";
 
 /**
@@ -22,6 +29,9 @@ import {
  *   map coordinate, adjacency, or Travel semantics.
  * - Rusk Recovery (#190): Wade's recovery yard, one ordinary walking edge
  *   northwest of Holo Hollow. Practice Welding happens here.
+ * - Deep Jag (#209): the collapsed lower workings southwest of The Jag. The
+ *   first location whose player-facing state changes durably — see its
+ *   `stateVariants` and `game/domain/location-state`.
  */
 const locationDefinitions = [
   {
@@ -59,6 +69,7 @@ const locationDefinitions = [
     region: "holo_hollow" as const,
     adjacentLocationIds: [LOCATION_IDS.crashSite, LOCATION_IDS.emergencyPowerAnnex],
     availableActionIds: [ACTION_IDS.refining],
+    mapStatus: "Refining",
     dormantActivities: [],
     presentation: {
       mapIconKey: "processing_yard" as const,
@@ -85,6 +96,7 @@ const locationDefinitions = [
       LOCATION_IDS.holoHollow,
     ],
     availableActionIds: [],
+    mapStatus: "Daily cells",
     dormantActivities: [],
     presentation: {
       mapIconKey: "power_annex" as const,
@@ -130,8 +142,9 @@ const locationDefinitions = [
     description:
       "An exposed ferrite seam carved into the hardpan by whoever got here first. Calling it a mine would be generous, but the shale cuts just fine.",
     region: "holo_hollow" as const,
-    adjacentLocationIds: [LOCATION_IDS.theLongScramble],
+    adjacentLocationIds: [LOCATION_IDS.theLongScramble, LOCATION_IDS.deepJag],
     availableActionIds: [ACTION_IDS.ferriteShaleMining],
+    mapStatus: "Mining",
     dormantActivities: [],
     presentation: {
       mapIconKey: "the_jag" as const,
@@ -212,7 +225,70 @@ const locationDefinitions = [
       },
     },
   },
-] as const satisfies readonly LocationDefinition[];
+  {
+    // Deep Jag (#209): ONE authored location with state-dependent presentation,
+    // never two locations and never a second hidden one. It is visible on the
+    // map from the beginning as a future-world tease, is impassable until
+    // Tansy's Brace Yourself is accepted, and becomes a working Galvanite mine
+    // the moment the brace is welded in.
+    //
+    // The unconditional fields below ARE the pre-Mission state: not travelable,
+    // no actions, CAVE-IN, collapsed scene. Everything that changes is an
+    // authored variant resolved from Mission acceptance and repair completion,
+    // so no `deep_jag_open` flag exists to drift from the repair record.
+    id: LOCATION_IDS.deepJag,
+    displayName: "Deep Jag",
+    description:
+      "The Jag's lower workings, closed since the roof came down. Broken rock fills the passage from floor to back, and the cold draught that should be coming out of it is not.",
+    region: "holo_hollow" as const,
+    adjacentLocationIds: [LOCATION_IDS.theJag],
+    availableActionIds: [],
+    travelable: false,
+    mapStatus: "CAVE-IN",
+    stateVariants: [
+      {
+        // Authored first: once the brace is in, the opened state wins however
+        // the Mission itself is progressing.
+        id: "deep_jag_opened",
+        requires: { completedRepairTargetId: REPAIR_TARGET_IDS.deepJagCaveIn },
+        description:
+          "The passage is open again, held by the brace assembly the two of you set: yellow jacks under a welded header, rock swept back to the sides. Galvanite runs in the exposed face beyond.",
+        travelable: true,
+        mapStatus: "MINING",
+        availableActionIds: [ACTION_IDS.galvaniteMining, ACTION_IDS.deepJagWelding],
+        scene: {
+          // Delivered at its native 1536x384 4:1 resolution, the matched pair
+          // to the collapsed scene: same camera, same framing, same lighting.
+          asset: "/location-scenes/deep-jag-opened.webp" as const,
+          width: 1536,
+          height: 384,
+          alt: "Cleared mine passage held open by a welded header beam on two yellow hydraulic braces, rubble pushed to the sides, tunnel running away into the dark",
+          focal: { x: 50, y: 48 } as const,
+        },
+      },
+      {
+        id: "deep_jag_worksite",
+        requires: { acceptedMissionId: MISSION_IDS.braceYourself },
+        travelable: true,
+        availableActionIds: [ACTION_IDS.deepJagWelding],
+      },
+    ],
+    dormantActivities: [],
+    presentation: {
+      mapIconKey: "deep_jag" as const,
+      layout: "deep_jag" as const,
+      localMap: { axial: { q: -3, r: 4 }, label: "Deep Jag" },
+      scene: {
+        // Delivered at its native 1536x384 4:1 resolution (#209).
+        asset: "/location-scenes/deep-jag-collapsed.webp" as const,
+        width: 1536,
+        height: 384,
+        alt: "Mine passage blocked floor to roof by a fall of broken rock, timber props leaning at the edges, brace hardware still crated on pallets to one side",
+        focal: { x: 50, y: 48 } as const,
+      },
+    },
+  },
+] as const satisfies readonly LocationDefinitionInput[];
 
 export const LOCATIONS: readonly LocationDefinition[] = locationDefinitions.map((location) =>
   LocationDefinitionSchema.parse(location),
@@ -248,4 +324,5 @@ export const LOCAL_MAP_LOCATION_IDS: readonly LocationDefinition["id"][] = [
   LOCATION_IDS.theJag,
   LOCATION_IDS.holoHollow,
   LOCATION_IDS.ruskRecovery,
+  LOCATION_IDS.deepJag,
 ];

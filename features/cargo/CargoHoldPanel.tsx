@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, useTransition } from "react";
+import { Fragment, useEffect, useRef, useState, useTransition } from "react";
 import { ActionButton } from "@/components/ui/ActionButton";
 import { Feedback } from "@/components/ui/Feedback";
 import { MissionActionButton } from "@/components/ui/MissionActionButton";
@@ -38,10 +38,13 @@ import {
 } from "@/features/cargo/cargo-selection";
 import { useSelectableDetails } from "@/features/shared/use-selectable-details";
 
-type Confirmation = {
-  refinedFerrite: number;
-  slag: number;
-};
+/**
+ * The exact contribution the player is being asked to confirm, keyed by item ID
+ * (#209). It is the plan the projection handed over, sent back verbatim, so the
+ * server can reject a stale one rather than silently installing a different
+ * amount than the dialog described.
+ */
+type Confirmation = Readonly<Record<string, number>>;
 
 type StorageMode = "carried" | "cargo";
 
@@ -75,7 +78,10 @@ function weldingMessage(state: PlayGameplayState): string | undefined {
     return "Welding is available only while stationary at Crash Site.";
   if (state.weldingError === "welding_locked") {
     const repair = state.repairs[REPAIR_TARGET_IDS.cargoHold];
-    return `Install ${repair?.refinedFerriteRequired ?? 0} Refined Ferrite and ${repair?.slagRequired ?? 0} Slag before Welding.`;
+    const required = (repair?.materials ?? [])
+      .map((material) => `${material.required} ${material.name}`)
+      .join(" and ");
+    return `Install ${required} before Welding.`;
   }
   if (state.weldingError === "repair_complete") return "The Cargo Hold is already operational.";
   if (state.commandError === "another_action_active")
@@ -130,8 +136,10 @@ export function CargoHoldPanel() {
   const cargoRepairGuided = deriveMissionGuidanceTargets(state.missions).repairTargetIds.has(
     REPAIR_TARGET_IDS.cargoHold,
   );
-  const contributionAvailable =
-    repair.availableContribution.refinedFerrite > 0 || repair.availableContribution.slag > 0;
+  const contributionAvailable = repair.canContribute;
+  const plannedContribution: Confirmation = Object.fromEntries(
+    repair.materials.map((material) => [material.itemId, material.availableContribution]),
+  );
   const contributeGuided =
     cargoRepairGuided &&
     !repair.complete &&
@@ -216,8 +224,7 @@ export function CargoHoldPanel() {
           const result = await contributeRepairMaterialsAction({
             characterId: state.characterId,
             targetId: REPAIR_TARGET_IDS.cargoHold,
-            expectedRefinedFerrite: confirmation.refinedFerrite,
-            expectedSlag: confirmation.slag,
+            expectedMaterials: confirmation,
           });
           if ("error" in result) setMessage(result.error);
           else {
@@ -681,7 +688,7 @@ export function CargoHoldPanel() {
               guidance={contributeGuided ? "active" : undefined}
               disabled={Boolean(pending) || !contributionAvailable}
               intent="mining"
-              onClick={() => setConfirmation(repair.availableContribution)}
+              onClick={() => setConfirmation(plannedContribution)}
             >
               CONTRIBUTE MATERIALS
             </MissionActionButton>
@@ -697,31 +704,32 @@ export function CargoHoldPanel() {
               <CleanPassControl cleanPass={repair.cleanPass} />
             </div>
           ) : null}
+          {/* One card per authored material row, in recipe order (#209). The
+              panel does not know that the Cargo Hold wants Ferrite and Slag;
+              it renders whatever the recipe asks for, with the target's own
+              authored note underneath when it wrote one. */}
           <div className="mt-4 grid gap-2 sm:grid-cols-2" data-cargo-repair-materials>
-            <div className="border border-[color:var(--rs-border-structural)] bg-[color:var(--rs-surface-panel)] p-3">
-              <p className="font-display text-xs uppercase tracking-wide">Refined Ferrite</p>
-              <p className="mt-1 font-display text-2xl font-bold">
-                {repair.refinedFerriteContributed} / {repair.refinedFerriteRequired}
-              </p>
-              <p className="text-xs text-[color:var(--rs-text-secondary)]">
-                replacement plating and braces
-              </p>
-            </div>
-            <div className="border border-[color:var(--rs-border-structural)] bg-[color:var(--rs-surface-panel)] p-3">
-              <p className="font-display text-xs uppercase tracking-wide">Slag</p>
-              <p className="mt-1 font-display text-2xl font-bold">
-                {repair.slagContributed} / {repair.slagRequired}
-              </p>
-              <p className="text-xs text-[color:var(--rs-text-secondary)]">
-                thermal packing for bulkhead voids
-              </p>
-            </div>
+            {repair.materials.map((material) => (
+              <div
+                className="border border-[color:var(--rs-border-structural)] bg-[color:var(--rs-surface-panel)] p-3"
+                data-cargo-repair-material={material.itemId}
+                key={material.itemId}
+              >
+                <p className="font-display text-xs uppercase tracking-wide">{material.name}</p>
+                <p className="mt-1 font-display text-2xl font-bold">
+                  {material.contributed} / {material.required}
+                </p>
+                {material.note ? (
+                  <p className="text-xs text-[color:var(--rs-text-secondary)]">{material.note}</p>
+                ) : null}
+              </div>
+            ))}
           </div>
           <div className="mt-4 border border-[color:var(--rs-border-structural)] bg-[color:var(--rs-surface-panel)] p-3">
             <p className="font-display text-xs uppercase tracking-wide">Welding</p>
             {!repair.materialComplete ? (
               <p className="mt-1 text-sm text-[color:var(--rs-text-secondary)]">
-                LOCKED until both material requirements are complete.
+                LOCKED until every material requirement is complete.
               </p>
             ) : (
               <>
@@ -767,8 +775,10 @@ export function CargoHoldPanel() {
           />
           <ActivityContextRow
             items={[
-              { label: "Refined Ferrite carried", quantity: state.refinedFerriteQuantity },
-              { label: "Slag carried", quantity: state.slagQuantity },
+              ...repair.materials.map((material) => ({
+                label: `${material.name} carried`,
+                quantity: state.carriedByItemId[material.itemId] ?? 0,
+              })),
             ]}
           />
         </>
@@ -808,9 +818,12 @@ export function CargoHoldPanel() {
             Commit to Cargo Hold repair
           </p>
           <p className="mt-2 text-sm text-[color:var(--rs-text-secondary)]">
-            Refined Ferrite ×{confirmation.refinedFerrite}
-            <br />
-            Slag ×{confirmation.slag}
+            {repair.materials.map((material, index) => (
+              <Fragment key={material.itemId}>
+                {index > 0 ? <br /> : null}
+                {material.name} ×{confirmation[material.itemId] ?? 0}
+              </Fragment>
+            ))}
           </p>
           <p className="mt-2 text-sm text-[color:var(--rs-text-secondary)]">
             These materials become permanently installed and cannot be recovered.

@@ -40,7 +40,26 @@ unfinished balance values or future activities.
   approved in the slices below; other skills and activities remain deliberately
   undecided.
 
-## Ferrite Shale Mining slice
+## Mining slice
+
+Mining is one skill with one attempt loop, and **what is being mined is an
+authored source** (`balance.mining.sources`, generalized in #209). A source owns
+its item, attempt duration, success curve, yield range and XP; the global rules
+— the whole-tick cadence, the Power Cell speed multiplier, the preflight, the
+run state — belong to Mining itself. Which source a location offers is that
+location's resolved state, never a client claim, and the source a lazily
+resolved attempt awards is recovered from the durable action ID.
+
+| Source | Where | Ticks | Success | Yield | XP |
+| --- | --- | ---: | --- | ---: | ---: |
+| Ferrite Shale | The Jag | 10 | 35% at 1 → 100% at 30 | 1–2 | 15 |
+| Galvanite | Deep Jag, once braced | 15 | 35% at 1 → 100% at 40 | 1–2 | 25 |
+
+A charged starter Salvage Cutter halves both under the shared whole-tick ceiling
+rule, so Ferrite Shale becomes 5 ticks and Galvanite 8, consuming one charge per
+charged attempt and changing neither success chance, XP nor yield.
+
+### Ferrite Shale
 
 The first playable action is infinite Ferrite Shale Mining at The Jag. Its concrete
 values live only in `game/config/balance.ts` behind `getEffectiveGameBalance()`:
@@ -62,7 +81,38 @@ The current Mining run is bounded per-character state. Aggregate totals survive
 refreshes and stopping; only the latest ten immutable server-resolved attempt
 summaries are retained. Starting a genuinely new Mining action resets this run.
 
-## Refining slice (issue #81)
+## Refining slice (issues #81 and #209)
+
+Refining is one skill, one console and one attempt loop, and **what is being
+refined is an authored recipe** (`balance.refining.recipes`). A recipe owns its
+inputs, its success output, its failure behaviour, its duration, its curve, its
+XP and the Refining level it requires. It also owns its own action ID, for the
+same durable-identity reason a Mining source does: the selected recipe survives
+refresh and lazy/offline resolution with no new persistence column, because the
+active action **is** the selection. This is deliberately not a generic crafting
+engine.
+
+| Recipe | Requires | In | Out | Ticks | Success | XP (hit / miss) |
+| --- | ---: | --- | --- | ---: | --- | --- |
+| Refined Ferrite | 1 | 2 Ferrite Shale | 1 Refined Ferrite | 7 | 40% at 1 → 100% at 20 | 15 / 3 |
+| Galvanic Stock | 5 | 2 Galvanite | 1 Galvanic Stock | 10 | 35% at 1 → 100% at 30 | 25 / 5 |
+| Galvaferrite | 8 | 1 Refined Ferrite + 1 Galvanic Stock | 1 Galvaferrite | 12 | 35% at 1 → 100% at 30 | 35 / 7 |
+
+Every recipe is visible in the console from the beginning; a recipe the
+character's level does not authorize renders as `Requires Refining N` and is
+refused server-side, not merely disabled in the browser.
+
+A failure is one of two authored shapes. **Fixed outputs** produce what the
+recipe names — 1 Slag for Refined Ferrite, 2 Slag for Galvanic Stock. **One
+input returned** hands exactly one of the inputs back, chosen 50/50, and loses
+the other; that is the Galvaferrite pour, and it is why the resolution's totals
+are item-keyed maps rather than a fixed trio of counters.
+
+The preflight simulates removing every input and then requires each mutually
+exclusive outcome to fit independently before any roll is requested, so no
+attempt can ever partially commit.
+
+### Refined Ferrite
 
 Processing Yard Refining consumes exactly 2 Ferrite Shale per attempt and
 produces one server-authoritative result: 1 Refined Ferrite (150 g, stack limit
@@ -127,6 +177,19 @@ weld belongs to that thing**, as a per-target recipe under `repairTargets`:
 | --- | --- | --- | --- |
 | Cargo Hold (Crash Site) | 15 Refined Ferrite + 6 Slag | 12 | 600 |
 | Crew Stop (Holo Hollow) | 20 Refined Ferrite | 10 | 500 |
+| Deep Jag cave-in | 25 Refined Ferrite + 5 Power Cells | 15 | 750 |
+
+A recipe's materials are an **authored list**, generalized in #209 from the
+original Refined-Ferrite-and-Slag pair. Deep Jag's brace wants Power Cells, and
+a `power_cells_contributed` column would have meant a new column for every
+future recipe; instead `character_repair_targets.materials` is one
+`{ itemId: quantity }` map on the same row. That also keeps a contribution a
+single atomic row update, which is what makes a retried or concurrent
+contribution unable to double-remove carried items. Contribution planning,
+projection, Mission repair observation and the UI all derive their rows from
+the recipe, so a target wanting a fourth material needs no code at all. A
+target may also author a `materialNotes` line per material — what that material
+is actually for — which the panels render beside the row.
 
 Every target shares one persistence boundary (`character_repair_targets`, keyed
 by character and target), one domain (`game/domain/welding-repair`), one

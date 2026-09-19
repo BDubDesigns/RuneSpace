@@ -7,11 +7,17 @@ import {
   equippedItems,
   inventoryStacks,
 } from "@/db/rune-space";
-import { getEffectiveGameBalance, standardSkillLevelThresholds } from "@/game/config/balance";
+import {
+  getEffectiveGameBalance,
+  miningActionIds,
+  refiningActionIds,
+  refiningRecipeForActionId,
+  standardSkillLevelThresholds,
+} from "@/game/config/balance";
 import { ACTION_IDS, LOCATION_IDS, SKILL_IDS } from "@/game/config/foundations";
 import { isActionAvailableAtLocation } from "@/game/content/locations";
 import { deriveEquipmentLoadout } from "@/game/domain/equipment";
-import { refiningPreflightStopReason } from "@/game/domain/refining";
+import { refiningPreflightStopReason, refiningRecipeUnlocked } from "@/game/domain/refining";
 import { levelFromXp } from "@/game/domain/progression";
 import { withResolvedOwnedCharacter } from "@/server/action-resolution";
 import { loadOwnedItemInstances } from "@/server/carried-inventory";
@@ -47,9 +53,20 @@ function refiningRecentFrom(
  * the full play resolver, then this command starts Refining in the same
  * transaction — preserving the pre-#127 lazy-resolution semantics exactly.
  */
+/**
+ * Begin a Refining run on one authored recipe (#209).
+ *
+ * The client names a recipe; everything that decides whether it may run is
+ * resolved here from authored content and the character's own authoritative
+ * state — that the recipe exists, that Refining is available where they are
+ * standing, and that their Refining level meets the recipe's minimum. A forged
+ * request for Galvaferrite at Refining 1 is refused server-side, not merely
+ * greyed out in the console.
+ */
 export async function startRefining(
   userId: string,
   characterId: string,
+  recipeActionId: string = ACTION_IDS.refining,
   now = new Date(),
   random?: MiningRandom,
 ): Promise<PlayGameplayState> {
@@ -76,12 +93,16 @@ export async function startRefining(
         .where(eq(characters.id, context.character.id))
         .limit(1);
       const currentLocationId = reloaded?.currentLocationId ?? LOCATION_IDS.crashSite;
+      const recipe = refiningRecipeForActionId(recipeActionId);
+      // Refining is hosted by the location, not by the recipe: every authored
+      // recipe is worked at the same console, so the availability question stays
+      // the one the Yard already answers (#209).
       const refiningBlockedHere = !isActionAvailableAtLocation(
         currentLocationId,
         ACTION_IDS.refining,
       );
-      // If already refining, idempotent
-      if (context.action?.actionId === ACTION_IDS.refining) {
+      // If already refining this same recipe, idempotent
+      if (recipe && context.action?.actionId === recipe.actionId) {
         return stateFromTransaction(
           transaction,
           context.character.id,
@@ -109,7 +130,7 @@ export async function startRefining(
           refiningOutcome?.stopReason,
         );
       }
-      if (refiningBlockedHere) {
+      if (refiningBlockedHere || !recipe) {
         return stateFromTransaction(
           transaction,
           context.character.id,
@@ -161,7 +182,24 @@ export async function startRefining(
           loadout.maximumCarryCapacityGrams - loadout.carriedMassGrams,
         ),
       };
-      const preflight = refiningPreflightStopReason(snapshot, balance);
+      // Server-authoritative level gate: the console greys a locked recipe out,
+      // but this is what actually refuses it (#209).
+      if (!refiningRecipeUnlocked(snapshot.refiningLevel, recipe)) {
+        return stateFromTransaction(
+          transaction,
+          context.character.id,
+          miningRecentFrom(miningOutcome),
+          miningOutcome?.stopReason,
+          undefined,
+          undefined,
+          undefined,
+          now,
+          refiningRecentFrom(refiningOutcome),
+          refiningOutcome?.stopReason,
+          "refining_recipe_locked",
+        );
+      }
+      const preflight = refiningPreflightStopReason(snapshot, balance, recipe);
       if (preflight && preflight !== "action_replaced" && preflight !== "manually_stopped") {
         return stateFromTransaction(
           transaction,
@@ -177,40 +215,31 @@ export async function startRefining(
         );
       }
       resetE2eRefiningRandom(context.character.id);
+      // The recipe's own action ID is what makes the selection durable across
+      // refresh and lazy/offline resolution (#209).
       await transaction.insert(activeActions).values({
         characterId: context.character.id,
-        actionId: ACTION_IDS.refining,
+        actionId: recipe.actionId,
         startedAt: now,
         resolvedThroughAt: now,
       });
       // Reset run counters for a genuinely new run
+      const freshRun = {
+        runAttempts: 0,
+        runSuccesses: 0,
+        runOutputsGained: {},
+        runInputsConsumed: {},
+        runXpGained: 0,
+        recentAttempts: [],
+        lastStopReason: null,
+        updatedAt: now,
+      };
       await transaction
         .insert(characterRefiningState)
-        .values({
-          characterId: context.character.id,
-          runAttempts: 0,
-          runSuccesses: 0,
-          runFerriteGained: 0,
-          runSlagGained: 0,
-          runShaleConsumed: 0,
-          runXpGained: 0,
-          recentAttempts: [],
-          lastStopReason: null,
-          updatedAt: now,
-        })
+        .values({ characterId: context.character.id, ...freshRun })
         .onConflictDoUpdate({
           target: characterRefiningState.characterId,
-          set: {
-            runAttempts: 0,
-            runSuccesses: 0,
-            runFerriteGained: 0,
-            runSlagGained: 0,
-            runShaleConsumed: 0,
-            runXpGained: 0,
-            recentAttempts: [],
-            lastStopReason: null,
-            updatedAt: now,
-          },
+          set: freshRun,
         });
       return stateFromTransaction(
         transaction,
@@ -253,7 +282,9 @@ export async function stopRefining(
     ),
     async (transaction, context) => {
       await ensurePlayProvisioning(transaction, context.character.id);
-      const manuallyStopped = context.action?.actionId === ACTION_IDS.refining;
+      // Any authored recipe's action, not just the original Ferrite one (#209).
+      const manuallyStopped =
+        context.action !== undefined && refiningActionIds().includes(context.action.actionId);
       if (manuallyStopped) {
         await transaction
           .delete(activeActions)
@@ -272,8 +303,8 @@ export async function stopRefining(
         miningRecentFrom(miningOutcome),
         miningOutcome?.stopReason,
         context.action &&
-          context.action.actionId !== ACTION_IDS.refining &&
-          context.action.actionId !== ACTION_IDS.ferriteShaleMining &&
+          !refiningActionIds().includes(context.action.actionId) &&
+          !miningActionIds().includes(context.action.actionId) &&
           context.action.actionId !== ACTION_IDS.travel
           ? "another_action_active"
           : undefined,

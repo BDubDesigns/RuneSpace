@@ -1,12 +1,16 @@
 import { describe, expect, it } from "vitest";
-import { getEffectiveGameBalance, miningLevelThresholds } from "@/game/config/balance";
-import { ITEM_IDS } from "@/game/config/foundations";
+import {
+  getEffectiveGameBalance,
+  miningLevelThresholds,
+  miningSourceForActionId,
+} from "@/game/config/balance";
+import { ACTION_IDS, ITEM_IDS } from "@/game/config/foundations";
 import { inventoryStackFillFraction } from "@/game/domain/inventory";
 import {
   boostedMiningAttemptDurationTicks,
   miningSuccessChanceBps,
   miningNearMissBasisPoints,
-  resolveFerriteShaleMining,
+  resolveMining,
   type MiningRandom,
 } from "@/game/domain/mining";
 import { levelFromXp } from "@/game/domain/progression";
@@ -19,6 +23,20 @@ function rolls(basisPoints: number[], units: number[] = [0]): MiningRandom {
 }
 
 const balance = getEffectiveGameBalance();
+/**
+ * The Ferrite Shale source, resolved from the authored source list (#209).
+ * Everything in this file is about Ferrite Shale specifically, and asserting it
+ * through the generic boundary is what proves the generalization left it alone.
+ */
+const ferriteShale = miningSourceForActionId(ACTION_IDS.ferriteShaleMining, balance)!;
+
+/** Ferrite Shale mining, with the source supplied for every call. */
+function resolveFerriteShaleMining(
+  input: Omit<Parameters<typeof resolveMining>[0], "source">,
+): ReturnType<typeof resolveMining> {
+  return resolveMining({ ...input, source: ferriteShale });
+}
+
 const ready = {
   miningLevel: 1,
   hasCompatibleTool: true,
@@ -42,10 +60,10 @@ describe("approved Ferrite Shale Mining balance", () => {
   });
 
   it("uses approved integer basis-point success interpolation", () => {
-    expect(miningSuccessChanceBps(1, balance)).toBe(3500);
-    expect(miningSuccessChanceBps(15, balance)).toBe(6637);
-    expect(miningSuccessChanceBps(30, balance)).toBe(10_000);
-    expect(miningSuccessChanceBps(99, balance)).toBe(10_000);
+    expect(miningSuccessChanceBps(1, ferriteShale)).toBe(3500);
+    expect(miningSuccessChanceBps(15, ferriteShale)).toBe(6637);
+    expect(miningSuccessChanceBps(30, ferriteShale)).toBe(10_000);
+    expect(miningSuccessChanceBps(99, ferriteShale)).toBe(10_000);
   });
 });
 
@@ -95,7 +113,8 @@ describe("Ferrite Shale Mining resolution", () => {
         success: true,
         rolledBasisPoints: 3499,
         thresholdBasisPoints: 3500,
-        shaleAwarded: 1,
+        itemId: ITEM_IDS.ferriteShale,
+        quantityAwarded: 1,
         xpAwarded: 15,
         boosted: false,
         durationTicks: 10,
@@ -108,7 +127,8 @@ describe("Ferrite Shale Mining resolution", () => {
         success: false,
         rolledBasisPoints: 3500,
         thresholdBasisPoints: 3500,
-        shaleAwarded: 0,
+        itemId: ITEM_IDS.ferriteShale,
+        quantityAwarded: 0,
         xpAwarded: 0,
         boosted: false,
         durationTicks: 10,
@@ -130,7 +150,8 @@ describe("Ferrite Shale Mining resolution", () => {
         success: true,
         rolledBasisPoints: 0,
         thresholdBasisPoints: 3500,
-        shaleAwarded: 1,
+        itemId: ITEM_IDS.ferriteShale,
+        quantityAwarded: 1,
         xpAwarded: 15,
         boosted: false,
         durationTicks: 10,
@@ -141,7 +162,8 @@ describe("Ferrite Shale Mining resolution", () => {
         success: false,
         rolledBasisPoints: 3500,
         thresholdBasisPoints: 3500,
-        shaleAwarded: 0,
+        itemId: ITEM_IDS.ferriteShale,
+        quantityAwarded: 0,
         xpAwarded: 0,
         boosted: false,
         durationTicks: 10,
@@ -152,7 +174,8 @@ describe("Ferrite Shale Mining resolution", () => {
         success: true,
         rolledBasisPoints: 0,
         thresholdBasisPoints: 3500,
-        shaleAwarded: 2,
+        itemId: ITEM_IDS.ferriteShale,
+        quantityAwarded: 2,
         xpAwarded: 15,
         boosted: false,
         durationTicks: 10,
@@ -255,7 +278,7 @@ describe("Ferrite Shale Mining resolution", () => {
   });
 
   it("derives the current 10-tick Mining boost as five ticks", () => {
-    expect(boostedMiningAttemptDurationTicks(balance)).toBe(5);
+    expect(boostedMiningAttemptDurationTicks(balance, ferriteShale)).toBe(5);
   });
 
   it("consumes one charge for both boosted success and boosted failure", () => {
@@ -354,7 +377,7 @@ describe("Ferrite Shale Mining resolution", () => {
     expect(boosted.attempts[0]).toMatchObject({
       rolledBasisPoints: normal.attempts[0]?.rolledBasisPoints,
       thresholdBasisPoints: normal.attempts[0]?.thresholdBasisPoints,
-      shaleAwarded: normal.attempts[0]?.shaleAwarded,
+      quantityAwarded: normal.attempts[0]?.quantityAwarded,
       xpAwarded: normal.attempts[0]?.xpAwarded,
     });
   });

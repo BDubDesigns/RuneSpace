@@ -50,6 +50,26 @@ const itemPresentations = {
     textFallback: "SM",
     artworkSrc: "/item-art/scrap-metal.webp",
   },
+  [ITEM_IDS.galvanite]: {
+    displayName: "Galvanite",
+    accessibleDescription:
+      "Chunks of dark Tier-2 ore shot through with bright conductive metallic veining",
+    textFallback: "GV",
+    artworkSrc: "/item-art/galvanite.webp",
+  },
+  [ITEM_IDS.galvanicStock]: {
+    displayName: "Galvanic Stock",
+    accessibleDescription: "Dense rough-cast conductive billets of refined Galvanite",
+    textFallback: "GS",
+    artworkSrc: "/item-art/galvanic-stock.webp",
+  },
+  [ITEM_IDS.galvaferrite]: {
+    displayName: "Galvaferrite",
+    accessibleDescription:
+      "Stacked ingots of advanced structural conductor, each struck with a bolt mark",
+    textFallback: "GF",
+    artworkSrc: "/item-art/galvaferrite.webp",
+  },
   [ITEM_IDS.slag]: {
     displayName: "Slag",
     accessibleDescription: "Vesicular slag byproduct from the refining process",

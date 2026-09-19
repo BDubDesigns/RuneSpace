@@ -83,7 +83,7 @@ describe("server play orchestration ownership (#127)", () => {
       "beginTravel",
       "claimScavenge",
       "acknowledgeScavengeReveal",
-      "startFerriteShaleMining",
+      "startMining",
       "stopMining",
       "loadSalvageCutterPowerCell",
       "startRefining",
