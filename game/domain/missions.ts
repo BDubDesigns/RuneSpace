@@ -12,6 +12,7 @@ import type {
   MissionDefinition,
   MissionRequirement,
   MissionRequirementKind,
+  MissionSkillPrerequisite,
 } from "@/game/content/missions";
 
 /**
@@ -622,20 +623,38 @@ function npcGuidance(npcId: string, currentLocationId: string): MissionGuidance 
 }
 
 /**
- * Whether an authored skill-level prerequisite currently holds (#207).
+ * The first authored skill-level prerequisite that does NOT currently hold, in
+ * authored order, or `undefined` when every one of them does (#207, #209).
+ *
+ * Exported alongside the boolean because a refusal has to be able to name the
+ * skill the player is short on, and the first unmet one in authored order is
+ * the answer both the projection and the acceptance command give — never two
+ * different skills for the same state.
+ */
+export function unmetMissionSkillPrerequisite(
+  definition: MissionDefinition,
+  skillLevels: ReadonlyMap<string, number> | undefined,
+): MissionSkillPrerequisite | undefined {
+  return (definition.prerequisiteSkillLevels ?? []).find(
+    (prerequisite) => (skillLevels?.get(prerequisite.skillId) ?? 0) < prerequisite.level,
+  );
+}
+
+/**
+ * Whether every authored skill-level prerequisite currently holds (#207, #209).
  *
  * Exported because projection and the authoritative acceptance command must
  * derive the identical answer from the identical authored content: a UI-only
  * check would be bypassable, and a second server-side check would be a rule
- * with two homes.
+ * with two homes. A Mission naming several skills is satisfied only when all
+ * of them hold — Brace Yourself is not offered to someone who can weld but
+ * has never mined.
  */
 export function missionSkillPrerequisiteSatisfied(
   definition: MissionDefinition,
   skillLevels: ReadonlyMap<string, number> | undefined,
 ): boolean {
-  const prerequisite = definition.prerequisiteSkillLevel;
-  if (!prerequisite) return true;
-  return (skillLevels?.get(prerequisite.skillId) ?? 0) >= prerequisite.level;
+  return unmetMissionSkillPrerequisite(definition, skillLevels) === undefined;
 }
 
 export function projectMission(
@@ -1015,8 +1034,8 @@ export function validateMissionDefinitions(definitions: readonly MissionDefiniti
         );
       }
     }
-    if (definition.prerequisiteSkillLevel !== undefined) {
-      const { skillId, level } = definition.prerequisiteSkillLevel;
+    const prerequisiteSkillIds = new Set<string>();
+    for (const { skillId, level } of definition.prerequisiteSkillLevels ?? []) {
       // The same standard the skill-XP reward is held to: a level is only
       // meaningful against a skill that has an approved progression curve, so a
       // typo becomes a module-load failure rather than a prerequisite that can
@@ -1026,6 +1045,12 @@ export function validateMissionDefinitions(definitions: readonly MissionDefiniti
           `${where} requires skill "${skillId}" without an approved progression curve.`,
         );
       }
+      // Two entries for one skill would make the eligibility answer depend on
+      // authored order, so the conjunction stays one requirement per skill.
+      if (prerequisiteSkillIds.has(skillId)) {
+        throw new Error(`${where} names skill "${skillId}" more than once as a prerequisite.`);
+      }
+      prerequisiteSkillIds.add(skillId);
       if (!Number.isInteger(level) || level <= 0) {
         throw new Error(`${where} skill prerequisite level must be a positive integer.`);
       }

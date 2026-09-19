@@ -292,7 +292,7 @@ suite("issue #207 10,001 Hours (real PostgreSQL)", () => {
 
   it("holds its Welding gate against the authoritative command, not just the surface", async () => {
     const { userId, character } = await apprentice({
-      weldingLevel: TEN_THOUSAND_ONE_HOURS.prerequisiteSkillLevel!.level - 1,
+      weldingLevel: TEN_THOUSAND_ONE_HOURS.prerequisiteSkillLevels![0]!.level - 1,
     });
 
     // Submitted straight to the command, with no surface involved at all.
@@ -303,7 +303,7 @@ suite("issue #207 10,001 Hours (real PostgreSQL)", () => {
     expect(await missionRow(character.id)).toBeUndefined();
 
     // And the very same submission is accepted the moment the level is real.
-    await setWeldingLevel(character.id, TEN_THOUSAND_ONE_HOURS.prerequisiteSkillLevel!.level);
+    await setWeldingLevel(character.id, TEN_THOUSAND_ONE_HOURS.prerequisiteSkillLevels![0]!.level);
     const accepted = await acceptMission(userId, character.id, 1_000);
     expect(accepted.mission.status).toBe("accepted");
     expect((await missionRow(character.id))?.acceptedAt).not.toBeNull();

@@ -1572,6 +1572,106 @@ const dialogue = {
       ),
     ],
   },
+  // Brace Yourself (#209). Tansy has had the brace hardware in storage for
+  // years and no one worth spending it on. She is not congratulating the player
+  // on a level — she is saying that someone who can read rock and run a torch is
+  // finally standing in front of her. The cave-in is old news to her; what is
+  // new is that it is worth reopening.
+  [DIALOGUE_IDS.tansyBraceYourselfOffer]: {
+    id: DIALOGUE_IDS.tansyBraceYourselfOffer,
+    npcId: NPC_IDS.tansyRusk,
+    beats: [
+      tansyLocal(EXPRESSION_IDS.neutral, "There's a second cut southwest of here. Deep Jag."),
+      tansyLocal(EXPRESSION_IDS.neutral, "Roof came down in the passage a long time before I got here."),
+      tansyLocal(
+        EXPRESSION_IDS.concerned,
+        "Nobody's touched it since. Wrong job for someone who only knows one half of it.",
+      ),
+      tansyLocal(
+        EXPRESSION_IDS.neutral,
+        "You need to read which rock is carrying weight, and you need to lay a bead that'll hold it.",
+      ),
+      tansyLocal(EXPRESSION_IDS.smile, "You can do both now. That's new."),
+      tansyLocal(
+        EXPRESSION_IDS.neutral,
+        "I've got the brace and the jack. Had them for years — that's not the part that was missing.",
+      ),
+      tansyLocal(
+        EXPRESSION_IDS.neutral,
+        "You haul the stock out and weld the support in: 25 Refined Ferrite and 5 Power Cells.",
+      ),
+      tansyLocal(EXPRESSION_IDS.concerned, "Once it's in, it stays in. Don't set it crooked."),
+    ],
+  },
+  [DIALOGUE_IDS.tansyBraceYourselfAccepted]: {
+    id: DIALOGUE_IDS.tansyBraceYourselfAccepted,
+    npcId: NPC_IDS.tansyRusk,
+    beats: [
+      tansyLocal(EXPRESSION_IDS.neutral, "Hardware's already down there, under a tarp."),
+      tansyLocal(EXPRESSION_IDS.neutral, "Southwest. It's a walk. Go when you're loaded, not before."),
+    ],
+  },
+  // She is not holding a clock over it either: the materials are expensive and
+  // the passage has waited this long. Nothing here may assume the player has
+  // started, because they may have walked ten steps and turned around.
+  [DIALOGUE_IDS.tansyBraceYourselfRepairReminder]: {
+    id: DIALOGUE_IDS.tansyBraceYourselfRepairReminder,
+    npcId: NPC_IDS.tansyRusk,
+    beats: [
+      tansyLocal(EXPRESSION_IDS.neutral, "Work's at Deep Jag. Southwest of here."),
+      tansyLocal(
+        EXPRESSION_IDS.neutral,
+        "Set the materials in, then weld it. It'll take more than a couple of passes.",
+      ),
+      tansyLocal(EXPRESSION_IDS.smile, "It waited twenty years. It'll wait for you."),
+    ],
+  },
+  [DIALOGUE_IDS.tansyBraceYourselfBusy]: {
+    id: DIALOGUE_IDS.tansyBraceYourselfBusy,
+    npcId: NPC_IDS.tansyRusk,
+    beats: [
+      tansyLocal(EXPRESSION_IDS.neutral, "You're in the middle of something."),
+      tansyLocal(EXPRESSION_IDS.smile, "Finish it first. I'm not going anywhere."),
+    ],
+  },
+  // The player can weld the fifteenth section and walk straight back, so Tansy
+  // reports the state of the passage rather than anything that needs time to
+  // have passed. The mine is already open by the time she says this — the
+  // Mission recognises the work, it does not perform it.
+  [DIALOGUE_IDS.tansyBraceYourselfTurnIn]: {
+    id: DIALOGUE_IDS.tansyBraceYourselfTurnIn,
+    npcId: NPC_IDS.tansyRusk,
+    beats: [
+      tansyLocal(EXPRESSION_IDS.smile, "Deep Jag's open."),
+      tansyLocal(EXPRESSION_IDS.neutral, "Support's taking the load. I went and stood under it."),
+      tansyLocal(EXPRESSION_IDS.smile, "That's a real thing you did."),
+    ],
+  },
+  [DIALOGUE_IDS.tansyBraceYourselfCompletion]: {
+    id: DIALOGUE_IDS.tansyBraceYourselfCompletion,
+    npcId: NPC_IDS.tansyRusk,
+    beats: [
+      tansyLocal(
+        EXPRESSION_IDS.neutral,
+        "The rock in there runs different. Heavier, and it'll throw a spark off a bare contact.",
+      ),
+      tansyLocal(EXPRESSION_IDS.neutral, "Galvanite. Some of the old crews called it live rock."),
+      tansyLocal(
+        EXPRESSION_IDS.concerned,
+        "It doesn't make power. It just carries it better than anything else you'll dig up here.",
+      ),
+      tansyLocal(EXPRESSION_IDS.smile, "It's yours to work. Nobody else was going to reopen it."),
+      tansySkillXpBeat(SKILL_IDS.welding, 250),
+    ],
+  },
+  [DIALOGUE_IDS.tansyPostBraceYourself]: {
+    id: DIALOGUE_IDS.tansyPostBraceYourself,
+    npcId: NPC_IDS.tansyRusk,
+    beats: [
+      tansyLocal(EXPRESSION_IDS.neutral, "Brace is holding. I check it."),
+      tansyLocal(EXPRESSION_IDS.smile, "Go mine your rock."),
+    ],
+  },
   [DIALOGUE_IDS.maraTheBnbTopic]: {
     id: DIALOGUE_IDS.maraTheBnbTopic,
     npcId: NPC_IDS.maraKells,

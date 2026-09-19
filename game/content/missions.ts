@@ -338,20 +338,24 @@ export type MissionDefinition = {
    */
   prerequisiteMissionId?: MissionId;
   /**
-   * An authored skill-level prerequisite (#207).
+   * Authored skill-level prerequisites, all of which must hold (#207, #209).
    *
-   * Like `prerequisiteMissionId`, this is an eligibility rule and never a
+   * Like `prerequisiteMissionId`, these are eligibility rules and never a
    * reveal mechanism: below the level the mission is simply not offered and
    * cannot be accepted, at the offer NPC or anywhere else. Projection derives
-   * it and the authoritative acceptance command revalidates it from the same
-   * authored content, so no surface holds a level literal of its own and no
-   * Mission-specific check exists in a command.
+   * them and the authoritative acceptance command revalidates them from the
+   * same authored content, so no surface holds a level literal of its own and
+   * no Mission-specific check exists in a command.
    *
-   * 10,001 Hours is the first use: Wade will not put customer property in front
-   * of an apprentice below Welding 5, which is a rule about the work rather
-   * than about Wade.
+   * 10,001 Hours was the first use: Wade will not put customer property in
+   * front of an apprentice below Welding 5, which is a rule about the work
+   * rather than about Wade. Brace Yourself is the first Mission to name more
+   * than one skill — a cave-in needs someone who can read the rock *and* set
+   * a brace — which is why this is a list rather than a single entry. It stays
+   * a flat conjunction on purpose: every prerequisite must hold, and there is
+   * deliberately no "any of" or nested condition language here.
    */
-  prerequisiteSkillLevel?: MissionSkillPrerequisite;
+  prerequisiteSkillLevels?: readonly MissionSkillPrerequisite[];
   /**
    * Explicitly authored automatic continuation: when this mission
    * successfully completes, the generic completion boundary atomically
@@ -811,7 +815,7 @@ export const TEN_THOUSAND_ONE_HOURS: MissionDefinition = {
   prerequisiteMissionId: MISSION_IDS.tenThousandHours,
   // The board's own authored requirement, expressed once, where projection and
   // the acceptance command both read it.
-  prerequisiteSkillLevel: { skillId: SKILL_IDS.welding, level: 5 },
+  prerequisiteSkillLevels: [{ skillId: SKILL_IDS.welding, level: 5 }],
   offers: [
     {
       npcId: NPC_IDS.wadeRusk,
@@ -866,6 +870,80 @@ export const TEN_THOUSAND_ONE_HOURS: MissionDefinition = {
   ],
 };
 
+/**
+ * Brace Yourself — Tansy reopens the Deep Jag (#209).
+ *
+ * A sibling branch to 10,001 Hours rather than a successor to it: both hang off
+ * 10,000 Hours, and a player may do either, both, or neither first. That is why
+ * `prerequisiteMissionId` names 10,000 Hours and nothing here mentions Work
+ * Orders at all.
+ *
+ * It is the first Mission to name two skills. Tansy is not asking for a
+ * certificate — a cave-in needs someone who can read which rock is holding and
+ * someone who can lay a bead that will take load, and below either of those she
+ * simply does not raise the subject. Both levels are authored here, where the
+ * projection and the acceptance command read the same list.
+ *
+ * The brace and jack hardware is Tansy's, supplied as part of the job: there is
+ * deliberately no carried "brace" item, because the fiction is that she has had
+ * the expensive part sitting in storage for years and was waiting for someone
+ * worth spending it on. What the player brings is ordinary material — 25
+ * Refined Ferrite and 5 Power Cells — and the welding.
+ *
+ * The requirement observes the repair target and nothing else. Opening the mine
+ * is the repair's own doing (the fifteenth section completes it, and the
+ * location-state boundary reads that completion directly), so this Mission
+ * neither unlocks Deep Jag nor is needed to keep it open: a player who finishes
+ * the brace and never walks back to Tansy still has a working mine. The 250
+ * Welding XP here is Tansy's recognition on top of the 750 the fifteen genuine
+ * sections already paid.
+ */
+export const BRACE_YOURSELF: MissionDefinition = {
+  id: MISSION_IDS.braceYourself,
+  title: "Brace Yourself",
+  summary: "Set Tansy Rusk's brace in the collapsed Deep Jag passage, then report back to her.",
+  prerequisiteMissionId: MISSION_IDS.tenThousandHours,
+  prerequisiteSkillLevels: [
+    { skillId: SKILL_IDS.mining, level: 5 },
+    { skillId: SKILL_IDS.welding, level: 5 },
+  ],
+  offers: [
+    {
+      npcId: NPC_IDS.tansyRusk,
+      locationId: LOCATION_IDS.theJag,
+      dialogueId: DIALOGUE_IDS.tansyBraceYourselfOffer,
+      actionLabel: "TAKE THE JOB",
+      acceptedContinuation: { dialogueId: DIALOGUE_IDS.tansyBraceYourselfAccepted },
+      // No acceptance effect: Tansy supplies the brace hardware as world
+      // equipment, and the player buys or mines their own material.
+    },
+  ],
+  requirements: [
+    {
+      kind: "repair_target_complete",
+      targetId: REPAIR_TARGET_IDS.deepJagCaveIn,
+      objective: "Brace the collapsed passage at Deep Jag",
+    },
+  ],
+  turnIn: {
+    npcId: NPC_IDS.tansyRusk,
+    locationId: LOCATION_IDS.theJag,
+    requiresStationary: true,
+    objective: "Tell Tansy Rusk the Deep Jag is open",
+    dialogueId: DIALOGUE_IDS.tansyBraceYourselfTurnIn,
+    actionLabel: "TELL TANSY",
+  },
+  reward: { kind: "skill_xp", skillId: SKILL_IDS.welding, amount: 250 },
+  dialogue: {
+    repairReminderDialogueId: DIALOGUE_IDS.tansyBraceYourselfRepairReminder,
+    busyDialogueId: DIALOGUE_IDS.tansyBraceYourselfBusy,
+    completionPresentationDialogueId: DIALOGUE_IDS.tansyBraceYourselfCompletion,
+  },
+  completedNpcDialogue: [
+    { npcId: NPC_IDS.tansyRusk, dialogueId: DIALOGUE_IDS.tansyPostBraceYourself },
+  ],
+};
+
 export const MISSIONS: readonly MissionDefinition[] = [
   WALK_IT_OFF,
   CUT_YOUR_TEETH,
@@ -874,6 +952,9 @@ export const MISSIONS: readonly MissionDefinition[] = [
   KEEP_THE_CHANGE,
   TEN_THOUSAND_HOURS,
   TEN_THOUSAND_ONE_HOURS,
+  // Deep Jag's branch is 10,001 Hours' sibling, not its successor: both need
+  // 10,000 Hours and neither needs the other (#209).
+  BRACE_YOURSELF,
   // The optional branch sits after the main chain: it is never a prerequisite
   // for anything, and completing or ignoring it changes nothing upstream.
   OUT_OF_THE_WEATHER,

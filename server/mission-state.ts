@@ -27,6 +27,8 @@ import { UNSTARTED_REPAIR } from "@/server/welding";
 import type { RepairTargetObservation } from "@/game/domain/missions";
 import { validateConversationTopics } from "@/game/domain/conversation";
 import { validateLocalPlaceAccess } from "@/game/domain/local-places";
+import { LOCATIONS } from "@/game/content/locations";
+import { validateLocationStateVariants } from "@/game/domain/location-state";
 import {
   projectMission,
   validateMissionDefinitions,
@@ -72,6 +74,17 @@ validateRepairTargets(REPAIR_TARGETS, new Set(MISSIONS.map((mission) => mission.
 // visibly at startup instead of quietly paying a stale number for a job.
 validateWorkOrderDefinitions(WORK_ORDERS);
 
+// Authored location state variants join the same boundary (#209). A variant
+// naming a Mission or repair target that does not exist can never be satisfied,
+// so Deep Jag would simply stay a cave-in forever with nothing to show for it —
+// exactly the kind of silent content failure this module-load check exists to
+// turn into a visible one.
+validateLocationStateVariants(
+  LOCATIONS,
+  new Set(MISSIONS.map((mission) => mission.id)),
+  new Set(REPAIR_TARGETS.map((target) => target.id)),
+);
+
 /**
  * Authoritative mission projection for the play state. Persistence contains
  * accepted/completed timestamps plus narrow authored tracked-activity progress;
@@ -105,7 +118,7 @@ export async function loadMissionProjections(
         .where(eq(equippedItems.characterId, characterId))
         .for("update"),
       loadRepairTargetStates(transaction, characterId),
-      // Every skill an authored `prerequisiteSkillLevel` names, so projection
+      // Every skill an authored `prerequisiteSkillLevels` entry names, so projection
       // derives the gate from the same authoritative level the player sees
       // rather than from a literal on a surface (#207).
       characterSkillLevels(
@@ -291,7 +304,7 @@ export function missionPrerequisiteSkills(
   return [
     ...new Set(
       definitions.flatMap((definition) =>
-        definition.prerequisiteSkillLevel ? [definition.prerequisiteSkillLevel.skillId] : [],
+        (definition.prerequisiteSkillLevels ?? []).map((prerequisite) => prerequisite.skillId),
       ),
     ),
   ];

@@ -162,6 +162,17 @@ const dialogueIds = {
     "wade_rusk_ten_thousand_one_hours_capacity_mass_refusal",
   ),
   wadePostTenThousandOneHours: asContentId("wade_rusk_post_ten_thousand_one_hours"),
+  // Brace Yourself (#209): Tansy finally spending the brace hardware she has
+  // been sitting on, because someone she trusts can now both read the rock and
+  // run a torch. Her active beat points at Deep Jag; her turn-in beat is the
+  // mine being open, not the paperwork.
+  tansyBraceYourselfOffer: asContentId("tansy_rusk_brace_yourself_offer"),
+  tansyBraceYourselfAccepted: asContentId("tansy_rusk_brace_yourself_accepted"),
+  tansyBraceYourselfRepairReminder: asContentId("tansy_rusk_brace_yourself_repair_reminder"),
+  tansyBraceYourselfBusy: asContentId("tansy_rusk_brace_yourself_busy"),
+  tansyBraceYourselfTurnIn: asContentId("tansy_rusk_brace_yourself_turn_in"),
+  tansyBraceYourselfCompletion: asContentId("tansy_rusk_brace_yourself_completion"),
+  tansyPostBraceYourself: asContentId("tansy_rusk_post_brace_yourself"),
   // Replayable social/worldbuilding topics (#164). These are ordinary NPC
   // conversations: they never carry a Mission action and never gate progression.
   wadeRecoveryWorkTopic: asContentId("wade_rusk_topic_recovery_work"),
