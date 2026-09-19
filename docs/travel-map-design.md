@@ -5,9 +5,10 @@ Owns the dedicated, query-backed `LocalMapPanel` treatment only. The current
 location scene and same-location population/profile flow belong to Location
 (see `docs/architecture.md` and `docs/location-scenes.md`); Journey owns the
 in-transit presentation. Full current-location scene artwork is #78.
-Six locations: Crash Site (`crash_site_deposit`), Abandoned Processing Yard (`processing_yard`),
+Eight locations: Crash Site (`crash_site_deposit`), Abandoned Processing Yard (`processing_yard`),
 Emergency Power Annex (`power_annex`), The Long Scramble (`the_long_scramble`), The Jag
-(`the_jag`), and Holo Hollow (`holo_hollow`). The panel's job is fast readable navigation and
+(`the_jag`), Holo Hollow (`holo_hollow`), Rusk Recovery (`rusk_recovery`), and Deep Jag
+(`deep_jag`, #209, southwest of The Jag at axial `q=-3, r=4` and adjacent only to it). The panel's job is fast readable navigation and
 gameplay-state communication on a phone; hexes are **not** miniature scene paintings.
 
 Holo Hollow's town places are Local Places (`docs/gameplay-foundations.md`), not
@@ -28,7 +29,7 @@ section on Location.
 1. **Top** — state plate (`YOU ARE HERE` / `REACHABLE` / `SELECTED` / `ORIGIN` / `DESTINATION`) — fitted smoked plaque, never truncated, may slightly overhang.
 2. **Upper-middle / center** — decorative location identifier (Layer 2, `aria-hidden`, clipped to hex, `0.72W×0.68H@0.58`).
 3. **Lower-middle** — location nameplate (Layer 3, fitted smoked plaque, `inline-flex`, reduced padding, centered, 1–2 lines, max-width controlled).
-4. **Bottom** — activity/status plate (`Mining` / `Daily cells` / `Refining`, `data-map-status`, same smoked family), rendered only where a production status is meaningful.
+4. **Bottom** — activity/status plate (`Mining` / `Daily cells` / `Refining` / `CAVE-IN`, `data-map-status`, same smoked family), rendered only where a production status is meaningful. **The status is the location's resolved state, not a constant** (#209): the panel reads `state.locationStates[locationId].mapStatus` rather than holding a status table of its own, which is how Deep Jag reads `CAVE-IN` before its brace is welded in and `MINING` afterwards, with no second flag and no map-side conditional.
 5. **Corner/secondary** — reserved for map presentation only. Same-location
    population browsing and profiles are Location-owned and are not rendered on
    Map.
@@ -129,12 +130,14 @@ than duplicating it in map tiles.
   `data-map-mission`, `data-map-turn-in`, `data-map-mission-marker`, `data-map-mission-ring`).
   `docs/missions.md` §10 is the authoritative semantic model for what qualifies as MISSION or TURN
   IN; this document owns presentation only.
-- Flat-top six-hex local map, `LOCAL_MAP_HEX_WIDTH=140` unified (no mobile/desktop branching, one `buildLocalMapGeometry` path), `hexButtonStyle` overlay,
+- Flat-top local map, `LOCAL_MAP_HEX_WIDTH=140` unified (no mobile/desktop branching, one `buildLocalMapGeometry` path), `hexButtonStyle` overlay,
   `LOCAL_MAP_PADDING`, `LOCAL_MAP_ROUTE_GAP=30` (~30px edge-to-edge at the unified 140), and single-path `buildLocalMapGeometry` remain authoritative.
 
 ## Registry / metadata contract
 - `game/schemas/locations.ts: presentation.mapIconKey` is `z.enum(["crash_site_deposit","processing_yard","power_annex","the_long_scramble","the_jag","holo_hollow"])`.
-  No second identifier field was added. `features/travel/local-map-identifiers.ts` resolves local assets via
+  …plus `rusk_recovery` and `deep_jag`. No second identifier field was added.
+  **CAVE-IN and MINING are gameplay status, not identifiers**: Deep Jag has exactly one
+  `mapIconKey` and one committed asset across both of its states. `features/travel/local-map-identifiers.ts` resolves local assets via
   `MAP_IDENTIFIER_ASSET_BY_KEY: Record<MapIconKey,string>` — one indirection, no scattered `if (id===…)` in panel code.
 - New locations **must** provide a compact identifier through the same `mapIconKey → helper` boundary and a local
   `public/map-icons/<slug>.webp` asset (lossless transparent, tightly cropped, ≤512 long edge); no baked text/status
@@ -191,6 +194,33 @@ recognizable yet subordinate to gameplay state.
   from `hexButtonStyle` (`hexWidth × hexHeight` ≥ ~108×93, ≥44px practical minimum). Text-based state never color-only.
 - Respects `prefers-reduced-motion` (panel has no animations; global `* { animation-duration: 0.01ms }` covers the hex button
   `scale-[1.025]` hover).
+
+## A blocked route is named, not silently unwalkable (issue #209)
+
+A location whose current state is not travelable still renders as a full hex:
+identifier, nameplate, and its own status plate. Selecting it opens the ordinary
+detail card with the location's name and its state's description, and in place
+of the Walk button the card states why the way is shut
+(`data-map-route-blocked`, e.g. "CAVE-IN — the way through is blocked."). There
+is no disabled Walk button to press and no silent hex that simply does nothing.
+
+The refusal is not the panel's: `planTravel` consults the character's own
+location-state facts, so a forged begin-travel request for a collapsed Deep Jag
+is refused server-side with `route_blocked`.
+
+## The map is a bounded two-axis viewport (issue #209)
+
+Deep Jag grew the geometry south as well as west, so the nested viewport now
+scrolls in both axes rather than only horizontally. This is the existing
+affordance model with nothing added: native `overflow: auto` on
+`data-map-scroll-viewport`, and the same axis-agnostic edge layer advertising
+`left` / `right` / `top` / `bottom` from real measured scroll metrics. There is
+no zoom, no grab-drag engine, and no minimap.
+
+The viewport is bounded (`max-h-[72dvh]`) so the map cannot push the rest of the
+page off a phone, and deliberately not shorter than that: a nested scroller
+small enough to trap ordinary vertical page scrolling would be worse than a tall
+map. Verified at 390×844 and at desktop width with no horizontal page overflow.
 
 ## Responsiveness
 - Primary constraint 390px mobile (compact `108` hexes where the current tile shows `YOU ARE HERE` plus a
