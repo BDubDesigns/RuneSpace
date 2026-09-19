@@ -19,7 +19,7 @@ import type { MiningSourceProjection, PlayGameplayState } from "@/server/play";
 import { refreshPlayAction, startMiningAction, stopMiningAction } from "@/server/actions";
 import { resolveItemPresentation } from "@/game/content/item-presentation";
 import { reportClientDiagnostic } from "@/features/diagnostics/client";
-import { latestMiningAttempt, resolvedAttemptCount } from "./latest-result";
+import { latestMiningAttempt, resolvedAttemptCount, runBelongsToSource } from "./latest-result";
 import { usePlay } from "@/features/play/PlayContext";
 
 const RESULT_FEEDBACK_DURATION_MS = 3_600;
@@ -290,7 +290,13 @@ export function MiningActivity({ characterName }: { characterName: string }) {
     };
   }, [Boolean(active), Boolean(state.travelState)]);
 
-  const latestAttempt = latestMiningAttempt(state.run.recentAttempts);
+  // A run survives travel by design, so the persisted one can belong to a
+  // source the player has since walked away from (#211 review). Its totals and
+  // its latest attempt are still true — they are simply not about what is being
+  // mined here, so this surface shows neither until a run at this source
+  // starts. Nothing is discarded: the run itself is untouched.
+  const runIsThisSource = source !== undefined && runBelongsToSource(state.run, source.itemId);
+  const latestAttempt = runIsThisSource ? latestMiningAttempt(state.run.recentAttempts) : undefined;
   const recentBatchCount = state.recentResult.successes + state.recentResult.failures;
   useEffect(() => {
     const previousAttempts = observedAttempts.current;
@@ -425,7 +431,9 @@ export function MiningActivity({ characterName }: { characterName: string }) {
         }}
         items={[{ label: source.itemName, quantity: state.carriedByItemId[source.itemId] ?? 0 }]}
       />
-      <MiningRunPanel balance={balance} run={state.run} source={source} />
+      {runIsThisSource ? (
+        <MiningRunPanel balance={balance} run={state.run} source={source} />
+      ) : null}
     </ActivityPanel>
   );
 }

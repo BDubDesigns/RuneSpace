@@ -112,7 +112,6 @@ import {
   createRefiningResolver,
   e2eRefiningRandom,
   type PersistedRefiningOutcome,
-  type RefiningRunAttempt,
   type RefiningRunState,
 } from "@/server/refining";
 import {
@@ -125,10 +124,13 @@ import {
 import {
   createMiningResolver,
   defaultMiningRandom,
-  type MiningRunAttempt,
   type MiningRunState,
   type PersistedMiningOutcome,
 } from "@/server/mining";
+import {
+  normalizePersistedMiningAttempts,
+  normalizePersistedRefiningAttempts,
+} from "@/server/run-history";
 import { loadCompletedMissionIds, loadMissionProjections } from "@/server/mission-state";
 import { missOpenRepairCleanPass } from "@/server/welding";
 import {
@@ -1246,7 +1248,7 @@ export async function stateFromTransaction(
     failures: (miningState?.runAttempts ?? 0) - (miningState?.runSuccesses ?? 0),
     itemsGained: (miningState?.runItemsGained as Record<string, number> | undefined) ?? {},
     xpGained: miningState?.runXpGained ?? 0,
-    recentAttempts: (miningState?.recentAttempts as MiningRunAttempt[] | undefined) ?? [],
+    recentAttempts: normalizePersistedMiningAttempts(miningState?.recentAttempts, balance),
   };
   const refiningState = refiningStateRows[0];
   const refiningRun: RefiningRunState = {
@@ -1256,7 +1258,7 @@ export async function stateFromTransaction(
     outputsGained: (refiningState?.runOutputsGained as Record<string, number> | undefined) ?? {},
     inputsConsumed: (refiningState?.runInputsConsumed as Record<string, number> | undefined) ?? {},
     xpGained: refiningState?.runXpGained ?? 0,
-    recentAttempts: (refiningState?.recentAttempts as RefiningRunAttempt[] | undefined) ?? [],
+    recentAttempts: normalizePersistedRefiningAttempts(refiningState?.recentAttempts, balance),
   };
   // One carried-quantity map covers every authored repair material, so a
   // recipe that wants Power Cells needs no new tally here (#209).

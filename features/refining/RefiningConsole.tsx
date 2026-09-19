@@ -13,6 +13,7 @@ import { StatusMeter } from "@/components/ui/StatusMeter";
 import { refiningActionIds } from "@/game/config/balance";
 import { GAME_TICK_MS } from "@/game/config/foundations";
 import { resolveItemPresentation } from "@/game/content/item-presentation";
+import { describeFailureOutcome, describeQuantities } from "@/features/refining/attempt-copy";
 import { deriveMissionGuidanceTargets } from "@/game/domain/missions";
 import type { RefiningRunAttempt } from "@/server/refining";
 import type { RefiningRecipeProjection } from "@/server/play";
@@ -55,15 +56,6 @@ function itemName(itemId: string): string {
   return resolveItemPresentation(itemId, itemId).displayName;
 }
 
-/** "2 Galvanite", "1 Refined Ferrite + 1 Galvanic Stock". */
-function describeQuantities(
-  quantities: readonly { itemId: string; quantity: number }[],
-  separator = " + ",
-): string {
-  if (quantities.length === 0) return "nothing";
-  return quantities.map((entry) => `${entry.quantity} ${itemName(entry.itemId)}`).join(separator);
-}
-
 function refiningCommandErrorMessage(error: string): string {
   return (
     (
@@ -94,12 +86,12 @@ function latestRefiningAttempt(
 function latestAnnouncement(attempt: RefiningRunAttempt, batch: number): string {
   const catchUp = batch > 1 ? `${batch} attempts resolved while away. ` : "";
   const roll = `Roll ${percentage(attempt.rolledBasisPoints)}. Needed below ${percentage(attempt.thresholdBasisPoints)}.`;
-  const produced = describeQuantities(attempt.awarded, ", ");
   // A failure is not always Slag: Galvaferrite hands one input back instead
-  // (#209), so the announcement reads the attempt's own awards.
+  // (#209), so the announcement reads the attempt's own consumed and awarded
+  // lists rather than assuming either verb.
   return attempt.success
-    ? `${catchUp}${produced} produced. ${roll} ${attempt.xpAwarded} Refining XP earned.`
-    : `${catchUp}Attempt failed, ${produced} returned. ${roll} ${attempt.xpAwarded} Refining XP earned.`;
+    ? `${catchUp}${describeQuantities(attempt.awarded, ", ")} produced. ${roll} ${attempt.xpAwarded} Refining XP earned.`
+    : `${catchUp}Attempt failed, ${describeFailureOutcome(attempt)}. ${roll} ${attempt.xpAwarded} Refining XP earned.`;
 }
 
 export function RefiningConsole() {
