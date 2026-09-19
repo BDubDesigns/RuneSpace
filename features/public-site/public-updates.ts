@@ -5,6 +5,52 @@ export type { PublicUpdate } from "@/game/schemas/public-updates";
 
 const authoredUpdates = [
   {
+    slug: "brace-yourself",
+    title: "Brace Yourself",
+    publishedAt: "2026-09-19T09:00:00-07:00",
+    summary:
+      "There is a passage under The Jag that has been shut since before you got here. Tansy has the brace. You have the torch. Below it is harder ore than anything you have cut so far.",
+    hero: {
+      src: "/updates/deep-jag-opened.webp",
+      alt: "Cleared mine passage held open by a welded header beam on two yellow hydraulic braces, rubble pushed to the sides, tunnel running away into the dark",
+      width: 1536,
+      height: 384,
+    },
+    body: [
+      "Look at your map. Southwest of The Jag, a little further down than anything else out there, is a hex that has been marked CAVE-IN since the day you made your character. You can select it. You cannot walk into it. Nobody has ever said a word about it.",
+      "That is Deep Jag, and it is Tansy's. The lower workings came down long before you arrived, and she has never mentioned it because there was nothing to mention: reopening it is two people's work, and until now you were not the second one. Finish 10,000 Hours, get your Mining and your Welding both to level 5, and she will bring it up.",
+      "Brace Yourself is the job. She supplies the brace and the jack — that hardware is hers and it stays hers. What she needs is somebody to haul the stock down and weld the support together under a roof that already fell once. That comes to 25 Refined Ferrite and 5 Power Cells, installed in as many trips as you like, and then fifteen welding passes.",
+      "The fifteenth pass is the one to watch. The moment it lands the passage is open: the rock is pushed back to the sides, the brace is standing where you welded it, the map reads MINING, and you can start cutting immediately. No walk back to Tansy first, no second thing to unlock. Her 250 Welding XP is waiting at The Jag whenever you next go up, on top of the 750 the work itself paid.",
+      "What is down there is Galvanite — dark rock shot through with bright conductive veining, which the crews call live rock and which does not, before you ask, generate any power on its own. It is harder going than shale: about nine seconds an attempt against six, a lower success rate that keeps climbing until Mining 40, and 400 grams a piece against shale's 100. A full container out of Deep Jag is a much shorter trip than a full container out of The Jag.",
+      "It also gives the Processing Yard two new things to do. Every recipe is listed at the console now, including the ones you cannot run yet, so you can see what is coming and what it will cost. Two Galvanite becomes one Galvanic Stock at Refining 5. One Refined Ferrite and one Galvanic Stock alloy into Galvaferrite at Refining 8 — and when that one fails, one of the two inputs comes back and the other is gone.",
+      "Bix takes Galvanite at 4 Credits and Galvanic Stock at 18. Wade has started buying structural material back out of his own yard as well: Refined Ferrite at 10, Galvanic Stock at 18, and Galvaferrite at 45. Where he and Bix both buy the same thing, they pay the same for it. Galvaferrite has nothing to make out of it yet. Sell it or stack it — it is the best thing you can currently produce, and it is going somewhere.",
+    ],
+    patchNotes: [
+      {
+        heading: "Added",
+        items: [
+          "Deep Jag, a new location southwest of The Jag and reachable only from it. It is on your map from the start, marked CAVE-IN, and cannot be walked into until you reopen it.",
+          "Brace Yourself, Tansy's job to reopen the collapsed passage. Needs 10,000 Hours finished plus Mining level 5 and Welding level 5; it does not need 10,001 Hours.",
+          "The cave-in repair: 25 Refined Ferrite and 5 Power Cells, installable across as many visits as you like, then fifteen welding passes for 750 Welding XP. Turning the job in with Tansy pays 250 more.",
+          "Galvanite Mining at Deep Jag once the brace is in — about nine seconds an attempt, one or two per success, 25 Mining XP, and a success rate that keeps improving until Mining 40. Your Salvage Cutter handles it, and a charged Power Cell halves the time the same way it does at The Jag.",
+          "Two Refining recipes: Galvanic Stock from two Galvanite at Refining 5, and Galvaferrite from one Refined Ferrite and one Galvanic Stock at Refining 8. A failed alloy hands back one input and loses the other.",
+          "Galvanite, Galvanic Stock and Galvaferrite as carryable material, with their own artwork and stack limits.",
+          "Bix buys Galvanite at 4 Credits and Galvanic Stock at 18. Wade buys Refined Ferrite at 10, Galvanic Stock at 18, and Galvaferrite at 45.",
+        ],
+      },
+      {
+        heading: "Changed",
+        items: [
+          "The Refining console lists every recipe, including ones your Refining level is too low for, each showing what it needs and the level it wants.",
+          "A place can now change what it is. Deep Jag is one location whose scene, map status and available work all follow the state of its repair rather than being fixed.",
+          "The local map scrolls in both directions now that it reaches further south, using the same edge markers it already used for left and right.",
+          "Mining run totals name the ore you are actually cutting instead of always saying shale.",
+          "Wade's counter has a Buy and a Sell side now that he buys material back.",
+        ],
+      },
+    ],
+  },
+  {
     slug: "ten-thousand-one-hours",
     title: "10,001 Hours",
     publishedAt: "2026-09-17T09:00:00-07:00",

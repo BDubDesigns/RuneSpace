@@ -83,7 +83,7 @@ const authoredWikiArticles = [
     sections: [
       {
         paragraphs: [
-          "Holo Hollow currently has seven connected locations. You can only walk between locations that are directly connected — there's no fast travel or shortcut. There is one paid ride, on a single fixed route, once you've earned it.",
+          "Holo Hollow currently has eight connected locations, though one of them is shut when you arrive. You can only walk between locations that are directly connected — there's no fast travel or shortcut. There is one paid ride, on a single fixed route, once you've earned it.",
         ],
       },
       {
@@ -93,7 +93,7 @@ const authoredWikiArticles = [
           "Abandoned Processing Yard — connects to Crash Site and the Power Annex.",
           "DeWhat? Emergency Power Annex — connects to Crash Site, the Abandoned Processing Yard, and the town of Holo Hollow.",
           "The Long Scramble — connects to Crash Site, The Jag, and the town of Holo Hollow. It has no work of its own; it's just the way through.",
-          "The Jag — only connects to The Long Scramble. There's no direct route between Crash Site and The Jag.",
+          "The Jag — connects to The Long Scramble and, below it, Deep Jag. There's no direct route between Crash Site and The Jag.",
           [
             "Holo Hollow — the ",
             { text: "town", articleSlug: "holo-hollow" },
@@ -103,6 +103,11 @@ const authoredWikiArticles = [
             "Rusk Recovery — ",
             { text: "Wade Rusk's", articleSlug: "wade-rusk" },
             " own yard, on the northwest edge of town. It only connects to Holo Hollow, so the town is the way in and the way out.",
+          ],
+          [
+            "Deep Jag — the lower workings, southwest of The Jag and reachable only from it. It shows on your map from the start, marked CAVE-IN, and you cannot walk into it: the passage is blocked by fallen rock until you reopen it during ",
+            { text: "Brace Yourself", articleSlug: "missions" },
+            ". After that it is an ordinary walk, and the map reads MINING.",
           ],
         ],
       },
@@ -141,34 +146,52 @@ const authoredWikiArticles = [
     slug: "mining-and-refining",
     title: "Mining & Refining",
     category: "work",
-    summary: "Turning Holo Hollow's exposed ferrite into Refined Ferrite, one attempt at a time.",
+    summary:
+      "Turning Holo Hollow's exposed ferrite — and Deep Jag's harder ore — into refined material, one attempt at a time.",
     sections: [
       {
         paragraphs: [
-          "Working material into something useful is a two-step loop: mine Ferrite Shale at The Jag, then refine it into Refined Ferrite at the Abandoned Processing Yard.",
+          "Working material into something useful is a two-step loop: mine ore, then refine it at the Abandoned Processing Yard. There are two places to mine and three things you can refine.",
         ],
       },
       {
         heading: "Mining at The Jag",
         paragraphs: [
           [
-            "Mining is only available at The Jag, and only while you have a Salvage Cutter equipped. Each attempt takes about six seconds; a success gives you one or two Ferrite Shale. Your chance of success improves as your Mining skill grows, and Mining stops on its own if you run out of room to carry more shale. A charged ",
+            "The Jag gives Ferrite Shale, and Mining needs a Salvage Cutter equipped. Each attempt takes about six seconds; a success gives you one or two shale. Your chance of success improves as your Mining skill grows, and Mining stops on its own if you run out of room to carry more. A charged ",
             { text: "Power Cell", articleSlug: "power-cells" },
             " can speed this up.",
           ],
         ],
       },
       {
+        heading: "Mining Galvanite at Deep Jag",
+        paragraphs: [
+          [
+            "Deep Jag, the lower workings southwest of The Jag, gives Galvanite once you have reopened it — see ",
+            { text: "Brace Yourself", articleSlug: "missions" },
+            ". It is harder rock and slower going: about nine seconds an attempt, with a lower chance of success that keeps improving until Mining 40. A success gives one or two Galvanite and noticeably more Mining experience than shale does.",
+          ],
+          "Galvanite is unusually conductive, but it does not generate power on its own. Your starter Salvage Cutter handles it, and a charged Power Cell speeds it up the same way.",
+        ],
+      },
+      {
         heading: "Refining at the Abandoned Processing Yard",
         paragraphs: [
-          "Refining is only available at the Abandoned Processing Yard. Each attempt consumes two Ferrite Shale and takes a little over four seconds. A success produces one Refined Ferrite; a failed attempt still produces one Slag, which isn't wasted — the Cargo Hold repair needs both. Your chance of success improves as your Refining skill grows.",
+          "Refining is only available at the Abandoned Processing Yard, and every recipe is listed there from the start — including ones your Refining skill is not high enough for yet, so you can see what is coming.",
+        ],
+        list: [
+          "Refined Ferrite — two Ferrite Shale, a little over four seconds. A failure still produces one Slag, which isn't wasted: the Cargo Hold repair needs both.",
+          "Galvanic Stock — two Galvanite, about six seconds. Needs Refining 5. A failed pour leaves two Slag.",
+          "Galvaferrite — one Refined Ferrite and one Galvanic Stock, about seven seconds. Needs Refining 8. A failed alloy hands back one of the two inputs and loses the other.",
         ],
       },
       {
         heading: "Practical tips",
         list: [
           "Keep a Salvage Cutter equipped before you try to start Mining — it won't start without one.",
-          "Refining needs Ferrite Shale on hand; stock up at The Jag before heading to the Processing Yard.",
+          "Refining needs its inputs on hand; stock up before heading to the Processing Yard.",
+          "Galvanite is heavy — 400g a piece against shale's 100g — so a full trip out of Deep Jag is a much shorter one.",
           "Both activities stop cleanly if you start walking somewhere else — whatever you've already finished is kept.",
         ],
       },
@@ -282,7 +305,7 @@ const authoredWikiArticles = [
             { text: "town of Holo Hollow", articleSlug: "holo-hollow" },
             ". Step into his shop and choose Trade. Talking to Bix and trading with him are separate — you can do either without the other.",
           ],
-          "Pick Buy or Sell, choose a quantity with the minus, plus, and Max controls, check the total, and confirm with a single Buy or Sell. You stay in the shop afterwards, with your Credits and Inventory updated straight away. A trader who only goes one way — Wade sells Scrap Metal and buys nothing — simply has no choice to make.",
+          "Pick Buy or Sell, choose a quantity with the minus, plus, and Max controls, check the total, and confirm with a single Buy or Sell. You stay in the shop afterwards, with your Credits and Inventory updated straight away. A trader who only goes one way simply has no choice to make.",
           "When buying, Max is the most you can actually take away — it accounts for your Credits and for the room left in your Inventory. When selling, Max is everything you're carrying of that item.",
         ],
       },
@@ -293,6 +316,8 @@ const authoredWikiArticles = [
           "Refined Ferrite — 10 Credits each",
           "Slag — 1 Credit each",
           "Power Cell — 3 Credits each",
+          "Galvanite — 4 Credits each",
+          "Galvanic Stock — 18 Credits each",
         ],
       },
       {
@@ -313,7 +338,8 @@ const authoredWikiArticles = [
             { text: "workbench", articleSlug: "practice-welding" },
             ". It works exactly like Bix's counter, out in the yard rather than inside a shop.",
           ],
-          "He never runs out and he doesn't buy anything back — what limits you is your Credits and your room. Scrap doesn't stack, so every piece takes an inventory slot of its own.",
+          "He never runs out, and what limits you is your Credits and your room. Scrap doesn't stack, so every piece takes an inventory slot of its own.",
+          "He also buys structural material back, at the same prices Bix pays where they both buy the same thing: Refined Ferrite at 10 Credits, Galvanic Stock at 18, and Galvaferrite at 45. He still leaves Slag to Bix.",
         ],
       },
     ],
@@ -370,7 +396,12 @@ const authoredWikiArticles = [
             { text: "Out of the Weather", articleSlug: "missions" },
             ".",
           ],
-          "Every welding job works the same way and uses the same skill: install its materials, then weld it in passes of about three seconds each, with each finished pass earning the same Welding XP. What changes from job to job is how much material it needs and how many passes it takes. The Crew Stop needs 20 Refined Ferrite, no Slag, and ten passes.",
+          "Every welding job works the same way and uses the same skill: install its materials, then weld it in passes of about three seconds each, with each finished pass earning the same Welding XP. What changes from job to job is what material it needs and how many passes it takes. The Crew Stop needs 20 Refined Ferrite and ten passes.",
+          [
+            "The biggest job so far is the collapsed passage at Deep Jag: 25 Refined Ferrite and 5 ",
+            { text: "Power Cells", articleSlug: "power-cells" },
+            " to build Tansy's brace out of, then fifteen passes to weld it together. The Cells go into the jack that lifts the roof and are spent doing it — like every other installed material, they don't come back.",
+          ],
           [
             "You can also weld with nothing at stake at all. Wade's workbench at Rusk Recovery lets you ",
             { text: "practice as much as you like", articleSlug: "practice-welding" },
@@ -603,6 +634,23 @@ const authoredWikiArticles = [
             { text: "welding passes", articleSlug: "cargo-hold-and-welding" },
             ". Renn brings it up in town once you've finished Hold It Together — he isn't asking you to do anything about it, and you can decide to pitch in. You don't need Keep the Change first, and it never blocks it.",
           ],
+          [
+            "Brace Yourself — Tansy Rusk has known about the cave-in below The Jag for years. Once you have finished 10,000 Hours and reached both Mining 5 and Welding 5, she will ask you to help her reopen it: 25 Refined Ferrite and 5 ",
+            { text: "Power Cells", articleSlug: "power-cells" },
+            " hauled down to Deep Jag, then fifteen welding passes to set the brace. You do not need 10,001 Hours first — Work Orders and Deep Jag are two separate directions out of the same point.",
+          ],
+        ],
+      },
+      {
+        heading: "Brace Yourself in detail",
+        paragraphs: [
+          "Deep Jag sits on the map southwest of The Jag from the very beginning, marked CAVE-IN. You can look at it and you cannot go there: the passage is full of fallen rock. Tansy is not being coy about it — it simply was not worth attempting until you had enough hours behind a pick and a torch to be useful down there.",
+          "She has the brace and the jack, which are hers and stay hers. What she needs is the stock to build the support out of and somebody to weld it, and that is the job. You can haul the material down over as many trips as you like; what you install stays installed and never comes back out.",
+          [
+            "The moment the fifteenth pass lands, the passage is open. The scene changes, the map reads MINING, and you can start mining ",
+            { text: "Galvanite", articleSlug: "mining-and-refining" },
+            " right there without going back up first. Tansy's 250 Welding XP is waiting for you at The Jag whenever you do head back — on top of the 750 the fifteen passes already earned.",
+          ],
         ],
       },
       {
@@ -619,7 +667,7 @@ const authoredWikiArticles = [
       {
         heading: "How missions work in practice",
         paragraphs: [
-          "Objectives update live as you meet them. Every job you've accepted gets its own strip at the top of the screen, on the Map and while travelling too — green while there's still work to do, blue once it's ready to hand in — and the Mission Log keeps the full checklist. Finishing Walk It Off, Cut Your Teeth, or Waste Not hands you the next job in the chain automatically — there's nothing extra to accept. Keep the Change works differently: after Hold It Together, go back and talk to Wade to take it on. 10,000 Hours and 10,001 Hours work the same way — Wade won't come find you, so walk out to Rusk Recovery and take each one on once it's available. 10,001 Hours is currently the last job in the chain. When every objective on a job is met, talk to the NPC named in it to turn it in.",
+          "Objectives update live as you meet them. Every job you've accepted gets its own strip at the top of the screen, on the Map and while travelling too — green while there's still work to do, blue once it's ready to hand in — and the Mission Log keeps the full checklist. Finishing Walk It Off, Cut Your Teeth, or Waste Not hands you the next job in the chain automatically — there's nothing extra to accept. Keep the Change works differently: after Hold It Together, go back and talk to Wade to take it on. 10,000 Hours and 10,001 Hours work the same way — Wade won't come find you, so walk out to Rusk Recovery and take each one on once it's available. 10,001 Hours is currently the last job in the chain, and Brace Yourself branches off alongside it. When every objective on a job is met, talk to the NPC named in it to turn it in.",
         ],
       },
       {
@@ -929,6 +977,17 @@ const authoredWikiArticles = [
             { text: "Power Cells", articleSlug: "power-cells" },
             " like yours does, and running dry at the far end of a shift is a real problem out there — a dead Cutter, in her words, is a very heavy stick.",
           ],
+        ],
+      },
+      {
+        heading: "The workings below",
+        paragraphs: [
+          [
+            "Below the seam is Deep Jag, closed since the roof came down long before you arrived. Tansy has known about it the whole time and has never mentioned it, because there was nothing to mention until somebody could actually help her reopen it. Once you can, she offers ",
+            { text: "Brace Yourself", articleSlug: "missions" },
+            ": she brings the brace and the jack, you bring the stock and the torch.",
+          ],
+          "It is the closest she comes to asking for something for herself, and she does it in the same flat way she explains a tool — the work is what matters, and she assumes you already know that.",
         ],
       },
     ],
