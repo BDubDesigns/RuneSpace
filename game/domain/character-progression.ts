@@ -56,6 +56,13 @@ export type CharacterSkillProgression = {
   /** XP required to reach the next level; absent at the maximum level. */
   xpToNextLevel?: number;
   atMaximumLevel: boolean;
+  /**
+   * The skill's canonical accent tone from the content boundary (issue #215),
+   * when one has been chosen — absent for a skill with no approved accent yet.
+   * A stable semantic key (e.g. `"mining"`), never a CSS value; resolving it to
+   * a color is a UI concern (`components/ui/skill-accent.ts`).
+   */
+  accentTone?: string;
 };
 
 /** A character's canonical level and its presented per-skill progression. */
@@ -96,11 +103,18 @@ export function projectCharacterProgression(input: {
   skillXp: readonly { skillId: string; totalXp: number }[];
   levelThresholds: (skillId: string) => readonly LevelThreshold[] | undefined;
   skillDisplayName: (skillId: string) => string | undefined;
+  /**
+   * The authoritative accent-tone source per skill (issue #215); absent for a
+   * skill with no approved accent yet. Defaults to none, so callers that don't
+   * present color (e.g. the location-population level list) need not supply it.
+   */
+  skillAccentTone?: (skillId: string) => string | undefined;
   /** Defaults to every skill the game defines. */
   skillIds?: readonly string[];
 }): CharacterProgression {
   const totalXpBySkillId = new Map(input.skillXp.map((row) => [row.skillId, row.totalXp]));
   const skillIds = input.skillIds ?? Object.values(SKILL_IDS);
+  const skillAccentTone = input.skillAccentTone ?? (() => undefined);
 
   const skills = skillIds
     .map((skillId) => {
@@ -108,7 +122,8 @@ export function projectCharacterProgression(input: {
       const displayName = input.skillDisplayName(skillId);
       if (!thresholds || !displayName) return undefined;
       const progress = skillLevelProgress(totalXpBySkillId.get(skillId) ?? 0, thresholds);
-      return { skillId, displayName, ...progress };
+      const accentTone = skillAccentTone(skillId);
+      return { skillId, displayName, accentTone, ...progress };
     })
     .filter((skill) => skill !== undefined)
     .sort((first, second) =>
@@ -124,6 +139,7 @@ export function projectCharacterProgression(input: {
       xpIntoLevel: skill.xpIntoLevel,
       ...(skill.xpToNextLevel !== undefined ? { xpToNextLevel: skill.xpToNextLevel } : {}),
       atMaximumLevel: skill.atMaximumLevel,
+      ...(skill.accentTone !== undefined ? { accentTone: skill.accentTone } : {}),
     })),
   };
 }

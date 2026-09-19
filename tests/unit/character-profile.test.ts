@@ -153,6 +153,23 @@ describe("issue #64 character profile projection", () => {
     ]);
   });
 
+  it("carries a skill's canonical accent tone when the caller injects one (#215)", () => {
+    const result = projectCharacterProfile({
+      displayName: "Rada",
+      ownerName: "Rada Stonehand",
+      skillXp: [{ skillId: "mining", totalXp: 0 }],
+      skillIds: TEST_SKILL_IDS,
+      levelThresholds: (skillId) =>
+        skillId === "mining" ? THRESHOLDS : skillId === "second" ? SECOND_CURVE : undefined,
+      skillDisplayName: (skillId) => skillNames.get(skillId),
+      skillAccentTone: (skillId) => (skillId === "mining" ? "mining" : undefined),
+    });
+    expect(result.skills.map((skill) => [skill.displayName, skill.accentTone])).toEqual([
+      ["Mining", "mining"],
+      ["Second Skill", undefined],
+    ]);
+  });
+
   it("exposes only the narrow public profile shape", () => {
     const profile: CharacterProfile = project([
       { skillId: "mining", totalXp: 500 },

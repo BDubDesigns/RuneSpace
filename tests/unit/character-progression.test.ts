@@ -174,6 +174,25 @@ describe("character progression projection (issue #213)", () => {
     expect(result.characterLevel).toBe(1);
   });
 
+  it("carries a skill's canonical accent tone when the caller injects one (#215)", () => {
+    const result = projectCharacterProgression({
+      skillXp: [{ skillId: "mining", totalXp: 0 }],
+      skillIds: ["mining", "second"],
+      levelThresholds: (skillId) => (skillId === "second" ? SECOND_CURVE : THRESHOLDS),
+      skillDisplayName: (skillId) => testSkillNames.get(skillId),
+      skillAccentTone: (skillId) => (skillId === "mining" ? "mining" : undefined),
+    });
+    expect(result.skills.map((skill) => [skill.displayName, skill.accentTone])).toEqual([
+      ["Mining", "mining"],
+      ["Second Skill", undefined],
+    ]);
+  });
+
+  it("omits accentTone entirely when the caller supplies none, rather than a null/undefined field", () => {
+    const untoned = project([{ skillId: "mining", totalXp: 0 }]);
+    expect(untoned.skills[0]).not.toHaveProperty("accentTone");
+  });
+
   it("exposes only the narrow progression shape", () => {
     const result = project([{ skillId: "mining", totalXp: 750 }]);
     expect(Object.keys(result).sort()).toEqual(["characterLevel", "skills"]);
