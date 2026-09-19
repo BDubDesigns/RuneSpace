@@ -1,4 +1,5 @@
 import {
+  ITEM_IDS,
   LOCAL_PLACE_IDS,
   LOCATION_IDS,
   MISSION_IDS,
@@ -30,6 +31,17 @@ export type RepairTargetDefinition = {
   /** The Local Place hosting the work, when the target lives inside one. */
   localPlaceId?: LocalPlaceId;
   authorizingMissionId: MissionId;
+  /**
+   * Optional authored flavour for one material row, keyed by item ID (#209).
+   *
+   * Presentation only, and authored here rather than in balance because a line
+   * like "thermal packing for bulkhead voids" is content, not an approved
+   * number. A repair surface renders whatever rows the recipe has and shows
+   * this line under one when the target bothered to write it — which is what
+   * keeps the Cargo Hold's two descriptions without any surface knowing that
+   * the Cargo Hold is the thing it is rendering.
+   */
+  materialNotes?: Readonly<Record<string, string>>;
 };
 
 export const REPAIR_TARGETS: readonly RepairTargetDefinition[] = [
@@ -38,6 +50,10 @@ export const REPAIR_TARGETS: readonly RepairTargetDefinition[] = [
     displayName: "Cargo Hold",
     locationId: LOCATION_IDS.crashSite,
     authorizingMissionId: MISSION_IDS.holdItTogether,
+    materialNotes: {
+      [ITEM_IDS.refinedFerrite]: "replacement plating and braces",
+      [ITEM_IDS.slag]: "thermal packing for bulkhead voids",
+    },
   },
   {
     id: REPAIR_TARGET_IDS.crewStop,
@@ -53,6 +69,10 @@ export const REPAIR_TARGETS: readonly RepairTargetDefinition[] = [
     displayName: "Collapsed Passage",
     locationId: LOCATION_IDS.deepJag,
     authorizingMissionId: MISSION_IDS.braceYourself,
+    materialNotes: {
+      [ITEM_IDS.refinedFerrite]: "the brace legs and the crown plate",
+      [ITEM_IDS.powerCell]: "charge for Tansy's jack, spent setting the brace",
+    },
   },
 ] as const satisfies readonly RepairTargetDefinition[];
 

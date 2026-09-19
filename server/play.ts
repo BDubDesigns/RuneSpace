@@ -53,11 +53,9 @@ import {
   repairMaterialsComplete,
   type RepairTargetState,
 } from "@/game/domain/welding-repair";
-import {
-  resolveLocationState,
-  type LocationStateFacts,
-} from "@/game/domain/location-state";
+import { resolveLocationState, type LocationStateFacts } from "@/game/domain/location-state";
 import { LOCATIONS } from "@/game/content/locations";
+import { getRepairTarget } from "@/game/content/repair-targets";
 import { loadLocationStateFacts } from "@/server/location-state";
 import { POWER_ANNEX_REWARD_SOURCE_ID, pacificResetDate } from "@/game/domain/power-annex";
 import { powerAnnexNow } from "@/server/power-annex-clock";
@@ -334,6 +332,8 @@ export type RepairMaterialProjection = {
   remaining: number;
   /** How much of this material the character could hand over right now. */
   availableContribution: number;
+  /** The target's authored flavour for this row, when it authors one. */
+  note?: string;
 };
 
 export type RepairProjection = {
@@ -1084,10 +1084,12 @@ async function projectRepairTarget(
   const access = await loadRepairAccess(transaction, characterId, targetId, repair);
   const cleanPass = projectCleanPass(repair.cleanPass, repair.weldingProgress, weldingActive);
   const contribution = planRepairMaterialContribution({ repair, carried, target });
+  const notes = getRepairTarget(targetId)?.materialNotes ?? {};
   const materials = repairMaterialProgress(repair, target).map((row) => ({
     ...row,
     name: resolveItemPresentation(row.itemId, row.itemId).displayName,
     availableContribution: contribution[row.itemId] ?? 0,
+    ...(notes[row.itemId] ? { note: notes[row.itemId] } : {}),
   }));
   return {
     ...(cleanPass ? { cleanPass } : {}),
@@ -1227,10 +1229,8 @@ export async function stateFromTransaction(
     attempts: refiningState?.runAttempts ?? 0,
     successes: refiningState?.runSuccesses ?? 0,
     failures: (refiningState?.runAttempts ?? 0) - (refiningState?.runSuccesses ?? 0),
-    outputsGained:
-      (refiningState?.runOutputsGained as Record<string, number> | undefined) ?? {},
-    inputsConsumed:
-      (refiningState?.runInputsConsumed as Record<string, number> | undefined) ?? {},
+    outputsGained: (refiningState?.runOutputsGained as Record<string, number> | undefined) ?? {},
+    inputsConsumed: (refiningState?.runInputsConsumed as Record<string, number> | undefined) ?? {},
     xpGained: refiningState?.runXpGained ?? 0,
     recentAttempts: (refiningState?.recentAttempts as RefiningRunAttempt[] | undefined) ?? [],
   };

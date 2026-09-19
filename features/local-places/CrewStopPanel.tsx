@@ -12,6 +12,10 @@ import { GAME_TICK_MS, LOCAL_PLACE_IDS, REPAIR_TARGET_IDS } from "@/game/config/
 import { deriveCompletedMissionIds, deriveMissionGuidanceTargets } from "@/game/domain/missions";
 import { usePlay } from "@/features/play/PlayContext";
 import { CleanPassControl } from "@/features/welding/CleanPassControl";
+import {
+  describeMaterialQuantities,
+  plannedContribution,
+} from "@/features/welding/repair-materials";
 import { CrewHaulerRideControl } from "@/features/travel/CrewHaulerRideControl";
 import { availableCrewHaulerRides } from "@/features/travel/crew-hauler-rides";
 import {
@@ -30,12 +34,12 @@ function weldingMessage(state: PlayGameplayState): string | undefined {
   if (state.weldingError === "welding_unavailable_here")
     return "Welding the Crew Stop is only possible while you are standing at it.";
   if (state.weldingError === "welding_locked") {
-    const repair = state.repairs[TARGET_ID];
-    const remaining = Math.max(
-      0,
-      (repair?.refinedFerriteRequired ?? 0) - (repair?.refinedFerriteContributed ?? 0),
+    const materials = state.repairs[TARGET_ID]?.materials ?? [];
+    const outstanding = describeMaterialQuantities(
+      Object.fromEntries(materials.map((material) => [material.itemId, material.remaining])),
+      materials,
     );
-    return `The brace still needs ${remaining} more Refined Ferrite before there is anything to weld.`;
+    return `The brace still needs ${outstanding} before there is anything to weld.`;
   }
   if (state.weldingError === "repair_complete") return "The Crew Stop is already repaired.";
   if (state.commandError === "another_action_active")
@@ -85,7 +89,8 @@ export function CrewStopPanel() {
     localPlaceId: PLACE_ID,
     completedMissionIds: deriveCompletedMissionIds(state.missions),
   });
-  const contribution = repair?.availableContribution.refinedFerrite ?? 0;
+  const contribution = plannedContribution(repair?.materials ?? []);
+  const contributionSummary = describeMaterialQuantities(contribution, repair?.materials ?? []);
   const previousCompletion = useRef(repair?.complete ?? false);
   const [completionAnnouncement, setCompletionAnnouncement] = useState("");
 
@@ -185,15 +190,14 @@ export function CrewStopPanel() {
           const result = await contributeRepairMaterialsAction({
             characterId: state.characterId,
             targetId: TARGET_ID,
-            expectedRefinedFerrite: contribution,
-            expectedSlag: 0,
+            expectedMaterials: contribution,
           });
           if ("error" in result) setMessage(result.error);
           else {
             acceptState(result.state);
             setMessage(
               result.repair.status === "committed"
-                ? `${result.repair.refinedFerrite} Refined Ferrite added to the brace.`
+                ? `${describeMaterialQuantities(result.repair.materials, repair?.materials ?? [])} added to the brace.`
                 : result.repair.message,
             );
           }
@@ -227,17 +231,22 @@ export function CrewStopPanel() {
         <>
           <MissionActionButton
             data-crew-stop-contribute
-            disabled={contribution === 0 || foregroundBusy || Boolean(state.activeAction)}
-            guidance={guided && contribution > 0 ? "active" : undefined}
+            disabled={!repair.canContribute || foregroundBusy || Boolean(state.activeAction)}
+            guidance={guided && repair.canContribute ? "active" : undefined}
             loading={pending === "materials"}
             onClick={contribute}
           >
-            {contribution > 0
-              ? `Add ${contribution} Refined Ferrite`
-              : "No useful Refined Ferrite carried"}
+            {repair.canContribute
+              ? `Add ${contributionSummary}`
+              : "Nothing useful carried for the brace"}
           </MissionActionButton>
           <p className="max-w-2xl text-sm leading-relaxed text-[color:var(--rs-text-secondary)]">
-            {`The canopy needs ${repair.refinedFerriteRequired} Refined Ferrite of bracing before any of it is worth welding. Hand over what you are carrying; the rest can wait until you come back.`}
+            {`The canopy needs ${describeMaterialQuantities(
+              Object.fromEntries(
+                repair.materials.map((material) => [material.itemId, material.required]),
+              ),
+              repair.materials,
+            )} of bracing before any of it is worth welding. Hand over what you are carrying; the rest can wait until you come back.`}
           </p>
         </>
       ) : activeWelding ? (
@@ -279,15 +288,16 @@ export function CrewStopPanel() {
       {/* The repair's own progress sits under the control that advances it
           (#193), not above it: the player came here to hand over ferrite or to
           weld, and the two meters are how they read the result. */}
-      <StatusMeter
-        detail={`${repair.refinedFerriteContributed} / ${repair.refinedFerriteRequired}`}
-        label="Refined Ferrite in the brace"
-        value={
-          repair.refinedFerriteRequired === 0
-            ? 100
-            : (repair.refinedFerriteContributed / repair.refinedFerriteRequired) * 100
-        }
-      />
+      {/* One meter per authored material row (#209); the Crew Stop happens to
+          want one, and the panel never assumes that. */}
+      {repair.materials.map((material) => (
+        <StatusMeter
+          detail={`${material.contributed} / ${material.required}`}
+          key={material.itemId}
+          label={`${material.name} in the brace`}
+          value={material.required === 0 ? 100 : (material.contributed / material.required) * 100}
+        />
+      ))}
       <StatusMeter
         detail={`${repair.weldingProgress} / ${repair.weldingIncrements} welds`}
         label="Welding"

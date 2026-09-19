@@ -1582,7 +1582,10 @@ const dialogue = {
     npcId: NPC_IDS.tansyRusk,
     beats: [
       tansyLocal(EXPRESSION_IDS.neutral, "There's a second cut southwest of here. Deep Jag."),
-      tansyLocal(EXPRESSION_IDS.neutral, "Roof came down in the passage a long time before I got here."),
+      tansyLocal(
+        EXPRESSION_IDS.neutral,
+        "Roof came down in the passage a long time before I got here.",
+      ),
       tansyLocal(
         EXPRESSION_IDS.concerned,
         "Nobody's touched it since. Wrong job for someone who only knows one half of it.",
@@ -1608,7 +1611,10 @@ const dialogue = {
     npcId: NPC_IDS.tansyRusk,
     beats: [
       tansyLocal(EXPRESSION_IDS.neutral, "Hardware's already down there, under a tarp."),
-      tansyLocal(EXPRESSION_IDS.neutral, "Southwest. It's a walk. Go when you're loaded, not before."),
+      tansyLocal(
+        EXPRESSION_IDS.neutral,
+        "Southwest. It's a walk. Go when you're loaded, not before.",
+      ),
     ],
   },
   // She is not holding a clock over it either: the materials are expensive and
