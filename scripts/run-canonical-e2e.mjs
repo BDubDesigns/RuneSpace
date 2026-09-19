@@ -110,6 +110,8 @@ const LOCATION_POPULATION_REQUIRED = [
   "location-population-mobile-yard.png",
 ];
 
+const CHARACTER_PANEL_REQUIRED = ["character-panel-mobile.png"];
+
 const CHARACTER_PROFILE_REQUIRED = [
   "character-profile-mobile-panel.png",
   "character-profile-mobile-rows.png",
@@ -199,6 +201,7 @@ async function runCanonical() {
         ...OVERLAY_REQUIRED,
         ...TRAVEL_REQUIRED,
         ...LOCATION_POPULATION_REQUIRED,
+        ...CHARACTER_PANEL_REQUIRED,
         ...CHARACTER_PROFILE_REQUIRED,
         ...PORTRAITS_REQUIRED,
         ...REFINING_REQUIRED,

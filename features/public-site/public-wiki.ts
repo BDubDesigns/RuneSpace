@@ -291,7 +291,9 @@ const authoredWikiArticles = [
         paragraphs: [
           "Credits are your character's money. Each character has their own balance — Credits aren't shared between the characters on your account. Every character starts with 10 Credits.",
           [
-            "You can see your balance in your ",
+            "You can see your balance on your ",
+            { text: "Character screen", articleSlug: "skills-and-progression" },
+            " and in your ",
             { text: "Inventory", articleSlug: "inventory-and-equipment" },
             ", and it's shown while you're trading.",
           ],
@@ -829,11 +831,26 @@ const authoredWikiArticles = [
     title: "Skills & Progression",
     category: "getting-started",
     summary:
-      "How Mining, Refining, and Welding track your progress, and what leveling them up gets you.",
+      "How Mining, Refining, and Welding track your progress, what your Character Level means, and what leveling up gets you.",
     sections: [
       {
         paragraphs: [
           "Three skills currently track your progress: Mining, Refining, and Welding. Each has its own experience (XP) total and level, earned separately.",
+        ],
+      },
+      {
+        heading: "Your Character screen",
+        paragraphs: [
+          "Character, on the far left of the bottom bar, is the character you're currently playing. It shows your portrait and name, your Character Level, your Credits, and every skill in the game with its current level and how far you are through that level.",
+          "Switch Character is always there at the bottom of that screen, however long the skill list gets, and takes you to the same character selection you already use.",
+        ],
+      },
+      {
+        heading: "Character Level",
+        paragraphs: [
+          "Your Character Level is a single number for everything you've trained. You start at Level 1, and every skill level you earn adds one to it.",
+          "So a character with Mining 4, Refining 2 and Welding 1 is Character Level 5: three levels earned in Mining, one in Refining, and none yet in Welding. A brand-new character with all three skills at Level 1 is Character Level 1.",
+          "Skills start at Level 1, so a skill you've never touched adds nothing. That also means adding a new skill to RuneSpace won't change anyone's Character Level until they actually train it. There's no separate Character XP to earn — the number simply follows your skills.",
         ],
       },
       {
@@ -865,7 +882,7 @@ const authoredWikiArticles = [
       {
         heading: "What leveling up does",
         paragraphs: [
-          "Higher Mining and Refining levels raise your chance of success on each attempt, up to a level where success is guaranteed. Levels have a cap, and every skill shows its current level and XP right where you use it — Mining at The Jag, Refining at the Processing Yard, and Welding at the Workbench, the Cargo Hold repair, and the Crew Stop repair.",
+          "Higher Mining and Refining levels raise your chance of success on each attempt, up to a level where success is guaranteed. Levels have a cap, and every skill shows its current level and XP right where you use it — Mining at The Jag, Refining at the Processing Yard, and Welding at the Workbench, the Cargo Hold repair, and the Crew Stop repair. The Character screen shows all of them in one place, whichever one you're standing next to.",
         ],
       },
     ],

@@ -10,6 +10,11 @@ import {
 } from "@/server/ownership";
 import { getPlayGameplayState } from "@/server/play";
 import { getAccountNewsUnread } from "@/server/account-news";
+import { loadPlayerPortraitUnlockIds } from "@/server/player-portrait-unlocks";
+import {
+  resolveCharacterPortrait,
+  type CharacterPortraitPresentation,
+} from "@/game/domain/character-portrait";
 
 export const metadata = { title: "Play — RuneSpace" };
 
@@ -27,6 +32,7 @@ export default async function PlayPage({ params }: { params: Promise<{ character
   if (!session?.user) redirect("/sign-in");
 
   let displayName = "Character";
+  let portrait: CharacterPortraitPresentation = { kind: "placeholder" };
   let playState;
   let newsUnread = false;
   try {
@@ -38,12 +44,24 @@ export default async function PlayPage({ params }: { params: Promise<{ character
     // every character, never from this specific character.
     const account = await requirePlayerAccount(user.id);
     newsUnread = getAccountNewsUnread(account);
+    // The Character surface shows the same resolved presentation the selection
+    // screen and the public profile do: a selected portrait the account still
+    // owns, or the neutral placeholder. The stored row is never rewritten.
+    portrait = resolveCharacterPortrait(
+      character.portraitId,
+      await loadPlayerPortraitUnlockIds(account.id),
+    );
   } catch (err) {
     if (err instanceof OwnershipError) redirect("/characters");
     throw err;
   }
 
   return (
-    <PlayScreen characterName={displayName} initialState={playState!} newsUnread={newsUnread} />
+    <PlayScreen
+      characterName={displayName}
+      characterPortrait={portrait}
+      initialState={playState!}
+      newsUnread={newsUnread}
+    />
   );
 }

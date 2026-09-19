@@ -44,6 +44,7 @@ const cargoCutter = {
 function cargoState(): PlayGameplayState {
   return {
     characterId: "character-1",
+    progression: { characterLevel: 1, skills: [] },
     missions: [],
     location: { currentLocationId: "crash_site" },
     repairs: {},

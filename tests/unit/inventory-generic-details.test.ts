@@ -31,6 +31,7 @@ function inventoryState(
 function baseState(inventory: PlayGameplayState["inventory"]): PlayGameplayState {
   return {
     characterId: "character-1",
+    progression: { characterLevel: 1, skills: [] },
     missions: [],
     location: { currentLocationId: "crash_site" },
     repairs: {},

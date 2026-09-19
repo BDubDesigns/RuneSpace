@@ -798,7 +798,8 @@ render this population flow; surface ownership is defined in `docs/architecture.
   accessible "Characters here" disclosure (label, compact count badge, and
   disclosure chevron) revealing the list, associated with that tile. Each
   entry is an interactive row — character name, owner name, and a compact
-  level badge with a chevron affordance — and the row of the character whose
+  Character Level badge with a chevron affordance (the same canonical level the
+  profile it opens shows; issue #213) — and the row of the character whose
   profile is open stays visibly selected (gold accent, tinted background, and
   a "Viewing" indicator) until the panel closes or is invalidated.
 - **Current low-population version:** all matching persisted characters are
@@ -839,11 +840,11 @@ interactive control that opens one compact, mobile-first public profile panel:
   receive one indistinguishable refusal. The panel re-reads on every open,
   every target switch, and every accepted authoritative gameplay revision, and
   is invalidated immediately when the active location changes.
-- **Overall-level rule:** the overall level is the highest derived level across
-  the character's published skills (skills with an approved level curve), with
-  level 1 as the baseline; with Mining, Refining, and Welding published it
-  reflects the highest of those. No total-level field is persisted and no
-  formula is duplicated in the UI.
+- **Overall-level rule:** the level shown is the canonical **Character Level**
+  defined below (issue #213), consumed from the one shared implementation. It
+  replaced this panel's original "highest published skill level" rule, which
+  was a second definition of a character's level. No total-level field is
+  persisted and no formula is duplicated in the UI.
 - **Skill rows:** each published skill shows its player-facing name (from the
   authoritative skill-presentation content boundary), current derived level,
   total XP, XP earned within the current level, XP required for the next level,
@@ -863,6 +864,44 @@ interactive control that opens one compact, mobile-first public profile panel:
   boundary (see "Character portraits" below): the selected catalog portrait as
   a normal `next/image` derivative, or the neutral system placeholder
   silhouette when no valid selection exists.
+
+### Character Level and the Character surface (issue #213)
+
+**Character Level** is the one overall level RuneSpace publishes:
+
+```
+Character Level = 1 + Σ(skillLevel - 1)
+```
+
+A character starts at Level 1 and every skill level earned above the starting
+level adds exactly one Character Level. Mining 1 / Refining 1 / Welding 1 is
+Character Level 1; Mining 4 / Refining 2 / Welding 1 is 5; Mining 8 /
+Refining 8 / Welding 5 is 19. This is deliberately **not** the sum of raw skill
+levels: because every skill begins at Level 1, a skill the player has not
+trained contributes zero, so adding a new skill to the game cannot move any
+existing character's level.
+
+- **One implementation:** `characterLevelFromSkillLevels` and
+  `projectCharacterProgression` in `game/domain/character-progression.ts`. The
+  same-location population list, the same-location profile panel, and the
+  Character surface all consume it; nothing re-derives it.
+- **Derived, never persisted:** Character Level has no XP track, no stored
+  column, and no separate progression of its own, so a change to the skill
+  catalog needs no migration or backfill.
+- **Which skills count:** every skill in `SKILL_IDS` with both an approved
+  level curve (`skillLevelThresholds`) and an approved player-facing name
+  (`game/content/skill-presentation.ts`). A skill with neither has no truthful
+  level and is neither presented nor counted — Strength today. A future skill
+  appears on every progression surface as soon as those two content boundaries
+  define it.
+- **Character surface:** the far-left footer destination is **Character**. It
+  opens the current character's profile in the shared modal Drawer, the same
+  interaction pattern as Inventory: portrait, name, Character Level, Credits
+  (also shown in Inventory, deliberately), and one row per presented skill with
+  its level and progress through that level. There is no overall-character XP
+  bar. A sticky **Switch Character** action links to the existing `/characters`
+  selection screen, so switching stays reachable however long the skill list
+  grows; this surface adds no second selection or management experience.
 
 ### Character portraits (issue #65)
 

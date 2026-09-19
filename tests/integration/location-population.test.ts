@@ -192,6 +192,41 @@ suite("issue #62 location population read boundary (real PostgreSQL)", () => {
     expect(two).toEqual({ displayName: twoName, level: 2, ownerName: "Level Owner" });
   });
 
+  it("publishes the canonical Character Level across every skill (#213)", async () => {
+    const owner = await makeUser("Canonical Owner");
+    const activeName = `Canonical Active ${token()}`;
+    const mateName = `Canonical Mate ${token()}`;
+    const active = await makeCharacterAt(owner, activeName, LOCATION_IDS.crashSite);
+    // Mining 2 and Refining 2 with Welding untrained: 1 + 1 + 1 + 0. Before
+    // #213 this list published the Mining level (2) while the profile the row
+    // opens said something else.
+    const mate = await makeCharacterAt(owner, mateName, LOCATION_IDS.crashSite, 500);
+    await db
+      .insert(rune.characterSkillXp)
+      .values({ characterId: mate.id, skillId: SKILL_IDS.refining, totalXp: 500 })
+      .onConflictDoUpdate({
+        target: [rune.characterSkillXp.characterId, rune.characterSkillXp.skillId],
+        set: { totalXp: 500 },
+      });
+    // Strength has no approved curve, so persisted XP there cannot move it.
+    await db
+      .insert(rune.characterSkillXp)
+      .values({ characterId: mate.id, skillId: SKILL_IDS.strength, totalXp: 9_999_999 })
+      .onConflictDoUpdate({
+        target: [rune.characterSkillXp.characterId, rune.characterSkillXp.skillId],
+        set: { totalXp: 9_999_999 },
+      });
+
+    const result = await population.getLocationPopulation(owner, active.id);
+    expect(result.characters).toContainEqual({
+      displayName: mateName,
+      level: 3,
+      ownerName: "Canonical Owner",
+    });
+    // One entry per character, however many skill-XP rows it has.
+    expect(result.characters.filter((entry) => entry.displayName === mateName)).toHaveLength(1);
+  });
+
   it("orders deterministically by character name", async () => {
     const owner = await makeUser("Order Owner");
     const fillerOwner = await makeUser("Filler Owner");

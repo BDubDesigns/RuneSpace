@@ -20,7 +20,7 @@ QA belong to `docs/art-cookbook.md`.
 Location owns this scene and the stationary activity/population presentation;
 the dedicated Map and in-transit Journey surfaces do not render a destination
 scene. Same-location character browsing and profile details remain below this
-Location header, not on Map. The fixed footer is **Characters · Inventory · Map ·
+Location header, not on Map. The fixed footer is **Character · Inventory · Map ·
 Missions**, with Inventory and Equipment consolidated into one tabbed overlay.
 
 ## Registry / schema contract

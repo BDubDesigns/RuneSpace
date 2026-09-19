@@ -148,7 +148,7 @@ profileTest(
     expect((await panelPortrait.getAttribute("alt"))?.length ?? 0).toBeGreaterThan(0);
     await expect(panel.getByText(radaOne, { exact: true })).toBeVisible();
     await expect(panel.getByText(`Player: ${radaOwnerName}`)).toBeVisible();
-    await expect(panel.getByText("Overall level 2")).toBeVisible();
+    await expect(panel.getByText("Character level 2")).toBeVisible();
     const skillRow = panel.locator("[data-character-skill]");
     // Mining, Refining, and the approved Welding skill all publish.
     await expect(skillRow).toHaveCount(3);
@@ -200,7 +200,7 @@ profileTest(
     ).toBeVisible();
     await expect(panel.getByText(radaTwo, { exact: true })).toBeVisible();
     await expect(panel.getByText(`Player: ${radaOwnerName}`)).toBeVisible();
-    await expect(panel.getByText("Overall level 1")).toBeVisible();
+    await expect(panel.getByText("Character level 1")).toBeVisible();
     await expect(panel.locator("[data-character-portrait] img")).toBeVisible();
     await expect(radaTwoTrigger).toHaveAttribute("aria-expanded", "true");
     await expect(kaelTrigger).toHaveAttribute("aria-expanded", "false");
@@ -276,7 +276,7 @@ profileTest(
     await page.keyboard.press("Enter");
     await expect(panel).toHaveCount(1);
     await expect(panel.getByText(radaTwo, { exact: true })).toBeVisible();
-    await expect(panel.getByText("Overall level 1")).toBeVisible();
+    await expect(panel.getByText("Character level 1")).toBeVisible();
 
     // Closing with the disclosure collapsed must not strand focus on the hidden
     // list button: Escape falls back to the persistent disclosure trigger.

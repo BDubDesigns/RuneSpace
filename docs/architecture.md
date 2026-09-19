@@ -96,10 +96,21 @@ below.
   The existing server-authoritative Travel state and `ScavengeControl` command
   remain the gameplay authority; Journey does not resolve, persist, or invent
   outcomes.
-- The fixed Play footer has four destinations: **Characters · Inventory · Map ·
+- The fixed Play footer has four destinations: **Character · Inventory · Map ·
   Missions**. Inventory and Equipment are two tabs in one shared overlay owned
   by `features/inventory/InventoryEquipmentPanel.tsx`; their existing
   server-authoritative command and projection boundaries remain unchanged.
+  Character (#213) opens the current character's profile in the same shared
+  overlay, owned by `features/characters/CharacterPanel.tsx`; account-level
+  character selection stays at `/characters`, reached from that overlay's
+  sticky Switch Character action.
+- Character Level has exactly one definition, `1 + Σ(skillLevel - 1)`, in
+  `game/domain/character-progression.ts` (#213). That module also decides which
+  skills a progression surface presents — every skill in `SKILL_IDS` with an
+  approved level curve and an approved player-facing name. The Character
+  overlay, the same-location player inspector, and the location population list
+  all read it; no component re-implements the formula or keeps a skill list.
+  Character Level is derived, never persisted, and has no XP track of its own.
 - Mission guidance continues to use the existing derived semantic targets on
   the primary surface. Issue #145 does not move or rewrite mission guidance.
   When its current target is an equipment item, the mission surface may open

@@ -14,7 +14,7 @@ gameplay-state communication on a phone; hexes are **not** miniature scene paint
 Holo Hollow's town places are Local Places (`docs/gameplay-foundations.md`), not
 map hexes: they own no coordinate, no adjacency, and never appear on this panel.
 
-The Play footer's four destinations are **Characters · Inventory · Map ·
+The Play footer's four destinations are **Character · Inventory · Map ·
 Missions**. Map is entered with `?surface=map`; it is not an inline activity
 section on Location.
 

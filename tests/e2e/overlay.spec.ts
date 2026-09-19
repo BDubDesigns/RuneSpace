@@ -118,7 +118,7 @@ test("footer has four equal destinations and the Mission Log opens through the s
 }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   const nav = page.getByRole("navigation", { name: "Primary" });
-  await expect(nav.getByRole("link", { name: "Characters" })).toBeVisible();
+  await expect(nav.getByRole("button", { name: "Character", exact: true })).toBeVisible();
   await expect(nav.getByRole("button", { name: "Inventory" })).toBeVisible();
   await expect(nav.getByRole("tab", { name: "Equipment" })).toHaveCount(0);
   await expect(nav.getByRole("button", { name: "Missions" })).toBeVisible();
@@ -131,7 +131,7 @@ test("footer has four equal destinations and the Mission Log opens through the s
           .replace(/, \d+ ready to turn in$/, ""),
       ),
     );
-  expect(footerLabels).toEqual(["Characters", "Inventory", "Map", "Missions"]);
+  expect(footerLabels).toEqual(["Character", "Inventory", "Map", "Missions"]);
   await expect(nav.getByRole("link", { name: "Equipment" })).toHaveCount(0);
   await expect(nav.getByRole("button", { name: "Equipment" })).toHaveCount(0);
   // No horizontal overflow at the narrow mobile width.

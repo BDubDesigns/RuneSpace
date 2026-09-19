@@ -82,7 +82,11 @@ test("News indicator starts unread, clears through a real navigation, and stays 
 
     // The boundary is account-level: a second character under the same
     // account sees the already-cleared state without acknowledging again.
-    await page.getByRole("link", { name: "Characters" }).click();
+    await page.getByRole("button", { name: "Character", exact: true }).click();
+    await page
+      .getByRole("dialog", { name: "Character" })
+      .getByRole("link", { name: "Switch Character" })
+      .click();
     await createCharacter(page, uniqueCharacterName("News Two"));
     await expect(banner.getByRole("button", { name: "News", exact: true })).toBeVisible();
     await expect(banner.getByRole("button", { name: /unread/i })).toHaveCount(0);

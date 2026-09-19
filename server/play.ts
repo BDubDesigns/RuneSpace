@@ -29,6 +29,7 @@ import {
   refiningRecipes,
   repairTargetBalances,
   repairTargetForActionId,
+  skillLevelThresholds,
   standardSkillLevelThresholds,
   weldingActionIds,
   weldingCadenceActionIds,
@@ -36,6 +37,7 @@ import {
   type EffectiveGameBalance,
 } from "@/game/config/balance";
 import { resolveItemPresentation } from "@/game/content/item-presentation";
+import { getSkillPresentation } from "@/game/content/skill-presentation";
 import {
   ACTION_IDS,
   ITEM_IDS,
@@ -85,6 +87,10 @@ import {
   type RefiningStopReason,
 } from "@/game/domain/refining";
 import { skillLevelProgress } from "@/game/domain/progression";
+import {
+  projectCharacterProgression,
+  type CharacterProgression,
+} from "@/game/domain/character-progression";
 import {
   planTransportTravel,
   planTravel,
@@ -489,6 +495,14 @@ export type PlayGameplayState = {
     nextAttemptBoosted: boolean;
     nextAttemptDurationTicks: number;
   };
+  /**
+   * The active character's canonical Character Level and every skill the game
+   * defines, projected through the shared cross-skill boundary the
+   * same-location player inspector uses (#213). The Character surface reads
+   * this rather than a screen-specific skill list, so a future skill appears
+   * there the moment the game defines it.
+   */
+  progression: CharacterProgression;
   mining: { totalXp: number; level: number; xpToNextLevel?: number; xpIntoLevel: number };
   refining: { totalXp: number; level: number; xpToNextLevel?: number; xpIntoLevel: number };
   welding: { totalXp: number; level: number; xpToNextLevel?: number; xpIntoLevel: number };
@@ -1225,6 +1239,15 @@ export async function stateFromTransaction(
   const thresholds = miningLevelThresholds(balance);
   const refiningThresholds = standardSkillLevelThresholds(balance);
   const weldingThresholds = standardSkillLevelThresholds(balance);
+  // Canonical cross-skill progression for the Character surface (#213): every
+  // skill the game defines, the same rule the player inspector projects. The
+  // per-skill fields below stay as they are — each activity surface reads its
+  // own skill's live run state, not a profile list.
+  const progression = projectCharacterProgression({
+    skillXp: xpRows.map((row) => ({ skillId: row.skillId, totalXp: row.totalXp })),
+    levelThresholds: skillLevelThresholds,
+    skillDisplayName: (skillId) => getSkillPresentation(skillId)?.displayName,
+  });
   const miningProgress = skillLevelProgress(totalXp, thresholds);
   const refiningProgress = skillLevelProgress(refiningTotalXp, refiningThresholds);
   const weldingProgress = skillLevelProgress(weldingTotalXp, weldingThresholds);
@@ -1480,6 +1503,7 @@ export async function stateFromTransaction(
             nextAttemptDurationTicks,
           }
         : undefined,
+    progression,
     mining: {
       totalXp,
       level: miningProgress.level,

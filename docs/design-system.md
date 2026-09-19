@@ -16,10 +16,12 @@ Translucent tokens: a Tailwind slash-opacity modifier such as `bg-[color:var(--r
 
 ## Play surface chrome (Issue #145)
 
-The Play footer is the fixed four-destination navigation: **Characters ·
+The Play footer is the fixed four-destination navigation: **Character ·
 Inventory · Map · Missions**. Inventory and Equipment share one Drawer and are
-selected with tabs; Equipment is not a fifth footer destination. The surface
-ownership and state rules are defined once in `docs/architecture.md`.
+selected with tabs; Equipment is not a fifth footer destination. Character is a
+sibling of Inventory in the same Drawer, with a sticky footer action so Switch
+Character never scrolls out of reach (#213). The surface ownership and state
+rules are defined once in `docs/architecture.md`.
 
 Location, Map, and Journey are separate compositions: Location presents the
 stationary scene, activity, and same-location population/profile flow; Map is
