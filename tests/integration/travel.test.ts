@@ -1,6 +1,6 @@
 import { eq } from "drizzle-orm";
 import { afterEach, beforeAll, describe, expect, it } from "vitest";
-import { ACTION_IDS, LOCATION_IDS } from "@/game/config/foundations";
+import { ACTION_IDS, ITEM_IDS, LOCATION_IDS } from "@/game/config/foundations";
 import { cleanupTestUser, createCharacterForUser, createTestUser } from "./fixtures";
 
 const DATABASE_URL = process.env.DATABASE_URL;
@@ -109,7 +109,7 @@ suite("issue #40 persistent locations and timed travel (real PostgreSQL)", () =>
       .update(rune.characters)
       .set({ currentLocationId: LOCATION_IDS.theJag })
       .where(eq(rune.characters.id, character.id));
-    await miningCommands.startFerriteShaleMining(userId, character.id, startedAt, random);
+    await miningCommands.startMining(userId, character.id, startedAt, random);
 
     const completedAt = new Date("2026-01-01T00:00:06.600Z");
     const traveled = await play.beginTravel(
@@ -123,7 +123,7 @@ suite("issue #40 persistent locations and timed travel (real PostgreSQL)", () =>
     expect(traveled.run).toMatchObject({
       attempts: 1,
       successes: 1,
-      shaleGained: 1,
+      itemsGained: { [ITEM_IDS.ferriteShale]: 1 },
       xpGained: 15,
     });
     expect(traveled.travelState?.destinationLocationId).toBe(LOCATION_IDS.theLongScramble);
@@ -139,10 +139,10 @@ suite("issue #40 persistent locations and timed travel (real PostgreSQL)", () =>
     expect(afterTravel.run).toMatchObject({
       attempts: 1,
       successes: 1,
-      shaleGained: 1,
+      itemsGained: { [ITEM_IDS.ferriteShale]: 1 },
       xpGained: 15,
     });
-    expect(afterTravel.ferriteShaleQuantity).toBe(1);
+    expect(afterTravel.carriedByItemId[ITEM_IDS.ferriteShale] ?? 0).toBe(1);
   });
 
   it("survives partial travel progress across a refresh and arrives exactly once", async () => {
@@ -233,7 +233,7 @@ suite("issue #40 persistent locations and timed travel (real PostgreSQL)", () =>
     const startedAt = new Date("2026-01-01T00:00:00.000Z");
     await play.beginTravel(userId, character.id, LOCATION_IDS.abandonedProcessingYard, startedAt);
 
-    const transitMining = await miningCommands.startFerriteShaleMining(
+    const transitMining = await miningCommands.startMining(
       userId,
       character.id,
       new Date("2026-01-01T00:00:06.000Z"),
@@ -253,7 +253,7 @@ suite("issue #40 persistent locations and timed travel (real PostgreSQL)", () =>
 
     // After arrival at the Processing Yard, Mining still cannot start there.
     await play.getPlayGameplayState(userId, character.id, new Date("2026-01-01T00:00:24.600Z"));
-    const yardMining = await miningCommands.startFerriteShaleMining(
+    const yardMining = await miningCommands.startMining(
       userId,
       character.id,
       new Date("2026-01-01T00:00:30.000Z"),
@@ -480,7 +480,7 @@ suite("issue #40 persistent locations and timed travel (real PostgreSQL)", () =>
     const now = new Date("2026-01-01T00:00:00.000Z");
     await play.getPlayGameplayState(userId, character.id, now);
 
-    const atCrash = await miningCommands.startFerriteShaleMining(userId, character.id, now);
+    const atCrash = await miningCommands.startMining(userId, character.id, now);
     expect(atCrash.travelError).toBe("mining_unavailable_here");
 
     await play.beginTravel(userId, character.id, LOCATION_IDS.theLongScramble, now);
@@ -490,7 +490,7 @@ suite("issue #40 persistent locations and timed travel (real PostgreSQL)", () =>
       new Date("2026-01-01T00:00:24.600Z"),
     );
     expect(atScramble.location.currentLocationId).toBe(LOCATION_IDS.theLongScramble);
-    const scrambleMining = await miningCommands.startFerriteShaleMining(
+    const scrambleMining = await miningCommands.startMining(
       userId,
       character.id,
       new Date("2026-01-01T00:00:24.600Z"),
@@ -509,7 +509,7 @@ suite("issue #40 persistent locations and timed travel (real PostgreSQL)", () =>
       new Date("2026-01-01T00:00:49.200Z"),
     );
     expect(atJag.location.currentLocationId).toBe(LOCATION_IDS.theJag);
-    const jagMining = await miningCommands.startFerriteShaleMining(
+    const jagMining = await miningCommands.startMining(
       userId,
       character.id,
       new Date("2026-01-01T00:00:49.200Z"),

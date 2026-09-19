@@ -118,8 +118,12 @@ suite("issue #110 Cut Your Teeth persistence and XP boundary (real PostgreSQL)",
 
   async function completeMiningAttempts(userId: string, characterId: string) {
     const start = new Date(now.getTime() + 10_000);
-    await miningCommands.startFerriteShaleMining(userId, characterId, start, deterministicRandom());
-    const durationMs = getEffectiveGameBalance().mining.attemptDurationTicks * GAME_TICK_MS * 5 + 1;
+    await miningCommands.startMining(userId, characterId, start, deterministicRandom());
+    const durationMs =
+      getEffectiveGameBalance().mining.sources.ferriteShale.attemptDurationTicks *
+        GAME_TICK_MS *
+        5 +
+      1;
     const stopped = await miningCommands.stopMining(
       userId,
       characterId,

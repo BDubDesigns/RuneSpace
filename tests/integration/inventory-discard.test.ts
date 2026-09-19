@@ -303,7 +303,7 @@ suite("Issue #58 authoritative inventory stack discard (real PostgreSQL)", () =>
     const startedAt = new Date("2026-07-02T00:00:00.000Z");
     const dueAt = new Date("2026-07-02T00:00:06.000Z");
     await provision(userId, character.id, startedAt);
-    await miningCommands.startFerriteShaleMining(userId, character.id, startedAt, successYield);
+    await miningCommands.startMining(userId, character.id, startedAt, successYield);
     // The selected stack holds the confirmed quantity; the due successful
     // attempt will add one more shale to the SAME stack.
     const stackId = await addStack(character.id, ITEM_IDS.ferriteShale, 5);
@@ -330,7 +330,7 @@ suite("Issue #58 authoritative inventory stack discard (real PostgreSQL)", () =>
     expect(result.state.inventory.stacks).toMatchObject([{ id: stackId, quantity: 6 }]);
     const rows = await stackRows(character.id);
     expect(rows).toMatchObject([{ id: stackId, quantity: 6 }]);
-    expect(result.state.ferriteShaleQuantity).toBe(6);
+    expect(result.state.carriedByItemId[ITEM_IDS.ferriteShale] ?? 0).toBe(6);
     // A renewed confirmation at the new authoritative quantity still works.
     const retried = await discardInventoryStack(
       userId,
@@ -352,7 +352,7 @@ suite("Issue #58 authoritative inventory stack discard (real PostgreSQL)", () =>
     const startedAt = new Date("2026-07-03T00:00:00.000Z");
     const dueAt = new Date("2026-07-03T00:00:06.000Z");
     await provision(userId, character.id, startedAt);
-    await miningCommands.startFerriteShaleMining(userId, character.id, startedAt, successYield);
+    await miningCommands.startMining(userId, character.id, startedAt, successYield);
     // The discard target is a Power Cell stack: due Mining work never touches
     // it, so the discard inside the failing transaction genuinely succeeds
     // before the forced throw.
@@ -429,7 +429,12 @@ suite("Issue #58 authoritative inventory stack discard (real PostgreSQL)", () =>
     // The same window still resolves exactly once and commits normally: two
     // boosted attempts consume two of the seven charges.
     const retried = await play.getPlayGameplayState(userId, character.id, dueAt, successYield);
-    expect(retried.run).toMatchObject({ attempts: 2, successes: 2, shaleGained: 2, xpGained: 30 });
+    expect(retried.run).toMatchObject({
+      attempts: 2,
+      successes: 2,
+      itemsGained: { [ITEM_IDS.ferriteShale]: 2 },
+      xpGained: 30,
+    });
     expect(retried.inventory.stacks).toMatchObject([
       { itemId: ITEM_IDS.powerCell, quantity: 2 },
       { itemId: ITEM_IDS.ferriteShale, quantity: 2 },

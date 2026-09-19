@@ -16,6 +16,8 @@ import {
   cleanupTestUser,
   createCharacterForUser,
   createTestUser,
+  installedMaterials,
+  requiredQuantity,
   seedRepairTarget,
 } from "./fixtures";
 
@@ -185,8 +187,7 @@ suite("issue #172 Out of the Weather (real PostgreSQL)", () => {
       characterId,
       {
         targetId: REPAIR_TARGET_IDS.crewStop,
-        expectedRefinedFerrite: expected,
-        expectedSlag: 0,
+        expectedMaterials: { [ITEM_IDS.refinedFerrite]: expected },
       },
       at,
       deterministicRandom(),
@@ -251,23 +252,23 @@ suite("issue #172 Out of the Weather (real PostgreSQL)", () => {
       await addRefinedFerrite(character.id, [5, 3]);
       expect((await contribute(userId, character.id, 8)).repair).toMatchObject({
         status: "committed",
-        refinedFerrite: 8,
-        slag: 0,
+        materials: { [ITEM_IDS.refinedFerrite]: 8 },
       });
       expect(await carriedRefinedFerrite(character.id)).toBe(0);
-      expect(await crewStopRow(character.id)).toMatchObject({ refinedFerriteContributed: 8 });
+      expect(await crewStopRow(character.id)).toMatchObject({
+        materials: { [ITEM_IDS.refinedFerrite]: 8 },
+      });
 
       // Leave, gather more, come back.
       await addRefinedFerrite(character.id, [5, 5, 5]);
       expect((await contribute(userId, character.id, 12)).repair).toMatchObject({
         status: "committed",
-        refinedFerrite: 12,
+        materials: { [ITEM_IDS.refinedFerrite]: 12 },
       });
       // Only the twelve still needed were taken; the surplus stays carried.
       expect(await carriedRefinedFerrite(character.id)).toBe(3);
       expect(await crewStopRow(character.id)).toMatchObject({
-        refinedFerriteContributed: crewStop.refinedFerriteRequired,
-        slagContributed: 0,
+        materials: installedMaterials(crewStop),
       });
     });
 
@@ -282,8 +283,8 @@ suite("issue #172 Out of the Weather (real PostgreSQL)", () => {
 
       expect((await contribute(userId, character.id, 20)).repair).toMatchObject({
         status: "committed",
-        refinedFerrite: 20,
-        slag: 0,
+        // Slag is not in the Crew Stop's recipe, so it is not in the commit.
+        materials: { [ITEM_IDS.refinedFerrite]: 20 },
       });
       const slag = (
         await db
@@ -312,7 +313,9 @@ suite("issue #172 Out of the Weather (real PostgreSQL)", () => {
       const statuses = [first.repair.status, second.repair.status].sort();
       expect(statuses).toEqual(["committed", "refused"]);
       expect(await carriedRefinedFerrite(character.id)).toBe(0);
-      expect(await crewStopRow(character.id)).toMatchObject({ refinedFerriteContributed: 20 });
+      expect(await crewStopRow(character.id)).toMatchObject({
+        materials: { [ITEM_IDS.refinedFerrite]: 20 },
+      });
     });
 
     it("refuses cleanly when the expected quantity no longer matches", async () => {
@@ -333,8 +336,7 @@ suite("issue #172 Out of the Weather (real PostgreSQL)", () => {
       await completeChainThroughHoldItTogether(character.id);
       await acceptSideMission(userId, character.id);
       await seedRepairTarget(db, rune, character.id, REPAIR_TARGET_IDS.crewStop, {
-        refinedFerriteContributed: crewStop.refinedFerriteRequired,
-        slagContributed: 0,
+        materials: installedMaterials(crewStop),
         weldingProgress: 0,
         completedAt: null,
         updatedAt: now,
@@ -347,7 +349,9 @@ suite("issue #172 Out of the Weather (real PostgreSQL)", () => {
       await completeChainThroughHoldItTogether(character.id);
       await acceptSideMission(userId, character.id);
       await seedRepairTarget(db, rune, character.id, REPAIR_TARGET_IDS.crewStop, {
-        refinedFerriteContributed: crewStop.refinedFerriteRequired - 1,
+        materials: installedMaterials(crewStop, {
+          [ITEM_IDS.refinedFerrite]: requiredQuantity(crewStop, ITEM_IDS.refinedFerrite) - 1,
+        }),
       });
 
       const refused = await repairs.startWelding(
@@ -477,7 +481,7 @@ suite("issue #172 Out of the Weather (real PostgreSQL)", () => {
       await completeChainThroughHoldItTogether(character.id);
       await acceptSideMission(userId, character.id);
       await seedRepairTarget(db, rune, character.id, REPAIR_TARGET_IDS.crewStop, {
-        refinedFerriteContributed: crewStop.refinedFerriteRequired,
+        materials: installedMaterials(crewStop),
         weldingProgress: crewStop.repairIncrements,
         completedAt: now,
         updatedAt: now,
@@ -588,8 +592,7 @@ suite("issue #172 Out of the Weather (real PostgreSQL)", () => {
       await completeChainThroughHoldItTogether(character.id);
       await acceptSideMission(userId, character.id);
       await seedRepairTarget(db, rune, character.id, REPAIR_TARGET_IDS.crewStop, {
-        refinedFerriteContributed: crewStop.refinedFerriteRequired,
-        slagContributed: 0,
+        materials: installedMaterials(crewStop),
         weldingProgress: 0,
         completedAt: null,
         updatedAt: now,
@@ -1011,8 +1014,10 @@ suite("issue #172 Out of the Weather (real PostgreSQL)", () => {
         deterministicRandom(),
       );
       expect(state.repairs[REPAIR_TARGET_IDS.cargoHold]).toMatchObject({
-        refinedFerriteRequired: 15,
-        slagRequired: 6,
+        materials: [
+          { itemId: ITEM_IDS.refinedFerrite, required: 15 },
+          { itemId: ITEM_IDS.slag, required: 6 },
+        ],
         weldingIncrements: 12,
       });
       // The Cargo panel's own projection is the same object.
@@ -1022,8 +1027,7 @@ suite("issue #172 Out of the Weather (real PostgreSQL)", () => {
     it("keeps the two targets' progress completely independent", async () => {
       const { userId, character } = await makeCharacter();
       await seedRepairTarget(db, rune, character.id, REPAIR_TARGET_IDS.cargoHold, {
-        refinedFerriteContributed: 15,
-        slagContributed: 6,
+        materials: { [ITEM_IDS.refinedFerrite]: 15, [ITEM_IDS.slag]: 6 },
         weldingProgress: 12,
         completedAt: now,
       });

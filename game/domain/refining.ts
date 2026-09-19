@@ -383,8 +383,26 @@ export function resolveRefining<Id>(input: {
     };
   };
 
+  // A run that cannot even start writes nothing. The loop's own stop echoes
+  // the stacks it has been working on, but there is no working copy yet here,
+  // so persisting one would be a no-op UPDATE per carried stack.
   const initialStop = refiningPreflightStopReason(snapshot, balance, recipe);
-  if (initialStop) return finish(initialStop);
+  if (initialStop) {
+    return {
+      consumedTicks: 0,
+      attempts: 0,
+      successes: 0,
+      failures: 0,
+      inputsConsumed: {},
+      outputsGained: {},
+      awardedXp: 0,
+      stackUpdates: [],
+      deletedStackIds: [],
+      createdStacks: [],
+      resolvedAttempts: [],
+      stopReason: initialStop,
+    };
+  }
 
   while (true) {
     const stopReason = refiningPreflightStopReason(

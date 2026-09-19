@@ -92,8 +92,7 @@ suite("gameplay foundations (real PostgreSQL)", () => {
       db.insert(rune.characterRepairTargets).values({
         characterId: character.id,
         targetId: REPAIR_TARGET_IDS.cargoHold,
-        refinedFerriteContributed: 15,
-        slagContributed: 6,
+        materials: { [ITEM_IDS.refinedFerrite]: 15, [ITEM_IDS.slag]: 6 },
         weldingProgress: 0,
         completedAt: new Date(),
       }),
@@ -420,8 +419,8 @@ suite("gameplay foundations (real PostgreSQL)", () => {
     await play.getPlayGameplayState(userId, character.id, startedAt, random);
     await moveToTheJag(character.id);
     await Promise.all([
-      miningCommands.startFerriteShaleMining(userId, character.id, startedAt, random),
-      miningCommands.startFerriteShaleMining(userId, character.id, startedAt, random),
+      miningCommands.startMining(userId, character.id, startedAt, random),
+      miningCommands.startMining(userId, character.id, startedAt, random),
     ]);
     const resolved = await play.getPlayGameplayState(
       userId,
@@ -429,13 +428,13 @@ suite("gameplay foundations (real PostgreSQL)", () => {
       new Date("2026-01-01T00:00:06.000Z"),
       random,
     );
-    expect(resolved.ferriteShaleQuantity).toBe(1);
+    expect(resolved.carriedByItemId[ITEM_IDS.ferriteShale] ?? 0).toBe(1);
     expect(resolved.mining.totalXp).toBe(15);
     expect(resolved.run).toMatchObject({
       attempts: 1,
       successes: 1,
       failures: 0,
-      shaleGained: 1,
+      itemsGained: { [ITEM_IDS.ferriteShale]: 1 },
       xpGained: 15,
     });
     expect(resolved.run.recentAttempts).toMatchObject([
@@ -444,7 +443,8 @@ suite("gameplay foundations (real PostgreSQL)", () => {
         success: true,
         rolledBasisPoints: 0,
         thresholdBasisPoints: 3500,
-        shaleAwarded: 1,
+        itemId: ITEM_IDS.ferriteShale,
+        quantityAwarded: 1,
         xpAwarded: 15,
       },
     ]);
@@ -454,7 +454,7 @@ suite("gameplay foundations (real PostgreSQL)", () => {
       new Date("2026-01-01T00:00:06.000Z"),
       random,
     );
-    expect(repeat.ferriteShaleQuantity).toBe(1);
+    expect(repeat.carriedByItemId[ITEM_IDS.ferriteShale] ?? 0).toBe(1);
     expect(repeat.run.attempts).toBe(1);
     const starterItems = await db
       .select()
@@ -469,7 +469,7 @@ suite("gameplay foundations (real PostgreSQL)", () => {
     const random = { nextBasisPoints: () => 9_999, nextUnit: () => 0 };
     await play.getPlayGameplayState(userId, character.id, startedAt, random);
     await moveToTheJag(character.id);
-    await miningCommands.startFerriteShaleMining(userId, character.id, startedAt, random);
+    await miningCommands.startMining(userId, character.id, startedAt, random);
     const resolved = await play.getPlayGameplayState(
       userId,
       character.id,
@@ -480,7 +480,7 @@ suite("gameplay foundations (real PostgreSQL)", () => {
       attempts: 12,
       successes: 0,
       failures: 12,
-      shaleGained: 0,
+      itemsGained: {},
       xpGained: 0,
     });
     expect(resolved.run.recentAttempts).toHaveLength(10);
@@ -500,7 +500,7 @@ suite("gameplay foundations (real PostgreSQL)", () => {
       random,
     );
     expect(stopped.run.attempts).toBe(12);
-    const restarted = await miningCommands.startFerriteShaleMining(
+    const restarted = await miningCommands.startMining(
       userId,
       character.id,
       new Date("2026-01-01T00:01:13.000Z"),
@@ -510,7 +510,7 @@ suite("gameplay foundations (real PostgreSQL)", () => {
       attempts: 0,
       successes: 0,
       failures: 0,
-      shaleGained: 0,
+      itemsGained: {},
       xpGained: 0,
       recentAttempts: [],
     });
@@ -527,7 +527,7 @@ suite("gameplay foundations (real PostgreSQL)", () => {
       itemId: ITEM_IDS.ferriteShale,
       quantity: 10,
     });
-    await miningCommands.startFerriteShaleMining(userId, character.id, startedAt, random);
+    await miningCommands.startMining(userId, character.id, startedAt, random);
     const resolved = await play.getPlayGameplayState(
       userId,
       character.id,
@@ -542,7 +542,7 @@ suite("gameplay foundations (real PostgreSQL)", () => {
     expect(resolved.run).toMatchObject({
       attempts: 1,
       successes: 1,
-      shaleGained: 1,
+      itemsGained: { [ITEM_IDS.ferriteShale]: 1 },
       xpGained: 15,
     });
     const retry = await play.getPlayGameplayState(
@@ -608,7 +608,7 @@ suite("gameplay foundations (real PostgreSQL)", () => {
       massGrams: 16_400,
       capacityGrams: 50_000,
     });
-    expect(first.ferriteShaleQuantity).toBe(14);
+    expect(first.carriedByItemId[ITEM_IDS.ferriteShale] ?? 0).toBe(14);
 
     await db
       .update(rune.inventoryStacks)
@@ -622,7 +622,7 @@ suite("gameplay foundations (real PostgreSQL)", () => {
       massGrams: 16_800,
       capacityGrams: first.inventory.capacityGrams,
     });
-    expect(afterQuantityUpdate.ferriteShaleQuantity).toBe(18);
+    expect(afterQuantityUpdate.carriedByItemId[ITEM_IDS.ferriteShale] ?? 0).toBe(18);
   });
 
   it("preserves an unsupported active action during Mining commands", async () => {
@@ -636,7 +636,7 @@ suite("gameplay foundations (real PostgreSQL)", () => {
       resolvedThroughAt,
     });
 
-    const state = await miningCommands.startFerriteShaleMining(
+    const state = await miningCommands.startMining(
       userId,
       character.id,
       new Date("2026-01-01T00:01:00.000Z"),
@@ -656,9 +656,9 @@ suite("gameplay foundations (real PostgreSQL)", () => {
     await moveToTheJag(character.id);
     await db.delete(rune.equippedItems).where(eq(rune.equippedItems.characterId, character.id));
 
-    const state = await miningCommands.startFerriteShaleMining(userId, character.id, now);
+    const state = await miningCommands.startMining(userId, character.id, now);
     expect(state.stop).toEqual({
-      actionId: ACTION_IDS.ferriteShaleMining,
+      activity: "mining",
       reason: "compatible_mining_tool_missing",
     });
     await expect(
@@ -751,7 +751,7 @@ suite("gameplay foundations (real PostgreSQL)", () => {
     const random = { nextBasisPoints: () => 0, nextUnit: () => 0 };
     await play.getPlayGameplayState(userId, character.id, startedAt, random);
     await moveToTheJag(character.id);
-    await miningCommands.startFerriteShaleMining(userId, character.id, startedAt, random);
+    await miningCommands.startMining(userId, character.id, startedAt, random);
     const removed = await equipment.changeEquipment(
       userId,
       character.id,
@@ -762,9 +762,14 @@ suite("gameplay foundations (real PostgreSQL)", () => {
       completedAt,
       random,
     );
-    expect(removed.run).toMatchObject({ attempts: 1, successes: 1, shaleGained: 1, xpGained: 15 });
+    expect(removed.run).toMatchObject({
+      attempts: 1,
+      successes: 1,
+      itemsGained: { [ITEM_IDS.ferriteShale]: 1 },
+      xpGained: 15,
+    });
     expect(removed.stop).toEqual({
-      actionId: ACTION_IDS.ferriteShaleMining,
+      activity: "mining",
       reason: "compatible_mining_tool_missing",
     });
     expect(removed.activeAction).toBeUndefined();
@@ -772,8 +777,13 @@ suite("gameplay foundations (real PostgreSQL)", () => {
       db.select().from(rune.activeActions).where(eq(rune.activeActions.characterId, character.id)),
     ).resolves.toEqual([]);
     const retry = await play.getPlayGameplayState(userId, character.id, completedAt, random);
-    expect(retry.run).toMatchObject({ attempts: 1, successes: 1, shaleGained: 1, xpGained: 15 });
-    expect(retry.ferriteShaleQuantity).toBe(1);
+    expect(retry.run).toMatchObject({
+      attempts: 1,
+      successes: 1,
+      itemsGained: { [ITEM_IDS.ferriteShale]: 1 },
+      xpGained: 15,
+    });
+    expect(retry.carriedByItemId[ITEM_IDS.ferriteShale] ?? 0).toBe(1);
   });
 
   it("rolls back pending Mining resolution when a loadout mutation is refused", async () => {
@@ -783,7 +793,7 @@ suite("gameplay foundations (real PostgreSQL)", () => {
     const random = { nextBasisPoints: () => 0, nextUnit: () => 0 };
     await play.getPlayGameplayState(userId, character.id, startedAt, random);
     await moveToTheJag(character.id);
-    await miningCommands.startFerriteShaleMining(userId, character.id, startedAt, random);
+    await miningCommands.startMining(userId, character.id, startedAt, random);
     await expect(
       equipment.changeEquipment(
         userId,
@@ -808,8 +818,13 @@ suite("gameplay foundations (real PostgreSQL)", () => {
         .where(eq(rune.inventoryStacks.characterId, character.id)),
     ).resolves.toEqual([]);
     const resolved = await play.getPlayGameplayState(userId, character.id, completedAt, random);
-    expect(resolved.run).toMatchObject({ attempts: 1, successes: 1, shaleGained: 1, xpGained: 15 });
-    expect(resolved.ferriteShaleQuantity).toBe(1);
+    expect(resolved.run).toMatchObject({
+      attempts: 1,
+      successes: 1,
+      itemsGained: { [ITEM_IDS.ferriteShale]: 1 },
+      xpGained: 15,
+    });
+    expect(resolved.carriedByItemId[ITEM_IDS.ferriteShale] ?? 0).toBe(1);
   });
 
   it("replacing an active Mining tool resolves, stops, and preserves rewards atomically", async () => {
@@ -819,7 +834,7 @@ suite("gameplay foundations (real PostgreSQL)", () => {
     const random = { nextBasisPoints: () => 0, nextUnit: () => 0 };
     await play.getPlayGameplayState(userId, character.id, startedAt, random);
     await moveToTheJag(character.id);
-    await miningCommands.startFerriteShaleMining(userId, character.id, startedAt, random);
+    await miningCommands.startMining(userId, character.id, startedAt, random);
 
     const spareCutter = (
       await db
@@ -848,10 +863,15 @@ suite("gameplay foundations (real PostgreSQL)", () => {
       random,
     );
     // One attempt resolved before the tool replacement stopped Mining.
-    expect(replaced.run).toMatchObject({ attempts: 1, successes: 1, shaleGained: 1, xpGained: 15 });
-    expect(replaced.ferriteShaleQuantity).toBe(1);
+    expect(replaced.run).toMatchObject({
+      attempts: 1,
+      successes: 1,
+      itemsGained: { [ITEM_IDS.ferriteShale]: 1 },
+      xpGained: 15,
+    });
+    expect(replaced.carriedByItemId[ITEM_IDS.ferriteShale] ?? 0).toBe(1);
     expect(replaced.stop).toEqual({
-      actionId: ACTION_IDS.ferriteShaleMining,
+      activity: "mining",
       reason: "mining_tool_replaced",
     });
     expect(replaced.activeAction).toBeUndefined();
@@ -873,8 +893,13 @@ suite("gameplay foundations (real PostgreSQL)", () => {
 
     // A later refresh must not resolve the same attempt again.
     const retry = await play.getPlayGameplayState(userId, character.id, completedAt, random);
-    expect(retry.run).toMatchObject({ attempts: 1, successes: 1, shaleGained: 1, xpGained: 15 });
-    expect(retry.ferriteShaleQuantity).toBe(1);
+    expect(retry.run).toMatchObject({
+      attempts: 1,
+      successes: 1,
+      itemsGained: { [ITEM_IDS.ferriteShale]: 1 },
+      xpGained: 15,
+    });
+    expect(retry.carriedByItemId[ITEM_IDS.ferriteShale] ?? 0).toBe(1);
     expect(retry.activeAction).toBeUndefined();
 
     // Retried replacement must not duplicate anything.
@@ -897,7 +922,12 @@ suite("gameplay foundations (real PostgreSQL)", () => {
       new Date("2026-01-01T00:00:12.000Z"),
       random,
     );
-    expect(later.run).toMatchObject({ attempts: 1, successes: 1, shaleGained: 1, xpGained: 15 });
-    expect(later.ferriteShaleQuantity).toBe(1);
+    expect(later.run).toMatchObject({
+      attempts: 1,
+      successes: 1,
+      itemsGained: { [ITEM_IDS.ferriteShale]: 1 },
+      xpGained: 15,
+    });
+    expect(later.carriedByItemId[ITEM_IDS.ferriteShale] ?? 0).toBe(1);
   });
 });

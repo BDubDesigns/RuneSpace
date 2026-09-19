@@ -526,7 +526,9 @@ describe("issue #124 semantic mission guidance projection", () => {
       true,
       observation({
         repairTargets: repairObservation({
-          [REPAIR_TARGET_IDS.cargoHold]: { contributed: 8, slag: 3 },
+          [REPAIR_TARGET_IDS.cargoHold]: {
+            materials: { [ITEM_IDS.refinedFerrite]: 8, [ITEM_IDS.slag]: 3 },
+          },
         }),
       }),
     );
@@ -545,7 +547,10 @@ describe("issue #124 semantic mission guidance projection", () => {
       true,
       observation({
         repairTargets: repairObservation({
-          [REPAIR_TARGET_IDS.cargoHold]: { contributed: 15, slag: 6, welded: 4 },
+          [REPAIR_TARGET_IDS.cargoHold]: {
+            materials: { [ITEM_IDS.refinedFerrite]: 15, [ITEM_IDS.slag]: 6 },
+            welded: 4,
+          },
         }),
       }),
     );
@@ -557,8 +562,11 @@ describe("issue #124 semantic mission guidance projection", () => {
   it("keeps the Cargo Hold's authored recipe exactly as it was (#172)", () => {
     const recipe = getRepairTargetBalance(REPAIR_TARGET_IDS.cargoHold);
     expect(recipe).toMatchObject({
-      refinedFerriteRequired: 15,
-      slagRequired: 6,
+      // The same authored quantities, now as a generic material list (#209).
+      materials: [
+        { itemId: ITEM_IDS.refinedFerrite, quantity: 15 },
+        { itemId: ITEM_IDS.slag, quantity: 6 },
+      ],
       repairIncrements: 12,
     });
   });

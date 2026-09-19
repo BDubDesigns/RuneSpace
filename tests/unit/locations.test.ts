@@ -25,6 +25,7 @@ describe("issue #47 location content", () => {
         LOCATION_IDS.theJag,
         LOCATION_IDS.holoHollow,
         LOCATION_IDS.ruskRecovery,
+        LOCATION_IDS.deepJag,
       ].sort(),
     );
     expect(getLocation(LOCATION_IDS.crashSite)?.displayName).toBe("Crash Site");

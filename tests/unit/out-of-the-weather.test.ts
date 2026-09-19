@@ -60,6 +60,8 @@ import { isTravelReplaceableAction } from "@/game/domain/travel-replacement";
 
 const balance = getEffectiveGameBalance();
 const crewStop = getRepairTargetBalance(REPAIR_TARGET_IDS.crewStop, balance);
+/** The Crew Stop's one authored material quantity, read from its recipe list (#209). */
+const crewStopFerriteRequired = crewStop.materials[0]?.quantity ?? 0;
 
 /**
  * One observation of the world, built the way the server builds it: the repair
@@ -75,7 +77,7 @@ function observation(
   } = {},
 ): MissionObservation {
   const repaired = options.repaired ?? false;
-  const contributed = repaired ? crewStop.refinedFerriteRequired : (options.contributed ?? 0);
+  const contributed = repaired ? crewStopFerriteRequired : (options.contributed ?? 0);
   const welded = repaired ? crewStop.repairIncrements : (options.welded ?? 0);
   const refinedFerrite = balance.items.refinedFerrite.itemId;
   return {
@@ -102,7 +104,7 @@ function observation(
             {
               itemId: refinedFerrite,
               contributed,
-              required: crewStop.refinedFerriteRequired,
+              required: crewStopFerriteRequired,
             },
           ],
           welding: { completed: welded, required: crewStop.repairIncrements },
@@ -298,7 +300,7 @@ describe("the repair is the Mission's only work", () => {
 
   it("turns to Welding progress once every unit is installed, carrying nothing", () => {
     const welding = project(OUT_OF_THE_WEATHER, accepted(), {
-      contributed: crewStop.refinedFerriteRequired,
+      contributed: crewStopFerriteRequired,
       welded: 3,
     });
     const [requirement] = welding.requirements ?? [];
@@ -463,6 +465,7 @@ describe("the Crew Stop as a place and as a repair target", () => {
     expect(REPAIR_TARGETS.map((target) => target.id)).toEqual([
       REPAIR_TARGET_IDS.cargoHold,
       REPAIR_TARGET_IDS.crewStop,
+      REPAIR_TARGET_IDS.deepJagCaveIn,
     ]);
   });
 

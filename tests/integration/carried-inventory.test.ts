@@ -193,7 +193,7 @@ suite("Issue #57 carried unique items in Inventory (real PostgreSQL)", () => {
     const dueAt = new Date("2026-01-01T00:00:06.000Z");
     await provision(userId, character.id, startedAt);
     const successRandom: MiningRandom = { nextBasisPoints: () => 0, nextUnit: () => 0 };
-    await miningCommands.startFerriteShaleMining(userId, character.id, startedAt, successRandom);
+    await miningCommands.startMining(userId, character.id, startedAt, successRandom);
     const cutter = await cutterInstance(character.id);
     await db
       .update(rune.itemInstances)
@@ -267,8 +267,13 @@ suite("Issue #57 carried unique items in Inventory (real PostgreSQL)", () => {
     // Cutter resolves both due attempts exactly once when retried at the same
     // due time, filling the eighth stack.
     const retried = await play.getPlayGameplayState(userId, character.id, dueAt, successRandom);
-    expect(retried.run).toMatchObject({ attempts: 2, successes: 2, shaleGained: 2, xpGained: 30 });
+    expect(retried.run).toMatchObject({
+      attempts: 2,
+      successes: 2,
+      itemsGained: { [ITEM_IDS.ferriteShale]: 2 },
+      xpGained: 30,
+    });
     expect(retried.inventory.stacks).toHaveLength(8);
-    expect(retried.ferriteShaleQuantity).toBe(72);
+    expect(retried.carriedByItemId[ITEM_IDS.ferriteShale] ?? 0).toBe(72);
   });
 });

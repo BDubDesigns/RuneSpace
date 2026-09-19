@@ -1,6 +1,8 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import {
+  miningActionIds,
+  refiningActionIds,
   getEffectiveGameBalance,
   repairTargetBalances,
   weldingActionIds,
@@ -116,7 +118,13 @@ describe("weldingCadenceActionIds is every action that resolves on the Welding s
     // A second, independent registry — leaving the yard has to interrupt every
     // kind of Welding, and the interrupt path fails closed on an action it does
     // not know. The two lists are maintained separately and must still agree.
-    const notWelding = new Set<string>([ACTION_IDS.ferriteShaleMining, ACTION_IDS.refining]);
+    // Every Mining source and Refining recipe, not the two original actions:
+    // a Galvanite run and a Galvaferrite run are replaceable by Travel exactly
+    // as their predecessors were, and neither is Welding (#209).
+    const notWelding = new Set<string>([
+      ...miningActionIds(balance),
+      ...refiningActionIds(balance),
+    ]);
     const replaceableWelding = travelReplaceableActionIds().filter((id) => !notWelding.has(id));
     expect(new Set(replaceableWelding)).toEqual(new Set(cadence));
   });
@@ -126,7 +134,7 @@ describe("weldingActionIds keeps its narrower repair-target contract (#172, #207
   it("returns exactly the repair-target registry's action IDs", () => {
     expect(weldingActionIds(balance)).toEqual(repairActionIds);
     expect(new Set(weldingActionIds(balance))).toEqual(
-      new Set([ACTION_IDS.cargoHoldWelding, ACTION_IDS.crewStopWelding]),
+      new Set([ACTION_IDS.cargoHoldWelding, ACTION_IDS.crewStopWelding, ACTION_IDS.deepJagWelding]),
     );
   });
 

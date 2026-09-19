@@ -36,8 +36,17 @@ describe("issue #159 Bix merchant catalog", () => {
 
   it("stocks Power Cells and nothing else", () => {
     expect(merchantPurchasableItemIds(bix)).toEqual([ITEM_IDS.powerCell]);
+    // Bix takes raw ore and rough stock as well now (#209); the finished alloy
+    // is Wade's trade, not his.
     expect([...merchantSellableItemIds(bix)].sort()).toEqual(
-      [ITEM_IDS.powerCell, ITEM_IDS.refinedFerrite, ITEM_IDS.ferriteShale, ITEM_IDS.slag].sort(),
+      [
+        ITEM_IDS.powerCell,
+        ITEM_IDS.refinedFerrite,
+        ITEM_IDS.ferriteShale,
+        ITEM_IDS.slag,
+        ITEM_IDS.galvanite,
+        ITEM_IDS.galvanicStock,
+      ].sort(),
     );
   });
 
@@ -179,11 +188,23 @@ describe("issue #190 Trade presents only the directions a merchant supports", ()
   });
 
   it("offers Buy only for a merchant with nothing to buy from the player", () => {
+    // Wade started buying structural material once Deep Jag opened (#209), so
+    // his counter now genuinely supports both directions. The rule under test
+    // is the derivation, not Wade: a merchant with nothing to buy from the
+    // player still gets a Buy-only counter, which the constructed merchant
+    // below proves.
     const wade = getMerchant(MERCHANT_IDS.wadeRusk)!;
-    // Wade supplies Scrap for Practice and buys nothing in this slice, so his
-    // counter must not open an empty Sell surface.
-    expect(merchantSellableItemIds(wade)).toEqual([]);
-    expect(merchantTradeDirections(wade)).toEqual(["buy"]);
+    expect([...merchantSellableItemIds(wade)].sort()).toEqual(
+      [ITEM_IDS.refinedFerrite, ITEM_IDS.galvanicStock, ITEM_IDS.galvaferrite].sort(),
+    );
+    expect(merchantTradeDirections(wade)).toEqual(["buy", "sell"]);
+
+    const sellerOnly = {
+      ...wade,
+      prices: wade.prices.filter((price) => price.buyPrice === undefined),
+    };
+    expect(merchantSellableItemIds(sellerOnly)).toEqual([]);
+    expect(merchantTradeDirections(sellerOnly)).toEqual(["buy"]);
   });
 
   it("offers Sell only for a merchant who posts no purchase price", () => {
