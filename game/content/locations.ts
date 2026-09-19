@@ -69,6 +69,7 @@ const locationDefinitions = [
     region: "holo_hollow" as const,
     adjacentLocationIds: [LOCATION_IDS.crashSite, LOCATION_IDS.emergencyPowerAnnex],
     availableActionIds: [ACTION_IDS.refining],
+    mapStatus: "Refining",
     dormantActivities: [],
     presentation: {
       mapIconKey: "processing_yard" as const,
@@ -95,6 +96,7 @@ const locationDefinitions = [
       LOCATION_IDS.holoHollow,
     ],
     availableActionIds: [],
+    mapStatus: "Daily cells",
     dormantActivities: [],
     presentation: {
       mapIconKey: "power_annex" as const,
@@ -142,6 +144,7 @@ const locationDefinitions = [
     region: "holo_hollow" as const,
     adjacentLocationIds: [LOCATION_IDS.theLongScramble, LOCATION_IDS.deepJag],
     availableActionIds: [ACTION_IDS.ferriteShaleMining],
+    mapStatus: "Mining",
     dormantActivities: [],
     presentation: {
       mapIconKey: "the_jag" as const,
