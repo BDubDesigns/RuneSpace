@@ -16,6 +16,8 @@ import type { PlayGameplayState } from "@/server/play";
 import { cancelRefresh, tryAcquire, release, requestRefresh, type GateModel } from "./command-gate";
 
 type PlayContextValue = {
+  characterOpen: boolean;
+  characterTrigger: RefObject<HTMLButtonElement | null>;
   inventoryOpen: boolean;
   inventoryTrigger: RefObject<HTMLButtonElement | null>;
   inventoryTab: "inventory" | "equipment";
@@ -31,7 +33,9 @@ type PlayContextValue = {
   releaseCommand: () => void;
   requestAutoRefresh: (schedulerToken?: number) => void;
   setRefreshCallback: (fn: (opts?: { background?: boolean }) => void) => void;
+  openCharacter: () => void;
   openInventory: (tab: "inventory" | "equipment") => void;
+  setCharacterOpen: Dispatch<SetStateAction<boolean>>;
   setInventoryOpen: Dispatch<SetStateAction<boolean>>;
   setInventoryTab: Dispatch<SetStateAction<"inventory" | "equipment">>;
   setMissionsOpen: Dispatch<SetStateAction<boolean>>;
@@ -61,12 +65,14 @@ export function PlayProvider({
   initialState: PlayGameplayState;
 }) {
   const [state, setState] = useState(initialState);
+  const [characterOpen, setCharacterOpen] = useState(false);
   const [inventoryOpen, setInventoryOpen] = useState(false);
   const [inventoryTab, setInventoryTab] = useState<"inventory" | "equipment">("inventory");
   const [missionsOpen, setMissionsOpen] = useState(false);
   const [missionsFocus, setMissionsFocus] = useState<string | undefined>(undefined);
   const [busy, setBusy] = useState(false);
   const [foregroundBusy, setForegroundBusy] = useState(false);
+  const characterTrigger = useRef<HTMLButtonElement>(null);
   const inventoryTrigger = useRef<HTMLButtonElement>(null);
   const missionsTrigger = useRef<HTMLButtonElement>(null);
   const gateModel = useRef<GateModel>({ locked: false, pending: false });
@@ -81,9 +87,18 @@ export function PlayProvider({
   const openInventory = useCallback((tab: "inventory" | "equipment") => {
     // These updates are batched together so contextual callers can open the
     // shared drawer directly on the requested tab without a tab-click relay.
+    setCharacterOpen(false);
     setMissionsOpen(false);
     setInventoryTab(tab);
     setInventoryOpen(true);
+  }, []);
+
+  // One overlay at a time, the same single-open rule Inventory and the Mission
+  // Log already follow (#213).
+  const openCharacter = useCallback(() => {
+    setInventoryOpen(false);
+    setMissionsOpen(false);
+    setCharacterOpen(true);
   }, []);
 
   const acquireCommand = useCallback((opts?: { background?: boolean }) => {
@@ -204,6 +219,8 @@ export function PlayProvider({
   return (
     <PlayContext.Provider
       value={{
+        characterOpen,
+        characterTrigger,
         inventoryOpen,
         inventoryTrigger,
         inventoryTab,
@@ -217,7 +234,9 @@ export function PlayProvider({
         releaseCommand,
         requestAutoRefresh,
         setRefreshCallback,
+        openCharacter,
         openInventory,
+        setCharacterOpen,
         setInventoryOpen,
         setInventoryTab,
         setMissionsOpen,

@@ -3,8 +3,8 @@
 import { useEffect, useRef, useState, type RefObject } from "react";
 import { ActionButton } from "@/components/ui/ActionButton";
 import { Feedback } from "@/components/ui/Feedback";
-import { StatusMeter } from "@/components/ui/StatusMeter";
 import { CharacterPortrait } from "@/components/portraits/CharacterPortrait";
+import { CharacterSkillList } from "@/features/shared/CharacterSkillList";
 import type { CharacterProfile } from "@/game/domain/character-profile";
 
 /** Public same-location profile presentation. The server remains the authority
@@ -150,39 +150,11 @@ export function CharacterProfilePanel({
                     Player: {profile.ownerName}
                   </p>
                   <p className="mt-1 font-display text-xs uppercase tracking-[0.16em] text-[color:var(--rs-accent-primary)]">
-                    Overall level {profile.overallLevel}
+                    Character level {profile.characterLevel}
                   </p>
                 </div>
               </div>
-              <ul className="mt-4 space-y-3">
-                {profile.skills.map((skill) => (
-                  <li className="min-w-0" data-character-skill key={skill.displayName}>
-                    <p className="font-display text-sm font-bold text-[color:var(--rs-text-primary)]">
-                      {skill.displayName} — Level {skill.level}
-                    </p>
-                    {skill.xpToNextLevel === undefined ? (
-                      <p className="mt-1 text-xs text-[color:var(--rs-text-muted)]">
-                        Maximum level reached — {skill.totalXp.toLocaleString()} total XP
-                      </p>
-                    ) : (
-                      <div className="mt-1">
-                        <StatusMeter
-                          detail={`${skill.xpToNextLevel} XP to next level`}
-                          label={`${skill.displayName} XP`}
-                          value={Math.min(
-                            100,
-                            (skill.xpIntoLevel / (skill.xpIntoLevel + skill.xpToNextLevel)) * 100,
-                          )}
-                        />
-                        <p className="mt-1 text-xs text-[color:var(--rs-text-muted)]">
-                          {skill.totalXp.toLocaleString()} total XP · {skill.xpIntoLevel} XP into
-                          this level
-                        </p>
-                      </div>
-                    )}
-                  </li>
-                ))}
-              </ul>
+              <CharacterSkillList className="mt-4" skills={profile.skills} />
             </>
           ) : null}
         </>

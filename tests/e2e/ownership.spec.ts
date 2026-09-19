@@ -61,7 +61,11 @@ test("register, create, and select a character; ownership boundary enforced", as
   // preserved display casing.
   await page
     .getByRole("navigation", { name: "Primary" })
-    .getByRole("link", { name: "Characters" })
+    .getByRole("button", { name: "Character", exact: true })
+    .click();
+  await page
+    .getByRole("dialog", { name: "Character" })
+    .getByRole("link", { name: "Switch Character" })
     .click();
   await page.waitForURL("**/characters");
   await expect(page.getByText(hero)).toBeVisible();

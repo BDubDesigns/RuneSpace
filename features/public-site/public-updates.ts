@@ -5,6 +5,41 @@ export type { PublicUpdate } from "@/game/schemas/public-updates";
 
 const authoredUpdates = [
   {
+    slug: "know-your-character",
+    title: "Know Your Character",
+    publishedAt: "2026-09-19T17:00:00-07:00",
+    summary:
+      "The far-left footer button is Character now. It is the character you are actually playing: portrait, name, Credits, every skill you have, and one Character Level that finally means something.",
+    body: [
+      "Until today, finding out how your character was doing meant piecing it together. Credits were in your Inventory. Your Mining level was at The Jag, your Refining level at the Processing Yard, your Welding level wherever you happened to be welding. The only place you could see a whole character at once was somebody else's — the profile that opens when you tap a name in the list of characters standing around you.",
+      "So the far-left footer destination has stopped being Characters and become Character: yours, the one you are playing right now. It opens the same way Inventory does, over the top of what you were doing, and it closes the same way.",
+      "At the top is your portrait, your name, your Character Level, and your Credits. Credits are still in your Inventory too — that is deliberate, because you want them while you are packing and you want them while you are sizing up your character.",
+      "Below that is every skill RuneSpace has, not just the ones you have used. Each one shows the level you are and how far through that level you are, which is the question that actually matters when you are deciding whether one more run is worth it. A skill you have never touched is Level 1 with a bar at zero, sitting there waiting.",
+      "Character Level is the new part. It is one number for everything you have trained: you start at Level 1, and every skill level you earn adds one. Mining 4, Refining 2 and Welding 1 makes you Character Level 5. All three at Level 1 makes you Character Level 1. It is not the sum of your levels, and there is no separate Character XP bar to grind — the number just follows your skills, so training anything moves it.",
+      "Because skills begin at Level 1, a skill you have not trained is worth nothing toward it. That is the point: when RuneSpace adds a fourth skill, nobody's Character Level jumps or drops overnight. It only moves when you do.",
+      "The level next to a character's name in the list of people at your location is that same Character Level now, and so is the one on their profile. Before today those two could disagree with each other, because they were counting different things.",
+      "Switching characters has not gone anywhere — it has moved one step in. Character, then Switch Character, and you are at the same selection screen as always. It is pinned to the bottom of the panel rather than sitting under the skill list, so it stays where you can reach it no matter how many skills you eventually have.",
+    ],
+    patchNotes: [
+      {
+        heading: "Added",
+        items: [
+          "A Character screen on the far-left footer destination, showing the character you are playing: portrait, name, Character Level, and Credits.",
+          "Every skill in the game listed on that screen with its current level and progress toward the next one, including skills you have not trained yet.",
+          "A Switch Character action pinned to the bottom of the Character screen, which opens the existing character selection.",
+        ],
+      },
+      {
+        heading: "Changed",
+        items: [
+          "The far-left footer destination is now Character and opens your own profile; character selection is one step further in, behind Switch Character.",
+          "Character Level is one definition everywhere: 1 plus every skill level you have earned. The profile panel for a nearby character and the level beside their name in the list now both show it.",
+          "A future skill will appear on the Character screen and in a nearby character's profile on its own, without changing anyone's existing Character Level.",
+        ],
+      },
+    ],
+  },
+  {
     slug: "brace-yourself",
     title: "Brace Yourself",
     publishedAt: "2026-09-19T09:00:00-07:00",

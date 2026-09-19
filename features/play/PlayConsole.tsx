@@ -3,6 +3,7 @@
 import { useEffect, useTransition } from "react";
 import { LocationActivity } from "@/features/location-scene/LocationActivity";
 import { LocationSurface } from "@/features/location-scene/LocationSurface";
+import { CharacterPanel } from "@/features/characters/CharacterPanel";
 import { InventoryEquipmentPanel } from "@/features/inventory/InventoryEquipmentPanel";
 import { MissionLogPanel } from "@/features/missions/MissionLogPanel";
 import { MissionGuidanceStrips } from "@/features/missions/MissionGuidanceStrips";
@@ -12,6 +13,7 @@ import { LocalMapPanel } from "@/features/travel/LocalMapPanel";
 import { ScavengeRevealOverlay } from "@/features/travel/ScavengeRevealOverlay";
 import { reportClientDiagnostic } from "@/features/diagnostics/client";
 import { refreshPlayAction } from "@/server/actions";
+import type { CharacterPortraitPresentation } from "@/game/domain/character-portrait";
 import { usePlay } from "./PlayContext";
 
 export type PlaySurface = "primary" | "map";
@@ -31,11 +33,14 @@ export type PlaySurface = "primary" | "map";
  */
 export function PlayConsole({
   characterName,
+  characterPortrait,
   localPlaceId,
   surface = "primary",
   onMapExit,
 }: {
   characterName: string;
+  /** The current character's resolved portrait, for the Character surface. */
+  characterPortrait: CharacterPortraitPresentation;
   /**
    * The Local Place the route currently has open. Presentation state only: it
    * decides which resident and place surface are shown, never what a server
@@ -48,12 +53,15 @@ export function PlayConsole({
   const {
     acquireCommand,
     acceptState,
+    characterOpen,
+    characterTrigger,
     inventoryOpen,
     inventoryTrigger,
     missionsOpen,
     missionsFocus,
     missionsTrigger,
     releaseCommand,
+    setCharacterOpen,
     setInventoryOpen,
     setMissionsOpen,
     setRefreshCallback,
@@ -131,6 +139,14 @@ export function PlayConsole({
           onClose={() => setMissionsOpen(false)}
           state={state}
           triggerRef={missionsTrigger}
+        />
+      ) : characterOpen ? (
+        <CharacterPanel
+          characterName={characterName}
+          onClose={() => setCharacterOpen(false)}
+          portrait={characterPortrait}
+          state={state}
+          triggerRef={characterTrigger}
         />
       ) : null}
     </div>

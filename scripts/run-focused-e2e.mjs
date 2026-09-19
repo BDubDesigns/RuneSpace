@@ -44,6 +44,7 @@ export const DEFAULT_FOCUSED_PORT = 3310;
 export const RESERVED_FOCUSED_PORTS = [3000, 3200];
 export const FOCUSED_PHASES = [
   "mining",
+  "character-panel",
   "character-profile",
   "location-population",
   "character-portraits",

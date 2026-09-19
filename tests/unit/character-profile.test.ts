@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { miningLevelThresholds } from "@/game/config/balance";
+import { standardSkillLevelThresholds } from "@/game/config/balance";
 import { PORTRAIT_IDS } from "@/game/config/foundations";
 import { projectCharacterProfile, type CharacterProfile } from "@/game/domain/character-profile";
 import type { LevelThreshold } from "@/game/domain/progression";
@@ -7,14 +7,18 @@ import type { LevelThreshold } from "@/game/domain/progression";
 /**
  * Unit coverage for the issue #64 public character-profile projection. SQL
  * joins are never mirrored here; these tests prove the pure projection
- * contract: overall-level aggregation, per-skill level/next-level progress
- * through the existing progression boundary, maximum-level truthfulness,
- * deterministic skill ordering, the narrow public shape (no skill IDs,
- * emails, or account/character database IDs), and the generic skill
- * presentation that needs no Mining-specific branch.
+ * contract: public identity and portrait resolution on top of the canonical
+ * cross-skill progression, per-skill level/next-level progress through the
+ * existing progression boundary, maximum-level truthfulness, deterministic
+ * skill ordering, the narrow public shape (no skill IDs, emails, or
+ * account/character database IDs), and the generic skill presentation that
+ * needs no Mining-specific branch.
+ *
+ * The Character Level rule itself is proven once, in
+ * `character-progression.test.ts`; this file proves the profile consumes it.
  */
 
-const THRESHOLDS = miningLevelThresholds();
+const THRESHOLDS = standardSkillLevelThresholds();
 const MAX_LEVEL = THRESHOLDS[THRESHOLDS.length - 1]!.level;
 const MAX_LEVEL_XP = THRESHOLDS[THRESHOLDS.length - 1]!.totalXp;
 
@@ -31,11 +35,14 @@ const skillNames = new Map([
   ["metallurgy", "Metallurgy"],
 ]);
 
+const TEST_SKILL_IDS = ["mining", "second", "metallurgy"];
+
 function project(rows: readonly { skillId: string; totalXp: number }[]) {
   return projectCharacterProfile({
     displayName: "Rada",
     ownerName: "Rada Stonehand",
-    skillProgress: rows,
+    skillXp: rows,
+    skillIds: TEST_SKILL_IDS,
     levelThresholds: (skillId) =>
       skillId === "mining" ? THRESHOLDS : skillId === "second" ? SECOND_CURVE : undefined,
     skillDisplayName: (skillId) => skillNames.get(skillId),
@@ -43,27 +50,28 @@ function project(rows: readonly { skillId: string; totalXp: number }[]) {
 }
 
 describe("issue #64 character profile projection", () => {
-  it("derives the overall level as the highest derived level across presented skills", () => {
-    const withMiningHigher = project([
+  it("publishes the canonical Character Level rather than a profile-only rule (#213)", () => {
+    const oneEarnedLevel = project([
       { skillId: "second", totalXp: 0 },
       { skillId: "mining", totalXp: 500 },
     ]);
-    expect(withMiningHigher.overallLevel).toBe(2);
-    expect(withMiningHigher.skills.map((skill) => skill.displayName)).toEqual([
+    expect(oneEarnedLevel.characterLevel).toBe(2);
+    expect(oneEarnedLevel.skills.map((skill) => skill.displayName)).toEqual([
       "Mining",
       "Second Skill",
     ]);
 
-    const withSecondHigher = project([
+    // Every earned skill level counts: Mining 2 and Second Skill 3 is 1+1+2.
+    const acrossSkills = project([
       { skillId: "second", totalXp: 250 },
-      { skillId: "mining", totalXp: 0 },
+      { skillId: "mining", totalXp: 500 },
     ]);
-    expect(withSecondHigher.overallLevel).toBe(3);
+    expect(acrossSkills.characterLevel).toBe(4);
   });
 
-  it("uses level 1 as the overall-level baseline when no skill is presented", () => {
-    expect(project([]).overallLevel).toBe(1);
-    expect(project([{ skillId: "mining", totalXp: 0 }]).overallLevel).toBe(1);
+  it("is Character Level 1 for an untouched character", () => {
+    expect(project([]).characterLevel).toBe(1);
+    expect(project([{ skillId: "mining", totalXp: 0 }]).characterLevel).toBe(1);
   });
 
   it("derives current-level XP progress and the next-level requirement", () => {
@@ -93,7 +101,7 @@ describe("issue #64 character profile projection", () => {
       atMaximumLevel: true,
     });
     expect(atMax.skills[0]?.xpToNextLevel).toBeUndefined();
-    expect(atMax.overallLevel).toBe(MAX_LEVEL);
+    expect(atMax.characterLevel).toBe(MAX_LEVEL);
 
     const beyondMax = project([{ skillId: "mining", totalXp: MAX_LEVEL_XP + 10_000 }]);
     expect(beyondMax.skills[0]).toMatchObject({
@@ -113,13 +121,13 @@ describe("issue #64 character profile projection", () => {
   });
 
   it("skips skills without an approved level curve", () => {
-    // Metallurgy has no curve in the injected source; Strength is not present
-    // at all. Neither may appear, regardless of persisted XP.
+    // Metallurgy has no curve in the injected source, so it may not appear
+    // regardless of persisted XP; Second Skill has one and appears untrained.
     const result = project([
       { skillId: "metallurgy", totalXp: 999_999_999 },
       { skillId: "mining", totalXp: 0 },
     ]);
-    expect(result.skills.map((skill) => skill.displayName)).toEqual(["Mining"]);
+    expect(result.skills.map((skill) => skill.displayName)).toEqual(["Mining", "Second Skill"]);
   });
 
   it("renders skills through the generic projection using the content boundary name", () => {
@@ -128,7 +136,8 @@ describe("issue #64 character profile projection", () => {
     const result = projectCharacterProfile({
       displayName: "Rada",
       ownerName: "Rada Stonehand",
-      skillProgress: [{ skillId: "mining", totalXp: 500 }],
+      skillXp: [{ skillId: "mining", totalXp: 500 }],
+      skillIds: ["mining"],
       levelThresholds: () => THRESHOLDS,
       skillDisplayName: () => "Miner Skill",
     });
@@ -150,8 +159,8 @@ describe("issue #64 character profile projection", () => {
       { skillId: "second", totalXp: 0 },
     ]);
     expect(Object.keys(profile).sort()).toEqual([
+      "characterLevel",
       "displayName",
-      "overallLevel",
       "ownerName",
       "portrait",
       "skills",
@@ -186,7 +195,7 @@ describe("issue #64 character profile projection", () => {
       projectCharacterProfile({
         displayName: "Rada",
         ownerName: "Rada Stonehand",
-        skillProgress: [],
+        skillXp: [],
         levelThresholds: () => undefined,
         skillDisplayName: () => undefined,
         portraitId: "portrait_gramma_01",
@@ -202,7 +211,7 @@ describe("issue #64 character profile projection", () => {
       projectCharacterProfile({
         displayName: "Rada",
         ownerName: "Rada Stonehand",
-        skillProgress: [],
+        skillXp: [],
         levelThresholds: () => undefined,
         skillDisplayName: () => undefined,
         portraitId: "portrait_gramma_01",
@@ -213,7 +222,7 @@ describe("issue #64 character profile projection", () => {
       projectCharacterProfile({
         displayName: "Rada",
         ownerName: "Rada Stonehand",
-        skillProgress: [],
+        skillXp: [],
         levelThresholds: () => undefined,
         skillDisplayName: () => undefined,
         portraitId: PORTRAIT_IDS.vonScavenger,

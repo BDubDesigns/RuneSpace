@@ -7,7 +7,6 @@ import {
   playerAccounts,
   playerPortraitUnlocks,
 } from "@/db/rune-space";
-import { SKILL_IDS } from "@/game/config/foundations";
 import { skillLevelThresholds } from "@/game/config/balance";
 import { getSkillPresentation } from "@/game/content/skill-presentation";
 import { validateCharacterName } from "@/game/domain/character-name";
@@ -114,11 +113,6 @@ export async function getCharacterProfile(
       .filter((row) => row.skillId !== null && row.totalXp !== null)
       .map((row) => [row.skillId!, row.totalXp!]),
   );
-  // Present every skill with an approved level curve (Mining today), defaulting
-  // absent XP rows to authoritative zero — the same convention as #62.
-  const skillProgress = Object.values(SKILL_IDS)
-    .filter((skillId) => skillLevelThresholds(skillId) !== undefined)
-    .map((skillId) => ({ skillId, totalXp: xpBySkill.get(skillId) ?? 0 }));
 
   const ownedPortraitIds = rows[0]!.ownedPortraitId ? [rows[0]!.ownedPortraitId] : [];
 
@@ -127,7 +121,7 @@ export async function getCharacterProfile(
     ownerName: rows[0]!.ownerName,
     portraitId: rows[0]!.portraitId,
     ownedPortraitIds,
-    skillProgress,
+    skillXp: [...xpBySkill].map(([skillId, totalXp]) => ({ skillId, totalXp })),
     levelThresholds: skillLevelThresholds,
     skillDisplayName: (skillId) => getSkillPresentation(skillId)?.displayName,
   });

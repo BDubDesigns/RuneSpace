@@ -2,18 +2,18 @@
   "schemaVersion": 1,
   "projectSlug": "runespace",
   "workState": "active",
-  "currentFocus": "Opening Deep Jag: Tansy's collapsed passage below The Jag, the Galvanite seam behind it, and the two tier-2 Refining recipes it feeds.",
+  "currentFocus": "A Character surface for the character you are playing: portrait, name, Credits, every skill, and one canonical Character Level used everywhere.",
   "currentChange": {
-    "summary": "Deep Jag is playable: brace the cave-in for Tansy, mine Galvanite behind it, and refine Galvanic Stock and Galvaferrite at the Processing Yard.",
-    "stage": "review",
-    "pullRequestNumber": 211
+    "summary": "The footer's Character destination opens the current character's profile — portrait, Credits, every skill's progress — and one canonical Character Level replaces the old per-surface levels.",
+    "stage": "implementation",
+    "pullRequestNumber": 214
   },
   "latestCompleted": {
-    "summary": "Work Orders are playable: Wade hands the board over, three jobs are posted at a time, and you supply the materials and weld the job at his bench for Credits.",
-    "date": "2026-09-18",
-    "url": "https://github.com/BDubDesigns/RuneSpace/pull/208"
+    "summary": "Deep Jag is playable: brace the cave-in for Tansy, mine Galvanite behind it, and refine Galvanic Stock and Galvaferrite at the Processing Yard.",
+    "date": "2026-09-19",
+    "url": "https://github.com/BDubDesigns/RuneSpace/pull/211"
   },
-  "nextStep": "Human review and playtest of Brace Yourself, Galvanite Mining at Deep Jag, and the two new Refining recipes.",
+  "nextStep": "Human review and playtest of the Character surface, the renamed footer destination, and the canonical Character Level on nearby characters.",
   "lastMeaningfulUpdate": "2026-09-19",
   "highlights": [
     {

@@ -164,7 +164,7 @@ suite("issue #64 character profile read boundary (real PostgreSQL)", () => {
     expect(result).toEqual({
       displayName: targetName,
       ownerName: "Narrow Owner",
-      overallLevel: 2,
+      characterLevel: 2,
       skills: [
         {
           displayName: "Mining",
@@ -235,7 +235,8 @@ suite("issue #64 character profile read boundary (real PostgreSQL)", () => {
     await makeCharacterAt(owner, maxName, LOCATION_IDS.crashSite, maxXp);
 
     const result = await profile.getCharacterProfile(owner, active.id, maxName);
-    expect(result.overallLevel).toBe(99);
+    // Mining 99, Refining 1, Welding 1: 1 + 98 earned levels.
+    expect(result.characterLevel).toBe(99);
     expect(result.skills[0]).toMatchObject({
       level: 99,
       totalXp: maxXp,
@@ -272,7 +273,7 @@ suite("issue #64 character profile read boundary (real PostgreSQL)", () => {
       "Welding",
     ]);
     expect(freshProfile.skills[0]).toMatchObject({ level: 1, totalXp: 0 });
-    expect(freshProfile.overallLevel).toBe(1);
+    expect(freshProfile.characterLevel).toBe(1);
   });
 
   it("performs a bounded number of queries (no per-skill round trips)", async () => {

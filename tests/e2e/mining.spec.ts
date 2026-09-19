@@ -57,7 +57,9 @@ test("owned character can start, observe, stop, and restore Ferrite Mining at Th
     name: "Latest mining attempt",
     exact: true,
   });
-  await expect(footer.getByRole("link", { name: "Characters" })).toHaveText("Characters");
+  await expect(footer.getByRole("button", { name: "Character", exact: true })).toHaveText(
+    "Character",
+  );
   await expect(footer.getByRole("button", { name: "Inventory" })).toBeVisible();
   await expect(latestResult).toContainText("Latest attempt: No yield");
   await expect(latestResult).toContainText("Roll 35.00 | Needed below 35.00");
@@ -412,13 +414,24 @@ test("retries an early unchanged Mining boundary without duplicating the attempt
   expect(persisted[0]?.runAttempts).toBe(1);
 });
 
-test("footer Characters navigation uses the full icon-plus-label destination", async ({ page }) => {
+test("footer Character destination uses the full icon-plus-label destination", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
-  const characters = page.getByRole("navigation", { name: "Primary" }).getByRole("link", {
-    name: "Characters",
+  const character = page.getByRole("navigation", { name: "Primary" }).getByRole("button", {
+    name: "Character",
+    exact: true,
   });
-  await expect(characters).toHaveText("Characters");
-  await characters.click();
+  await expect(character).toHaveText("Character");
+  // Character selection moved one layer below the current-character profile
+  // (#213): the destination opens that profile, and Switch Character inside it
+  // is what reaches the selector.
+  await character.click();
+  await expect(page.getByRole("dialog", { name: "Character" })).toBeVisible();
+  await page
+    .getByRole("dialog", { name: "Character" })
+    .getByRole("link", {
+      name: "Switch Character",
+    })
+    .click();
   await expect(page).toHaveURL(/\/characters$/);
 });
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { Backpack, Mail, Map as MapIcon, ScrollText, Users } from "lucide-react";
+import { Backpack, Mail, Map as MapIcon, ScrollText, User } from "lucide-react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { ActionButton } from "@/components/ui/ActionButton";
 import { GameShell, TopBar } from "@/components/ui/GameShell";
@@ -9,6 +9,7 @@ import { SignOutButton } from "@/features/auth/SignOutButton";
 import { PlayBoundaryTestTrigger } from "@/features/diagnostics/PlayBoundaryTestTrigger";
 import { LOCAL_PLACE_PARAM } from "@/features/local-places/navigation";
 import { acknowledgeNewsAction } from "@/server/actions";
+import type { CharacterPortraitPresentation } from "@/game/domain/character-portrait";
 import type { PlayGameplayState } from "@/server/play";
 import { PlayConsole } from "./PlayConsole";
 import { PlayProvider, usePlay } from "./PlayContext";
@@ -18,9 +19,13 @@ function PlayFooter() {
   const pathname = usePathname();
   const mapActive = useSearchParams().get("surface") === "map";
   const {
+    characterOpen,
+    characterTrigger,
     inventoryTrigger,
     missionsTrigger,
+    openCharacter,
     openInventory,
+    setCharacterOpen,
     setInventoryOpen,
     setMissionsOpen,
     setMissionsFocus,
@@ -33,12 +38,13 @@ function PlayFooter() {
   ).length;
   return (
     <div className="mx-auto flex w-full max-w-xl gap-1.5 sm:max-w-7xl sm:justify-end">
-      <FooterNavLink
-        active={false}
-        aria-label="Characters"
-        href="/characters"
-        icon={<Users />}
-        label="Characters"
+      <FooterNavButton
+        active={characterOpen}
+        aria-label="Character"
+        icon={<User />}
+        label="Character"
+        onClick={openCharacter}
+        ref={characterTrigger}
       />
       <FooterNavButton
         active={inventoryOpen}
@@ -66,6 +72,7 @@ function PlayFooter() {
         icon={<ScrollText />}
         label="Missions"
         onClick={() => {
+          setCharacterOpen(false);
           setInventoryOpen(false);
           setMissionsFocus(undefined);
           setMissionsOpen(true);
@@ -153,10 +160,13 @@ function PlayTopBar({ newsUnread }: { newsUnread: boolean }) {
 
 export function PlayScreen({
   characterName,
+  characterPortrait,
   initialState,
   newsUnread,
 }: {
   characterName: string;
+  /** Resolved server-side through the narrow portrait boundary (#65, #98). */
+  characterPortrait: CharacterPortraitPresentation;
   initialState: PlayGameplayState;
   newsUnread: boolean;
 }) {
@@ -172,6 +182,7 @@ export function PlayScreen({
         <PlayBoundaryTestTrigger />
         <PlayConsole
           characterName={characterName}
+          characterPortrait={characterPortrait}
           localPlaceId={localPlaceId}
           onMapExit={() => router.replace(pathname)}
           surface={mapActive ? "map" : "primary"}
