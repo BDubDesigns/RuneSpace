@@ -82,7 +82,7 @@ test("Processing Yard Refining journey — Ferrite and Slag both branches, artwo
     .where(eq(activeActions.characterId, characterId));
   await page.getByRole("button", { name: "Refresh status" }).click();
   const latestRefining = page.getByRole("region", { name: "Latest refining attempt", exact: true });
-  await expect(latestRefining).toContainText("Latest attempt: Refined Ferrite");
+  await expect(latestRefining).toContainText("Latest attempt: 1 Refined Ferrite");
   await expect(latestRefining.getByLabel("1 Refined Ferrite produced")).toBeVisible();
   await expect(latestRefining.getByLabel("15 Refining XP earned")).toBeVisible();
   await expect(page.getByText("1 attempts", { exact: true })).toBeVisible();
@@ -96,7 +96,7 @@ test("Processing Yard Refining journey — Ferrite and Slag both branches, artwo
     .set({ resolvedThroughAt: secondAttemptAgo })
     .where(eq(activeActions.characterId, characterId));
   await page.getByRole("button", { name: "Refresh status" }).click();
-  await expect(latestRefining).toContainText("Latest attempt: Slag");
+  await expect(latestRefining).toContainText("Latest attempt: 1 Slag");
   await expect(latestRefining.getByLabel("1 Slag produced")).toBeVisible();
   await expect(latestRefining.getByLabel("3 Refining XP earned")).toBeVisible();
   await expect(page.getByText("2 attempts", { exact: true })).toBeVisible();
@@ -140,7 +140,7 @@ test("Processing Yard Refining journey — Ferrite and Slag both branches, artwo
   await page.reload();
   await expect(page.getByRole("button", { name: "Stop Refining" })).toBeVisible();
   await expect(page.getByText("2 attempts", { exact: true })).toBeVisible();
-  await expect(latestRefining).toContainText("Latest attempt: Slag");
+  await expect(latestRefining).toContainText("Latest attempt: 1 Slag");
 
   // 9. Travel while Refining resolves only completed attempts; incomplete <7 tick discarded
   // Enter the dedicated Map before moving the cursor back so navigation time
@@ -201,7 +201,11 @@ test("Processing Yard Refining journey — Ferrite and Slag both branches, artwo
     .insert(inventoryStacks)
     .values({ characterId, itemId: ITEM_IDS.ferriteShale, quantity: 1 });
   await page.getByRole("button", { name: "Start Refining" }).click();
-  await expect(page.getByText(/Not enough Ferrite Shale/)).toBeVisible();
+  // The refusal is written for whichever recipe is selected (#209), so it must
+  // still name this one's own input and how much of it an attempt takes.
+  await expect(
+    page.getByText(/Not enough material \u2014 each attempt requires 2 Ferrite Shale/),
+  ).toBeVisible();
 
   // 12. inventory-fit refusal
   await db.delete(inventoryStacks).where(eq(inventoryStacks.characterId, characterId));

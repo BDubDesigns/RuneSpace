@@ -28,8 +28,10 @@ async function seedRepairedCargoHold(
   cargoTarget: ReturnType<typeof getRepairTargetBalance>,
 ) {
   const repaired = {
-    refinedFerriteContributed: cargoTarget.refinedFerriteRequired,
-    slagContributed: cargoTarget.slagRequired,
+    // Every authored material installed in full, read from the recipe (#209).
+    materials: Object.fromEntries(
+      cargoTarget.materials.map((material) => [material.itemId, material.quantity]),
+    ),
     weldingProgress: cargoTarget.repairIncrements,
     completedAt: new Date(),
     updatedAt: new Date(),
@@ -135,12 +137,11 @@ test("keeps damaged Cargo Hold locked and transfers completed storage on mobile 
     acceptedAt: new Date(),
   });
   await db.insert(inventoryStacks).values([
-    {
+    ...cargoTarget.materials.map((material) => ({
       characterId,
-      itemId: ITEM_IDS.refinedFerrite,
-      quantity: cargoTarget.refinedFerriteRequired,
-    },
-    { characterId, itemId: ITEM_IDS.slag, quantity: cargoTarget.slagRequired },
+      itemId: material.itemId,
+      quantity: material.quantity,
+    })),
   ]);
   await page.reload();
   await expect(lockedStatus).toHaveCount(0);
