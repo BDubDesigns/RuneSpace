@@ -14,6 +14,7 @@ import { usePlay } from "@/features/play/PlayContext";
 import { CleanPassControl } from "@/features/welding/CleanPassControl";
 import {
   describeMaterialQuantities,
+  describeOutstandingMaterials,
   plannedContribution,
 } from "@/features/welding/repair-materials";
 import { CrewHaulerRideControl } from "@/features/travel/CrewHaulerRideControl";
@@ -238,7 +239,7 @@ export function CrewStopPanel() {
           >
             {repair.canContribute
               ? `Add ${contributionSummary}`
-              : "Nothing useful carried for the brace"}
+              : `No useful ${describeOutstandingMaterials(repair.materials)} carried`}
           </MissionActionButton>
           <p className="max-w-2xl text-sm leading-relaxed text-[color:var(--rs-text-secondary)]">
             {`The canopy needs ${describeMaterialQuantities(

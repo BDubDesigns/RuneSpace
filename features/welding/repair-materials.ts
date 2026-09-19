@@ -43,3 +43,22 @@ export function describeMaterialQuantities(
   if (parts.length === 1) return parts[0] as string;
   return `${parts.slice(0, -1).join(", ")} and ${parts.at(-1)}`;
 }
+
+/**
+ * "Refined Ferrite" / "Refined Ferrite or Power Cells" — the materials a repair
+ * still wants, named without quantities.
+ *
+ * Used by the empty-handed state of a contribute control, which should tell the
+ * player what to go and get rather than only that they have nothing useful.
+ * Materials already installed in full are left out, because fetching more of
+ * them would not help.
+ */
+export function describeOutstandingMaterials(
+  materials: readonly RepairMaterialProjection[],
+): string {
+  const outstanding = materials.filter((material) => material.remaining > 0);
+  const names = (outstanding.length > 0 ? outstanding : materials).map((material) => material.name);
+  if (names.length === 0) return "material";
+  if (names.length === 1) return names[0] as string;
+  return `${names.slice(0, -1).join(", ")} or ${names.at(-1)}`;
+}
