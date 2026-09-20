@@ -1,5 +1,9 @@
 import { and, eq, isNotNull, sql } from "drizzle-orm";
-import { characters, characterWorkOrderPostings } from "@/db/rune-space";
+import {
+  characters,
+  characterWorkOrderBoardRefreshes,
+  characterWorkOrderPostings,
+} from "@/db/rune-space";
 import {
   getEffectiveGameBalance,
   standardSkillLevelThresholds,
@@ -15,9 +19,11 @@ import {
   type CleanPassRandom,
   type CleanPassState,
 } from "@/game/domain/clean-pass";
+import { pacificResetDate } from "@/game/domain/daily-reset";
 import {
   eligibleWorkOrders,
   selectInitialWorkOrderBoard,
+  selectWorkOrderBoardRefresh,
   selectWorkOrderRefill,
   workOrderComplete,
   type ActiveWorkOrderState,
@@ -180,6 +186,7 @@ export async function ensureWorkOrderBoard(
     characterId: string;
     unlocked: boolean;
     weldingLevel: number;
+    refiningLevel: number;
     random: CleanPassRandom;
     now: Date;
   },
@@ -200,9 +207,10 @@ export async function ensureWorkOrderBoard(
   // remaining slots of a partial board cannot pick a job the board already
   // shows. A whole-board draw passes an empty list and behaves as before.
   const board = selectInitialWorkOrderBoard({
-    eligible: eligibleWorkOrders(input.weldingLevel).filter(
-      (definition) => !existing.some((row) => row.workOrderId === definition.id),
-    ),
+    eligible: eligibleWorkOrders({
+      weldingLevel: input.weldingLevel,
+      refiningLevel: input.refiningLevel,
+    }).filter((definition) => !existing.some((row) => row.workOrderId === definition.id)),
     slots: balance.workOrders.postedSlots - existing.length,
     random: input.random,
   });
@@ -415,14 +423,13 @@ export async function refillWorkOrderSlot(
     .from(characterWorkOrderPostings)
     .where(eq(characterWorkOrderPostings.characterId, input.characterId))
     .for("update");
-  const weldingLevel = await characterSkillLevel(
-    transaction,
-    input.characterId,
-    SKILL_IDS.welding,
-    standardSkillLevelThresholds(),
-  );
+  const thresholds = standardSkillLevelThresholds();
+  const [weldingLevel, refiningLevel] = await Promise.all([
+    characterSkillLevel(transaction, input.characterId, SKILL_IDS.welding, thresholds),
+    characterSkillLevel(transaction, input.characterId, SKILL_IDS.refining, thresholds),
+  ]);
   const replacement = selectWorkOrderRefill({
-    eligible: eligibleWorkOrders(weldingLevel),
+    eligible: eligibleWorkOrders({ weldingLevel, refiningLevel }),
     visibleWorkOrderIds: rows
       .filter((row) => row.slotIndex !== input.slotIndex)
       .map((row) => row.workOrderId as WorkOrderId),
@@ -446,6 +453,99 @@ export async function refillWorkOrderSlot(
         eq(characterWorkOrderPostings.slotIndex, input.slotIndex),
       ),
     );
+}
+
+/** Today's ForceSales entitlement, and whether this character has ever used one. */
+export type WorkOrderRefreshState = {
+  refreshedToday: boolean;
+  everRefreshed: boolean;
+};
+
+/**
+ * Read the ForceSales daily-refresh ledger for one reset date (#217).
+ *
+ * Two narrow, independently indexed reads rather than one unbounded scan: a
+ * character accumulates one row per day they ever refresh, and neither
+ * question needs more than the first matching row.
+ */
+export async function loadWorkOrderRefreshState(
+  transaction: DatabaseTransaction,
+  input: { characterId: string; resetDate: string },
+): Promise<WorkOrderRefreshState> {
+  const [todayRows, everRows] = await Promise.all([
+    transaction
+      .select({ characterId: characterWorkOrderBoardRefreshes.characterId })
+      .from(characterWorkOrderBoardRefreshes)
+      .where(
+        and(
+          eq(characterWorkOrderBoardRefreshes.characterId, input.characterId),
+          eq(characterWorkOrderBoardRefreshes.resetDate, input.resetDate),
+        ),
+      )
+      .limit(1),
+    transaction
+      .select({ characterId: characterWorkOrderBoardRefreshes.characterId })
+      .from(characterWorkOrderBoardRefreshes)
+      .where(eq(characterWorkOrderBoardRefreshes.characterId, input.characterId))
+      .limit(1),
+  ]);
+  return { refreshedToday: todayRows.length > 0, everRefreshed: everRows.length > 0 };
+}
+
+/**
+ * Commit one Pacific day's ForceSales board refresh (#217).
+ *
+ * The entitlement row is the guard, inserted before anything else changes: a
+ * retried or concurrent request that loses the insert (a row already exists
+ * for this reset date) commits nothing at all, so a refresh can never be
+ * spent twice for one day and a failed/rolled-back attempt never spends it.
+ * Only the caller's chosen replacements are written — the active/In Progress
+ * slot is simply never included in that list.
+ */
+export async function commitWorkOrderBoardRefresh(
+  transaction: DatabaseTransaction,
+  input: {
+    characterId: string;
+    resetDate: string;
+    replacements: readonly { slotIndex: number; workOrderId: WorkOrderId }[];
+    now: Date;
+  },
+): Promise<boolean> {
+  const inserted = await transaction
+    .insert(characterWorkOrderBoardRefreshes)
+    .values({
+      characterId: input.characterId,
+      resetDate: input.resetDate,
+      refreshedAt: input.now,
+    })
+    .onConflictDoNothing({
+      target: [
+        characterWorkOrderBoardRefreshes.characterId,
+        characterWorkOrderBoardRefreshes.resetDate,
+      ],
+    })
+    .returning({ characterId: characterWorkOrderBoardRefreshes.characterId });
+  if (!inserted[0]) return false;
+
+  for (const replacement of input.replacements) {
+    await transaction
+      .update(characterWorkOrderPostings)
+      .set({
+        workOrderId: replacement.workOrderId,
+        acceptedAt: null,
+        sectionsCompleted: 0,
+        cleanPass: null,
+        postedAt: input.now,
+        updatedAt: input.now,
+      })
+      .where(
+        and(
+          eq(characterWorkOrderPostings.characterId, input.characterId),
+          eq(characterWorkOrderPostings.slotIndex, replacement.slotIndex),
+        ),
+      );
+  }
+  return true;
 }
 
 export type WorkOrderWeldingSnapshot = {

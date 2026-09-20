@@ -548,7 +548,7 @@ const authoredWikiArticles = [
       {
         heading: "Taking a job",
         paragraphs: [
-          "Taking a job hands over its materials right away — Refined Ferrite, and sometimes a Power Cell or two — straight out of your Inventory. Make sure you are carrying everything it asks for before you accept, because the materials do not come back once you have. There is no way to abandon a job either: once it is on the bench, finishing it is the only way it leaves.",
+          "Taking a job hands over its materials right away — Refined Ferrite or Galvanic Stock, and sometimes a Power Cell or two — straight out of your Inventory. Make sure you are carrying everything it asks for before you accept, because the materials do not come back once you have. There is no way to abandon a job either: once it is on the bench, finishing it is the only way it leaves.",
         ],
       },
       {
@@ -569,6 +569,17 @@ const authoredWikiArticles = [
             { text: "Credits", articleSlug: "credits-and-trading" },
             ", plus Welding XP for every section you completed. The moment it is done, a new job takes its place on the board, so there are always three to choose from.",
           ],
+        ],
+      },
+      {
+        heading: "Refining 5 and ForceSales",
+        paragraphs: [
+          [
+            "Reach Refining level 5 and eight more jobs join the board's rotation, built around ",
+            { text: "Galvanic Stock", articleSlug: "mining-and-refining" },
+            " instead of Refined Ferrite. They go to the same eight clients you already know — Wade's yard has not found any new customers, just second jobs for the old ones.",
+          ],
+          "Refining 5 also switches on ForceSales Free's daily refresh: once a day, RuneSpace Pacific time, you can replace every unaccepted posting on the board at once. A job you already have on the bench is never touched by a refresh, and nothing about the board changes automatically — no reroll at midnight, no reroll for reaching Refining 5. It only moves when you finish a job or spend the day's refresh yourself.",
         ],
       },
     ],

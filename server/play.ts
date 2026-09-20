@@ -163,6 +163,7 @@ import {
   createWorkOrderWeldingResolver,
   ensureWorkOrderBoard,
   loadWorkOrderBoard,
+  loadWorkOrderRefreshState,
   missOpenWorkOrderCleanPass,
   takeWorkOrderCompletion,
 } from "@/server/work-orders";
@@ -231,6 +232,8 @@ export type WorkOrderPostingProjection = {
   clientName: string;
   description: string;
   requiredWeldingLevel: number;
+  /** The additional Refining floor this job authors, when it authors one (#217). */
+  requiredRefiningLevel?: number;
   materials: readonly { itemId: string; itemName: string; quantity: number; carried: number }[];
   sections: number;
   payoutCredits: number;
@@ -244,10 +247,33 @@ export type WorkOrderPostingProjection = {
    */
   blockedReason?:
     | "welding_level"
+    | "refining_level"
     | "materials"
     | "workbench_occupied"
     | "work_order_active"
     | "not_here";
+};
+
+/**
+ * ForceSales' daily full-board refresh (#217).
+ *
+ * `unlocked` is the board's own unlock AND Refining 5 — a single authoritative
+ * fact the surface, and the optional Wade topic gated on the same thing, both
+ * read rather than re-deriving from a Mission ID and a level literal.
+ */
+export type WorkOrderRefreshProjection = {
+  unlocked: boolean;
+  requiredRefiningLevel: number;
+  meetsRefiningLevel: boolean;
+  /** One refresh is available for today's RuneSpace Pacific reset date. */
+  availableToday: boolean;
+  /**
+   * This character has never completed a successful refresh. Persists across
+   * refresh, reconnect, and login until the first one commits — derived from
+   * durable refresh history, never a standalone tutorial-seen flag.
+   */
+  firstUnlock: boolean;
+  resetDate: string;
 };
 
 /** The accepted job on the bench, and its durable Welding progress. */
@@ -278,6 +304,7 @@ export type WorkOrdersProjection = {
   missionAvailable: boolean;
   postings: readonly WorkOrderPostingProjection[];
   active?: ActiveWorkOrderProjection;
+  refresh: WorkOrderRefreshProjection;
   /**
    * A job that genuinely completed during THIS request's reconciliation, and
    * what it paid (#207).
@@ -978,12 +1005,14 @@ async function projectWorkOrders(
   input: {
     characterId: string;
     weldingLevel: number;
+    refiningLevel: number;
     currentLocationId: string;
     action: { actionId: string } | undefined;
     practice: PracticeWeldState;
     stacks: readonly { itemId: string; quantity: number }[];
     balance: EffectiveGameBalance;
     random: CleanPassRandom;
+    resetDate: string;
     now: Date;
   },
 ): Promise<WorkOrdersProjection> {
@@ -1012,10 +1041,28 @@ async function projectWorkOrders(
     characterId: input.characterId,
     unlocked,
     weldingLevel: input.weldingLevel,
+    refiningLevel: input.refiningLevel,
     random: input.random,
     now: input.now,
   });
   const board = await loadWorkOrderBoard(transaction, input.characterId);
+
+  // ForceSales (#217): the same board unlock, plus Refining 5, exposes one
+  // manual full-board refresh per RuneSpace Pacific reset date.
+  const requiredRefreshRefiningLevel = balance.workOrders.refresh.requiredRefiningLevel;
+  const meetsRefreshRefiningLevel = input.refiningLevel >= requiredRefreshRefiningLevel;
+  const refreshState = await loadWorkOrderRefreshState(transaction, {
+    characterId: input.characterId,
+    resetDate: input.resetDate,
+  });
+  const refresh: WorkOrderRefreshProjection = {
+    unlocked: unlocked && meetsRefreshRefiningLevel,
+    requiredRefiningLevel: requiredRefreshRefiningLevel,
+    meetsRefiningLevel: meetsRefreshRefiningLevel,
+    availableToday: unlocked && meetsRefreshRefiningLevel && !refreshState.refreshedToday,
+    firstUnlock: !refreshState.everRefreshed,
+    resetDate: input.resetDate,
+  };
 
   const carried = new Map<string, number>();
   for (const stack of input.stacks) {
@@ -1054,13 +1101,16 @@ async function projectWorkOrders(
           ? ("not_here" as const)
           : input.weldingLevel < definition.requiredWeldingLevel
             ? ("welding_level" as const)
-            : board.active
-              ? ("work_order_active" as const)
-              : benchOccupancy.kind !== "clear" || benchBusy
-                ? ("workbench_occupied" as const)
-                : materials.some((material) => material.carried < material.quantity)
-                  ? ("materials" as const)
-                  : undefined;
+            : definition.requiredRefiningLevel !== undefined &&
+                input.refiningLevel < definition.requiredRefiningLevel
+              ? ("refining_level" as const)
+              : board.active
+                ? ("work_order_active" as const)
+                : benchOccupancy.kind !== "clear" || benchBusy
+                  ? ("workbench_occupied" as const)
+                  : materials.some((material) => material.carried < material.quantity)
+                    ? ("materials" as const)
+                    : undefined;
       return [
         {
           slotIndex: posting.slotIndex,
@@ -1069,6 +1119,9 @@ async function projectWorkOrders(
           clientName: definition.clientName,
           description: definition.description,
           requiredWeldingLevel: definition.requiredWeldingLevel,
+          ...(definition.requiredRefiningLevel !== undefined
+            ? { requiredRefiningLevel: definition.requiredRefiningLevel }
+            : {}),
           materials,
           sections: definition.sections,
           payoutCredits: definition.payoutCredits,
@@ -1086,7 +1139,9 @@ async function projectWorkOrders(
   const withCompletion = completion ? { recentCompletion: completion } : {};
 
   const activeDefinition = board.active ? getWorkOrder(board.active.workOrderId) : undefined;
-  if (!board.active || !activeDefinition) return { ...base, ...withCompletion, postings };
+  if (!board.active || !activeDefinition) {
+    return { ...base, ...withCompletion, postings, refresh };
+  }
 
   const workOrderActive = input.action?.actionId === ACTION_IDS.workOrderWelding;
   const cleanPass = projectCleanPass(
@@ -1098,6 +1153,7 @@ async function projectWorkOrders(
     ...base,
     ...withCompletion,
     postings,
+    refresh,
     active: {
       workOrderId: activeDefinition.id,
       title: activeDefinition.title,
@@ -1350,12 +1406,14 @@ export async function stateFromTransaction(
   const workOrders = await projectWorkOrders(transaction, {
     characterId,
     weldingLevel: weldingProgress.level,
+    refiningLevel: refiningProgress.level,
     currentLocationId,
     action,
     practice: practiceState,
     stacks,
     balance,
     random: defaultMiningRandom(),
+    resetDate,
     now,
   });
   const credits = character[0]?.credits ?? 0;

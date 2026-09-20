@@ -988,7 +988,13 @@ server-side even against a stale or manipulated client.
 - RuneSpace daily reset dates are calendar dates in the IANA timezone
   `America/Los_Angeles`, changing at local midnight. Daylight-saving transitions
   are handled by timezone-aware date calculation; this is not a rolling
-  24-hour timer.
+  24-hour timer. The calculation itself (`pacificResetDate`) lives in the
+  shared `game/domain/daily-reset.ts` boundary rather than being Annex-specific
+  code — `game/domain/power-annex.ts` re-exports it under its original name so
+  every existing import and this section's DST/local-midnight behavior are
+  unchanged. Work Orders' ForceSales daily board refresh (issue #217,
+  `docs/work-orders.md`) is the second consumer of the same boundary; each
+  feature still keeps its own entitlement persistence.
 - Each character may claim exactly five loose `power_cell` items once per
   Pacific reset date after physically traveling to and stopping at the DeWhat?
   Emergency Power Annex. Eligibility is per character, not per account.

@@ -784,6 +784,40 @@ export const characterPowerCellDailyClaims = pgTable(
 );
 
 /**
+ * Immutable per-character ForceSales board-refresh entitlement records (#217).
+ *
+ * The Work Order counterpart of `characterPowerCellDailyClaims`, sharing its
+ * exact shape and the same `pacificResetDate` boundary — but kept as its own
+ * table rather than folded into the Annex's, because the two ledgers record
+ * genuinely different rewards for genuinely different features, and reusing
+ * one table for both would need a second `rewardSourceId`-shaped concept doing
+ * no real simplifying work.
+ *
+ * A row existing for today's reset date is the single authoritative fact that
+ * today's refresh is spent; a row existing at all, for ANY reset date, is what
+ * "has this character ever used their first ForceSales refresh" derives from
+ * — no separate first-use flag. Nothing is cleared at midnight; eligibility is
+ * derived by comparing the current reset date against the rows that exist.
+ */
+export const characterWorkOrderBoardRefreshes = pgTable(
+  "character_work_order_board_refreshes",
+  {
+    characterId: text("character_id")
+      .notNull()
+      .references(() => characters.id, { onDelete: "restrict" }),
+    resetDate: date("reset_date", { mode: "string" }).notNull(),
+    refreshedAt: timestamp("refreshed_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    primaryKey({
+      columns: [table.characterId, table.resetDate],
+      name: "character_work_order_board_refreshes_pk",
+    }),
+    index("character_work_order_board_refreshes_character_id_idx").on(table.characterId),
+  ],
+);
+
+/**
  * Append-only operator audit log (Issue #113). One immutable row records a
  * SUCCESSFUL operator mutation, atomically committed with that mutation inside
  * the same transaction. Refused/failed commands, no-op/idempotent commands,

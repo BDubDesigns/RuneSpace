@@ -41,6 +41,14 @@ function baseState(inventory: PlayGameplayState["inventory"]): PlayGameplayState
       unlocked: false,
       missionAvailable: false,
       postings: [],
+      refresh: {
+        unlocked: false,
+        requiredRefiningLevel: 5,
+        meetsRefiningLevel: false,
+        availableToday: false,
+        firstUnlock: true,
+        resetDate: "2026-01-01",
+      },
     },
     practice: {
       unlocked: false,

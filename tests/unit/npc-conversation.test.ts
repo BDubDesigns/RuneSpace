@@ -445,6 +445,7 @@ describe("issue #164 replayable social topics", () => {
   it("authors the approved Wade and Tansy topics as short subjects, never player lines", () => {
     expect(getNpcConversationTopics(NPC_IDS.wadeRusk).map((topic) => topic.label)).toEqual([
       "Recovery work",
+      "ForceSales",
     ]);
     expect(getNpcConversationTopics(NPC_IDS.tansyRusk).map((topic) => topic.label)).toEqual([
       "Mining",

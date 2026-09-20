@@ -176,6 +176,9 @@ const dialogueIds = {
   // Replayable social/worldbuilding topics (#164). These are ordinary NPC
   // conversations: they never carry a Mission action and never gate progression.
   wadeRecoveryWorkTopic: asContentId("wade_rusk_topic_recovery_work"),
+  // ForceSales: available once the board is unlocked and Refining 5 exposes
+  // the daily refresh (#217).
+  wadeForceSalesTopic: asContentId("wade_rusk_topic_force_sales"),
   tansyMiningTopic: asContentId("tansy_rusk_topic_mining"),
   tansyBeyondHoloHollowTopic: asContentId("tansy_rusk_topic_beyond_holo_hollow"),
   // Holo Hollow foundation topics (#159).
@@ -198,6 +201,7 @@ const dialogueIds = {
  */
 const conversationTopicIds = {
   wadeRecoveryWork: asContentId("wade_rusk_recovery_work"),
+  wadeForceSales: asContentId("wade_rusk_force_sales"),
   tansyMining: asContentId("tansy_rusk_mining"),
   tansyBeyondHoloHollow: asContentId("tansy_rusk_beyond_holo_hollow"),
   bixTheShop: asContentId("bix_weller_the_shop"),
@@ -341,6 +345,16 @@ export const WORK_ORDER_IDS = {
   stempSpeederRack: asContentId("stemp_speeder_rack"),
   larkinHandWinch: asContentId("larkin_hand_winch"),
   mottCargoDolly: asContentId("mott_cargo_dolly"),
+  // Refining-5+ pool (#217): Galvanic Stock work, each reusing an existing
+  // client for a second job rather than introducing a new resident.
+  vossCountertopCooker: asContentId("voss_countertop_cooker"),
+  bixSouvenirDisplay: asContentId("bix_souvenir_display"),
+  tansyFurbabyRepair: asContentId("tansy_furbaby_repair"),
+  rennHelmetRack: asContentId("renn_helmet_rack"),
+  mottCargoScale: asContentId("mott_cargo_scale"),
+  maraLinenPress: asContentId("mara_linen_press"),
+  larkinCablePuller: asContentId("larkin_cable_puller"),
+  stempSpeederCradle: asContentId("stemp_speeder_cradle"),
 } as const satisfies Record<string, ContentId>;
 
 export type WorkOrderId = (typeof WORK_ORDER_IDS)[keyof typeof WORK_ORDER_IDS];

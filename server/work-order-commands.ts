@@ -41,12 +41,14 @@ export type WorkOrderRefusalReason =
   | "unknown_work_order"
   | "work_orders_locked"
   | "welding_level"
+  | "refining_level"
   | "wrong_location"
   | "in_transit"
   | "posting_changed"
   | "workbench_occupied"
   | "insufficient_materials"
-  | "no_active_work_order";
+  | "no_active_work_order"
+  | "already_refreshed_today";
 
 export type WorkOrderRefusal = {
   status: "refused";
@@ -65,7 +67,8 @@ export type WorkOrderCommandState = {
   workOrder: WorkOrderCommandResult;
 };
 
-async function currentLocationId(
+/** Read the character's own authoritative current location. */
+export async function currentLocationId(
   transaction: DatabaseTransaction,
   characterId: string,
 ): Promise<string> {
@@ -110,7 +113,7 @@ function stateWith(
  * Start on the Mission instead would strand a paid customer job on the one
  * bench with no way to finish it and no way to clear it.
  */
-async function workOrdersUnlocked(
+export async function workOrdersUnlocked(
   transaction: DatabaseTransaction,
   characterId: string,
 ): Promise<WorkOrderRefusal | undefined> {
@@ -224,6 +227,24 @@ export async function acceptWorkOrder(
           status: "refused",
           reason: "welding_level",
           message: `${definition.title} needs Welding level ${definition.requiredWeldingLevel}.`,
+        });
+      }
+      // Refined-material jobs (#217) author an additional Refining floor.
+      // Revalidated here exactly like Welding, so a forged or stale client
+      // request can never accept a job the character has not actually earned.
+      if (
+        definition.requiredRefiningLevel !== undefined &&
+        (await characterSkillLevel(
+          transaction,
+          context.character.id,
+          SKILL_IDS.refining,
+          standardSkillLevelThresholds(balance),
+        )) < definition.requiredRefiningLevel
+      ) {
+        return stateWith(transaction, context.character.id, now, {
+          status: "refused",
+          reason: "refining_level",
+          message: `${definition.title} needs Refining level ${definition.requiredRefiningLevel}.`,
         });
       }
 

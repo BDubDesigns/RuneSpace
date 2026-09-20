@@ -47,6 +47,12 @@ export type WorkOrderDefinition = {
   description: string;
   /** The minimum Welding level this job needs. */
   requiredWeldingLevel: number;
+  /**
+   * The minimum Refining level this job needs, when it authors one (#217).
+   * Absent on the original eight, which stay Welding-only forever; every
+   * Galvanic Stock job authors this alongside its Welding requirement.
+   */
+  requiredRefiningLevel?: number;
   /** The complete recipe, committed in full when the job is accepted. */
   materials: readonly WorkOrderMaterial[];
   /** How much Welding there is to do: this job's whole work unit. */
@@ -56,11 +62,14 @@ export type WorkOrderDefinition = {
 };
 
 /**
- * The initial pool: eight level-5 jobs.
+ * The pool: the original eight Welding-5 jobs, plus eight more Refining-5+
+ * jobs added by #217 once Galvanic Stock is craftable. The original eight keep
+ * their exact eligibility and never gain a Refining requirement; every new job
+ * authors both `requiredWeldingLevel: 5` and `requiredRefiningLevel: 5`.
  *
  * Authoring sizes are `short` (2-4 Refined Ferrite), `medium` (3-6) and `long`
  * (4-8), recorded in `docs/work-orders.md` as guidance for whoever writes the
- * ninth. They are deliberately NOT a runtime concept: nothing here stores a
+ * next one. They are deliberately NOT a runtime concept: nothing here stores a
  * size, and job length is expressed purely through `sections`.
  */
 const workOrderDefinitions = [
@@ -163,6 +172,126 @@ const workOrderDefinitions = [
     ],
     sections: 19,
     payoutCredits: 200,
+  },
+  // Refining-5+ pool (#217): eight more jobs, unlocked once Galvanic Stock is
+  // craftable. Every client here already has a job above — reusing them is
+  // deliberate worldbuilding, not a shortage of names — and none of the four
+  // background residents is promoted to a roster NPC by getting a second job.
+  {
+    id: WORK_ORDER_IDS.vossCountertopCooker,
+    title: "Countertop Cooker",
+    clientName: "Greta Voss",
+    description:
+      "Greta Voss's old induction-style countertop cooker has split its conductive support ring. It wants a fresh ring of proper stock, not another patch.",
+    requiredWeldingLevel: 5,
+    requiredRefiningLevel: 5,
+    materials: [{ itemId: ITEM_IDS.galvanicStock, quantity: 2 }],
+    sections: 10,
+    payoutCredits: 95,
+  },
+  {
+    id: WORK_ORDER_IDS.bixSouvenirDisplay,
+    title: "Powered Souvenir Display",
+    clientName: "Bix Weller",
+    description:
+      "One of Holo Hollow Souvenirs' old rotating, lighted tourism-era displays has a failed conductive rail. Bix Weller wants it running again, not thrown out.",
+    requiredWeldingLevel: 5,
+    requiredRefiningLevel: 5,
+    materials: [{ itemId: ITEM_IDS.galvanicStock, quantity: 3 }],
+    sections: 11,
+    payoutCredits: 120,
+  },
+  {
+    id: WORK_ORDER_IDS.tansyFurbabyRepair,
+    title: "FurBaby™ Repair",
+    clientName: "Tansy Rusk",
+    // She has had the FurBaby since she was little (SHIPPED / PUBLIC-SAFE
+    // once this job ships) — do NOT reveal or imply that her parents gave it
+    // to her. That remains protected canon (docs/npc-canon.md, Tansy Rusk).
+    description:
+      "Tansy Rusk's old FurBaby™ companion toy has a failing conductive rail and a burned-out Cell socket. She has had it since she was little, and she wants it fixed, not replaced.",
+    requiredWeldingLevel: 5,
+    requiredRefiningLevel: 5,
+    materials: [
+      { itemId: ITEM_IDS.galvanicStock, quantity: 2 },
+      { itemId: ITEM_IDS.powerCell, quantity: 1 },
+    ],
+    sections: 12,
+    payoutCredits: 110,
+  },
+  {
+    id: WORK_ORDER_IDS.rennHelmetRack,
+    title: "Helmet Charging Rack",
+    clientName: "Renn Calder",
+    description:
+      "The charging rack for Renn Calder's mining helmet, lamp, and comms gear has a cracked power rail. The rest of the rack is fine; the rail needs proper conductive stock.",
+    requiredWeldingLevel: 5,
+    requiredRefiningLevel: 5,
+    materials: [{ itemId: ITEM_IDS.galvanicStock, quantity: 4 }],
+    sections: 13,
+    payoutCredits: 145,
+  },
+  {
+    id: WORK_ORDER_IDS.mottCargoScale,
+    title: "Portable Cargo Scale",
+    clientName: "Otis Mott",
+    description:
+      "Otis Mott's portable cargo scale has a bent platform frame and a damaged load-sensing rail. The frame wants Ferrite; the rail wants conductive stock.",
+    requiredWeldingLevel: 5,
+    requiredRefiningLevel: 5,
+    materials: [
+      { itemId: ITEM_IDS.galvanicStock, quantity: 3 },
+      { itemId: ITEM_IDS.refinedFerrite, quantity: 4 },
+    ],
+    sections: 15,
+    payoutCredits: 175,
+  },
+  {
+    id: WORK_ORDER_IDS.maraLinenPress,
+    title: "B&B Linen Press",
+    clientName: "Mara Kells",
+    description:
+      "HH B&B's old commercial linen press has a warped heated-platen support and a conductive rail separating from the frame. Mara Kells would rather it were repaired than replaced.",
+    requiredWeldingLevel: 5,
+    requiredRefiningLevel: 5,
+    materials: [
+      { itemId: ITEM_IDS.galvanicStock, quantity: 3 },
+      { itemId: ITEM_IDS.refinedFerrite, quantity: 5 },
+    ],
+    sections: 16,
+    payoutCredits: 190,
+  },
+  {
+    id: WORK_ORDER_IDS.larkinCablePuller,
+    title: "Powered Cable Puller",
+    clientName: "Pell Larkin",
+    description:
+      "Pell Larkin's powered cable puller has damage to its mounting frame, its current rail, and its powered assembly — a different job than his old hand winch.",
+    requiredWeldingLevel: 5,
+    requiredRefiningLevel: 5,
+    materials: [
+      { itemId: ITEM_IDS.galvanicStock, quantity: 4 },
+      { itemId: ITEM_IDS.refinedFerrite, quantity: 5 },
+      { itemId: ITEM_IDS.powerCell, quantity: 1 },
+    ],
+    sections: 18,
+    payoutCredits: 225,
+  },
+  {
+    id: WORK_ORDER_IDS.stempSpeederCradle,
+    title: "Speeder Power Cradle",
+    clientName: "Juno Stemp",
+    description:
+      "A hard landing twisted part of Juno Stemp's speeder frame and damaged the conductive bus around its drive and Cell cradle. She runs deliveries and cannot be down long.",
+    requiredWeldingLevel: 5,
+    requiredRefiningLevel: 5,
+    materials: [
+      { itemId: ITEM_IDS.galvanicStock, quantity: 5 },
+      { itemId: ITEM_IDS.refinedFerrite, quantity: 6 },
+      { itemId: ITEM_IDS.powerCell, quantity: 2 },
+    ],
+    sections: 20,
+    payoutCredits: 270,
   },
 ] as const satisfies readonly WorkOrderDefinition[];
 

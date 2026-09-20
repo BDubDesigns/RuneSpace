@@ -180,18 +180,24 @@ suite("issue #141 Waste Not tracked activity (real PostgreSQL)", () => {
       .select()
       .from(rune.characterMissionProgress)
       .where(eq(rune.characterMissionProgress.characterId, character.id));
-    expect(initialProgress).toEqual([
-      expect.objectContaining({
-        missionId: MISSION_IDS.cutYourTeeth,
-        progressKey: "mining-attempts",
-        progress: 5,
-      }),
-      expect.objectContaining({
-        missionId: MISSION_IDS.wasteNot,
-        progressKey: "refining-attempts",
-        progress: 0,
-      }),
-    ]);
+    // No ORDER BY on the query above: Postgres row order is not guaranteed,
+    // so this asserts the two rows exist without depending on which comes back
+    // first.
+    expect(initialProgress).toHaveLength(2);
+    expect(initialProgress).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          missionId: MISSION_IDS.cutYourTeeth,
+          progressKey: "mining-attempts",
+          progress: 5,
+        }),
+        expect.objectContaining({
+          missionId: MISSION_IDS.wasteNot,
+          progressKey: "refining-attempts",
+          progress: 0,
+        }),
+      ]),
+    );
 
     const manualAcceptance = await missions.acceptMission(
       userId,

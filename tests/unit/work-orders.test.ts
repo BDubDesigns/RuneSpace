@@ -15,6 +15,7 @@ import {
   acceptedWorkOrderState,
   eligibleWorkOrders,
   selectInitialWorkOrderBoard,
+  selectWorkOrderBoardRefresh,
   selectWorkOrderRefill,
   validateWorkOrderDefinitions,
   workOrderComplete,
@@ -73,8 +74,8 @@ describe("The authored Work Order pool validates (#207)", () => {
   });
 });
 
-describe("Every authored payout equals the one payout formula (#207)", () => {
-  it("matches workOrderPayoutCredits exactly for all eight jobs, and locks the shipped Credit values", () => {
+describe("Every authored payout equals the one payout formula (#207, #217)", () => {
+  it("matches workOrderPayoutCredits exactly for all sixteen jobs, and locks the shipped Credit values", () => {
     const expectedPayouts: Record<string, number> = {
       [WORK_ORDER_IDS.rennCarryFrame]: 75,
       [WORK_ORDER_IDS.vossHeaterHousing]: 100,
@@ -84,8 +85,16 @@ describe("Every authored payout equals the one payout formula (#207)", () => {
       [WORK_ORDER_IDS.stempSpeederRack]: 135,
       [WORK_ORDER_IDS.larkinHandWinch]: 120,
       [WORK_ORDER_IDS.mottCargoDolly]: 200,
+      [WORK_ORDER_IDS.vossCountertopCooker]: 95,
+      [WORK_ORDER_IDS.bixSouvenirDisplay]: 120,
+      [WORK_ORDER_IDS.tansyFurbabyRepair]: 110,
+      [WORK_ORDER_IDS.rennHelmetRack]: 145,
+      [WORK_ORDER_IDS.mottCargoScale]: 175,
+      [WORK_ORDER_IDS.maraLinenPress]: 190,
+      [WORK_ORDER_IDS.larkinCablePuller]: 225,
+      [WORK_ORDER_IDS.stempSpeederCradle]: 270,
     };
-    expect(WORK_ORDERS).toHaveLength(8);
+    expect(WORK_ORDERS).toHaveLength(16);
     for (const job of WORK_ORDERS) {
       expect(workOrderPayoutCredits(job, balance)).toBe(job.payoutCredits);
       expect(job.payoutCredits).toBe(expectedPayouts[job.id]);
@@ -213,6 +222,14 @@ describe("Work Order XP is a derived share of the global Welding XP (#207)", () 
       [WORK_ORDER_IDS.stempSpeederRack]: 280,
       [WORK_ORDER_IDS.larkinHandWinch]: 320,
       [WORK_ORDER_IDS.mottCargoDolly]: 380,
+      [WORK_ORDER_IDS.vossCountertopCooker]: 200,
+      [WORK_ORDER_IDS.bixSouvenirDisplay]: 220,
+      [WORK_ORDER_IDS.tansyFurbabyRepair]: 240,
+      [WORK_ORDER_IDS.rennHelmetRack]: 260,
+      [WORK_ORDER_IDS.mottCargoScale]: 300,
+      [WORK_ORDER_IDS.maraLinenPress]: 320,
+      [WORK_ORDER_IDS.larkinCablePuller]: 360,
+      [WORK_ORDER_IDS.stempSpeederCradle]: 400,
     };
     for (const job of WORK_ORDERS) {
       expect(workOrderTotalXp(job, balance)).toBe(job.sections * 20);
@@ -221,9 +238,9 @@ describe("Work Order XP is a derived share of the global Welding XP (#207)", () 
   });
 });
 
-describe("Clean Pass count per job is floor(sections / 5) (#207)", () => {
-  it("matches the table's order exactly: 1, 1, 2, 2, 2, 2, 3, 3", () => {
-    const expectedCounts = [1, 1, 2, 2, 2, 2, 3, 3];
+describe("Clean Pass count per job is floor(sections / 5) (#207, #217)", () => {
+  it("matches the table's order exactly: 1, 1, 2, 2, 2, 2, 3, 3, 2, 2, 2, 2, 3, 3, 3, 4", () => {
+    const expectedCounts = [1, 1, 2, 2, 2, 2, 3, 3, 2, 2, 2, 2, 3, 3, 3, 4];
     expect(WORK_ORDERS.map((job) => cleanPassOpportunityCount(job.sections, balance))).toEqual(
       expectedCounts,
     );
@@ -232,7 +249,7 @@ describe("Clean Pass count per job is floor(sections / 5) (#207)", () => {
 
 describe("Board selection (#207)", () => {
   it("draws exactly three distinct jobs for the initial board", () => {
-    const eligible = eligibleWorkOrders(5);
+    const eligible = eligibleWorkOrders({ weldingLevel: 5, refiningLevel: 0 });
     const board = selectInitialWorkOrderBoard({
       eligible,
       slots: balance.workOrders.postedSlots,
@@ -243,7 +260,7 @@ describe("Board selection (#207)", () => {
   });
 
   it("never refills with a job already visible on the board", () => {
-    const eligible = eligibleWorkOrders(5);
+    const eligible = eligibleWorkOrders({ weldingLevel: 5, refiningLevel: 0 });
     const visible = eligible.slice(0, 2).map((job) => job.id);
     for (let roll = 0; roll < eligible.length; roll += 1) {
       const drawn = selectWorkOrderRefill({
@@ -257,7 +274,7 @@ describe("Board selection (#207)", () => {
   });
 
   it("avoids the just-cleared job when another eligible option exists", () => {
-    const eligible = eligibleWorkOrders(5);
+    const eligible = eligibleWorkOrders({ weldingLevel: 5, refiningLevel: 0 });
     const justCleared = eligible[0]!.id;
     for (let roll = 0; roll < eligible.length; roll += 1) {
       const drawn = selectWorkOrderRefill({
@@ -307,7 +324,7 @@ describe("Board selection (#207)", () => {
 
 describe("eligibleWorkOrders grows the pool with Welding level; it never replaces (#207)", () => {
   it("makes nothing eligible below the required level", () => {
-    expect(eligibleWorkOrders(4)).toEqual([]);
+    expect(eligibleWorkOrders({ weldingLevel: 4, refiningLevel: 0 })).toEqual([]);
   });
 
   it("keeps a lower-level job eligible forever as higher-tier jobs are added", () => {
@@ -316,14 +333,128 @@ describe("eligibleWorkOrders grows the pool with Welding level; it never replace
       syntheticJob({ id: "tier_ten", requiredWeldingLevel: 10 }),
       syntheticJob({ id: "tier_twenty", requiredWeldingLevel: 20 }),
     ];
-    expect(eligibleWorkOrders(4, pool)).toEqual([]);
-    expect(eligibleWorkOrders(5, pool).map((job) => job.id)).toEqual(["tier_five"]);
-    expect(eligibleWorkOrders(10, pool).map((job) => job.id)).toEqual(["tier_five", "tier_ten"]);
-    expect(eligibleWorkOrders(20, pool).map((job) => job.id)).toEqual([
+    const levels = (weldingLevel: number) => ({ weldingLevel, refiningLevel: 0 });
+    expect(eligibleWorkOrders(levels(4), pool)).toEqual([]);
+    expect(eligibleWorkOrders(levels(5), pool).map((job) => job.id)).toEqual(["tier_five"]);
+    expect(eligibleWorkOrders(levels(10), pool).map((job) => job.id)).toEqual([
+      "tier_five",
+      "tier_ten",
+    ]);
+    expect(eligibleWorkOrders(levels(20), pool).map((job) => job.id)).toEqual([
       "tier_five",
       "tier_ten",
       "tier_twenty",
     ]);
+  });
+});
+
+describe("eligibleWorkOrders also gates on Refining level when a job authors one (#217)", () => {
+  it("keeps the original Welding-only jobs eligible regardless of Refining level", () => {
+    const pool = [syntheticJob({ id: "welding_only", requiredWeldingLevel: 5 })];
+    expect(
+      eligibleWorkOrders({ weldingLevel: 5, refiningLevel: 0 }, pool).map((job) => job.id),
+    ).toEqual(["welding_only"]);
+  });
+
+  it("excludes a job authoring a Refining requirement until that level is met", () => {
+    const pool = [
+      syntheticJob({ id: "needs_refining", requiredWeldingLevel: 5, requiredRefiningLevel: 5 }),
+    ];
+    expect(eligibleWorkOrders({ weldingLevel: 5, refiningLevel: 4 }, pool)).toEqual([]);
+    expect(
+      eligibleWorkOrders({ weldingLevel: 5, refiningLevel: 5 }, pool).map((job) => job.id),
+    ).toEqual(["needs_refining"]);
+  });
+});
+
+describe("selectWorkOrderBoardRefresh replaces every unaccepted slot at once (#217)", () => {
+  it("never selects the active (In Progress) posting for any slot", () => {
+    const active = syntheticJob({ id: "active_job" });
+    const cleared = [syntheticJob({ id: "cleared_a" }), syntheticJob({ id: "cleared_b" })];
+    const eligible = [active, ...cleared, syntheticJob({ id: "spare" })];
+    for (let roll = 0; roll < eligible.length * 2; roll += 1) {
+      const replacements = selectWorkOrderBoardRefresh({
+        eligible,
+        activeWorkOrderId: active.id,
+        clearedWorkOrderIds: cleared.map((job) => job.id),
+        random: scriptedRandom(roll),
+      });
+      expect(replacements.map((job) => job.id)).not.toContain(active.id);
+    }
+  });
+
+  it("never picks the same replacement twice within one refresh", () => {
+    const cleared = [
+      syntheticJob({ id: "cleared_a" }),
+      syntheticJob({ id: "cleared_b" }),
+      syntheticJob({ id: "cleared_c" }),
+    ];
+    const eligible = [...cleared, syntheticJob({ id: "spare" })];
+    const replacements = selectWorkOrderBoardRefresh({
+      eligible,
+      clearedWorkOrderIds: cleared.map((job) => job.id),
+      random: scriptedRandom(0),
+    });
+    expect(new Set(replacements.map((job) => job.id)).size).toBe(replacements.length);
+  });
+
+  it("avoids redrawing the just-cleared postings when another eligible option exists", () => {
+    const cleared = [syntheticJob({ id: "cleared_a" }), syntheticJob({ id: "cleared_b" })];
+    const spares = [syntheticJob({ id: "spare_a" }), syntheticJob({ id: "spare_b" })];
+    const eligible = [...cleared, ...spares];
+    const replacements = selectWorkOrderBoardRefresh({
+      eligible,
+      clearedWorkOrderIds: cleared.map((job) => job.id),
+      random: scriptedRandom(0, 1),
+    });
+    const clearedIds = new Set(cleared.map((job) => job.id));
+    expect(replacements.some((job) => clearedIds.has(job.id))).toBe(false);
+  });
+
+  it("falls back to redrawing a just-cleared posting when it is the only way to fill every slot", () => {
+    // Only the two cleared jobs are eligible at all, so avoiding both of them
+    // for every slot is impossible — the anti-redraw rule must relax rather
+    // than leave a slot empty.
+    const cleared = [syntheticJob({ id: "cleared_a" }), syntheticJob({ id: "cleared_b" })];
+    const replacements = selectWorkOrderBoardRefresh({
+      eligible: cleared,
+      clearedWorkOrderIds: cleared.map((job) => job.id),
+      random: scriptedRandom(0, 1),
+    });
+    expect(replacements).toHaveLength(2);
+  });
+
+  it("leaves a slot unfilled, rather than throwing, when the eligible pool runs out", () => {
+    const onlyJob = syntheticJob({ id: "only_job" });
+    const replacements = selectWorkOrderBoardRefresh({
+      eligible: [onlyJob],
+      activeWorkOrderId: onlyJob.id,
+      clearedWorkOrderIds: ["cleared_a", "cleared_b"],
+      random: scriptedRandom(0),
+    });
+    expect(replacements).toEqual([]);
+  });
+});
+
+describe("validateWorkOrderDefinitions rejects a malformed requiredRefiningLevel (#217)", () => {
+  it("rejects zero and non-integer values", () => {
+    expect(() =>
+      validateWorkOrderDefinitions([syntheticJob({ requiredRefiningLevel: 0 })]),
+    ).toThrow(/positive integer Refining level/);
+    expect(() =>
+      validateWorkOrderDefinitions([syntheticJob({ requiredRefiningLevel: 1.5 })]),
+    ).toThrow(/positive integer Refining level/);
+  });
+
+  it("accepts a job with no Refining requirement at all", () => {
+    expect(() =>
+      validateWorkOrderDefinitions([
+        syntheticJob({ id: "one" }),
+        syntheticJob({ id: "two" }),
+        syntheticJob({ id: "three" }),
+        syntheticJob({ id: "four", requiredRefiningLevel: 5 }),
+      ]),
+    ).not.toThrow();
   });
 });
 

@@ -91,7 +91,11 @@ export function NpcInteractionPanel({
       ? venueMerchant
       : undefined;
   const stationary = !state.activeAction && !state.travelState;
-  const entries = npc ? resolveNpcConversation(npc.id, state.missions) : [];
+  const entries = npc
+    ? resolveNpcConversation(npc.id, state.missions, {
+        workOrdersRefreshUnlocked: state.workOrders.refresh.unlocked,
+      })
+    : [];
   // Active (green), turn-in (blue), and available (blue) are distinct semantic
   // sets; when one NPC is several targets at once the shared precedence picks
   // the one meaning its Talk control presents.

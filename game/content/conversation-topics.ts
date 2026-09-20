@@ -12,15 +12,20 @@ import {
 /**
  * The closed availability vocabulary for a replayable conversation topic.
  *
- * Deliberately narrow: an ordinary topic is always available, or it becomes
- * visible once one authored Mission is completed. Completion is read from the
- * existing semantic Mission projection — there is no new persistence, no
- * boolean-expression language, no relationship/trust score, and no world-state
- * scripting. A future real content need earns one more explicit kind here.
+ * Deliberately narrow: an ordinary topic is always available, it becomes
+ * visible once one authored Mission is completed, or it reads one other
+ * already-authoritative server-computed fact. `work_orders_refresh_unlocked`
+ * is that last kind's only member (#217's Wade ForceSales topic, gated on
+ * Work Orders being unlocked AND Refining 5 — a combination the Mission-state
+ * vocabulary above cannot express). It is resolved from an externally
+ * supplied boolean, never from a new boolean-expression language, a
+ * relationship/trust score, or world-state scripting. A future real content
+ * need earns one more explicit kind here, not a generalized combinator.
  */
 export type ConversationTopicAvailability =
   | { kind: "always" }
-  | { kind: "mission_completed"; missionId: MissionId };
+  | { kind: "mission_completed"; missionId: MissionId }
+  | { kind: "work_orders_refresh_unlocked" };
 
 /**
  * One authored replayable social/worldbuilding topic.
@@ -125,6 +130,16 @@ export const CONVERSATION_TOPICS = [
     label: "Life here",
     dialogueId: DIALOGUE_IDS.rennLifeHereTopic,
     availability: { kind: "always" },
+  },
+  {
+    // #217: visible once Work Orders' ForceSales Free refresh is unlocked
+    // (board unlock + Refining 5), read from the already-authoritative
+    // server-computed projection rather than re-deriving either condition.
+    id: CONVERSATION_TOPIC_IDS.wadeForceSales,
+    npcId: NPC_IDS.wadeRusk,
+    label: "ForceSales",
+    dialogueId: DIALOGUE_IDS.wadeForceSalesTopic,
+    availability: { kind: "work_orders_refresh_unlocked" },
   },
 ] as const satisfies readonly ConversationTopicDefinition[];
 

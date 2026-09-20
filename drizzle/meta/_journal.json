@@ -169,6 +169,13 @@
       "when": 1789781073426,
       "tag": "0023_deep_jag_drop_legacy_material_columns",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1789868314295,
+      "tag": "0024_work_order_board_refreshes",
+      "breakpoints": true
     }
   ]
 }

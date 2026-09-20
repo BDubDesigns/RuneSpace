@@ -49,6 +49,10 @@ import {
   stopWorkOrderWelding,
   type WorkOrderCommandState,
 } from "@/server/work-order-commands";
+import {
+  refreshWorkOrderBoard,
+  type WorkOrderRefreshCommandState,
+} from "@/server/work-order-refresh";
 import { claimCleanPass, type CleanPassClaimResult } from "@/server/clean-pass";
 import { EquipmentRuleError } from "@/game/domain/equipment";
 import { TravelRuleError } from "@/server/travel";
@@ -363,6 +367,22 @@ export async function stopWorkOrderWeldingAction(input: unknown): Promise<WorkOr
   try {
     const user = await requireCurrentUser(await headers());
     return await stopWorkOrderWelding(user.id, request.data.characterId);
+  } catch (error) {
+    if (error instanceof OwnershipError) return { error: error.message };
+    throw error;
+  }
+}
+
+export type WorkOrderRefreshActionResult = WorkOrderRefreshCommandState | { error: string };
+
+export async function refreshWorkOrderBoardAction(
+  input: unknown,
+): Promise<WorkOrderRefreshActionResult> {
+  const request = WorkOrderCommandRequestSchema.safeParse(input);
+  if (!request.success) return { error: "Invalid Work Order command." };
+  try {
+    const user = await requireCurrentUser(await headers());
+    return await refreshWorkOrderBoard(user.id, request.data.characterId);
   } catch (error) {
     if (error instanceof OwnershipError) return { error: error.message };
     throw error;

@@ -273,9 +273,11 @@ turn-in; offers and turns in **Hold It Together**; offers **Keep the Change**
 (handing over six Scrap Metal on acceptance, paying 50 Credits on completion);
 offers and turns in **10,001 Hours** (granting a bundle of 10 Refined Ferrite
 + 5 Power Cells on completion — shop stock so the apprentice does not have to
-stop working mid-shift to go and buy their own). Replayable topic: **Recovery
-work**, always available. Structure and exact values live in
-`game/content/missions.ts`.
+stop working mid-shift to go and buy their own). Replayable topics: **Recovery
+work**, always available, and **ForceSales** (#217), once the Work Order board
+is unlocked and the player has reached Refining level 5 — restrained flavor
+about the generic commercial software running his terminal, never a Mission.
+Structure and exact values live in `game/content/missions.ts`.
 
 **Work, business, and equipment context.** The richest inventory of any NPC,
 and the most useful for Work Orders. All `SHIPPED / PUBLIC-SAFE` unless noted:
@@ -296,6 +298,14 @@ and the most useful for Work Orders. All `SHIPPED / PUBLIC-SAFE` unless noted:
   Wade says so plainly: *"Board's yours now. It stays yours. I'm not going to
   keep unlocking it for you."* Requires Welding level 5
   (`balance.workOrders.requiredWeldingLevel`) as well as the Mission itself.
+- **ForceSales** (#217) — the generic commercial SaaS product the terminal
+  runs on, on its free tier. Ordinary software Wade happens to use, not
+  something built for him and not a new megacorp storyline: *"Free tier does
+  what I need. Takes the jobs, keeps the board straight."* At Refining level
+  5 it exposes one free daily full-board refresh, and its own upsell copy
+  tells Wade to contact his Network Administrator about upgrading to Pro — a
+  joke that lands entirely on him, since he *is* the Network Administrator.
+  See the **ForceSales** replayable topic above and `docs/work-orders.md`.
 - **Scrap Metal stock** — sells at 2 Credits a piece, *"same as he would charge
   anybody"*. Deliberately unlimited; he does **not** buy Slag back, because Bix
   already does.
@@ -370,10 +380,11 @@ The two statements do not conflict, and no reconciliation should be invented.
 
 **Source references.** `game/content/npcs.ts`; `game/content/dialogue.ts`
 (`wadeOffer`, `wadeKeepTheChangeOffer`, `wadeTenThousandHours*`,
-`wadeTenThousandOneHours*`, `wadeRecoveryWorkTopic`,
+`wadeTenThousandOneHours*`, `wadeRecoveryWorkTopic`, `wadeForceSalesTopic`,
 `tansyKeepTheChangeCompletion`); `game/content/missions.ts`
 (`TEN_THOUSAND_HOURS`, `TEN_THOUSAND_ONE_HOURS`); `game/content/work-orders.ts`;
-`server/work-orders.ts`; `game/content/locations.ts` (Rusk Recovery);
+`server/work-orders.ts`; `server/work-order-refresh.ts`;
+`game/content/locations.ts` (Rusk Recovery);
 `game/content/merchants.ts`; `game/content/rusk-recovery.ts`;
 `docs/holo-hollow.md` (Holo Drive-In and Tansy's longer arc); `docs/missions.md`
 (10,001 Hours example); `docs/work-orders.md`;
@@ -465,6 +476,17 @@ restatement, and it is hers to keep and use, never the player's. Do not expand
 it with a model name, age, history, or a wider inventory of her tools, and do
 not add anything beyond what the job itself establishes
 (`game/content/work-orders.ts`, `docs/work-orders.md`).
+
+`SHIPPED / PUBLIC-SAFE` (#217) — the authored Work Order `tansy_furbaby_repair`
+introduces **one** further possession: a **FurBaby™** animatronic companion
+toy she has had since she was little, whose internal conductive rail and
+Cell socket have failed. It is safe to say she has had it since childhood; it
+is **not** approved to reveal or imply that her parents gave it to her — that
+remains the protected, unshipped history noted above
+(`APPROVED — NOT SHIPPED / INTERNAL-ONLY`, Wade/the deeper history). Do not
+expand the FurBaby with a model name, history, or how she came to have it
+beyond what the job itself establishes (`game/content/work-orders.ts`,
+`docs/work-orders.md`).
 
 **Knowledge.** Ferrite, shale, cutting, and improvised repair. Knows the hopper
 at the Abandoned Processing Yard and how Refining behaves. Knows Wade well
@@ -1052,7 +1074,11 @@ five more characters.
 
 The authored background clients and the minimal canon each one introduces live in
 `docs/work-orders.md`. Do not expand them here, and do not promote one into this
-roster without a deliberate decision to make them a real NPC.
+roster without a deliberate decision to make them a real NPC. A background
+client receiving a **second** authored job (#217 paired one Refining-5+ job
+with every existing client rather than inventing a new one) does not change
+any of this — two jobs is still zero roster entries, zero portraits, and zero
+dialogue.
 
 ### Welding level 5 — the paper arithmetic
 

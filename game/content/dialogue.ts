@@ -1038,6 +1038,30 @@ const dialogue = {
       wadeLocal(EXPRESSION_IDS.neutral, "No. I'm not going to stop bringing that up."),
     ],
   },
+  [DIALOGUE_IDS.wadeForceSalesTopic]: {
+    id: DIALOGUE_IDS.wadeForceSalesTopic,
+    npcId: NPC_IDS.wadeRusk,
+    // Wade says this wherever Wade currently is (#190), same as his other
+    // replayable topics.
+    presentsAtCurrentVenue: true,
+    beats: [
+      wadeLocal(EXPRESSION_IDS.neutral, "Yeah. ForceSales."),
+      wadeLocal(
+        EXPRESSION_IDS.neutral,
+        "Free tier does what I need. Takes the jobs, keeps the board straight.",
+      ),
+      wadeLocal(
+        EXPRESSION_IDS.neutral,
+        "Now it says you qualify for enough different work that it'll let you refresh the queue once a day.",
+      ),
+      wadeLocal(
+        EXPRESSION_IDS.scowl,
+        "Also says I should contact my Network Administrator about upgrading to Pro.",
+      ),
+      wadeLocal(EXPRESSION_IDS.neutral, "I am the Network Administrator."),
+      wadeLocal(EXPRESSION_IDS.scowl, "No."),
+    ],
+  },
   [DIALOGUE_IDS.tansyMiningTopic]: {
     id: DIALOGUE_IDS.tansyMiningTopic,
     npcId: NPC_IDS.tansyRusk,
