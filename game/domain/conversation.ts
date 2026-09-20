@@ -140,11 +140,22 @@ const ROLE_LABELS: Record<MissionConversationRole, string> = {
  *    accumulate into a growing historical list;
  * 4. replayable social topics whose authored availability currently holds.
  */
+/**
+ * Externally-supplied facts a topic's availability may read beyond the
+ * Mission projections — currently just #217's Work Orders refresh unlock.
+ * Kept as one small optional bag rather than growing the function's
+ * positional parameters each time a topic needs one more outside fact.
+ */
+export type ConversationAvailabilityContext = {
+  workOrdersRefreshUnlocked?: boolean;
+};
+
 export function resolveNpcConversation(
   npcId: string,
   projections: readonly NpcConversationProjection[],
+  context?: ConversationAvailabilityContext,
 ): readonly NpcConversationEntry[] {
-  return resolveNpcConversationWith(npcId, projections, MISSIONS, CONVERSATION_TOPICS);
+  return resolveNpcConversationWith(npcId, projections, MISSIONS, CONVERSATION_TOPICS, context);
 }
 
 /**
@@ -158,6 +169,7 @@ export function resolveNpcConversationWith(
   projections: readonly NpcConversationProjection[],
   definitions: readonly MissionDefinition[],
   topics: readonly ConversationTopicDefinition[],
+  context?: ConversationAvailabilityContext,
 ): readonly NpcConversationEntry[] {
   const byId = new Map(definitions.map((definition) => [definition.id, definition]));
   const newestFirst = [...projections].reverse();
@@ -210,7 +222,7 @@ export function resolveNpcConversationWith(
     if (completed) mission.push(completed);
   }
 
-  return [...mission, ...availableTopics(npcId, projections, topics)];
+  return [...mission, ...availableTopics(npcId, projections, topics, context)];
 }
 
 /** The Mission conversation this NPC owns while a Mission is accepted and incomplete. */
@@ -323,10 +335,11 @@ function availableTopics(
   npcId: string,
   projections: readonly NpcConversationProjection[],
   topics: readonly ConversationTopicDefinition[],
+  context: ConversationAvailabilityContext | undefined,
 ): readonly NpcConversationEntry[] {
   return topics
     .filter((topic) => topic.npcId === npcId)
-    .filter((topic) => topicAvailable(topic, projections))
+    .filter((topic) => topicAvailable(topic, projections, context))
     .filter((topic) => getDialogue(topic.dialogueId) !== undefined)
     .map((topic) => ({
       kind: "topic" as const,
@@ -339,8 +352,12 @@ function availableTopics(
 export function topicAvailable(
   topic: ConversationTopicDefinition,
   projections: readonly NpcConversationProjection[],
+  context?: ConversationAvailabilityContext,
 ): boolean {
   if (topic.availability.kind === "always") return true;
+  if (topic.availability.kind === "work_orders_refresh_unlocked") {
+    return context?.workOrdersRefreshUnlocked ?? false;
+  }
   const gate = topic.availability.missionId;
   return projections.some(
     (projection) => projection.missionId === gate && projection.state === "completed",
@@ -478,6 +495,8 @@ export function validateConversationTopics(
     ) {
       throw new Error(`${where} gates on unknown mission "${topic.availability.missionId}".`);
     }
+    // "work_orders_refresh_unlocked" needs no mission lookup: it reads a
+    // server-supplied fact, not a projected Mission.
   }
   // A Mission-owned sequence must never double as a replayable social topic.
   const missionDialogueIds = new Set(missionOwnedDialogueIds(definitions));

@@ -121,14 +121,27 @@ export function acceptedWorkOrderState(
   };
 }
 
-/** Every job the character's Welding level currently makes eligible. */
+/**
+ * Every job the character's current skill levels make eligible.
+ *
+ * The single authoritative eligibility rule (#217): Welding, and — only for a
+ * job that authors one — Refining. A job with no `requiredRefiningLevel` is
+ * Welding-only forever, exactly as the original eight remain. Board seeding,
+ * refill, refresh, and acceptance all call this one function rather than
+ * re-deriving the level comparison.
+ */
 export function eligibleWorkOrders(
-  weldingLevel: number,
+  levels: { weldingLevel: number; refiningLevel: number },
   pool: readonly WorkOrderDefinition[] = WORK_ORDERS,
 ): readonly WorkOrderDefinition[] {
-  // Lower-level jobs stay eligible forever: a later Welding tier expands the
-  // pool rather than replacing the work the player already knows how to do.
-  return pool.filter((definition) => weldingLevel >= definition.requiredWeldingLevel);
+  // Lower-level jobs stay eligible forever: a later tier expands the pool
+  // rather than replacing the work the player already knows how to do.
+  return pool.filter(
+    (definition) =>
+      levels.weldingLevel >= definition.requiredWeldingLevel &&
+      (definition.requiredRefiningLevel === undefined ||
+        levels.refiningLevel >= definition.requiredRefiningLevel),
+  );
 }
 
 /**
@@ -195,6 +208,51 @@ export function selectInitialWorkOrderBoard(input: {
 }
 
 /**
+ * Refresh every currently unaccepted slot at once (#217, ForceSales).
+ *
+ * The same anti-repeat rule `selectWorkOrderRefill` applies to one slot,
+ * generalized to a whole batch: each replacement excludes the active/In
+ * Progress posting (if any), every unaccepted posting being refreshed, and any
+ * replacement already chosen earlier in this same refresh. If that leaves
+ * nothing for a given slot, the cleared jobs become drawable again for that
+ * slot only — never the active posting or another slot's new pick.
+ *
+ * Slots are filled in the given order, one selection rule applied repeatedly
+ * rather than a second batch algorithm. Returns fewer entries than
+ * `clearedWorkOrderIds` only if the eligible pool is too small to fill every
+ * slot at all, in which case the remaining original slots are left as they
+ * were — the same graceful-empty-slot behavior `selectInitialWorkOrderBoard`
+ * already uses.
+ */
+export function selectWorkOrderBoardRefresh(input: {
+  eligible: readonly WorkOrderDefinition[];
+  /** The accepted job's slot is never touched by a refresh. */
+  activeWorkOrderId?: WorkOrderId;
+  /** The unaccepted postings a refresh is replacing, in slot order. */
+  clearedWorkOrderIds: readonly WorkOrderId[];
+  random: CleanPassRandom;
+}): readonly WorkOrderDefinition[] {
+  const cleared = new Set<string>(input.clearedWorkOrderIds);
+  const selected: WorkOrderDefinition[] = [];
+  for (let i = 0; i < input.clearedWorkOrderIds.length; i += 1) {
+    const excluded = new Set<string>(selected.map((definition) => definition.id));
+    if (input.activeWorkOrderId) excluded.add(input.activeWorkOrderId);
+    const distinct = input.eligible.filter((definition) => !excluded.has(definition.id));
+    if (distinct.length === 0) break;
+
+    const preferred = distinct.filter((definition) => !cleared.has(definition.id));
+    const candidates = preferred.length > 0 ? preferred : distinct;
+
+    const roll = input.random.nextBasisPoints();
+    if (!Number.isInteger(roll) || roll < 0) {
+      throw new RangeError("Work Order refresh randomness must be a non-negative integer roll");
+    }
+    selected.push(candidates[roll % candidates.length]!);
+  }
+  return selected;
+}
+
+/**
  * Validate the authored pool against the rules it is supposed to obey.
  *
  * Runs at module load beside the other content registries, so an authoring
@@ -221,6 +279,12 @@ export function validateWorkOrderDefinitions(
     }
     if (!Number.isInteger(definition.requiredWeldingLevel) || definition.requiredWeldingLevel < 1) {
       throw new Error(`${definition.id} requires a positive integer Welding level`);
+    }
+    if (
+      definition.requiredRefiningLevel !== undefined &&
+      (!Number.isInteger(definition.requiredRefiningLevel) || definition.requiredRefiningLevel < 1)
+    ) {
+      throw new Error(`${definition.id} requires a positive integer Refining level, when authored`);
     }
     if (!Number.isInteger(definition.sections) || definition.sections < 1) {
       throw new Error(`${definition.id} requires a positive integer section count`);

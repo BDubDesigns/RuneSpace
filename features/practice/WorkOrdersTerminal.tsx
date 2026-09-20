@@ -8,8 +8,13 @@ import { SectionHeader } from "@/components/ui/SectionHeader";
 import { LOCATION_IDS } from "@/game/config/foundations";
 import { usePlay } from "@/features/play/PlayContext";
 import { WORKBENCH_ANCHOR_ID } from "@/features/practice/WorkbenchPanel";
-import { acceptWorkOrderAction, type WorkOrderActionResult } from "@/server/actions";
-import type { WorkOrderPostingProjection } from "@/server/play";
+import {
+  acceptWorkOrderAction,
+  refreshWorkOrderBoardAction,
+  type WorkOrderActionResult,
+  type WorkOrderRefreshActionResult,
+} from "@/server/actions";
+import type { WorkOrderPostingProjection, WorkOrderRefreshProjection } from "@/server/play";
 
 /**
  * The Work Orders terminal at Rusk Recovery (#190, made playable by #207).
@@ -35,6 +40,11 @@ export function WorkOrdersTerminal() {
   const { acceptState, enqueueForeground, foregroundBusy, releaseCommand, state } = usePlay();
   const [message, setMessage] = useState<string>();
   const [pending, setPending] = useState<string>();
+  const [refreshPending, setRefreshPending] = useState(false);
+  const [refreshFeedback, setRefreshFeedback] = useState<{
+    tone: "danger" | "success";
+    text: string;
+  }>();
   const [, startTransition] = useTransition();
   // Set only after a successful acceptance commits, so focus moves once the
   // Workbench is genuinely rendering the accepted job — never before the
@@ -58,7 +68,8 @@ export function WorkOrdersTerminal() {
   }
   // Both the reveal and the level requirement are authoritative projection: this
   // surface never learns a Mission ID or a balance literal of its own.
-  const { revealed, requiredWeldingLevel, unlocked, missionAvailable, postings } = state.workOrders;
+  const { revealed, requiredWeldingLevel, unlocked, missionAvailable, postings, refresh } =
+    state.workOrders;
   if (!revealed) return null;
 
   function applyResult(result: WorkOrderActionResult) {
@@ -91,6 +102,39 @@ export function WorkOrdersTerminal() {
     });
   }
 
+  function applyRefreshResult(result: WorkOrderRefreshActionResult) {
+    if ("error" in result) {
+      setRefreshFeedback({ tone: "danger", text: result.error });
+      return;
+    }
+    acceptState(result.state);
+    if (result.refresh.status === "refused") {
+      setRefreshFeedback({ tone: "danger", text: result.refresh.message });
+      return;
+    }
+    setRefreshFeedback({ tone: "success", text: "Queue refreshed. New postings loaded." });
+  }
+
+  function refreshBoard() {
+    enqueueForeground(() => {
+      setRefreshPending(true);
+      setRefreshFeedback(undefined);
+      startTransition(async () => {
+        try {
+          applyRefreshResult(await refreshWorkOrderBoardAction({ characterId: state.characterId }));
+        } catch {
+          setRefreshFeedback({
+            tone: "danger",
+            text: "Comms interruption. The refresh could not be confirmed.",
+          });
+        } finally {
+          releaseCommand();
+          setRefreshPending(false);
+        }
+      });
+    });
+  }
+
   // `missionAvailable` is the projection's own answer to "is the board simply
   // not theirs yet", so the terminal never re-derives it from a level literal.
   const terminalState = !unlocked
@@ -109,6 +153,27 @@ export function WorkOrdersTerminal() {
       <p className="mt-4 max-w-2xl text-sm leading-relaxed text-[color:var(--rs-text-secondary)]">
         The terminal in the corner is where paying jobs come in off the wire.
       </p>
+      {/* ForceSales is restrained secondary flavor on an otherwise ordinary shop
+          queue (#217) — the terminal's own generic SaaS vendor, never a
+          renamed panel identity. */}
+      <p
+        className="mt-1 text-xs uppercase tracking-[0.12em] text-[color:var(--rs-text-muted)]"
+        data-work-orders-branding
+      >
+        Powered by ForceSales Free
+      </p>
+
+      {refresh.unlocked ? (
+        <ForceSalesRefreshPanel
+          busy={foregroundBusy}
+          onRefresh={refreshBoard}
+          pending={refreshPending}
+          refresh={refresh}
+        />
+      ) : null}
+      {refreshFeedback ? (
+        <Feedback tone={refreshFeedback.tone}>{refreshFeedback.text}</Feedback>
+      ) : null}
 
       {terminalState === "locked" ? (
         <div className="mt-4">
@@ -263,6 +328,12 @@ function WorkOrderPosting({
         <dd className="tabular-nums">{`${posting.sections} sections`}</dd>
         <dt className="text-[color:var(--rs-text-muted)]">Welding</dt>
         <dd className="tabular-nums">{`Level ${posting.requiredWeldingLevel}`}</dd>
+        {posting.requiredRefiningLevel !== undefined ? (
+          <>
+            <dt className="text-[color:var(--rs-text-muted)]">Refining</dt>
+            <dd className="tabular-nums">{`Level ${posting.requiredRefiningLevel}`}</dd>
+          </>
+        ) : null}
       </dl>
 
       {posting.inProgress ? (
@@ -302,10 +373,115 @@ function WorkOrderPosting({
   );
 }
 
+/**
+ * ForceSales' one-per-Pacific-day full-board refresh (#217).
+ *
+ * Three settled copy states, chosen from the authoritative projection alone —
+ * never a client-side guess at "just unlocked" or "used it recently". The
+ * first-unlock treatment is never color-only: its own labeled copy carries the
+ * meaning, matching the existing "In Progress" badge's pattern of an
+ * uppercase-styled label over ordinary-case text.
+ */
+function ForceSalesRefreshPanel({
+  busy,
+  onRefresh,
+  pending,
+  refresh,
+}: {
+  busy: boolean;
+  onRefresh: () => void;
+  pending: boolean;
+  refresh: WorkOrderRefreshProjection;
+}) {
+  const panelState = !refresh.availableToday
+    ? "used_today"
+    : refresh.firstUnlock
+      ? "first_unlock"
+      : "available";
+
+  return (
+    <div
+      className={`mt-4 border p-3 ${
+        panelState === "first_unlock"
+          ? "border-[color:var(--rs-accent-primary)] bg-[color:var(--rs-accent-primary-subtle)]"
+          : "border-[color:var(--rs-border-subtle)] bg-[color:var(--rs-surface-panel)]"
+      }`}
+      data-work-orders-refresh
+      data-work-orders-refresh-state={panelState}
+    >
+      {panelState === "first_unlock" ? (
+        <>
+          <p className="font-display text-xs font-bold uppercase tracking-[0.16em] text-[color:var(--rs-accent-primary)]">
+            New Work Available
+          </p>
+          <p className="mt-1 text-sm leading-relaxed text-[color:var(--rs-text-secondary)]">
+            Your contractor profile now qualifies for conductive repair work.
+          </p>
+          <p className="mt-1 text-sm leading-relaxed text-[color:var(--rs-text-secondary)]">
+            ForceSales Free has unlocked 1 complimentary queue refresh per day. Refresh now to pull
+            from your expanded job pool.
+          </p>
+          <div className="mt-3">
+            <ActionButton
+              data-work-orders-refresh-control
+              disabled={busy}
+              intent="primary"
+              loading={pending}
+              onClick={onRefresh}
+            >
+              Refresh Board — Free
+            </ActionButton>
+          </div>
+        </>
+      ) : null}
+
+      {panelState === "available" ? (
+        <>
+          <p className="font-display text-sm font-semibold text-[color:var(--rs-text-primary)]">
+            ForceSales Free · 1 refresh available today
+          </p>
+          <p className="mt-1 text-sm leading-relaxed text-[color:var(--rs-text-secondary)]">
+            Replaces all unaccepted postings. In Progress work stays put.
+          </p>
+          <div className="mt-3">
+            <ActionButton
+              data-work-orders-refresh-control
+              disabled={busy}
+              intent="secondary"
+              loading={pending}
+              onClick={onRefresh}
+            >
+              Refresh Board
+            </ActionButton>
+          </div>
+        </>
+      ) : null}
+
+      {panelState === "used_today" ? (
+        <>
+          <p className="font-display text-sm font-semibold text-[color:var(--rs-text-primary)]">
+            ForceSales Free · Daily refresh used
+          </p>
+          <p className="mt-1 text-sm leading-relaxed text-[color:var(--rs-text-secondary)]">
+            Additional refreshes require ForceSales Pro.
+          </p>
+          {/* Settled copy, not a real upgrade path (#217): no Pro purchase flow
+              exists, so this line is flavor text, never a control. */}
+          <p className="mt-1 text-sm font-semibold leading-relaxed text-[color:var(--rs-text-secondary)]">
+            Contact your Network Administrator to authorize an upgrade.
+          </p>
+        </>
+      ) : null}
+    </div>
+  );
+}
+
 function blockedCopy(posting: WorkOrderPostingProjection): string {
   switch (posting.blockedReason) {
     case "welding_level":
       return `Needs Welding level ${posting.requiredWeldingLevel}.`;
+    case "refining_level":
+      return `Needs Refining level ${posting.requiredRefiningLevel}.`;
     case "materials": {
       const short = posting.materials.filter((material) => material.carried < material.quantity);
       return `You are short ${short

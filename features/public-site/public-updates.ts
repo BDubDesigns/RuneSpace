@@ -5,6 +5,37 @@ export type { PublicUpdate } from "@/game/schemas/public-updates";
 
 const authoredUpdates = [
   {
+    slug: "network-administrator",
+    title: "I Am the Network Administrator",
+    publishedAt: "2026-09-20T14:00:00-07:00",
+    summary:
+      "Refining 5 turns Galvanic Stock into real client work — eight new jobs at Wade's terminal — and unlocks ForceSales Free's one free queue refresh a day.",
+    body: [
+      "Deep Jag gave you a reason to refine Galvanite into Galvanic Stock. Refining 5 gives you a reason to keep making it: Wade's terminal has eight new jobs that need it, on top of the eight you already know.",
+      "Every one of them goes to somebody already on the board. Greta Voss's countertop cooker joins her heater housing. Bix Weller's old souvenir-shop display joins his sagging shelving. Renn Calder needs his helmet charging rack looked at, on top of the carry frame he already brought you. It is the same eight clients, and now each one has brought a second thing in — Holo Hollow is small enough that a repair shop sees the same names twice.",
+      "One of them is Tansy's. She has had a FurBaby™ companion toy since she was a kid, and its conductive rail and Cell socket have finally given out. She would like it fixed, not replaced, and she is not going to tell you where she got it.",
+      "The originals still pay in Refined Ferrite. This new batch runs on Galvanic Stock — with Refined Ferrite or a Power Cell layered in where the fiction actually calls for it, the same way it always has. Nothing about the eight jobs you already know has changed, and nothing about how you take a job, weld it, or get paid is any different for these.",
+      "Reaching Refining 5 also does something to the terminal itself. It runs ForceSales — commercial software, not something built for Wade, and he is on the free tier. Free tier gets you one thing: a full refresh of every unaccepted posting, once a day, RuneSpace Pacific time. A job already on the bench is never touched by a refresh, whatever else changes around it. There is still no auto-rotation and no reroll on level-up; the board only ever changes because you finished a job or spent your day's refresh.",
+      "Ask Wade about it and he will tell you, in exactly as many words as he ever uses, that ForceSales thinks he should talk to his Network Administrator about upgrading to Pro. He is aware of the joke. He is not upgrading.",
+    ],
+    patchNotes: [
+      {
+        heading: "Added",
+        items: [
+          "Eight new Work Orders at Refining level 5, one more job for each of the eight clients you already know: Greta Voss, Bix Weller, Tansy Rusk, Renn Calder, Otis Mott, Mara Kells, Pell Larkin, and Juno Stemp. All run on Galvanic Stock.",
+          "ForceSales Free's daily board refresh: once you have the board and Refining level 5, refresh every unaccepted posting once per RuneSpace Pacific day. A job already on the bench is never touched.",
+          "A ForceSales topic when you talk to Wade, once the refresh is unlocked — his side of why the yard is still running the free tier.",
+        ],
+      },
+      {
+        heading: "Changed",
+        items: [
+          "The Work Orders terminal now credits ForceSales Free as the software running it, alongside the same job board you already use.",
+        ],
+      },
+    ],
+  },
+  {
     slug: "know-your-character",
     title: "Know Your Character",
     publishedAt: "2026-09-19T17:00:00-07:00",

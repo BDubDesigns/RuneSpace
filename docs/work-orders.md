@@ -10,19 +10,30 @@ who has accepted it can browse the board, accept a posting, Start/Resume
 Welding it, and get paid on completion. See "The unlock" below for why
 acceptance, not turn-in, is the gate.
 
+At **Refining level 5** (issue #217), Galvanic Stock becomes craftable and
+eight more jobs join the eligible pool — the original eight remain eligible
+forever, unchanged, under their existing Welding-only rule. Reaching Refining
+5 also unlocks **ForceSales Free's daily board refresh**: one player-initiated
+full-board refresh per RuneSpace Pacific calendar day, plus an optional Wade
+conversation topic. See "ForceSales daily refresh" below.
+
 This document owns the **content and product** side: the settled board rules,
-the rule for choosing a client, the authored pool of eight level-5 jobs, and
-the payout and XP rules the pool is authored against. The runtime mechanics
-Work Orders share with every other kind of Welding — the Clean Pass cadence,
-the one-bench exclusivity rule, and the offline/Stop/Travel contract — are
-recorded once in `docs/gameplay-foundations.md` and are not repeated here.
+the rule for choosing a client, the authored pool of sixteen jobs, the payout
+and XP rules the pool is authored against, and the ForceSales daily refresh.
+The runtime mechanics Work Orders share with every other kind of Welding — the
+Clean Pass cadence, the one-bench exclusivity rule, and the offline/Stop/Travel
+contract — are recorded once in `docs/gameplay-foundations.md` and are not
+repeated here.
 
 Implementation: `game/content/work-orders.ts` (the pool),
-`game/domain/work-orders.ts` (payout, XP, selection, and the load-time
-validation), `game/config/balance.ts` (`workOrders`, `welding.cleanPass`),
-`server/work-orders.ts` (the durable board and its completion),
-`server/work-order-commands.ts` (Accept/Start/Stop), and `db/rune-space.ts`
-(`character_work_order_postings`).
+`game/domain/work-orders.ts` (payout, XP, eligibility, selection, board
+refresh, and the load-time validation), `game/config/balance.ts`
+(`workOrders`, `welding.cleanPass`), `server/work-orders.ts` (the durable
+board and its completion), `server/work-order-commands.ts` (Accept/Start/
+Stop), `server/work-order-refresh.ts` (ForceSales' daily refresh command),
+`game/domain/daily-reset.ts` (the shared RuneSpace Pacific reset-date
+boundary, also used by the Power Annex), and `db/rune-space.ts`
+(`character_work_order_postings`, `character_work_order_board_refreshes`).
 
 Related: `docs/npc-canon.md` (internal character canon and the client-
 eligibility rule), `docs/holo-hollow.md` (settlement, economy, tone),
@@ -32,8 +43,12 @@ shared offline/Stop/Travel contract Work Orders reuse rather than reimplement).
 
 ## Shipped board rules
 
-- **Exactly 8 authored level-5 jobs** in the pool today (`WORK_ORDERS` in
-  `game/content/work-orders.ts`).
+- **Sixteen authored jobs** in the pool today (`WORK_ORDERS` in
+  `game/content/work-orders.ts`): the original eight, Welding-5-only forever,
+  plus eight more that additionally require **Refining 5** (#217). A job's
+  optional `requiredRefiningLevel` is the only new field — there is no runtime
+  "tier" concept, and the two groups are not stored, selected, or eligibility-
+  checked any differently from each other beyond that one extra comparison.
 - **Exactly 3 distinct posted jobs** visible at once (`workOrders.postedSlots`).
 - **One active Work Order per character**, enforced as a database invariant, not
   merely a rule every command has to remember: `character_work_order_postings`
@@ -52,21 +67,30 @@ shared offline/Stop/Travel contract Work Orders reuse rather than reimplement).
   bench is finishing it. Every rule below that used to describe abandonment as
   a second clearing path has been removed rather than reworded, because the
   design was explicitly dropped, not merely renamed.
-- No real-time rotation, daily reset, cooldown, or manual refresh: a slot's job
-  changes only when that slot's job is completed.
+- **No automatic rotation, ever.** Midnight, a level-up, or reaching Refining 5
+  never mutates a posted slot on its own. A slot's job changes only when that
+  slot's job is completed, or the player deliberately spends their day's
+  ForceSales refresh (see "ForceSales daily refresh" below). Leaving the board
+  alone forever leaves it exactly as durable as it always has been.
 - A refill never duplicates another currently posted job, and never
   immediately redraws the job just completed while another eligible option
   exists (`selectWorkOrderRefill`; see "Selection and refill" below).
-- Welding level expands the eligible pool later; **lower-level jobs stay
-  eligible forever** (`eligibleWorkOrders` filters by `>=`, never by exact
-  tier).
-- Low-level jobs use **Refined Ferrite** as their base repair material; two of
-  the eight (Tansy's and Otis's) also require **Power Cell**, because their
-  fiction is that a Cell was physically destroyed, not because higher-level
-  jobs have arrived yet. Every job in the pool is level 5 today, so the pool's
-  own gate and the board's minimum Welding level
-  (`workOrders.requiredWeldingLevel`, also 5) coincide until a higher-level
-  job is authored.
+- Welding level (and, since #217, Refining level for the jobs that author a
+  floor) expands the eligible pool later; **lower-level jobs stay eligible
+  forever** (`eligibleWorkOrders` filters both by `>=`, never by exact tier).
+- The original eight use **Refined Ferrite** as their base repair material;
+  two of them (Tansy's and Otis's) also require **Power Cell**, because their
+  fiction is that a Cell was physically destroyed. All eight remain Welding
+  level 5 only, so the pool's own gate and the board's minimum Welding level
+  (`workOrders.requiredWeldingLevel`, also 5) coincide for that group.
+- The eight Refining-5+ jobs (#217) use **Galvanic Stock** as their base
+  conductive-repair material — the reason Refining 5 matters at all, since
+  the material is what a repair genuinely needs rather than a label for "the
+  new tier". Four of them (Mott, Kells, Larkin, Stemp) also require
+  **Refined Ferrite** for structural members, and three (Tansy, Larkin,
+  Stemp) also require **Power Cell** because their fiction destroys one,
+  following the same "material follows the fiction" rule as the original
+  eight.
 - Real Work Orders use genuine Welding and pay **40% of the global Welding
   XP per section** — double Practice's share, well under an authored story
   repair's full rate. See "Welding XP" below.
@@ -79,7 +103,7 @@ shared offline/Stop/Travel contract Work Orders reuse rather than reimplement).
 > **Repeatable Work Orders are shop jobs, not miniature Missions. Their
 > completion does not carry bespoke client dialogue.**
 
-None of the eight jobs authors a completion scene. Completion is a database
+None of the sixteen jobs authors a completion scene. Completion is a database
 transaction (`completeActiveWorkOrder`): it pays the Credits, credits the
 Mission's generic `work_order` tracked-activity counter, and refills the slot,
 all under the guard of the same update that claims the completion — so a retry
@@ -236,6 +260,128 @@ table, or something else):
   them lazily on the first authoritative touch after acceptance, exactly as
   Practice's row is seeded lazily), so nothing needed backfilling when the
   table shipped.
+- **ForceSales' daily refresh entitlement is a separate table**
+  (`character_work_order_board_refreshes`, #217), not a new column here: a
+  refresh row's job is "has this character used today's refresh", which has
+  nothing to do with what any individual slot currently holds, and folding it
+  into this table would only tie two unrelated facts together. Its primary key
+  is `(character_id, reset_date)`, so committing it is exactly the
+  "insert-or-lose-the-race" shape the entitlement needs.
+
+## ForceSales daily refresh
+
+The Work Orders terminal runs **ForceSales**, a generic commercial SaaS
+product — not software built specifically for Wade or Rusk Recovery. Wade
+uses the free tier, and the terminal names it as restrained secondary flavor
+("Powered by ForceSales Free") without renaming the panel's own identity away
+from Work Orders.
+
+At **Refining level 5, once the board is also unlocked** (10,001 Hours
+accepted), ForceSales Free exposes one small player-controlled action: a
+manual full-board refresh, once per **RuneSpace Pacific calendar day**
+(`America/Los_Angeles`), per character. Reaching Refining 5 before the board
+is unlocked, or the reverse, both resolve correctly: the refresh becomes
+available the moment both conditions hold, with no missed window either way
+(`refreshWorkOrderBoard` in `server/work-order-refresh.ts` checks both
+authoritatively, alongside the board's existing location/Travel access rule).
+
+### What one refresh does
+
+- **Replaces every currently unaccepted posting at once.** With no active job,
+  all 3 postings are replaced; with one **In Progress**, that posting is
+  preserved exactly — never removed, rerolled, reset, or touched — and the
+  other 2 are replaced.
+- **Refreshing while a job is In Progress is explicitly allowed.** It is not
+  treated as the bench being "busy" the way accepting a second job is.
+- **Selection reuses the board's existing distinct-posting rule**, generalized
+  to a whole batch (`selectWorkOrderBoardRefresh` in
+  `game/domain/work-orders.ts`): each replacement excludes the active posting,
+  every posting being refreshed, and any replacement already chosen earlier in
+  the same refresh, so a refresh cannot draw one job into two slots. When
+  those exclusions would leave a slot with no eligible option, the
+  just-cleared jobs become drawable again for that slot only — the same
+  graceful-fallback shape `selectWorkOrderRefill` already uses for a single
+  slot, applied slot by slot across the batch.
+- **The entitlement is consumed only when the replacement genuinely commits.**
+  A refused command, a network interruption, or a rolled-back transaction
+  never burns the day's refresh (`commitWorkOrderBoardRefresh` in
+  `server/work-orders.ts` inserts the day's entitlement row with
+  `onConflictDoNothing` and only then updates the board rows, inside the same
+  transaction the rest of the command runs in — a lost race reports
+  `already_refreshed_today` rather than double-spending).
+- **Midnight itself never touches a posting.** The daily boundary restores
+  refresh *eligibility* only; an untouched board stays exactly as durable as
+  it always has been if the player never presses Refresh.
+
+### Shared daily-reset boundary
+
+The Pacific calendar-day calculation is shared with the Power Annex, not
+duplicated: `pacificResetDate` now lives in `game/domain/daily-reset.ts`
+(`RUNESPACE_RESET_TIME_ZONE = "America/Los_Angeles"`), and
+`game/domain/power-annex.ts` re-exports it under its original name so every
+existing Annex import, and its DST/local-midnight test coverage, is unchanged.
+The refresh's own entitlement is still its own table
+(`character_work_order_board_refreshes`, keyed on `character_id, reset_date`)
+rather than folded into the Annex's claims table — the two features consume
+their reset date the same way without sharing persistence that has no reason
+to be shared.
+
+### First-ever refresh: the NEW treatment
+
+The refresh area shows a **NEW WORK AVAILABLE** treatment the first time a
+character becomes eligible for it, and keeps showing it — across reconnects,
+logins, and days — until that character's **first successful refresh ever**
+commits. This is derived from durable refresh history
+(`loadWorkOrderRefreshState`: "does any row exist for this character at all,
+regardless of date") rather than a standalone tutorial-seen flag or a
+one-frame level-up event that could be missed.
+
+### Settled UI copy
+
+The terminal shows exactly one of these states, chosen from the authoritative
+projection (`WorkOrderRefreshProjection` in `server/play.ts`) alone:
+
+**First-unlock** (`firstUnlock && availableToday`):
+
+> **NEW WORK AVAILABLE**
+> Your contractor profile now qualifies for conductive repair work.
+>
+> ForceSales Free has unlocked 1 complimentary queue refresh per day. Refresh
+> now to pull from your expanded job pool.
+>
+> **Refresh Board — Free**
+
+**Normal available** (`!firstUnlock && availableToday`):
+
+> **ForceSales Free · 1 refresh available today**
+> Replaces all unaccepted postings. In Progress work stays put.
+>
+> **Refresh Board**
+
+**Used for today** (`!availableToday`):
+
+> **ForceSales Free · Daily refresh used**
+> Additional refreshes require ForceSales Pro.
+> Contact your Network Administrator to authorize an upgrade.
+
+There is deliberately **no Upgrade button** here — ForceSales Pro is a joke
+about Wade, not a purchasable feature, and no paid or additional-refresh path
+exists.
+
+**Successful refresh:**
+
+> Queue refreshed. New postings loaded.
+
+### Wade's ForceSales topic
+
+Wade gains one optional, replayable conversation topic once the board is
+unlocked **and** the character has reached Refining 5 — the same
+`refresh.unlocked` fact the terminal itself reads, via the conversation
+resolver's `work_orders_refresh_unlocked` availability kind
+(`game/domain/conversation.ts`). It is flavor, not a Mission, tutorial
+requirement, or forced interruption; the player character stays silent
+throughout, per the shipped topic model (`game/content/dialogue.ts`,
+`DIALOGUE_IDS.wadeForceSalesTopic`).
 
 ## Choosing a client
 
@@ -289,7 +435,9 @@ possessions unless a job actually requires them. Some of these names may become
 useful for future NPCs or Missions; others stay background residents forever.
 Both outcomes are fine — ordinary residents are allowed to simply exist.
 
-## The pool — eight level-5 Work Orders
+## The pool — sixteen Work Orders
+
+### The original eight (Welding 5)
 
 Common to all eight, and therefore not repeated per job:
 
@@ -331,14 +479,18 @@ extra features, or second inventory of that person's tools.
 
 ### Authoring material ranges — guidance only, not a runtime concept
 
-Jobs were authored against three rough sizes: **short** (2-4 Refined Ferrite),
-**medium** (3-6), and **long** (4-8). These ranges are recorded here as
-guidance for whoever authors the ninth job, so a new job lands in a size the
-pool doesn't already have plenty of — they are **not** stored anywhere in the
-runtime pool. Nothing in `WorkOrderDefinition` carries a size label; a job's
-scale is expressed purely through its `materials` and `sections`, and the
-ranges above may be revised or ignored entirely once a real ninth job proves
-what the next size needs.
+The original eight were authored against three rough sizes: **short** (2-4
+Refined Ferrite), **medium** (3-6), and **long** (4-8). The Refining-5+ eight
+(#217) instead range **2-5 Galvanic Stock**, **4-6 Refined Ferrite** where a
+job also needs one, and **1-2 Power Cell** where a job also needs one — a
+separate scale for a separate material family, not a continuation of the
+Ferrite ranges above. Both sets of ranges are recorded here as guidance for
+whoever authors the next job in either family, so it lands in a size that
+family doesn't already have plenty of — they are **not** stored anywhere in
+the runtime pool. Nothing in `WorkOrderDefinition` carries a size label; a
+job's scale is expressed purely through its `materials` and `sections`, and
+either set of ranges may be revised or ignored entirely once a real new job
+proves what the next size needs.
 
 ### 1. Cracked Cutter Housing
 
@@ -524,6 +676,147 @@ what the next size needs.
   somebody's trade, which is deliberate: the shop serves the town, not only its
   workers.
 
+### The Refining-5+ pool (Welding 5 + Refining 5) — #217
+
+Common to all eight, and therefore not repeated per job:
+
+- **Minimum Welding level:** 5 (the same floor as the original eight).
+- **Minimum Refining level:** 5 — the only new field on `WorkOrderDefinition`,
+  `requiredRefiningLevel`, checked by `eligibleWorkOrders` alongside the
+  existing Welding comparison and authoritatively revalidated by
+  `acceptWorkOrder` server-side exactly as Welding already is.
+- **Repair material family:** Galvanic Stock, with Refined Ferrite added for
+  structural members and/or Power Cell added where the fiction destroys one
+  (see the per-job list above).
+- **Every client here already has a job in the original eight.** Reusing them
+  is deliberate worldbuilding — Holo Hollow is small enough that one person
+  plausibly brings a shop two different repairs over time — not a shortage of
+  names, and none of the four background clients (Voss, Mott, Larkin, Stemp)
+  is promoted to the interactable NPC roster by receiving a second job.
+- **Progression prerequisite:** none beyond the board's own gate plus Welding
+  5 and Refining 5. No job below needs a prerequisite of its own.
+
+The complete shipped recipe, length, and payout for each job
+(`game/content/work-orders.ts`; validated against the same payout rule at
+module load):
+
+| Job | Client | Materials | Sections | Payout |
+| --- | --- | --- | --- | --- |
+| Countertop Cooker (`voss_countertop_cooker`) | Greta Voss | 2 Galvanic Stock | 10 | 95 |
+| Powered Souvenir Display (`bix_souvenir_display`) | Bix Weller | 3 Galvanic Stock | 11 | 120 |
+| FurBaby™ Repair (`tansy_furbaby_repair`) | Tansy Rusk | 2 Galvanic Stock + 1 Power Cell | 12 | 110 |
+| Helmet Charging Rack (`renn_helmet_rack`) | Renn Calder | 4 Galvanic Stock | 13 | 145 |
+| Portable Cargo Scale (`mott_cargo_scale`) | Otis Mott | 3 Galvanic Stock + 4 Refined Ferrite | 15 | 175 |
+| B&B Linen Press (`mara_linen_press`) | Mara Kells | 3 Galvanic Stock + 5 Refined Ferrite | 16 | 190 |
+| Powered Cable Puller (`larkin_cable_puller`) | Pell Larkin | 4 Galvanic Stock + 5 Refined Ferrite + 1 Power Cell | 18 | 225 |
+| Speeder Power Cradle (`stemp_speeder_cradle`) | Juno Stemp | 5 Galvanic Stock + 6 Refined Ferrite + 2 Power Cell | 20 | 270 |
+
+#### Countertop Cooker
+
+- **Client:** Greta Voss — *background resident*, already established via
+  Cracked Heater Housing above.
+- **Item:** her old induction-style countertop cooker, split at its
+  conductive support ring.
+- **New Work Order canon:** Greta owns a countertop cooker in addition to her
+  established room heater. Nothing else — no new occupation, home, or family.
+- **Why the pairing works:** a second ordinary Power-Cell appliance failing is
+  exactly her established register — domestic need, not a trade.
+
+#### Powered Souvenir Display
+
+- **Client:** Bix Weller — *established NPC*.
+- **Item:** one of Holo Hollow Souvenirs' old rotating, lighted tourism-era
+  displays, with a failed conductive rail.
+- **New Work Order canon:** the shop has an old powered display fixture in
+  addition to the established shelving. Bix keeps it running rather than
+  replacing it.
+- **Why the pairing works:** it is the same "tourism-era fixtures outliving
+  their purpose" characterization as the Sagging Shelf Bay, applied to a
+  second object rather than restated on the same one.
+
+#### FurBaby™ Repair
+
+- **Client:** Tansy Rusk — *established NPC*.
+- **Item:** her **FurBaby™** animatronic companion toy, which she has had
+  since she was little — a failing conductive rail and a burned-out Cell
+  socket.
+- **New Work Order canon:** Tansy owns and has long owned a FurBaby™ toy.
+  **Protected canon — do not violate:** it is approved and safe to say she has
+  had it since childhood; it is **not** approved to reveal or imply that her
+  parents gave it to her. Her parents and that history remain internal,
+  unshipped canon for a later authored reveal (`docs/npc-canon.md`, Tansy
+  Rusk).
+- **Why the pairing works:** a mechanic who builds her own equipment from
+  mismatched salvage keeping a childhood object running the same way is
+  consistent with her established engineering style, without touching the
+  protected family history that object could otherwise imply.
+
+#### Helmet Charging Rack
+
+- **Client:** Renn Calder — *established NPC*.
+- **Item:** the charging rack for his mining helmet, lamp, and comms gear —
+  a cracked power rail, with the rest of the rack still sound.
+- **New Work Order canon:** Renn owns a charging rack for his own gear, in
+  addition to his established carry frame. Ordinary miner equipment; nothing
+  else is implied about a home, vehicle, or business.
+- **Why the pairing works:** the same unglamorous, understated register as
+  the Split Carry Frame — plain kit a working miner would own and use daily.
+
+#### Portable Cargo Scale
+
+- **Client:** Otis Mott — *background resident*, already established via
+  Electric Cargo Dolly above.
+- **Item:** his portable freight/cargo scale — a bent platform frame and a
+  damaged load-sensing rail.
+- **New Work Order canon:** Otis owns a cargo scale in addition to his
+  established electric dolly. Refined Ferrite repairs the bent frame;
+  Galvanic Stock repairs the sensing/conductive hardware — a mechanical split,
+  not an arbitrary one.
+- **Why the pairing works:** a hauler plausibly owns more than one piece of
+  cargo-handling equipment, and this job needs no new biography to justify it.
+
+#### B&B Linen Press
+
+- **Client:** Mara Kells — *established NPC*.
+- **Item:** HH B&B's old commercial linen press — a warped heated-platen
+  support and a conductive rail separating from the frame.
+- **New Work Order canon:** the B&B has a commercial linen press in addition
+  to its established bed frames. Refined Ferrite handles the platen support;
+  Galvanic Stock handles the conductive rail.
+- **Why the pairing works:** it quietly deepens the B&B as a working inn
+  (laundry infrastructure, not just rooms) exactly the way the Tourist-Era Bed
+  Frame already does.
+
+#### Powered Cable Puller
+
+- **Client:** Pell Larkin — *background resident*, already established via
+  Binding Hand Winch above.
+- **Item:** his mining-crew powered cable puller — damage to its mounting
+  frame, its current rail, and its powered assembly.
+- **New Work Order canon:** Pell owns a *second*, powered piece of crew
+  equipment in addition to his established manual hand winch. The contrast
+  (manual vs. powered) is deliberate and is the entire characterization this
+  job adds — nothing else about Pell is expanded.
+- **Why the pairing works:** a mining crew plausibly has both manual and
+  powered gear, and pairing the two jobs for one person makes that contrast
+  legible without inventing a new person.
+
+#### Speeder Power Cradle
+
+- **Client:** Juno Stemp — *background resident*, already established via
+  Speeder Cargo Rack above.
+- **Item:** her speeder's frame and the conductive bus around its drive and
+  Cell cradle — twisted and damaged by a hard landing.
+- **New Work Order canon:** the same established speeder from Speeder Cargo
+  Rack, now with drive/Cell-cradle damage instead of cargo-rack damage. **20
+  sections**, the longest job in either pool, because she runs deliveries and
+  cannot be down long — urgency expressed through scale, not through new
+  dialogue or a portrait. Juno remains a background client with no authored
+  dialogue, map presence, or portrait.
+- **Why the pairing works:** it is the same established vehicle failing in a
+  different, plausible way, which is exactly what "a real local repair
+  business has repeat customers" means in practice.
+
 ## Background residents introduced by this pool
 
 | Name | Pronouns | Occupation | The one possession the job needs |
@@ -539,6 +832,12 @@ to fill in while writing something else — if a job or a line seems to need mor
 it does not get invented here. None of them is on the NPC roster, and none gets a
 portrait, dialogue, map presence, or Wiki page
 (`docs/npc-canon.md`, "Background Work Order clients are not roster NPCs").
+
+Each of these four now has **two** authored jobs (the Refining-5+ pool reuses
+every client from the original eight; see above). Receiving a second job does
+**not** promote any of them off this table or onto the interactable NPC
+roster — the same "background residents are allowed to simply exist" rule
+applies regardless of how many jobs a client has.
 
 They stay background residents unless somebody deliberately promotes one. Later
 authored content **may** establish new facts about them — that is a deliberate
@@ -561,8 +860,9 @@ just finished:
   visible jobs and the job just completed would leave nothing, the just-cleared
   job becomes drawable again rather than leaving the slot empty. That
   precedence — never duplicate a visible posting, relax the just-completed
-  exclusion first — cannot actually trigger against the current eight-job pool,
-  because lower-level jobs stay eligible forever and the pool only grows.
+  exclusion first — cannot actually trigger against the current sixteen-job
+  pool, because lower-level jobs stay eligible forever and the pool only
+  grows.
 - There is deliberately **no weighting, normalization, or per-client cap.** A
   client with more authored jobs simply appears more often on the board, which
   is the content saying they use Wade's shop more. Nothing compensates for one
@@ -580,10 +880,11 @@ of one person's jobs appearing among the three visible postings at once is
 - weighting or normalizing selection by client;
 - compensation for one client having more authored jobs than another.
 
-**All eight clients in the current pool happen to be distinct**, so no board
-drawn from *this* pool can show the same person twice today. That is an
-incidental property of the current eight, **not a board rule**, and adding a
-second job for an existing client would not need any of the above to change.
+**Every client in the current sixteen-job pool has two authored jobs** (#217
+paired each Refining-5+ job with an existing client rather than introducing a
+new one), so a board — or a refresh — showing the same person's two different
+jobs at once is expected, not a bug. Nothing above needed to change when that
+happened: job identity, never client identity, was always the rule.
 
 ## Runtime validation
 
@@ -597,16 +898,19 @@ instead of reaching a player as a wrong payout or an unpayable recipe:
 | Unique `id` | Two jobs cannot silently collide |
 | Non-empty `title`, `clientName`, `description` | No blank board copy |
 | Positive integer `requiredWeldingLevel` and `sections` | No zero-length or negative job |
+| Positive integer `requiredRefiningLevel`, when authored | No zero or fractional Refining floor (#217) |
 | At least one material, no item named twice, every item a known stackable | No unpayable or malformed recipe |
 | `payoutCredits` equals `workOrderPayoutCredits(definition)` | A stored payout can never drift from the rule that derives it |
 | Pool size `>= postedSlots + 1` (currently 4) | A board of 3 distinct postings plus one non-repeating refill is always possible |
 
-Eight jobs against a minimum pool of four leaves four jobs of headroom, so the
-selection rules never deadlock at the current pool size.
+Sixteen jobs against a minimum pool of four leaves twelve jobs of headroom, so
+the selection rules never deadlock at the current pool size — comfortably true
+even restricted to just the eight Welding-only or the eight Refining-5+ jobs
+considered alone.
 
 There is deliberately **no minimum section count** beyond one. The generalized
 Clean Pass cadence supports zero opportunities below its own authored minimum
 length (`docs/gameplay-foundations.md`), so a job shorter than that simply has
-none — that is the cadence working as specified, not a malformed job. All eight
-current jobs are 8 sections or longer, which is authoring taste rather than a
-rule the validator enforces.
+none — that is the cadence working as specified, not a malformed job. All
+sixteen current jobs are 8 sections or longer, which is authoring taste rather
+than a rule the validator enforces.

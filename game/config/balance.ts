@@ -293,6 +293,16 @@ const balanceSchema = z.object({
       materialPremiumBps: z.literal(11_000),
       roundUpToCredits: z.literal(5),
     }),
+    /**
+     * ForceSales' daily full-board refresh (#217): one manual refresh per
+     * RuneSpace Pacific reset date, once the board is unlocked and the
+     * character has reached this Refining level. A per-job `requiredRefiningLevel`
+     * (`game/content/work-orders`) is what actually gates the new jobs
+     * themselves; this is the separate, smaller gate on the refresh feature.
+     */
+    refresh: z.object({
+      requiredRefiningLevel: z.literal(5),
+    }),
   }),
   travel: z.object({
     actionId: z.literal(ACTION_IDS.travel),
@@ -551,6 +561,9 @@ const defaults = balanceSchema.parse({
       creditsPerSection: 3,
       materialPremiumBps: 11_000,
       roundUpToCredits: 5,
+    },
+    refresh: {
+      requiredRefiningLevel: 5,
     },
   },
   travel: {
