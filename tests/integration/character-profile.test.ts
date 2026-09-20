@@ -173,6 +173,7 @@ suite("issue #64 character profile read boundary (real PostgreSQL)", () => {
           xpIntoLevel: 0,
           xpToNextLevel: 550,
           atMaximumLevel: false,
+          accentTone: "mining",
         },
         {
           displayName: "Refining",
@@ -181,6 +182,7 @@ suite("issue #64 character profile read boundary (real PostgreSQL)", () => {
           xpIntoLevel: 0,
           xpToNextLevel: 500,
           atMaximumLevel: false,
+          accentTone: "refining",
         },
         {
           displayName: "Welding",
@@ -189,6 +191,7 @@ suite("issue #64 character profile read boundary (real PostgreSQL)", () => {
           xpIntoLevel: 0,
           xpToNextLevel: 500,
           atMaximumLevel: false,
+          accentTone: "welding",
         },
       ],
       portrait: {

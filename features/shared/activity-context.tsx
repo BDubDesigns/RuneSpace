@@ -1,5 +1,6 @@
 "use client";
 
+import { skillAccentColor, type SkillAccentTone } from "@/components/ui/skill-accent";
 import { formatMassGrams } from "@/game/domain/mass";
 
 /**
@@ -19,16 +20,6 @@ import { formatMassGrams } from "@/game/domain/mass";
  * showing every fact it could reach would just rebuild the card these replace.
  */
 
-export type SkillTone = "mining" | "refining" | "welding";
-
-function toneAccent(tone: SkillTone) {
-  return tone === "refining"
-    ? "var(--rs-accent-arcane)"
-    : tone === "welding"
-      ? "var(--rs-accent-primary)"
-      : "var(--rs-accent-mining)";
-}
-
 /**
  * One line of skill progression: which skill, what level, how far to the next.
  *
@@ -45,11 +36,11 @@ export function SkillProgressRow({
 }: {
   level: number;
   skill: string;
-  tone: SkillTone;
+  tone: SkillAccentTone;
   xpIntoLevel: number;
   xpToNextLevel?: number;
 }) {
-  const accent = toneAccent(tone);
+  const accent = skillAccentColor(tone) ?? "var(--rs-accent-primary)";
   const percent = xpToNextLevel
     ? Math.min(100, (xpIntoLevel / (xpIntoLevel + xpToNextLevel)) * 100)
     : 100;

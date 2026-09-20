@@ -124,5 +124,6 @@ export async function getCharacterProfile(
     skillXp: [...xpBySkill].map(([skillId, totalXp]) => ({ skillId, totalXp })),
     levelThresholds: skillLevelThresholds,
     skillDisplayName: (skillId) => getSkillPresentation(skillId)?.displayName,
+    skillAccentTone: (skillId) => getSkillPresentation(skillId)?.accentTone,
   });
 }

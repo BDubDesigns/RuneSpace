@@ -1,4 +1,4 @@
-import { expect, test, openMapSurface, openTestCharacter } from "./fixtures";
+import { expect, test, openMapSurface, openTestCharacter, resolvedCssVarColor } from "./fixtures";
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import * as authSchema from "@/db/auth-schema";
@@ -160,6 +160,17 @@ profileTest(
     ).toHaveAttribute("aria-valuenow", "0");
     await expect(skillRow.getByText(/^Refining — Level 1$/)).toBeVisible();
     await expect(skillRow.getByText(/^Welding — Level 1$/)).toBeVisible();
+
+    // Nearby Player profiles share CharacterSkillList with the Character modal
+    // (#215): the same canonical accent identity applies here too, on both the
+    // name/level line and the XP fill.
+    const miningColor = await resolvedCssVarColor(page, "--rs-skill-mining");
+    const miningRow = skillRow.filter({ hasText: /^Mining — Level 2/ });
+    await expect(miningRow.locator("p").first()).toHaveCSS("color", miningColor);
+    await expect(miningRow.getByRole("progressbar").locator("> div")).toHaveCSS(
+      "background-color",
+      miningColor,
+    );
 
     // No private account information appears anywhere in the panel.
     await expect(panel.getByText("@")).toHaveCount(0);

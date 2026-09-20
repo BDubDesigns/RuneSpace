@@ -20,6 +20,12 @@
   --rs-accent-mining: #f5c451;
   --rs-accent-arcane: #c48cff;
   --rs-accent-danger: #f16c75;
+  /* Canonical player-facing skill accent identity (issue #215): progression
+     surfaces consume these, never the underlying accent tokens directly, so a
+     skill's hue can change without redefining a generic accent. */
+  --rs-skill-mining: var(--rs-accent-mining);
+  --rs-skill-refining: var(--rs-accent-arcane);
+  --rs-skill-welding: var(--rs-accent-primary);
   --rs-comms-tint: rgb(93 151 105 / 0.2);
   --rs-comms-scanline: rgb(190 255 184 / 0.16);
   --rs-comms-label: #b9e8aa;

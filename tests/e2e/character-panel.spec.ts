@@ -4,7 +4,7 @@ import { characterSkillXp, characters } from "@/db/rune-space";
 import { getEffectiveGameBalance, standardSkillLevelThresholds } from "@/game/config/balance";
 import { SKILL_IDS } from "@/game/config/foundations";
 import { getSkillPresentation } from "@/game/content/skill-presentation";
-import { expect, openTestCharacter, test } from "./fixtures";
+import { expect, openTestCharacter, resolvedCssVarColor, test } from "./fixtures";
 import { captureReviewScreenshot } from "./review-screenshot";
 
 /**
@@ -87,6 +87,35 @@ test("the Character destination shows identity, canonical level, Credits, and ev
     skillRows.filter({ hasText: /^Mining — Level 4/ }).getByRole("progressbar"),
   ).toBeVisible();
   await expect(dialog.getByRole("progressbar")).toHaveCount(expectedSkills.length);
+
+  // Each skill's canonical accent (#215): the name/level line and the XP fill
+  // both carry it, and the three skills stay visually distinct rather than
+  // collapsing to the same neutral or default color.
+  const [miningColor, refiningColor, weldingColor] = await Promise.all([
+    resolvedCssVarColor(page, "--rs-skill-mining"),
+    resolvedCssVarColor(page, "--rs-skill-refining"),
+    resolvedCssVarColor(page, "--rs-skill-welding"),
+  ]);
+  expect(new Set([miningColor, refiningColor, weldingColor]).size).toBe(3);
+
+  const miningRow = skillRows.filter({ hasText: /^Mining — Level 4/ });
+  const refiningRow = skillRows.filter({ hasText: /^Refining — Level 2/ });
+  const weldingRow = skillRows.filter({ hasText: /^Welding — Level 1/ });
+  await expect(miningRow.locator("p").first()).toHaveCSS("color", miningColor);
+  await expect(refiningRow.locator("p").first()).toHaveCSS("color", refiningColor);
+  await expect(weldingRow.locator("p").first()).toHaveCSS("color", weldingColor);
+  await expect(miningRow.getByRole("progressbar").locator("> div")).toHaveCSS(
+    "background-color",
+    miningColor,
+  );
+  await expect(refiningRow.getByRole("progressbar").locator("> div")).toHaveCSS(
+    "background-color",
+    refiningColor,
+  );
+  await expect(weldingRow.getByRole("progressbar").locator("> div")).toHaveCSS(
+    "background-color",
+    weldingColor,
+  );
 
   await captureReviewScreenshot(page, "character-panel-mobile.png");
 });

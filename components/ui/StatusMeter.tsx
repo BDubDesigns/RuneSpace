@@ -2,10 +2,13 @@ export function StatusMeter({
   label,
   value,
   detail,
+  accentColor,
 }: {
   label: string;
   value: number;
   detail: string;
+  /** Overrides the default `--rs-accent-primary` fill, e.g. a skill's canonical accent (#215). */
+  accentColor?: string;
 }) {
   return (
     <div className="min-w-0">
@@ -22,8 +25,8 @@ export function StatusMeter({
         role="progressbar"
       >
         <div
-          className="h-full bg-[color:var(--rs-accent-primary)]"
-          style={{ width: `${value}%` }}
+          className={accentColor ? "h-full" : "h-full bg-[color:var(--rs-accent-primary)]"}
+          style={{ width: `${value}%`, ...(accentColor ? { background: accentColor } : {}) }}
         />
       </div>
     </div>

@@ -1,6 +1,7 @@
 "use client";
 
 import { StatusMeter } from "@/components/ui/StatusMeter";
+import { skillAccentColor } from "@/components/ui/skill-accent";
 import type { CharacterSkillProgression } from "@/game/domain/character-progression";
 
 /**
@@ -28,32 +29,39 @@ export function CharacterSkillList({
 }) {
   return (
     <ul className={`space-y-3 ${className}`}>
-      {skills.map((skill) => (
-        <li className="min-w-0" data-character-skill key={skill.displayName}>
-          <p className="font-display text-sm font-bold text-[color:var(--rs-text-primary)]">
-            {skill.displayName} — Level {skill.level}
-          </p>
-          {skill.xpToNextLevel === undefined ? (
-            <p className="mt-1 text-xs text-[color:var(--rs-text-muted)]">
-              Maximum level reached — {skill.totalXp.toLocaleString()} total XP
+      {skills.map((skill) => {
+        const accent = skillAccentColor(skill.accentTone);
+        return (
+          <li className="min-w-0" data-character-skill key={skill.displayName}>
+            <p
+              className="font-display text-sm font-bold"
+              style={{ color: accent ?? "var(--rs-text-primary)" }}
+            >
+              {skill.displayName} — Level {skill.level}
             </p>
-          ) : (
-            <div className="mt-1">
-              <StatusMeter
-                detail={`${skill.xpToNextLevel} XP to next level`}
-                label={`${skill.displayName} XP`}
-                value={Math.min(
-                  100,
-                  (skill.xpIntoLevel / (skill.xpIntoLevel + skill.xpToNextLevel)) * 100,
-                )}
-              />
+            {skill.xpToNextLevel === undefined ? (
               <p className="mt-1 text-xs text-[color:var(--rs-text-muted)]">
-                {skill.totalXp.toLocaleString()} total XP · {skill.xpIntoLevel} XP into this level
+                Maximum level reached — {skill.totalXp.toLocaleString()} total XP
               </p>
-            </div>
-          )}
-        </li>
-      ))}
+            ) : (
+              <div className="mt-1">
+                <StatusMeter
+                  accentColor={accent}
+                  detail={`${skill.xpToNextLevel} XP to next level`}
+                  label={`${skill.displayName} XP`}
+                  value={Math.min(
+                    100,
+                    (skill.xpIntoLevel / (skill.xpIntoLevel + skill.xpToNextLevel)) * 100,
+                  )}
+                />
+                <p className="mt-1 text-xs text-[color:var(--rs-text-muted)]">
+                  {skill.totalXp.toLocaleString()} total XP · {skill.xpIntoLevel} XP into this level
+                </p>
+              </div>
+            )}
+          </li>
+        );
+      })}
     </ul>
   );
 }

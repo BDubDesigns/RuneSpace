@@ -279,6 +279,24 @@ export async function openNpcDialogue(page: Page, npcName: string, entryName: st
 }
 
 /**
+ * Resolve a `--rs-*` custom property to its computed color, the way
+ * `expectExteriorMissionHalo`'s neutral-surface probe does: exact token hex
+ * values are not a durable contract, but this lets a test compare what an
+ * element actually painted against the canonical token it's supposed to
+ * carry (see issue #215's skill-accent coverage).
+ */
+export async function resolvedCssVarColor(page: Page, cssVar: string): Promise<string> {
+  return page.evaluate((varName) => {
+    const probe = document.createElement("span");
+    probe.style.color = `var(${varName})`;
+    document.body.append(probe);
+    const resolved = getComputedStyle(probe).color;
+    probe.remove();
+    return resolved;
+  }, cssVar);
+}
+
+/**
  * Prove a Mission-guided beveled control really paints its exterior halo.
  *
  * The guidance state lives on the button, but the button's own `.rs-bevel`

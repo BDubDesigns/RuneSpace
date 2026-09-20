@@ -54,6 +54,8 @@ export function projectCharacterProfile(input: {
   skillXp: readonly { skillId: string; totalXp: number }[];
   levelThresholds: (skillId: string) => readonly LevelThreshold[] | undefined;
   skillDisplayName: (skillId: string) => string | undefined;
+  /** The authoritative accent-tone source per skill (issue #215). */
+  skillAccentTone?: (skillId: string) => string | undefined;
   /** Defaults to every skill the game defines. */
   skillIds?: readonly string[];
   /** Persisted portrait ID (nullable for legacy characters). */
@@ -65,6 +67,7 @@ export function projectCharacterProfile(input: {
     skillXp: input.skillXp,
     levelThresholds: input.levelThresholds,
     skillDisplayName: input.skillDisplayName,
+    ...(input.skillAccentTone ? { skillAccentTone: input.skillAccentTone } : {}),
     ...(input.skillIds ? { skillIds: input.skillIds } : {}),
   });
 

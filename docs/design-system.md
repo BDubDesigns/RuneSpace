@@ -14,6 +14,27 @@ Translucent tokens: a Tailwind slash-opacity modifier such as `bg-[color:var(--r
 
 `components/ui/` contains presentational primitives only: panels, headings, actions, form fields, feedback, status meters, and the responsive shell. Intent variants use `primary`, `secondary`, `success`, `mining`, `arcane`, and `danger`; use the semantic intent, never a visual hex value.
 
+## Canonical skill accent identity (Issue #215)
+
+Each player-facing skill has exactly one accent identity, defined once at
+`game/content/skill-presentation.ts` as a stable semantic `accentTone`
+(`"mining"`, `"refining"`, `"welding"`) — content names the tone, never a CSS
+value. `app/globals.css` owns the tone → underlying accent redirection
+(`--rs-skill-mining`, `--rs-skill-refining`, `--rs-skill-welding`, aliasing the
+existing `--rs-accent-*` tokens today), and `components/ui/skill-accent.ts`'s
+`skillAccentColor` is the one place a tone resolves to a color. A skill with no
+approved tone (Strength; a future skill before its owner picks one) presents
+neutrally rather than guessing.
+
+Every progression surface consumes this through the same path instead of its
+own mapping: `features/shared/activity-context.tsx`'s `SkillProgressRow`
+(Mining/Refining/Welding activity screens) and
+`features/shared/CharacterSkillList.tsx` (the Character modal and Nearby
+Player profiles) both call `skillAccentColor`, so a skill's name/level text and
+XP fill carry the same identity everywhere it appears. Do not add a
+`skill === "Mining"` conditional or a second skill → color mapping; extend the
+`accentTone` registry instead.
+
 ## Play surface chrome (Issue #145)
 
 The Play footer is the fixed four-destination navigation: **Character ·
