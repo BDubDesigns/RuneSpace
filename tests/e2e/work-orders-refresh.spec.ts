@@ -130,7 +130,9 @@ test("shows the first-unlock glow until a real refresh commits, and never touche
   const panel = terminal.locator("[data-work-orders-refresh]");
   await expect(panel).toHaveAttribute("data-work-orders-refresh-state", "first_unlock");
   await expect(panel).toContainText("New Work Available");
-  await expect(panel).toContainText("Your contractor profile now qualifies for conductive repair work.");
+  await expect(panel).toContainText(
+    "Your contractor profile now qualifies for conductive repair work.",
+  );
   const control = panel.locator("[data-work-orders-refresh-control]");
   await expect(control).toHaveText("Refresh Board — Free");
 
@@ -195,7 +197,9 @@ test("reads as a plain available refresh after an earlier day's refresh, never t
   const panel = page.locator("[data-work-orders-refresh]");
   await expect(panel).toHaveAttribute("data-work-orders-refresh-state", "available");
   await expect(panel).toContainText("ForceSales Free · 1 refresh available today");
-  await expect(panel).toContainText("Replaces all unaccepted postings. In Progress work stays put.");
+  await expect(panel).toContainText(
+    "Replaces all unaccepted postings. In Progress work stays put.",
+  );
   const control = panel.locator("[data-work-orders-refresh-control]");
   await expect(control).toHaveText("Refresh Board");
 
