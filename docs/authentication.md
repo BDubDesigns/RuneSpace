@@ -136,10 +136,17 @@ lock) enforce:
 | Global velocity circuit | at 100 verification emails in 10 min, dispatch, sign-up, and resend pause and the server logs `[account-verification] ALERT` |
 
 The IP is Better Auth's resolved client address (`X-Forwarded-For` with one
-entry); requests without a resolvable address share one `unknown` bucket, so a
-misconfigured proxy degrades to a strict shared limit, not an unlimited one.
-IP is a rate-limit signal only, never an identity key. Better Auth's own
-built-in rate limiter stays at its defaults.
+entry); requests without a resolvable address — or with a multi-entry header —
+share one `unknown` bucket, so a proxy that appends hops degrades to a strict
+shared limit, not an unlimited one. The per-IP limits therefore assume the
+production proxy **replaces** any client-supplied `X-Forwarded-For` with the
+real client address (Traefik's default for untrusted sources). If it ever
+passed a client's single-value header through unchanged, a client could rotate
+its bucket; the per-address resend limits and the global circuit would still
+hold. The rollout checklist verifies this, and pinning
+`advanced.ipAddress.trustedProxies` is the fix if it does not hold. IP is a
+rate-limit signal only, never an identity key. Better Auth's own built-in rate
+limiter stays at its defaults.
 
 ### Environment variables
 
