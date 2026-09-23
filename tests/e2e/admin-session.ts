@@ -2,6 +2,7 @@ import { hashPassword } from "better-auth/crypto";
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import * as authSchema from "@/db/auth-schema";
+import { testPlayerIdentity } from "../integration/fixtures";
 
 /**
  * Deterministic Better Auth admin-session bootstrap for the admin E2E spec
@@ -43,7 +44,7 @@ export async function seedAuthUser(input: {
     await db.transaction(async (tx) => {
       await tx.insert(authSchema.user).values({
         id: input.id,
-        name: input.name,
+        ...testPlayerIdentity(input.id, input.name),
         email: input.email,
         emailVerified: true,
         createdAt: new Date(),

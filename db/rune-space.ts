@@ -856,6 +856,50 @@ export const operatorAuditLogs = pgTable(
   ],
 );
 
+/**
+ * Short-lived ledger behind the signup / verification-mail abuse limits
+ * (Issue #221). One row per admitted signup attempt, verification resend
+ * request, or verification email actually dispatched; `server/account-abuse.ts`
+ * is its only reader and writer and prunes rows once they can no longer affect
+ * any limit window.
+ *
+ * - `ip_bucket` is the normalized client IP as Better Auth resolves it, or
+ *   `unknown` when none can be resolved. It is a weak rate-limit signal, never
+ *   an identity key, and is never joined to accounts.
+ * - `email_key` is the lowercased address for resend/dispatch rows and null
+ *   for signup attempts. Resend rows are recorded for any requested address,
+ *   registered or not, so the limits cannot be used to probe for accounts.
+ */
+export const accountAbuseEvents = pgTable(
+  "account_abuse_events",
+  {
+    id: text("id")
+      .primaryKey()
+      .default(sql`gen_random_uuid()`),
+    kind: text("kind").notNull(),
+    ipBucket: text("ip_bucket").notNull(),
+    emailKey: text("email_key"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    check(
+      "account_abuse_events_kind_check",
+      sql`${table.kind} in ('signup_attempt', 'verification_resend', 'verification_dispatch')`,
+    ),
+    index("account_abuse_events_kind_ip_created_idx").on(
+      table.kind,
+      table.ipBucket,
+      table.createdAt,
+    ),
+    index("account_abuse_events_kind_email_created_idx").on(
+      table.kind,
+      table.emailKey,
+      table.createdAt,
+    ),
+    index("account_abuse_events_created_idx").on(table.createdAt),
+  ],
+);
+
 export type PlayerAccount = typeof playerAccounts.$inferSelect;
 export type NewPlayerAccount = typeof playerAccounts.$inferInsert;
 export type PlayerPortraitUnlock = typeof playerPortraitUnlocks.$inferSelect;

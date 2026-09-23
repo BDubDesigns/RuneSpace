@@ -30,8 +30,12 @@ export type LocationPopulationRow = {
   displayName: string;
   /** Folded comparison key; the repository's global-uniqueness convention. */
   normalizedName: string;
-  /** Better Auth user.name of the owning player account. */
-  ownerName: string;
+  /**
+   * The owning account's canonical Player name (Better Auth Username-plugin
+   * `displayUsername`, issue #221). Null only for an account created before
+   * Player names existed and not yet migrated by the one-time cutover.
+   */
+  ownerName: string | null;
   /**
    * One persisted skill-XP row for the character. A character with no rows at
    * all appears once with nulls (authoritative zero in every skill); a
@@ -45,7 +49,7 @@ export type LocationPopulationRow = {
 export type LocationPopulationEntry = {
   displayName: string;
   level: number;
-  ownerName: string;
+  ownerName: string | null;
 };
 
 /**

@@ -26,6 +26,7 @@ import { existsSync, mkdirSync, rmSync } from "node:fs";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
+  accountBoundaryE2eEnv,
   assertLocalDatabaseUrl,
   assertNode22,
   assertPortAvailable,
@@ -119,6 +120,7 @@ export function buildFocusedEnv({ databaseUrl, port, databaseName }) {
     PLAYWRIGHT_PORT: String(port),
     PORT: String(port),
     BASE_URL: `http://127.0.0.1:${port}`,
+    ...accountBoundaryE2eEnv({ port, runId: databaseName ?? "focused" }),
   };
 }
 

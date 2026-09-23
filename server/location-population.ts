@@ -17,7 +17,7 @@ import { requireOwnedCharacter } from "@/server/ownership";
  * - The request is scoped by the owned active character: the server resolves
  *   the location from the character row; a client can never enumerate a
  *   location directly or use another player's character.
- * - One set-based query fetches the population, the owner `user.name`, and
+ * - One set-based query fetches the population, the owner's Player name, and
  *   every persisted skill-XP row without N+1 queries; absent XP rows are
  *   authoritative zero.
  * - The pure domain projection derives the canonical Character Level (#213)
@@ -39,7 +39,7 @@ export async function getLocationPopulation(
       characterId: characters.id,
       displayName: characters.displayName,
       normalizedName: characters.normalizedName,
-      ownerName: user.name,
+      ownerName: user.displayUsername,
       skillId: characterSkillXp.skillId,
       totalXp: characterSkillXp.totalXp,
     })

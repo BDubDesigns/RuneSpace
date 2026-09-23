@@ -26,6 +26,24 @@ export const PACKAGE_MANAGER = process.platform === "win32" ? "pnpm.cmd" : "pnpm
 // strengthened validator.
 export { assertLocalDatabaseUrl } from "./local-db-url.mjs";
 
+/**
+ * The account-boundary settings every local production E2E server needs
+ * (issue #221): test-only Turnstile keys, Turnstile site verification
+ * redirected to the server's own loopback stub, and a run-scoped outbox file
+ * that captures verification mail. The server honors the redirect and the
+ * outbox only inside its local-E2E gate (CI + plain-HTTP runner flag +
+ * loopback database), so no browser journey ever calls Cloudflare or
+ * ZeptoMail. Specs read the outbox path from the same variable.
+ */
+export function accountBoundaryE2eEnv({ port, runId }) {
+  return {
+    TURNSTILE_SITE_KEY: "e2e-turnstile-site-key",
+    TURNSTILE_SECRET_KEY: "e2e-turnstile-secret-not-for-production",
+    RUNESPACE_E2E_TURNSTILE_SITEVERIFY_URL: `http://127.0.0.1:${port}/api/e2e/turnstile-siteverify`,
+    RUNESPACE_E2E_MAIL_OUTBOX_FILE: resolve(ROOT, ".playwright", `mail-outbox-${runId}.jsonl`),
+  };
+}
+
 export function readPositiveInteger(value, fallback, label) {
   if (value === undefined || value === null || value === "") return fallback;
   // The whole value must be an integer representation; parseInt would silently

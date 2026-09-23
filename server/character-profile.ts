@@ -75,7 +75,7 @@ export async function getCharacterProfile(
   const rows = await db
     .select({
       displayName: characters.displayName,
-      ownerName: user.name,
+      ownerName: user.displayUsername,
       portraitId: characters.portraitId,
       ownedPortraitId: playerPortraitUnlocks.portraitId,
       skillId: characterSkillXp.skillId,

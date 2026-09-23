@@ -21,6 +21,7 @@ import {
   cleanupTestCharacter,
   cleanupTestUser,
   createCharacterForUser,
+  testPlayerIdentity,
 } from "../integration/fixtures";
 import { assertDisposableE2EDatabase } from "./test-database";
 
@@ -92,11 +93,13 @@ export async function establishAuthenticatedSession(
   const userId = randomUUID();
   const password = "sup3r-secret-password";
   const now = new Date();
+  // An explicitly verified account (issue #221): sign-in requires a verified
+  // email, exactly as it does for real players.
   await db.insert(authSchema.user).values({
     id: userId,
-    name: displayName,
+    ...testPlayerIdentity(userId, displayName),
     email,
-    emailVerified: false,
+    emailVerified: true,
     createdAt: now,
     updatedAt: now,
   });

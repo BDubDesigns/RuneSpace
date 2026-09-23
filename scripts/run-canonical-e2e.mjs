@@ -3,6 +3,7 @@
 import { copyFileSync, existsSync, mkdirSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import {
+  accountBoundaryE2eEnv,
   assertNode22,
   assertPortAvailable,
   createE2eRuntime,
@@ -248,6 +249,7 @@ async function main() {
       RUNESPACE_ADMIN_USER_IDS: "00000000-0000-0000-0000-0000000000a1",
       PLAYWRIGHT_PORT: String(PORT),
       PORT: String(PORT),
+      ...accountBoundaryE2eEnv({ port: PORT, runId }),
     };
     runtime = createE2eRuntime({
       label: screenshotLane ? "canonical-e2e-screenshots" : "canonical-e2e",

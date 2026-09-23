@@ -13,7 +13,7 @@ import { spawn } from "node:child_process";
 import { resolve } from "node:path";
 import pg from "pg";
 import { assertLocalDatabaseUrl } from "./local-db-url.mjs";
-import { assertPortAvailable } from "./e2e-shared.mjs";
+import { accountBoundaryE2eEnv, assertPortAvailable } from "./e2e-shared.mjs";
 
 const { Client } = pg;
 const ROOT = resolve(new URL("..", import.meta.url).pathname);
@@ -160,6 +160,10 @@ async function main(argv) {
     environment.PLAYWRIGHT_PORT = String(e2ePort);
     environment.PORT = String(e2ePort);
     environment.BASE_URL = `http://127.0.0.1:${e2ePort}`;
+    Object.assign(
+      environment,
+      accountBoundaryE2eEnv({ port: e2ePort, runId: disposable.databaseName }),
+    );
   }
   const signalHandlers = ["SIGINT", "SIGTERM"].map((signal) => {
     const handler = () => forwardSignal(signal);

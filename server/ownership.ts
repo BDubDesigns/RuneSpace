@@ -30,15 +30,33 @@ export class OwnershipError extends Error {
   }
 }
 
+export type CurrentUser = { id: string; email: string; emailVerified: boolean };
+
 /** Authenticate the request via Better Auth and return the current user. */
-export async function requireCurrentUser(
-  headers: Headers,
-): Promise<{ id: string; email: string; name: string }> {
+export async function requireCurrentUser(headers: Headers): Promise<CurrentUser> {
   const session = await auth.api.getSession({ headers });
   if (!session?.user) {
     throw new OwnershipError("Authentication required", 401);
   }
-  return session.user;
+  const { id, email, emailVerified } = session.user;
+  return { id, email, emailVerified };
+}
+
+export const EMAIL_VERIFICATION_REQUIRED_MESSAGE =
+  "Verify your email address before creating characters.";
+
+/**
+ * Authenticate the request and require a verified email address (issue #221).
+ * The one server-side gate for character reservation: every character-creation
+ * route and action calls it, so a forged request from an unverified session is
+ * refused even though the UI never offers the action.
+ */
+export async function requireVerifiedUser(headers: Headers): Promise<CurrentUser> {
+  const user = await requireCurrentUser(headers);
+  if (!user.emailVerified) {
+    throw new OwnershipError(EMAIL_VERIFICATION_REQUIRED_MESSAGE, 403);
+  }
+  return user;
 }
 
 /**

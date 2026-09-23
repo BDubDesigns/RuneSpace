@@ -39,8 +39,8 @@ small number of critical mobile player journeys.
   in `playwright.config.ts` is its single source of truth — covering Mining,
   Inventory Equip, Overlay, Character, Walk It Off, Cut Your Teeth, Travel,
   Location Population, Character Profile, Character Portraits, Refining, Cargo
-  Hold, Deep Jag, Holo Hollow, Rusk Recovery, Admin Operator, Sign-out, and
-  Account News. It intentionally excludes noncanonical `smoke`, `ownership`,
+  Hold, Deep Jag, Holo Hollow, Rusk Recovery, Admin Operator, Sign-out,
+  Account News, and Account Verification. It intentionally excludes noncanonical `smoke`, `ownership`,
   `design-system`, `work-orders`, `public-*`, and QC Studio specs. It:
   - requires Node 22.x
   - requires a localhost-only disposable PostgreSQL database (refuses remote)
@@ -89,6 +89,18 @@ small number of critical mobile player journeys.
     server those runners own, including canonical execution in GitHub Actions;
     it is never set for the ordinary CI build job, for previews, or for
     production.
+- Every local E2E server also receives the account-boundary settings from
+  `accountBoundaryE2eEnv` in `scripts/e2e-shared.mjs` (issue #221): test-only
+  Turnstile keys, Turnstile site verification redirected to the server's own
+  gated loopback stub (`app/api/e2e/turnstile-siteverify`, a 404 outside the
+  local-E2E gate), and a run-scoped `RUNESPACE_E2E_MAIL_OUTBOX_FILE` that
+  captures verification email. Registration journeys serve a local Turnstile
+  stand-in script, give each journey its own client address through
+  `X-Forwarded-For`, and follow the exact emailed link
+  (`tests/e2e/account-helpers.ts`); no browser test calls Cloudflare or
+  ZeptoMail. Specs that only need a signed-in player keep using
+  `establishAuthenticatedSession`, which creates an explicitly verified
+  account with a fixture Player name.
 - Database isolation is automatic for the supported test entry points. The
   `pnpm test:integration`, `pnpm test:e2e`, `pnpm test:e2e:focused`, and
   `pnpm test:e2e:canonical` commands derive a uniquely named local disposable
