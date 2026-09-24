@@ -103,7 +103,7 @@ function LocationPopulationList({
               <button
                 aria-controls="character-profile-panel"
                 aria-expanded={selected}
-                aria-label={`${entry.displayName}, Level ${entry.level}, player ${entry.ownerName}`}
+                aria-label={`${entry.displayName}, Level ${entry.level}${entry.ownerName ? `, player ${entry.ownerName}` : ""}`}
                 className={`rs-focus flex min-h-[var(--rs-touch-target)] w-full items-center gap-3 border-l-2 px-2 py-2 text-left outline-none motion-safe:transition-colors ${selected ? "border-[color:var(--rs-accent-mining)] bg-[color:var(--rs-accent-mining-hover)]" : "border-transparent hover:bg-[color:var(--rs-accent-mining-subtle)] active:bg-[color:var(--rs-accent-mining-hover)]"}`}
                 onClick={(event) => onOpenProfile(entry.displayName, event.currentTarget)}
                 type="button"
@@ -119,9 +119,11 @@ function LocationPopulationList({
                       </span>
                     ) : null}
                   </span>
-                  <span className="truncate text-xs text-[color:var(--rs-text-secondary)]">
-                    Player: {entry.ownerName}
-                  </span>
+                  {entry.ownerName ? (
+                    <span className="truncate text-xs text-[color:var(--rs-text-secondary)]">
+                      Player: {entry.ownerName}
+                    </span>
+                  ) : null}
                 </span>
                 <span
                   className={`shrink-0 border px-1.5 py-0.5 font-display text-[10px] uppercase leading-none tracking-[0.08em] ${selected ? "border-[color:var(--rs-accent-mining)] bg-[color:var(--rs-accent-mining-subtle)] text-[color:var(--rs-accent-mining)]" : "border-[color:var(--rs-item-plate-border)] bg-[color:var(--rs-item-plate-surface)] text-[color:var(--rs-text-secondary)]"}`}

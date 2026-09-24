@@ -47,7 +47,36 @@ const envSchema = z.object({
         .map((entry) => entry.trim())
         .filter((entry) => entry.length > 0),
     ),
+  /**
+   * Cloudflare Turnstile protecting sign-up and verification resend (issue
+   * #221). The site key is public and rendered into the registration page; the
+   * secret key is server-only. Both are optional to parse so builds and tests
+   * need no placeholders; `server/account-protection.ts` decides what an
+   * absent pair means per environment and fails closed in production.
+   */
+  TURNSTILE_SITE_KEY: optionalNonEmpty(),
+  TURNSTILE_SECRET_KEY: optionalNonEmpty(),
+  /**
+   * Zoho ZeptoMail — transactional account email only (issue #221). The Send
+   * Mail token is server-only. `ZEPTOMAIL_API_URL` selects the account's data
+   * center (for example `https://api.zeptomail.eu/v1.1/email`).
+   */
+  ZEPTOMAIL_SEND_MAIL_TOKEN: optionalNonEmpty(),
+  ZEPTOMAIL_API_URL: z.string().url().default("https://api.zeptomail.com/v1.1/email"),
+  RUNESPACE_MAIL_FROM_ADDRESS: optionalNonEmpty().pipe(z.string().email().optional()),
+  RUNESPACE_MAIL_FROM_NAME: z.string().trim().min(1).default("RuneSpace"),
 });
+
+/** An optional string where an empty or whitespace-only value means "unset". */
+function optionalNonEmpty() {
+  return z
+    .string()
+    .optional()
+    .transform((value) => {
+      const trimmed = value?.trim();
+      return trimmed ? trimmed : undefined;
+    });
+}
 
 export type AppEnv = z.infer<typeof envSchema>;
 

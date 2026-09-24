@@ -22,19 +22,36 @@ type Rune = typeof import("@/db/rune-space");
 type Ownership = typeof import("@/server/ownership");
 type Characters = typeof import("@/server/characters");
 
-/** Creates one Better Auth user row and returns its id. */
+/**
+ * The explicit Player identity of a fixture account (issue #221).
+ * `displayUsername` is the readable Player name tests assert on; the unique
+ * `username` key is synthetic (`fixture:<userId>`) — `:` can never appear in a
+ * real Player name — so parallel suites may reuse readable names without
+ * colliding, and fixture accounts are never mistaken for pre-cutover accounts
+ * (which have no username at all).
+ */
+export function testPlayerIdentity(userId: string, displayName: string) {
+  return { name: displayName, username: `fixture:${userId}`, displayUsername: displayName };
+}
+
+/**
+ * Creates one Better Auth user row and returns its id. Fixture accounts are
+ * explicitly verified, like every account allowed to reserve characters;
+ * suites proving the verification gate itself pass `emailVerified: false`.
+ */
 export async function createTestUser(
   db: Db,
   authSchema: AuthSchema,
   displayName: string,
   email?: string,
+  options: { emailVerified?: boolean } = {},
 ): Promise<string> {
   const userId = randomUUID();
   await db.insert(authSchema.user).values({
     id: userId,
-    name: displayName,
+    ...testPlayerIdentity(userId, displayName),
     email: email ?? `${userId}@example.com`,
-    emailVerified: false,
+    emailVerified: options.emailVerified ?? true,
     createdAt: new Date(),
     updatedAt: new Date(),
   });

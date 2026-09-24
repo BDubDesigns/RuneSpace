@@ -41,15 +41,18 @@ export type CharacterProfileSkill = CharacterSkillProgression;
 /** The narrow public character profile for one visible target. */
 export type CharacterProfile = CharacterProgression & {
   displayName: string;
-  /** Public owner/player name from the Better Auth `user.name` boundary. */
-  ownerName: string;
+  /**
+   * Public Player name of the owning account (Better Auth `displayUsername`,
+   * issue #221); null only for a not-yet-migrated pre-cutover account.
+   */
+  ownerName: string | null;
   /** Safe portrait presentation: the selected catalog portrait or the neutral placeholder. */
   portrait: CharacterPortraitPresentation;
 };
 
 export function projectCharacterProfile(input: {
   displayName: string;
-  ownerName: string;
+  ownerName: string | null;
   /** Persisted per-skill XP rows for the target character. */
   skillXp: readonly { skillId: string; totalXp: number }[];
   levelThresholds: (skillId: string) => readonly LevelThreshold[] | undefined;

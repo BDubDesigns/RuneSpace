@@ -7,7 +7,11 @@ import { SectionHeader } from "@/components/ui/SectionHeader";
 import { SignOutButton } from "@/features/auth/SignOutButton";
 import { ManageCharacterPortrait } from "@/features/characters/ManageCharacterPortrait";
 import { auth } from "@/server/auth";
-import { ensurePlayerAccount, requireCurrentUser } from "@/server/ownership";
+import {
+  EMAIL_VERIFICATION_REQUIRED_MESSAGE,
+  ensurePlayerAccount,
+  requireCurrentUser,
+} from "@/server/ownership";
 import { listCharacters, occupiedSlots } from "@/server/characters";
 import { SLOT_MIN, SLOT_MAX } from "@/db/rune-space";
 import {
@@ -30,9 +34,17 @@ export const metadata = { title: "Characters — RuneSpace" };
  * and the Choose/Change portrait flow; picker options and presentation are
  * projected from the authenticated player's account unlocks.
  */
-export default async function CharactersPage() {
+export default async function CharactersPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ error?: string }>;
+}) {
   const session = await auth.api.getSession({ headers: await headers() });
-  if (!session?.user) redirect("/sign-in");
+  if (!session?.user) {
+    // The verification link returns here; Better Auth appends `error` when the
+    // link is expired or invalid, so the sign-in page can explain it.
+    redirect((await searchParams).error ? "/sign-in?verification=invalid" : "/sign-in");
+  }
 
   const user = await requireCurrentUser(await headers());
   const account = await ensurePlayerAccount(user.id);
@@ -107,7 +119,11 @@ export default async function CharactersPage() {
           );
         })}
       </ul>
-      {hasFreeSlot ? (
+      {!user.emailVerified ? (
+        <p className="mt-6 text-center text-sm text-[color:var(--rs-text-muted)]">
+          {EMAIL_VERIFICATION_REQUIRED_MESSAGE}
+        </p>
+      ) : hasFreeSlot ? (
         <ActionLink href="/characters/new" intent="secondary" className="mt-6 flex w-full">
           New character
         </ActionLink>

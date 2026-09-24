@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { stubTurnstile } from "./account-helpers";
 
 test("production build does not expose the development design-system preview", async ({ page }) => {
   test.skip(
@@ -18,6 +19,7 @@ test("registration controls remain visible and focused without horizontal overfl
     "This control check runs against the production server.",
   );
   await page.setViewportSize({ width: 390, height: 844 });
+  await stubTurnstile(page);
   await page.goto("/register");
 
   const register = page.getByRole("button", { name: "Create account" });
@@ -26,7 +28,7 @@ test("registration controls remain visible and focused without horizontal overfl
   await expect(register).toBeFocused();
   await expect(register).toHaveCSS("outline-style", "solid");
 
-  await page.getByLabel("Display name").focus();
+  await page.getByLabel("Player name").focus();
   await page.keyboard.press("Tab");
   await expect(page.getByLabel("Email")).toBeFocused();
 

@@ -13,6 +13,7 @@ import {
   createCharacterForUser,
   createLegacyCharacterForUser,
 } from "../integration/fixtures";
+import { registerVerifiedAccount, uniquePlayerName } from "./account-helpers";
 import { populationDisclosure } from "./population-disclosure";
 import { captureReviewScreenshot } from "./review-screenshot";
 
@@ -34,7 +35,8 @@ import { captureReviewScreenshot } from "./review-screenshot";
  *   selections; no horizontal overflow or private-data exposure occurs.
  *
  * Registrations are kept minimal (one fixture user per journey) so the phase stays well under the
- * Better Auth sign-up rate limit.
+ * sign-up rate limits; each goes through the real form and the emailed verification link
+ * (issue #221).
  */
 
 /** Short unique token so seeded names never collide with leftovers. */
@@ -66,11 +68,11 @@ test.describe("character creation portrait journey", () => {
   }) => {
     await page.setViewportSize({ width: 390, height: 844 });
     const creationEmail = `portrait-creation-${Date.now()}-${Math.floor(Math.random() * 1e6)}@example.com`;
-    await page.goto("/register");
-    await page.getByLabel("Display name").fill("Portrait Creation");
-    await page.getByLabel("Email").fill(creationEmail);
-    await page.getByLabel("Password", { exact: true }).fill("sup3r-secret-password");
-    await page.getByRole("button", { name: "Create account" }).click();
+    await registerVerifiedAccount(page, {
+      playerName: uniquePlayerName("Portrait Maker"),
+      email: creationEmail,
+      password: "sup3r-secret-password",
+    });
     await expect(page.getByRole("link", { name: "New character" })).toBeVisible();
     const fixtureUser = (
       await db
@@ -216,11 +218,12 @@ test.describe("existing character portrait management journey", () => {
     // authoritative command (slot 1) and one legacy (pre-portrait) character
     // with a NULL portrait (slot 2).
     const ownerEmail = `portrait-owner-${Date.now()}-${Math.floor(Math.random() * 1e6)}@example.com`;
-    await page.goto("/register");
-    await page.getByLabel("Display name").fill("Portrait Owner");
-    await page.getByLabel("Email").fill(ownerEmail);
-    await page.getByLabel("Password", { exact: true }).fill("sup3r-secret-password");
-    await page.getByRole("button", { name: "Create account" }).click();
+    const ownerPlayerName = uniquePlayerName("Portrait Keeper");
+    await registerVerifiedAccount(page, {
+      playerName: ownerPlayerName,
+      email: ownerEmail,
+      password: "sup3r-secret-password",
+    });
     await expect(page.getByRole("link", { name: "New character" })).toBeVisible();
     const owner = (
       await db
@@ -409,7 +412,7 @@ test.describe("existing character portrait management journey", () => {
     await populationDisclosure(page).click();
     await page
       .getByRole("button", {
-        name: new RegExp(`^${legacyName}, Level 1, player Portrait Owner$`),
+        name: new RegExp(`^${legacyName}, Level 1, player ${ownerPlayerName}$`),
       })
       .click();
 

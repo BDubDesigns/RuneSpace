@@ -3,6 +3,13 @@ import type { ChildProcess } from "node:child_process";
 export const ROOT: string;
 export const PACKAGE_MANAGER: string;
 
+export function accountBoundaryE2eEnv(input: { port: number; runId: string }): {
+  TURNSTILE_SITE_KEY: string;
+  TURNSTILE_SECRET_KEY: string;
+  RUNESPACE_E2E_TURNSTILE_SITEVERIFY_URL: string;
+  RUNESPACE_E2E_MAIL_OUTBOX_FILE: string;
+};
+
 export function readPositiveInteger(
   value: string | undefined,
   fallback: number,

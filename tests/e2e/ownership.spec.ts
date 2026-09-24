@@ -1,10 +1,12 @@
 import { expect, test } from "@playwright/test";
+import { registerVerifiedAccount, uniquePlayerName } from "./account-helpers";
 
 /**
  * Player-journey e2e for issue #6: Better Auth + multi-character ownership.
  *
  * Exercises the full server-authoritative flow against a real running app:
- * register, create a character, select it, and reach the protected placeholder.
+ * register (with email verification, issue #221), create a character, select
+ * it, and reach the protected placeholder.
  * Also asserts the ownership boundary — a signed-in user is redirected away from
  * a character id they do not own (the server verifies ownership on every
  * request; another player's id is never revealed).
@@ -30,17 +32,18 @@ test("register, create, and select a character; ownership boundary enforced", as
 
   // Landing routes to registration.
   await page.goto("/");
-  await page.getByRole("link", { name: "Register" }).click();
-  await expect(page.getByRole("heading", { name: "Create account" })).toBeVisible();
+  await page.getByRole("link", { name: "Register" }).first().click();
+  await expect(
+    page.getByRole("heading", { name: "Reserve your place in RuneSpace" }),
+  ).toBeVisible();
 
-  await page.getByLabel("Display name").fill("Captain Test");
-  await page.getByLabel("Email").fill(email);
-  await page.getByLabel("Password", { exact: true }).fill(password);
-  await page.getByRole("button", { name: "Create account" }).click();
-
-  // Redirected to character selection after registration.
-  await page.waitForURL("**/characters");
-  await expect(page.getByRole("heading", { name: "Characters" })).toBeVisible();
+  // Register and follow the emailed verification link (issue #221), which
+  // signs the player in and lands on character selection.
+  await registerVerifiedAccount(page, {
+    playerName: uniquePlayerName("Captain Test"),
+    email,
+    password,
+  });
   await expect(page.getByText(email)).toBeVisible();
 
   // Empty slots shown; create a new character.
@@ -55,7 +58,7 @@ test("register, create, and select a character; ownership boundary enforced", as
 
   // Lands on the protected placeholder for the created character.
   await page.waitForURL("**/play/**");
-  await expect(page.getByRole("heading", { name: hero })).toBeVisible();
+  await expect(page.getByText(hero, { exact: true }).first()).toBeVisible();
 
   // Back to characters via the play footer: the slot is now occupied with
   // preserved display casing.
@@ -81,12 +84,11 @@ test("character names are unique after normalization (case-insensitive collision
   const email = uniqueEmail();
   const password = "sup3r-secret-password";
 
-  await page.goto("/register");
-  await page.getByLabel("Display name").fill("Owner Two");
-  await page.getByLabel("Email").fill(email);
-  await page.getByLabel("Password", { exact: true }).fill(password);
-  await page.getByRole("button", { name: "Create account" }).click();
-  await page.waitForURL("**/characters");
+  await registerVerifiedAccount(page, {
+    playerName: uniquePlayerName("Second Pilot"),
+    email,
+    password,
+  });
 
   await page.getByRole("link", { name: "New character" }).click();
   const hero = uniqueName("Nova Prime");

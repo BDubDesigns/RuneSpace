@@ -2,7 +2,12 @@
 
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
-import { ensurePlayerAccount, requireCurrentUser, OwnershipError } from "@/server/ownership";
+import {
+  ensurePlayerAccount,
+  requireCurrentUser,
+  requireVerifiedUser,
+  OwnershipError,
+} from "@/server/ownership";
 import { createCharacter, changeCharacterPortrait, CharacterError } from "@/server/characters";
 import { acknowledgeNews } from "@/server/account-news";
 import {
@@ -114,7 +119,9 @@ export async function createCharacterAction(formData: FormData): Promise<ActionR
   // the server re-validates selectability before anything is persisted.
   const portraitId = String(formData.get("portraitId") ?? "");
   try {
-    const user = await requireCurrentUser(await headers());
+    // Character reservation requires a verified email (issue #221), enforced
+    // here independently of the page so a forged submission is refused too.
+    const user = await requireVerifiedUser(await headers());
     const account = await ensurePlayerAccount(user.id);
     const character = await createCharacter(account.id, displayName, portraitId);
     // `redirect` throws NEXT_REDIRECT; let it propagate out of the action so

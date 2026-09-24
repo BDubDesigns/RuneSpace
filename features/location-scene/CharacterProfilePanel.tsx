@@ -146,9 +146,11 @@ export function CharacterProfilePanel({
                   <p className="break-words font-display text-sm font-bold text-[color:var(--rs-text-primary)]">
                     {profile.displayName}
                   </p>
-                  <p className="break-words text-xs text-[color:var(--rs-text-secondary)]">
-                    Player: {profile.ownerName}
-                  </p>
+                  {profile.ownerName ? (
+                    <p className="break-words text-xs text-[color:var(--rs-text-secondary)]">
+                      Player: {profile.ownerName}
+                    </p>
+                  ) : null}
                   <p className="mt-1 font-display text-xs uppercase tracking-[0.16em] text-[color:var(--rs-accent-primary)]">
                     Character level {profile.characterLevel}
                   </p>

@@ -1,5 +1,5 @@
 import { adminUserIdAllowlist } from "@/server/env";
-import { requireCurrentUser, OwnershipError } from "@/server/ownership";
+import { requireCurrentUser, OwnershipError, type CurrentUser } from "@/server/ownership";
 
 /**
  * Server-only admin/operator authorization (Issue #113).
@@ -37,9 +37,7 @@ export function isAdminUserId(userId: string): boolean {
  * cannot invoke admin commands. Authentication failures propagate the existing
  * 401 ownership error.
  */
-export async function requireAdmin(
-  headers: Headers,
-): Promise<{ id: string; email: string; name: string }> {
+export async function requireAdmin(headers: Headers): Promise<CurrentUser> {
   const user = await requireCurrentUser(headers);
   if (!isAdminUserId(user.id)) {
     throw new AdminError("Forbidden", 403);
@@ -60,7 +58,7 @@ export async function requireAdmin(
  *   contract.
  */
 export type AdminPageAuth =
-  | { authorized: true; admin: { id: string; email: string; name: string } }
+  | { authorized: true; admin: CurrentUser }
   | { authorized: false; reason: "unauthenticated" | "forbidden" };
 
 export async function authorizeAdminPage(headers: Headers): Promise<AdminPageAuth> {

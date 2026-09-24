@@ -1,4 +1,5 @@
 import { createAuthClient } from "better-auth/react";
+import { usernameClient } from "better-auth/client/plugins";
 
 /**
  * Browser-side Better Auth client.
@@ -8,5 +9,11 @@ import { createAuthClient } from "better-auth/react";
  * integration: Better Auth sets the session cookie on the HTTP response
  * natively, so the browser stores it correctly (no manual cookie bridging,
  * which previously double-encoded the token and broke server-action auth).
+ *
+ * The Username client plugin types the Player-name fields on sign-up
+ * (issue #221).
  */
-export const authClient = createAuthClient({});
+export const authClient = createAuthClient({ plugins: [usernameClient()] });
+
+/** Where a verification link lands once the address is confirmed. */
+export const VERIFIED_CALLBACK_PATH = "/characters";

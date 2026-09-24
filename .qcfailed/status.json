@@ -2,20 +2,25 @@
   "schemaVersion": 1,
   "projectSlug": "runespace",
   "workState": "active",
-  "currentFocus": "A Character surface for the character you are playing: portrait, name, Credits, every skill, and one canonical Character Level used everywhere.",
+  "currentFocus": "Opening soft-alpha reservations: a public Player name per account, verified email, and up to three reserved character names ahead of Soft Alpha.",
   "currentChange": {
-    "summary": "The footer's Character destination opens the current character's profile — portrait, Credits, every skill's progress — and one canonical Character Level replaces the old per-surface levels.",
+    "summary": "New accounts choose a public Player name and verify their email before reserving character names; sign-up is protected by Cloudflare Turnstile and rate limits.",
     "stage": "implementation",
-    "pullRequestNumber": 214
+    "pullRequestNumber": 222
   },
   "latestCompleted": {
-    "summary": "Deep Jag is playable: brace the cave-in for Tansy, mine Galvanite behind it, and refine Galvanic Stock and Galvaferrite at the Processing Yard.",
+    "summary": "The footer's Character destination opens the current character's profile — portrait, Credits, every skill's progress — and one canonical Character Level replaces the old per-surface levels.",
     "date": "2026-09-19",
-    "url": "https://github.com/BDubDesigns/RuneSpace/pull/211"
+    "url": "https://github.com/BDubDesigns/RuneSpace/pull/214"
   },
-  "nextStep": "Human review and playtest of the Character surface, the renamed footer destination, and the canonical Character Level on nearby characters.",
-  "lastMeaningfulUpdate": "2026-09-19",
+  "nextStep": "Human review of registration, email verification, and Player names, then the one-time cutover that gives existing accounts their Player names.",
+  "lastMeaningfulUpdate": "2026-09-23",
   "highlights": [
+    {
+      "summary": "Deep Jag is playable: brace the cave-in for Tansy, mine Galvanite behind it, and refine Galvanic Stock and Galvaferrite at the Processing Yard.",
+      "date": "2026-09-19",
+      "url": "https://github.com/BDubDesigns/RuneSpace/pull/211"
+    },
     {
       "summary": "Added Rusk Recovery and 10,000 Hours: Wade's own yard, a workbench that practises Welding indefinitely for scrap, and the Clean Pass moment every weld now rolls.",
       "date": "2026-09-15",
@@ -25,11 +30,6 @@
       "summary": "Added Map MISSION and TURN IN destinations, blue turn-in guidance, compact Mission strips at the top of Play, and visible keyboard focus on beveled controls.",
       "date": "2026-09-12",
       "url": "https://github.com/BDubDesigns/RuneSpace/pull/180"
-    },
-    {
-      "summary": "Extracted generic Play orchestration from the Mining feature into its own server and client boundary.",
-      "date": "2026-09-01",
-      "url": "https://github.com/BDubDesigns/RuneSpace/pull/132"
     }
   ]
 }
