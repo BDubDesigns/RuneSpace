@@ -3,6 +3,7 @@ import { RuneSpaceBrand } from "@/components/branding/RuneSpaceBrand";
 import { PublicSiteShell } from "@/components/public-site/PublicSiteShell";
 import { ActionLink } from "@/components/ui/ActionLink";
 import { Panel } from "@/components/ui/Panel";
+import { SoftAlphaCountdown } from "@/features/launch/SoftAlphaCountdown";
 import {
   formatPublicUpdateDate,
   getLatestPublishedUpdate,
@@ -47,7 +48,21 @@ function PublicSectionHeader({
   );
 }
 
-export function PublicLandingPage({ signedIn }: { signedIn: boolean }) {
+/** The persisted Soft Alpha launch state the hero countdown renders (issue #223). */
+export type PublicLaunchState = {
+  publicGameplayOpen: boolean;
+  /** ISO instant, or null if the launch state is unavailable. */
+  launchTargetAt: string | null;
+  serverNow: string;
+};
+
+export function PublicLandingPage({
+  signedIn,
+  launch,
+}: {
+  signedIn: boolean;
+  launch: PublicLaunchState;
+}) {
   const { adventure, buildSignal, capabilities, currentBuild, hero, showcase, status } =
     publicLandingContent;
   const latestUpdate = getLatestPublishedUpdate();
@@ -85,7 +100,7 @@ export function PublicLandingPage({ signedIn }: { signedIn: boolean }) {
               ) : (
                 <>
                   <ActionLink className={prominentActionClassName} href="/register">
-                    Register
+                    {hero.reserveAction}
                   </ActionLink>
                   <ActionLink
                     className={prominentActionClassName}
@@ -97,6 +112,14 @@ export function PublicLandingPage({ signedIn }: { signedIn: boolean }) {
                 </>
               )}
             </div>
+            {launch.launchTargetAt ? (
+              <SoftAlphaCountdown
+                className="mt-6"
+                launchTargetAt={launch.launchTargetAt}
+                publicGameplayOpen={launch.publicGameplayOpen}
+                serverNow={launch.serverNow}
+              />
+            ) : null}
           </div>
 
           <aside className="rs-bevel min-w-0 border border-[color:var(--rs-border-structural)] bg-[color:var(--rs-surface-raised)] p-5 shadow-[var(--rs-shadow-panel)] sm:p-6">

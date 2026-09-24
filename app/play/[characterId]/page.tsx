@@ -2,12 +2,8 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { PlayScreen } from "@/features/play/PlayScreen";
 import { auth } from "@/server/auth";
-import {
-  requireCurrentUser,
-  requireOwnedCharacter,
-  requirePlayerAccount,
-  OwnershipError,
-} from "@/server/ownership";
+import { requirePlayableOwnedCharacter } from "@/server/gameplay-access";
+import { requireCurrentUser, requirePlayerAccount, OwnershipError } from "@/server/ownership";
 import { getPlayGameplayState } from "@/server/play";
 import { getAccountNewsUnread } from "@/server/account-news";
 import { loadPlayerPortraitUnlockIds } from "@/server/player-portrait-unlocks";
@@ -21,10 +17,12 @@ export const metadata = { title: "Play — RuneSpace" };
 /**
  * Protected placeholder screen for a single owned character.
  *
- * Every access re-authenticates the session and verifies, server-side, that the
- * requested character belongs to the authenticated user. Changing the URL to
- * another user's character ID yields a 404-style redirect — never another
- * player's data.
+ * Every access re-authenticates the session, re-checks gameplay access (issue
+ * #223: verified email and public gameplay open or account Early Access), and
+ * verifies, server-side, that the requested character belongs to the
+ * authenticated user. An account without gameplay access, or a URL naming
+ * another user's character, is redirected to Characters — never another
+ * player's data and never gameplay state.
  */
 export default async function PlayPage({ params }: { params: Promise<{ characterId: string }> }) {
   const { characterId } = await params;
@@ -37,7 +35,7 @@ export default async function PlayPage({ params }: { params: Promise<{ character
   let newsUnread = false;
   try {
     const user = await requireCurrentUser(await headers());
-    const character = await requireOwnedCharacter(user.id, characterId);
+    const character = await requirePlayableOwnedCharacter(user.id, characterId);
     displayName = character.displayName;
     playState = await getPlayGameplayState(user.id, characterId);
     // Account-level (issue #156): derived from the same player account for

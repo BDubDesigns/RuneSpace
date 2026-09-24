@@ -381,7 +381,9 @@ simply an unclaimed port here.
   `1024..65535`).
 - The focused runner currently supports `mining`, `character-profile`,
   `location-population`, `character-portraits`, `cargo-hold`, `inventory-equip`,
-  `travel`, `walk-it-off`, and `cut-your-teeth`. To run one Travel test in
+  `travel`, `walk-it-off`, `cut-your-teeth`, `rusk-recovery`, `work-orders`,
+  `gameplay-access`, and `account-verification` (the focused runner also puts the fixed loopback test
+  operator on the admin allowlist, as the canonical runner does). To run one Travel test in
   isolation, use the same disposable lifecycle with `travel`:
 
   ```bash
@@ -442,8 +444,10 @@ behavioral specs and excludes smoke, ownership, design-system, and QC Studio
 coverage from the Full/Merge browser gate. Ordinary authenticated tests use one
 worker-scoped Better Auth session and one fresh server-created character per
 test. The admin operator spec remains serial because its fixed identity and
-process-global allowlist are the explicit shared boundary; sign-out, portraits,
-registration, and character creation retain independent sessions.
+process-global allowlist are the explicit shared boundary, and the
+gameplay-access spec (issue #223) is serial and chromium-only because it alone
+changes the global public-gameplay row; sign-out, portraits, registration, and
+character creation retain independent sessions.
 
 The canonical runner invokes that selection once with zero retries and
 retain-on-failure traces. GitHub runs three `--shard` jobs concurrently, each

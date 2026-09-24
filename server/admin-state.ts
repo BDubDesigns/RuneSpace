@@ -10,6 +10,7 @@ import {
 import { user } from "@/db/auth-schema";
 import { requireAdmin } from "@/server/admin-auth";
 import { loadCharacterAuditLog } from "@/server/admin-audit";
+import { loadAccountAccessView, type AdminAccountAccessView } from "@/server/admin-access-state";
 import { withResolvedCharacter } from "@/server/action-resolution";
 import { createPlayResolver, stateFromTransaction, type PlayGameplayState } from "@/server/play";
 import { getMission, MISSIONS } from "@/game/content/missions";
@@ -151,6 +152,11 @@ export type AdminInspectorState = {
   /** Unified view of every occupied unique instance (equipped/carried/Cargo). */
   uniqueInstances: readonly AdminUniqueInstanceView[];
   audit: readonly (typeof import("@/db/rune-space").operatorAuditLogs.$inferSelect)[];
+  /**
+   * The owning player account's gameplay access (issue #223) for the Account
+   * access panel. Early Access is account-wide, never per character.
+   */
+  accountAccess: AdminAccountAccessView;
 };
 
 export async function loadAdminInspectorState(
@@ -184,6 +190,7 @@ export async function loadAdminInspectorState(
             .from(cargoHoldItemInstances)
             .where(eq(cargoHoldItemInstances.characterId, context.character.id)),
         ]);
+      const accountAccess = await loadAccountAccessView(transaction, ownerRows.playerAccountId);
       const state = await stateFromTransaction(
         transaction,
         characterId,
@@ -263,6 +270,7 @@ export async function loadAdminInspectorState(
         missions,
         uniqueInstances,
         audit: auditRows,
+        accountAccess,
       };
     },
     now,

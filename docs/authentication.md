@@ -163,15 +163,17 @@ Without the first four, production registration reports unavailable; existing
 accounts can still sign in. PR previews need their own values (or remain
 closed to registration). Never commit or print any of them.
 
-**Keep production registration closed until the gameplay-access gate ships.**
-Issue #221 deliberately does not gate gameplay: a verified account that
-reserves a character is redirected straight into `/play/{characterId}`, and
-Play does not yet enforce `publicGameplayOpen || earlyAccessGranted`. So leave
-the four production values above **unset** — registration then stays closed —
-until the follow-up gameplay-access / launch-control slice has merged and its
-closed-gate behavior has been verified in production. Until then, exercise the
-real signup → ZeptoMail → verification journey only on a PR preview configured
-with its own values.
+**Enable production registration only after the gameplay gate is verified.**
+Issue #221 did not gate gameplay; issue #223 does: gameplay requires
+`emailVerified && (publicGameplayOpen || earlyAccessGranted)`, public gameplay
+is seeded Closed, and a verified ordinary account that reserves a character
+returns to Characters instead of entering Play (see `docs/gameplay-access.md`).
+Leave the four production values above **unset** until #223 has merged, its
+migration has run, and its closed-gate behavior has been verified in
+production; then registration may be enabled while ordinary verified accounts
+stay reservation-only. Opening public gameplay remains a separate, explicit,
+audited operator action. The rollout preflight in `docs/gameplay-access.md`
+is the checklist.
 
 ### Pre-cutover accounts
 

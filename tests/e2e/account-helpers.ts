@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { expect, type BrowserContext, type Page } from "@playwright/test";
 import { E2E_TURNSTILE_PASS_TOKEN } from "@/server/local-e2e";
+import { grantTestEarlyAccess, userIdForEmail } from "./fixtures";
 
 /**
  * Browser helpers for the real registration → verification journey (issue
@@ -109,14 +110,24 @@ export async function submitRegistration(
  * Register through the real form, then open the emailed verification link:
  * Better Auth verifies the address, signs the player in, and lands on
  * `/characters`.
+ *
+ * The new account receives fixture Early Access by default (issue #223) so
+ * registration journeys that go on to reserve and play are independent of the
+ * global public-gameplay switch; the closed-gate journeys in
+ * `gameplay-access.spec.ts` pass `{ earlyAccess: false }`.
  */
 export async function registerVerifiedAccount(
   page: Page,
   input: { playerName: string; email: string; password: string },
+  options: { earlyAccess?: boolean } = {},
 ): Promise<void> {
   await submitRegistration(page, input);
   await page.goto(await waitForVerificationLink(input.email));
   await page.waitForURL("**/characters");
+  if (options.earlyAccess !== false) {
+    await grantTestEarlyAccess(await userIdForEmail(input.email));
+    await page.reload();
+  }
   await expect(page.getByRole("heading", { name: "Characters" })).toBeVisible();
 }
 

@@ -11,7 +11,7 @@ import { skillLevelThresholds } from "@/game/config/balance";
 import { getSkillPresentation } from "@/game/content/skill-presentation";
 import { validateCharacterName } from "@/game/domain/character-name";
 import { projectCharacterProfile, type CharacterProfile } from "@/game/domain/character-profile";
-import { requireOwnedCharacter } from "@/server/ownership";
+import { requirePlayableOwnedCharacter } from "@/server/gameplay-access";
 
 /**
  * Narrow authenticated public-character-profile read boundary (issue #64).
@@ -51,11 +51,12 @@ export async function getCharacterProfile(
   activeCharacterId: string,
   targetName: string,
 ): Promise<CharacterProfile> {
-  // Ownership of the active character is the authenticated scope for every
-  // read (same boundary as #62). The character ID itself is immutable, so this
-  // guard cannot go stale; the location is NOT read here — the profile
+  // Gameplay access (issue #223) and ownership of the active character are
+  // the authenticated scope for every read (same boundary as #62). The
+  // character ID itself is immutable, so ownership cannot go stale; access is
+  // re-read on every request. The location is NOT read here — the profile
   // statement below resolves it atomically at read time.
-  await requireOwnedCharacter(userId, activeCharacterId);
+  await requirePlayableOwnedCharacter(userId, activeCharacterId);
 
   // Validate through the name boundary (SSOT): malformed or overlong raw query
   // input is refused rather than normalized into a lookup key.

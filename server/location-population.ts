@@ -8,15 +8,16 @@ import {
   projectLocationPopulation,
   type LocationPopulationEntry,
 } from "@/game/domain/location-population";
-import { requireOwnedCharacter } from "@/server/ownership";
+import { requirePlayableOwnedCharacter } from "@/server/gameplay-access";
 
 /**
  * Narrow authenticated read boundary for the characters at the active
  * character's authoritative location (issue #62).
  *
- * - The request is scoped by the owned active character: the server resolves
- *   the location from the character row; a client can never enumerate a
- *   location directly or use another player's character.
+ * - The request requires gameplay access (issue #223) and is scoped by the
+ *   owned active character: the server resolves the location from the
+ *   character row; a client can never enumerate a location directly or use
+ *   another player's character.
  * - One set-based query fetches the population, the owner's Player name, and
  *   every persisted skill-XP row without N+1 queries; absent XP rows are
  *   authoritative zero.
@@ -32,7 +33,7 @@ export async function getLocationPopulation(
   userId: string,
   characterId: string,
 ): Promise<LocationPopulation> {
-  const character = await requireOwnedCharacter(userId, characterId);
+  const character = await requirePlayableOwnedCharacter(userId, characterId);
 
   const rows = await db
     .select({

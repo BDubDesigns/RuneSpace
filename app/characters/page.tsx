@@ -5,8 +5,15 @@ import { ActionLink } from "@/components/ui/ActionLink";
 import { Panel } from "@/components/ui/Panel";
 import { SectionHeader } from "@/components/ui/SectionHeader";
 import { SignOutButton } from "@/features/auth/SignOutButton";
+import {
+  CharactersAccessCallout,
+  ReadyForAlphaStatus,
+  type CharactersAccess,
+} from "@/features/characters/CharactersAccessCallout";
 import { ManageCharacterPortrait } from "@/features/characters/ManageCharacterPortrait";
+import { db } from "@/db";
 import { auth } from "@/server/auth";
+import { loadAccountGameplayAccess } from "@/server/gameplay-access";
 import {
   EMAIL_VERIFICATION_REQUIRED_MESSAGE,
   ensurePlayerAccount,
@@ -33,6 +40,15 @@ export const metadata = { title: "Characters — RuneSpace" };
  * catalog portrait or the neutral placeholder for legacy/unowned characters)
  * and the Choose/Change portrait flow; picker options and presentation are
  * projected from the authenticated player's account unlocks.
+ *
+ * Issue #223: this is account/character management, so it stays available
+ * while public gameplay is closed. The authoritative gameplay-access decision
+ * (loaded fresh for this request) selects the treatment: a verified account
+ * waiting for Soft Alpha sees its reservation state, a READY FOR ALPHA status on
+ * each reserved character, and "Reserve character" on empty slots — never a
+ * fake disabled Play control. Early Access and public-open accounts keep the
+ * normal Play actions. Hiding Play is presentation only; the Play page and
+ * every gameplay command enforce the gate server-side.
  */
 export default async function CharactersPage({
   searchParams,
@@ -48,11 +64,21 @@ export default async function CharactersPage({
 
   const user = await requireCurrentUser(await headers());
   const account = await ensurePlayerAccount(user.id);
-  const [chars, used, ownedPortraitIds] = await Promise.all([
+  const [chars, used, ownedPortraitIds, gameplayAccess] = await Promise.all([
     listCharacters(account.id),
     occupiedSlots(account.id),
     loadPlayerPortraitUnlockIds(account.id),
+    loadAccountGameplayAccess(db, user.id),
   ]);
+  const verified = gameplayAccess.emailVerified;
+  const access: CharactersAccess | null = !verified
+    ? null
+    : !gameplayAccess.decision.allowed
+      ? "waiting"
+      : gameplayAccess.decision.via === "early_access"
+        ? "early_access"
+        : "open";
+  const canPlay = gameplayAccess.decision.allowed;
   const portraitOptions = getSelectablePortraitOptions(ownedPortraitIds);
 
   const slots = [];
@@ -71,6 +97,14 @@ export default async function CharactersPage({
       <p className="mt-2 text-sm text-[color:var(--rs-text-secondary)]">
         Signed in as <span className="text-[color:var(--rs-text-primary)]">{user.email}</span>.
       </p>
+      {access ? (
+        <CharactersAccessCallout
+          access={access}
+          hasCharacters={chars.length > 0}
+          launchTargetAt={gameplayAccess.launchTargetAt?.toISOString() ?? null}
+          serverNow={new Date().toISOString()}
+        />
+      ) : null}
       <ul className="mt-6 space-y-3">
         {slots.map(({ slot, character }) => {
           const portrait =
@@ -102,28 +136,42 @@ export default async function CharactersPage({
                     <p className="truncate text-xs text-[color:var(--rs-text-muted)]">
                       {portrait.kind === "selected" ? portrait.displayName : "No portrait yet"}
                     </p>
+                    {access === "waiting" ? (
+                      <div className="mt-2">
+                        <ReadyForAlphaStatus />
+                      </div>
+                    ) : null}
                   </div>
-                  <ActionLink className="shrink-0" href={`/play/${character.id}`}>
-                    Play
-                  </ActionLink>
+                  {canPlay ? (
+                    <ActionLink className="shrink-0" href={`/play/${character.id}`}>
+                      Play
+                    </ActionLink>
+                  ) : null}
                 </div>
               ) : (
-                <div className="min-w-0 flex-1">
-                  <p className="font-display text-xs uppercase tracking-wide text-[color:var(--rs-text-muted)]">
-                    Slot {slot}
-                  </p>
-                  <p className="italic text-[color:var(--rs-text-muted)]">Empty</p>
+                <div className="flex items-center gap-4">
+                  <div className="min-w-0 flex-1">
+                    <p className="font-display text-xs uppercase tracking-wide text-[color:var(--rs-text-muted)]">
+                      Slot {slot}
+                    </p>
+                    <p className="italic text-[color:var(--rs-text-muted)]">Empty</p>
+                  </div>
+                  {access === "waiting" ? (
+                    <ActionLink className="shrink-0" href="/characters/new" intent="secondary">
+                      Reserve character
+                    </ActionLink>
+                  ) : null}
                 </div>
               )}
             </Panel>
           );
         })}
       </ul>
-      {!user.emailVerified ? (
+      {!verified ? (
         <p className="mt-6 text-center text-sm text-[color:var(--rs-text-muted)]">
           {EMAIL_VERIFICATION_REQUIRED_MESSAGE}
         </p>
-      ) : hasFreeSlot ? (
+      ) : access === "waiting" ? null : hasFreeSlot ? (
         <ActionLink href="/characters/new" intent="secondary" className="mt-6 flex w-full">
           New character
         </ActionLink>

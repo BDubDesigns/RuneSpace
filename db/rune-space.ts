@@ -10,6 +10,7 @@ import {
   jsonb,
   pgTable,
   primaryKey,
+  smallint,
   text,
   timestamp,
   unique,
@@ -74,8 +75,22 @@ export const playerAccounts = pgTable(
     // Update as read. This is intentionally the only unread-news state: no
     // per-Update row, no per-character row.
     newsReadThroughAt: timestamp("news_read_through_at", { withTimezone: true }),
+    // Issue #223 — the CURRENT account-level Early Access grant. Both columns
+    // null = no Early Access; both present = Early Access active (grant sets
+    // both, revoke clears both). There is intentionally no boolean, expiry, or
+    // per-character row; grant/revoke history lives only in the append-only
+    // operator audit. `granted_by` is the opaque Better Auth admin user id (no
+    // FK, exactly like `operator_audit_logs.admin_user_id`).
+    earlyAccessGrantedAt: timestamp("early_access_granted_at", { withTimezone: true }),
+    earlyAccessGrantedByAdminUserId: text("early_access_granted_by_admin_user_id"),
   },
-  (table) => [index("player_accounts_user_id_idx").on(table.userId)],
+  (table) => [
+    index("player_accounts_user_id_idx").on(table.userId),
+    check(
+      "player_accounts_early_access_paired_check",
+      sql`(${table.earlyAccessGrantedAt} is null) = (${table.earlyAccessGrantedByAdminUserId} is null)`,
+    ),
+  ],
 );
 
 /** Permanent player-account ownership of explicitly unlockable portraits. */
@@ -827,7 +842,11 @@ export const characterWorkOrderBoardRefreshes = pgTable(
  * This is deliberately NOT an event-sourcing or observability store:
  * - `admin_user_id` is the authenticated Better Auth admin user id (opaque
  *   text; no FK so the log is decoupled and can never be orphaned by a user).
- * - `character_id` is the target character (FK RESTRICT for referential safety).
+ * - `target_kind` makes the target scope explicit (issue #223): `character`
+ *   rows carry only `character_id`, `player_account` rows carry only
+ *   `player_account_id`, and `system` rows (global RuneSpace access state)
+ *   carry neither. A CHECK enforces exactly that shape; both FKs RESTRICT.
+ *   Every row written before #223 is a `character` row and keeps its meaning.
  * - `operation` is a stable op-kind, e.g. `stop_current_action`.
  * - `target_identity` is the affected stack/instance/mission/skill/location/
  *   action id where applicable.
@@ -843,17 +862,61 @@ export const operatorAuditLogs = pgTable(
       .primaryKey()
       .default(sql`gen_random_uuid()`),
     adminUserId: text("admin_user_id").notNull(),
-    characterId: text("character_id")
-      .notNull()
-      .references(() => characters.id, { onDelete: "restrict" }),
+    targetKind: text("target_kind").notNull(),
+    characterId: text("character_id").references(() => characters.id, { onDelete: "restrict" }),
+    playerAccountId: text("player_account_id").references(() => playerAccounts.id, {
+      onDelete: "restrict",
+    }),
     operation: text("operation").notNull(),
     targetIdentity: text("target_identity"),
     details: jsonb("details").notNull(),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [
+    check(
+      "operator_audit_logs_target_kind_check",
+      sql`${table.targetKind} in ('character', 'player_account', 'system')`,
+    ),
+    check(
+      "operator_audit_logs_target_shape_check",
+      sql`(${table.targetKind} = 'character' and ${table.characterId} is not null and ${table.playerAccountId} is null) or (${table.targetKind} = 'player_account' and ${table.playerAccountId} is not null and ${table.characterId} is null) or (${table.targetKind} = 'system' and ${table.characterId} is null and ${table.playerAccountId} is null)`,
+    ),
     index("operator_audit_logs_character_created_idx").on(table.characterId, table.createdAt),
+    index("operator_audit_logs_player_account_created_idx").on(
+      table.playerAccountId,
+      table.createdAt,
+    ),
+    index("operator_audit_logs_system_created_idx")
+      .on(table.createdAt)
+      .where(sql`${table.targetKind} = 'system'`),
   ],
+);
+
+/**
+ * The one explicit application-data boundary for global RuneSpace access state
+ * (issue #223). Exactly one row (`id = 1`, enforced by CHECK); it is not a
+ * generic settings/key-value store and has no lifecycle enum.
+ *
+ * - `public_gameplay_open` is the explicit, reversible operator switch. The
+ *   migration seeds it `false` (Closed) and only an audited operator command
+ *   changes it — never a clock, an env var, or a redeploy.
+ * - `soft_alpha_launch_target_at` is a fixed presentation instant for the
+ *   October 27 countdown, seeded by the migration. Reaching it never mutates
+ *   access state, and no application code path writes it.
+ * - `updated_by_admin_user_id` is null only for the migration-seeded row.
+ */
+export const runespaceAccessState = pgTable(
+  "runespace_access_state",
+  {
+    id: smallint("id").primaryKey().default(1),
+    publicGameplayOpen: boolean("public_gameplay_open").notNull().default(false),
+    softAlphaLaunchTargetAt: timestamp("soft_alpha_launch_target_at", {
+      withTimezone: true,
+    }).notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedByAdminUserId: text("updated_by_admin_user_id"),
+  },
+  (table) => [check("runespace_access_state_singleton_check", sql`${table.id} = 1`)],
 );
 
 /**
@@ -922,3 +985,4 @@ export type CargoHoldStack = typeof cargoHoldStacks.$inferSelect;
 export type CargoHoldItemInstance = typeof cargoHoldItemInstances.$inferSelect;
 export type OperatorAuditLog = typeof operatorAuditLogs.$inferSelect;
 export type NewOperatorAuditLog = typeof operatorAuditLogs.$inferInsert;
+export type RuneSpaceAccessState = typeof runespaceAccessState.$inferSelect;

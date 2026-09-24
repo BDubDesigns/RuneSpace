@@ -27,6 +27,14 @@ export const PACKAGE_MANAGER = process.platform === "win32" ? "pnpm.cmd" : "pnpm
 export { assertLocalDatabaseUrl } from "./local-db-url.mjs";
 
 /**
+ * The fixed Better Auth user id the admin/operator browser specs seed and sign
+ * in as (`tests/e2e/admin-session.ts` `ADMIN_USER_ID`). Both local runners put
+ * it on the server-only admin allowlist so operator journeys run; it is a
+ * loopback test identity, never a real operator.
+ */
+export const E2E_ADMIN_USER_IDS = "00000000-0000-0000-0000-0000000000a1";
+
+/**
  * The account-boundary settings every local production E2E server needs
  * (issue #221): test-only Turnstile keys, Turnstile site verification
  * redirected to the server's own loopback stub, and a run-scoped outbox file

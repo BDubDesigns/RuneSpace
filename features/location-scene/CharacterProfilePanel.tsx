@@ -1,11 +1,13 @@
 "use client";
 
 import { useEffect, useRef, useState, type RefObject } from "react";
+import { useRouter } from "next/navigation";
 import { ActionButton } from "@/components/ui/ActionButton";
 import { Feedback } from "@/components/ui/Feedback";
 import { CharacterPortrait } from "@/components/portraits/CharacterPortrait";
 import { CharacterSkillList } from "@/features/shared/CharacterSkillList";
 import type { CharacterProfile } from "@/game/domain/character-profile";
+import { GAMEPLAY_ACCESS_REQUIRED_CODE } from "@/game/domain/gameplay-access";
 
 /** Public same-location profile presentation. The server remains the authority
  * for visibility and only returns the approved public projection. */
@@ -24,6 +26,7 @@ export function CharacterProfilePanel({
   panelRef: RefObject<HTMLElement | null>;
   onClose: () => void;
 }) {
+  const router = useRouter();
   const [profile, setProfile] = useState<CharacterProfile | undefined>();
   const [error, setError] = useState<string | undefined>();
   const [loading, setLoading] = useState(false);
@@ -69,8 +72,15 @@ export function CharacterProfilePanel({
         const body = (await response.json().catch(() => null)) as {
           profile?: CharacterProfile;
           error?: string;
+          code?: string;
         } | null;
         if (token !== requestToken.current) return;
+        // Issue #223: gameplay access was revoked or closed since this page
+        // loaded; the server refused the read, so recover to Characters.
+        if (body?.code === GAMEPLAY_ACCESS_REQUIRED_CODE) {
+          router.replace("/characters");
+          return;
+        }
         setLoading(false);
         if (!response.ok || !body?.profile) {
           setProfile(undefined);

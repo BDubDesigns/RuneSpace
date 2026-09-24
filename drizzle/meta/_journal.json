@@ -183,6 +183,13 @@
       "when": 1790184362472,
       "tag": "0025_player_identity_verification",
       "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1790281390985,
+      "tag": "0026_gameplay_access_launch_control",
+      "breakpoints": true
     }
   ]
 }

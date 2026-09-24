@@ -468,6 +468,10 @@ test("automatically reconciles arrival without refresh or reload", async ({
 test("the full journey walks, arrives, and returns between the original locations", async ({
   page,
 }) => {
+  // The whole multi-leg journey (Crash Site → Scramble → Jag and back, with
+  // Mining and reloads) runs close to the 30 s default under canonical
+  // two-worker load; the same timeout reproduces on unmodified main.
+  test.setTimeout(60_000);
   const characterId = new URL(page.url()).pathname.split("/").at(-1)!;
 
   // Stationary at the Crash Site — screenshot. Mining is at The Jag after issue #83,

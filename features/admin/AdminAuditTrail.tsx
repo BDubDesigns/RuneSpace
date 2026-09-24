@@ -58,18 +58,28 @@ function AuditTimestamp({ value }: { value: Date | string }) {
   );
 }
 
-export function AdminAuditTrail({ rows }: { rows: readonly AuditRow[] }) {
+export function AdminAuditTrail({
+  rows,
+  title = "Operator audit history",
+  emptyMessage = "No operator mutations recorded for this character yet.",
+  listTestId = "admin-audit-list",
+}: {
+  rows: readonly AuditRow[];
+  /** The account and system access histories (issue #223) name their scope. */
+  title?: string;
+  emptyMessage?: string;
+  /** Distinguishes the character, account, and system histories on one page. */
+  listTestId?: string;
+}) {
   return (
     <Panel className="p-4" tone="raised">
       <h2 className="font-display text-sm uppercase tracking-wide text-[color:var(--rs-text-muted)]">
-        Operator audit history
+        {title}
       </h2>
       {rows.length === 0 ? (
-        <p className="mt-3 text-sm text-[color:var(--rs-text-muted)]">
-          No operator mutations recorded for this character yet.
-        </p>
+        <p className="mt-3 text-sm text-[color:var(--rs-text-muted)]">{emptyMessage}</p>
       ) : (
-        <ol className="mt-3 space-y-2" data-testid="admin-audit-list">
+        <ol className="mt-3 space-y-2" data-testid={listTestId}>
           {rows.map((row) => {
             const summary = formatAuditSummary(row.operation, row.details, row.targetIdentity);
             const hasDetails =

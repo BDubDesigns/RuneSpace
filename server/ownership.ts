@@ -1,7 +1,7 @@
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { auth } from "@/server/auth";
-import { playerAccounts, characters, type PlayerAccount, type Character } from "@/db/rune-space";
+import { playerAccounts, type PlayerAccount } from "@/db/rune-space";
 
 /**
  * Server-authoritative ownership boundaries (single source of truth for
@@ -16,8 +16,10 @@ import { playerAccounts, characters, type PlayerAccount, type Character } from "
  * - `requireCurrentUser`  — authenticate session, return Better Auth user.
  * - `ensurePlayerAccount`  — idempotently create the 1:1 account for a user.
  * - `requirePlayerAccount` — load the account, throwing if missing.
- * - `requireOwnedCharacter`— load a character and verify it belongs to the
- *                           authenticated user's account.
+ *
+ * Gameplay reads of an owned character go through
+ * `requirePlayableOwnedCharacter` in `server/gameplay-access.ts`, which also
+ * enforces the issue #223 gameplay-access gate.
  */
 
 export class OwnershipError extends Error {
@@ -101,31 +103,4 @@ export async function requirePlayerAccount(userId: string): Promise<PlayerAccoun
     throw new OwnershipError("Player account not found", 404);
   }
   return row;
-}
-
-/**
- * Load a character by ID and verify it belongs to the authenticated user's
- * player account. Returns the character, or throws if not found / not owned.
- *
- * This is the authoritative guard for every protected character route. Even if a
- * caller forges another user's character ID, the FK join through the
- * authenticated account rejects it.
- */
-export async function requireOwnedCharacter(
-  userId: string,
-  characterId: string,
-): Promise<Character> {
-  const account = await requirePlayerAccount(userId);
-
-  const rows = await db.select().from(characters).where(eq(characters.id, characterId)).limit(1);
-  const character = rows[0];
-
-  if (!character) {
-    throw new OwnershipError("Character not found", 404);
-  }
-  if (character.playerAccountId !== account.id) {
-    // Forged/foreign character ID: do not reveal existence details.
-    throw new OwnershipError("Character not found", 404);
-  }
-  return character;
 }

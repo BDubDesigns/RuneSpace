@@ -2,7 +2,8 @@ import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import * as authSchema from "@/db/auth-schema";
 import * as rune from "@/db/rune-space";
-import { cleanupTestUser } from "../integration/fixtures";
+import * as ownership from "@/server/ownership";
+import { cleanupTestUser, createLegacyCharacterForUser } from "../integration/fixtures";
 import {
   stubTurnstile,
   submitRegistration,
@@ -12,7 +13,7 @@ import {
   waitForVerificationLink,
 } from "./account-helpers";
 import { expect, test } from "@playwright/test";
-import { establishAuthenticatedSession } from "./fixtures";
+import { establishAuthenticatedSession, grantTestEarlyAccess } from "./fixtures";
 
 /**
  * Soft-alpha registration and email verification (issue #221), through the
@@ -85,6 +86,11 @@ test.describe("account verification", () => {
     await page.waitForURL("**/characters");
     await expect(page.getByRole("heading", { name: "Characters" })).toBeVisible();
 
+    // Reserving and entering Play needs gameplay access (issue #223); fixture
+    // Early Access keeps this registration journey independent of the global
+    // switch. The closed-gate reservation journey is gameplay-access.spec.ts.
+    await grantTestEarlyAccess(userId!);
+    await page.reload();
     await page.getByRole("link", { name: "New character" }).click();
     const hero = `Reserved ${Math.random().toString(36).slice(2, 8)}`;
     await page.getByLabel("Character name").fill(hero);
@@ -161,6 +167,46 @@ test.describe("account verification", () => {
         page.getByText("Verify your email address before creating characters."),
       ).toBeVisible();
       await expect(page.getByLabel("Character name")).toHaveCount(0);
+    } finally {
+      await context.close();
+    }
+  });
+
+  test("an unverified account with a saved character sees the verification reminder, not READY FOR ALPHA", async ({
+    browser,
+  }) => {
+    // Issue #223: READY FOR ALPHA belongs only to a verified account waiting
+    // for Soft Alpha; an unverified account (for example a pre-cutover one
+    // with a saved character) keeps the verification reminder instead.
+    const { context, userId } = await establishAuthenticatedSession(
+      browser,
+      "Unverified Legacy",
+      uniqueEmail("legacy"),
+      { earlyAccess: false },
+    );
+    createdUsers.push(userId);
+    await createLegacyCharacterForUser(
+      db,
+      rune,
+      ownership,
+      userId,
+      `Legacy ${Math.random().toString(36).slice(2, 8)}`,
+      undefined,
+      { gameplayAccess: false },
+    );
+    await db
+      .update(authSchema.user)
+      .set({ emailVerified: false })
+      .where(eq(authSchema.user.id, userId));
+    try {
+      const page = await context.newPage();
+      await useDistinctClientIp(page);
+      await page.goto("/characters");
+      await expect(
+        page.getByText("Verify your email address before creating characters."),
+      ).toBeVisible();
+      await expect(page.getByText("READY FOR ALPHA", { exact: true })).toHaveCount(0);
+      await expect(page.getByRole("link", { name: "Play" })).toHaveCount(0);
     } finally {
       await context.close();
     }

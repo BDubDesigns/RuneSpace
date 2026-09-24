@@ -65,9 +65,12 @@ helper on the assumption it must match a UUID format.
 
 ## Scope and single-character discipline
 
-All operator commands act on exactly **one** selected character. There is **no
-population-wide reset**: RESET ALL MISSIONS clears only the selected
-character's mission rows. Operator commands are reached behind a character
+All character operator commands act on exactly **one** selected character.
+There is **no population-wide reset**: RESET ALL MISSIONS clears only the
+selected character's mission rows. The two issue #223 access controls are the
+deliberate exceptions: Early Access targets the selected character's whole
+owning player account, and PUBLIC GAMEPLAY targets the global RuneSpace access
+state (see "Account and global access controls" below). Operator commands are reached behind a character
 search (`/admin/characters`) and resolve to a per-character inspector
 (`/admin/characters/{characterId}`).
 
@@ -130,10 +133,55 @@ entering a command is **not** an operator mutation and is never logged.
 Every command returns the refreshed authoritative `PlayGameplayState`, which the
 inspector swaps in place.
 
+## Account and global access controls (Issue #223)
+
+The gameplay-access contract itself — the rule, its seams, persistence, and
+the rollout preflight — is `docs/gameplay-access.md`. The console adds two
+controls; there is no new admin page, account search, or date editor.
+
+- **Account access panel** on the existing selected-character inspector. The
+  inspector already resolves the character's owning player account; the panel
+  shows Player account ID, email verification status, public gameplay
+  Open/Closed, Early Access Granted/Not granted, granted at, and granted by
+  (the granting operator's user id), plus that account's access history.
+  `Grant Early Access` (confirmation **Grant Early Access to this account?** —
+  "All characters on this RuneSpace account will be able to enter gameplay
+  before public Soft Alpha opens.") and `Revoke Early Access` (equivalent
+  confirmation) apply to the whole account, never only the inspected
+  character. While public gameplay is open the grant is kept and marked
+  currently irrelevant.
+- **PUBLIC GAMEPLAY panel** on the Operator Console home, separate from the
+  inspector: the launch target (`October 27, 2026 · 9:00 AM Pacific`), current
+  state, and the shared countdown (**LAUNCH IMMINENT!** at/after the target
+  while closed). `Open Public Gameplay` (confirmation **Open RuneSpace to
+  everyone?**) and the emergency `Close Public Gameplay` (confirmation **Close
+  public gameplay?**) flip the one explicit switch. The target is never edited.
+
+| Control | Command | Target | Notes |
+| --- | --- | --- | --- |
+| Grant Early Access | `grant_early_access` | player account | Sets both paired fields; already granted ⇒ no-op, no audit. |
+| Revoke Early Access | `revoke_early_access` | player account | Clears both paired fields; not granted ⇒ no-op, no audit. |
+| Open Public Gameplay | `open_public_gameplay` | system | Already open ⇒ no-op, no audit. |
+| Close Public Gameplay | `close_public_gameplay` | system | Already closed ⇒ no-op, no audit. |
+
+These commands follow the same production stance: `server/admin-commands.ts`
+calls `requireAdmin(headers)` and then the internal seam in
+`server/admin-command-seams.ts`, which locks the account row (or the access
+singleton) `FOR UPDATE` and commits the state change and its one audit row in
+one transaction. Reads for the panels live in `server/admin-access-state.ts`.
+Operator status never grants gameplay: an operator's own account plays early
+only with an explicit Early Access grant.
+
 ## Audit history
 
-`operatorAuditLogs` (`db/rune-space.ts`, migration `0015`) is the smallest
-relational append-only record of successful operator mutations. One row is
+`operatorAuditLogs` (`db/rune-space.ts`, migration `0015`; target
+generalization in `0026`) is the smallest relational append-only record of
+successful operator mutations. Each row states its target explicitly:
+`target_kind` is `character` (only `character_id` set), `player_account` (only
+`player_account_id` set), or `system` (neither), enforced by a database CHECK
+with RESTRICT foreign keys. Every row written before issue #223 migrated as a
+`character` row with its meaning unchanged, and the per-character history the
+inspector shows is still exactly that character's rows. One row is
 written **atomically inside the same transaction** as the mutation it records, so
 a success and its audit commit or roll back together. Rows are immutable; there
 is no update or delete path, and the operator console only ever reads them.
@@ -142,10 +190,14 @@ An audit row is written **only for a genuine operator mutation** (correction D6)
 
 - No audit for STOP-after-natural-reconcile-end, reset-with-no-rows,
   reset-all-none, set-XP-to-same-value, teleport-to-current-location-without-interruption, or any refused/stale/invalid command.
+- No audit for granting Early Access that is already granted, revoking Early
+  Access that is not granted, opening public gameplay that is open, or closing
+  public gameplay that is closed.
 - Normal lazy gameplay reconciliation is never audited.
 
 Operation kinds are enumerated in `server/admin-audit.ts`
-(`OPERATOR_OPERATIONS`) and include a `targetIdentity` and a structured
+(`OPERATOR_OPERATION_TARGET_KINDS`, which also fixes each operation's one
+target kind) and include a `targetIdentity` and a structured
 `details` (never secrets, tokens, or session data). The console renders each
 row's `details` as a concise human-readable summary (via
 `formatAuditSummary` in `features/admin/admin-format.ts`, which resolves
@@ -181,12 +233,16 @@ progress, and the recent operator history.
   `tests/unit/mission-reset-scope.test.ts`,
   `tests/unit/admin-surface.test.ts` (production surface exposes no bypass seam),
   `tests/unit/admin-destinations.test.ts` (every offered teleport destination
-  resolves canonically).
+  resolves canonically), `tests/unit/operator-audit-target.test.ts` (issue
+  #223 target shapes).
 - PostgreSQL integration: `tests/integration/admin-operator.test.ts` exercises
   reconcile/interrupt/audit/command-layer rejection, Mining-tool FORCE UNEQUIP
   invalidation, Cargo stack removal reloading post-mutation state, authored-only
   mission reset, and fail-closed unsupported-action interruption, against a real
-  database.
+  database. Issue #223 access controls, their atomic audit, no-op silence, and
+  non-admin refusal are in `tests/integration/gameplay-access.test.ts`; the
+  audit migration replay is `tests/integration/gameplay-access-migration.test.ts`.
 - Browser: the admin console has an E2E spec whose deterministic admin-session
   bootstrap is gated on a proof (see the PR notes); the rest of #113 is not
-  gated on that fixture.
+  gated on that fixture. The issue #223 controls are exercised end to end in
+  `tests/e2e/gameplay-access.spec.ts`.

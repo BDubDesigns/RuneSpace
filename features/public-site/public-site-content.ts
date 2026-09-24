@@ -5,12 +5,14 @@ export const publicSiteNavigation = [
 ] as const;
 
 export const publicLandingContent = {
+  // Issue #223: the locked Soft Alpha reservation state.
   hero: {
     eyebrow: "Low-fi sci-fi RPG / Holo Hollow",
-    status: "Playable pre-alpha",
-    title: "The ship is down. The work starts here.",
+    status: "SOFT ALPHA — OCTOBER 27",
+    title: "Your ship crashed. The engines are dead. But you’re not. Yet.",
     description:
-      "RuneSpace is a browser-first, low-fi sci-fi RPG about making something useful from a bad landing. Travel through Holo Hollow, learn the local trades, and turn salvage into a way forward.",
+      "Create your account, verify your email, and reserve up to three globally unique character names before RuneSpace Soft Alpha opens October 27.",
+    reserveAction: "Reserve your characters",
   },
   buildSignal: [
     { label: "Region", value: "Holo Hollow" },

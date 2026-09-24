@@ -1,17 +1,12 @@
 import { and, eq } from "drizzle-orm";
 import { db } from "@/db";
-import {
-  activeActions,
-  characters,
-  playerAccounts,
-  type ActiveAction,
-  type Character,
-} from "@/db/rune-space";
+import { activeActions, characters, type ActiveAction, type Character } from "@/db/rune-space";
 import {
   calculateResolutionWindow,
   cursorAfterConsumedTicks,
   type ResolutionWindow,
 } from "@/game/domain/timing";
+import { requireGameplayAccess } from "@/server/gameplay-access";
 import { OwnershipError, requireCurrentUser } from "@/server/ownership";
 
 export type DatabaseTransaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
@@ -78,19 +73,20 @@ export type ResolvedCharacterContext = {
   action: ActiveAction | undefined;
 };
 
-/** Resolve the owning player account id for a Better Auth user inside a transaction. */
-async function resolvePlayerAccountId(
+/**
+ * Resolve the owning player account id for a Better Auth user inside a
+ * transaction, requiring gameplay access (issue #223).
+ *
+ * This is the gameplay-access seam for every owned-character command: both
+ * `withResolvedOwnedCharacter` and `withLockedOwnedCharacter` enter through it,
+ * so a refused account never locks its character row and never reconciles due
+ * activity work. The access inputs are read fresh inside this transaction.
+ */
+async function resolvePlayableAccountId(
   transaction: DatabaseTransaction,
   userId: string,
 ): Promise<string> {
-  const accounts = await transaction
-    .select({ id: playerAccounts.id })
-    .from(playerAccounts)
-    .where(eq(playerAccounts.userId, userId))
-    .limit(1);
-  const account = accounts[0];
-  if (!account) throw new OwnershipError("Player account not found", 404);
-  return account.id;
+  return requireGameplayAccess(transaction, userId);
 }
 
 /**
@@ -198,6 +194,7 @@ async function reconcileActiveAction<Snapshot, Outcome>(
  * Authorize an owned character without resolving its active action.
  * Instantaneous location interactions use this boundary so an expired Mining or
  * Travel row cannot be implicitly progressed as a side effect of the interaction.
+ * Gameplay access (issue #223) is required before the row is locked.
  */
 export async function withLockedOwnedCharacter<Result>(
   userId: string,
@@ -205,7 +202,7 @@ export async function withLockedOwnedCharacter<Result>(
   command: (transaction: DatabaseTransaction, context: { character: Character }) => Promise<Result>,
 ): Promise<Result> {
   return db.transaction(async (transaction) => {
-    const playerAccountId = await resolvePlayerAccountId(transaction, userId);
+    const playerAccountId = await resolvePlayableAccountId(transaction, userId);
     const character = await lockCharacterRow(transaction, characterId, playerAccountId);
     return command(transaction, { character });
   });
@@ -220,6 +217,8 @@ export async function withLockedOwnedCharacter<Result>(
  * transaction through the shared `lockCharacterRow` (scoped by the player's
  * account id), so a forged or foreign character id matches nothing and yields
  * the existing safe `404` semantics without locking another player's row.
+ * Gameplay access (issue #223) is required first, so a refused account never
+ * locks the row or reconciles due activity work.
  */
 export async function withResolvedOwnedCharacter<Snapshot, Outcome, Result>(
   userId: string,
@@ -229,7 +228,7 @@ export async function withResolvedOwnedCharacter<Snapshot, Outcome, Result>(
   now: Date = new Date(),
 ): Promise<Result> {
   return db.transaction(async (transaction) => {
-    const playerAccountId = await resolvePlayerAccountId(transaction, userId);
+    const playerAccountId = await resolvePlayableAccountId(transaction, userId);
     const character = await lockCharacterRow(transaction, characterId, playerAccountId);
     const action = await reconcileActiveAction(transaction, character, resolver, now);
     return command(transaction, { character, action });

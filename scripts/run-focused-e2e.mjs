@@ -27,6 +27,7 @@ import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
   accountBoundaryE2eEnv,
+  E2E_ADMIN_USER_IDS,
   assertLocalDatabaseUrl,
   assertNode22,
   assertPortAvailable,
@@ -56,6 +57,8 @@ export const FOCUSED_PHASES = [
   "cut-your-teeth",
   "rusk-recovery",
   "work-orders",
+  "gameplay-access",
+  "account-verification",
 ];
 // Local E2E build-and-runtime placeholder only: the production build and
 // `next start` both run as production, so server/env.ts requires a
@@ -117,6 +120,9 @@ export function buildFocusedEnv({ databaseUrl, port, databaseName }) {
     // next.config.ts for the Play-boundary test.
     RUNESPACE_E2E_MINING: "true",
     RUNESPACE_E2E_PLAY_ERROR: "true",
+    // Operator journeys (the gameplay-access phase) sign in as the fixed
+    // loopback test admin, exactly as in the canonical runner.
+    RUNESPACE_ADMIN_USER_IDS: E2E_ADMIN_USER_IDS,
     PLAYWRIGHT_PORT: String(port),
     PORT: String(port),
     BASE_URL: `http://127.0.0.1:${port}`,

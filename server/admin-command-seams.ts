@@ -1,4 +1,5 @@
 import { and, eq, inArray } from "drizzle-orm";
+import { db } from "@/db";
 import {
   cargoHoldItemInstances,
   characterMissions,
@@ -7,6 +8,8 @@ import {
   equippedItems,
   inventoryStacks,
   itemInstances,
+  playerAccounts,
+  runespaceAccessState,
 } from "@/db/rune-space";
 import {
   getEffectiveGameBalance,
@@ -28,6 +31,13 @@ import { levelFromXp } from "@/game/domain/progression";
 import { withResolvedCharacter } from "@/server/action-resolution";
 import type { ActionResolver, DatabaseTransaction } from "@/server/action-resolution";
 import { recordOperatorAudit } from "@/server/admin-audit";
+import {
+  loadAccountAccessView,
+  loadPublicGameplayView,
+  type AdminAccessCommandResult,
+  type AdminAccountAccessView,
+  type AdminPublicGameplayView,
+} from "@/server/admin-access-state";
 import { forceIdleResolvedAction } from "@/server/play-interrupt";
 import { invalidateMiningActionForChangedTool } from "@/server/equipment";
 import { removeCargoStack } from "@/server/cargo-hold";
@@ -134,7 +144,7 @@ export async function stopCurrentActionAsAdmin(
       if (!result.interrupted) return { state, outcome: { kind: "already_idle" } };
       await recordOperatorAudit(transaction, {
         adminUserId: admin,
-        characterId: character.id,
+        target: { kind: "character", characterId: character.id },
         operation: "stop_current_action",
         targetIdentity: result.interruptedActionId,
         details: { actionId: result.interruptedActionId },
@@ -215,7 +225,7 @@ export async function teleportCharacterAsAdmin(
         .where(eq(characters.id, character.id));
       await recordOperatorAudit(transaction, {
         adminUserId: admin,
-        characterId: character.id,
+        target: { kind: "character", characterId: character.id },
         operation: "teleport_character",
         targetIdentity: destinationLocationId,
         details: {
@@ -281,7 +291,7 @@ export async function removeCarriedStackQuantityAsAdmin(
       const removedQuantity = mode === "stack" ? expectedQuantity : 1;
       await recordOperatorAudit(transaction, {
         adminUserId: admin,
-        characterId: character.id,
+        target: { kind: "character", characterId: character.id },
         operation: "removed_stack_quantity",
         targetIdentity: stackId,
         // `removal.itemId` is the locked stack's canonical item id; the audit
@@ -328,7 +338,7 @@ export async function removeCargoStackQuantityAsAdmin(
       }
       await recordOperatorAudit(transaction, {
         adminUserId: admin,
-        characterId: character.id,
+        target: { kind: "character", characterId: character.id },
         operation: "removed_stack_quantity",
         targetIdentity: stackId,
         // `removal.itemId` is returned by `removeCargoStack` from the locked
@@ -453,7 +463,7 @@ export async function forceUnequipItemAsAdmin(
 
       await recordOperatorAudit(transaction, {
         adminUserId: admin,
-        characterId: character.id,
+        target: { kind: "character", characterId: character.id },
         operation: "force_unequipped_item",
         targetIdentity: itemInstanceId,
         // `instance.itemId` is the loaded instance's canonical item id (the
@@ -563,7 +573,7 @@ export async function deleteUniqueItemAsAdmin(
         );
       await recordOperatorAudit(transaction, {
         adminUserId: admin,
-        characterId: character.id,
+        target: { kind: "character", characterId: character.id },
         operation: "removed_unique_item",
         targetIdentity: itemInstanceId,
         details: { source: cargo ? "cargo" : "carried", itemId: instance.itemId },
@@ -652,7 +662,7 @@ export async function addItemAsAdmin(
         });
         await recordOperatorAudit(transaction, {
           adminUserId: admin,
-          characterId: character.id,
+          target: { kind: "character", characterId: character.id },
           operation: "added_stackable_item",
           targetIdentity: itemId,
           details: { quantity: amount },
@@ -705,7 +715,7 @@ export async function addItemAsAdmin(
         return { state, outcome: { kind: "refused", message: "Could not create item." } };
       await recordOperatorAudit(transaction, {
         adminUserId: admin,
-        characterId: character.id,
+        target: { kind: "character", characterId: character.id },
         operation: "added_unique_item",
         targetIdentity: inserted.id,
         details: { itemId, currentCharge: inserted.currentCharge },
@@ -769,7 +779,7 @@ export async function resetMissionChainAsAdmin(
       if (deleted.length === 0) return { state, outcome: { kind: "nothing_to_reset", scope } };
       await recordOperatorAudit(transaction, {
         adminUserId: admin,
-        characterId: character.id,
+        target: { kind: "character", characterId: character.id },
         operation: "reset_mission_chain",
         targetIdentity: missionId,
         details: { scope, deletedMissionIds: deleted.map((d) => d.missionId) },
@@ -812,7 +822,7 @@ export async function resetAllMissionsAsAdmin(
       if (deleted.length === 0) return { state, outcome: { kind: "nothing_to_reset", scope: [] } };
       await recordOperatorAudit(transaction, {
         adminUserId: admin,
-        characterId: character.id,
+        target: { kind: "character", characterId: character.id },
         operation: "reset_all_missions",
         details: { deletedMissionIds: deleted.map((d) => d.missionId) },
       });
@@ -879,7 +889,7 @@ export async function setSkillTotalXpAsAdmin(
       const state = await refreshedState(transaction, character.id, now);
       await recordOperatorAudit(transaction, {
         adminUserId: admin,
-        characterId: character.id,
+        target: { kind: "character", characterId: character.id },
         operation: "set_skill_xp",
         targetIdentity: skillId,
         details: { skillId, before, after: totalXp },
@@ -889,6 +899,134 @@ export async function setSkillTotalXpAsAdmin(
     },
     now,
   );
+}
+
+// ---------------------------------------------------------------------------
+// ACCOUNT EARLY ACCESS + PUBLIC GAMEPLAY (Issue #223)
+// ---------------------------------------------------------------------------
+
+export type {
+  AdminAccessCommandResult,
+  AdminAccountAccessView,
+  AdminPublicGameplayView,
+} from "@/server/admin-access-state";
+
+/**
+ * Grant account-level Early Access: sets BOTH paired fields and writes one
+ * `grant_early_access` audit row in the same transaction. Already granted ⇒
+ * no state change and no audit row.
+ */
+export async function grantEarlyAccessAsAdmin(
+  adminUserId: string,
+  playerAccountId: string,
+  now: Date = new Date(),
+): Promise<AdminAccessCommandResult<AdminAccountAccessView>> {
+  return db.transaction(async (transaction) => {
+    const [account] = await transaction
+      .select({
+        id: playerAccounts.id,
+        earlyAccessGrantedAt: playerAccounts.earlyAccessGrantedAt,
+      })
+      .from(playerAccounts)
+      .where(eq(playerAccounts.id, playerAccountId))
+      .for("update");
+    if (!account) throw new AdminCommandError("Player account not found", 404);
+    let changed = false;
+    if (account.earlyAccessGrantedAt === null) {
+      await transaction
+        .update(playerAccounts)
+        .set({ earlyAccessGrantedAt: now, earlyAccessGrantedByAdminUserId: adminUserId })
+        .where(eq(playerAccounts.id, playerAccountId));
+      await recordOperatorAudit(transaction, {
+        adminUserId,
+        target: { kind: "player_account", playerAccountId },
+        operation: "grant_early_access",
+        targetIdentity: playerAccountId,
+        details: { grantedAt: now.toISOString() },
+      });
+      changed = true;
+    }
+    return { changed, view: await loadAccountAccessView(transaction, playerAccountId) };
+  });
+}
+
+/**
+ * Revoke account-level Early Access: clears BOTH paired fields and writes one
+ * `revoke_early_access` audit row (recording the grant it ended) in the same
+ * transaction. Not granted ⇒ no state change and no audit row.
+ */
+export async function revokeEarlyAccessAsAdmin(
+  adminUserId: string,
+  playerAccountId: string,
+): Promise<AdminAccessCommandResult<AdminAccountAccessView>> {
+  return db.transaction(async (transaction) => {
+    const [account] = await transaction
+      .select({
+        id: playerAccounts.id,
+        earlyAccessGrantedAt: playerAccounts.earlyAccessGrantedAt,
+        earlyAccessGrantedByAdminUserId: playerAccounts.earlyAccessGrantedByAdminUserId,
+      })
+      .from(playerAccounts)
+      .where(eq(playerAccounts.id, playerAccountId))
+      .for("update");
+    if (!account) throw new AdminCommandError("Player account not found", 404);
+    let changed = false;
+    if (account.earlyAccessGrantedAt !== null) {
+      await transaction
+        .update(playerAccounts)
+        .set({ earlyAccessGrantedAt: null, earlyAccessGrantedByAdminUserId: null })
+        .where(eq(playerAccounts.id, playerAccountId));
+      await recordOperatorAudit(transaction, {
+        adminUserId,
+        target: { kind: "player_account", playerAccountId },
+        operation: "revoke_early_access",
+        targetIdentity: playerAccountId,
+        details: {
+          previousGrantedAt: account.earlyAccessGrantedAt.toISOString(),
+          previousGrantedByAdminUserId: account.earlyAccessGrantedByAdminUserId,
+        },
+      });
+      changed = true;
+    }
+    return { changed, view: await loadAccountAccessView(transaction, playerAccountId) };
+  });
+}
+
+/**
+ * Open or close public gameplay: flips the singleton's explicit switch and
+ * writes one `open_public_gameplay` / `close_public_gameplay` system audit row
+ * in the same transaction. Already in the requested state ⇒ no state change and
+ * no audit row. The launch target is never written.
+ */
+export async function setPublicGameplayOpenAsAdmin(
+  adminUserId: string,
+  open: boolean,
+  now: Date = new Date(),
+): Promise<AdminAccessCommandResult<AdminPublicGameplayView>> {
+  return db.transaction(async (transaction) => {
+    const [state] = await transaction
+      .select({ publicGameplayOpen: runespaceAccessState.publicGameplayOpen })
+      .from(runespaceAccessState)
+      .where(eq(runespaceAccessState.id, 1))
+      .for("update");
+    if (!state) throw new AdminCommandError("RuneSpace access state is missing", 500);
+    let changed = false;
+    if (state.publicGameplayOpen !== open) {
+      await transaction
+        .update(runespaceAccessState)
+        .set({ publicGameplayOpen: open, updatedAt: now, updatedByAdminUserId: adminUserId })
+        .where(eq(runespaceAccessState.id, 1));
+      await recordOperatorAudit(transaction, {
+        adminUserId,
+        target: { kind: "system" },
+        operation: open ? "open_public_gameplay" : "close_public_gameplay",
+        targetIdentity: "public_gameplay",
+        details: { publicGameplayOpen: { from: state.publicGameplayOpen, to: open } },
+      });
+      changed = true;
+    }
+    return { changed, view: await loadPublicGameplayView(transaction, now) };
+  });
 }
 
 /** Minimal error carrier so seams can reject without importing the public class. */

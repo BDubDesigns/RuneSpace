@@ -67,6 +67,10 @@ describe("admin production command surface (requireAdmin-only)", () => {
       "resetMissionChain",
       "resetAllMissions",
       "setSkillTotalXp",
+      "grantEarlyAccess",
+      "revokeEarlyAccess",
+      "openPublicGameplay",
+      "closePublicGameplay",
       "AdminCommandError",
     ]) {
       expect(exportedNames, `missing public entrypoint ${expected}`).toContain(expected);
