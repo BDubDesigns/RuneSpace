@@ -2,19 +2,19 @@
   "schemaVersion": 1,
   "projectSlug": "runespace",
   "workState": "active",
-  "currentFocus": "Opening soft-alpha reservations: a public Player name per account, verified email, and up to three reserved character names ahead of Soft Alpha.",
+  "currentFocus": "Preparing the October 27 Soft Alpha: verified players can reserve characters; account-level Early Access and a closed-by-default public gameplay gate control when play begins.",
   "currentChange": {
-    "summary": "New accounts choose a public Player name and verify their email before reserving character names; sign-up is protected by Cloudflare Turnstile and rate limits.",
-    "stage": "implementation",
-    "pullRequestNumber": 222
+    "summary": "Add a closed-by-default gameplay gate, account-wide Early Access, audited Operator Console controls, and launch/waiting presentation.",
+    "stage": "review",
+    "pullRequestNumber": 228
   },
   "latestCompleted": {
-    "summary": "The footer's Character destination opens the current character's profile — portrait, Credits, every skill's progress — and one canonical Character Level replaces the old per-surface levels.",
-    "date": "2026-09-19",
-    "url": "https://github.com/BDubDesigns/RuneSpace/pull/214"
+    "summary": "Introduced verified Player identities and pre-alpha character reservations: email verification and up to three reserved character names per account.",
+    "date": "2026-09-24",
+    "url": "https://github.com/BDubDesigns/RuneSpace/pull/222"
   },
-  "nextStep": "Human review of registration, email verification, and Player names, then the one-time cutover that gives existing accounts their Player names.",
-  "lastMeaningfulUpdate": "2026-09-23",
+  "nextStep": "Human review of the access gate and production preflight; public gameplay remains closed until an operator deliberately opens it.",
+  "lastMeaningfulUpdate": "2026-09-24",
   "highlights": [
     {
       "summary": "Deep Jag is playable: brace the cave-in for Tansy, mine Galvanite behind it, and refine Galvanic Stock and Galvaferrite at the Processing Yard.",
