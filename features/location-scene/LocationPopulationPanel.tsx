@@ -1,7 +1,9 @@
 "use client";
 
 import { useEffect, useRef, useState, type RefObject } from "react";
+import { useRouter } from "next/navigation";
 import { Feedback } from "@/components/ui/Feedback";
+import { GAMEPLAY_ACCESS_REQUIRED_CODE } from "@/game/domain/gameplay-access";
 import type { LocationPopulationEntry } from "@/game/domain/location-population";
 import { usePlay } from "@/features/play/PlayContext";
 import { CharacterProfilePanel } from "./CharacterProfilePanel";
@@ -154,6 +156,7 @@ function LocationPopulationList({
 
 export function LocationPopulationPanel() {
   const { state } = usePlay();
+  const router = useRouter();
   const [population, setPopulation] = useState<readonly LocationPopulationEntry[]>([]);
   const [populationLocationId, setPopulationLocationId] = useState<string>();
   const [populationError, setPopulationError] = useState<string>();
@@ -190,7 +193,14 @@ export function LocationPopulationPanel() {
         const body = (await response.json().catch(() => null)) as {
           characters?: readonly LocationPopulationEntry[];
           error?: string;
+          code?: string;
         } | null;
+        // Issue #223: gameplay access was revoked or closed since this page
+        // loaded; the server refused the read, so recover to Characters.
+        if (body?.code === GAMEPLAY_ACCESS_REQUIRED_CODE) {
+          router.replace("/characters");
+          return;
+        }
         if (!response.ok || !body?.characters) {
           setPopulation([]);
           setPopulationLocationId(undefined);

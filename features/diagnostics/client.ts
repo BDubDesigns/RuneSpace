@@ -43,6 +43,11 @@ function errorDetails(error: unknown) {
   };
 }
 
+function isNavigationSignal(error: unknown): boolean {
+  const digest = (error as { digest?: unknown } | null)?.digest;
+  return typeof digest === "string" && digest.startsWith("NEXT_REDIRECT");
+}
+
 /** Best effort by design: diagnostics can never throw into player interaction. */
 export function reportClientDiagnostic(
   source: ClientDiagnostic["source"],
@@ -51,6 +56,11 @@ export function reportClientDiagnostic(
 ) {
   let id = "rs-unknown";
   try {
+    // A server-action redirect (for example the issue #223 return to
+    // Characters after gameplay access was revoked) rejects the awaiting
+    // promise with Next's redirect signal after the navigation is already
+    // committed. It is navigation, not a failure, so it is never reported.
+    if (isNavigationSignal(error)) return id;
     id = createId();
     if (error && typeof error === "object") {
       const existing = incidents.get(error);

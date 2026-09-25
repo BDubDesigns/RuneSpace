@@ -9,6 +9,7 @@ import { hashPassword } from "better-auth/crypto";
 import { parseSetCookieHeader } from "better-auth/cookies";
 import { mkdir } from "node:fs/promises";
 import { randomUUID } from "node:crypto";
+import { eq } from "drizzle-orm";
 import { dirname, resolve } from "node:path";
 import { db } from "@/db";
 import * as authSchema from "@/db/auth-schema";
@@ -21,6 +22,7 @@ import {
   cleanupTestCharacter,
   cleanupTestUser,
   createCharacterForUser,
+  grantFixtureEarlyAccess,
   testPlayerIdentity,
 } from "../integration/fixtures";
 import { assertDisposableE2EDatabase } from "./test-database";
@@ -82,11 +84,17 @@ function resolveBaseURL(): string {
  * without touching the rate-limited path. Callers that specifically need to
  * exercise the registration or sign-in *form* itself (not just an
  * authenticated session) must not use this helper.
+ *
+ * The account receives fixture Early Access (issue #223) by default, so
+ * ordinary gameplay journeys play regardless of the global public-gameplay
+ * switch that the serial gameplay-access spec toggles. Journeys that prove the
+ * closed gate pass `{ earlyAccess: false }`.
  */
 export async function establishAuthenticatedSession(
   browser: Browser,
   displayName: string,
   email: string,
+  options: { earlyAccess?: boolean } = {},
 ): Promise<{ context: BrowserContext; userId: string }> {
   assertDisposableE2EDatabase();
   const baseURL = resolveBaseURL();
@@ -110,6 +118,7 @@ export async function establishAuthenticatedSession(
     userId,
     password: await hashPassword(password),
   });
+  if (options.earlyAccess !== false) await grantTestEarlyAccess(userId);
 
   const signIn = await auth.api.signInEmail({
     headers: new Headers({ host: new URL(baseURL).host }),
@@ -213,6 +222,30 @@ export const test = base.extend<TestFixtures, WorkerFixtures>({
 });
 
 export { expect };
+
+/**
+ * Fixture Early Access for a test account (issue #223): ensures its player
+ * account and grants account-level Early Access directly in the disposable
+ * database. Registration journeys call it after verification so their
+ * reservation → Play flow is independent of the global public-gameplay switch.
+ */
+export async function grantTestEarlyAccess(userId: string) {
+  assertDisposableE2EDatabase();
+  const account = await ownership.ensurePlayerAccount(userId);
+  await grantFixtureEarlyAccess(db, rune, account.id);
+}
+
+/** Resolve a fixture account id by its (unique) email address. */
+export async function userIdForEmail(email: string): Promise<string> {
+  const rows = await db
+    .select({ id: authSchema.user.id })
+    .from(authSchema.user)
+    .where(eq(authSchema.user.email, email))
+    .limit(1);
+  const row = rows[0];
+  if (!row) throw new Error("No fixture account exists for that email address");
+  return row.id;
+}
 
 /** Navigate directly to the exact test-owned character, never the first row in a list. */
 export async function openTestCharacter(page: Page, characterId: string) {

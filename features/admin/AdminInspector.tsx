@@ -9,6 +9,7 @@ import type { PlayGameplayState } from "@/server/play";
 import { adminLoadInspector } from "@/server/admin-actions";
 import { AdminControls } from "./AdminControls";
 import { AdminAuditTrail } from "./AdminAuditTrail";
+import { AdminAccountAccessPanel } from "./AdminAccountAccessPanel";
 import { itemLabel, locationLabel, skillLabel } from "./admin-format";
 
 /**
@@ -398,6 +399,12 @@ export function AdminInspector({ initial }: { initial: AdminInspectorState }) {
           <MissionRows missions={state.missions} />
         </div>
       </Panel>
+
+      <AdminAccountAccessPanel
+        access={state.accountAccess}
+        onChange={(accountAccess) => setState((prev) => ({ ...prev, accountAccess }))}
+        bus={bus}
+      />
 
       <AdminControls
         characterId={state.characterId}

@@ -3,6 +3,7 @@ import type { ChildProcess } from "node:child_process";
 export const ROOT: string;
 export const PACKAGE_MANAGER: string;
 
+export const E2E_ADMIN_USER_IDS: string;
 export function accountBoundaryE2eEnv(input: { port: number; runId: string }): {
   TURNSTILE_SITE_KEY: string;
   TURNSTILE_SECRET_KEY: string;

@@ -17,7 +17,8 @@ import { testPlayerIdentity } from "../integration/fixtures";
  * Auth itself issues and signs the session cookie. No hand-forged cookie and no
  * id mutation.
  *
- * The seed is deterministic and idempotent: seeding twice is a no-op.
+ * The seed is deterministic and idempotent: seeding twice (even concurrently,
+ * from two suites) is a no-op.
  */
 
 export const ADMIN_USER_ID = "00000000-0000-0000-0000-0000000000a1";
@@ -42,23 +43,30 @@ export async function seedAuthUser(input: {
   if (!existing.length) {
     const passwordHash = await hashPassword(input.password);
     await db.transaction(async (tx) => {
-      await tx.insert(authSchema.user).values({
-        id: input.id,
-        ...testPlayerIdentity(input.id, input.name),
-        email: input.email,
-        emailVerified: true,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      });
-      await tx.insert(authSchema.account).values({
-        id: `${input.id}-credential`,
-        accountId: input.id,
-        providerId: "credential",
-        userId: input.id,
-        password: passwordHash,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      });
+      await tx
+        .insert(authSchema.user)
+        .values({
+          id: input.id,
+          ...testPlayerIdentity(input.id, input.name),
+          email: input.email,
+          emailVerified: true,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        })
+        // Concurrent suites may seed the same fixed identity; the first wins.
+        .onConflictDoNothing();
+      await tx
+        .insert(authSchema.account)
+        .values({
+          id: `${input.id}-credential`,
+          accountId: input.id,
+          providerId: "credential",
+          userId: input.id,
+          password: passwordHash,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        })
+        .onConflictDoNothing();
     });
   }
   return { userId: input.id, email: input.email, password: input.password };

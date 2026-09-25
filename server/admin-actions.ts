@@ -9,6 +9,7 @@ import {
   AdminAddItemRequestSchema,
   AdminCarriedStackRemovalRequestSchema,
   AdminDeleteUniqueItemRequestSchema,
+  AdminEarlyAccessRequestSchema,
   AdminForceUnequipRequestSchema,
   AdminResetAllMissionsRequestSchema,
   AdminResetMissionChainRequestSchema,
@@ -18,7 +19,11 @@ import {
 } from "@/game/schemas/admin";
 import {
   addItem,
+  closePublicGameplay,
   deleteUniqueItem,
+  grantEarlyAccess,
+  openPublicGameplay,
+  revokeEarlyAccess,
   forceUnequipItem,
   removeCargoStackQuantity,
   removeCarriedStackQuantity,
@@ -27,7 +32,10 @@ import {
   setSkillTotalXp,
   stopCurrentAction,
   teleportCharacter,
+  type AdminAccessCommandResult,
+  type AdminAccountAccessView,
   type AdminAddItemResult,
+  type AdminPublicGameplayView,
   type AdminDeleteItemResult,
   type AdminForceUnequipResult,
   type AdminResetMissionResult,
@@ -269,5 +277,57 @@ export async function adminLoadInspector(input: unknown): Promise<AdminInspector
     return { state };
   } catch (error) {
     return adminReadError(error);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Issue #223 — account Early Access (from the selected-character inspector)
+// and the global PUBLIC GAMEPLAY switch (from the Operator Console home).
+// Authorization happens server-side inside each command (`requireAdmin`).
+// ---------------------------------------------------------------------------
+
+export type AdminEarlyAccessActionResult =
+  | AdminAccessCommandResult<AdminAccountAccessView>
+  | { error: string };
+
+export async function adminGrantEarlyAccess(input: unknown): Promise<AdminEarlyAccessActionResult> {
+  const parsed = AdminEarlyAccessRequestSchema.safeParse(input);
+  if (!parsed.success) return { error: "Invalid Early Access command." };
+  try {
+    return await grantEarlyAccess(await headers(), parsed.data.playerAccountId);
+  } catch (error) {
+    return adminError(error);
+  }
+}
+
+export async function adminRevokeEarlyAccess(
+  input: unknown,
+): Promise<AdminEarlyAccessActionResult> {
+  const parsed = AdminEarlyAccessRequestSchema.safeParse(input);
+  if (!parsed.success) return { error: "Invalid Early Access command." };
+  try {
+    return await revokeEarlyAccess(await headers(), parsed.data.playerAccountId);
+  } catch (error) {
+    return adminError(error);
+  }
+}
+
+export type AdminPublicGameplayActionResult =
+  | AdminAccessCommandResult<AdminPublicGameplayView>
+  | { error: string };
+
+export async function adminOpenPublicGameplay(): Promise<AdminPublicGameplayActionResult> {
+  try {
+    return await openPublicGameplay(await headers());
+  } catch (error) {
+    return adminError(error);
+  }
+}
+
+export async function adminClosePublicGameplay(): Promise<AdminPublicGameplayActionResult> {
+  try {
+    return await closePublicGameplay(await headers());
+  } catch (error) {
+    return adminError(error);
   }
 }

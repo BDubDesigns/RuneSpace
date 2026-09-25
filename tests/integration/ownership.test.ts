@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { eq } from "drizzle-orm";
 import { describe, it, expect, beforeAll } from "vitest";
 import { PORTRAIT_IDS } from "@/game/config/foundations";
-import { cleanupTestUser, createTestUser } from "./fixtures";
+import { cleanupTestUser, createTestUser, grantFixtureEarlyAccess } from "./fixtures";
 
 /**
  * Integration tests for the server-authoritative ownership + character rules,
@@ -28,6 +28,7 @@ suite("ownership & character rules (real PostgreSQL)", () => {
   let rune: typeof import("@/db/rune-space");
   let ownership: typeof import("@/server/ownership");
   let characters: typeof import("@/server/characters");
+  let gameplayAccess: typeof import("@/server/gameplay-access");
 
   beforeAll(async () => {
     db = (await import("@/db")).db;
@@ -35,6 +36,7 @@ suite("ownership & character rules (real PostgreSQL)", () => {
     rune = await import("@/db/rune-space");
     ownership = await import("@/server/ownership");
     characters = await import("@/server/characters");
+    gameplayAccess = await import("@/server/gameplay-access");
   });
 
   async function makeUser(email: string) {
@@ -122,13 +124,17 @@ suite("ownership & character rules (real PostgreSQL)", () => {
     try {
       const acc = await ownership.ensurePlayerAccount(owner);
       const char = await characters.createCharacter(acc.id, name, PORTRAIT_IDS.stationCaptain);
+      // Both accounts may play (issue #223), so only ownership decides.
+      await grantFixtureEarlyAccess(db, rune, acc.id);
+      const strangerAccount = await ownership.ensurePlayerAccount(stranger);
+      await grantFixtureEarlyAccess(db, rune, strangerAccount.id);
 
       // Owner can resolve their own character.
-      const ok = await ownership.requireOwnedCharacter(owner, char.id);
+      const ok = await gameplayAccess.requirePlayableOwnedCharacter(owner, char.id);
       expect(ok.id).toBe(char.id);
 
       // A stranger (even with a valid-looking id) cannot.
-      await expect(ownership.requireOwnedCharacter(stranger, char.id)).rejects.toThrow(
+      await expect(gameplayAccess.requirePlayableOwnedCharacter(stranger, char.id)).rejects.toThrow(
         /not found/i,
       );
     } finally {

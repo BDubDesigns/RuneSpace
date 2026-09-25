@@ -4,6 +4,7 @@ import { copyFileSync, existsSync, mkdirSync, rmSync, statSync, writeFileSync } 
 import { resolve } from "node:path";
 import {
   accountBoundaryE2eEnv,
+  E2E_ADMIN_USER_IDS,
   assertNode22,
   assertPortAvailable,
   createE2eRuntime,
@@ -132,6 +133,19 @@ const CARGO_HOLD_REQUIRED = [
   "cargo-desktop-storage.png",
 ];
 
+// Issue #223: Characters waiting / Early Access states and the Operator
+// Console account and global access controls.
+const GAMEPLAY_ACCESS_REQUIRED = [
+  "gameplay-access-landing-launch-state.png",
+  "gameplay-access-landing-open-state.png",
+  "gameplay-access-claim-your-crew.png",
+  "gameplay-access-crew-reserved.png",
+  "gameplay-access-admin-account-access.png",
+  "gameplay-access-early-access.png",
+  "gameplay-access-admin-public-closed.png",
+  "gameplay-access-admin-public-open.png",
+];
+
 const INVENTORY_EQUIP_REQUIRED = [
   "inventory-equip-mobile-selected-cutter.png",
   "inventory-equip-mobile-equipped.png",
@@ -207,6 +221,7 @@ async function runCanonical() {
         ...PORTRAITS_REQUIRED,
         ...REFINING_REQUIRED,
         ...CARGO_HOLD_REQUIRED,
+        ...GAMEPLAY_ACCESS_REQUIRED,
       ],
       resolve(ROOT, "artifacts/e2e-review"),
     );
@@ -246,7 +261,7 @@ async function main() {
       RUNESPACE_RELEASE_ID: "local-ci-parity",
       BETTER_AUTH_SECRET: "canonical-e2e-local-test-secret-not-for-production",
       // The admin operator console E2E seeds a fixed-allowlisted admin session.
-      RUNESPACE_ADMIN_USER_IDS: "00000000-0000-0000-0000-0000000000a1",
+      RUNESPACE_ADMIN_USER_IDS: E2E_ADMIN_USER_IDS,
       PLAYWRIGHT_PORT: String(PORT),
       PORT: String(PORT),
       ...accountBoundaryE2eEnv({ port: PORT, runId }),

@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { eq } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
 import { LOCATION_IDS, PORTRAIT_IDS } from "@/game/config/foundations";
 import { normalizeCharacterName } from "@/game/domain/character-name";
 import { SLOT_MIN } from "@/db/rune-space";
@@ -59,10 +59,40 @@ export async function createTestUser(
 }
 
 /**
+ * The `granted_by` value of fixture Early Access grants (issue #223). Test
+ * accounts that exercise gameplay need gameplay access exactly like real
+ * accounts; fixtures grant it directly (never through a runtime path) so
+ * gameplay suites stay independent of the global public-gameplay switch. It is
+ * deliberately not a real operator id.
+ */
+export const FIXTURE_EARLY_ACCESS_GRANTOR = "fixture:early-access";
+
+/**
+ * Grants account-level Early Access to a fixture account. Idempotent: an
+ * account that already has a grant keeps it unchanged.
+ */
+export async function grantFixtureEarlyAccess(db: Db, rune: Rune, playerAccountId: string) {
+  await db
+    .update(rune.playerAccounts)
+    .set({
+      earlyAccessGrantedAt: new Date(),
+      earlyAccessGrantedByAdminUserId: FIXTURE_EARLY_ACCESS_GRANTOR,
+    })
+    .where(
+      and(
+        eq(rune.playerAccounts.id, playerAccountId),
+        isNull(rune.playerAccounts.earlyAccessGrantedAt),
+      ),
+    );
+}
+
+/**
  * Ensures the player account for a user and creates one character through the
  * authoritative command. Portraits are required at the creation boundary
  * (issue #65), so suites that do not care about portraits get a stable default
  * starter ID; suites that need a deliberately chosen portrait pass one.
+ * The account receives fixture Early Access (issue #223) so gameplay suites can
+ * play; suites proving the gameplay gate pass `gameplayAccess: false`.
  */
 export async function createCharacterForUser(
   db: Db,
@@ -72,9 +102,12 @@ export async function createCharacterForUser(
   userId: string,
   characterName: string,
   portraitId: string = PORTRAIT_IDS.evaSalvageWelder,
-  options: { seedLegacyStarterCutter?: boolean } = { seedLegacyStarterCutter: true },
+  options: { seedLegacyStarterCutter?: boolean; gameplayAccess?: boolean } = {
+    seedLegacyStarterCutter: true,
+  },
 ) {
   const account = await ownership.ensurePlayerAccount(userId);
+  if (options.gameplayAccess !== false) await grantFixtureEarlyAccess(db, rune, account.id);
   const character = await characters.createCharacter(account.id, characterName, portraitId);
   if (options.seedLegacyStarterCutter !== false) {
     await seedLegacyStarterCutter(db, rune, character.id);
@@ -112,8 +145,10 @@ export async function createLegacyCharacterForUser(
   userId: string,
   characterName: string,
   slot: number = SLOT_MIN,
+  options: { gameplayAccess?: boolean } = {},
 ) {
   const account = await ownership.ensurePlayerAccount(userId);
+  if (options.gameplayAccess !== false) await grantFixtureEarlyAccess(db, rune, account.id);
   const row = await db
     .insert(rune.characters)
     .values({
@@ -152,6 +187,10 @@ export async function cleanupTestUser(db: Db, authSchema: AuthSchema, rune: Rune
     await db
       .delete(rune.playerPortraitUnlocks)
       .where(eq(rune.playerPortraitUnlocks.playerAccountId, account.id));
+    // Account-scoped operator audit rows (issue #223) reference the account.
+    await db
+      .delete(rune.operatorAuditLogs)
+      .where(eq(rune.operatorAuditLogs.playerAccountId, account.id));
   }
   await db.delete(rune.playerAccounts).where(eq(rune.playerAccounts.userId, userId));
   await db.delete(authSchema.user).where(eq(authSchema.user.id, userId));

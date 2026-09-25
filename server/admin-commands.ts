@@ -10,6 +10,12 @@ import {
   resetMissionChainAsAdmin,
   resetAllMissionsAsAdmin,
   setSkillTotalXpAsAdmin,
+  grantEarlyAccessAsAdmin,
+  revokeEarlyAccessAsAdmin,
+  setPublicGameplayOpenAsAdmin,
+  type AdminAccessCommandResult,
+  type AdminAccountAccessView,
+  type AdminPublicGameplayView,
   type AdminStopOutcome,
   type AdminStopResult,
   type AdminTeleportOutcome,
@@ -77,6 +83,9 @@ export type {
   AdminResetMissionResult,
   AdminSetXpOutcome,
   AdminSetXpResult,
+  AdminAccessCommandResult,
+  AdminAccountAccessView,
+  AdminPublicGameplayView,
 };
 
 export async function stopCurrentAction(
@@ -195,4 +204,44 @@ export async function setSkillTotalXp(
 ): Promise<AdminSetXpResult> {
   const admin = await requireAdmin(headers);
   return setSkillTotalXpAsAdmin(admin.id, characterId, skillId, totalXp, now);
+}
+
+// ---------------------------------------------------------------------------
+// Issue #223 — account Early Access and the global public-gameplay switch.
+// Same stance: `requireAdmin(headers)` first, then the internal seam, which
+// commits the state change and its one audit row atomically (no-op ⇒ no row).
+// UI visibility never grants authority.
+// ---------------------------------------------------------------------------
+
+export async function grantEarlyAccess(
+  headers: Headers,
+  playerAccountId: string,
+  now: Date = new Date(),
+): Promise<AdminAccessCommandResult<AdminAccountAccessView>> {
+  const admin = await requireAdmin(headers);
+  return grantEarlyAccessAsAdmin(admin.id, playerAccountId, now);
+}
+
+export async function revokeEarlyAccess(
+  headers: Headers,
+  playerAccountId: string,
+): Promise<AdminAccessCommandResult<AdminAccountAccessView>> {
+  const admin = await requireAdmin(headers);
+  return revokeEarlyAccessAsAdmin(admin.id, playerAccountId);
+}
+
+export async function openPublicGameplay(
+  headers: Headers,
+  now: Date = new Date(),
+): Promise<AdminAccessCommandResult<AdminPublicGameplayView>> {
+  const admin = await requireAdmin(headers);
+  return setPublicGameplayOpenAsAdmin(admin.id, true, now);
+}
+
+export async function closePublicGameplay(
+  headers: Headers,
+  now: Date = new Date(),
+): Promise<AdminAccessCommandResult<AdminPublicGameplayView>> {
+  const admin = await requireAdmin(headers);
+  return setPublicGameplayOpenAsAdmin(admin.id, false, now);
 }

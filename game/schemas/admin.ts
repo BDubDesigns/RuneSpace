@@ -83,3 +83,12 @@ export const AdminSetSkillXpRequestSchema = z.object({
   skillId: SkillIdSchema,
   totalXp: z.number().int().nonnegative(),
 });
+
+/**
+ * GRANT / REVOKE EARLY ACCESS (issue #223). The browser names only the owning
+ * player account the server-rendered inspector resolved for the selected
+ * character; the grant always applies to that whole account.
+ */
+export const AdminEarlyAccessRequestSchema = z.object({
+  playerAccountId: z.string().uuid(),
+});

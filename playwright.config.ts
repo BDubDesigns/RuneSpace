@@ -23,7 +23,7 @@ const requestedWorkers = process.env.RUNESPACE_E2E_WORKERS
   ? Number.parseInt(process.env.RUNESPACE_E2E_WORKERS, 10)
   : undefined;
 const canonicalSpecPattern =
-  /.*\/(?:account-news|account-verification|admin-operator|cargo-hold|character-panel|character-portraits|character-profile|cut-your-teeth|deep-jag|holo-hollow|inventory-equip|location-population|mining|overlay|refining|rusk-recovery|signout|travel|walk-it-off)\.spec\.ts$/;
+  /.*\/(?:account-news|account-verification|admin-operator|cargo-hold|character-panel|character-portraits|character-profile|cut-your-teeth|deep-jag|gameplay-access|holo-hollow|inventory-equip|location-population|mining|overlay|refining|rusk-recovery|signout|travel|walk-it-off)\.spec\.ts$/;
 const timingOutput = process.env.RUNESPACE_E2E_TIMING_OUTPUT;
 
 export default defineConfig({
@@ -53,6 +53,11 @@ export default defineConfig({
     {
       name: "mobile",
       use: { ...devices["Pixel 5"] },
+      // Issue #223: this spec toggles the one global public-gameplay row, so it
+      // runs in exactly one project (chromium); its player contexts set their
+      // own mobile viewports. A second project would race its serial journeys
+      // and restore hooks against the same database row.
+      testIgnore: /gameplay-access\.spec\.ts$/,
     },
   ],
   ...(externalServer

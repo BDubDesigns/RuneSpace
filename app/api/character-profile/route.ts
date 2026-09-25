@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getCharacterProfile, ProfileError } from "@/server/character-profile";
+import { GameplayAccessError } from "@/server/gameplay-access";
 import { requireCurrentUser, OwnershipError } from "@/server/ownership";
 
 /**
@@ -24,6 +25,14 @@ export async function GET(request: Request) {
     const profile = await getCharacterProfile(user.id, characterId, targetName);
     return NextResponse.json({ profile }, { headers: { "cache-control": "no-store" } });
   } catch (error) {
+    if (error instanceof GameplayAccessError) {
+      // Issue #223: the account may not read gameplay state right now; the
+      // stable code lets an already-open Play page recover to Characters.
+      return NextResponse.json(
+        { error: error.message, code: error.code },
+        { status: error.status, headers: { "cache-control": "no-store" } },
+      );
+    }
     if (error instanceof OwnershipError) {
       return NextResponse.json({ error: error.message }, { status: error.status });
     }

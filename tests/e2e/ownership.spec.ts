@@ -32,7 +32,7 @@ test("register, create, and select a character; ownership boundary enforced", as
 
   // Landing routes to registration.
   await page.goto("/");
-  await page.getByRole("link", { name: "Register" }).first().click();
+  await page.getByRole("link", { name: "Reserve your characters" }).first().click();
   await expect(
     page.getByRole("heading", { name: "Reserve your place in RuneSpace" }),
   ).toBeVisible();

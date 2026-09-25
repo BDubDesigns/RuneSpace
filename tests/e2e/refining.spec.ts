@@ -143,24 +143,30 @@ test("Processing Yard Refining journey — Ferrite and Slag both branches, artwo
   await expect(latestRefining).toContainText("Latest attempt: 1 Slag");
 
   // 9. Travel while Refining resolves only completed attempts; incomplete <7 tick discarded
-  // Enter the dedicated Map before moving the cursor back so navigation time
-  // cannot turn the intentionally incomplete boundary into a completed tick.
+  // Finish all Map navigation and the destination choice first, record the
+  // Shale, and only then move the cursor back, immediately before Walk.
+  // A Refining attempt takes 7 ticks. The previous 6-tick cursor was written
+  // before the Map clicks, leaving only 1 tick (600 ms) for the clicks and the
+  // Travel round trip; under canonical two-worker load that elapsed, an
+  // attempt completed, and 2 Shale were consumed. A 1-tick cursor written
+  // right before Walk is still an incomplete attempt Travel must discard, with
+  // 6 ticks of margin.
   await openMapSurface(page);
-  const incompleteCursor = new Date(Date.now() - 6 * GAME_TICK_MS);
-  await db
-    .update(activeActions)
-    .set({ resolvedThroughAt: incompleteCursor })
-    .where(eq(activeActions.characterId, characterId));
-  const shaleBeforeTravel = (
-    await db.select().from(inventoryStacks).where(eq(inventoryStacks.characterId, characterId))
-  )
-    .filter((s) => s.itemId === ITEM_IDS.ferriteShale)
-    .reduce((t, s) => t + s.quantity, 0);
   // travel back to Crash Site via helper (ensures In transit is reached before warp)
   await page.getByLabel("Local map").scrollIntoViewIfNeeded();
   await expect(page.locator('[data-map-location="crash_site"]')).toBeVisible();
   await page.locator('[data-map-location="crash_site"]').click();
   await expect(page.getByRole("button", { name: /Walk to Crash Site/ })).toBeVisible();
+  const shaleBeforeTravel = (
+    await db.select().from(inventoryStacks).where(eq(inventoryStacks.characterId, characterId))
+  )
+    .filter((s) => s.itemId === ITEM_IDS.ferriteShale)
+    .reduce((t, s) => t + s.quantity, 0);
+  const incompleteCursor = new Date(Date.now() - GAME_TICK_MS);
+  await db
+    .update(activeActions)
+    .set({ resolvedThroughAt: incompleteCursor })
+    .where(eq(activeActions.characterId, characterId));
   await page.getByRole("button", { name: /Walk to Crash Site/ }).click();
   await expect(page.getByText("In transit", { exact: true }).first()).toBeVisible();
   // Travel was just created at ~now; fast-forward 25s by moving cursor back so arrival is due on next load.

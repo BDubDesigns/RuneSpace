@@ -2,15 +2,26 @@ import { expect, test } from "@playwright/test";
 
 /** Protects durable public landing identity and signed-out entry navigation. */
 
-test("public landing loads with pre-alpha identity and entry actions", async ({ page }) => {
+test("public landing loads with the Soft Alpha reservation identity and entry actions", async ({
+  page,
+}) => {
   await page.goto("/");
 
   await expect(page.getByRole("heading", { name: "RuneSpace", exact: true })).toBeVisible();
   await expect(page.getByText("Low-fi sci-fi RPG / Holo Hollow", { exact: true })).toBeVisible();
-  await expect(page.getByText("Playable pre-alpha", { exact: true })).toBeVisible();
-  await expect(page.getByRole("link", { name: "Register" }).first()).toBeVisible();
-  await expect(page.getByRole("link", { name: "Sign in" }).first()).toBeVisible();
-  await expect(page.getByRole("link", { name: "Register", exact: true })).toHaveCount(2);
+  // Issue #223: the locked Soft Alpha reservation hero.
+  await expect(page.getByText("SOFT ALPHA — OCTOBER 27", { exact: true })).toBeVisible();
+  await expect(
+    page.getByRole("heading", {
+      name: "Your ship crashed. The engines are dead. But you’re not. Yet.",
+    }),
+  ).toBeVisible();
+  // The hero and the final call to action both reserve through registration.
+  const reserve = page.getByRole("link", { name: "Reserve your characters", exact: true });
+  await expect(reserve).toHaveCount(2);
+  for (const link of await reserve.all()) await expect(link).toHaveAttribute("href", "/register");
+  await expect(page.getByTestId("soft-alpha-countdown")).toBeVisible();
+  await expect(page.getByRole("link", { name: "Register", exact: true })).toHaveCount(0);
   await expect(page.getByRole("link", { name: "Sign in", exact: true })).toHaveCount(2);
   await expect(page.getByRole("navigation", { name: "Public" })).toBeVisible();
   await expect(page.getByRole("link", { name: "Home", exact: true })).toHaveAttribute("href", "/");

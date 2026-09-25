@@ -9,6 +9,8 @@ import {
   OwnershipError,
 } from "@/server/ownership";
 import { createCharacter, changeCharacterPortrait, CharacterError } from "@/server/characters";
+import { GameplayAccessError, loadAccountGameplayAccess } from "@/server/gameplay-access";
+import { db } from "@/db";
 import { acknowledgeNews } from "@/server/account-news";
 import {
   getPlayGameplayState,
@@ -112,6 +114,31 @@ import {
  */
 export type ActionResult = { error?: string };
 
+/**
+ * Stale-page recovery for player gameplay commands (issue #223).
+ *
+ * The gameplay-access DECISION is never made here: every gameplay command's own
+ * server boundary (`server/action-resolution.ts` for commands and the Play
+ * state load) requires access for each request and throws `GameplayAccessError`.
+ * Every gameplay action's error handler calls this first, so when Early Access
+ * was revoked or public gameplay closed after the page loaded, the browser is
+ * navigated back to Characters instead of being left in a broken retry loop.
+ * An action that forgot this call would still be refused (the error is an
+ * `OwnershipError`); it would only lose the navigation. The classification in
+ * `tests/unit/gameplay-entrypoints.test.ts` keeps every gameplay action on it.
+ */
+function redirectOnGameplayRefusal(error: unknown): void {
+  if (error instanceof GameplayAccessError) redirect("/characters");
+}
+
+/**
+ * Character reservation (issue #221) — account/character management, NOT
+ * gameplay: it stays available while public gameplay is closed. After a
+ * successful reservation the server decides where to go from authoritative
+ * access state (issue #223): an account that can play right now keeps the
+ * normal Play entry, while a verified ordinary account waiting for Soft Alpha
+ * returns to Characters and its waiting-state treatment.
+ */
 export async function createCharacterAction(formData: FormData): Promise<ActionResult> {
   const displayName = String(formData.get("name") ?? "");
   // The deliberate portrait choice is part of the authoritative creation
@@ -124,9 +151,10 @@ export async function createCharacterAction(formData: FormData): Promise<ActionR
     const user = await requireVerifiedUser(await headers());
     const account = await ensurePlayerAccount(user.id);
     const character = await createCharacter(account.id, displayName, portraitId);
+    const access = await loadAccountGameplayAccess(db, user.id);
     // `redirect` throws NEXT_REDIRECT; let it propagate out of the action so
     // Next performs the navigation. Only domain errors are caught here.
-    redirect(`/play/${character.id}`);
+    redirect(access.decision.allowed ? `/play/${character.id}` : "/characters");
   } catch (err) {
     if (err instanceof CharacterError) return { error: err.message };
     if (err instanceof OwnershipError) return { error: err.message };
@@ -183,6 +211,7 @@ async function runPlayAction(
     const user = await requireCurrentUser(await headers());
     return { state: await command(user.id, characterId) };
   } catch (error) {
+    redirectOnGameplayRefusal(error);
     if (error instanceof OwnershipError) return { error: error.message };
     if (error instanceof TravelRuleError) return { error: error.message };
     throw error;
@@ -219,6 +248,7 @@ export async function acceptMissionAction(input: unknown): Promise<MissionAction
       request.data.npcId,
     );
   } catch (error) {
+    redirectOnGameplayRefusal(error);
     if (error instanceof OwnershipError) return { error: error.message };
     throw error;
   }
@@ -241,6 +271,7 @@ export async function completeMissionAction(input: unknown): Promise<MissionActi
       request.data.npcId,
     );
   } catch (error) {
+    redirectOnGameplayRefusal(error);
     if (error instanceof OwnershipError) return { error: error.message };
     throw error;
   }
@@ -267,6 +298,7 @@ export async function acknowledgeMissionConversationAction(
       request.data.dialogueId,
     );
   } catch (error) {
+    redirectOnGameplayRefusal(error);
     if (error instanceof OwnershipError) return { error: error.message };
     throw error;
   }
@@ -301,6 +333,7 @@ export async function startWeldingAction(input: unknown): Promise<PlayActionResu
       state: await startWelding(user.id, request.data.characterId, request.data.targetId),
     };
   } catch (error) {
+    redirectOnGameplayRefusal(error);
     if (error instanceof OwnershipError) return { error: error.message };
     throw error;
   }
@@ -313,6 +346,7 @@ export async function startPracticeWeldingAction(input: unknown): Promise<PlayAc
     const user = await requireCurrentUser(await headers());
     return { state: await startPracticeWelding(user.id, request.data.characterId) };
   } catch (error) {
+    redirectOnGameplayRefusal(error);
     if (error instanceof OwnershipError) return { error: error.message };
     throw error;
   }
@@ -325,6 +359,7 @@ export async function stopPracticeWeldingAction(input: unknown): Promise<PlayAct
     const user = await requireCurrentUser(await headers());
     return { state: await stopPracticeWelding(user.id, request.data.characterId) };
   } catch (error) {
+    redirectOnGameplayRefusal(error);
     if (error instanceof OwnershipError) return { error: error.message };
     throw error;
   }
@@ -337,6 +372,7 @@ export async function finishCurrentPracticeWeldAction(input: unknown): Promise<P
     const user = await requireCurrentUser(await headers());
     return { state: await finishCurrentPracticeWeld(user.id, request.data.characterId) };
   } catch (error) {
+    redirectOnGameplayRefusal(error);
     if (error instanceof OwnershipError) return { error: error.message };
     throw error;
   }
@@ -351,6 +387,7 @@ export async function acceptWorkOrderAction(input: unknown): Promise<WorkOrderAc
     const user = await requireCurrentUser(await headers());
     return await acceptWorkOrder(user.id, request.data.characterId, request.data.workOrderId);
   } catch (error) {
+    redirectOnGameplayRefusal(error);
     if (error instanceof OwnershipError) return { error: error.message };
     throw error;
   }
@@ -363,6 +400,7 @@ export async function startWorkOrderWeldingAction(input: unknown): Promise<WorkO
     const user = await requireCurrentUser(await headers());
     return await startWorkOrderWelding(user.id, request.data.characterId);
   } catch (error) {
+    redirectOnGameplayRefusal(error);
     if (error instanceof OwnershipError) return { error: error.message };
     throw error;
   }
@@ -375,6 +413,7 @@ export async function stopWorkOrderWeldingAction(input: unknown): Promise<WorkOr
     const user = await requireCurrentUser(await headers());
     return await stopWorkOrderWelding(user.id, request.data.characterId);
   } catch (error) {
+    redirectOnGameplayRefusal(error);
     if (error instanceof OwnershipError) return { error: error.message };
     throw error;
   }
@@ -391,6 +430,7 @@ export async function refreshWorkOrderBoardAction(
     const user = await requireCurrentUser(await headers());
     return await refreshWorkOrderBoard(user.id, request.data.characterId);
   } catch (error) {
+    redirectOnGameplayRefusal(error);
     if (error instanceof OwnershipError) return { error: error.message };
     throw error;
   }
@@ -409,6 +449,7 @@ export async function setPracticeSlagPreferenceAction(input: unknown): Promise<P
       ),
     };
   } catch (error) {
+    redirectOnGameplayRefusal(error);
     if (error instanceof OwnershipError) return { error: error.message };
     throw error;
   }
@@ -423,6 +464,7 @@ export async function claimCleanPassAction(input: unknown): Promise<CleanPassCla
     const user = await requireCurrentUser(await headers());
     return await claimCleanPass(user.id, request.data.characterId);
   } catch (error) {
+    redirectOnGameplayRefusal(error);
     if (error instanceof OwnershipError) return { error: error.message };
     throw error;
   }
@@ -437,6 +479,7 @@ export async function stopWeldingAction(input: unknown): Promise<PlayActionResul
       state: await stopWelding(user.id, request.data.characterId, request.data.targetId),
     };
   } catch (error) {
+    redirectOnGameplayRefusal(error);
     if (error instanceof OwnershipError) return { error: error.message };
     throw error;
   }
@@ -458,6 +501,7 @@ export async function contributeRepairMaterialsAction(
       expectedMaterials: request.data.expectedMaterials,
     });
   } catch (error) {
+    redirectOnGameplayRefusal(error);
     if (error instanceof OwnershipError) return { error: error.message };
     throw error;
   }
@@ -476,6 +520,7 @@ export async function depositCargoStackAction(
     const user = await requireCurrentUser(await headers());
     return await depositCargoStack(user.id, request.data.characterId, request.data);
   } catch (error) {
+    redirectOnGameplayRefusal(error);
     if (error instanceof OwnershipError) return { error: error.message };
     throw error;
   }
@@ -490,6 +535,7 @@ export async function withdrawCargoStackAction(
     const user = await requireCurrentUser(await headers());
     return await withdrawCargoStack(user.id, request.data.characterId, request.data);
   } catch (error) {
+    redirectOnGameplayRefusal(error);
     if (error instanceof OwnershipError) return { error: error.message };
     throw error;
   }
@@ -504,6 +550,7 @@ export async function depositCargoUniqueItemAction(
     const user = await requireCurrentUser(await headers());
     return await depositCargoUniqueItem(user.id, request.data.characterId, request.data);
   } catch (error) {
+    redirectOnGameplayRefusal(error);
     if (error instanceof OwnershipError) return { error: error.message };
     throw error;
   }
@@ -518,6 +565,7 @@ export async function withdrawCargoUniqueItemAction(
     const user = await requireCurrentUser(await headers());
     return await withdrawCargoUniqueItem(user.id, request.data.characterId, request.data);
   } catch (error) {
+    redirectOnGameplayRefusal(error);
     if (error instanceof OwnershipError) return { error: error.message };
     throw error;
   }
@@ -545,6 +593,7 @@ export async function loadPowerCellAction(input: unknown): Promise<LoadPowerCell
       selectedStack,
     );
   } catch (error) {
+    redirectOnGameplayRefusal(error);
     if (error instanceof OwnershipError) return { error: error.message };
     throw error;
   }
@@ -565,6 +614,7 @@ export async function discardInventoryStackAction(
       expectedQuantity: request.data.expectedQuantity,
     });
   } catch (error) {
+    redirectOnGameplayRefusal(error);
     if (error instanceof OwnershipError) return { error: error.message };
     throw error;
   }
@@ -583,6 +633,7 @@ export async function beginTravelAction(input: unknown): Promise<PlayActionResul
       ),
     };
   } catch (error) {
+    redirectOnGameplayRefusal(error);
     if (error instanceof OwnershipError) return { error: error.message };
     if (error instanceof TravelRuleError) return { error: error.message };
     throw error;
@@ -603,6 +654,7 @@ export async function beginTransportTravelAction(input: unknown): Promise<PlayAc
       ),
     };
   } catch (error) {
+    redirectOnGameplayRefusal(error);
     if (error instanceof OwnershipError) return { error: error.message };
     if (error instanceof TravelRuleError) return { error: error.message };
     throw error;
@@ -620,6 +672,7 @@ export async function claimScavengeAction(input: unknown): Promise<ScavengeClaim
     const user = await requireCurrentUser(await headers());
     return await claimScavenge(user.id, request.data.characterId);
   } catch (error) {
+    redirectOnGameplayRefusal(error);
     if (error instanceof OwnershipError || error instanceof TravelRuleError)
       return { error: error.message };
     throw error;
@@ -643,6 +696,7 @@ export async function acknowledgeScavengeRevealAction(
       request.data.revealId,
     );
   } catch (error) {
+    redirectOnGameplayRefusal(error);
     if (error instanceof OwnershipError) return { error: error.message };
     throw error;
   }
@@ -664,6 +718,7 @@ async function runEquipmentAction(
       state: await changeEquipment(user.id, request.characterId, change(request)),
     };
   } catch (error) {
+    redirectOnGameplayRefusal(error);
     if (error instanceof OwnershipError || error instanceof EquipmentRuleError)
       return { error: error.message };
     throw error;
@@ -698,6 +753,7 @@ export async function claimPowerCellsAction(input: unknown): Promise<PowerAnnexA
     const user = await requireCurrentUser(await headers());
     return await claimPowerCells(user.id, request.data.characterId);
   } catch (error) {
+    redirectOnGameplayRefusal(error);
     if (error instanceof OwnershipError) return { error: error.message };
     throw error;
   }
@@ -713,6 +769,7 @@ export async function tradeWithMerchantAction(input: unknown): Promise<TradeActi
     const { characterId, ...trade } = request.data;
     return await tradeWithMerchant(user.id, characterId, trade);
   } catch (error) {
+    redirectOnGameplayRefusal(error);
     if (error instanceof OwnershipError) return { error: error.message };
     throw error;
   }

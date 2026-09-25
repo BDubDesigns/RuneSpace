@@ -137,6 +137,15 @@ export function formatAuditSummary(
         return `Set ${skill} total XP ${before} → ${after}.`;
       return `Set ${skill} total XP.`;
     }
+    // Issue #223 — account and system access operations.
+    case "grant_early_access":
+      return "Granted Early Access to this account.";
+    case "revoke_early_access":
+      return "Revoked Early Access for this account.";
+    case "open_public_gameplay":
+      return "Opened public gameplay.";
+    case "close_public_gameplay":
+      return "Closed public gameplay.";
     default:
       return `${operation}${targetIdentity ? ` (${targetIdentity})` : ""}.`;
   }

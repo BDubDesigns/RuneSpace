@@ -40,7 +40,7 @@ small number of critical mobile player journeys.
   Inventory Equip, Overlay, Character, Walk It Off, Cut Your Teeth, Travel,
   Location Population, Character Profile, Character Portraits, Refining, Cargo
   Hold, Deep Jag, Holo Hollow, Rusk Recovery, Admin Operator, Sign-out,
-  Account News, and Account Verification. It intentionally excludes noncanonical `smoke`, `ownership`,
+  Account News, Account Verification, and Gameplay Access. It intentionally excludes noncanonical `smoke`, `ownership`,
   `design-system`, `work-orders`, `public-*`, and QC Studio specs. It:
   - requires Node 22.x
   - requires a localhost-only disposable PostgreSQL database (refuses remote)
@@ -58,8 +58,11 @@ small number of critical mobile player journeys.
     depending on the host wall clock
   - runs with zero retries, `trace: "retain-on-failure"`, and a timing reporter
     that prints total wall-clock time and the ten slowest tests; the admin
-    operator suite is the intentional serial exception for its fixed allowlist
-    and identity
+    operator suite is an intentional serial exception for its fixed allowlist
+    and identity, and the gameplay-access suite (issue #223) is the other: it
+    is the only spec that changes the global public-gameplay row, so it runs
+    serially in the chromium project only and restores Closed after every
+    journey, while every other fixture account carries fixture Early Access
   - on failure, Playwright's `screenshot: "only-on-failure"` and
     `trace: "retain-on-failure"` write per-test screenshots and traces into
     `test-results/`; CI uploads those as a bounded failure-diagnostics artifact
@@ -127,7 +130,8 @@ small number of critical mobile player journeys.
   `pnpm test:e2e:canonical` and the matching CI job establish CI parity.
 - Managed-host focused iteration uses `pnpm test:e2e:focused <phase>` (currently
   `mining`, `character-profile`, `location-population`, `character-portraits`,
-  `cargo-hold`, `inventory-equip`, `travel`, `walk-it-off`, and `cut-your-teeth`; recipe
+  `cargo-hold`, `inventory-equip`, `travel`, `walk-it-off`, `cut-your-teeth`,
+  `rusk-recovery`, `work-orders`, `gameplay-access`, and `account-verification`; recipe
   in `docs/development-workflow.md`). The focused runner
   reuses the canonical primitives from `scripts/e2e-shared.mjs` (localhost-only
   database safety, Node 22 validation, port availability, targeted process
