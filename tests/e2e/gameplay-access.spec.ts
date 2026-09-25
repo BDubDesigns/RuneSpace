@@ -50,6 +50,52 @@ async function expectLaunchPresentation(page: Page, targetAt: Date) {
   }
 }
 
+/**
+ * The public landing's state-dependent copy while public gameplay is closed:
+ * the reservation wording throughout, and none of the open-state claims.
+ */
+async function expectClosedLandingCopy(page: Page) {
+  await expect(page.getByText("RESERVATIONS OPEN", { exact: true })).toBeVisible();
+  await expect(page.getByText("Reservations open", { exact: true })).toBeVisible();
+  await expect(
+    page.getByText("Reserve your crew before Soft Alpha opens October 27.", { exact: true }),
+  ).toBeVisible();
+  const reserve = page.getByRole("link", { name: "Reserve your characters", exact: true });
+  await expect(reserve).toHaveCount(2);
+  for (const link of await reserve.all()) await expect(link).toHaveAttribute("href", "/register");
+  await expect(page.getByText("SOFT ALPHA — LIVE", { exact: true })).toHaveCount(0);
+  await expect(page.getByText("PLAYABLE", { exact: true })).toHaveCount(0);
+  await expect(page.getByRole("link", { name: "Start playing", exact: true })).toHaveCount(0);
+}
+
+/**
+ * The public landing once public gameplay is open: the Soft Alpha live hero and
+ * play wording, with no reservation copy and no countdown.
+ */
+async function expectOpenLandingCopy(page: Page) {
+  await expect(page.getByText("SOFT ALPHA — LIVE", { exact: true })).toBeVisible();
+  await expect(
+    page.getByText(
+      "Create your account, verify your email, and start playing RuneSpace. You can create up to three globally unique characters.",
+      { exact: true },
+    ),
+  ).toBeVisible();
+  await expect(page.getByText("PLAYABLE", { exact: true })).toBeVisible();
+  await expect(page.getByText("Soft Alpha", { exact: true })).toBeVisible();
+  await expect(
+    page.getByText("Create your account and start putting the wreck back together.", {
+      exact: true,
+    }),
+  ).toBeVisible();
+  const start = page.getByRole("link", { name: "Start playing", exact: true });
+  await expect(start).toHaveCount(2);
+  for (const link of await start.all()) await expect(link).toHaveAttribute("href", "/register");
+  await expect(page.getByText("SOFT ALPHA — OCTOBER 27", { exact: true })).toHaveCount(0);
+  await expect(page.getByText("RESERVATIONS OPEN", { exact: true })).toHaveCount(0);
+  await expect(page.getByRole("link", { name: "Reserve your characters" })).toHaveCount(0);
+  await expect(page.getByTestId("soft-alpha-countdown")).toHaveCount(0);
+}
+
 function baseURL(): string {
   const configured = test.info().project.use.baseURL;
   if (!configured) throw new Error("Playwright baseURL is required");
@@ -198,9 +244,10 @@ test.describe("gameplay access gate and launch controls", () => {
         ),
       ).toBeVisible();
       await expect(
-        landing.getByRole("link", { name: "Reserve your characters", exact: true }),
+        landing.getByRole("link", { name: "Reserve your characters", exact: true }).first(),
       ).toBeVisible();
       await expectLaunchPresentation(landing, launchTarget);
+      await expectClosedLandingCopy(landing);
       await captureReviewScreenshot(landing, "gameplay-access-landing-launch-state.png");
     } finally {
       await landingContext.close();
@@ -326,7 +373,9 @@ test.describe("gameplay access gate and launch controls", () => {
     await expect(playerA.getByText("READY FOR ALPHA", { exact: true })).toBeVisible();
   });
 
-  test("5-6. opening public gameplay admits ordinary accounts; closing blocks them again but not Early Access", async () => {
+  test("5-6. opening public gameplay admits ordinary accounts; closing blocks them again but not Early Access", async ({
+    browser,
+  }) => {
     await admin.goto("/admin");
     const control = admin.getByRole("region", { name: "PUBLIC GAMEPLAY" });
     await expect(
@@ -350,6 +399,18 @@ test.describe("gameplay access gate and launch controls", () => {
       admin.getByTestId("admin-system-audit-list").getByText("Opened public gameplay.").first(),
     ).toBeVisible();
     await captureReviewScreenshot(admin, "gameplay-access-admin-public-open.png");
+
+    // The public landing reads the same switch: Soft Alpha live, no reservation copy.
+    const landingContext = await browser.newContext({ baseURL: baseURL() });
+    try {
+      const landing = await landingContext.newPage();
+      await landing.setViewportSize({ width: 390, height: 844 });
+      await landing.goto("/");
+      await expectOpenLandingCopy(landing);
+      await captureReviewScreenshot(landing, "gameplay-access-landing-open-state.png");
+    } finally {
+      await landingContext.close();
+    }
 
     // Ordinary account: normal playable Characters experience, then Play.
     await playerB.goto("/characters");

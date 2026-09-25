@@ -63,8 +63,18 @@ export function PublicLandingPage({
   signedIn: boolean;
   launch: PublicLaunchState;
 }) {
-  const { adventure, buildSignal, capabilities, currentBuild, hero, showcase, status } =
-    publicLandingContent;
+  const {
+    adventure,
+    buildSignal,
+    capabilities,
+    capabilitiesHeader,
+    currentBuild,
+    gameplayState,
+    hero,
+    showcase,
+    status,
+  } = publicLandingContent;
+  const stateCopy = gameplayState[launch.publicGameplayOpen ? "open" : "closed"];
   const latestUpdate = getLatestPublishedUpdate();
   const prominentActionClassName = "min-h-14 px-6 py-3 text-base sm:min-h-16 sm:px-8 sm:text-lg";
 
@@ -77,7 +87,7 @@ export function PublicLandingPage({
               {hero.eyebrow}
             </p>
             <p className="mt-3 inline-flex border border-[color:var(--rs-accent-success)] bg-[color:var(--rs-accent-success-subtle)] px-2 py-1 font-display text-xs font-bold uppercase tracking-[0.12em] text-[color:var(--rs-accent-success)]">
-              {hero.status}
+              {stateCopy.heroStatus}
             </p>
             <h1 className="mt-5 max-w-2xl">
               <RuneSpaceBrand
@@ -90,7 +100,7 @@ export function PublicLandingPage({
               {hero.title}
             </h2>
             <p className="mt-5 max-w-2xl text-base leading-7 text-[color:var(--rs-text-secondary)] sm:text-lg">
-              {hero.description}
+              {stateCopy.heroDescription}
             </p>
             <div className="mt-8 flex flex-wrap gap-3">
               {signedIn ? (
@@ -100,7 +110,7 @@ export function PublicLandingPage({
               ) : (
                 <>
                   <ActionLink className={prominentActionClassName} href="/register">
-                    {hero.reserveAction}
+                    {stateCopy.primaryAction}
                   </ActionLink>
                   <ActionLink
                     className={prominentActionClassName}
@@ -127,12 +137,13 @@ export function PublicLandingPage({
               Build signal
             </p>
             <p className="mt-3 font-display text-2xl font-bold text-[color:var(--rs-text-primary)]">
-              PLAYABLE
+              {stateCopy.buildSignalBadge}
             </p>
             <div className="mt-6">
               {buildSignal.map((signal) => (
                 <BuildSignal key={signal.label} label={signal.label} value={signal.value} />
               ))}
+              <BuildSignal label="Status" value={stateCopy.buildSignalStatus} />
             </div>
           </aside>
         </section>
@@ -205,8 +216,8 @@ export function PublicLandingPage({
         </section>
 
         <section aria-labelledby="capabilities-heading" className="pt-20 sm:pt-28">
-          <PublicSectionHeader eyebrow="The current loop" id="capabilities-heading">
-            What you can do now
+          <PublicSectionHeader eyebrow={capabilitiesHeader.eyebrow} id="capabilities-heading">
+            {capabilitiesHeader.title}
           </PublicSectionHeader>
           <div className="mt-8 grid min-w-0 gap-x-10 sm:grid-cols-2">
             {capabilities.map((capability) => (
@@ -294,7 +305,7 @@ export function PublicLandingPage({
                 THE WRECK ISN&apos;T GOING TO FIX ITSELF.
               </h2>
               <p className="mt-3 text-sm leading-6 text-[color:var(--rs-text-secondary)] sm:text-base">
-                Take the next job and keep the ship moving.
+                {stateCopy.finalCallToAction}
               </p>
             </div>
             <div className="flex shrink-0 flex-wrap gap-3">
@@ -305,7 +316,7 @@ export function PublicLandingPage({
               ) : (
                 <>
                   <ActionLink className={prominentActionClassName} href="/register">
-                    Register
+                    {stateCopy.primaryAction}
                   </ActionLink>
                   <ActionLink
                     className={prominentActionClassName}

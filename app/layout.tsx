@@ -3,9 +3,9 @@ import type { ReactNode } from "react";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "RuneSpace — Pre-Alpha",
+  title: "RuneSpace — Low-fi sci-fi RPG",
   description:
-    "RuneSpace — playable pre-alpha browser RPG. Early development build with a real early-game loop.",
+    "A browser-based low-fi sci-fi RPG about salvage, work, repair, and survival on Holo Hollow.",
   icons: {
     icon: [
       { url: "/favicon.ico", sizes: "any" },

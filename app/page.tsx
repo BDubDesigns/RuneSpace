@@ -5,9 +5,9 @@ import { auth } from "@/server/auth";
 import { loadRuneSpaceLaunchState } from "@/server/gameplay-access";
 
 export const metadata: Metadata = {
-  title: "RuneSpace — Playable pre-alpha",
+  title: "RuneSpace — Low-fi sci-fi RPG",
   description:
-    "RuneSpace is a browser-first, low-fi sci-fi RPG with a playable early-game loop in Holo Hollow.",
+    "A browser-based low-fi sci-fi RPG about salvage, work, repair, and survival on Holo Hollow.",
 };
 
 export default async function HomePage() {

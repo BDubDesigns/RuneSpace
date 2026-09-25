@@ -16,11 +16,12 @@ test("public landing loads with the Soft Alpha reservation identity and entry ac
       name: "Your ship crashed. The engines are dead. But you’re not. Yet.",
     }),
   ).toBeVisible();
-  await expect(
-    page.getByRole("link", { name: "Reserve your characters", exact: true }),
-  ).toHaveAttribute("href", "/register");
+  // The hero and the final call to action both reserve through registration.
+  const reserve = page.getByRole("link", { name: "Reserve your characters", exact: true });
+  await expect(reserve).toHaveCount(2);
+  for (const link of await reserve.all()) await expect(link).toHaveAttribute("href", "/register");
   await expect(page.getByTestId("soft-alpha-countdown")).toBeVisible();
-  await expect(page.getByRole("link", { name: "Register", exact: true })).toHaveCount(1);
+  await expect(page.getByRole("link", { name: "Register", exact: true })).toHaveCount(0);
   await expect(page.getByRole("link", { name: "Sign in", exact: true })).toHaveCount(2);
   await expect(page.getByRole("navigation", { name: "Public" })).toBeVisible();
   await expect(page.getByRole("link", { name: "Home", exact: true })).toHaveAttribute("href", "/");

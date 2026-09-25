@@ -161,9 +161,19 @@ anchored to that server time, and never writes, refreshes, or grants anything.
   can play now. Public Soft Alpha opens October 27.", the countdown, and the
   normal Play actions. There is no in-game countdown or HUD.
 - **Characters, public gameplay open** — the normal playable experience.
-- **Public landing** — status `SOFT ALPHA — OCTOBER 27`, the locked hero line
+- **Public landing, closed** — status `SOFT ALPHA — OCTOBER 27`, the locked hero line
   and supporting copy, the signed-out `Reserve your characters` CTA with
   `Sign in`, and the countdown beside them.
+- **Public landing, open** — status `SOFT ALPHA — LIVE`, the same hero line,
+  play-now supporting copy, and a signed-out `Start playing` CTA (still to
+  `/register`); no countdown.
+
+The landing reads the public switch only (never Early Access), rendered on the
+server per request. The state-dependent strings — hero status, supporting
+copy, CTA label, Build signal badge and status, and the final call-to-action
+line — live together in `publicLandingContent.gameplayState`
+(`features/public-site/public-site-content.ts`); the rest of the landing is
+written to be true in both states.
 
 ## Operator controls
 

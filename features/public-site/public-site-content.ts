@@ -5,25 +5,46 @@ export const publicSiteNavigation = [
 ] as const;
 
 export const publicLandingContent = {
-  // Issue #223: the locked Soft Alpha reservation state.
   hero: {
     eyebrow: "Low-fi sci-fi RPG / Holo Hollow",
-    status: "SOFT ALPHA — OCTOBER 27",
     title: "Your ship crashed. The engines are dead. But you’re not. Yet.",
-    description:
-      "Create your account, verify your email, and reserve up to three globally unique character names before RuneSpace Soft Alpha opens October 27.",
-    reserveAction: "Reserve your characters",
+  },
+  // Issue #223: the only landing copy whose truth depends on the persisted
+  // public-gameplay switch. `closed` is the locked Soft Alpha reservation
+  // state; everything outside this block reads true in both states.
+  gameplayState: {
+    closed: {
+      heroStatus: "SOFT ALPHA — OCTOBER 27",
+      heroDescription:
+        "Create your account, verify your email, and reserve up to three globally unique character names before RuneSpace Soft Alpha opens October 27.",
+      primaryAction: "Reserve your characters",
+      buildSignalBadge: "RESERVATIONS OPEN",
+      buildSignalStatus: "Reservations open",
+      finalCallToAction: "Reserve your crew before Soft Alpha opens October 27.",
+    },
+    open: {
+      heroStatus: "SOFT ALPHA — LIVE",
+      heroDescription:
+        "Create your account, verify your email, and start playing RuneSpace. You can create up to three globally unique characters.",
+      primaryAction: "Start playing",
+      buildSignalBadge: "PLAYABLE",
+      buildSignalStatus: "Soft Alpha",
+      finalCallToAction: "Create your account and start putting the wreck back together.",
+    },
   },
   buildSignal: [
     { label: "Region", value: "Holo Hollow" },
     { label: "Loop", value: "Salvage / work / repair" },
-    { label: "Status", value: "Pre-alpha" },
   ],
   currentBuild: {
     eyebrow: "Current build",
-    title: "A playable slice with real ground under it",
+    title: "A real early-game slice with ground under it",
     description:
-      "The early game is live: move between locations, find useful material, put it through the right work, and make the wreck more capable one job at a time.",
+      "The current build is a focused early-game loop: move between locations, find useful material, put it through the right work, and make the wreck more capable one job at a time.",
+  },
+  capabilitiesHeader: {
+    eyebrow: "The current build",
+    title: "What RuneSpace already supports",
   },
   showcase: [
     {
@@ -70,7 +91,7 @@ export const publicLandingContent = {
     {
       number: "04",
       title: "Progress",
-      copy: "Take on authored missions, meet Wade and Tansy, and build Mining, Refining, Welding, and Strength as the work gets harder.",
+      copy: "Take on authored missions, meet Wade and Tansy, and build Mining, Refining, and Welding as the work gets harder.",
     },
   ],
   adventure: {
@@ -83,7 +104,7 @@ export const publicLandingContent = {
   },
   status: {
     eyebrow: "Development status",
-    title: "Playable now. Expanding regularly.",
-    body: "RuneSpace is a playable pre-alpha under active development. The current build is a focused early-game loop, so expect rough edges, new work, and frequent changes as Holo Hollow grows.",
+    title: "Under active development. Expanding regularly.",
+    body: "RuneSpace is under active development. The current build is a focused early-game slice, so expect rough edges, frequent changes, balance shifts, and occasional resets as Holo Hollow grows.",
   },
 } as const;

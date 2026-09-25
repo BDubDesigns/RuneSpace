@@ -137,6 +137,7 @@ const CARGO_HOLD_REQUIRED = [
 // Console account and global access controls.
 const GAMEPLAY_ACCESS_REQUIRED = [
   "gameplay-access-landing-launch-state.png",
+  "gameplay-access-landing-open-state.png",
   "gameplay-access-claim-your-crew.png",
   "gameplay-access-crew-reserved.png",
   "gameplay-access-admin-account-access.png",
