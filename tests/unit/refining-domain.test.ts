@@ -6,7 +6,8 @@ import {
   type RefiningRecipeBalance,
   type RolledRefiningRecipeBalance,
 } from "@/game/config/balance";
-import { ACTION_IDS, BOUNDED_RUN_QUANTITY_CEILING, SKILL_IDS } from "@/game/config/foundations";
+import { ACTION_IDS, SKILL_IDS } from "@/game/config/foundations";
+import { BOUNDED_RUN_MAX, boundedRunAllowance } from "@/game/domain/bounded-run";
 import {
   refiningRecipeUnlocked,
   refiningSuccessChanceBps,
@@ -30,8 +31,11 @@ describe("refining domain", () => {
   const refinedFerrite = rolled(ACTION_IDS.refining);
   const galvanicStock = rolled(ACTION_IDS.galvanicStockRefining);
   const galvaferrite = rolled(ACTION_IDS.galvaferriteRefining);
-  /** These tests predate bounded runs (#229); they exercise the loop uncapped. */
-  const UNBOUNDED = BOUNDED_RUN_QUANTITY_CEILING;
+  /**
+   * These tests predate bounded runs (#229): they exercise the loop in Max
+   * mode, which is what the original run-until-blocked Refining run was.
+   */
+  const UNBOUNDED = boundedRunAllowance(BOUNDED_RUN_MAX, 0);
 
   function resolveFerriteRefining(
     input: Omit<Parameters<typeof resolveRefining<string>>[0], "recipe">,
@@ -82,7 +86,7 @@ describe("refining domain", () => {
     };
     const random = { nextBasisPoints: vi.fn(() => 0) };
     const res = resolveFerriteRefining({
-      attemptLimit: UNBOUNDED,
+      allowance: UNBOUNDED,
       elapsedTicks: 6,
       snapshot,
       balance,
@@ -112,7 +116,7 @@ describe("refining domain", () => {
       massAvailableGrams: 50_000,
     };
     const res = resolveFerriteRefining({
-      attemptLimit: UNBOUNDED,
+      allowance: UNBOUNDED,
       elapsedTicks: 7,
       snapshot,
       balance,
@@ -135,7 +139,7 @@ describe("refining domain", () => {
       massAvailableGrams: 50_000,
     };
     const res = resolveFerriteRefining({
-      attemptLimit: UNBOUNDED,
+      allowance: UNBOUNDED,
       elapsedTicks: 7,
       snapshot,
       balance,
@@ -179,7 +183,7 @@ describe("refining domain", () => {
       expect(ferritePreflight(snapshot)).toBeUndefined();
       const random = { nextBasisPoints: vi.fn(() => 0) };
       const res = resolveFerriteRefining({
-        attemptLimit: UNBOUNDED,
+        allowance: UNBOUNDED,
         elapsedTicks: 7,
         snapshot,
         balance,
@@ -207,7 +211,7 @@ describe("refining domain", () => {
 
       const random = { nextBasisPoints: vi.fn(() => 0) };
       const res = resolveFerriteRefining({
-        attemptLimit: UNBOUNDED,
+        allowance: UNBOUNDED,
         elapsedTicks: 7,
         snapshot,
         balance,
@@ -240,7 +244,7 @@ describe("refining domain", () => {
 
       const random = { nextBasisPoints: vi.fn(() => 0) };
       const res = resolveFerriteRefining({
-        attemptLimit: UNBOUNDED,
+        allowance: UNBOUNDED,
         elapsedTicks: 7,
         snapshot,
         balance,
@@ -272,7 +276,7 @@ describe("refining domain", () => {
       expect(ferritePreflight(snapshot)).toBe("inventory_slots_full");
       const random = { nextBasisPoints: vi.fn(() => 0) };
       const res = resolveFerriteRefining({
-        attemptLimit: UNBOUNDED,
+        allowance: UNBOUNDED,
         elapsedTicks: 7,
         snapshot,
         balance,
@@ -327,7 +331,7 @@ describe("refining domain", () => {
     };
     const random = { nextBasisPoints: vi.fn(() => 0) }; // all successes
     const res = resolveFerriteRefining({
-      attemptLimit: UNBOUNDED,
+      allowance: UNBOUNDED,
       elapsedTicks: 21,
       snapshot,
       balance,
@@ -360,7 +364,7 @@ describe("refining domain", () => {
     expect(ferritePreflight(snapshot)).toBe("inventory_slots_full");
     const random = { nextBasisPoints: vi.fn(() => 0) };
     const res = resolveFerriteRefining({
-      attemptLimit: UNBOUNDED,
+      allowance: UNBOUNDED,
       elapsedTicks: 21,
       snapshot,
       balance,
@@ -381,7 +385,7 @@ describe("refining domain", () => {
     };
     const random = { nextBasisPoints: vi.fn(() => 0) };
     const res = resolveFerriteRefining({
-      attemptLimit: UNBOUNDED,
+      allowance: UNBOUNDED,
       elapsedTicks: 13,
       snapshot,
       balance,
@@ -419,14 +423,14 @@ describe("refining domain", () => {
       expect(ferritePreflight(snapA)).toBeUndefined();
       expect(ferritePreflight(snapB)).toBeUndefined();
       const resA = resolveFerriteRefining({
-        attemptLimit: UNBOUNDED,
+        allowance: UNBOUNDED,
         elapsedTicks: 7,
         snapshot: snapA,
         balance,
         random: { nextBasisPoints: () => 0 },
       });
       const resB = resolveFerriteRefining({
-        attemptLimit: UNBOUNDED,
+        allowance: UNBOUNDED,
         elapsedTicks: 7,
         snapshot: snapB,
         balance,
@@ -483,7 +487,7 @@ describe("refining domain", () => {
 
     it("a failed Galvanic Stock pour is 2 Slag", () => {
       const res = resolveRefining({
-        attemptLimit: UNBOUNDED,
+        allowance: UNBOUNDED,
         elapsedTicks: galvanicStock.attemptDurationTicks,
         snapshot: {
           refiningLevel: 1,
@@ -514,7 +518,7 @@ describe("refining domain", () => {
       };
       const runWith = (unit: number) =>
         resolveRefining({
-          attemptLimit: UNBOUNDED,
+          allowance: UNBOUNDED,
           elapsedTicks: galvaferrite.attemptDurationTicks,
           snapshot,
           balance,
@@ -538,7 +542,7 @@ describe("refining domain", () => {
 
     it("a successful Galvaferrite alloy consumes both inputs for one Galvaferrite", () => {
       const res = resolveRefining({
-        attemptLimit: UNBOUNDED,
+        allowance: UNBOUNDED,
         elapsedTicks: galvaferrite.attemptDurationTicks,
         snapshot: {
           refiningLevel: 30,

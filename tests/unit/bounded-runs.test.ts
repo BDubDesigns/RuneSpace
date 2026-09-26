@@ -14,21 +14,28 @@ import {
 } from "@/game/config/foundations";
 import {
   BOUNDED_RUN_DEFAULT_QUANTITY,
+  BOUNDED_RUN_MAX,
+  boundedRunAllowance,
   boundedRunProgress,
-  checkBoundedRunQuantity,
-  stepBoundedRunQuantity,
+  boundedRunSelectionFromColumn,
+  boundedRunSelectionToColumn,
+  checkBoundedRunSelection,
+  stepBoundedRunSelection,
 } from "@/game/domain/bounded-run";
 import type { StackState } from "@/game/domain/inventory";
 import {
+  refiningAffordableBatches,
   refiningAwardFacts,
-  refiningPreflightStopReason,
   refiningRecipeUnlocked,
-  refiningRunMaximum,
   refiningSuccessChanceBps,
   resolveRefining,
   type RefiningSnapshot,
 } from "@/game/domain/refining";
-import { BoundedRunQuantitySchema, StartRefiningRequestSchema } from "@/game/schemas/gameplay";
+import {
+  BoundedRunSelectionSchema,
+  StartPracticeRequestSchema,
+  StartRefiningRequestSchema,
+} from "@/game/schemas/gameplay";
 
 const balance = getEffectiveGameBalance();
 const recipe = (actionId: string) => refiningRecipeForActionId(actionId, balance)!;
@@ -36,6 +43,10 @@ const refinedFerrite = recipe(ACTION_IDS.refining);
 const galvaferrite = recipe(ACTION_IDS.galvaferriteRefining);
 const ferriteShaleSlag = recipe(ACTION_IDS.ferriteShaleSlagRefining);
 const galvaniteSlag = recipe(ACTION_IDS.galvaniteSlagRefining);
+
+/** A numeric run with `n` batches left, and a fresh Max run. */
+const count = (n: number) => boundedRunAllowance(n, 0);
+const max = boundedRunAllowance(BOUNDED_RUN_MAX, 0);
 
 function stacks(...entries: [itemId: string, quantity: number][]): StackState<string>[] {
   return entries.map(([itemId, quantity], index) => ({ id: `s${index}`, itemId, quantity }));
@@ -54,73 +65,35 @@ function snapshot(
   };
 }
 
-/** A seeded roll stream, so a property run is reproducible. */
-function seededRandom(seed: number) {
-  let state = seed;
-  const next = () => {
-    state = (state * 1_103_515_245 + 12_345) % 2_147_483_648;
-    return state / 2_147_483_648;
-  };
-  return { nextBasisPoints: () => Math.floor(next() * 10_000), nextUnit: next };
-}
-
-/**
- * One scripted outcome per attempt: `"success"`, or the index of the failure
- * branch that comes back. The script drives the real resolver, so a sequence is
- * reachable exactly when the resolver can play it out.
- */
-type ScriptedOutcome = "success" | number;
-
-function scriptedRandom(outcomes: readonly ScriptedOutcome[], failureBranches: number) {
+/** Rolls in order: `"success"`, or the index of the input a failure hands back. */
+function scripted(outcomes: readonly ("success" | number)[]) {
   let rolled = 0;
   let chosen = 0;
   return {
     nextBasisPoints: () => (outcomes[rolled++] === "success" ? 0 : 9_999),
     nextUnit: () => {
       while (outcomes[chosen] === "success") chosen += 1;
-      const branch = outcomes[chosen++] as number;
-      return (branch + 0.5) / failureBranches;
+      return ((outcomes[chosen++] as number) + 0.5) / 2;
     },
   };
 }
 
-function runScripted(
-  start: RefiningSnapshot<string>,
-  candidate: RefiningRecipeBalance,
-  outcomes: readonly ScriptedOutcome[],
-  attemptLimit: number,
+/** Totals by item, whatever the stack split. */
+function carriedAfter(
+  start: StackState<string>[],
+  resolved: ReturnType<typeof resolveRefining<string>>,
 ) {
-  return resolveRefining({
-    elapsedTicks: candidate.attemptDurationTicks * (attemptLimit + 5),
-    snapshot: start,
-    balance,
-    recipe: candidate,
-    random: scriptedRandom(outcomes, refiningAwardFacts(balance, candidate).failureOutcomes.length),
-    attemptLimit,
-  });
-}
-
-/**
- * The longest outcome sequence the real resolver can play out, found by trying
- * every sequence — an independent check on `refiningRunMaximum`'s search.
- */
-function longestScriptedRun(start: RefiningSnapshot<string>, candidate: RefiningRecipeBalance) {
-  const failures = refiningAwardFacts(balance, candidate).failureOutcomes.length;
-  const choices: ScriptedOutcome[] = [
-    "success",
-    ...Array.from({ length: failures }, (_, index) => index),
-  ];
-  const extend = (prefix: readonly ScriptedOutcome[]): number => {
-    let longest = prefix.length;
-    for (const choice of choices) {
-      const next = [...prefix, choice];
-      if (runScripted(start, candidate, next, next.length).attempts === next.length) {
-        longest = Math.max(longest, extend(next));
-      }
-    }
-    return longest;
-  };
-  return extend([]);
+  const totals: Record<string, number> = {};
+  const updated = new Map(resolved.stackUpdates.map((update) => [update.id, update.quantity]));
+  const deleted = new Set(resolved.deletedStackIds);
+  for (const stack of start) {
+    if (deleted.has(stack.id)) continue;
+    totals[stack.itemId] = (totals[stack.itemId] ?? 0) + (updated.get(stack.id) ?? stack.quantity);
+  }
+  for (const created of resolved.createdStacks) {
+    totals[created.itemId] = (totals[created.itemId] ?? 0) + created.quantity;
+  }
+  return totals;
 }
 
 const ORDINARY_REFINING_SHORTAGES = [
@@ -129,65 +102,117 @@ const ORDINARY_REFINING_SHORTAGES = [
   "carried_mass_capacity_reached",
 ];
 
-describe("the shared bounded-run quantity rule", () => {
+describe("the shared bounded-run selection rule", () => {
   it("defaults to one and never steps below one", () => {
     expect(BOUNDED_RUN_DEFAULT_QUANTITY).toBe(1);
     expect(BOUNDED_RUN_MINIMUM_QUANTITY).toBe(1);
-    expect(stepBoundedRunQuantity(1, -1, 5)).toBe(1);
-    expect(stepBoundedRunQuantity(3, -1, 5)).toBe(2);
+    expect(stepBoundedRunSelection(1, -1, 5)).toBe(1);
+    expect(stepBoundedRunSelection(3, -1, 5)).toBe(2);
   });
 
-  it("never steps above the authoritative maximum", () => {
-    expect(stepBoundedRunQuantity(4, 1, 5)).toBe(5);
-    expect(stepBoundedRunQuantity(5, 1, 5)).toBe(5);
-    // A selection left above a shrunken maximum steps back inside it.
-    expect(stepBoundedRunQuantity(9, 1, 5)).toBe(5);
-    // With nothing available the selector rests at one.
-    expect(stepBoundedRunQuantity(1, 1, 0)).toBe(1);
+  it("never steps a number above what the inputs carried pay for", () => {
+    expect(stepBoundedRunSelection(4, 1, 5)).toBe(5);
+    expect(stepBoundedRunSelection(5, 1, 5)).toBe(5);
+    // A number left above a shrunken count steps back inside it.
+    expect(stepBoundedRunSelection(9, 1, 5)).toBe(5);
+    // With nothing affordable the selector rests at one.
+    expect(stepBoundedRunSelection(1, 1, 0)).toBe(1);
   });
 
-  it("accepts any whole quantity from one to the current maximum", () => {
-    expect(checkBoundedRunQuantity(1, 5)).toEqual({ ok: true, quantity: 1 });
-    expect(checkBoundedRunQuantity(5, 5)).toEqual({ ok: true, quantity: 5 });
+  it("treats Max as its own choice: − leaves it for the largest number, + keeps it", () => {
+    expect(stepBoundedRunSelection(BOUNDED_RUN_MAX, -1, 5)).toBe(5);
+    expect(stepBoundedRunSelection(BOUNDED_RUN_MAX, 1, 5)).toBe(BOUNDED_RUN_MAX);
+    // + never turns a number into Max.
+    expect(stepBoundedRunSelection(5, 1, 5)).toBe(5);
   });
 
-  it("refuses an excess quantity rather than reducing it", () => {
-    expect(checkBoundedRunQuantity(6, 5)).toEqual({
-      ok: false,
-      reason: "exceeds_maximum",
-      maximum: 5,
+  it("accepts any whole number up to what the inputs pay for, and Max", () => {
+    expect(checkBoundedRunSelection(1, 5)).toEqual({ ok: true, selection: 1 });
+    expect(checkBoundedRunSelection(5, 5)).toEqual({ ok: true, selection: 5 });
+    expect(checkBoundedRunSelection(BOUNDED_RUN_MAX, 1)).toEqual({
+      ok: true,
+      selection: BOUNDED_RUN_MAX,
     });
-    expect(checkBoundedRunQuantity(1, 0)).toEqual({ ok: false, reason: "unavailable", maximum: 0 });
   });
 
-  it("refuses forged quantities outright", () => {
-    for (const forged of [0, -1, 1.5, Number.NaN, BOUNDED_RUN_QUANTITY_CEILING + 1]) {
-      expect(checkBoundedRunQuantity(forged, 5)).toMatchObject({
+  it("refuses a stale number rather than reducing it", () => {
+    expect(checkBoundedRunSelection(6, 5)).toEqual({
+      ok: false,
+      reason: "exceeds_affordable",
+      affordable: 5,
+    });
+    // Nothing affordable refuses a number and Max alike.
+    for (const selection of [1, BOUNDED_RUN_MAX] as const) {
+      expect(checkBoundedRunSelection(selection, 0)).toEqual({
         ok: false,
-        reason: "invalid_quantity",
+        reason: "unavailable",
+        affordable: 0,
       });
-      expect(BoundedRunQuantitySchema.safeParse(forged).success).toBe(false);
     }
   });
 
-  it("makes quantity part of the Start Refining request itself", () => {
+  it("refuses forged selections outright", () => {
+    for (const forged of [0, -1, 1.5, Number.NaN, BOUNDED_RUN_QUANTITY_CEILING + 1]) {
+      expect(checkBoundedRunSelection(forged, 5)).toMatchObject({
+        ok: false,
+        reason: "invalid_quantity",
+      });
+      expect(BoundedRunSelectionSchema.safeParse(forged).success).toBe(false);
+    }
+    for (const forged of ["MAX", "all", "", null, "5"]) {
+      expect(BoundedRunSelectionSchema.safeParse(forged).success).toBe(false);
+    }
+    expect(BoundedRunSelectionSchema.safeParse(BOUNDED_RUN_MAX).success).toBe(true);
+  });
+
+  it("makes the selection part of both Start requests", () => {
     const characterId = "0e9f5b2a-4c1d-4e8a-9b6f-2d3c4e5f6a7b";
     const recipeActionId = ACTION_IDS.refining;
     expect(StartRefiningRequestSchema.safeParse({ characterId, recipeActionId }).success).toBe(
       false,
     );
-    expect(
-      StartRefiningRequestSchema.safeParse({ characterId, recipeActionId, quantity: 3 }).success,
-    ).toBe(true);
+    for (const quantity of [3, BOUNDED_RUN_MAX]) {
+      expect(
+        StartRefiningRequestSchema.safeParse({ characterId, recipeActionId, quantity }).success,
+      ).toBe(true);
+      expect(StartPracticeRequestSchema.safeParse({ characterId, quantity }).success).toBe(true);
+    }
   });
 
-  it("reports selected, completed and remaining for the active-run line", () => {
-    expect(boundedRunProgress(5, 2)).toEqual({ selected: 5, completed: 2, remaining: 3 });
-    expect(boundedRunProgress(5, 7)).toEqual({ selected: 5, completed: 5, remaining: 0 });
+  it("allows a number what is left of it, and Max only the internal safety ceiling", () => {
+    expect(boundedRunAllowance(5, 2)).toEqual({ remaining: 3, exhaustedReason: "run_completed" });
+    expect(boundedRunAllowance(5, 7)).toEqual({ remaining: 0, exhaustedReason: "run_completed" });
+    expect(boundedRunAllowance(BOUNDED_RUN_MAX, 3)).toEqual({
+      remaining: BOUNDED_RUN_QUANTITY_CEILING - 3,
+      exhaustedReason: "run_safety_limit",
+    });
+  });
+
+  it("stores Max as a distinct durable mode, not as a number", () => {
+    expect(boundedRunSelectionToColumn(BOUNDED_RUN_MAX)).toBeNull();
+    expect(boundedRunSelectionToColumn(4)).toBe(4);
+    expect(boundedRunSelectionFromColumn(null)).toBe(BOUNDED_RUN_MAX);
+    expect(boundedRunSelectionFromColumn(4)).toBe(4);
+  });
+
+  it("reports progress with a denominator only for a number", () => {
+    expect(boundedRunProgress(5, 2)).toEqual({
+      mode: "count",
+      selected: 5,
+      completed: 2,
+      remaining: 3,
+    });
+    expect(boundedRunProgress(5, 7)).toEqual({
+      mode: "count",
+      selected: 5,
+      completed: 5,
+      remaining: 0,
+    });
+    expect(boundedRunProgress(BOUNDED_RUN_MAX, 3)).toEqual({ mode: "max", completed: 3 });
   });
 });
 
-describe("bounded Refining runs", () => {
+describe("numeric Refining runs", () => {
   it("attempts exactly the selected count and stops with run_completed", () => {
     const resolved = resolveRefining({
       elapsedTicks: refinedFerrite.attemptDurationTicks * 50,
@@ -195,7 +220,7 @@ describe("bounded Refining runs", () => {
       balance,
       recipe: refinedFerrite,
       random: { nextBasisPoints: () => 0 },
-      attemptLimit: 3,
+      allowance: count(3),
     });
     expect(resolved.attempts).toBe(3);
     expect(resolved.stopReason).toBe("run_completed");
@@ -214,7 +239,7 @@ describe("bounded Refining runs", () => {
       balance,
       recipe: refinedFerrite,
       random: { nextBasisPoints: () => rolls[index++]! },
-      attemptLimit: 3,
+      allowance: count(3),
     });
     expect(resolved.attempts).toBe(3);
     expect(resolved.successes).toBe(1);
@@ -235,7 +260,7 @@ describe("bounded Refining runs", () => {
       balance,
       recipe: refinedFerrite,
       random: { nextBasisPoints: () => 0 },
-      attemptLimit: 0,
+      allowance: count(0),
     });
     expect(resolved.attempts).toBe(0);
     expect(resolved.stopReason).toBe("run_completed");
@@ -249,7 +274,7 @@ describe("bounded Refining runs", () => {
       balance,
       recipe: refinedFerrite,
       random: { nextBasisPoints: () => 0 },
-      attemptLimit: 10,
+      allowance: count(10),
     });
     expect(resolved.attempts).toBe(2);
     expect(resolved.stopReason).toBe("insufficient_inputs");
@@ -265,14 +290,14 @@ describe("bounded Refining runs", () => {
       balance,
       recipe: refinedFerrite,
       random: { nextBasisPoints: () => 0 },
-      attemptLimit: 3,
+      allowance: count(3),
     });
     expect(resolved.attempts).toBe(0);
     expect(resolved.stopReason).toBe("inventory_slots_full");
   });
 
-  it("rejects a negative or fractional attempt limit", () => {
-    for (const attemptLimit of [-1, 1.5]) {
+  it("rejects a negative or fractional allowance", () => {
+    for (const remaining of [-1, 1.5]) {
       expect(() =>
         resolveRefining({
           elapsedTicks: 0,
@@ -280,29 +305,191 @@ describe("bounded Refining runs", () => {
           balance,
           recipe: refinedFerrite,
           random: { nextBasisPoints: () => 0 },
-          attemptLimit,
+          allowance: { remaining, exhaustedReason: "run_completed" },
         }),
       ).toThrow(RangeError);
     }
   });
 });
 
-describe("the Refining run maximum", () => {
-  it("is limited by inputs: whole batches of the recipe's inputs", () => {
+describe("Max Refining runs: until blocked, from the real results", () => {
+  // Four Refined Ferrite and four Galvanic Stock pay for four pours, with room
+  // to spare. At Refining 8 a pour can fail and hand one input back.
+  const alloyStart = stacks([ITEM_IDS.refinedFerrite, 4], [ITEM_IDS.galvanicStock, 4]);
+  const alloy = snapshot(alloyStart, { refiningLevel: 8 });
+  const runAlloy = (outcomes: readonly ("success" | number)[]) =>
+    resolveRefining({
+      elapsedTicks: galvaferrite.attemptDurationTicks * 50,
+      snapshot: alloy,
+      balance,
+      recipe: galvaferrite,
+      random: scripted(outcomes),
+      allowance: max,
+    });
+
+  it("the affordable count is what the inputs pay for, not a prediction", () => {
+    expect(refiningAffordableBatches(alloy, balance, galvaferrite)).toBe(4);
+    // Twenty of each is twenty pours — not the 39 a chain of failures could reach.
     expect(
-      refiningRunMaximum(snapshot(stacks([ITEM_IDS.ferriteShale, 10])), balance, refinedFerrite),
-    ).toBe(5);
-    expect(
-      refiningRunMaximum(snapshot(stacks([ITEM_IDS.ferriteShale, 9])), balance, refinedFerrite),
-    ).toBe(4);
-    expect(
-      refiningRunMaximum(snapshot(stacks([ITEM_IDS.ferriteShale, 1])), balance, refinedFerrite),
-    ).toBe(0);
+      refiningAffordableBatches(
+        snapshot(
+          stacks(
+            ...Array.from({ length: 4 }, () => [ITEM_IDS.refinedFerrite, 5] as [string, number]),
+            ...Array.from({ length: 4 }, () => [ITEM_IDS.galvanicStock, 5] as [string, number]),
+          ),
+          { refiningLevel: 8 },
+        ),
+        balance,
+        galvaferrite,
+      ),
+    ).toBe(20);
+  });
+
+  it("successes consume both inputs, so all-success stops at the inputs carried", () => {
+    const ran = runAlloy(["success", "success", "success", "success", "success"]);
+    expect(ran.attempts).toBe(4);
+    expect(ran.successes).toBe(4);
+    expect(ran.stopReason).toBe("insufficient_inputs");
+    expect(carriedAfter(alloyStart, ran)).toEqual({ [ITEM_IDS.galvaferrite]: 4 });
+  });
+
+  it("a failure's returned input is used naturally, extending the run", () => {
+    // Each failure alternates which input comes back, so each spends only one
+    // unit and the run keeps going on what the real results left.
+    const ran = runAlloy([0, 1, 0, 1, 0, 1, 0, 1, 0]);
+    expect(ran.attempts).toBe(7);
+    expect(ran.failures).toBe(7);
+    expect(ran.stopReason).toBe("insufficient_inputs");
+    expect(carriedAfter(alloyStart, ran)).toEqual({ [ITEM_IDS.refinedFerrite]: 1 });
+  });
+
+  it("the same start runs a different number of attempts under different rolls", () => {
+    const sequences: ("success" | number)[][] = [
+      ["success", "success", "success", "success"],
+      [0, 1, 0, 1, 0, 1, 0, 1],
+      [0, 0, 0, 0, 0],
+      ["success", 1, "success", 0, 1, 0],
+    ];
+    const totals = sequences.map((outcomes) => runAlloy(outcomes).attempts);
+    // All successes, alternating returns, always the same return, a mix.
+    expect(totals).toEqual([4, 7, 4, 5]);
+  });
+
+  it("never reports run_completed: it ends with the ordinary reason", () => {
+    for (let seed = 1; seed <= 30; seed += 1) {
+      let state = seed;
+      const next = () => {
+        state = (state * 1_103_515_245 + 12_345) % 2_147_483_648;
+        return state / 2_147_483_648;
+      };
+      const ran = resolveRefining({
+        elapsedTicks: galvaferrite.attemptDurationTicks * 50,
+        snapshot: alloy,
+        balance,
+        recipe: galvaferrite,
+        random: { nextBasisPoints: () => Math.floor(next() * 10_000), nextUnit: next },
+        allowance: max,
+      });
+      expect(ORDINARY_REFINING_SHORTAGES).toContain(ran.stopReason);
+      expect(ran.attempts).toBeGreaterThanOrEqual(4);
+    }
+  });
+
+  it("at certain success runs until its real inputs are spent", () => {
+    const ran = resolveRefining({
+      elapsedTicks: refinedFerrite.attemptDurationTicks * 50,
+      snapshot: snapshot(stacks([ITEM_IDS.ferriteShale, 10], [ITEM_IDS.ferriteShale, 7])),
+      balance,
+      recipe: refinedFerrite,
+      random: { nextBasisPoints: () => 9_999 },
+      allowance: max,
+    });
+    expect(refiningSuccessChanceBps(30, refinedFerrite)).toBe(10_000);
+    expect(ran.attempts).toBe(8);
+    expect(ran.successes).toBe(8);
+    expect(ran.stopReason).toBe("insufficient_inputs");
+  });
+
+  it("at certain success runs until its real capacity is spent", () => {
+    // The Refined Ferrite stack has room for two and no slot is free: two
+    // batches fill it, and the third has nowhere to go.
+    const ran = resolveRefining({
+      elapsedTicks: refinedFerrite.attemptDurationTicks * 50,
+      snapshot: snapshot(
+        stacks([ITEM_IDS.ferriteShale, 10], [ITEM_IDS.refinedFerrite, 3], [ITEM_IDS.slag, 5]),
+        { slotsAvailable: 0 },
+      ),
+      balance,
+      recipe: refinedFerrite,
+      random: { nextBasisPoints: () => 0 },
+      allowance: max,
+    });
+    expect(ran.attempts).toBe(2);
+    expect(ran.stopReason).toBe("inventory_slots_full");
+  });
+
+  it("runs each deliberate Slag recipe until its real inputs are spent", () => {
+    for (const [candidate, input] of [
+      [ferriteShaleSlag, ITEM_IDS.ferriteShale],
+      [galvaniteSlag, ITEM_IDS.galvanite],
+    ] as const) {
+      const ran = resolveRefining({
+        elapsedTicks: candidate.attemptDurationTicks * 50,
+        snapshot: snapshot(stacks([input, 10], [input, 7]), { refiningLevel: 5 }),
+        balance,
+        recipe: candidate,
+        random: { nextBasisPoints: () => 9_999, nextUnit: () => 0.99 },
+        allowance: max,
+      });
+      expect(ran.attempts).toBe(8);
+      expect(ran.failures).toBe(0);
+      expect(ran.stopReason).toBe("insufficient_inputs");
+    }
+  });
+
+  it("stops at the internal safety ceiling with its own reason, never as completion", () => {
+    // Plenty of Shale: only the guard can end these.
+    const plenty = snapshot(stacks([ITEM_IDS.ferriteShale, 10], [ITEM_IDS.ferriteShale, 10]));
+    const nearly = resolveRefining({
+      elapsedTicks: refinedFerrite.attemptDurationTicks * 50,
+      snapshot: plenty,
+      balance,
+      recipe: refinedFerrite,
+      random: { nextBasisPoints: () => 0 },
+      allowance: boundedRunAllowance(BOUNDED_RUN_MAX, BOUNDED_RUN_QUANTITY_CEILING - 2),
+    });
+    expect(nearly.attempts).toBe(2);
+    expect(nearly.stopReason).toBe("run_safety_limit");
+    const reached = resolveRefining({
+      elapsedTicks: refinedFerrite.attemptDurationTicks * 50,
+      snapshot: plenty,
+      balance,
+      recipe: refinedFerrite,
+      random: { nextBasisPoints: () => 0 },
+      allowance: boundedRunAllowance(BOUNDED_RUN_MAX, BOUNDED_RUN_QUANTITY_CEILING),
+    });
+    expect(reached.attempts).toBe(0);
+    expect(reached.stopReason).toBe("run_safety_limit");
+    expect(reached.stackUpdates).toEqual([]);
+  });
+});
+
+describe("the Refining affordable batch count", () => {
+  it("is whole batches of the recipe's inputs", () => {
+    const at = (quantity: number) =>
+      refiningAffordableBatches(
+        snapshot(stacks([ITEM_IDS.ferriteShale, quantity])),
+        balance,
+        refinedFerrite,
+      );
+    expect(at(10)).toBe(5);
+    expect(at(9)).toBe(4);
+    expect(at(1)).toBe(0);
   });
 
   it("is zero for a recipe the character's level does not unlock", () => {
     expect(
-      refiningRunMaximum(
+      refiningAffordableBatches(
         snapshot(stacks([ITEM_IDS.ferriteShale, 10]), { refiningLevel: 4 }),
         balance,
         ferriteShaleSlag,
@@ -310,246 +497,24 @@ describe("the Refining run maximum", () => {
     ).toBe(0);
   });
 
-  it("is limited by capacity through the ordinary preflight", () => {
-    // No free slot and no stack to top up: the first attempt would need a new
-    // slot for its output, and taking two of four Shale empties nothing.
-    const blocked = snapshot(stacks([ITEM_IDS.ferriteShale, 4]), { slotsAvailable: 0 });
-    expect(refiningRunMaximum(blocked, balance, refinedFerrite)).toBe(0);
-    expect(refiningPreflightStopReason(blocked, balance, refinedFerrite)).toBe(
-      "inventory_slots_full",
-    );
-    // Two Shale in their own stack free that slot for the output: one batch.
-    const freeing = snapshot(stacks([ITEM_IDS.ferriteShale, 2]), { slotsAvailable: 0 });
-    expect(refiningRunMaximum(freeing, balance, refinedFerrite)).toBe(1);
-  });
-
-  it("is limited by carried mass through the ordinary preflight", () => {
-    // Galvanite -> Slag loses 500 g per batch, so mass only ever frees up; a
-    // character with no spare mass can still start, because the inputs leave.
-    const heavy = snapshot(stacks([ITEM_IDS.galvanite, 4]), { massAvailableGrams: 0 });
-    expect(refiningRunMaximum(heavy, balance, galvaniteSlag)).toBe(2);
-  });
-
-  describe("is the longest reachable run, not the shortest guaranteed one", () => {
-    // No free slot, and ten Shale in one stack, so no batch frees a slot until
-    // the last. Refined Ferrite has room for two more and Slag for two more,
-    // and every preflight needs room for both. Two successes (or two failures)
-    // in a row leave no room for the next; alternating reaches three.
-    const tight = snapshot(
-      stacks([ITEM_IDS.ferriteShale, 10], [ITEM_IDS.refinedFerrite, 3], [ITEM_IDS.slag, 8]),
-      { refiningLevel: 8, slotsAvailable: 0 },
-    );
-
-    it("selects the longest path the outcomes allow", () => {
-      expect(refiningRunMaximum(tight, balance, refinedFerrite)).toBe(3);
-      expect(longestScriptedRun(tight, refinedFerrite)).toBe(3);
-    });
-
-    it("a favorable sequence reaches the selected Max and completes", () => {
-      const ran = runScripted(tight, refinedFerrite, ["success", 0, "success"], 3);
-      expect(ran.attempts).toBe(3);
-      expect(ran.successes).toBe(2);
-      expect(ran.failures).toBe(1);
-      expect(ran.stopReason).toBe("run_completed");
-    });
-
-    it("an unfavorable sequence stops early with the ordinary reason", () => {
-      for (const outcomes of [
-        ["success", "success"],
-        [0, 0],
-      ] satisfies ScriptedOutcome[][]) {
-        const ran = runScripted(tight, refinedFerrite, outcomes, 3);
-        expect(ran.attempts).toBe(2);
-        expect(ran.stopReason).toBe("inventory_slots_full");
-        // Nothing beyond what the two real attempts produced is awarded.
-        expect(ran.resolvedAttempts).toHaveLength(2);
-      }
-    });
-  });
-
-  it("matches an exhaustive search of real outcome sequences", () => {
-    // Tight inventories where success and failure outputs compete for slots.
-    // The oracle tries every sequence, so the fixtures keep runs short.
-    const cases: [RefiningRecipeBalance, StackState<string>[]][] = [
-      [refinedFerrite, stacks([ITEM_IDS.ferriteShale, 10], [ITEM_IDS.ferriteShale, 7])],
-      [
-        refinedFerrite,
-        stacks([ITEM_IDS.ferriteShale, 10], [ITEM_IDS.refinedFerrite, 4], [ITEM_IDS.slag, 9]),
-      ],
-      [
-        refinedFerrite,
-        stacks([ITEM_IDS.ferriteShale, 10], [ITEM_IDS.refinedFerrite, 3], [ITEM_IDS.slag, 8]),
-      ],
-      [
-        galvaferrite,
-        stacks(
-          [ITEM_IDS.refinedFerrite, 3],
-          [ITEM_IDS.galvanicStock, 2],
-          [ITEM_IDS.galvaferrite, 2],
-        ),
-      ],
-      [
-        galvaferrite,
-        stacks(
-          [ITEM_IDS.refinedFerrite, 2],
-          [ITEM_IDS.refinedFerrite, 1],
-          [ITEM_IDS.galvanicStock, 3],
-          [ITEM_IDS.galvaferrite, 3],
-        ),
-      ],
-    ];
-    let cutShort = false;
-    for (const [candidate, existing] of cases) {
-      for (const tight of [0, 1, 2]) {
-        const start = snapshot(existing, { refiningLevel: 8, slotsAvailable: tight });
-        const maximum = refiningRunMaximum(start, balance, candidate);
-        expect(maximum).toBe(longestScriptedRun(start, candidate));
-
-        // Any real run of Max attempts at most Max, and a run cut short by its
-        // own rolls keeps the ordinary reason rather than completing.
-        for (let seed = 1; seed <= 40; seed += 1) {
-          const resolved = resolveRefining({
-            elapsedTicks: candidate.attemptDurationTicks * (maximum + 5),
-            snapshot: start,
-            balance,
-            recipe: candidate,
-            random: seededRandom(seed),
-            attemptLimit: maximum,
-          });
-          expect(resolved.attempts).toBeLessThanOrEqual(maximum);
-          if (resolved.attempts === maximum) {
-            expect(resolved.stopReason).toBe("run_completed");
-          } else {
-            cutShort = true;
-            expect(ORDINARY_REFINING_SHORTAGES).toContain(resolved.stopReason);
-          }
-        }
-      }
-    }
-    // The fixtures include inventories where real rolls end a run of Max early.
-    expect(cutShort).toBe(true);
-  });
-
-  it("stays fast when a long rolled run could interleave outcomes many ways", () => {
-    // Keyed on stack order, these took seconds (#229 review): every
-    // success/failure interleaving was a distinct state. The same inventory is
-    // the same state however it was reached.
-    const cases: [RefiningRecipeBalance, string, number, number][] = [
-      [refinedFerrite, ITEM_IDS.ferriteShale, 14, 1],
-      [recipe(ACTION_IDS.galvanicStockRefining), ITEM_IDS.galvanite, 12, 5],
-    ];
-    for (const [candidate, input, stackCount, level] of cases) {
-      const full = snapshot(
-        stacks(...Array.from({ length: stackCount }, (): [string, number] => [input, 10])),
-        { refiningLevel: level, slotsAvailable: 16 - stackCount, massAvailableGrams: 100_000 },
-      );
-      const started = performance.now();
-      const maximum = refiningRunMaximum(full, balance, candidate);
-      expect(performance.now() - started).toBeLessThan(500);
-      // Enough room for any mix of outputs: inputs are the only bound.
-      expect(maximum).toBe((stackCount * 10) / 2);
-    }
-  });
-
-  it("explores only the success branch once success is guaranteed", () => {
-    // Every attempt's preflight still requires a failure's Slag to fit, but at
-    // Refining 99 no failure can actually happen, so the Slag it would have
-    // left behind must not lower the maximum. The real run does all five.
-    const tight = snapshot(
-      stacks(
-        [ITEM_IDS.galvanite, 10],
-        [ITEM_IDS.galvaferrite, 3],
-        [ITEM_IDS.slag, 5],
-        [ITEM_IDS.refinedFerrite, 3],
-      ),
-      { refiningLevel: 99, slotsAvailable: 1, massAvailableGrams: 3_000 },
-    );
-    const galvanicStock = recipe(ACTION_IDS.galvanicStockRefining);
-    expect(refiningRunMaximum(tight, balance, galvanicStock)).toBe(5);
-    const ran = resolveRefining({
-      elapsedTicks: galvanicStock.attemptDurationTicks * 20,
-      snapshot: tight,
-      balance,
-      recipe: galvanicStock,
-      random: { nextBasisPoints: () => 9_999 },
-      attemptLimit: 5,
-    });
-    expect(ran.attempts).toBe(5);
-    expect(ran.stopReason).toBe("run_completed");
-    // Where failure is possible, all successes still reach five, so Max stays
-    // five — but failures fill the Slag stack and can end that run early.
-    const rolled = { ...tight, refiningLevel: 5 };
-    expect(refiningRunMaximum(rolled, balance, galvanicStock)).toBe(5);
-    expect(longestScriptedRun(rolled, galvanicStock)).toBe(5);
-    const unlucky = runScripted(rolled, galvanicStock, [0, 0, 0, 0, 0], 5);
-    expect(unlucky.attempts).toBeLessThan(5);
-    expect(ORDINARY_REFINING_SHORTAGES).toContain(unlucky.stopReason);
-  });
-
-  it("is the plain supportable count once success is certain", () => {
-    // Refining 30 is certain success for Refined Ferrite: no failure is
-    // explored, so with room for the output Max is just whole batches of
-    // carried Shale, and any rolls complete it.
-    const certain = snapshot(stacks([ITEM_IDS.ferriteShale, 10], [ITEM_IDS.ferriteShale, 7]), {
-      refiningLevel: 30,
-    });
-    expect(refiningSuccessChanceBps(30, refinedFerrite)).toBe(10_000);
-    expect(refiningRunMaximum(certain, balance, refinedFerrite)).toBe(8);
-    for (let seed = 1; seed <= 10; seed += 1) {
-      const ran = resolveRefining({
-        elapsedTicks: refinedFerrite.attemptDurationTicks * 20,
-        snapshot: certain,
+  it("is bounded by the scarcer input of a two-input recipe", () => {
+    expect(
+      refiningAffordableBatches(
+        snapshot(stacks([ITEM_IDS.refinedFerrite, 5], [ITEM_IDS.galvanicStock, 2]), {
+          refiningLevel: 8,
+        }),
         balance,
-        recipe: refinedFerrite,
-        random: seededRandom(seed),
-        attemptLimit: 8,
-      });
-      expect(ran.attempts).toBe(8);
-      expect(ran.stopReason).toBe("run_completed");
-    }
-  });
-
-  it("is deterministic for the deliberate Slag recipes, and every run of Max completes", () => {
-    const cases: [RefiningRecipeBalance, string, number][] = [
-      [ferriteShaleSlag, ITEM_IDS.ferriteShale, 8],
-      [galvaniteSlag, ITEM_IDS.galvanite, 8],
-    ];
-    for (const [candidate, input, expected] of cases) {
-      const start = snapshot(stacks([input, 10], [input, 7]), { refiningLevel: 5 });
-      expect(refiningRunMaximum(start, balance, candidate)).toBe(expected);
-      for (let seed = 1; seed <= 10; seed += 1) {
-        const ran = resolveRefining({
-          elapsedTicks: candidate.attemptDurationTicks * 20,
-          snapshot: start,
-          balance,
-          recipe: candidate,
-          random: seededRandom(seed),
-          attemptLimit: expected,
-        });
-        expect(ran.attempts).toBe(expected);
-        expect(ran.failures).toBe(0);
-        expect(ran.stopReason).toBe("run_completed");
-      }
-    }
-  });
-
-  it("stays cheap enough to project on every refresh, even for the alloy", () => {
-    // Fourteen slots of the alloy's inputs, with room to spare.
-    const full = snapshot(
-      stacks(
-        ...Array.from({ length: 8 }, (_, index): [string, number] =>
-          index % 2 === 0 ? [ITEM_IDS.refinedFerrite, 5] : [ITEM_IDS.galvanicStock, 5],
-        ),
+        galvaferrite,
       ),
-      { refiningLevel: 8, slotsAvailable: 8, massAvailableGrams: 100_000 },
+    ).toBe(2);
+  });
+
+  it("does not fall as the Refining level rises", () => {
+    const inventory = stacks([ITEM_IDS.refinedFerrite, 5], [ITEM_IDS.galvanicStock, 5]);
+    const counts = [8, 12, 20, 30, 99].map((refiningLevel) =>
+      refiningAffordableBatches(snapshot(inventory, { refiningLevel }), balance, galvaferrite),
     );
-    const started = performance.now();
-    const maximum = refiningRunMaximum(full, balance, galvaferrite);
-    const elapsed = performance.now() - started;
-    // A failed pour hands one input back, so it spends one unit, not two. The
-    // longest reachable run is nearly all failures: 40 units, 39 attempts.
-    expect(maximum).toBe(39);
-    expect(elapsed).toBeLessThan(500);
+    expect(new Set(counts)).toEqual(new Set([5]));
   });
 });
 
@@ -624,7 +589,7 @@ describe("the deliberate Slag recipes (#229)", () => {
             return 0.99;
           },
         },
-        attemptLimit: 4,
+        allowance: count(4),
       });
       expect(rolled).toBe(0);
       expect(resolved.successes).toBe(4);
@@ -645,7 +610,7 @@ describe("the deliberate Slag recipes (#229)", () => {
       balance,
       recipe: refinedFerrite,
       random: { nextBasisPoints: () => 0 },
-      attemptLimit: 1,
+      allowance: count(1),
     });
     expect(resolved.resolvedAttempts[0]!.deterministic).toBeUndefined();
   });

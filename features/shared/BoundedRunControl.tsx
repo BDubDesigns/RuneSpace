@@ -3,48 +3,58 @@
 import type { ReactNode } from "react";
 import { ActionButton } from "@/components/ui/ActionButton";
 import { StatusMeter } from "@/components/ui/StatusMeter";
-import { boundedRunProgress, stepBoundedRunQuantity } from "@/game/domain/bounded-run";
+import {
+  BOUNDED_RUN_MAX,
+  boundedRunProgress,
+  stepBoundedRunSelection,
+  type BoundedRunSelection,
+} from "@/game/domain/bounded-run";
 
 /**
- * The one bounded-run quantity selector (#229).
+ * The one bounded-run selector (#229).
  *
- * Refining batches and Practice welds choose a finite run the same way, and
- * Fabrication and Tinkering will too: the quantity starts at 1, − and + move it
- * by one, and Max jumps straight to the server-projected maximum. The selector
- * never decides anything — `maximum` is the authoritative projection, and Start
- * sends the chosen number for the server to revalidate. A selection the
- * maximum has since shrunk below is shown as unavailable, never quietly
- * lowered: the player chooses again.
+ * Refining batches and Practice welds choose a run the same way, and
+ * Fabrication and Tinkering will too: the selection starts at 1, − and + move
+ * it by one, and Max chooses to keep going until the activity is blocked. Max
+ * is shown as Max, never as a number — how long a Max run lasts depends on
+ * the real results, and nothing here predicts it.
+ *
+ * The selector never decides anything. `affordable` is the server's count of
+ * how many units the inputs carried right now pay for: the largest number +
+ * offers, and what Start revalidates a number against. A number that count has
+ * since shrunk below is shown as unavailable, never quietly lowered: the
+ * player chooses again.
  *
  * What a unit costs or yields stays with the activity, passed in as `summary`.
  */
 export function BoundedRunSelector({
+  affordable,
   disabled = false,
-  maximum,
   onChange,
-  quantity,
+  selection,
   summary,
   unit,
 }: {
+  /** How many units the inputs carried pay for, from the server projection. */
+  affordable: number;
   disabled?: boolean;
-  /** The authoritative maximum from the server projection. */
-  maximum: number;
-  onChange: (quantity: number) => void;
-  quantity: number;
-  /** The whole selected run, in the activity's own terms. */
+  onChange: (selection: BoundedRunSelection) => void;
+  selection: BoundedRunSelection;
+  /** The selected run, in the activity's own terms. */
   summary?: ReactNode;
   unit: { singular: string; plural: string };
 }) {
   const noun = (count: number) => (count === 1 ? unit.singular : unit.plural);
-  const unavailable = maximum < 1;
-  const exceeds = !unavailable && quantity > maximum;
-  const step = (delta: number) => onChange(stepBoundedRunQuantity(quantity, delta, maximum));
+  const isMax = selection === BOUNDED_RUN_MAX;
+  const unavailable = affordable < 1;
+  const exceeds = !unavailable && !isMax && selection > affordable;
+  const step = (delta: number) => onChange(stepBoundedRunSelection(selection, delta, affordable));
   return (
     <fieldset
       className="min-w-0 space-y-2 border border-[color:var(--rs-border-structural)] bg-[color:var(--rs-surface-panel)] p-3"
       data-bounded-run
-      data-bounded-run-maximum={maximum}
-      data-bounded-run-quantity={quantity}
+      data-bounded-run-affordable={affordable}
+      data-bounded-run-quantity={selection}
       disabled={disabled || unavailable}
     >
       <legend className="px-1 font-display text-xs font-bold uppercase tracking-[0.16em] text-[color:var(--rs-accent-primary)]">
@@ -55,7 +65,7 @@ export function BoundedRunSelector({
           aria-label={`Fewer ${unit.plural}`}
           className="w-11 px-0"
           data-bounded-run-decrease
-          disabled={quantity <= 1}
+          disabled={!isMax && selection <= 1}
           intent="secondary"
           onClick={() => step(-1)}
           type="button"
@@ -67,14 +77,16 @@ export function BoundedRunSelector({
           className="min-w-[4.5rem] text-center font-display text-lg tabular-nums"
           data-bounded-run-value
         >
-          {quantity}
-          <span className="sr-only"> {noun(quantity)} selected</span>
+          {isMax ? "Max" : selection}
+          <span className="sr-only">
+            {isMax ? ` selected: run until blocked` : ` ${noun(selection)} selected`}
+          </span>
         </output>
         <ActionButton
           aria-label={`More ${unit.plural}`}
           className="w-11 px-0"
           data-bounded-run-increase
-          disabled={quantity >= maximum}
+          disabled={isMax || selection >= affordable}
           intent="secondary"
           onClick={() => step(1)}
           type="button"
@@ -82,17 +94,22 @@ export function BoundedRunSelector({
           +
         </ActionButton>
         <ActionButton
-          aria-label={`Max: ${maximum} ${noun(maximum)}`}
+          aria-label="Max: run until materials or space run out"
+          aria-pressed={isMax}
           data-bounded-run-max
-          disabled={unavailable || quantity === maximum}
+          disabled={unavailable}
           intent="secondary"
-          onClick={() => onChange(Math.max(1, maximum))}
+          onClick={() => onChange(BOUNDED_RUN_MAX)}
           type="button"
         >
           Max
         </ActionButton>
         <p className="text-xs uppercase tracking-wide text-[color:var(--rs-text-muted)]">
-          {unavailable ? `No ${unit.plural} available` : `Up to ${maximum} ${noun(maximum)}`}
+          {unavailable
+            ? `No ${unit.plural} available`
+            : isMax
+              ? "Runs until blocked"
+              : `Materials for ${affordable} ${noun(affordable)}`}
         </p>
       </div>
       {exceeds ? (
@@ -101,7 +118,7 @@ export function BoundedRunSelector({
           data-bounded-run-exceeds
           role="status"
         >
-          Only {maximum} {noun(maximum)} can start now. Choose again.
+          Your materials cover {affordable} {noun(affordable)} right now. Choose again.
         </p>
       ) : null}
       {summary && !unavailable ? (
@@ -113,20 +130,39 @@ export function BoundedRunSelector({
   );
 }
 
-/** Where a running bounded run stands: the counterpart of the selector. */
+/**
+ * Where a running selection stands: the counterpart of the selector. A number
+ * shows how far through it the run is; Max has no denominator to show, so it
+ * shows only what has been done and that it continues until blocked.
+ */
 export function BoundedRunProgress({
   completed,
-  selected,
+  selection,
   unit,
 }: {
   completed: number;
-  selected: number;
+  selection: BoundedRunSelection;
   unit: { singular: string; plural: string };
 }) {
-  const progress = boundedRunProgress(selected, completed);
+  const progress = boundedRunProgress(selection, completed);
+  if (progress.mode === "max") {
+    const noun = progress.completed === 1 ? unit.singular : unit.plural;
+    return (
+      <p
+        className="flex items-center justify-between gap-2 text-xs text-[color:var(--rs-text-secondary)]"
+        data-bounded-run-mode="max"
+        data-bounded-run-progress
+      >
+        <span>
+          Run — {progress.completed} {noun} · Max
+        </span>
+        <span>Until blocked</span>
+      </p>
+    );
+  }
   const current = Math.min(progress.selected, progress.completed + 1);
   return (
-    <div data-bounded-run-progress>
+    <div data-bounded-run-mode="count" data-bounded-run-progress>
       <StatusMeter
         detail={`${progress.completed} / ${progress.selected} done · ${progress.remaining} left`}
         label={`Run — ${unit.singular} ${current} of ${progress.selected}`}

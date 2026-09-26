@@ -442,12 +442,12 @@ test("equips the Cutter through Inventory, shows a full stack, and earns Mining 
   // focus does not (#173 on a guided control).
   await expectKeyboardFocusRingPaints(page.getByRole("button", { name: "Start Refining" }));
   await expectPointerFocusWithoutRing(page.getByRole("button", { name: "Start Refining" }));
-  // A run is bounded (#229) and starts at one batch; ten Shale support five,
-  // which is exactly what Waste Not asks for.
+  // A run starts at one batch (#229); Max runs until the Shale is gone, and
+  // ten Shale is five batches — exactly what Waste Not asks for.
   const runSize = page.locator("[data-refining-activity] [data-bounded-run]");
   await expect(runSize.locator("[data-bounded-run-value]")).toContainText("1");
   await runSize.locator("[data-bounded-run-max]").click();
-  await expect(runSize).toHaveAttribute("data-bounded-run-quantity", "5");
+  await expect(runSize).toHaveAttribute("data-bounded-run-quantity", "max");
   await page.getByRole("button", { name: "Start Refining" }).click();
   await expect(page.getByRole("button", { name: "Stop Refining" })).toBeVisible();
   const refiningAgo = new Date(Date.now() - 5 * 7 * GAME_TICK_MS - 100);
@@ -456,7 +456,7 @@ test("equips the Cutter through Inventory, shows a full stack, and earns Mining 
     .set({ startedAt: refiningAgo, resolvedThroughAt: refiningAgo })
     .where(eq(activeActions.characterId, characterId));
   await page.getByRole("button", { name: "Refresh status" }).click();
-  await expect(page.getByText("5 of 5 attempts", { exact: true })).toBeVisible();
+  await expect(page.getByText("5 attempts · Max", { exact: true })).toBeVisible();
   await expect(page.locator("[data-mission-strip-objective]")).toHaveText(
     "Return to Wade Rusk at the Crash Site",
   );

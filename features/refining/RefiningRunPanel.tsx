@@ -2,6 +2,7 @@
 
 import { RunSummary } from "@/features/shared/RunSummary";
 import { resolveItemPresentation } from "@/game/content/item-presentation";
+import { BOUNDED_RUN_MAX } from "@/game/domain/bounded-run";
 import type { RefiningRunAttempt, RefiningRunState } from "@/server/refining";
 
 function percentage(bps: number) {
@@ -36,8 +37,11 @@ export function RefiningRunPanel({ run }: { run: RefiningRunState }) {
     <RunSummary
       historyLabel="Refining attempt history"
       stats={[
-        // Selected versus attempted is the bounded run's whole story (#229).
-        { label: "attempts", value: `${run.attempts} of ${run.selectedAttempts}` },
+        // Selected versus attempted is a numeric run's whole story (#229); a
+        // Max run has no selected count, only what it attempted.
+        run.selection === BOUNDED_RUN_MAX
+          ? { label: "attempts · Max", value: run.attempts }
+          : { label: "attempts", value: `${run.attempts} of ${run.selection}` },
         { label: "successful", value: run.successes },
         { label: "failed", value: run.failures },
         // Keyed by item, so a run of any recipe reads correctly (#209).

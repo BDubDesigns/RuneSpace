@@ -4,7 +4,7 @@
   "workState": "active",
   "currentFocus": "Preparing the October 27 Soft Alpha: verified players can reserve characters; account-level Early Access and a closed-by-default public gameplay gate control when play begins.",
   "currentChange": {
-    "summary": "Refining and Practice Welding ask how many before starting: a shared 1 / - / + / Max run size, server-checked, plus two Refining 5 recipes that make Slag on purpose.",
+    "summary": "Refining and Practice Welding ask how many before starting: a shared 1 / - / + run size, or Max to run until materials run out, server-checked, plus two Refining 5 recipes that make Slag on purpose.",
     "stage": "review",
     "pullRequestNumber": 237
   },

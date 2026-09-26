@@ -1,6 +1,12 @@
 import { eq } from "drizzle-orm";
 import { afterEach, beforeAll, describe, expect, it } from "vitest";
-import { ACTION_IDS, ITEM_IDS, LOCATION_IDS, SKILL_IDS } from "@/game/config/foundations";
+import {
+  ACTION_IDS,
+  BOUNDED_RUN_MAX,
+  ITEM_IDS,
+  LOCATION_IDS,
+  SKILL_IDS,
+} from "@/game/config/foundations";
 import type { DatabaseTransaction } from "@/server/action-resolution";
 import { grantCharacterSkillXp } from "@/server/progression";
 import { cleanupTestUser, createCharacterForUser, createTestUser } from "./fixtures";
@@ -70,27 +76,23 @@ suite("issue #81 Refining persistence and concurrency (real PostgreSQL)", () => 
   }
 
   /**
-   * Start a run of every batch the carried inventory supports. These tests were
-   * written against the open-ended run that #229 replaced; Max is its bounded
-   * equivalent, so their resolution assertions keep their original meaning.
+   * Start a Max run. These tests were written against the open-ended run that
+   * #229 turned into Max — run until the preflight refuses — so their
+   * resolution assertions keep their original meaning.
    */
-  async function startRefiningAtMax(
+  function startRefiningAtMax(
     userId: string,
     characterId: string,
     at: Date,
     random?: { nextBasisPoints(): number; nextUnit(): number },
   ) {
-    const projected = await play.getPlayGameplayState(userId, characterId, at, random);
-    const maximum = projected.refiningRecipes.find(
-      (recipe) => recipe.actionId === ACTION_IDS.refining,
-    )!.maximumBatches;
     return refiningCommands.startRefining(
       userId,
       characterId,
       ACTION_IDS.refining,
       at,
       random,
-      Math.max(1, maximum),
+      BOUNDED_RUN_MAX,
     );
   }
 

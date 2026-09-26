@@ -9,8 +9,8 @@ import { getEffectiveGameBalance } from "@/game/config/balance";
 import { ACTION_IDS, ITEM_IDS } from "@/game/config/foundations";
 import { RUSK_RECOVERY_CONTENT } from "@/game/content/rusk-recovery";
 import { rolledCleanPass } from "@/game/domain/clean-pass";
-import { checkBoundedRunQuantity } from "@/game/domain/bounded-run";
-import { canBeginPracticeWeld, practiceRunMaximum } from "@/game/domain/practice-welding";
+import { checkBoundedRunSelection, type BoundedRunSelection } from "@/game/domain/bounded-run";
+import { canBeginPracticeWeld, practiceAffordableWelds } from "@/game/domain/practice-welding";
 import { deriveWorkbenchOccupancy } from "@/game/domain/workbench";
 import { loadActiveWorkOrder } from "@/server/work-orders";
 import type { MiningRandom } from "@/game/domain/mining";
@@ -53,8 +53,8 @@ export type PracticeCommandError =
   /** Nothing is on the bench to finish, so "finish and stop" has no subject. */
   | "no_weld_in_progress"
   /**
-   * The selected weld count is more than the bench can run right now (#229).
-   * Refused rather than reduced; the returned state carries the fresh maximum.
+   * The selected weld count is more than the Scrap carried pays for (#229).
+   * Refused rather than reduced; the returned state carries the fresh count.
    */
   | "practice_quantity_unavailable";
 
@@ -101,17 +101,19 @@ function stateWith(
  * nothing and rerolls nothing: those two Scrap were spent when that weld began,
  * which is exactly why Resume works with no Scrap left at all.
  *
- * The run is bounded (#229): `quantity` is how many COMPLETE welds to run, a
- * resumed partial weld being the first. It is revalidated against the
- * authoritative maximum before any Scrap is spent, and a quantity that no
- * longer fits is refused rather than quietly shortened.
+ * The run has a selection (#229). A number is how many COMPLETE welds to run,
+ * a resumed partial weld being the first; it is revalidated against the welds
+ * the Scrap carried pays for before any Scrap is spent, and a number that no
+ * longer fits is refused rather than quietly shortened. Max needs only that
+ * the first weld can begin; after that the resolver keeps welding until the
+ * Scrap cannot pay for another.
  */
 export async function startPracticeWelding(
   userId: string,
   characterId: string,
   now = new Date(),
   random: MiningRandom = defaultMiningRandom(),
-  quantity = 1,
+  selection: BoundedRunSelection = 1,
 ): Promise<PlayGameplayState> {
   return withResolvedOwnedCharacter(
     userId,
@@ -166,11 +168,14 @@ export async function startPracticeWelding(
         }
       }
 
-      // The selected weld count, against what the bench can actually run from
-      // here — checked before the first weld's Scrap is spent.
-      const quantityCheck = checkBoundedRunQuantity(
-        quantity,
-        practiceRunMaximum(await loadPracticeSnapshot(transaction, context.character.id), balance),
+      // The selection, against the welds the Scrap carried pays for — checked
+      // before the first weld's Scrap is spent.
+      const quantityCheck = checkBoundedRunSelection(
+        selection,
+        practiceAffordableWelds(
+          await loadPracticeSnapshot(transaction, context.character.id),
+          balance,
+        ),
       );
       if (!quantityCheck.ok) {
         return stateWith(transaction, context.character.id, now, "practice_quantity_unavailable");
@@ -199,7 +204,7 @@ export async function startPracticeWelding(
         });
       }
 
-      await resetPracticeRun(transaction, context.character.id, quantityCheck.quantity, now);
+      await resetPracticeRun(transaction, context.character.id, quantityCheck.selection, now);
       // An ordinary Start is a request for the selected run in full, so it
       // clears any "finish and stop" the player set and then changed their mind
       // about.

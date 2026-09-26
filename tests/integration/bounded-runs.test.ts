@@ -7,6 +7,8 @@ import {
 } from "@/game/config/balance";
 import {
   ACTION_IDS,
+  BOUNDED_RUN_MAX,
+  BOUNDED_RUN_QUANTITY_CEILING,
   GAME_TICK_MS,
   ITEM_IDS,
   LOCATION_IDS,
@@ -153,18 +155,18 @@ suite("issue #229 bounded runs (real PostgreSQL)", () => {
 
     const ferriteMs = balance.refining.recipes.refinedFerrite.attemptDurationTicks * tick;
 
-    it("projects an authoritative maximum per recipe", async () => {
+    it("projects, per recipe, the batches the inputs carried pay for", async () => {
       const { userId, character } = await refiner();
       await setCarried(character.id, ITEM_IDS.ferriteShale, [10, 3]);
       const state = await play.getPlayGameplayState(userId, character.id, start, certain());
       const ferrite = state.refiningRecipes.find((r) => r.actionId === ACTION_IDS.refining)!;
-      expect(ferrite.maximumBatches).toBe(6);
-      // Locked recipes can never be started, so their maximum is zero.
+      expect(ferrite.affordableBatches).toBe(6);
+      // Locked recipes can never be started, so they pay for nothing.
       const slag = state.refiningRecipes.find(
         (r) => r.actionId === ACTION_IDS.ferriteShaleSlagRefining,
       )!;
       expect(slag.unlocked).toBe(false);
-      expect(slag.maximumBatches).toBe(0);
+      expect(slag.affordableBatches).toBe(0);
     });
 
     it("attempts exactly the selected batches across a lazy offline window, then stops", async () => {
@@ -179,7 +181,7 @@ suite("issue #229 bounded runs (real PostgreSQL)", () => {
         3,
       );
       expect(started.activeAction?.actionId).toBe(ACTION_IDS.refining);
-      expect(started.refiningRun).toMatchObject({ selectedAttempts: 3, attempts: 0 });
+      expect(started.refiningRun).toMatchObject({ selection: 3, attempts: 0 });
 
       // Mid-run refresh projects where the run stands.
       const midway = await play.getPlayGameplayState(
@@ -188,7 +190,7 @@ suite("issue #229 bounded runs (real PostgreSQL)", () => {
         at(ferriteMs),
         certain(),
       );
-      expect(midway.refiningRun).toMatchObject({ selectedAttempts: 3, attempts: 1 });
+      expect(midway.refiningRun).toMatchObject({ selection: 3, attempts: 1 });
       expect(midway.activeAction?.actionId).toBe(ACTION_IDS.refining);
 
       // An hour away resolves only the two remaining selected batches.
@@ -199,7 +201,7 @@ suite("issue #229 bounded runs (real PostgreSQL)", () => {
         certain(),
       );
       expect(later.activeAction).toBeUndefined();
-      expect(later.refiningRun).toMatchObject({ selectedAttempts: 3, attempts: 3 });
+      expect(later.refiningRun).toMatchObject({ selection: 3, attempts: 3 });
       expect(later.stop).toEqual({ activity: "refining", reason: "run_completed" });
       expect(await carried(character.id, ITEM_IDS.ferriteShale)).toBe(14);
       expect(await carried(character.id, ITEM_IDS.refinedFerrite)).toBe(3);
@@ -252,87 +254,132 @@ suite("issue #229 bounded runs (real PostgreSQL)", () => {
       expect(done.stop).toEqual({ activity: "refining", reason: "insufficient_inputs" });
     });
 
-    it("Max is the longest reachable run; the real rolls may stop it sooner", async () => {
-      // Ten Shale in one stack, Refined Ferrite with room for two, Slag with
-      // room for two, and every other slot filled: two successes (or two
-      // failures) in a row leave no room for the next batch, alternating
-      // reaches three. Max is three, not the two every sequence could reach.
-      async function tightRefiner() {
-        const made = await refiner();
-        const { userId, character } = made;
-        await setCarried(character.id, ITEM_IDS.ferriteShale, [10]);
-        await setCarried(character.id, ITEM_IDS.refinedFerrite, [3]);
-        await setCarried(character.id, ITEM_IDS.slag, [8]);
-        const open = await play.getPlayGameplayState(userId, character.id, start, certain());
-        await setCarried(
-          character.id,
-          ITEM_IDS.galvanite,
-          Array.from({ length: open.inventory.slotsAvailable }, () => 1),
-        );
-        const state = await play.getPlayGameplayState(userId, character.id, start, certain());
-        expect(state.inventory.slotsAvailable).toBe(0);
-        const maximum = state.refiningRecipes.find(
-          (r) => r.actionId === ACTION_IDS.refining,
-        )!.maximumBatches;
-        expect(maximum).toBe(3);
-        const started = await refiningCommands.startRefining(
-          userId,
-          character.id,
-          ACTION_IDS.refining,
+    it("Max runs Galvaferrite until the real results leave nothing to pour", async () => {
+      // Four of each input pay for four pours. At Refining 8 a pour can fail
+      // and hand one input back, and the run keeps going on what is left.
+      async function alloyRun(rolls: readonly number[], units: readonly number[]) {
+        const made = await refiner(8);
+        await setCarried(made.character.id, ITEM_IDS.refinedFerrite, [4]);
+        await setCarried(made.character.id, ITEM_IDS.galvanicStock, [4]);
+        const state = await play.getPlayGameplayState(
+          made.userId,
+          made.character.id,
           start,
           certain(),
-          maximum,
+        );
+        // What the inputs pay for — never a prediction of what Max will do.
+        expect(
+          state.refiningRecipes.find((r) => r.actionId === ACTION_IDS.galvaferriteRefining)!
+            .affordableBatches,
+        ).toBe(4);
+        const started = await refiningCommands.startRefining(
+          made.userId,
+          made.character.id,
+          ACTION_IDS.galvaferriteRefining,
+          start,
+          certain(),
+          BOUNDED_RUN_MAX,
         );
         expect(started.refiningError).toBeUndefined();
-        expect(started.refiningRun.selectedAttempts).toBe(3);
-        return made;
+        expect(started.refiningRun.selection).toBe(BOUNDED_RUN_MAX);
+        // Max is its own durable mode, not a stored number.
+        const [row] = await db
+          .select({ selected: rune.characterRefiningState.runSelectedAttempts })
+          .from(rune.characterRefiningState)
+          .where(eq(rune.characterRefiningState.characterId, made.character.id));
+        expect(row!.selected).toBeNull();
+        let rolled = 0;
+        let chosen = 0;
+        const random = {
+          nextBasisPoints: () => rolls[rolled++] ?? 0,
+          nextUnit: () => units[chosen++] ?? 0,
+        };
+        const alloyMs = balance.refining.recipes.galvaferrite.attemptDurationTicks * tick;
+        // A refresh mid-run still knows it is a Max run.
+        const midway = await play.getPlayGameplayState(
+          made.userId,
+          made.character.id,
+          at(alloyMs),
+          random,
+        );
+        expect(midway.activeAction?.actionId).toBe(ACTION_IDS.galvaferriteRefining);
+        expect(midway.refiningRun).toMatchObject({ selection: BOUNDED_RUN_MAX, attempts: 1 });
+        const done = await play.getPlayGameplayState(
+          made.userId,
+          made.character.id,
+          at(60 * 60 * 1000),
+          random,
+        );
+        expect(done.activeAction).toBeUndefined();
+        expect(done.refiningRun.selection).toBe(BOUNDED_RUN_MAX);
+        return { ...made, done };
       }
-      const scripted = (rolls: readonly number[]) => {
-        let index = 0;
-        return { nextBasisPoints: () => rolls[index++] ?? 9_999, nextUnit: () => 0 };
-      };
 
-      // Success, failure, success: all three selected attempts happen.
-      const lucky = await tightRefiner();
-      const completed = await play.getPlayGameplayState(
-        lucky.userId,
-        lucky.character.id,
-        at(ferriteMs * 10),
-        scripted([0, 9_999, 0]),
-      );
-      expect(completed.refiningRun).toMatchObject({
-        selectedAttempts: 3,
-        attempts: 3,
-        successes: 2,
-        failures: 1,
-      });
-      expect(completed.stop).toEqual({ activity: "refining", reason: "run_completed" });
-      expect(await carried(lucky.character.id, ITEM_IDS.refinedFerrite)).toBe(5);
-      expect(await carried(lucky.character.id, ITEM_IDS.slag)).toBe(9);
+      // Every pour succeeds: both inputs go each time, four pours, then out.
+      const lucky = await alloyRun([0, 0, 0, 0, 0], []);
+      expect(lucky.done.refiningRun).toMatchObject({ attempts: 4, successes: 4, failures: 0 });
+      expect(lucky.done.stop).toEqual({ activity: "refining", reason: "insufficient_inputs" });
+      expect(await carried(lucky.character.id, ITEM_IDS.galvaferrite)).toBe(4);
 
-      // Two successes fill Refined Ferrite: the third batch cannot start, and
-      // the run says so rather than claiming it completed or awarding more.
-      const unlucky = await tightRefiner();
-      const stopped = await play.getPlayGameplayState(
-        unlucky.userId,
-        unlucky.character.id,
-        at(ferriteMs * 10),
-        scripted([0, 0, 0]),
+      // Every pour fails, alternating which input comes back: each spends one
+      // unit, so the same start runs seven attempts on the real results.
+      const unlucky = await alloyRun(
+        [9_999, 9_999, 9_999, 9_999, 9_999, 9_999, 9_999, 9_999],
+        [0, 0.9, 0, 0.9, 0, 0.9, 0, 0.9],
       );
-      expect(stopped.refiningRun).toMatchObject({
-        selectedAttempts: 3,
-        attempts: 2,
-        successes: 2,
-        failures: 0,
-      });
-      expect(stopped.activeAction).toBeUndefined();
-      expect(stopped.stop).toEqual({ activity: "refining", reason: "inventory_slots_full" });
-      expect(await carried(unlucky.character.id, ITEM_IDS.refinedFerrite)).toBe(5);
-      expect(await carried(unlucky.character.id, ITEM_IDS.slag)).toBe(8);
-      expect(await carried(unlucky.character.id, ITEM_IDS.ferriteShale)).toBe(6);
+      expect(unlucky.done.refiningRun).toMatchObject({ attempts: 7, successes: 0, failures: 7 });
+      expect(unlucky.done.stop).toEqual({ activity: "refining", reason: "insufficient_inputs" });
+      expect(await carried(unlucky.character.id, ITEM_IDS.refinedFerrite)).toBe(1);
+      expect(await carried(unlucky.character.id, ITEM_IDS.galvanicStock)).toBe(0);
     });
 
-    it("refuses a quantity above the current maximum without starting anything", async () => {
+    it("refuses Max when not even one batch can begin", async () => {
+      const { userId, character } = await refiner();
+      await setCarried(character.id, ITEM_IDS.ferriteShale, [1]);
+      const refused = await refiningCommands.startRefining(
+        userId,
+        character.id,
+        ACTION_IDS.refining,
+        start,
+        certain(),
+        BOUNDED_RUN_MAX,
+      );
+      expect(refused.activeAction).toBeUndefined();
+      expect(refused.stop).toEqual({ activity: "refining", reason: "insufficient_inputs" });
+      expect(await activeActionCount(character.id)).toBe(0);
+      expect(await carried(character.id, ITEM_IDS.ferriteShale)).toBe(1);
+    });
+
+    it("a Max run that reaches the internal safety ceiling stops with its own reason", async () => {
+      const { userId, character } = await refiner();
+      await setCarried(character.id, ITEM_IDS.ferriteShale, [10, 10]);
+      await refiningCommands.startRefining(
+        userId,
+        character.id,
+        ACTION_IDS.refining,
+        start,
+        certain(),
+        BOUNDED_RUN_MAX,
+      );
+      // Simulate a run that has somehow attempted all but one of the ceiling.
+      await db
+        .update(rune.characterRefiningState)
+        .set({ runAttempts: BOUNDED_RUN_QUANTITY_CEILING - 1 })
+        .where(eq(rune.characterRefiningState.characterId, character.id));
+      const done = await play.getPlayGameplayState(
+        userId,
+        character.id,
+        at(ferriteMs * 10),
+        certain(),
+      );
+      expect(done.activeAction).toBeUndefined();
+      expect(done.refiningRun.attempts).toBe(BOUNDED_RUN_QUANTITY_CEILING);
+      expect(done.stop).toEqual({ activity: "refining", reason: "run_safety_limit" });
+      // One batch, then the guard — not the Shale — ended it.
+      expect(await carried(character.id, ITEM_IDS.ferriteShale)).toBe(18);
+    });
+
+    it("refuses a number above what the inputs pay for without starting anything", async () => {
       const { userId, character } = await refiner();
       await setCarried(character.id, ITEM_IDS.ferriteShale, [10]);
       const refused = await refiningCommands.startRefining(
@@ -345,9 +392,9 @@ suite("issue #229 bounded runs (real PostgreSQL)", () => {
       );
       expect(refused.refiningError).toBe("refining_quantity_unavailable");
       expect(refused.activeAction).toBeUndefined();
-      // The refusal carries the fresh maximum to choose again from.
+      // The refusal carries the fresh count to choose again from.
       expect(
-        refused.refiningRecipes.find((r) => r.actionId === ACTION_IDS.refining)!.maximumBatches,
+        refused.refiningRecipes.find((r) => r.actionId === ACTION_IDS.refining)!.affordableBatches,
       ).toBe(5);
       expect(await activeActionCount(character.id)).toBe(0);
       expect(await carried(character.id, ITEM_IDS.ferriteShale)).toBe(10);
@@ -359,7 +406,7 @@ suite("issue #229 bounded runs (real PostgreSQL)", () => {
       const projected = await play.getPlayGameplayState(userId, character.id, start, certain());
       const maximum = projected.refiningRecipes.find(
         (r) => r.actionId === ACTION_IDS.refining,
-      )!.maximumBatches;
+      )!.affordableBatches;
       expect(maximum).toBe(5);
       // Something spends Shale between the projection and Start.
       await setCarried(character.id, ITEM_IDS.ferriteShale, [4]);
@@ -374,9 +421,9 @@ suite("issue #229 bounded runs (real PostgreSQL)", () => {
       expect(refused.refiningError).toBe("refining_quantity_unavailable");
       expect(refused.activeAction).toBeUndefined();
       expect(
-        refused.refiningRecipes.find((r) => r.actionId === ACTION_IDS.refining)!.maximumBatches,
+        refused.refiningRecipes.find((r) => r.actionId === ACTION_IDS.refining)!.affordableBatches,
       ).toBe(2);
-      // Choosing again from the fresh maximum starts normally.
+      // Choosing again from the fresh count starts normally.
       const started = await refiningCommands.startRefining(
         userId,
         character.id,
@@ -386,7 +433,7 @@ suite("issue #229 bounded runs (real PostgreSQL)", () => {
         2,
       );
       expect(started.refiningError).toBeUndefined();
-      expect(started.refiningRun.selectedAttempts).toBe(2);
+      expect(started.refiningRun.selection).toBe(2);
     });
 
     it("refuses forged quantities at the command boundary", async () => {
@@ -516,11 +563,11 @@ suite("issue #229 bounded runs (real PostgreSQL)", () => {
       return made;
     }
 
-    it("projects the maximum from stacked Scrap, one weld per two pieces", async () => {
+    it("projects the welds stacked Scrap pays for, one per two pieces", async () => {
       const { userId, character } = await welder([3, 3, 1]);
       const state = await play.getPlayGameplayState(userId, character.id, start, certain());
       expect(state.practice.scrapAvailable).toBe(7);
-      expect(state.practice.maximumWelds).toBe(3);
+      expect(state.practice.affordableWelds).toBe(3);
     });
 
     it("a run of one is exactly one complete weld", async () => {
@@ -533,7 +580,7 @@ suite("issue #229 bounded runs (real PostgreSQL)", () => {
         1,
       );
       expect(started.practice.active).toBe(true);
-      expect(started.practice.run.selectedWelds).toBe(1);
+      expect(started.practice.run.selection).toBe(1);
       const done = await play.getPlayGameplayState(userId, character.id, at(weldMs * 5), certain());
       expect(done.practice.active).toBe(false);
       expect(done.practice.run.welds).toBe(1);
@@ -549,7 +596,7 @@ suite("issue #229 bounded runs (real PostgreSQL)", () => {
       const { userId, character } = await welder([3, 3, 3]);
       await practiceCommands.startPracticeWelding(userId, character.id, start, certain(), 3);
       const midway = await play.getPlayGameplayState(userId, character.id, at(weldMs), certain());
-      expect(midway.practice.run).toMatchObject({ selectedWelds: 3, welds: 1 });
+      expect(midway.practice.run).toMatchObject({ selection: 3, welds: 1 });
       expect(midway.practice.active).toBe(true);
       const done = await play.getPlayGameplayState(
         userId,
@@ -557,12 +604,12 @@ suite("issue #229 bounded runs (real PostgreSQL)", () => {
         at(60 * 60 * 1000),
         certain(),
       );
-      expect(done.practice.run).toMatchObject({ selectedWelds: 3, welds: 3, xpGained: 300 });
+      expect(done.practice.run).toMatchObject({ selection: 3, welds: 3, xpGained: 300 });
       expect(done.practice.lastStopReason).toBe("run_completed");
       expect(await carried(character.id, ITEM_IDS.scrapMetal)).toBe(3);
     });
 
-    it("refuses a quantity above the maximum before any Scrap is spent", async () => {
+    it("refuses a number above what the Scrap pays for before any is spent", async () => {
       const { userId, character } = await welder([3, 1]);
       const refused = await practiceCommands.startPracticeWelding(
         userId,
@@ -572,7 +619,7 @@ suite("issue #229 bounded runs (real PostgreSQL)", () => {
         3,
       );
       expect(refused.practiceError).toBe("practice_quantity_unavailable");
-      expect(refused.practice.maximumWelds).toBe(2);
+      expect(refused.practice.affordableWelds).toBe(2);
       expect(refused.practice.active).toBe(false);
       expect(await carried(character.id, ITEM_IDS.scrapMetal)).toBe(4);
       expect(await activeActionCount(character.id)).toBe(0);
@@ -590,7 +637,7 @@ suite("issue #229 bounded runs (real PostgreSQL)", () => {
         certain(),
       );
       expect(stopped.practice.cycleActive).toBe(true);
-      expect(stopped.practice.maximumWelds).toBe(1);
+      expect(stopped.practice.affordableWelds).toBe(1);
 
       await setCarried(character.id, ITEM_IDS.scrapMetal, [2]);
       const projected = await play.getPlayGameplayState(
@@ -599,7 +646,7 @@ suite("issue #229 bounded runs (real PostgreSQL)", () => {
         at(weldMs / 2),
         certain(),
       );
-      expect(projected.practice.maximumWelds).toBe(2);
+      expect(projected.practice.affordableWelds).toBe(2);
       await practiceCommands.startPracticeWelding(
         userId,
         character.id,
@@ -613,7 +660,7 @@ suite("issue #229 bounded runs (real PostgreSQL)", () => {
         at(weldMs * 10),
         certain(),
       );
-      expect(done.practice.run).toMatchObject({ selectedWelds: 2, welds: 2 });
+      expect(done.practice.run).toMatchObject({ selection: 2, welds: 2 });
       expect(done.practice.lastStopReason).toBe("run_completed");
       expect(await carried(character.id, ITEM_IDS.scrapMetal)).toBe(0);
     });
@@ -635,7 +682,7 @@ suite("issue #229 bounded runs (real PostgreSQL)", () => {
         certain(),
       );
       expect(done.practice.active).toBe(false);
-      expect(done.practice.run).toMatchObject({ selectedWelds: 4, welds: 2 });
+      expect(done.practice.run).toMatchObject({ selection: 4, welds: 2 });
       expect(done.practice.lastStopReason).toBe("finished_current_weld");
       expect(done.practice.finishCurrentWeld).toBe(false);
       expect(done.practice.cycleActive).toBe(false);
@@ -661,6 +708,82 @@ suite("issue #229 bounded runs (real PostgreSQL)", () => {
       );
       expect(done.practice.run).toMatchObject({ welds: 3, slagKept: 0, slagDiscarded: 6 });
       expect(done.practice.lastStopReason).toBe("run_completed");
+    });
+
+    it("Max welds until the Scrap runs out, and a refresh keeps it a Max run", async () => {
+      const { userId, character } = await welder([3, 3, 1]);
+      const started = await practiceCommands.startPracticeWelding(
+        userId,
+        character.id,
+        start,
+        certain(),
+        BOUNDED_RUN_MAX,
+      );
+      expect(started.practice.active).toBe(true);
+      expect(started.practice.run.selection).toBe(BOUNDED_RUN_MAX);
+      const [row] = await db
+        .select({ selected: rune.characterPracticeWelds.runSelectedWelds })
+        .from(rune.characterPracticeWelds)
+        .where(eq(rune.characterPracticeWelds.characterId, character.id));
+      expect(row!.selected).toBeNull();
+
+      const midway = await play.getPlayGameplayState(userId, character.id, at(weldMs), certain());
+      expect(midway.practice.run).toMatchObject({ selection: BOUNDED_RUN_MAX, welds: 1 });
+      expect(midway.practice.active).toBe(true);
+
+      const done = await play.getPlayGameplayState(
+        userId,
+        character.id,
+        at(60 * 60 * 1000),
+        certain(),
+      );
+      expect(done.practice.active).toBe(false);
+      expect(done.practice.run).toMatchObject({
+        selection: BOUNDED_RUN_MAX,
+        welds: 3,
+        xpGained: 300,
+      });
+      expect(done.practice.lastStopReason).toBe("out_of_scrap");
+      expect(await carried(character.id, ITEM_IDS.scrapMetal)).toBe(1);
+    });
+
+    it("Max resumes a paid partial weld as its first, then welds on while Scrap lasts", async () => {
+      const { userId, character } = await welder([2]);
+      await practiceCommands.startPracticeWelding(userId, character.id, start, certain(), 1);
+      await practiceCommands.stopPracticeWelding(userId, character.id, at(weldMs / 2), certain());
+      await setCarried(character.id, ITEM_IDS.scrapMetal, [3, 1]);
+      await practiceCommands.startPracticeWelding(
+        userId,
+        character.id,
+        at(weldMs / 2),
+        certain(),
+        BOUNDED_RUN_MAX,
+      );
+      const done = await play.getPlayGameplayState(
+        userId,
+        character.id,
+        at(weldMs * 10),
+        certain(),
+      );
+      // The paid weld, then two more from four Scrap.
+      expect(done.practice.run).toMatchObject({ selection: BOUNDED_RUN_MAX, welds: 3 });
+      expect(done.practice.lastStopReason).toBe("out_of_scrap");
+      expect(await carried(character.id, ITEM_IDS.scrapMetal)).toBe(0);
+    });
+
+    it("refuses Max when there is neither Scrap nor a paid weld", async () => {
+      const { userId, character } = await welder([1]);
+      const refused = await practiceCommands.startPracticeWelding(
+        userId,
+        character.id,
+        start,
+        certain(),
+        BOUNDED_RUN_MAX,
+      );
+      expect(refused.practice.active).toBe(false);
+      expect(refused.practiceError).toBe("insufficient_scrap");
+      expect(await activeActionCount(character.id)).toBe(0);
+      expect(await carried(character.id, ITEM_IDS.scrapMetal)).toBe(1);
     });
   });
 });

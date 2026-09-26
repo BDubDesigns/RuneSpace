@@ -259,12 +259,12 @@ test("welds for real at the bench, takes a live Clean Pass, and turns the work i
   await expect(panel.locator("[data-practice-start]")).toContainText("Resume Practice");
   await expect(panel.locator("[data-practice-scrap]")).toContainText("2");
 
-  // Resuming is a new bounded run (#229) whose first weld is the paid one on
-  // the bench; the two Scrap left buy one more, so Max is two welds.
+  // Resuming is a new run (#229) whose first weld is the paid one on the
+  // bench; the two Scrap left pay for one more. Max welds until they are gone.
   const runSize = panel.locator("[data-bounded-run]");
-  await expect(runSize).toHaveAttribute("data-bounded-run-maximum", "2");
+  await expect(runSize).toHaveAttribute("data-bounded-run-affordable", "2");
   await runSize.locator("[data-bounded-run-max]").click();
-  await expect(runSize).toHaveAttribute("data-bounded-run-quantity", "2");
+  await expect(runSize).toHaveAttribute("data-bounded-run-quantity", "max");
   await panel.locator("[data-practice-start]").click();
   await expect(panel).toHaveAttribute("data-practice-active", "true");
 
@@ -281,13 +281,13 @@ test("welds for real at the bench, takes a live Clean Pass, and turns the work i
   });
   // The server-resolved run summary records that weld: its totals are visible
   // in the bench panel, and the weld itself is one History click away (#193).
-  await expect(panel.locator("[data-run-summary]")).toContainText("1 of 2 welds");
+  await expect(panel.locator("[data-run-summary]")).toContainText("1 welds · Max");
   await panel.getByRole("button", { name: "History", exact: true }).click();
   await expect(page.locator("[aria-label='Practice weld history']")).toContainText("Weld 1");
   await panel.getByRole("button", { name: "Hide history", exact: true }).click();
 
-  // The run carried straight on into its second selected weld with the Scrap
-  // that is left. Trade is an instantaneous interaction
+  // The Max run carried straight on into its next weld with the Scrap that is
+  // left. Trade is an instantaneous interaction
   // and refuses while any activity is running, so the bench stops first.
   await expect(panel).toHaveAttribute("data-practice-active", "true");
   await panel.locator("[data-practice-stop]").click();

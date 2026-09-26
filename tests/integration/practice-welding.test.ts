@@ -10,6 +10,7 @@ import {
   REPAIR_TARGET_IDS,
   SKILL_IDS,
 } from "@/game/config/foundations";
+import { BOUNDED_RUN_MAX, type BoundedRunSelection } from "@/game/domain/bounded-run";
 import type { CleanPassOpportunity } from "@/game/domain/clean-pass";
 import {
   cleanupTestUser,
@@ -214,20 +215,23 @@ suite("issue #190 Practice Welding (real PostgreSQL)", () => {
     play.getPlayGameplayState(userId, characterId, at(ms), deterministicRandom());
 
   /**
-   * Start a run of every weld the bench supports, unless a size is given. These
-   * tests were written against the open-ended run #229 replaced; Max is its
-   * bounded equivalent, so what they assert about resolution still holds.
+   * Start a Max run unless a size is given. These tests were written against
+   * the open-ended run that #229 turned into Max — weld until the Scrap runs
+   * out — so what they assert about resolution still holds.
    */
-  const startPractice = async (userId: string, characterId: string, ms = 0, quantity?: number) => {
-    const maximum = (await refresh(userId, characterId, ms)).practice.maximumWelds;
-    return practiceCommands.startPracticeWelding(
+  const startPractice = (
+    userId: string,
+    characterId: string,
+    ms = 0,
+    selection: BoundedRunSelection = BOUNDED_RUN_MAX,
+  ) =>
+    practiceCommands.startPracticeWelding(
       userId,
       characterId,
       at(ms),
       deterministicRandom(),
-      quantity ?? Math.max(1, maximum),
+      selection,
     );
-  };
 
   it("consumes the cycle's two Scrap exactly once, even under retried starts", async () => {
     const { userId, character } = await apprentice();
@@ -270,10 +274,9 @@ suite("issue #190 Practice Welding (real PostgreSQL)", () => {
     expect(await carried(character.id, ITEM_IDS.slag)).toBe(balance.practiceWelding.slagPerWeld);
     expect(await weldingXp(character.id)).toBe(balance.practiceWelding.sectionsPerWeld * sectionXp);
     expect(await weldCounter(character.id)).toBe(1);
-    // Two Scrap buy exactly one weld, so the bench's maximum run is one weld
-    // and it stopped on its own the moment that selection was complete (#229).
+    // Out of Scrap, so the Max run stopped on its own.
     expect(state.practice.active).toBe(false);
-    expect(state.practice.lastStopReason).toBe("run_completed");
+    expect(state.practice.lastStopReason).toBe("out_of_scrap");
   });
 
   it("counts only completed welds, never sections", async () => {
@@ -307,18 +310,17 @@ suite("issue #190 Practice Welding (real PostgreSQL)", () => {
   });
 
   it("keeps running while the player is away, through the ordinary resolution path", async () => {
-    // The selected run, not the clock, is what ends a Practice run: six pieces
-    // buy a maximum of three welds, and a player cannot carry enough to reach
-    // the standard one-hour offline cap. So what a long absence must prove is
-    // that the whole run resolved on the next command and stopped itself
-    // cleanly at its selection (#229).
+    // Scrap, not the clock, is what ends a Max Practice run: six pieces is
+    // three welds, and a player cannot carry enough to reach the standard
+    // one-hour offline cap. So what a long absence must prove is that the whole
+    // run resolved on the next command and stopped itself cleanly.
     const { userId, character } = await apprentice({ scrap: 6 });
     await startPractice(userId, character.id);
 
     const state = await refresh(userId, character.id, 2 * 60 * 60 * 1_000);
     expect(state.practice.run.welds).toBe(3);
     expect(state.practice.active).toBe(false);
-    expect(state.practice.lastStopReason).toBe("run_completed");
+    expect(state.practice.lastStopReason).toBe("out_of_scrap");
     expect(await weldCounter(character.id)).toBe(3);
   });
 

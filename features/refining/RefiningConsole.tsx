@@ -6,7 +6,11 @@ import { ActivityPanel } from "@/features/shared/ActivityPanel";
 import { ActivityContextRow, SkillProgressRow } from "@/features/shared/activity-context";
 import { RefiningRunPanel } from "@/features/refining/RefiningRunPanel";
 import { BoundedRunProgress, BoundedRunSelector } from "@/features/shared/BoundedRunControl";
-import { BOUNDED_RUN_DEFAULT_QUANTITY } from "@/game/domain/bounded-run";
+import {
+  BOUNDED_RUN_DEFAULT_QUANTITY,
+  BOUNDED_RUN_MAX,
+  type BoundedRunSelection,
+} from "@/game/domain/bounded-run";
 import { ItemVisual } from "@/components/items/ItemVisual";
 import { VisualTile } from "@/components/items/VisualTile";
 import { Feedback } from "@/components/ui/Feedback";
@@ -34,11 +38,16 @@ const BATCH_UNIT = { singular: "batch", plural: "batches" };
 function refiningStopMessage(
   reason: Extract<import("@/server/play").ActivityStop, { activity: "refining" }>["reason"],
   recipe: RefiningRecipeProjection | undefined,
-  run?: { attempts: number; selectedAttempts: number },
+  run?: { attempts: number },
 ): string {
   if (reason === "run_completed") {
     const attempted = run?.attempts ?? 0;
     return `Run complete — ${attempted} ${attempted === 1 ? "batch" : "batches"} attempted.`;
+  }
+  // A Max run's internal guard, not its materials, ended it (#229). Real
+  // inventories never get here; if one does, say so plainly.
+  if (reason === "run_safety_limit") {
+    return "Refining paused at the run safety limit. Start again to keep going.";
   }
   // The authoritative reason says the inputs ran out; the recipe says which
   // ones and how many, so the copy is right for all three recipes (#209).
@@ -60,6 +69,23 @@ function refiningStopMessage(
   );
 }
 
+/**
+ * Whether a stop is simply how the chosen run ends, rather than a problem to
+ * act on (#229). A number ends by completing. Max runs until blocked, so
+ * spending the last of its material is its ordinary ending too; a capacity
+ * stop still asks the player to make room, so it stays a warning.
+ */
+function refiningStopIsExpected(
+  reason: Extract<import("@/server/play").ActivityStop, { activity: "refining" }>["reason"],
+  selection: BoundedRunSelection,
+): boolean {
+  if (reason === "run_completed") return true;
+  return (
+    selection === BOUNDED_RUN_MAX &&
+    (reason === "insufficient_inputs" || reason === "run_safety_limit")
+  );
+}
+
 /** The item's authoritative display name, by its stable ID. */
 function itemName(itemId: string): string {
   return resolveItemPresentation(itemId, itemId).displayName;
@@ -77,11 +103,11 @@ function refiningCommandErrorMessage(error: string): string {
 
 function refiningErrorMessage(error: string, recipe?: RefiningRecipeProjection): string {
   if (error === "refining_quantity_unavailable") {
-    // Refused, never shortened (#229): the fresh maximum is already in the
-    // projection, so the player can choose again from it.
-    const maximum = recipe?.maximumBatches ?? 0;
-    return maximum > 0
-      ? `Only ${maximum} ${maximum === 1 ? "batch" : "batches"} can start now. Choose a run size and start again.`
+    // Refused, never shortened (#229): the fresh affordable count is already
+    // in the projection, so the player can choose again from it.
+    const affordable = recipe?.affordableBatches ?? 0;
+    return affordable > 0
+      ? `Your materials cover ${affordable} ${affordable === 1 ? "batch" : "batches"} right now. Choose a run size and start again.`
       : "Nothing can be refined right now.";
   }
   return (
@@ -94,19 +120,34 @@ function refiningErrorMessage(error: string, recipe?: RefiningRecipeProjection):
   );
 }
 
-/** The whole selected run, before Start, from the recipe's per-batch facts. */
-function refiningRunSummary(recipe: RefiningRecipeProjection, quantity: number): string {
-  const inputs = recipe.inputs
-    .map((input) => `${input.quantity * quantity} ${input.name}`)
+/**
+ * The selected run, before Start, from the recipe's per-batch facts (#229).
+ *
+ * Only a deterministic recipe with a number can honestly total its run. A
+ * rolled recipe's failures can hand material back, and a Max run lasts until
+ * it is blocked, so both describe one batch and leave the total to the run.
+ */
+function refiningRunSummary(
+  recipe: RefiningRecipeProjection,
+  selection: BoundedRunSelection,
+): string {
+  const perBatchInputs = recipe.inputs
+    .map((input) => `${input.quantity} ${input.name}`)
     .join(" + ");
-  const seconds = (recipe.attemptDurationTicks * quantity * GAME_TICK_MS) / 1000;
-  const outputs = `${recipe.outputQuantity * quantity} ${recipe.outputName}`;
-  const xp = recipe.deterministic
-    ? `${recipe.successXp * quantity} Refining XP`
-    : `${recipe.failureXp * quantity}–${recipe.successXp * quantity} Refining XP`;
-  return `${inputs} · ${seconds.toFixed(1)}s · ${
-    recipe.deterministic ? outputs : `up to ${outputs}`
-  } · ${xp}`;
+  const perBatchSeconds = (recipe.attemptDurationTicks * GAME_TICK_MS) / 1000;
+  if (selection === BOUNDED_RUN_MAX) {
+    return `Max · ${perBatchInputs} per batch · ${perBatchSeconds.toFixed(1)}s each · runs until materials or space run out`;
+  }
+  const batches = `${selection} ${selection === 1 ? "batch" : "batches"}`;
+  if (!recipe.deterministic) {
+    return `${batches} · ${perBatchInputs} per batch · ${perBatchSeconds.toFixed(1)}s each`;
+  }
+  const inputs = recipe.inputs
+    .map((input) => `${input.quantity * selection} ${input.name}`)
+    .join(" + ");
+  return `${batches} · ${inputs} · ${(perBatchSeconds * selection).toFixed(1)}s · ${
+    recipe.outputQuantity * selection
+  } ${recipe.outputName} · ${recipe.successXp * selection} Refining XP`;
 }
 
 function latestRefiningAttempt(
@@ -146,9 +187,9 @@ export function RefiningConsole() {
   // is the first authored one, and the authored order puts Refined Ferrite —
   // the only recipe a new character can work — first.
   const [selectedActionId, setSelectedActionId] = useState<string | undefined>();
-  // The bounded run's size (#229): always starts at one, and resets to one
+  // The run's selection (#229): always starts at one, and resets to one
   // whenever the recipe changes, because a count means batches OF a recipe.
-  const [quantity, setQuantity] = useState(BOUNDED_RUN_DEFAULT_QUANTITY);
+  const [selection, setSelection] = useState<BoundedRunSelection>(BOUNDED_RUN_DEFAULT_QUANTITY);
   const [now, setNow] = useState(Date.now());
   const [, startTransition] = useTransition();
   const [recovery, setRecovery] = useState<(() => void) | undefined>();
@@ -277,27 +318,28 @@ export function RefiningConsole() {
   // Every new selection starts at one (#229): once a run is under way the
   // selector is hidden, and when it next appears it is for a fresh run.
   useEffect(() => {
-    if (isActive) setQuantity(BOUNDED_RUN_DEFAULT_QUANTITY);
+    if (isActive) setSelection(BOUNDED_RUN_DEFAULT_QUANTITY);
   }, [isActive]);
 
   return (
     <ActivityPanel title="Refining" data-refining-activity>
-      {/* The bounded run (#229): choose how many batches to attempt before
-          Start, then follow the run through them. The maximum and the running
-          counts are both the server's; nothing here computes either. */}
+      {/* The run (#229): choose how many batches to attempt, or Max to run
+          until blocked, before Start; then follow the run through them. The
+          affordable count and the running counts are both the server's;
+          nothing here computes either or predicts how long Max will run. */}
       {isActive ? (
         <BoundedRunProgress
           completed={refiningRun.attempts}
-          selected={refiningRun.selectedAttempts}
+          selection={refiningRun.selection}
           unit={BATCH_UNIT}
         />
       ) : recipe?.unlocked ? (
         <BoundedRunSelector
+          affordable={recipe.affordableBatches}
           disabled={foregroundBusy || Boolean(state.activeAction)}
-          maximum={recipe.maximumBatches}
-          onChange={setQuantity}
-          quantity={quantity}
-          summary={refiningRunSummary(recipe, quantity)}
+          onChange={setSelection}
+          selection={selection}
+          summary={refiningRunSummary(recipe, selection)}
           unit={BATCH_UNIT}
         />
       ) : null}
@@ -318,7 +360,11 @@ export function RefiningConsole() {
             loading={foregroundBusy && pendingCommand === "start"}
             onClick={() =>
               runForeground("start", (characterId) =>
-                startRefiningAction({ characterId, recipeActionId: recipe?.actionId, quantity }),
+                startRefiningAction({
+                  characterId,
+                  recipeActionId: recipe?.actionId,
+                  quantity: selection,
+                }),
               )
             }
           >
@@ -356,7 +402,7 @@ export function RefiningConsole() {
               key={candidate.actionId}
               onClick={() => {
                 if (candidate.actionId !== recipe?.actionId)
-                  setQuantity(BOUNDED_RUN_DEFAULT_QUANTITY);
+                  setSelection(BOUNDED_RUN_DEFAULT_QUANTITY);
                 setSelectedActionId(candidate.actionId);
               }}
               type="button"
@@ -481,7 +527,9 @@ export function RefiningConsole() {
       {message ? (
         <Feedback
           tone={
-            state.stop?.activity === "refining" && state.stop.reason !== "run_completed" && !active
+            state.stop?.activity === "refining" &&
+            !active &&
+            !refiningStopIsExpected(state.stop.reason, refiningRun.selection)
               ? "danger"
               : "muted"
           }

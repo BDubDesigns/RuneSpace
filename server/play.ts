@@ -87,7 +87,7 @@ import {
 import {
   refiningAwardFacts,
   refiningRecipeUnlocked,
-  refiningRunMaximum,
+  refiningAffordableBatches,
   refiningSuccessChanceBps,
   type RefiningStopReason,
 } from "@/game/domain/refining";
@@ -162,7 +162,11 @@ import {
 } from "@/game/domain/clean-pass";
 import { getWorkOrder } from "@/game/content/work-orders";
 import { deriveWorkbenchOccupancy } from "@/game/domain/workbench";
-import { practiceRunMaximum, type PracticeWeldState } from "@/game/domain/practice-welding";
+import { practiceAffordableWelds, type PracticeWeldState } from "@/game/domain/practice-welding";
+import {
+  BOUNDED_RUN_DEFAULT_QUANTITY,
+  boundedRunSelectionFromColumn,
+} from "@/game/domain/bounded-run";
 import { isMissionAccepted } from "@/server/mission-state";
 import {
   createWorkOrderWeldingResolver,
@@ -348,11 +352,12 @@ export type PracticeProjection = {
   scrapAvailable: number;
   scrapPerWeld: number;
   /**
-   * The authoritative bounded-run maximum (#229): how many complete welds a run
-   * started now could finish, a paid partial weld counting as the first. The
-   * browser's Max reads this; it never derives its own.
+   * How many complete welds the Scrap carried right now pays for, a paid
+   * partial weld counting as the first (#229): the largest number the run
+   * selector offers, and what Start revalidates a number against. Not what Max
+   * does — Max runs until the Scrap cannot pay for another weld.
    */
-  maximumWelds: number;
+  affordableWelds: number;
   autoDiscardSlag: boolean;
   /**
    * The durable "finish this weld, then stop" intent (#207 follow-up). The
@@ -436,13 +441,13 @@ export type RefiningRecipeProjection = {
   /** Always succeeds and never rolls (#229): the intentional Slag recipes. */
   deterministic: boolean;
   /**
-   * The authoritative bounded-run maximum (#229): the most batches of this
-   * recipe that could be attempted from current inventory under some possible
-   * sequence of outcomes — a ceiling the run's real rolls may stop short of. Zero
-   * when the recipe is locked, nothing can start, or Refining is not available
-   * where the character is standing.
+   * How many batches of this recipe the inputs carried right now pay for
+   * (#229): the largest number the run selector offers, and what Start
+   * revalidates a number against. Not a prediction and not what Max does —
+   * Max runs until the ordinary preflight refuses the next attempt, however
+   * many that turns out to be. Zero when the recipe is locked.
    */
-  maximumBatches: number;
+  affordableBatches: number;
   inputs: readonly { itemId: string; name: string; quantity: number; carried: number }[];
   /** Every mutually exclusive thing a failure can produce, already named. */
   failureOutcomes: readonly (readonly { itemId: string; name: string; quantity: number }[])[];
@@ -651,7 +656,7 @@ export type PlayGameplayState = {
     | "workbench_occupied"
     /** "Finish current weld and stop" was asked for with nothing on the bench. */
     | "no_weld_in_progress"
-    /** The selected weld count exceeds the fresh maximum (#229); choose again. */
+    /** The selected weld count exceeds what the Scrap now pays for (#229); choose again. */
     | "practice_quantity_unavailable";
   /** Authoritative persistent current location (stable ID from the registry). */
   location: { currentLocationId: string };
@@ -710,7 +715,7 @@ export type PlayGameplayState = {
   refiningError?:
     | "refining_unavailable_here"
     | "refining_recipe_locked"
-    /** The selected batch count exceeds the fresh maximum (#229); choose again. */
+    /** The selected batch count exceeds what the inputs now pay for (#229); choose again. */
     | "refining_quantity_unavailable";
   /** Set when the finite Crash Site Welding command cannot begin. */
   weldingError?: "welding_unavailable_here" | "welding_locked" | "repair_complete";
@@ -1371,7 +1376,10 @@ export async function stateFromTransaction(
   };
   const refiningState = refiningStateRows[0];
   const refiningRun: RefiningRunState = {
-    selectedAttempts: refiningState?.runSelectedAttempts ?? 1,
+    // NULL is Max, so a missing row (no run yet) is told apart from it.
+    selection: refiningState
+      ? boundedRunSelectionFromColumn(refiningState.runSelectedAttempts)
+      : BOUNDED_RUN_DEFAULT_QUANTITY,
     attempts: refiningState?.runAttempts ?? 0,
     successes: refiningState?.runSuccesses ?? 0,
     failures: (refiningState?.runAttempts ?? 0) - (refiningState?.runSuccesses ?? 0),
@@ -1419,21 +1427,12 @@ export async function stateFromTransaction(
       .filter((stack) => stack.itemId === ITEM_IDS.scrapMetal)
       .reduce((total, stack) => total + stack.quantity, 0),
     scrapPerWeld: balance.practiceWelding.scrapPerWeld,
-    // The same resolver a real run uses, over this character's real stacks
-    // and capacity: Scrap per weld, whole-stack slot freeing, and the Slag
-    // keep/discard rule all decide it exactly as they decide a run (#229).
-    maximumWelds: practiceRunMaximum(
+    affordableWelds: practiceAffordableWelds(
       {
         practice: practiceState,
         scrapStackQuantities: stacks
           .filter((stack) => stack.itemId === ITEM_IDS.scrapMetal)
           .map((stack) => stack.quantity),
-        slagStackQuantities: stacks
-          .filter((stack) => stack.itemId === ITEM_IDS.slag)
-          .map((stack) => stack.quantity),
-        slotsAvailable: snapshot.slotsAvailable,
-        massAvailableGrams: snapshot.massAvailableGrams,
-        autoDiscardSlag: practiceRow?.autoDiscardSlag ?? false,
       },
       balance,
     ),
@@ -1589,9 +1588,6 @@ export async function stateFromTransaction(
       scene: resolved.scene,
     };
   }
-  // Refining is hosted by the location, not by the recipe (#209).
-  const refiningAvailableHere =
-    locationStates[currentLocationId]?.availableActionIds.includes(ACTION_IDS.refining) ?? false;
   // Exactly one Mining source is reachable where the character is standing.
   const locationMiningSource = miningSources(balance).find((source) =>
     locationStates[currentLocationId]?.availableActionIds.includes(source.actionId),
@@ -1676,20 +1672,11 @@ export async function stateFromTransaction(
         successXp: recipe.successXp,
         failureXp: refiningRecipeIsDeterministic(recipe) ? 0 : recipe.failureXp,
         deterministic: refiningRecipeIsDeterministic(recipe),
-        // Only where the console exists: a maximum is only ever chosen from,
-        // or revalidated, at the Yard, so the search is not paid elsewhere.
-        maximumBatches: refiningAvailableHere
-          ? refiningRunMaximum(
-              {
-                refiningLevel: refiningProgress.level,
-                existingStacks: snapshot.stacks,
-                slotsAvailable: snapshot.slotsAvailable,
-                massAvailableGrams: snapshot.massAvailableGrams,
-              },
-              balance,
-              recipe,
-            )
-          : 0,
+        affordableBatches: refiningAffordableBatches(
+          { refiningLevel: refiningProgress.level, existingStacks: snapshot.stacks },
+          balance,
+          recipe,
+        ),
         inputs: award.inputs.map((input) => ({
           itemId: input.itemId,
           name: resolveItemPresentation(input.itemId, input.itemId).displayName,

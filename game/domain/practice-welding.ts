@@ -10,11 +10,13 @@ import {
   type CleanPassState,
 } from "@/game/domain/clean-pass";
 import { BOUNDED_RUN_QUANTITY_CEILING, ITEM_IDS } from "@/game/config/foundations";
+import type { BoundedRunAllowance } from "@/game/domain/bounded-run";
 import { planExactStackRemoval } from "@/game/domain/inventory";
 
 /**
  * Practice Welding — the repeatable Welding training loop at Wade's Workbench
- * (#190), run a player-selected number of complete welds at a time (#229).
+ * (#190), run a player-selected number of complete welds at a time, or until
+ * the Scrap runs out (#229).
  *
  * It is genuine Welding, not a tutorial simulation: the same skill, the same
  * five-tick section cadence, and the same Clean Pass opportunities as an
@@ -84,12 +86,14 @@ export type PracticeSnapshot = {
    */
   finishCurrentWeld: boolean;
   /**
-   * How many more complete welds the player's selected run may still START
-   * (#229): the selected count less the welds this run has already completed.
-   * A weld already on the bench was started, so it always finishes; this only
+   * How many more complete welds the player's selection may still START, and
+   * what reaching that means (#229). A numeric run allows its count less the
+   * welds this run has already completed; Max allows only up to the internal
+   * safety ceiling, because what ends a Max run is the ordinary Scrap check. A
+   * weld already on the bench was started, so it always finishes; this only
    * decides whether another begins after it.
    */
-  runWeldsRemaining: number;
+  runAllowance: BoundedRunAllowance;
 };
 
 /** One completed weld, as `This Run` shows it. */
@@ -109,13 +113,19 @@ export type PracticeResolvedWeld = {
  * there is nothing to start another with. `finished_current_weld` is the player
  * having asked for exactly that outcome in advance (#207) — the paid weld
  * completes, no next recipe is consumed, and the bench is left clear.
- * `run_completed` is the bounded run (#229) having completed every weld the
+ * `run_completed` is a numeric run (#229) having completed every weld the
  * player selected: like Finish Current, it ends before the next weld would
- * begin, so it spends no Scrap it was not asked to. Everything else that ends a
+ * begin, so it spends no Scrap it was not asked to. A Max run ends with
+ * `out_of_scrap` like any run that runs dry; `run_safety_limit` is only its
+ * internal ceiling, which real Scrap never reaches. Everything else that ends a
  * run — the player's ordinary Stop, Travel — is an interruption, not a
  * resolution.
  */
-export type PracticeStopReason = "out_of_scrap" | "finished_current_weld" | "run_completed";
+export type PracticeStopReason =
+  | "out_of_scrap"
+  | "finished_current_weld"
+  | "run_completed"
+  | "run_safety_limit";
 
 export type PracticeResolution = {
   consumedTicks: number;
@@ -263,11 +273,11 @@ export function resolvePracticeWelding(input: {
         stopReason = "finished_current_weld";
         break;
       }
-      // The selected run is complete (#229). Every weld this run started has
+      // The selection is used up (#229). Every weld this run started has
       // finished by the time the bench is clear, so completed welds are the
       // welds started; checked before Scrap for the same reason as above.
-      if (resolvedWelds.length >= snapshot.runWeldsRemaining) {
-        stopReason = "run_completed";
+      if (resolvedWelds.length >= snapshot.runAllowance.remaining) {
+        stopReason = snapshot.runAllowance.exhaustedReason;
         break;
       }
       if (scrapAvailable < practiceWelding.scrapPerWeld) {
@@ -347,38 +357,21 @@ export function resolvePracticeWelding(input: {
   };
 }
 
-/** Clean Pass rolls do not change how many welds a run completes, only their pace. */
-const MAXIMUM_PROBE_RANDOM: CleanPassRandom = { nextBasisPoints: () => 0 };
-
 /**
- * The server-authoritative maximum for a bounded Practice run (#229): how many
- * complete welds a run started now could finish, counting a paid partial weld
- * already on the bench as the first of them.
- *
- * It is not a formula of its own. It runs the ordinary resolver over enough
- * time for every weld the carried Scrap could pay for, with no selection cap
- * and no Finish Current intent, and counts the welds it completes — so Scrap
- * per weld, whole-stack slot freeing (#230), the Slag keep/discard rule and the
- * player's Auto-discard setting are all exactly the rules a real run obeys.
- * Under today's rules Slag never blocks a weld (overflow is discarded), so the
- * answer is the partial weld plus one weld per full Scrap-per-weld carried; if
- * output capacity ever became able to stop a weld, this would follow it.
+ * How many complete welds the Scrap carried right now pays for (#229), a paid
+ * partial weld on the bench counting as the first: the ceiling a numeric run
+ * selection may ask for. Slag never blocks a weld (overflow is discarded), so
+ * Scrap is the whole question. Max does not use this — it runs until the
+ * ordinary Scrap check refuses the next weld.
  */
-export function practiceRunMaximum(
-  snapshot: Omit<PracticeSnapshot, "finishCurrentWeld" | "runWeldsRemaining">,
+export function practiceAffordableWelds(
+  snapshot: Pick<PracticeSnapshot, "practice" | "scrapStackQuantities">,
   balance: EffectiveGameBalance = getEffectiveGameBalance(),
 ): number {
-  const { practiceWelding, welding } = balance;
-  const payableWelds = Math.floor(practiceScrapAvailable(snapshot) / practiceWelding.scrapPerWeld);
-  const candidateWelds = payableWelds + (snapshot.practice.cycleActive ? 1 : 0);
-  if (candidateWelds === 0) return 0;
-  const probe = resolvePracticeWelding({
-    elapsedTicks: candidateWelds * practiceWelding.sectionsPerWeld * welding.attemptDurationTicks,
-    snapshot: { ...snapshot, finishCurrentWeld: false, runWeldsRemaining: candidateWelds },
-    random: MAXIMUM_PROBE_RANDOM,
-    balance,
-  });
-  return Math.min(BOUNDED_RUN_QUANTITY_CEILING, probe.completedWelds);
+  const payable = Math.floor(
+    practiceScrapAvailable(snapshot) / balance.practiceWelding.scrapPerWeld,
+  );
+  return Math.min(BOUNDED_RUN_QUANTITY_CEILING, payable + (snapshot.practice.cycleActive ? 1 : 0));
 }
 
 /**

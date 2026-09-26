@@ -74,8 +74,8 @@ describe("createPlayResolver RNG wiring (#127)", () => {
       existingStacks: [{ id: "shale", itemId: ITEM_IDS.ferriteShale, quantity: 100 }],
       slotsAvailable: 8,
       massAvailableGrams: 100_000,
-      // A bounded run (#229) with batches left to attempt.
-      attemptsRemaining: 10,
+      // A numeric run (#229) with batches left to attempt.
+      allowance: { remaining: 10, exhaustedReason: "run_completed" as const },
     };
   }
 

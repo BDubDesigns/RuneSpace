@@ -83,39 +83,61 @@ summaries are retained. Starting a genuinely new Mining action resets this run.
 
 ## Bounded runs (issue #229)
 
-Where the player chooses a finite repeatable run before starting, RuneSpace
-uses **one** interaction: the run size starts at **1**, **− / +** step it by
-one, and **Max** jumps to the server-authoritative maximum in a single action.
-Start sends the chosen number and the server revalidates it inside the
-character lock; a selection that authoritative state no longer supports is
-**refused, never silently shortened** — the refusal carries the fresh maximum
-and the player chooses again. Refining and Practice Welding use it today; it is
-the quantity language later production skills reuse.
+Where the player chooses how long a repeatable run should be before starting,
+RuneSpace uses **one** interaction: `− · 5 · + · Max`. The selection starts at
+**1**, **− / +** step a number by one, and **Max** is its own choice.
+
+- **A number is a bounded run**: attempt up to exactly that many, unless the
+  activity naturally becomes unable to continue first. + stops at how many
+  units the inputs carried right now pay for (`affordableBatches` /
+  `affordableWelds` in the play state). Start revalidates the number against
+  that count inside the character lock; a number authoritative state no longer
+  supports is **refused, never silently shortened** — the refusal carries the
+  fresh count and the player chooses again.
+- **Max is a run-until-blocked mode, not a number.** Start requires only that
+  one unit can begin now. The activity's ordinary resolver then re-evaluates
+  real authoritative state after every attempt or weld and continues while
+  another can begin, so a Max run's final length depends on the actual results
+  and inventory. Nothing predicts it ahead of time, and the browser never
+  shows a number for it.
+
+Refining and Practice Welding use it today; it is the selection language later
+production skills reuse.
 
 | Fact | Home |
 | --- | --- |
-| Quantity rule (default, step, refusal, progress) | `game/domain/bounded-run.ts` |
-| Structural bounds (1 .. 999) | `BOUNDED_RUN_MINIMUM_QUANTITY` / `BOUNDED_RUN_QUANTITY_CEILING` in `game/config/foundations.ts` |
-| Request shape | `BoundedRunQuantitySchema` in `game/schemas/gameplay.ts` |
+| Selection rule (default, step, revalidation, allowance, progress, durable form) | `game/domain/bounded-run.ts` |
+| Structural bounds (1 .. 999) and the Max literal | `BOUNDED_RUN_MINIMUM_QUANTITY` / `BOUNDED_RUN_QUANTITY_CEILING` / `BOUNDED_RUN_MAX` in `game/config/foundations.ts` |
+| Request shape (`number` or `"max"`) | `BoundedRunSelectionSchema` in `game/schemas/gameplay.ts` |
 | Selector and active-run progress | `features/shared/BoundedRunControl.tsx` |
-| Refining maximum | `refiningRunMaximum` in `game/domain/refining.ts` |
-| Practice maximum | `practiceRunMaximum` in `game/domain/practice-welding.ts` |
+| Refining affordable count | `refiningAffordableBatches` in `game/domain/refining.ts` |
+| Practice affordable count | `practiceAffordableWelds` in `game/domain/practice-welding.ts` |
 
-The durable state is one integer on each activity's existing row —
+The durable state is one nullable integer on each activity's existing row —
 `character_refining_state.run_selected_attempts` and
 `character_practice_welds.run_selected_welds` — next to the run counter that
-already existed (`run_attempts`, `run_welds`). Remaining is their difference and
-is never stored. `active_actions` is unchanged and still the one-active-action
-boundary; lazy/offline resolution and the one-hour cap are unchanged.
+already existed (`run_attempts`, `run_welds`). A number is the selected count;
+**`NULL` is Max** (migration `0029`), so refresh, lazy/offline resolution and
+server-side continuation all know which mode the run is in. Remaining is the
+difference and is never stored. `active_actions` is unchanged and still the
+one-active-action boundary; lazy/offline resolution and the one-hour cap are
+unchanged.
 
-A completed selection stops the run with its own `run_completed` reason, checked
-before the activity's shortage reasons (inputs, capacity, Scrap), so a run that
-reaches its selection ends by saying it finished rather than that it ran out. Practice's explicit
-Stop After Current Weld intent is checked before it and keeps its own reason. Only the current unit is ever committed:
-the next batch or weld is revalidated as it begins, and a run that cannot begin
-its next unit before the selection is used up — because of an inventory change
-mid-run or, for Refining, its own outcomes — stops early with its ordinary
-reason. The selection is an attempt ceiling, not a promise of completion.
+A number that is fully attempted stops the run with its own `run_completed`
+reason, checked before the activity's shortage reasons (inputs, capacity,
+Scrap), so a run that reaches its number ends by saying it finished rather than
+that it ran out. A Max run never reports `run_completed`: it ends with the
+ordinary reason that stopped the next unit. Practice's explicit Stop After
+Current Weld intent is checked first and keeps its own reason. Only the current
+unit is ever committed: the next batch or weld is revalidated as it begins, and
+a run that cannot begin its next unit — because of an inventory change mid-run
+or, for Refining, its own outcomes — stops with its ordinary reason.
+
+The ceiling (999) is only an internal guard on a Max run, so a defect can never
+keep one going forever; it is not what Max means. Carried inventory ends every
+real run far below it. If a Max run ever reaches it, the run stops with its own
+`run_safety_limit` reason rather than presenting it as ordinary completion or
+as running out.
 
 ## Refining slice (issues #81, #209 and #229)
 
@@ -144,20 +166,28 @@ curve and no failure path (`failure: { kind: "none" }`), never consults the
 random source, and its attempts are marked `deterministic` so no surface shows a
 roll.
 
-**A run is a selected number of attempted batches** (see "Bounded runs"). A
-failed attempt counts toward the selection exactly like a success. The
-maximum is the greatest number of batches that can be started one after
-another from the current inventory **under at least one possible sequence of
-outcomes**: `refiningRunMaximum` asks the ordinary preflight before every
-attempt and steps through every possible outcome with the resolver's own
-transition, taking the longest sequence (an outcome the character's level makes
-impossible, such as a failure at certain success, is not explored). Max is an
-attempt ceiling, not a guarantee: the real run still rolls, and if its actual
-outcomes leave the next batch unable to start — inputs spent, or a success's or
-failure's output no longer fitting — it stops before the selection with the
-ordinary `insufficient_inputs`, `inventory_slots_full`, or
-`carried_mass_capacity_reached` reason. Nothing is fabricated and the selection
-is never silently shortened.
+**A run is a number of attempted batches, or Max** (see "Bounded runs"). A
+failed attempt counts toward a number exactly like a success. The most a number
+may ask for is `refiningAffordableBatches`: whole batches of the recipe's
+inputs carried right now. It deliberately ignores capacity and anything a
+failure might hand back; capacity is the ordinary preflight's question, asked
+before every attempt.
+
+A Max run resolves each real attempt, applies its actual output or returned
+input, and runs the ordinary preflight again, continuing while another attempt
+can start. Nothing explores future outcomes: a Galvaferrite failure that hands
+back an input simply leaves that input carried for the next preflight, so the
+same inventory can make a different number of attempts under different rolls.
+It stops with the ordinary `insufficient_inputs`, `inventory_slots_full`, or
+`carried_mass_capacity_reached` reason. Nothing is fabricated, and the RNG is
+unchanged.
+
+Persistence writes the resolver's final stack state — updated, deleted and
+created stacks — rather than replaying the window's gross input and output
+totals. Within one resolution window a returned input can be spent again by a
+later attempt, so gross use can exceed what was ever carried at once; the
+resolver's end state, computed under the same transaction's row locks, is the
+authoritative inventory.
 
 Every recipe is visible in the console from the beginning; a recipe the
 character's level does not authorize renders as `Requires Refining N` and is
@@ -329,24 +359,24 @@ Pass roll. An untouched bench is an absent row, so nothing needs backfilling.
   Practice weld cannot begin while a client job — or an unfinished Practice weld
   the player has not resolved — already occupies the bench. See "Workbench
   exclusivity" below for the shared rule and its refusal.
-- **A bounded run of complete welds (#229).** Start takes a selected number of
-  welds (see "Bounded runs"); a paid partial weld being resumed is the run's
-  first. Each completed weld begins the next selected one, consuming its two
+- **A run of complete welds, or Max (#229).** Start takes a number of welds or
+  Max (see "Bounded runs"); a paid partial weld being resumed is the run's
+  first either way. Each completed weld begins the next one, consuming its two
   Scrap at that instant, through the ordinary lazy resolution and the standard
-  one-hour offline cap. A run stops itself for one of three authored reasons,
+  one-hour offline cap. A run stops itself for one of these authored reasons,
   checked in this order before a next weld would begin:
   `finished_current_weld`, when the player has asked the run to end after the
   weld already on the bench — see "Stop After Current Weld" below;
-  `run_completed`, when every selected weld has completed; and
-  `out_of_scrap`, when fewer than two Scrap remain (adding Scrap later never
-  auto-restarts it). Every other way a run ends — the player's ordinary Stop,
-  Travel — is an interruption, not a resolution, and is recorded as neither.
-- **The maximum** is `practiceRunMaximum`: the ordinary resolver run over the
-  character's real Scrap and Slag stacks, capacity and Auto-discard setting,
-  counting the welds it completes. Slag can never block a weld, so today that
-  is the paid partial weld (if any) plus one weld per two carried Scrap. Scrap
-  stacking to three (#230) changes which slots a weld frees for its Slag, not
-  how many welds the Scrap pays for.
+  `run_completed`, when every weld of a number has completed (a Max run never
+  reports it); and `out_of_scrap`, when fewer than two Scrap remain (adding
+  Scrap later never auto-restarts it) — which is how a Max run normally ends.
+  `run_safety_limit` is only the Max run's internal guard. Every other way a
+  run ends — the player's ordinary Stop, Travel — is an interruption, not a
+  resolution, and is recorded as neither.
+- **The affordable count** is `practiceAffordableWelds`: the paid partial weld
+  (if any) plus one weld per two carried Scrap. It is the most a number may ask
+  for. Slag can never block a weld, and Scrap stacking to three (#230) changes
+  which slots a weld frees for its Slag, not how many welds the Scrap pays for.
 - **Stop and Resume** preserve the real partial weld: the completed sections,
   the two Scrap already spent, and the rolled Clean Pass positions. Resuming
   costs nothing and works with no Scrap at all. Stop never refunds, never

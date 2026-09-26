@@ -70,13 +70,14 @@ test("Processing Yard Refining journey — Ferrite and Slag both branches, artwo
   ).toHaveCount(0);
   await expect(page.getByText("Metallurgy", { exact: false })).toHaveCount(0);
 
-  // 4. Start Refining works — as a bounded run (#229). The selector starts at
-  // one; Max selects every batch the ten carried Shale support.
+  // 4. Start Refining works — here as a Max run (#229), which keeps going
+  // until the Shale is gone. The selector starts at one; the ten carried
+  // Shale pay for five batches, the most a number can ask for.
   const runSize = page.locator("[data-refining-activity] [data-bounded-run]");
   await expect(runSize).toHaveAttribute("data-bounded-run-quantity", "1");
-  await expect(runSize).toHaveAttribute("data-bounded-run-maximum", "5");
+  await expect(runSize).toHaveAttribute("data-bounded-run-affordable", "5");
   await runSize.locator("[data-bounded-run-max]").click();
-  await expect(runSize).toHaveAttribute("data-bounded-run-quantity", "5");
+  await expect(runSize).toHaveAttribute("data-bounded-run-quantity", "max");
   await page.getByRole("button", { name: "Start Refining" }).click();
   await expect(page.getByRole("button", { name: "Stop Refining" })).toBeVisible();
 
@@ -91,7 +92,7 @@ test("Processing Yard Refining journey — Ferrite and Slag both branches, artwo
   await expect(latestRefining).toContainText("Latest attempt: 1 Refined Ferrite");
   await expect(latestRefining.getByLabel("1 Refined Ferrite produced")).toBeVisible();
   await expect(latestRefining.getByLabel("15 Refining XP earned")).toBeVisible();
-  await expect(page.getByText("1 of 5 attempts", { exact: true })).toBeVisible();
+  await expect(page.getByText("1 attempts · Max", { exact: true })).toBeVisible();
   await expect(page.getByText("1 Refined Ferrite", { exact: true }).first()).toBeVisible();
   await captureReviewScreenshot(page, "refining-mobile-active.png");
 
@@ -105,7 +106,7 @@ test("Processing Yard Refining journey — Ferrite and Slag both branches, artwo
   await expect(latestRefining).toContainText("Latest attempt: 1 Slag");
   await expect(latestRefining.getByLabel("1 Slag produced")).toBeVisible();
   await expect(latestRefining.getByLabel("3 Refining XP earned")).toBeVisible();
-  await expect(page.getByText("2 of 5 attempts", { exact: true })).toBeVisible();
+  await expect(page.getByText("2 attempts · Max", { exact: true })).toBeVisible();
 
   // History holds the attempts *before* this one (#193): attempt 2 is the
   // latest and is presented in full directly above, so opening History must
@@ -145,7 +146,7 @@ test("Processing Yard Refining journey — Ferrite and Slag both branches, artwo
   // 8. refresh/reload while Refining retains authoritative run/progress state
   await page.reload();
   await expect(page.getByRole("button", { name: "Stop Refining" })).toBeVisible();
-  await expect(page.getByText("2 of 5 attempts", { exact: true })).toBeVisible();
+  await expect(page.getByText("2 attempts · Max", { exact: true })).toBeVisible();
   await expect(latestRefining).toContainText("Latest attempt: 1 Slag");
 
   // 9. Travel while Refining resolves only completed attempts; incomplete <7 tick discarded

@@ -503,12 +503,13 @@ export const characterRefiningState = pgTable(
       .references(() => characters.id, { onDelete: "restrict" }),
     lastStopReason: text("last_stop_reason"),
     /**
-     * The bounded run's selected quantity (#229): how many recipe batches the
-     * player chose to ATTEMPT. `run_attempts` already counts attempts in the
-     * current run, failures included, so the two together are the whole
-     * bounded-run state — remaining is the difference, never stored.
+     * The run's selection (#229): how many recipe batches the player chose to
+     * ATTEMPT, or NULL for Max — run until the ordinary preflight refuses the
+     * next attempt. `run_attempts` already counts attempts in the current run,
+     * failures included, so the two together are the whole bounded-run state —
+     * remaining is the difference, never stored.
      */
-    runSelectedAttempts: integer("run_selected_attempts").notNull().default(1),
+    runSelectedAttempts: integer("run_selected_attempts").default(1),
     runAttempts: integer("run_attempts").notNull().default(0),
     runSuccesses: integer("run_successes").notNull().default(0),
     /**
@@ -651,11 +652,12 @@ export const characterPracticeWelds = pgTable(
     finishCurrentWeld: boolean("finish_current_weld").notNull().default(false),
     lastStopReason: text("last_stop_reason"),
     /**
-     * The bounded run's selected quantity (#229): how many complete welds the
-     * player chose. A resumed partial weld is the run's first. `run_welds`
-     * counts the welds this run has completed, so remaining is the difference.
+     * The run's selection (#229): how many complete welds the player chose, or
+     * NULL for Max — run until the Scrap cannot pay for another. A resumed
+     * partial weld is the run's first. `run_welds` counts the welds this run
+     * has completed, so remaining is the difference.
      */
-    runSelectedWelds: integer("run_selected_welds").notNull().default(1),
+    runSelectedWelds: integer("run_selected_welds").default(1),
     runWelds: integer("run_welds").notNull().default(0),
     runScrapConsumed: integer("run_scrap_consumed").notNull().default(0),
     runSlagKept: integer("run_slag_kept").notNull().default(0),

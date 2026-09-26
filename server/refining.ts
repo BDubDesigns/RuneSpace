@@ -1,4 +1,4 @@
-import { and, asc, eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { randomInt } from "node:crypto";
 import { db } from "@/db";
 import {
@@ -16,6 +16,12 @@ import {
   type RefiningRecipeBalance,
 } from "@/game/config/balance";
 import { SKILL_IDS } from "@/game/config/foundations";
+import {
+  boundedRunAllowance,
+  boundedRunSelectionFromColumn,
+  type BoundedRunAllowance,
+  type BoundedRunSelection,
+} from "@/game/domain/bounded-run";
 import { deriveEquipmentLoadout } from "@/game/domain/equipment";
 import type { StackState } from "@/game/domain/inventory";
 import {
@@ -30,11 +36,7 @@ import {
 import { levelFromXp } from "@/game/domain/progression";
 import { ticksToMilliseconds } from "@/game/domain/timing";
 import type { ActionResolver, DatabaseTransaction } from "@/server/action-resolution";
-import {
-  addStackableItem,
-  consumeStackableItem,
-  loadOwnedItemInstances,
-} from "@/server/carried-inventory";
+import { loadOwnedItemInstances } from "@/server/carried-inventory";
 import { grantCharacterSkillXp } from "@/server/progression";
 
 export type RefiningSnapshot = {
@@ -42,8 +44,11 @@ export type RefiningSnapshot = {
   existingStacks: readonly StackState<string>[];
   slotsAvailable: number;
   massAvailableGrams: number;
-  /** Batches the selected run may still attempt (#229): selected less attempted. */
-  attemptsRemaining: number;
+  /**
+   * What the run's selection still allows (#229): a numeric run's count less
+   * its attempts, or for Max only the internal safety ceiling.
+   */
+  allowance: BoundedRunAllowance;
 };
 
 export type RefiningRunAttempt = RefiningResolvedAttempt & {
@@ -52,8 +57,11 @@ export type RefiningRunAttempt = RefiningResolvedAttempt & {
 };
 
 export type RefiningRunState = {
-  /** The bounded run's selected batch count (#229); `attempts` counts toward it. */
-  selectedAttempts: number;
+  /**
+   * The run's selection (#229): a batch count that `attempts` counts toward,
+   * or Max, which has no count — it runs until the preflight refuses.
+   */
+  selection: BoundedRunSelection;
   attempts: number;
   successes: number;
   failures: number;
@@ -186,7 +194,9 @@ async function loadRefiningSnapshot(
       equipmentLoadout.maximumCarryCapacityGrams - equipmentLoadout.carriedMassGrams,
     ),
     // No row means no run has ever been started, so there is nothing to attempt.
-    attemptsRemaining: run ? Math.max(0, run.runSelectedAttempts - run.runAttempts) : 0,
+    allowance: run
+      ? boundedRunAllowance(boundedRunSelectionFromColumn(run.runSelectedAttempts), run.runAttempts)
+      : { remaining: 0, exhaustedReason: "run_completed" },
   };
 }
 
@@ -224,7 +234,7 @@ export function createRefiningResolver(
         balance: getEffectiveGameBalance(),
         recipe,
         random,
-        attemptLimit: snapshot.attemptsRemaining,
+        allowance: snapshot.allowance,
       });
       let cumulativeAttemptTicks = 0;
       const outcome: PersistedRefiningOutcome = {
@@ -249,45 +259,68 @@ export function createRefiningResolver(
     },
     persist: async (transaction, outcome) => {
       const persistedStacks = await transaction
-        .select({ id: inventoryStacks.id, itemId: inventoryStacks.itemId })
+        .select({
+          id: inventoryStacks.id,
+          itemId: inventoryStacks.itemId,
+          quantity: inventoryStacks.quantity,
+        })
         .from(inventoryStacks)
         .where(eq(inventoryStacks.characterId, outcome.characterId))
         .for("update");
-      const itemIdByStackId = new Map(persistedStacks.map((stack) => [stack.id, stack.itemId]));
+      const persistedById = new Map(persistedStacks.map((stack) => [String(stack.id), stack]));
       const now = new Date();
-      // Consume every authored input of the recipe, not a hardcoded Ferrite
-      // Shale line (#209).
-      for (const [itemId, quantity] of Object.entries(outcome.inputsConsumed)) {
-        if (quantity <= 0) continue;
-        const consumption = await consumeStackableItem(transaction, {
-          characterId: outcome.characterId,
-          itemId,
-          quantity,
-          now,
-        });
-        if (!consumption.ok) {
-          throw new Error(`Refining consumed more "${itemId}" than available at persistence time`);
-        }
-      }
-
-      // Award every item this window actually produced. A Galvaferrite failure
-      // hands back an input, so the awarded set is not a fixed output pair.
-      const awardedItemIds = new Set<string>([
+      // Write the resolver's final inventory, not a replay of its totals. The
+      // snapshot it resolved against was read under this same transaction's
+      // row locks, so its end state is authoritative. Replaying gross totals
+      // (consume every input, then award every output) broke as soon as a
+      // Galvaferrite failure handed back an input that a later attempt in the
+      // same window spent again: the window's gross use exceeds what was ever
+      // carried at once, and the replay refused it (#229).
+      const touchedItemIds = new Set<string>([
+        ...outcome.recipe.inputs.map((input) => input.itemId),
         ...Object.keys(outcome.outputsGained),
-        ...outcome.createdStacks.map((stack) => stack.itemId),
       ]);
-      for (const itemId of awardedItemIds) {
-        await addStackableItem(transaction, {
-          characterId: outcome.characterId,
-          plan: {
-            updatedStacks: outcome.stackUpdates.filter(
-              (update) => itemIdByStackId.get(String(update.id)) === itemId,
+      for (const stackId of outcome.deletedStackIds) {
+        if (!persistedById.has(String(stackId))) {
+          throw new Error("Refining resolved against a stack that no longer exists");
+        }
+        await transaction
+          .delete(inventoryStacks)
+          .where(
+            and(
+              eq(inventoryStacks.id, String(stackId)),
+              eq(inventoryStacks.characterId, outcome.characterId),
             ),
-            createdStacks: outcome.createdStacks.filter((stack) => stack.itemId === itemId),
-            remainingQuantity: 0,
-          },
-          now,
-        });
+          );
+      }
+      for (const update of outcome.stackUpdates) {
+        const persisted = persistedById.get(String(update.id));
+        if (!persisted) {
+          throw new Error("Refining resolved against a stack that no longer exists");
+        }
+        if (!touchedItemIds.has(persisted.itemId) || persisted.quantity === update.quantity) {
+          continue;
+        }
+        await transaction
+          .update(inventoryStacks)
+          .set({ quantity: update.quantity, updatedAt: now })
+          .where(
+            and(
+              eq(inventoryStacks.id, String(update.id)),
+              eq(inventoryStacks.characterId, outcome.characterId),
+            ),
+          );
+      }
+      if (outcome.createdStacks.length) {
+        await transaction.insert(inventoryStacks).values(
+          outcome.createdStacks.map((stack) => ({
+            characterId: outcome.characterId,
+            itemId: stack.itemId,
+            quantity: stack.quantity,
+            createdAt: now,
+            updatedAt: now,
+          })),
+        );
       }
       if (outcome.awardedXp > 0) {
         await grantCharacterSkillXp(transaction, {

@@ -5,13 +5,14 @@ import {
   practiceSectionXp,
 } from "@/game/config/balance";
 import { ACTION_IDS, BOUNDED_RUN_QUANTITY_CEILING, ITEM_IDS } from "@/game/config/foundations";
+import { BOUNDED_RUN_MAX, boundedRunAllowance } from "@/game/domain/bounded-run";
 import { isTravelReplaceableAction } from "@/game/domain/travel-replacement";
 import { UNROLLED_CLEAN_PASS, type CleanPassRandom } from "@/game/domain/clean-pass";
 import { planStackAddition, planExactStackRemoval } from "@/game/domain/inventory";
 import {
   canBeginPracticeWeld,
   hasResumablePracticeWeld,
-  practiceRunMaximum,
+  practiceAffordableWelds,
   resolvePracticeWelding,
   UNSTARTED_PRACTICE,
   type PracticeSnapshot,
@@ -52,8 +53,9 @@ function snapshot(overrides: Partial<PracticeSnapshot> = {}): PracticeSnapshot {
     massAvailableGrams: 50_000,
     autoDiscardSlag: false,
     finishCurrentWeld: false,
-    // These tests predate bounded runs (#229) and exercise the loop uncapped.
-    runWeldsRemaining: BOUNDED_RUN_QUANTITY_CEILING,
+    // These tests predate bounded runs (#229): they exercise the loop in Max
+    // mode, which is what the original continuous run was.
+    runAllowance: boundedRunAllowance(BOUNDED_RUN_MAX, 0),
     ...overrides,
   };
 }
@@ -527,7 +529,7 @@ describe("bounded Practice runs (#229)", () => {
     const resolved = resolve(oneWeld * 5, {
       practice: { ...UNSTARTED_PRACTICE, cycleActive: true },
       scrapStackQuantities: scrap(12),
-      runWeldsRemaining: 1,
+      runAllowance: boundedRunAllowance(1, 0),
     });
     expect(resolved.completedWelds).toBe(1);
     expect(resolved.stopReason).toBe("run_completed");
@@ -541,7 +543,7 @@ describe("bounded Practice runs (#229)", () => {
     const resolved = resolve(oneWeld * 10, {
       practice: { ...UNSTARTED_PRACTICE, cycleActive: true },
       scrapStackQuantities: scrap(12),
-      runWeldsRemaining: 3,
+      runAllowance: boundedRunAllowance(3, 0),
     });
     expect(resolved.completedWelds).toBe(3);
     expect(resolved.stopReason).toBe("run_completed");
@@ -553,7 +555,7 @@ describe("bounded Practice runs (#229)", () => {
     const resolved = resolve(oneWeld * 3, {
       practice: { ...UNSTARTED_PRACTICE, cycleActive: true },
       scrapStackQuantities: scrap(12),
-      runWeldsRemaining: 3,
+      runAllowance: boundedRunAllowance(3, 0),
     });
     expect(weldXp).toBe(100);
     expect(resolved.awardedXp).toBe(3 * weldXp);
@@ -566,7 +568,7 @@ describe("bounded Practice runs (#229)", () => {
     const resolved = resolve(oneWeld, {
       practice: { sectionsCompleted: 4, cycleActive: true, cleanPass: UNROLLED_CLEAN_PASS },
       scrapStackQuantities: [],
-      runWeldsRemaining: 1,
+      runAllowance: boundedRunAllowance(1, 0),
     });
     expect(resolved.completedWelds).toBe(1);
     expect(resolved.resolvedWelds[0]!.sections).toBe(6);
@@ -578,7 +580,7 @@ describe("bounded Practice runs (#229)", () => {
     const resolved = resolve(oneWeld * 5, {
       practice: { ...UNSTARTED_PRACTICE, cycleActive: true },
       scrapStackQuantities: scrap(12),
-      runWeldsRemaining: 4,
+      runAllowance: boundedRunAllowance(4, 0),
       finishCurrentWeld: true,
     });
     expect(resolved.completedWelds).toBe(1);
@@ -591,46 +593,53 @@ describe("bounded Practice runs (#229)", () => {
     const resolved = resolve(oneWeld * 10, {
       practice: { ...UNSTARTED_PRACTICE, cycleActive: true },
       scrapStackQuantities: scrap(2),
-      runWeldsRemaining: 5,
+      runAllowance: boundedRunAllowance(5, 0),
     });
     expect(resolved.completedWelds).toBe(2);
     expect(resolved.stopReason).toBe("out_of_scrap");
   });
 });
 
-describe("the Practice run maximum (#229)", () => {
-  const maximumFor = (overrides: Partial<PracticeSnapshot> = {}) => {
-    const {
-      finishCurrentWeld: _finish,
-      runWeldsRemaining: _remaining,
-      ...rest
-    } = snapshot(overrides);
-    return practiceRunMaximum(rest, balance);
-  };
+describe("Max Practice runs (#229)", () => {
+  const oneWeld = practiceWelding.sectionsPerWeld * sectionTicks;
+  const max = boundedRunAllowance(BOUNDED_RUN_MAX, 0);
 
-  it("is one weld per full two Scrap carried", () => {
-    expect(maximumFor({ scrapStackQuantities: scrap(0) })).toBe(0);
-    expect(maximumFor({ scrapStackQuantities: scrap(1) })).toBe(0);
-    expect(maximumFor({ scrapStackQuantities: scrap(2) })).toBe(1);
-    expect(maximumFor({ scrapStackQuantities: scrap(7) })).toBe(3);
-    expect(maximumFor({ scrapStackQuantities: scrap(12) })).toBe(6);
+  it("welds until the Scrap cannot pay for another, and says so", () => {
+    for (const [quantities, welds] of [
+      [[3], 1],
+      [[3, 1], 2],
+      [[2, 2, 3], 3],
+      [[1, 1, 1], 1],
+      [[3, 3, 3, 3], 6],
+    ] as const) {
+      const ran = resolve(oneWeld * 50, { scrapStackQuantities: quantities, runAllowance: max });
+      expect(ran.completedWelds).toBe(welds);
+      expect(ran.stopReason).toBe("out_of_scrap");
+      // A Max run never claims it completed a count it never had.
+      expect(ran.stopReason).not.toBe("run_completed");
+    }
   });
 
-  it("counts a paid partial weld as the first weld, even with no Scrap left", () => {
+  it("finishes a resumed paid weld first, then continues while Scrap lasts", () => {
     const partial = { sectionsCompleted: 3, cycleActive: true, cleanPass: UNROLLED_CLEAN_PASS };
-    expect(maximumFor({ practice: partial, scrapStackQuantities: [] })).toBe(1);
-    expect(maximumFor({ practice: partial, scrapStackQuantities: scrap(5) })).toBe(3);
+    const alone = resolve(oneWeld * 20, {
+      practice: partial,
+      scrapStackQuantities: [],
+      runAllowance: max,
+    });
+    expect(alone.completedWelds).toBe(1);
+    expect(alone.scrapConsumed).toBe(0);
+    expect(alone.stopReason).toBe("out_of_scrap");
+    const more = resolve(oneWeld * 20, {
+      practice: partial,
+      scrapStackQuantities: scrap(5),
+      runAllowance: max,
+    });
+    expect(more.completedWelds).toBe(3);
+    expect(more.scrapConsumed).toBe(2 * practiceWelding.scrapPerWeld);
   });
 
-  it("does not depend on how the Scrap is split across stacks of three", () => {
-    // Stack-3 Scrap changes which slots consuming it frees, not how many welds
-    // it pays for.
-    expect(maximumFor({ scrapStackQuantities: [3, 3] })).toBe(3);
-    expect(maximumFor({ scrapStackQuantities: [1, 1, 1, 1, 1, 1] })).toBe(3);
-    expect(maximumFor({ scrapStackQuantities: [2, 2, 2] })).toBe(3);
-  });
-
-  it("is not reduced by full Slag capacity, with or without Auto-discard", () => {
+  it("is not stopped by full Slag capacity, with or without Auto-discard", () => {
     // Slag never blocks a completed weld — overflow is discarded — so a bench
     // with no room for Slag at all still runs every weld its Scrap pays for.
     const noRoom = {
@@ -638,16 +647,69 @@ describe("the Practice run maximum (#229)", () => {
       slagStackQuantities: [items.slag.stackLimit],
       slotsAvailable: 0,
       massAvailableGrams: 0,
+      runAllowance: max,
     };
-    expect(maximumFor({ ...noRoom, autoDiscardSlag: false })).toBe(3);
-    expect(maximumFor({ ...noRoom, autoDiscardSlag: true })).toBe(3);
+    for (const autoDiscardSlag of [false, true]) {
+      const ran = resolve(oneWeld * 20, { ...noRoom, autoDiscardSlag });
+      expect(ran.completedWelds).toBe(3);
+      expect(ran.stopReason).toBe("out_of_scrap");
+    }
   });
 
-  it("matches what an uncapped run of that length actually completes", () => {
+  it("Finish Current still ends a Max run after the weld on the bench", () => {
+    const ran = resolve(oneWeld * 20, {
+      practice: { ...UNSTARTED_PRACTICE, cycleActive: true },
+      scrapStackQuantities: scrap(12),
+      runAllowance: max,
+      finishCurrentWeld: true,
+    });
+    expect(ran.completedWelds).toBe(1);
+    expect(ran.stopReason).toBe("finished_current_weld");
+  });
+
+  it("stops at the internal safety ceiling with its own reason, never as completion", () => {
+    // A Max run that has somehow completed the ceiling's worth of welds starts
+    // no more, however much Scrap is left, and reports the guard explicitly.
+    const guard = boundedRunAllowance(BOUNDED_RUN_MAX, BOUNDED_RUN_QUANTITY_CEILING);
+    expect(guard).toEqual({ remaining: 0, exhaustedReason: "run_safety_limit" });
+    const ran = resolve(oneWeld * 20, { scrapStackQuantities: scrap(12), runAllowance: guard });
+    expect(ran.completedWelds).toBe(0);
+    expect(ran.scrapConsumed).toBe(0);
+    expect(ran.stopReason).toBe("run_safety_limit");
+  });
+});
+
+describe("the Practice affordable weld count (#229)", () => {
+  const affordableFor = (overrides: Partial<PracticeSnapshot> = {}) =>
+    practiceAffordableWelds(snapshot(overrides), balance);
+
+  it("is one weld per full two Scrap carried", () => {
+    expect(affordableFor({ scrapStackQuantities: scrap(0) })).toBe(0);
+    expect(affordableFor({ scrapStackQuantities: scrap(1) })).toBe(0);
+    expect(affordableFor({ scrapStackQuantities: scrap(2) })).toBe(1);
+    expect(affordableFor({ scrapStackQuantities: scrap(7) })).toBe(3);
+    expect(affordableFor({ scrapStackQuantities: scrap(12) })).toBe(6);
+  });
+
+  it("counts a paid partial weld as the first weld, even with no Scrap left", () => {
+    const partial = { sectionsCompleted: 3, cycleActive: true, cleanPass: UNROLLED_CLEAN_PASS };
+    expect(affordableFor({ practice: partial, scrapStackQuantities: [] })).toBe(1);
+    expect(affordableFor({ practice: partial, scrapStackQuantities: scrap(5) })).toBe(3);
+  });
+
+  it("does not depend on how the Scrap is split across stacks of three", () => {
+    expect(affordableFor({ scrapStackQuantities: [3, 3] })).toBe(3);
+    expect(affordableFor({ scrapStackQuantities: [1, 1, 1, 1, 1, 1] })).toBe(3);
+    expect(affordableFor({ scrapStackQuantities: [2, 2, 2] })).toBe(3);
+  });
+
+  it("is exactly what a Max run completes from the same bench", () => {
     for (const quantities of [[3], [3, 1], [2, 2, 3], [1, 1, 1]]) {
-      const maximum = maximumFor({ scrapStackQuantities: quantities });
-      const ran = resolve(1_000 * sectionTicks, { scrapStackQuantities: quantities });
-      expect(ran.completedWelds).toBe(maximum);
+      const ran = resolve(1_000 * sectionTicks, {
+        scrapStackQuantities: quantities,
+        runAllowance: boundedRunAllowance(BOUNDED_RUN_MAX, 0),
+      });
+      expect(ran.completedWelds).toBe(affordableFor({ scrapStackQuantities: quantities }));
     }
   });
 });

@@ -191,8 +191,8 @@ const authoredWikiArticles = [
       {
         heading: "Choosing how many batches",
         paragraphs: [
-          "Before you start, pick how many batches to run. It starts at one; the minus and plus buttons change it by one, and Max jumps straight to the most your carried material and free space allow. The console shows what the whole run will take and how long it should last.",
-          "A batch counts whether it succeeds or fails, so a run of five is five attempts, not five guaranteed results. Max is the most batches your carried materials could reach if the attempts fall the right way. It is a ceiling, not a promise: if the results leave no room or no materials for the next batch, the run ends early and says why. Refining stops by itself once the last batch you chose is done.",
+          "Before you start, pick how many batches to run. It starts at one, and the minus and plus buttons change it by one, up to as many as your carried material pays for. Or press Max to keep refining until there is no material or no room for another batch. The console shows what one batch takes and how long it lasts, and for a recipe that never fails, what the whole run adds up to.",
+          "A batch counts whether it succeeds or fails, so a run of five is five attempts, not five guaranteed results, and Refining stops by itself once the last batch you chose is done. A Max run has no number to reach: it keeps going while the next batch can start, so a failed Galvaferrite pour that hands back one of its inputs just leaves more to pour. Either way, if there is no room or no material for the next batch, the run ends there and says why.",
           "If your inventory changes before you press Start and the number you picked no longer fits, Refining will not quietly run fewer — it tells you the new most you can start, and you choose again.",
         ],
       },
@@ -481,7 +481,7 @@ const authoredWikiArticles = [
       {
         heading: "Starting, stopping, and coming back",
         paragraphs: [
-          "Before you start, pick how many welds to run: it starts at one, the minus and plus buttons change it by one, and Max jumps to as many as your scrap pays for. A number of welds means whole welds — ten sections each — and the bench shows the scrap, time, and Welding XP the run adds up to. If a half-finished weld is waiting on the bench, it counts as the first of them.",
+          "Before you start, pick how many welds to run: it starts at one, and the minus and plus buttons change it by one, up to as many as your scrap pays for. Or press Max to keep welding until the scrap runs out. A number of welds means whole welds — ten sections each — and the bench shows the scrap, time, and Welding XP the run adds up to. If a half-finished weld is waiting on the bench, it counts as the first of them.",
           "As each weld finishes the next one you chose begins, taking two more scrap, and the bench stops on its own after the last. It keeps going while you are away from the screen, the same as any other work. If your scrap changes before you press Start and the number you picked no longer fits, the bench tells you how many it can run now rather than quietly running fewer.",
           "Stop whenever you like. The half-finished weld stays exactly as it is, and so does the scrap you already spent on it — resuming continues that same weld and costs nothing, even with no scrap left at all. Walking away from the yard stops the bench the same way; you cannot weld from the road.",
           "If the scrap somehow runs short before the run is done, the bench finishes the weld in progress and stops on its own, saying so. Getting more does not start it again — that is your call.",

@@ -5,14 +5,17 @@ export const GAME_TICK_MS = 600;
 export const STANDARD_OFFLINE_RESOLUTION_CAP_MS = 60 * 60 * 1000;
 export const EQUIPMENT_ASSIGNMENT_KINDS = ["gear", "container"] as const;
 /**
- * The structural bounds on any bounded-run selection (#229): at least one
- * batch or weld, and never more than the ceiling. Not balance — carried
- * inventory bounds every real maximum far below the ceiling; it keeps request
- * validation and the maximum search finite. `game/domain/bounded-run` owns
- * the rule that uses them.
+ * The structural bounds on any bounded-run selection (#229): a numeric run is
+ * at least one batch or weld and never more than the ceiling. The ceiling is
+ * also the internal safety guard on a Max (run-until-blocked) run, which stops
+ * with its own reason if it is ever reached. Not balance, and not what Max
+ * means — carried inventory ends every real run far below it.
+ * `game/domain/bounded-run` owns the rule that uses them.
  */
 export const BOUNDED_RUN_MINIMUM_QUANTITY = 1;
 export const BOUNDED_RUN_QUANTITY_CEILING = 999;
+/** The Max selection: run until the activity cannot continue (#229). */
+export const BOUNDED_RUN_MAX = "max";
 
 export type EquipmentAssignmentKind = (typeof EQUIPMENT_ASSIGNMENT_KINDS)[number];
 

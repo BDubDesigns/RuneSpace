@@ -16,10 +16,11 @@ import { captureReviewScreenshot } from "./review-screenshot";
  * Issue #229 — the shared bounded-run selector on both activity surfaces.
  *
  * Refining and Practice Welding present the same interaction: the run size
- * starts at one, − and + step it inside the server's maximum, Max jumps there
- * in one action, and a selection that authoritative state has since outgrown
- * is refused and chosen again rather than quietly run smaller. Completion and
- * durability arithmetic is proven against real PostgreSQL in
+ * starts at one, − and + step it inside what the inputs carried pay for, and
+ * Max is its own choice — shown as Max, never as a number — that runs until
+ * the activity is blocked. A number that authoritative state has since
+ * outgrown is refused and chosen again rather than quietly run smaller.
+ * Completion and durability arithmetic is proven against real PostgreSQL in
  * tests/integration/bounded-runs.test.ts; this proves what the player sees.
  */
 
@@ -66,11 +67,12 @@ async function expectNoHorizontalOverflow(page: import("@playwright/test").Page)
   ).toBeLessThanOrEqual(0);
 }
 
-test("Refining runs a selected number of batches through the shared selector", async ({
+test("Refining runs a number of batches, or Max until blocked, through the shared selector", async ({
   page,
   testCharacter,
 }) => {
   const characterId = testCharacter.id;
+  const attemptMs = balance.refining.recipes.refinedFerrite.attemptDurationTicks * GAME_TICK_MS;
   await page.setViewportSize(PHONE);
   await setCarried(characterId, ITEM_IDS.ferriteShale, [6]);
   await standAt(characterId, LOCATION_IDS.abandonedProcessingYard);
@@ -79,40 +81,48 @@ test("Refining runs a selected number of batches through the shared selector", a
   const panel = page.locator("[data-refining-activity]");
   const selector = panel.locator("[data-bounded-run]");
   const value = selector.locator("[data-bounded-run-value]");
+  const summary = selector.locator("[data-bounded-run-summary]");
   const decrease = selector.locator("[data-bounded-run-decrease]");
   const increase = selector.locator("[data-bounded-run-increase]");
   const max = selector.locator("[data-bounded-run-max]");
 
-  // Starts at one; − cannot go below it; the maximum is the server's.
+  // Starts at one; − cannot go below it; + stops at what the Shale pays for.
   await expect(selector).toHaveAttribute("data-bounded-run-quantity", "1");
-  await expect(selector).toHaveAttribute("data-bounded-run-maximum", "3");
+  await expect(selector).toHaveAttribute("data-bounded-run-affordable", "3");
   await expect(decrease).toBeDisabled();
-  await expect(selector).toContainText("Up to 3 batches");
-  await expect(selector.locator("[data-bounded-run-summary]")).toContainText("2 Ferrite Shale");
-
-  // + steps by one; Max is a single action; + stops at the maximum.
+  await expect(selector).toContainText("Materials for 3 batches");
+  // A rolled recipe describes one batch: failures decide the rest.
+  await expect(summary).toContainText("1 batch · 2 Ferrite Shale per batch · 4.2s each");
   await increase.click();
-  await expect(value).toContainText("2");
-  await max.click();
-  await expect(selector).toHaveAttribute("data-bounded-run-quantity", "3");
+  await increase.click();
+  await expect(value).toContainText("3");
   await expect(increase).toBeDisabled();
-  await expect(max).toBeDisabled();
-  // The whole run, before Start: every input it will take.
-  await expect(selector.locator("[data-bounded-run-summary]")).toContainText("6 Ferrite Shale");
+
+  // Max is its own choice, shown as Max rather than a computed number.
+  await max.click();
+  await expect(selector).toHaveAttribute("data-bounded-run-quantity", "max");
+  await expect(value).toContainText("Max");
+  await expect(max).toHaveAttribute("aria-pressed", "true");
+  await expect(increase).toBeDisabled();
+  await expect(summary).toContainText("Max · 2 Ferrite Shale per batch");
+  await expect(summary).toContainText("runs until materials or space run out");
   await expectNoHorizontalOverflow(page);
   await captureReviewScreenshot(page, "bounded-run-refining-mobile-selector.png");
+  // − leaves Max for the largest number.
+  await decrease.click();
+  await expect(selector).toHaveAttribute("data-bounded-run-quantity", "3");
 
-  // The Shale shrinks behind the player's back: Start revalidates and refuses
-  // rather than refining fewer batches than were chosen.
+  // The Shale shrinks behind the player's back: Start revalidates the number
+  // and refuses rather than refining fewer batches than were chosen.
   await setCarried(characterId, ITEM_IDS.ferriteShale, [2]);
   await page.getByRole("button", { name: "Start Refining" }).click();
-  await expect(panel).toContainText(/Only 1 batch can start now/);
-  await expect(selector).toHaveAttribute("data-bounded-run-maximum", "1");
+  await expect(panel).toContainText(/Your materials cover 1 batch right now/);
+  await expect(selector).toHaveAttribute("data-bounded-run-affordable", "1");
   await expect(selector.locator("[data-bounded-run-exceeds]")).toBeVisible();
   await expect(page.getByRole("button", { name: "Stop Refining" })).toHaveCount(0);
   expect(await carried(characterId, ITEM_IDS.ferriteShale)).toBe(2);
 
-  // Choosing again from the fresh maximum starts the run.
+  // Choosing again from the fresh count starts the run.
   await decrease.click();
   await expect(selector).toHaveAttribute("data-bounded-run-quantity", "1");
   await page.getByRole("button", { name: "Start Refining" }).click();
@@ -120,15 +130,28 @@ test("Refining runs a selected number of batches through the shared selector", a
   const progress = panel.locator("[data-bounded-run-progress]");
   await expect(progress).toContainText("batch 1 of 1");
 
-  // It stops by itself at its selection.
-  await fastForward(
-    characterId,
-    balance.refining.recipes.refinedFerrite.attemptDurationTicks * GAME_TICK_MS + 100,
-  );
+  // A number stops by itself at its selection.
+  await fastForward(characterId, attemptMs + 100);
   await page.getByRole("button", { name: "Refresh status" }).click();
   await expect(panel).toContainText("Run complete — 1 batch attempted.");
   await expect(page.getByRole("button", { name: "Start Refining" })).toBeVisible();
   await expect(panel.getByText("1 of 1 attempts", { exact: true })).toBeVisible();
+
+  // A Max run shows no denominator, and ends when the Shale runs out.
+  await setCarried(characterId, ITEM_IDS.ferriteShale, [6]);
+  await page.getByRole("button", { name: "Refresh status" }).click();
+  await max.click();
+  await page.getByRole("button", { name: "Start Refining" }).click();
+  await expect(page.getByRole("button", { name: "Stop Refining" })).toBeVisible();
+  await expect(progress).toHaveAttribute("data-bounded-run-mode", "max");
+  await expect(progress).toContainText("Run — 0 batches · Max");
+  await expect(progress).not.toContainText(" of ");
+  await fastForward(characterId, attemptMs * 5 + 100);
+  await page.reload();
+  await expect(page.getByRole("button", { name: "Start Refining" })).toBeVisible();
+  await expect(panel).toContainText("Not enough material");
+  await expect(panel.getByText("3 attempts · Max", { exact: true })).toBeVisible();
+  expect(await carried(characterId, ITEM_IDS.ferriteShale)).toBe(0);
 
   // The deliberate Slag recipes are listed, and locked below Refining 5.
   const recipes = panel.locator("[data-refining-recipes]");
@@ -142,7 +165,7 @@ test("Refining runs a selected number of batches through the shared selector", a
   await expectNoHorizontalOverflow(page);
 });
 
-test("Practice Welding runs a selected number of complete welds", async ({
+test("Practice Welding runs a number of complete welds, or Max until the Scrap runs out", async ({
   page,
   testCharacter,
 }) => {
@@ -178,43 +201,51 @@ test("Practice Welding runs a selected number of complete welds", async ({
   const selector = panel.locator("[data-bounded-run]");
   await expect(panel).toBeVisible();
 
-  // The same interaction as Refining, counting complete welds.
+  // The same interaction as Refining, counting complete welds. Practice
+  // totals a number exactly: every weld costs the same Scrap and pays 100 XP.
+  const summary = selector.locator("[data-bounded-run-summary]");
   await expect(selector).toHaveAttribute("data-bounded-run-quantity", "1");
-  await expect(selector).toHaveAttribute("data-bounded-run-maximum", "3");
+  await expect(selector).toHaveAttribute("data-bounded-run-affordable", "3");
   await expect(selector.locator("[data-bounded-run-decrease]")).toBeDisabled();
-  await expect(selector).toContainText("Up to 3 welds");
-  await expect(selector.locator("[data-bounded-run-summary]")).toContainText("2 Scrap Metal");
-  await expect(selector.locator("[data-bounded-run-summary]")).toContainText("100 Welding XP");
-  await selector.locator("[data-bounded-run-max]").click();
+  await expect(selector).toContainText("Materials for 3 welds");
+  await expect(summary).toContainText("2 Scrap Metal");
+  await expect(summary).toContainText("100 Welding XP");
+  await selector.locator("[data-bounded-run-increase]").click();
+  await selector.locator("[data-bounded-run-increase]").click();
   await expect(selector).toHaveAttribute("data-bounded-run-quantity", "3");
-  await expect(selector.locator("[data-bounded-run-summary]")).toContainText("300 Welding XP");
+  await expect(summary).toContainText("300 Welding XP");
   await expectNoHorizontalOverflow(page);
 
-  // Stale selection: Start refuses before a single piece of Scrap is spent.
+  // Stale number: Start refuses before a single piece of Scrap is spent.
   await setCarried(characterId, ITEM_IDS.scrapMetal, [3, 1]);
   await panel.locator("[data-practice-start]").click();
-  await expect(panel).toContainText(/The bench can run 2 welds right now/);
-  await expect(selector).toHaveAttribute("data-bounded-run-maximum", "2");
+  await expect(panel).toContainText(/Your Scrap covers 2 welds right now/);
+  await expect(selector).toHaveAttribute("data-bounded-run-affordable", "2");
   await expect(panel).toHaveAttribute("data-practice-active", "false");
   expect(await carried(characterId, ITEM_IDS.scrapMetal)).toBe(4);
 
-  // Choose again: two welds.
+  // Choose again: Max, which welds until the Scrap runs out.
   await selector.locator("[data-bounded-run-max]").click();
-  await expect(selector).toHaveAttribute("data-bounded-run-quantity", "2");
+  await expect(selector).toHaveAttribute("data-bounded-run-quantity", "max");
+  await expect(selector.locator("[data-bounded-run-value]")).toContainText("Max");
+  await expect(summary).toContainText("Max · 2 Scrap Metal per weld");
+  await expect(summary).toContainText("runs until the Scrap runs out");
   await panel.locator("[data-practice-start]").click();
   await expect(panel).toHaveAttribute("data-practice-active", "true");
-  await expect(panel.locator("[data-bounded-run-progress]")).toContainText("weld 1 of 2");
+  const progress = panel.locator("[data-bounded-run-progress]");
+  await expect(progress).toHaveAttribute("data-bounded-run-mode", "max");
+  await expect(progress).toContainText("Run — 0 welds · Max");
   await captureReviewScreenshot(page, "bounded-run-practice-mobile-active.png");
 
-  // Both selected welds resolve while the player is away, and the run ends
-  // there on its own with the bench clear and exactly two welds of Scrap spent.
+  // Both welds the Scrap pays for resolve while the player is away, and the
+  // run ends on its own when the Scrap is gone, with no count it never had.
   const weldMs =
     balance.welding.attemptDurationTicks * balance.practiceWelding.sectionsPerWeld * GAME_TICK_MS;
   await fastForward(characterId, weldMs * 2 + 500);
   await page.reload();
   await expect(panel).toHaveAttribute("data-practice-active", "false");
-  await expect(panel).toContainText("Run complete — 2 welds finished.");
-  await expect(panel.locator("[data-run-summary]")).toContainText("2 of 2 welds");
+  await expect(panel).toContainText("Out of Scrap Metal");
+  await expect(panel.locator("[data-run-summary]")).toContainText("2 welds · Max");
   expect(await carried(characterId, ITEM_IDS.scrapMetal)).toBe(0);
 
   await page.setViewportSize(DESKTOP);
@@ -246,7 +277,8 @@ test("Stop After Current Weld ends a bounded Practice run after the weld on the 
 
   const panel = page.locator("[data-practice-panel]");
   const selector = panel.locator("[data-bounded-run]");
-  await selector.locator("[data-bounded-run-max]").click();
+  await selector.locator("[data-bounded-run-increase]").click();
+  await selector.locator("[data-bounded-run-increase]").click();
   await expect(selector).toHaveAttribute("data-bounded-run-quantity", "3");
   await panel.locator("[data-practice-start]").click();
   await expect(panel).toHaveAttribute("data-practice-active", "true");

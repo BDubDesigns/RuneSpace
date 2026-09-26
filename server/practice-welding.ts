@@ -20,6 +20,13 @@ import {
   type CleanPassState,
   UNROLLED_CLEAN_PASS,
 } from "@/game/domain/clean-pass";
+import {
+  BOUNDED_RUN_DEFAULT_QUANTITY,
+  boundedRunAllowance,
+  boundedRunSelectionFromColumn,
+  boundedRunSelectionToColumn,
+  type BoundedRunSelection,
+} from "@/game/domain/bounded-run";
 import { deriveEquipmentLoadout } from "@/game/domain/equipment";
 import { planStackAddition } from "@/game/domain/inventory";
 import type { MiningRandom } from "@/game/domain/mining";
@@ -48,8 +55,11 @@ export type PracticeRunWeld = PracticeResolvedWeld & {
 };
 
 export type PracticeRunState = {
-  /** The bounded run's selected weld count (#229); `welds` counts toward it. */
-  selectedWelds: number;
+  /**
+   * The run's selection (#229): a weld count that `welds` counts toward, or
+   * Max, which has no count — it runs until the Scrap cannot pay for another.
+   */
+  selection: BoundedRunSelection;
   welds: number;
   scrapConsumed: number;
   slagKept: number;
@@ -174,7 +184,9 @@ export async function loadPracticeSnapshot(
     massAvailableGrams: Math.max(0, loadout.maximumCarryCapacityGrams - loadout.carriedMassGrams),
     autoDiscardSlag: row?.autoDiscardSlag ?? false,
     finishCurrentWeld: row?.finishCurrentWeld ?? false,
-    runWeldsRemaining: row ? Math.max(0, row.runSelectedWelds - row.runWelds) : 0,
+    runAllowance: row
+      ? boundedRunAllowance(boundedRunSelectionFromColumn(row.runSelectedWelds), row.runWelds)
+      : { remaining: 0, exhaustedReason: "run_completed" },
   };
 }
 
@@ -226,19 +238,19 @@ export async function setPracticeFinishCurrentWeld(
 }
 
 /**
- * Reset the `This Run` totals when a new run begins, recording how many
- * complete welds the player selected for it (#229).
+ * Reset the `This Run` totals when a new run begins, recording the player's
+ * selection for it: a count of complete welds, or Max (#229).
  */
 export async function resetPracticeRun(
   transaction: DatabaseTransaction,
   characterId: string,
-  selectedWelds: number,
+  selection: BoundedRunSelection,
   now: Date,
 ): Promise<void> {
   await transaction
     .update(characterPracticeWelds)
     .set({
-      runSelectedWelds: selectedWelds,
+      runSelectedWelds: boundedRunSelectionToColumn(selection),
       runWelds: 0,
       runScrapConsumed: 0,
       runSlagKept: 0,
@@ -253,7 +265,10 @@ export async function resetPracticeRun(
 
 export function practiceRunStateFromRow(row: PracticeRow | undefined): PracticeRunState {
   return {
-    selectedWelds: row?.runSelectedWelds ?? 1,
+    // NULL is Max, so a missing row (no run yet) is told apart from it.
+    selection: row
+      ? boundedRunSelectionFromColumn(row.runSelectedWelds)
+      : BOUNDED_RUN_DEFAULT_QUANTITY,
     welds: row?.runWelds ?? 0,
     scrapConsumed: row?.runScrapConsumed ?? 0,
     slagKept: row?.runSlagKept ?? 0,

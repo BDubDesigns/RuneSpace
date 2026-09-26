@@ -4,6 +4,7 @@ import {
   type RefiningRecipeBalance,
 } from "@/game/config/balance";
 import { BOUNDED_RUN_QUANTITY_CEILING } from "@/game/config/foundations";
+import type { BoundedRunAllowance } from "@/game/domain/bounded-run";
 import {
   planPossibleAwardAdditions,
   planStackAddition,
@@ -21,8 +22,14 @@ export const REFINING_STOP_REASONS = [
   "inventory_slots_full",
   "carried_mass_capacity_reached",
   "action_replaced",
-  /** The run attempted every batch the player selected (#229). */
+  /** A numeric run attempted every batch the player selected (#229). */
   "run_completed",
+  /**
+   * A Max run reached the internal safety ceiling (#229). Carried inventory
+   * ends every real run long before it; this exists so a defect cannot run
+   * forever, and says so rather than pretending the materials ran out.
+   */
+  "run_safety_limit",
 ] as const;
 export type RefiningStopReason = (typeof REFINING_STOP_REASONS)[number];
 
@@ -359,8 +366,7 @@ type RefiningWorkingState<Id> = {
 
 /**
  * One attempt's effect on carried inventory: remove the recipe's inputs, then
- * add one outcome branch. The resolver and the run maximum both step through
- * this, so the maximum is computed against exactly the transitions a run makes.
+ * add the outcome branch the attempt actually produced.
  */
 function applyRefiningAttempt<Id>(
   state: RefiningWorkingState<Id>,
@@ -386,106 +392,26 @@ function applyRefiningAttempt<Id>(
   return { stacks, ...applied };
 }
 
-/** Everything a recipe's attempt can produce: success, then every failure branch. */
-function refiningOutcomeBranches(
-  award: ReturnType<typeof refiningAwardFacts>,
-): readonly RefiningOutcomeBranch[] {
-  return [award.successOutputs, ...award.failureOutcomes];
-}
-
 /**
- * The server-authoritative maximum for a bounded Refining run (#229): the most
- * attempted batches of this recipe that can be started one after another from
- * the character's current inventory under at least one possible sequence of
- * outcomes.
- *
- * It asks the ordinary Refining preflight before every attempt — the same
- * inputs, and the same rule that every mutually exclusive outcome must fit
- * before the roll — and steps through every possible outcome with the same
- * transition the resolver applies, taking the longest sequence. Max is an
- * attempt ceiling, not a promise: the real run still rolls, and if its actual
- * outcomes leave the next attempt unable to start before the selection is
- * used up, it stops early with that attempt's ordinary stop reason.
- *
- * A deterministic recipe has one outcome, so this is a straight walk.
+ * How many batches of this recipe the inputs carried right now pay for (#229):
+ * the ceiling a numeric run selection may ask for. It is deliberately not a
+ * prediction — it ignores capacity and anything a failure might hand back.
+ * Capacity is the ordinary preflight's question, asked before every attempt,
+ * and Max is a run-until-blocked mode that follows the real results instead
+ * of counting them in advance. Zero for a recipe the level does not unlock.
  */
-export function refiningRunMaximum<Id>(
-  snapshot: RefiningSnapshot<Id>,
+export function refiningAffordableBatches<Id>(
+  snapshot: Pick<RefiningSnapshot<Id>, "refiningLevel" | "existingStacks">,
   balance: EffectiveGameBalance,
   recipe: RefiningRecipeBalance,
 ): number {
   if (!refiningRecipeUnlocked(snapshot.refiningLevel, recipe)) return 0;
-  const award = refiningAwardFacts(balance, recipe);
-  // A branch the character's level makes impossible is not a sequence the run
-  // can take: at certain success only the success branch is explored, so a
-  // failure's output never makes a path look longer than any real run can be.
-  const branches =
-    refiningSuccessChanceBps(snapshot.refiningLevel, recipe) >= 10_000
-      ? [award.successOutputs]
-      : refiningOutcomeBranches(award);
-  const memo = new Map<string, number>();
-
-  // States are keyed by each item's sorted stack sizes, not by stack order.
-  // That is sound because no transition's future depends on order: input
-  // removal always settles on the smallest-first plan (it frees at least as
-  // many slots as any other order), which also leaves each input's stacks in
-  // ascending order for a returned input to top up; and an output item is never
-  // removed, so only its total free room matters. Keying on order instead made
-  // every success/failure interleaving a distinct state — exponential work.
-  const signature = (state: RefiningWorkingState<Id>) =>
-    `${state.slotsAvailable}|${state.massAvailableGrams}|${state.stacks
-      .map((stack) => `${stack.itemId}:${String(stack.quantity).padStart(4, "0")}`)
-      .sort()
-      .join(",")}`;
-
-  // Every attempt consumes at least one input unit net of anything a failure
-  // hands back, so this recursion always reaches a state the preflight
-  // refuses. The ceiling keeps it finite regardless.
-  //
-  // The key ignores depth even though the ceiling truncates by depth. That is
-  // sound for a maximum: a state is only ever cut off by the ceiling on a path
-  // that has already reached it, so the root is the ceiling whatever a later,
-  // shallower visit to that state reads back. Every value below the ceiling is
-  // the state's own longest run, which does not depend on how it was reached.
-  const longest = (state: RefiningWorkingState<Id>, depth: number): number => {
-    if (depth >= BOUNDED_RUN_QUANTITY_CEILING) return 0;
-    const key = signature(state);
-    const known = memo.get(key);
-    if (known !== undefined) return known;
-    const stop = refiningPreflightStopReason(
-      {
-        refiningLevel: snapshot.refiningLevel,
-        existingStacks: state.stacks,
-        slotsAvailable: state.slotsAvailable,
-        massAvailableGrams: state.massAvailableGrams,
-      },
-      balance,
-      recipe,
-    );
-    let result = 0;
-    if (!stop) {
-      for (const branch of branches) {
-        const next = applyRefiningAttempt(state, award, branch, depth);
-        result = Math.max(result, 1 + longest(next, depth + 1));
-        // Nothing longer is possible once a branch reaches the ceiling.
-        if (depth + result >= BOUNDED_RUN_QUANTITY_CEILING) break;
-      }
-    }
-    memo.set(key, result);
-    return result;
-  };
-
-  return Math.min(
-    BOUNDED_RUN_QUANTITY_CEILING,
-    longest(
-      {
-        stacks: snapshot.existingStacks.map((stack) => ({ ...stack, persisted: true })),
-        slotsAvailable: snapshot.slotsAvailable,
-        massAvailableGrams: snapshot.massAvailableGrams,
-      },
-      0,
+  const batches = Math.min(
+    ...refiningAwardFacts(balance, recipe).inputs.map((input) =>
+      Math.floor(totalQuantityForItem(snapshot.existingStacks, input.itemId) / input.quantity),
     ),
   );
+  return Math.min(BOUNDED_RUN_QUANTITY_CEILING, batches);
 }
 
 export function resolveRefining<Id>(input: {
@@ -495,17 +421,21 @@ export function resolveRefining<Id>(input: {
   recipe: RefiningRecipeBalance;
   random: RefiningRandom;
   /**
-   * How many more batches the player's selected run may attempt (#229). The
-   * run stops with `run_completed` the moment it has attempted that many; a
-   * failed attempt counts exactly like a successful one.
+   * How many more batches the player's selection may attempt, and what
+   * reaching that means (#229). A numeric run stops with `run_completed` the
+   * moment it has attempted its count; a failed attempt counts exactly like a
+   * successful one. A Max run's allowance is only the internal safety ceiling:
+   * what ends it is the ordinary preflight refusing the next attempt, asked
+   * against the inventory the real results left behind.
    */
-  attemptLimit: number;
+  allowance: BoundedRunAllowance;
 }): RefiningResolution<Id> {
   const { balance, snapshot, recipe, random } = input;
   if (!Number.isInteger(input.elapsedTicks) || input.elapsedTicks < 0)
     throw new RangeError("Elapsed ticks must be a non-negative integer");
-  if (!Number.isInteger(input.attemptLimit) || input.attemptLimit < 0)
-    throw new RangeError("A Refining attempt limit must be a non-negative integer");
+  const { allowance } = input;
+  if (!Number.isInteger(allowance.remaining) || allowance.remaining < 0)
+    throw new RangeError("A Refining run allowance must be a non-negative integer");
 
   const durationTicks = recipe.attemptDurationTicks;
   const award = refiningAwardFacts(balance, recipe);
@@ -556,12 +486,12 @@ export function resolveRefining<Id>(input: {
 
   // A run that cannot even start writes nothing. The loop's own stop echoes
   // the stacks it has been working on, but there is no working copy yet here,
-  // so persisting one would be a no-op UPDATE per carried stack. A selected run
-  // that has already attempted everything it asked for is checked first, so it
-  // reports that it finished rather than whatever it would have run out of.
+  // so persisting one would be a no-op UPDATE per carried stack. A selection
+  // with nothing left to attempt is checked first, so it reports that it
+  // finished rather than whatever it would have run out of.
   const initialStop =
-    input.attemptLimit === 0
-      ? ("run_completed" as const)
+    allowance.remaining === 0
+      ? allowance.exhaustedReason
       : refiningPreflightStopReason(snapshot, balance, recipe);
   if (initialStop) {
     return {
@@ -581,9 +511,9 @@ export function resolveRefining<Id>(input: {
   }
 
   while (true) {
-    // The selected count is reached: stop at once, before the next preflight,
-    // so the run never starts (or waits to start) a batch nobody asked for.
-    if (successes + failures >= input.attemptLimit) return finish("run_completed");
+    // The selection is used up: stop at once, before the next preflight, so
+    // the run never starts (or waits to start) a batch nobody asked for.
+    if (successes + failures >= allowance.remaining) return finish(allowance.exhaustedReason);
     const stopReason = refiningPreflightStopReason(
       {
         refiningLevel: snapshot.refiningLevel,

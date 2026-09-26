@@ -17,11 +17,15 @@ import {
 import { ACTION_IDS, LOCATION_IDS, SKILL_IDS } from "@/game/config/foundations";
 import { isActionAvailableAtLocation } from "@/game/content/locations";
 import { deriveEquipmentLoadout } from "@/game/domain/equipment";
-import { checkBoundedRunQuantity } from "@/game/domain/bounded-run";
 import {
+  boundedRunSelectionToColumn,
+  checkBoundedRunSelection,
+  type BoundedRunSelection,
+} from "@/game/domain/bounded-run";
+import {
+  refiningAffordableBatches,
   refiningPreflightStopReason,
   refiningRecipeUnlocked,
-  refiningRunMaximum,
 } from "@/game/domain/refining";
 import { levelFromXp } from "@/game/domain/progression";
 import { withResolvedOwnedCharacter } from "@/server/action-resolution";
@@ -68,10 +72,12 @@ function refiningRecentFrom(
  * request for Galvaferrite at Refining 1 is refused server-side, not merely
  * greyed out in the console.
  *
- * The run is bounded (#229): `quantity` is how many recipe batches to ATTEMPT,
- * failures included. It is revalidated here against the authoritative maximum
- * for the character's current inventory, and a quantity that no longer fits is
- * refused outright — never quietly run as a smaller batch count.
+ * The run has a selection (#229). A number is how many recipe batches to
+ * ATTEMPT, failures included; it is revalidated here against the batches the
+ * inputs carried right now pay for, and a number that no longer fits is refused
+ * outright — never quietly run as a smaller batch count. Max needs only that
+ * the first attempt can begin, which the preflight above has already proven;
+ * after that the resolver keeps going until the preflight refuses.
  */
 export async function startRefining(
   userId: string,
@@ -79,7 +85,7 @@ export async function startRefining(
   recipeActionId: string = ACTION_IDS.refining,
   now = new Date(),
   random?: MiningRandom,
-  quantity = 1,
+  selection: BoundedRunSelection = 1,
 ): Promise<PlayGameplayState> {
   let miningOutcome: PersistedMiningOutcome | undefined;
   let refiningOutcome: PersistedRefiningOutcome | undefined;
@@ -225,12 +231,12 @@ export async function startRefining(
           preflight,
         );
       }
-      // The selected batch count, against the maximum this inventory supports
-      // right now. A stale or forged quantity is refused, and the state this
-      // returns carries the fresh maximum for the player to choose against.
-      const quantityCheck = checkBoundedRunQuantity(
-        quantity,
-        refiningRunMaximum(snapshot, balance, recipe),
+      // The selection, against the batches the inputs carried right now pay
+      // for. A stale or forged number is refused, and the state this returns
+      // carries the fresh affordable count for the player to choose against.
+      const quantityCheck = checkBoundedRunSelection(
+        selection,
+        refiningAffordableBatches(snapshot, balance, recipe),
       );
       if (!quantityCheck.ok) {
         return stateFromTransaction(
@@ -258,7 +264,7 @@ export async function startRefining(
       });
       // Reset run counters for a genuinely new run
       const freshRun = {
-        runSelectedAttempts: quantityCheck.quantity,
+        runSelectedAttempts: boundedRunSelectionToColumn(quantityCheck.selection),
         runAttempts: 0,
         runSuccesses: 0,
         runOutputsGained: {},

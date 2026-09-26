@@ -9,6 +9,7 @@ import {
 } from "@/game/config/balance";
 import {
   ACTION_IDS,
+  BOUNDED_RUN_MAX,
   GAME_TICK_MS,
   ITEM_IDS,
   LOCATION_IDS,
@@ -708,6 +709,37 @@ suite("issue #209 Deep Jag progression (real PostgreSQL)", () => {
         (await carried(character.id, ITEM_IDS.galvanicStock));
       expect(returned).toBe(1);
       expect(resolved.refiningRun.xpGained).toBe(galvaferrite.failureXp);
+    });
+
+    it("persists a failed pour whose returned input is spent again in the same window", async () => {
+      // One Refined Ferrite: the first pour fails and hands it back, and the
+      // second pour spends it again. The window's gross use (2) is more than
+      // was ever carried at once (1); persisting that as a replay of totals
+      // used to refuse the whole resolution (#229).
+      const { userId, character } = await atTheYard(8);
+      await addCarried(character.id, ITEM_IDS.refinedFerrite, [1]);
+      await addCarried(character.id, ITEM_IDS.galvanicStock, [3]);
+      const failing = () => ({ nextBasisPoints: () => 9_999, nextUnit: () => 0 });
+      await refiningCommands.startRefining(
+        userId,
+        character.id,
+        ACTION_IDS.galvaferriteRefining,
+        now,
+        failing(),
+        BOUNDED_RUN_MAX,
+      );
+      const resolved = await play.getPlayGameplayState(
+        userId,
+        character.id,
+        tick(now, galvaferrite.attemptDurationTicks * 2),
+        failing(),
+      );
+      expect(resolved.refiningRun.failures).toBe(2);
+      // A Max run with Galvanic Stock left keeps going on the returned Ferrite.
+      expect(resolved.activeAction?.actionId).toBe(ACTION_IDS.galvaferriteRefining);
+      expect(await carried(character.id, ITEM_IDS.refinedFerrite)).toBe(1);
+      expect(await carried(character.id, ITEM_IDS.galvanicStock)).toBe(1);
+      expect(await carried(character.id, ITEM_IDS.galvaferrite)).toBe(0);
     });
 
     it("keeps the selected recipe across a refresh, because the action IS the selection", async () => {
