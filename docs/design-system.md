@@ -62,8 +62,9 @@ in one order. This is the authoritative home for that grammar;
 `docs/architecture.md` owns which surfaces exist, and each feature owns its own
 gameplay.
 
-1. **The place.** One raised panel: scene, description, the resident's row, and
-   who else is here. `features/location-scene/LocationSurface.tsx` and
+1. **The place.** One raised panel: scene, description, one row per resident
+   in authored order (#231), and who else is here — once, after the people.
+   `features/location-scene/LocationSurface.tsx` and
    `features/local-places/LocalPlaceSurface.tsx`.
 2. **The primary activity.** A sibling panel, never nested inside the place —
    `features/shared/ActivityPanel.tsx`, selected by the one narrow switch in

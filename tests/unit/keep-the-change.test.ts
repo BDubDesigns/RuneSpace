@@ -20,7 +20,7 @@ import {
   MISSIONS,
   type MissionDefinition,
 } from "@/game/content/missions";
-import { getResidentNpc } from "@/game/content/npcs";
+import { getResidentNpcs } from "@/game/content/npcs";
 import { getNpcConversationTopics } from "@/game/content/conversation-topics";
 import {
   resolveNpcConversation,
@@ -668,11 +668,11 @@ describe("Keep the Change authored content", () => {
     expect(new Set(speakers)).toEqual(new Set([NPC_IDS.bixWeller, NPC_IDS.maraKells]));
     // Standing in Bix's shop still resolves exactly one resident: Bix.
     expect(
-      getResidentNpc({
+      getResidentNpcs({
         locationId: LOCATION_IDS.holoHollow,
         localPlaceId: "holo_hollow_souvenirs",
-      })?.id,
-    ).toBe(NPC_IDS.bixWeller);
+      }).map((npc) => npc.id),
+    ).toEqual([NPC_IDS.bixWeller]);
   });
 
   const introBeats = () =>
