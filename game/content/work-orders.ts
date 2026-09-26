@@ -27,8 +27,9 @@ import { ITEM_IDS, WORK_ORDER_IDS, type ItemId, type WorkOrderId } from "@/game/
  * Four of these are established NPCs and four are background residents
  * introduced by the job fiction itself. A background client gets a name, an
  * occupation, and the one possession the job needs — no portrait, no dialogue,
- * no map presence, no Wiki page. See `docs/npc-canon.md`, "Background Work
- * Order clients are not roster NPCs".
+ * no map presence, no Wiki page. See the Notion Canon (linked from
+ * `docs/npc-canon.md`) → NPCs, "Background Work Order clients are not roster
+ * NPCs".
  */
 
 /** One authored material line of a job's recipe. */
@@ -207,7 +208,7 @@ const workOrderDefinitions = [
     clientName: "Tansy Rusk",
     // She has had the FurBaby since she was little (SHIPPED / PUBLIC-SAFE
     // once this job ships) — do NOT reveal or imply that her parents gave it
-    // to her. That remains protected canon (docs/npc-canon.md, Tansy Rusk).
+    // to her. That remains protected canon (Notion Canon, Tansy Rusk).
     description:
       "Tansy Rusk's old FurBaby™ companion toy has a failing conductive rail and a burned-out Cell socket. She has had it since she was little, and she wants it fixed, not replaced.",
     requiredWeldingLevel: 5,

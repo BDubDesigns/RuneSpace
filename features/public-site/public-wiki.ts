@@ -13,9 +13,9 @@ export type { WikiArticle, WikiCategoryId } from "@/game/schemas/public-wiki";
  * category articles keep the exact order they appear in below. Reorder this
  * array to reorder a category.
  *
- * Character articles are written only from the `Public-Wiki-safe facts` field
- * of that NPC's entry in docs/npc-canon.md, which is internal and
- * spoiler-complete. Do not copy from the rest of it.
+ * Character articles are written only from the `Public-Wiki-safe facts` on
+ * that NPC's page in the Notion Canon (linked from docs/npc-canon.md), which is
+ * internal and spoiler-complete. Do not copy from the rest of it.
  */
 const authoredWikiArticles = [
   {

@@ -11,6 +11,13 @@ foundation (shipped in #167)** section below records what is live and what
 remains deferred. Everything else here is approved direction, not a claim that
 the described system exists yet.
 
+World and narrative canon — who the residents are, their relationships and
+backstory, and the settlement's history — is owned by the Notion Canon (#220;
+see `docs/npc-canon.md`). The narrative passages below are the approved
+direction that seeded it. Where this document and the Canon disagree about a
+narrative fact, the Canon wins and the difference is a discrepancy to reconcile
+here, not a second answer.
+
 Existing authoritative gameplay mechanics remain owned by their current docs:
 
 - Mining, Refining, Power Cells, Cargo Hold repair, and Travel timing/rules:
