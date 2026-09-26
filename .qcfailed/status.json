@@ -4,17 +4,17 @@
   "workState": "active",
   "currentFocus": "Preparing the October 27 Soft Alpha: verified players can reserve characters; account-level Early Access and a closed-by-default public gameplay gate control when play begins.",
   "currentChange": {
-    "summary": "Add a closed-by-default gameplay gate, account-wide Early Access, audited Operator Console controls, and launch/waiting presentation.",
+    "summary": "Rebalance Scrap Metal and Power Cells: Scrap stacks to three, Wade and Bix get new prices and a twelve-a-day purchase limit, and Keep the Change pays 36 Credits.",
     "stage": "review",
-    "pullRequestNumber": 228
+    "pullRequestNumber": 235
   },
   "latestCompleted": {
-    "summary": "Introduced verified Player identities and pre-alpha character reservations: email verification and up to three reserved character names per account.",
+    "summary": "Added a closed-by-default gameplay gate, account-wide Early Access, and audited Operator Console launch controls for the Soft Alpha.",
     "date": "2026-09-24",
-    "url": "https://github.com/BDubDesigns/RuneSpace/pull/222"
+    "url": "https://github.com/BDubDesigns/RuneSpace/pull/228"
   },
-  "nextStep": "Human review of the access gate and production preflight; public gameplay remains closed until an operator deliberately opens it.",
-  "lastMeaningfulUpdate": "2026-09-24",
+  "nextStep": "Human review of the Scrap and Power Cell rebalance; public gameplay remains closed until an operator deliberately opens it.",
+  "lastMeaningfulUpdate": "2026-09-26",
   "highlights": [
     {
       "summary": "Deep Jag is playable: brace the cave-in for Tansy, mine Galvanite behind it, and refine Galvanic Stock and Galvaferrite at the Processing Yard.",
