@@ -13,7 +13,8 @@ export function PracticeRunPanel({ run }: { run: PracticeRunState }) {
     <RunSummary
       historyLabel="Practice weld history"
       stats={[
-        { label: "welds", value: run.welds },
+        // Selected versus completed is the bounded run's whole story (#229).
+        { label: "welds", value: `${run.welds} of ${run.selectedWelds}` },
         { label: "Scrap used", value: run.scrapConsumed },
         { label: "Slag kept", value: run.slagKept },
         ...(run.slagDiscarded > 0 ? [{ label: "Slag discarded", value: run.slagDiscarded }] : []),

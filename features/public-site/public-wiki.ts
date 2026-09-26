@@ -151,7 +151,7 @@ const authoredWikiArticles = [
     sections: [
       {
         paragraphs: [
-          "Working material into something useful is a two-step loop: mine ore, then refine it at the Abandoned Processing Yard. There are two places to mine and three things you can refine.",
+          "Working material into something useful is a two-step loop: mine ore, then refine it at the Abandoned Processing Yard. There are two places to mine, three things you can refine, and — from Refining 5 — two ways to turn ore into Slag on purpose.",
         ],
       },
       {
@@ -184,6 +184,16 @@ const authoredWikiArticles = [
           "Refined Ferrite — two Ferrite Shale, a little over four seconds. A failure still produces one Slag, which isn't wasted: the Cargo Hold repair needs both.",
           "Galvanic Stock — two Galvanite, about six seconds. Needs Refining 5. A failed pour leaves two Slag.",
           "Galvaferrite — one Refined Ferrite and one Galvanic Stock, about seven seconds. Needs Refining 8. A failed alloy hands back one of the two inputs and loses the other.",
+          "Slag from Ferrite Shale — two Ferrite Shale into one Slag, a little under four seconds. Needs Refining 5. It never fails, and it pays the same small Refining XP a failed Refined Ferrite attempt does.",
+          "Slag from Galvanite — two Galvanite into two Slag, a little under five seconds. Needs Refining 5. It never fails, and it pays what a failed Galvanic Stock pour does.",
+        ],
+      },
+      {
+        heading: "Choosing how many batches",
+        paragraphs: [
+          "Before you start, pick how many batches to run. It starts at one; the minus and plus buttons change it by one, and Max jumps straight to the most your carried material and free space allow. The console shows what the whole run will take and how long it should last.",
+          "A batch counts whether it succeeds or fails, so a run of five is five attempts, not five guaranteed results. Max is the number you can be sure of finishing, however the attempts turn out. Refining stops by itself once the last batch you chose is done.",
+          "If your inventory changes before you press Start and the number you picked no longer fits, Refining will not quietly run fewer — it tells you the new most you can start, and you choose again.",
         ],
       },
       {
@@ -471,10 +481,11 @@ const authoredWikiArticles = [
       {
         heading: "Starting, stopping, and coming back",
         paragraphs: [
-          "One Start keeps the bench going: as each weld finishes the next one begins, taking two more scrap, until there is not enough left for another. It keeps going while you are away from the screen, the same as any other work.",
+          "Before you start, pick how many welds to run: it starts at one, the minus and plus buttons change it by one, and Max jumps to as many as your scrap pays for. A number of welds means whole welds — ten sections each — and the bench shows the scrap, time, and Welding XP the run adds up to. If a half-finished weld is waiting on the bench, it counts as the first of them.",
+          "As each weld finishes the next one you chose begins, taking two more scrap, and the bench stops on its own after the last. It keeps going while you are away from the screen, the same as any other work. If your scrap changes before you press Start and the number you picked no longer fits, the bench tells you how many it can run now rather than quietly running fewer.",
           "Stop whenever you like. The half-finished weld stays exactly as it is, and so does the scrap you already spent on it — resuming continues that same weld and costs nothing, even with no scrap left at all. Walking away from the yard stops the bench the same way; you cannot weld from the road.",
-          "When the scrap runs out the bench finishes the weld in progress and stops on its own, saying so. Buying more does not start it again — that is your call.",
-          "If you would rather the weld on the bench finish without another one starting after it, use Stop After Current Weld instead of an ordinary Stop. It lets that weld run to completion — full XP and output, same as always — then leaves the bench clear instead of spending scrap on the next one. It works whether the weld is currently running or already Stopped partway through.",
+          "If the scrap somehow runs short before the run is done, the bench finishes the weld in progress and stops on its own, saying so. Getting more does not start it again — that is your call.",
+          "If you would rather the weld on the bench finish without another one starting after it, use Stop After Current Weld instead of an ordinary Stop, even partway through a run of several. It lets that weld run to completion — full XP and output, same as always — then leaves the bench clear instead of spending scrap on the next one. It works whether the weld is currently running or already Stopped partway through.",
         ],
       },
       {

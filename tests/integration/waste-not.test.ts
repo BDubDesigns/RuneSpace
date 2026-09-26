@@ -216,6 +216,8 @@ suite("issue #141 Waste Not tracked activity (real PostgreSQL)", () => {
       ACTION_IDS.refining,
       new Date(now.getTime() + 20_000),
       refiningRandom([0, 9_000, 0, 9_000, 0]),
+      // One selected batch per scripted roll (#229).
+      5,
     );
     const refiningDuration =
       getEffectiveGameBalance().refining.recipes.refinedFerrite.attemptDurationTicks;

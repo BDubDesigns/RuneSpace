@@ -42,6 +42,8 @@ export type RefiningSnapshot = {
   existingStacks: readonly StackState<string>[];
   slotsAvailable: number;
   massAvailableGrams: number;
+  /** Batches the selected run may still attempt (#229): selected less attempted. */
+  attemptsRemaining: number;
 };
 
 export type RefiningRunAttempt = RefiningResolvedAttempt & {
@@ -50,6 +52,8 @@ export type RefiningRunAttempt = RefiningResolvedAttempt & {
 };
 
 export type RefiningRunState = {
+  /** The bounded run's selected batch count (#229); `attempts` counts toward it. */
+  selectedAttempts: number;
   attempts: number;
   successes: number;
   failures: number;
@@ -136,7 +140,7 @@ async function loadRefiningSnapshot(
   characterId: string,
 ): Promise<RefiningSnapshot> {
   const balance = getEffectiveGameBalance();
-  const [xpRows, stacks, itemState, assignments] = await Promise.all([
+  const [xpRows, stacks, itemState, assignments, runRows] = await Promise.all([
     transaction
       .select()
       .from(characterSkillXp)
@@ -153,7 +157,16 @@ async function loadRefiningSnapshot(
       .from(equippedItems)
       .where(eq(equippedItems.characterId, characterId))
       .for("update"),
+    transaction
+      .select({
+        runSelectedAttempts: characterRefiningState.runSelectedAttempts,
+        runAttempts: characterRefiningState.runAttempts,
+      })
+      .from(characterRefiningState)
+      .where(eq(characterRefiningState.characterId, characterId))
+      .for("update"),
   ]);
+  const run = runRows[0];
   const refiningXp = xpRows.find((row) => row.skillId === SKILL_IDS.refining)?.totalXp ?? 0;
   const equipmentLoadout = deriveEquipmentLoadout({
     assignments,
@@ -172,6 +185,8 @@ async function loadRefiningSnapshot(
       0,
       equipmentLoadout.maximumCarryCapacityGrams - equipmentLoadout.carriedMassGrams,
     ),
+    // No row means no run has ever been started, so there is nothing to attempt.
+    attemptsRemaining: run ? Math.max(0, run.runSelectedAttempts - run.runAttempts) : 0,
   };
 }
 
@@ -209,6 +224,7 @@ export function createRefiningResolver(
         balance: getEffectiveGameBalance(),
         recipe,
         random,
+        attemptLimit: snapshot.attemptsRemaining,
       });
       let cumulativeAttemptTicks = 0;
       const outcome: PersistedRefiningOutcome = {

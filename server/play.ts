@@ -26,6 +26,7 @@ import {
   miningSources,
   refiningActionIds,
   refiningRecipeForActionId,
+  refiningRecipeIsDeterministic,
   refiningRecipes,
   repairTargetBalances,
   repairTargetForActionId,
@@ -86,6 +87,7 @@ import {
 import {
   refiningAwardFacts,
   refiningRecipeUnlocked,
+  refiningRunMaximum,
   refiningSuccessChanceBps,
   type RefiningStopReason,
 } from "@/game/domain/refining";
@@ -160,7 +162,7 @@ import {
 } from "@/game/domain/clean-pass";
 import { getWorkOrder } from "@/game/content/work-orders";
 import { deriveWorkbenchOccupancy } from "@/game/domain/workbench";
-import type { PracticeWeldState } from "@/game/domain/practice-welding";
+import { practiceRunMaximum, type PracticeWeldState } from "@/game/domain/practice-welding";
 import { isMissionAccepted } from "@/server/mission-state";
 import {
   createWorkOrderWeldingResolver,
@@ -345,6 +347,12 @@ export type PracticeProjection = {
   /** Loose carried Scrap Metal available for the NEXT fresh weld. */
   scrapAvailable: number;
   scrapPerWeld: number;
+  /**
+   * The authoritative bounded-run maximum (#229): how many complete welds a run
+   * started now could finish, a paid partial weld counting as the first. The
+   * browser's Max reads this; it never derives its own.
+   */
+  maximumWelds: number;
   autoDiscardSlag: boolean;
   /**
    * The durable "finish this weld, then stop" intent (#207 follow-up). The
@@ -423,7 +431,17 @@ export type RefiningRecipeProjection = {
   attemptDurationTicks: number;
   successChanceBps: number;
   successXp: number;
+  /** Zero for a deterministic recipe, which has no failure (#229). */
   failureXp: number;
+  /** Always succeeds and never rolls (#229): the intentional Slag recipes. */
+  deterministic: boolean;
+  /**
+   * The authoritative bounded-run maximum (#229): how many batches of this
+   * recipe can be attempted from current inventory whatever the rolls do. Zero
+   * when the recipe is locked, nothing can start, or Refining is not available
+   * where the character is standing.
+   */
+  maximumBatches: number;
   inputs: readonly { itemId: string; name: string; quantity: number; carried: number }[];
   /** Every mutually exclusive thing a failure can produce, already named. */
   failureOutcomes: readonly (readonly { itemId: string; name: string; quantity: number }[])[];
@@ -631,7 +649,9 @@ export type PlayGameplayState = {
     /** The one bench already holds an unfinished customer Work Order (#207). */
     | "workbench_occupied"
     /** "Finish current weld and stop" was asked for with nothing on the bench. */
-    | "no_weld_in_progress";
+    | "no_weld_in_progress"
+    /** The selected weld count exceeds the fresh maximum (#229); choose again. */
+    | "practice_quantity_unavailable";
   /** Authoritative persistent current location (stable ID from the registry). */
   location: { currentLocationId: string };
   /**
@@ -686,7 +706,11 @@ export type PlayGameplayState = {
    * server-authoritative answer for a recipe whose minimum Refining level the
    * character has not reached (#209).
    */
-  refiningError?: "refining_unavailable_here" | "refining_recipe_locked";
+  refiningError?:
+    | "refining_unavailable_here"
+    | "refining_recipe_locked"
+    /** The selected batch count exceeds the fresh maximum (#229); choose again. */
+    | "refining_quantity_unavailable";
   /** Set when the finite Crash Site Welding command cannot begin. */
   weldingError?: "welding_unavailable_here" | "welding_locked" | "repair_complete";
 };
@@ -1346,6 +1370,7 @@ export async function stateFromTransaction(
   };
   const refiningState = refiningStateRows[0];
   const refiningRun: RefiningRunState = {
+    selectedAttempts: refiningState?.runSelectedAttempts ?? 1,
     attempts: refiningState?.runAttempts ?? 0,
     successes: refiningState?.runSuccesses ?? 0,
     failures: (refiningState?.runAttempts ?? 0) - (refiningState?.runSuccesses ?? 0),
@@ -1393,6 +1418,24 @@ export async function stateFromTransaction(
       .filter((stack) => stack.itemId === ITEM_IDS.scrapMetal)
       .reduce((total, stack) => total + stack.quantity, 0),
     scrapPerWeld: balance.practiceWelding.scrapPerWeld,
+    // The same resolver a real run uses, over this character's real stacks
+    // and capacity: Scrap per weld, whole-stack slot freeing, and the Slag
+    // keep/discard rule all decide it exactly as they decide a run (#229).
+    maximumWelds: practiceRunMaximum(
+      {
+        practice: practiceState,
+        scrapStackQuantities: stacks
+          .filter((stack) => stack.itemId === ITEM_IDS.scrapMetal)
+          .map((stack) => stack.quantity),
+        slagStackQuantities: stacks
+          .filter((stack) => stack.itemId === ITEM_IDS.slag)
+          .map((stack) => stack.quantity),
+        slotsAvailable: snapshot.slotsAvailable,
+        massAvailableGrams: snapshot.massAvailableGrams,
+        autoDiscardSlag: practiceRow?.autoDiscardSlag ?? false,
+      },
+      balance,
+    ),
     autoDiscardSlag: practiceRow?.autoDiscardSlag ?? false,
     finishCurrentWeld: practiceRow?.finishCurrentWeld ?? false,
     ...(practiceRow?.lastStopReason ? { lastStopReason: practiceRow.lastStopReason } : {}),
@@ -1545,6 +1588,9 @@ export async function stateFromTransaction(
       scene: resolved.scene,
     };
   }
+  // Refining is hosted by the location, not by the recipe (#209).
+  const refiningAvailableHere =
+    locationStates[currentLocationId]?.availableActionIds.includes(ACTION_IDS.refining) ?? false;
   // Exactly one Mining source is reachable where the character is standing.
   const locationMiningSource = miningSources(balance).find((source) =>
     locationStates[currentLocationId]?.availableActionIds.includes(source.actionId),
@@ -1627,7 +1673,22 @@ export async function stateFromTransaction(
         attemptDurationTicks: recipe.attemptDurationTicks,
         successChanceBps: refiningSuccessChanceBps(refiningProgress.level, recipe),
         successXp: recipe.successXp,
-        failureXp: recipe.failureXp,
+        failureXp: refiningRecipeIsDeterministic(recipe) ? 0 : recipe.failureXp,
+        deterministic: refiningRecipeIsDeterministic(recipe),
+        // Only where the console exists: a maximum is only ever chosen from,
+        // or revalidated, at the Yard, so the search is not paid elsewhere.
+        maximumBatches: refiningAvailableHere
+          ? refiningRunMaximum(
+              {
+                refiningLevel: refiningProgress.level,
+                existingStacks: snapshot.stacks,
+                slotsAvailable: snapshot.slotsAvailable,
+                massAvailableGrams: snapshot.massAvailableGrams,
+              },
+              balance,
+              recipe,
+            )
+          : 0,
         inputs: award.inputs.map((input) => ({
           itemId: input.itemId,
           name: resolveItemPresentation(input.itemId, input.itemId).displayName,

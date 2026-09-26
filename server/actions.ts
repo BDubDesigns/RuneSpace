@@ -87,6 +87,7 @@ import {
   StartRefiningRequestSchema,
   WeldingCommandRequestSchema,
   PracticeCommandRequestSchema,
+  StartPracticeRequestSchema,
   PracticeSlagPreferenceRequestSchema,
   WorkOrderAcceptRequestSchema,
   WorkOrderCommandRequestSchema,
@@ -316,7 +317,14 @@ export async function startRefiningAction(input: unknown): Promise<PlayActionRes
   const request = StartRefiningRequestSchema.safeParse(input);
   if (!request.success) return { error: "Invalid Refining command." };
   return runPlayAction(request.data.characterId, (userId, characterId) =>
-    startRefining(userId, characterId, request.data.recipeActionId),
+    startRefining(
+      userId,
+      characterId,
+      request.data.recipeActionId,
+      undefined,
+      undefined,
+      request.data.quantity,
+    ),
   );
 }
 
@@ -340,11 +348,19 @@ export async function startWeldingAction(input: unknown): Promise<PlayActionResu
 }
 
 export async function startPracticeWeldingAction(input: unknown): Promise<PlayActionResult> {
-  const request = PracticeCommandRequestSchema.safeParse(input);
+  const request = StartPracticeRequestSchema.safeParse(input);
   if (!request.success) return { error: "Invalid Practice command." };
   try {
     const user = await requireCurrentUser(await headers());
-    return { state: await startPracticeWelding(user.id, request.data.characterId) };
+    return {
+      state: await startPracticeWelding(
+        user.id,
+        request.data.characterId,
+        undefined,
+        undefined,
+        request.data.quantity,
+      ),
+    };
   } catch (error) {
     redirectOnGameplayRefusal(error);
     if (error instanceof OwnershipError) return { error: error.message };

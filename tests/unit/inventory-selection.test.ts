@@ -58,9 +58,11 @@ function baseState(inventory: PlayGameplayState["inventory"]): PlayGameplayState
       cycleActive: false,
       scrapAvailable: 0,
       scrapPerWeld: 2,
+      maximumWelds: 0,
       autoDiscardSlag: false,
       finishCurrentWeld: false,
       run: {
+        selectedWelds: 1,
         welds: 0,
         scrapConsumed: 0,
         slagKept: 0,
@@ -91,6 +93,7 @@ function baseState(inventory: PlayGameplayState["inventory"]): PlayGameplayState
       recentAttempts: [],
     },
     refiningRun: {
+      selectedAttempts: 1,
       attempts: 0,
       successes: 0,
       failures: 0,

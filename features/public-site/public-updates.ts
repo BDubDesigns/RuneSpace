@@ -5,6 +5,38 @@ export type { PublicUpdate } from "@/game/schemas/public-updates";
 
 const authoredUpdates = [
   {
+    slug: "how-many",
+    title: "How Many?",
+    publishedAt: "2026-09-26T11:00:00-07:00",
+    summary:
+      "Refining and Practice Welding now ask how many before you start — batches or welds, one to Max — and stop on their own when the run is done. Refining 5 also adds two ways to make Slag on purpose.",
+    body: [
+      "Refining and practice at Wade's bench used to be all or nothing. Press Start and the work kept going until you stopped it or ran out of material, which meant a trip to the Processing Yard to refine a few pieces of shale could quietly eat the whole stack.",
+      "Now both of them ask first. Before you start, pick how many: it starts at one, the minus and plus buttons change it by one, and Max jumps straight to the most you can actually run. The console or the bench shows what the whole run adds up to, and while it runs you can see how far through it you are. When the last one you picked is done, it stops by itself.",
+      "At the Processing Yard the number counts batches, and a batch counts whether it succeeds or fails — five batches is five attempts. Max is the number you can be sure of finishing, however those attempts turn out. At the bench it counts whole practice welds, and a half-finished weld waiting on the bench is the first of them. Stop After Current Weld still works partway through a run, finishing the weld you are on and leaving the rest.",
+      "If your inventory changes between choosing a number and pressing Start, neither one will quietly run fewer than you asked for. It tells you the new most you can start, and you choose again.",
+      "Reaching Refining 5 also opens two new recipes for when you need Slag and do not feel like waiting for a bad pour: two Ferrite Shale into one Slag, or two Galvanite into two. They never fail, they are quick, and they pay about what a failed attempt does — useful, not a shortcut for training.",
+    ],
+    patchNotes: [
+      {
+        heading: "Added",
+        items: [
+          "A run-size control on the Refining console and the Practice Welding bench: starts at 1, with minus, plus, and Max.",
+          "Progress through the chosen run while it is working, and a message when it completes.",
+          "Two Refining 5 recipes that always succeed: 2 Ferrite Shale into 1 Slag, and 2 Galvanite into 2 Slag.",
+        ],
+      },
+      {
+        heading: "Changed",
+        items: [
+          "Refining runs the number of batches you choose — failed attempts included — then stops by itself.",
+          "Practice Welding runs the number of whole welds you choose, then stops by itself with the bench clear.",
+          "Starting with a number that no longer fits your inventory is refused with the new maximum, instead of running a different amount.",
+        ],
+      },
+    ],
+  },
+  {
     slug: "price-check",
     title: "Price Check",
     publishedAt: "2026-09-26T01:00:00-07:00",

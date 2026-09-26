@@ -69,6 +69,31 @@ suite("issue #81 Refining persistence and concurrency (real PostgreSQL)", () => 
     return now;
   }
 
+  /**
+   * Start a run of every batch the carried inventory supports. These tests were
+   * written against the open-ended run that #229 replaced; Max is its bounded
+   * equivalent, so their resolution assertions keep their original meaning.
+   */
+  async function startRefiningAtMax(
+    userId: string,
+    characterId: string,
+    at: Date,
+    random?: { nextBasisPoints(): number; nextUnit(): number },
+  ) {
+    const projected = await play.getPlayGameplayState(userId, characterId, at, random);
+    const maximum = projected.refiningRecipes.find(
+      (recipe) => recipe.actionId === ACTION_IDS.refining,
+    )!.maximumBatches;
+    return refiningCommands.startRefining(
+      userId,
+      characterId,
+      ACTION_IDS.refining,
+      at,
+      random,
+      Math.max(1, maximum),
+    );
+  }
+
   async function addShale(characterId: string, quantity: number) {
     await db
       .insert(rune.inventoryStacks)
@@ -80,12 +105,7 @@ suite("issue #81 Refining persistence and concurrency (real PostgreSQL)", () => 
     const now = new Date("2026-01-01T00:00:00.000Z");
     await play.getPlayGameplayState(userId, character.id, now);
     // Still at Crash Site — starting Refining must be refused via refiningError, not travelError
-    const refused = await refiningCommands.startRefining(
-      userId,
-      character.id,
-      ACTION_IDS.refining,
-      now,
-    );
+    const refused = await startRefiningAtMax(userId, character.id, now);
     expect(refused.refiningError).toBe("refining_unavailable_here");
     expect(refused.travelError).toBeUndefined();
     expect(refused.activeAction).toBeUndefined();
@@ -94,12 +114,7 @@ suite("issue #81 Refining persistence and concurrency (real PostgreSQL)", () => 
     ).resolves.toEqual([]);
 
     // A manipulated direct call is still server-authoritative: no active action is created
-    const stillRefused = await refiningCommands.startRefining(
-      userId,
-      character.id,
-      ACTION_IDS.refining,
-      now,
-    );
+    const stillRefused = await startRefiningAtMax(userId, character.id, now);
     expect(stillRefused.refiningError).toBe("refining_unavailable_here");
   });
 
@@ -123,16 +138,10 @@ suite("issue #81 Refining persistence and concurrency (real PostgreSQL)", () => 
       storedAt: now,
     });
 
-    const started = await refiningCommands.startRefining(
-      userId,
-      character.id,
-      ACTION_IDS.refining,
-      now,
-      {
-        nextBasisPoints: () => 0,
-        nextUnit: () => 0,
-      },
-    );
+    const started = await startRefiningAtMax(userId, character.id, now, {
+      nextBasisPoints: () => 0,
+      nextUnit: () => 0,
+    });
     expect(started.activeAction?.actionId).toBe(ACTION_IDS.refining);
   });
 
@@ -215,7 +224,7 @@ suite("issue #81 Refining persistence and concurrency (real PostgreSQL)", () => 
     await db
       .insert(rune.inventoryStacks)
       .values({ characterId: character.id, itemId: ITEM_IDS.ferriteShale, quantity: 5 });
-    await refiningCommands.startRefining(userId, character.id, ACTION_IDS.refining, now, {
+    await startRefiningAtMax(userId, character.id, now, {
       nextBasisPoints: () => 0,
       nextUnit: () => 0,
     });
@@ -266,7 +275,7 @@ suite("issue #81 Refining persistence and concurrency (real PostgreSQL)", () => 
     const startedAt = new Date("2026-01-01T00:00:00.000Z");
     await provisionAtYard(userId, character.id, startedAt);
     await addShale(character.id, 10);
-    await refiningCommands.startRefining(userId, character.id, ACTION_IDS.refining, startedAt, {
+    await startRefiningAtMax(userId, character.id, startedAt, {
       nextBasisPoints: () => 0,
       nextUnit: () => 0,
     });
@@ -314,7 +323,7 @@ suite("issue #81 Refining persistence and concurrency (real PostgreSQL)", () => 
     const startedAt = new Date("2026-01-01T00:00:00.000Z");
     await provisionAtYard(userId, character.id, startedAt);
     await addShale(character.id, 5);
-    await refiningCommands.startRefining(userId, character.id, ACTION_IDS.refining, startedAt, {
+    await startRefiningAtMax(userId, character.id, startedAt, {
       nextBasisPoints: () => 0,
       nextUnit: () => 0,
     });
@@ -359,7 +368,7 @@ suite("issue #81 Refining persistence and concurrency (real PostgreSQL)", () => 
     const startedAt = new Date("2026-01-01T00:00:00.000Z");
     await provisionAtYard(userId, character.id, startedAt);
     await addShale(character.id, 5);
-    await refiningCommands.startRefining(userId, character.id, ACTION_IDS.refining, startedAt, {
+    await startRefiningAtMax(userId, character.id, startedAt, {
       nextBasisPoints: () => 9_999,
       nextUnit: () => 0,
     });
@@ -396,7 +405,7 @@ suite("issue #81 Refining persistence and concurrency (real PostgreSQL)", () => 
     const startedAt = new Date("2026-01-01T00:00:00.000Z");
     await provisionAtYard(userId, character.id, startedAt);
     await addShale(character.id, 5);
-    await refiningCommands.startRefining(userId, character.id, ACTION_IDS.refining, startedAt, {
+    await startRefiningAtMax(userId, character.id, startedAt, {
       nextBasisPoints: () => 0,
       nextUnit: () => 0,
     });
@@ -521,7 +530,7 @@ suite("issue #81 Refining persistence and concurrency (real PostgreSQL)", () => 
     const startedAt = new Date("2026-01-01T00:00:00.000Z");
     await provisionAtYard(userId, character.id, startedAt);
     await addShale(character.id, 10);
-    await refiningCommands.startRefining(userId, character.id, ACTION_IDS.refining, startedAt, {
+    await startRefiningAtMax(userId, character.id, startedAt, {
       nextBasisPoints: () => 0,
       nextUnit: () => 0,
     });
@@ -557,7 +566,7 @@ suite("issue #81 Refining persistence and concurrency (real PostgreSQL)", () => 
     const startedAt = new Date("2026-01-01T00:00:00.000Z");
     await provisionAtYard(userId, character.id, startedAt);
     await addShale(character.id, 10);
-    await refiningCommands.startRefining(userId, character.id, ACTION_IDS.refining, startedAt, {
+    await startRefiningAtMax(userId, character.id, startedAt, {
       nextBasisPoints: () => 0,
       nextUnit: () => 0,
     });
@@ -588,7 +597,7 @@ suite("issue #81 Refining persistence and concurrency (real PostgreSQL)", () => 
     const startedAt = new Date("2026-01-01T00:00:00.000Z");
     await provisionAtYard(userId, character.id, startedAt);
     await addShale(character.id, 10);
-    await refiningCommands.startRefining(userId, character.id, ACTION_IDS.refining, startedAt, {
+    await startRefiningAtMax(userId, character.id, startedAt, {
       nextBasisPoints: () => 0,
       nextUnit: () => 0,
     });
@@ -626,7 +635,7 @@ suite("issue #81 Refining persistence and concurrency (real PostgreSQL)", () => 
     const startedAt = new Date("2026-01-01T00:00:00.000Z");
     await provisionAtYard(userId, character.id, startedAt);
     await addShale(character.id, 5);
-    await refiningCommands.startRefining(userId, character.id, ACTION_IDS.refining, startedAt);
+    await startRefiningAtMax(userId, character.id, startedAt);
     const traveled = await play.beginTravel(
       userId,
       character.id,
@@ -652,7 +661,7 @@ suite("issue #81 Refining persistence and concurrency (real PostgreSQL)", () => 
     const startedAt = new Date("2026-01-01T00:00:00.000Z");
     await provisionAtYard(userId, character.id, startedAt);
     await addShale(character.id, 50);
-    await refiningCommands.startRefining(userId, character.id, ACTION_IDS.refining, startedAt, {
+    await startRefiningAtMax(userId, character.id, startedAt, {
       nextBasisPoints: () => 0,
       nextUnit: () => 0,
     });
@@ -690,7 +699,7 @@ suite("issue #81 Refining persistence and concurrency (real PostgreSQL)", () => 
     const startedAt = new Date("2026-01-01T00:00:00.000Z");
     await provisionAtYard(userId, character.id, startedAt);
     await addShale(character.id, 5000);
-    await refiningCommands.startRefining(userId, character.id, ACTION_IDS.refining, startedAt, {
+    await startRefiningAtMax(userId, character.id, startedAt, {
       nextBasisPoints: () => 0,
       nextUnit: () => 0,
     });
@@ -835,7 +844,7 @@ suite("issue #81 Refining persistence and concurrency (real PostgreSQL)", () => 
     await db
       .insert(rune.inventoryStacks)
       .values({ characterId: character.id, itemId: ITEM_IDS.ferriteShale, quantity: 5 });
-    await refiningCommands.startRefining(userId, character.id, ACTION_IDS.refining, atYard, {
+    await startRefiningAtMax(userId, character.id, atYard, {
       nextBasisPoints: () => 0,
       nextUnit: () => 0,
     });

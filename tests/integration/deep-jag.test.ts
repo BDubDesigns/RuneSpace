@@ -5,6 +5,7 @@ import {
   getRepairTargetBalance,
   refiningRecipeForActionId,
   standardSkillLevelThresholds,
+  type RolledRefiningRecipeBalance,
 } from "@/game/config/balance";
 import {
   ACTION_IDS,
@@ -56,7 +57,10 @@ suite("issue #209 Deep Jag progression (real PostgreSQL)", () => {
   const balance = getEffectiveGameBalance();
   const caveIn = getRepairTargetBalance(REPAIR_TARGET_IDS.deepJagCaveIn, balance);
   const galvanicStock = refiningRecipeForActionId(ACTION_IDS.galvanicStockRefining, balance)!;
-  const galvaferrite = refiningRecipeForActionId(ACTION_IDS.galvaferriteRefining, balance)!;
+  const galvaferrite = refiningRecipeForActionId(
+    ACTION_IDS.galvaferriteRefining,
+    balance,
+  ) as RolledRefiningRecipeBalance;
   const WELD_TICKS = balance.welding.attemptDurationTicks;
 
   beforeAll(async () => {
@@ -715,6 +719,8 @@ suite("issue #209 Deep Jag progression (real PostgreSQL)", () => {
         ACTION_IDS.galvanicStockRefining,
         now,
         deterministicRandom(),
+        // Every batch the ten Galvanite support (#229).
+        5,
       );
 
       // A refresh reads the durable row back, with no client-supplied recipe.

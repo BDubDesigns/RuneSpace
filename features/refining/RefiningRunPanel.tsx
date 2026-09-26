@@ -36,7 +36,8 @@ export function RefiningRunPanel({ run }: { run: RefiningRunState }) {
     <RunSummary
       historyLabel="Refining attempt history"
       stats={[
-        { label: "attempts", value: run.attempts },
+        // Selected versus attempted is the bounded run's whole story (#229).
+        { label: "attempts", value: `${run.attempts} of ${run.selectedAttempts}` },
         { label: "successful", value: run.successes },
         { label: "failed", value: run.failures },
         // Keyed by item, so a run of any recipe reads correctly (#209).
@@ -68,10 +69,12 @@ function RefiningAttemptRow({ attempt }: { attempt: RefiningRunAttempt }) {
       <p className="font-display uppercase tracking-wide">
         Attempt {attempt.sequence} — {attempt.success ? "Success" : "Failed"}
       </p>
-      <p className="text-[color:var(--rs-text-secondary)]">
-        Roll {percentage(attempt.rolledBasisPoints)} | Needed below{" "}
-        {percentage(attempt.thresholdBasisPoints)}
-      </p>
+      {attempt.deterministic ? null : (
+        <p className="text-[color:var(--rs-text-secondary)]">
+          Roll {percentage(attempt.rolledBasisPoints)} | Needed below{" "}
+          {percentage(attempt.thresholdBasisPoints)}
+        </p>
+      )}
       <p className="text-xs uppercase tracking-wide text-[color:var(--rs-text-muted)]">
         {attempt.durationTicks} ticks &middot; {describeQuantities(attempt.consumed)} consumed
       </p>

@@ -5,6 +5,8 @@ import { ActionButton } from "@/components/ui/ActionButton";
 import { ActivityPanel } from "@/features/shared/ActivityPanel";
 import { ActivityContextRow, SkillProgressRow } from "@/features/shared/activity-context";
 import { RefiningRunPanel } from "@/features/refining/RefiningRunPanel";
+import { BoundedRunProgress, BoundedRunSelector } from "@/features/shared/BoundedRunControl";
+import { BOUNDED_RUN_DEFAULT_QUANTITY } from "@/game/domain/bounded-run";
 import { ItemVisual } from "@/components/items/ItemVisual";
 import { VisualTile } from "@/components/items/VisualTile";
 import { Feedback } from "@/components/ui/Feedback";
@@ -27,10 +29,17 @@ function percentage(bps: number) {
   return (bps / 100).toFixed(2);
 }
 
+const BATCH_UNIT = { singular: "batch", plural: "batches" };
+
 function refiningStopMessage(
   reason: Extract<import("@/server/play").ActivityStop, { activity: "refining" }>["reason"],
   recipe: RefiningRecipeProjection | undefined,
+  run?: { attempts: number; selectedAttempts: number },
 ): string {
+  if (reason === "run_completed") {
+    const attempted = run?.attempts ?? 0;
+    return `Run complete — ${attempted} ${attempted === 1 ? "batch" : "batches"} attempted.`;
+  }
   // The authoritative reason says the inputs ran out; the recipe says which
   // ones and how many, so the copy is right for all three recipes (#209).
   const inputs = recipe
@@ -66,7 +75,15 @@ function refiningCommandErrorMessage(error: string): string {
   );
 }
 
-function refiningErrorMessage(error: string): string {
+function refiningErrorMessage(error: string, recipe?: RefiningRecipeProjection): string {
+  if (error === "refining_quantity_unavailable") {
+    // Refused, never shortened (#229): the fresh maximum is already in the
+    // projection, so the player can choose again from it.
+    const maximum = recipe?.maximumBatches ?? 0;
+    return maximum > 0
+      ? `Only ${maximum} ${maximum === 1 ? "batch" : "batches"} can start now. Choose a run size and start again.`
+      : "Nothing can be refined right now.";
+  }
   return (
     (
       {
@@ -77,6 +94,21 @@ function refiningErrorMessage(error: string): string {
   );
 }
 
+/** The whole selected run, before Start, from the recipe's per-batch facts. */
+function refiningRunSummary(recipe: RefiningRecipeProjection, quantity: number): string {
+  const inputs = recipe.inputs
+    .map((input) => `${input.quantity * quantity} ${input.name}`)
+    .join(" + ");
+  const seconds = (recipe.attemptDurationTicks * quantity * GAME_TICK_MS) / 1000;
+  const outputs = `${recipe.outputQuantity * quantity} ${recipe.outputName}`;
+  const xp = recipe.deterministic
+    ? `${recipe.successXp * quantity} Refining XP`
+    : `${recipe.failureXp * quantity}–${recipe.successXp * quantity} Refining XP`;
+  return `${inputs} · ${seconds.toFixed(1)}s · ${
+    recipe.deterministic ? outputs : `up to ${outputs}`
+  } · ${xp}`;
+}
+
 function latestRefiningAttempt(
   attempts: readonly RefiningRunAttempt[],
 ): RefiningRunAttempt | undefined {
@@ -85,6 +117,9 @@ function latestRefiningAttempt(
 
 function latestAnnouncement(attempt: RefiningRunAttempt, batch: number): string {
   const catchUp = batch > 1 ? `${batch} attempts resolved while away. ` : "";
+  if (attempt.deterministic) {
+    return `${catchUp}${describeQuantities(attempt.awarded, ", ")} produced. ${attempt.xpAwarded} Refining XP earned.`;
+  }
   const roll = `Roll ${percentage(attempt.rolledBasisPoints)}. Needed below ${percentage(attempt.thresholdBasisPoints)}.`;
   // A failure is not always Slag: Galvaferrite hands one input back instead
   // (#209), so the announcement reads the attempt's own consumed and awarded
@@ -111,6 +146,9 @@ export function RefiningConsole() {
   // is the first authored one, and the authored order puts Refined Ferrite —
   // the only recipe a new character can work — first.
   const [selectedActionId, setSelectedActionId] = useState<string | undefined>();
+  // The bounded run's size (#229): always starts at one, and resets to one
+  // whenever the recipe changes, because a count means batches OF a recipe.
+  const [quantity, setQuantity] = useState(BOUNDED_RUN_DEFAULT_QUANTITY);
   const [now, setNow] = useState(Date.now());
   const [, startTransition] = useTransition();
   const [recovery, setRecovery] = useState<(() => void) | undefined>();
@@ -130,7 +168,7 @@ export function RefiningConsole() {
     recipes[0];
   const [message, setMessage] = useState<string | undefined>(
     state.stop?.activity === "refining"
-      ? refiningStopMessage(state.stop.reason, recipe)
+      ? refiningStopMessage(state.stop.reason, recipe, refiningRun)
       : undefined,
   );
   // Mission guidance consumes the ONE derived target set: a Refining mission
@@ -155,10 +193,13 @@ export function RefiningConsole() {
     if (result.state) {
       acceptState(result.state);
       const next = result.state;
-      if (next.refiningError) setMessage(refiningErrorMessage(next.refiningError));
+      const nextRecipe = next.refiningRecipes.find(
+        (candidate) => candidate.actionId === recipe?.actionId,
+      );
+      if (next.refiningError) setMessage(refiningErrorMessage(next.refiningError, nextRecipe));
       else if (next.commandError) setMessage(refiningCommandErrorMessage(next.commandError));
       else if (next.stop?.activity === "refining")
-        setMessage(refiningStopMessage(next.stop.reason, recipe));
+        setMessage(refiningStopMessage(next.stop.reason, recipe, next.refiningRun));
       else setMessage(undefined);
     }
   }
@@ -233,8 +274,33 @@ export function RefiningConsole() {
 
   const isActive = Boolean(active);
 
+  // Every new selection starts at one (#229): once a run is under way the
+  // selector is hidden, and when it next appears it is for a fresh run.
+  useEffect(() => {
+    if (isActive) setQuantity(BOUNDED_RUN_DEFAULT_QUANTITY);
+  }, [isActive]);
+
   return (
     <ActivityPanel title="Refining" data-refining-activity>
+      {/* The bounded run (#229): choose how many batches to attempt before
+          Start, then follow the run through them. The maximum and the running
+          counts are both the server's; nothing here computes either. */}
+      {isActive ? (
+        <BoundedRunProgress
+          completed={refiningRun.attempts}
+          selected={refiningRun.selectedAttempts}
+          unit={BATCH_UNIT}
+        />
+      ) : recipe?.unlocked ? (
+        <BoundedRunSelector
+          disabled={foregroundBusy || Boolean(state.activeAction)}
+          maximum={recipe.maximumBatches}
+          onChange={setQuantity}
+          quantity={quantity}
+          summary={refiningRunSummary(recipe, quantity)}
+          unit={BATCH_UNIT}
+        />
+      ) : null}
       <div className="flex flex-wrap gap-3">
         {isActive || pendingCommand === "stop" ? (
           <ActionButton
@@ -252,7 +318,7 @@ export function RefiningConsole() {
             loading={foregroundBusy && pendingCommand === "start"}
             onClick={() =>
               runForeground("start", (characterId) =>
-                startRefiningAction({ characterId, recipeActionId: recipe?.actionId }),
+                startRefiningAction({ characterId, recipeActionId: recipe?.actionId, quantity }),
               )
             }
           >
@@ -288,7 +354,11 @@ export function RefiningConsole() {
               data-refining-recipe-locked={candidate.unlocked ? "false" : "true"}
               disabled={Boolean(active) || !candidate.unlocked}
               key={candidate.actionId}
-              onClick={() => setSelectedActionId(candidate.actionId)}
+              onClick={() => {
+                if (candidate.actionId !== recipe?.actionId)
+                  setQuantity(BOUNDED_RUN_DEFAULT_QUANTITY);
+                setSelectedActionId(candidate.actionId);
+              }}
               type="button"
             >
               <p className="font-display text-sm uppercase tracking-wide">
@@ -302,7 +372,10 @@ export function RefiningConsole() {
                 <p className="mt-1 text-xs uppercase tracking-wide text-[color:var(--rs-text-muted)]">
                   {candidate.attemptDurationTicks} ticks /{" "}
                   {(candidate.attemptDurationTicks * GAME_TICK_MS) / 1000}s &middot;{" "}
-                  {percentage(candidate.successChanceBps)}% &middot; +{candidate.successXp} XP
+                  {candidate.deterministic
+                    ? "Certain"
+                    : `${percentage(candidate.successChanceBps)}%`}{" "}
+                  &middot; +{candidate.successXp} XP
                 </p>
               ) : (
                 <p className="mt-1 font-display text-xs uppercase tracking-wide text-[color:var(--rs-accent-danger)]">
@@ -316,7 +389,9 @@ export function RefiningConsole() {
       {recipe ? (
         <>
           <p className="font-display text-sm uppercase tracking-wide text-[color:var(--rs-accent-arcane)]">
-            Success chance: {percentage(recipe.successChanceBps)}%
+            {recipe.deterministic
+              ? "Deterministic: every batch succeeds"
+              : `Success chance: ${percentage(recipe.successChanceBps)}%`}
           </p>
           <p className="!mt-2 text-xs uppercase tracking-wide text-[color:var(--rs-text-muted)]">
             {recipe.attemptDurationTicks} ticks /{" "}
@@ -358,10 +433,12 @@ export function RefiningConsole() {
               </p>
             ) : null}
           </div>
-          <p className="mt-2 text-sm text-[color:var(--rs-text-secondary)]">
-            Roll {percentage(latestAttempt.rolledBasisPoints)} | Needed below{" "}
-            {percentage(latestAttempt.thresholdBasisPoints)}
-          </p>
+          {latestAttempt.deterministic ? null : (
+            <p className="mt-2 text-sm text-[color:var(--rs-text-secondary)]">
+              Roll {percentage(latestAttempt.rolledBasisPoints)} | Needed below{" "}
+              {percentage(latestAttempt.thresholdBasisPoints)}
+            </p>
+          )}
           <p className="mt-2 text-xs uppercase tracking-wide text-[color:var(--rs-text-muted)]">
             {latestAttempt.durationTicks} ticks &middot;{" "}
             {describeQuantities(latestAttempt.consumed, ", ")} consumed
@@ -402,7 +479,13 @@ export function RefiningConsole() {
           : ""}
       </p>
       {message ? (
-        <Feedback tone={state.stop?.activity === "refining" && !active ? "danger" : "muted"}>
+        <Feedback
+          tone={
+            state.stop?.activity === "refining" && state.stop.reason !== "run_completed" && !active
+              ? "danger"
+              : "muted"
+          }
+        >
           {message}
         </Feedback>
       ) : null}

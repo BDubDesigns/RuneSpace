@@ -48,6 +48,8 @@ export type PracticeRunWeld = PracticeResolvedWeld & {
 };
 
 export type PracticeRunState = {
+  /** The bounded run's selected weld count (#229); `welds` counts toward it. */
+  selectedWelds: number;
   welds: number;
   scrapConsumed: number;
   slagKept: number;
@@ -133,7 +135,7 @@ export async function loadPracticeUnlocked(
   );
 }
 
-async function loadPracticeSnapshot(
+export async function loadPracticeSnapshot(
   transaction: DatabaseTransaction,
   characterId: string,
 ): Promise<PracticeSnapshot> {
@@ -172,6 +174,7 @@ async function loadPracticeSnapshot(
     massAvailableGrams: Math.max(0, loadout.maximumCarryCapacityGrams - loadout.carriedMassGrams),
     autoDiscardSlag: row?.autoDiscardSlag ?? false,
     finishCurrentWeld: row?.finishCurrentWeld ?? false,
+    runWeldsRemaining: row ? Math.max(0, row.runSelectedWelds - row.runWelds) : 0,
   };
 }
 
@@ -208,7 +211,7 @@ export async function writePracticeState(
  * Durable because the weld it applies to resolves lazily: the player can set it
  * and close the game, and the weld they already paid for should still finish
  * and still stop there. Cleared by the resolution that honours it and by any
- * ordinary Start, which is a request for the continuous run again.
+ * ordinary Start, which is a request for a fresh selected run.
  */
 export async function setPracticeFinishCurrentWeld(
   transaction: DatabaseTransaction,
@@ -222,15 +225,20 @@ export async function setPracticeFinishCurrentWeld(
     .where(eq(characterPracticeWelds.characterId, characterId));
 }
 
-/** Reset the bounded `This Run` totals when a new run begins. */
+/**
+ * Reset the `This Run` totals when a new run begins, recording how many
+ * complete welds the player selected for it (#229).
+ */
 export async function resetPracticeRun(
   transaction: DatabaseTransaction,
   characterId: string,
+  selectedWelds: number,
   now: Date,
 ): Promise<void> {
   await transaction
     .update(characterPracticeWelds)
     .set({
+      runSelectedWelds: selectedWelds,
       runWelds: 0,
       runScrapConsumed: 0,
       runSlagKept: 0,
@@ -245,6 +253,7 @@ export async function resetPracticeRun(
 
 export function practiceRunStateFromRow(row: PracticeRow | undefined): PracticeRunState {
   return {
+    selectedWelds: row?.runSelectedWelds ?? 1,
     welds: row?.runWelds ?? 0,
     scrapConsumed: row?.runScrapConsumed ?? 0,
     slagKept: row?.runSlagKept ?? 0,

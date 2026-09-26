@@ -55,6 +55,8 @@ export const FOCUSED_PHASES = [
   "travel",
   "walk-it-off",
   "cut-your-teeth",
+  "refining",
+  "bounded-runs",
   "rusk-recovery",
   "work-orders",
   "gameplay-access",

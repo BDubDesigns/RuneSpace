@@ -210,7 +210,7 @@ test("the worksite is one generic repair panel, and the last weld opens the mine
   );
 });
 
-test("the Refining console shows all three recipes, with the locked two legible", async ({
+test("the Refining console shows every recipe, with the locked ones legible", async ({
   page,
   testCharacter,
 }) => {
@@ -223,7 +223,8 @@ test("the Refining console shows all three recipes, with the locked two legible"
   await openTestCharacter(page, characterId);
 
   const recipes = page.locator("[data-refining-recipes]");
-  await expect(recipes.locator("[data-refining-recipe]")).toHaveCount(3);
+  // The three productive recipes (#209) and the two deliberate Slag ones (#229).
+  await expect(recipes.locator("[data-refining-recipe]")).toHaveCount(5);
   const stock = recipes.locator(`[data-refining-recipe="${ACTION_IDS.galvanicStockRefining}"]`);
   const alloy = recipes.locator(`[data-refining-recipe="${ACTION_IDS.galvaferriteRefining}"]`);
 
@@ -247,4 +248,10 @@ test("the Refining console shows all three recipes, with the locked two legible"
   await expect(stock).toBeEnabled();
   await stock.click();
   await expect(stock).toHaveAttribute("aria-pressed", "true");
+  // So do both deliberate Slag recipes, which never roll (#229).
+  for (const actionId of [ACTION_IDS.ferriteShaleSlagRefining, ACTION_IDS.galvaniteSlagRefining]) {
+    const slag = recipes.locator(`[data-refining-recipe="${actionId}"]`);
+    await expect(slag).toHaveAttribute("data-refining-recipe-locked", "false");
+    await expect(slag).toContainText("Certain");
+  }
 });

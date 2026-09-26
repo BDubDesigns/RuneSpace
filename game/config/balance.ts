@@ -79,9 +79,11 @@ const balanceSchema = z.object({
    * reason Mining sources do: the selected recipe survives refresh and
    * lazy/offline resolution without a new persistence column.
    *
-   * `failure` is a two-case union rather than a free-form script, because the
-   * approved recipes need exactly two behaviours: produce fixed authored
-   * outputs, or hand back exactly one of the inputs.
+   * `failure` is a small union rather than a free-form script, because the
+   * approved recipes need exactly three behaviours: produce fixed authored
+   * outputs, hand back exactly one of the inputs, or — for a deterministic
+   * recipe (#229) — have no failure path at all. A deterministic recipe
+   * authors no success curve and never consults the random source.
    */
   refining: z.object({
     skillId: z.literal(SKILL_IDS.refining),
@@ -151,6 +153,38 @@ const balanceSchema = z.object({
         ]),
         outputQuantity: z.literal(1),
         failure: z.object({ kind: z.literal("one_input_returned") }),
+      }),
+      /**
+       * Deliberate Slag (#229): 2 Ferrite Shale -> 1 Slag at Refining 5.
+       * Utility processing, not training — it mirrors the Refined Ferrite
+       * failure output and pays that failure's XP, and it is gated at Refining 5
+       * so the opening Cargo Hold arc still teaches Slag as a byproduct rather
+       * than something to manufacture.
+       */
+      ferriteShaleSlag: z.object({
+        actionId: z.literal(ACTION_IDS.ferriteShaleSlagRefining),
+        outputItemId: z.literal(ITEM_IDS.slag),
+        minimumLevel: z.literal(5),
+        attemptDurationTicks: z.literal(6),
+        successXp: z.literal(3),
+        inputs: z.tuple([
+          z.object({ itemId: z.literal(ITEM_IDS.ferriteShale), quantity: z.literal(2) }),
+        ]),
+        outputQuantity: z.literal(1),
+        failure: z.object({ kind: z.literal("none") }),
+      }),
+      /** Deliberate Slag (#229): 2 Galvanite -> 2 Slag at Refining 5. */
+      galvaniteSlag: z.object({
+        actionId: z.literal(ACTION_IDS.galvaniteSlagRefining),
+        outputItemId: z.literal(ITEM_IDS.slag),
+        minimumLevel: z.literal(5),
+        attemptDurationTicks: z.literal(8),
+        successXp: z.literal(5),
+        inputs: z.tuple([
+          z.object({ itemId: z.literal(ITEM_IDS.galvanite), quantity: z.literal(2) }),
+        ]),
+        outputQuantity: z.literal(2),
+        failure: z.object({ kind: z.literal("none") }),
       }),
     }),
   }),
@@ -499,6 +533,26 @@ const defaults = balanceSchema.parse({
         outputQuantity: 1,
         failure: { kind: "one_input_returned" },
       },
+      ferriteShaleSlag: {
+        actionId: ACTION_IDS.ferriteShaleSlagRefining,
+        outputItemId: ITEM_IDS.slag,
+        minimumLevel: 5,
+        attemptDurationTicks: 6,
+        successXp: 3,
+        inputs: [{ itemId: ITEM_IDS.ferriteShale, quantity: 2 }],
+        outputQuantity: 1,
+        failure: { kind: "none" },
+      },
+      galvaniteSlag: {
+        actionId: ACTION_IDS.galvaniteSlagRefining,
+        outputItemId: ITEM_IDS.slag,
+        minimumLevel: 5,
+        attemptDurationTicks: 8,
+        successXp: 5,
+        inputs: [{ itemId: ITEM_IDS.galvanite, quantity: 2 }],
+        outputQuantity: 2,
+        failure: { kind: "none" },
+      },
     },
   },
   welding: {
@@ -625,6 +679,23 @@ export type MiningSourceBalance =
 /** One authored Refining recipe (#209). */
 export type RefiningRecipeBalance =
   EffectiveGameBalance["refining"]["recipes"][keyof EffectiveGameBalance["refining"]["recipes"]];
+
+/** A Refining recipe that rolls for success and authors a failure path. */
+export type RolledRefiningRecipeBalance = Exclude<
+  RefiningRecipeBalance,
+  { failure: { kind: "none" } }
+>;
+
+/**
+ * Whether a recipe always produces its output (#229). A deterministic recipe
+ * authors no success curve and no failure XP, and never consults the random
+ * source.
+ */
+export function refiningRecipeIsDeterministic(
+  recipe: RefiningRecipeBalance,
+): recipe is Exclude<RefiningRecipeBalance, RolledRefiningRecipeBalance> {
+  return recipe.failure.kind === "none";
+}
 
 /** Every authored Mining source, in a stable authored order. */
 export function miningSources(balance = getEffectiveGameBalance()): readonly MiningSourceBalance[] {

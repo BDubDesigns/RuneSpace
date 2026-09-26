@@ -4,13 +4,14 @@ import {
   getItemDefinition,
   practiceSectionXp,
 } from "@/game/config/balance";
-import { ACTION_IDS, ITEM_IDS } from "@/game/config/foundations";
+import { ACTION_IDS, BOUNDED_RUN_QUANTITY_CEILING, ITEM_IDS } from "@/game/config/foundations";
 import { isTravelReplaceableAction } from "@/game/domain/travel-replacement";
 import { UNROLLED_CLEAN_PASS, type CleanPassRandom } from "@/game/domain/clean-pass";
 import { planStackAddition, planExactStackRemoval } from "@/game/domain/inventory";
 import {
   canBeginPracticeWeld,
   hasResumablePracticeWeld,
+  practiceRunMaximum,
   resolvePracticeWelding,
   UNSTARTED_PRACTICE,
   type PracticeSnapshot,
@@ -51,6 +52,8 @@ function snapshot(overrides: Partial<PracticeSnapshot> = {}): PracticeSnapshot {
     massAvailableGrams: 50_000,
     autoDiscardSlag: false,
     finishCurrentWeld: false,
+    // These tests predate bounded runs (#229) and exercise the loop uncapped.
+    runWeldsRemaining: BOUNDED_RUN_QUANTITY_CEILING,
     ...overrides,
   };
 }
@@ -512,5 +515,139 @@ describe("Practice interruption seams", () => {
   it("rejects a negative or fractional elapsed window", () => {
     expect(() => resolve(-1)).toThrow(RangeError);
     expect(() => resolve(1.5)).toThrow(RangeError);
+  });
+});
+
+describe("bounded Practice runs (#229)", () => {
+  const oneWeld = practiceWelding.sectionsPerWeld * sectionTicks;
+  const weldXp = practiceWelding.sectionsPerWeld * practiceSectionXp(balance);
+
+  it("a run of one completes exactly one weld and stops before the next begins", () => {
+    // Plenty of Scrap and plenty of time: only the selection ends the run.
+    const resolved = resolve(oneWeld * 5, {
+      practice: { ...UNSTARTED_PRACTICE, cycleActive: true },
+      scrapStackQuantities: scrap(12),
+      runWeldsRemaining: 1,
+    });
+    expect(resolved.completedWelds).toBe(1);
+    expect(resolved.stopReason).toBe("run_completed");
+    // The weld on the bench was already paid for, so nothing more is spent.
+    expect(resolved.scrapConsumed).toBe(0);
+    expect(resolved.consumedTicks).toBe(oneWeld);
+    expect(resolved.practice.cycleActive).toBe(false);
+  });
+
+  it("counts complete welds and stops at exactly the selected count", () => {
+    const resolved = resolve(oneWeld * 10, {
+      practice: { ...UNSTARTED_PRACTICE, cycleActive: true },
+      scrapStackQuantities: scrap(12),
+      runWeldsRemaining: 3,
+    });
+    expect(resolved.completedWelds).toBe(3);
+    expect(resolved.stopReason).toBe("run_completed");
+    // The first weld was paid at Start; the two that followed paid their own.
+    expect(resolved.scrapConsumed).toBe(2 * practiceWelding.scrapPerWeld);
+  });
+
+  it("keeps exactly 100 Welding XP per weld; the bound never adds or removes XP", () => {
+    const resolved = resolve(oneWeld * 3, {
+      practice: { ...UNSTARTED_PRACTICE, cycleActive: true },
+      scrapStackQuantities: scrap(12),
+      runWeldsRemaining: 3,
+    });
+    expect(weldXp).toBe(100);
+    expect(resolved.awardedXp).toBe(3 * weldXp);
+    expect(resolved.resolvedWelds.map((weld) => weld.xpGained)).toEqual([weldXp, weldXp, weldXp]);
+  });
+
+  it("a Clean Pass shortens a weld but never becomes bonus XP", () => {
+    // Four sections already done (three welded plus one claimed Clean Pass,
+    // whose XP was paid at the claim): the resolver welds the remaining six.
+    const resolved = resolve(oneWeld, {
+      practice: { sectionsCompleted: 4, cycleActive: true, cleanPass: UNROLLED_CLEAN_PASS },
+      scrapStackQuantities: [],
+      runWeldsRemaining: 1,
+    });
+    expect(resolved.completedWelds).toBe(1);
+    expect(resolved.resolvedWelds[0]!.sections).toBe(6);
+    expect(resolved.awardedXp).toBe(6 * practiceSectionXp(balance));
+    expect(resolved.consumedTicks).toBe(6 * sectionTicks);
+  });
+
+  it("Finish Current still ends the run after the current weld, with its own reason", () => {
+    const resolved = resolve(oneWeld * 5, {
+      practice: { ...UNSTARTED_PRACTICE, cycleActive: true },
+      scrapStackQuantities: scrap(12),
+      runWeldsRemaining: 4,
+      finishCurrentWeld: true,
+    });
+    expect(resolved.completedWelds).toBe(1);
+    expect(resolved.stopReason).toBe("finished_current_weld");
+    expect(resolved.finishCurrentWeldHonoured).toBe(true);
+    expect(resolved.scrapConsumed).toBe(0);
+  });
+
+  it("running out of Scrap before the selection is exhausted keeps its own reason", () => {
+    const resolved = resolve(oneWeld * 10, {
+      practice: { ...UNSTARTED_PRACTICE, cycleActive: true },
+      scrapStackQuantities: scrap(2),
+      runWeldsRemaining: 5,
+    });
+    expect(resolved.completedWelds).toBe(2);
+    expect(resolved.stopReason).toBe("out_of_scrap");
+  });
+});
+
+describe("the Practice run maximum (#229)", () => {
+  const maximumFor = (overrides: Partial<PracticeSnapshot> = {}) => {
+    const {
+      finishCurrentWeld: _finish,
+      runWeldsRemaining: _remaining,
+      ...rest
+    } = snapshot(overrides);
+    return practiceRunMaximum(rest, balance);
+  };
+
+  it("is one weld per full two Scrap carried", () => {
+    expect(maximumFor({ scrapStackQuantities: scrap(0) })).toBe(0);
+    expect(maximumFor({ scrapStackQuantities: scrap(1) })).toBe(0);
+    expect(maximumFor({ scrapStackQuantities: scrap(2) })).toBe(1);
+    expect(maximumFor({ scrapStackQuantities: scrap(7) })).toBe(3);
+    expect(maximumFor({ scrapStackQuantities: scrap(12) })).toBe(6);
+  });
+
+  it("counts a paid partial weld as the first weld, even with no Scrap left", () => {
+    const partial = { sectionsCompleted: 3, cycleActive: true, cleanPass: UNROLLED_CLEAN_PASS };
+    expect(maximumFor({ practice: partial, scrapStackQuantities: [] })).toBe(1);
+    expect(maximumFor({ practice: partial, scrapStackQuantities: scrap(5) })).toBe(3);
+  });
+
+  it("does not depend on how the Scrap is split across stacks of three", () => {
+    // Stack-3 Scrap changes which slots consuming it frees, not how many welds
+    // it pays for.
+    expect(maximumFor({ scrapStackQuantities: [3, 3] })).toBe(3);
+    expect(maximumFor({ scrapStackQuantities: [1, 1, 1, 1, 1, 1] })).toBe(3);
+    expect(maximumFor({ scrapStackQuantities: [2, 2, 2] })).toBe(3);
+  });
+
+  it("is not reduced by full Slag capacity, with or without Auto-discard", () => {
+    // Slag never blocks a completed weld — overflow is discarded — so a bench
+    // with no room for Slag at all still runs every weld its Scrap pays for.
+    const noRoom = {
+      scrapStackQuantities: [3, 3],
+      slagStackQuantities: [items.slag.stackLimit],
+      slotsAvailable: 0,
+      massAvailableGrams: 0,
+    };
+    expect(maximumFor({ ...noRoom, autoDiscardSlag: false })).toBe(3);
+    expect(maximumFor({ ...noRoom, autoDiscardSlag: true })).toBe(3);
+  });
+
+  it("matches what an uncapped run of that length actually completes", () => {
+    for (const quantities of [[3], [3, 1], [2, 2, 3], [1, 1, 1]]) {
+      const maximum = maximumFor({ scrapStackQuantities: quantities });
+      const ran = resolve(1_000 * sectionTicks, { scrapStackQuantities: quantities });
+      expect(ran.completedWelds).toBe(maximum);
+    }
   });
 });
