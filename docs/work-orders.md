@@ -149,8 +149,9 @@ as a second price table (`workOrderMaterialReplacementValue`): a merchant's
 replacing the unit the player gave up; where nobody sells the item, the best
 available buy-back price is the only honest valuation there is. Today that
 resolves to **Refined Ferrite at 10 Credits** (Bix buys it at 10 and no one
-sells it) and **Power Cell at 8 Credits** (Bix sells it at 8, which outranks
-his 3-Credit buy-back). A merchant price change moves this value automatically
+sells it) and **Power Cell at 12 Credits** (Bix sells it at 12, which outranks
+his 4-Credit buy-back; it was 8 until #230 repriced Cells, which moved every
+Cell-consuming payout below). A merchant price change moves this value automatically
 — nothing here is a frozen second constant.
 
 `validateWorkOrderDefinitions` recomputes `workOrderPayoutCredits` for every
@@ -456,11 +457,11 @@ rule above at module load, so it can never drift from it):
 | Split Carry Frame (`renn_carry_frame`) | Renn Calder | 2 Refined Ferrite | 8 | 75 |
 | Cracked Heater Housing (`voss_heater_housing`) | Greta Voss | 4 Refined Ferrite | 9 | 100 |
 | Sagging Shelf Bay (`bix_shop_shelving`) | Bix Weller | 3 Refined Ferrite | 10 | 90 |
-| Cracked Cutter Housing (`tansy_cutter_housing`) | Tansy Rusk | 4 Refined Ferrite + 1 Power Cell | 12 | 115 |
+| Cracked Cutter Housing (`tansy_cutter_housing`) | Tansy Rusk | 4 Refined Ferrite + 1 Power Cell | 12 | 120 |
 | Tourist-Era Bed Frame (`mara_bed_frame`) | Mara Kells | 5 Refined Ferrite | 13 | 120 |
 | Speeder Cargo Rack (`stemp_speeder_rack`) | Juno Stemp | 6 Refined Ferrite | 14 | 135 |
 | Binding Hand Winch (`larkin_hand_winch`) | Pell Larkin | 4 Refined Ferrite | 16 | 120 |
-| Electric Cargo Dolly (`mott_cargo_dolly`) | Otis Mott | 8 Refined Ferrite + 3 Power Cell | 19 | 200 |
+| Electric Cargo Dolly (`mott_cargo_dolly`) | Otis Mott | 8 Refined Ferrite + 3 Power Cell | 19 | 210 |
 
 ### Possession provenance — the standard for every job
 
@@ -499,7 +500,7 @@ proves what the next size needs.
 - **Item:** the housing of her own working cutter, including the Cell it
   carried
 - **Materials:** 4 Refined Ferrite + 1 Power Cell · **Sections:** 12 ·
-  **Payout:** 115 Credits
+  **Payout:** 120 Credits
 - **Terminal description:** "The Cell cradle has torn loose at one of the
   mismatched joints in Tansy Rusk's working cutter, and took the Cell in it
   with it. The housing wants re-laying straight and a fresh Cell fitted."
@@ -604,7 +605,7 @@ proves what the next size needs.
 - **Client:** Otis Mott — *background resident*
 - **Item:** the frame of his electric cargo dolly, buckled around the power rack
 - **Materials:** 8 Refined Ferrite + 3 Power Cell · **Sections:** 19 ·
-  **Payout:** 200 Credits
+  **Payout:** 210 Credits
 - **Terminal description:** "The frame on Otis Mott's electric cargo dolly has
   buckled around the power rack and taken three Cells with it. He hauls
   freight around the valley and cannot work without it."
@@ -704,12 +705,12 @@ module load):
 | --- | --- | --- | --- | --- |
 | Countertop Cooker (`voss_countertop_cooker`) | Greta Voss | 2 Galvanic Stock | 10 | 95 |
 | Powered Souvenir Display (`bix_souvenir_display`) | Bix Weller | 3 Galvanic Stock | 11 | 120 |
-| FurBaby™ Repair (`tansy_furbaby_repair`) | Tansy Rusk | 2 Galvanic Stock + 1 Power Cell | 12 | 110 |
+| FurBaby™ Repair (`tansy_furbaby_repair`) | Tansy Rusk | 2 Galvanic Stock + 1 Power Cell | 12 | 115 |
 | Helmet Charging Rack (`renn_helmet_rack`) | Renn Calder | 4 Galvanic Stock | 13 | 145 |
 | Portable Cargo Scale (`mott_cargo_scale`) | Otis Mott | 3 Galvanic Stock + 4 Refined Ferrite | 15 | 175 |
 | B&B Linen Press (`mara_linen_press`) | Mara Kells | 3 Galvanic Stock + 5 Refined Ferrite | 16 | 190 |
-| Powered Cable Puller (`larkin_cable_puller`) | Pell Larkin | 4 Galvanic Stock + 5 Refined Ferrite + 1 Power Cell | 18 | 225 |
-| Speeder Power Cradle (`stemp_speeder_cradle`) | Juno Stemp | 5 Galvanic Stock + 6 Refined Ferrite + 2 Power Cell | 20 | 270 |
+| Powered Cable Puller (`larkin_cable_puller`) | Pell Larkin | 4 Galvanic Stock + 5 Refined Ferrite + 1 Power Cell | 18 | 230 |
+| Speeder Power Cradle (`stemp_speeder_cradle`) | Juno Stemp | 5 Galvanic Stock + 6 Refined Ferrite + 2 Power Cell | 20 | 280 |
 
 #### Countertop Cooker
 

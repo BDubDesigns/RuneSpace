@@ -290,9 +290,9 @@ type MissionAcceptEffect =
 ```
 
 This is what the person offering the job hands over so the work can start — a
-different thing from a reward for finishing it. Wade hands his new apprentice 24
+different thing from a reward for finishing it. Wade hands his new apprentice 36
 Credits for Keep the Change — the retail price of the three Power Cells the job
-needs — and six Scrap Metal for 10,000 Hours, which is exactly the three
+needs, derived from Bix's price line (#230) — and six Scrap Metal for 10,000 Hours, which is exactly the three
 practice welds it asks for. Whatever the player does not spend stays theirs.
 There is deliberately no reimbursement, no completion payout, and no provenance
 tracking on what they buy or what they weld.
@@ -646,7 +646,7 @@ authored sequence it just played; the command revalidates everything else:
 rows are locked and an existing accepted/completed row short-circuits before the
 insert, so `MissionOffer.acceptEffect` (§8.1) is applied only in the branch that
 creates the acceptance stamp. A concurrent duplicate blocks on that lock and then
-sees the accepted row, so Wade's 24 Credits are granted once even under retries,
+sees the accepted row, so Wade's 36 Credits are granted once even under retries,
 reloads, replayed dialogue, or parallel requests. Integration coverage asserts
 this directly.
 
@@ -756,7 +756,7 @@ Short concrete examples that demonstrate the framework vocabulary. Do not copy m
 ### Keep the Change — apprenticeship, a paid-up-front budget, and a required introduction
 
 - **Acceptance:** the first mission that is neither open discovery nor a continuation. `prerequisiteMissionId: holdItTogether` gates eligibility and Hold It Together names no continuation, so the player must go back to Wade and take the job (§3.1, §11). One offer route: Wade at the Crash Site, `actionLabel: "TAKE THE JOB"`.
-- **Acceptance effect:** `acceptEffect: { kind: "credits", amount: 24 }` (§8.1) — the retail price of three Power Cells from Bix, granted exactly once with the acceptance stamp. Unspent Credits are never reclaimed and nothing is reimbursed.
+- **Acceptance effect:** `acceptEffect: { kind: "credits", amount: KEEP_THE_CHANGE_BUDGET_CREDITS }` (§8.1) — the retail price of three Power Cells from Bix, `KEEP_THE_CHANGE_CELL_COUNT × merchantRetailPrice(bix, powerCell)`, so 36 Credits at the 12-Credit price #230 set; a Cell price change moves it with no second number to update. Granted exactly once with the acceptance stamp. Unspent Credits are never reclaimed and nothing is reimbursed.
 - **Requirements (ordered):** `npc_conversation` with Bix at Holo Hollow → `carried_stack: powerCell` (`quantity: 3`, `turnIn: "consume_required_quantity"`). Meeting Bix stays first even for a player already carrying Cells, because the introduction is the point; buying is never required, and the Cells may come from inventory, the Annex, or the shop — carried quantity is observed regardless of provenance (§5–§6). No `recommendedActionId`: no gameplay action authoritatively produces Power Cells.
 - **Reward:** none (§8). The outcome is world/social state — HH B&B becomes enterable because the Mission is completed, derived from that record rather than a second persisted unlock flag (`docs/gameplay-foundations.md`, Local Places).
 - **Dialogue:** Wade's offer scene carries the post-repair beat and the apprenticeship itself, with Tansy interrupting over comms from the seam (per-beat `speakerNpcId` + `presentationMode: "comms"`); Bix's required scene hosts Mara as an authored guest speaker in his own sequence; Tansy authors `conversationReminder` → `carriedReminder` → `busy` → turn-in → completion presentation.

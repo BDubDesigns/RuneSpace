@@ -247,7 +247,7 @@ of the Welding XP and can be done forever.
 | Sections per weld | 10 | `balance.practiceWelding` |
 | XP per section | authored share of the global Welding XP (20% → 10, so 100 per weld) | `practiceSectionXp()` |
 | Output per weld | up to 2 Slag, at completion time | `balance.practiceWelding` |
-| Scrap Metal | `stackLimit: 1`, so one piece per inventory slot | `balance.items.scrapMetal` |
+| Scrap Metal | `stackLimit: 3` (#230); consuming it frees a slot only when a stack empties | `balance.items.scrapMetal` |
 | Where, and what opens it | Rusk Recovery; accepting 10,000 Hours | `game/content/rusk-recovery` |
 
 Practice is deliberately **not** a repair target: a repair target is one finite
@@ -503,7 +503,37 @@ approved price table, merchant personality, and Trade UX — belong to
   capacity, and carried mass behave exactly as everywhere else. A purchase is
   all-or-nothing: a partial fill is never delivered.
 - There is no merchant wallet, finite merchant stock, restock timer, dynamic
-  pricing, buy limit, or player-to-player exchange.
+  pricing, or player-to-player exchange. The one limit is per character, not
+  per shop: a price line may author a `dailySellLimit` (below).
+
+### Merchant daily purchase limits (issue #230)
+
+Ahead of Fabrication, two lines are capped per character per RuneSpace Pacific
+reset date: Wade sells at most **12 Scrap Metal** (4 Credits each; he buys it
+back at 1) and Bix at most **12 Power Cells** (12 Credits each; he buys them
+back at 4). The limit is authored on the price line (`dailySellLimit`,
+`game/content/merchants.ts`) and never mirrored anywhere else.
+
+- The reset date is the shared `pacificResetDate` boundary the Annex and the
+  ForceSales refresh use (`game/domain/daily-reset.ts`). Nothing is cleared at
+  midnight; a new reset date simply has no ledger row yet.
+- The ledger is `character_merchant_daily_purchases`, one row per
+  `(character, merchant, item, reset date)` holding the quantity bought that
+  day. Wade's Scrap row and Bix's Cell row are independent records, and the
+  table is separate from the Annex claim and ForceSales refresh ledgers.
+- The purchase command reads today's row under the character lock it already
+  holds, refuses a request larger than what is left (`daily_limit`), and only
+  after every other refusal has passed consumes the allowance with a guarded
+  upsert (the increment applies only while the new total stays within the
+  limit) — in the same transaction as the Credit and inventory change. A
+  refused or rolled-back purchase spends none of it; concurrent or retried
+  requests cannot take a line past twelve.
+- The cap counts units bought from that line today, not units owned. Selling
+  back never restores it, and stock from anywhere else (the Annex, 10,000
+  Hours' six Scrap) never counts against it.
+- Play state projects `merchantDailyPurchases` (limit, purchased, remaining per
+  line) so the Trade row can show what is left today and cap Max; the server
+  alone decides.
 
 ### World Location merchants (issue #190)
 
@@ -513,8 +543,9 @@ trades out of his own yard rather than a room in a town. The merchant itself
 owns its prices and its authored unlock: `authorizingMissionId` names the
 Mission whose **acceptance** opens the counter, revalidated server-side against
 the character's own accepted record, and it stays open after that Mission
-completes. Wade sells Scrap Metal at 2 Credits with no stock row, restock timer,
-or day cap, and buys nothing; Bix's Local Place path is unchanged.
+completes. Wade sells Scrap Metal at 4 Credits and buys it back at 1, with no
+stock row or restock timer — only the per-character daily limit above (#230);
+Bix's Local Place path is unchanged.
 
 The Trade surface presents only the directions the authored price table
 supports, derived generically by `merchantTradeDirections`: a merchant with no

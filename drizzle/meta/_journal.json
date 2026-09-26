@@ -190,6 +190,13 @@
       "when": 1790281390985,
       "tag": "0026_gameplay_access_launch_control",
       "breakpoints": true
+    },
+    {
+      "idx": 27,
+      "version": "7",
+      "when": 1790411685185,
+      "tag": "0027_merchant_daily_purchases",
+      "breakpoints": true
     }
   ]
 }

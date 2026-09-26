@@ -390,14 +390,18 @@ describe("Wade's Scrap counter", () => {
     expect(getLocationMerchant(LOCATION_IDS.crashSite)).toBeUndefined();
   });
 
-  it("still sells Scrap at two Credits, and buys structural material but never Slag", () => {
+  it("sells Scrap at four Credits, and buys it back, structural material, but never Slag", () => {
     const wadeShop = getMerchant(MERCHANT_IDS.wadeRusk)!;
-    // His original catalog entry is untouched by the Deep Jag buybacks (#209).
-    expect(wadeShop.prices).toContainEqual({ itemId: ITEM_IDS.scrapMetal, sellPrice: 2 });
-    expect(wadeShop.prices.filter((price) => price.sellPrice !== undefined)).toEqual([
-      { itemId: ITEM_IDS.scrapMetal, sellPrice: 2 },
-    ]);
+    // #230 repriced his Scrap line and gave it a buyback and a daily limit.
+    const scrapLine = {
+      itemId: ITEM_IDS.scrapMetal,
+      buyPrice: 1,
+      sellPrice: 4,
+      dailySellLimit: 12,
+    };
+    expect(wadeShop.prices.filter((price) => price.sellPrice !== undefined)).toEqual([scrapLine]);
     expect(wadeShop.prices.filter((price) => price.buyPrice !== undefined)).toEqual([
+      scrapLine,
       { itemId: ITEM_IDS.refinedFerrite, buyPrice: 10 },
       { itemId: ITEM_IDS.galvanicStock, buyPrice: 18 },
       { itemId: ITEM_IDS.galvaferrite, buyPrice: 45 },

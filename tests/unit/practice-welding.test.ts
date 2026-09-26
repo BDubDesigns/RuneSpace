@@ -33,10 +33,19 @@ const sectionXp = practiceSectionXp(balance);
 /** Rolls the same placement every time; Clean Pass placement has its own suite. */
 const steadyRandom: CleanPassRandom = { nextBasisPoints: () => 0 };
 
+/** Carried Scrap packed the way the inventory planner packs it: full stacks first. */
+function scrap(quantity: number): number[] {
+  const stacks: number[] = [];
+  for (let left = quantity; left > 0; left -= items.scrapMetal.stackLimit) {
+    stacks.push(Math.min(items.scrapMetal.stackLimit, left));
+  }
+  return stacks;
+}
+
 function snapshot(overrides: Partial<PracticeSnapshot> = {}): PracticeSnapshot {
   return {
     practice: UNSTARTED_PRACTICE,
-    scrapAvailable: 6,
+    scrapStackQuantities: scrap(6),
     slagStackQuantities: [],
     slotsAvailable: 8,
     massAvailableGrams: 50_000,
@@ -55,37 +64,163 @@ function resolve(elapsedTicks: number, overrides: Partial<PracticeSnapshot> = {}
   });
 }
 
-describe("Scrap Metal is fungible but non-stacking", () => {
-  it("occupies one ordinary inventory slot per piece", () => {
+describe("Scrap Metal stacks to three (#230)", () => {
+  it("is a fungible stack with a limit of exactly three", () => {
     const definition = getItemDefinition(ITEM_IDS.scrapMetal, balance);
     expect(definition).toEqual({
       itemId: ITEM_IDS.scrapMetal,
       kind: "stack",
-      stackLimit: 1,
+      stackLimit: 3,
       massGrams: items.scrapMetal.massGrams,
     });
-
-    // Six pieces is six stacks, so it is a real carrying decision.
-    const plan = planStackAddition([], ITEM_IDS.scrapMetal, 6, 1, 8, Number.POSITIVE_INFINITY, 0);
-    expect(plan.remainingQuantity).toBe(0);
-    expect(plan.createdStacks).toHaveLength(6);
-    expect(plan.createdStacks.every((stack) => stack.quantity === 1)).toBe(true);
   });
 
-  it("will not fit six pieces into five free slots", () => {
-    const plan = planStackAddition([], ITEM_IDS.scrapMetal, 6, 1, 5, Number.POSITIVE_INFINITY, 0);
+  it("packs six pieces into two full stacks through the ordinary planner", () => {
+    const plan = planStackAddition([], ITEM_IDS.scrapMetal, 6, 3, 8, Number.POSITIVE_INFINITY, 0);
+    expect(plan.remainingQuantity).toBe(0);
+    expect(plan.createdStacks.map((stack) => stack.quantity)).toEqual([3, 3]);
+  });
+
+  it("tops up a partial stack before opening a new slot", () => {
+    const plan = planStackAddition(
+      [{ id: "a", itemId: ITEM_IDS.scrapMetal, quantity: 2 }],
+      ITEM_IDS.scrapMetal,
+      2,
+      3,
+      8,
+      Number.POSITIVE_INFINITY,
+      0,
+    );
+    expect(plan.updatedStacks).toEqual([{ id: "a", quantity: 3 }]);
+    expect(plan.createdStacks).toEqual([{ itemId: ITEM_IDS.scrapMetal, quantity: 1 }]);
+  });
+
+  it("will not fit seven pieces into two free slots", () => {
+    const plan = planStackAddition([], ITEM_IDS.scrapMetal, 7, 3, 2, Number.POSITIVE_INFINITY, 0);
     expect(plan.remainingQuantity).toBe(1);
   });
 
-  it("spends whichever pieces are to hand, because one piece is like any other", () => {
+  it("spends the smallest stacks first, so a split pair empties the loose piece", () => {
     const stacks = [
-      { id: "a", itemId: ITEM_IDS.scrapMetal, quantity: 1 },
+      { id: "a", itemId: ITEM_IDS.scrapMetal, quantity: 3 },
       { id: "b", itemId: ITEM_IDS.scrapMetal, quantity: 1 },
-      { id: "c", itemId: ITEM_IDS.scrapMetal, quantity: 1 },
     ];
     const removal = planExactStackRemoval(stacks, ITEM_IDS.scrapMetal, 2);
-    expect(removal.ok).toBe(true);
-    if (removal.ok) expect(removal.deletedStackIds).toHaveLength(2);
+    expect(removal).toEqual({
+      ok: true,
+      deletedStackIds: ["b"],
+      updatedStacks: [{ id: "a", quantity: 2 }],
+    });
+  });
+});
+
+describe("Practice capacity with stacked Scrap (#230)", () => {
+  const oneWeld = practiceWelding.sectionsPerWeld * sectionTicks;
+  const fullSlag = [items.slag.stackLimit];
+
+  it("frees no slot when a weld's two Scrap come out of one stack of three", () => {
+    // Every slot is taken and the only Slag stack is full. The weld spends two
+    // of the three pieces, so the Scrap stack survives with one in it and not
+    // one slot has opened — the Slag has nowhere to go.
+    const resolved = resolve(oneWeld, {
+      scrapStackQuantities: [3],
+      slotsAvailable: 0,
+      massAvailableGrams: 0,
+      slagStackQuantities: fullSlag,
+    });
+    expect(resolved.completedWelds).toBe(1);
+    expect(resolved.scrapConsumed).toBe(2);
+    expect(resolved.slagKept).toBe(0);
+    expect(resolved.slagDiscarded).toBe(practiceWelding.slagPerWeld);
+    // The mass freed is real; the slots are not.
+    expect(resolved.slagBudget).toEqual({ slots: 0, massGrams: 2 * items.scrapMetal.massGrams });
+  });
+
+  it("frees exactly one slot when the pair empties a stack of two", () => {
+    const resolved = resolve(oneWeld, {
+      scrapStackQuantities: [2],
+      slotsAvailable: 0,
+      massAvailableGrams: 0,
+      slagStackQuantities: fullSlag,
+    });
+    expect(resolved.slagBudget.slots).toBe(1);
+    // Both Slag share the one freed slot, because Slag stacks to ten.
+    expect(resolved.slagKept).toBe(practiceWelding.slagPerWeld);
+    expect(resolved.slagDiscarded).toBe(0);
+  });
+
+  it("frees the one slot the loose piece held when the pair spans two stacks", () => {
+    // [1, 2]: removal takes the single piece first (its slot frees) and one
+    // from the two (which survives at one). Three pieces is one weld only.
+    const resolved = resolve(oneWeld, {
+      scrapStackQuantities: [1, 2],
+      slotsAvailable: 0,
+      massAvailableGrams: 0,
+      slagStackQuantities: fullSlag,
+    });
+    expect(resolved.slagBudget.slots).toBe(1);
+    expect(resolved.slagKept).toBe(practiceWelding.slagPerWeld);
+  });
+
+  it("frees two slots when the pair is two loose single pieces", () => {
+    const resolved = resolve(oneWeld, {
+      scrapStackQuantities: [1, 1],
+      slotsAvailable: 0,
+      massAvailableGrams: 0,
+      slagStackQuantities: fullSlag,
+    });
+    expect(resolved.slagBudget.slots).toBe(2);
+    expect(resolved.slagKept).toBe(practiceWelding.slagPerWeld);
+  });
+
+  it("counts slots across several welds by what the whole consumption empties", () => {
+    // Six pieces as [3, 3], three welds: the first weld frees nothing, the
+    // second empties the first stack, the third empties the second. Two slots
+    // in total, never the six a per-piece count would claim.
+    const resolved = resolve(3 * oneWeld, {
+      scrapStackQuantities: [3, 3],
+      slotsAvailable: 0,
+      massAvailableGrams: 0,
+      slagStackQuantities: fullSlag,
+    });
+    expect(resolved.completedWelds).toBe(3);
+    expect(resolved.scrapConsumed).toBe(6);
+    expect(resolved.slagBudget.slots).toBe(2);
+    // Weld one has no slot and discards both; welds two and three share the
+    // freed slots, and Slag stacks to ten, so all four of theirs are kept.
+    expect(resolved.resolvedWelds.map((weld) => weld.slagKept)).toEqual([0, 2, 2]);
+    expect(resolved.slagDiscarded).toBe(2);
+  });
+
+  it("never budgets more slots than persistence's one bulk removal actually frees", () => {
+    const scrapPerWeld = practiceWelding.scrapPerWeld;
+    for (const stacks of [[3], [2], [1, 3], [3, 3], [1, 2, 3], [2, 2, 2], [1, 1, 3, 3]]) {
+      const resolved = resolve(10 * oneWeld, {
+        scrapStackQuantities: stacks,
+        slotsAvailable: 0,
+        massAvailableGrams: 0,
+      });
+      const removal = planExactStackRemoval(
+        stacks.map((quantity, index) => ({ id: index, itemId: ITEM_IDS.scrapMetal, quantity })),
+        ITEM_IDS.scrapMetal,
+        resolved.scrapConsumed,
+      );
+      expect(removal.ok).toBe(true);
+      if (removal.ok) expect(resolved.slagBudget.slots).toBe(removal.deletedStackIds.length);
+      expect(resolved.scrapConsumed % scrapPerWeld).toBe(0);
+    }
+  });
+
+  it("still keeps no Slag once every slot and mass gram is spoken for", () => {
+    const resolved = resolve(oneWeld, {
+      scrapStackQuantities: [3],
+      slotsAvailable: 0,
+      massAvailableGrams: 0,
+      slagStackQuantities: [items.slag.stackLimit - 1],
+    });
+    // One unit tops up the partial Slag stack; the other has no slot.
+    expect(resolved.slagKept).toBe(1);
+    expect(resolved.slagDiscarded).toBe(1);
   });
 });
 
@@ -147,7 +282,7 @@ describe("Slag at completion time", () => {
         cycleActive: true,
         cleanPass: UNROLLED_CLEAN_PASS,
       },
-      scrapAvailable: 0,
+      scrapStackQuantities: scrap(0),
       slotsAvailable: 0,
       slagStackQuantities: [items.slag.stackLimit - 1],
     });
@@ -181,7 +316,7 @@ describe("Slag at completion time", () => {
         cycleActive: true,
         cleanPass: UNROLLED_CLEAN_PASS,
       },
-      scrapAvailable: 0,
+      scrapStackQuantities: scrap(0),
       slotsAvailable: 0,
       massAvailableGrams: 0,
       slagStackQuantities: [items.slag.stackLimit],
@@ -191,11 +326,12 @@ describe("Slag at completion time", () => {
     expect(resolved.slagDiscarded).toBe(practiceWelding.slagPerWeld);
   });
 
-  it("always has room for a fresh weld's Slag, because its Scrap freed the slots", () => {
-    // Two non-stacking Scrap leave two slots and 600g behind when the weld
-    // begins; two Slag need at most two slots and 300g.
+  it("has room for a fresh weld's Slag when its Scrap empties a stack", () => {
+    // Two Scrap in one stack of two leave a slot and 600g behind when the weld
+    // begins; two Slag need one slot and 300g. (A pair that does not empty its
+    // stack frees no slot — see the stacked-Scrap capacity suite.)
     const resolved = resolve(practiceWelding.sectionsPerWeld * sectionTicks, {
-      scrapAvailable: 2,
+      scrapStackQuantities: [2],
       slotsAvailable: 0,
       massAvailableGrams: 0,
       slagStackQuantities: [items.slag.stackLimit],
@@ -208,7 +344,7 @@ describe("Slag at completion time", () => {
 describe("continuous runs", () => {
   it("begins the next weld the instant the last one finishes", () => {
     const resolved = resolve(practiceWelding.sectionsPerWeld * 3 * sectionTicks, {
-      scrapAvailable: 6,
+      scrapStackQuantities: scrap(6),
     });
     expect(resolved.completedWelds).toBe(3);
     expect(resolved.scrapConsumed).toBe(6);
@@ -217,7 +353,7 @@ describe("continuous runs", () => {
   });
 
   it("resolves a long offline window into as many welds as the Scrap allows", () => {
-    const resolved = resolve(60 * 60 * 1_000, { scrapAvailable: 10 });
+    const resolved = resolve(60 * 60 * 1_000, { scrapStackQuantities: scrap(10) });
     expect(resolved.completedWelds).toBe(5);
     expect(resolved.scrapConsumed).toBe(10);
     expect(resolved.stopReason).toBe("out_of_scrap");
@@ -225,7 +361,7 @@ describe("continuous runs", () => {
 
   it("finishes the weld in progress before stopping for want of Scrap", () => {
     const resolved = resolve(practiceWelding.sectionsPerWeld * 2 * sectionTicks, {
-      scrapAvailable: 2,
+      scrapStackQuantities: scrap(2),
     });
     expect(resolved.completedWelds).toBe(1);
     expect(resolved.stopReason).toBe("out_of_scrap");
@@ -234,7 +370,7 @@ describe("continuous runs", () => {
   });
 
   it("stops immediately when the bench never had enough Scrap", () => {
-    const resolved = resolve(100 * sectionTicks, { scrapAvailable: 1 });
+    const resolved = resolve(100 * sectionTicks, { scrapStackQuantities: scrap(1) });
     expect(resolved.stopReason).toBe("out_of_scrap");
     expect(resolved.scrapConsumed).toBe(0);
     expect(resolved.sectionsResolved).toBe(0);
@@ -246,7 +382,7 @@ describe("continuous runs", () => {
     // behaviour: this mirrors "begins the next weld the instant the last one
     // finishes" above, with the field set instead of defaulted.
     const resolved = resolve(practiceWelding.sectionsPerWeld * 3 * sectionTicks, {
-      scrapAvailable: 6,
+      scrapStackQuantities: scrap(6),
       finishCurrentWeld: false,
     });
     expect(resolved.completedWelds).toBe(3);
@@ -271,7 +407,7 @@ describe("finishing the current weld and stopping", () => {
   it("lets the already-paid weld finish, spends no further Scrap, and starts no next one", () => {
     const resolved = resolve(4 * sectionTicks, {
       practice: partial,
-      scrapAvailable: 6,
+      scrapStackQuantities: scrap(6),
       finishCurrentWeld: true,
     });
     expect(resolved.completedWelds).toBe(1);
@@ -285,7 +421,7 @@ describe("finishing the current weld and stopping", () => {
   it("completes exactly one weld, however much time is left over afterwards", () => {
     const resolved = resolve(practiceWelding.sectionsPerWeld * 5 * sectionTicks, {
       practice: partial,
-      scrapAvailable: 20,
+      scrapStackQuantities: scrap(20),
       finishCurrentWeld: true,
     });
     expect(resolved.completedWelds).toBe(1);
@@ -296,7 +432,7 @@ describe("finishing the current weld and stopping", () => {
 
   it("stops immediately, with nothing to finish, when no weld was in progress", () => {
     const resolved = resolve(practiceWelding.sectionsPerWeld * sectionTicks, {
-      scrapAvailable: 6,
+      scrapStackQuantities: scrap(6),
       finishCurrentWeld: true,
     });
     expect(resolved.completedWelds).toBe(0);
@@ -323,20 +459,26 @@ describe("a partial weld the player already paid for", () => {
     expect(canBeginPracticeWeld(0, balance)).toBe(false);
     expect(canBeginPracticeWeld(practiceWelding.scrapPerWeld, balance)).toBe(true);
 
-    const resolved = resolve(4 * sectionTicks, { practice: partial, scrapAvailable: 0 });
+    const resolved = resolve(4 * sectionTicks, {
+      practice: partial,
+      scrapStackQuantities: scrap(0),
+    });
     expect(resolved.scrapConsumed).toBe(0);
     expect(resolved.completedWelds).toBe(1);
     expect(resolved.awardedXp).toBe(4 * sectionXp);
   });
 
   it("keeps its already-rolled Clean Pass placement across the resume", () => {
-    const resolved = resolve(sectionTicks, { practice: partial, scrapAvailable: 0 });
+    const resolved = resolve(sectionTicks, { practice: partial, scrapStackQuantities: scrap(0) });
     expect(resolved.practice.cleanPass.opportunities![0]!.section).toBe(3);
     expect(resolved.practice.cleanPass.opportunities![1]!.section).toBe(6);
   });
 
   it("clears the placement only when that weld is finished", () => {
-    const resolved = resolve(4 * sectionTicks, { practice: partial, scrapAvailable: 0 });
+    const resolved = resolve(4 * sectionTicks, {
+      practice: partial,
+      scrapStackQuantities: scrap(0),
+    });
     expect(resolved.practice.cleanPass).toEqual(UNROLLED_CLEAN_PASS);
     expect(resolved.practice.cycleActive).toBe(false);
   });

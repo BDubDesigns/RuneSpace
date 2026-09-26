@@ -5,6 +5,32 @@ export type { PublicUpdate } from "@/game/schemas/public-updates";
 
 const authoredUpdates = [
   {
+    slug: "price-check",
+    title: "Price Check",
+    publishedAt: "2026-09-26T01:00:00-07:00",
+    summary:
+      "Scrap Metal now stacks three to a slot, Wade and Bix have new prices and a daily limit of twelve, Keep the Change pays 36 Credits, and the Work Orders that use Power Cells pay more.",
+    body: [
+      "Scrap Metal stacks now. Three pieces share one inventory slot, so the six Wade hands you for 10,000 Hours take two slots instead of six, and a trip to the bench is a lot less of a packing puzzle.",
+      "Wade and Bix have both repriced. Wade sells Scrap Metal at 4 Credits a piece and will now take spare scrap back at 1. Bix sells Power Cells at 12 Credits each and buys them back at 4. Each of them now sells any one character at most twelve a day — twelve Scrap from Wade, twelve Power Cells from Bix — and the counter shows how many you have left. The count starts again at midnight Pacific time, the same moment the Annex allotment and ForceSales' refresh come back.",
+      "The limit is on what you buy from them, not on what you own. Selling back doesn't earn you more for the day, and Cells from the Annex or the Scrap Wade gives you for 10,000 Hours never count against it.",
+      "Wade still pays Keep the Change's budget up front at exactly what three Cells cost from Bix, so that job now hands over 36 Credits. And because a Work Order's pay covers what it would cost you to replace its materials, the five jobs that use up a Power Cell now pay a little more.",
+    ],
+    patchNotes: [
+      {
+        heading: "Changed",
+        items: [
+          "Scrap Metal stacks up to three to an inventory slot. Using scrap at the bench frees a slot only when it empties a stack.",
+          "Wade sells Scrap Metal at 4 Credits each (up to 12 per character per day) and buys it back at 1.",
+          "Bix sells Power Cells at 12 Credits each (up to 12 per character per day) and buys them back at 4.",
+          "The Trade counter shows how many of Wade's Scrap and Bix's Power Cells you can still buy today, and Max accounts for it.",
+          "Keep the Change hands over 36 Credits when you take the job — still exactly the price of three Cells from Bix.",
+          "Work Orders that use Power Cells pay more: Cracked Cutter Housing 120, Electric Cargo Dolly 210, FurBaby™ Repair 115, Powered Cable Puller 230, and Speeder Power Cradle 280 Credits.",
+        ],
+      },
+    ],
+  },
+  {
     slug: "network-administrator",
     title: "I Am the Network Administrator",
     publishedAt: "2026-09-20T14:00:00-07:00",

@@ -164,7 +164,7 @@ suite("issue #207 Workbench exclusivity (real PostgreSQL)", () => {
     return { userId, character };
   }
 
-  /** Scrap does not stack, so each piece is its own row and its own slot. */
+  /** Each piece as its own single-piece row — a valid layout at three to a stack (#230). */
   async function setScrap(characterId: string, pieces: number) {
     await db
       .delete(rune.inventoryStacks)

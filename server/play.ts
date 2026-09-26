@@ -63,6 +63,9 @@ import { getRepairTarget } from "@/game/content/repair-targets";
 import { loadLocationStateFacts } from "@/server/location-state";
 import { POWER_ANNEX_REWARD_SOURCE_ID, pacificResetDate } from "@/game/domain/power-annex";
 import { powerAnnexNow } from "@/server/power-annex-clock";
+import { MERCHANTS } from "@/game/content/merchants";
+import { merchantDailyAllowances, type DailyPurchaseAllowance } from "@/game/domain/trade";
+import { loadMerchantDailyPurchases } from "@/server/merchant-daily-purchases";
 import {
   carriedItemMassGrams,
   isCompatibleEquipmentAssignment,
@@ -657,6 +660,15 @@ export type PlayGameplayState = {
   scavengeReveals: readonly ScavengeReveal[];
   /** Current Pacific-day claim state, only when the character is at the Annex. */
   powerAnnex?: { resetDate: string; claimed: boolean };
+  /**
+   * Today's allowance on every daily-limited merchant line (#230), keyed by
+   * merchant then item — Wade's Scrap and Bix's Power Cells. The Trade surface
+   * reads its merchant's entry; the purchase command re-reads the ledger under
+   * the character lock and alone decides.
+   */
+  merchantDailyPurchases: Readonly<
+    Record<string, Readonly<Record<string, DailyPurchaseAllowance>>>
+  >;
   /** Set when a begin-travel command was refused by the authoritative rules. */
   travelError?:
     | "route_blocked"
@@ -1235,6 +1247,7 @@ export async function stateFromTransaction(
     travelRows,
     scavengeRevealRows,
     claimRows,
+    merchantPurchaseRows,
     character,
   ] = await Promise.all([
     transaction
@@ -1285,6 +1298,7 @@ export async function stateFromTransaction(
           eq(characterPowerCellDailyClaims.resetDate, resetDate),
         ),
       ),
+    loadMerchantDailyPurchases(transaction, { characterId, resetDate }),
     characterRow
       ? Promise.resolve([characterRow])
       : transaction.select().from(characters).where(eq(characters.id, characterId)).limit(1),
@@ -1546,6 +1560,7 @@ export async function stateFromTransaction(
       currentLocationId === LOCATION_IDS.emergencyPowerAnnex
         ? { resetDate, claimed: claimRows.length > 0 }
         : undefined,
+    merchantDailyPurchases: merchantDailyAllowances(MERCHANTS, merchantPurchaseRows),
     activeAction:
       action &&
       (activeMiningSource !== undefined ||

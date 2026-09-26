@@ -39,6 +39,62 @@ export function merchantUnitPrice(
   return direction === "buy" ? price.sellPrice : price.buyPrice;
 }
 
+/**
+ * How many units of an item this merchant sells each character per Pacific
+ * reset date (#230), or undefined when that line authors no daily limit.
+ */
+export function merchantDailySellLimit(
+  merchant: MerchantDefinition,
+  itemId: string,
+): number | undefined {
+  return merchant.prices.find((candidate) => candidate.itemId === itemId)?.dailySellLimit;
+}
+
+/** One merchant line's allowance for the current reset date. */
+export type DailyPurchaseAllowance = {
+  limit: number;
+  purchased: number;
+  remaining: number;
+};
+
+/**
+ * Today's allowance from the authored limit and what this character has
+ * already bought from that line today. Owning, selling back, or receiving the
+ * item from anywhere else never enters into it.
+ */
+export function dailyPurchaseAllowance(limit: number, purchased: number): DailyPurchaseAllowance {
+  if (!Number.isInteger(limit) || limit <= 0) throw new RangeError("Daily limit must be positive");
+  if (!Number.isInteger(purchased) || purchased < 0) {
+    throw new RangeError("Purchased quantity must be non-negative");
+  }
+  return { limit, purchased, remaining: Math.max(0, limit - purchased) };
+}
+
+/**
+ * Every daily-limited line's allowance for one character and one reset date,
+ * keyed by merchant then item. A line with no ledger row today has its whole
+ * limit; lines that author no limit are absent.
+ */
+export function merchantDailyAllowances(
+  merchants: readonly MerchantDefinition[],
+  purchasedToday: readonly { merchantId: string; itemId: string; quantityPurchased: number }[],
+): Record<string, Record<string, DailyPurchaseAllowance>> {
+  const allowances: Record<string, Record<string, DailyPurchaseAllowance>> = {};
+  for (const merchant of merchants) {
+    for (const price of merchant.prices) {
+      if (price.dailySellLimit === undefined) continue;
+      const purchased =
+        purchasedToday.find((row) => row.merchantId === merchant.id && row.itemId === price.itemId)
+          ?.quantityPurchased ?? 0;
+      (allowances[merchant.id] ??= {})[price.itemId] = dailyPurchaseAllowance(
+        price.dailySellLimit,
+        purchased,
+      );
+    }
+  }
+  return allowances;
+}
+
 /** Items the player may buy from this merchant, in authored order. */
 export function merchantPurchasableItemIds(merchant: MerchantDefinition): readonly string[] {
   return merchant.prices
@@ -113,7 +169,8 @@ export function maximumAffordableQuantity(credits: number, unitPrice: number): n
 
 /**
  * The largest genuinely useful purchase: what the balance can pay for, reduced
- * to what the carried Inventory can actually accept.
+ * to what is left of a daily-limited line's allowance and to what the carried
+ * Inventory can actually accept.
  *
  * Stack filling, free slots, and carried mass are not re-derived here — the
  * quantity is handed to the ordinary inventory planner, whose partial result
@@ -133,8 +190,13 @@ export function maximumPurchasableQuantity(input: {
   availableSlots: number;
   availableWeight: number;
   itemWeight: number;
+  /** What is left of today's allowance on a daily-limited line (#230). */
+  dailyRemaining?: number;
 }): number {
-  const affordable = maximumAffordableQuantity(input.credits, input.unitPrice);
+  const affordable = Math.min(
+    maximumAffordableQuantity(input.credits, input.unitPrice),
+    input.dailyRemaining ?? Number.POSITIVE_INFINITY,
+  );
   if (affordable === 0) return 0;
   const plan = planStackAddition(
     input.existingStacks,

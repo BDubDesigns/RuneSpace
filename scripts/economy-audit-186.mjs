@@ -704,7 +704,7 @@ const practiceWeld = (() => {
     elapsedTicks: 1_000_000,
     snapshot: {
       practice: UNSTARTED_PRACTICE,
-      scrapAvailable: balance.practiceWelding.scrapPerWeld,
+      scrapStackQuantities: [balance.practiceWelding.scrapPerWeld],
       slagStackQuantities: [],
       slotsAvailable: STARTER_SLOTS,
       massAvailableGrams: MINING_MASS_AVAILABLE,

@@ -156,6 +156,7 @@ function cargoState(): PlayGameplayState {
     recentResult: { successes: 0, failures: 0, awardedXp: 0 },
     refiningRecentResult: { successes: 0, failures: 0, awardedXp: 0 },
     scavengeReveals: [],
+    merchantDailyPurchases: {},
   };
 }
 

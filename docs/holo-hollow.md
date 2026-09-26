@@ -368,7 +368,7 @@ Bix's initial approved playtest prices are:
 | Ferrite Shale | 2 Credits | Not initially stocked |
 | Refined Ferrite | 10 Credits | Not initially stocked |
 | Slag | 1 Credit | Not initially stocked |
-| Power Cell | 3 Credits | 8 Credits |
+| Power Cell | 4 Credits | 12 Credits (at most 12 per character per Pacific day) |
 
 These values are approved **initial playtest balance**, not permanent sacred
 economy constants. They should be authored centrally and tuned after real
@@ -389,8 +389,9 @@ forever:
   automatic requirement.
 
 A later Wade apprentice Mission asks the player to bring Tansy three Power
-Cells. At the approved 8-Credit retail price, Wade provides exactly **24
-Credits** for that purchase. The Mission still requires visiting/talking to Bix
+Cells. Wade provides exactly the retail cost of three Cells from Bix — **36
+Credits** at the 12-Credit price #230 set, derived from the merchant registry
+(`KEEP_THE_CHANGE_BUDGET_CREDITS`) rather than restated. The Mission still requires visiting/talking to Bix
 even if the player already owns enough Cells.
 
 ### First merchant transaction UX
@@ -575,7 +576,8 @@ existing remote-dialogue/comms presentation and says she has run out of Power
 Cells while Mining. Wade has none.
 
 Wade sends his new apprentice to bring Tansy **3 Power Cells** and gives the
-player exactly **24 Credits** — the retail cost of three Cells from Bix.
+player exactly the retail cost of three Cells from Bix — **36 Credits** since
+#230 repriced Cells to 12 (it was 24 at the original 8).
 
 As shipped, the Mission:
 

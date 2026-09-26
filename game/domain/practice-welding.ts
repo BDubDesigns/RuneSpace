@@ -9,6 +9,8 @@ import {
   type CleanPassRandom,
   type CleanPassState,
 } from "@/game/domain/clean-pass";
+import { ITEM_IDS } from "@/game/config/foundations";
+import { planExactStackRemoval } from "@/game/domain/inventory";
 
 /**
  * Practice Welding — the indefinite Welding training loop at Wade's Workbench
@@ -51,13 +53,18 @@ export const UNSTARTED_PRACTICE: PracticeWeldState = {
  *
  * Slag output can never block or fail a completed weld, so this models exactly
  * what Keep Slag needs: which Slag stacks have room, and how many slots and how
- * much mass are free. Consuming Scrap frees a slot and its mass immediately,
- * which is what lets a full-but-for-the-Scrap inventory keep welding.
+ * much mass are free. Consuming Scrap frees its mass immediately, and frees a
+ * slot only when it empties a whole Scrap stack (#230) — which is why the
+ * snapshot carries the stacks themselves rather than a loose total.
  */
 export type PracticeSnapshot = {
   practice: PracticeWeldState;
-  /** Loose carried Scrap Metal. One piece per slot, so this is also a stack count. */
-  scrapAvailable: number;
+  /**
+   * Quantities of the carried Scrap Metal stacks, each at or under the Scrap
+   * stack limit. Their sum is the Scrap available; how they are split across
+   * stacks decides how many slots consuming them actually frees.
+   */
+  scrapStackQuantities: readonly number[];
   /** Quantities of the carried Slag stacks, each at or under the Slag stack limit. */
   slagStackQuantities: readonly number[];
   slotsAvailable: number;
@@ -115,7 +122,8 @@ export type PracticeResolution = {
   resolvedWelds: readonly PracticeResolvedWeld[];
   /**
    * The aggregate capacity this resolution decided its Slag against: what was
-   * free at the start plus everything the consumed Scrap freed along the way.
+   * free at the start plus everything the consumed Scrap freed along the way —
+   * its full mass, but only the slots of the Scrap stacks it actually emptied.
    *
    * Persistence plans the kept Slag against exactly this, so the write places
    * what resolution decided rather than re-deciding it against a snapshot taken
@@ -162,6 +170,34 @@ function depositSlag(
   return { kept, discarded: units - kept };
 }
 
+/** Total carried Scrap across its stacks. */
+export function practiceScrapAvailable(snapshot: Pick<PracticeSnapshot, "scrapStackQuantities">) {
+  return snapshot.scrapStackQuantities.reduce((total, quantity) => total + quantity, 0);
+}
+
+/**
+ * How many inventory slots consuming `quantity` Scrap from these stacks frees.
+ *
+ * A slot frees only when a stack empties, so two Scrap taken from one stack of
+ * three free nothing, while the same two taken from two single pieces free
+ * two. This asks the same removal planner persistence's carried-stack
+ * consumption applies, so resolution and the write agree on which stacks go.
+ */
+function scrapSlotsFreed(stackQuantities: readonly number[], quantity: number): number {
+  if (quantity === 0) return 0;
+  const removal = planExactStackRemoval(
+    stackQuantities.map((stackQuantity, index) => ({
+      id: index,
+      itemId: ITEM_IDS.scrapMetal,
+      quantity: stackQuantity,
+    })),
+    ITEM_IDS.scrapMetal,
+    quantity,
+  );
+  if (!removal.ok) throw new RangeError("Practice cannot consume more Scrap than is carried");
+  return removal.deletedStackIds.length;
+}
+
 /**
  * Resolve only whole, bounded Practice sections.
  *
@@ -195,7 +231,8 @@ export function resolvePracticeWelding(input: {
   };
 
   let { sectionsCompleted, cycleActive, cleanPass } = snapshot.practice;
-  let scrapAvailable = snapshot.scrapAvailable;
+  let scrapAvailable = practiceScrapAvailable(snapshot);
+  let scrapSlotsFreedSoFar = 0;
   let remainingTicks = input.elapsedTicks;
   let consumedTicks = 0;
   let sectionsResolved = 0;
@@ -219,12 +256,16 @@ export function resolvePracticeWelding(input: {
         stopReason = "out_of_scrap";
         break;
       }
-      // The two Scrap are spent the moment the weld begins, and their slots and
-      // mass are free from that moment — which is what lets the run keep going
-      // with a nearly full inventory.
+      // The two Scrap are spent the moment the weld begins, and their mass is
+      // free from that moment. Slots free only as whole Scrap stacks empty
+      // (#230): the cumulative consumption is replanned against the original
+      // stacks, exactly as persistence removes it in one go, so the freed count
+      // only ever grows and ends at precisely what the write will free.
       scrapAvailable -= practiceWelding.scrapPerWeld;
       scrapConsumed += practiceWelding.scrapPerWeld;
-      capacity.slotsAvailable += practiceWelding.scrapPerWeld;
+      const slotsFreed = scrapSlotsFreed(snapshot.scrapStackQuantities, scrapConsumed);
+      capacity.slotsAvailable += slotsFreed - scrapSlotsFreedSoFar;
+      scrapSlotsFreedSoFar = slotsFreed;
       capacity.massAvailableGrams += practiceWelding.scrapPerWeld * items.scrapMetal.massGrams;
       cycleActive = true;
       sectionsCompleted = 0;
@@ -281,7 +322,7 @@ export function resolvePracticeWelding(input: {
     practice: { sectionsCompleted, cycleActive, cleanPass },
     resolvedWelds,
     slagBudget: {
-      slots: snapshot.slotsAvailable + scrapConsumed,
+      slots: snapshot.slotsAvailable + scrapSlotsFreedSoFar,
       massGrams: snapshot.massAvailableGrams + scrapConsumed * items.scrapMetal.massGrams,
     },
     ...(stopReason ? { stopReason } : {}),

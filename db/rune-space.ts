@@ -833,6 +833,49 @@ export const characterWorkOrderBoardRefreshes = pgTable(
 );
 
 /**
+ * Per-character merchant daily purchase allowances (#230).
+ *
+ * Wade's Scrap and Bix's Power Cells are each capped per character per
+ * RuneSpace Pacific reset date. One row is one merchant price line's usage for
+ * one reset date: `(character, merchant, item, reset date)` is the key, so
+ * Wade's Scrap row and Bix's Cell row are independent records that never share
+ * a counter, and neither shares a table with the Annex claim or the ForceSales
+ * refresh — those are different rewards for different features, while these
+ * two are the same rule (a merchant line's daily limit) applied to two lines.
+ *
+ * The row is written only by the authoritative purchase transaction, in the
+ * same transaction as the Credit and inventory mutation, so a refused or
+ * rolled-back purchase leaves no trace. Selling back never touches it.
+ * Nothing is cleared at midnight: a new reset date simply has no row yet.
+ * The limit itself is content (`game/content/merchants`), never mirrored here;
+ * the CHECK only rejects a row that could not describe a real purchase.
+ */
+export const characterMerchantDailyPurchases = pgTable(
+  "character_merchant_daily_purchases",
+  {
+    characterId: text("character_id")
+      .notNull()
+      .references(() => characters.id, { onDelete: "restrict" }),
+    merchantId: text("merchant_id").notNull(),
+    itemId: text("item_id").notNull(),
+    resetDate: date("reset_date", { mode: "string" }).notNull(),
+    quantityPurchased: integer("quantity_purchased").notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    primaryKey({
+      columns: [table.characterId, table.merchantId, table.itemId, table.resetDate],
+      name: "character_merchant_daily_purchases_pk",
+    }),
+    check(
+      "character_merchant_daily_purchases_quantity_positive",
+      sql`${table.quantityPurchased} > 0`,
+    ),
+    index("character_merchant_daily_purchases_character_id_idx").on(table.characterId),
+  ],
+);
+
+/**
  * Append-only operator audit log (Issue #113). One immutable row records a
  * SUCCESSFUL operator mutation, atomically committed with that mutation inside
  * the same transaction. Refused/failed commands, no-op/idempotent commands,
@@ -980,6 +1023,7 @@ export type CharacterMission = typeof characterMissions.$inferSelect;
 export type CharacterMissionProgress = typeof characterMissionProgress.$inferSelect;
 export type CharacterPowerCellDailyClaim = typeof characterPowerCellDailyClaims.$inferSelect;
 export type CharacterRepairTarget = typeof characterRepairTargets.$inferSelect;
+export type CharacterMerchantDailyPurchase = typeof characterMerchantDailyPurchases.$inferSelect;
 export type CharacterWorkOrderPosting = typeof characterWorkOrderPostings.$inferSelect;
 export type CargoHoldStack = typeof cargoHoldStacks.$inferSelect;
 export type CargoHoldItemInstance = typeof cargoHoldItemInstances.$inferSelect;

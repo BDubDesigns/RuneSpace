@@ -1,6 +1,7 @@
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import {
+  characterMerchantDailyPurchases,
   characterMissionProgress,
   characterMissions,
   characterRepairTargets,
@@ -533,7 +534,7 @@ test("buys and sells against the authoritative balance without leaving the shop"
 }) => {
   const characterId = testCharacter.id;
   await page.setViewportSize({ width: 390, height: 844 });
-  await arriveInHoloHollow(characterId, { credits: 20, shale: 5 });
+  await arriveInHoloHollow(characterId, { credits: 30, shale: 5 });
   await openTestCharacter(page, characterId);
   await page.emulateMedia({ reducedMotion: "reduce" });
   await page
@@ -543,19 +544,21 @@ test("buys and sells against the authoritative balance without leaving the shop"
   await page.locator('[data-npc-action="trade"]').click();
 
   const trade = page.locator("[data-trade-panel]");
-  await expect(trade.locator("[data-trade-credits]")).toContainText("20 Credits");
+  await expect(trade.locator("[data-trade-credits]")).toContainText("30 Credits");
 
-  // Buy: Power Cells are the only stock, priced at eight Credits.
+  // Buy: Power Cells are the only stock, priced at twelve Credits (#230), with
+  // today's allowance of twelve shown beside the price.
   const cellRow = trade.locator(`[data-trade-row="${ITEM_IDS.powerCell}"]`);
   await expect(trade.locator("[data-trade-row]")).toHaveCount(1);
-  await expect(cellRow.locator("[data-trade-unit-price]")).toHaveText("8");
+  await expect(cellRow.locator("[data-trade-unit-price]")).toHaveText("12");
+  await expect(cellRow.locator("[data-trade-daily-allowance]")).toHaveText("12 of 12 left today");
   await expect(cellRow.locator("[data-trade-quantity]")).toHaveText("1");
-  await expect(cellRow.locator("[data-trade-total]")).toHaveText("8");
+  await expect(cellRow.locator("[data-trade-total]")).toHaveText("12");
 
   // The total tracks the quantity before anything is committed.
   await cellRow.getByRole("button", { name: /Increase Power Cell quantity/ }).click();
   await expect(cellRow.locator("[data-trade-quantity]")).toHaveText("2");
-  await expect(cellRow.locator("[data-trade-total]")).toHaveText("16");
+  await expect(cellRow.locator("[data-trade-total]")).toHaveText("24");
   await cellRow.getByRole("button", { name: /Decrease Power Cell quantity/ }).click();
   await expect(cellRow.locator("[data-trade-quantity]")).toHaveText("1");
 
@@ -569,8 +572,9 @@ test("buys and sells against the authoritative balance without leaving the shop"
   await expect(
     page.locator(`[data-local-place-surface="${LOCAL_PLACE_IDS.holoHollowSouvenirs}"]`),
   ).toBeVisible();
-  await expect(trade.locator("[data-trade-credits]")).toContainText("4 Credits");
+  await expect(trade.locator("[data-trade-credits]")).toContainText("6 Credits");
   await expect(cellRow.locator("[data-trade-owned]")).toHaveText("2");
+  await expect(cellRow.locator("[data-trade-daily-allowance]")).toHaveText("10 of 12 left today");
 
   // Sell: Bix buys the six approved materials — the original four plus the two
   // Deep Jag ones (#209) — with Shale still at two Credits each.
@@ -585,20 +589,80 @@ test("buys and sells against the authoritative balance without leaving the shop"
   await shaleRow.locator(`[data-trade-commit="${ITEM_IDS.ferriteShale}"]`).click();
 
   await expect(trade.locator("[data-trade-feedback]")).toContainText("Sold 5 Ferrite Shale");
-  await expect(trade.locator("[data-trade-credits]")).toContainText("14 Credits");
+  await expect(trade.locator("[data-trade-credits]")).toContainText("16 Credits");
 
   // The persisted balance matches exactly what the surface reported.
   const [row] = await db
     .select({ credits: characters.credits })
     .from(characters)
     .where(eq(characters.id, characterId));
-  expect(row?.credits).toBe(14);
+  expect(row?.credits).toBe(16);
 
   // The same balance is available from Inventory, once the counter is closed —
   // Trade is a modal surface since #193, so the footer is behind it.
   await page.getByRole("button", { name: /^Close trade with Bix Weller$/i }).click();
   await page.getByRole("button", { name: /Inventory/ }).click();
-  await expect(page.locator("[data-inventory-credits]")).toContainText("14 Credits");
+  await expect(page.locator("[data-inventory-credits]")).toContainText("16 Credits");
+});
+
+test("sells at most twelve Power Cells a day, and selling back does not buy more", async ({
+  page,
+  testCharacter,
+}) => {
+  const characterId = testCharacter.id;
+  await page.setViewportSize({ width: 390, height: 844 });
+  await arriveInHoloHollow(characterId, { credits: 500 });
+  await openTestCharacter(page, characterId);
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page
+    .locator("[data-local-place-directory]")
+    .locator(`[data-local-place="${LOCAL_PLACE_IDS.holoHollowSouvenirs}"]`)
+    .click();
+  await page.locator('[data-npc-action="trade"]').click();
+
+  const trade = page.locator("[data-trade-panel]");
+  const cellRow = trade.locator(`[data-trade-row="${ITEM_IDS.powerCell}"]`);
+  const allowance = cellRow.locator("[data-trade-daily-allowance]");
+  const commit = cellRow.locator(`[data-trade-commit="${ITEM_IDS.powerCell}"]`);
+
+  // 500 Credits would pay for 41; Max stops at today's twelve.
+  await cellRow.locator("[data-trade-max]").click();
+  await expect(cellRow.locator("[data-trade-quantity]")).toHaveText("12");
+  await expect(cellRow.locator("[data-trade-total]")).toHaveText("144");
+  await commit.click();
+  await expect(trade.locator("[data-trade-feedback]")).toContainText("Bought 12 Power Cell");
+  await expect(trade.locator("[data-trade-credits]")).toContainText("356 Credits");
+
+  // Sold out for the day: the row says so, and neither Max nor Buy is offered.
+  await expect(allowance).toHaveAttribute("data-trade-daily-remaining", "0");
+  await expect(allowance).toHaveText("All 12 sold today · more after midnight Pacific");
+  await expect(cellRow.locator("[data-trade-max]")).toBeDisabled();
+  await expect(commit).toBeDisabled();
+
+  // Selling cells back pays four each and restores nothing.
+  await trade.locator('[data-trade-mode="sell"]').click();
+  const cellSale = trade.locator(`[data-trade-row="${ITEM_IDS.powerCell}"]`);
+  await expect(cellSale.locator("[data-trade-unit-price]")).toHaveText("4");
+  await cellSale.locator("[data-trade-max]").click();
+  await cellSale.locator(`[data-trade-commit="${ITEM_IDS.powerCell}"]`).click();
+  await expect(trade.locator("[data-trade-feedback]")).toContainText("Sold 12 Power Cell");
+  await expect(trade.locator("[data-trade-credits]")).toContainText("404 Credits");
+  await trade.locator('[data-trade-mode="buy"]').click();
+  await expect(allowance).toHaveAttribute("data-trade-daily-remaining", "0");
+  await expect(commit).toBeDisabled();
+
+  // The phone-width counter stays readable: nothing overflows the viewport.
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
+  const allowanceBox = (await allowance.boundingBox())!;
+  const rowBox = (await cellRow.boundingBox())!;
+  expect(allowanceBox.x + allowanceBox.width).toBeLessThanOrEqual(rowBox.x + rowBox.width + 1);
+
+  // The ledger holds exactly the twelve bought, whatever was sold back.
+  const rows = await db
+    .select()
+    .from(characterMerchantDailyPurchases)
+    .where(eq(characterMerchantDailyPurchases.characterId, characterId));
+  expect(rows.map((ledger) => ledger.quantityPurchased)).toEqual([12]);
 });
 
 test("opening Trade reveals the Trade surface above the bottom navigation", async ({

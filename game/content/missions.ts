@@ -3,6 +3,7 @@ import {
   DIALOGUE_IDS,
   ITEM_IDS,
   LOCATION_IDS,
+  MERCHANT_IDS,
   MISSION_IDS,
   NPC_IDS,
   REPAIR_TARGET_IDS,
@@ -16,6 +17,7 @@ import {
   type RepairTargetId,
   type SkillId,
 } from "@/game/config/foundations";
+import { merchantRetailPrice } from "@/game/content/merchants";
 
 /**
  * The real completion reward shapes proven by production content. A mission
@@ -238,7 +240,7 @@ export type MissionOffer = {
   activeDialogueId?: DialogueId;
   /**
    * Applied exactly once when acceptance at THIS offer route commits (Wade's
-   * 24-Credit job budget). Absent for an ordinary offer.
+   * Keep the Change job budget). Absent for an ordinary offer.
    */
   acceptEffect?: MissionAcceptEffect;
 };
@@ -591,13 +593,24 @@ export const HOLD_IT_TOGETHER: MissionDefinition = {
  * continuation: Hold It Together names no continuation, so the player earns it
  * by going back to Wade and taking the job themselves.
  *
- * Wade's 24 Credits arrive up front as the offer's accept effect — the retail
+ * Wade's budget arrives up front as the offer's accept effect — the retail
  * cost of three Power Cells from Bix — and whatever the player does not spend
  * stays theirs. Meeting Bix is a real ordered requirement even for a player who
  * already carries Cells, because the job is also a professional introduction;
  * buying anything never is. The three Cells may come from any legitimate source
  * and are consumed at the delivery through the generic carried-stack boundary.
  */
+/** The Power Cells Tansy needs, which is also what Wade's budget pays for. */
+export const KEEP_THE_CHANGE_CELL_COUNT = 3;
+
+/**
+ * Wade's exact job budget: three Cells at Bix's authoritative retail price
+ * (#230). Derived rather than authored, so a Power Cell price change moves the
+ * budget with it and a stale total cannot survive — 36 Credits at Bix's 12.
+ */
+export const KEEP_THE_CHANGE_BUDGET_CREDITS =
+  KEEP_THE_CHANGE_CELL_COUNT * merchantRetailPrice(MERCHANT_IDS.bixWeller, ITEM_IDS.powerCell);
+
 export const KEEP_THE_CHANGE: MissionDefinition = {
   id: MISSION_IDS.keepTheChange,
   title: "Keep the Change",
@@ -609,7 +622,7 @@ export const KEEP_THE_CHANGE: MissionDefinition = {
       locationId: LOCATION_IDS.crashSite,
       dialogueId: DIALOGUE_IDS.wadeKeepTheChangeOffer,
       actionLabel: "TAKE THE JOB",
-      acceptEffect: { kind: "credits", amount: 24 },
+      acceptEffect: { kind: "credits", amount: KEEP_THE_CHANGE_BUDGET_CREDITS },
       activeDialogueId: DIALOGUE_IDS.wadeKeepTheChangeActive,
     },
   ],
@@ -626,7 +639,7 @@ export const KEEP_THE_CHANGE: MissionDefinition = {
     {
       kind: "carried_stack",
       itemId: ITEM_IDS.powerCell,
-      quantity: 3,
+      quantity: KEEP_THE_CHANGE_CELL_COUNT,
       turnIn: "consume_required_quantity",
       objective: "Carry three {item} — {carried} / {required}",
     },

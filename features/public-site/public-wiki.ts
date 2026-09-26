@@ -308,7 +308,7 @@ const authoredWikiArticles = [
             ". Step into his shop and choose Trade. Talking to Bix and trading with him are separate — you can do either without the other.",
           ],
           "Pick Buy or Sell, choose a quantity with the minus, plus, and Max controls, check the total, and confirm with a single Buy or Sell. You stay in the shop afterwards, with your Credits and Inventory updated straight away. A trader who only goes one way simply has no choice to make.",
-          "When buying, Max is the most you can actually take away — it accounts for your Credits and for the room left in your Inventory. When selling, Max is everything you're carrying of that item.",
+          "When buying, Max is the most you can actually take away — it accounts for your Credits, the room left in your Inventory, and anything left of a daily limit. When selling, Max is everything you're carrying of that item.",
         ],
       },
       {
@@ -317,7 +317,7 @@ const authoredWikiArticles = [
           "Ferrite Shale — 2 Credits each",
           "Refined Ferrite — 10 Credits each",
           "Slag — 1 Credit each",
-          "Power Cell — 3 Credits each",
+          "Power Cell — 4 Credits each",
           "Galvanite — 4 Credits each",
           "Galvanic Stock — 18 Credits each",
         ],
@@ -327,8 +327,9 @@ const authoredWikiArticles = [
         paragraphs: [
           [
             { text: "Power Cells", articleSlug: "power-cells" },
-            " cost 8 Credits each. That's more than he pays for them, which he'll explain if you ask him about Power Cells. He doesn't stock anything else at the moment.",
+            " cost 12 Credits each. That's more than he pays for them, which he'll explain if you ask him about Power Cells. He doesn't stock anything else at the moment.",
           ],
+          "He sells each character at most 12 Power Cells a day. The counter shows how many are left for you today, and the count starts again at midnight Pacific time. Selling cells back to him doesn't give you more for the day, and cells you get anywhere else never count against it.",
           "A purchase has to fit: if your Inventory doesn't have room for the whole amount, or you can't afford it, nothing is bought and nothing is charged.",
         ],
       },
@@ -336,12 +337,12 @@ const authoredWikiArticles = [
         heading: "Trading with Wade",
         paragraphs: [
           [
-            "Wade Rusk sells Scrap Metal at 2 Credits a piece out of his own yard at Rusk Recovery, once he has put you on the ",
+            "Wade Rusk sells Scrap Metal at 4 Credits a piece out of his own yard at Rusk Recovery, once he has put you on the ",
             { text: "workbench", articleSlug: "practice-welding" },
             ". It works exactly like Bix's counter, out in the yard rather than inside a shop.",
           ],
-          "He never runs out, and what limits you is your Credits and your room. Scrap doesn't stack, so every piece takes an inventory slot of its own.",
-          "He also buys structural material back, at the same prices Bix pays where they both buy the same thing: Refined Ferrite at 10 Credits, Galvanic Stock at 18, and Galvaferrite at 45. He still leaves Slag to Bix.",
+          "He sells each character at most 12 Scrap Metal a day, counted and reset exactly like Bix's Power Cells: the counter shows what's left today, it starts again at midnight Pacific time, and selling scrap back doesn't add to it. Scrap stacks up to three to an inventory slot.",
+          "He buys spare Scrap Metal back at 1 Credit a piece, and structural material at the same prices Bix pays where they both buy the same thing: Refined Ferrite at 10 Credits, Galvanic Stock at 18, and Galvaferrite at 45. He still leaves Slag to Bix.",
         ],
       },
     ],
@@ -455,7 +456,7 @@ const authoredWikiArticles = [
             { text: "10,000 Hours", articleSlug: "missions" },
             "; accepting it hands you six Scrap Metal and opens the workbench.",
           ],
-          "He hands over all six pieces or none. Scrap does not stack, so each piece takes an inventory slot — if you have not got room for all six he will tell you to make room and come back, and nothing is handed over or started until you do.",
+          "He hands over all six pieces or none. Scrap stacks three to a slot, so six pieces take two inventory slots — if you have not got room for all six he will tell you to make room and come back, and nothing is handed over or started until you do. Those six are his to give and don't count against what he'll sell you in a day.",
         ],
       },
       {
@@ -490,14 +491,14 @@ const authoredWikiArticles = [
         heading: "Scrap and slag",
         paragraphs: [
           [
-            "Wade sells Scrap Metal at 2 Credits a piece out of the yard, with no limit but your ",
-            { text: "Credits and your inventory", articleSlug: "credits-and-trading" },
-            ". He does not buy anything back.",
+            "Wade sells Scrap Metal at 4 Credits a piece out of the yard, up to 12 a day, and buys spare scrap back at 1 — see ",
+            { text: "Credits and trading", articleSlug: "credits-and-trading" },
+            ".",
           ],
           [
             "Slag is yours to keep or throw out: the bench has a setting for it, applied as each weld finishes. Bix pays 1 Credit apiece for ",
             { text: "Slag", articleSlug: "mining-and-refining" },
-            " in town, so a 4-Credit weld can return 2 if you keep both and sell them. If you keep Slag and run out of room for it, the overflow is thrown out rather than stopping the weld.",
+            " in town, so an 8-Credit weld can return 2 if you keep both and sell them. If you keep Slag and run out of room for it, the overflow is thrown out rather than stopping the weld. Scrap stacks three to a slot, so using two pieces only frees a slot for Slag when it empties a stack.",
           ],
         ],
       },
@@ -620,7 +621,7 @@ const authoredWikiArticles = [
             ", then report the finished repair to Wade.",
           ],
           [
-            "Keep the Change — Wade makes you his apprentice and hands you 24 Credits to get Tansy three ",
+            "Keep the Change — Wade makes you his apprentice and hands you 36 Credits to get Tansy three ",
             { text: "Power Cells", articleSlug: "power-cells" },
             ". Meet Bix Weller in town, then take the cells to Tansy at The Jag.",
           ],
@@ -694,7 +695,7 @@ const authoredWikiArticles = [
       {
         heading: "Keep the Change in detail",
         paragraphs: [
-          "Wade's 24 Credits are a job budget, handed over when you accept. They're yours: three cells cost 24 Credits at Bix's price, but if you already have cells, or claim them free at the Annex, you keep whatever you don't spend. There's no second payout when you finish, and nothing is reimbursed.",
+          "Wade's 36 Credits are a job budget, handed over when you accept. They're yours: three cells cost 36 Credits at Bix's price, but if you already have cells, or claim them free at the Annex, you keep whatever you don't spend. There's no second payout when you finish, and nothing is reimbursed.",
           [
             "Meeting Bix is part of the job even if you already have three cells — Wade wants his apprentice to know who keeps useful things on a shelf. Talking to him is all that's required; you never have to buy or sell anything. The three cells themselves can come from anywhere: your ",
             { text: "Inventory", articleSlug: "inventory-and-equipment" },
@@ -949,7 +950,7 @@ const authoredWikiArticles = [
           [
             "Rusk Recovery is racked salvage, stripped components, damaged work vehicles waiting their turn, and a workbench somebody genuinely uses — messy, and organised by a man who knows exactly where everything is. You can ",
             { text: "practise Welding", articleSlug: "practice-welding" },
-            " there for as long as you have scrap, and he sells the scrap at two Credits a piece, the same as he would charge anybody.",
+            " there for as long as you have scrap, and he sells the scrap at four Credits a piece, the same as he would charge anybody.",
           ],
         ],
       },

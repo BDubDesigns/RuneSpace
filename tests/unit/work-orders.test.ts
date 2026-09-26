@@ -4,7 +4,8 @@ import {
   practiceSectionXp,
   workOrderSectionXp,
 } from "@/game/config/balance";
-import { ITEM_IDS, WORK_ORDER_IDS } from "@/game/config/foundations";
+import { ITEM_IDS, MERCHANT_IDS, WORK_ORDER_IDS } from "@/game/config/foundations";
+import { merchantRetailPrice } from "@/game/content/merchants";
 import { WORK_ORDERS, type WorkOrderDefinition } from "@/game/content/work-orders";
 import {
   cleanPassOpportunityCount,
@@ -74,25 +75,25 @@ describe("The authored Work Order pool validates (#207)", () => {
   });
 });
 
-describe("Every authored payout equals the one payout formula (#207, #217)", () => {
+describe("Every authored payout equals the one payout formula (#207, #217, #230)", () => {
   it("matches workOrderPayoutCredits exactly for all sixteen jobs, and locks the shipped Credit values", () => {
     const expectedPayouts: Record<string, number> = {
       [WORK_ORDER_IDS.rennCarryFrame]: 75,
       [WORK_ORDER_IDS.vossHeaterHousing]: 100,
       [WORK_ORDER_IDS.bixShopShelving]: 90,
-      [WORK_ORDER_IDS.tansyCutterHousing]: 115,
+      [WORK_ORDER_IDS.tansyCutterHousing]: 120,
       [WORK_ORDER_IDS.maraBedFrame]: 120,
       [WORK_ORDER_IDS.stempSpeederRack]: 135,
       [WORK_ORDER_IDS.larkinHandWinch]: 120,
-      [WORK_ORDER_IDS.mottCargoDolly]: 200,
+      [WORK_ORDER_IDS.mottCargoDolly]: 210,
       [WORK_ORDER_IDS.vossCountertopCooker]: 95,
       [WORK_ORDER_IDS.bixSouvenirDisplay]: 120,
-      [WORK_ORDER_IDS.tansyFurbabyRepair]: 110,
+      [WORK_ORDER_IDS.tansyFurbabyRepair]: 115,
       [WORK_ORDER_IDS.rennHelmetRack]: 145,
       [WORK_ORDER_IDS.mottCargoScale]: 175,
       [WORK_ORDER_IDS.maraLinenPress]: 190,
-      [WORK_ORDER_IDS.larkinCablePuller]: 225,
-      [WORK_ORDER_IDS.stempSpeederCradle]: 270,
+      [WORK_ORDER_IDS.larkinCablePuller]: 230,
+      [WORK_ORDER_IDS.stempSpeederCradle]: 280,
     };
     expect(WORK_ORDERS).toHaveLength(16);
     for (const job of WORK_ORDERS) {
@@ -107,11 +108,31 @@ describe("Replacement value comes from the merchant registry, not a second table
     expect(workOrderMaterialReplacementValue(ITEM_IDS.refinedFerrite)).toBe(10);
   });
 
-  it("resolves Power Cell to 8 — Bix's SELL price, not the 3 he buys them back for", () => {
+  it("resolves Power Cell to 12 — Bix's SELL price, not the 4 he buys them back for", () => {
     // Replacement value is what the player would pay to replace the unit, so
     // a consumed Cell must be valued at what it costs to buy another, never at
-    // the lower price Bix pays when he buys one back.
-    expect(workOrderMaterialReplacementValue(ITEM_IDS.powerCell)).toBe(8);
+    // the lower price Bix pays when he buys one back (#230 moved it from 8).
+    expect(workOrderMaterialReplacementValue(ITEM_IDS.powerCell)).toBe(12);
+    expect(workOrderMaterialReplacementValue(ITEM_IDS.powerCell)).toBe(
+      merchantRetailPrice(MERCHANT_IDS.bixWeller, ITEM_IDS.powerCell),
+    );
+  });
+
+  it("moves exactly the Cell-consuming jobs when the Cell price moves, and no others", () => {
+    // Every job whose payout #230 changed consumes Power Cells; every job that
+    // consumes none kept its #207/#217 value. The formula itself is unchanged.
+    const cellJobs = WORK_ORDERS.filter((job) =>
+      job.materials.some((material) => material.itemId === ITEM_IDS.powerCell),
+    ).map((job) => job.id);
+    expect(cellJobs.sort()).toEqual(
+      [
+        WORK_ORDER_IDS.tansyCutterHousing,
+        WORK_ORDER_IDS.mottCargoDolly,
+        WORK_ORDER_IDS.tansyFurbabyRepair,
+        WORK_ORDER_IDS.larkinCablePuller,
+        WORK_ORDER_IDS.stempSpeederCradle,
+      ].sort(),
+    );
   });
 });
 

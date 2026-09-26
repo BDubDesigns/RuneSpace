@@ -3,6 +3,7 @@ import {
   DIALOGUE_IDS,
   EXPRESSION_IDS,
   ITEM_IDS,
+  MERCHANT_IDS,
   NPC_IDS,
   SKILL_IDS,
   type ConversationBackgroundId,
@@ -13,6 +14,9 @@ import {
   type SkillId,
 } from "@/game/config/foundations";
 import { getItemPresentation } from "./item-presentation";
+import { merchantBuybackPrice, merchantRetailPrice } from "./merchants";
+import { KEEP_THE_CHANGE_BUDGET_CREDITS } from "./missions";
+import { spelledNumber, spelledNumberCapitalized } from "./spelled-numbers";
 import { getSkillPresentation } from "./skill-presentation";
 import { getNpc, resolveNpcExpression } from "./npcs";
 
@@ -87,6 +91,13 @@ export type DialogueSequence = {
   presentsAtCurrentVenue?: true;
   beats: readonly DialogueBeat[];
 };
+
+// Shop prices quoted in dialogue (#230) are read from the merchant registry and
+// spelled out here, never restated: a price change updates every line that
+// names it, and no line can keep quoting a price the shop no longer charges.
+const CELL_PRICE = merchantRetailPrice(MERCHANT_IDS.bixWeller, ITEM_IDS.powerCell);
+const CELL_BUYBACK = merchantBuybackPrice(MERCHANT_IDS.bixWeller, ITEM_IDS.powerCell);
+const SCRAP_PRICE = merchantRetailPrice(MERCHANT_IDS.wadeRusk, ITEM_IDS.scrapMetal);
 
 const crash = CONVERSATION_BACKGROUND_IDS.crashSiteExterior;
 const jag = CONVERSATION_BACKGROUND_IDS.theJagExterior;
@@ -802,7 +813,7 @@ const dialogue = {
       ),
       wadeLocal(
         EXPRESSION_IDS.neutral,
-        "Tansy needs three Power Cells. Bix charges eight Credits each. Here's twenty-four Credits.",
+        `Tansy needs three Power Cells. Bix charges ${spelledNumber(CELL_PRICE)} Credits each. Here's ${spelledNumber(KEEP_THE_CHANGE_BUDGET_CREDITS)} Credits.`,
       ),
       wadeLocal(
         EXPRESSION_IDS.neutral,
@@ -840,7 +851,7 @@ const dialogue = {
       bixLocal(EXPRESSION_IDS.amused, "And Wade's already got you running errands. That was fast."),
       bixLocal(
         EXPRESSION_IDS.neutral,
-        "Three Power Cells. Eight Credits each. Twenty-four Credits.",
+        `Three Power Cells. ${spelledNumberCapitalized(CELL_PRICE)} Credits each. ${spelledNumberCapitalized(KEEP_THE_CHANGE_BUDGET_CREDITS)} Credits.`,
       ),
       bixLocal(EXPRESSION_IDS.amused, "Let me guess. That's exactly what Wade handed you."),
       bixLocal(EXPRESSION_IDS.amused, "No delivery tip. That's Wade."),
@@ -866,7 +877,7 @@ const dialogue = {
       ),
       bixLocal(
         EXPRESSION_IDS.neutral,
-        "Need another one? Eight Credits. Got extras? I'll give you three Credits each.",
+        `Need another one? ${spelledNumberCapitalized(CELL_PRICE)} Credits. Got extras? I'll give you ${spelledNumber(CELL_BUYBACK)} Credits each.`,
       ),
       bixLocal(EXPRESSION_IDS.amused, "That's called a store."),
       maraAtBixShop(EXPRESSION_IDS.amused, "Morning, Bix. How's business?"),
@@ -927,7 +938,7 @@ const dialogue = {
       ),
       tansyLocal(
         EXPRESSION_IDS.neutral,
-        "Bix sells them for eight Credits. The Annex hands out five a day for nothing. Either one works.",
+        `Bix sells them for ${spelledNumber(CELL_PRICE)} Credits. The Annex hands out five a day for nothing. Either one works.`,
       ),
     ],
   },
@@ -994,7 +1005,7 @@ const dialogue = {
       ),
       wadeLocal(
         EXPRESSION_IDS.neutral,
-        "Whatever's left of that twenty-four is yours. Don't make a ceremony out of it.",
+        `Whatever's left of that ${spelledNumber(KEEP_THE_CHANGE_BUDGET_CREDITS)} is yours. Don't make a ceremony out of it.`,
       ),
     ],
   },
@@ -1166,13 +1177,16 @@ const dialogue = {
     id: DIALOGUE_IDS.bixPowerCellsTopic,
     npcId: NPC_IDS.bixWeller,
     beats: [
-      bixLocal(EXPRESSION_IDS.neutral, "Power Cells are eight Credits."),
+      bixLocal(EXPRESSION_IDS.neutral, `Power Cells are ${spelledNumber(CELL_PRICE)} Credits.`),
       bixLocal(EXPRESSION_IDS.concerned, "Yes, I know."),
       bixLocal(
         EXPRESSION_IDS.neutral,
         "Getting anything out here costs money before I even put it on a shelf.",
       ),
-      bixLocal(EXPRESSION_IDS.neutral, "If you've got extras, I'll buy them for three."),
+      bixLocal(
+        EXPRESSION_IDS.neutral,
+        `If you've got extras, I'll buy them for ${spelledNumber(CELL_BUYBACK)}.`,
+      ),
       bixLocal(EXPRESSION_IDS.amused, "If that price offends you, keep the Cell. They're useful."),
       bixLocal(EXPRESSION_IDS.concerned, "I'm not going to wrestle it away from you."),
     ],
@@ -1415,7 +1429,7 @@ const dialogue = {
       wadeAtYard(EXPRESSION_IDS.neutral, "Bench is right there. Three welds."),
       wadeAtYard(
         EXPRESSION_IDS.neutral,
-        "Run out of scrap, I sell it. Two credits a piece, same as anybody pays.",
+        `Run out of scrap, I sell it. ${spelledNumberCapitalized(SCRAP_PRICE)} credits a piece, same as anybody pays.`,
       ),
     ],
   },
@@ -1443,7 +1457,7 @@ const dialogue = {
       wadeAtYard(EXPRESSION_IDS.neutral, "Fifty credits. Shop time is still work."),
       wadeAtYard(
         EXPRESSION_IDS.neutral,
-        "Bench stays open. Scrap's two credits when you want more of it.",
+        `Bench stays open. Scrap's ${spelledNumber(SCRAP_PRICE)} credits when you want more of it.`,
       ),
       wadeAtYard(
         EXPRESSION_IDS.neutral,
@@ -1455,7 +1469,10 @@ const dialogue = {
     id: DIALOGUE_IDS.wadePostTenThousandHours,
     npcId: NPC_IDS.wadeRusk,
     beats: [
-      wadeAtYard(EXPRESSION_IDS.neutral, "Bench is open. Scrap's two credits."),
+      wadeAtYard(
+        EXPRESSION_IDS.neutral,
+        `Bench is open. Scrap's ${spelledNumber(SCRAP_PRICE)} credits.`,
+      ),
       wadeAtYard(
         EXPRESSION_IDS.neutral,
         "Ten thousand hours, the old hands say. You've got a few of them behind you now.",
@@ -1589,7 +1606,10 @@ const dialogue = {
     id: DIALOGUE_IDS.wadePostTenThousandOneHours,
     npcId: NPC_IDS.wadeRusk,
     beats: [
-      wadeAtYard(EXPRESSION_IDS.neutral, "Board's up. Bench is open. Scrap's still two credits."),
+      wadeAtYard(
+        EXPRESSION_IDS.neutral,
+        `Board's up. Bench is open. Scrap's still ${spelledNumber(SCRAP_PRICE)} credits.`,
+      ),
       wadeAtYard(
         EXPRESSION_IDS.neutral,
         "You don't need me standing over the terminal. Take what you can finish.",
