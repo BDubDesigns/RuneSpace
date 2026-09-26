@@ -15,10 +15,15 @@ boundary.** This file is the repository's normative agent-behavior contract;
     `docs/gameplay-foundations.md`.
   - Missions and NPC conversations: `docs/missions.md`,
     `docs/npc-conversations.md`.
-  - Character canon, voice, relationships, and spoiler boundaries:
-    `docs/npc-canon.md` — internal and spoiler-complete. Read it before writing
-    any dialogue, Mission, Work Order, Update, or Wiki copy involving a named
-    NPC, and never copy from it into player-facing text.
+  - Character canon, voice, relationships, and spoiler boundaries: the
+    **Notion Canon**, RuneSpace's world/narrative source of truth.
+    `docs/npc-canon.md` links to it and explains the Notion / shipped-code /
+    GitHub Issue split. Canon is internal and spoiler-complete: read the
+    relevant Canon page before writing any dialogue, Mission, Work Order,
+    Update, or Wiki copy involving a named NPC, never copy from it into
+    player-facing text, and never quote protected canon into this public
+    repository. Without Notion access, stop and ask rather than inventing or
+    reconstructing canon.
   - Work Order board rules, client eligibility, and the authored job pool:
     `docs/work-orders.md`. Work Orders shipped in #207, so that document now
     describes shipped behaviour; `docs/gameplay-foundations.md` owns the
@@ -112,7 +117,7 @@ Grep for these before re-deriving them from scratch; a recent session spent
 
 - **A named mechanic's display name fans out well past its component.** For
   example, "Clean Pass" appears in `docs/architecture.md`,
-  `docs/game-rules.md`, `docs/gameplay-foundations.md`, `docs/npc-canon.md`,
+  `docs/game-rules.md`, `docs/gameplay-foundations.md`, the Notion Canon,
   `features/public-site/public-wiki.ts`, `features/public-site/public-updates.ts`,
   several feature components, `game/domain/`, `game/config/balance.ts`, and
   multiple test files — two dozen files for one name. When adding, renaming,
@@ -230,8 +235,8 @@ does not fit cleanly into an existing page; otherwise update the most
 relevant existing page(s) — never a blanket "new feature = new page" rule,
 and never one thin page per new item, action, or mechanic. One narrow
 exception: a named recurring character in the NPC roster gets its own page,
-written only from that character's public-safe facts in `docs/npc-canon.md`
-(see `docs/public-wiki.md`, "Named-character pages"). Internal-only
+written only from the Public-Wiki-safe facts on that character's Notion Canon
+page (see `docs/public-wiki.md`, "Named-character pages"). Internal-only
 CI/test/refactor/architecture work does not require a Wiki edit unless it
 changes actual player-visible behavior. Never publish approved-but-unshipped
 design as current Wiki behavior.
