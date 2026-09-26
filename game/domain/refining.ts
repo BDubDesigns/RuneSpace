@@ -394,17 +394,18 @@ function refiningOutcomeBranches(
 }
 
 /**
- * The server-authoritative maximum for a bounded Refining run (#229): how many
- * attempted batches of this recipe can be started one after another from the
- * character's current inventory, whatever each attempt's roll turns out to be.
+ * The server-authoritative maximum for a bounded Refining run (#229): the most
+ * attempted batches of this recipe that can be started one after another from
+ * the character's current inventory under at least one possible sequence of
+ * outcomes.
  *
  * It asks the ordinary Refining preflight before every attempt — the same
  * inputs, and the same rule that every mutually exclusive outcome must fit
  * before the roll — and steps through every possible outcome with the same
- * transition the resolver applies. The answer is the minimum over outcome
- * sequences, so a run of Max batches can never be cut short by its own rolls;
- * only a change the player makes to their inventory mid-run can stop it early,
- * and that still reports its ordinary stop reason.
+ * transition the resolver applies, taking the longest sequence. Max is an
+ * attempt ceiling, not a promise: the real run still rolls, and if its actual
+ * outcomes leave the next attempt unable to start before the selection is
+ * used up, it stops early with that attempt's ordinary stop reason.
  *
  * A deterministic recipe has one outcome, so this is a straight walk.
  */
@@ -416,7 +417,8 @@ export function refiningRunMaximum<Id>(
   if (!refiningRecipeUnlocked(snapshot.refiningLevel, recipe)) return 0;
   const award = refiningAwardFacts(balance, recipe);
   // A branch the character's level makes impossible is not a sequence the run
-  // can take: at a guaranteed success only the success branch is explored.
+  // can take: at certain success only the success branch is explored, so a
+  // failure's output never makes a path look longer than any real run can be.
   const branches =
     refiningSuccessChanceBps(snapshot.refiningLevel, recipe) >= 10_000
       ? [award.successOutputs]
@@ -439,7 +441,13 @@ export function refiningRunMaximum<Id>(
   // Every attempt consumes at least one input unit net of anything a failure
   // hands back, so this recursion always reaches a state the preflight
   // refuses. The ceiling keeps it finite regardless.
-  const guaranteed = (state: RefiningWorkingState<Id>, depth: number): number => {
+  //
+  // The key ignores depth even though the ceiling truncates by depth. That is
+  // sound for a maximum: a state is only ever cut off by the ceiling on a path
+  // that has already reached it, so the root is the ceiling whatever a later,
+  // shallower visit to that state reads back. Every value below the ceiling is
+  // the state's own longest run, which does not depend on how it was reached.
+  const longest = (state: RefiningWorkingState<Id>, depth: number): number => {
     if (depth >= BOUNDED_RUN_QUANTITY_CEILING) return 0;
     const key = signature(state);
     const known = memo.get(key);
@@ -456,11 +464,11 @@ export function refiningRunMaximum<Id>(
     );
     let result = 0;
     if (!stop) {
-      result = Number.POSITIVE_INFINITY;
       for (const branch of branches) {
         const next = applyRefiningAttempt(state, award, branch, depth);
-        result = Math.min(result, 1 + guaranteed(next, depth + 1));
-        if (result === 1) break;
+        result = Math.max(result, 1 + longest(next, depth + 1));
+        // Nothing longer is possible once a branch reaches the ceiling.
+        if (depth + result >= BOUNDED_RUN_QUANTITY_CEILING) break;
       }
     }
     memo.set(key, result);
@@ -469,7 +477,7 @@ export function refiningRunMaximum<Id>(
 
   return Math.min(
     BOUNDED_RUN_QUANTITY_CEILING,
-    guaranteed(
+    longest(
       {
         stacks: snapshot.existingStacks.map((stack) => ({ ...stack, persisted: true })),
         slotsAvailable: snapshot.slotsAvailable,

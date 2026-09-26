@@ -252,6 +252,86 @@ suite("issue #229 bounded runs (real PostgreSQL)", () => {
       expect(done.stop).toEqual({ activity: "refining", reason: "insufficient_inputs" });
     });
 
+    it("Max is the longest reachable run; the real rolls may stop it sooner", async () => {
+      // Ten Shale in one stack, Refined Ferrite with room for two, Slag with
+      // room for two, and every other slot filled: two successes (or two
+      // failures) in a row leave no room for the next batch, alternating
+      // reaches three. Max is three, not the two every sequence could reach.
+      async function tightRefiner() {
+        const made = await refiner();
+        const { userId, character } = made;
+        await setCarried(character.id, ITEM_IDS.ferriteShale, [10]);
+        await setCarried(character.id, ITEM_IDS.refinedFerrite, [3]);
+        await setCarried(character.id, ITEM_IDS.slag, [8]);
+        const open = await play.getPlayGameplayState(userId, character.id, start, certain());
+        await setCarried(
+          character.id,
+          ITEM_IDS.galvanite,
+          Array.from({ length: open.inventory.slotsAvailable }, () => 1),
+        );
+        const state = await play.getPlayGameplayState(userId, character.id, start, certain());
+        expect(state.inventory.slotsAvailable).toBe(0);
+        const maximum = state.refiningRecipes.find(
+          (r) => r.actionId === ACTION_IDS.refining,
+        )!.maximumBatches;
+        expect(maximum).toBe(3);
+        const started = await refiningCommands.startRefining(
+          userId,
+          character.id,
+          ACTION_IDS.refining,
+          start,
+          certain(),
+          maximum,
+        );
+        expect(started.refiningError).toBeUndefined();
+        expect(started.refiningRun.selectedAttempts).toBe(3);
+        return made;
+      }
+      const scripted = (rolls: readonly number[]) => {
+        let index = 0;
+        return { nextBasisPoints: () => rolls[index++] ?? 9_999, nextUnit: () => 0 };
+      };
+
+      // Success, failure, success: all three selected attempts happen.
+      const lucky = await tightRefiner();
+      const completed = await play.getPlayGameplayState(
+        lucky.userId,
+        lucky.character.id,
+        at(ferriteMs * 10),
+        scripted([0, 9_999, 0]),
+      );
+      expect(completed.refiningRun).toMatchObject({
+        selectedAttempts: 3,
+        attempts: 3,
+        successes: 2,
+        failures: 1,
+      });
+      expect(completed.stop).toEqual({ activity: "refining", reason: "run_completed" });
+      expect(await carried(lucky.character.id, ITEM_IDS.refinedFerrite)).toBe(5);
+      expect(await carried(lucky.character.id, ITEM_IDS.slag)).toBe(9);
+
+      // Two successes fill Refined Ferrite: the third batch cannot start, and
+      // the run says so rather than claiming it completed or awarding more.
+      const unlucky = await tightRefiner();
+      const stopped = await play.getPlayGameplayState(
+        unlucky.userId,
+        unlucky.character.id,
+        at(ferriteMs * 10),
+        scripted([0, 0, 0]),
+      );
+      expect(stopped.refiningRun).toMatchObject({
+        selectedAttempts: 3,
+        attempts: 2,
+        successes: 2,
+        failures: 0,
+      });
+      expect(stopped.activeAction).toBeUndefined();
+      expect(stopped.stop).toEqual({ activity: "refining", reason: "inventory_slots_full" });
+      expect(await carried(unlucky.character.id, ITEM_IDS.refinedFerrite)).toBe(5);
+      expect(await carried(unlucky.character.id, ITEM_IDS.slag)).toBe(8);
+      expect(await carried(unlucky.character.id, ITEM_IDS.ferriteShale)).toBe(6);
+    });
+
     it("refuses a quantity above the current maximum without starting anything", async () => {
       const { userId, character } = await refiner();
       await setCarried(character.id, ITEM_IDS.ferriteShale, [10]);

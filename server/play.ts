@@ -436,8 +436,9 @@ export type RefiningRecipeProjection = {
   /** Always succeeds and never rolls (#229): the intentional Slag recipes. */
   deterministic: boolean;
   /**
-   * The authoritative bounded-run maximum (#229): how many batches of this
-   * recipe can be attempted from current inventory whatever the rolls do. Zero
+   * The authoritative bounded-run maximum (#229): the most batches of this
+   * recipe that could be attempted from current inventory under some possible
+   * sequence of outcomes — a ceiling the run's real rolls may stop short of. Zero
    * when the recipe is locked, nothing can start, or Refining is not available
    * where the character is standing.
    */

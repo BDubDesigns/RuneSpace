@@ -192,7 +192,7 @@ const authoredWikiArticles = [
         heading: "Choosing how many batches",
         paragraphs: [
           "Before you start, pick how many batches to run. It starts at one; the minus and plus buttons change it by one, and Max jumps straight to the most your carried material and free space allow. The console shows what the whole run will take and how long it should last.",
-          "A batch counts whether it succeeds or fails, so a run of five is five attempts, not five guaranteed results. Max is the number you can be sure of finishing, however the attempts turn out. Refining stops by itself once the last batch you chose is done.",
+          "A batch counts whether it succeeds or fails, so a run of five is five attempts, not five guaranteed results. Max is the most batches your carried materials could reach if the attempts fall the right way. It is a ceiling, not a promise: if the results leave no room or no materials for the next batch, the run ends early and says why. Refining stops by itself once the last batch you chose is done.",
           "If your inventory changes before you press Start and the number you picked no longer fits, Refining will not quietly run fewer — it tells you the new most you can start, and you choose again.",
         ],
       },

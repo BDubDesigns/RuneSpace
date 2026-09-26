@@ -109,11 +109,13 @@ is never stored. `active_actions` is unchanged and still the one-active-action
 boundary; lazy/offline resolution and the one-hour cap are unchanged.
 
 A completed selection stops the run with its own `run_completed` reason, checked
-before the activity's shortage reasons (inputs, capacity, Scrap), so a run of
-Max ends by saying it finished rather than that it ran out. Practice's explicit
+before the activity's shortage reasons (inputs, capacity, Scrap), so a run that
+reaches its selection ends by saying it finished rather than that it ran out. Practice's explicit
 Stop After Current Weld intent is checked before it and keeps its own reason. Only the current unit is ever committed:
-the next batch or weld is revalidated as it begins, and an inventory change
-mid-run still stops it early with its ordinary reason.
+the next batch or weld is revalidated as it begins, and a run that cannot begin
+its next unit before the selection is used up — because of an inventory change
+mid-run or, for Refining, its own outcomes — stops early with its ordinary
+reason. The selection is an attempt ceiling, not a promise of completion.
 
 ## Refining slice (issues #81, #209 and #229)
 
@@ -144,11 +146,18 @@ roll.
 
 **A run is a selected number of attempted batches** (see "Bounded runs"). A
 failed attempt counts toward the selection exactly like a success. The
-maximum is the number of batches that can be started one after another from the
-current inventory **whatever the rolls do**: `refiningRunMaximum` asks the
-ordinary preflight before every attempt and steps through every possible
-outcome with the resolver's own transition, taking the minimum. A run of Max
-therefore cannot be cut short by its own rolls.
+maximum is the greatest number of batches that can be started one after
+another from the current inventory **under at least one possible sequence of
+outcomes**: `refiningRunMaximum` asks the ordinary preflight before every
+attempt and steps through every possible outcome with the resolver's own
+transition, taking the longest sequence (an outcome the character's level makes
+impossible, such as a failure at certain success, is not explored). Max is an
+attempt ceiling, not a guarantee: the real run still rolls, and if its actual
+outcomes leave the next batch unable to start — inputs spent, or a success's or
+failure's output no longer fitting — it stops before the selection with the
+ordinary `insufficient_inputs`, `inventory_slots_full`, or
+`carried_mass_capacity_reached` reason. Nothing is fabricated and the selection
+is never silently shortened.
 
 Every recipe is visible in the console from the beginning; a recipe the
 character's level does not authorize renders as `Requires Refining N` and is
