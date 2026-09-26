@@ -25,7 +25,7 @@ import type { LocalPlaceSurface as LocalPlaceSurfaceState } from "@/game/domain/
  * place's merchant is offered as Trade on its resident's Local Contact card
  * (features/npc/NpcInteractionPanel), beside Talk, so the player meets one
  * person with several interactions rather than a shop that unfolds on arrival.
- * That card arrives as a `resident` slot and sits directly under the
+ * Those cards arrive as a `residents` slot and sit directly under the
  * description, above whatever gameplay the place hosts, so the person in front
  * of the player is never pushed below the place's activity UI on a phone.
  *
@@ -39,12 +39,12 @@ import type { LocalPlaceSurface as LocalPlaceSurfaceState } from "@/game/domain/
 export function LocalPlaceSurface({
   characterName,
   parentDisplayName,
-  resident,
+  residents,
   surface,
 }: {
   characterName: string;
   parentDisplayName: string;
-  resident?: ReactNode;
+  residents?: ReactNode;
   surface: LocalPlaceSurfaceState;
 }) {
   const pathname = usePathname();
@@ -64,7 +64,7 @@ export function LocalPlaceSurface({
         >
           {surface.description}
         </p>
-        {resident}
+        {residents}
         <div className="mt-5">
           <ActionLink
             className="max-w-full gap-2 text-left"

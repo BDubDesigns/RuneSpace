@@ -14,7 +14,7 @@ import { DIALOGUE_SEQUENCES, getDialogue } from "@/game/content/dialogue";
 import { areLocationsAdjacent, getLocation } from "@/game/content/locations";
 import { getLocationMerchant, getMerchant, isMerchantOpen } from "@/game/content/merchants";
 import {
-  getResidentNpc,
+  getResidentNpcs,
   resolveNpcPlacement,
   resolveNpcVenueBackgroundId,
   getNpc,
@@ -106,18 +106,22 @@ describe("Wade moves to his own yard, derived from the Mission record", () => {
     const before = new Set<string>();
     const after = new Set([MISSION_IDS.keepTheChange]);
     expect(
-      getResidentNpc({ locationId: LOCATION_IDS.crashSite, completedMissionIds: before })?.id,
-    ).toBe(NPC_IDS.wadeRusk);
+      getResidentNpcs({ locationId: LOCATION_IDS.crashSite, completedMissionIds: before }).map(
+        (npc) => npc.id,
+      ),
+    ).toEqual([NPC_IDS.wadeRusk]);
     expect(
-      getResidentNpc({ locationId: LOCATION_IDS.ruskRecovery, completedMissionIds: before }),
-    ).toBeUndefined();
+      getResidentNpcs({ locationId: LOCATION_IDS.ruskRecovery, completedMissionIds: before }),
+    ).toEqual([]);
 
     expect(
-      getResidentNpc({ locationId: LOCATION_IDS.crashSite, completedMissionIds: after }),
-    ).toBeUndefined();
+      getResidentNpcs({ locationId: LOCATION_IDS.crashSite, completedMissionIds: after }),
+    ).toEqual([]);
     expect(
-      getResidentNpc({ locationId: LOCATION_IDS.ruskRecovery, completedMissionIds: after })?.id,
-    ).toBe(NPC_IDS.wadeRusk);
+      getResidentNpcs({ locationId: LOCATION_IDS.ruskRecovery, completedMissionIds: after }).map(
+        (npc) => npc.id,
+      ),
+    ).toEqual([NPC_IDS.wadeRusk]);
   });
 
   it("keeps one Wade, with no second shop identity", () => {
@@ -341,7 +345,7 @@ describe("a present-tense local conversation follows the speaker", () => {
 
   it("leaves an NPC who has never moved on their authored background", () => {
     const tansy = getNpc(NPC_IDS.tansyRusk)!;
-    expect(tansy.relocation).toBeUndefined();
+    expect(tansy.relocations).toBeUndefined();
     expect(resolveNpcVenueBackgroundId(tansy, new Set([MISSION_IDS.keepTheChange]))).toBe(
       tansy.conversationBackgroundId,
     );

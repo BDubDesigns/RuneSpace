@@ -186,21 +186,23 @@ changed when access is later granted.
 
 ### NPC presence in Local Places
 
-The foundation does not require a generic simultaneous multi-NPC interaction
-system.
-
-Persistent NPC presence should resolve from the relevant spatial context:
-ordinary existing World Locations can continue to behave as they do now, while
-Holo Hollow's resident interaction is scoped to the active Local Place. Bix is
-the resident interaction in his shop and Renn is the resident interaction at the
+Persistent NPC presence resolves from the exact spatial context: ordinary World
+Locations present the NPCs who stand at the World Location itself, while Holo
+Hollow's resident interaction is scoped to the active Local Place. Bix is the
+resident interaction in his shop and Renn is the resident interaction at the
 Community Assistance Center.
 
+Since #231 a context resolves an ordered *set* of residents rather than at most
+one, so two NPCs may share a World Location or a Local Place when authored
+placement puts them there. No shipped context currently has more than one; the
+mechanics are in `docs/npc-conversations.md`. This is not an NPC-grid UI and
+not a reason to put a character into a Local Place merely to keep them apart.
+
 Mara's appearance in Bix's shop during the Wade apprentice Mission is an
-authored dialogue beat. It does not make Mara a persistent second shop
-NPC and did not justify building multi-NPC interaction UI. As shipped in #170 it
-needed no new system at all: a dialogue beat already carries its own
-`speakerNpcId`, so Mara simply speaks inside Bix's own authored sequence while
-`getResidentNpc` keeps resolving exactly one resident per place.
+authored dialogue beat. It does not make Mara a persistent second shop NPC. As
+shipped in #170 it needed no new system at all: a dialogue beat already carries
+its own `speakerNpcId`, so Mara simply speaks inside Bix's own authored sequence
+while the shop's resident set is still only Bix.
 
 ### Holo Drive-In
 
