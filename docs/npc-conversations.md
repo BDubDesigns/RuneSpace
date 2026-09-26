@@ -51,36 +51,54 @@ separate actions (`docs/holo-hollow.md`).
 | Mission conversation metadata | `game/content/missions.ts` — `MissionOffer` (`dialogueId`, `actionLabel`, `acceptedContinuation`, `activeDialogueId`), `MissionTurnIn` (`dialogueId`, `actionLabel`), `MissionDialogue`, `activeNpcDialogue`, `completedNpcDialogue`, and the `npc_conversation` requirement's own `dialogueId` / `actionLabel` |
 | Conversation resolution (pure) | `game/domain/conversation.ts` — `resolveNpcConversation`, `NpcConversationEntry`, `topicAvailable`, `validateConversationTopics`, `getMissionCompletionPresentation`, `getMissionCapacityRefusalDialogue` |
 | Content validation at module load | `server/mission-state.ts` — `validateMissionDefinitions` + `validateConversationTopics` |
-| Player-facing surfaces | `features/npc/NpcInteractionPanel.tsx` (Talk control + guidance), `features/npc/NpcConversation.tsx` (hub + command execution), `features/dialogue/DialoguePlayer.tsx` / `DialogueScene.tsx` (beat presentation) |
+| Player-facing surfaces | `features/npc/NpcInteractionPanel.tsx` (the place's resident rows: Talk control + guidance, Trade), `features/npc/NpcConversation.tsx` (hub + command execution), `features/dialogue/DialoguePlayer.tsx` / `DialogueScene.tsx` (beat presentation) |
 | Server authority | `server/missions.ts` — `acceptMission` / `completeMission` (unchanged by #164) |
-| Which resident is present | `game/content/npcs.ts` — `getResidentNpc({ locationId, localPlaceId, completedMissionIds })`, `resolveNpcPlacement`, `resolveNpcVenueBackgroundId` |
+| Who is present | `game/content/npcs.ts` — `getResidentNpcs({ locationId, localPlaceId, completedMissionIds })`, `resolveNpcPlacement`, `resolveNpcVenueBackgroundId` |
 
-**Where the card renders (#190).** The Local Contact card is composed *inside*
-the panel for the place the player is in — directly under the World Location's
-description, or under a Local Place's, above whatever gameplay that place hosts
-(`LocalPlaceSurface`'s `resident` slot). It is one shared rule for every venue,
-not a per-location arrangement: the person in front of the player must never sit
-below the place's activity UI on a phone.
+**Where the cards render (#190, #231).** Each resident's Local Contact card is
+composed *inside* the panel for the place the player is in — directly under the
+World Location's description, or under a Local Place's, above whatever gameplay
+that place hosts (`LocalPlaceSurface`'s `residents` slot). It is one shared rule
+for every venue, not a per-location arrangement: the people in front of the
+player must never sit below the place's activity UI on a phone. When several
+people stand in one place, each gets their own card in authored order, each
+with their own Talk and Trade, and the place's own population line renders
+once, after the people, rather than inside anybody's card. A resident with no
+available conversation and no open merchant presents no card.
 
-**Where a resident stands (#159).** `getResidentNpc` resolves one NPC from a
-spatial context. An NPC with no `localPlaceId` is present at their World
-Location, which is how Wade and Tansy have always worked and still do.
-An NPC with a `localPlaceId` is found only inside that Local Place, which is
-how Bix and Renn share Holo Hollow without either appearing merely because the
-player is standing in town. It stays a single-resident lookup: there is no
-simultaneous multi-NPC interaction system, and an NPC whose conversation
-content is not authored yet simply has no expression art or background.
+**Where a resident stands (#159, #231).** `getResidentNpcs` resolves every NPC
+whose current placement matches one exact spatial context. An NPC with no
+`localPlaceId` is present at their World Location, which is how Wade and Tansy
+have always worked and still do. An NPC with a `localPlaceId` is found only
+inside that Local Place, which is how Bix and Renn share Holo Hollow without
+either appearing merely because the player is standing in town. Both halves
+must match exactly, so a Local Place's residents never bleed into their parent
+World Location and the reverse. The result is in the roster's authored order in
+`game/content/npcs.ts` — never completion or arrival order — so the same state
+presents the same people in the same sequence on every refresh, and each NPC
+appears at most once. No shipped context currently has two residents; the
+generalization exists so that one can without faking a Local Place.
 
-**When a resident moves (#190).** An NPC may author **one** Mission-derived
-relocation: `relocation: { afterCompletedMissionId, homeLocationId }`. Wade is
-at the Crash Site until Keep the Change completes and at Rusk Recovery
-afterwards, resolved per NPC by `resolveNpcPlacement` from the character's own
-completed Missions. That is one person in two places over time — never a second
-"shop Wade", and never a persisted relocation flag that could disagree with the
-Mission record. Where a conversation happened stays authored per beat, so his
-Crash Site beats keep the Crash Site behind them and his yard beats use the
-yard: a person moving is new beats in a new place, not a dynamic-background
-system that retroactively relocates what they already said.
+This is presentation, not authority. The client resolves residents from the
+authoritative Mission projection to decide which cards to show, and every
+Mission, conversation, and Trade command still revalidates its own location on
+the server.
+
+**When a resident moves (#190, #231).** An NPC authors a home placement
+(`homeLocationId`, optional `localPlaceId`) and zero or more ordered
+Mission-derived relocations:
+`relocations: [{ afterCompletedMissionId, locationId, localPlaceId?, conversationBackgroundId? }]`.
+`resolveNpcPlacement` takes the character's own completed Missions and returns
+the **latest entry in authored order** whose Mission is complete, or the home
+placement when none is. A later entry wins over an earlier one whichever Mission
+happened to finish first, and a completed Mission that no entry names changes
+nothing. Wade authors one entry: he is at the Crash Site until Keep the Change
+completes and at Rusk Recovery afterwards. That is one person in several places
+over time — never a second "shop Wade", and never a persisted relocation flag
+that could disagree with the Mission record. Where a conversation happened stays
+authored per beat, so his Crash Site beats keep the Crash Site behind them and
+his yard beats use the yard: a person moving is new beats in a new place, not a
+dynamic-background system that retroactively relocates what they already said.
 
 **Scenes stay put; present-tense conversation follows the speaker (#190).**
 Two different things share the word "background". A scene or a comms call
@@ -90,17 +108,19 @@ it is the person standing in front of the player today, and after a relocation
 it would otherwise be presented in a place neither of them is in. Such a
 sequence opts in with `presentsAtCurrentVenue: true`, and its **local** beats
 are presented against `resolveNpcVenueBackgroundId(npc, completedMissionIds)`:
-`relocation.conversationBackgroundId` once the move has happened, and the NPC's
-ordinary `conversationBackgroundId` before it. Comms beats are never overridden,
+the current relocation's `conversationBackgroundId` once a move has happened,
+and the NPC's ordinary `conversationBackgroundId` before it (or when the current
+relocation authors no venue of its own). Comms beats are never overridden,
 authored content is never rewritten, no topic is duplicated per venue, and
 nothing new is persisted — the venue comes from the same completed-Mission set
 that decides where the person is standing. An NPC who never moves resolves the
 background they were already authored against, so this changes nothing for
 anybody else.
 
-Deliberately one authored move per NPC, in completion order. This is not an NPC
-schedule or movement engine; a future story beat that moves somebody again earns
-its own explicit entry.
+This is story placement, not an NPC schedule or movement engine. Nothing reads
+the clock; there are no shifts, pathing, random presence, or presence flags, and
+nothing about placement is persisted. A story beat that moves somebody earns its
+own authored relocation entry, added with the Mission that causes it.
 
 **Authored capacity refusals (#170, #190).** A Mission command that refuses
 because a grant will not fit reports `reason: "capacity"` with its

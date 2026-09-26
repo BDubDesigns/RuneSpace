@@ -21,7 +21,7 @@ import { LocationSceneHeader } from "./LocationSceneHeader";
  * the way back. The walk home is the ordinary Travel control, unchanged.
  *
  * This surface is the place: its scene, its description, who is here, and the
- * resident standing in it. What the player can *do* here is a sibling panel
+ * residents standing in it. What the player can *do* here is a sibling panel
  * (`LocationActivity`, #193), so that every location presents its activity in
  * the same frame at the same depth instead of four different ways.
  */
@@ -40,7 +40,7 @@ export function LocationSurface({
 
   // The shared interpretation: a hand-edited URL naming an unknown,
   // wrong-parent, or locked place falls back to the town surface rather than
-  // revealing an interior. The resident panel reads the same answer.
+  // revealing an interior. The residents panel reads the same answer.
   const activePlace = resolveActiveLocalPlace({
     locationId,
     requestedLocalPlaceId: localPlaceId,
@@ -51,7 +51,7 @@ export function LocationSurface({
       <LocalPlaceSurface
         characterName={characterName}
         parentDisplayName={location.displayName}
-        resident={
+        residents={
           // Keyed by the requested place so a contact's opened Trade surface
           // never survives moving to another place and reappears there.
           <NpcInteractionPanel
@@ -115,11 +115,12 @@ export function LocationSurface({
         >
           {presentedLocation.description}
         </p>
-        {/* Who is here rides on the resident row's second line rather than
+        {/* Who is here rides on the line after the resident rows rather than
             taking a row of its own (#193) — 32px on a phone, which is the
             difference between the Workbench starting above the fold at Rusk
-            Recovery and starting below it. It states its own subject so it
-            still reads as the place's, not the resident's. */}
+            Recovery and starting below it. It renders once however many people
+            stand here (#231), and states its own subject so it still reads as
+            the place's, not any resident's. */}
         <NpcInteractionPanel className="mt-3" meta={<LocationPopulationPanel />} />
         {localPlaces.length > 0 ? (
           <div className="mt-5">

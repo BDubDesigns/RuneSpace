@@ -3,7 +3,13 @@ import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import * as authSchema from "@/db/auth-schema";
 import * as rune from "@/db/rune-space";
-import { LOCATION_IDS, PORTRAIT_IDS, SKILL_IDS } from "@/game/config/foundations";
+import {
+  LOCATION_IDS,
+  MISSION_IDS,
+  NPC_IDS,
+  PORTRAIT_IDS,
+  SKILL_IDS,
+} from "@/game/config/foundations";
 import { getLocation } from "@/game/content/locations";
 import { createCharacter } from "@/server/characters";
 import { ensurePlayerAccount } from "@/server/ownership";
@@ -170,9 +176,13 @@ populationTest(
     expect(Number(await badge.getAttribute("data-population-count"))).toBe(before);
 
     // Collapsed, at a location with a resident NPC (Wade Rusk, Crash Site):
-    // the trigger stays compact and right-aligned against the resident row,
-    // not stretched to the row's full width.
-    const residentRow = page.locator("[data-npc-interaction]");
+    // the trigger stays compact and right-aligned against the resident rows,
+    // not stretched to their full width. It is the place's line, so it renders
+    // once, after the people rather than inside anybody's row (#231).
+    const residentRow = page.locator("[data-npc-residents]");
+    await expect(page.locator("[data-npc-interaction]")).toHaveCount(1);
+    await expect(page.locator("[data-place-meta]")).toHaveCount(1);
+    await expect(page.locator("[data-npc-interaction] [data-location-population]")).toHaveCount(0);
     const [residentRowBox, disclosureBox] = await Promise.all([
       residentRow.boundingBox(),
       disclosure.boundingBox(),
@@ -193,7 +203,7 @@ populationTest(
     // Expanded, the list (and any opened Character Profile, which mounts
     // inside it) is free to use the full row instead of staying pinned to the
     // collapsed trigger's narrow width.
-    await expectPopulationListFillsRow(page, "[data-npc-interaction]");
+    await expectPopulationListFillsRow(page, "[data-npc-residents]");
     const expandedOverflow = await page.evaluate(
       () => document.documentElement.scrollWidth - window.innerWidth,
     );
@@ -344,3 +354,98 @@ populationTest(
     await expect(page.locator("#location-population-list")).toBeHidden();
   },
 );
+
+/**
+ * Issue #231: the place panel resolves an ordered set of residents. Every
+ * shipped context still has at most one, so these journeys pin the migrated
+ * behaviour at phone width: Wade stands where his Mission record says, Tansy
+ * has not moved, each resident row sits above the place's activity, and the
+ * place's own population line renders once, after the people.
+ */
+test.describe("issue #231 resident rows at phone width", () => {
+  const PHONE = { width: 390, height: 844 };
+
+  async function standAfterKeepTheChange(characterId: string, locationId: string) {
+    const now = new Date();
+    await db
+      .insert(rune.characterMissions)
+      .values(
+        [
+          MISSION_IDS.walkItOff,
+          MISSION_IDS.cutYourTeeth,
+          MISSION_IDS.wasteNot,
+          MISSION_IDS.holdItTogether,
+          MISSION_IDS.keepTheChange,
+        ].map((missionId) => ({ characterId, missionId, acceptedAt: now, completedAt: now })),
+      );
+    await db
+      .update(rune.characters)
+      .set({ currentLocationId: locationId })
+      .where(eq(rune.characters.id, characterId));
+  }
+
+  /** Exactly these residents, in order, above the activity, with one meta line. */
+  async function expectResidents(page: import("@playwright/test").Page, npcIds: string[]) {
+    const rows = page.locator("[data-location-surface] [data-npc-interaction]");
+    await expect(rows).toHaveCount(npcIds.length);
+    for (const [index, npcId] of npcIds.entries()) {
+      await expect(rows.nth(index)).toHaveAttribute("data-npc-interaction", npcId);
+    }
+    const meta = page.locator("[data-location-surface] [data-place-meta]");
+    await expect(meta).toHaveCount(1);
+    await expect(meta.locator("[data-location-population]")).toBeVisible();
+    const metaBox = (await meta.boundingBox())!;
+    if (npcIds.length > 0) {
+      const lastRow = (await rows.last().boundingBox())!;
+      expect(metaBox.y).toBeGreaterThanOrEqual(lastRow.y + lastRow.height - 1);
+    }
+    const activity = page.locator("[data-activity-panel]").first();
+    if ((await activity.count()) > 0) {
+      const activityBox = (await activity.boundingBox())!;
+      expect(metaBox.y + metaBox.height).toBeLessThanOrEqual(activityBox.y);
+    }
+    const overflow = await page.evaluate(
+      () => document.documentElement.scrollWidth - window.innerWidth,
+    );
+    expect(overflow).toBeLessThanOrEqual(0);
+  }
+
+  test("Wade is the Crash Site's resident until Keep the Change completes", async ({
+    page,
+    testCharacter,
+  }) => {
+    await page.setViewportSize(PHONE);
+    await openTestCharacter(page, testCharacter.id);
+    await expect(page.locator(`[data-location-scene="${LOCATION_IDS.crashSite}"]`)).toBeVisible();
+    await expectResidents(page, [NPC_IDS.wadeRusk]);
+  });
+
+  test("after Keep the Change Wade is at his yard, the Crash Site is empty, and Tansy has not moved", async ({
+    page,
+    testCharacter,
+  }) => {
+    await page.setViewportSize(PHONE);
+    await standAfterKeepTheChange(testCharacter.id, LOCATION_IDS.crashSite);
+    await openTestCharacter(page, testCharacter.id);
+    await expect(page.locator(`[data-location-scene="${LOCATION_IDS.crashSite}"]`)).toBeVisible();
+    await expectResidents(page, []);
+
+    await db
+      .update(rune.characters)
+      .set({ currentLocationId: LOCATION_IDS.ruskRecovery })
+      .where(eq(rune.characters.id, testCharacter.id));
+    await page.reload();
+    await expect(
+      page.locator(`[data-location-scene="${LOCATION_IDS.ruskRecovery}"]`),
+    ).toBeVisible();
+    await expectResidents(page, [NPC_IDS.wadeRusk]);
+
+    await db
+      .update(rune.characters)
+      .set({ currentLocationId: LOCATION_IDS.theJag })
+      .where(eq(rune.characters.id, testCharacter.id));
+    await page.reload();
+    await expect(page.locator(`[data-location-scene="${LOCATION_IDS.theJag}"]`)).toBeVisible();
+    await expectResidents(page, [NPC_IDS.tansyRusk]);
+  });
+});

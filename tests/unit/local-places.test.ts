@@ -15,7 +15,7 @@ import {
   getLocalPlacesForLocation,
 } from "@/game/content/local-places";
 import { LOCATIONS, areLocationsAdjacent, getLocation } from "@/game/content/locations";
-import { getResidentNpc } from "@/game/content/npcs";
+import { getResidentNpcs } from "@/game/content/npcs";
 import {
   deriveLocalPlaceAccess,
   resolveActiveLocalPlace,
@@ -190,55 +190,62 @@ describe("issue #159 active Local Place interpretation", () => {
     });
     expect(active).toBeUndefined();
     expect(
-      getResidentNpc({ locationId: LOCATION_IDS.holoHollow, localPlaceId: active?.id }),
-    ).toBeUndefined();
+      getResidentNpcs({ locationId: LOCATION_IDS.holoHollow, localPlaceId: active?.id }),
+    ).toEqual([]);
     // Reading the raw request instead would have resolved Mara.
     expect(
-      getResidentNpc({ locationId: LOCATION_IDS.holoHollow, localPlaceId: requestedLocalPlaceId })
-        ?.id,
-    ).toBe(NPC_IDS.maraKells);
+      getResidentNpcs({
+        locationId: LOCATION_IDS.holoHollow,
+        localPlaceId: requestedLocalPlaceId,
+      }).map((npc) => npc.id),
+    ).toEqual([NPC_IDS.maraKells]);
   });
 });
 
 describe("issue #159 Local-Place-scoped residents", () => {
   it("resolves each Holo Hollow resident from their own place", () => {
     expect(
-      getResidentNpc({
+      getResidentNpcs({
         locationId: LOCATION_IDS.holoHollow,
         localPlaceId: LOCAL_PLACE_IDS.holoHollowSouvenirs,
-      })?.id,
-    ).toBe(NPC_IDS.bixWeller);
+      }).map((npc) => npc.id),
+    ).toEqual([NPC_IDS.bixWeller]);
     expect(
-      getResidentNpc({
+      getResidentNpcs({
         locationId: LOCATION_IDS.holoHollow,
         localPlaceId: LOCAL_PLACE_IDS.holoHollowAssistanceCenter,
-      })?.id,
-    ).toBe(NPC_IDS.rennCalder);
+      }).map((npc) => npc.id),
+    ).toEqual([NPC_IDS.rennCalder]);
   });
 
   it("exposes nobody merely for standing in town", () => {
-    expect(getResidentNpc({ locationId: LOCATION_IDS.holoHollow })).toBeUndefined();
+    expect(getResidentNpcs({ locationId: LOCATION_IDS.holoHollow })).toEqual([]);
   });
 
   it("keeps World-Location residents resolving exactly as before", () => {
-    expect(getResidentNpc({ locationId: LOCATION_IDS.crashSite })?.id).toBe(NPC_IDS.wadeRusk);
-    expect(getResidentNpc({ locationId: LOCATION_IDS.theJag })?.id).toBe(NPC_IDS.tansyRusk);
+    expect(getResidentNpcs({ locationId: LOCATION_IDS.crashSite }).map((npc) => npc.id)).toEqual([
+      NPC_IDS.wadeRusk,
+    ]);
+    expect(getResidentNpcs({ locationId: LOCATION_IDS.theJag }).map((npc) => npc.id)).toEqual([
+      NPC_IDS.tansyRusk,
+    ]);
     // Supplying a place at a location that has none resolves nothing rather
     // than falling back to the location's own resident.
     expect(
-      getResidentNpc({
+      getResidentNpcs({
         locationId: LOCATION_IDS.crashSite,
         localPlaceId: LOCAL_PLACE_IDS.holoHollowSouvenirs,
       }),
-    ).toBeUndefined();
+    ).toEqual([]);
   });
 
   it("keeps Mara as the B&B's resident, now with her authored conversation art", () => {
-    const mara = getResidentNpc({
+    const residents = getResidentNpcs({
       locationId: LOCATION_IDS.holoHollow,
       localPlaceId: LOCAL_PLACE_IDS.hhBnb,
     });
-    expect(mara?.id).toBe(NPC_IDS.maraKells);
+    expect(residents.map((npc) => npc.id)).toEqual([NPC_IDS.maraKells]);
+    const mara = residents[0];
     // Issue #170 supplies her approved set. The shared expression vocabulary is
     // mapped to her own art; `firm` is composed and matter-of-fact rather than
     // reusing `guarded`, which means wary.
@@ -296,10 +303,12 @@ describe("issue #170 mission-derived Local Place access", () => {
       completedMissionIds: completed,
     });
     expect(
-      getResidentNpc({ locationId: LOCATION_IDS.holoHollow, localPlaceId: active?.id })?.id,
-    ).toBe(NPC_IDS.maraKells);
+      getResidentNpcs({ locationId: LOCATION_IDS.holoHollow, localPlaceId: active?.id }).map(
+        (npc) => npc.id,
+      ),
+    ).toEqual([NPC_IDS.maraKells]);
     // Still nobody merely for standing in town, and still nobody while locked.
-    expect(getResidentNpc({ locationId: LOCATION_IDS.holoHollow })).toBeUndefined();
+    expect(getResidentNpcs({ locationId: LOCATION_IDS.holoHollow })).toEqual([]);
     expect(
       resolveActiveLocalPlace({
         locationId: LOCATION_IDS.holoHollow,
