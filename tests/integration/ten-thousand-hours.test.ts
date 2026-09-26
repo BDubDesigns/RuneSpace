@@ -151,6 +151,12 @@ suite("issue #190 10,000 Hours acceptance (real PostgreSQL)", () => {
     )[0]?.totalXp;
   }
 
+  /** The carried slots still free, read from the authoritative projection. */
+  async function freeSlots(userId: string, characterId: string) {
+    return (await play.getPlayGameplayState(userId, characterId, now, deterministicRandom()))
+      .inventory.slotsAvailable;
+  }
+
   /** Fill inventory slots so a grant of six cannot fit. */
   async function fillSlots(characterId: string, stacks: number) {
     for (let index = 0; index < stacks; index += 1) {
@@ -167,8 +173,8 @@ suite("issue #190 10,000 Hours acceptance (real PostgreSQL)", () => {
     expect(result.mission.status).toBe("accepted");
     const scrap = await carriedScrap(character.id);
     expect(scrap.total).toBe(6);
-    // Non-stacking: six pieces is six occupied slots.
-    expect(scrap.stacks).toBe(6);
+    // Scrap stacks to three (#230): six pieces is two full stacks, two slots.
+    expect(scrap.stacks).toBe(2);
     expect((await missionRow(character.id))?.acceptedAt).not.toBeNull();
   });
 
@@ -188,8 +194,8 @@ suite("issue #190 10,000 Hours acceptance (real PostgreSQL)", () => {
 
   it("refuses without granting anything, accepting anything, or leaving a row", async () => {
     const { userId, character } = await apprenticeAtTheYard();
-    // The starter container holds eight slots; leave room for only five pieces.
-    await fillSlots(character.id, 3);
+    // Six pieces need two slots at three to a stack; leave room for only one.
+    await fillSlots(character.id, (await freeSlots(userId, character.id)) - 1);
 
     const refused = await accept(userId, character.id);
     expect(refused.mission).toMatchObject({
@@ -214,7 +220,7 @@ suite("issue #190 10,000 Hours acceptance (real PostgreSQL)", () => {
 
   it("accepts cleanly on the retry once the player has made room", async () => {
     const { userId, character } = await apprenticeAtTheYard();
-    await fillSlots(character.id, 3);
+    await fillSlots(character.id, (await freeSlots(userId, character.id)) - 1);
     expect((await accept(userId, character.id)).mission.status).toBe("refused");
 
     await db
@@ -316,10 +322,10 @@ suite("issue #190 10,000 Hours acceptance (real PostgreSQL)", () => {
     expect(opened.trade.status).toBe("traded");
   });
 
-  it("sells Scrap at two Credits in any quantity Credits and capacity allow", async () => {
+  it("sells Scrap at four Credits, and capacity still stops a purchase that will not fit", async () => {
     const { userId, character } = await apprenticeAtTheYard();
     await accept(userId, character.id);
-    // Six pieces already fill six of eight slots; sell nothing, buy what fits.
+    // The six granted pieces sit in two full stacks.
     await db
       .update(rune.characters)
       .set({ credits: 100 })
@@ -328,14 +334,15 @@ suite("issue #190 10,000 Hours acceptance (real PostgreSQL)", () => {
     const bought = await trade.tradeWithMerchant(
       userId,
       character.id,
-      { itemId: ITEM_IDS.scrapMetal, direction: "buy", quantity: 2 },
+      { itemId: ITEM_IDS.scrapMetal, direction: "buy", quantity: 3 },
       now,
     );
-    expect(bought.trade).toMatchObject({ status: "traded", totalCredits: 4 });
-    expect((await carriedScrap(character.id)).total).toBe(8);
-    expect(await credits(character.id)).toBe(96);
+    expect(bought.trade).toMatchObject({ status: "traded", totalCredits: 12 });
+    expect(await carriedScrap(character.id)).toEqual({ total: 9, stacks: 3 });
+    expect(await credits(character.id)).toBe(88);
 
-    // And capacity, not stock, is what stops the next purchase.
+    // Well inside today's allowance, capacity is what stops the next purchase.
+    await fillSlots(character.id, await freeSlots(userId, character.id));
     const overCapacity = await trade.tradeWithMerchant(
       userId,
       character.id,

@@ -119,11 +119,15 @@ test("offers 10,000 Hours only at Wade's yard, and only once there is room for t
   const characterId = testCharacter.id;
   await page.setViewportSize(PHONE);
   await completeKeepTheChange(characterId, new Date());
-  // Six pieces will not fit: the starter container holds eight slots and three
-  // of them are already spoken for.
-  await db
-    .insert(inventoryStacks)
-    .values([1, 1, 1].map(() => ({ characterId, itemId: ITEM_IDS.ferriteShale, quantity: 1 })));
+  // Six pieces will not fit: at three to a stack they need two of the starter
+  // container's eight slots (#230), and seven are already spoken for.
+  await db.insert(inventoryStacks).values(
+    Array.from({ length: 7 }, () => ({
+      characterId,
+      itemId: ITEM_IDS.ferriteShale,
+      quantity: 1,
+    })),
+  );
   await standAt(characterId, LOCATION_IDS.ruskRecovery);
   await openTestCharacter(page, characterId);
   await page.emulateMedia({ reducedMotion: "reduce" });
@@ -283,19 +287,31 @@ test("welds for real at the bench, takes a live Clean Pass, and turns the work i
   await panel.locator("[data-practice-stop]").click();
   await expect(panel.locator("[data-practice-start]")).toBeVisible();
 
-  // Replacement Scrap is two Credits a piece, out of Wade's own yard.
+  // Replacement Scrap is four Credits a piece out of Wade's own yard, twelve a
+  // day per character (#230).
   await page.locator('[data-npc-action="trade"]').click();
   const trade = page.locator("[data-trade-panel]");
   const scrapRow = trade.locator(`[data-trade-row="${ITEM_IDS.scrapMetal}"]`);
-  await expect(scrapRow.locator("[data-trade-unit-price]")).toHaveText("2");
+  await expect(scrapRow.locator("[data-trade-unit-price]")).toHaveText("4");
+  const allowance = scrapRow.locator("[data-trade-daily-allowance]");
+  await expect(allowance).toHaveText("12 of 12 left today");
   // Wade now buys structural material back as well as selling Scrap (#209), so
   // his counter offers both directions the way Bix's does.
   await expect(trade.locator("[data-trade-mode]")).toHaveCount(2);
   await expect(trade.locator('[data-trade-mode="buy"]')).toHaveAttribute("aria-pressed", "true");
   await scrapRow.getByRole("button", { name: /Increase Scrap Metal quantity/ }).click();
-  await expect(scrapRow.locator("[data-trade-total]")).toHaveText("4");
+  await expect(scrapRow.locator("[data-trade-total]")).toHaveText("8");
   await scrapRow.locator(`[data-trade-commit="${ITEM_IDS.scrapMetal}"]`).click();
   await expect(trade.locator("[data-trade-feedback]")).toContainText("Bought 2 Scrap Metal");
+  await expect(allowance).toHaveText("10 of 12 left today");
+  // Selling to him is a separate line with its own price, and never restores
+  // today's allowance.
+  await trade.locator('[data-trade-mode="sell"]').click();
+  const scrapSale = trade.locator(`[data-trade-row="${ITEM_IDS.scrapMetal}"]`);
+  await expect(scrapSale.locator("[data-trade-unit-price]")).toHaveText("1");
+  await expect(scrapSale.locator("[data-trade-daily-allowance]")).toHaveCount(0);
+  await trade.locator('[data-trade-mode="buy"]').click();
+  await expect(allowance).toHaveText("10 of 12 left today");
 
   // The remaining two welds are seeded; the turn-in itself is the real subject.
   await db

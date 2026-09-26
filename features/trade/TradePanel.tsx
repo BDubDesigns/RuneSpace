@@ -83,7 +83,11 @@ export function TradePanel({
    * planner via the domain helper, so this surface never re-derives stacking,
    * slot, or mass rules of its own.
    */
-  function purchasableMaximum(itemId: string, unitPrice: number): number {
+  function purchasableMaximum(
+    itemId: string,
+    unitPrice: number,
+    dailyRemaining: number | undefined,
+  ): number {
     const definition = getItemDefinition(itemId);
     if (!definition || definition.kind !== "stack") return 0;
     return maximumPurchasableQuantity({
@@ -95,6 +99,7 @@ export function TradePanel({
       availableSlots: state.inventory.slotsAvailable,
       availableWeight: Math.max(0, state.inventory.capacityGrams - state.inventory.massGrams),
       itemWeight: definition.massGrams,
+      ...(dailyRemaining === undefined ? {} : { dailyRemaining }),
     });
   }
 
@@ -186,11 +191,20 @@ export function TradePanel({
           const owned = ownedQuantity(itemId);
           const quantity = quantityFor(itemId);
           const total = unitPrice * quantity;
-          // Buy caps at the largest purchase that is both affordable and
-          // actually carryable; Sell caps at the authoritative carried
-          // quantity. The server re-plans either way.
-          const maximum = mode === "buy" ? purchasableMaximum(itemId, unitPrice) : owned;
-          const affordable = mode === "buy" ? total <= state.credits : quantity <= owned;
+          // A daily-limited line (#230) shows today's allowance from the
+          // authoritative projection; it only matters when buying, because
+          // selling back never restores it.
+          const allowance =
+            mode === "buy" ? state.merchantDailyPurchases[merchant.id]?.[itemId] : undefined;
+          // Buy caps at the largest purchase that is affordable, within today's
+          // allowance, and actually carryable; Sell caps at the authoritative
+          // carried quantity. The server re-plans either way.
+          const maximum =
+            mode === "buy" ? purchasableMaximum(itemId, unitPrice, allowance?.remaining) : owned;
+          const affordable =
+            mode === "buy"
+              ? total <= state.credits && quantity <= (allowance?.remaining ?? quantity)
+              : quantity <= owned;
 
           return (
             <li
@@ -224,6 +238,22 @@ export function TradePanel({
                   <span data-trade-unit-price>{unitPrice}</span> Credits each · carried{" "}
                   <span data-trade-owned>{owned}</span>
                 </p>
+                {allowance ? (
+                  <p
+                    className={`mt-0.5 text-xs ${
+                      allowance.remaining === 0
+                        ? "text-[color:var(--rs-text-muted)]"
+                        : "text-[color:var(--rs-text-secondary)]"
+                    }`}
+                    data-trade-daily-allowance
+                    data-trade-daily-limit={allowance.limit}
+                    data-trade-daily-remaining={allowance.remaining}
+                  >
+                    {allowance.remaining === 0
+                      ? `All ${allowance.limit} sold today · more after midnight Pacific`
+                      : `${allowance.remaining} of ${allowance.limit} left today`}
+                  </p>
+                ) : null}
                 {/* The committed number reads with the price it comes from, which
                     also keeps it out of the quantity cluster so that cluster fits
                     one line at 390px. */}

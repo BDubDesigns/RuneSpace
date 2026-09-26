@@ -2,9 +2,18 @@ import { describe, expect, it } from "vitest";
 import { STARTING_CREDITS } from "@/db/rune-space";
 import { getEffectiveGameBalance, getItemDefinition } from "@/game/config/balance";
 import { ITEM_IDS, MERCHANT_IDS, NPC_IDS } from "@/game/config/foundations";
-import { getMerchant } from "@/game/content/merchants";
 import {
+  getMerchant,
+  MERCHANTS,
+  merchantBuybackPrice,
+  merchantRetailPrice,
+} from "@/game/content/merchants";
+import { MerchantPriceSchema } from "@/game/schemas/merchants";
+import {
+  dailyPurchaseAllowance,
   maximumAffordableQuantity,
+  merchantDailyAllowances,
+  merchantDailySellLimit,
   maximumPurchasableQuantity,
   merchantPurchasableItemIds,
   merchantSellableItemIds,
@@ -30,8 +39,9 @@ describe("issue #159 Bix merchant catalog", () => {
     expect(merchantUnitPrice(bix, ITEM_IDS.ferriteShale, "sell")).toBe(2);
     expect(merchantUnitPrice(bix, ITEM_IDS.refinedFerrite, "sell")).toBe(10);
     expect(merchantUnitPrice(bix, ITEM_IDS.slag, "sell")).toBe(1);
-    expect(merchantUnitPrice(bix, ITEM_IDS.powerCell, "sell")).toBe(3);
-    expect(merchantUnitPrice(bix, ITEM_IDS.powerCell, "buy")).toBe(8);
+    // Power Cells were repriced ahead of Fabrication (#230): 12 to buy, 4 back.
+    expect(merchantUnitPrice(bix, ITEM_IDS.powerCell, "sell")).toBe(4);
+    expect(merchantUnitPrice(bix, ITEM_IDS.powerCell, "buy")).toBe(12);
   });
 
   it("stocks Power Cells and nothing else", () => {
@@ -91,9 +101,9 @@ describe("issue #159 trade arithmetic", () => {
       quote: {
         itemId: ITEM_IDS.powerCell,
         direction: "buy",
-        unitPrice: 8,
+        unitPrice: 12,
         quantity: 3,
-        totalCredits: 24,
+        totalCredits: 36,
       },
     });
   });
@@ -105,7 +115,7 @@ describe("issue #159 trade arithmetic", () => {
       direction: "sell",
       quantity: 4,
     });
-    expect(quoted.ok && quoted.quote.totalCredits).toBe(12);
+    expect(quoted.ok && quoted.quote.totalCredits).toBe(16);
   });
 
   it("rejects quantities that are not whole positive counts", () => {
@@ -174,6 +184,24 @@ describe("issue #159 Buy Max respects what the player can carry", () => {
     expect(maxPurchase({ credits: 1_000, availableWeight: 0 })).toBe(0);
   });
 
+  it("caps at what is left of today's allowance on a daily-limited line (#230)", () => {
+    const withAllowance = (dailyRemaining: number) =>
+      maximumPurchasableQuantity({
+        credits: 1_000,
+        unitPrice: 12,
+        existingStacks: [],
+        itemId: ITEM_IDS.powerCell,
+        stackLimit,
+        availableSlots: 8,
+        availableWeight: 50_000,
+        itemWeight,
+        dailyRemaining,
+      });
+    expect(withAllowance(12)).toBe(12);
+    expect(withAllowance(5)).toBe(5);
+    expect(withAllowance(0)).toBe(0);
+  });
+
   it("takes whichever limit binds first", () => {
     // Affordable 2, mass allows 4, slots allow plenty — affordability wins.
     expect(maxPurchase({ credits: 16, availableWeight: itemWeight * 4 })).toBe(2);
@@ -195,13 +223,20 @@ describe("issue #190 Trade presents only the directions a merchant supports", ()
     // below proves.
     const wade = getMerchant(MERCHANT_IDS.wadeRusk)!;
     expect([...merchantSellableItemIds(wade)].sort()).toEqual(
-      [ITEM_IDS.refinedFerrite, ITEM_IDS.galvanicStock, ITEM_IDS.galvaferrite].sort(),
+      [
+        ITEM_IDS.scrapMetal,
+        ITEM_IDS.refinedFerrite,
+        ITEM_IDS.galvanicStock,
+        ITEM_IDS.galvaferrite,
+      ].sort(),
     );
     expect(merchantTradeDirections(wade)).toEqual(["buy", "sell"]);
 
     const sellerOnly = {
       ...wade,
-      prices: wade.prices.filter((price) => price.buyPrice === undefined),
+      prices: wade.prices
+        .filter((price) => price.sellPrice !== undefined)
+        .map((price) => ({ itemId: price.itemId, sellPrice: price.sellPrice })),
     };
     expect(merchantSellableItemIds(sellerOnly)).toEqual([]);
     expect(merchantTradeDirections(sellerOnly)).toEqual(["buy"]);
@@ -216,5 +251,84 @@ describe("issue #190 Trade presents only the directions a merchant supports", ()
     };
     expect(merchantPurchasableItemIds(buyerOnly)).toEqual([]);
     expect(merchantTradeDirections(buyerOnly)).toEqual(["sell"]);
+  });
+});
+
+describe("issue #230 Scrap and Power Cell trade terms", () => {
+  const wade = getMerchant(MERCHANT_IDS.wadeRusk)!;
+
+  it("has Wade sell Scrap Metal at 4 and buy it back at 1", () => {
+    expect(merchantUnitPrice(wade, ITEM_IDS.scrapMetal, "buy")).toBe(4);
+    expect(merchantUnitPrice(wade, ITEM_IDS.scrapMetal, "sell")).toBe(1);
+  });
+
+  it("has Bix sell Power Cells at 12 and buy them back at 4", () => {
+    expect(merchantUnitPrice(bix, ITEM_IDS.powerCell, "buy")).toBe(12);
+    expect(merchantUnitPrice(bix, ITEM_IDS.powerCell, "sell")).toBe(4);
+  });
+
+  it("limits each of those two lines to twelve a day, and no other line", () => {
+    expect(merchantDailySellLimit(wade, ITEM_IDS.scrapMetal)).toBe(12);
+    expect(merchantDailySellLimit(bix, ITEM_IDS.powerCell)).toBe(12);
+    for (const merchant of MERCHANTS) {
+      for (const price of merchant.prices) {
+        const limited =
+          (merchant.id === MERCHANT_IDS.wadeRusk && price.itemId === ITEM_IDS.scrapMetal) ||
+          (merchant.id === MERCHANT_IDS.bixWeller && price.itemId === ITEM_IDS.powerCell);
+        expect(price.dailySellLimit !== undefined).toBe(limited);
+      }
+    }
+  });
+
+  it("exposes the retail and buyback prices content quotes from the same lines", () => {
+    expect(merchantRetailPrice(MERCHANT_IDS.bixWeller, ITEM_IDS.powerCell)).toBe(12);
+    expect(merchantBuybackPrice(MERCHANT_IDS.bixWeller, ITEM_IDS.powerCell)).toBe(4);
+    expect(merchantRetailPrice(MERCHANT_IDS.wadeRusk, ITEM_IDS.scrapMetal)).toBe(4);
+    expect(merchantBuybackPrice(MERCHANT_IDS.wadeRusk, ITEM_IDS.scrapMetal)).toBe(1);
+    expect(() => merchantRetailPrice(MERCHANT_IDS.bixWeller, ITEM_IDS.slag)).toThrow();
+    expect(() => merchantBuybackPrice(MERCHANT_IDS.wadeRusk, ITEM_IDS.slag)).toThrow();
+  });
+
+  it("refuses a daily limit on a line the player cannot buy from", () => {
+    expect(
+      MerchantPriceSchema.safeParse({ itemId: ITEM_IDS.slag, buyPrice: 1, dailySellLimit: 12 })
+        .success,
+    ).toBe(false);
+    expect(
+      MerchantPriceSchema.safeParse({ itemId: ITEM_IDS.slag, sellPrice: 1, dailySellLimit: 0 })
+        .success,
+    ).toBe(false);
+  });
+});
+
+describe("issue #230 daily purchase allowance", () => {
+  it("is the whole limit before anything is bought today", () => {
+    expect(dailyPurchaseAllowance(12, 0)).toEqual({ limit: 12, purchased: 0, remaining: 12 });
+  });
+
+  it("counts only what was bought, never below zero", () => {
+    expect(dailyPurchaseAllowance(12, 7)).toEqual({ limit: 12, purchased: 7, remaining: 5 });
+    expect(dailyPurchaseAllowance(12, 12).remaining).toBe(0);
+    expect(dailyPurchaseAllowance(12, 13).remaining).toBe(0);
+  });
+
+  it("refuses impossible inputs", () => {
+    expect(() => dailyPurchaseAllowance(0, 0)).toThrow(RangeError);
+    expect(() => dailyPurchaseAllowance(12, -1)).toThrow(RangeError);
+    expect(() => dailyPurchaseAllowance(12, 1.5)).toThrow(RangeError);
+  });
+
+  it("projects every limited line independently, keyed by merchant then item", () => {
+    const allowances = merchantDailyAllowances(MERCHANTS, [
+      { merchantId: MERCHANT_IDS.wadeRusk, itemId: ITEM_IDS.scrapMetal, quantityPurchased: 9 },
+    ]);
+    expect(allowances).toEqual({
+      [MERCHANT_IDS.bixWeller]: {
+        [ITEM_IDS.powerCell]: { limit: 12, purchased: 0, remaining: 12 },
+      },
+      [MERCHANT_IDS.wadeRusk]: {
+        [ITEM_IDS.scrapMetal]: { limit: 12, purchased: 9, remaining: 3 },
+      },
+    });
   });
 });

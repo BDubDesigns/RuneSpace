@@ -12,8 +12,15 @@ import { getLocalPlaceInLocation } from "@/game/content/local-places";
 import { getLocationMerchant, getMerchant } from "@/game/content/merchants";
 import { deriveEquipmentLoadout } from "@/game/domain/equipment";
 import { planExactStackAddition } from "@/game/domain/inventory";
+import { resolveItemPresentation } from "@/game/content/item-presentation";
+import { pacificResetDate } from "@/game/domain/daily-reset";
 import { deriveLocalPlaceAccess } from "@/game/domain/local-places";
-import { quoteTrade, type TradeDirection } from "@/game/domain/trade";
+import {
+  dailyPurchaseAllowance,
+  merchantDailySellLimit,
+  quoteTrade,
+  type TradeDirection,
+} from "@/game/domain/trade";
 import { isMissionAccepted, loadCompletedMissionIds } from "@/server/mission-state";
 import { withLockedOwnedCharacter, type DatabaseTransaction } from "@/server/action-resolution";
 import {
@@ -21,6 +28,11 @@ import {
   consumeStackableItem,
   loadOwnedItemInstances,
 } from "@/server/carried-inventory";
+import {
+  consumeMerchantDailyAllowance,
+  loadMerchantDailyPurchases,
+} from "@/server/merchant-daily-purchases";
+import { powerAnnexNow } from "@/server/power-annex-clock";
 import {
   ensurePlayProvisioning,
   stateFromTransaction,
@@ -45,6 +57,8 @@ export type TradeRefusalReason =
   | "invalid_quantity"
   | "insufficient_credits"
   | "insufficient_items"
+  /** More than is left of today's allowance on a daily-limited line (#230). */
+  | "daily_limit"
   | "slots"
   | "mass";
 
@@ -63,6 +77,16 @@ export type TradeResult = {
   state: PlayGameplayState;
   trade: TradeStatus;
 };
+
+function dailyLimitMessage(
+  itemId: string,
+  allowance: { limit: number; remaining: number },
+): string {
+  const name = resolveItemPresentation(itemId, itemId).displayName;
+  return allowance.remaining === 0
+    ? `Today's limit of ${allowance.limit} ${name} is used up. More after midnight Pacific.`
+    : `Only ${allowance.remaining} more can be bought today (limit ${allowance.limit} ${name}).`;
+}
 
 async function stateForTrade(
   transaction: DatabaseTransaction,
@@ -98,6 +122,11 @@ async function stateForTrade(
  * permits entry, and that Local Place genuinely owns the merchant being traded
  * with. Prices and totals come from authored content; nothing about the money
  * is taken from the client.
+ *
+ * A daily-limited line (#230) is checked against this character's ledger row
+ * for the current Pacific reset date and consumed in this same transaction,
+ * only once every other refusal has passed, so the allowance is spent by
+ * exactly the purchases that commit.
  */
 export async function tradeWithMerchant(
   userId: string,
@@ -211,6 +240,23 @@ export async function tradeWithMerchant(
       };
     }
 
+    // The allowance is read under the character lock this command already
+    // holds, so a concurrent purchase for the same character waits for this one
+    // to commit and then reads what it spent.
+    const dailyLimit = merchantDailySellLimit(merchant, request.itemId);
+    const resetDate = pacificResetDate(powerAnnexNow(now));
+    if (dailyLimit !== undefined) {
+      const purchasedToday =
+        (
+          await loadMerchantDailyPurchases(transaction, { characterId: character.id, resetDate })
+        ).find((row) => row.merchantId === merchant.id && row.itemId === request.itemId)
+          ?.quantityPurchased ?? 0;
+      const allowance = dailyPurchaseAllowance(dailyLimit, purchasedToday);
+      if (quote.quantity > allowance.remaining) {
+        return refuse("daily_limit", dailyLimitMessage(request.itemId, allowance));
+      }
+    }
+
     if (character.credits < quote.totalCredits) {
       return refuse("insufficient_credits", "You cannot afford that many.");
     }
@@ -247,6 +293,26 @@ export async function tradeWithMerchant(
       return plan.reason === "mass"
         ? refuse("mass", "That purchase will not fit within carried-mass capacity.")
         : refuse("slots", "That purchase will not fit in your available inventory slots.");
+    }
+
+    if (
+      dailyLimit !== undefined &&
+      !(await consumeMerchantDailyAllowance(transaction, {
+        characterId: character.id,
+        merchantId: merchant.id,
+        itemId: request.itemId,
+        resetDate,
+        quantity: quote.quantity,
+        limit: dailyLimit,
+        now,
+      }))
+    ) {
+      // Unreachable while the character lock holds; the guarded write is the
+      // backstop, and it has changed nothing.
+      return refuse(
+        "daily_limit",
+        dailyLimitMessage(request.itemId, dailyPurchaseAllowance(dailyLimit, dailyLimit)),
+      );
     }
 
     const credits = character.credits - quote.totalCredits;

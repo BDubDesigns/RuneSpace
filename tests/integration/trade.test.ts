@@ -116,13 +116,14 @@ suite("issue #159 Credits and the Bix merchant loop (real PostgreSQL)", () => {
   });
 
   it("commits a purchase as one atomic Credit and inventory change", async () => {
-    const { userId, characterId } = await makeTrader({ credits: 20 });
+    const { userId, characterId } = await makeTrader({ credits: 30 });
     const result = await buy(userId, characterId, ITEM_IDS.powerCell, 2);
 
-    expect(result.trade).toMatchObject({ status: "traded", totalCredits: 16, credits: 4 });
-    expect(await creditsOf(characterId)).toBe(4);
+    // Power Cells are 12 Credits each since #230.
+    expect(result.trade).toMatchObject({ status: "traded", totalCredits: 24, credits: 6 });
+    expect(await creditsOf(characterId)).toBe(6);
     expect(await carriedQuantity(characterId, ITEM_IDS.powerCell)).toBe(2);
-    expect(result.state.credits).toBe(4);
+    expect(result.state.credits).toBe(6);
   });
 
   it("commits a sale as one atomic Credit and inventory change", async () => {
@@ -141,7 +142,7 @@ suite("issue #159 Credits and the Bix merchant loop (real PostgreSQL)", () => {
       [ITEM_IDS.ferriteShale, 2],
       [ITEM_IDS.refinedFerrite, 10],
       [ITEM_IDS.slag, 1],
-      [ITEM_IDS.powerCell, 3],
+      [ITEM_IDS.powerCell, 4],
     ] as const) {
       const { userId, characterId } = await makeTrader({ credits: 0 });
       await giveStack(characterId, itemId, 1);
@@ -152,11 +153,11 @@ suite("issue #159 Credits and the Bix merchant loop (real PostgreSQL)", () => {
   });
 
   it("refuses an unaffordable purchase without mutating anything", async () => {
-    const { userId, characterId } = await makeTrader({ credits: 7 });
+    const { userId, characterId } = await makeTrader({ credits: 11 });
     const result = await buy(userId, characterId, ITEM_IDS.powerCell, 1);
 
     expect(result.trade).toMatchObject({ status: "refused", reason: "insufficient_credits" });
-    expect(await creditsOf(characterId)).toBe(7);
+    expect(await creditsOf(characterId)).toBe(11);
     expect(await carriedQuantity(characterId, ITEM_IDS.powerCell)).toBe(0);
   });
 

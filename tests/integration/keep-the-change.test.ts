@@ -3,6 +3,7 @@ import { afterEach, beforeAll, describe, expect, it } from "vitest";
 import { ITEM_IDS, LOCATION_IDS, MISSION_IDS, NPC_IDS } from "@/game/config/foundations";
 import { DIALOGUE_IDS, LOCAL_PLACE_IDS } from "@/game/config/foundations";
 import { getLocalPlace } from "@/game/content/local-places";
+import { KEEP_THE_CHANGE_BUDGET_CREDITS } from "@/game/content/missions";
 import { deriveLocalPlaceAccess } from "@/game/domain/local-places";
 import { cleanupTestUser, createCharacterForUser, createTestUser } from "./fixtures";
 
@@ -13,7 +14,7 @@ const suite = DATABASE_URL ? describe : describe.skip;
  * Issue #170 — Keep the Change, against real PostgreSQL.
  *
  * These are the rules a browser or a pure unit test cannot prove: that Wade's
- * 24-Credit budget is granted exactly once even under retries and concurrent
+ * 36-Credit budget (#230; 24 before the Cell repricing) is granted exactly once even under retries and concurrent
  * requests, that the mandatory Bix conversation is satisfied only by the
  * authoritative command at the right place, that delivery consumes exactly
  * three Power Cells through the shared inventory boundary whatever the stack
@@ -29,6 +30,7 @@ suite("issue #170 Keep the Change (real PostgreSQL)", () => {
   let play: typeof import("@/server/play");
   let missions: typeof import("@/server/missions");
   let missionState: typeof import("@/server/mission-state");
+  let trade: typeof import("@/server/trade");
   const createdUsers: string[] = [];
   const now = new Date("2026-09-12T00:00:00.000Z");
 
@@ -41,6 +43,7 @@ suite("issue #170 Keep the Change (real PostgreSQL)", () => {
     play = await import("@/server/play");
     missions = await import("@/server/missions");
     missionState = await import("@/server/mission-state");
+    trade = await import("@/server/trade");
   });
 
   afterEach(async () => {
@@ -188,7 +191,7 @@ suite("issue #170 Keep the Change (real PostgreSQL)", () => {
     return { userId, character };
   }
 
-  describe("availability and the 24-Credit budget", () => {
+  describe("availability and the 36-Credit budget", () => {
     it("refuses acceptance until Hold It Together is completed, and grants nothing", () => {
       return (async () => {
         const { userId, character } = await makeCharacter();
@@ -227,12 +230,12 @@ suite("issue #170 Keep the Change (real PostgreSQL)", () => {
       expect(await credits(character.id)).toBe(rune.STARTING_CREDITS);
     });
 
-    it("grants exactly 24 Credits when the job is taken", async () => {
+    it("grants exactly 36 Credits when the job is taken", async () => {
       const { userId, character } = await makeCharacter();
       await completeChainThroughHoldItTogether(character.id);
       const before = await credits(character.id);
       expect((await accept(userId, character.id)).mission.status).toBe("accepted");
-      expect(await credits(character.id)).toBe((before ?? 0) + 24);
+      expect(await credits(character.id)).toBe((before ?? 0) + KEEP_THE_CHANGE_BUDGET_CREDITS);
     });
 
     it("never grants the budget twice on a retry", async () => {
@@ -241,7 +244,9 @@ suite("issue #170 Keep the Change (real PostgreSQL)", () => {
       expect((await accept(userId, character.id)).mission.status).toBe("accepted");
       const retried = await accept(userId, character.id);
       expect(retried.mission.status).toBe("already_accepted");
-      expect(await credits(character.id)).toBe(rune.STARTING_CREDITS + 24);
+      expect(await credits(character.id)).toBe(
+        rune.STARTING_CREDITS + KEEP_THE_CHANGE_BUDGET_CREDITS,
+      );
     });
 
     it("never grants the budget twice under concurrent acceptance", async () => {
@@ -254,7 +259,38 @@ suite("issue #170 Keep the Change (real PostgreSQL)", () => {
       ]);
       const statuses = results.map((result) => result.mission.status).sort();
       expect(statuses).toEqual(["accepted", "already_accepted", "already_accepted"]);
-      expect(await credits(character.id)).toBe(rune.STARTING_CREDITS + 24);
+      expect(await credits(character.id)).toBe(
+        rune.STARTING_CREDITS + KEEP_THE_CHANGE_BUDGET_CREDITS,
+      );
+    });
+
+    it("pays exactly Bix's retail price for three Cells, so the budget buys the job (#230)", async () => {
+      const { userId, character } = await makeCharacter();
+      await completeChainThroughHoldItTogether(character.id);
+      expect(KEEP_THE_CHANGE_BUDGET_CREDITS).toBe(36);
+      // Start from nothing, so the budget alone has to cover the purchase.
+      await db
+        .update(rune.characters)
+        .set({ credits: 0 })
+        .where(eq(rune.characters.id, character.id));
+      expect((await accept(userId, character.id)).mission.status).toBe("accepted");
+      expect(await credits(character.id)).toBe(36);
+
+      await move(character.id, LOCATION_IDS.holoHollow);
+      const bought = await trade.tradeWithMerchant(
+        userId,
+        character.id,
+        {
+          localPlaceId: LOCAL_PLACE_IDS.holoHollowSouvenirs,
+          itemId: ITEM_IDS.powerCell,
+          direction: "buy",
+          quantity: 3,
+        },
+        now,
+      );
+      expect(bought.trade).toMatchObject({ status: "traded", quantity: 3, totalCredits: 36 });
+      expect(await credits(character.id)).toBe(0);
+      expect((await carriedPowerCells(character.id)).total).toBe(3);
     });
 
     it("refuses acceptance from the wrong person or the wrong place, granting nothing", async () => {
@@ -458,7 +494,9 @@ suite("issue #170 Keep the Change (real PostgreSQL)", () => {
       await move(character.id, LOCATION_IDS.theJag);
       expect((await deliver(userId, character.id)).mission.status).toBe("completed");
       // Nothing was spent, so the whole budget stays with the player.
-      expect(await credits(character.id)).toBe((startingCredits ?? 0) + 24);
+      expect(await credits(character.id)).toBe(
+        (startingCredits ?? 0) + KEEP_THE_CHANGE_BUDGET_CREDITS,
+      );
     });
   });
 

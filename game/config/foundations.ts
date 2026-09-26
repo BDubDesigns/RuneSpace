@@ -22,8 +22,8 @@ const itemIds = {
   salvageCutter: asContentId("salvage_cutter"),
   powerCell: asContentId("power_cell"),
   mykeaSchleppraum8: asContentId("mykea_schleppraum_8"),
-  // Practice Welding stock (#190). Fungible but non-stacking: one piece per
-  // inventory slot, so six of them is a real carrying decision.
+  // Practice Welding stock (#190). Fungible, stacking to three (#230), so six
+  // of them is still a real carrying decision.
   scrapMetal: asContentId("scrap_metal"),
   // Deep Jag Tier-2 materials (#209). Galvanite is the raw ore Deep Jag
   // produces once the cave-in is braced; the other two are what Refining makes

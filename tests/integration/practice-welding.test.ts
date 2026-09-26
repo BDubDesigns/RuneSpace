@@ -122,6 +122,14 @@ suite("issue #190 Practice Welding (real PostgreSQL)", () => {
   }
 
   async function setScrap(characterId: string, pieces: number) {
+    await setScrapStacks(
+      characterId,
+      Array.from({ length: pieces }, () => 1),
+    );
+  }
+
+  /** Replace the carried Scrap with exactly these stacks (#230: they stack to three). */
+  async function setScrapStacks(characterId: string, quantities: readonly number[]) {
     await db
       .delete(rune.inventoryStacks)
       .where(
@@ -130,10 +138,22 @@ suite("issue #190 Practice Welding (real PostgreSQL)", () => {
           eq(rune.inventoryStacks.itemId, ITEM_IDS.scrapMetal),
         ),
       );
-    for (let index = 0; index < pieces; index += 1) {
+    for (const quantity of quantities) {
       await db
         .insert(rune.inventoryStacks)
-        .values({ characterId, itemId: ITEM_IDS.scrapMetal, quantity: 1 });
+        .values({ characterId, itemId: ITEM_IDS.scrapMetal, quantity });
+    }
+  }
+
+  /** Occupy every free slot with a full Slag stack, so no Slag has room to top up. */
+  async function fillFreeSlotsWithFullSlag(userId: string, characterId: string, ms: number) {
+    const state = await refresh(userId, characterId, ms);
+    for (let index = 0; index < state.inventory.slotsAvailable; index += 1) {
+      await db.insert(rune.inventoryStacks).values({
+        characterId,
+        itemId: ITEM_IDS.slag,
+        quantity: balance.items.slag.stackLimit,
+      });
     }
   }
 
@@ -296,6 +316,48 @@ suite("issue #190 Practice Welding (real PostgreSQL)", () => {
       2 * balance.practiceWelding.slagPerWeld,
     );
     expect(await carried(character.id, ITEM_IDS.slag)).toBe(state.practice.run.slagKept);
+  });
+
+  it("never places Slag in a slot that consuming stacked Scrap did not free (#230)", async () => {
+    // Scrap [3, 3]; every other slot holds a full Slag stack. Start paid for
+    // weld one by emptying a stack of two, and that slot is then filled too.
+    const { userId, character } = await apprentice();
+    await setScrapStacks(character.id, [2, 3, 3]);
+    await startPractice(userId, character.id);
+    await fillFreeSlotsWithFullSlag(userId, character.id, 1);
+    const slagBefore = await carried(character.id, ITEM_IDS.slag);
+
+    const state = await refresh(userId, character.id, weldMs * 3);
+
+    // Weld one had no room: both Slag discarded. Weld two's Scrap came out of
+    // [3, 3], emptying neither stack, so it had no room either — the fix; the
+    // old per-piece count claimed two free slots here. Weld three's Scrap
+    // emptied the loose piece, freeing one slot for its two Slag.
+    // Weld four begins the instant weld three finishes, spending the last two
+    // pieces and emptying the last Scrap stack.
+    expect(state.practice.run.welds).toBe(3);
+    expect(state.practice.run.recentWelds.map((weld) => weld.slagKept)).toEqual([0, 0, 2]);
+    expect(state.practice.run.slagDiscarded).toBe(4);
+    expect(await carried(character.id, ITEM_IDS.slag)).toBe(slagBefore + 2);
+    expect(await carried(character.id, ITEM_IDS.scrapMetal)).toBe(0);
+    // The carried inventory never holds more stacks than its container has
+    // slots; the one slot open is the one weld four's Scrap just emptied.
+    expect(state.inventory.slotsUsed).toBe(state.equipment.aggregateContainerSlots - 1);
+    expect(state.inventory.slotsAvailable).toBe(1);
+  });
+
+  it("frees slots for Slag as welds empty whole Scrap stacks (#230)", async () => {
+    // Loose single pieces free a slot each, exactly as before stacking.
+    const { userId, character } = await apprentice();
+    await setScrapStacks(character.id, [1, 1, 1, 1]);
+    await startPractice(userId, character.id);
+    await fillFreeSlotsWithFullSlag(userId, character.id, 1);
+
+    const state = await refresh(userId, character.id, weldMs * 2);
+    expect(state.practice.run.welds).toBe(2);
+    // Weld one had no room; weld two's two loose pieces freed two slots.
+    expect(state.practice.run.recentWelds.map((weld) => weld.slagKept)).toEqual([0, 2]);
+    expect(state.inventory.slotsUsed).toBeLessThanOrEqual(state.equipment.aggregateContainerSlots);
   });
 
   it("discards both Slag when the player has chosen Auto-discard", async () => {

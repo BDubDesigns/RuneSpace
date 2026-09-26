@@ -5,14 +5,18 @@ import {
   EXPRESSION_IDS,
   ITEM_IDS,
   LOCATION_IDS,
+  MERCHANT_IDS,
   MISSION_IDS,
   NPC_IDS,
   REPAIR_TARGET_IDS,
 } from "@/game/config/foundations";
 import { getDialogue } from "@/game/content/dialogue";
+import { merchantRetailPrice } from "@/game/content/merchants";
 import {
   HOLD_IT_TOGETHER,
   KEEP_THE_CHANGE,
+  KEEP_THE_CHANGE_BUDGET_CREDITS,
+  KEEP_THE_CHANGE_CELL_COUNT,
   MISSIONS,
   type MissionDefinition,
 } from "@/game/content/missions";
@@ -108,15 +112,28 @@ describe("Keep the Change definition", () => {
     expect(KEEP_THE_CHANGE.continuationMissionId).toBeUndefined();
   });
 
-  it("is offered only by Wade at the Crash Site, and hands over exactly 24 Credits", () => {
+  it("is offered only by Wade at the Crash Site, and hands over exactly 36 Credits", () => {
     expect(KEEP_THE_CHANGE.offers).toHaveLength(1);
     const [offer] = KEEP_THE_CHANGE.offers;
     expect(offer).toMatchObject({
       npcId: NPC_IDS.wadeRusk,
       locationId: LOCATION_IDS.crashSite,
       dialogueId: DIALOGUE_IDS.wadeKeepTheChangeOffer,
-      acceptEffect: { kind: "credits", amount: 24 },
+      acceptEffect: { kind: "credits", amount: 36 },
     });
+  });
+
+  it("derives the budget from Bix's authoritative Cell price, not a second number (#230)", () => {
+    const retail = merchantRetailPrice(MERCHANT_IDS.bixWeller, ITEM_IDS.powerCell);
+    expect(retail).toBe(12);
+    expect(KEEP_THE_CHANGE_BUDGET_CREDITS).toBe(KEEP_THE_CHANGE_CELL_COUNT * retail);
+    expect(KEEP_THE_CHANGE_BUDGET_CREDITS).toBe(36);
+    // The delivery and the budget are the same three Cells.
+    const cells = KEEP_THE_CHANGE.requirements.find(
+      (requirement) => requirement.kind === "carried_stack",
+    );
+    expect(cells).toMatchObject({ itemId: ITEM_IDS.powerCell, quantity: 3 });
+    expect(KEEP_THE_CHANGE_CELL_COUNT).toBe(3);
   });
 
   it("adds no completion reward", () => {
@@ -568,8 +585,7 @@ describe("Keep the Change authored content", () => {
     const text = offer.beats.map((beat) => beat.text).join(" ");
     expect(text).toContain("Cargo Hold");
     expect(text).toContain("apprentice");
-    expect(text).toContain("eight Credits");
-    expect(text).toContain("twenty-four Credits");
+    expect(text).toContain("Bix charges twelve Credits each. Here's thirty-six Credits.");
     expect(text).toContain("Keep what you don't spend");
   });
 
@@ -620,7 +636,7 @@ describe("Keep the Change authored content", () => {
     const text = getDialogue(DIALOGUE_IDS.tansyKeepTheChangeCarriedReminder)!
       .beats.map((beat) => beat.text)
       .join(" ");
-    expect(text).toContain("Bix sells them for eight Credits.");
+    expect(text).toContain("Bix sells them for twelve Credits.");
   });
 
   it("has Tansy say Wade is proud rather than deny the apprenticeship he announced", () => {
@@ -684,11 +700,11 @@ describe("Keep the Change authored content", () => {
 
   it("names Credits for every price and budget Bix mentions", () => {
     const text = introText();
-    expect(text).toContain("Eight Credits each. Twenty-four Credits.");
-    expect(text).toContain("Need another one? Eight Credits.");
-    expect(text).toContain("I'll give you three Credits each.");
-    expect(text).not.toMatch(/\beight\b(?! Credits)/i);
-    expect(text).not.toMatch(/\btwenty-four\b(?! Credits)/i);
+    expect(text).toContain("Twelve Credits each. Thirty-six Credits.");
+    expect(text).toContain("Need another one? Twelve Credits.");
+    expect(text).toContain("I'll give you four Credits each.");
+    expect(text).not.toMatch(/\btwelve\b(?! Credits)/i);
+    expect(text).not.toMatch(/\bthirty-six\b(?! Credits)/i);
   });
 
   it("establishes Mara's entrance and the apprenticeship before her approved line", () => {

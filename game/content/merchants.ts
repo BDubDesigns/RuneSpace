@@ -11,20 +11,24 @@ import { getLocation } from "@/game/content/locations";
  * an authoritative price or total.
  *
  * Bix's initial stock is deliberately one line deep. He sells Power Cells only,
- * and buys exactly the four approved materials — no rotating stock, no
- * simulated finite inventory, no merchant wallet, no dynamic pricing.
+ * and buys exactly the approved materials — no rotating stock, no simulated
+ * finite inventory, no merchant wallet, no dynamic pricing.
  *
  * Wade sells practice stock out of his own yard (#190) — the same shape, at a
- * World Location rather than inside a Local Place. His Scrap is effectively
- * unlimited on purpose: no stock row, no restock timer, no day cap. What limits
- * a player is Credits and what they can carry.
+ * World Location rather than inside a Local Place.
+ *
+ * Ahead of Fabrication (#230), both lines that sell to the player carry a
+ * per-character daily limit: Wade sells at most twelve Scrap and Bix at most
+ * twelve Power Cells per character per Pacific reset date. There is still no
+ * stock row or restock timer — the limit is this character's allowance from
+ * that line today, recorded by the purchase itself.
  */
 const merchantDefinitions = [
   {
     id: MERCHANT_IDS.bixWeller,
     npcId: NPC_IDS.bixWeller,
     prices: [
-      { itemId: ITEM_IDS.powerCell, buyPrice: 3, sellPrice: 8 },
+      { itemId: ITEM_IDS.powerCell, buyPrice: 4, sellPrice: 12, dailySellLimit: 12 },
       { itemId: ITEM_IDS.refinedFerrite, buyPrice: 10 },
       { itemId: ITEM_IDS.ferriteShale, buyPrice: 2 },
       { itemId: ITEM_IDS.slag, buyPrice: 1 },
@@ -38,10 +42,11 @@ const merchantDefinitions = [
     id: MERCHANT_IDS.wadeRusk,
     npcId: NPC_IDS.wadeRusk,
     authorizingMissionId: MISSION_IDS.tenThousandHours,
-    // Two Credits a piece, the same as he would charge anybody. He does not buy
-    // Slag back: Bix already does, and one buyer for it is the economy.
+    // Four Credits a piece, the same as he would charge anybody, and he takes
+    // spare Scrap back at one (#230). He does not buy Slag back: Bix already
+    // does, and one buyer for it is the economy.
     prices: [
-      { itemId: ITEM_IDS.scrapMetal, sellPrice: 2 },
+      { itemId: ITEM_IDS.scrapMetal, buyPrice: 1, sellPrice: 4, dailySellLimit: 12 },
       // Wade starts buying structural material once the player is working at
       // Deep Jag depth (#209). No specialist differential yet: where he and
       // Bix both buy an item, the approved starting price is the same.
@@ -63,6 +68,32 @@ const merchantById = new Map<string, MerchantDefinition>(
 /** Resolve a merchant from the authoritative registry by stable ID. */
 export function getMerchant(merchantId: string): MerchantDefinition | undefined {
   return merchantById.get(merchantId);
+}
+
+function authoredPriceLine(merchantId: string, itemId: string) {
+  const line = getMerchant(merchantId)?.prices.find((price) => price.itemId === itemId);
+  if (!line) throw new Error(`${merchantId} authors no price line for ${itemId}`);
+  return line;
+}
+
+/**
+ * What the player pays this merchant for one unit, for content that quotes it.
+ *
+ * Mission budgets and dialogue that state a shop price read it from here
+ * (#230) rather than restating it, so a price change cannot leave a stale
+ * number behind. A line that does not sell is a content error, not zero.
+ */
+export function merchantRetailPrice(merchantId: string, itemId: string): number {
+  const { sellPrice } = authoredPriceLine(merchantId, itemId);
+  if (sellPrice === undefined) throw new Error(`${merchantId} does not sell ${itemId}`);
+  return sellPrice;
+}
+
+/** What this merchant pays the player for one unit, for content that quotes it. */
+export function merchantBuybackPrice(merchantId: string, itemId: string): number {
+  const { buyPrice } = authoredPriceLine(merchantId, itemId);
+  if (buyPrice === undefined) throw new Error(`${merchantId} does not buy ${itemId}`);
+  return buyPrice;
 }
 
 /**

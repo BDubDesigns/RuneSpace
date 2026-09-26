@@ -122,7 +122,7 @@ const workOrderDefinitions = [
       { itemId: ITEM_IDS.powerCell, quantity: 1 },
     ],
     sections: 12,
-    payoutCredits: 115,
+    payoutCredits: 120,
   },
   {
     id: WORK_ORDER_IDS.maraBedFrame,
@@ -171,7 +171,7 @@ const workOrderDefinitions = [
       { itemId: ITEM_IDS.powerCell, quantity: 3 },
     ],
     sections: 19,
-    payoutCredits: 200,
+    payoutCredits: 210,
   },
   // Refining-5+ pool (#217): eight more jobs, unlocked once Galvanic Stock is
   // craftable. Every client here already has a job above — reusing them is
@@ -217,7 +217,7 @@ const workOrderDefinitions = [
       { itemId: ITEM_IDS.powerCell, quantity: 1 },
     ],
     sections: 12,
-    payoutCredits: 110,
+    payoutCredits: 115,
   },
   {
     id: WORK_ORDER_IDS.rennHelmetRack,
@@ -275,7 +275,7 @@ const workOrderDefinitions = [
       { itemId: ITEM_IDS.powerCell, quantity: 1 },
     ],
     sections: 18,
-    payoutCredits: 225,
+    payoutCredits: 230,
   },
   {
     id: WORK_ORDER_IDS.stempSpeederCradle,
@@ -291,7 +291,7 @@ const workOrderDefinitions = [
       { itemId: ITEM_IDS.powerCell, quantity: 2 },
     ],
     sections: 20,
-    payoutCredits: 270,
+    payoutCredits: 280,
   },
 ] as const satisfies readonly WorkOrderDefinition[];
 

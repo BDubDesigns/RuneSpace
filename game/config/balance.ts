@@ -341,14 +341,15 @@ const balanceSchema = z.object({
       stackLimit: z.literal(10),
     }),
     /**
-     * Practice stock (#190). Fungible but non-stacking: `stackLimit: 1` is the
-     * authored fact that makes one piece occupy one ordinary inventory slot, so
-     * six of them is a real carrying decision rather than a rounding error.
+     * Practice stock (#190). Fungible, stacking to three (#230, ahead of
+     * Fabrication): six pieces still take two ordinary inventory slots, so
+     * carrying Scrap stays a real decision. Consuming Scrap frees a slot only
+     * when it empties a stack — see `resolvePracticeWelding`.
      */
     scrapMetal: z.object({
       itemId: z.literal(ITEM_IDS.scrapMetal),
       massGrams: z.literal(300),
-      stackLimit: z.literal(1),
+      stackLimit: z.literal(3),
     }),
     salvageCutter: z.object({
       itemId: z.literal(ITEM_IDS.salvageCutter),
@@ -581,7 +582,7 @@ const defaults = balanceSchema.parse({
     ferriteShale: { itemId: ITEM_IDS.ferriteShale, massGrams: 100, stackLimit: 10 },
     refinedFerrite: { itemId: ITEM_IDS.refinedFerrite, massGrams: 150, stackLimit: 5 },
     slag: { itemId: ITEM_IDS.slag, massGrams: 150, stackLimit: 10 },
-    scrapMetal: { itemId: ITEM_IDS.scrapMetal, massGrams: 300, stackLimit: 1 },
+    scrapMetal: { itemId: ITEM_IDS.scrapMetal, massGrams: 300, stackLimit: 3 },
     salvageCutter: {
       itemId: ITEM_IDS.salvageCutter,
       massGrams: 5_000,

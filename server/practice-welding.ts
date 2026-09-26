@@ -160,10 +160,11 @@ async function loadPracticeSnapshot(
   });
   return {
     practice: practiceStateFromRow(row),
-    // Scrap has a stack limit of one, so a piece and a stack are the same thing.
-    scrapAvailable: stacks
+    // The stacks themselves, not a total: consuming Scrap frees a slot only
+    // when it empties one (#230).
+    scrapStackQuantities: stacks
       .filter((stack) => stack.itemId === ITEM_IDS.scrapMetal)
-      .reduce((total, stack) => total + stack.quantity, 0),
+      .map((stack) => stack.quantity),
     slagStackQuantities: stacks
       .filter((stack) => stack.itemId === ITEM_IDS.slag)
       .map((stack) => stack.quantity),

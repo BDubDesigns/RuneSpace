@@ -445,7 +445,8 @@ describe("the new materials and who buys them", () => {
     expect(priceOf(ITEM_IDS.galvanicStock)?.buyPrice).toBe(18);
     expect(priceOf(ITEM_IDS.galvaferrite)?.buyPrice).toBe(45);
     expect(wade.authorizingMissionId).toBe(MISSION_IDS.tenThousandHours);
-    expect(priceOf(ITEM_IDS.scrapMetal)?.sellPrice).toBe(2);
+    // Scrap moved to 4 in #230; tests/unit/trade.test.ts owns that price.
+    expect(priceOf(ITEM_IDS.scrapMetal)?.sellPrice).toBe(4);
   });
 
   it("introduces no new sell stock, so none of the three can be arbitraged", () => {

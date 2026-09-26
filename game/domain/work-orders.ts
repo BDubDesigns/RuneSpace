@@ -34,7 +34,7 @@ export type ActiveWorkOrderState = {
  * Derived from the merchant registry rather than restated as a second price
  * table, so a shop price and a Work Order payout can never disagree. A price a
  * merchant *sells* at is the real replacement cost, which is why a Power Cell
- * counts at Bix's 8 rather than the 3 he buys them back for — a job that
+ * counts at Bix's retail price rather than what he buys them back for — a job that
  * consumes a Cell must not underpay the player who has to buy another. Where
  * nobody sells the material, the best available buy-back price is the only
  * honest valuation of the unit the player gives up.
