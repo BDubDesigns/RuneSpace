@@ -35,8 +35,8 @@ Stop), `server/work-order-refresh.ts` (ForceSales' daily refresh command),
 boundary, also used by the Power Annex), and `db/rune-space.ts`
 (`character_work_order_postings`, `character_work_order_board_refreshes`).
 
-Related: `docs/npc-canon.md` (internal character canon and the client-
-eligibility rule), `docs/holo-hollow.md` (settlement, economy, tone),
+Related: the Notion Canon, linked from `docs/npc-canon.md` (internal
+character canon and the client-eligibility rule), `docs/holo-hollow.md` (settlement, economy, tone),
 `docs/missions.md` (the Mission framework, which Work Orders are **not**),
 `docs/gameplay-foundations.md` (Clean Pass, Workbench exclusivity, and the
 shared offline/Stop/Travel contract Work Orders reuse rather than reimplement).
@@ -526,7 +526,7 @@ proves what the next size needs.
   not cite the player's Cutter as evidence that this one already existed.
 - **Canon notes:** `game/content/dialogue.ts` (`tansyCompletion`,
   `tansyAfterRemoteAcceptance`, `tansyMiningTopic`), `game/content/npcs.ts`,
-  `docs/npc-canon.md` (Tansy → Work, business, and equipment context).
+  Notion Canon (Tansy Rusk → Story Chronology / Appearances).
 
 ### 2. Sagging Shelf Bay
 
@@ -573,8 +573,8 @@ proves what the next size needs.
   reference the Crew Stop or the Crew Hauler — that would foreground an optional
   Mission the player may never have found.
 - **Canon notes:** `game/content/npcs.ts` (role: Ferrite miner),
-  `game/content/dialogue.ts` (`rennFerriteTopic`), `docs/npc-canon.md`
-  (Renn → Work, business, and equipment context; and the copy rule).
+  `game/content/dialogue.ts` (`rennFerriteTopic`), Notion Canon
+  (Renn Calder → Story Chronology / Appearances; and the copy rule on NPCs).
 
 ### 4. Tourist-Era Bed Frame
 
@@ -744,7 +744,7 @@ module load):
   **Protected canon — do not violate:** it is approved and safe to say she has
   had it since childhood; it is **not** approved to reveal or imply that her
   parents gave it to her. Her parents and that history remain internal,
-  unshipped canon for a later authored reveal (`docs/npc-canon.md`, Tansy
+  unshipped canon for a later authored reveal (Notion Canon, Tansy
   Rusk).
 - **Why the pairing works:** a mechanic who builds her own equipment from
   mismatched salvage keeping a childhood object running the same way is
@@ -831,7 +831,7 @@ beyond the facts listed may be assumed, and it is not a placeholder for an agent
 to fill in while writing something else — if a job or a line seems to need more,
 it does not get invented here. None of them is on the NPC roster, and none gets a
 portrait, dialogue, map presence, or Wiki page
-(`docs/npc-canon.md`, "Background Work Order clients are not roster NPCs").
+(Notion Canon → NPCs, "Background Work Order clients are not roster NPCs").
 
 Each of these four now has **two** authored jobs (the Refining-5+ pool reuses
 every client from the original eight; see above). Receiving a second job does

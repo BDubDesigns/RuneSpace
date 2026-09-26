@@ -112,9 +112,10 @@ The exception is scoped to exactly that, and does not widen:
   world. It does not cover items, actions, mechanics, Local Places, merchants,
   repair targets, Missions, or any other registry entry, each of which still
   belongs in the most relevant existing article;
-- a character page is written from the `Public-Wiki-safe facts` field of that
-  NPC's entry in `docs/npc-canon.md` and from nothing else. `docs/npc-canon.md`
-  is **internal and spoiler-complete**, and must never be copied from wholesale;
+- a character page is written from the `Public-Wiki-safe facts` on that NPC's
+  page in the Notion Canon (linked from `docs/npc-canon.md`) and from nothing
+  else. The Canon is **internal and spoiler-complete**, and must never be copied
+  from wholesale;
 - a character with little player-safe canon gets a short, truthful page. Do not
   pad one with invented biography, and do not open an empty page for a character
   who has not shipped.
