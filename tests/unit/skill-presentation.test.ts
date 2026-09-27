@@ -5,7 +5,7 @@ import { getSkillPresentation, SKILL_PRESENTATIONS } from "@/game/content/skill-
 /**
  * Unit coverage for the issue #215 canonical skill accent identity: Mining,
  * Refining, and Welding each resolve to exactly one accent tone, Strength has
- * none (it isn't a presented skill), and Fabrication (#232) is presented with none.
+ * none (it isn't a presented skill), and Fabrication (#232) has its own Shop Olive tone.
  */
 describe("canonical skill accent tone (issue #215)", () => {
   it("assigns Mining, Refining, and Welding their approved tones", () => {
@@ -27,8 +27,11 @@ describe("canonical skill accent tone (issue #215)", () => {
     expect(getSkillPresentation(SKILL_IDS.strength)?.accentTone).toBeUndefined();
   });
 
-  it("presents Fabrication (#232) with no approved color, through the neutral fallback", () => {
+  it("presents Fabrication (#232) with its own approved tone", () => {
     expect(SKILL_PRESENTATIONS.map((skill) => skill.id)).toContain(SKILL_IDS.fabrication);
-    expect(getSkillPresentation(SKILL_IDS.fabrication)).toEqual({ displayName: "Fabrication" });
+    expect(getSkillPresentation(SKILL_IDS.fabrication)).toEqual({
+      displayName: "Fabrication",
+      accentTone: "fabrication",
+    });
   });
 });

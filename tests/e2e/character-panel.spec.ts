@@ -122,12 +122,17 @@ test("the Character destination shows identity, canonical level, Credits, and ev
     weldingColor,
   );
 
-  // Fabrication (#232) has no approved hue: its name presents neutrally in
-  // plain text rather than borrowing a skill's color or inventing one.
-  const neutralColor = await resolvedCssVarColor(page, "--rs-text-primary");
-  expect([miningColor, refiningColor, weldingColor]).not.toContain(neutralColor);
+  // Fabrication (#232) carries its approved Shop Olive, distinct from the
+  // other three skills, on both the name line and the XP fill.
+  const fabricationColor = await resolvedCssVarColor(page, "--rs-skill-fabrication");
+  expect(fabricationColor).toBe("rgb(127, 163, 71)");
+  expect([miningColor, refiningColor, weldingColor]).not.toContain(fabricationColor);
   const fabricationRow = skillRows.filter({ hasText: /^Fabrication — Level 1/ });
-  await expect(fabricationRow.locator("p").first()).toHaveCSS("color", neutralColor);
+  await expect(fabricationRow.locator("p").first()).toHaveCSS("color", fabricationColor);
+  await expect(fabricationRow.getByRole("progressbar").locator("> div")).toHaveCSS(
+    "background-color",
+    fabricationColor,
+  );
 
   await captureReviewScreenshot(page, "character-panel-mobile.png");
 });

@@ -170,7 +170,7 @@ suite("issue #64 character profile read boundary (real PostgreSQL)", () => {
       ownerName: "Narrow Owner",
       characterLevel: 2,
       skills: [
-        // A standard skill since #232 with no approved accent, so none is sent.
+        // A standard skill since #232, with its own approved accent.
         {
           displayName: "Fabrication",
           level: 1,
@@ -178,6 +178,7 @@ suite("issue #64 character profile read boundary (real PostgreSQL)", () => {
           xpIntoLevel: 0,
           xpToNextLevel: 500,
           atMaximumLevel: false,
+          accentTone: "fabrication",
         },
         {
           displayName: "Mining",

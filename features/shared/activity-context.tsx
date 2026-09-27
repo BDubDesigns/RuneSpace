@@ -36,14 +36,11 @@ export function SkillProgressRow({
 }: {
   level: number;
   skill: string;
-  /** Absent for a skill with no approved accent yet (Fabrication, #232): the neutral fallback. */
-  tone?: SkillAccentTone;
+  tone: SkillAccentTone;
   xpIntoLevel: number;
   xpToNextLevel?: number;
 }) {
-  // An untoned skill presents neutrally exactly as CharacterSkillList does:
-  // plain text for its name, the meter's default fill for its progress.
-  const accent = skillAccentColor(tone);
+  const accent = skillAccentColor(tone) ?? "var(--rs-accent-primary)";
   const percent = xpToNextLevel
     ? Math.min(100, (xpIntoLevel / (xpIntoLevel + xpToNextLevel)) * 100)
     : 100;
@@ -52,7 +49,7 @@ export function SkillProgressRow({
       <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5">
         <p
           className="font-display text-xs font-bold uppercase tracking-[0.14em]"
-          style={{ color: accent ?? "var(--rs-text-primary)" }}
+          style={{ color: accent }}
         >
           {skill} Lv. {level}
         </p>
@@ -68,10 +65,7 @@ export function SkillProgressRow({
         className="mt-1.5 h-1 overflow-hidden bg-[color:var(--rs-border-subtle)]"
         role="progressbar"
       >
-        <div
-          className="h-full"
-          style={{ background: accent ?? "var(--rs-accent-primary)", width: `${percent}%` }}
-        />
+        <div className="h-full" style={{ background: accent, width: `${percent}%` }} />
       </div>
     </div>
   );

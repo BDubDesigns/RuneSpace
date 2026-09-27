@@ -526,8 +526,8 @@ every other kind.
 Fabrication turns processed stock into discrete items. It is a standard skill on
 the shared level curve (`skillLevelCurves` in `game/config/balance.ts`), starts
 at level 1, appears on every progression surface through the canonical skill
-projection, and has no approved accent colour yet, so it presents through the
-neutral fallback. Tier 1 ships here; Fabrication 5 and 8 are the next slice.
+projection, and carries its approved Shop Olive accent (`#7FA347`) there like
+every other skill. Tier 1 ships here; Fabrication 5 and 8 are the next slice.
 
 ### Rusk Recovery's two work areas
 

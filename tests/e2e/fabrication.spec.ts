@@ -356,11 +356,10 @@ test("Manual Override at desktop width: push, hold at 0, Lock In, and a bust", a
   await expectKeyboardFocusRingPaints(stationCard);
   await stationCard.click();
   const station = page.locator("[data-fabrication-station]");
-  // Fabrication has no approved hue yet (#232): the station's skill line is
-  // neutral text, never another skill's identity color.
+  // The station's skill line carries Fabrication's own Shop Olive (#232).
   await expect(station.locator('[data-skill-progress="fabrication"] p').first()).toHaveCSS(
     "color",
-    await resolvedCssVarColor(page, "--rs-text-primary"),
+    await resolvedCssVarColor(page, "--rs-skill-fabrication"),
   );
   await station
     .locator(`[data-fabricate-recipe="${ACTION_IDS.mountingBracketFabrication}"]`)

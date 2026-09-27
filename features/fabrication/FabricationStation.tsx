@@ -81,6 +81,7 @@ export function FabricationStation() {
       <SkillProgressRow
         level={state.fabrication.level}
         skill="Fabrication"
+        tone="fabrication"
         xpIntoLevel={state.fabrication.xpIntoLevel}
         {...(state.fabrication.xpToNextLevel === undefined
           ? {}
