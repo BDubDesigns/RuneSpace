@@ -36,7 +36,8 @@ export function SkillProgressRow({
 }: {
   level: number;
   skill: string;
-  tone: SkillAccentTone;
+  /** Absent for a skill with no approved accent yet (Fabrication, #232): the neutral fallback. */
+  tone?: SkillAccentTone;
   xpIntoLevel: number;
   xpToNextLevel?: number;
 }) {

@@ -7,7 +7,6 @@ import { CharacterPanel } from "@/features/characters/CharacterPanel";
 import { InventoryEquipmentPanel } from "@/features/inventory/InventoryEquipmentPanel";
 import { MissionLogPanel } from "@/features/missions/MissionLogPanel";
 import { MissionGuidanceStrips } from "@/features/missions/MissionGuidanceStrips";
-import { WorkOrdersTerminal } from "@/features/practice/WorkOrdersTerminal";
 import { JourneyPanel } from "@/features/travel/JourneyPanel";
 import { LocalMapPanel } from "@/features/travel/LocalMapPanel";
 import { ScavengeRevealOverlay } from "@/features/travel/ScavengeRevealOverlay";
@@ -120,8 +119,9 @@ export function PlayConsole({
               this shell composes surfaces rather than assembling any one
               activity's parts from a location branch. */}
           <LocationSurface characterName={characterName} localPlaceId={localPlaceId} />
+          {/* Rusk Recovery's Work Orders terminal now lives in its Welding
+              Workshop work area (#232), composed by the activity. */}
           <LocationActivity characterName={characterName} localPlaceId={localPlaceId} />
-          <WorkOrdersTerminal />
         </>
       )}
 

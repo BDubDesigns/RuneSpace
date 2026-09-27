@@ -8,7 +8,7 @@ import { MissionActionButton } from "@/components/ui/MissionActionButton";
 import { NpcConversation } from "@/features/npc/NpcConversation";
 import { TradePanel } from "@/features/trade/TradePanel";
 import { getLocationMerchant, getMerchant, isMerchantOpen } from "@/game/content/merchants";
-import { getResidentNpcs, type NpcDefinition } from "@/game/content/npcs";
+import { getNpc, getResidentNpcs, type NpcDefinition } from "@/game/content/npcs";
 import { resolveNpcConversation, type NpcConversationEntry } from "@/game/domain/conversation";
 import { resolveActiveLocalPlace } from "@/game/domain/local-places";
 import {
@@ -28,6 +28,14 @@ export type ResidentContact = {
   merchant?: MerchantDefinition;
   guidance?: MissionGuidanceMeaning;
   turnInAvailable: boolean;
+  /**
+   * This person has just left — a Mission completed in their own conversation
+   * moved them (#232, Tansy going home after Break It Down) — but that
+   * conversation is still open. They present no row; the conversation stays
+   * mounted so its completion scene plays to the end, and they are gone once
+   * it closes.
+   */
+  departed?: true;
 };
 
 /**
@@ -73,6 +81,9 @@ export function NpcInteractionPanel({
   meta?: ReactNode;
 }) {
   const { foregroundBusy, state } = usePlay();
+  // Whose conversation is open. Presentation state only: it keeps a person who
+  // has just moved on-screen until the scene with them is finished.
+  const [conversationNpcId, setConversationNpcId] = useState<string>();
 
   const locationId = state.location.currentLocationId;
   const completedMissionIds = deriveCompletedMissionIds(state.missions);
@@ -100,7 +111,11 @@ export function NpcInteractionPanel({
     : getLocationMerchant(locationId);
   const stationary = !state.activeAction && !state.travelState;
   const guidanceTargets = deriveMissionGuidanceTargets(state.missions);
-  const contacts = residents
+  const departed =
+    conversationNpcId && !residents.some((npc) => npc.id === conversationNpcId)
+      ? getNpc(conversationNpcId)
+      : undefined;
+  const contacts = [...residents, ...(departed ? [departed] : [])]
     .map((npc): ResidentContact => {
       const entries = resolveNpcConversation(npc.id, state.missions, {
         workOrdersRefreshUnlocked: state.workOrders.refresh.unlocked,
@@ -122,10 +137,11 @@ export function NpcInteractionPanel({
           entries.some(
             (entry) => entry.kind === "mission" && entry.action?.kind === "complete_mission",
           ),
+        ...(npc.id === departed?.id ? { departed: true as const } : {}),
       };
     })
     // Somebody with nothing to say and nothing to sell presents no row.
-    .filter((contact) => contact.entries.length > 0 || contact.merchant);
+    .filter((contact) => contact.departed || contact.entries.length > 0 || contact.merchant);
 
   return (
     <ResidentContacts
@@ -134,6 +150,7 @@ export function NpcInteractionPanel({
       disabled={foregroundBusy}
       {...(activePlace ? { localPlaceId: activePlace.id } : {})}
       meta={meta}
+      onConversationChange={setConversationNpcId}
       stationary={stationary}
     />
   );
@@ -149,6 +166,7 @@ export function ResidentContacts({
   disabled,
   localPlaceId,
   meta,
+  onConversationChange,
   stationary,
 }: {
   className?: string;
@@ -157,6 +175,8 @@ export function ResidentContacts({
   /** The validated Local Place a merchant's counter trades in, if any. */
   localPlaceId?: string;
   meta?: ReactNode;
+  /** Told whose conversation opens and closes, so a departing person's scene can finish. */
+  onConversationChange?: (npcId: string | undefined) => void;
   stationary: boolean;
 }) {
   // Nobody to talk to here. The place's own context still has to render: the
@@ -180,6 +200,7 @@ export function ResidentContacts({
           disabled={disabled}
           key={contact.npc.id}
           localPlaceId={localPlaceId}
+          {...(onConversationChange ? { onConversationChange } : {})}
           stationary={stationary}
         />
       ))}
@@ -219,15 +240,17 @@ function LocalContact({
   contact,
   disabled,
   localPlaceId,
+  onConversationChange,
   stationary,
 }: {
   className: string;
   contact: ResidentContact;
   disabled: boolean;
   localPlaceId?: string;
+  onConversationChange?: (npcId: string | undefined) => void;
   stationary: boolean;
 }) {
-  const { npc, entries, merchant, guidance, turnInAvailable } = contact;
+  const { npc, entries, merchant, guidance, turnInAvailable, departed } = contact;
   const [open, setOpen] = useState(false);
   const [tradeOpen, setTradeOpen] = useState(false);
   const triggerRef = useRef<HTMLButtonElement>(null);
@@ -254,49 +277,57 @@ function LocalContact({
           Name and role are one identity block so they read as one person, and
           the actions sit beside it rather than competing with the name for the
           same baseline. */}
-      <section
-        aria-label={`Local contact: ${npc.displayName}`}
-        className={`border-t border-[color:var(--rs-border-structural)] pt-3 ${className}`.trim()}
-        data-npc-interaction={npc.id}
-      >
-        <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-3">
-          <div className="min-w-0 flex-1 basis-36">
-            <h2 className="font-display text-base font-bold leading-tight">{npc.displayName}</h2>
-            <p className="mt-0.5 text-xs leading-snug text-[color:var(--rs-text-secondary)]">
-              {npc.role}
-            </p>
+      {/* A departing person keeps this exact element structure — only the row
+          goes — so their open conversation is the same mounted instance and
+          its completion scene plays to the end (#232). */}
+      {departed ? null : (
+        <section
+          aria-label={`Local contact: ${npc.displayName}`}
+          className={`border-t border-[color:var(--rs-border-structural)] pt-3 ${className}`.trim()}
+          data-npc-interaction={npc.id}
+        >
+          <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-3">
+            <div className="min-w-0 flex-1 basis-36">
+              <h2 className="font-display text-base font-bold leading-tight">{npc.displayName}</h2>
+              <p className="mt-0.5 text-xs leading-snug text-[color:var(--rs-text-secondary)]">
+                {npc.role}
+              </p>
+            </div>
+            <div className="flex shrink-0 items-center gap-2" data-npc-actions>
+              {entries.length > 0 ? (
+                <MissionActionButton
+                  aria-label={`Talk to ${npc.displayName}`}
+                  data-npc-action="talk"
+                  data-npc-turn-in={turnInAvailable ? "true" : "false"}
+                  guidance={guidance}
+                  haloClassName="w-full"
+                  ref={triggerRef}
+                  disabled={disabled}
+                  intent={turnInAvailable ? "mission" : "secondary"}
+                  onClick={() => {
+                    setOpen(true);
+                    onConversationChange?.(npc.id);
+                  }}
+                >
+                  Talk
+                </MissionActionButton>
+              ) : null}
+              {merchant ? (
+                <ActionButton
+                  aria-haspopup="dialog"
+                  aria-label={`Trade with ${npc.displayName}`}
+                  data-npc-action="trade"
+                  intent="secondary"
+                  onClick={() => setTradeOpen(true)}
+                  ref={tradeTriggerRef}
+                >
+                  Trade
+                </ActionButton>
+              ) : null}
+            </div>
           </div>
-          <div className="flex shrink-0 items-center gap-2" data-npc-actions>
-            {entries.length > 0 ? (
-              <MissionActionButton
-                aria-label={`Talk to ${npc.displayName}`}
-                data-npc-action="talk"
-                data-npc-turn-in={turnInAvailable ? "true" : "false"}
-                guidance={guidance}
-                haloClassName="w-full"
-                ref={triggerRef}
-                disabled={disabled}
-                intent={turnInAvailable ? "mission" : "secondary"}
-                onClick={() => setOpen(true)}
-              >
-                Talk
-              </MissionActionButton>
-            ) : null}
-            {merchant ? (
-              <ActionButton
-                aria-haspopup="dialog"
-                aria-label={`Trade with ${npc.displayName}`}
-                data-npc-action="trade"
-                intent="secondary"
-                onClick={() => setTradeOpen(true)}
-                ref={tradeTriggerRef}
-              >
-                Trade
-              </ActionButton>
-            ) : null}
-          </div>
-        </div>
-      </section>
+        </section>
+      )}
       {merchant && tradeOpen ? (
         // Trade is its own surface rather than an inline expansion (#193): the
         // counter is ~390px tall, and unfolding it here pushed the place's own
@@ -321,7 +352,10 @@ function LocalContact({
         <NpcConversation
           entries={entries}
           npc={npc}
-          onClose={() => setOpen(false)}
+          onClose={() => {
+            setOpen(false);
+            onConversationChange?.(undefined);
+          }}
           stationary={stationary}
           triggerRef={triggerRef}
         />

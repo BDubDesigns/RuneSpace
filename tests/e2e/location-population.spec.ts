@@ -356,11 +356,12 @@ populationTest(
 );
 
 /**
- * Issue #231: the place panel resolves an ordered set of residents. Every
- * shipped context still has at most one, so these journeys pin the migrated
- * behaviour at phone width: Wade stands where his Mission record says, Tansy
- * has not moved, each resident row sits above the place's activity, and the
- * place's own population line renders once, after the people.
+ * Issue #231: the place panel resolves an ordered set of residents. These
+ * journeys pin the behaviour at phone width: Wade stands where his Mission
+ * record says, each resident row sits above the place's activity, and the
+ * place's own population line renders once, after the people. Since #232 one
+ * shipped context has two: Tansy stands beside Wade in his yard through her
+ * Fabrication chapter.
  */
 test.describe("issue #231 resident rows at phone width", () => {
   const PHONE = { width: 390, height: 844 };
@@ -447,5 +448,33 @@ test.describe("issue #231 resident rows at phone width", () => {
     await page.reload();
     await expect(page.locator(`[data-location-scene="${LOCATION_IDS.theJag}"]`)).toBeVisible();
     await expectResidents(page, [NPC_IDS.tansyRusk]);
+  });
+
+  test("after 10,000 Hours Tansy stands beside Wade at his yard, Wade first (#232)", async ({
+    page,
+    testCharacter,
+  }) => {
+    await page.setViewportSize(PHONE);
+    await standAfterKeepTheChange(testCharacter.id, LOCATION_IDS.ruskRecovery);
+    const now = new Date();
+    await db.insert(rune.characterMissions).values({
+      characterId: testCharacter.id,
+      missionId: MISSION_IDS.tenThousandHours,
+      acceptedAt: now,
+      completedAt: now,
+    });
+    await openTestCharacter(page, testCharacter.id);
+    await expect(
+      page.locator(`[data-location-scene="${LOCATION_IDS.ruskRecovery}"]`),
+    ).toBeVisible();
+    await expectResidents(page, [NPC_IDS.wadeRusk, NPC_IDS.tansyRusk]);
+
+    await db
+      .update(rune.characters)
+      .set({ currentLocationId: LOCATION_IDS.theJag })
+      .where(eq(rune.characters.id, testCharacter.id));
+    await page.reload();
+    await expect(page.locator(`[data-location-scene="${LOCATION_IDS.theJag}"]`)).toBeVisible();
+    await expectResidents(page, []);
   });
 });

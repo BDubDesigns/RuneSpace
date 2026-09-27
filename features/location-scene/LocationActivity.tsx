@@ -7,7 +7,7 @@ import { CargoHoldPanel } from "@/features/cargo/CargoHoldPanel";
 import { CrewStopPanel } from "@/features/local-places/CrewStopPanel";
 import { MiningActivity } from "@/features/mining/MiningActivity";
 import { PowerAnnexClaimPanel } from "@/features/power-annex/PowerAnnexClaimPanel";
-import { WorkbenchPanel } from "@/features/practice/WorkbenchPanel";
+import { RuskRecoveryWorkAreas } from "@/features/location-scene/RuskRecoveryWorkAreas";
 import { RefiningConsole } from "@/features/refining/RefiningConsole";
 import { RepairWorkPanel } from "@/features/welding/RepairWorkPanel";
 import { usePlay } from "@/features/play/PlayContext";
@@ -89,10 +89,10 @@ export function LocationActivity({
     case LOCATION_IDS.emergencyPowerAnnex:
       return <PowerAnnexClaimPanel />;
     case LOCATION_IDS.ruskRecovery:
-      // One bench, one component: which controls it shows follows the
-      // authoritative Workbench occupancy rather than each surface deciding
-      // independently whether to appear (#207).
-      return <WorkbenchPanel />;
+      // Wade's Welding Workshop — one bench, one component, following the
+      // authoritative Workbench occupancy (#207) — and, once Tansy opens it,
+      // the Fabrication Station beside it (#232).
+      return <RuskRecoveryWorkAreas />;
     default:
       return null;
   }

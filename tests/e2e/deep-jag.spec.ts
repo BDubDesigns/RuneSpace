@@ -53,7 +53,11 @@ async function setSkillXp(characterId: string, skillId: string, totalXp: number)
     });
 }
 
-/** Everything through 10,000 Hours, both skills at 5, standing at The Jag. */
+/**
+ * Everything through Brace Yourself's story gate — Tansy's Fabrication chapter
+ * since #232, which also brings her home to The Jag — both skills at 5,
+ * standing at The Jag.
+ */
 async function qualifiedAtTheJag(characterId: string) {
   const now = new Date();
   await db
@@ -65,6 +69,8 @@ async function qualifiedAtTheJag(characterId: string) {
         MISSION_IDS.wasteNot,
         MISSION_IDS.holdItTogether,
         MISSION_IDS.tenThousandHours,
+        MISSION_IDS.returnTheFavor,
+        MISSION_IDS.breakItDown,
       ].map((missionId) => ({ characterId, missionId, acceptedAt: now, completedAt: now })),
     );
   await setSkillXp(characterId, SKILL_IDS.mining, xpForLevel(5));
