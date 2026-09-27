@@ -211,23 +211,32 @@ test("Tansy's Fabrication chapter, from Return the Favor to her walk home", asyn
   // No Tinker yet: Tansy has not shown it.
   await expect(station.locator('[data-station-mode-select="tinker"]')).toHaveCount(0);
 
-  // Every authored recipe, whether or not it can be made now.
+  // Fabricate lists what the carried materials make now — no filters. The
+  // Scrap Box needs a Bracket and Scrap this character does not carry.
   const recipes = station.locator("[data-fabricate-recipes]");
   for (const actionId of [
     ACTION_IDS.mountingBracketFabrication,
     ACTION_IDS.scrapMetalFabrication,
-    ACTION_IDS.scrapBoxFabrication,
     ACTION_IDS.salvageCutterFabrication,
   ]) {
     await expect(recipes.locator(`[data-fabricate-recipe="${actionId}"]`)).toBeVisible();
   }
   const box = recipes.locator(`[data-fabricate-recipe="${ACTION_IDS.scrapBoxFabrication}"]`);
-  await expect(box.locator("[data-station-requirement]").first()).toContainText(/Need/);
-  // The materials filter hides what cannot be made now; toggling it off restores it.
-  await station.locator('[data-fabricate-filter="materials"]').click();
   await expect(box).toHaveCount(0);
-  await station.locator('[data-fabricate-filter="materials"]').click();
-  await expect(box).toBeVisible();
+  await expect(station.getByRole("button", { name: /^Hide / })).toHaveCount(0);
+
+  // Recipes is everything the character knows, carried materials or not.
+  await station.locator('[data-station-mode-select="recipes"]').click();
+  const catalog = station.locator("[data-fabrication-recipes-catalog]");
+  await expect(catalog.locator("[data-recipes-catalog-entry]")).toHaveCount(4);
+  await expect(
+    catalog
+      .locator(`[data-recipes-catalog-entry="${ACTION_IDS.scrapBoxFabrication}"]`)
+      .locator("[data-station-requirement]")
+      .first(),
+  ).toContainText(/Need/);
+  await expectNoHorizontalOverflow(page);
+  await station.locator('[data-station-mode-select="fabricate"]').click();
 
   // The Mission's recipe is the guided one, selected, with its run at one.
   const cutterTile = recipes.locator(
@@ -265,6 +274,13 @@ test("Tansy's Fabrication chapter, from Return the Favor to her walk home", asyn
   await expect(page.locator("[data-live-workpiece]")).toHaveCount(0);
   expect(await carried(characterId, ITEM_IDS.refinedFerrite)).toBe(0);
   expect(await fabricationXp(characterId)).toBe(65);
+  // What resolved while away is acknowledged at the station on return.
+  await page.locator('[data-work-area="fabrication"]').click();
+  const made = page.locator('[data-station-result="success"]');
+  await expect(made.locator("[data-station-result-headline]")).toHaveText(
+    "Salvage Cutter fabricated",
+  );
+  await expect(made.locator("[data-station-result-details]")).toHaveText("+65 Fabrication XP");
 
   // The turn-in: Tansy inspects it, takes it apart, and teaches Tinkering.
   const turnIn = await openNpcConversation(page, "Tansy Rusk");
@@ -293,9 +309,11 @@ test("Tansy's Fabrication chapter, from Return the Favor to her walk home", asyn
   await tinkerMode.click();
   const tinker = page.locator("[data-tinker-mode]");
   await expect(tinker).toBeVisible();
+  // Only what the character carries unequipped: the Cutter in hand is not listed.
   await expect(
     tinker.locator(`[data-tinker-target="${ACTION_IDS.salvageCutterTinkering}"]`),
-  ).toContainText(/Carry 1 Salvage Cutter|Your last Mining Cutter/);
+  ).toHaveCount(0);
+  await expect(tinker.getByRole("button", { name: /^Hide / })).toHaveCount(0);
   await tinker
     .locator(`[data-tinker-target="${ACTION_IDS.mountingBracketTinkering}"]`)
     .getByRole("button")
@@ -313,6 +331,14 @@ test("Tansy's Fabrication chapter, from Return the Favor to her walk home", asyn
   await fastForward(characterId, 15_000);
   await page.reload();
   expect(await carried(characterId, ITEM_IDS.scrapMetal)).toBe(1);
+  await page.locator('[data-work-area="fabrication"]').click();
+  const dismantled = page.locator('[data-station-result-kind="tinkering"]');
+  await expect(dismantled.locator("[data-station-result-headline]")).toHaveText(
+    "Mounting Bracket dismantled",
+  );
+  await expect(dismantled.locator("[data-station-result-details]")).toHaveText(
+    "+1 Scrap Metal · +25 Fabrication XP",
+  );
   await expect(page.locator("[data-mission-strip-objective]").first()).toContainText(
     /Return to Tansy/,
   );
@@ -367,9 +393,16 @@ test("Manual Override at desktop width: push, hold at 0, Lock In, and a bust", a
     .click();
 
   // Manual Override on before Start: the first workpiece is an Override one.
+  // A latched toggle: subdued when off, Shop Olive when on, still clickable.
   const toggle = station.locator("[data-manual-override-toggle]");
+  const shopOlive = await resolvedCssVarColor(page, "--rs-accent-shop-olive");
+  await expect(toggle).not.toHaveCSS("border-top-color", shopOlive);
   await toggle.click();
   await expect(toggle).toHaveAttribute("aria-pressed", "true");
+  await expect(toggle).toHaveCSS("border-top-color", shopOlive);
+  await expect(toggle).toBeEnabled();
+  // The keyboard ring still paints distinctly over the latched treatment.
+  await expectKeyboardFocusRingPaints(toggle);
   await station.locator("[data-fabricate-start]").click();
   const machine = station.locator("[data-manual-override]");
   await expect(machine).toBeVisible();
@@ -399,6 +432,14 @@ test("Manual Override at desktop width: push, hold at 0, Lock In, and a bust", a
   // floor(25 × 1.30)
   await expect.poll(() => fabricationXp(characterId)).toBe(32);
   expect(await carried(characterId, ITEM_IDS.mountingBracket)).toBe(1);
+  const lockedIn = page.locator('[data-station-result="success"]');
+  await expect(lockedIn.locator("[data-station-result-headline]")).toHaveText(
+    "Mounting Bracket fabricated",
+  );
+  await expect(lockedIn.locator("[data-station-result-details]")).toHaveText(
+    "Manual Override 1.30× · +32 Fabrication XP",
+  );
+  await captureReviewScreenshot(page, "fabrication-result-beat-desktop.png");
 
   // A bust: the workpiece's whole input set is gone, nothing made, no XP.
   const bracketTile = page
@@ -410,6 +451,9 @@ test("Manual Override at desktop width: push, hold at 0, Lock In, and a bust", a
   await page.locator('[data-override-feed="10"]').check({ force: true });
   await page.locator("[data-override-push]").click();
   await expect(page.locator("[data-live-workpiece]")).toHaveCount(0);
+  await expect(
+    page.locator('[data-station-result="bust"] [data-station-result-headline]'),
+  ).toHaveText("Workpiece bust · materials lost");
   await expect(page.locator('[data-workpiece-result="bust"]')).toHaveCount(0);
   await page.getByRole("button", { name: "History", exact: true }).click();
   await expect(page.locator('[data-workpiece-result="bust"]')).toContainText(

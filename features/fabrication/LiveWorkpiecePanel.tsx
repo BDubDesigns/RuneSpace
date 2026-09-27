@@ -119,7 +119,7 @@ export function LiveWorkpiecePanel({
           aria-pressed={station.manualOverrideEnabled}
           data-manual-override-toggle
           disabled={busy && pending !== "override"}
-          intent="secondary"
+          intent={station.manualOverrideEnabled ? "fabrication" : "secondary"}
           loading={pending === "override"}
           onClick={() => onToggleOverride(!station.manualOverrideEnabled)}
         >

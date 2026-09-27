@@ -175,3 +175,21 @@ export function fabricationRunSummary(
     .join(" + ");
   return `${selection} ${selection === 1 ? "batch" : "batches"} · ${inputs} → ${recipe.outputQuantity * selection} ${recipe.outputName} · ${seconds(recipe.durationTicks * selection, GAME_TICK_MS)} · ${recipe.baseXp * selection} base Fabrication XP`;
 }
+
+/** A recipe as one line, e.g. "2 Refined Ferrite → 1 Mounting Bracket". */
+export function recipeLine(recipe: FabricationRecipeProjection): string {
+  return `${recipe.inputs.map((input) => `${input.quantity} ${input.name}`).join(" + ")} → ${recipe.outputQuantity} ${recipe.outputName}`;
+}
+
+/** What still stands between the character and one batch of a recipe. */
+export function unmetRequirements(recipe: FabricationRecipeProjection, level: number): string[] {
+  const unmet: string[] = [];
+  if (!recipe.unlocked)
+    unmet.push(`Requires Fabrication ${recipe.minimumLevel} (you are ${level})`);
+  for (const input of recipe.inputs) {
+    if (input.carried < input.quantity) {
+      unmet.push(`Need ${input.quantity - input.carried} more ${input.name}`);
+    }
+  }
+  return unmet;
+}

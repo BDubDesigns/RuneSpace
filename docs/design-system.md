@@ -12,7 +12,7 @@ Translucent tokens: a Tailwind slash-opacity modifier such as `bg-[color:var(--r
 
 ## Primitives
 
-`components/ui/` contains presentational primitives only: panels, headings, actions, form fields, feedback, status meters, and the responsive shell. Intent variants use `primary`, `secondary`, `success`, `mining`, `arcane`, and `danger`; use the semantic intent, never a visual hex value.
+`components/ui/` contains presentational primitives only: panels, headings, actions, form fields, feedback, status meters, and the responsive shell. Intent variants use `primary`, `secondary`, `success`, `mining`, `arcane`, `fabrication`, and `danger`; use the semantic intent, never a visual hex value. A persistent on/off toggle is latched visibly, not by `aria-pressed` alone: `secondary` while off, its activity's accent intent while on, and it stays enabled so it can be switched back. The Fabrication Station's Manual Override and Auto-discard Scrap toggles use `fabrication` (Shop Olive, with an inset glow because `.rs-bevel` clips anything outside); a one-shot request such as Finish Current is not a toggle and keeps its own disabled confirmation.
 
 ## Canonical skill accent identity (Issue #215)
 

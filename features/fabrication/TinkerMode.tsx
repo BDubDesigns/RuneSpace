@@ -8,6 +8,7 @@ import { StatusMeter } from "@/components/ui/StatusMeter";
 import { BoundedRunProgress, BoundedRunSelector } from "@/features/shared/BoundedRunControl";
 import { TinkeringRunPanel } from "@/features/fabrication/FabricationRunPanel";
 import { StationRecipeTile } from "@/features/fabrication/StationRecipeTile";
+import { tinkerVisibleTargets } from "@/features/fabrication/station-lists";
 import {
   BATCH_UNIT,
   seconds,
@@ -78,26 +79,26 @@ function describe(
 
 /**
  * Tinker (#232): dismantle one complete authored Fabrication batch for its
- * base Fabrication XP and Scrap Metal. It mirrors Fabricate's list and filters,
- * uses the same bounded-run selector, and follows Practice Welding's cycle:
+ * base Fabrication XP and Scrap Metal. Like Fabricate it lists what can be done
+ * now (`tinkerVisibleTargets`) — a carried last Cutter included, with the
+ * safety reason — uses the same bounded-run selector, and follows Practice Welding's cycle:
  * a started cycle's batch is gone at once, Stop keeps it waiting, and Finish
  * Current completes it and stops.
  */
 export function TinkerMode() {
   const { foregroundBusy, state } = usePlay();
   const tinkering = state.tinkering;
-  const [hideLocked, setHideLocked] = useState(false);
-  const [hideUnavailable, setHideUnavailable] = useState(false);
   const [selectedActionId, setSelectedActionId] = useState<string>();
   const [selection, setSelection] = useState<BoundedRunSelection>(BOUNDED_RUN_DEFAULT_QUANTITY);
   const [now, setNow] = useState(Date.now());
   const cycle = tinkering.cycle;
   const cycleTarget = tinkering.targets.find((target) => target.actionId === cycle?.targetActionId);
+  const visible = tinkerVisibleTargets(tinkering.targets);
   const target =
     cycleTarget ??
-    tinkering.targets.find((candidate) => candidate.actionId === selectedActionId) ??
-    tinkering.targets.find((candidate) => candidate.affordableBatches > 0) ??
-    tinkering.targets[0];
+    visible.find((candidate) => candidate.actionId === selectedActionId) ??
+    visible.find((candidate) => candidate.affordableBatches > 0) ??
+    visible[0];
   const command = useStationCommand((next) => describe(next, target?.actionId));
   const running = tinkering.active;
   const guided = deriveMissionGuidanceTargets(state.missions).activities.has("tinkering");
@@ -112,10 +113,6 @@ export function TinkerMode() {
   }, [running]);
 
   const characterId = state.characterId;
-  const visible = tinkering.targets.filter(
-    (candidate) =>
-      (!hideLocked || candidate.unlocked) && (!hideUnavailable || candidate.affordableBatches > 0),
-  );
   const cycleProgress =
     running && state.activeAction
       ? Math.min(
@@ -194,26 +191,6 @@ export function TinkerMode() {
 
       {running ? null : (
         <>
-          <div className="flex flex-wrap gap-2" role="group" aria-label="Tinkering filters">
-            <ActionButton
-              aria-pressed={hideLocked}
-              className="!min-h-9 px-3 text-xs"
-              data-tinker-filter="level"
-              intent="secondary"
-              onClick={() => setHideLocked((value) => !value)}
-            >
-              Hide above my level
-            </ActionButton>
-            <ActionButton
-              aria-pressed={hideUnavailable}
-              className="!min-h-9 px-3 text-xs"
-              data-tinker-filter="items"
-              intent="secondary"
-              onClick={() => setHideUnavailable((value) => !value)}
-            >
-              Hide what I can&apos;t Tinker
-            </ActionButton>
-          </div>
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4" data-tinker-targets>
             {visible.map((candidate) => (
               <StationRecipeTile
@@ -239,6 +216,14 @@ export function TinkerMode() {
               />
             ))}
           </div>
+          {visible.length === 0 && !cycle ? (
+            <Feedback tone="muted">
+              <span data-tinker-empty>
+                You are not carrying anything you can take apart. Equipped items must be unequipped
+                first.
+              </span>
+            </Feedback>
+          ) : null}
           {target?.lastCutterBlocked ? (
             <Feedback tone="muted">
               That is your last Mining Cutter. Make or get another Cutter before taking one apart.
@@ -283,7 +268,7 @@ export function TinkerMode() {
           aria-pressed={tinkering.autoDiscardScrap}
           data-tinker-scrap-toggle
           disabled={foregroundBusy && command.pending !== "scrap"}
-          intent="secondary"
+          intent={tinkering.autoDiscardScrap ? "fabrication" : "secondary"}
           loading={command.pending === "scrap"}
           onClick={() =>
             command.run("scrap", () =>
@@ -294,7 +279,7 @@ export function TinkerMode() {
             )
           }
         >
-          {tinkering.autoDiscardScrap ? "Auto-discard Scrap" : "Keep Scrap"}
+          Auto-discard Scrap: {tinkering.autoDiscardScrap ? "On" : "Off"}
         </ActionButton>
         <p className="text-xs uppercase tracking-wide text-[color:var(--rs-text-muted)]">
           Applied when an item finishes

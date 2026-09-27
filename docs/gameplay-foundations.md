@@ -547,6 +547,27 @@ Accepting Return the Favor opens Fabricate; completing it — Tansy's
 demonstration — opens Tinker (`RUSK_RECOVERY_CONTENT`). Both are derived from
 the Mission record, never a flag.
 
+The station answers "what can I do now?" (human-preview reconciliation of
+#232), through the pure rules in `features/fabrication/station-lists.ts`:
+
+- **Fabricate** lists level-unlocked recipes whose materials are carried for one
+  batch, plus any recipe a Mission is guiding, shown with what it is missing, so
+  guidance never points at a hidden recipe. There are no list filters.
+- **Tinker** lists level-unlocked targets with a complete carried, unequipped
+  batch; a carried Cutter held back only by last-Cutter safety stays, showing
+  the safety reason.
+- **Recipes** is the read-only catalog of every recipe the character's level
+  unlocks, carried materials or not; nothing above the character's level. The
+  public Wiki remains the whole skill's reference.
+
+Newly observed outcomes show as one inline **result beat** — item made or
+dismantled, Scrap, XP, an Override success's multiplier, or a distinct bust.
+It is presentation of the authoritative run counters
+(`features/fabrication/station-results.ts`): whatever resolved before the client
+looked, one or a whole offline Max run, arrives aggregated as one beat. The last
+observation is remembered per character on the device, so a first visit only
+records a baseline.
+
 ### Tier-1 recipes
 
 | Recipe | Inputs → output | Duration | Base XP |

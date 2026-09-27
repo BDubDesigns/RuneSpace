@@ -28,14 +28,15 @@ export function StationRecipeTile({
   guided?: boolean;
   itemId: string;
   name: string;
-  onSelect: () => void;
+  /** Absent for a read-only reference tile (the Recipes catalog). */
+  onSelect?: () => void;
   /** Per-batch quantity of the item this tile depicts. */
   quantity: number;
   /** The recipe line, e.g. "2 Refined Ferrite → 1 Mounting Bracket". */
   recipe: string;
   /** Unmet requirements, shown under the recipe; empty when it can begin. */
   requirements: readonly string[];
-  selected: boolean;
+  selected?: boolean;
   /** Present for a stackable item; a unique item has no stack to fill. */
   stackLimit?: number;
   tileLabel: string;
@@ -45,24 +46,24 @@ export function StationRecipeTile({
       {stackLimit !== undefined ? (
         <InventoryStackVisual
           accessibleLabel={tileLabel}
-          interactive
+          interactive={onSelect !== undefined}
           itemId={itemId}
           missionGuidance={guided}
           name={name}
-          onSelect={onSelect}
           quantity={quantity}
-          selected={selected}
+          selected={selected ?? false}
           stackLimit={stackLimit}
+          {...(onSelect ? { onSelect } : {})}
         />
       ) : (
         <ItemVisual
           accessibleLabel={tileLabel}
-          interactive
+          interactive={onSelect !== undefined}
           itemId={itemId}
           missionGuidance={guided}
           name={name}
-          onSelect={onSelect}
-          selected={selected}
+          selected={selected ?? false}
+          {...(onSelect ? { onSelect } : {})}
           {...(quantity > 1 ? { quantity } : {})}
         />
       )}

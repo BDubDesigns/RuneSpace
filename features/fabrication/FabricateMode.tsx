@@ -8,8 +8,11 @@ import { BoundedRunSelector } from "@/features/shared/BoundedRunControl";
 import { FabricationRunPanel } from "@/features/fabrication/FabricationRunPanel";
 import { LiveWorkpiecePanel } from "@/features/fabrication/LiveWorkpiecePanel";
 import { StationRecipeTile } from "@/features/fabrication/StationRecipeTile";
+import { fabricateVisibleRecipes } from "@/features/fabrication/station-lists";
 import {
   BATCH_UNIT,
+  recipeLine,
+  unmetRequirements,
   fabricationErrorMessage,
   fabricationRunSummary,
   fabricationStopIsExpected,
@@ -32,23 +35,7 @@ import {
   setManualOverrideAction,
   startFabricationAction,
 } from "@/server/actions";
-import type { FabricationRecipeProjection, PlayGameplayState } from "@/server/play";
-
-function recipeLine(recipe: FabricationRecipeProjection): string {
-  return `${recipe.inputs.map((input) => `${input.quantity} ${input.name}`).join(" + ")} → ${recipe.outputQuantity} ${recipe.outputName}`;
-}
-
-function unmetRequirements(recipe: FabricationRecipeProjection, level: number): string[] {
-  const unmet: string[] = [];
-  if (!recipe.unlocked)
-    unmet.push(`Requires Fabrication ${recipe.minimumLevel} (you are ${level})`);
-  for (const input of recipe.inputs) {
-    if (input.carried < input.quantity) {
-      unmet.push(`Need ${input.quantity - input.carried} more ${input.name}`);
-    }
-  }
-  return unmet;
-}
+import type { PlayGameplayState } from "@/server/play";
 
 function describe(
   state: PlayGameplayState,
@@ -65,16 +52,16 @@ function describe(
 }
 
 /**
- * Fabricate (#232): the full authored recipe list by default, locked and
- * unaffordable recipes included with what they are missing, under two
- * independent filters; the shared bounded-run selector; and — once a workpiece
- * is on the machine — the live workpiece panel with its Manual Override.
+ * Fabricate (#232): what the character can make now — level-unlocked recipes
+ * whose materials are carried, plus a Mission-guided recipe with what it is
+ * missing (`fabricateVisibleRecipes`). Everything the character knows lives on
+ * the station's Recipes surface instead. Then the shared bounded-run selector
+ * and — once a workpiece is on the machine — the live workpiece panel with its
+ * Manual Override.
  */
 export function FabricateMode() {
   const { foregroundBusy, state } = usePlay();
   const station = state.fabricationStation;
-  const [hideLocked, setHideLocked] = useState(false);
-  const [hideUnaffordable, setHideUnaffordable] = useState(false);
   const [selectedActionId, setSelectedActionId] = useState<string>();
   const [selection, setSelection] = useState<BoundedRunSelection>(BOUNDED_RUN_DEFAULT_QUANTITY);
   const active = station.workpiece;
@@ -83,15 +70,14 @@ export function FabricateMode() {
   const activeRecipe = station.recipes.find(
     (candidate) => candidate.actionId === active?.recipeActionId,
   );
+  const visible = fabricateVisibleRecipes(station.recipes, guidance.actionIds);
   // With nothing chosen yet, the recipe a Mission is teaching comes first.
-  const guidedRecipe = station.recipes.find((candidate) =>
-    guidance.actionIds.has(candidate.actionId),
-  );
+  const guidedRecipe = visible.find((candidate) => guidance.actionIds.has(candidate.actionId));
   const recipe =
     activeRecipe ??
-    station.recipes.find((candidate) => candidate.actionId === selectedActionId) ??
+    visible.find((candidate) => candidate.actionId === selectedActionId) ??
     guidedRecipe ??
-    station.recipes[0];
+    visible[0];
   const command = useStationCommand((next) => describe(next, recipe?.actionId));
 
   // A fresh selection starts at one whenever a run ends (#229).
@@ -99,10 +85,6 @@ export function FabricateMode() {
     if (isActive) setSelection(BOUNDED_RUN_DEFAULT_QUANTITY);
   }, [isActive]);
 
-  const visible = station.recipes.filter(
-    (candidate) =>
-      (!hideLocked || candidate.unlocked) && (!hideUnaffordable || candidate.inputsAvailable),
-  );
   const stopReason = !active ? station.lastStopReason : undefined;
   const characterId = state.characterId;
 
@@ -144,27 +126,6 @@ export function FabricateMode() {
 
   return (
     <div className="space-y-3" data-fabricate-mode>
-      <div className="flex flex-wrap gap-2" role="group" aria-label="Recipe filters">
-        <ActionButton
-          aria-pressed={hideLocked}
-          className="!min-h-9 px-3 text-xs"
-          data-fabricate-filter="level"
-          intent="secondary"
-          onClick={() => setHideLocked((value) => !value)}
-        >
-          Hide above my level
-        </ActionButton>
-        <ActionButton
-          aria-pressed={hideUnaffordable}
-          className="!min-h-9 px-3 text-xs"
-          data-fabricate-filter="materials"
-          intent="secondary"
-          onClick={() => setHideUnaffordable((value) => !value)}
-        >
-          Hide without materials
-        </ActionButton>
-      </div>
-
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4" data-fabricate-recipes>
         {visible.map((candidate) => (
           <StationRecipeTile
@@ -191,7 +152,12 @@ export function FabricateMode() {
         ))}
       </div>
       {visible.length === 0 ? (
-        <Feedback tone="muted">No recipe matches both filters right now.</Feedback>
+        <Feedback tone="muted">
+          <span data-fabricate-empty>
+            Nothing you are carrying makes a recipe right now. Recipes shows everything you know how
+            to make.
+          </span>
+        </Feedback>
       ) : null}
 
       {recipe ? (
@@ -237,7 +203,7 @@ export function FabricateMode() {
               aria-pressed={station.manualOverrideEnabled}
               data-manual-override-toggle
               disabled={foregroundBusy && command.pending !== "override"}
-              intent="secondary"
+              intent={station.manualOverrideEnabled ? "fabrication" : "secondary"}
               loading={command.pending === "override"}
               onClick={() =>
                 command.run("override", () =>

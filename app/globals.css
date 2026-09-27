@@ -49,6 +49,8 @@
   --rs-accent-mining-hover: rgb(245 196 81 / 0.17);
   --rs-accent-arcane-subtle: rgb(196 140 255 / 0.1);
   --rs-accent-arcane-hover: rgb(196 140 255 / 0.17);
+  --rs-accent-shop-olive-subtle: rgb(127 163 71 / 0.14);
+  --rs-accent-shop-olive-hover: rgb(127 163 71 / 0.22);
   --rs-accent-danger-subtle: rgb(241 108 117 / 0.1);
   --rs-accent-danger-hover: rgb(241 108 117 / 0.17);
   --rs-focus-ring: #a5efff;

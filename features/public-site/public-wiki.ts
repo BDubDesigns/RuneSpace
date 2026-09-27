@@ -649,7 +649,7 @@ const authoredWikiArticles = [
           ],
         ],
         paragraphs: [
-          "Every current recipe needs only Fabrication level 1. The station lists every recipe, and under each one what you are still missing. Two filters can hide recipes above your level and recipes you do not have the materials for — either on its own, or both together.",
+          "Every current recipe needs only Fabrication level 1. Fabricate lists what you can make right now with what you are carrying — plus any recipe a job is pointing you at, with what it is still missing. Recipes, beside it, lists every recipe you know, whether or not you have the materials. When a piece finishes, the station tells you what you made and the XP it paid.",
         ],
       },
       {
@@ -689,7 +689,7 @@ const authoredWikiArticles = [
       {
         heading: "How Tinkering runs",
         paragraphs: [
-          "Tinkering uses the same run control: a number of pieces, or Max until there is nothing left to take apart. Only pieces you are carrying and not wearing can be taken apart — unequip something first if you want to Tinker it.",
+          "Tinkering uses the same run control: a number of pieces, or Max until there is nothing left to take apart. Only pieces you are carrying and not wearing can be taken apart, and only those are listed — unequip something first if you want to Tinker it.",
           "The piece is gone the moment its Tinkering starts. Stop keeps that piece exactly where it was, and Resume carries on with it without taking another; walking away from the yard does the same. Finish Current Item finishes it — full XP and Scrap — and then stops.",
           "By default Tinkering keeps its Scrap, and a piece will not start if there is no room for the Scrap it gives back. Turn on Auto-discard Scrap to keep going regardless: the piece is still taken apart and still pays its XP, but the Scrap is thrown away. The setting stays until you change it.",
           "Tinkering will not take apart your last Mining Cutter. Cutters you are wearing or have stored in the Cargo Hold count, so you can take one apart as long as you have another somewhere — otherwise make or get another Cutter first.",
