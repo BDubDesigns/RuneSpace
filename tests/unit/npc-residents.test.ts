@@ -211,20 +211,59 @@ describe("issue #231 Wade's migrated relocation", () => {
   });
 });
 
-describe("issue #231 Tansy stays where she ships", () => {
-  it("authors no relocation and stays at The Jag whatever is complete", () => {
-    const tansy = getNpc(NPC_IDS.tansyRusk)!;
-    expect(tansy.relocations).toBeUndefined();
+describe("issue #232 Tansy's Fabrication chapter is an ordered Mission-derived move", () => {
+  const tansy = getNpc(NPC_IDS.tansyRusk)!;
+  const through = (...missionIds: string[]) => new Set<string>(missionIds);
+
+  it("stays at The Jag until 10,000 Hours is complete", () => {
+    const before = through(MISSION_IDS.keepTheChange);
+    expect(resolveNpcPlacement(tansy, before)).toEqual({ locationId: LOCATION_IDS.theJag });
+    expect(
+      ids(getResidentNpcs({ locationId: LOCATION_IDS.theJag, completedMissionIds: before })),
+    ).toEqual([tansy.id]);
+  });
+
+  it("stands beside Wade at Rusk Recovery through the chapter, Wade first", () => {
+    for (const completed of [
+      through(MISSION_IDS.keepTheChange, MISSION_IDS.tenThousandHours),
+      through(MISSION_IDS.keepTheChange, MISSION_IDS.tenThousandHours, MISSION_IDS.returnTheFavor),
+    ]) {
+      expect(resolveNpcPlacement(tansy, completed)).toEqual({
+        locationId: LOCATION_IDS.ruskRecovery,
+      });
+      expect(
+        ids(
+          getResidentNpcs({
+            locationId: LOCATION_IDS.ruskRecovery,
+            completedMissionIds: completed,
+          }),
+        ),
+      ).toEqual([NPC_IDS.wadeRusk, tansy.id]);
+      expect(
+        getResidentNpcs({ locationId: LOCATION_IDS.theJag, completedMissionIds: completed }),
+      ).toEqual([]);
+    }
+  });
+
+  it("goes home to The Jag once Break It Down is complete, and stays there", () => {
     const everything = new Set(Object.values(MISSION_IDS));
     expect(resolveNpcPlacement(tansy, everything)).toEqual({ locationId: LOCATION_IDS.theJag });
     expect(
       ids(getResidentNpcs({ locationId: LOCATION_IDS.theJag, completedMissionIds: everything })),
     ).toEqual([tansy.id]);
     expect(
-      getResidentNpcs({ locationId: LOCATION_IDS.ruskRecovery, completedMissionIds: everything })
-        .map((npc) => npc.id)
-        .includes(tansy.id),
-    ).toBe(false);
+      ids(
+        getResidentNpcs({ locationId: LOCATION_IDS.ruskRecovery, completedMissionIds: everything }),
+      ),
+    ).toEqual([NPC_IDS.wadeRusk]);
+  });
+
+  it("is placed by her authored relocations, not a Fabrication-specific branch", () => {
+    expect(tansy.homeLocationId).toBe(LOCATION_IDS.theJag);
+    expect(tansy.relocations?.map((entry) => entry.afterCompletedMissionId)).toEqual([
+      MISSION_IDS.tenThousandHours,
+      MISSION_IDS.breakItDown,
+    ]);
   });
 });
 

@@ -343,11 +343,17 @@ describe("a present-tense local conversation follows the speaker", () => {
     );
   });
 
-  it("leaves an NPC who has never moved on their authored background", () => {
+  it("leaves an NPC who has not moved on their authored background", () => {
+    // Tansy moves only once 10,000 Hours is done (#232); before that she is
+    // exactly where she was authored, whatever else is complete.
     const tansy = getNpc(NPC_IDS.tansyRusk)!;
-    expect(tansy.relocations).toBeUndefined();
     expect(resolveNpcVenueBackgroundId(tansy, new Set([MISSION_IDS.keepTheChange]))).toBe(
       tansy.conversationBackgroundId,
+    );
+    const bix = getNpc(NPC_IDS.bixWeller)!;
+    expect(bix.relocations).toBeUndefined();
+    expect(resolveNpcVenueBackgroundId(bix, new Set(Object.values(MISSION_IDS)))).toBe(
+      bix.conversationBackgroundId,
     );
   });
 

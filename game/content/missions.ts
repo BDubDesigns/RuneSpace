@@ -141,14 +141,24 @@ export type MissionRequirement =
       /** Stable identity for this requirement's durable progress row. */
       progressKey: string;
       /** Closed production activity vocabulary owned by the gameplay boundary. */
-      activity: "mining" | "refining" | "practice_welding" | "work_order";
+      activity: TrackedMissionActivity;
       /**
-       * Closed production metric vocabulary: one resolved unit of that
-       * activity. For Mining and Refining that is a resolved attempt; for
-       * Practice Welding it is a completed weld — never a section, a start, or
-       * a button press (#190).
+       * Closed production metric vocabulary. `attempts` is one resolved unit of
+       * the activity, succeeded or failed: a Mining or Refining attempt, a
+       * completed Practice weld (never a section, a start, or a button press,
+       * #190), a completed Work Order. `completions` is one SUCCESSFUL unit only
+       * (#232): a Fabrication workpiece that produced its output — never a start,
+       * a busted workpiece, or an item obtained any other way — and a completed
+       * Tinkering batch. Each activity has exactly one metric; validation holds
+       * them together.
        */
-      metric: "attempts";
+      metric: "attempts" | "completions";
+      /**
+       * Count only this one authored action of the activity (#232): Return the
+       * Favor needs a Salvage Cutter fabricated, not any Fabrication. Absent,
+       * every action of the activity counts.
+       */
+      actionId?: ActionId;
       /** Positive authored target; current progress is persisted separately. */
       target: number;
       /** Player-facing copy; `{current}` and `{target}` are substituted. */
@@ -173,6 +183,21 @@ export type MissionRequirement =
        * repair target's own identity and recipe (#172), so a requirement needs
        * nothing but its `kind` and `targetId` to read correctly at every stage.
        */
+      objective: string;
+    }
+  | {
+      /**
+       * One unique item instance carried and unequipped (#232): the smallest
+       * unique-item counterpart to `carried_stack`. Equipped items and items in
+       * the Cargo Hold never count, so a turn-in can never take the tool in the
+       * player's hand. No provenance: any instance of the item satisfies it, so
+       * a Cutter bought, found or kept since the start is as good as a new one.
+       */
+      kind: "carried_unique_item";
+      itemId: ItemId;
+      /** `show` inspects it; `consume_one` hands one eligible instance over at turn-in. */
+      turnIn: "show" | "consume_one";
+      /** Player-facing copy; `{item}` receives the authoritative display name. */
       objective: string;
     }
   | {
@@ -209,6 +234,63 @@ export type MissionRequirement =
 
 /** The kinds a requirement may take, used for semantic stage routing. */
 export type MissionRequirementKind = MissionRequirement["kind"];
+
+/**
+ * The closed tracked-activity vocabulary. Fabrication and Tinkering (#232)
+ * count only what genuinely completed.
+ */
+export type TrackedMissionActivity =
+  | "mining"
+  | "refining"
+  | "practice_welding"
+  | "work_order"
+  | "fabrication"
+  | "tinkering";
+
+/**
+ * A narrow Mission-local story fact (#232): a boolean the Mission remembers
+ * only so an NPC can react to what the player actually did while it was
+ * active. It is set once by the authoritative outcome it observes, lives in
+ * the Mission's own progress-key space (and so dies with the Mission row), and
+ * never changes a requirement, a reward, or progression. It is not a counter,
+ * a lifetime statistic, or telemetry.
+ *
+ * Deliberately two closed observations, both Manual Override outcomes on one
+ * authored Fabrication action — the first real need. A new kind of reactive
+ * fact is a deliberate extension, not an authoring choice.
+ */
+export type MissionReactiveFact = {
+  /** Stable key in this Mission's progress-key space. */
+  key: string;
+  observes:
+    | {
+        /** A Manual Override push busted a workpiece of this recipe while the Mission was active. */
+        kind: "fabrication_override_bust";
+        actionId: ActionId;
+      }
+    | {
+        /**
+         * The successful workpiece of this recipe that satisfied the named
+         * tracked requirement had been pushed with Manual Override.
+         */
+        kind: "fabrication_override_success";
+        actionId: ActionId;
+        requirementProgressKey: string;
+      };
+};
+
+/**
+ * One authored dialogue variant chosen by a reactive fact (#232). Variants for
+ * the same moment are tried in authored order — that order IS the priority —
+ * and the first whose fact holds replaces the ordinary sequence. Every variant
+ * rejoins the same story: they are openings, not branches.
+ */
+export type MissionReactiveDialogue = {
+  factKey: string;
+  /** The turn-in opening, or the reminder while the tracked activity is the objective. */
+  moment: "turn_in" | "tracked_activity_reminder";
+  dialogueId: DialogueId;
+};
 
 /**
  * One authored offer interaction. A mission may have several real offer routes
@@ -321,6 +403,11 @@ export type MissionDialogue = {
    */
   capacitySlotsDialogueId?: DialogueId;
   capacityMassDialogueId?: DialogueId;
+  /**
+   * Fact-chosen variants of the turn-in opening or the tracked-activity
+   * reminder (#232), in priority order. See `MissionReactiveDialogue`.
+   */
+  reactive?: readonly MissionReactiveDialogue[];
 };
 
 /** One authored minimum skill level a mission requires before it is offered. */
@@ -391,6 +478,8 @@ export type MissionDefinition = {
    * NPCs who are neither an offer nor the turn-in NPC.
    */
   activeNpcDialogue?: readonly MissionNpcDialogue[];
+  /** Narrow Mission-local story facts for reactive dialogue (#232). */
+  reactiveFacts?: readonly MissionReactiveFact[];
 };
 
 /**
@@ -884,12 +973,161 @@ export const TEN_THOUSAND_ONE_HOURS: MissionDefinition = {
 };
 
 /**
+ * Return the Favor — Tansy's Fabrication lesson at Rusk Recovery (#232).
+ *
+ * A deliberate pickup after 10,000 Hours, never an automatic continuation:
+ * learning a whole new skill is choosing new work from Tansy. Accepting it
+ * opens the Fabrication Station; completing it — her demonstration — opens
+ * Tinkering and hands straight on to Break It Down.
+ *
+ * The fabrication objective counts only a Salvage Cutter the player genuinely
+ * fabricates while the Mission is active: buying one, being given one, or
+ * owning one already cannot satisfy it, and a busted workpiece is not a Cutter.
+ * The hand-in needs no provenance at all — any unequipped Salvage Cutter the
+ * player is carrying will do, and the starter Cutter is never singled out.
+ *
+ * Manual Override stays fully usable on this first craft. Two narrow facts let
+ * Tansy react to what she watched: whether an Override push busted a Cutter
+ * workpiece, and whether the Cutter that counted had been pushed. Neither is a
+ * counter, and neither changes the reward or the requirements.
+ */
+export const RETURN_THE_FAVOR: MissionDefinition = {
+  id: MISSION_IDS.returnTheFavor,
+  title: "Return the Favor",
+  summary:
+    "Fabricate a Salvage Cutter at Rusk Recovery's Fabrication Station and hand Tansy Rusk a Salvage Cutter.",
+  prerequisiteMissionId: MISSION_IDS.tenThousandHours,
+  continuationMissionId: MISSION_IDS.breakItDown,
+  offers: [
+    {
+      npcId: NPC_IDS.tansyRusk,
+      locationId: LOCATION_IDS.ruskRecovery,
+      dialogueId: DIALOGUE_IDS.tansyReturnTheFavorOffer,
+      actionLabel: "TAKE THE JOB",
+    },
+  ],
+  requirements: [
+    {
+      kind: "tracked_activity",
+      progressKey: "salvage-cutter-fabricated",
+      activity: "fabrication",
+      metric: "completions",
+      actionId: ACTION_IDS.salvageCutterFabrication,
+      target: 1,
+      objective: "Fabricate a Salvage Cutter at the Fabrication Station — {current} / {target}",
+      recommendedActionId: ACTION_IDS.salvageCutterFabrication,
+    },
+    {
+      kind: "carried_unique_item",
+      itemId: ITEM_IDS.salvageCutter,
+      turnIn: "consume_one",
+      objective: "Carry an unequipped {item} to hand over",
+    },
+  ],
+  turnIn: {
+    npcId: NPC_IDS.tansyRusk,
+    locationId: LOCATION_IDS.ruskRecovery,
+    requiresStationary: true,
+    objective: "Bring Tansy Rusk the Salvage Cutter",
+    dialogueId: DIALOGUE_IDS.tansyReturnTheFavorTurnIn,
+    actionLabel: "HAND OVER THE CUTTER",
+  },
+  reward: { kind: "skill_xp", skillId: SKILL_IDS.fabrication, amount: 100 },
+  reactiveFacts: [
+    {
+      key: "override-bust",
+      observes: {
+        kind: "fabrication_override_bust",
+        actionId: ACTION_IDS.salvageCutterFabrication,
+      },
+    },
+    {
+      key: "override-success",
+      observes: {
+        kind: "fabrication_override_success",
+        actionId: ACTION_IDS.salvageCutterFabrication,
+        requirementProgressKey: "salvage-cutter-fabricated",
+      },
+    },
+  ],
+  dialogue: {
+    trackedActivityReminderDialogueId: DIALOGUE_IDS.tansyReturnTheFavorReminder,
+    // With the Cutter made but none carried unequipped, the ordinary reminder
+    // still says exactly what is missing: one Salvage Cutter, brought to her.
+    carriedReminderDialogueId: DIALOGUE_IDS.tansyReturnTheFavorReminder,
+    busyDialogueId: DIALOGUE_IDS.tansyFabricationChapterBusy,
+    completionPresentationDialogueId: DIALOGUE_IDS.tansyReturnTheFavorCompletion,
+    // Priority is authored order: a bust she saw outranks a clean Override
+    // success, and either outranks the ordinary opening. All three rejoin the
+    // same inspection, demonstration and continuation.
+    reactive: [
+      {
+        factKey: "override-bust",
+        moment: "turn_in",
+        dialogueId: DIALOGUE_IDS.tansyReturnTheFavorBustTurnIn,
+      },
+      {
+        factKey: "override-success",
+        moment: "turn_in",
+        dialogueId: DIALOGUE_IDS.tansyReturnTheFavorOverrideTurnIn,
+      },
+      {
+        factKey: "override-bust",
+        moment: "tracked_activity_reminder",
+        dialogueId: DIALOGUE_IDS.tansyReturnTheFavorBustReminder,
+      },
+    ],
+  },
+};
+
+/**
+ * Break It Down — the second half of Tansy's lesson (#232).
+ *
+ * An authored automatic continuation: it is the next beat of the same teaching
+ * sequence, so it has no offer of its own. One genuinely completed Tinkering
+ * batch of any eligible item satisfies it; reporting back to Tansy closes the
+ * chapter, and her completion sends her home to The Jag (`game/content/npcs.ts`).
+ */
+export const BREAK_IT_DOWN: MissionDefinition = {
+  id: MISSION_IDS.breakItDown,
+  title: "Break It Down",
+  summary:
+    "Tinker one eligible fabricated item at the Fabrication Station, then report to Tansy Rusk.",
+  prerequisiteMissionId: MISSION_IDS.returnTheFavor,
+  offers: [],
+  requirements: [
+    {
+      kind: "tracked_activity",
+      progressKey: "tinkering-batches",
+      activity: "tinkering",
+      metric: "completions",
+      target: 1,
+      objective: "Tinker one eligible fabricated item — {current} / {target}",
+    },
+  ],
+  turnIn: {
+    npcId: NPC_IDS.tansyRusk,
+    locationId: LOCATION_IDS.ruskRecovery,
+    requiresStationary: true,
+    objective: "Return to Tansy at Rusk Recovery",
+    dialogueId: DIALOGUE_IDS.tansyBreakItDownTurnIn,
+    actionLabel: "TELL TANSY",
+  },
+  reward: { kind: "skill_xp", skillId: SKILL_IDS.fabrication, amount: 250 },
+  dialogue: {
+    trackedActivityReminderDialogueId: DIALOGUE_IDS.tansyBreakItDownReminder,
+    busyDialogueId: DIALOGUE_IDS.tansyFabricationChapterBusy,
+    completionPresentationDialogueId: DIALOGUE_IDS.tansyBreakItDownCompletion,
+  },
+};
+
+/**
  * Brace Yourself — Tansy reopens the Deep Jag (#209).
  *
- * A sibling branch to 10,001 Hours rather than a successor to it: both hang off
- * 10,000 Hours, and a player may do either, both, or neither first. That is why
- * `prerequisiteMissionId` names 10,000 Hours and nothing here mentions Work
- * Orders at all.
+ * A sibling branch to 10,001 Hours rather than a successor to it: a player may
+ * do either, both, or neither first. Since #232 its story gate is Tansy's
+ * Fabrication chapter — Break It Down is what sends her back to The Jag, where
+ * she raises the Deep Jag — so nothing here mentions Work Orders at all.
  *
  * It is the first Mission to name two skills. Tansy is not asking for a
  * certificate — a cave-in needs someone who can read which rock is holding and
@@ -915,7 +1153,9 @@ export const BRACE_YOURSELF: MissionDefinition = {
   id: MISSION_IDS.braceYourself,
   title: "Brace Yourself",
   summary: "Set Tansy Rusk's brace in the collapsed Deep Jag passage, then report back to her.",
-  prerequisiteMissionId: MISSION_IDS.tenThousandHours,
+  // The Fabrication teaching chapter now canonically precedes the Deep Jag
+  // (#232): Tansy is back at The Jag only once Break It Down is complete.
+  prerequisiteMissionId: MISSION_IDS.breakItDown,
   prerequisiteSkillLevels: [
     { skillId: SKILL_IDS.mining, level: 5 },
     { skillId: SKILL_IDS.welding, level: 5 },
@@ -965,8 +1205,12 @@ export const MISSIONS: readonly MissionDefinition[] = [
   KEEP_THE_CHANGE,
   TEN_THOUSAND_HOURS,
   TEN_THOUSAND_ONE_HOURS,
-  // Deep Jag's branch is 10,001 Hours' sibling, not its successor: both need
-  // 10,000 Hours and neither needs the other (#209).
+  // Tansy's Fabrication chapter (#232): after 10,000 Hours, independent of
+  // 10,001 Hours, and before the Deep Jag.
+  RETURN_THE_FAVOR,
+  BREAK_IT_DOWN,
+  // Deep Jag's branch is 10,001 Hours' sibling, not its successor: neither
+  // needs the other (#209). Its story gate is Break It Down (#232).
   BRACE_YOURSELF,
   // The optional branch sits after the main chain: it is never a prerequisite
   // for anything, and completing or ignoring it changes nothing upstream.

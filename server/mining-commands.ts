@@ -21,6 +21,7 @@ import {
   loadOwnedItemInstances,
   removeFromSelectedStack,
 } from "@/server/carried-inventory";
+import { assertActiveWorkpieceResolvable } from "@/server/fabrication-reservation";
 import {
   createPlayResolver,
   ensurePlayProvisioning,
@@ -316,6 +317,8 @@ export async function loadSalvageCutterPowerCell(
         .where(
           and(eq(itemInstances.id, cutter.id), eq(itemInstances.characterId, context.character.id)),
         );
+      // A Power Cell a Salvage Cutter workpiece has reserved is not loose (#232).
+      await assertActiveWorkpieceResolvable(transaction, context.character.id);
 
       return stateFor({
         status: "loaded",

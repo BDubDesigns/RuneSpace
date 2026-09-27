@@ -123,6 +123,22 @@ suite("issue #209 Deep Jag progression (real PostgreSQL)", () => {
       );
   }
 
+  /**
+   * Brace Yourself's story gate since #232: Tansy's Fabrication chapter, which
+   * is also what brings her home to The Jag to offer it.
+   */
+  async function completeStoryGate(characterId: string) {
+    await completeChainThroughTenThousandHours(characterId);
+    await db.insert(rune.characterMissions).values(
+      [MISSION_IDS.returnTheFavor, MISSION_IDS.breakItDown].map((missionId) => ({
+        characterId,
+        missionId,
+        acceptedAt: now,
+        completedAt: now,
+      })),
+    );
+  }
+
   async function setSkill(characterId: string, skillId: SkillId, level: number) {
     // Grant the cumulative XP the shared authored curve requires for that
     // level, through the same boundary gameplay uses.
@@ -153,7 +169,7 @@ suite("issue #209 Deep Jag progression (real PostgreSQL)", () => {
   /** Qualified for Brace Yourself and standing at The Jag. */
   async function qualified(label?: string) {
     const { userId, character } = await makeCharacter(label);
-    await completeChainThroughTenThousandHours(character.id);
+    await completeStoryGate(character.id);
     await setSkill(character.id, SKILL_IDS.mining, 5);
     await setSkill(character.id, SKILL_IDS.welding, 5);
     await move(character.id, LOCATION_IDS.theJag);
@@ -273,9 +289,29 @@ suite("issue #209 Deep Jag progression (real PostgreSQL)", () => {
       });
     });
 
-    it("refuses acceptance below Mining 5 even with 10,000 Hours complete", async () => {
-      const { userId, character } = await makeCharacter("Under-levelled");
+    it("refuses acceptance until Break It Down is complete, whatever the skills (#232)", async () => {
+      const { userId, character } = await makeCharacter("Before the chapter");
       await completeChainThroughTenThousandHours(character.id);
+      await setSkill(character.id, SKILL_IDS.mining, 5);
+      await setSkill(character.id, SKILL_IDS.welding, 5);
+      await move(character.id, LOCATION_IDS.theJag);
+      expect((await accept(userId, character.id)).mission.status).not.toBe("accepted");
+      await expect(
+        db
+          .select()
+          .from(rune.characterMissions)
+          .where(
+            and(
+              eq(rune.characterMissions.characterId, character.id),
+              eq(rune.characterMissions.missionId, MISSION_IDS.braceYourself),
+            ),
+          ),
+      ).resolves.toEqual([]);
+    });
+
+    it("refuses acceptance below Mining 5 even with the story gate complete", async () => {
+      const { userId, character } = await makeCharacter("Under-levelled");
+      await completeStoryGate(character.id);
       await setSkill(character.id, SKILL_IDS.welding, 5);
       await move(character.id, LOCATION_IDS.theJag);
       const refused = await accept(userId, character.id);
@@ -293,9 +329,9 @@ suite("issue #209 Deep Jag progression (real PostgreSQL)", () => {
       ).resolves.toEqual([]);
     });
 
-    it("refuses acceptance below Welding 5 even with 10,000 Hours complete", async () => {
+    it("refuses acceptance below Welding 5 even with the story gate complete", async () => {
       const { userId, character } = await makeCharacter("Under-torched");
-      await completeChainThroughTenThousandHours(character.id);
+      await completeStoryGate(character.id);
       await setSkill(character.id, SKILL_IDS.mining, 5);
       await move(character.id, LOCATION_IDS.theJag);
       expect((await accept(userId, character.id)).mission.status).not.toBe("accepted");

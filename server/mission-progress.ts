@@ -4,6 +4,7 @@ import {
   getMission,
   type MissionDefinition,
   type MissionRequirement,
+  type TrackedMissionActivity,
 } from "@/game/content/missions";
 import type { DatabaseTransaction } from "@/server/action-resolution";
 
@@ -16,9 +17,11 @@ import type { DatabaseTransaction } from "@/server/action-resolution";
  * or provenance tracking. `work_order` is credited only by the authoritative
  * Work Order completion transaction, so opening the terminal, accepting a job,
  * committing its materials, starting the weld, or finishing a single section
- * can none of them advance a Mission.
+ * can none of them advance a Mission. Fabrication and Tinkering (#232) count
+ * `completions` only — a successful workpiece, a completed Tinkering batch —
+ * credited by their own resolution, never by a start or a bust.
  */
-export type TrackedActivity = "mining" | "refining" | "practice_welding" | "work_order";
+export type TrackedActivity = TrackedMissionActivity;
 
 /** Return the narrow durable requirements authored by one mission. */
 export function trackedActivityRequirements(
@@ -111,22 +114,35 @@ export async function recordMissionConversation(
     });
 }
 
+/** One requirement a recorded outcome actually advanced. */
+export type TrackedActivityCredit = {
+  missionId: string;
+  progressKey: string;
+  before: number;
+  after: number;
+};
+
 /**
  * Consume one authoritative activity outcome inside the surrounding character
- * transaction. Activity resolvers provide only the generic activity and exact
- * resolved-attempt count; mission definitions decide which accepted missions
- * care about that fact.
+ * transaction. Activity resolvers provide only the generic activity, the exact
+ * resolved count, and — for a family activity like Fabrication — which authored
+ * action it was; mission definitions decide which accepted missions care.
+ * Returns the requirements it advanced, so a caller can tell which outcome was
+ * the one that satisfied an objective.
  */
 export async function recordTrackedActivity(
   transaction: DatabaseTransaction,
   input: {
     characterId: string;
     activity: TrackedActivity;
-    metric: "attempts";
+    metric: "attempts" | "completions";
     attemptCount: number;
+    /** The authored action performed; a requirement naming another action ignores it. */
+    actionId?: string;
   },
-): Promise<void> {
-  if (!Number.isInteger(input.attemptCount) || input.attemptCount <= 0) return;
+): Promise<readonly TrackedActivityCredit[]> {
+  const credits: TrackedActivityCredit[] = [];
+  if (!Number.isInteger(input.attemptCount) || input.attemptCount <= 0) return credits;
 
   const activeRows = await transaction
     .select()
@@ -144,7 +160,9 @@ export async function recordTrackedActivity(
     if (!definition) continue;
     const matchingRequirements = trackedActivityRequirements(definition).filter(
       (requirement) =>
-        requirement.activity === input.activity && requirement.metric === input.metric,
+        requirement.activity === input.activity &&
+        requirement.metric === input.metric &&
+        (requirement.actionId === undefined || requirement.actionId === input.actionId),
     );
     for (const requirement of matchingRequirements) {
       const existing = (
@@ -164,6 +182,14 @@ export async function recordTrackedActivity(
         (existing?.progress ?? 0) + input.attemptCount,
         requirement.target,
       );
+      if (nextProgress > (existing?.progress ?? 0)) {
+        credits.push({
+          missionId: definition.id,
+          progressKey: requirement.progressKey,
+          before: existing?.progress ?? 0,
+          after: nextProgress,
+        });
+      }
       if (!existing) {
         await transaction.insert(characterMissionProgress).values({
           characterId: input.characterId,
@@ -183,6 +209,103 @@ export async function recordTrackedActivity(
             ),
           );
       }
+    }
+  }
+  return credits;
+}
+
+/**
+ * Set one Mission-local reactive fact (#232). Idempotent: the fact is a
+ * boolean that something happened at least once, so a second occurrence
+ * changes nothing and there is nothing to count.
+ */
+async function setMissionFact(
+  transaction: DatabaseTransaction,
+  input: { characterId: string; missionId: string; key: string },
+): Promise<void> {
+  const now = new Date();
+  await transaction
+    .insert(characterMissionProgress)
+    .values({ ...input, progressKey: input.key, progress: 1, updatedAt: now })
+    .onConflictDoUpdate({
+      target: [
+        characterMissionProgress.characterId,
+        characterMissionProgress.missionId,
+        characterMissionProgress.progressKey,
+      ],
+      set: { progress: 1, updatedAt: now },
+    });
+}
+
+/**
+ * Credit resolved Fabrication workpieces to Missions, in resolution order,
+ * inside the transaction that resolved them (#232).
+ *
+ * A successful workpiece counts toward `fabrication` completions for its own
+ * recipe; a bust counts toward nothing. The two narrow Manual Override facts
+ * are set here and only here: a bust of the watched recipe while the Mission
+ * is active, and a success that pushed the machine and was the very workpiece
+ * that satisfied the watched objective. Nothing else is remembered.
+ */
+export async function recordFabricationOutcomes(
+  transaction: DatabaseTransaction,
+  input: {
+    characterId: string;
+    actionId: string;
+    outcomes: readonly { result: "success" | "bust"; usedOverride: boolean }[];
+  },
+): Promise<void> {
+  if (input.outcomes.length === 0) return;
+  const activeRows = await transaction
+    .select()
+    .from(characterMissions)
+    .where(
+      and(
+        eq(characterMissions.characterId, input.characterId),
+        isNull(characterMissions.completedAt),
+      ),
+    )
+    .for("update");
+  const watching = activeRows
+    .map((row) => getMission(row.missionId))
+    .filter((definition): definition is MissionDefinition => definition !== undefined)
+    .flatMap((definition) =>
+      (definition.reactiveFacts ?? [])
+        .filter((fact) => fact.observes.actionId === input.actionId)
+        .map((fact) => ({ missionId: definition.id, fact })),
+    );
+  for (const outcome of input.outcomes) {
+    if (outcome.result === "bust") {
+      for (const { missionId, fact } of watching) {
+        if (fact.observes.kind !== "fabrication_override_bust") continue;
+        await setMissionFact(transaction, {
+          characterId: input.characterId,
+          missionId,
+          key: fact.key,
+        });
+      }
+      continue;
+    }
+    const credits = await recordTrackedActivity(transaction, {
+      characterId: input.characterId,
+      activity: "fabrication",
+      metric: "completions",
+      attemptCount: 1,
+      actionId: input.actionId,
+    });
+    if (!outcome.usedOverride) continue;
+    for (const { missionId, fact } of watching) {
+      if (fact.observes.kind !== "fabrication_override_success") continue;
+      const watched = fact.observes.requirementProgressKey;
+      const satisfiedNow = credits.some(
+        (credit) => credit.missionId === missionId && credit.progressKey === watched,
+      );
+      if (!satisfiedNow) continue;
+      await setMissionFact(transaction, {
+        characterId: input.characterId,
+        missionId,
+        key: fact.key,
+      });
     }
   }
 }

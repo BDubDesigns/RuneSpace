@@ -70,6 +70,11 @@ export type NpcConversationProjection = {
     availableNpcIds?: readonly string[];
     turnIn?: true;
   };
+  /**
+   * The Mission-local reactive facts that hold (#232). They choose an authored
+   * variant of the same moment; they never change what the Mission requires.
+   */
+  facts?: readonly string[];
 };
 
 /** Which Mission conversation this entry is; drives its short role copy. */
@@ -232,11 +237,16 @@ function activeEntry(
   projection: NpcConversationProjection,
 ): NpcConversationEntry | undefined {
   if (definition.turnIn.npcId === npcId) {
-    const dialogueId = turnInStageDialogueId(definition, projection.stage);
+    const dialogueId = turnInStageDialogueId(definition, projection.stage, projection.facts);
     if (!dialogueId) return undefined;
-    // The completion command belongs to the turn-in conversation only. A
-    // reminder or busy branch presents state; it never offers a turn-in.
-    const isTurnIn = dialogueId === definition.turnIn.dialogueId;
+    // The completion command belongs to the turn-in conversation only — its
+    // ordinary opening or a reactive one. A reminder or busy branch presents
+    // state; it never offers a turn-in.
+    const isTurnIn =
+      dialogueId === definition.turnIn.dialogueId ||
+      (definition.dialogue.reactive ?? []).some(
+        (variant) => variant.moment === "turn_in" && variant.dialogueId === dialogueId,
+      );
     return {
       kind: "mission",
       id: `${definition.id}:${isTurnIn ? "turn_in" : "active"}`,
@@ -398,23 +408,50 @@ function guidanceFor(
   return undefined;
 }
 
+/**
+ * The first authored reactive variant of `moment` whose fact holds (#232).
+ * Authored order is the priority; with no fact holding, the ordinary sequence
+ * stands.
+ */
+function reactiveVariant(
+  definition: MissionDefinition,
+  moment: "turn_in" | "tracked_activity_reminder",
+  facts: readonly string[] | undefined,
+): DialogueId | undefined {
+  if (!facts?.length) return undefined;
+  return (definition.dialogue.reactive ?? []).find(
+    (variant) =>
+      variant.moment === moment &&
+      facts.includes(variant.factKey) &&
+      getDialogue(variant.dialogueId) !== undefined,
+  )?.dialogueId;
+}
+
 /** Selects the turn-in NPC's authored sequence from semantic stage data. */
 function turnInStageDialogueId(
   definition: MissionDefinition,
   stage: NpcConversationProjection["stage"],
+  facts?: readonly string[],
 ): DialogueId | undefined {
-  const turnIn = definition.turnIn.dialogueId;
+  const turnIn = reactiveVariant(definition, "turn_in", facts) ?? definition.turnIn.dialogueId;
   if (!stage) return turnIn;
   if (stage.turnInAvailable) return turnIn;
   if (stage.requirementsSatisfied) return dialogueOr(definition.dialogue.busyDialogueId, turnIn);
   if (stage.nextObjectiveKind === "equipped_item") {
     return dialogueOr(definition.dialogue.equipmentReminderDialogueId, turnIn);
   }
-  if (stage.nextObjectiveKind === "carried_stack") {
+  if (
+    stage.nextObjectiveKind === "carried_stack" ||
+    stage.nextObjectiveKind === "carried_unique_item"
+  ) {
     return dialogueOr(definition.dialogue.carriedReminderDialogueId, turnIn);
   }
   if (stage.nextObjectiveKind === "tracked_activity") {
-    return dialogueOr(definition.dialogue.trackedActivityReminderDialogueId, turnIn);
+    return dialogueOr(
+      reactiveVariant(definition, "tracked_activity_reminder", facts) ??
+        definition.dialogue.trackedActivityReminderDialogueId,
+      turnIn,
+    );
   }
   if (stage.nextObjectiveKind === "repair_target_complete") {
     return dialogueOr(definition.dialogue.repairReminderDialogueId, turnIn);

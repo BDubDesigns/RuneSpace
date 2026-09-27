@@ -13,6 +13,8 @@ import {
   type NpcId,
   type SkillId,
 } from "@/game/config/foundations";
+import { getEffectiveGameBalance } from "@/game/config/balance";
+import { tinkeringScrapYield } from "@/game/domain/tinkering";
 import { getItemPresentation } from "./item-presentation";
 import { merchantBuybackPrice, merchantRetailPrice } from "./merchants";
 import { KEEP_THE_CHANGE_BUDGET_CREDITS } from "./missions";
@@ -92,6 +94,13 @@ export type DialogueSequence = {
   beats: readonly DialogueBeat[];
 };
 
+// Tansy's Tinkering demonstration (#232) shows what one Salvage Cutter breaks
+// down into, from the same universal rule the player's own Tinkering uses, so
+// the teaching number can never disagree with the station.
+const DEMONSTRATION_SCRAP = tinkeringScrapYield(
+  getEffectiveGameBalance().fabrication.recipes.salvageCutter,
+);
+
 // Shop prices quoted in dialogue (#230) are read from the merchant registry and
 // spelled out here, never restated: a price change updates every line that
 // names it, and no line can keep quoting a price the shop no longer charges.
@@ -163,6 +172,22 @@ function tansyLocal(expressionId: ExpressionId, text: string): DialogueBeat {
     speakerNpcId: NPC_IDS.tansyRusk,
     expressionId,
     backgroundId: jag,
+    presentationMode: "local",
+    text,
+  };
+}
+
+/**
+ * Tansy at Wade's yard, for her Fabrication chapter (#232). Where a
+ * conversation happened is authored per beat, so her scenes at Rusk Recovery
+ * carry the yard and her Jag beats keep The Jag.
+ */
+function tansyAtYard(expressionId: ExpressionId, text: string): DialogueBeat {
+  return {
+    kind: "npc",
+    speakerNpcId: NPC_IDS.tansyRusk,
+    expressionId,
+    backgroundId: ruskYard,
     presentationMode: "local",
     text,
   };
@@ -1076,6 +1101,9 @@ const dialogue = {
   [DIALOGUE_IDS.tansyMiningTopic]: {
     id: DIALOGUE_IDS.tansyMiningTopic,
     npcId: NPC_IDS.tansyRusk,
+    // A replayable topic is Tansy talking where she stands now — at Wade's
+    // yard during her Fabrication chapter (#232), at the seam otherwise.
+    presentsAtCurrentVenue: true,
     beats: [
       tansyLocal(EXPRESSION_IDS.smile, "The Jag? It's a seam, not a mine. Big difference."),
       tansyLocal(
@@ -1099,6 +1127,9 @@ const dialogue = {
   [DIALOGUE_IDS.tansyBeyondHoloHollowTopic]: {
     id: DIALOGUE_IDS.tansyBeyondHoloHollowTopic,
     npcId: NPC_IDS.tansyRusk,
+    // A replayable topic is Tansy talking where she stands now — at Wade's
+    // yard during her Fabrication chapter (#232), at the seam otherwise.
+    presentsAtCurrentVenue: true,
     beats: [
       tansyLocal(EXPRESSION_IDS.neutral, "What's it like out there?"),
       tansyLocal(
@@ -1720,6 +1751,224 @@ const dialogue = {
     beats: [
       tansyLocal(EXPRESSION_IDS.neutral, "Brace is holding. I check it."),
       tansyLocal(EXPRESSION_IDS.smile, "Go mine your rock."),
+    ],
+  },
+  // Return the Favor (#232) — the locked offer scene from the Fabrication
+  // design. Tansy teaches the station; Wade supplies the shop's shorthand.
+  [DIALOGUE_IDS.tansyReturnTheFavorOffer]: {
+    id: DIALOGUE_IDS.tansyReturnTheFavorOffer,
+    npcId: NPC_IDS.tansyRusk,
+    beats: [
+      tansyAtYard(EXPRESSION_IDS.smile, "Wade says you've been useful."),
+      wadeAtYard(EXPRESSION_IDS.neutral, "Didn't say useful."),
+      tansyAtYard(EXPRESSION_IDS.smile, "He said you finished the work."),
+      tansyAtYard(
+        EXPRESSION_IDS.neutral,
+        "You know how to weld now. Join pieces. Patch something that's broken. Keep an old machine alive another few years.",
+      ),
+      tansyAtYard(EXPRESSION_IDS.smile, "That's Wade's side of the business."),
+      wadeAtYard(EXPRESSION_IDS.neutral, "The welding workshop."),
+      tansyAtYard(EXPRESSION_IDS.neutral, "Fabrication's different."),
+      tansyAtYard(
+        EXPRESSION_IDS.neutral,
+        "You start with processed stock and make the piece you need.",
+      ),
+      tansyAtYard(EXPRESSION_IDS.smile, "A bracket. A housing. A tool."),
+      tansyAtYard(
+        EXPRESSION_IDS.neutral,
+        "Sometimes the thing Wade's going to complain about fixing ten years from now.",
+      ),
+      wadeAtYard(EXPRESSION_IDS.neutral, "If it lasts ten years, I won't complain."),
+      tansyAtYard(EXPRESSION_IDS.smile, "You absolutely will."),
+      tansyAtYard(EXPRESSION_IDS.neutral, "Remember that Cutter I gave you at the Jag?"),
+      tansyAtYard(
+        EXPRESSION_IDS.smile,
+        "I threw that together because you needed one and couldn't make your own.",
+      ),
+      tansyAtYard(EXPRESSION_IDS.neutral, "Time to fix that."),
+      tansyAtYard(
+        EXPRESSION_IDS.neutral,
+        "Use the Fabrication Station and make me a Salvage Cutter.",
+      ),
+      tansyAtYard(EXPRESSION_IDS.smile, "Call it returning the favor."),
+      tansyAtYard(EXPRESSION_IDS.concerned, "One thing."),
+      tansyAtYard(EXPRESSION_IDS.neutral, "You'll see a control marked Manual Override."),
+      tansyAtYard(EXPRESSION_IDS.concerned, "Don't press it unless you know what you're doing."),
+      wadeAtYard(EXPRESSION_IDS.neutral, "She presses it every time."),
+      tansyAtYard(EXPRESSION_IDS.neutral, "I know what I'm doing."),
+      wadeAtYard(EXPRESSION_IDS.neutral, "Usually."),
+      tansyAtYard(EXPRESSION_IDS.smile, "Make me a Cutter."),
+    ],
+  },
+  [DIALOGUE_IDS.tansyReturnTheFavorReminder]: {
+    id: DIALOGUE_IDS.tansyReturnTheFavorReminder,
+    npcId: NPC_IDS.tansyRusk,
+    beats: [
+      tansyAtYard(EXPRESSION_IDS.neutral, "Fabrication Station. One Salvage Cutter."),
+      tansyAtYard(EXPRESSION_IDS.smile, "Bring it to me when it's done."),
+    ],
+  },
+  // After a Manual Override bust and before a Cutter has been made: the one
+  // reactive reminder. It does not clear the fact or open another route.
+  [DIALOGUE_IDS.tansyReturnTheFavorBustReminder]: {
+    id: DIALOGUE_IDS.tansyReturnTheFavorBustReminder,
+    npcId: NPC_IDS.tansyRusk,
+    beats: [
+      tansyAtYard(EXPRESSION_IDS.smile, "You pressed it."),
+      tansyAtYard(EXPRESSION_IDS.neutral, "The button I specifically told you not to press."),
+      tansyAtYard(EXPRESSION_IDS.smile, "Make another one."),
+      tansyAtYard(EXPRESSION_IDS.neutral, "This time, stop before it comes apart."),
+    ],
+  },
+  // Shared by both halves of the chapter. Tansy's own established busy beat,
+  // at the yard rather than the seam.
+  [DIALOGUE_IDS.tansyFabricationChapterBusy]: {
+    id: DIALOGUE_IDS.tansyFabricationChapterBusy,
+    npcId: NPC_IDS.tansyRusk,
+    beats: [
+      tansyAtYard(EXPRESSION_IDS.neutral, "You're in the middle of something."),
+      tansyAtYard(EXPRESSION_IDS.smile, "Finish it first. I'm not going anywhere."),
+    ],
+  },
+  // Three turn-in openings, chosen by the Mission's two reactive facts in
+  // authored priority (bust, then a clean Override success, then this), all
+  // rejoining the same completion below.
+  [DIALOGUE_IDS.tansyReturnTheFavorTurnIn]: {
+    id: DIALOGUE_IDS.tansyReturnTheFavorTurnIn,
+    npcId: NPC_IDS.tansyRusk,
+    beats: [tansyAtYard(EXPRESSION_IDS.neutral, "Let's see it.")],
+  },
+  [DIALOGUE_IDS.tansyReturnTheFavorOverrideTurnIn]: {
+    id: DIALOGUE_IDS.tansyReturnTheFavorOverrideTurnIn,
+    npcId: NPC_IDS.tansyRusk,
+    beats: [
+      tansyAtYard(EXPRESSION_IDS.smile, "You pushed it."),
+      tansyAtYard(EXPRESSION_IDS.neutral, "I told you not to unless you knew what you were doing."),
+      tansyAtYard(EXPRESSION_IDS.smile, "Looks like you did."),
+      wadeAtYard(EXPRESSION_IDS.neutral, "Once."),
+      tansyAtYard(EXPRESSION_IDS.smile, "Let them have this moment!"),
+      tansyAtYard(EXPRESSION_IDS.smile, "Let me see the Cutter."),
+    ],
+  },
+  [DIALOGUE_IDS.tansyReturnTheFavorBustTurnIn]: {
+    id: DIALOGUE_IDS.tansyReturnTheFavorBustTurnIn,
+    npcId: NPC_IDS.tansyRusk,
+    beats: [
+      tansyAtYard(EXPRESSION_IDS.smile, "Don't think I didn't see that first one."),
+      tansyAtYard(EXPRESSION_IDS.neutral, "You really had to push the Override."),
+      tansyAtYard(EXPRESSION_IDS.smile, "Can't say I blame you. I always push it too."),
+      wadeAtYard(EXPRESSION_IDS.neutral, "Every time."),
+      tansyAtYard(EXPRESSION_IDS.smile, "Difference is, I usually know when to stop."),
+      wadeAtYard(EXPRESSION_IDS.neutral, "Usually."),
+      tansyAtYard(EXPRESSION_IDS.smile, "Yeah, yeah. Let me see the Cutter."),
+    ],
+  },
+  // The common completion, then straight on into Break It Down. Presentation
+  // only: the turn-in has already taken the Cutter, and Tansy's demonstration
+  // Scrap is illustrative — it stays with her and nothing is granted.
+  [DIALOGUE_IDS.tansyReturnTheFavorCompletion]: {
+    id: DIALOGUE_IDS.tansyReturnTheFavorCompletion,
+    npcId: NPC_IDS.tansyRusk,
+    beats: [
+      { ...itemBeat(ITEM_IDS.salvageCutter, 1), backgroundId: ruskYard },
+      tansyAtYard(EXPRESSION_IDS.smile, "Not bad!"),
+      tansyAtYard(EXPRESSION_IDS.neutral, "You know how to put one together."),
+      tansyAtYard(EXPRESSION_IDS.smile, "So now I'm going to take it apart."),
+      {
+        ...itemBeat(ITEM_IDS.salvageCutter, 1, "Tansy dismantles the Salvage Cutter."),
+        backgroundId: ruskYard,
+      },
+      {
+        ...itemBeat(
+          ITEM_IDS.scrapMetal,
+          DEMONSTRATION_SCRAP,
+          `Her demonstration recovers ${DEMONSTRATION_SCRAP} Scrap Metal. It stays on her bench.`,
+        ),
+        backgroundId: ruskYard,
+      },
+      tansyAtYard(
+        EXPRESSION_IDS.neutral,
+        "Putting something together teaches you where everything goes.",
+      ),
+      tansyAtYard(EXPRESSION_IDS.neutral, "Taking it apart teaches you why."),
+      tansyAtYard(EXPRESSION_IDS.smile, "That's Tinkering."),
+      {
+        kind: "skill_xp",
+        skillId: SKILL_IDS.fabrication,
+        amount: 100,
+        backgroundId: ruskYard,
+        text: "Tinkering unlocked.",
+      },
+      // Break It Down begins here, as its authored continuation.
+      tansyAtYard(EXPRESSION_IDS.neutral, "Your turn."),
+      tansyAtYard(
+        EXPRESSION_IDS.smile,
+        "Make something you can spare. Then break it down yourself.",
+      ),
+      tansyAtYard(
+        EXPRESSION_IDS.neutral,
+        "Doesn't matter what. Just make sure it's something you can actually Tinker.",
+      ),
+      tansyAtYard(
+        EXPRESSION_IDS.smile,
+        "And maybe don't dismantle the only tool keeping you employed.",
+      ),
+      wadeAtYard(EXPRESSION_IDS.neutral, "Good rule generally."),
+    ],
+  },
+  // Break It Down (#232).
+  [DIALOGUE_IDS.tansyBreakItDownReminder]: {
+    id: DIALOGUE_IDS.tansyBreakItDownReminder,
+    npcId: NPC_IDS.tansyRusk,
+    beats: [
+      tansyAtYard(EXPRESSION_IDS.neutral, "Make something. Take it apart."),
+      tansyAtYard(EXPRESSION_IDS.smile, "Try to learn something in between."),
+    ],
+  },
+  [DIALOGUE_IDS.tansyBreakItDownTurnIn]: {
+    id: DIALOGUE_IDS.tansyBreakItDownTurnIn,
+    npcId: NPC_IDS.tansyRusk,
+    beats: [
+      tansyAtYard(EXPRESSION_IDS.neutral, "Nicely done."),
+      tansyAtYard(EXPRESSION_IDS.smile, "Now you've seen both sides of it."),
+      tansyAtYard(EXPRESSION_IDS.neutral, "Fabrication isn't just knowing how to make something."),
+      tansyAtYard(
+        EXPRESSION_IDS.neutral,
+        "It's knowing what went into it, what can come back out, and what isn't worth saving.",
+      ),
+      tansyAtYard(EXPRESSION_IDS.smile, "You've got enough to work with."),
+      wadeAtYard(EXPRESSION_IDS.neutral, "Enough to be dangerous."),
+      tansyAtYard(EXPRESSION_IDS.smile, "Seems to work for me."),
+    ],
+  },
+  // The chapter's close. Completing it is what sends Tansy home to The Jag
+  // (`game/content/npcs.ts`).
+  [DIALOGUE_IDS.tansyBreakItDownCompletion]: {
+    id: DIALOGUE_IDS.tansyBreakItDownCompletion,
+    npcId: NPC_IDS.tansyRusk,
+    beats: [
+      {
+        kind: "skill_xp",
+        skillId: SKILL_IDS.fabrication,
+        amount: 250,
+        backgroundId: ruskYard,
+        text: "",
+      },
+      tansyAtYard(EXPRESSION_IDS.neutral, "I should get back to the Jag."),
+      wadeAtYard(EXPRESSION_IDS.neutral, "Friday. Do not forget."),
+      tansyAtYard(EXPRESSION_IDS.smile, "I know."),
+      wadeAtYard(EXPRESSION_IDS.neutral, "You said that last week."),
+      tansyAtYard(EXPRESSION_IDS.neutral, "And I showed up."),
+      wadeAtYard(EXPRESSION_IDS.neutral, "Twenty minutes late."),
+      tansyAtYard(EXPRESSION_IDS.smile, "The trailers were still playing."),
+      wadeAtYard(EXPRESSION_IDS.neutral, "Still."),
+      tansyAtYard(EXPRESSION_IDS.smile, "You picking this week?"),
+      wadeAtYard(EXPRESSION_IDS.neutral, "No."),
+      tansyAtYard(EXPRESSION_IDS.smile, "Good."),
+      wadeAtYard(EXPRESSION_IDS.neutral, "You complain through my movie choices."),
+      tansyAtYard(EXPRESSION_IDS.smile, "The last one was three hours of dialogue!"),
+      tansyAtYard(EXPRESSION_IDS.neutral, "Anyway. Back to The Jag."),
+      tansyAtYard(EXPRESSION_IDS.smile, "Come find me when you're ready for real trouble."),
     ],
   },
   [DIALOGUE_IDS.maraTheBnbTopic]: {

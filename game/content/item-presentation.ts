@@ -76,6 +76,19 @@ const itemPresentations = {
     textFallback: "SL",
     artworkSrc: "/item-art/slag.webp",
   },
+  // Tier-1 Fabrication outputs (#232). No reviewed artwork exists for either
+  // yet, so both present through the canonical text fallback until approved
+  // art lands (docs/art-cookbook.md) — never a placeholder image.
+  [ITEM_IDS.mountingBracket]: {
+    displayName: "Mounting Bracket",
+    accessibleDescription: "Fabricated mounting bracket for permanent installations",
+    textFallback: "MB",
+  },
+  [ITEM_IDS.scrapBox]: {
+    displayName: "Scrap Box",
+    accessibleDescription: "Crude, overbuilt fabricated container attachment",
+    textFallback: "SB",
+  },
 } as const satisfies Partial<Record<ItemId, ItemPresentation>>;
 
 export function getItemPresentation(itemId: string): ItemPresentation | undefined {

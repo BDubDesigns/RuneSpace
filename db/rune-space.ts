@@ -684,6 +684,150 @@ export const characterPracticeWelds = pgTable(
 );
 
 /**
+ * Issue #232 — the Fabrication Station, one row per character.
+ *
+ * The workpiece on the machine is identified without a payload of its own:
+ * its recipe is the active action's ID (one action per authored recipe, the
+ * rule Refining already follows), its start is that action's durable cursor,
+ * and its reserved inputs are that recipe's input set, still sitting in the
+ * real `inventory_stacks` rows. Nothing about carried items is cloned here.
+ *
+ * This row carries only what those cannot: the run's selection and totals,
+ * the player's Finish Current intent, the station's Manual Override toggle,
+ * and the current workpiece's machine state once Override is enabled on it —
+ * persisted so a reload, a retried request, or a disconnect observes the same
+ * Load rather than a reroll. `override_load` IS NULL means the workpiece on the
+ * machine is an ordinary 1.00× workpiece.
+ *
+ * A character who has never fabricated simply has no row.
+ */
+export const characterFabricationState = pgTable(
+  "character_fabrication_state",
+  {
+    characterId: text("character_id")
+      .primaryKey()
+      .references(() => characters.id, { onDelete: "restrict" }),
+    /** The station's Manual Override toggle, read as each new workpiece begins. */
+    manualOverrideEnabled: boolean("manual_override_enabled").notNull().default(false),
+    /**
+     * The run's selection (#229): a number of recipe batches, or NULL for Max
+     * — keep starting workpieces while one can begin. `run_batches` counts the
+     * run's resolved workpieces (busts included), so remaining is the
+     * difference.
+     */
+    runSelectedBatches: integer("run_selected_batches").default(1),
+    runBatches: integer("run_batches").notNull().default(0),
+    runSuccesses: integer("run_successes").notNull().default(0),
+    runBusts: integer("run_busts").notNull().default(0),
+    /** This run's totals, as `{ itemId: quantity }` maps. */
+    runInputsConsumed: jsonb("run_inputs_consumed").notNull().default({}),
+    runOutputsGained: jsonb("run_outputs_gained").notNull().default({}),
+    runXpGained: integer("run_xp_gained").notNull().default(0),
+    /** Latest ten immutable server-resolved workpiece summaries for the current run. */
+    recentWorkpieces: jsonb("recent_workpieces").notNull().default([]),
+    /**
+     * Stop, for a run of several workpieces, means Finish Current: the
+     * workpiece on the machine resolves normally and no next one begins. There
+     * is no cancel. Cleared by the resolution that honours it and by Start.
+     */
+    finishCurrent: boolean("finish_current").notNull().default(false),
+    lastStopReason: text("last_stop_reason"),
+    /** The Override machine on the current workpiece; NULL when it has none. */
+    overrideLoad: smallint("override_load"),
+    overrideTrend: text("override_trend"),
+    overrideSafePushes: smallint("override_safe_pushes").notNull().default(0),
+    overrideExactPushes: smallint("override_exact_pushes").notNull().default(0),
+    overrideLocked: boolean("override_locked").notNull().default(false),
+    /** The current workpiece's last push, `{ feed, load, outcome }`, for the live panel. */
+    overrideLastPush: jsonb("override_last_push"),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    check(
+      "character_fabrication_state_run_selected_batches_positive",
+      sql`${table.runSelectedBatches} >= 1`,
+    ),
+    check(
+      "character_fabrication_state_run_counts_non_negative",
+      sql`${table.runBatches} >= 0 AND ${table.runSuccesses} >= 0 AND ${table.runBusts} >= 0 AND ${table.runXpGained} >= 0`,
+    ),
+    check(
+      "character_fabrication_state_override_trend_valid",
+      sql`${table.overrideTrend} IS NULL OR ${table.overrideTrend} IN ('higher', 'lower')`,
+    ),
+    // Structural only: the machine's dial and push limit are balance, enforced
+    // by the domain. What schema can say is that an Override machine is whole —
+    // a Load always has a Trend — and that no push state exists without one.
+    check(
+      "character_fabrication_state_override_complete",
+      sql`(${table.overrideLoad} IS NULL) = (${table.overrideTrend} IS NULL)`,
+    ),
+    check(
+      "character_fabrication_state_override_pushes_non_negative",
+      sql`${table.overrideSafePushes} >= 0 AND ${table.overrideExactPushes} >= 0`,
+    ),
+    check(
+      "character_fabrication_state_override_requires_machine",
+      sql`${table.overrideLoad} IS NOT NULL OR (${table.overrideSafePushes} = 0 AND ${table.overrideExactPushes} = 0 AND NOT ${table.overrideLocked} AND ${table.overrideLastPush} IS NULL)`,
+    ),
+  ],
+);
+
+/**
+ * Issue #232 — Tinkering, one row per character.
+ *
+ * Tinkering follows Practice Welding's cycle model rather than Fabrication's
+ * reservation: starting a cycle commits — destroys — its complete batch at
+ * once, so `cycle_action_id` names a cycle whose batch is already gone, and
+ * Resume continues it without committing another. Ordinary Stop preserves it;
+ * Finish Current completes it and ends the run.
+ */
+export const characterTinkeringState = pgTable(
+  "character_tinkering_state",
+  {
+    characterId: text("character_id")
+      .primaryKey()
+      .references(() => characters.id, { onDelete: "restrict" }),
+    /** Persistent per-character preference, default off, read at each cycle. */
+    autoDiscardScrap: boolean("auto_discard_scrap").notNull().default(false),
+    /** The committed cycle's Tinkering target action, or NULL when none is committed. */
+    cycleActionId: text("cycle_action_id"),
+    /** Whole ticks already worked on the committed cycle. */
+    cycleTicksCompleted: integer("cycle_ticks_completed").notNull().default(0),
+    /** "Finish current item": complete the committed cycle, then commit no other. */
+    finishCurrent: boolean("finish_current").notNull().default(false),
+    lastStopReason: text("last_stop_reason"),
+    /** The run's selection (#229): a number of batches, or NULL for Max. */
+    runSelectedBatches: integer("run_selected_batches").default(1),
+    runBatches: integer("run_batches").notNull().default(0),
+    runItemsConsumed: jsonb("run_items_consumed").notNull().default({}),
+    runScrapKept: integer("run_scrap_kept").notNull().default(0),
+    runScrapDiscarded: integer("run_scrap_discarded").notNull().default(0),
+    runXpGained: integer("run_xp_gained").notNull().default(0),
+    /** Latest ten immutable server-resolved batch summaries for the current run. */
+    recentBatches: jsonb("recent_batches").notNull().default([]),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    check(
+      "character_tinkering_state_run_selected_batches_positive",
+      sql`${table.runSelectedBatches} >= 1`,
+    ),
+    check(
+      "character_tinkering_state_run_counts_non_negative",
+      sql`${table.runBatches} >= 0 AND ${table.runScrapKept} >= 0 AND ${table.runScrapDiscarded} >= 0 AND ${table.runXpGained} >= 0`,
+    ),
+    check("character_tinkering_state_ticks_non_negative", sql`${table.cycleTicksCompleted} >= 0`),
+    // Worked ticks belong to a committed cycle; with no cycle there is nothing
+    // to have worked on.
+    check(
+      "character_tinkering_state_ticks_require_cycle",
+      sql`${table.cycleActionId} IS NOT NULL OR ${table.cycleTicksCompleted} = 0`,
+    ),
+  ],
+);
+
+/**
  * Issue #207 — the durable Work Orders board, one row per posted slot.
  *
  * The board is persistent rather than re-rolled on render, refresh, or login,

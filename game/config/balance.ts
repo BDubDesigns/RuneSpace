@@ -288,6 +288,128 @@ const balanceSchema = z.object({
     capacitySlots: z.literal(32),
   }),
   /**
+   * Tier-1 Fabrication (#232): turning processed stock into discrete items at
+   * Rusk Recovery's Fabrication Station.
+   *
+   * Fabrication is its own authored recipe boundary, deliberately not a
+   * generic crafting engine and not a Refining variant: a recipe is inputs, one
+   * authored output batch, a duration, and base XP. Baseline Fabrication never
+   * fails; the only failure path is a Manual Override bust the player chose to
+   * risk. Each recipe carries its own action ID for the durable-identity reason
+   * Refining recipes do.
+   */
+  fabrication: z.object({
+    skillId: z.literal(SKILL_IDS.fabrication),
+    recipes: z.object({
+      /** Installation hardware: 2 Refined Ferrite -> 1 Mounting Bracket. */
+      mountingBracket: z.object({
+        actionId: z.literal(ACTION_IDS.mountingBracketFabrication),
+        outputItemId: z.literal(ITEM_IDS.mountingBracket),
+        outputQuantity: z.literal(1),
+        minimumLevel: z.literal(1),
+        durationTicks: z.literal(12),
+        baseXp: z.literal(25),
+        inputs: z.tuple([
+          z.object({ itemId: z.literal(ITEM_IDS.refinedFerrite), quantity: z.literal(2) }),
+        ]),
+      }),
+      /**
+       * Direct Scrap: 2 Refined Ferrite -> 1 Scrap Metal. A utility recipe so
+       * nobody has to fabricate a finished item and dismantle it just to get
+       * Scrap — not intended as training. It is not a Tinkering target.
+       */
+      scrapMetal: z.object({
+        actionId: z.literal(ACTION_IDS.scrapMetalFabrication),
+        outputItemId: z.literal(ITEM_IDS.scrapMetal),
+        outputQuantity: z.literal(1),
+        minimumLevel: z.literal(1),
+        durationTicks: z.literal(10),
+        baseXp: z.literal(10),
+        inputs: z.tuple([
+          z.object({ itemId: z.literal(ITEM_IDS.refinedFerrite), quantity: z.literal(2) }),
+        ]),
+      }),
+      /** A crude +3-slot container: 1 Mounting Bracket + 2 Scrap Metal + 3 Refined Ferrite. */
+      scrapBox: z.object({
+        actionId: z.literal(ACTION_IDS.scrapBoxFabrication),
+        outputItemId: z.literal(ITEM_IDS.scrapBox),
+        outputQuantity: z.literal(1),
+        minimumLevel: z.literal(1),
+        durationTicks: z.literal(36),
+        baseXp: z.literal(81),
+        inputs: z.tuple([
+          z.object({ itemId: z.literal(ITEM_IDS.mountingBracket), quantity: z.literal(1) }),
+          z.object({ itemId: z.literal(ITEM_IDS.scrapMetal), quantity: z.literal(2) }),
+          z.object({ itemId: z.literal(ITEM_IDS.refinedFerrite), quantity: z.literal(3) }),
+        ]),
+      }),
+      /**
+       * Another ordinary Salvage Cutter: 5 Refined Ferrite + 1 Power Cell. The
+       * Cell is a construction component, not stored charge — the new Cutter
+       * starts at the Cutter's ordinary uncharged state.
+       */
+      salvageCutter: z.object({
+        actionId: z.literal(ACTION_IDS.salvageCutterFabrication),
+        outputItemId: z.literal(ITEM_IDS.salvageCutter),
+        outputQuantity: z.literal(1),
+        minimumLevel: z.literal(1),
+        durationTicks: z.literal(20),
+        baseXp: z.literal(65),
+        inputs: z.tuple([
+          z.object({ itemId: z.literal(ITEM_IDS.refinedFerrite), quantity: z.literal(5) }),
+          z.object({ itemId: z.literal(ITEM_IDS.powerCell), quantity: z.literal(1) }),
+        ]),
+      }),
+    }),
+    /**
+     * Manual Override (#232): the optional per-workpiece push-your-luck layer.
+     * An Override workpiece starts at a Load rolled uniformly from the initial
+     * range; each push rolls the next Load strictly in the announced Trend's
+     * direction, and a Feed within `safeRange` of it compounds the XP
+     * multiplier (exactly on it compounds by more). A miss busts the workpiece.
+     */
+    manualOverride: z.object({
+      loadMinimum: z.literal(1),
+      loadMaximum: z.literal(10),
+      initialLoadMinimum: z.literal(2),
+      initialLoadMaximum: z.literal(9),
+      safeRange: z.literal(2),
+      maximumPushes: z.literal(5),
+      safePushMultiplierBps: z.literal(12_000),
+      exactPushMultiplierBps: z.literal(13_000),
+    }),
+  }),
+  /**
+   * Tinkering (#232): dismantling one complete authored Fabrication output
+   * batch at the Fabrication Station for Fabrication XP and Scrap Metal.
+   *
+   * Every value is derived from the target's own Fabrication recipe through
+   * these universal rules — there are no per-item exceptions: the recipe's
+   * base XP, twice its duration, and one Scrap per `inputUnitsPerScrap`
+   * immediate recipe-input units, rounded up. A target names the recipe it
+   * dismantles and carries its own action ID.
+   */
+  tinkering: z.object({
+    skillId: z.literal(SKILL_IDS.fabrication),
+    durationMultiplier: z.literal(2),
+    inputUnitsPerScrap: z.literal(2),
+    recoveredItemId: z.literal(ITEM_IDS.scrapMetal),
+    targets: z.object({
+      mountingBracket: z.object({
+        actionId: z.literal(ACTION_IDS.mountingBracketTinkering),
+        recipeActionId: z.literal(ACTION_IDS.mountingBracketFabrication),
+      }),
+      scrapBox: z.object({
+        actionId: z.literal(ACTION_IDS.scrapBoxTinkering),
+        recipeActionId: z.literal(ACTION_IDS.scrapBoxFabrication),
+      }),
+      salvageCutter: z.object({
+        actionId: z.literal(ACTION_IDS.salvageCutterTinkering),
+        recipeActionId: z.literal(ACTION_IDS.salvageCutterFabrication),
+      }),
+    }),
+  }),
+  /**
    * Work Orders (#190, made playable by #207) — the paying client jobs that
    * arrive through Wade's terminal.
    *
@@ -420,6 +542,22 @@ const balanceSchema = z.object({
       itemId: z.literal(ITEM_IDS.mykeaSchleppraum8),
       massGrams: z.literal(10_000),
       slotCapacity: z.literal(8),
+    }),
+    /**
+     * Tier-1 Fabrication outputs (#232). The Bracket's 300 g is exactly its
+     * two 150 g Refined Ferrite. The Scrap Box is a crude, overbuilt container
+     * attachment: half the MYKEA's mass for a little under half its storage,
+     * using the existing container slots rather than a new one.
+     */
+    mountingBracket: z.object({
+      itemId: z.literal(ITEM_IDS.mountingBracket),
+      massGrams: z.literal(300),
+      stackLimit: z.literal(5),
+    }),
+    scrapBox: z.object({
+      itemId: z.literal(ITEM_IDS.scrapBox),
+      massGrams: z.literal(5_000),
+      slotCapacity: z.literal(3),
     }),
   }),
   carrying: z.object({
@@ -605,6 +743,84 @@ const defaults = balanceSchema.parse({
   cargoHold: {
     capacitySlots: 32,
   },
+  fabrication: {
+    skillId: SKILL_IDS.fabrication,
+    recipes: {
+      mountingBracket: {
+        actionId: ACTION_IDS.mountingBracketFabrication,
+        outputItemId: ITEM_IDS.mountingBracket,
+        outputQuantity: 1,
+        minimumLevel: 1,
+        durationTicks: 12,
+        baseXp: 25,
+        inputs: [{ itemId: ITEM_IDS.refinedFerrite, quantity: 2 }],
+      },
+      scrapMetal: {
+        actionId: ACTION_IDS.scrapMetalFabrication,
+        outputItemId: ITEM_IDS.scrapMetal,
+        outputQuantity: 1,
+        minimumLevel: 1,
+        durationTicks: 10,
+        baseXp: 10,
+        inputs: [{ itemId: ITEM_IDS.refinedFerrite, quantity: 2 }],
+      },
+      scrapBox: {
+        actionId: ACTION_IDS.scrapBoxFabrication,
+        outputItemId: ITEM_IDS.scrapBox,
+        outputQuantity: 1,
+        minimumLevel: 1,
+        durationTicks: 36,
+        baseXp: 81,
+        inputs: [
+          { itemId: ITEM_IDS.mountingBracket, quantity: 1 },
+          { itemId: ITEM_IDS.scrapMetal, quantity: 2 },
+          { itemId: ITEM_IDS.refinedFerrite, quantity: 3 },
+        ],
+      },
+      salvageCutter: {
+        actionId: ACTION_IDS.salvageCutterFabrication,
+        outputItemId: ITEM_IDS.salvageCutter,
+        outputQuantity: 1,
+        minimumLevel: 1,
+        durationTicks: 20,
+        baseXp: 65,
+        inputs: [
+          { itemId: ITEM_IDS.refinedFerrite, quantity: 5 },
+          { itemId: ITEM_IDS.powerCell, quantity: 1 },
+        ],
+      },
+    },
+    manualOverride: {
+      loadMinimum: 1,
+      loadMaximum: 10,
+      initialLoadMinimum: 2,
+      initialLoadMaximum: 9,
+      safeRange: 2,
+      maximumPushes: 5,
+      safePushMultiplierBps: 12_000,
+      exactPushMultiplierBps: 13_000,
+    },
+  },
+  tinkering: {
+    skillId: SKILL_IDS.fabrication,
+    durationMultiplier: 2,
+    inputUnitsPerScrap: 2,
+    recoveredItemId: ITEM_IDS.scrapMetal,
+    targets: {
+      mountingBracket: {
+        actionId: ACTION_IDS.mountingBracketTinkering,
+        recipeActionId: ACTION_IDS.mountingBracketFabrication,
+      },
+      scrapBox: {
+        actionId: ACTION_IDS.scrapBoxTinkering,
+        recipeActionId: ACTION_IDS.scrapBoxFabrication,
+      },
+      salvageCutter: {
+        actionId: ACTION_IDS.salvageCutterTinkering,
+        recipeActionId: ACTION_IDS.salvageCutterFabrication,
+      },
+    },
+  },
   workOrders: {
     actionId: ACTION_IDS.workOrderWelding,
     skillId: SKILL_IDS.welding,
@@ -652,6 +868,8 @@ const defaults = balanceSchema.parse({
       massGrams: 10_000,
       slotCapacity: 8,
     },
+    mountingBracket: { itemId: ITEM_IDS.mountingBracket, massGrams: 300, stackLimit: 5 },
+    scrapBox: { itemId: ITEM_IDS.scrapBox, massGrams: 5_000, slotCapacity: 3 },
   },
   carrying: {
     startingCapacityGrams: 50_000,
@@ -745,6 +963,67 @@ export function refiningRecipeForActionId(
 /** Every Refining action ID the recipe registry authors. */
 export function refiningActionIds(balance = getEffectiveGameBalance()): readonly string[] {
   return refiningRecipes(balance).map((recipe) => recipe.actionId);
+}
+
+/** One authored Fabrication recipe (#232). */
+export type FabricationRecipeBalance =
+  EffectiveGameBalance["fabrication"]["recipes"][keyof EffectiveGameBalance["fabrication"]["recipes"]];
+
+/** Every authored Fabrication recipe, in a stable authored order. */
+export function fabricationRecipes(
+  balance = getEffectiveGameBalance(),
+): readonly FabricationRecipeBalance[] {
+  return Object.values(balance.fabrication.recipes);
+}
+
+/**
+ * The authoritative recipe on the machine, by its own action ID — the same
+ * durable-identity rule Refining recipes follow, so a refreshed or lazily
+ * resolved workpiece is always the recipe the player actually started.
+ */
+export function fabricationRecipeForActionId(
+  actionId: string,
+  balance = getEffectiveGameBalance(),
+): FabricationRecipeBalance | undefined {
+  return fabricationRecipes(balance).find((recipe) => recipe.actionId === actionId);
+}
+
+/** Every Fabrication action ID the recipe registry authors. */
+export function fabricationActionIds(balance = getEffectiveGameBalance()): readonly string[] {
+  return fabricationRecipes(balance).map((recipe) => recipe.actionId);
+}
+
+/**
+ * One Tinkering target, resolved against the Fabrication recipe it dismantles
+ * (#232). Everything but the action identity is that recipe's.
+ */
+export type TinkeringTargetBalance = {
+  actionId: string;
+  recipe: FabricationRecipeBalance;
+};
+
+/** Every authored Tinkering target, in a stable authored order. */
+export function tinkeringTargets(
+  balance = getEffectiveGameBalance(),
+): readonly TinkeringTargetBalance[] {
+  return Object.values(balance.tinkering.targets).map((target) => {
+    const recipe = fabricationRecipeForActionId(target.recipeActionId, balance);
+    if (!recipe) throw new Error(`Tinkering target ${target.actionId} names no Fabrication recipe`);
+    return { actionId: target.actionId, recipe };
+  });
+}
+
+/** The Tinkering target a durable action or committed cycle names. */
+export function tinkeringTargetForActionId(
+  actionId: string,
+  balance = getEffectiveGameBalance(),
+): TinkeringTargetBalance | undefined {
+  return tinkeringTargets(balance).find((target) => target.actionId === actionId);
+}
+
+/** Every Tinkering action ID the target registry authors. */
+export function tinkeringActionIds(balance = getEffectiveGameBalance()): readonly string[] {
+  return tinkeringTargets(balance).map((target) => target.actionId);
 }
 
 /** Every authored repair target's recipe, in a stable order. */
@@ -878,6 +1157,8 @@ const skillLevelCurves = {
   [SKILL_IDS.mining]: standardSkillLevelThresholds,
   [SKILL_IDS.refining]: standardSkillLevelThresholds,
   [SKILL_IDS.welding]: standardSkillLevelThresholds,
+  // A standard skill on the shared curve (#232): no special hidden state.
+  [SKILL_IDS.fabrication]: standardSkillLevelThresholds,
 } as const satisfies Partial<Record<SkillId, () => readonly LevelThreshold[]>>;
 
 /** The approved level-curve source for a skill, or undefined when none exists. */

@@ -163,7 +163,10 @@ describe("character progression projection (issue #213)", () => {
       levelThresholds: skillLevelThresholds,
       skillDisplayName: (skillId) => getSkillPresentation(skillId)?.displayName,
     });
+    // Deterministic stable-ID order; Fabrication is a standard skill since
+    // #232, presented everywhere without a per-surface edit.
     expect(result.skills.map((skill) => skill.displayName)).toEqual([
+      "Fabrication",
       "Mining",
       "Refining",
       "Welding",

@@ -52,14 +52,25 @@ function itemEquipmentDefinition(itemId: string, balance: EffectiveGameBalance) 
       suitSlotIds: [balance.items.salvageCutter.suitSlotId],
       massGrams,
     };
-  if (itemId === balance.items.starterContainer.itemId)
+  const container = containerItems(balance).find((candidate) => candidate.itemId === itemId);
+  if (container)
     return {
       assignmentKind: "container" as const,
       suitSlotIds: balance.carrying.containerSuitSlotIds,
       massGrams,
-      containerSlotCapacity: balance.items.starterContainer.slotCapacity,
+      containerSlotCapacity: container.slotCapacity,
     };
   return undefined;
+}
+
+/**
+ * Every authored container attachment: the starter MYKEA and, since #232, the
+ * fabricated Scrap Box. Both use the existing container-slot namespace — a
+ * container is any item whose authored definition supplies slot capacity, so
+ * there is no third slot and no per-container rule here.
+ */
+function containerItems(balance: EffectiveGameBalance) {
+  return [balance.items.starterContainer, balance.items.scrapBox];
 }
 
 export function isApprovedEquipmentTarget(

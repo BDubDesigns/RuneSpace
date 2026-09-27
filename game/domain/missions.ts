@@ -1,4 +1,9 @@
-import { getItemDefinition, skillLevelThresholds } from "@/game/config/balance";
+import {
+  fabricationActionIds,
+  getItemDefinition,
+  skillLevelThresholds,
+  tinkeringActionIds,
+} from "@/game/config/balance";
 import { ACTION_IDS } from "@/game/config/foundations";
 import { getActionOutputItemIds } from "@/game/domain/action-outputs";
 import { getDialogue } from "@/game/content/dialogue";
@@ -13,23 +18,44 @@ import type {
   MissionRequirement,
   MissionRequirementKind,
   MissionSkillPrerequisite,
+  TrackedMissionActivity,
 } from "@/game/content/missions";
 
 /**
- * The authoritative action each tracked activity is performed through. Mission
- * guidance may only recommend the action that genuinely produces the tracked
+ * The authoritative actions each tracked activity is performed through. Mission
+ * guidance may only recommend an action that genuinely produces the tracked
  * fact, so a new activity adds one entry here rather than a new conditional.
+ *
+ * The original activities each name their one taught action. Fabrication and
+ * Tinkering (#232) are families — one action per authored recipe or target —
+ * and a requirement may narrow to one member with `actionId`.
  */
-const TRACKED_ACTIVITY_ACTION_IDS = {
-  mining: ACTION_IDS.ferriteShaleMining,
-  refining: ACTION_IDS.refining,
-  practice_welding: ACTION_IDS.practiceWelding,
+const TRACKED_ACTIVITY_ACTION_IDS: Record<TrackedMissionActivity, () => readonly string[]> = {
+  mining: () => [ACTION_IDS.ferriteShaleMining],
+  refining: () => [ACTION_IDS.refining],
+  practice_welding: () => [ACTION_IDS.practiceWelding],
   // A Work Order completion is observed through the same generic path (#207).
   // The recommended action is the Welding a customer job actually takes, so
   // guidance points at the bench and the terminal that feeds it rather than
   // inventing a Work-Order-shaped guidance kind.
-  work_order: ACTION_IDS.workOrderWelding,
-} as const;
+  work_order: () => [ACTION_IDS.workOrderWelding],
+  fabrication: () => fabricationActionIds(),
+  tinkering: () => tinkeringActionIds(),
+};
+
+/**
+ * Each activity's one honest metric. Only Fabrication and Tinkering count
+ * `completions`, because only they have a unit that can be started and then
+ * not succeed — a busted workpiece is never a fabricated item (#232).
+ */
+const TRACKED_ACTIVITY_METRICS: Record<TrackedMissionActivity, "attempts" | "completions"> = {
+  mining: "attempts",
+  refining: "attempts",
+  practice_welding: "attempts",
+  work_order: "attempts",
+  fabrication: "completions",
+  tinkering: "completions",
+};
 
 export type MissionState = "not_accepted" | "active" | "ready_for_completion" | "completed";
 
@@ -47,6 +73,12 @@ export type MissionObservation = {
   equippedItemIds: ReadonlySet<string>;
   /** Current carried quantity by item ID (inventory is the durable state). */
   carriedQuantities: ReadonlyMap<string, number>;
+  /**
+   * Carried, UNEQUIPPED unique instances by item ID (#232). Equipped gear and
+   * Cargo Hold contents are never here, so a unique-item turn-in can never
+   * reach the tool in the player's hand.
+   */
+  carriedUniqueItems?: ReadonlyMap<string, number>;
   /** Authoritative stack limit by item ID (from item definitions). */
   stackLimits: ReadonlyMap<string, number>;
   /** Authoritative display names by item ID for authored copy. */
@@ -138,6 +170,12 @@ export type MissionGuidance = {
   /** The authored recommended acquisition action for the first unmet carried requirement. */
   actionId?: string;
   /**
+   * The tracked activity the current objective counts (#232), whether or not
+   * it recommends one action: Break It Down counts any Tinkering batch, so the
+   * Tinker mode itself — not one recipe — is where the player is guided.
+   */
+  activity?: TrackedMissionActivity;
+  /**
    * The repair surface that is the current progression target: the first unmet
    * requirement observes authoritative completion of this repair target. That
    * surface owns the repair/material/Welding substate and selects the advancing
@@ -187,6 +225,8 @@ export type MissionRequirementStatus = {
   npcId?: string;
   /** The repair target this requirement observes, when it observes one. */
   repairTargetId?: string;
+  /** The tracked activity this requirement counts, when it counts one (#232). */
+  activity?: TrackedMissionActivity;
   /**
    * Secondary context for this objective, rendered as its own subordinate
    * line. Never progress and never part of `progress` — it exists so a player
@@ -272,6 +312,12 @@ export type MissionProjection = {
   };
   /** Projected semantic guidance targets (empty when nothing needs guidance). */
   guidance?: MissionGuidance;
+  /**
+   * The Mission-local reactive facts that currently hold (#232), by authored
+   * key, for accepted incomplete Missions only. Read by conversation routing
+   * to choose an authored variant; never by progression.
+   */
+  facts?: readonly string[];
 };
 
 /** Renders authored copy with authoritative names/numbers; no other rewriting. */
@@ -294,7 +340,7 @@ function renderRequirementObjective(
   }
   if (requirement.kind === "npc_conversation") return requirement.objective;
   const itemName = observation?.itemNames.get(requirement.itemId) ?? requirement.itemId;
-  if (requirement.kind === "equipped_item") {
+  if (requirement.kind === "equipped_item" || requirement.kind === "carried_unique_item") {
     return requirement.objective.replace("{item}", itemName);
   }
   const required = requiredCarriedQuantity(requirement, observation);
@@ -364,6 +410,8 @@ function requirementSatisfied(
       const carried = observation?.carriedQuantities.get(requirement.itemId) ?? 0;
       return carried >= requiredCarriedQuantity(requirement, observation);
     }
+    case "carried_unique_item":
+      return (observation?.carriedUniqueItems?.get(requirement.itemId) ?? 0) >= 1;
     case "tracked_activity":
       return (
         (observation?.trackedProgress?.get(requirement.progressKey) ?? 0) >= requirement.target
@@ -503,6 +551,11 @@ function deriveGuidance(
       actionId: firstUnsatisfied.recommendedActionId,
       ...actionDestination(firstUnsatisfied.recommendedActionId, currentLocationId),
     };
+  }
+  if (firstUnsatisfied.kind === "tracked_activity") {
+    // No single recommended action (Break It Down counts any Tinkering batch):
+    // the activity is the target, and nothing more specific is invented.
+    return { activity: firstUnsatisfied.activity };
   }
   if (firstUnsatisfied.kind === "repair_target_complete") {
     const guidance = repairTargetGuidance(firstUnsatisfied, currentLocationId, observation);
@@ -710,6 +763,13 @@ export function projectMission(
       observation,
       prerequisiteSatisfied,
     ),
+    ...(active && definition.reactiveFacts
+      ? {
+          facts: definition.reactiveFacts
+            .filter((fact) => (observation?.trackedProgress?.get(fact.key) ?? 0) >= 1)
+            .map((fact) => fact.key),
+        }
+      : {}),
   };
 }
 
@@ -747,6 +807,15 @@ function projectRequirement(
       objective: renderRequirementObjective(requirement, observation),
       satisfied,
       progress: { current, target: requirement.target },
+      activity: requirement.activity,
+    };
+  }
+  if (requirement.kind === "carried_unique_item") {
+    return {
+      kind: requirement.kind,
+      objective: renderRequirementObjective(requirement, observation),
+      satisfied,
+      itemId: requirement.itemId,
     };
   }
   if (requirement.kind === "repair_target_complete") {
@@ -881,6 +950,8 @@ export type MissionGuidanceTargets = {
   turnInLocationIds: ReadonlySet<string>;
   equipmentItemIds: ReadonlySet<string>;
   actionIds: ReadonlySet<string>;
+  /** Tracked activities an accepted Mission's current objective counts (#232). */
+  activities: ReadonlySet<string>;
   /** Repair target(s) whose surface is an accepted Mission's current work (#172). */
   repairTargetIds: ReadonlySet<string>;
 };
@@ -976,6 +1047,7 @@ export function deriveMissionGuidanceTargets(
   const turnInLocationIds = new Set<string>();
   const equipmentItemIds = new Set<string>();
   const actionIds = new Set<string>();
+  const activities = new Set<string>();
   const repairTargetIds = new Set<string>();
   for (const projection of projections) {
     const guidance = projection.guidance;
@@ -991,6 +1063,7 @@ export function deriveMissionGuidanceTargets(
     if (guidance.locationId) (turnIn ? turnInLocationIds : locationIds).add(guidance.locationId);
     if (guidance.equipmentItemId) equipmentItemIds.add(guidance.equipmentItemId);
     if (guidance.actionId) actionIds.add(guidance.actionId);
+    if (guidance.activity) activities.add(guidance.activity);
     if (guidance.repairTargetId) repairTargetIds.add(guidance.repairTargetId);
   }
   return {
@@ -1003,6 +1076,7 @@ export function deriveMissionGuidanceTargets(
     turnInLocationIds,
     equipmentItemIds,
     actionIds,
+    activities,
     repairTargetIds,
   };
 }
@@ -1183,15 +1257,22 @@ export function validateMissionDefinitions(definitions: readonly MissionDefiniti
         if (!(requirement.activity in TRACKED_ACTIVITY_ACTION_IDS)) {
           throw new Error(`${where} references unsupported tracked activity.`);
         }
-        if (requirement.metric !== "attempts") {
+        if (requirement.metric !== TRACKED_ACTIVITY_METRICS[requirement.activity]) {
           throw new Error(`${where} references unsupported tracked activity metric.`);
         }
         if (!Number.isInteger(requirement.target) || requirement.target <= 0) {
           throw new Error(`${where} tracked activity target must be a positive integer.`);
         }
+        const activityActionIds = TRACKED_ACTIVITY_ACTION_IDS[requirement.activity]();
+        if (requirement.actionId && !activityActionIds.includes(requirement.actionId)) {
+          throw new Error(`${where} tracked activity names an action outside its activity.`);
+        }
         if (requirement.recommendedActionId) {
-          const expectedActionId = TRACKED_ACTIVITY_ACTION_IDS[requirement.activity];
-          if (requirement.recommendedActionId !== expectedActionId) {
+          if (
+            !activityActionIds.includes(requirement.recommendedActionId) ||
+            (requirement.actionId !== undefined &&
+              requirement.recommendedActionId !== requirement.actionId)
+          ) {
             throw new Error(
               `${where} tracked activity guidance must target its authoritative activity action.`,
             );
@@ -1263,6 +1344,12 @@ export function validateMissionDefinitions(definitions: readonly MissionDefiniti
       if (!itemDefinition) {
         throw new Error(`${where} requirement references unknown item "${requirement.itemId}".`);
       }
+      if (requirement.kind === "carried_unique_item") {
+        if (itemDefinition.kind !== "unique") {
+          throw new Error(`${where} unique-item requirement must target a unique item.`);
+        }
+        continue;
+      }
       if (requirement.kind === "carried_stack") {
         if (itemDefinition.kind !== "stack") {
           throw new Error(`${where} carried requirement must target a stackable item.`);
@@ -1328,6 +1415,7 @@ export function validateMissionDefinitions(definitions: readonly MissionDefiniti
       assertDialogue(definition.id, dialogue.capacitySlotsDialogueId, "capacity slots");
     if (dialogue.capacityMassDialogueId)
       assertDialogue(definition.id, dialogue.capacityMassDialogueId, "capacity mass");
+    assertReactiveContent(definition, progressKeys);
     if (!definition.reward) {
       // A mission may deliberately author no completion reward when its real
       // outcome is world/social state (Keep the Change pays up front instead).
@@ -1391,6 +1479,62 @@ export function validateMissionDefinitions(definitions: readonly MissionDefiniti
     }
   }
   assertContinuationGraph(definitions);
+}
+
+/**
+ * The reactive-fact contract (#232): lowercase hyphenated keys that share the
+ * Mission's progress-key space without colliding with it, observations of a
+ * real Fabrication recipe, a success fact that names the tracked Fabrication
+ * requirement it watches, and variants that belong to the turn-in NPC and read
+ * a fact the Mission actually authors.
+ */
+function assertReactiveContent(
+  definition: MissionDefinition,
+  progressKeys: ReadonlySet<string>,
+): void {
+  const where = `Mission "${definition.id}"`;
+  const factKeys = new Set<string>();
+  for (const fact of definition.reactiveFacts ?? []) {
+    if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(fact.key)) {
+      throw new Error(`${where} reactive fact key must be lowercase hyphenated text.`);
+    }
+    if (factKeys.has(fact.key) || progressKeys.has(fact.key)) {
+      throw new Error(`${where} reactive fact key "${fact.key}" is not unique.`);
+    }
+    factKeys.add(fact.key);
+    if (!fabricationActionIds().includes(fact.observes.actionId)) {
+      throw new Error(`${where} reactive fact must observe an authored Fabrication recipe.`);
+    }
+    if (fact.observes.kind === "fabrication_override_success") {
+      const watched = fact.observes;
+      const requirement = definition.requirements.find(
+        (candidate) =>
+          candidate.kind === "tracked_activity" &&
+          candidate.progressKey === watched.requirementProgressKey,
+      );
+      if (
+        requirement?.kind !== "tracked_activity" ||
+        requirement.activity !== "fabrication" ||
+        requirement.actionId !== watched.actionId
+      ) {
+        throw new Error(
+          `${where} reactive success fact must watch a tracked Fabrication requirement for its recipe.`,
+        );
+      }
+    }
+  }
+  for (const variant of definition.dialogue.reactive ?? []) {
+    if (!factKeys.has(variant.factKey)) {
+      throw new Error(`${where} reactive dialogue reads unknown fact "${variant.factKey}".`);
+    }
+    assertDialogue(definition.id, variant.dialogueId, "reactive dialogue");
+    assertDialogueNpc(
+      definition.id,
+      variant.dialogueId,
+      definition.turnIn.npcId,
+      "reactive dialogue",
+    );
+  }
 }
 
 /**

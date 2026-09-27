@@ -24,6 +24,8 @@ const skillIds = {
   refining: asContentId("refining"),
   welding: asContentId("welding"),
   strength: asContentId("strength"),
+  // Tier-1 Fabrication (#232): a standard skill on the shared level curve.
+  fabrication: asContentId("fabrication"),
 } as const satisfies Record<string, ContentId>;
 
 const itemIds = {
@@ -45,6 +47,10 @@ const itemIds = {
   galvanite: asContentId("galvanite"),
   galvanicStock: asContentId("galvanic_stock"),
   galvaferrite: asContentId("galvaferrite"),
+  // Tier-1 Fabrication outputs (#232). The Mounting Bracket is stackable
+  // installation hardware; the Scrap Box is a unique container attachment.
+  mountingBracket: asContentId("mounting_bracket"),
+  scrapBox: asContentId("scrap_box"),
 } as const satisfies Record<string, ContentId>;
 
 const npcIds = {
@@ -73,6 +79,11 @@ const missionIds = {
   // successor: it requires 10,000 Hours complete plus Mining 5 and Welding 5,
   // and deliberately does NOT require 10,001 Hours.
   braceYourself: asContentId("brace_yourself"),
+  // Tansy's Fabrication teaching chapter (#232). Return the Favor is a
+  // deliberate pickup after 10,000 Hours; Break It Down is its authored
+  // continuation, and completing it is Brace Yourself's story prerequisite.
+  returnTheFavor: asContentId("return_the_favor"),
+  breakItDown: asContentId("break_it_down"),
 } as const satisfies Record<string, ContentId>;
 
 const dialogueIds = {
@@ -185,6 +196,21 @@ const dialogueIds = {
   tansyBraceYourselfTurnIn: asContentId("tansy_rusk_brace_yourself_turn_in"),
   tansyBraceYourselfCompletion: asContentId("tansy_rusk_brace_yourself_completion"),
   tansyPostBraceYourself: asContentId("tansy_rusk_post_brace_yourself"),
+  // Return the Favor and Break It Down (#232): Tansy's Fabrication chapter at
+  // Rusk Recovery. The turn-in has three openings chosen by two narrow
+  // Mission-local Manual Override facts, all rejoining one completion.
+  tansyReturnTheFavorOffer: asContentId("tansy_rusk_return_the_favor_offer"),
+  tansyReturnTheFavorReminder: asContentId("tansy_rusk_return_the_favor_reminder"),
+  tansyReturnTheFavorBustReminder: asContentId("tansy_rusk_return_the_favor_bust_reminder"),
+  // One "finish what you've got going" beat for both halves of the chapter.
+  tansyFabricationChapterBusy: asContentId("tansy_rusk_fabrication_chapter_busy"),
+  tansyReturnTheFavorTurnIn: asContentId("tansy_rusk_return_the_favor_turn_in"),
+  tansyReturnTheFavorOverrideTurnIn: asContentId("tansy_rusk_return_the_favor_override_turn_in"),
+  tansyReturnTheFavorBustTurnIn: asContentId("tansy_rusk_return_the_favor_bust_turn_in"),
+  tansyReturnTheFavorCompletion: asContentId("tansy_rusk_return_the_favor_completion"),
+  tansyBreakItDownReminder: asContentId("tansy_rusk_break_it_down_reminder"),
+  tansyBreakItDownTurnIn: asContentId("tansy_rusk_break_it_down_turn_in"),
+  tansyBreakItDownCompletion: asContentId("tansy_rusk_break_it_down_completion"),
   // Replayable social/worldbuilding topics (#164). These are ordinary NPC
   // conversations: they never carry a Mission action and never gate progression.
   wadeRecoveryWorkTopic: asContentId("wade_rusk_topic_recovery_work"),
@@ -288,6 +314,18 @@ export const ACTION_IDS = {
   galvaniteSlagRefining: asContentId("galvanite_slag_refining"),
   // Welding the brace/support assembly into the collapsed Deep Jag passage.
   deepJagWelding: asContentId("deep_jag_welding"),
+  // Tier-1 Fabrication recipes (#232), one action per authored recipe for the
+  // same durable-identity reason Refining recipes have one: the active action
+  // IS the recipe of the workpiece on the machine, so refresh and lazy
+  // resolution never need a payload to know what is being made.
+  mountingBracketFabrication: asContentId("mounting_bracket_fabrication"),
+  scrapMetalFabrication: asContentId("scrap_metal_fabrication"),
+  scrapBoxFabrication: asContentId("scrap_box_fabrication"),
+  salvageCutterFabrication: asContentId("salvage_cutter_fabrication"),
+  // Tinkering (#232), one action per eligible output under the same rule.
+  mountingBracketTinkering: asContentId("mounting_bracket_tinkering"),
+  scrapBoxTinkering: asContentId("scrap_box_tinkering"),
+  salvageCutterTinkering: asContentId("salvage_cutter_tinkering"),
   travel: asContentId("travel"),
 } as const satisfies Record<string, ContentId>;
 

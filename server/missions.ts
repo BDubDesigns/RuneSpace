@@ -36,6 +36,7 @@ import {
   type StackAdditionPlan,
 } from "@/game/domain/inventory";
 import { unmetMissionSkillPrerequisite, type MissionObservation } from "@/game/domain/missions";
+import { orderInstancesForConsumption } from "@/game/domain/tinkering";
 import { getSkillPresentation } from "@/game/content/skill-presentation";
 import { characterSkillLevel } from "@/server/skill-levels";
 import type { MiningRandom } from "@/game/domain/mining";
@@ -674,11 +675,17 @@ async function completeMissionForDefinition(input: {
     loadRepairTargetStates(transaction, context.character.id),
   ]);
   const carriedById = new Map(itemState.carriedInstances.map((i) => [i.id, i.itemId]));
+  const equippedInstanceIds = new Set(assignments.map((assignment) => assignment.itemInstanceId));
+  // Carried and unequipped: the only instances a unique-item turn-in may take.
+  const handableInstances = itemState.carriedInstances.filter(
+    (instance) => !equippedInstanceIds.has(instance.id),
+  );
   const observation = buildCompletionObservation(
     assignmentCarriedItemIds(assignments, carriedById),
     stacks,
     new Map(progressRows.map((row) => [row.progressKey, row.progress])),
     repairStates,
+    handableInstances,
   );
 
   // Re-evaluate every authored requirement against live authoritative
@@ -735,6 +742,16 @@ async function completeMissionForDefinition(input: {
       }
       continue;
     }
+    if (requirement.kind === "carried_unique_item") {
+      if ((observation.carriedUniqueItems?.get(requirement.itemId) ?? 0) < 1) {
+        return stateFor({
+          status: "refused",
+          reason: "insufficient_items",
+          message: `Objective not met: ${renderRequirementCopy(requirement, observation)}.`,
+        });
+      }
+      continue;
+    }
     const carried = observation.carriedQuantities.get(requirement.itemId) ?? 0;
     if (carried < resolveRequiredQuantity(requirement, observation)) {
       return stateFor({
@@ -778,6 +795,39 @@ async function completeMissionForDefinition(input: {
     consumptionPlans.push(plan);
     candidateStacks = applyRemovalPlanToCandidate(candidateStacks, plan);
   }
+  // A handed-over unique item (#232): one eligible carried, unequipped
+  // instance, chosen by the same least-value-first order Tinkering uses, so
+  // the player's charged or original tool is never the one singled out.
+  const consumedInstanceIds: string[] = [];
+  for (const requirement of definition.requirements) {
+    if (requirement.kind !== "carried_unique_item" || requirement.turnIn !== "consume_one") {
+      continue;
+    }
+    const [chosen] = orderInstancesForConsumption(
+      handableInstances
+        .filter(
+          (instance) =>
+            instance.itemId === requirement.itemId && !consumedInstanceIds.includes(instance.id),
+        )
+        .map((instance) => ({
+          id: instance.id,
+          itemId: instance.itemId,
+          currentCharge: instance.currentCharge,
+          createdAt: instance.createdAt.toISOString(),
+        })),
+    );
+    if (!chosen) {
+      return stateFor({
+        status: "refused",
+        reason: "insufficient_items",
+        message: `Objective not met: ${renderRequirementCopy(requirement, observation)}.`,
+      });
+    }
+    consumedInstanceIds.push(chosen.id);
+  }
+  const candidateInstances = itemState.carriedInstances.filter(
+    (instance) => !consumedInstanceIds.includes(instance.id),
+  );
 
   // Preflight the declared reward against the post-consumption candidate
   // inventory. Consumption may legitimately free the slot or mass the
@@ -789,7 +839,7 @@ async function completeMissionForDefinition(input: {
     }
     const loadout = deriveEquipmentLoadout({
       assignments,
-      instances: itemState.carriedInstances,
+      instances: candidateInstances,
       stacks: candidateStacks,
       balance,
     });
@@ -824,7 +874,7 @@ async function completeMissionForDefinition(input: {
   if (definition.reward?.kind === "stack_bundle") {
     const loadout = deriveEquipmentLoadout({
       assignments,
-      instances: itemState.carriedInstances,
+      instances: candidateInstances,
       stacks: candidateStacks,
       balance,
     });
@@ -876,6 +926,13 @@ async function completeMissionForDefinition(input: {
       plan,
       now,
     });
+  }
+  for (const instanceId of consumedInstanceIds) {
+    await transaction
+      .delete(itemInstances)
+      .where(
+        and(eq(itemInstances.id, instanceId), eq(itemInstances.characterId, context.character.id)),
+      );
   }
 
   let rewardInfo: { itemId: string; quantity: 1; itemInstanceId?: string } | undefined;
@@ -994,7 +1051,7 @@ function renderRequirementCopy(
   if (requirement.kind === "repair_target_complete") return requirement.objective;
   if (requirement.kind === "npc_conversation") return requirement.objective;
   const itemName = observation.itemNames.get(requirement.itemId) ?? requirement.itemId;
-  if (requirement.kind === "equipped_item") {
+  if (requirement.kind === "equipped_item" || requirement.kind === "carried_unique_item") {
     return requirement.objective.replace("{item}", itemName);
   }
   const required = resolveRequiredQuantity(requirement, observation);
@@ -1051,7 +1108,12 @@ function buildCompletionObservation(
   stacks: readonly { itemId: string; quantity: number }[],
   trackedProgress: ReadonlyMap<string, number> = new Map(),
   repairStates: ReadonlyMap<string, RepairTargetState>,
+  handableInstances: readonly { itemId: string }[] = [],
 ): MissionObservation {
+  const carriedUniqueItems = new Map<string, number>();
+  for (const instance of handableInstances) {
+    carriedUniqueItems.set(instance.itemId, (carriedUniqueItems.get(instance.itemId) ?? 0) + 1);
+  }
   const balance = getEffectiveGameBalance();
   const carriedQuantities = new Map<string, number>();
   for (const stack of stacks) {
@@ -1070,7 +1132,9 @@ function buildCompletionObservation(
       mission.requirements
         .filter(
           (requirement): requirement is Extract<MissionRequirement, { itemId: string }> =>
-            requirement.kind === "equipped_item" || requirement.kind === "carried_stack",
+            requirement.kind === "equipped_item" ||
+            requirement.kind === "carried_stack" ||
+            requirement.kind === "carried_unique_item",
         )
         .map((requirement) => requirement.itemId),
     ),
@@ -1085,6 +1149,7 @@ function buildCompletionObservation(
   return {
     equippedItemIds: equippedCarriedIds,
     carriedQuantities,
+    carriedUniqueItems,
     stackLimits,
     itemNames,
     trackedProgress,

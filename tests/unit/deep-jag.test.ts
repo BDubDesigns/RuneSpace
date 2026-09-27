@@ -85,8 +85,9 @@ describe("Brace Yourself eligibility", () => {
     expect(offered(atSkills(qualified)).prerequisiteSatisfied).toBe(true);
   });
 
-  it("is unavailable before 10,000 Hours is complete", () => {
-    expect(braceYourself.prerequisiteMissionId).toBe(MISSION_IDS.tenThousandHours);
+  it("is unavailable before Break It Down is complete (#232)", () => {
+    // Tansy's Fabrication chapter now canonically precedes the Deep Jag.
+    expect(braceYourself.prerequisiteMissionId).toBe(MISSION_IDS.breakItDown);
     expect(offered(atSkills(qualified), false).prerequisiteSatisfied).toBe(false);
   });
 
@@ -109,7 +110,7 @@ describe("Brace Yourself eligibility", () => {
   });
 
   it("does not require 10,001 Hours: Work Orders and Deep Jag are siblings", () => {
-    // Its predecessor is 10,000 Hours, and nothing in the authored Mission
+    // Its predecessor is Break It Down, and nothing in the authored Mission
     // mentions the Work Order branch at all.
     expect(braceYourself.prerequisiteMissionId).not.toBe(MISSION_IDS.tenThousandOneHours);
     expect(JSON.stringify(braceYourself)).not.toContain(MISSION_IDS.tenThousandOneHours);

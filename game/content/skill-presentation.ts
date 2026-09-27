@@ -27,6 +27,9 @@ const skillPresentations = {
   [SKILL_IDS.refining]: { displayName: "Refining", accentTone: "refining" },
   [SKILL_IDS.welding]: { displayName: "Welding", accentTone: "welding" },
   [SKILL_IDS.strength]: { displayName: "Strength" },
+  // No Fabrication accent has been approved (#232): it presents through the
+  // canonical neutral fallback rather than an invented hue.
+  [SKILL_IDS.fabrication]: { displayName: "Fabrication" },
 } as const satisfies Partial<Record<SkillId, SkillPresentation>>;
 
 /** Canonical selectable skill identities for skill-XP presentation beats. */
