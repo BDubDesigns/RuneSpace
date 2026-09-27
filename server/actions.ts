@@ -8,6 +8,7 @@ import {
   requireVerifiedUser,
   OwnershipError,
 } from "@/server/ownership";
+import { FabricationReservationError } from "@/server/fabrication-reservation";
 import { createCharacter, changeCharacterPortrait, CharacterError } from "@/server/characters";
 import { GameplayAccessError, loadAccountGameplayAccess } from "@/server/gameplay-access";
 import { db } from "@/db";
@@ -27,6 +28,19 @@ import {
   type LoadPowerCellResult,
 } from "@/server/mining-commands";
 import { startRefining, stopRefining } from "@/server/refining-commands";
+import {
+  finishCurrentFabrication,
+  lockInFabricationOverride,
+  pushFabricationOverride,
+  setManualOverride,
+  startFabrication,
+} from "@/server/fabrication-commands";
+import {
+  finishCurrentTinkering,
+  setTinkeringScrapPreference,
+  startTinkering,
+  stopTinkering,
+} from "@/server/tinkering-commands";
 import { changeEquipment } from "@/server/equipment";
 import { discardInventoryStack, type DiscardInventoryStackResult } from "@/server/inventory";
 import {
@@ -85,6 +99,14 @@ import {
   DiscardInventoryStackRequestSchema,
   RepairMaterialContributionRequestSchema,
   StartRefiningRequestSchema,
+  StartFabricationRequestSchema,
+  FabricationCommandRequestSchema,
+  ManualOverrideToggleRequestSchema,
+  ManualOverridePushRequestSchema,
+  ManualOverrideLockInRequestSchema,
+  StartTinkeringRequestSchema,
+  TinkeringCommandRequestSchema,
+  TinkeringScrapPreferenceRequestSchema,
   WeldingCommandRequestSchema,
   PracticeCommandRequestSchema,
   StartPracticeRequestSchema,
@@ -330,6 +352,85 @@ export async function startRefiningAction(input: unknown): Promise<PlayActionRes
 
 export async function stopRefiningAction(characterId: string): Promise<PlayActionResult> {
   return runPlayAction(characterId, stopRefining);
+}
+
+export async function startFabricationAction(input: unknown): Promise<PlayActionResult> {
+  const request = StartFabricationRequestSchema.safeParse(input);
+  if (!request.success) return { error: "Invalid Fabrication command." };
+  return runPlayAction(request.data.characterId, (userId, characterId) =>
+    startFabrication(userId, characterId, request.data.recipeActionId, request.data.quantity),
+  );
+}
+
+/** Stop, for a Fabrication run, is Finish Current: there is no cancel (#232). */
+export async function finishCurrentFabricationAction(input: unknown): Promise<PlayActionResult> {
+  const request = FabricationCommandRequestSchema.safeParse(input);
+  if (!request.success) return { error: "Invalid Fabrication command." };
+  return runPlayAction(request.data.characterId, (userId, characterId) =>
+    finishCurrentFabrication(userId, characterId),
+  );
+}
+
+export async function setManualOverrideAction(input: unknown): Promise<PlayActionResult> {
+  const request = ManualOverrideToggleRequestSchema.safeParse(input);
+  if (!request.success) return { error: "Invalid Manual Override command." };
+  return runPlayAction(request.data.characterId, (userId, characterId) =>
+    setManualOverride(userId, characterId, request.data.enabled),
+  );
+}
+
+export async function pushManualOverrideAction(input: unknown): Promise<PlayActionResult> {
+  const request = ManualOverridePushRequestSchema.safeParse(input);
+  if (!request.success) return { error: "Invalid Manual Override command." };
+  return runPlayAction(request.data.characterId, (userId, characterId) =>
+    pushFabricationOverride(
+      userId,
+      characterId,
+      request.data.feed,
+      request.data.expectedWorkpiece,
+      request.data.expectedPushes,
+    ),
+  );
+}
+
+export async function lockInManualOverrideAction(input: unknown): Promise<PlayActionResult> {
+  const request = ManualOverrideLockInRequestSchema.safeParse(input);
+  if (!request.success) return { error: "Invalid Manual Override command." };
+  return runPlayAction(request.data.characterId, (userId, characterId) =>
+    lockInFabricationOverride(userId, characterId, request.data.expectedWorkpiece),
+  );
+}
+
+export async function startTinkeringAction(input: unknown): Promise<PlayActionResult> {
+  const request = StartTinkeringRequestSchema.safeParse(input);
+  if (!request.success) return { error: "Invalid Tinkering command." };
+  return runPlayAction(request.data.characterId, (userId, characterId) =>
+    startTinkering(userId, characterId, request.data.targetActionId, request.data.quantity),
+  );
+}
+
+export async function stopTinkeringAction(input: unknown): Promise<PlayActionResult> {
+  const request = TinkeringCommandRequestSchema.safeParse(input);
+  if (!request.success) return { error: "Invalid Tinkering command." };
+  return runPlayAction(request.data.characterId, (userId, characterId) =>
+    stopTinkering(userId, characterId),
+  );
+}
+
+export async function finishCurrentTinkeringAction(input: unknown): Promise<PlayActionResult> {
+  const request = TinkeringCommandRequestSchema.safeParse(input);
+  if (!request.success) return { error: "Invalid Tinkering command." };
+  return runPlayAction(request.data.characterId, (userId, characterId) =>
+    finishCurrentTinkering(userId, characterId),
+  );
+}
+
+export async function setTinkeringScrapPreferenceAction(input: unknown): Promise<PlayActionResult> {
+  const request = TinkeringScrapPreferenceRequestSchema.safeParse(input);
+  if (!request.success) return { error: "Invalid Tinkering setting." };
+  return runPlayAction(request.data.characterId, (userId, characterId) =>
+    setTinkeringScrapPreference(userId, characterId, request.data.autoDiscardScrap),
+  );
 }
 
 export async function startWeldingAction(input: unknown): Promise<PlayActionResult> {
@@ -610,7 +711,8 @@ export async function loadPowerCellAction(input: unknown): Promise<LoadPowerCell
     );
   } catch (error) {
     redirectOnGameplayRefusal(error);
-    if (error instanceof OwnershipError) return { error: error.message };
+    if (error instanceof OwnershipError || error instanceof FabricationReservationError)
+      return { error: error.message };
     throw error;
   }
 }
@@ -631,7 +733,8 @@ export async function discardInventoryStackAction(
     });
   } catch (error) {
     redirectOnGameplayRefusal(error);
-    if (error instanceof OwnershipError) return { error: error.message };
+    if (error instanceof OwnershipError || error instanceof FabricationReservationError)
+      return { error: error.message };
     throw error;
   }
 }
@@ -735,7 +838,11 @@ async function runEquipmentAction(
     };
   } catch (error) {
     redirectOnGameplayRefusal(error);
-    if (error instanceof OwnershipError || error instanceof EquipmentRuleError)
+    if (
+      error instanceof OwnershipError ||
+      error instanceof EquipmentRuleError ||
+      error instanceof FabricationReservationError
+    )
       return { error: error.message };
     throw error;
   }

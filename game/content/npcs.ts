@@ -95,6 +95,21 @@ export const NPCS: readonly NpcDefinition[] = [
     displayName: "Tansy Rusk",
     role: "Field mechanic & miner",
     homeLocationId: LOCATION_IDS.theJag,
+    // Tansy's Fabrication chapter (#232): once 10,000 Hours is done she comes
+    // to Wade's yard to teach the Fabrication Station, standing beside him,
+    // and Break It Down sends her home. Her home never changes; the later
+    // entry wins once both Missions are complete.
+    relocations: [
+      {
+        afterCompletedMissionId: MISSION_IDS.tenThousandHours,
+        locationId: LOCATION_IDS.ruskRecovery,
+        conversationBackgroundId: CONVERSATION_BACKGROUND_IDS.ruskRecoveryYard,
+      },
+      {
+        afterCompletedMissionId: MISSION_IDS.breakItDown,
+        locationId: LOCATION_IDS.theJag,
+      },
+    ],
     conversationBackgroundId: CONVERSATION_BACKGROUND_IDS.theJagExterior,
     expressionAssets: {
       [EXPRESSION_IDS.neutral]: "/npc-art/tansy-neutral.png",

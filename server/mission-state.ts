@@ -206,6 +206,29 @@ export async function isMissionAccepted(
 }
 
 /**
+ * Whether this character has completed one Mission — the authoritative read
+ * for anything a completed Mission opens, such as Tinkering after Tansy's
+ * Return the Favor demonstration (#232).
+ */
+export async function isMissionCompleted(
+  transaction: DatabaseTransaction,
+  characterId: string,
+  missionId: string,
+): Promise<boolean> {
+  const rows = await transaction
+    .select({ completedAt: characterMissions.completedAt })
+    .from(characterMissions)
+    .where(
+      and(
+        eq(characterMissions.characterId, characterId),
+        eq(characterMissions.missionId, missionId),
+      ),
+    )
+    .limit(1);
+  return rows[0]?.completedAt != null;
+}
+
+/**
  * True when the mission's authored prerequisite (if any) is completed for the
  * character. A mission with no prerequisite is always available.
  */
@@ -227,7 +250,9 @@ function requirementItemIds(definitions: readonly MissionDefinition[]): readonly
     mission.requirements
       .filter(
         (requirement): requirement is Extract<typeof requirement, { itemId: string }> =>
-          requirement.kind === "equipped_item" || requirement.kind === "carried_stack",
+          requirement.kind === "equipped_item" ||
+          requirement.kind === "carried_stack" ||
+          requirement.kind === "carried_unique_item",
       )
       .map((requirement) => requirement.itemId),
   );
@@ -258,6 +283,13 @@ function buildObservation(
       .map((assignment) => carriedById.get(assignment.itemInstanceId))
       .filter((itemId): itemId is string => itemId !== undefined),
   );
+  // Carried and unequipped unique instances, for a unique-item turn-in (#232).
+  const equippedInstanceIds = new Set(assignments.map((assignment) => assignment.itemInstanceId));
+  const carriedUniqueItems = new Map<string, number>();
+  for (const instance of carriedInstances) {
+    if (equippedInstanceIds.has(instance.id)) continue;
+    carriedUniqueItems.set(instance.itemId, (carriedUniqueItems.get(instance.itemId) ?? 0) + 1);
+  }
   const carriedQuantities = new Map<string, number>();
   for (const stack of stackRows) {
     carriedQuantities.set(
@@ -290,6 +322,7 @@ function buildObservation(
   return {
     equippedItemIds: equippedCarriedIds,
     carriedQuantities,
+    carriedUniqueItems,
     stackLimits,
     itemNames,
     repairTargets,

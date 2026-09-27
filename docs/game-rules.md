@@ -25,15 +25,16 @@ The following are live on `main` as server-authoritative, Play-orchestrated syst
 - **Refining** — authored recipes at the Abandoned Processing Yard, run a chosen number of batches at a time, or Max until blocked (bounded runs, #229).
 - **Welding & Cargo Hold** — ship Cargo Hold repair at Crash Site, the Crew Stop repair in Holo Hollow, and Welding progression.
 - **Practice Welding & Clean Pass** — the repeatable Welding training loop at Wade's Workbench in Rusk Recovery, run a chosen number of welds at a time or Max until the Scrap runs out, and the two optional Clean Pass opportunities every Welding work unit rolls (`docs/gameplay-foundations.md`).
-- **Inventory & Equipment** — carried stacks/unique items, slot/mass capacity, containers, and Equipment.
+- **Fabrication & Tinkering** — Tier-1 Fabrication at Rusk Recovery's Fabrication Station: four authored recipes, a binding workpiece whose materials stay reserved until it resolves, numeric or Max runs, the optional Manual Override push-your-luck layer, and Tinkering — dismantling finished Fabrication output for Fabrication XP and Scrap Metal (#232, `docs/gameplay-foundations.md`).
+- **Inventory & Equipment** — carried stacks/unique items, slot/mass capacity, containers (the starter MYKEA and the fabricated Scrap Box), and Equipment.
 - **Locations & presentation** — location scenes and the local world map.
 - **Holo Hollow, Local Places & Credits** — the first settlement, one-level Local Places inside it, character-scoped Credits, and Bix's authored merchant Trade (`docs/gameplay-foundations.md`, `docs/holo-hollow.md`).
-- **Missions & NPC conversations** — declarative mission framework (`docs/missions.md`), authored missions (Walk It Off / Cut Your Teeth / Waste Not / Hold It Together / Keep the Change / 10,000 Hours, plus the optional Out of the Weather), the one canonical NPC conversation model with replayable topics (`docs/npc-conversations.md`), and dialogue authoring (`docs/qc-studio.md`).
+- **Missions & NPC conversations** — declarative mission framework (`docs/missions.md`), authored missions (Walk It Off / Cut Your Teeth / Waste Not / Hold It Together / Keep the Change / 10,000 Hours / 10,001 Hours / Return the Favor / Break It Down / Brace Yourself, plus the optional Out of the Weather), the one canonical NPC conversation model with replayable topics (`docs/npc-conversations.md`), and dialogue authoring (`docs/qc-studio.md`).
 
 ## World & skills
 
 - The opening direction is a **one-way crash-site tutorial planet**.
-- **Mining** is the first core skill direction; **Refining** is the second (at the Abandoned Processing Yard); **Welding** repairs the crashed ship's Cargo Hold at Crash Site, and is practised, as often as the player likes, at Wade's Workbench in Rusk Recovery.
+- **Mining** is the first core skill direction; **Refining** is the second (at the Abandoned Processing Yard); **Welding** repairs the crashed ship's Cargo Hold at Crash Site, and is practised, as often as the player likes, at Wade's Workbench in Rusk Recovery; **Fabrication** turns processed stock into discrete items at the Fabrication Station beside that bench, taught by Tansy after 10,000 Hours.
 - Planetary maps use **hexes** with **local fog-of-war** exploration.
 - **Explore** consumes **limited fuel**.
 - **Speeder Piloting** and **Ship Piloting** are separate skill directions.
@@ -45,7 +46,7 @@ The following are live on `main` as server-authoritative, Play-orchestrated syst
 
 ## Non-goals (currently)
 
-The following remain explicitly out of scope until later approved issues: additional quest/mission content beyond the current authored missions, additional crafting/gathering activities beyond the approved Mining/Refining/Welding slices, hex exploration, fuel consumption beyond the approved Cargo Hold repair, ships/speeders, combat, Phaser minigames, chat/clans/multiplayer, player-to-player trading and any player-driven market or economy simulation, a CMS, background workers, and autonomous issue selection. See `docs/gameplay-foundations.md` for the authoritative slice boundaries.
+The following remain explicitly out of scope until later approved issues: additional quest/mission content beyond the current authored missions, additional crafting/gathering activities beyond the approved Mining/Refining/Welding/Fabrication slices (Fabrication beyond Tier 1 is the next approved slice, not yet shipped), hex exploration, fuel consumption beyond the approved Cargo Hold repair, ships/speeders, combat, Phaser minigames, chat/clans/multiplayer, player-to-player trading and any player-driven market or economy simulation, a CMS, background workers, and autonomous issue selection. See `docs/gameplay-foundations.md` for the authoritative slice boundaries.
 
 The approved NPC merchant loop (Credits and Bix's fixed buy/sell catalog, issue
 #159) is live and described in `docs/gameplay-foundations.md` and

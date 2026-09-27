@@ -19,6 +19,8 @@
   --rs-accent-success: #88d763;
   --rs-accent-mining: #f5c451;
   --rs-accent-arcane: #c48cff;
+  /* Shop Olive (#232), approved for Fabrication. */
+  --rs-accent-shop-olive: #7fa347;
   --rs-accent-danger: #f16c75;
   /* Canonical player-facing skill accent identity (issue #215): progression
      surfaces consume these, never the underlying accent tokens directly, so a
@@ -26,6 +28,7 @@
   --rs-skill-mining: var(--rs-accent-mining);
   --rs-skill-refining: var(--rs-accent-arcane);
   --rs-skill-welding: var(--rs-accent-primary);
+  --rs-skill-fabrication: var(--rs-accent-shop-olive);
   --rs-comms-tint: rgb(93 151 105 / 0.2);
   --rs-comms-scanline: rgb(190 255 184 / 0.16);
   --rs-comms-label: #b9e8aa;
@@ -46,6 +49,8 @@
   --rs-accent-mining-hover: rgb(245 196 81 / 0.17);
   --rs-accent-arcane-subtle: rgb(196 140 255 / 0.1);
   --rs-accent-arcane-hover: rgb(196 140 255 / 0.17);
+  --rs-accent-shop-olive-subtle: rgb(127 163 71 / 0.14);
+  --rs-accent-shop-olive-hover: rgb(127 163 71 / 0.22);
   --rs-accent-danger-subtle: rgb(241 108 117 / 0.1);
   --rs-accent-danger-hover: rgb(241 108 117 / 0.17);
   --rs-focus-ring: #a5efff;

@@ -12,6 +12,10 @@ const suite = DATABASE_URL ? describe : describe.skip;
 /** Short unique token so fixture names never collide with leftovers. */
 const token = () => Math.random().toString(36).slice(2, 8);
 
+/** The profile's Mining entry, by name: skills present in stable-ID order. */
+const mining = <Skill extends { displayName: string }>(result: { skills: readonly Skill[] }) =>
+  result.skills.find((skill) => skill.displayName === "Mining");
+
 /**
  * Issue #64 acceptance: the narrow authenticated public-character-profile read
  * boundary, proven against real PostgreSQL. Every read is scoped by the owned
@@ -166,6 +170,16 @@ suite("issue #64 character profile read boundary (real PostgreSQL)", () => {
       ownerName: "Narrow Owner",
       characterLevel: 2,
       skills: [
+        // A standard skill since #232, with its own approved accent.
+        {
+          displayName: "Fabrication",
+          level: 1,
+          totalXp: 0,
+          xpIntoLevel: 0,
+          xpToNextLevel: 500,
+          atMaximumLevel: false,
+          accentTone: "fabrication",
+        },
         {
           displayName: "Mining",
           level: 2,
@@ -224,9 +238,9 @@ suite("issue #64 character profile read boundary (real PostgreSQL)", () => {
     await makeCharacterAt(owner, midName, LOCATION_IDS.crashSite, 750);
 
     const edge = await profile.getCharacterProfile(owner, active.id, edgeName);
-    expect(edge.skills[0]).toMatchObject({ level: 2, xpIntoLevel: 0, xpToNextLevel: 550 });
+    expect(mining(edge)).toMatchObject({ level: 2, xpIntoLevel: 0, xpToNextLevel: 550 });
     const mid = await profile.getCharacterProfile(owner, active.id, midName);
-    expect(mid.skills[0]).toMatchObject({ level: 2, xpIntoLevel: 250, xpToNextLevel: 300 });
+    expect(mining(mid)).toMatchObject({ level: 2, xpIntoLevel: 250, xpToNextLevel: 300 });
   });
 
   it("is truthful at the maximum level", async () => {
@@ -238,14 +252,14 @@ suite("issue #64 character profile read boundary (real PostgreSQL)", () => {
     await makeCharacterAt(owner, maxName, LOCATION_IDS.crashSite, maxXp);
 
     const result = await profile.getCharacterProfile(owner, active.id, maxName);
-    // Mining 99, Refining 1, Welding 1: 1 + 98 earned levels.
+    // Mining 99, every other skill 1: 1 + 98 earned levels.
     expect(result.characterLevel).toBe(99);
-    expect(result.skills[0]).toMatchObject({
+    expect(mining(result)).toMatchObject({
       level: 99,
       totalXp: maxXp,
       atMaximumLevel: true,
     });
-    expect(result.skills[0]?.xpToNextLevel).toBeUndefined();
+    expect(mining(result)?.xpToNextLevel).toBeUndefined();
   });
 
   it("presents only skills with an approved curve and defaults absent XP to zero", async () => {
@@ -264,18 +278,20 @@ suite("issue #64 character profile read boundary (real PostgreSQL)", () => {
 
     const playedProfile = await profile.getCharacterProfile(owner, active.id, playedName);
     expect(playedProfile.skills.map((skill) => skill.displayName)).toEqual([
+      "Fabrication",
       "Mining",
       "Refining",
       "Welding",
     ]);
-    expect(playedProfile.skills[0]).toMatchObject({ level: 2, totalXp: 500 });
+    expect(mining(playedProfile)).toMatchObject({ level: 2, totalXp: 500 });
     const freshProfile = await profile.getCharacterProfile(owner, active.id, freshName);
     expect(freshProfile.skills.map((skill) => skill.displayName)).toEqual([
+      "Fabrication",
       "Mining",
       "Refining",
       "Welding",
     ]);
-    expect(freshProfile.skills[0]).toMatchObject({ level: 1, totalXp: 0 });
+    expect(mining(freshProfile)).toMatchObject({ level: 1, totalXp: 0 });
     expect(freshProfile.characterLevel).toBe(1);
   });
 
@@ -306,8 +322,9 @@ suite("issue #64 character profile read boundary (real PostgreSQL)", () => {
 
     try {
       const result = await profile.getCharacterProfile(owner, active.id, targetName);
-      // Mining, Refining, and Welding have approved level curves and are published.
-      expect(result.skills).toHaveLength(3);
+      // Fabrication, Mining, Refining, and Welding have approved level curves
+      // and are published.
+      expect(result.skills).toHaveLength(4);
     } finally {
       spy.mockRestore();
     }

@@ -10,6 +10,12 @@ who has accepted it can browse the board, accept a posting, Start/Resume
 Welding it, and get paid on completion. See "The unlock" below for why
 acceptance, not turn-in, is the gate.
 
+Since #232 the terminal and the Workbench together make up Rusk Recovery's
+**Welding Workshop** work area. Once Tansy opens the Fabrication Station beside
+it, the yard presents the two work areas as cards and the terminal renders with
+the Workshop when that area is selected (`docs/design-system.md`); nothing about
+the board itself changed.
+
 At **Refining level 5** (issue #217), Galvanic Stock becomes craftable and
 eight more jobs join the eligible pool — the original eight remain eligible
 forever, unchanged, under their existing Welding-only rule. Reaching Refining

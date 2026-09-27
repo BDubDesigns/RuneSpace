@@ -39,6 +39,10 @@ import {
   type AdminPublicGameplayView,
 } from "@/server/admin-access-state";
 import { forceIdleResolvedAction } from "@/server/play-interrupt";
+import {
+  assertActiveWorkpieceResolvable,
+  FabricationReservationError,
+} from "@/server/fabrication-reservation";
 import { invalidateMiningActionForChangedTool } from "@/server/equipment";
 import { removeCargoStack } from "@/server/cargo-hold";
 import { defaultMiningRandom } from "@/server/mining";
@@ -284,6 +288,7 @@ export async function removeCarriedStackQuantityAsAdmin(
         quantity: mode === "stack" ? expectedQuantity : 1,
         now,
       });
+      if (removal.ok) await operatorWorkpieceGuard(transaction, character.id);
       // Reload AFTER the mutation so the returned state is authoritative.
       const state = await refreshedState(transaction, character.id, now);
       if (!removal.ok)
@@ -445,6 +450,7 @@ export async function forceUnequipItemAsAdmin(
             eq(equippedItems.itemInstanceId, itemInstanceId),
           ),
         );
+      await operatorWorkpieceGuard(transaction, character.id);
 
       // If the Mining tool slot was just vacated while an active Mining action
       // is live, apply the shared authoritative Mining-loadout invalidation so
@@ -1027,6 +1033,28 @@ export async function setPublicGameplayOpenAsAdmin(
     }
     return { changed, view: await loadPublicGameplayView(transaction, now) };
   });
+}
+
+/**
+ * Operators get the same answer players do (#232): a carried-item tool may not
+ * strand the Fabrication workpiece on the machine. Stop the current action
+ * first — that clears the workpiece without consuming anything — then edit.
+ */
+async function operatorWorkpieceGuard(
+  transaction: DatabaseTransaction,
+  characterId: string,
+): Promise<void> {
+  try {
+    await assertActiveWorkpieceResolvable(transaction, characterId);
+  } catch (error) {
+    if (error instanceof FabricationReservationError) {
+      throw new AdminCommandError(
+        "A Fabrication workpiece has reserved this. Stop the current action first.",
+        409,
+      );
+    }
+    throw error;
+  }
 }
 
 /** Minimal error carrier so seams can reject without importing the public class. */

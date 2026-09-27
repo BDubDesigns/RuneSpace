@@ -1,4 +1,9 @@
-import { miningActionIds, refiningActionIds, weldingActionIds } from "@/game/config/balance";
+import {
+  miningActionIds,
+  refiningActionIds,
+  tinkeringActionIds,
+  weldingActionIds,
+} from "@/game/config/balance";
 import { ACTION_IDS } from "@/game/config/foundations";
 
 /**
@@ -15,6 +20,11 @@ import { ACTION_IDS } from "@/game/config/foundations";
  * partial pass is simply never resolved. Practice Welding joins them because
  * leaving Wade's yard stops the bench, and the partial weld is waiting when the
  * player comes back (#190).
+ *
+ * Tinkering (#232) joins for the same reason: its cycle's batch was committed
+ * when the cycle began, so walking away keeps that cycle waiting exactly as
+ * Stop does. Fabrication deliberately does NOT: a started workpiece is binding
+ * and must reach success or bust before the character may leave the station.
  */
 const TRAVEL_REPLACEABLE_ACTION_IDS = new Set<string>([
   ...miningActionIds(),
@@ -24,6 +34,7 @@ const TRAVEL_REPLACEABLE_ACTION_IDS = new Set<string>([
   // Walking out of the yard interrupts a customer job under the same shared
   // Stop/Travel semantics, preserving its durable progress (#207).
   ACTION_IDS.workOrderWelding,
+  ...tinkeringActionIds(),
 ]);
 
 export function isTravelReplaceableAction(actionId: string): boolean {

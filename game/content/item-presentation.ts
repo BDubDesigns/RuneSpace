@@ -76,6 +76,19 @@ const itemPresentations = {
     textFallback: "SL",
     artworkSrc: "/item-art/slag.webp",
   },
+  // Tier-1 Fabrication outputs (#232).
+  [ITEM_IDS.mountingBracket]: {
+    displayName: "Mounting Bracket",
+    accessibleDescription: "Fabricated mounting bracket for permanent installations",
+    textFallback: "MB",
+    artworkSrc: "/item-art/mounting-bracket.webp",
+  },
+  [ITEM_IDS.scrapBox]: {
+    displayName: "Scrap Box",
+    accessibleDescription: "Crude, overbuilt fabricated container attachment",
+    textFallback: "SB",
+    artworkSrc: "/item-art/scrap-box.webp",
+  },
 } as const satisfies Partial<Record<ItemId, ItemPresentation>>;
 
 export function getItemPresentation(itemId: string): ItemPresentation | undefined {

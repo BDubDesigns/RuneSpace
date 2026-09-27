@@ -16,6 +16,8 @@ import {
 import { ACTION_IDS } from "@/game/config/foundations";
 import type { DatabaseTransaction } from "@/server/action-resolution";
 import { interruptPracticeWelding } from "@/server/practice-welding";
+import { clearFabricationWorkpiece, isFabricationAction } from "@/server/fabrication";
+import { interruptTinkering, isTinkeringAction } from "@/server/tinkering";
 import { missOpenWorkOrderCleanPass } from "@/server/work-orders";
 import { missOpenRepairCleanPass } from "@/server/welding";
 
@@ -38,6 +40,12 @@ import { missOpenRepairCleanPass } from "@/server/welding";
  * - Practice: the shared Practice interruption — close an open Clean Pass
  *             window and delete the action, preserving the partial weld and the
  *             Scrap already spent on it.
+ * - Fabrication (#232): clear the workpiece and its Override machine and end
+ *             the run. Its reserved inputs were never consumed — they only
+ *             ever leave at resolution — so nothing is lost and nothing is
+ *             granted. There is no player path to this; it is an operator's.
+ * - Tinkering (#232): the shared Tinkering interruption — delete the action,
+ *             keeping the committed cycle exactly as the player's own Stop does.
  * - Travel:   delete the remaining active action + `characterTravelState` only;
  *             committed `characterScavengeReveals` are preserved untouched, and
  *             the character's authoritative origin row is not relocated here.
@@ -114,6 +122,16 @@ export async function forceIdleResolvedAction(
   if (actionId === ACTION_IDS.workOrderWelding) {
     await missOpenWorkOrderCleanPass(transaction, { characterId: character.id, now });
     await transaction.delete(activeActions).where(eq(activeActions.characterId, character.id));
+    return { interrupted: true, interruptedActionId: actionId };
+  }
+
+  if (isFabricationAction(actionId)) {
+    await clearFabricationWorkpiece(transaction, character.id, "manually_stopped", now);
+    return { interrupted: true, interruptedActionId: actionId };
+  }
+
+  if (isTinkeringAction(actionId)) {
+    await interruptTinkering(transaction, character.id);
     return { interrupted: true, interruptedActionId: actionId };
   }
 

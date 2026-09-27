@@ -15,14 +15,17 @@ import {
  * anyway, because they are genuinely different moments: Wade offering the bench
  * is not Wade trusting the player with paying work.
  *
- * Deliberately not a workstation registry: this is one bench and one terminal,
- * in one yard. A second workstation earns its own shape when a real one exists.
+ * Deliberately not a workstation registry: one bench, one terminal, and since
+ * #232 one Fabrication Station, in one yard — each named here by the Mission
+ * moment that opens it.
  */
 export const RUSK_RECOVERY_CONTENT: {
   locationId: LocationId;
   practiceAuthorizingMissionId: MissionId;
   workOrdersRevealMissionId: MissionId;
   workOrdersMissionId: MissionId;
+  fabricationAuthorizingMissionId: MissionId;
+  tinkeringAuthorizingMissionId: MissionId;
 } = {
   locationId: LOCATION_IDS.ruskRecovery,
   practiceAuthorizingMissionId: MISSION_IDS.tenThousandHours,
@@ -33,4 +36,10 @@ export const RUSK_RECOVERY_CONTENT: {
   // terminal becomes visible long before it becomes the player's to use, and
   // turning 10,001 Hours in is never a second gate.
   workOrdersMissionId: MISSION_IDS.tenThousandOneHours,
+  // The Fabrication Station (#232) is Tansy's to open, the way the Workbench is
+  // Wade's: ACCEPTING Return the Favor puts the player on it for good...
+  fabricationAuthorizingMissionId: MISSION_IDS.returnTheFavor,
+  // ...and COMPLETING it — Tansy's own demonstration, at the turn-in — is what
+  // unlocks Tinkering. Not a separate pickup, and no second unlock flag.
+  tinkeringAuthorizingMissionId: MISSION_IDS.returnTheFavor,
 };

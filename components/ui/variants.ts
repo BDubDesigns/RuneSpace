@@ -4,6 +4,7 @@ export type Intent =
   | "success"
   | "mining"
   | "arcane"
+  | "fabrication"
   | "danger"
   | "mission";
 
@@ -18,6 +19,10 @@ export const intentClassNames: Record<Intent, string> = {
     "border-[color:var(--rs-accent-mining)] bg-[color:var(--rs-accent-mining-subtle)] text-[color:var(--rs-accent-mining)] hover:bg-[color:var(--rs-accent-mining-hover)]",
   arcane:
     "border-[color:var(--rs-accent-arcane)] bg-[color:var(--rs-accent-arcane-subtle)] text-[color:var(--rs-accent-arcane)] hover:bg-[color:var(--rs-accent-arcane-hover)]",
+  // Shop Olive (#232): the latched ON state of a Fabrication Station toggle.
+  // The glow is inset because `.rs-bevel`'s clip-path cuts off anything outside.
+  fabrication:
+    "border-[color:var(--rs-accent-shop-olive)] bg-[color:var(--rs-accent-shop-olive-subtle)] text-[color:var(--rs-accent-shop-olive)] shadow-[inset_0_0_0_1px_var(--rs-accent-shop-olive),inset_0_0_12px_rgb(127_163_71_/_0.35)] hover:bg-[color:var(--rs-accent-shop-olive-hover)]",
   danger:
     "border-[color:var(--rs-accent-danger)] bg-[color:var(--rs-accent-danger-subtle)] text-[color:var(--rs-accent-danger)] hover:bg-[color:var(--rs-accent-danger-hover)]",
   mission:

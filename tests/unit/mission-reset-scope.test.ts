@@ -51,8 +51,11 @@ describe("missionChainResetScope", () => {
       // off 10,000 Hours (#207).
       "ten_thousand_hours",
       "ten_thousand_one_hours",
-      // Brace Yourself is 10,001 Hours' sibling rather than its successor: it
-      // hangs off 10,000 Hours too, so the same reset reaches both (#209).
+      // Tansy's Fabrication chapter hangs off 10,000 Hours too (#232), and
+      // Brace Yourself now hangs off its end rather than off 10,000 Hours
+      // (#209, #232) — so the same reset still reaches all of them.
+      "return_the_favor",
+      "break_it_down",
       "brace_yourself",
       // Out of the Weather hangs off Hold It Together, so resetting the chain
       // from the start necessarily clears the optional branch with it (#172).
@@ -67,8 +70,11 @@ describe("missionChainResetScope", () => {
       // off 10,000 Hours (#207).
       "ten_thousand_hours",
       "ten_thousand_one_hours",
-      // Brace Yourself is 10,001 Hours' sibling rather than its successor: it
-      // hangs off 10,000 Hours too, so the same reset reaches both (#209).
+      // Tansy's Fabrication chapter hangs off 10,000 Hours too (#232), and
+      // Brace Yourself now hangs off its end rather than off 10,000 Hours
+      // (#209, #232) — so the same reset still reaches all of them.
+      "return_the_favor",
+      "break_it_down",
       "brace_yourself",
       // Out of the Weather hangs off Hold It Together, so resetting the chain
       // from the start necessarily clears the optional branch with it (#172).
@@ -78,6 +84,8 @@ describe("missionChainResetScope", () => {
       "keep_the_change",
       "ten_thousand_hours",
       "ten_thousand_one_hours",
+      "return_the_favor",
+      "break_it_down",
       "brace_yourself",
     ]);
   });

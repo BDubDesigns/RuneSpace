@@ -10,6 +10,7 @@ import { planEquipmentChange, type EquipmentChange } from "@/game/domain/equipme
 import { ACTION_IDS } from "@/game/config/foundations";
 import { withResolvedOwnedCharacter } from "@/server/action-resolution";
 import { loadOwnedItemInstances } from "@/server/carried-inventory";
+import { assertActiveWorkpieceResolvable } from "@/server/fabrication-reservation";
 import {
   createPlayResolver,
   ensurePlayProvisioning,
@@ -137,6 +138,9 @@ export async function changeEquipment(
         currentToolItemInstanceId: currentToolAssignment?.itemInstanceId,
         now,
       });
+      // A loadout change may not take away the room a Fabrication workpiece's
+      // output was guaranteed (#232).
+      await assertActiveWorkpieceResolvable(transaction, context.character.id);
       if (
         context.action !== undefined &&
         miningActionIds().includes(context.action.actionId) &&

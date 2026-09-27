@@ -356,11 +356,12 @@ populationTest(
 );
 
 /**
- * Issue #231: the place panel resolves an ordered set of residents. Every
- * shipped context still has at most one, so these journeys pin the migrated
- * behaviour at phone width: Wade stands where his Mission record says, Tansy
- * has not moved, each resident row sits above the place's activity, and the
- * place's own population line renders once, after the people.
+ * Issue #231: the place panel resolves an ordered set of residents. These
+ * journeys pin the behaviour at phone width: Wade stands where his Mission
+ * record says, each resident row sits above the place's activity, and the
+ * place's own population line renders once, after the people. Since #232 one
+ * shipped context has two: Tansy stands beside Wade in his yard through her
+ * Fabrication chapter.
  */
 test.describe("issue #231 resident rows at phone width", () => {
   const PHONE = { width: 390, height: 844 };
@@ -398,6 +399,17 @@ test.describe("issue #231 resident rows at phone width", () => {
     if (npcIds.length > 0) {
       const lastRow = (await rows.last().boundingBox())!;
       expect(metaBox.y).toBeGreaterThanOrEqual(lastRow.y + lastRow.height - 1);
+      // Every resident keeps their own hairline, and one more closes the
+      // resident block before the place's population (#232 human preview).
+      for (const index of npcIds.keys()) {
+        await expect(rows.nth(index)).toHaveCSS("border-top-width", "1px");
+      }
+      await expect(meta).toHaveAttribute("data-population-divider", "");
+      await expect(meta).toHaveCSS("border-top-width", "1px");
+    } else {
+      // Nobody here: no leading divider above the population.
+      await expect(meta).not.toHaveAttribute("data-population-divider");
+      await expect(meta).toHaveCSS("border-top-width", "0px");
     }
     const activity = page.locator("[data-activity-panel]").first();
     if ((await activity.count()) > 0) {
@@ -447,5 +459,35 @@ test.describe("issue #231 resident rows at phone width", () => {
     await page.reload();
     await expect(page.locator(`[data-location-scene="${LOCATION_IDS.theJag}"]`)).toBeVisible();
     await expectResidents(page, [NPC_IDS.tansyRusk]);
+  });
+
+  test("after 10,000 Hours Tansy stands beside Wade at his yard, Wade first (#232)", async ({
+    page,
+    testCharacter,
+  }) => {
+    await page.setViewportSize(PHONE);
+    await standAfterKeepTheChange(testCharacter.id, LOCATION_IDS.ruskRecovery);
+    const now = new Date();
+    await db.insert(rune.characterMissions).values({
+      characterId: testCharacter.id,
+      missionId: MISSION_IDS.tenThousandHours,
+      acceptedAt: now,
+      completedAt: now,
+    });
+    await openTestCharacter(page, testCharacter.id);
+    await expect(
+      page.locator(`[data-location-scene="${LOCATION_IDS.ruskRecovery}"]`),
+    ).toBeVisible();
+    await expectResidents(page, [NPC_IDS.wadeRusk, NPC_IDS.tansyRusk]);
+    await page.locator("[data-npc-residents]").scrollIntoViewIfNeeded();
+    await captureReviewScreenshot(page, "location-population-rusk-residents.png");
+
+    await db
+      .update(rune.characters)
+      .set({ currentLocationId: LOCATION_IDS.theJag })
+      .where(eq(rune.characters.id, testCharacter.id));
+    await page.reload();
+    await expect(page.locator(`[data-location-scene="${LOCATION_IDS.theJag}"]`)).toBeVisible();
+    await expectResidents(page, []);
   });
 });

@@ -20,6 +20,8 @@ import {
   getEffectiveGameBalance,
   getItemDefinition,
   getRepairTargetBalance,
+  fabricationRecipeForActionId,
+  fabricationRecipes,
   miningActionIds,
   miningLevelThresholds,
   miningSourceForActionId,
@@ -32,6 +34,8 @@ import {
   repairTargetForActionId,
   skillLevelThresholds,
   standardSkillLevelThresholds,
+  tinkeringTargetForActionId,
+  tinkeringTargets,
   weldingActionIds,
   weldingCadenceActionIds,
   workOrderSectionXp,
@@ -180,6 +184,50 @@ import { loadRepairAccess } from "@/server/repair-access";
 import { recordTrackedActivity, type TrackedActivity } from "@/server/mission-progress";
 import type { MissionProjection } from "@/game/domain/missions";
 import { loadPlaySnapshot } from "@/server/play-state";
+import {
+  createFabricationResolver,
+  defaultOverrideRandom,
+  fabricationRunStateFromRow,
+  isFabricationAction,
+  loadFabricationRow,
+  loadFabricationUnlocked,
+  overrideFromRow,
+  type FabricationRunState,
+} from "@/server/fabrication";
+import type { FabricationCommandError } from "@/server/fabrication-commands";
+import {
+  createTinkeringResolver,
+  isTinkeringAction,
+  loadTinkeringRow,
+  loadTinkeringUnlocked,
+  tinkeringCycleFromRow,
+  tinkeringRunStateFromRow,
+  type TinkeringRunState,
+} from "@/server/tinkering";
+import type { TinkeringCommandError } from "@/server/tinkering-commands";
+import {
+  fabricationAffordableBatches,
+  fabricationRecipeUnlocked,
+  type FabricationStopReason,
+} from "@/game/domain/fabrication";
+import {
+  manualOverrideMultiplierLabel,
+  manualOverrideXp,
+  overrideCanPush,
+  overridePushes,
+  overrideSafeRange,
+  type OverrideRandom,
+  type OverrideTrend,
+} from "@/game/domain/manual-override";
+import {
+  isMiningCutter,
+  tinkeringAffordableBatches,
+  tinkeringDurationTicks,
+  tinkeringScrapYield,
+  tinkeringUnlocked,
+  tinkeringXp,
+  type TinkeringStopReason,
+} from "@/game/domain/tinkering";
 
 function itemStackLimit(itemId: string, balance = getEffectiveGameBalance()): number {
   const definition = getItemDefinition(itemId, balance);
@@ -455,6 +503,108 @@ export type RefiningRecipeProjection = {
   inputsAvailable: boolean;
 };
 
+/** One authored Fabrication recipe as the Fabricate mode presents it (#232). */
+export type FabricationRecipeProjection = {
+  actionId: string;
+  outputItemId: string;
+  outputName: string;
+  /** Per-batch output: the tile's badge, never the selected run's total. */
+  outputQuantity: number;
+  /** Stack limit for a stackable output's tile; absent for a unique item. */
+  outputStackLimit?: number;
+  minimumLevel: number;
+  /** The character's Fabrication level authorizes it. */
+  unlocked: boolean;
+  durationTicks: number;
+  baseXp: number;
+  inputs: readonly { itemId: string; name: string; quantity: number; carried: number }[];
+  /** Enough of every input is carried for one batch right now. */
+  inputsAvailable: boolean;
+  /**
+   * How many batches the inputs carried right now pay for (#229): the most a
+   * number may ask for, and what Start revalidates against. Not a prediction
+   * and not what Max does.
+   */
+  affordableBatches: number;
+};
+
+/** The Manual Override machine on the current workpiece, as the live panel shows it. */
+export type ManualOverrideProjection = {
+  load: number;
+  trend: OverrideTrend;
+  pushes: number;
+  maximumPushes: number;
+  locked: boolean;
+  canPush: boolean;
+  multiplierLabel: string;
+  /** What this workpiece would pay if it resolved now at the multiplier earned. */
+  xpIfLockedIn: number;
+  lastPush?: {
+    feed: number;
+    load: number;
+    outcome: "safe" | "exact";
+    safeRange: { minimum: number; maximum: number };
+  };
+  dial: { minimum: number; maximum: number };
+};
+
+/** The Fabrication Station's Fabricate side (#232). */
+export type FabricationProjection = {
+  /** Return the Favor is accepted: the station is the player's to use. */
+  unlocked: boolean;
+  recipes: readonly FabricationRecipeProjection[];
+  /** The station's Manual Override toggle. */
+  manualOverrideEnabled: boolean;
+  /** The workpiece on the machine, when there is one. */
+  workpiece?: {
+    recipeActionId: string;
+    /** The run's number for this workpiece, which Push and Lock In echo back. */
+    sequence: number;
+    startedAt: string;
+    endsAt: string;
+    /** The Stop request: finish this workpiece, then start no other. */
+    finishCurrent: boolean;
+    override?: ManualOverrideProjection;
+  };
+  run: FabricationRunState;
+  lastStopReason?: FabricationStopReason;
+};
+
+/** One Tinkering target as the Tinker mode presents it (#232). */
+export type TinkeringTargetProjection = {
+  actionId: string;
+  itemId: string;
+  name: string;
+  /** One complete authored output batch — the tile's badge. */
+  batchQuantity: number;
+  stackLimit?: number;
+  minimumLevel: number;
+  unlocked: boolean;
+  durationTicks: number;
+  xp: number;
+  scrap: number;
+  /** Complete batches carried, before the last-Cutter guard. */
+  carriedBatches: number;
+  /** Complete batches that may begin — the most a number may ask for (#229). */
+  affordableBatches: number;
+  /** Carried batches exist, but the last-Cutter guard forbids every one of them. */
+  lastCutterBlocked: boolean;
+};
+
+/** The Fabrication Station's Tinker side (#232). */
+export type TinkeringProjection = {
+  /** Tansy's Return the Favor demonstration has happened. */
+  unlocked: boolean;
+  active: boolean;
+  autoDiscardScrap: boolean;
+  finishCurrent: boolean;
+  /** A committed cycle — its batch already destroyed — waiting or running. */
+  cycle?: { targetActionId: string; ticksCompleted: number; durationTicks: number };
+  targets: readonly TinkeringTargetProjection[];
+  run: TinkeringRunState;
+  lastStopReason?: TinkeringStopReason;
+};
+
 /**
  * One World Location's derived player-facing state (#209), resolved through
  * `game/domain/location-state` rather than by any surface's own conditionals.
@@ -560,6 +710,15 @@ export type PlayGameplayState = {
   mining: { totalXp: number; level: number; xpToNextLevel?: number; xpIntoLevel: number };
   refining: { totalXp: number; level: number; xpToNextLevel?: number; xpIntoLevel: number };
   welding: { totalXp: number; level: number; xpToNextLevel?: number; xpIntoLevel: number };
+  fabrication: { totalXp: number; level: number; xpToNextLevel?: number; xpIntoLevel: number };
+  /** The Fabrication Station's Fabricate side (#232). */
+  fabricationStation: FabricationProjection;
+  /** The Fabrication Station's Tinker side (#232). */
+  tinkering: TinkeringProjection;
+  /** One current Fabrication refusal, for the Fabricate surface (#232). */
+  fabricationError?: FabricationCommandError;
+  /** One current Tinkering refusal, for the Tinker surface (#232). */
+  tinkeringError?: TinkeringCommandError;
   /**
    * The Mining source reachable where the character is standing, or undefined
    * where none is (#209). Replaces the old global `successChanceBps`, which
@@ -809,6 +968,7 @@ export function createPlayResolver(
   onRefiningOutcome?: (outcome: PersistedRefiningOutcome) => void,
   onWeldingOutcome?: (outcome: PersistedWeldingOutcome) => void,
   onPracticeOutcome?: (outcome: PersistedPracticeOutcome) => void,
+  overrideRandom: OverrideRandom = defaultOverrideRandom(),
 ): PlayResolver {
   const refiningRandom = isCanonicalE2EMiningOverride()
     ? e2eRefiningRandom()
@@ -864,6 +1024,19 @@ export function createPlayResolver(
         (outcome) => outcome.completedWelds,
       ) as PlayResolver,
     },
+    // One Fabrication resolver under every authored recipe's action, and one
+    // Tinkering resolver under every target's (#232). Each credits Missions
+    // from its own persistence — successful workpieces and completed batches
+    // only — rather than through `withTrackedActivityProgress`, because a
+    // busted workpiece is a resolved unit that must count for nothing.
+    ...fabricationRecipes().map((recipe) => ({
+      actionId: recipe.actionId,
+      resolver: createFabricationResolver(overrideRandom) as PlayResolver,
+    })),
+    ...tinkeringTargets().map((target) => ({
+      actionId: target.actionId,
+      resolver: createTinkeringResolver() as PlayResolver,
+    })),
   ];
   return composePlayResolvers(entries);
 }
@@ -1243,6 +1416,188 @@ async function projectRepairTarget(
   };
 }
 
+/**
+ * The Fabricate side of the station (#232): every authored recipe with its
+ * unmet requirements, the Override toggle, and the workpiece on the machine.
+ * Everything a surface shows is decided here or in the domain; the browser
+ * derives nothing it could be wrong about.
+ */
+async function projectFabricationStation(
+  transaction: DatabaseTransaction,
+  input: {
+    characterId: string;
+    action: typeof activeActions.$inferSelect | undefined;
+    level: number;
+    stacks: readonly (typeof inventoryStacks.$inferSelect)[];
+    carriedByItemId: Readonly<Record<string, number>>;
+    balance: EffectiveGameBalance;
+  },
+): Promise<FabricationProjection> {
+  const { balance } = input;
+  const row = await loadFabricationRow(transaction, input.characterId);
+  const activeRecipe =
+    input.action && isFabricationAction(input.action.actionId)
+      ? fabricationRecipeForActionId(input.action.actionId, balance)
+      : undefined;
+  const override = activeRecipe ? overrideFromRow(row) : undefined;
+  const rules = balance.fabrication.manualOverride;
+  const lastPush = override?.lastPush;
+  return {
+    unlocked: await loadFabricationUnlocked(transaction, input.characterId),
+    manualOverrideEnabled: row?.manualOverrideEnabled ?? false,
+    recipes: fabricationRecipes(balance).map((recipe) => {
+      const output = getItemDefinition(recipe.outputItemId, balance);
+      return {
+        actionId: recipe.actionId,
+        outputItemId: recipe.outputItemId,
+        outputName: resolveItemPresentation(recipe.outputItemId, recipe.outputItemId).displayName,
+        outputQuantity: recipe.outputQuantity,
+        ...(output?.kind === "stack" ? { outputStackLimit: output.stackLimit } : {}),
+        minimumLevel: recipe.minimumLevel,
+        unlocked: fabricationRecipeUnlocked(input.level, recipe),
+        durationTicks: recipe.durationTicks,
+        baseXp: recipe.baseXp,
+        inputs: recipe.inputs.map((each) => ({
+          itemId: each.itemId,
+          name: resolveItemPresentation(each.itemId, each.itemId).displayName,
+          quantity: each.quantity,
+          carried: input.carriedByItemId[each.itemId] ?? 0,
+        })),
+        inputsAvailable: recipe.inputs.every(
+          (each) => (input.carriedByItemId[each.itemId] ?? 0) >= each.quantity,
+        ),
+        affordableBatches: fabricationAffordableBatches(
+          { fabricationLevel: input.level, stacks: input.stacks },
+          recipe,
+        ),
+      };
+    }),
+    ...(activeRecipe && input.action
+      ? {
+          workpiece: {
+            recipeActionId: activeRecipe.actionId,
+            sequence: (row?.runBatches ?? 0) + 1,
+            startedAt: input.action.resolvedThroughAt.toISOString(),
+            endsAt: new Date(
+              input.action.resolvedThroughAt.getTime() +
+                ticksToMilliseconds(activeRecipe.durationTicks),
+            ).toISOString(),
+            finishCurrent: row?.finishCurrent ?? false,
+            ...(override
+              ? {
+                  override: {
+                    load: override.load,
+                    trend: override.trend,
+                    pushes: overridePushes(override),
+                    maximumPushes: rules.maximumPushes,
+                    locked: override.locked,
+                    canPush: overrideCanPush(override, balance),
+                    multiplierLabel: manualOverrideMultiplierLabel(override, balance),
+                    xpIfLockedIn: manualOverrideXp(activeRecipe.baseXp, override, balance),
+                    ...(lastPush
+                      ? {
+                          lastPush: {
+                            ...lastPush,
+                            safeRange: overrideSafeRange(lastPush.load, balance),
+                          },
+                        }
+                      : {}),
+                    dial: { minimum: rules.loadMinimum, maximum: rules.loadMaximum },
+                  },
+                }
+              : {}),
+          },
+        }
+      : {}),
+    run: fabricationRunStateFromRow(row),
+    ...(row?.lastStopReason ? { lastStopReason: row.lastStopReason as FabricationStopReason } : {}),
+  };
+}
+
+/** The Tinker side of the station (#232), with the last-Cutter guard already applied. */
+async function projectTinkering(
+  transaction: DatabaseTransaction,
+  input: {
+    characterId: string;
+    action: typeof activeActions.$inferSelect | undefined;
+    level: number;
+    snapshot: Awaited<ReturnType<typeof loadPlaySnapshot>>;
+    carriedByItemId: Readonly<Record<string, number>>;
+    balance: EffectiveGameBalance;
+  },
+): Promise<TinkeringProjection> {
+  const { balance, snapshot } = input;
+  const row = await loadTinkeringRow(transaction, input.characterId);
+  const cycle = tinkeringCycleFromRow(row);
+  const cycleTarget = cycle ? tinkeringTargetForActionId(cycle.targetActionId, balance) : undefined;
+  const equipped = snapshot.equipmentLoadout.equippedItemInstanceIds;
+  const carriedUniqueItems = snapshot.carriedInstances
+    .filter((instance) => !equipped.has(instance.id))
+    .map((instance) => ({
+      id: instance.id,
+      itemId: instance.itemId,
+      currentCharge: instance.currentCharge,
+      createdAt: instance.createdAt.toISOString(),
+    }));
+  const ownedMiningCutters = snapshot.allItemInstances.filter((instance) =>
+    isMiningCutter(instance.itemId, balance),
+  ).length;
+  return {
+    unlocked: await loadTinkeringUnlocked(transaction, input.characterId),
+    active: isTinkeringAction(input.action?.actionId),
+    autoDiscardScrap: row?.autoDiscardScrap ?? false,
+    finishCurrent: row?.finishCurrent ?? false,
+    ...(cycle && cycleTarget
+      ? {
+          cycle: {
+            targetActionId: cycle.targetActionId,
+            ticksCompleted: cycle.ticksCompleted,
+            durationTicks: tinkeringDurationTicks(cycleTarget.recipe, balance),
+          },
+        }
+      : {}),
+    targets: tinkeringTargets(balance).map((target) => {
+      const { recipe } = target;
+      const output = getItemDefinition(recipe.outputItemId, balance);
+      const carried =
+        output?.kind === "stack"
+          ? (input.carriedByItemId[recipe.outputItemId] ?? 0)
+          : carriedUniqueItems.filter((instance) => instance.itemId === recipe.outputItemId).length;
+      const carriedBatches = Math.floor(carried / recipe.outputQuantity);
+      const affordableBatches = tinkeringAffordableBatches(
+        {
+          fabricationLevel: input.level,
+          stacks: snapshot.stacks,
+          carriedUniqueItems,
+          ownedMiningCutters,
+        },
+        target,
+        balance,
+      );
+      return {
+        actionId: target.actionId,
+        itemId: recipe.outputItemId,
+        name: resolveItemPresentation(recipe.outputItemId, recipe.outputItemId).displayName,
+        batchQuantity: recipe.outputQuantity,
+        ...(output?.kind === "stack" ? { stackLimit: output.stackLimit } : {}),
+        minimumLevel: recipe.minimumLevel,
+        unlocked: tinkeringUnlocked(input.level, recipe),
+        durationTicks: tinkeringDurationTicks(recipe, balance),
+        xp: tinkeringXp(recipe),
+        scrap: tinkeringScrapYield(recipe, balance),
+        carriedBatches,
+        affordableBatches,
+        lastCutterBlocked:
+          isMiningCutter(recipe.outputItemId, balance) &&
+          carriedBatches > 0 &&
+          affordableBatches === 0,
+      };
+    }),
+    run: tinkeringRunStateFromRow(row),
+    ...(row?.lastStopReason ? { lastStopReason: row.lastStopReason as TinkeringStopReason } : {}),
+  };
+}
+
 export async function stateFromTransaction(
   transaction: DatabaseTransaction,
   characterId: string,
@@ -1261,6 +1616,7 @@ export async function stateFromTransaction(
   refiningError?: PlayGameplayState["refiningError"],
   weldingError?: PlayGameplayState["weldingError"],
   practiceError?: PlayGameplayState["practiceError"],
+  stationErrors?: Pick<PlayGameplayState, "fabricationError" | "tinkeringError">,
 ): Promise<PlayGameplayState> {
   const balance = getEffectiveGameBalance();
   const snapshot = await loadPlaySnapshot(transaction, characterId);
@@ -1336,6 +1692,8 @@ export async function stateFromTransaction(
   const totalXp = xpRows.find((row) => row.skillId === SKILL_IDS.mining)?.totalXp ?? 0;
   const refiningTotalXp = xpRows.find((row) => row.skillId === SKILL_IDS.refining)?.totalXp ?? 0;
   const weldingTotalXp = xpRows.find((row) => row.skillId === SKILL_IDS.welding)?.totalXp ?? 0;
+  const fabricationTotalXp =
+    xpRows.find((row) => row.skillId === SKILL_IDS.fabrication)?.totalXp ?? 0;
   const thresholds = miningLevelThresholds(balance);
   const refiningThresholds = standardSkillLevelThresholds(balance);
   const weldingThresholds = standardSkillLevelThresholds(balance);
@@ -1352,6 +1710,10 @@ export async function stateFromTransaction(
   const miningProgress = skillLevelProgress(totalXp, thresholds);
   const refiningProgress = skillLevelProgress(refiningTotalXp, refiningThresholds);
   const weldingProgress = skillLevelProgress(weldingTotalXp, weldingThresholds);
+  const fabricationProgress = skillLevelProgress(
+    fabricationTotalXp,
+    standardSkillLevelThresholds(balance),
+  );
   const action = actionRows[0];
   const miningState = miningStateRows[0];
   const travel = travelRows[0];
@@ -1442,6 +1804,22 @@ export async function stateFromTransaction(
     run: practiceRunStateFromRow(practiceRow),
     ...(practiceCleanPass ? { cleanPass: practiceCleanPass } : {}),
   };
+  const fabricationStation = await projectFabricationStation(transaction, {
+    characterId,
+    action,
+    level: fabricationProgress.level,
+    stacks: snapshot.stacks,
+    carriedByItemId,
+    balance,
+  });
+  const tinkering = await projectTinkering(transaction, {
+    characterId,
+    action,
+    level: fabricationProgress.level,
+    snapshot,
+    carriedByItemId,
+    balance,
+  });
   const cargoRepairProjection = repairs[REPAIR_TARGET_IDS.cargoHold]!;
   const cargoUniqueItems = cargoItemRows
     .map((row) => snapshot.allItemInstances.find((instance) => instance.id === row.itemInstanceId))
@@ -1547,15 +1925,32 @@ export async function stateFromTransaction(
   const isWeldingCadenceAction =
     action !== undefined && weldingCadenceActionIds(balance).includes(action.actionId);
   const nextAttemptBoosted = activeMiningSource !== undefined && cutterCharge > 0;
+  const activeFabricationRecipe = action
+    ? fabricationRecipeForActionId(action.actionId, balance)
+    : undefined;
+  const activeTinkeringTarget = action
+    ? tinkeringTargetForActionId(action.actionId, balance)
+    : undefined;
   const nextAttemptDurationTicks = isWeldingCadenceAction
     ? balance.welding.attemptDurationTicks
     : activeRefiningRecipe
       ? activeRefiningRecipe.attemptDurationTicks
-      : activeMiningSource
-        ? nextAttemptBoosted
-          ? boostedMiningAttemptDurationTicks(balance, activeMiningSource)
-          : activeMiningSource.attemptDurationTicks
-        : balance.welding.attemptDurationTicks;
+      : activeFabricationRecipe
+        ? activeFabricationRecipe.durationTicks
+        : activeTinkeringTarget
+          ? tinkeringDurationTicks(activeTinkeringTarget.recipe, balance)
+          : activeMiningSource
+            ? nextAttemptBoosted
+              ? boostedMiningAttemptDurationTicks(balance, activeMiningSource)
+              : activeMiningSource.attemptDurationTicks
+            : balance.welding.attemptDurationTicks;
+  // A workpiece's timer runs from the cursor, which always stands at its start.
+  // A Tinkering cycle's cursor moves with every resolution, so its timer runs
+  // from the ticks it has already had.
+  const progressStartedAtMs = action
+    ? action.resolvedThroughAt.getTime() -
+      (activeTinkeringTarget ? ticksToMilliseconds(tinkering.cycle?.ticksCompleted ?? 0) : 0)
+    : 0;
   const carriedPowerCellQuantity = stacks
     .filter((stack) => stack.itemId === ITEM_IDS.powerCell)
     .reduce((total, stack) => total + stack.quantity, 0);
@@ -1608,13 +2003,15 @@ export async function stateFromTransaction(
       action &&
       (activeMiningSource !== undefined ||
         activeRefiningRecipe !== undefined ||
+        activeFabricationRecipe !== undefined ||
+        activeTinkeringTarget !== undefined ||
         isWeldingCadenceAction)
         ? {
             actionId: action.actionId,
             resolvedThroughAt: action.resolvedThroughAt.toISOString(),
-            progressStartedAt: action.resolvedThroughAt.toISOString(),
+            progressStartedAt: new Date(progressStartedAtMs).toISOString(),
             nextAttemptAt: new Date(
-              action.resolvedThroughAt.getTime() + ticksToMilliseconds(nextAttemptDurationTicks),
+              progressStartedAtMs + ticksToMilliseconds(nextAttemptDurationTicks),
             ).toISOString(),
             nextAttemptBoosted,
             nextAttemptDurationTicks,
@@ -1639,6 +2036,18 @@ export async function stateFromTransaction(
       xpToNextLevel: weldingProgress.xpToNextLevel,
       xpIntoLevel: weldingProgress.xpIntoLevel,
     },
+    fabrication: {
+      totalXp: fabricationTotalXp,
+      level: fabricationProgress.level,
+      xpToNextLevel: fabricationProgress.xpToNextLevel,
+      xpIntoLevel: fabricationProgress.xpIntoLevel,
+    },
+    fabricationStation,
+    tinkering,
+    ...(stationErrors?.fabricationError
+      ? { fabricationError: stationErrors.fabricationError }
+      : {}),
+    ...(stationErrors?.tinkeringError ? { tinkeringError: stationErrors.tinkeringError } : {}),
     miningSource: locationMiningSource
       ? {
           actionId: locationMiningSource.actionId,

@@ -11,10 +11,11 @@ describe("skillAccentColor (issue #215)", () => {
     expect(skillAccentColor("mining")).toBe("var(--rs-skill-mining)");
     expect(skillAccentColor("refining")).toBe("var(--rs-skill-refining)");
     expect(skillAccentColor("welding")).toBe("var(--rs-skill-welding)");
+    expect(skillAccentColor("fabrication")).toBe("var(--rs-skill-fabrication)");
   });
 
   it("returns undefined for an unassigned or unrecognized tone", () => {
     expect(skillAccentColor(undefined)).toBeUndefined();
-    expect(skillAccentColor("fabrication")).toBeUndefined();
+    expect(skillAccentColor("strength")).toBeUndefined();
   });
 });

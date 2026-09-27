@@ -81,13 +81,16 @@ describe("player server actions (server/actions.ts)", () => {
   const source = read("server/actions.ts");
   const bodies = exportedFunctionBodies(source);
 
-  it("enumerates exactly the 37 production player actions", () => {
-    expect(bodies.size).toBe(37);
+  it("enumerates exactly the 46 production player actions", () => {
+    // #232 adds nine: Fabrication's start, finish-current, Override toggle,
+    // push and Lock In, and Tinkering's start, stop, finish-current and
+    // Auto-discard Scrap preference.
+    expect(bodies.size).toBe(46);
   });
 
   it("classifies every export as gameplay or named account management", () => {
     const gameplay = [...bodies.keys()].filter((name) => !(name in ACCOUNT_MANAGEMENT_ACTIONS));
-    expect(gameplay).toHaveLength(34);
+    expect(gameplay).toHaveLength(43);
     for (const name of Object.keys(ACCOUNT_MANAGEMENT_ACTIONS)) {
       expect(bodies.has(name), `unknown account action ${name}`).toBe(true);
     }

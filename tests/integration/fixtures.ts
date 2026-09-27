@@ -226,6 +226,12 @@ export async function cleanupTestCharacter(db: Db, rune: Rune, characterId: stri
       .delete(rune.characterPracticeWelds)
       .where(eq(rune.characterPracticeWelds.characterId, characterId));
     await tx
+      .delete(rune.characterFabricationState)
+      .where(eq(rune.characterFabricationState.characterId, characterId));
+    await tx
+      .delete(rune.characterTinkeringState)
+      .where(eq(rune.characterTinkeringState.characterId, characterId));
+    await tx
       .delete(rune.characterWorkOrderPostings)
       .where(eq(rune.characterWorkOrderPostings.characterId, characterId));
     await tx

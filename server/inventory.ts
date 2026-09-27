@@ -1,4 +1,5 @@
 import { removeFromSelectedStack } from "@/server/carried-inventory";
+import { assertActiveWorkpieceResolvable } from "@/server/fabrication-reservation";
 import {
   createPlayResolver,
   ensurePlayProvisioning,
@@ -67,6 +68,8 @@ export async function discardInventoryStackInTransaction(
     now,
   });
   if (!removal.ok) return refuse();
+  // Units a Fabrication workpiece has reserved can never be dropped (#232).
+  await assertActiveWorkpieceResolvable(transaction, characterId);
 
   return {
     state: await stateFromTransaction(

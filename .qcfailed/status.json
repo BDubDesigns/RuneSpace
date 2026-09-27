@@ -4,16 +4,16 @@
   "workState": "active",
   "currentFocus": "Preparing the October 27 Soft Alpha: verified players can reserve characters; account-level Early Access and a closed-by-default public gameplay gate control when play begins.",
   "currentChange": {
-    "summary": "Refining and Practice Welding ask how many before starting: a shared 1 / - / + run size, or Max to run until materials run out, server-checked, plus two Refining 5 recipes that make Slag on purpose.",
+    "summary": "Tansy teaches Fabrication at Rusk Recovery: a Fabrication Station with four Tier-1 recipes, Manual Override for riskier XP, Tinkering to take pieces apart, and the Return the Favor and Break It Down Missions.",
     "stage": "review",
-    "pullRequestNumber": 237
+    "pullRequestNumber": 238
   },
   "latestCompleted": {
-    "summary": "Rebalanced Scrap Metal and Power Cells: Scrap stacks to three, Wade and Bix have new prices and a twelve-a-day purchase limit, and Keep the Change pays 36 Credits.",
+    "summary": "Refining and Practice Welding ask how many before starting: a number of batches or welds, or Max to run until materials run out, plus two Refining 5 recipes that make Slag on purpose.",
     "date": "2026-09-26",
-    "url": "https://github.com/BDubDesigns/RuneSpace/pull/235"
+    "url": "https://github.com/BDubDesigns/RuneSpace/pull/237"
   },
-  "nextStep": "Human review of bounded Refining and Practice runs; public gameplay remains closed until an operator deliberately opens it.",
+  "nextStep": "Human review and playtest of Tansy's Fabrication chapter; public gameplay remains closed until an operator deliberately opens it.",
   "lastMeaningfulUpdate": "2026-09-26",
   "highlights": [
     {

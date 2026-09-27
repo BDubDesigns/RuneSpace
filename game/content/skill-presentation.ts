@@ -15,7 +15,7 @@ import { SKILL_IDS, type SkillId } from "@/game/config/foundations";
  * never names a color. A skill with no approved accent yet (a future skill
  * before its owner picks one) has no tone and presents neutrally.
  */
-export type SkillAccentTone = "mining" | "refining" | "welding";
+export type SkillAccentTone = "mining" | "refining" | "welding" | "fabrication";
 
 export type SkillPresentation = {
   displayName: string;
@@ -27,6 +27,7 @@ const skillPresentations = {
   [SKILL_IDS.refining]: { displayName: "Refining", accentTone: "refining" },
   [SKILL_IDS.welding]: { displayName: "Welding", accentTone: "welding" },
   [SKILL_IDS.strength]: { displayName: "Strength" },
+  [SKILL_IDS.fabrication]: { displayName: "Fabrication", accentTone: "fabrication" },
 } as const satisfies Partial<Record<SkillId, SkillPresentation>>;
 
 /** Canonical selectable skill identities for skill-XP presentation beats. */

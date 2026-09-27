@@ -211,20 +211,59 @@ describe("issue #231 Wade's migrated relocation", () => {
   });
 });
 
-describe("issue #231 Tansy stays where she ships", () => {
-  it("authors no relocation and stays at The Jag whatever is complete", () => {
-    const tansy = getNpc(NPC_IDS.tansyRusk)!;
-    expect(tansy.relocations).toBeUndefined();
+describe("issue #232 Tansy's Fabrication chapter is an ordered Mission-derived move", () => {
+  const tansy = getNpc(NPC_IDS.tansyRusk)!;
+  const through = (...missionIds: string[]) => new Set<string>(missionIds);
+
+  it("stays at The Jag until 10,000 Hours is complete", () => {
+    const before = through(MISSION_IDS.keepTheChange);
+    expect(resolveNpcPlacement(tansy, before)).toEqual({ locationId: LOCATION_IDS.theJag });
+    expect(
+      ids(getResidentNpcs({ locationId: LOCATION_IDS.theJag, completedMissionIds: before })),
+    ).toEqual([tansy.id]);
+  });
+
+  it("stands beside Wade at Rusk Recovery through the chapter, Wade first", () => {
+    for (const completed of [
+      through(MISSION_IDS.keepTheChange, MISSION_IDS.tenThousandHours),
+      through(MISSION_IDS.keepTheChange, MISSION_IDS.tenThousandHours, MISSION_IDS.returnTheFavor),
+    ]) {
+      expect(resolveNpcPlacement(tansy, completed)).toEqual({
+        locationId: LOCATION_IDS.ruskRecovery,
+      });
+      expect(
+        ids(
+          getResidentNpcs({
+            locationId: LOCATION_IDS.ruskRecovery,
+            completedMissionIds: completed,
+          }),
+        ),
+      ).toEqual([NPC_IDS.wadeRusk, tansy.id]);
+      expect(
+        getResidentNpcs({ locationId: LOCATION_IDS.theJag, completedMissionIds: completed }),
+      ).toEqual([]);
+    }
+  });
+
+  it("goes home to The Jag once Break It Down is complete, and stays there", () => {
     const everything = new Set(Object.values(MISSION_IDS));
     expect(resolveNpcPlacement(tansy, everything)).toEqual({ locationId: LOCATION_IDS.theJag });
     expect(
       ids(getResidentNpcs({ locationId: LOCATION_IDS.theJag, completedMissionIds: everything })),
     ).toEqual([tansy.id]);
     expect(
-      getResidentNpcs({ locationId: LOCATION_IDS.ruskRecovery, completedMissionIds: everything })
-        .map((npc) => npc.id)
-        .includes(tansy.id),
-    ).toBe(false);
+      ids(
+        getResidentNpcs({ locationId: LOCATION_IDS.ruskRecovery, completedMissionIds: everything }),
+      ),
+    ).toEqual([NPC_IDS.wadeRusk]);
+  });
+
+  it("is placed by her authored relocations, not a Fabrication-specific branch", () => {
+    expect(tansy.homeLocationId).toBe(LOCATION_IDS.theJag);
+    expect(tansy.relocations?.map((entry) => entry.afterCompletedMissionId)).toEqual([
+      MISSION_IDS.tenThousandHours,
+      MISSION_IDS.breakItDown,
+    ]);
   });
 });
 
@@ -372,12 +411,16 @@ describe("issue #231 resident presentation", () => {
       React.createElement(ResidentContacts, { contacts, disabled: false, meta, stationary }),
     );
   const count = (html: string, needle: string) => html.split(needle).length - 1;
+  const DIVIDER = "border-t border-[color:var(--rs-border-structural)]";
 
   it("renders the place meta alone when nobody is here", () => {
     const html = render([]);
     expect(count(html, "data-npc-interaction")).toBe(0);
     expect(count(html, "data-place-meta")).toBe(1);
     expect(count(html, "data-test-meta")).toBe(1);
+    // No resident block to close: no leading divider above the population.
+    expect(count(html, DIVIDER)).toBe(0);
+    expect(html).not.toContain("data-population-divider");
   });
 
   it("renders one resident with the place meta once", () => {
@@ -402,11 +445,28 @@ describe("issue #231 resident presentation", () => {
     expect(count(html, "data-place-meta")).toBe(1);
     expect(count(html, "data-test-meta")).toBe(1);
     expect(html.indexOf("data-test-meta")).toBeGreaterThan(html.lastIndexOf("</section>"));
+    // Each resident keeps their own separator, and exactly one more closes the
+    // resident block before the population — none is added between residents.
+    expect(count(html, DIVIDER)).toBe(3);
+    expect(count(html, "data-population-divider")).toBe(1);
+    expect(html.indexOf("data-population-divider")).toBeGreaterThan(secondAt);
 
     const reversed = render([second, first]);
     expect(reversed.indexOf('data-npc-interaction="second"')).toBeLessThan(
       reversed.indexOf('data-npc-interaction="first"'),
     );
+  });
+
+  it("closes a single resident's block with one divider before the population", () => {
+    const html = render([first]);
+    expect(count(html, DIVIDER)).toBe(2);
+    expect(count(html, "data-population-divider")).toBe(1);
+  });
+
+  it("draws no population divider when the only resident's row has already gone", () => {
+    const html = render([{ ...first, departed: true }]);
+    expect(count(html, "data-npc-interaction")).toBe(0);
+    expect(html).not.toContain("data-population-divider");
   });
 
   it("states the stationary requirement once for the place, not once per person", () => {

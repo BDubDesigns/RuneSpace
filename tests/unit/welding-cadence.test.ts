@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   miningActionIds,
   refiningActionIds,
+  tinkeringActionIds,
   getEffectiveGameBalance,
   repairTargetBalances,
   weldingActionIds,
@@ -114,16 +115,19 @@ describe("weldingCadenceActionIds is every action that resolves on the Welding s
     expect(new Set(registered)).toEqual(new Set(cadence));
   });
 
-  it("is what remains of the travel-replaceable work once Mining and Refining are set aside", () => {
+  it("is what remains of the travel-replaceable work once Mining, Refining and Tinkering are set aside", () => {
     // A second, independent registry — leaving the yard has to interrupt every
     // kind of Welding, and the interrupt path fails closed on an action it does
     // not know. The two lists are maintained separately and must still agree.
     // Every Mining source and Refining recipe, not the two original actions:
     // a Galvanite run and a Galvaferrite run are replaceable by Travel exactly
     // as their predecessors were, and neither is Welding (#209).
+    // Tinkering (#232) is replaceable by Travel for Practice's reason — its
+    // committed cycle waits — and it is not Welding either.
     const notWelding = new Set<string>([
       ...miningActionIds(balance),
       ...refiningActionIds(balance),
+      ...tinkeringActionIds(balance),
     ]);
     const replaceableWelding = travelReplaceableActionIds().filter((id) => !notWelding.has(id));
     expect(new Set(replaceableWelding)).toEqual(new Set(cadence));

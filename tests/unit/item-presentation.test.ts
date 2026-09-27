@@ -1,3 +1,5 @@
+import { existsSync } from "node:fs";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { getItemPresentation, resolveItemPresentation } from "@/game/content/item-presentation";
 import { ITEM_IDS } from "@/game/config/foundations";
@@ -66,6 +68,23 @@ describe("item presentation content", () => {
       textFallback: "SL",
       artworkSrc: "/item-art/slag.webp",
     });
+  });
+
+  it("resolves the Tier-1 Fabrication outputs (#232) to their committed artwork", () => {
+    expect(getItemPresentation(ITEM_IDS.mountingBracket)).toMatchObject({
+      displayName: "Mounting Bracket",
+      textFallback: "MB",
+      artworkSrc: "/item-art/mounting-bracket.webp",
+    });
+    expect(getItemPresentation(ITEM_IDS.scrapBox)).toMatchObject({
+      displayName: "Scrap Box",
+      textFallback: "SB",
+      artworkSrc: "/item-art/scrap-box.webp",
+    });
+    for (const itemId of [ITEM_IDS.mountingBracket, ITEM_IDS.scrapBox]) {
+      const src = getItemPresentation(itemId)!.artworkSrc!;
+      expect(existsSync(join(process.cwd(), "public", src))).toBe(true);
+    }
   });
 
   it("uses the supplied item name as text fallback when artwork metadata is unavailable", () => {

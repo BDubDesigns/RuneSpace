@@ -11,6 +11,7 @@ const SKILL_ACCENT_VARS: Record<SkillAccentTone, string> = {
   mining: "var(--rs-skill-mining)",
   refining: "var(--rs-skill-refining)",
   welding: "var(--rs-skill-welding)",
+  fabrication: "var(--rs-skill-fabrication)",
 };
 
 /**

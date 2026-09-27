@@ -12,23 +12,24 @@ Translucent tokens: a Tailwind slash-opacity modifier such as `bg-[color:var(--r
 
 ## Primitives
 
-`components/ui/` contains presentational primitives only: panels, headings, actions, form fields, feedback, status meters, and the responsive shell. Intent variants use `primary`, `secondary`, `success`, `mining`, `arcane`, and `danger`; use the semantic intent, never a visual hex value.
+`components/ui/` contains presentational primitives only: panels, headings, actions, form fields, feedback, status meters, and the responsive shell. Intent variants use `primary`, `secondary`, `success`, `mining`, `arcane`, `fabrication`, and `danger`; use the semantic intent, never a visual hex value. A persistent on/off toggle is latched visibly, not by `aria-pressed` alone: `secondary` while off, its activity's accent intent while on, and it stays enabled so it can be switched back. The Fabrication Station's Manual Override and Auto-discard Scrap toggles use `fabrication` (Shop Olive, with an inset glow because `.rs-bevel` clips anything outside); a one-shot request such as Finish Current is not a toggle and keeps its own disabled confirmation.
 
 ## Canonical skill accent identity (Issue #215)
 
 Each player-facing skill has exactly one accent identity, defined once at
 `game/content/skill-presentation.ts` as a stable semantic `accentTone`
-(`"mining"`, `"refining"`, `"welding"`) — content names the tone, never a CSS
-value. `app/globals.css` owns the tone → underlying accent redirection
-(`--rs-skill-mining`, `--rs-skill-refining`, `--rs-skill-welding`, aliasing the
-existing `--rs-accent-*` tokens today), and `components/ui/skill-accent.ts`'s
-`skillAccentColor` is the one place a tone resolves to a color. A skill with no
+(`"mining"`, `"refining"`, `"welding"`, `"fabrication"`) — content names the
+tone, never a CSS value. `app/globals.css` owns the tone → underlying accent
+redirection (`--rs-skill-mining`, `--rs-skill-refining`, `--rs-skill-welding`,
+`--rs-skill-fabrication`, aliasing `--rs-accent-*` tokens), and
+`components/ui/skill-accent.ts`'s `skillAccentColor` is the one place a tone resolves to a color. A skill with no
 approved tone (Strength; a future skill before its owner picks one) presents
-neutrally rather than guessing.
+neutrally rather than guessing. Fabrication's (#232) approved accent is Shop
+Olive, `#7FA347` (`--rs-accent-shop-olive`).
 
 Every progression surface consumes this through the same path instead of its
 own mapping: `features/shared/activity-context.tsx`'s `SkillProgressRow`
-(Mining/Refining/Welding activity screens) and
+(Mining/Refining/Welding activity screens and the Fabrication Station) and
 `features/shared/CharacterSkillList.tsx` (the Character modal and Nearby
 Player profiles) both call `skillAccentColor`, so a skill's name/level text and
 XP fill carry the same identity everywhere it appears. Do not add a
@@ -63,7 +64,9 @@ in one order. This is the authoritative home for that grammar;
 gameplay.
 
 1. **The place.** One raised panel: scene, description, one row per resident
-   in authored order (#231), and who else is here — once, after the people.
+   in authored order (#231), and who else is here — once, after the people,
+   below one structural hairline that closes the resident block (none when
+   nobody is resident).
    `features/location-scene/LocationSurface.tsx` and
    `features/local-places/LocalPlaceSurface.tsx`.
 2. **The primary activity.** A sibling panel, never nested inside the place —
@@ -74,6 +77,17 @@ gameplay.
 4. **This Run**, inside the activity panel: `features/shared/RunSummary.tsx`.
 5. **Secondary systems**, as their own panels — Work Orders, Cargo Hold storage
    once repaired, the Crew Stop's hauler.
+
+**Several work areas in one place (#232).** When one World Location offers more
+than one activity — Rusk Recovery's Welding Workshop and Fabrication Station —
+a row of prominent work-area cards sits between the place (1) and its activity
+(2), never a dropdown, and only the selected area's surfaces render beneath it
+in the order above. The place's art and people stay shared and do not move. The
+cards carry Mission guidance with the shared exterior halo, draw their keyboard
+ring inside the card as the beveled controls do, and follow the running work.
+It is Rusk Recovery's own composition
+(`features/location-scene/RuskRecoveryWorkAreas.tsx`), not a framework: a
+second place with work areas earns the abstraction.
 
 Rules that follow from it:
 

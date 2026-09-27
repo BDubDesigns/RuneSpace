@@ -198,6 +198,63 @@ export const PracticeSlagPreferenceRequestSchema = z.object({
   autoDiscardSlag: z.boolean(),
 });
 
+/**
+ * Fabrication (#232). Starting names the character, one authored recipe by its
+ * stable action ID, and the run selection; everything the recipe costs,
+ * makes, takes, and pays is resolved server-side.
+ */
+export const StartFabricationRequestSchema = z.object({
+  characterId: z.string().uuid(),
+  recipeActionId: ContentId,
+  quantity: BoundedRunSelectionSchema,
+});
+
+/** Finish Current and Lock-less station commands name only the character. */
+export const FabricationCommandRequestSchema = z.object({
+  characterId: z.string().uuid(),
+});
+
+/** The station's Manual Override toggle. */
+export const ManualOverrideToggleRequestSchema = z.object({
+  characterId: z.string().uuid(),
+  enabled: z.boolean(),
+});
+
+/**
+ * One Manual Override push: the Feed, plus the workpiece and push count the
+ * player's screen showed, so a retried push can never roll the machine twice
+ * or land on a later workpiece. The dial's range is balance; the server checks it.
+ */
+export const ManualOverridePushRequestSchema = z.object({
+  characterId: z.string().uuid(),
+  feed: z.number().int(),
+  expectedWorkpiece: z.number().int().positive(),
+  expectedPushes: z.number().int().nonnegative(),
+});
+
+/** Lock In names the workpiece the player was looking at. */
+export const ManualOverrideLockInRequestSchema = z.object({
+  characterId: z.string().uuid(),
+  expectedWorkpiece: z.number().int().positive(),
+});
+
+/** Tinkering (#232): which authored target, and the run selection. */
+export const StartTinkeringRequestSchema = z.object({
+  characterId: z.string().uuid(),
+  targetActionId: ContentId,
+  quantity: BoundedRunSelectionSchema,
+});
+
+export const TinkeringCommandRequestSchema = z.object({
+  characterId: z.string().uuid(),
+});
+
+/** The persistent per-character Auto-discard Scrap preference. */
+export const TinkeringScrapPreferenceRequestSchema = z.object({
+  characterId: z.string().uuid(),
+  autoDiscardScrap: z.boolean(),
+});
+
 /** A Clean Pass claim names only the character; the open window is derived. */
 export const CleanPassClaimRequestSchema = z.object({
   characterId: z.string().uuid(),

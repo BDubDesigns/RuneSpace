@@ -9,6 +9,8 @@ type InventoryStackVisualProps = {
   accessibleLabel?: string;
   className?: string;
   interactive?: boolean;
+  /** Marks the tile as a current semantic mission-guidance target. */
+  missionGuidance?: boolean;
   selected?: boolean;
   onSelect?: () => void;
 };
@@ -28,6 +30,7 @@ export function InventoryStackVisual({
   accessibleLabel,
   className,
   interactive,
+  missionGuidance,
   selected,
   onSelect,
 }: InventoryStackVisualProps) {
@@ -51,6 +54,7 @@ export function InventoryStackVisual({
       className={className}
       interactive={interactive}
       itemId={itemId}
+      missionGuidance={missionGuidance}
       name={name}
       onSelect={onSelect}
       quantity={quantity}

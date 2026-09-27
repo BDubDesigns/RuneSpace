@@ -58,6 +58,7 @@ export const FOCUSED_PHASES = [
   "refining",
   "bounded-runs",
   "rusk-recovery",
+  "fabrication",
   "work-orders",
   "gameplay-access",
   "account-verification",
