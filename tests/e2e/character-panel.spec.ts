@@ -39,8 +39,9 @@ test("the Character destination shows identity, canonical level, Credits, and ev
   testCharacter,
 }) => {
   const characterId = await openTestCharacter(page, testCharacter.id);
-  // Mining 4, Refining 2, Welding untrained: the issue's worked example, so
-  // the canonical rule (1 + 3 + 1 + 0) shows a level no single skill has.
+  // Mining 4, Refining 2, Welding and Fabrication untrained: the issue's worked
+  // example, so the canonical rule (1 + 3 + 1 + 0 + 0) shows a level no single
+  // skill has.
   await setSkillXp(characterId, SKILL_IDS.mining, xpForLevel(4));
   await setSkillXp(characterId, SKILL_IDS.refining, xpForLevel(2));
   await db.update(characters).set({ credits: 42 }).where(eq(characters.id, characterId));
@@ -66,9 +67,12 @@ test("the Character destination shows identity, canonical level, Credits, and ev
 
   // Every skill the game defines with an approved curve, discovered through
   // the canonical source rather than a list this screen keeps.
-  const expectedSkills = [SKILL_IDS.mining, SKILL_IDS.refining, SKILL_IDS.welding].map(
-    (skillId) => getSkillPresentation(skillId)!.displayName,
-  );
+  const expectedSkills = [
+    SKILL_IDS.fabrication,
+    SKILL_IDS.mining,
+    SKILL_IDS.refining,
+    SKILL_IDS.welding,
+  ].map((skillId) => getSkillPresentation(skillId)!.displayName);
   const skillRows = dialog.locator("[data-character-skill]");
   await expect(skillRows).toHaveCount(expectedSkills.length);
   for (const displayName of expectedSkills) {
@@ -81,6 +85,7 @@ test("the Character destination shows identity, canonical level, Credits, and ev
   await expect(
     skillRows.filter({ hasText: /^Welding — Level 1/ }).getByRole("progressbar"),
   ).toHaveAttribute("aria-valuenow", "0");
+  await expect(skillRows.getByText(/^Fabrication — Level 1$/)).toBeVisible();
   // Progress is through the current level, never a lifetime-XP bar, and there
   // is no overall-character XP meter.
   await expect(
@@ -116,6 +121,13 @@ test("the Character destination shows identity, canonical level, Credits, and ev
     "background-color",
     weldingColor,
   );
+
+  // Fabrication (#232) has no approved hue: its name presents neutrally in
+  // plain text rather than borrowing a skill's color or inventing one.
+  const neutralColor = await resolvedCssVarColor(page, "--rs-text-primary");
+  expect([miningColor, refiningColor, weldingColor]).not.toContain(neutralColor);
+  const fabricationRow = skillRows.filter({ hasText: /^Fabrication — Level 1/ });
+  await expect(fabricationRow.locator("p").first()).toHaveCSS("color", neutralColor);
 
   await captureReviewScreenshot(page, "character-panel-mobile.png");
 });

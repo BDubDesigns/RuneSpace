@@ -24,6 +24,7 @@ import {
   expectKeyboardFocusRingPaints,
   openNpcConversation,
   openTestCharacter,
+  resolvedCssVarColor,
   test,
 } from "./fixtures";
 import { captureReviewScreenshot } from "./review-screenshot";
@@ -355,6 +356,12 @@ test("Manual Override at desktop width: push, hold at 0, Lock In, and a bust", a
   await expectKeyboardFocusRingPaints(stationCard);
   await stationCard.click();
   const station = page.locator("[data-fabrication-station]");
+  // Fabrication has no approved hue yet (#232): the station's skill line is
+  // neutral text, never another skill's identity color.
+  await expect(station.locator('[data-skill-progress="fabrication"] p').first()).toHaveCSS(
+    "color",
+    await resolvedCssVarColor(page, "--rs-text-primary"),
+  );
   await station
     .locator(`[data-fabricate-recipe="${ACTION_IDS.mountingBracketFabrication}"]`)
     .getByRole("button")

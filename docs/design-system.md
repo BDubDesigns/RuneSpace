@@ -24,7 +24,11 @@ value. `app/globals.css` owns the tone → underlying accent redirection
 existing `--rs-accent-*` tokens today), and `components/ui/skill-accent.ts`'s
 `skillAccentColor` is the one place a tone resolves to a color. A skill with no
 approved tone (Strength; a future skill before its owner picks one) presents
-neutrally rather than guessing.
+neutrally rather than guessing. Fabrication (#232) is the first shipped skill
+without a tone: on both surfaces its name is plain `--rs-text-primary` text and
+its meter keeps the meter's default fill. That default is `--rs-accent-primary`,
+which Welding's tone also aliases today, so choosing Fabrication's hue remains an
+open product decision rather than something the fallback settles.
 
 Every progression surface consumes this through the same path instead of its
 own mapping: `features/shared/activity-context.tsx`'s `SkillProgressRow`
