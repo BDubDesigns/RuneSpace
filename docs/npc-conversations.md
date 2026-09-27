@@ -63,8 +63,11 @@ for every venue, not a per-location arrangement: the people in front of the
 player must never sit below the place's activity UI on a phone. When several
 people stand in one place, each gets their own card in authored order, each
 with their own Talk and Trade, and the place's own population line renders
-once, after the people, rather than inside anybody's card. A resident with no
-available conversation and no open merchant presents no card.
+once, after the people, rather than inside anybody's card. Every card keeps its
+structural hairline above it, and one more hairline closes the resident block
+before the population line so it never reads as part of the last card; with no
+resident there is no leading divider. A resident with no available
+conversation and no open merchant presents no card.
 
 **Where a resident stands (#159, #231).** `getResidentNpcs` resolves every NPC
 whose current placement matches one exact spatial context. An NPC with no

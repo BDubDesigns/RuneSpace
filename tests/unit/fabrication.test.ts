@@ -372,14 +372,14 @@ describe("the pre-start run summary (#229)", () => {
 
   it("totals a number exactly at the safe 1.00× baseline", () => {
     expect(fabricationRunSummary(projection, 3)).toBe(
-      "3 batches · 6 Refined Ferrite → 3 Mounting Bracket · 21.6s · 75 base Fabrication XP",
+      "3 batches · 6 Refined Ferrite → 3 Mounting Bracket · 21.6\u00a0sec · 75 base Fabrication XP",
     );
   });
 
   it("describes one batch for Max and never predicts a total", () => {
     const summary = fabricationRunSummary(projection, BOUNDED_RUN_MAX);
     expect(summary).toBe(
-      "Max · 2 Refined Ferrite per batch · 1 Mounting Bracket and 25 Fabrication XP each · 7.2s each · runs until the next workpiece cannot begin",
+      "Max · 2 Refined Ferrite per batch · 1 Mounting Bracket and 25 Fabrication XP each · 7.2\u00a0sec each · runs until the next workpiece cannot begin",
     );
     expect(summary).not.toMatch(/\b3\b/);
   });

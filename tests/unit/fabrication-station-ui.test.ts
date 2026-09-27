@@ -1,11 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { ACTION_IDS, ITEM_IDS } from "@/game/config/foundations";
+import { ACTION_IDS, GAME_TICK_MS, ITEM_IDS } from "@/game/config/foundations";
 import { BOUNDED_RUN_MAX } from "@/game/domain/bounded-run";
 import {
   fabricateVisibleRecipes,
   learnedRecipes,
   tinkerVisibleTargets,
 } from "@/features/fabrication/station-lists";
+import { seconds } from "@/features/fabrication/station-copy";
 import {
   fabricationResultBeat,
   observeFabricationRun,
@@ -57,6 +58,13 @@ const target = (
   affordableBatches: 1,
   lastCutterBlocked: false,
   ...overrides,
+});
+
+describe("the station's duration format", () => {
+  it('spells the unit out as "sec", never a bare "s", and never splits it from its number', () => {
+    expect(seconds(12, GAME_TICK_MS)).toBe("7.2\u00a0sec");
+    expect(seconds(20, GAME_TICK_MS)).toBe("12\u00a0sec");
+  });
 });
 
 describe("Fabricate lists what can be made now", () => {

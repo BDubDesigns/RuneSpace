@@ -150,9 +150,13 @@ export function tinkeringStopIsExpected(
   );
 }
 
+/**
+ * The station's one duration format: "7.2 sec", never a bare "s". The space is
+ * non-breaking so a narrow tile never strands the unit on a line of its own.
+ */
 export function seconds(ticks: number, tickMs: number): string {
   const value = (ticks * tickMs) / 1000;
-  return `${Number.isInteger(value) ? value : value.toFixed(1)}s`;
+  return `${Number.isInteger(value) ? value : value.toFixed(1)}\u00a0sec`;
 }
 
 /**

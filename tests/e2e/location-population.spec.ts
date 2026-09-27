@@ -399,6 +399,17 @@ test.describe("issue #231 resident rows at phone width", () => {
     if (npcIds.length > 0) {
       const lastRow = (await rows.last().boundingBox())!;
       expect(metaBox.y).toBeGreaterThanOrEqual(lastRow.y + lastRow.height - 1);
+      // Every resident keeps their own hairline, and one more closes the
+      // resident block before the place's population (#232 human preview).
+      for (const index of npcIds.keys()) {
+        await expect(rows.nth(index)).toHaveCSS("border-top-width", "1px");
+      }
+      await expect(meta).toHaveAttribute("data-population-divider", "");
+      await expect(meta).toHaveCSS("border-top-width", "1px");
+    } else {
+      // Nobody here: no leading divider above the population.
+      await expect(meta).not.toHaveAttribute("data-population-divider");
+      await expect(meta).toHaveCSS("border-top-width", "0px");
     }
     const activity = page.locator("[data-activity-panel]").first();
     if ((await activity.count()) > 0) {
@@ -468,6 +479,8 @@ test.describe("issue #231 resident rows at phone width", () => {
       page.locator(`[data-location-scene="${LOCATION_IDS.ruskRecovery}"]`),
     ).toBeVisible();
     await expectResidents(page, [NPC_IDS.wadeRusk, NPC_IDS.tansyRusk]);
+    await page.locator("[data-npc-residents]").scrollIntoViewIfNeeded();
+    await captureReviewScreenshot(page, "location-population-rusk-residents.png");
 
     await db
       .update(rune.characters)

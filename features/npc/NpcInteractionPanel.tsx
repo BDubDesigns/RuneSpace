@@ -215,9 +215,25 @@ export function ResidentContacts({
           here") to the line's end; it never constrains a block box's own
           width, so the expanded list stays free to fill the row.
           `LocationPopulationPanel` resets the alignment back to `text-left`
-          once content is meant to fill the row, so the cascade stops there. */}
+          once content is meant to fill the row, so the cascade stops there.
+
+          The same structural hairline that separates each resident from the
+          one before closes the resident block (#232 human preview), so the
+          place's population never reads as a line of the last person's row.
+          It needs somebody visibly standing here: a departing person's row is
+          already gone, and a divider above nobody would mean nothing. */}
       {meta ? (
-        <div className="mt-2 text-right" data-place-meta>
+        <div
+          className={
+            contacts.some((contact) => !contact.departed)
+              ? "mt-3 border-t border-[color:var(--rs-border-structural)] pt-3 text-right"
+              : "mt-2 text-right"
+          }
+          data-place-meta
+          {...(contacts.some((contact) => !contact.departed)
+            ? { "data-population-divider": "" }
+            : {})}
+        >
           {meta}
         </div>
       ) : null}

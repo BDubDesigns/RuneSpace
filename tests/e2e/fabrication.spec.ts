@@ -221,6 +221,10 @@ test("Tansy's Fabrication chapter, from Return the Favor to her walk home", asyn
   ]) {
     await expect(recipes.locator(`[data-fabricate-recipe="${actionId}"]`)).toBeVisible();
   }
+  // Each Fabricate tile shows its per-batch time, in the station's "sec" unit.
+  await expect(
+    recipes.locator(`[data-fabricate-recipe="${ACTION_IDS.mountingBracketFabrication}"]`),
+  ).toContainText("2 Refined Ferrite → 1 Mounting Bracket · 7.2 sec");
   const box = recipes.locator(`[data-fabricate-recipe="${ACTION_IDS.scrapBoxFabrication}"]`);
   await expect(box).toHaveCount(0);
   await expect(station.getByRole("button", { name: /^Hide / })).toHaveCount(0);
@@ -247,7 +251,7 @@ test("Tansy's Fabrication chapter, from Return the Favor to her walk home", asyn
   await expect(runSize).toHaveAttribute("data-bounded-run-quantity", "1");
   await expect(runSize).toHaveAttribute("data-bounded-run-affordable", "1");
   await expect(runSize.locator("[data-bounded-run-summary]")).toContainText(
-    "1 batch · 5 Refined Ferrite + 1 Power Cell → 1 Salvage Cutter · 12s · 65 base Fabrication XP",
+    "1 batch · 5 Refined Ferrite + 1 Power Cell → 1 Salvage Cutter · 12 sec · 65 base Fabrication XP",
   );
   // Max is Max: a mode, never a number, with per-batch facts.
   await runSize.locator("[data-bounded-run-max]").click();
@@ -319,7 +323,7 @@ test("Tansy's Fabrication chapter, from Return the Favor to her walk home", asyn
     .getByRole("button")
     .click();
   await expect(tinker.locator("[data-bounded-run-summary]")).toContainText(
-    "1 batch · 1 Mounting Bracket · 14.4s · 25 Fabrication XP · 1 Scrap Metal",
+    "1 batch · 1 Mounting Bracket · 14.4 sec · 25 Fabrication XP · 1 Scrap Metal",
   );
   await captureReviewScreenshot(page, "fabrication-tinker-phone.png");
   await tinker.locator("[data-tinker-start]").click();

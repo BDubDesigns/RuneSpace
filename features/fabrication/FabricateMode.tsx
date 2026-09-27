@@ -141,7 +141,7 @@ export function FabricateMode() {
               setSelectedActionId(candidate.actionId);
             }}
             quantity={candidate.outputQuantity}
-            recipe={recipeLine(candidate)}
+            recipe={`${recipeLine(candidate)} · ${seconds(candidate.durationTicks, GAME_TICK_MS)}`}
             requirements={unmetRequirements(candidate, state.fabrication.level)}
             selected={candidate.actionId === recipe?.actionId}
             {...(candidate.outputStackLimit !== undefined

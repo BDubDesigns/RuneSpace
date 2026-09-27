@@ -64,7 +64,9 @@ in one order. This is the authoritative home for that grammar;
 gameplay.
 
 1. **The place.** One raised panel: scene, description, one row per resident
-   in authored order (#231), and who else is here — once, after the people.
+   in authored order (#231), and who else is here — once, after the people,
+   below one structural hairline that closes the resident block (none when
+   nobody is resident).
    `features/location-scene/LocationSurface.tsx` and
    `features/local-places/LocalPlaceSurface.tsx`.
 2. **The primary activity.** A sibling panel, never nested inside the place —
