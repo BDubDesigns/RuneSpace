@@ -17,7 +17,16 @@ import {
 import { ACTION_IDS, LOCATION_IDS, SKILL_IDS } from "@/game/config/foundations";
 import { isActionAvailableAtLocation } from "@/game/content/locations";
 import { deriveEquipmentLoadout } from "@/game/domain/equipment";
-import { refiningPreflightStopReason, refiningRecipeUnlocked } from "@/game/domain/refining";
+import {
+  boundedRunSelectionToColumn,
+  checkBoundedRunSelection,
+  type BoundedRunSelection,
+} from "@/game/domain/bounded-run";
+import {
+  refiningAffordableBatches,
+  refiningPreflightStopReason,
+  refiningRecipeUnlocked,
+} from "@/game/domain/refining";
 import { levelFromXp } from "@/game/domain/progression";
 import { withResolvedOwnedCharacter } from "@/server/action-resolution";
 import { loadOwnedItemInstances } from "@/server/carried-inventory";
@@ -62,6 +71,13 @@ function refiningRecentFrom(
  * standing, and that their Refining level meets the recipe's minimum. A forged
  * request for Galvaferrite at Refining 1 is refused server-side, not merely
  * greyed out in the console.
+ *
+ * The run has a selection (#229). A number is how many recipe batches to
+ * ATTEMPT, failures included; it is revalidated here against the batches the
+ * inputs carried right now pay for, and a number that no longer fits is refused
+ * outright — never quietly run as a smaller batch count. Max needs only that
+ * the first attempt can begin, which the preflight above has already proven;
+ * after that the resolver keeps going until the preflight refuses.
  */
 export async function startRefining(
   userId: string,
@@ -69,6 +85,7 @@ export async function startRefining(
   recipeActionId: string = ACTION_IDS.refining,
   now = new Date(),
   random?: MiningRandom,
+  selection: BoundedRunSelection = 1,
 ): Promise<PlayGameplayState> {
   let miningOutcome: PersistedMiningOutcome | undefined;
   let refiningOutcome: PersistedRefiningOutcome | undefined;
@@ -145,7 +162,7 @@ export async function startRefining(
           "refining_unavailable_here",
         );
       }
-      // Preflight: need at least 2 shale and room for either output
+      // Preflight: the recipe's inputs, and room for every outcome it can have.
       const balance = getEffectiveGameBalance();
       // Build snapshot for preflight: same as refining resolver would
       const [xpRows, stacks, itemState, assignments] = await Promise.all([
@@ -214,6 +231,28 @@ export async function startRefining(
           preflight,
         );
       }
+      // The selection, against the batches the inputs carried right now pay
+      // for. A stale or forged number is refused, and the state this returns
+      // carries the fresh affordable count for the player to choose against.
+      const quantityCheck = checkBoundedRunSelection(
+        selection,
+        refiningAffordableBatches(snapshot, balance, recipe),
+      );
+      if (!quantityCheck.ok) {
+        return stateFromTransaction(
+          transaction,
+          context.character.id,
+          miningRecentFrom(miningOutcome),
+          miningOutcome?.stopReason,
+          undefined,
+          undefined,
+          undefined,
+          now,
+          refiningRecentFrom(refiningOutcome),
+          refiningOutcome?.stopReason,
+          "refining_quantity_unavailable",
+        );
+      }
       resetE2eRefiningRandom(context.character.id);
       // The recipe's own action ID is what makes the selection durable across
       // refresh and lazy/offline resolution (#209).
@@ -225,6 +264,7 @@ export async function startRefining(
       });
       // Reset run counters for a genuinely new run
       const freshRun = {
+        runSelectedAttempts: boundedRunSelectionToColumn(quantityCheck.selection),
         runAttempts: 0,
         runSuccesses: 0,
         runOutputsGained: {},

@@ -1,5 +1,8 @@
 import { z } from "zod";
 import {
+  BOUNDED_RUN_MAX,
+  BOUNDED_RUN_MINIMUM_QUANTITY,
+  BOUNDED_RUN_QUANTITY_CEILING,
   EQUIPMENT_ASSIGNMENT_KINDS,
   ITEM_IDS,
   REPAIR_TARGET_IDS,
@@ -125,7 +128,20 @@ export const RepairMaterialContributionRequestSchema = z.object({
 });
 
 /**
- * Starting Refining names the character and which authored recipe (#209).
+ * A bounded run's selection (#229): a whole number of batches or welds inside
+ * the structural bounds, or `"max"` to run until the activity is blocked.
+ * Whether a number is actually affordable is never this schema's call — the
+ * command revalidates it against the inputs carried and refuses one that no
+ * longer fits.
+ */
+export const BoundedRunSelectionSchema = z.union([
+  z.number().int().min(BOUNDED_RUN_MINIMUM_QUANTITY).max(BOUNDED_RUN_QUANTITY_CEILING),
+  z.literal(BOUNDED_RUN_MAX),
+]);
+
+/**
+ * Starting Refining names the character, which authored recipe (#209), and the
+ * run selection: how many batches to attempt, or Max (#229).
  *
  * The recipe is a stable action ID and nothing more: its inputs, outputs,
  * duration, success curve and minimum Refining level are all resolved
@@ -136,6 +152,7 @@ export const RepairMaterialContributionRequestSchema = z.object({
 export const StartRefiningRequestSchema = z.object({
   characterId: z.string().uuid(),
   recipeActionId: ContentId,
+  quantity: BoundedRunSelectionSchema,
 });
 
 /** Starting or stopping Welding names only the character and the repair target. */
@@ -150,6 +167,11 @@ export const WeldingCommandRequestSchema = z.object({
  */
 export const PracticeCommandRequestSchema = z.object({
   characterId: z.string().uuid(),
+});
+
+/** Starting Practice adds only the run selection: complete welds, or Max (#229). */
+export const StartPracticeRequestSchema = PracticeCommandRequestSchema.extend({
+  quantity: BoundedRunSelectionSchema,
 });
 
 /**

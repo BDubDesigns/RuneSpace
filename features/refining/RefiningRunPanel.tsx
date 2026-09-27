@@ -2,6 +2,7 @@
 
 import { RunSummary } from "@/features/shared/RunSummary";
 import { resolveItemPresentation } from "@/game/content/item-presentation";
+import { BOUNDED_RUN_MAX } from "@/game/domain/bounded-run";
 import type { RefiningRunAttempt, RefiningRunState } from "@/server/refining";
 
 function percentage(bps: number) {
@@ -36,7 +37,11 @@ export function RefiningRunPanel({ run }: { run: RefiningRunState }) {
     <RunSummary
       historyLabel="Refining attempt history"
       stats={[
-        { label: "attempts", value: run.attempts },
+        // Selected versus attempted is a numeric run's whole story (#229); a
+        // Max run has no selected count, only what it attempted.
+        run.selection === BOUNDED_RUN_MAX
+          ? { label: "attempts · Max", value: run.attempts }
+          : { label: "attempts", value: `${run.attempts} of ${run.selection}` },
         { label: "successful", value: run.successes },
         { label: "failed", value: run.failures },
         // Keyed by item, so a run of any recipe reads correctly (#209).
@@ -68,10 +73,12 @@ function RefiningAttemptRow({ attempt }: { attempt: RefiningRunAttempt }) {
       <p className="font-display uppercase tracking-wide">
         Attempt {attempt.sequence} — {attempt.success ? "Success" : "Failed"}
       </p>
-      <p className="text-[color:var(--rs-text-secondary)]">
-        Roll {percentage(attempt.rolledBasisPoints)} | Needed below{" "}
-        {percentage(attempt.thresholdBasisPoints)}
-      </p>
+      {attempt.deterministic ? null : (
+        <p className="text-[color:var(--rs-text-secondary)]">
+          Roll {percentage(attempt.rolledBasisPoints)} | Needed below{" "}
+          {percentage(attempt.thresholdBasisPoints)}
+        </p>
+      )}
       <p className="text-xs uppercase tracking-wide text-[color:var(--rs-text-muted)]">
         {attempt.durationTicks} ticks &middot; {describeQuantities(attempt.consumed)} consumed
       </p>

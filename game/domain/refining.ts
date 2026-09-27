@@ -1,4 +1,10 @@
-import type { EffectiveGameBalance, RefiningRecipeBalance } from "@/game/config/balance";
+import {
+  refiningRecipeIsDeterministic,
+  type EffectiveGameBalance,
+  type RefiningRecipeBalance,
+} from "@/game/config/balance";
+import { BOUNDED_RUN_QUANTITY_CEILING } from "@/game/config/foundations";
+import type { BoundedRunAllowance } from "@/game/domain/bounded-run";
 import {
   planPossibleAwardAdditions,
   planStackAddition,
@@ -16,6 +22,14 @@ export const REFINING_STOP_REASONS = [
   "inventory_slots_full",
   "carried_mass_capacity_reached",
   "action_replaced",
+  /** A numeric run attempted every batch the player selected (#229). */
+  "run_completed",
+  /**
+   * A Max run reached the internal safety ceiling (#229). Carried inventory
+   * ends every real run long before it; this exists so a defect cannot run
+   * forever, and says so rather than pretending the materials ran out.
+   */
+  "run_safety_limit",
 ] as const;
 export type RefiningStopReason = (typeof REFINING_STOP_REASONS)[number];
 
@@ -58,6 +72,7 @@ export function refiningAwardFacts(balance: EffectiveGameBalance, recipe: Refini
   const successOutputs = [
     { ...stackFacts(balance, recipe.outputItemId), quantity: recipe.outputQuantity },
   ];
+  // A deterministic recipe (#229) has no failure, so nothing else can happen.
   const failureOutcomes =
     recipe.failure.kind === "fixed_outputs"
       ? [
@@ -66,17 +81,21 @@ export function refiningAwardFacts(balance: EffectiveGameBalance, recipe: Refini
             quantity: output.quantity,
           })),
         ]
-      : recipe.inputs.map((input) => [{ ...stackFacts(balance, input.itemId), quantity: 1 }]);
+      : recipe.failure.kind === "one_input_returned"
+        ? recipe.inputs.map((input) => [{ ...stackFacts(balance, input.itemId), quantity: 1 }])
+        : [];
   return { inputs, successOutputs, failureOutcomes } as const;
 }
 
 /**
  * The success chance for one recipe at one Refining level, on the shared
- * whole-basis-point interpolation model.
+ * whole-basis-point interpolation model. A deterministic recipe always
+ * succeeds; it authors no curve at all.
  */
 export function refiningSuccessChanceBps(level: number, recipe: RefiningRecipeBalance): number {
   if (!Number.isInteger(level) || level < 1)
     throw new RangeError("Refining level must be positive");
+  if (refiningRecipeIsDeterministic(recipe)) return 10_000;
   return Math.min(
     10_000,
     recipe.successAtLevelOneBps +
@@ -107,6 +126,11 @@ export type RefiningSnapshot<Id = string> = {
  */
 export type RefiningResolvedAttempt = {
   success: boolean;
+  /**
+   * The recipe has no failure path, so nothing was rolled (#229). The roll
+   * fields then carry no information and a surface must not present them.
+   */
+  deterministic?: true;
   rolledBasisPoints: number;
   thresholdBasisPoints: number;
   consumed: readonly RefiningItemQuantity[];
@@ -327,16 +351,91 @@ function addAwards<Id>(
   return { slotsAvailable: slots, massAvailableGrams: mass };
 }
 
+type RefiningOutcomeBranch = readonly {
+  itemId: string;
+  quantity: number;
+  stackLimit: number;
+  massGrams: number;
+}[];
+
+type RefiningWorkingState<Id> = {
+  stacks: WorkingStack<Id>[];
+  slotsAvailable: number;
+  massAvailableGrams: number;
+};
+
+/**
+ * One attempt's effect on carried inventory: remove the recipe's inputs, then
+ * add the outcome branch the attempt actually produced.
+ */
+function applyRefiningAttempt<Id>(
+  state: RefiningWorkingState<Id>,
+  award: ReturnType<typeof refiningAwardFacts>,
+  branch: RefiningOutcomeBranch,
+  attemptIndex: number,
+): RefiningWorkingState<Id> {
+  const removal = planRecipeInputRemoval(
+    state.stacks,
+    state.slotsAvailable,
+    state.massAvailableGrams,
+    award.inputs,
+  );
+  if (!removal) throw new Error("Refining consumed more input than available after preflight");
+  const stacks = removal.stacksAfter;
+  const applied = addAwards(
+    stacks,
+    branch,
+    removal.slotsAvailableAfter,
+    removal.massAvailableAfter,
+    attemptIndex,
+  );
+  return { stacks, ...applied };
+}
+
+/**
+ * How many batches of this recipe the inputs carried right now pay for (#229):
+ * the ceiling a numeric run selection may ask for. It is deliberately not a
+ * prediction — it ignores capacity and anything a failure might hand back.
+ * Capacity is the ordinary preflight's question, asked before every attempt,
+ * and Max is a run-until-blocked mode that follows the real results instead
+ * of counting them in advance. Zero for a recipe the level does not unlock.
+ */
+export function refiningAffordableBatches<Id>(
+  snapshot: Pick<RefiningSnapshot<Id>, "refiningLevel" | "existingStacks">,
+  balance: EffectiveGameBalance,
+  recipe: RefiningRecipeBalance,
+): number {
+  if (!refiningRecipeUnlocked(snapshot.refiningLevel, recipe)) return 0;
+  const batches = Math.min(
+    ...refiningAwardFacts(balance, recipe).inputs.map((input) =>
+      Math.floor(totalQuantityForItem(snapshot.existingStacks, input.itemId) / input.quantity),
+    ),
+  );
+  return Math.min(BOUNDED_RUN_QUANTITY_CEILING, batches);
+}
+
 export function resolveRefining<Id>(input: {
   elapsedTicks: number;
   snapshot: RefiningSnapshot<Id>;
   balance: EffectiveGameBalance;
   recipe: RefiningRecipeBalance;
   random: RefiningRandom;
+  /**
+   * How many more batches the player's selection may attempt, and what
+   * reaching that means (#229). A numeric run stops with `run_completed` the
+   * moment it has attempted its count; a failed attempt counts exactly like a
+   * successful one. A Max run's allowance is only the internal safety ceiling:
+   * what ends it is the ordinary preflight refusing the next attempt, asked
+   * against the inventory the real results left behind.
+   */
+  allowance: BoundedRunAllowance;
 }): RefiningResolution<Id> {
   const { balance, snapshot, recipe, random } = input;
   if (!Number.isInteger(input.elapsedTicks) || input.elapsedTicks < 0)
     throw new RangeError("Elapsed ticks must be a non-negative integer");
+  const { allowance } = input;
+  if (!Number.isInteger(allowance.remaining) || allowance.remaining < 0)
+    throw new RangeError("A Refining run allowance must be a non-negative integer");
 
   const durationTicks = recipe.attemptDurationTicks;
   const award = refiningAwardFacts(balance, recipe);
@@ -355,8 +454,10 @@ export function resolveRefining<Id>(input: {
   let failures = 0;
   const resolvedAttempts: RefiningResolvedAttempt[] = [];
   const thresholdBasisPoints = refiningSuccessChanceBps(snapshot.refiningLevel, recipe);
+  const deterministic = refiningRecipeIsDeterministic(recipe);
+  const failureXp = deterministic ? 0 : recipe.failureXp;
 
-  const awardedXp = () => successes * recipe.successXp + failures * recipe.failureXp;
+  const awardedXp = () => successes * recipe.successXp + failures * failureXp;
   const finish = (stopReason?: RefiningStopReason): RefiningResolution<Id> => {
     const remainingIds = new Set(
       stacks.filter((stack) => stack.persisted).map((stack) => String(stack.id)),
@@ -385,8 +486,13 @@ export function resolveRefining<Id>(input: {
 
   // A run that cannot even start writes nothing. The loop's own stop echoes
   // the stacks it has been working on, but there is no working copy yet here,
-  // so persisting one would be a no-op UPDATE per carried stack.
-  const initialStop = refiningPreflightStopReason(snapshot, balance, recipe);
+  // so persisting one would be a no-op UPDATE per carried stack. A selection
+  // with nothing left to attempt is checked first, so it reports that it
+  // finished rather than whatever it would have run out of.
+  const initialStop =
+    allowance.remaining === 0
+      ? allowance.exhaustedReason
+      : refiningPreflightStopReason(snapshot, balance, recipe);
   if (initialStop) {
     return {
       consumedTicks: 0,
@@ -405,6 +511,9 @@ export function resolveRefining<Id>(input: {
   }
 
   while (true) {
+    // The selection is used up: stop at once, before the next preflight, so
+    // the run never starts (or waits to start) a batch nobody asked for.
+    if (successes + failures >= allowance.remaining) return finish(allowance.exhaustedReason);
     const stopReason = refiningPreflightStopReason(
       {
         refiningLevel: snapshot.refiningLevel,
@@ -420,30 +529,17 @@ export function resolveRefining<Id>(input: {
     remainingTicks -= durationTicks;
     consumedTicks += durationTicks;
 
-    const removal = planRecipeInputRemoval(
-      stacks,
-      slotsAvailable,
-      massAvailableGrams,
-      award.inputs,
-    );
-    if (!removal) throw new Error("Refining consumed more input than available after preflight");
-    stacks = removal.stacksAfter;
-    slotsAvailable = removal.slotsAvailableAfter;
-    massAvailableGrams = removal.massAvailableAfter;
     const consumed = award.inputs.map((item) => ({ itemId: item.itemId, quantity: item.quantity }));
     for (const item of consumed) {
       inputsConsumed[item.itemId] = (inputsConsumed[item.itemId] ?? 0) + item.quantity;
     }
 
-    const rolledBasisPoints = random.nextBasisPoints();
-    const success = rolledBasisPoints < thresholdBasisPoints;
+    // A deterministic recipe never consults the random source, so adding one
+    // leaves every rolled recipe's random stream exactly as it was.
+    const rolledBasisPoints = deterministic ? 0 : random.nextBasisPoints();
+    const success = deterministic || rolledBasisPoints < thresholdBasisPoints;
 
-    let branch: readonly {
-      itemId: string;
-      quantity: number;
-      stackLimit: number;
-      massGrams: number;
-    }[];
+    let branch: RefiningOutcomeBranch;
     if (success) {
       branch = award.successOutputs;
     } else {
@@ -462,13 +558,13 @@ export function resolveRefining<Id>(input: {
       branch = chosen;
     }
 
-    const applied = addAwards(
-      stacks,
+    const applied = applyRefiningAttempt(
+      { stacks, slotsAvailable, massAvailableGrams },
+      award,
       branch,
-      slotsAvailable,
-      massAvailableGrams,
       resolvedAttempts.length,
     );
+    stacks = applied.stacks;
     slotsAvailable = applied.slotsAvailable;
     massAvailableGrams = applied.massAvailableGrams;
     const awarded = branch.map((item) => ({ itemId: item.itemId, quantity: item.quantity }));
@@ -480,11 +576,12 @@ export function resolveRefining<Id>(input: {
     else failures += 1;
     resolvedAttempts.push({
       success,
+      ...(deterministic ? { deterministic: true as const } : {}),
       rolledBasisPoints,
       thresholdBasisPoints,
       consumed,
       awarded,
-      xpAwarded: success ? recipe.successXp : recipe.failureXp,
+      xpAwarded: success ? recipe.successXp : failureXp,
       durationTicks,
     });
   }

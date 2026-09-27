@@ -5,6 +5,7 @@ import {
   miningSourceForActionId,
   refiningRecipeForActionId,
   refiningRecipes,
+  type RolledRefiningRecipeBalance,
 } from "@/game/config/balance";
 import {
   ACTION_IDS,
@@ -342,13 +343,17 @@ describe("Galvanite Mining", () => {
   });
 });
 
-describe("the three Refining recipes", () => {
-  it("authors all three, each with its own durable action ID", () => {
+describe("the authored Refining recipes", () => {
+  it("authors each recipe with its own durable action ID", () => {
     const recipes = refiningRecipes(balance);
+    // The three productive recipes (#209), then the two deliberate Slag
+    // recipes (#229).
     expect(recipes.map((recipe) => recipe.actionId)).toEqual([
       ACTION_IDS.refining,
       ACTION_IDS.galvanicStockRefining,
       ACTION_IDS.galvaferriteRefining,
+      ACTION_IDS.ferriteShaleSlagRefining,
+      ACTION_IDS.galvaniteSlagRefining,
     ]);
     // Every recipe resolves back from its own action ID, which is what makes a
     // lazily-resolved or offline attempt refine what the player selected.
@@ -389,7 +394,7 @@ describe("the three Refining recipes", () => {
       },
     ];
     for (const { actionId, ticks, atOne, guaranteed, xp } of expected) {
-      const recipe = refiningRecipeForActionId(actionId, balance)!;
+      const recipe = refiningRecipeForActionId(actionId, balance) as RolledRefiningRecipeBalance;
       expect(recipe.attemptDurationTicks).toBe(ticks);
       expect(refiningSuccessChanceBps(1, recipe)).toBe(atOne);
       expect(refiningSuccessChanceBps(guaranteed, recipe)).toBe(10_000);

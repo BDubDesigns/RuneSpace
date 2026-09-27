@@ -26,6 +26,7 @@ import {
   miningSources,
   refiningActionIds,
   refiningRecipeForActionId,
+  refiningRecipeIsDeterministic,
   refiningRecipes,
   repairTargetBalances,
   repairTargetForActionId,
@@ -86,6 +87,7 @@ import {
 import {
   refiningAwardFacts,
   refiningRecipeUnlocked,
+  refiningAffordableBatches,
   refiningSuccessChanceBps,
   type RefiningStopReason,
 } from "@/game/domain/refining";
@@ -160,7 +162,11 @@ import {
 } from "@/game/domain/clean-pass";
 import { getWorkOrder } from "@/game/content/work-orders";
 import { deriveWorkbenchOccupancy } from "@/game/domain/workbench";
-import type { PracticeWeldState } from "@/game/domain/practice-welding";
+import { practiceAffordableWelds, type PracticeWeldState } from "@/game/domain/practice-welding";
+import {
+  BOUNDED_RUN_DEFAULT_QUANTITY,
+  boundedRunSelectionFromColumn,
+} from "@/game/domain/bounded-run";
 import { isMissionAccepted } from "@/server/mission-state";
 import {
   createWorkOrderWeldingResolver,
@@ -345,6 +351,13 @@ export type PracticeProjection = {
   /** Loose carried Scrap Metal available for the NEXT fresh weld. */
   scrapAvailable: number;
   scrapPerWeld: number;
+  /**
+   * How many complete welds the Scrap carried right now pays for, a paid
+   * partial weld counting as the first (#229): the largest number the run
+   * selector offers, and what Start revalidates a number against. Not what Max
+   * does — Max runs until the Scrap cannot pay for another weld.
+   */
+  affordableWelds: number;
   autoDiscardSlag: boolean;
   /**
    * The durable "finish this weld, then stop" intent (#207 follow-up). The
@@ -423,7 +436,18 @@ export type RefiningRecipeProjection = {
   attemptDurationTicks: number;
   successChanceBps: number;
   successXp: number;
+  /** Zero for a deterministic recipe, which has no failure (#229). */
   failureXp: number;
+  /** Always succeeds and never rolls (#229): the intentional Slag recipes. */
+  deterministic: boolean;
+  /**
+   * How many batches of this recipe the inputs carried right now pay for
+   * (#229): the largest number the run selector offers, and what Start
+   * revalidates a number against. Not a prediction and not what Max does —
+   * Max runs until the ordinary preflight refuses the next attempt, however
+   * many that turns out to be. Zero when the recipe is locked.
+   */
+  affordableBatches: number;
   inputs: readonly { itemId: string; name: string; quantity: number; carried: number }[];
   /** Every mutually exclusive thing a failure can produce, already named. */
   failureOutcomes: readonly (readonly { itemId: string; name: string; quantity: number }[])[];
@@ -631,7 +655,9 @@ export type PlayGameplayState = {
     /** The one bench already holds an unfinished customer Work Order (#207). */
     | "workbench_occupied"
     /** "Finish current weld and stop" was asked for with nothing on the bench. */
-    | "no_weld_in_progress";
+    | "no_weld_in_progress"
+    /** The selected weld count exceeds what the Scrap now pays for (#229); choose again. */
+    | "practice_quantity_unavailable";
   /** Authoritative persistent current location (stable ID from the registry). */
   location: { currentLocationId: string };
   /**
@@ -686,7 +712,11 @@ export type PlayGameplayState = {
    * server-authoritative answer for a recipe whose minimum Refining level the
    * character has not reached (#209).
    */
-  refiningError?: "refining_unavailable_here" | "refining_recipe_locked";
+  refiningError?:
+    | "refining_unavailable_here"
+    | "refining_recipe_locked"
+    /** The selected batch count exceeds what the inputs now pay for (#229); choose again. */
+    | "refining_quantity_unavailable";
   /** Set when the finite Crash Site Welding command cannot begin. */
   weldingError?: "welding_unavailable_here" | "welding_locked" | "repair_complete";
 };
@@ -1346,6 +1376,10 @@ export async function stateFromTransaction(
   };
   const refiningState = refiningStateRows[0];
   const refiningRun: RefiningRunState = {
+    // NULL is Max, so a missing row (no run yet) is told apart from it.
+    selection: refiningState
+      ? boundedRunSelectionFromColumn(refiningState.runSelectedAttempts)
+      : BOUNDED_RUN_DEFAULT_QUANTITY,
     attempts: refiningState?.runAttempts ?? 0,
     successes: refiningState?.runSuccesses ?? 0,
     failures: (refiningState?.runAttempts ?? 0) - (refiningState?.runSuccesses ?? 0),
@@ -1393,6 +1427,15 @@ export async function stateFromTransaction(
       .filter((stack) => stack.itemId === ITEM_IDS.scrapMetal)
       .reduce((total, stack) => total + stack.quantity, 0),
     scrapPerWeld: balance.practiceWelding.scrapPerWeld,
+    affordableWelds: practiceAffordableWelds(
+      {
+        practice: practiceState,
+        scrapStackQuantities: stacks
+          .filter((stack) => stack.itemId === ITEM_IDS.scrapMetal)
+          .map((stack) => stack.quantity),
+      },
+      balance,
+    ),
     autoDiscardSlag: practiceRow?.autoDiscardSlag ?? false,
     finishCurrentWeld: practiceRow?.finishCurrentWeld ?? false,
     ...(practiceRow?.lastStopReason ? { lastStopReason: practiceRow.lastStopReason } : {}),
@@ -1627,7 +1670,13 @@ export async function stateFromTransaction(
         attemptDurationTicks: recipe.attemptDurationTicks,
         successChanceBps: refiningSuccessChanceBps(refiningProgress.level, recipe),
         successXp: recipe.successXp,
-        failureXp: recipe.failureXp,
+        failureXp: refiningRecipeIsDeterministic(recipe) ? 0 : recipe.failureXp,
+        deterministic: refiningRecipeIsDeterministic(recipe),
+        affordableBatches: refiningAffordableBatches(
+          { refiningLevel: refiningProgress.level, existingStacks: snapshot.stacks },
+          balance,
+          recipe,
+        ),
         inputs: award.inputs.map((input) => ({
           itemId: input.itemId,
           name: resolveItemPresentation(input.itemId, input.itemId).displayName,

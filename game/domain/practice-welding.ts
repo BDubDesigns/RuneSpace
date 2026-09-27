@@ -9,12 +9,14 @@ import {
   type CleanPassRandom,
   type CleanPassState,
 } from "@/game/domain/clean-pass";
-import { ITEM_IDS } from "@/game/config/foundations";
+import { BOUNDED_RUN_QUANTITY_CEILING, ITEM_IDS } from "@/game/config/foundations";
+import type { BoundedRunAllowance } from "@/game/domain/bounded-run";
 import { planExactStackRemoval } from "@/game/domain/inventory";
 
 /**
- * Practice Welding — the indefinite Welding training loop at Wade's Workbench
- * (#190).
+ * Practice Welding — the repeatable Welding training loop at Wade's Workbench
+ * (#190), run a player-selected number of complete welds at a time, or until
+ * the Scrap runs out (#229).
  *
  * It is genuine Welding, not a tutorial simulation: the same skill, the same
  * five-tick section cadence, and the same Clean Pass opportunities as an
@@ -23,8 +25,8 @@ import { planExactStackRemoval } from "@/game/domain/inventory";
  * out at the end of it.
  *
  * What makes it different from a repair is that it repeats. A repair target is
- * one finite physical job that permanently completes; Practice has no end
- * state at all, so it owns a small durable state of its own — the partial
+ * one finite physical job that permanently completes; Practice can be run
+ * again whenever the player likes, so it owns a small durable state of its own — the partial
  * weld, whether the current weld's Scrap is already spent, this run's totals,
  * and the player's Slag preference — rather than pretending to be a resettable
  * repair target.
@@ -75,13 +77,23 @@ export type PracticeSnapshot = {
    * The player asked for the weld they have already paid for to finish and the
    * run to end there (#207).
    *
-   * Practice is deliberately continuous, so "let the current one finish" is not
-   * something ordinary Stop can express: Stop preserves a partial weld, and
-   * waiting costs two more Scrap the moment the weld completes. This is the
+   * A run rolls straight from one selected weld into the next, so "let the
+   * current one finish" is not something ordinary Stop can express: Stop
+   * preserves a partial weld, and waiting costs two more Scrap the moment the
+   * weld completes if the selection has welds left. This is the
    * narrow third intent — finish this unit, charge nothing further, and leave
    * the Workbench clear so a customer Work Order can claim it.
    */
   finishCurrentWeld: boolean;
+  /**
+   * How many more complete welds the player's selection may still START, and
+   * what reaching that means (#229). A numeric run allows its count less the
+   * welds this run has already completed; Max allows only up to the internal
+   * safety ceiling, because what ends a Max run is the ordinary Scrap check. A
+   * weld already on the bench was started, so it always finishes; this only
+   * decides whether another begins after it.
+   */
+  runAllowance: BoundedRunAllowance;
 };
 
 /** One completed weld, as `This Run` shows it. */
@@ -95,16 +107,25 @@ export type PracticeResolvedWeld = {
 };
 
 /**
- * Why a continuous run stopped on its own.
+ * Why a run stopped on its own.
  *
  * `out_of_scrap` is the bench running dry: the weld in progress finishes and
  * there is nothing to start another with. `finished_current_weld` is the player
  * having asked for exactly that outcome in advance (#207) — the paid weld
- * completes, no next recipe is consumed, and the bench is left clear. Everything
- * else that ends a run — the player's ordinary Stop, Travel — is an
- * interruption, not a resolution.
+ * completes, no next recipe is consumed, and the bench is left clear.
+ * `run_completed` is a numeric run (#229) having completed every weld the
+ * player selected: like Finish Current, it ends before the next weld would
+ * begin, so it spends no Scrap it was not asked to. A Max run ends with
+ * `out_of_scrap` like any run that runs dry; `run_safety_limit` is only its
+ * internal ceiling, which real Scrap never reaches. Everything else that ends a
+ * run — the player's ordinary Stop, Travel — is an interruption, not a
+ * resolution.
  */
-export type PracticeStopReason = "out_of_scrap" | "finished_current_weld";
+export type PracticeStopReason =
+  | "out_of_scrap"
+  | "finished_current_weld"
+  | "run_completed"
+  | "run_safety_limit";
 
 export type PracticeResolution = {
   consumedTicks: number;
@@ -203,8 +224,8 @@ function scrapSlotsFreed(stackQuantities: readonly number[], quantity: number): 
  *
  * A partial section leaves the durable cursor untouched and therefore grants
  * neither progress nor XP, exactly as repair Welding does. A fresh weld begins
- * the instant the previous one finishes — that is what makes one Start a
- * continuous run — and its two Scrap are consumed at that instant, even when
+ * the instant the previous one finishes, while the selected run has welds left
+ * (#229) — that is what makes one Start a run of several — and its two Scrap are consumed at that instant, even when
  * the window ends before the new weld's first section resolves. `cycleActive`
  * is what makes that safe: the next resolution continues the weld the player
  * already paid for instead of charging again.
@@ -250,6 +271,13 @@ export function resolvePracticeWelding(input: {
       // reports what the player asked for rather than an incidental shortage.
       if (snapshot.finishCurrentWeld) {
         stopReason = "finished_current_weld";
+        break;
+      }
+      // The selection is used up (#229). Every weld this run started has
+      // finished by the time the bench is clear, so completed welds are the
+      // welds started; checked before Scrap for the same reason as above.
+      if (resolvedWelds.length >= snapshot.runAllowance.remaining) {
+        stopReason = snapshot.runAllowance.exhaustedReason;
         break;
       }
       if (scrapAvailable < practiceWelding.scrapPerWeld) {
@@ -327,6 +355,23 @@ export function resolvePracticeWelding(input: {
     },
     ...(stopReason ? { stopReason } : {}),
   };
+}
+
+/**
+ * How many complete welds the Scrap carried right now pays for (#229), a paid
+ * partial weld on the bench counting as the first: the ceiling a numeric run
+ * selection may ask for. Slag never blocks a weld (overflow is discarded), so
+ * Scrap is the whole question. Max does not use this — it runs until the
+ * ordinary Scrap check refuses the next weld.
+ */
+export function practiceAffordableWelds(
+  snapshot: Pick<PracticeSnapshot, "practice" | "scrapStackQuantities">,
+  balance: EffectiveGameBalance = getEffectiveGameBalance(),
+): number {
+  const payable = Math.floor(
+    practiceScrapAvailable(snapshot) / balance.practiceWelding.scrapPerWeld,
+  );
+  return Math.min(BOUNDED_RUN_QUANTITY_CEILING, payable + (snapshot.practice.cycleActive ? 1 : 0));
 }
 
 /**

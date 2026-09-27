@@ -5,9 +5,11 @@ import {
   getRepairTargetBalance,
   refiningRecipeForActionId,
   standardSkillLevelThresholds,
+  type RolledRefiningRecipeBalance,
 } from "@/game/config/balance";
 import {
   ACTION_IDS,
+  BOUNDED_RUN_MAX,
   GAME_TICK_MS,
   ITEM_IDS,
   LOCATION_IDS,
@@ -56,7 +58,10 @@ suite("issue #209 Deep Jag progression (real PostgreSQL)", () => {
   const balance = getEffectiveGameBalance();
   const caveIn = getRepairTargetBalance(REPAIR_TARGET_IDS.deepJagCaveIn, balance);
   const galvanicStock = refiningRecipeForActionId(ACTION_IDS.galvanicStockRefining, balance)!;
-  const galvaferrite = refiningRecipeForActionId(ACTION_IDS.galvaferriteRefining, balance)!;
+  const galvaferrite = refiningRecipeForActionId(
+    ACTION_IDS.galvaferriteRefining,
+    balance,
+  ) as RolledRefiningRecipeBalance;
   const WELD_TICKS = balance.welding.attemptDurationTicks;
 
   beforeAll(async () => {
@@ -706,6 +711,37 @@ suite("issue #209 Deep Jag progression (real PostgreSQL)", () => {
       expect(resolved.refiningRun.xpGained).toBe(galvaferrite.failureXp);
     });
 
+    it("persists a failed pour whose returned input is spent again in the same window", async () => {
+      // One Refined Ferrite: the first pour fails and hands it back, and the
+      // second pour spends it again. The window's gross use (2) is more than
+      // was ever carried at once (1); persisting that as a replay of totals
+      // used to refuse the whole resolution (#229).
+      const { userId, character } = await atTheYard(8);
+      await addCarried(character.id, ITEM_IDS.refinedFerrite, [1]);
+      await addCarried(character.id, ITEM_IDS.galvanicStock, [3]);
+      const failing = () => ({ nextBasisPoints: () => 9_999, nextUnit: () => 0 });
+      await refiningCommands.startRefining(
+        userId,
+        character.id,
+        ACTION_IDS.galvaferriteRefining,
+        now,
+        failing(),
+        BOUNDED_RUN_MAX,
+      );
+      const resolved = await play.getPlayGameplayState(
+        userId,
+        character.id,
+        tick(now, galvaferrite.attemptDurationTicks * 2),
+        failing(),
+      );
+      expect(resolved.refiningRun.failures).toBe(2);
+      // A Max run with Galvanic Stock left keeps going on the returned Ferrite.
+      expect(resolved.activeAction?.actionId).toBe(ACTION_IDS.galvaferriteRefining);
+      expect(await carried(character.id, ITEM_IDS.refinedFerrite)).toBe(1);
+      expect(await carried(character.id, ITEM_IDS.galvanicStock)).toBe(1);
+      expect(await carried(character.id, ITEM_IDS.galvaferrite)).toBe(0);
+    });
+
     it("keeps the selected recipe across a refresh, because the action IS the selection", async () => {
       const { userId, character } = await atTheYard(5);
       await addCarried(character.id, ITEM_IDS.galvanite, [10]);
@@ -715,6 +751,8 @@ suite("issue #209 Deep Jag progression (real PostgreSQL)", () => {
         ACTION_IDS.galvanicStockRefining,
         now,
         deterministicRandom(),
+        // Every batch the ten Galvanite support (#229).
+        5,
       );
 
       // A refresh reads the durable row back, with no client-supplied recipe.

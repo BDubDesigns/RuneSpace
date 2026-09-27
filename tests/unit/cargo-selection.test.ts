@@ -72,9 +72,11 @@ function cargoState(): PlayGameplayState {
       cycleActive: false,
       scrapAvailable: 0,
       scrapPerWeld: 2,
+      affordableWelds: 0,
       autoDiscardSlag: false,
       finishCurrentWeld: false,
       run: {
+        selection: 1,
         welds: 0,
         scrapConsumed: 0,
         slagKept: 0,
@@ -112,6 +114,7 @@ function cargoState(): PlayGameplayState {
       recentAttempts: [],
     },
     refiningRun: {
+      selection: 1,
       attempts: 0,
       successes: 0,
       failures: 0,

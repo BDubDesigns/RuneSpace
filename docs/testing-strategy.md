@@ -38,8 +38,8 @@ small number of critical mobile player journeys.
   selection is an explicit allowlist of behavioral specs — `canonicalSpecPattern`
   in `playwright.config.ts` is its single source of truth — covering Mining,
   Inventory Equip, Overlay, Character, Walk It Off, Cut Your Teeth, Travel,
-  Location Population, Character Profile, Character Portraits, Refining, Cargo
-  Hold, Deep Jag, Holo Hollow, Rusk Recovery, Admin Operator, Sign-out,
+  Location Population, Character Profile, Character Portraits, Refining, Bounded
+  Runs, Cargo Hold, Deep Jag, Holo Hollow, Rusk Recovery, Admin Operator, Sign-out,
   Account News, Account Verification, and Gameplay Access. It intentionally excludes noncanonical `smoke`, `ownership`,
   `design-system`, `work-orders`, `public-*`, and QC Studio specs. It:
   - requires Node 22.x
@@ -131,7 +131,7 @@ small number of critical mobile player journeys.
 - Managed-host focused iteration uses `pnpm test:e2e:focused <phase>` (currently
   `mining`, `character-profile`, `location-population`, `character-portraits`,
   `cargo-hold`, `inventory-equip`, `travel`, `walk-it-off`, `cut-your-teeth`,
-  `rusk-recovery`, `work-orders`, `gameplay-access`, and `account-verification`; recipe
+  `refining`, `bounded-runs`, `rusk-recovery`, `work-orders`, `gameplay-access`, and `account-verification`; recipe
   in `docs/development-workflow.md`). The focused runner
   reuses the canonical primitives from `scripts/e2e-shared.mjs` (localhost-only
   database safety, Node 22 validation, port availability, targeted process

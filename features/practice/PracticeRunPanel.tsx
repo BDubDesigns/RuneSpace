@@ -1,6 +1,7 @@
 "use client";
 
 import { RunSummary } from "@/features/shared/RunSummary";
+import { BOUNDED_RUN_MAX } from "@/game/domain/bounded-run";
 import type { PracticeRunState, PracticeRunWeld } from "@/server/practice-welding";
 
 /**
@@ -13,7 +14,11 @@ export function PracticeRunPanel({ run }: { run: PracticeRunState }) {
     <RunSummary
       historyLabel="Practice weld history"
       stats={[
-        { label: "welds", value: run.welds },
+        // Selected versus completed is a numeric run's whole story (#229); a
+        // Max run has no selected count, only what it completed.
+        run.selection === BOUNDED_RUN_MAX
+          ? { label: "welds · Max", value: run.welds }
+          : { label: "welds", value: `${run.welds} of ${run.selection}` },
         { label: "Scrap used", value: run.scrapConsumed },
         { label: "Slag kept", value: run.slagKept },
         ...(run.slagDiscarded > 0 ? [{ label: "Slag discarded", value: run.slagDiscarded }] : []),

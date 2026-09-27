@@ -8,8 +8,14 @@ import { StatusMeter } from "@/components/ui/StatusMeter";
 import { ActivityPanel } from "@/features/shared/ActivityPanel";
 import { ActivityContextRow, SkillProgressRow } from "@/features/shared/activity-context";
 import { PracticeRunPanel } from "@/features/practice/PracticeRunPanel";
+import { BoundedRunProgress, BoundedRunSelector } from "@/features/shared/BoundedRunControl";
+import {
+  BOUNDED_RUN_DEFAULT_QUANTITY,
+  BOUNDED_RUN_MAX,
+  type BoundedRunSelection,
+} from "@/game/domain/bounded-run";
 import { getEffectiveGameBalance, practiceSectionXp } from "@/game/config/balance";
-import { ACTION_IDS } from "@/game/config/foundations";
+import { ACTION_IDS, GAME_TICK_MS } from "@/game/config/foundations";
 import { deriveMissionGuidanceTargets } from "@/game/domain/missions";
 import { CleanPassControl } from "@/features/welding/CleanPassControl";
 import { usePlay } from "@/features/play/PlayContext";
@@ -22,6 +28,31 @@ import {
 } from "@/server/actions";
 import type { PlayGameplayState } from "@/server/play";
 
+const WELD_UNIT = { singular: "weld", plural: "welds" };
+
+/**
+ * The selected run, before Start, from the authoritative per-weld facts. A
+ * paid partial weld is the run's first: it costs no Scrap and only its
+ * remaining sections are left to weld. A number totals exactly, because every
+ * weld costs the same Scrap and pays the same XP; Max describes one weld and
+ * leaves the total to the Scrap (#229).
+ */
+function practiceRunSummary(
+  practice: PlayGameplayState["practice"],
+  selection: BoundedRunSelection,
+  sectionXp: number,
+  sectionSeconds: number,
+): string {
+  if (selection === BOUNDED_RUN_MAX) {
+    return `Max \u00b7 ${practice.scrapPerWeld} Scrap Metal per weld \u00b7 ${practice.sectionsPerWeld * sectionXp} Welding XP each \u00b7 runs until the Scrap runs out`;
+  }
+  const quantity = selection;
+  const freshWelds = quantity - (practice.cycleActive ? 1 : 0);
+  const sections =
+    quantity * practice.sectionsPerWeld - (practice.cycleActive ? practice.sectionsCompleted : 0);
+  return `${freshWelds * practice.scrapPerWeld} Scrap Metal \u00b7 ${(sections * sectionSeconds).toFixed(0)}s \u00b7 ${sections * sectionXp} Welding XP`;
+}
+
 function practiceMessage(state: PlayGameplayState): string | undefined {
   if (state.practiceError === "practice_unavailable_here")
     return "The Workbench is only usable while you are standing at it.";
@@ -32,6 +63,14 @@ function practiceMessage(state: PlayGameplayState): string | undefined {
     return "The Workbench already has a client job on it. Finish it before practising.";
   if (state.practiceError === "no_weld_in_progress")
     return "There is no weld on the bench to finish.";
+  if (state.practiceError === "practice_quantity_unavailable") {
+    // Refused, never shortened (#229): the projection already carries the
+    // fresh affordable count to choose from.
+    const affordable = state.practice.affordableWelds;
+    return affordable > 0
+      ? `Your Scrap covers ${affordable} ${affordable === 1 ? "weld" : "welds"} right now. Choose a run size and start again.`
+      : `A fresh weld takes ${state.practice.scrapPerWeld} Scrap Metal.`;
+  }
   if (state.commandError === "another_action_active")
     return "Another activity is active. Finish it before starting a weld.";
   return undefined;
@@ -53,6 +92,8 @@ export function PracticeWeldingPanel() {
   const { acceptState, enqueueForeground, foregroundBusy, releaseCommand, state } = usePlay();
   const [message, setMessage] = useState<string>();
   const [pending, setPending] = useState<string>();
+  // The run's selection (#229): complete welds starting at one, or Max.
+  const [selection, setSelection] = useState<BoundedRunSelection>(BOUNDED_RUN_DEFAULT_QUANTITY);
   const [now, setNow] = useState(Date.now());
   const [, startTransition] = useTransition();
 
@@ -64,6 +105,12 @@ export function PracticeWeldingPanel() {
     if (!active) return;
     const clock = window.setInterval(() => setNow(Date.now()), 250);
     return () => window.clearInterval(clock);
+  }, [active]);
+
+  // Every new selection starts at one (#229): once a run is under way the
+  // selector is hidden, and when it next appears it is for a fresh run.
+  useEffect(() => {
+    if (active) setSelection(BOUNDED_RUN_DEFAULT_QUANTITY);
   }, [active]);
 
   // The bench is scenery until the Mission that opens it is accepted.
@@ -92,7 +139,10 @@ export function PracticeWeldingPanel() {
         try {
           applyResult(
             intent === "start"
-              ? await startPracticeWeldingAction({ characterId: state.characterId })
+              ? await startPracticeWeldingAction({
+                  characterId: state.characterId,
+                  quantity: selection,
+                })
               : intent === "stop"
                 ? await stopPracticeWeldingAction({ characterId: state.characterId })
                 : intent === "finish"
@@ -165,9 +215,10 @@ export function PracticeWeldingPanel() {
           </MissionActionButton>
         )}
 
-        {/* Practice repeats by design, which leaves no ordinary way to end a
-            run on a clear bench: Stop preserves a partial weld, and simply
-            waiting spends two more Scrap the instant this one finishes.
+        {/* A run rolls from one selected weld into the next (#229), which
+            leaves no ordinary way to end it early on a clear bench: Stop
+            preserves a partial weld, and simply waiting spends two more Scrap
+            the instant this one finishes if the run has welds left.
             Offered whenever a paid weld exists — running or stopped —
             because that weld is what stands between the player and a
             customer job (#207). Once armed there is no way to disarm it
@@ -215,6 +266,32 @@ export function PracticeWeldingPanel() {
         <Feedback tone="muted">Practice will stop when this weld finishes.</Feedback>
       ) : null}
 
+      {/* The run (#229): how many complete welds, or Max to weld until the
+          Scrap runs out, chosen before Start and followed while it runs.
+          Finish Current still ends it early after the weld on the bench, so
+          the two never compete. */}
+      {active ? (
+        <BoundedRunProgress
+          completed={practice.run.welds}
+          selection={practice.run.selection}
+          unit={WELD_UNIT}
+        />
+      ) : (
+        <BoundedRunSelector
+          affordable={practice.affordableWelds}
+          disabled={Boolean(state.activeAction) || foregroundBusy}
+          onChange={setSelection}
+          selection={selection}
+          summary={practiceRunSummary(
+            practice,
+            selection,
+            practiceSectionXp(balance),
+            (balance.welding.attemptDurationTicks * GAME_TICK_MS) / 1000,
+          )}
+          unit={WELD_UNIT}
+        />
+      )}
+
       <StatusMeter
         detail={`${practice.sectionsCompleted} / ${practice.sectionsPerWeld}`}
         label="Current weld"
@@ -257,6 +334,17 @@ export function PracticeWeldingPanel() {
       ) : null}
       {practice.lastStopReason === "finished_current_weld" && !active ? (
         <Feedback tone="muted">Weld finished. The Workbench is clear.</Feedback>
+      ) : null}
+      {practice.lastStopReason === "run_safety_limit" && !active ? (
+        <Feedback tone="muted">
+          Practice paused at the run safety limit. Start again to keep going.
+        </Feedback>
+      ) : null}
+      {practice.lastStopReason === "run_completed" && !active ? (
+        <Feedback tone="muted">
+          Run complete — {practice.run.welds} {practice.run.welds === 1 ? "weld" : "welds"}{" "}
+          finished. The Workbench is clear.
+        </Feedback>
       ) : null}
       {message ? <Feedback tone="danger">{message}</Feedback> : null}
       {/* Welding progression belongs with the welding, and the loose Scrap is

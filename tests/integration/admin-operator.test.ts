@@ -1024,6 +1024,9 @@ suite("issue #113 admin operator console (real PostgreSQL)", () => {
       ACTION_IDS.refining,
       startedAt,
       detRandom,
+      // More than one selected batch (#229), so the run is still going when
+      // the operator stops it after the first.
+      2,
     );
     const stopAt = tick(startedAt, 7); // exactly one 7-tick attempt
     const result = await adminCommands.stopCurrentActionAsAdmin(

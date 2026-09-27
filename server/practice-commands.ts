@@ -9,7 +9,8 @@ import { getEffectiveGameBalance } from "@/game/config/balance";
 import { ACTION_IDS, ITEM_IDS } from "@/game/config/foundations";
 import { RUSK_RECOVERY_CONTENT } from "@/game/content/rusk-recovery";
 import { rolledCleanPass } from "@/game/domain/clean-pass";
-import { canBeginPracticeWeld } from "@/game/domain/practice-welding";
+import { checkBoundedRunSelection, type BoundedRunSelection } from "@/game/domain/bounded-run";
+import { canBeginPracticeWeld, practiceAffordableWelds } from "@/game/domain/practice-welding";
 import { deriveWorkbenchOccupancy } from "@/game/domain/workbench";
 import { loadActiveWorkOrder } from "@/server/work-orders";
 import type { MiningRandom } from "@/game/domain/mining";
@@ -26,6 +27,7 @@ import {
   ensurePracticeState,
   interruptPracticeWelding,
   loadPracticeRow,
+  loadPracticeSnapshot,
   loadPracticeUnlocked,
   practiceStateFromRow,
   resetPracticeRun,
@@ -49,7 +51,12 @@ export type PracticeCommandError =
   /** A customer Work Order holds the one bench (#207). */
   | "workbench_occupied"
   /** Nothing is on the bench to finish, so "finish and stop" has no subject. */
-  | "no_weld_in_progress";
+  | "no_weld_in_progress"
+  /**
+   * The selected weld count is more than the Scrap carried pays for (#229).
+   * Refused rather than reduced; the returned state carries the fresh count.
+   */
+  | "practice_quantity_unavailable";
 
 async function currentLocationId(
   transaction: DatabaseTransaction,
@@ -93,12 +100,20 @@ function stateWith(
  * that weld's Clean Pass opportunities once. Resuming a partial weld consumes
  * nothing and rerolls nothing: those two Scrap were spent when that weld began,
  * which is exactly why Resume works with no Scrap left at all.
+ *
+ * The run has a selection (#229). A number is how many COMPLETE welds to run,
+ * a resumed partial weld being the first; it is revalidated against the welds
+ * the Scrap carried pays for before any Scrap is spent, and a number that no
+ * longer fits is refused rather than quietly shortened. Max needs only that
+ * the first weld can begin; after that the resolver keeps welding until the
+ * Scrap cannot pay for another.
  */
 export async function startPracticeWelding(
   userId: string,
   characterId: string,
   now = new Date(),
   random: MiningRandom = defaultMiningRandom(),
+  selection: BoundedRunSelection = 1,
 ): Promise<PlayGameplayState> {
   return withResolvedOwnedCharacter(
     userId,
@@ -151,6 +166,22 @@ export async function startPracticeWelding(
         if (!canBeginPracticeWeld(scrapAvailable, balance)) {
           return stateWith(transaction, context.character.id, now, "insufficient_scrap");
         }
+      }
+
+      // The selection, against the welds the Scrap carried pays for — checked
+      // before the first weld's Scrap is spent.
+      const quantityCheck = checkBoundedRunSelection(
+        selection,
+        practiceAffordableWelds(
+          await loadPracticeSnapshot(transaction, context.character.id),
+          balance,
+        ),
+      );
+      if (!quantityCheck.ok) {
+        return stateWith(transaction, context.character.id, now, "practice_quantity_unavailable");
+      }
+
+      if (!practice.cycleActive) {
         const consumption = await consumeStackableItem(transaction, {
           characterId: context.character.id,
           itemId: ITEM_IDS.scrapMetal,
@@ -173,9 +204,10 @@ export async function startPracticeWelding(
         });
       }
 
-      await resetPracticeRun(transaction, context.character.id, now);
-      // An ordinary Start is a request for the continuous run, so it clears any
-      // "finish and stop" the player set and then changed their mind about.
+      await resetPracticeRun(transaction, context.character.id, quantityCheck.selection, now);
+      // An ordinary Start is a request for the selected run in full, so it
+      // clears any "finish and stop" the player set and then changed their mind
+      // about.
       await setPracticeFinishCurrentWeld(transaction, context.character.id, false, now);
       await transaction.insert(activeActions).values({
         characterId: context.character.id,
@@ -242,10 +274,13 @@ export async function stopPracticeWelding(
 /**
  * Finish the weld already on the bench, then stop (#207).
  *
- * Practice is deliberately continuous, which leaves the player no way to end a
- * run on a clean bench: ordinary Stop preserves a partial weld, and simply
- * waiting spends two more Scrap the instant the current weld completes. Neither
- * is an answer when the bench has to be clear for customer work.
+ * A run rolls straight from one selected weld into the next (#229), which
+ * leaves the player no other way to end it early on a clean bench: ordinary Stop
+ * preserves a partial weld, and simply waiting spends two more Scrap the instant
+ * the current weld completes if the selection has welds left. Neither is an
+ * answer when the bench has to be clear for customer work. In a bounded run
+ * this ends the run after the weld on the bench, whatever the selection had
+ * left — the selection is a cap, never an obligation.
  *
  * So this is a third intent rather than a variant of Stop. It applies to the
  * weld the player has ALREADY paid for, whether that weld is running or was

@@ -10,6 +10,7 @@ import {
   REPAIR_TARGET_IDS,
   SKILL_IDS,
 } from "@/game/config/foundations";
+import { BOUNDED_RUN_MAX, type BoundedRunSelection } from "@/game/domain/bounded-run";
 import type { CleanPassOpportunity } from "@/game/domain/clean-pass";
 import {
   cleanupTestUser,
@@ -213,8 +214,24 @@ suite("issue #190 Practice Welding (real PostgreSQL)", () => {
   const refresh = (userId: string, characterId: string, ms: number) =>
     play.getPlayGameplayState(userId, characterId, at(ms), deterministicRandom());
 
-  const startPractice = (userId: string, characterId: string, ms = 0) =>
-    practiceCommands.startPracticeWelding(userId, characterId, at(ms), deterministicRandom());
+  /**
+   * Start a Max run unless a size is given. These tests were written against
+   * the open-ended run that #229 turned into Max — weld until the Scrap runs
+   * out — so what they assert about resolution still holds.
+   */
+  const startPractice = (
+    userId: string,
+    characterId: string,
+    ms = 0,
+    selection: BoundedRunSelection = BOUNDED_RUN_MAX,
+  ) =>
+    practiceCommands.startPracticeWelding(
+      userId,
+      characterId,
+      at(ms),
+      deterministicRandom(),
+      selection,
+    );
 
   it("consumes the cycle's two Scrap exactly once, even under retried starts", async () => {
     const { userId, character } = await apprentice();
@@ -257,7 +274,7 @@ suite("issue #190 Practice Welding (real PostgreSQL)", () => {
     expect(await carried(character.id, ITEM_IDS.slag)).toBe(balance.practiceWelding.slagPerWeld);
     expect(await weldingXp(character.id)).toBe(balance.practiceWelding.sectionsPerWeld * sectionXp);
     expect(await weldCounter(character.id)).toBe(1);
-    // Out of Scrap, so the run stopped on its own.
+    // Out of Scrap, so the Max run stopped on its own.
     expect(state.practice.active).toBe(false);
     expect(state.practice.lastStopReason).toBe("out_of_scrap");
   });
@@ -293,7 +310,7 @@ suite("issue #190 Practice Welding (real PostgreSQL)", () => {
   });
 
   it("keeps running while the player is away, through the ordinary resolution path", async () => {
-    // Scrap, not the clock, is what ends a real Practice run: six pieces is
+    // Scrap, not the clock, is what ends a Max Practice run: six pieces is
     // three welds, and a player cannot carry enough to reach the standard
     // one-hour offline cap. So what a long absence must prove is that the whole
     // run resolved on the next command and stopped itself cleanly.

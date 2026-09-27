@@ -495,26 +495,43 @@ export const characterMiningState = pgTable("character_mining_state", {
 });
 
 /** Issue #81 — bounded refining run state, mirroring mining (one row per character, latest ten attempts). */
-export const characterRefiningState = pgTable("character_refining_state", {
-  characterId: text("character_id")
-    .primaryKey()
-    .references(() => characters.id, { onDelete: "restrict" }),
-  lastStopReason: text("last_stop_reason"),
-  runAttempts: integer("run_attempts").notNull().default(0),
-  runSuccesses: integer("run_successes").notNull().default(0),
-  /**
-   * This run's totals, as `{ itemId: quantity }` maps (#209). Replaced the
-   * three Ferrite-specific counters: with three authored recipes, what a run
-   * consumed and produced depends on the recipe, and a Galvaferrite failure
-   * returns an input rather than producing Slag.
-   */
-  runOutputsGained: jsonb("run_outputs_gained").notNull().default({}),
-  runInputsConsumed: jsonb("run_inputs_consumed").notNull().default({}),
-  runXpGained: integer("run_xp_gained").notNull().default(0),
-  /** Latest ten immutable server-resolved refining attempt summaries for the current run. */
-  recentAttempts: jsonb("recent_attempts").notNull().default([]),
-  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
-});
+export const characterRefiningState = pgTable(
+  "character_refining_state",
+  {
+    characterId: text("character_id")
+      .primaryKey()
+      .references(() => characters.id, { onDelete: "restrict" }),
+    lastStopReason: text("last_stop_reason"),
+    /**
+     * The run's selection (#229): how many recipe batches the player chose to
+     * ATTEMPT, or NULL for Max — run until the ordinary preflight refuses the
+     * next attempt. `run_attempts` already counts attempts in the current run,
+     * failures included, so the two together are the whole bounded-run state —
+     * remaining is the difference, never stored.
+     */
+    runSelectedAttempts: integer("run_selected_attempts").default(1),
+    runAttempts: integer("run_attempts").notNull().default(0),
+    runSuccesses: integer("run_successes").notNull().default(0),
+    /**
+     * This run's totals, as `{ itemId: quantity }` maps (#209). Replaced the
+     * three Ferrite-specific counters: with three authored recipes, what a run
+     * consumed and produced depends on the recipe, and a Galvaferrite failure
+     * returns an input rather than producing Slag.
+     */
+    runOutputsGained: jsonb("run_outputs_gained").notNull().default({}),
+    runInputsConsumed: jsonb("run_inputs_consumed").notNull().default({}),
+    runXpGained: integer("run_xp_gained").notNull().default(0),
+    /** Latest ten immutable server-resolved refining attempt summaries for the current run. */
+    recentAttempts: jsonb("recent_attempts").notNull().default([]),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    check(
+      "character_refining_state_run_selected_attempts_positive",
+      sql`${table.runSelectedAttempts} >= 1`,
+    ),
+  ],
+);
 
 /**
  * Issue #172 — the generic character-scoped repair-target state.
@@ -634,6 +651,13 @@ export const characterPracticeWelds = pgTable(
      */
     finishCurrentWeld: boolean("finish_current_weld").notNull().default(false),
     lastStopReason: text("last_stop_reason"),
+    /**
+     * The run's selection (#229): how many complete welds the player chose, or
+     * NULL for Max — run until the Scrap cannot pay for another. A resumed
+     * partial weld is the run's first. `run_welds` counts the welds this run
+     * has completed, so remaining is the difference.
+     */
+    runSelectedWelds: integer("run_selected_welds").default(1),
     runWelds: integer("run_welds").notNull().default(0),
     runScrapConsumed: integer("run_scrap_consumed").notNull().default(0),
     runSlagKept: integer("run_slag_kept").notNull().default(0),
@@ -646,6 +670,10 @@ export const characterPracticeWelds = pgTable(
   (table) => [
     check("character_practice_welds_sections_non_negative", sql`${table.sectionsCompleted} >= 0`),
     check("character_practice_welds_run_welds_non_negative", sql`${table.runWelds} >= 0`),
+    check(
+      "character_practice_welds_run_selected_welds_positive",
+      sql`${table.runSelectedWelds} >= 1`,
+    ),
     // A weld that is not in progress cannot hold partial sections: the pair is
     // written together by one resolution, so a split state is corruption.
     check(
