@@ -22,7 +22,7 @@ The framework deliberately does not attempt to support every future mission shap
 | --- | --- | --- |
 | Mission definitions / content | `game/content/missions.ts` — `MissionDefinition`, `MissionOffer`, `MissionRequirement`, `MissionTurnIn`, `MissionDialogue`, `MissionReward`, `MissionAcceptEffect`, `MISSIONS` registry, `WALK_IT_OFF` / `CUT_YOUR_TEETH` / `WASTE_NOT` / `HOLD_IT_TOGETHER` / `KEEP_THE_CHANGE` | `getMission(id)` is the content accessor. |
 | Generic mission projection | `game/domain/missions.ts` — `projectMission`, `deriveMissionState`, `deriveMissionGuidanceTargets`, `validateMissionDefinitions`; `server/mission-state.ts` — `loadMissionProjections` | Projection combines live authoritative state with current generic tracked progress; targets and activity definitions remain content-owned. |
-| Tracked activity progress | `db/rune-space.ts` — `characterMissionProgress`; `server/mission-progress.ts` — row initialization, capped attempt consumption, and the mandatory-conversation marker | One row per character, mission, and stable authored `progressKey`; only current progress is persisted. `tracked_activity` and `npc_conversation` requirements share that one row shape and one progress-key space. There is no event history, provenance, lifetime counter, or acceptance-time slicing. Repair completion is observed separately from its authoritative `character_repair_targets` row and never creates mission progress. |
+| Tracked activity progress | `db/rune-space.ts` — `characterMissionProgress`; `server/mission-progress.ts` — row initialization, capped attempt consumption, the mandatory-conversation marker, and Fabrication outcomes with their reactive facts (`recordFabricationOutcomes`, #232) | One row per character, mission, and stable authored `progressKey`; only current progress is persisted. `tracked_activity` and `npc_conversation` requirements, and reactive facts (§9.3), share that one row shape and one progress-key space. There is no event history, provenance, lifetime counter, or acceptance-time slicing. Repair completion is observed separately from its authoritative `character_repair_targets` row and never creates mission progress. |
 | Generic acceptance / completion boundary | `server/missions.ts` — `acceptMission`, `completeMission`, `acknowledgeMissionConversation` (+ `completeMissionWithDefinition` test seam); `server/actions.ts` — `acceptMissionAction` / `completeMissionAction` / `acknowledgeMissionConversationAction`; `game/schemas/gameplay.ts` — `AcceptMissionRequestSchema` / `CompleteMissionRequestSchema` / `AcknowledgeMissionConversationRequestSchema` | Shared `runMissionCommand` character lock / reconciliation wrapper. See §12. |
 | Authored dialogue | `game/content/dialogue.ts` — `DIALOGUE_SEQUENCES` / `getDialogue` | Sequences are pure presentation content (no `action`). |
 | NPC conversation resolution | `game/domain/conversation.ts` — `resolveNpcConversation`, `NpcConversationEntry`, `getMissionCapacityRefusalDialogue`, `getMissionCompletionPresentation`; authored topics in `game/content/conversation-topics.ts` | The one canonical conversation model (§9); see `docs/npc-conversations.md`. |
@@ -47,6 +47,7 @@ type MissionDefinition = {
   turnIn: MissionTurnIn;                 // authoritative completion interaction
   reward?: MissionReward;                // at most one, see §8
   dialogue: MissionDialogue;             // semantic dialogue mapping
+  reactiveFacts?: readonly MissionReactiveFact[]; // narrow Mission-local story facts, see §9.3
 };
 ```
 
@@ -130,8 +131,9 @@ The currently supported live-state requirement kinds (`MissionRequirement`) are 
 | --- | --- | --- |
 | `at_location` | `locationId`, `objective` | `currentLocationId === locationId` (current location alone) |
 | `equipped_item` | `itemId`, `objective` | the item genuinely occupies its authoritative compatible slot (carried instance + `equippedItems` assignment; a stored instance does not count) |
-| `tracked_activity` | `progressKey`, `activity`, `metric: "attempts"`, `target`, `objective`, `recommendedActionId?` | current persisted progress for the stable key reaches the authored target; resolved attempts count whether the activity succeeds or fails |
+| `tracked_activity` | `progressKey`, `activity`, `metric: "attempts" \| "completions"`, `actionId?`, `target`, `objective`, `recommendedActionId?` | current persisted progress for the stable key reaches the authored target; `attempts` count whether the activity succeeds or fails, `completions` (#232) count only successful units; `actionId` narrows a family activity to one authored action |
 | `carried_stack` | `itemId`, `quantity?`, `turnIn`, `objective`, `recommendedActionId?` | current carried quantity for `itemId` ≥ resolved required quantity (§6) |
+| `carried_unique_item` (#232) | `itemId`, `turnIn: "show" \| "consume_one"`, `objective` | at least one instance of the unique `itemId` is carried and **unequipped** — equipped gear and Cargo Hold contents never count, so a turn-in can never take the tool in the player's hand. No provenance: any instance satisfies it. `consume_one` hands one over at turn-in, least value first (an uncharged instance before a charged one, then the newest) |
 | `repair_target_complete` | `targetId`, `objective` | that repair target's authoritative completion (`completed_at` is present in `character_repair_targets`); no mission-progress row is created. Hold It Together observes the Cargo Hold, Out of the Weather the Crew Stop. Phase copy and guidance are generated from the target's own recipe — see §5.1 |
 | `npc_conversation` | `npcId`, `locationId`, `dialogueId`, `progressKey`, `objective`, `actionLabel?` | the durable marker for that authored key is set, which only the generic `acknowledgeMissionConversation` command does (§12.3). Trade, arrival, or reading prose never satisfy it |
 
@@ -146,7 +148,7 @@ For example, Cut Your Teeth authors:
 
 If the character is away from The Jag, (1) is the current objective even though (2) and (3) are also unmet.
 
-**The `tracked_activity` `activity` vocabulary is closed:** `"mining" | "refining" | "practice_welding" | "work_order"` — owned by `TRACKED_ACTIVITY_ACTION_IDS` in `game/domain/missions.ts` and mirrored by the persistence-layer `TrackedActivity` union in `server/mission-progress.ts`. A new activity is a deliberate framework extension, never an authoring choice. `work_order` (#207) is credited **only** by the authoritative Work Order completion transaction (`completeActiveWorkOrder` in `server/work-orders.ts`) — never by opening the Work Orders terminal, accepting a job, committing its materials, starting Welding, completing one section, stopping or resuming the activity, or a board refill. It works identically whether that completion resolves while the character is actively welding or through the same shared lazy/offline reconciliation that already resolves Mining, Refining, and Practice Welding away from the keyboard — the generic action-resolver boundary (`ActionResolver` / `resolve` + `persist`), not a Work-Order-specific timer or a second credit path.
+**The `tracked_activity` `activity` vocabulary is closed:** `"mining" | "refining" | "practice_welding" | "work_order" | "fabrication" | "tinkering"` — owned by `TRACKED_ACTIVITY_ACTION_IDS` and `TRACKED_ACTIVITY_METRICS` in `game/domain/missions.ts` (the `TrackedMissionActivity` union in `game/content/missions.ts`), which the persistence-layer `TrackedActivity` in `server/mission-progress.ts` reuses. Each activity has exactly one metric, and validation holds them together: `fabrication` and `tinkering` (#232) count `completions` — a Fabrication workpiece that produced its output, a completed Tinkering batch — never a start, a busted workpiece, or an item obtained any other way; every other activity counts `attempts`. `fabrication` and `tinkering` are families (one action per authored recipe or target); a requirement may narrow to one member with `actionId`, and its `recommendedActionId` must then be that member. Both are credited only by their own resolution's persistence (`server/fabrication.ts`, `server/tinkering.ts`), in the same transaction. A new activity is a deliberate framework extension, never an authoring choice. `work_order` (#207) is credited **only** by the authoritative Work Order completion transaction (`completeActiveWorkOrder` in `server/work-orders.ts`) — never by opening the Work Orders terminal, accepting a job, committing its materials, starting Welding, completing one section, stopping or resuming the activity, or a board refill. It works identically whether that completion resolves while the character is actively welding or through the same shared lazy/offline reconciliation that already resolves Mining, Refining, and Practice Welding away from the keyboard — the generic action-resolver boundary (`ActionResolver` / `resolve` + `persist`), not a Work-Order-specific timer or a second credit path.
 
 **Live-state observation, plus narrow current counters.** Location, equipment, and carried-stack requirements observe current authoritative state. Tracked activities use only the current capped progress value for their stable authored key; the framework does not create per-attempt timestamps, event history, provenance, or lifetime counters. Scavenged shale and mined shale are indistinguishable — carried `ferriteShale` counts regardless of how it was obtained. See §14 for what this boundary currently excludes.
 
@@ -377,7 +379,8 @@ persistent idle dialogue — it is immediate one-shot presentation after success
 | Active (turn-in NPC) | **Turn-in** | `MissionTurnIn.dialogueId` | `active` / `ready_for_completion` + every requirement holds (the stage turns the interaction into a completion attempt; busy is distinguished below) |
 | Active (turn-in NPC) | **Requirements satisfied but busy** | `MissionDialogue.busyDialogueId` | requirements hold but `turnInAvailable` is false because the character is still busy |
 | Active (turn-in NPC) | **Equipment reminder** | `MissionDialogue.equipmentReminderDialogueId` | first unmet requirement `kind === "equipped_item"` |
-| Active (turn-in NPC) | **Carried-item reminder** | `MissionDialogue.carriedReminderDialogueId` | first unmet requirement `kind === "carried_stack"` |
+| Active (turn-in NPC) | **Carried-item reminder** | `MissionDialogue.carriedReminderDialogueId` | first unmet requirement `kind === "carried_stack"` or `"carried_unique_item"` |
+| Active (turn-in NPC) | **Reactive variant** (#232) | `MissionDialogue.reactive` | replaces the turn-in opening or the tracked-activity reminder when its Mission-local fact holds; first in authored order wins (§9.3) |
 | Active (turn-in NPC) | **Tracked-activity reminder** | `MissionDialogue.trackedActivityReminderDialogueId` | first unmet requirement `kind === "tracked_activity"` |
 | Active (turn-in NPC) | **Repair reminder** | `MissionDialogue.repairReminderDialogueId` | first unmet requirement `kind === "repair_target_complete"` |
 | Active (turn-in NPC) | **Conversation reminder** | `MissionDialogue.conversationReminderDialogueId` | first unmet requirement `kind === "npc_conversation"` — e.g. Tansy telling the player to go and see Bix first |
@@ -415,6 +418,41 @@ viewed-conversation flag — RuneSpace still persists nothing about conversation
 themselves (`docs/npc-conversations.md` §6). The authored sequence keeps its
 stable ID in content for identity and history even though normal play can no
 longer reach it.
+
+#### 9.3 Reactive Mission facts (#232)
+
+A Mission may remember a **small number of narrow story facts** so its NPC can
+react to what the player actually did while it was active — the reactive
+mission dialogue pattern. Each `MissionReactiveFact` is a boolean with an
+authored `key` in the Mission's own progress-key space, set once by the one
+authoritative outcome it observes (`observes`), and stored as an ordinary
+`character_mission_progress` row — so it lives exactly as long as the Mission
+row does and never outlives it. It is not a counter, a lifetime statistic, or
+telemetry, and it never changes a requirement, a reward, or progression.
+
+The observations are a closed union, grown only by a real need:
+
+- `fabrication_override_bust` — a Manual Override push busted a workpiece of
+  the named Fabrication recipe while the Mission was active;
+- `fabrication_override_success` — the successful workpiece of the named recipe
+  that **satisfied** the named tracked requirement had been pushed at least
+  once.
+
+`MissionProjection.facts` lists the keys that hold (accepted, incomplete
+Missions only). `MissionDialogue.reactive` authors variants of two moments — the
+turn-in opening and the tracked-activity reminder — as `{ factKey, moment,
+dialogueId }`; authored order is the priority, and the first variant whose fact
+holds replaces the ordinary sequence. A turn-in variant carries the same
+completion command as the ordinary opening, and every variant rejoins the same
+completion presentation: variants are openings, never branches. Validation
+rejects an unknown or colliding key, an observation of anything but an authored
+Fabrication recipe, a success fact that does not watch a tracked Fabrication
+requirement for its recipe, and a variant reading an unauthored fact or owned by
+anyone but the turn-in NPC.
+
+Return the Favor is the first use: `override-bust` and `override-success`, with
+the bust-aware opening outranking the approving one, and the bust-aware reminder
+while the Cutter is still to be made.
 
 ## 9.1 Completion presentation is one-shot, not persistent idle
 
@@ -470,6 +508,8 @@ Derived from the **first unmet requirement in authored order** on each accepted-
 | `tracked_activity` / `carried_stack` (with `recommendedActionId`) | `actionId: requirement.recommendedActionId`, plus `locationId` naming the single World Location offering that action (`actionDestination`) when it cannot currently be done — none when the current location already offers it, none when zero or several World Locations do |
 | `repair_target_complete` | `repairTargetId` — that repair surface is the current target, plus the World Location while the player is elsewhere and then the Local Place entrance hosting it, if it has one. The repair surface selects the advancing affordance (contribute materials vs start Welding) from authoritative repair/material/Welding substate. **Exception:** while the recipe still needs material the player carries none of, there is no guidance at all — see §5.1 |
 | `npc_conversation` | `npcId: requirement.npcId` — the person to go and meet, reusing the same NPC-boundary guidance (`npcBoundaryGuidance`) the turn-in NPC uses. While the character is elsewhere, `locationId: requirement.locationId` is the target instead; arriving hands off to the NPC |
+| `tracked_activity` (no `recommendedActionId`, #232) | `activity: requirement.activity` only — the activity itself is the target, with no invented action or destination. Break It Down's "any Tinkering batch" guides the Fabrication Station's Tinker control this way |
+| `carried_unique_item` | no guidance (a Cutter may be carried, equipped, stored or bought — no single route) |
 | *(carried requirement with no `recommendedActionId`)* | no guidance at all (see Ambiguous acquisition, below) |
 
 **Generic World Location → Local Place → interaction handoff.** Guidance resolves in narrow steps, derived purely from authored data, never from mission IDs or prose:
@@ -482,7 +522,7 @@ Arriving at a step removes that step's guidance and hands off to the next; the p
 
 ### Ambiguous acquisition never invents guidance
 
-A `carried_stack` or `tracked_activity` requirement authored **without** a `recommendedActionId` gets no guidance at all when it is the first unmet requirement — not a location, not an action, nothing. Several legitimate acquisition sources with no single authored route means the framework never picks one for the player. Keep the Change's Power Cell requirement is the proof case: once Bix's mandatory `npc_conversation` is satisfied, three Power Cells may still come from Inventory, the Annex, or Bix's shop — nothing glows anywhere until the player unambiguously carries the required quantity and only the turn-in remains.
+A `carried_stack` requirement authored **without** a `recommendedActionId` gets no guidance at all when it is the first unmet requirement — not a location, not an action, nothing; a `tracked_activity` without one gets only its `activity` (above), never a location or an action. Several legitimate acquisition sources with no single authored route means the framework never picks one for the player. Keep the Change's Power Cell requirement is the proof case: once Bix's mandatory `npc_conversation` is satisfied, three Power Cells may still come from Inventory, the Annex, or Bix's shop — nothing glows anywhere until the player unambiguously carries the required quantity and only the turn-in remains.
 
 ### No new persistence
 
@@ -701,7 +741,8 @@ When in doubt, favour adding or correcting authored mission content and reusing 
 The framework currently models **one live-state phase** per mission. Requirements observe current authoritative state (§5), while tracked activity requirements persist only a capped current value keyed by character, mission, and authored `progressKey`. This keeps ordinary missions simple, but the following progress shapes are **not yet modelled** and must earn an explicit framework extension when a real mission needs them:
 
 - **Multi-location history** such as "visit A → visit B → return to A" when the visits leave no durable evidence in current state (e.g. two `at_location` steps that would both already be satisfied by the current location).
-- **Arbitrary dialogue memory.** One shape is now modelled: a single authored
+- **Arbitrary dialogue memory.** Two narrow shapes are now modelled: reactive
+  Mission-local facts (§9.3), and a single authored
   mandatory conversation per NPC, marked durably by the `npc_conversation`
   requirement (§5, §9.2, §12.3). That is a concrete gameplay requirement, not
   conversation history — nothing records which optional topics were read, in
@@ -792,13 +833,28 @@ Short concrete examples that demonstrate the framework vocabulary. Do not copy m
 - **Two capacity-refusal beats, not one.** Unlike 10,000 Hours' single Scrap grant, small enough that slots and mass are practically the same problem and share one authored beat, ten Refined Ferrite and five Power Cells are large enough that the two failures are genuinely different situations, so Wade gets a separate line for each: `capacitySlotsDialogueId` ("Where exactly were you planning to put it?") and `capacityMassDialogueId` ("You can barely stand up as it is.") are two distinct sequences, not one shared refusal.
 - **Dialogue and tone:** Wade's offer keeps his ordinary register — a compliment arrives ("Hm. You're getting decent with that torch.") and is undercut in the very next line ("Decent. Don't write it down anywhere."), the real reason is stated plainly (the terminal is outpacing him, not that trust has been earned), and the scene ends on a flat instruction that asks for the first finished job back for inspection without gating the second ("Bring the first one back here when it's done. My name's on the work, so I'll want a look at it.") — the board is his apprentice's from the moment this is accepted, so his dialogue must not imply otherwise. No exclamation marks, no ceremony, and the pride — as always with Wade — arrives as a shorter sentence, not a warmer one.
 
+### Return the Favor — a deliberate pickup, a fabricated Cutter, any Cutter handed in, and two reactive facts
+
+- **Acceptance:** `prerequisiteMissionId: tenThousandHours`; one offer route, **Tansy at Rusk Recovery** (her Mission-derived relocation puts her there once 10,000 Hours is complete — `docs/npc-conversations.md`), `actionLabel: "TAKE THE JOB"`. 10,000 Hours has no `continuationMissionId`: learning a new skill is choosing new work, never an objective that silently appears. Accepting it is what opens the Fabrication Station (`RUSK_RECOVERY_CONTENT.fabricationAuthorizingMissionId`).
+- **Requirements:** a `tracked_activity` — `fabrication`, `metric: "completions"`, `actionId: salvageCutterFabrication`, `target: 1` — so only a Salvage Cutter the player genuinely fabricates while the Mission is active counts; one bought, given, or already owned cannot, and a busted workpiece is not a Cutter. Then a `carried_unique_item` for the Salvage Cutter with `consume_one`: any unequipped carried Cutter will do, with no provenance, and the starter Cutter is never singled out.
+- **Reactive facts (§9.3):** `override-bust` and `override-success`, choosing among three turn-in openings — bust-aware, approving, ordinary — that all rejoin one completion; the bust-aware reminder plays while the Cutter is still to be made.
+- **Completion:** Tansy inspects the handed-in Cutter and takes it apart as the Tinkering demonstration. The Scrap her demonstration shows is illustrative teaching only — nothing is granted. Completing the Mission opens Tinkering (`tinkeringAuthorizingMissionId`), pays `{ kind: "skill_xp", skillId: fabrication, amount: 100 }`, and **automatically continues** into Break It Down, because that is the next beat of the same lesson.
+
+### Break It Down — one Tinkering batch, and Tansy goes home
+
+- **Continuation-only:** `offers: []`, `prerequisiteMissionId: returnTheFavor`.
+- **Requirement:** one `tracked_activity` — `tinkering`, `metric: "completions"`, `target: 1`, no `actionId` — any genuinely completed Tinkering batch of anything eligible. With no single recommended action, its guidance names the activity (`MissionGuidance.activity`), which the station's Tinker control reads.
+- **Turn-in:** Tansy at Rusk Recovery; **reward** `{ kind: "skill_xp", skillId: fabrication, amount: 250 }`.
+- **Completion** closes the teaching chapter. Tansy's second authored relocation takes her home to The Jag, and Brace Yourself becomes the next story gate. Her closing conversation stays open while she leaves, so the scene plays to the end (`docs/npc-conversations.md`).
+
 ### Brace Yourself — two skill gates at once, and a repair that changes the world
 
-- **Two authored gates, one shared model.** `prerequisiteSkillLevels: [{ mining, 5 }, { welding, 5 }]` (§3) alongside `prerequisiteMissionId: tenThousandHours`. Tansy's reasoning is the gate: she has known about the cave-in for years, and it was not worth attempting until the player had proven themselves with both a pick and a torch. Widening the existing field from one entry to a list is the whole of the framework change — there is no Deep-Jag-specific eligibility check anywhere, and the acceptance command reads every named skill before judging so its refusal can name the one that is short.
-- **It does not require 10,001 Hours.** Work Orders and Deep Jag are sibling branches after 10,000 Hours, not a chain.
+- **Two authored gates, one shared model.** `prerequisiteSkillLevels: [{ mining, 5 }, { welding, 5 }]` (§3) alongside `prerequisiteMissionId: breakItDown` (10,000 Hours until #232 put Tansy's Fabrication chapter first). Tansy's reasoning is the gate: she has known about the cave-in for years, and it was not worth attempting until the player had proven themselves with both a pick and a torch. Widening the existing field from one entry to a list is the whole of the framework change — there is no Deep-Jag-specific eligibility check anywhere, and the acceptance command reads every named skill before judging so its refusal can name the one that is short.
+- **Accepted before #232.** A character who already held Brace Yourself when the gate moved keeps it — prerequisites are judged at acceptance only. Tansy's move to Rusk Recovery follows 10,000 Hours alone, so that character finds her at the yard rather than at The Jag, where Brace Yourself turns in; the chapter is still offered, and completing Break It Down sends her home to an untouched turn-in. This is a detour, never a dead end, and is covered by the chapter's PostgreSQL integration test. Its guidance still names The Jag while she is away — a known rough edge left as it is rather than widening #231's completed-Missions-only relocation model.
+- **It does not require 10,001 Hours.** Work Orders and Deep Jag are sibling branches, not a chain; 10,001 Hours hangs off 10,000 Hours and nothing in the Fabrication chapter touches it.
 - **Acceptance effect:** none. Tansy supplies the brace and the jack as story hardware; the player hauls the ordinary stock. No carried "brace" item was invented to represent equipment the fiction already gives her.
 - **Requirement:** one `repair_target_complete` observing the Deep Jag cave-in (§5), authoring nothing but its target. The generic phases (§5.1) read "Install Refined Ferrite at Deep Jag — 10 / 25", then "Weld Deep Jag — 3 / 15 welds".
 - **The repair, not the turn-in, opens the world.** The fifteenth welded section completes the repair, and Deep Jag's authored state variant resolves from that one durable fact: the scene becomes the opened passage, the map status becomes **MINING**, and Galvanite Mining is available immediately, without a trip back to Tansy and without a second `deep_jag_open` flag to drift (`docs/gameplay-foundations.md`, state-dependent World Locations).
 - **Offered and turned in at The Jag,** while the work itself is at Deep Jag — the first Mission whose repair location and turn-in location differ, which the generic guidance and phase projection already handled.
 - **Reward:** `{ kind: "skill_xp", skillId: welding, amount: 250 }` (§8), on top of the 750 Welding XP the fifteen genuine sections already paid, for a clean 1,000 across the journey.
-- **Dialogue:** Tansy authors the offer, the repair reminder, busy, the turn-in, the completion presentation (carrying the authored skill-XP beat), and post-completion story dialogue, all within her established expression set. She does not foreshadow Fabrication or anything else that does not exist yet.
+- **Dialogue:** Tansy authors the offer, the repair reminder, busy, the turn-in, the completion presentation (carrying the authored skill-XP beat), and post-completion story dialogue, all within her established expression set.

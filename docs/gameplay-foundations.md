@@ -521,6 +521,159 @@ every other kind.
   closing any open Clean Pass window as missed and preserving every resolved
   section — never refunding materials and never completing the job early.
 
+## Fabrication and Tinkering (issue #232)
+
+Fabrication turns processed stock into discrete items. It is a standard skill on
+the shared level curve (`skillLevelCurves` in `game/config/balance.ts`), starts
+at level 1, appears on every progression surface through the canonical skill
+projection, and has no approved accent colour yet, so it presents through the
+neutral fallback. Tier 1 ships here; Fabrication 5 and 8 are the next slice.
+
+### Rusk Recovery's two work areas
+
+Rusk Recovery stays one World Location — no Local Place, no separate scene. Its
+place, art and people stay shared at the top of the Location surface; beneath
+them, once Tansy has opened the station, two prominent work-area cards select
+which surface is expanded: **Welding Workshop** (Practice Welding, the Work
+Orders terminal, and the one shared bench) and **Fabrication Station**
+(Fabricate, and Tinker once it is unlocked). Only the selected area's surface
+renders. Work actually running decides the area shown, and a Mission turning to
+the station brings it forward. Before Return the Favor is accepted the yard
+renders exactly as it did before #232. This is the yard's own composition
+(`features/location-scene/RuskRecoveryWorkAreas.tsx`), not a work-area
+framework.
+
+Accepting Return the Favor opens Fabricate; completing it — Tansy's
+demonstration — opens Tinker (`RUSK_RECOVERY_CONTENT`). Both are derived from
+the Mission record, never a flag.
+
+### Tier-1 recipes
+
+| Recipe | Inputs → output | Duration | Base XP |
+| --- | --- | --- | --- |
+| Mounting Bracket | 2 Refined Ferrite → 1 Mounting Bracket (300 g, stack 5) | 12 ticks / 7.2 s | 25 |
+| Direct Scrap | 2 Refined Ferrite → 1 Scrap Metal | 10 ticks / 6 s | 10 |
+| Scrap Box | 1 Mounting Bracket + 2 Scrap Metal + 3 Refined Ferrite → 1 Scrap Box | 36 ticks / 21.6 s | 81 |
+| Salvage Cutter | 5 Refined Ferrite + 1 Power Cell → 1 Salvage Cutter | 20 ticks / 12 s | 65 |
+
+All are Fabrication 1. Each recipe is its own action ID, so the durable action
+row is the recipe on the machine. The Scrap Box is a unique 5 kg container
+attachment that adds +3 Inventory slots in either of the existing two container
+slots — there is no third. A fabricated Salvage Cutter is another ordinary
+Cutter instance at the Cutter's ordinary uncharged state; the recipe's Power
+Cell is a construction component, not stored charge. Direct Scrap is a utility
+recipe and not a Tinkering target.
+
+### The workpiece is binding
+
+Starting a workpiece commits it. Its complete input set is **reserved**: the
+units stay in the real `inventory_stacks` rows, still counting for mass and
+slots, but nothing may make them unavailable, and nothing may take away the room
+its output was guaranteed. Most carried-item commands already refuse while any
+action runs; the ones that deliberately do not — Drop, equipment changes, Power
+Cell loading, and the operator's carried-item tools — end by asking
+`assertActiveWorkpieceResolvable` whether the workpiece could still resolve
+exactly as committed, and roll the whole command back when it could not. Spare
+units the workpiece does not need can still be dropped.
+
+Only the workpiece on the machine is reserved. Before each later workpiece
+begins, the next one is checked against the inventory the last one actually
+left.
+
+Resolution is one transaction. **Success** revalidates the level, the reserved
+inputs and the output's room — judged against the hypothetical inventory *after*
+the inputs leave, so an output may use the slot its own inputs free — then
+consumes the whole input set, creates the whole output and grants the XP
+together. A **Manual Override bust** consumes the whole input set, creates
+nothing, and grants 0 XP. Nothing ever persists half a recipe.
+
+There is no cancel. A started workpiece cannot be stopped mid-cycle, travelled
+away from (Travel refuses it — it is deliberately not travel-replaceable), or
+replaced by another activity; Stop on a run means **Finish Current**: the
+workpiece on the machine resolves normally and no next one begins or reserves
+anything. Disconnects and reloads change nothing: resolution is the ordinary
+lazy/offline resolution with its one-hour cap. An operator's Stop clears the
+workpiece without consuming its inputs, which were never consumed in the first
+place, and records `manually_stopped`.
+
+Persistence: the recipe is the active action's ID, the workpiece's start is the
+action's cursor, and the reserved inputs are that recipe's input set in the real
+rows — nothing about carried items is cloned. `character_fabrication_state`
+(migration 0030) holds only what those cannot: the run's selection and totals,
+the Finish Current intent, the station's Manual Override toggle, and the current
+workpiece's machine state.
+
+### Runs: a number, or Max
+
+Fabrication uses #229's shared selector. A number is a bounded count of recipe
+batches (busts included), capped at Start by what the inputs carried right now
+pay for, and refused — never shortened — when it no longer fits. **Max** is a
+run-until-blocked mode: after every resolved workpiece the next one begins only
+if it can, and the run stops with the ordinary reason (`insufficient_inputs`,
+`inventory_slots_full`, `carried_mass_capacity_reached`). Before Start a number
+shows exact whole-run totals at the safe 1.00× baseline — inputs, outputs, base
+time, base XP — and Max shows one batch's facts.
+
+### Manual Override
+
+Optional per workpiece, never a third mode: the station's toggle (persistent per
+character) decides whether each new workpiece starts as an Override workpiece.
+Off is an automatic 1.00× Lock In. On, a workpiece starts at 1.00× with a Load
+rolled uniformly from 2–9 and a visible Trend (50/50 at 2–9, forced HIGHER at 1
+and LOWER at 10). A push names a Feed from 1–10; the next Load is rolled then —
+uniformly from L+1–10 for HIGHER or 1–L−1 for LOWER — and a Feed within ±2 of it
+(clipped to 1–10) compounds the multiplier ×1.20, exactly on it ×1.30; a miss
+busts the workpiece. The fifth successful push locks in by itself. XP is the
+recipe's base XP compounded by every push, rounded down.
+
+Lock In may happen at any time: before timer 0 the multiplier commits and the
+timer runs on; at or after it the workpiece resolves at once. Switching Override
+off is Lock In at what was earned. A workpiece whose timer runs out while its
+machine is unlocked **holds at 0 indefinitely** — producing nothing, starting
+nothing, and still blocking Travel and other activities — until the player
+decides. There is no reaction-time pressure.
+
+Every machine state is persisted, so a reload or a retried request observes the
+same Load; nothing about the next Load exists before the push that rolls it.
+Push and Lock In carry the workpiece number and push count the player saw, so a
+duplicated request can neither push twice nor land on a later workpiece. A CI-
+only deterministic source (`defaultOverrideRandom`) makes browser journeys
+reproducible.
+
+### Tinkering
+
+Tinkering dismantles one complete authored Fabrication output batch at the
+station for Fabrication XP and Scrap Metal. The Tier-1 targets are the Mounting
+Bracket, Scrap Box and Salvage Cutter; eligibility follows the item's recipe
+level. Every number is derived from the recipe through universal rules — the
+recipe's base XP, twice its duration, and one Scrap per two immediate input
+units rounded up: Salvage Cutter 65 XP / 24 s / 3 Scrap, Scrap Box 81 XP /
+43.2 s / 3 Scrap, Mounting Bracket 25 XP / 14.4 s / 1 Scrap. Scrap only, never
+original ingredients, and no Override multiplier travels with an item.
+
+It follows Practice Welding's cycle model: a cycle commits — destroys — its batch
+the instant it begins, so a refresh can neither duplicate nor dodge the
+destruction; ordinary Stop (and Travel) keeps the committed cycle and its worked
+ticks, Resume continues it without committing another, and Finish Current
+completes it and commits no next. A number is capped by the complete batches the
+eligible carried items form; Max runs until the next batch cannot begin.
+Equipped and stored items are never selectable, and a unique batch spends the
+least value first — an uncharged instance before a charged one, then the newest.
+
+**Auto-discard Scrap** is a persistent per-character preference, default off.
+Off, a cycle begins only when its Scrap can be kept; on, the batch is still
+destroyed and XP still paid, but the Scrap is discarded. If room was lost
+mid-cycle, what fits is kept and the rest is reported as discarded.
+
+**Last-Cutter safety (first-alpha provisional):** a Cutter batch that would
+leave the character with zero usable Mining Cutters across equipped gear,
+carried Inventory and the Cargo Hold is refused, and a Cutter that would be the
+last never counts as a batch the selector may offer.
+
+State lives in `character_tinkering_state` (migration 0030): the preference, the
+committed cycle's target and worked ticks, the Finish Current intent, and the
+run.
+
 ## Inventory and equipment
 
 - Fungible items are carried as positive-quantity stacks. Unique items are
@@ -561,7 +714,8 @@ every other kind.
   items are **permanently destroyed in the current development build**. The
   server-authoritative `discardInventoryStack` command locks the owned stack,
   validates the confirmed quantity after any due-work reconciliation, and
-  refuses safely when the stack changed. Real ground items, map coordinates,
+  refuses safely when the stack changed, and refuses units a Fabrication
+  workpiece has reserved (#232). Real ground items, map coordinates,
   visibility to other players, pickup, and player-to-player transfers remain
   future work; no world object is created by dropping. Selling to an approved
   NPC merchant is a separate authoritative command (see Credits below), not a
@@ -715,7 +869,8 @@ a second geography.
 
 ## Approved identities and boundaries
 
-Near-term stable skills are Mining, Refining, Welding, and Strength. Stable
+Near-term stable skills are Mining, Refining, Welding, Fabrication (#232), and
+Strength. Stable
 opening item identities are Ferrite Shale, Refined Ferrite, Slag, Crash-Grade
 Structural Alloy, Salvage Cutter, and Power Cell. These identities establish no
 weights, capacities, charge behavior, rewards, starter loadout, or action beyond
@@ -727,11 +882,12 @@ Processing Yard, producing 1 Refined Ferrite (150 g / stack 5, 15 XP) on
 success or 1 Slag (150 g / stack 10, 3 XP) otherwise, with a 40%→100% L1–20
 linear success curve. Welding (issue #89) repairs the Cargo Hold at Crash Site
 after its exact 15 Refined Ferrite + 6 Slag recipe is installed, using twelve
-deterministic 5-tick increments for 600 total XP. Salvage
-dismantles and recovers components. Fabrication assembles finished objects.
-Machining creates precise components. Salvage, Fabrication, Machining, Speeder
-Piloting, and Ship Piloting are documented future skill directions only; they
-have no persistence initialization or gameplay in this foundation.
+deterministic 5-tick increments for 600 total XP. Fabrication (#232) assembles
+finished objects from processed stock — see "Fabrication and Tinkering" above.
+Salvage dismantles and recovers components; Machining creates precise
+components. Salvage, Machining, Speeder Piloting, and Ship Piloting are
+documented future skill directions only; they have no persistence
+initialization or gameplay in this foundation.
 
 ## World and Travel (issues #40, #47, and #83)
 
@@ -1092,7 +1248,8 @@ that is used wherever the character is publicly presented.
 ### Atomic work-action → Travel replacement (issues #40 and #81)
 
 When Travel replaces an active travel-replaceable work action (Mining, Refining,
-or Welding):
+Welding, Practice Welding, a Work Order, or Tinkering — never a Fabrication
+workpiece, which is binding until it resolves, #232):
 
 1. The character and active-action state is locked.
 2. Only attempts already completed before the command are resolved,

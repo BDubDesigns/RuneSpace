@@ -333,6 +333,64 @@ suite("issue #232 Tansy's Fabrication chapter (real PostgreSQL)", () => {
     expect(mission(gate, MISSION_IDS.tenThousandOneHours).state).toBe("not_accepted");
   });
 
+  it("detours, never strands, a Brace Yourself accepted before the chapter existed", async () => {
+    // Before #232 Brace Yourself needed only 10,000 Hours, so a character may
+    // already hold it. Tansy's move to the yard follows 10,000 Hours alone, so
+    // that character meets her at Rusk; the chapter is still open to them, and
+    // finishing it sends her home to the Brace Yourself turn-in untouched.
+    const { userId, character } = await apprentice("Legacy brace");
+    await db.insert(rune.characterMissions).values({
+      characterId: character.id,
+      missionId: MISSION_IDS.braceYourself,
+      acceptedAt: start,
+    });
+    let state = await play.getPlayGameplayState(userId, character.id, start, certain());
+    expect(mission(state, MISSION_IDS.braceYourself).state).toBe("active");
+    expect(residentsAt(state, LOCATION_IDS.theJag)).not.toContain(NPC_IDS.tansyRusk);
+    expect(tansyEntry(state, MISSION_IDS.returnTheFavor)).toMatchObject({ role: "offer" });
+
+    await missions.acceptMission(
+      userId,
+      character.id,
+      MISSION_IDS.returnTheFavor,
+      NPC_IDS.tansyRusk,
+      at(1),
+      certain(),
+    );
+    await fabricateCutter(userId, character.id, 2);
+    await missions.completeMission(
+      userId,
+      character.id,
+      MISSION_IDS.returnTheFavor,
+      NPC_IDS.tansyRusk,
+      at(100),
+      certain(),
+    );
+    await give(character.id, ITEM_IDS.mountingBracket, 1);
+    await tinkering.startTinkering(
+      userId,
+      character.id,
+      ACTION_IDS.mountingBracketTinkering,
+      1,
+      at(200),
+    );
+    await play.getPlayGameplayState(userId, character.id, at(200 + 24));
+    const closed = await missions.completeMission(
+      userId,
+      character.id,
+      MISSION_IDS.breakItDown,
+      NPC_IDS.tansyRusk,
+      at(300),
+      certain(),
+    );
+    expect(closed.mission.status).toBe("completed");
+
+    state = closed.state;
+    expect(residentsAt(state, LOCATION_IDS.theJag)).toEqual([NPC_IDS.tansyRusk]);
+    expect(mission(state, MISSION_IDS.braceYourself).state).toBe("active");
+    expect(tansyEntry(state, MISSION_IDS.braceYourself)).toMatchObject({ role: "active" });
+  });
+
   it("cannot be satisfied by a Cutter that was bought, given or already owned", async () => {
     const { userId, character } = await apprentice("Pre-owned");
     await missions.acceptMission(

@@ -223,6 +223,11 @@ const authoredWikiArticles = [
         heading: "How much you can carry",
         paragraphs: [
           "You start with one container, a beat-up MYKEA SCHLEPPRAUM-8 with eight slots, and a starting weight limit for everything you're carrying. Equipped gear — including containers — counts toward that weight limit but doesn't take up an Inventory slot itself.",
+          [
+            "You have two container attachments. A ",
+            { text: "Scrap Box", articleSlug: "fabrication-and-tinkering" },
+            " you fabricate yourself fits either one and adds three more slots, at a heavy 5 kg.",
+          ],
         ],
       },
       {
@@ -239,6 +244,11 @@ const authoredWikiArticles = [
         heading: "Dropping items",
         paragraphs: [
           "Dropping a stack asks you to confirm the exact quantity first. In the current build, dropped items are permanently destroyed — there's no ground pickup yet, so only drop what you're sure you don't need.",
+          [
+            "Materials set aside for a piece on the ",
+            { text: "Fabrication Station", articleSlug: "fabrication-and-tinkering" },
+            " can't be dropped until that piece is finished.",
+          ],
         ],
       },
     ],
@@ -517,6 +527,11 @@ const authoredWikiArticles = [
         heading: "Work Orders",
         paragraphs: [
           [
+            "Once Tansy opens the ",
+            { text: "Fabrication Station", articleSlug: "fabrication-and-tinkering" },
+            " beside it, the yard shows two work areas; the bench and the terminal are both under the Welding Workshop.",
+          ],
+          [
             "There is a beaten-up terminal in the corner of the yard, and it is not just scenery any more. Once you are good enough with a torch, it is where the paying jobs come in — see ",
             { text: "Work Orders", articleSlug: "work-orders" },
             " for how the board works.",
@@ -597,6 +612,92 @@ const authoredWikiArticles = [
     ],
   },
   {
+    slug: "fabrication-and-tinkering",
+    title: "Fabrication & Tinkering",
+    category: "work",
+    summary:
+      "Making parts, containers and tools from processed stock at Rusk Recovery's Fabrication Station, the Manual Override control, and taking finished pieces apart again.",
+    sections: [
+      {
+        paragraphs: [
+          [
+            "Fabrication is making the piece you need out of processed stock — a bracket, a container, a tool. It is its own skill with its own level, and it happens at the Fabrication Station in Wade Rusk's yard at Rusk Recovery, right beside his welding workshop. Tansy Rusk teaches it: after ",
+            { text: "10,000 Hours", articleSlug: "missions" },
+            " she comes out to the yard, and taking on her job opens the station.",
+          ],
+          "Once the station is open, the yard shows two work areas to choose between — the Welding Workshop, with the practice bench and the Work Orders terminal, and the Fabrication Station. Only the one you pick is laid out on screen; Wade and Tansy stay where they are either way.",
+        ],
+      },
+      {
+        heading: "What you can make",
+        list: [
+          "Mounting Bracket — 2 Refined Ferrite. 7.2 seconds, 25 Fabrication XP. Installation hardware; it stacks five to a slot.",
+          [
+            "Scrap Metal — 2 Refined Ferrite into 1 Scrap Metal. 6 seconds, 10 Fabrication XP. A way to make ",
+            { text: "practice scrap", articleSlug: "practice-welding" },
+            " yourself; it is not meant as training.",
+          ],
+          [
+            "Scrap Box — 1 Mounting Bracket, 2 Scrap Metal and 3 Refined Ferrite. 21.6 seconds, 81 Fabrication XP. A crude, heavy container that adds three ",
+            { text: "Inventory", articleSlug: "inventory-and-equipment" },
+            " slots when you equip it as a container.",
+          ],
+          [
+            "Salvage Cutter — 5 Refined Ferrite and 1 Power Cell. 12 seconds, 65 Fabrication XP. Another ordinary ",
+            { text: "Salvage Cutter", articleSlug: "mining-and-refining" },
+            ". The Power Cell goes into building it, so it comes off the machine uncharged like any Cutter.",
+          ],
+        ],
+        paragraphs: [
+          "Every current recipe needs only Fabrication level 1. The station lists every recipe, and under each one what you are still missing. Two filters can hide recipes above your level and recipes you do not have the materials for — either on its own, or both together.",
+        ],
+      },
+      {
+        heading: "Choosing a run",
+        paragraphs: [
+          "Pick how many batches to make before you start, the same way Refining and the practice bench work: it starts at one, and the minus and plus buttons change it up to as many as your materials pay for. The station shows what the whole run will take and give you — materials, pieces, time and Fabrication XP. Or press Max to keep going until the next piece cannot be started; Max shows what each batch takes, because how many it makes depends on what you have left as it goes.",
+        ],
+      },
+      {
+        heading: "Once a piece is on the machine",
+        paragraphs: [
+          "Starting a piece commits you to it. Its materials stay in your Inventory until it is finished — still counting toward your weight and slots — but they are set aside for it: you cannot drop them, sell them or use them for anything else, and you cannot walk away from the station until the piece is done. Only the piece on the machine sets anything aside; the materials for later batches are still yours until each one starts.",
+          "When a piece finishes, its materials are used up and the finished piece lands in your Inventory at the same moment. Room for it is judged after its own materials are gone, so a full Inventory can still finish a piece whose materials free the slot it needs.",
+          "There is no cancel. Stop After This Workpiece lets the piece on the machine finish and ends the run there. Closing the game or losing your connection changes nothing: the piece keeps going, and when you come back it is exactly where it would have been.",
+        ],
+      },
+      {
+        heading: "Manual Override",
+        paragraphs: [
+          "Fabrication never fails on its own. Manual Override is a control on the station for when you want to push your luck: switch it on and the piece on the machine gets a Load between 2 and 9, a Trend of Higher or Lower, and a multiplier on the Fabrication XP it will pay, starting at 1.00×.",
+          "To push, pick a Feed from 1 to 10. The Load then moves in the direction the Trend showed — Higher lands anywhere above it up to 10, Lower anywhere below it down to 1 — and you do not know how far until it moves. A Feed within two of the new Load multiplies the XP by 1.20; a Feed exactly on it, by 1.30. Anything else wrecks the piece: its materials are gone, nothing is made, and it pays no XP.",
+          "You can push up to five times on one piece, and the fifth locks it in on its own. Lock In whenever you are happy with the multiplier. If the timer is still running, the piece finishes normally at that multiplier; if it has already run out, it finishes straight away. There is no rush: a piece whose timer runs out while Manual Override is still working just holds on the machine until you decide. Switching Manual Override off locks in whatever you have earned so far, and the next piece starts at 1.00× again.",
+        ],
+      },
+      {
+        heading: "Tinkering",
+        paragraphs: [
+          "Tinkering is the other half of the station: taking a finished piece apart for Fabrication XP. Tansy shows it to you, and it is available from then on.",
+          "Taking a piece apart pays its full Fabrication XP, takes twice as long as making it, and gives back Scrap Metal — one piece for every two things that went into making it, rounded up. It never gives back the original materials.",
+        ],
+        list: [
+          "Salvage Cutter — 65 Fabrication XP, 24 seconds, 3 Scrap Metal.",
+          "Scrap Box — 81 Fabrication XP, 43.2 seconds, 3 Scrap Metal.",
+          "Mounting Bracket — 25 Fabrication XP, 14.4 seconds, 1 Scrap Metal.",
+        ],
+      },
+      {
+        heading: "How Tinkering runs",
+        paragraphs: [
+          "Tinkering uses the same run control: a number of pieces, or Max until there is nothing left to take apart. Only pieces you are carrying and not wearing can be taken apart — unequip something first if you want to Tinker it.",
+          "The piece is gone the moment its Tinkering starts. Stop keeps that piece exactly where it was, and Resume carries on with it without taking another; walking away from the yard does the same. Finish Current Item finishes it — full XP and Scrap — and then stops.",
+          "By default Tinkering keeps its Scrap, and a piece will not start if there is no room for the Scrap it gives back. Turn on Auto-discard Scrap to keep going regardless: the piece is still taken apart and still pays its XP, but the Scrap is thrown away. The setting stays until you change it.",
+          "Tinkering will not take apart your last Mining Cutter. Cutters you are wearing or have stored in the Cargo Hold count, so you can take one apart as long as you have another somewhere — otherwise make or get another Cutter first.",
+        ],
+      },
+    ],
+  },
+  {
     slug: "missions",
     title: "Missions",
     category: "getting-started",
@@ -642,9 +743,19 @@ const authoredWikiArticles = [
             " and show him the work.",
           ],
           [
+            "Return the Favor — once 10,000 Hours is done, Tansy comes out to Rusk Recovery. Take the job and she opens the ",
+            { text: "Fabrication Station", articleSlug: "fabrication-and-tinkering" },
+            ": fabricate a Salvage Cutter there yourself, then hand her a Salvage Cutter. Worth 100 Fabrication XP.",
+          ],
+          [
+            "Break It Down — follows straight on from Return the Favor. ",
+            { text: "Tinker", articleSlug: "fabrication-and-tinkering" },
+            " one piece of anything you can take apart, then tell Tansy. Worth 250 Fabrication XP, and she heads back to The Jag afterwards.",
+          ],
+          [
             "10,001 Hours — once you are Welding level 5, Wade offers you a paying job off his ",
             { text: "Work Orders", articleSlug: "work-orders" },
-            " terminal at Rusk Recovery. Accepting it is what makes the board yours for good; finishing the job and showing him the work is just the formality.",
+            " terminal at Rusk Recovery. Accepting it is what makes the board yours for good; finishing the job and showing him the work is just the formality. It does not need Return the Favor or Break It Down.",
           ],
         ],
       },
@@ -660,7 +771,7 @@ const authoredWikiArticles = [
             ". Renn brings it up in town once you've finished Hold It Together — he isn't asking you to do anything about it, and you can decide to pitch in. You don't need Keep the Change first, and it never blocks it.",
           ],
           [
-            "Brace Yourself — Tansy Rusk has known about the cave-in below The Jag for years. Once you have finished 10,000 Hours and reached both Mining 5 and Welding 5, she will ask you to help her reopen it: 25 Refined Ferrite and 5 ",
+            "Brace Yourself — Tansy Rusk has known about the cave-in below The Jag for years. Once you have finished Break It Down and reached both Mining 5 and Welding 5, she will ask you to help her reopen it back at The Jag: 25 Refined Ferrite and 5 ",
             { text: "Power Cells", articleSlug: "power-cells" },
             " hauled down to Deep Jag, then fifteen welding passes to set the brace. You do not need 10,001 Hours first — Work Orders and Deep Jag are two separate directions out of the same point.",
           ],
@@ -692,7 +803,7 @@ const authoredWikiArticles = [
       {
         heading: "How missions work in practice",
         paragraphs: [
-          "Objectives update live as you meet them. Every job you've accepted gets its own strip at the top of the screen, on the Map and while travelling too — green while there's still work to do, blue once it's ready to hand in — and the Mission Log keeps the full checklist. Finishing Walk It Off, Cut Your Teeth, or Waste Not hands you the next job in the chain automatically — there's nothing extra to accept. Keep the Change works differently: after Hold It Together, go back and talk to Wade to take it on. 10,000 Hours and 10,001 Hours work the same way — Wade won't come find you, so walk out to Rusk Recovery and take each one on once it's available. 10,001 Hours is currently the last job in the chain, and Brace Yourself branches off alongside it. When every objective on a job is met, talk to the NPC named in it to turn it in.",
+          "Objectives update live as you meet them. Every job you've accepted gets its own strip at the top of the screen, on the Map and while travelling too — green while there's still work to do, blue once it's ready to hand in — and the Mission Log keeps the full checklist. Finishing Walk It Off, Cut Your Teeth, or Waste Not hands you the next job in the chain automatically — there's nothing extra to accept. Keep the Change works differently: after Hold It Together, go back and talk to Wade to take it on. 10,000 Hours and 10,001 Hours work the same way — Wade won't come find you, so walk out to Rusk Recovery and take each one on once it's available. Return the Favor is the same again, taken from Tansy in that yard, and Break It Down follows it automatically. Brace Yourself comes after Break It Down; 10,001 Hours is a separate branch that needs neither. When every objective on a job is met, talk to the NPC named in it to turn it in.",
         ],
       },
       {
@@ -725,6 +836,18 @@ const authoredWikiArticles = [
             " and his scrap counter at the same time. He will not let you near real client property yet.",
           ],
           "Any three genuine practice welds count, whatever scrap you used: his, scrap you already had, or scrap you bought back from him. Losing his scrap does not dead-end anything — buy two more and carry on. Showing him the finished work pays 50 Credits. The three welds already paid their own Welding XP, so there is no second helping.",
+        ],
+      },
+      {
+        heading: "Return the Favor in detail",
+        paragraphs: [
+          "Tansy gave you your first Cutter. This job is making one of your own — and it has to be one you actually fabricate while the job is open. A Cutter you already had, bought or were given does not count for that part.",
+          "The Cutter you hand her can be any Salvage Cutter you are carrying and not wearing, including the one you just made. She will not take the one in your hand. She takes it apart on the spot to show you how Tinkering works; the Scrap from her demonstration stays with her.",
+          [
+            "You may use ",
+            { text: "Manual Override", articleSlug: "fabrication-and-tinkering" },
+            " on the job. If a push wrecks the Cutter, the job just waits for another one.",
+          ],
         ],
       },
       {
@@ -832,7 +955,11 @@ const authoredWikiArticles = [
             { text: "Keep the Change", articleSlug: "missions" },
             ". His niece ",
             { text: "Tansy Rusk", articleSlug: "tansy-rusk" },
-            ", a field mechanic and miner, is based out at The Jag.",
+            ", a field mechanic and miner, is based out at The Jag, though after ",
+            { text: "10,000 Hours", articleSlug: "missions" },
+            " she spends a while at Rusk Recovery teaching ",
+            { text: "Fabrication", articleSlug: "fabrication-and-tinkering" },
+            ".",
           ],
           [
             "In town, ",
@@ -854,11 +981,11 @@ const authoredWikiArticles = [
     title: "Skills & Progression",
     category: "getting-started",
     summary:
-      "How Mining, Refining, and Welding track your progress, what your Character Level means, and what leveling up gets you.",
+      "How Mining, Refining, Welding, and Fabrication track your progress, what your Character Level means, and what leveling up gets you.",
     sections: [
       {
         paragraphs: [
-          "Three skills currently track your progress: Mining, Refining, and Welding. Each has its own experience (XP) total and level, earned separately.",
+          "Four skills currently track your progress: Mining, Refining, Welding, and Fabrication. Each has its own experience (XP) total and level, earned separately.",
         ],
       },
       {
@@ -872,7 +999,7 @@ const authoredWikiArticles = [
         heading: "Character Level",
         paragraphs: [
           "Your Character Level is a single number for everything you've trained. You start at Level 1, and every skill level you earn adds one to it.",
-          "So a character with Mining 4, Refining 2 and Welding 1 is Character Level 5: three levels earned in Mining, one in Refining, and none yet in Welding. A brand-new character with all three skills at Level 1 is Character Level 1.",
+          "So a character with Mining 4, Refining 2 and Welding 1 is Character Level 5: three levels earned in Mining, one in Refining, and none yet in Welding. A brand-new character with every skill at Level 1 is Character Level 1.",
           "Skills start at Level 1, so a skill you've never touched adds nothing. That also means adding a new skill to RuneSpace won't change anyone's Character Level until they actually train it. There's no separate Character XP to earn — the number simply follows your skills.",
         ],
       },
@@ -882,6 +1009,11 @@ const authoredWikiArticles = [
           "Mining — a successful Mining attempt at The Jag grants Mining XP.",
           "Refining — a Refining attempt at the Abandoned Processing Yard grants Refining XP, whether it succeeds or not.",
           "Welding — each completed welding pass grants Welding XP, whether you are repairing the Cargo Hold, repairing the Crew Stop, or practising at Wade's workbench. A practice pass pays a reduced share, because nothing is actually being repaired.",
+          [
+            "Fabrication — each finished piece at the ",
+            { text: "Fabrication Station", articleSlug: "fabrication-and-tinkering" },
+            " grants Fabrication XP, more if you pushed it with Manual Override, and taking a finished piece apart by Tinkering grants the same XP making it did. A piece wrecked by Manual Override grants none.",
+          ],
         ],
       },
       {
@@ -896,7 +1028,11 @@ const authoredWikiArticles = [
             { text: "Hold It Together", articleSlug: "missions" },
             " grants +100 Welding XP, and ",
             { text: "Out of the Weather", articleSlug: "missions" },
-            " grants +250 Welding XP on top of what the welding itself paid. Not every mission pays in XP — ",
+            " grants +250 Welding XP on top of what the welding itself paid. ",
+            { text: "Return the Favor", articleSlug: "missions" },
+            " grants +100 Fabrication XP and ",
+            { text: "Break It Down", articleSlug: "missions" },
+            " +250. Not every mission pays in XP — ",
             { text: "10,000 Hours", articleSlug: "missions" },
             " pays 50 Credits instead, because its practice welds already earned their own Welding XP as you did them.",
           ],

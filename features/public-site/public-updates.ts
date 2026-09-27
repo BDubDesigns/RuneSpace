@@ -5,6 +5,47 @@ export type { PublicUpdate } from "@/game/schemas/public-updates";
 
 const authoredUpdates = [
   {
+    slug: "return-the-favor",
+    title: "Return the Favor",
+    publishedAt: "2026-09-26T21:00:00-07:00",
+    summary:
+      "Tansy comes out to Rusk Recovery to teach Fabrication: brackets, a Scrap Box and a Salvage Cutter of your own at the new Fabrication Station, Manual Override if you want to push your luck, and Tinkering to take finished pieces apart again.",
+    hero: {
+      src: "/updates/rusk-recovery-yard.webp",
+      alt: "Wade Rusk's recovery yard, with the Workbench and a terminal reading WORK ORDERS beneath the yard's sign, racked salvage under an overcast sky",
+      width: 1536,
+      height: 384,
+    },
+    body: [
+      "Once you have finished 10,000 Hours, Tansy Rusk comes out to Wade's yard. She has a job for you: she made your first Salvage Cutter, and now you make one. Taking on Return the Favor opens the Fabrication Station and a new skill to train, Fabrication.",
+      "Rusk Recovery now has two work areas. The Welding Workshop is the bench and the Work Orders terminal, exactly where they were; the Fabrication Station sits beside it. Pick one and that is what the yard lays out, while Wade and Tansy stay where they are.",
+      "The station makes four things from Fabrication level 1: Mounting Brackets, Scrap Metal for practice welding, a Scrap Box — a heavy container that adds three Inventory slots — and a Salvage Cutter of your own, from Refined Ferrite and a Power Cell. Choose how many before you start, or Max to keep going until the next piece cannot start. A piece on the machine sets its materials aside until it is done: you cannot drop them or walk off, and there is no cancel. Stop After This Workpiece finishes it and ends the run there.",
+      "Manual Override is there for more XP at more risk. Each piece gets a Load and a Trend; choose a Feed, and if it lands within two of where the Load moves, the piece's XP goes up by 1.20×, or 1.30× dead on. Miss, and the piece is wrecked — no item, no XP. Up to five pushes a piece, lock in whenever you like, and a piece whose timer runs out while you are deciding simply waits for you.",
+      "Hand Tansy a Cutter and she shows you Tinkering: taking a finished piece apart for its full Fabrication XP and some Scrap Metal, at twice the time it took to make. That leads straight into Break It Down. Finish it and she heads back to The Jag, and Brace Yourself now follows Break It Down, still needing Mining 5 and Welding 5. 10,001 Hours needs none of it.",
+    ],
+    patchNotes: [
+      {
+        heading: "Added",
+        items: [
+          "The Fabrication skill.",
+          "Return the Favor and Break It Down, from Tansy at Rusk Recovery once 10,000 Hours is done.",
+          "The Fabrication Station at Rusk Recovery, with Mounting Bracket, Scrap Metal, Scrap Box and Salvage Cutter recipes and the same run-size control as Refining.",
+          "Manual Override: optional pushes for up to 1.30× Fabrication XP each, at the risk of wrecking the piece.",
+          "Tinkering: take a Mounting Bracket, Scrap Box or Salvage Cutter apart for Fabrication XP and Scrap Metal, with an Auto-discard Scrap setting. It never takes your last Mining Cutter.",
+          "The Scrap Box, a 5 kg container that adds three Inventory slots.",
+        ],
+      },
+      {
+        heading: "Changed",
+        items: [
+          "Rusk Recovery shows two work areas once the Fabrication Station is open; the bench and the Work Orders terminal are under the Welding Workshop.",
+          "Tansy is at Rusk Recovery from 10,000 Hours until Break It Down is done.",
+          "Brace Yourself now follows Break It Down instead of 10,000 Hours. If you already have it, you keep it — finish Tansy's chapter and she will be back at The Jag for the hand-in.",
+        ],
+      },
+    ],
+  },
+  {
     slug: "how-many",
     title: "How Many?",
     publishedAt: "2026-09-26T11:00:00-07:00",

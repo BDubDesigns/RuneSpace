@@ -201,7 +201,10 @@ Wade's yard ships **one static scene**, not a before/after pair: what changes
 with progression is who is standing in it and what they will let the player
 touch, never the place itself. The Workbench and the beaten-up Work Orders
 terminal are physically in the art from the first visit, so their player-facing
-surfaces can appear later without the picture changing. The yard also ships its
+surfaces can appear later without the picture changing. The Fabrication Station
+(#232) follows the same rule — the yard's machining gear is already in the
+picture, so Fabricate and Tinker are activity UI under the shared scene, with no
+station scene of its own. The yard also ships its
 own conversation background rather than reusing the 4:1 scene, the same choice
 the Holo Hollow interiors made. Its scene is committed a second time under
 `public/updates/` as that release's Update hero, per `docs/public-updates.md`.

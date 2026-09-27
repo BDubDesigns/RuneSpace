@@ -76,8 +76,8 @@ must match exactly, so a Local Place's residents never bleed into their parent
 World Location and the reverse. The result is in the roster's authored order in
 `game/content/npcs.ts` — never completion or arrival order — so the same state
 presents the same people in the same sequence on every refresh, and each NPC
-appears at most once. No shipped context currently has two residents; the
-generalization exists so that one can without faking a Local Place.
+appears at most once. Rusk Recovery during Tansy's Fabrication chapter (#232) is
+the first shipped context with two: Wade, then Tansy, each with their own card.
 
 This is presentation, not authority. The client resolves residents from the
 authoritative Mission projection to decide which cards to show, and every
@@ -93,7 +93,9 @@ the **latest entry in authored order** whose Mission is complete, or the home
 placement when none is. A later entry wins over an earlier one whichever Mission
 happened to finish first, and a completed Mission that no entry names changes
 nothing. Wade authors one entry: he is at the Crash Site until Keep the Change
-completes and at Rusk Recovery afterwards. That is one person in several places
+completes and at Rusk Recovery afterwards. Tansy authors two (#232): her home is
+The Jag; completing 10,000 Hours brings her to Rusk Recovery for her Fabrication
+chapter, and completing Break It Down takes her home again. That is one person in several places
 over time — never a second "shop Wade", and never a persisted relocation flag
 that could disagree with the Mission record. Where a conversation happened stays
 authored per beat, so his Crash Site beats keep the Crash Site behind them and
@@ -116,6 +118,14 @@ nothing new is persisted — the venue comes from the same completed-Mission set
 that decides where the person is standing. An NPC who never moves resolves the
 background they were already authored against, so this changes nothing for
 anybody else.
+
+**A conversation outlives its speaker's move (#232).** Completing a Mission can
+move the very person the player is talking to — Tansy walks home the moment
+Break It Down completes. Her card leaves the place at once, but the open
+conversation stays mounted, as the same instance, until the player closes it, so
+the completion scene plays to the end (`NpcInteractionPanel` keeps a departing
+person's contact with no card while their conversation is open). Presentation
+only; nothing is persisted.
 
 This is story placement, not an NPC schedule or movement engine. Nothing reads
 the clock; there are no shifts, pathing, random presence, or presence flags, and
@@ -157,13 +167,17 @@ Consequences that must stay true:
   accidentally carry a Mission command. Registry validation rejects a topic that
   reuses any Mission-owned sequence.
 - A reminder or busy branch presents state only. The completion action attaches
-  **only** when stage routing selects the mission's own `turnIn.dialogueId`.
+  **only** when stage routing selects the mission's own `turnIn.dialogueId`, or
+  one of its reactive turn-in openings (`docs/missions.md` §9.3), which rejoin
+  the same completion.
 - Selecting an entry in the client grants no Mission authority: `server/missions.ts`
   re-reads and revalidates prerequisite, offer route, turn-in NPC, location,
   stationary state, and every requirement inside the character transaction.
 
-Current authored labels: `Claim Cutter` (Walk It Off), `SHOW SHALE` (Cut Your
-Teeth), `REPORT TO WADE` (Waste Not), `REPORT REPAIR` (Hold It Together).
+Current authored labels include `Claim Cutter` (Walk It Off), `SHOW SHALE` (Cut
+Your Teeth), `REPORT TO WADE` (Waste Not), `REPORT REPAIR` (Hold It Together),
+`HAND OVER THE CUTTER` (Return the Favor), and `TELL TANSY` (Break It Down,
+Brace Yourself).
 Offers fall back to `Accept mission`; a turn-in without authored copy falls back
 to `Turn in`.
 
@@ -175,7 +189,9 @@ hard-coded mission-ID chains — and returns an ordered entry list:
 
 1. **Accepted Mission conversations**, newest Mission first. For the turn-in NPC
    the stage branch is selected exactly as before (turn-in / busy / equipment /
-   carried / tracked-activity / cargo-repair / conversation reminder); for other
+   carried / tracked-activity / cargo-repair / conversation reminder), with a
+   reactive variant replacing the turn-in opening or the tracked-activity
+   reminder when a Mission-local fact holds (#232, `docs/missions.md` §9.3); for other
    NPCs an **unsatisfied mandatory conversation** (§4.1) wins first, then the
    authored `activeNpcDialogue`, then that NPC's offer `activeDialogueId`.
 2. **Available offers**, newest first: a `not_accepted` Mission whose projected
@@ -248,6 +264,9 @@ reuses a Mission-owned sequence.
 | Wade Rusk | Recovery work | always |
 | Tansy Rusk | Mining | always |
 | Tansy Rusk | Beyond Holo Hollow | after **Hold It Together** is completed |
+
+Tansy's topics present at her current venue (`presentsAtCurrentVenue`, #232):
+at Wade's yard during her Fabrication chapter, at The Jag otherwise.
 | Bix Weller | The shop | always |
 | Bix Weller | Power Cells | always |
 | Bix Weller | Holo Hollow | always |

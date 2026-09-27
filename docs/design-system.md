@@ -75,6 +75,17 @@ gameplay.
 5. **Secondary systems**, as their own panels — Work Orders, Cargo Hold storage
    once repaired, the Crew Stop's hauler.
 
+**Several work areas in one place (#232).** When one World Location offers more
+than one activity — Rusk Recovery's Welding Workshop and Fabrication Station —
+a row of prominent work-area cards sits between the place (1) and its activity
+(2), never a dropdown, and only the selected area's surfaces render beneath it
+in the order above. The place's art and people stay shared and do not move. The
+cards carry Mission guidance with the shared exterior halo, draw their keyboard
+ring inside the card as the beveled controls do, and follow the running work.
+It is Rusk Recovery's own composition
+(`features/location-scene/RuskRecoveryWorkAreas.tsx`), not a framework: a
+second place with work areas earns the abstraction.
+
 Rules that follow from it:
 
 - **The place owns the screen's one `h1`**, and it is the scene plate that

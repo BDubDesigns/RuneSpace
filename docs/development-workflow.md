@@ -382,7 +382,7 @@ simply an unclaimed port here.
 - The focused runner currently supports `mining`, `character-profile`,
   `location-population`, `character-portraits`, `cargo-hold`, `inventory-equip`,
   `travel`, `walk-it-off`, `cut-your-teeth`, `refining`, `bounded-runs`,
-  `rusk-recovery`, `work-orders`,
+  `rusk-recovery`, `fabrication`, `work-orders`,
   `gameplay-access`, and `account-verification` (the focused runner also puts the fixed loopback test
   operator on the admin allowlist, as the canonical runner does). To run one Travel test in
   isolation, use the same disposable lifecycle with `travel`:
