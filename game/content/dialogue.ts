@@ -1394,6 +1394,70 @@ const dialogue = {
       rennLocal(EXPRESSION_IDS.guarded, "I'll know it wasn't."),
     ],
   },
+  // Cutting Costs (#233) — the locked scene. Renn is buying, not asking a
+  // favour: he names his price up front and does not care where the Cutter
+  // came from. The player stays silent; showing and handing over the Cutter
+  // are item beats, and the turn-in itself is the Mission's own control.
+  [DIALOGUE_IDS.rennCuttingCostsOffer]: {
+    id: DIALOGUE_IDS.rennCuttingCostsOffer,
+    npcId: NPC_IDS.rennCalder,
+    beats: [
+      rennLocal(EXPRESSION_IDS.neutral, "Been looking at those Loadsteel Cutters."),
+      rennLocal(EXPRESSION_IDS.neutral, "Faster base cutting speed, without a charge."),
+      rennLocal(
+        EXPRESSION_IDS.neutral,
+        "Means I don't have to keep feeding the damn thing a Cell every time I want to get some work done.",
+      ),
+      rennLocal(EXPRESSION_IDS.guarded, "I've been putting Credits aside for one."),
+      rennLocal(EXPRESSION_IDS.guarded, "Five hundred credits."),
+      rennLocal(EXPRESSION_IDS.guarded, "Had to save a while."),
+      rennLocal(
+        EXPRESSION_IDS.neutral,
+        "If you can get me a Loadsteel Cutter, that's what I'll pay.",
+      ),
+      rennLocal(EXPRESSION_IDS.neutral, "Don't care where or how you get it."),
+      rennLocal(EXPRESSION_IDS.neutral, "I need the Cutter, not the story behind it."),
+    ],
+  },
+  [DIALOGUE_IDS.rennCuttingCostsReminder]: {
+    id: DIALOGUE_IDS.rennCuttingCostsReminder,
+    npcId: NPC_IDS.rennCalder,
+    beats: [
+      rennLocal(EXPRESSION_IDS.neutral, "Still looking for that Cutter."),
+      rennLocal(
+        EXPRESSION_IDS.neutral,
+        "Five hundred credits waiting for you when you've got one.",
+      ),
+    ],
+  },
+  [DIALOGUE_IDS.rennCuttingCostsTurnIn]: {
+    id: DIALOGUE_IDS.rennCuttingCostsTurnIn,
+    npcId: NPC_IDS.rennCalder,
+    beats: [
+      rennLocal(EXPRESSION_IDS.neutral, "That it?"),
+      { ...itemBeat(ITEM_IDS.loadsteelCutter, 1), backgroundId: assistanceCenter },
+      rennLocal(EXPRESSION_IDS.guarded, "Yeah."),
+      rennLocal(EXPRESSION_IDS.guarded, "That'll do."),
+      rennLocal(EXPRESSION_IDS.neutral, "Five hundred credits, like I said."),
+    ],
+  },
+  // Presentation only: the turn-in has already taken one Loadsteel Cutter and
+  // paid the Credits.
+  [DIALOGUE_IDS.rennCuttingCostsCompletion]: {
+    id: DIALOGUE_IDS.rennCuttingCostsCompletion,
+    npcId: NPC_IDS.rennCalder,
+    beats: [
+      {
+        ...itemBeat(ITEM_IDS.loadsteelCutter, 1, "Renn takes the Loadsteel Cutter."),
+        backgroundId: assistanceCenter,
+      },
+      rennLocal(EXPRESSION_IDS.neutral, "Been saving up for far longer than I care to admit."),
+      rennLocal(
+        EXPRESSION_IDS.neutral,
+        "Worth it if I can stop carrying half my weight around in Power Cells.",
+      ),
+    ],
+  },
   // 10,000 Hours (#190) — Wade's own shop, in his own voice. The offer scene IS
   // the onboarding: it establishes the place, what the player may touch, what
   // they may not, and hands over the scrap the first three welds will burn.
@@ -1969,6 +2033,78 @@ const dialogue = {
       tansyAtYard(EXPRESSION_IDS.smile, "The last one was three hours of dialogue!"),
       tansyAtYard(EXPRESSION_IDS.neutral, "Anyway. Back to The Jag."),
       tansyAtYard(EXPRESSION_IDS.smile, "Come find me when you're ready for real trouble."),
+    ],
+  },
+  // A Cut Above (#233) — the locked scene from the Fabrication design, at The
+  // Jag. Tansy is teaching a rule, not a recipe: the list grows with the skill.
+  // The player stays silent throughout.
+  [DIALOGUE_IDS.tansyACutAboveOffer]: {
+    id: DIALOGUE_IDS.tansyACutAboveOffer,
+    npcId: NPC_IDS.tansyRusk,
+    beats: [
+      tansyLocal(
+        EXPRESSION_IDS.smile,
+        "You've been using that Fabrication Station enough that it's starting to trust you.",
+      ),
+      tansyLocal(EXPRESSION_IDS.neutral, "Take another look at the recipe list."),
+      tansyLocal(
+        EXPRESSION_IDS.neutral,
+        "You'll get more options as your Fabrication gets better. Some of them are just different ways to make a mess.",
+      ),
+      tansyLocal(EXPRESSION_IDS.neutral, "Some are worth paying attention to."),
+      tansyLocal(EXPRESSION_IDS.smile, "You can build a Loadsteel Cutter now."),
+      tansyLocal(
+        EXPRESSION_IDS.smile,
+        "Better frame. Better drive. Faster than that Salvage Cutter you've been dragging around.",
+      ),
+      tansyLocal(
+        EXPRESSION_IDS.smile,
+        "And if you feed it a Power Cell, it'll pull a little more out of the rock.",
+      ),
+      tansyLocal(EXPRESSION_IDS.neutral, "Go make one."),
+      tansyLocal(
+        EXPRESSION_IDS.neutral,
+        "Bring it back when you're done. I want to see what you can do with higher tier materials.",
+      ),
+    ],
+  },
+  // While the Cutter is still to be made, she repeats the offer's own closing
+  // instruction rather than saying anything the locked scene does not.
+  [DIALOGUE_IDS.tansyACutAboveReminder]: {
+    id: DIALOGUE_IDS.tansyACutAboveReminder,
+    npcId: NPC_IDS.tansyRusk,
+    beats: [
+      tansyLocal(EXPRESSION_IDS.neutral, "Go make one."),
+      tansyLocal(
+        EXPRESSION_IDS.neutral,
+        "Bring it back when you're done. I want to see what you can do with higher tier materials.",
+      ),
+    ],
+  },
+  [DIALOGUE_IDS.tansyACutAboveTurnIn]: {
+    id: DIALOGUE_IDS.tansyACutAboveTurnIn,
+    npcId: NPC_IDS.tansyRusk,
+    beats: [
+      tansyLocal(EXPRESSION_IDS.smile, "There it is."),
+      tansyLocal(EXPRESSION_IDS.smile, "Looks like you're done making starter gear."),
+    ],
+  },
+  // Presentation only: the turn-in takes nothing, and the Cutter stays the
+  // player's.
+  [DIALOGUE_IDS.tansyACutAboveCompletion]: {
+    id: DIALOGUE_IDS.tansyACutAboveCompletion,
+    npcId: NPC_IDS.tansyRusk,
+    beats: [
+      tansyLocal(
+        EXPRESSION_IDS.neutral,
+        "Keep checking that recipe list as your Fabrication improves.",
+      ),
+      tansyLocal(
+        EXPRESSION_IDS.neutral,
+        "The better you get, the more useful things you'll be able to make.",
+      ),
+      tansyLocal(EXPRESSION_IDS.smile, "And keep the Cutter. You earned it."),
+      tansySkillXpBeat(SKILL_IDS.fabrication, 500),
     ],
   },
   [DIALOGUE_IDS.maraTheBnbTopic]: {

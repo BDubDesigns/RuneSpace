@@ -10,7 +10,6 @@ import { MissionActionButton } from "@/components/ui/MissionActionButton";
 import { StatusMeter } from "@/components/ui/StatusMeter";
 import { ItemVisual } from "@/components/items/ItemVisual";
 import { VisualTile } from "@/components/items/VisualTile";
-import { getEffectiveGameBalance } from "@/game/config/balance";
 import { GAME_TICK_MS } from "@/game/config/foundations";
 import { miningNearMissBasisPoints, type MiningStopReason } from "@/game/domain/mining";
 import { deriveMissionGuidanceTargets } from "@/game/domain/missions";
@@ -19,7 +18,12 @@ import type { MiningSourceProjection, PlayGameplayState } from "@/server/play";
 import { refreshPlayAction, startMiningAction, stopMiningAction } from "@/server/actions";
 import { resolveItemPresentation } from "@/game/content/item-presentation";
 import { reportClientDiagnostic } from "@/features/diagnostics/client";
-import { latestMiningAttempt, resolvedAttemptCount, runBelongsToSource } from "./latest-result";
+import {
+  latestMiningAttempt,
+  remainingChargeLabel,
+  resolvedAttemptCount,
+  runBelongsToSource,
+} from "./latest-result";
 import { usePlay } from "@/features/play/PlayContext";
 
 const RESULT_FEEDBACK_DURATION_MS = 3_600;
@@ -49,7 +53,7 @@ function miningStopMessage(reason: MiningStopReason) {
     manually_stopped: "Mining stopped.",
     inventory_slots_full: "Mining stopped: inventory slots are full.",
     carried_mass_capacity_reached: "Mining stopped: carried-mass capacity reached.",
-    compatible_mining_tool_missing: "Mining stopped: equip a Salvage Cutter.",
+    compatible_mining_tool_missing: "Mining stopped: equip a Mining Cutter you can use.",
     mining_tool_replaced: "Mining stopped: the mining tool was replaced.",
     action_replaced: "Mining stopped when Travel began.",
   }[reason];
@@ -65,16 +69,21 @@ function percentage(basisPoints: number) {
   return (basisPoints / 100).toFixed(2);
 }
 
+/** A duration multiplier in basis points, as players read it: "0.8×". */
+function durationMultiplierLabel(bps: number) {
+  return `${bps / 10_000}×`;
+}
+
 function latestAttemptAnnouncement(
   attempt: MiningRunAttempt,
   attemptsResolved: number,
-  maximumCharge: number,
+  maximumCharge: number | undefined,
   itemName: string,
 ) {
   const catchUp = attemptsResolved > 1 ? `${attemptsResolved} attempts resolved while away. ` : "";
   const roll = `Roll ${percentage(attempt.rolledBasisPoints)}. Needed below ${percentage(attempt.thresholdBasisPoints)}.`;
   const charge = attempt.chargeConsumed
-    ? `Power Cell charge consumed · ${attempt.remainingCharge} / ${maximumCharge} remaining.`
+    ? `Power Cell charge consumed · ${remainingChargeLabel(attempt.remainingCharge, maximumCharge)}.`
     : "";
   const depleted =
     attempt.boosted && attempt.remainingCharge === 0
@@ -97,7 +106,8 @@ function LatestAttemptResult({
   feedback: boolean;
   /** The awarded item's authoritative display name — never assumed to be Shale. */
   itemName: string;
-  maximumCharge: number;
+  /** The equipped Mining tool's own maximum charge, when one is equipped (#233). */
+  maximumCharge: number | undefined;
 }) {
   const feedbackTone = feedback ? (attempt.success ? "success" : "danger") : "calm";
   return (
@@ -123,7 +133,7 @@ function LatestAttemptResult({
       </p>
       <p className="mt-2 text-xs uppercase tracking-wide text-[color:var(--rs-text-muted)]">
         {attempt.boosted
-          ? `Power Cell boosted · ${attempt.durationTicks} ticks · ${attempt.chargeConsumed ? `Power Cell charge consumed · ${attempt.remainingCharge} / ${maximumCharge} remaining` : "charge not consumed"}`
+          ? `Power Cell boosted · ${attempt.durationTicks} ticks · ${attempt.chargeConsumed ? `Power Cell charge consumed · ${remainingChargeLabel(attempt.remainingCharge, maximumCharge)}` : "charge not consumed"}`
           : `Normal attempt · ${attempt.durationTicks} ticks`}
       </p>
       {attempt.boosted && attempt.remainingCharge === 0 ? (
@@ -199,7 +209,6 @@ export function MiningActivity({ characterName }: { characterName: string }) {
   const observedAttempts = useRef(state.run.attempts);
   const observedSequence = useRef(latestMiningAttempt(state.run.recentAttempts)?.sequence);
   const [feedback, setFeedback] = useState<{ sequence: number; attempts: number }>();
-  const balance = getEffectiveGameBalance();
   const active = state.activeAction;
   // Where Mining happens is the location state's answer, not this surface's
   // (#209): The Jag offers Ferrite Shale, an opened Deep Jag offers Galvanite,
@@ -220,7 +229,9 @@ export function MiningActivity({ characterName }: { characterName: string }) {
   const secondsRemaining = active
     ? Math.max(0, (new Date(active.nextAttemptAt).getTime() - now) / 1_000)
     : 0;
-  const cutter = state.equipment.salvageCutter;
+  // Whichever authored Mining tool is equipped (#233), with its own charge
+  // ceiling and effects — never the Salvage Cutter by assumption.
+  const cutter = state.equipment.miningTool;
   const nextMiningDurationTicks =
     active?.nextAttemptDurationTicks ??
     (cutter && cutter.currentCharge > 0
@@ -353,6 +364,23 @@ export function MiningActivity({ characterName }: { characterName: string }) {
       <p className="font-display text-sm uppercase tracking-wide text-[color:var(--rs-accent-mining)]">
         Success chance: {percentage(source.successChanceBps)}%
       </p>
+      {cutter &&
+      (cutter.baseDurationMultiplierBps !== 10_000 || cutter.chargedYieldMaximumBonus > 0) ? (
+        // A tool's own authored effects, read from its definition (#233). A
+        // tool with none — the Salvage Cutter — adds no line at all.
+        <p
+          className="text-sm text-[color:var(--rs-text-secondary)]"
+          data-mining-tool-effects={cutter.itemId}
+        >
+          {cutter.name}
+          {cutter.baseDurationMultiplierBps !== 10_000
+            ? ` · ${durationMultiplierLabel(cutter.baseDurationMultiplierBps)} attempt time, charged or not`
+            : ""}
+          {cutter.chargedYieldMaximumBonus > 0
+            ? ` · charged successes yield ${source.yieldMinimum}–${source.chargedYieldMaximum} ${source.itemName}`
+            : ""}
+        </p>
+      ) : null}
       {active && !active.nextAttemptBoosted ? (
         <p className="font-display text-sm uppercase tracking-wide text-[color:var(--rs-text-secondary)]">
           NORMAL TIMING · Next attempt: {active.nextAttemptDurationTicks} ticks
@@ -387,7 +415,7 @@ export function MiningActivity({ characterName }: { characterName: string }) {
           }
           feedback={feedback?.sequence === latestAttempt.sequence}
           itemName={itemName(latestAttempt.itemId)}
-          maximumCharge={balance.items.salvageCutter.maximumCharge}
+          maximumCharge={cutter?.maximumCharge}
         />
       ) : null}
       <p aria-live="polite" className="sr-only">
@@ -395,7 +423,7 @@ export function MiningActivity({ characterName }: { characterName: string }) {
           ? latestAttemptAnnouncement(
               latestAttempt,
               feedback.attempts,
-              balance.items.salvageCutter.maximumCharge,
+              cutter?.maximumCharge,
               itemName(latestAttempt.itemId),
             )
           : ""}
@@ -432,7 +460,7 @@ export function MiningActivity({ characterName }: { characterName: string }) {
         items={[{ label: source.itemName, quantity: state.carriedByItemId[source.itemId] ?? 0 }]}
       />
       {runIsThisSource ? (
-        <MiningRunPanel balance={balance} run={state.run} source={source} />
+        <MiningRunPanel maximumCharge={cutter?.maximumCharge} run={state.run} source={source} />
       ) : null}
     </ActivityPanel>
   );

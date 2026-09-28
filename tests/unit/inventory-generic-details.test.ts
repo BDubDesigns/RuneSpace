@@ -11,6 +11,7 @@ import {
   resolveInventorySelection,
 } from "@/features/inventory/inventory-selection";
 import { InventoryDetailsStats } from "@/features/inventory/InventoryDetailsStats";
+import { salvageCutterProjection } from "./mining-tool-projection";
 
 const balance = getEffectiveGameBalance();
 
@@ -301,11 +302,7 @@ describe("inventory generic stack details — issue #119", () => {
 
     const powerCellState = baseState(inventoryState([powerCellStack], []));
     powerCellState.equipment.carriedPowerCellQuantity = 2;
-    powerCellState.equipment.salvageCutter = {
-      currentCharge: 0,
-      maximumCharge: 10,
-      boostedAttemptDurationTicks: 5,
-    };
+    powerCellState.equipment.miningTool = salvageCutterProjection(0);
     const powerCellSelection = resolveInventorySelection(powerCellState.inventory, {
       kind: "stack",
       id: powerCellStack.id,
@@ -316,11 +313,7 @@ describe("inventory generic stack details — issue #119", () => {
 
     const refinedState = baseState(inventoryState([refinedFerriteStack], []));
     refinedState.equipment.carriedPowerCellQuantity = 0;
-    refinedState.equipment.salvageCutter = {
-      currentCharge: 0,
-      maximumCharge: 10,
-      boostedAttemptDurationTicks: 5,
-    };
+    refinedState.equipment.miningTool = salvageCutterProjection(0);
     const refinedSelection = resolveInventorySelection(refinedState.inventory, {
       kind: "stack",
       id: refinedFerriteStack.id,
@@ -418,5 +411,46 @@ describe("InventoryDetailsStats — real UI regression (issue #119)", () => {
     expect(html).toContain("5 kg");
     expect(html).not.toContain('data-stat="total-mass"');
     expect(html).not.toContain('data-stat="unit-mass"');
+    // The Salvage Cutter's definition changes nothing, so it adds no rows (#233).
+    expect(html).not.toContain('data-stat="required-mining-level"');
+    expect(html).not.toContain('data-stat="mining-time"');
+    expect(html).not.toContain('data-stat="charged-yield"');
+  });
+
+  it("renders a Loadsteel Cutter's requirement and effects from its equipment definition (#233)", () => {
+    const html = renderToStaticMarkup(
+      React.createElement(InventoryDetailsStats, {
+        selection: {
+          kind: "unique",
+          entry: {
+            id: "instance-loadsteel",
+            itemId: ITEM_IDS.loadsteelCutter,
+            name: "Loadsteel Cutter",
+            massGrams: 8_000,
+            currentCharge: 0,
+          },
+        },
+      }),
+    );
+    expect(html).toContain("8 kg");
+    expect(html).toContain('data-stat="required-mining-level"');
+    expect(html).toContain("Mining 5");
+    expect(html).toContain('data-stat="mining-time"');
+    expect(html).toContain("0.8×, charged or not");
+    expect(html).toContain('data-stat="charged-yield"');
+    expect(html).toContain("+1 maximum yield");
+  });
+
+  it("renders every container's slot contribution from the same boundary (#233)", () => {
+    const render = (itemId: string, name: string, massGrams: number) =>
+      renderToStaticMarkup(
+        React.createElement(InventoryDetailsStats, {
+          selection: { kind: "unique", entry: { id: `i-${itemId}`, itemId, name, massGrams } },
+        }),
+      );
+    expect(render(ITEM_IDS.freightHarness, "Freight Harness", 9_000)).toContain("+6");
+    expect(render(ITEM_IDS.scrapBox, "Scrap Box", 5_000)).toContain("+3");
+    expect(render(ITEM_IDS.mykeaSchleppraum8, "MYKEA SCHLEPPRAUM-8", 10_000)).toContain("+8");
+    expect(render(ITEM_IDS.freightHarness, "Freight Harness", 9_000)).toContain("9 kg");
   });
 });

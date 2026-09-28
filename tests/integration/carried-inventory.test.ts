@@ -170,7 +170,7 @@ suite("Issue #57 carried unique items in Inventory (real PostgreSQL)", () => {
 
     expect(reequipped.inventory.uniqueItems).toHaveLength(0);
     expect(reequipped.inventory.slotsUsed).toBe(7);
-    expect(reequipped.equipment.salvageCutter).toMatchObject({
+    expect(reequipped.equipment.miningTool).toMatchObject({
       currentCharge: 6,
       maximumCharge: 10,
     });

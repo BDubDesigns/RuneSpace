@@ -89,6 +89,23 @@ const itemPresentations = {
     textFallback: "SB",
     artworkSrc: "/item-art/scrap-box.webp",
   },
+  // Fabrication 5 and 8 outputs (#233). No approved artwork exists for them
+  // yet, so they present through the ordinary text fallback until it does.
+  [ITEM_IDS.galvanicWireSpool]: {
+    displayName: "Galvanic Wire Spool",
+    accessibleDescription: "Spool of insulated Galvanic wire wound on a fabricated core",
+    textFallback: "GW",
+  },
+  [ITEM_IDS.loadsteelCutter]: {
+    displayName: "Loadsteel Cutter",
+    accessibleDescription: "Heavy Galvaferrite-framed Loadsteel Cutter mining tool",
+    textFallback: "LC",
+  },
+  [ITEM_IDS.freightHarness]: {
+    displayName: "Freight Harness",
+    accessibleDescription: "Galvaferrite freight harness container attachment",
+    textFallback: "FH",
+  },
 } as const satisfies Partial<Record<ItemId, ItemPresentation>>;
 
 export function getItemPresentation(itemId: string): ItemPresentation | undefined {

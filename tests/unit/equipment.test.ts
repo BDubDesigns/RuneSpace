@@ -9,7 +9,7 @@ import {
 } from "@/game/domain/equipment";
 
 const balance = getEffectiveGameBalance();
-const toolTarget = { assignmentKind: "gear", suitSlotId: balance.items.salvageCutter.suitSlotId };
+const toolTarget = { assignmentKind: "gear", suitSlotId: balance.carrying.miningToolSuitSlotId };
 const firstContainerTarget = {
   assignmentKind: "container",
   suitSlotId: balance.carrying.containerSuitSlotIds[0],
@@ -84,6 +84,7 @@ describe("equipment loadout rules", () => {
     expect(() =>
       planEquipmentChange({
         balance,
+        miningLevel: 1,
         instances: [cutter, firstContainer],
         stacks: [],
         assignments: [
@@ -99,6 +100,7 @@ describe("equipment loadout rules", () => {
     expect(() =>
       planEquipmentChange({
         balance,
+        miningLevel: 1,
         instances: [cutter, firstContainer, secondContainer],
         stacks: Array.from({ length: 9 }, (_, index) => ({
           itemId: ITEM_IDS.ferriteShale,

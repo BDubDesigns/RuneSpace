@@ -1,4 +1,9 @@
-import { getItemDefinition, type EffectiveGameBalance } from "@/game/config/balance";
+import {
+  getEquipmentDefinition,
+  getItemDefinition,
+  type EffectiveGameBalance,
+  type MiningToolDefinition,
+} from "@/game/config/balance";
 import {
   calculateCarriedWeight,
   inventorySlotCapacityFromContainers,
@@ -34,6 +39,13 @@ export class EquipmentRuleError extends Error {
   }
 }
 
+/** The Mining tool genuinely occupying the Mining-tool slot, with its authored definition (#233). */
+export type EquippedMiningTool = {
+  itemInstanceId: string;
+  itemId: string;
+  definition: MiningToolDefinition;
+};
+
 export type EquipmentLoadout = {
   assignments: readonly EquipmentAssignmentState[];
   equippedItemInstanceIds: ReadonlySet<string>;
@@ -41,45 +53,28 @@ export type EquipmentLoadout = {
   inventorySlotsUsed: number;
   carriedMassGrams: number;
   maximumCarryCapacityGrams: number;
-  hasCompatibleMiningTool: boolean;
+  /**
+   * Whichever authored Mining tool is equipped (#233) — the Salvage Cutter, the
+   * Loadsteel Cutter, or none. Compatibility only: whether the character's
+   * Mining level lets them use it is Mining's own question.
+   */
+  miningTool?: EquippedMiningTool;
 };
 
-function itemEquipmentDefinition(itemId: string, balance: EffectiveGameBalance) {
-  const massGrams = getItemDefinition(itemId, balance)?.massGrams ?? 0;
-  if (itemId === balance.items.salvageCutter.itemId)
-    return {
-      assignmentKind: "gear" as const,
-      suitSlotIds: [balance.items.salvageCutter.suitSlotId],
-      massGrams,
-    };
-  const container = containerItems(balance).find((candidate) => candidate.itemId === itemId);
-  if (container)
-    return {
-      assignmentKind: "container" as const,
-      suitSlotIds: balance.carrying.containerSuitSlotIds,
-      massGrams,
-      containerSlotCapacity: container.slotCapacity,
-    };
-  return undefined;
-}
-
 /**
- * Every authored container attachment: the starter MYKEA and, since #232, the
- * fabricated Scrap Box. Both use the existing container-slot namespace — a
- * container is any item whose authored definition supplies slot capacity, so
- * there is no third slot and no per-container rule here.
+ * Every container and Mining tool resolves through the one authored
+ * equipment-definition boundary (`getEquipmentDefinition`, #233): the MYKEA,
+ * the Scrap Box and the Freight Harness are ordinary containers there, and the
+ * Salvage and Loadsteel Cutters ordinary Mining tools. There is no per-item
+ * rule in this module, no third container slot, and no second tool slot.
  */
-function containerItems(balance: EffectiveGameBalance) {
-  return [balance.items.starterContainer, balance.items.scrapBox];
-}
-
 export function isApprovedEquipmentTarget(
   target: EquipmentTarget,
   balance: EffectiveGameBalance,
 ): boolean {
   return (
     (target.assignmentKind === "gear" &&
-      target.suitSlotId === balance.items.salvageCutter.suitSlotId) ||
+      target.suitSlotId === balance.carrying.miningToolSuitSlotId) ||
     (target.assignmentKind === "container" &&
       balance.carrying.containerSuitSlotIds.includes(
         target.suitSlotId as (typeof balance.carrying.containerSuitSlotIds)[number],
@@ -92,7 +87,7 @@ export function isCompatibleEquipmentAssignment(
   target: EquipmentTarget,
   balance: EffectiveGameBalance,
 ): boolean {
-  const definition = itemEquipmentDefinition(itemId, balance);
+  const definition = getEquipmentDefinition(itemId, balance);
   const compatibleSuitSlotIds: readonly string[] = definition?.suitSlotIds ?? [];
   return Boolean(
     definition &&
@@ -155,22 +150,27 @@ export function deriveEquipmentLoadout(input: {
   );
   const containerSlotCapacity = inventorySlotCapacityFromContainers(
     equippedContainers.map(({ instance }) => {
-      const definition = itemEquipmentDefinition(instance.itemId, balance);
-      if (!definition || definition.assignmentKind !== "container")
+      const definition = getEquipmentDefinition(instance.itemId, balance);
+      if (definition?.kind !== "container")
         throw new EquipmentRuleError("Container assignment is incompatible.");
-      return definition.containerSlotCapacity;
+      return definition.slotCapacity;
     }),
   );
   const carriedMassGrams = calculateCarriedWeight([
     ...stacks.map((stack) => carriedItemMassGrams(stack.itemId, balance) * stack.quantity),
     ...instances.map((instance) => carriedItemMassGrams(instance.itemId, balance)),
   ]);
-  const hasCompatibleMiningTool = assigned.some(
-    ({ assignment, instance }) =>
-      assignment.assignmentKind === "gear" &&
-      assignment.suitSlotId === balance.items.salvageCutter.suitSlotId &&
-      instance.itemId === balance.items.salvageCutter.itemId,
-  );
+  const miningTool = assigned.flatMap(({ assignment, instance }) => {
+    if (
+      assignment.assignmentKind !== "gear" ||
+      assignment.suitSlotId !== balance.carrying.miningToolSuitSlotId
+    )
+      return [];
+    const definition = getEquipmentDefinition(instance.itemId, balance);
+    return definition?.kind === "mining_tool"
+      ? [{ itemInstanceId: instance.id, itemId: instance.itemId, definition }]
+      : [];
+  })[0];
   return {
     assignments,
     equippedItemInstanceIds,
@@ -181,7 +181,7 @@ export function deriveEquipmentLoadout(input: {
     ),
     carriedMassGrams,
     maximumCarryCapacityGrams: balance.carrying.startingCapacityGrams,
-    hasCompatibleMiningTool,
+    ...(miningTool ? { miningTool } : {}),
   };
 }
 
@@ -195,6 +195,23 @@ function validateCandidateLoadout(loadout: EquipmentLoadout): EquipmentLoadout {
   return loadout;
 }
 
+/**
+ * The Mining level an item requires before it may be equipped (#233), or
+ * undefined when it requires none beyond what every character has. Only a
+ * Mining tool can author one today; the Salvage Cutter's is level 1.
+ */
+export function unmetEquipRequirement(
+  itemId: string,
+  miningLevel: number,
+  balance: EffectiveGameBalance,
+): { requiredMiningLevel: number } | undefined {
+  const definition = getEquipmentDefinition(itemId, balance);
+  if (definition?.kind !== "mining_tool") return undefined;
+  return miningLevel >= definition.requiredMiningLevel
+    ? undefined
+    : { requiredMiningLevel: definition.requiredMiningLevel };
+}
+
 /** Validates a requested change against the complete resulting authoritative loadout. */
 export function planEquipmentChange(input: {
   assignments: readonly EquipmentAssignmentState[];
@@ -202,6 +219,8 @@ export function planEquipmentChange(input: {
   stacks: readonly EquipmentInventoryStack[];
   balance: EffectiveGameBalance;
   change: EquipmentChange;
+  /** The character's authoritative Mining level, for a Mining tool's requirement (#233). */
+  miningLevel: number;
 }): EquipmentLoadout {
   const { assignments, instances, stacks, balance, change } = input;
   if (!isApprovedEquipmentTarget(change.target, balance))
@@ -213,6 +232,9 @@ export function planEquipmentChange(input: {
     if (!item) throw new EquipmentRuleError("Item is not currently carried by this character.");
     if (!isCompatibleEquipmentAssignment(item.itemId, change.target, balance))
       throw new EquipmentRuleError("Item is not compatible with that equipment slot.");
+    const unmet = unmetEquipRequirement(item.itemId, input.miningLevel, balance);
+    if (unmet)
+      throw new EquipmentRuleError(`Requires Mining ${unmet.requiredMiningLevel} to equip.`);
     const source = assignments.find((assignment) => assignment.itemInstanceId === item.id);
     if (source && assignmentKey(source) === assignmentKey(change.target))
       throw new EquipmentRuleError("Item is already equipped in that slot.");

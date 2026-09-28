@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   getEffectiveGameBalance,
+  getMiningToolDefinition,
   getRepairTargetBalance,
   miningSourceForActionId,
   refiningRecipeForActionId,
@@ -269,7 +270,7 @@ describe("Galvanite Mining", () => {
   it("awards Galvanite and 25 XP on a success, and nothing on a failure", () => {
     const ready = {
       miningLevel: 40,
-      hasCompatibleTool: true,
+      tool: getMiningToolDefinition(ITEM_IDS.salvageCutter, balance)!,
       existingStacks: [],
       slotsAvailable: 8,
       massAvailableGrams: 35_000,
@@ -301,7 +302,7 @@ describe("Galvanite Mining", () => {
   it("stops on Galvanite's own stack and mass facts, not Shale's", () => {
     const full = {
       miningLevel: 40,
-      hasCompatibleTool: true,
+      tool: getMiningToolDefinition(ITEM_IDS.salvageCutter, balance)!,
       existingStacks: [{ id: "g", itemId: ITEM_IDS.galvanite, quantity: 10 }],
       slotsAvailable: 0,
       massAvailableGrams: 35_000,

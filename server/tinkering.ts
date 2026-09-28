@@ -25,7 +25,7 @@ import {
 import { levelFromXp } from "@/game/domain/progression";
 import { ticksToMilliseconds } from "@/game/domain/timing";
 import {
-  isMiningCutter,
+  usableMiningCutterCount,
   resolveTinkering,
   type TinkeringCycle,
   type TinkeringResolution,
@@ -143,10 +143,13 @@ export async function loadTinkeringSnapshot(
   ]);
   const fabricationXp =
     snapshot.xpRows.find((xp) => xp.skillId === SKILL_IDS.fabrication)?.totalXp ?? 0;
+  const miningXp = snapshot.xpRows.find((xp) => xp.skillId === SKILL_IDS.mining)?.totalXp ?? 0;
+  const miningLevel = levelFromXp(miningXp, standardSkillLevelThresholds(balance));
   const equipped = snapshot.equipmentLoadout.equippedItemInstanceIds;
   const cycle = tinkeringCycleFromRow(row);
   return {
     fabricationLevel: levelFromXp(fabricationXp, standardSkillLevelThresholds(balance)),
+    miningLevel,
     stacks: snapshot.stacks,
     carriedUniqueItems: snapshot.carriedInstances
       .filter((instance) => !equipped.has(instance.id))
@@ -156,11 +159,9 @@ export async function loadTinkeringSnapshot(
         currentCharge: instance.currentCharge,
         createdAt: instance.createdAt.toISOString(),
       })),
-    // Every owned instance counts for the last-Cutter guard: equipped,
-    // carried, and in the Cargo Hold alike.
-    ownedMiningCutters: snapshot.allItemInstances.filter((instance) =>
-      isMiningCutter(instance.itemId, balance),
-    ).length,
+    // Every owned usable Cutter counts for the last-Cutter guard: equipped,
+    // carried, and in the Cargo Hold alike (#233: either Mining tool).
+    usableMiningCutters: usableMiningCutterCount(snapshot.allItemInstances, miningLevel, balance),
     slotsAvailable: snapshot.slotsAvailable,
     massAvailableGrams: snapshot.massAvailableGrams,
     autoDiscardScrap: row?.autoDiscardScrap ?? false,

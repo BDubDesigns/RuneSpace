@@ -37,3 +37,16 @@ export function runBelongsToSource(
   ]);
   return workedItemIds.size === 0 || workedItemIds.has(sourceItemId);
 }
+
+/**
+ * "3 / 10 remaining" against the equipped Mining tool's own maximum (#233).
+ * With no tool equipped there is no maximum to name, so only what remains is.
+ */
+export function remainingChargeLabel(
+  remainingCharge: number,
+  maximumCharge: number | undefined,
+): string {
+  return maximumCharge === undefined
+    ? `${remainingCharge} remaining`
+    : `${remainingCharge} / ${maximumCharge} remaining`;
+}

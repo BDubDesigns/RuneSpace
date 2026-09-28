@@ -7,7 +7,7 @@ import { ActionButton } from "@/components/ui/ActionButton";
 import { Drawer } from "@/components/ui/Drawer";
 import { Feedback } from "@/components/ui/Feedback";
 import { StatusMeter } from "@/components/ui/StatusMeter";
-import { getEffectiveGameBalance } from "@/game/config/balance";
+import { getItemMaximumCharge } from "@/game/config/balance";
 import { ITEM_IDS } from "@/game/config/foundations";
 import { deriveMissionGuidanceTargets } from "@/game/domain/missions";
 import { discardInventoryStackAction } from "@/server/actions";
@@ -86,7 +86,8 @@ export function InventoryPanel({
   const confirmTriggerRef = useRef<HTMLButtonElement>(null);
   const hasConfirmedRef = useRef(false);
   const totalSlots = state.inventory.slotsUsed + state.inventory.slotsAvailable;
-  const balance = getEffectiveGameBalance();
+  // The equipped Mining tool a loose Power Cell would go into (#233).
+  const loadTool = state.equipment.miningTool;
   // Mission guidance is consumed from the ONE derived target set: while an
   // equipped-item requirement is the current unmet step, the matching carried
   // item's tile receives the treatment so the player finds the equip path.
@@ -274,12 +275,12 @@ export function InventoryPanel({
             accessibleLabel={item.name}
             additionalDescription={
               item.currentCharge !== undefined
-                ? `${item.currentCharge} of ${balance.items.salvageCutter.maximumCharge} charges remaining`
+                ? `${item.currentCharge} of ${getItemMaximumCharge(item.itemId)} charges remaining`
                 : undefined
             }
             badge={
               item.currentCharge !== undefined
-                ? `${item.currentCharge}/${balance.items.salvageCutter.maximumCharge}`
+                ? `${item.currentCharge}/${getItemMaximumCharge(item.itemId)}`
                 : undefined
             }
             className={
@@ -340,7 +341,7 @@ export function InventoryPanel({
                 accessibleLabel={resolvedSelection.entry.name}
                 badge={
                   resolvedSelection.entry.currentCharge !== undefined
-                    ? `${resolvedSelection.entry.currentCharge}/${balance.items.salvageCutter.maximumCharge}`
+                    ? `${resolvedSelection.entry.currentCharge}/${getItemMaximumCharge(resolvedSelection.entry.itemId)}`
                     : undefined
                 }
                 className="h-28 w-28 self-start"
@@ -358,9 +359,23 @@ export function InventoryPanel({
                 Load effect
               </p>
               <ul className="mt-2 space-y-1 text-sm text-[color:var(--rs-text-secondary)]">
-                <li>{balance.items.salvageCutter.maximumCharge} boosted attempts</li>
-                <li>Speeds attempt timing only</li>
-                <li>Success chance, yield, and XP remain unchanged</li>
+                {!loadTool ? (
+                  <li>Loads into an equipped Mining Cutter</li>
+                ) : loadTool.chargedYieldMaximumBonus > 0 ? (
+                  // What loading does is the equipped tool's own definition (#233).
+                  <>
+                    <li>{loadTool.maximumCharge} boosted attempts</li>
+                    <li>Speeds attempt timing</li>
+                    <li>+{loadTool.chargedYieldMaximumBonus} maximum yield per success</li>
+                    <li>Success chance and XP remain unchanged</li>
+                  </>
+                ) : (
+                  <>
+                    <li>{loadTool.maximumCharge} boosted attempts</li>
+                    <li>Speeds attempt timing only</li>
+                    <li>Success chance, yield, and XP remain unchanged</li>
+                  </>
+                )}
               </ul>
             </div>
           ) : null}
@@ -369,11 +384,11 @@ export function InventoryPanel({
               {resolvedSelection.entry.currentCharge !== undefined ? (
                 <div className="mt-3">
                   <StatusMeter
-                    detail={`${resolvedSelection.entry.currentCharge} of ${balance.items.salvageCutter.maximumCharge} charges remaining`}
+                    detail={`${resolvedSelection.entry.currentCharge} of ${getItemMaximumCharge(resolvedSelection.entry.itemId)} charges remaining`}
                     label="Cutter charge"
                     value={
                       (resolvedSelection.entry.currentCharge /
-                        balance.items.salvageCutter.maximumCharge) *
+                        (getItemMaximumCharge(resolvedSelection.entry.itemId) ?? 1)) *
                       100
                     }
                   />
@@ -395,7 +410,13 @@ export function InventoryPanel({
                       : "Equip Cutter"}
                   </ActionButton>
                   {!equipAvailability.enabled ? (
-                    <Feedback>Another command is in progress.</Feedback>
+                    equipAvailability.reason === "mining_level" ? (
+                      <Feedback>
+                        Requires Mining {equipAvailability.requiredMiningLevel} to equip.
+                      </Feedback>
+                    ) : (
+                      <Feedback>Another command is in progress.</Feedback>
+                    )
                   ) : null}
                 </div>
               ) : null}
@@ -409,7 +430,7 @@ export function InventoryPanel({
                 loading={loadBusy}
                 onClick={loadPowerCell}
               >
-                Load into Salvage Cutter
+                Load into {loadTool?.name ?? "Mining Cutter"}
               </ActionButton>
               {loadAvailability && !loadAvailability.enabled ? (
                 loadAvailability.reason === "charged" ? (
@@ -418,7 +439,7 @@ export function InventoryPanel({
                     remain. Deplete the Cutter before loading another.
                   </Feedback>
                 ) : loadAvailability.reason === "no_cutter" ? (
-                  <Feedback>Equip a Salvage Cutter before loading a Power Cell.</Feedback>
+                  <Feedback>Equip a Mining Cutter before loading a Power Cell.</Feedback>
                 ) : loadAvailability.reason === "no_cells" ? (
                   <Feedback>No loose Power Cells are carried.</Feedback>
                 ) : (

@@ -126,7 +126,7 @@ export async function seedLegacyStarterCutter(db: Db, rune: Rune, characterId: s
   await db.insert(rune.equippedItems).values({
     characterId,
     assignmentKind: "gear",
-    suitSlotId: balance.items.salvageCutter.suitSlotId,
+    suitSlotId: balance.carrying.miningToolSuitSlotId,
     itemInstanceId: instance.id,
   });
   return instance;

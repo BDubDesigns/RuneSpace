@@ -6,7 +6,12 @@ import {
   equippedItems,
   itemInstances,
 } from "@/db/rune-space";
-import { getEffectiveGameBalance, miningActionIds, miningSources } from "@/game/config/balance";
+import {
+  getEffectiveGameBalance,
+  getMiningToolDefinition,
+  miningActionIds,
+  miningSources,
+} from "@/game/config/balance";
 import { ACTION_IDS, LOCATION_IDS } from "@/game/config/foundations";
 import { loadLocationState } from "@/server/location-state";
 import {
@@ -211,13 +216,14 @@ export async function stopMining(
 }
 
 /**
- * Load exactly one loose Power Cell into the equipped Cutter. The shared
- * character lock first resolves any due active action work, then this command
- * changes the Cutter and inventory in the same transaction. Loading is allowed
- * while idle, Mining, or another action is in progress; only due Mining work is
- * resolved by the supplied play resolver.
+ * Load exactly one loose Power Cell into the equipped Mining tool — whichever
+ * authored Cutter it is (#233). The shared character lock first resolves any
+ * due active action work, then this command changes the Cutter and inventory
+ * in the same transaction. Loading is allowed while idle, Mining, or another
+ * action is in progress; only due Mining work is resolved by the supplied play
+ * resolver. A depleted tool is filled to its own authored maximum.
  */
-export async function loadSalvageCutterPowerCell(
+export async function loadMiningToolPowerCell(
   userId: string,
   characterId: string,
   now = new Date(),
@@ -245,16 +251,16 @@ export async function loadSalvageCutterPowerCell(
       const cutterAssignment = assignments.find(
         (assignment) =>
           assignment.assignmentKind === "gear" &&
-          assignment.suitSlotId === balance.items.salvageCutter.suitSlotId,
+          assignment.suitSlotId === balance.carrying.miningToolSuitSlotId,
       );
       const cutter = cutterAssignment
         ? itemState.carriedInstances.find(
             (instance) =>
               instance.id === cutterAssignment.itemInstanceId &&
-              instance.itemId === balance.items.salvageCutter.itemId &&
               isCompatibleEquipmentAssignment(instance.itemId, cutterAssignment, balance),
           )
         : undefined;
+      const tool = cutter ? getMiningToolDefinition(cutter.itemId, balance) : undefined;
 
       const stateFor = async (load: LoadPowerCellStatus): Promise<LoadPowerCellResult> => ({
         state: await stateFromTransaction(
@@ -270,14 +276,14 @@ export async function loadSalvageCutterPowerCell(
         load,
       });
 
-      if (!cutter) {
+      if (!cutter || !tool) {
         return stateFor({
           status: "no_cutter",
-          message: "Equip a Salvage Cutter before loading a Power Cell.",
+          message: "Equip a Mining Cutter before loading a Power Cell.",
         });
       }
 
-      const currentCharge = normalizeCutterCharge(cutter.currentCharge, balance);
+      const currentCharge = normalizeCutterCharge(cutter.currentCharge, tool);
       if (currentCharge > 0) {
         return stateFor({
           status: "already_loaded",
@@ -313,17 +319,14 @@ export async function loadSalvageCutterPowerCell(
       }
       await transaction
         .update(itemInstances)
-        .set({ currentCharge: balance.items.salvageCutter.maximumCharge, updatedAt: now })
+        .set({ currentCharge: tool.maximumCharge, updatedAt: now })
         .where(
           and(eq(itemInstances.id, cutter.id), eq(itemInstances.characterId, context.character.id)),
         );
-      // A Power Cell a Salvage Cutter workpiece has reserved is not loose (#232).
+      // A Power Cell a Cutter workpiece has reserved is not loose (#232).
       await assertActiveWorkpieceResolvable(transaction, context.character.id);
 
-      return stateFor({
-        status: "loaded",
-        remainingCharge: balance.items.salvageCutter.maximumCharge,
-      });
+      return stateFor({ status: "loaded", remainingCharge: tool.maximumCharge });
     },
     now,
   );

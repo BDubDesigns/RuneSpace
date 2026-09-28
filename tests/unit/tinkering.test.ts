@@ -51,9 +51,10 @@ function instance(
 function snapshot(overrides: Partial<TinkeringSnapshot> = {}): TinkeringSnapshot {
   return {
     fabricationLevel: 1,
+    miningLevel: 1,
     stacks: [],
     carriedUniqueItems: [],
-    ownedMiningCutters: 1,
+    usableMiningCutters: 1,
     slotsAvailable: 4,
     massAvailableGrams: 30_000,
     autoDiscardScrap: false,
@@ -64,15 +65,20 @@ function snapshot(overrides: Partial<TinkeringSnapshot> = {}): TinkeringSnapshot
 }
 
 describe("the Tier-1 Tinkering set and its exact values", () => {
-  it("authors exactly the three eligible Tier-1 targets — never Direct Scrap", () => {
+  it("authors exactly the eligible targets — never either Direct Scrap recipe", () => {
+    // The three Tier-1 targets (#232), then Fabrication 5 and 8's (#233).
     expect(tinkeringActionIds(balance)).toEqual([
       ACTION_IDS.mountingBracketTinkering,
       ACTION_IDS.scrapBoxTinkering,
       ACTION_IDS.salvageCutterTinkering,
+      ACTION_IDS.galvanicWireSpoolTinkering,
+      ACTION_IDS.powerCellTinkering,
+      ACTION_IDS.loadsteelCutterTinkering,
+      ACTION_IDS.freightHarnessTinkering,
     ]);
-    expect(tinkeringActionIds(balance).map((id) => target(id).recipe.actionId)).not.toContain(
-      ACTION_IDS.scrapMetalFabrication,
-    );
+    const dismantled = tinkeringActionIds(balance).map((id) => target(id).recipe.actionId);
+    expect(dismantled).not.toContain(ACTION_IDS.scrapMetalFabrication);
+    expect(dismantled).not.toContain(ACTION_IDS.galvanicScrapFabrication);
   });
 
   it.each([
@@ -133,13 +139,13 @@ describe("the first-alpha last-Cutter guard", () => {
   const carriedCutter = instance("c1", ITEM_IDS.salvageCutter, 0, "2026-01-01");
 
   it("refuses the batch that would leave zero usable Mining Cutters", () => {
-    const only = snapshot({ carriedUniqueItems: [carriedCutter], ownedMiningCutters: 1 });
+    const only = snapshot({ carriedUniqueItems: [carriedCutter], usableMiningCutters: 1 });
     expect(tinkeringStartCheck(only, cutter)).toEqual({ ok: false, reason: "last_cutter" });
     expect(tinkeringAffordableBatches(only, cutter)).toBe(0);
   });
 
   it("allows it while another Cutter is owned anywhere — equipped or in the Cargo Hold", () => {
-    const spare = snapshot({ carriedUniqueItems: [carriedCutter], ownedMiningCutters: 2 });
+    const spare = snapshot({ carriedUniqueItems: [carriedCutter], usableMiningCutters: 2 });
     expect(tinkeringStartCheck(spare, cutter)).toEqual({ ok: true });
     expect(tinkeringAffordableBatches(spare, cutter)).toBe(1);
   });
@@ -147,7 +153,7 @@ describe("the first-alpha last-Cutter guard", () => {
   it("never selects an equipped Cutter: only carried, unequipped instances are candidates", () => {
     // Two owned — one equipped, one in the Cargo Hold — but none carried unequipped.
     expect(
-      tinkeringStartCheck(snapshot({ carriedUniqueItems: [], ownedMiningCutters: 2 }), cutter),
+      tinkeringStartCheck(snapshot({ carriedUniqueItems: [], usableMiningCutters: 2 }), cutter),
     ).toEqual({ ok: false, reason: "no_eligible_items" });
   });
 });
@@ -237,7 +243,7 @@ describe("Auto-discard Scrap and the committed cycle", () => {
           instance("a", ITEM_IDS.salvageCutter, 0, "2026-01-01"),
           instance("b", ITEM_IDS.salvageCutter, 0, "2026-01-02"),
         ],
-        ownedMiningCutters: 2,
+        usableMiningCutters: 2,
       }),
       target: cutter,
     });

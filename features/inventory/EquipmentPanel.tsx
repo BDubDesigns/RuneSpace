@@ -42,7 +42,10 @@ export function EquipmentPanel({
     setMessage(feedback.tone === "muted" ? undefined : feedback.message);
     setMessageTone(feedback.tone);
   });
-  const miningToolSlotId = getEffectiveGameBalance().items.salvageCutter.suitSlotId;
+  const miningToolSlotId = getEffectiveGameBalance().carrying.miningToolSuitSlotId;
+  // Whichever authored Mining tool is equipped (#233): its own name, charge
+  // ceiling and effects. The Salvage Cutter is one such tool, never the rule.
+  const tool = state.equipment.miningTool;
   // Mission guidance is consumed from the ONE derived target set: while an
   // equipped-item requirement is the current unmet step, the matching item's
   // equip affordance receives the treatment. No mission-ID branching here.
@@ -96,48 +99,65 @@ export function EquipmentPanel({
                     {slot.item.name}
                     <br />
                     {formatMassGrams(slot.item.massGrams)}
+                    {slot.item.slotCapacity !== undefined ? (
+                      <>
+                        <br />+{slot.item.slotCapacity} Inventory slots
+                      </>
+                    ) : null}
                   </p>
                 </div>
                 {slot.target.assignmentKind === "gear" &&
                 slot.target.suitSlotId === miningToolSlotId &&
-                state.equipment.salvageCutter ? (
-                  <div className="border-t border-[color:var(--rs-border-subtle)] pt-3 sm:col-span-2">
+                tool ? (
+                  <div
+                    className="border-t border-[color:var(--rs-border-subtle)] pt-3 sm:col-span-2"
+                    data-equipped-mining-tool={tool.itemId}
+                  >
                     <div className="flex flex-wrap items-baseline justify-between gap-2">
                       <p className="font-display text-xs uppercase tracking-[0.16em] text-[color:var(--rs-accent-mining)]">
                         Power Cell charge
                       </p>
                       <p className="text-sm text-[color:var(--rs-text-secondary)]">
-                        {state.equipment.salvageCutter.currentCharge > 0
-                          ? "Loaded · "
-                          : "Depleted · "}
-                        {state.equipment.salvageCutter.currentCharge} /{" "}
-                        {state.equipment.salvageCutter.maximumCharge}
+                        {tool.currentCharge > 0 ? "Loaded · " : "Depleted · "}
+                        {tool.currentCharge} / {tool.maximumCharge}
                       </p>
                     </div>
                     <div className="mt-2">
                       <StatusMeter
                         label="Boosted attempts"
-                        value={
-                          (state.equipment.salvageCutter.currentCharge /
-                            state.equipment.salvageCutter.maximumCharge) *
-                          100
-                        }
-                        detail={`${state.equipment.salvageCutter.currentCharge} remaining`}
+                        value={(tool.currentCharge / tool.maximumCharge) * 100}
+                        detail={`${tool.currentCharge} remaining`}
                       />
                     </div>
+                    {tool.baseDurationMultiplierBps !== 10_000 ? (
+                      // Only a tool whose own definition changes the base
+                      // duration says so; the Salvage Cutter's 1.00× does not.
+                      <p className="mt-2 text-sm text-[color:var(--rs-text-secondary)]">
+                        Normal attempt: {tool.attemptDurationTicks} ticks /{" "}
+                        {secondsForTicks(tool.attemptDurationTicks)} seconds (
+                        {tool.baseDurationMultiplierBps / 10_000}× base time, charged or not)
+                      </p>
+                    ) : null}
                     <p className="mt-2 text-sm text-[color:var(--rs-text-secondary)]">
-                      Boosted attempt: {state.equipment.salvageCutter.boostedAttemptDurationTicks}{" "}
-                      ticks /{" "}
-                      {secondsForTicks(state.equipment.salvageCutter.boostedAttemptDurationTicks)}{" "}
-                      seconds
+                      Boosted attempt: {tool.boostedAttemptDurationTicks} ticks /{" "}
+                      {secondsForTicks(tool.boostedAttemptDurationTicks)} seconds
                     </p>
+                    {tool.chargedYieldMaximumBonus > 0 ? (
+                      <p className="mt-1 text-sm text-[color:var(--rs-text-secondary)]">
+                        While charged: +{tool.chargedYieldMaximumBonus} maximum yield per success
+                      </p>
+                    ) : null}
+                    {!tool.usable ? (
+                      <Feedback tone="danger">
+                        Requires Mining {tool.requiredMiningLevel} to use.
+                      </Feedback>
+                    ) : null}
                     <p className="mt-1 text-sm text-[color:var(--rs-text-secondary)]">
                       Carried Power Cells: {state.equipment.carriedPowerCellQuantity}
                     </p>
-                    {state.equipment.salvageCutter.currentCharge > 0 ? (
+                    {tool.currentCharge > 0 ? (
                       <Feedback>
-                        Power Cell already loaded — {state.equipment.salvageCutter.currentCharge}{" "}
-                        boosted attempts remain.
+                        Power Cell already loaded — {tool.currentCharge} boosted attempts remain.
                       </Feedback>
                     ) : state.equipment.carriedPowerCellQuantity > 0 ? (
                       <ActionButton
@@ -186,20 +206,37 @@ export function EquipmentPanel({
                         {item.name}
                         <br />
                         {formatMassGrams(item.massGrams)}
+                        {item.slotCapacity !== undefined ? (
+                          <>
+                            <br />+{item.slotCapacity} Inventory slots
+                          </>
+                        ) : null}
                       </p>
                     </div>
-                    <MissionActionButton
-                      guidance={
-                        missionGuidanceTargets.equipmentItemIds.has(item.itemId)
-                          ? "active"
-                          : undefined
-                      }
-                      disabled={foregroundBusy}
-                      intent="mining"
-                      onClick={() => equip(item.itemInstanceId, slot.target, "")}
-                    >
-                      Equip in {slot.label}
-                    </MissionActionButton>
+                    <div className="space-y-1">
+                      <MissionActionButton
+                        guidance={
+                          item.requiredMiningLevel === undefined &&
+                          missionGuidanceTargets.equipmentItemIds.has(item.itemId)
+                            ? "active"
+                            : undefined
+                        }
+                        disabled={foregroundBusy || item.requiredMiningLevel !== undefined}
+                        intent="mining"
+                        onClick={() => equip(item.itemInstanceId, slot.target, "")}
+                      >
+                        Equip in {slot.label}
+                      </MissionActionButton>
+                      {item.requiredMiningLevel !== undefined ? (
+                        // The server refuses it too; this only says why first.
+                        <p
+                          className="text-xs uppercase tracking-wide text-[color:var(--rs-accent-danger)]"
+                          data-equip-requirement
+                        >
+                          Requires Mining {item.requiredMiningLevel} (you are {state.mining.level})
+                        </p>
+                      ) : null}
+                    </div>
                   </div>
                 ))}
               </div>

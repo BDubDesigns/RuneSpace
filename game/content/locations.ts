@@ -207,9 +207,9 @@ const locationDefinitions = [
     // Both kinds of Welding the yard's one bench does. Listing the customer one
     // is what lets Mission guidance point a player who is somewhere else back
     // to the only place a Work Order can be welded (#207).
-    // The Fabrication Station's work (#232) is here too, which is what lets
-    // Mission guidance point a player somewhere else back to the one place a
-    // Salvage Cutter can be fabricated.
+    // The Fabrication Station's work (#232, #233) is here too, which is what
+    // lets Mission guidance point a player somewhere else back to the one
+    // place a Salvage or Loadsteel Cutter can be fabricated.
     availableActionIds: [
       ACTION_IDS.practiceWelding,
       ACTION_IDS.workOrderWelding,
@@ -217,9 +217,18 @@ const locationDefinitions = [
       ACTION_IDS.scrapMetalFabrication,
       ACTION_IDS.scrapBoxFabrication,
       ACTION_IDS.salvageCutterFabrication,
+      ACTION_IDS.galvanicScrapFabrication,
+      ACTION_IDS.galvanicWireSpoolFabrication,
+      ACTION_IDS.powerCellFabrication,
+      ACTION_IDS.loadsteelCutterFabrication,
+      ACTION_IDS.freightHarnessFabrication,
       ACTION_IDS.mountingBracketTinkering,
       ACTION_IDS.scrapBoxTinkering,
       ACTION_IDS.salvageCutterTinkering,
+      ACTION_IDS.galvanicWireSpoolTinkering,
+      ACTION_IDS.powerCellTinkering,
+      ACTION_IDS.loadsteelCutterTinkering,
+      ACTION_IDS.freightHarnessTinkering,
     ],
     merchantId: MERCHANT_IDS.wadeRusk,
     dormantActivities: [],

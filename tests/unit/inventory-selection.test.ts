@@ -12,6 +12,7 @@ import {
 } from "@/features/inventory/inventory-selection";
 import { toggleSelection } from "@/features/shared/selectable-details";
 import { DiscardInventoryStackRequestSchema } from "@/game/schemas/gameplay";
+import { miningToolProjection, salvageCutterProjection } from "./mining-tool-projection";
 
 function inventoryState(
   stacks: PlayGameplayState["inventory"]["stacks"] = [],
@@ -296,20 +297,20 @@ describe("selection toggling", () => {
 
 describe("Power Cell load availability", () => {
   function stateWith(overrides: {
-    cutter?: PlayGameplayState["equipment"]["salvageCutter"];
+    cutter?: PlayGameplayState["equipment"]["miningTool"];
     carriedPowerCellQuantity?: number;
   }) {
     const inventory = inventoryState([powerCellStack], []);
     const state = baseState(inventory);
     state.equipment.carriedPowerCellQuantity = overrides.carriedPowerCellQuantity ?? 2;
     if (overrides.cutter !== undefined) {
-      state.equipment.salvageCutter = overrides.cutter;
+      state.equipment.miningTool = overrides.cutter;
     }
     return state;
   }
 
-  function depletedCutter() {
-    return { currentCharge: 0, maximumCharge: 10, boostedAttemptDurationTicks: 5 };
+  function depletedCutter(): NonNullable<PlayGameplayState["equipment"]["miningTool"]> {
+    return salvageCutterProjection(0);
   }
 
   it("enables loading a depleted equipped Cutter when a Power Cell stack is selected", () => {
@@ -323,7 +324,7 @@ describe("Power Cell load availability", () => {
 
   it("disables loading with the remaining-charge reason while the Cutter is charged", () => {
     const state = stateWith({
-      cutter: { currentCharge: 4, maximumCharge: 10, boostedAttemptDurationTicks: 5 },
+      cutter: salvageCutterProjection(4),
     });
     const selection = resolveInventorySelection(state.inventory, {
       kind: "stack",
@@ -375,10 +376,25 @@ describe("Power Cell load availability", () => {
     });
   });
 
+  it("loads whichever Cutter is equipped: a depleted Loadsteel Cutter takes a Cell too (#233)", () => {
+    const state = stateWith({ cutter: miningToolProjection(ITEM_IDS.loadsteelCutter, 0, 5) });
+    const selection = resolveInventorySelection(state.inventory, {
+      kind: "stack",
+      id: powerCellStack.id,
+    });
+    expect(derivePowerCellLoadAvailability(state, selection, false)).toEqual({ enabled: true });
+    const charged = stateWith({ cutter: miningToolProjection(ITEM_IDS.loadsteelCutter, 7, 5) });
+    expect(derivePowerCellLoadAvailability(charged, selection, false)).toEqual({
+      enabled: false,
+      reason: "charged",
+      remainingCharge: 7,
+    });
+  });
+
   it("offers no load surface for non-Power-Cell selections", () => {
     const inventory = inventoryState([ferriteStack], []);
     const state = baseState(inventory);
-    state.equipment.salvageCutter = depletedCutter();
+    state.equipment.miningTool = depletedCutter();
     const selection = resolveInventorySelection(state.inventory, {
       kind: "stack",
       id: ferriteStack.id,
@@ -390,7 +406,7 @@ describe("Power Cell load availability", () => {
   it("offers no load surface for carried unique items", () => {
     const inventory = inventoryState([], [carriedCutter]);
     const state = baseState(inventory);
-    state.equipment.salvageCutter = depletedCutter();
+    state.equipment.miningTool = depletedCutter();
     const selection = resolveInventorySelection(state.inventory, {
       kind: "unique",
       id: carriedCutter.id,
@@ -448,7 +464,7 @@ describe("discard request boundary", () => {
 
 describe("inventory equip availability", () => {
   const balance = getEffectiveGameBalance();
-  const toolSlotId = balance.items.salvageCutter.suitSlotId;
+  const toolSlotId = balance.carrying.miningToolSuitSlotId;
   const toolTarget = { assignmentKind: "gear" as const, suitSlotId: toolSlotId };
   const containerTarget = {
     assignmentKind: "container" as const,
@@ -505,6 +521,35 @@ describe("inventory equip availability", () => {
     expect(deriveInventoryEquipAvailability(state, selection, true)).toEqual({
       enabled: false,
       reason: "busy",
+    });
+  });
+
+  it("names the Mining requirement instead of offering Equip for a Loadsteel Cutter below Mining 5 (#233)", () => {
+    const state = stateWith(carriedCutter.id);
+    state.equipment.slots = [
+      {
+        target: toolTarget,
+        label: "Mining tool",
+        item: undefined,
+        eligibleItems: [
+          {
+            itemInstanceId: carriedCutter.id,
+            itemId: ITEM_IDS.loadsteelCutter,
+            name: "Loadsteel Cutter",
+            massGrams: 8_000,
+            requiredMiningLevel: 5,
+          },
+        ],
+      },
+    ];
+    const selection = resolveInventorySelection(state.inventory, {
+      kind: "unique",
+      id: carriedCutter.id,
+    });
+    expect(deriveInventoryEquipAvailability(state, selection, false)).toEqual({
+      enabled: false,
+      reason: "mining_level",
+      requiredMiningLevel: 5,
     });
   });
 

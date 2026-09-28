@@ -57,6 +57,9 @@ describe("missionChainResetScope", () => {
       "return_the_favor",
       "break_it_down",
       "brace_yourself",
+      // A Cut Above and Cutting Costs both hang off Brace Yourself (#233).
+      "a_cut_above",
+      "cutting_costs",
       // Out of the Weather hangs off Hold It Together, so resetting the chain
       // from the start necessarily clears the optional branch with it (#172).
       "out_of_the_weather",
@@ -76,6 +79,9 @@ describe("missionChainResetScope", () => {
       "return_the_favor",
       "break_it_down",
       "brace_yourself",
+      // A Cut Above and Cutting Costs both hang off Brace Yourself (#233).
+      "a_cut_above",
+      "cutting_costs",
       // Out of the Weather hangs off Hold It Together, so resetting the chain
       // from the start necessarily clears the optional branch with it (#172).
       "out_of_the_weather",
@@ -87,6 +93,8 @@ describe("missionChainResetScope", () => {
       "return_the_favor",
       "break_it_down",
       "brace_yourself",
+      "a_cut_above",
+      "cutting_costs",
     ]);
   });
 });

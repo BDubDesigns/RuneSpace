@@ -101,7 +101,7 @@ suite("issue #102 Walk It Off persistence and reward boundary (real PostgreSQL)"
     expect(assignments).toHaveLength(1);
     expect(assignments[0]?.assignmentKind).toBe("container");
     const state = await play.getPlayGameplayState(userId, character.id, now, deterministicRandom());
-    expect(state.equipment.salvageCutter).toBeUndefined();
+    expect(state.equipment.miningTool).toBeUndefined();
     expect(state.inventory.uniqueItems.map((item) => item.itemId)).toEqual([]);
   });
 
@@ -209,7 +209,7 @@ suite("issue #102 Walk It Off persistence and reward boundary (real PostgreSQL)"
     if (completed.mission.status !== "completed") throw new Error("completion fixture failed");
     expect(completed.mission.reward?.quantity).toBe(1);
     expect(completed.state.inventory.uniqueItems).toHaveLength(1);
-    expect(completed.state.equipment.salvageCutter).toBeUndefined();
+    expect(completed.state.equipment.miningTool).toBeUndefined();
   });
 
   it("refuses a mass-over-capacity reward without writing mission or item state", async () => {

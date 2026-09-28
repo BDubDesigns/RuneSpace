@@ -889,7 +889,7 @@ suite("issue #128 Cargo Hold repair gate and existing Welding mechanics (real Po
           itemInstanceId: extraCutter.id,
           target: {
             assignmentKind: "gear",
-            suitSlotId: balance.items.salvageCutter.suitSlotId,
+            suitSlotId: balance.carrying.miningToolSuitSlotId,
           },
         },
         now,

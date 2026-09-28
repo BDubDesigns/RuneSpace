@@ -1,6 +1,10 @@
-import type { EffectiveGameBalance, MiningSourceBalance } from "@/game/config/balance";
+import type {
+  EffectiveGameBalance,
+  MiningSourceBalance,
+  MiningToolDefinition,
+} from "@/game/config/balance";
 import { planStackAddition, type StackState } from "@/game/domain/inventory";
-import { effectiveAttemptDurationTicks } from "@/game/domain/timing";
+import { effectiveAttemptDurationTicks, scaledAttemptDurationTicks } from "@/game/domain/timing";
 
 export const MINING_STOP_REASONS = [
   "manually_stopped",
@@ -61,7 +65,13 @@ export function miningSuccessChanceBps(level: number, source: MiningSourceBalanc
 
 export type MiningSnapshot<Id = string> = {
   miningLevel: number;
-  hasCompatibleTool: boolean;
+  /**
+   * The authored definition of the Mining tool actually equipped right now
+   * (#233), or undefined when the Mining-tool slot holds none. Its duration,
+   * charge and yield effects are read from here and nowhere else, so a lazily
+   * or offline-resolved attempt always uses the tool that is really equipped.
+   */
+  tool?: MiningToolDefinition;
   /** Null is the established uncharged representation for legacy Cutter rows. */
   cutterCharge?: number | null;
   existingStacks: readonly StackState<Id>[];
@@ -100,30 +110,73 @@ export type MiningResolvedAttempt = {
 };
 
 /**
+ * One attempt's duration at one source with one Mining tool (#233), under the
+ * shared whole-tick rules. The tool's permanent multiplier applies first,
+ * charged or not; while charged, the global Power Cell speed multiplier then
+ * applies to that tool duration. The Salvage Cutter's 1.00× leaves every
+ * source's authored duration exactly as it was — Ferrite Shale 10, or 5
+ * charged; Galvanite 15, or 8 charged — and the Loadsteel Cutter's 0.8× makes
+ * them 8 / 4 and 12 / 6. No tool at all means the source's own duration.
+ */
+export function miningAttemptDurationTicks(
+  balance: EffectiveGameBalance,
+  source: MiningSourceBalance,
+  tool: Pick<MiningToolDefinition, "baseDurationMultiplierBps"> | undefined,
+  charged: boolean,
+): number {
+  const toolTicks = tool
+    ? scaledAttemptDurationTicks(source.attemptDurationTicks, tool.baseDurationMultiplierBps)
+    : source.attemptDurationTicks;
+  return charged
+    ? effectiveAttemptDurationTicks(toolTicks, balance.mining.powerCellBoost.speedMultiplier)
+    : toolTicks;
+}
+
+/**
  * A charged attempt's duration at one source, under the shared whole-tick
- * ceiling rule. Ferrite Shale's 10 ticks become 5; Galvanite's 15 become 8.
+ * ceiling rule. With the Salvage Cutter (or no tool named), Ferrite Shale's 10
+ * ticks become 5 and Galvanite's 15 become 8.
  */
 export function boostedMiningAttemptDurationTicks(
   balance: EffectiveGameBalance,
   source: MiningSourceBalance,
+  tool?: Pick<MiningToolDefinition, "baseDurationMultiplierBps">,
 ): number {
-  return effectiveAttemptDurationTicks(
-    source.attemptDurationTicks,
-    balance.mining.powerCellBoost.speedMultiplier,
-  );
+  return miningAttemptDurationTicks(balance, source, tool, true);
 }
 
+/**
+ * The yield range one successful attempt rolls between (#233). A charged tool
+ * may raise the source's maximum; the minimum never changes, and the roll
+ * itself is the source's existing one.
+ */
+export function miningYieldRange(
+  source: Pick<MiningSourceBalance, "yieldMinimum" | "yieldMaximum">,
+  tool: Pick<MiningToolDefinition, "chargedYieldMaximumBonus"> | undefined,
+  charged: boolean,
+): { minimum: number; maximum: number } {
+  return {
+    minimum: source.yieldMinimum,
+    maximum: source.yieldMaximum + (charged && tool ? tool.chargedYieldMaximumBonus : 0),
+  };
+}
+
+/** Whether a Mining tool's own level requirement lets this character use it (#233). */
+export function miningToolUsable(
+  tool: Pick<MiningToolDefinition, "requiredMiningLevel">,
+  miningLevel: number,
+): boolean {
+  return miningLevel >= tool.requiredMiningLevel;
+}
+
+/** A tool's durable charge, validated against that tool's own maximum (#233). */
 export function normalizeCutterCharge(
   currentCharge: number | null | undefined,
-  balance: EffectiveGameBalance,
+  tool: Pick<MiningToolDefinition, "maximumCharge">,
 ): number {
   const charge = currentCharge ?? 0;
-  if (
-    !Number.isInteger(charge) ||
-    charge < 0 ||
-    charge > balance.items.salvageCutter.maximumCharge
-  ) {
-    throw new RangeError("Salvage Cutter charge is outside the approved range");
+  if (!Number.isInteger(charge) || charge < 0 || charge > tool.maximumCharge) {
+    throw new RangeError("Mining tool charge is outside the approved range");
   }
   return charge;
 }
@@ -143,7 +196,10 @@ export function miningPreflightStopReason<Id>(
   balance: EffectiveGameBalance,
   source: MiningSourceBalance,
 ): MiningStopReason | undefined {
-  if (!snapshot.hasCompatibleTool) return "compatible_mining_tool_missing";
+  // An equipped tool the character's Mining level does not meet is no tool at
+  // all (#233): equipping refuses it, and this refuses using it.
+  if (!snapshot.tool || !miningToolUsable(snapshot.tool, snapshot.miningLevel))
+    return "compatible_mining_tool_missing";
   const award = miningAwardFacts(balance, source);
   const plan = planStackAddition(
     snapshot.existingStacks,
@@ -178,11 +234,12 @@ export function resolveMining<Id>(input: {
   const { balance, snapshot, source, random } = input;
   if (!Number.isInteger(input.elapsedTicks) || input.elapsedTicks < 0)
     throw new RangeError("Elapsed ticks must be a non-negative integer");
-  const normalDurationTicks = source.attemptDurationTicks;
-  const boostedDurationTicks = boostedMiningAttemptDurationTicks(balance, source);
+  const { tool } = snapshot;
+  const normalDurationTicks = miningAttemptDurationTicks(balance, source, tool, false);
+  const boostedDurationTicks = miningAttemptDurationTicks(balance, source, tool, true);
   let remainingTicks = input.elapsedTicks;
   let consumedTicks = 0;
-  let remainingCutterCharge = normalizeCutterCharge(snapshot.cutterCharge, balance);
+  let remainingCutterCharge = tool ? normalizeCutterCharge(snapshot.cutterCharge, tool) : 0;
   const initialStopReason = miningPreflightStopReason(snapshot, balance, source);
   if (initialStopReason)
     return {
@@ -253,7 +310,10 @@ export function resolveMining<Id>(input: {
       continue;
     }
     const award = miningAwardFacts(balance, source);
-    const rolledQuantity = random.nextUnit() < 0.5 ? award.yieldMinimum : award.yieldMaximum;
+    // The source's own roll between its minimum and maximum; a charged tool may
+    // only raise that maximum (#233).
+    const yieldRange = miningYieldRange(award, tool, boosted);
+    const rolledQuantity = random.nextUnit() < 0.5 ? yieldRange.minimum : yieldRange.maximum;
     let quantity = rolledQuantity;
     let plan = planStackAddition(
       stacks,
@@ -267,7 +327,7 @@ export function resolveMining<Id>(input: {
     // The minimum-fit check authorizes this success. At a final partial stack or
     // mass boundary, retain a valid one-unit yield rather than partially adding a two-unit roll.
     if (plan.remainingQuantity > 0) {
-      quantity = award.yieldMinimum;
+      quantity = yieldRange.minimum;
       plan = planStackAddition(
         stacks,
         award.itemId,
