@@ -179,8 +179,8 @@ Consequences that must stay true:
 
 Current authored labels include `Claim Cutter` (Walk It Off), `SHOW SHALE` (Cut
 Your Teeth), `REPORT TO WADE` (Waste Not), `REPORT REPAIR` (Hold It Together),
-`HAND OVER THE CUTTER` (Return the Favor), and `TELL TANSY` (Break It Down,
-Brace Yourself).
+`HAND OVER THE CUTTER` (Return the Favor, Cutting Costs), `SHOW HER THE CUTTER`
+(A Cut Above), and `TELL TANSY` (Break It Down, Brace Yourself).
 Offers fall back to `Accept mission`; a turn-in without authored copy falls back
 to `Turn in`.
 

@@ -858,3 +858,20 @@ Short concrete examples that demonstrate the framework vocabulary. Do not copy m
 - **Offered and turned in at The Jag,** while the work itself is at Deep Jag — the first Mission whose repair location and turn-in location differ, which the generic guidance and phase projection already handled.
 - **Reward:** `{ kind: "skill_xp", skillId: welding, amount: 250 }` (§8), on top of the 750 Welding XP the fifteen genuine sections already paid, for a clean 1,000 across the journey.
 - **Dialogue:** Tansy authors the offer, the repair reminder, busy, the turn-in, the completion presentation (carrying the authored skill-XP beat), and post-completion story dialogue, all within her established expression set.
+
+### A Cut Above — a Fabrication-level gate, a personal fabrication, and nothing taken
+
+- **Acceptance:** `prerequisiteMissionId: braceYourself` and `prerequisiteSkillLevels: [{ fabrication, 5 }]` (§3); one offer route, **Tansy at The Jag**, `actionLabel: "TAKE THE JOB"`. There is no Refining requirement — Fabrication and Refining are separate professions — and no acceptance effect.
+- **It teaches a rule, not a recipe.** The Loadsteel Cutter recipe is Fabrication 5 on its own (`docs/gameplay-foundations.md`); it is open whether or not A Cut Above was ever offered or accepted, and accepting it unlocks nothing.
+- **Requirement:** one `tracked_activity` — `fabrication`, `metric: "completions"`, `actionId: loadsteelCutterFabrication`, `target: 1` — Return the Favor's recipe-specific seam. Only a Loadsteel Cutter the player genuinely fabricates while the Mission is active counts: one made before accepting, bought, given, traded or already owned cannot, and a Manual Override bust is not a Cutter.
+- **Turn-in:** Tansy at The Jag, `actionLabel: "SHOW HER THE CUTTER"`. There is deliberately **no** hand-in requirement: Tansy only wants to see it made, the turn-in consumes nothing, and the player keeps the tool.
+- **Reward:** `{ kind: "skill_xp", skillId: fabrication, amount: 500 }`, paid once by the ordinary completion stamp.
+- **Dialogue:** the locked offer, turn-in and completion scenes. The design authors no separate reminder or busy scene, so the reminder repeats the offer's own closing instruction ("Go make one." / "Bring it back when you're done…") and busy reuses Tansy's ordinary Jag "finish it first" beat (`tansy_rusk_brace_yourself_busy`) rather than inventing prose.
+
+### Cutting Costs — an optional purchase with no provenance
+
+- **Acceptance:** `prerequisiteMissionId: braceYourself` only — **no** Fabrication level and **no** A Cut Above, because Renn wants the Cutter, not proof of who made it. One offer route, **Renn at Holo Hollow**, `actionLabel: "TAKE THE JOB"`.
+- **Requirement:** one `carried_unique_item` for the Loadsteel Cutter with `consume_one` (§5) — Return the Favor's reusable unique-item turn-in. Any carried, unequipped Loadsteel Cutter satisfies it — self-crafted, traded, gifted or otherwise legitimately held — least value first; an equipped Cutter and one in the Cargo Hold never count, so the tool in the player's hand cannot be handed over. No provenance is recorded for it.
+- **Turn-in:** Renn at Holo Hollow, `actionLabel: "HAND OVER THE CUTTER"`. The turn-in consumes one Cutter because Renn is buying it.
+- **Reward:** `{ kind: "credits", amount: 500 }` (§8), paid by the same exactly-once transaction that stamps completion.
+- **Dialogue:** the locked offer, active reminder, turn-in (with the Cutter shown as an item beat) and completion (Renn taking it, as an item beat). Busy reuses Renn's ordinary "Finish it. I'll be here." beat. The player stays silent throughout.

@@ -3,18 +3,13 @@
   "projectSlug": "runespace",
   "workState": "active",
   "currentFocus": "Preparing the October 27 Soft Alpha: verified players can reserve characters; account-level Early Access and a closed-by-default public gameplay gate control when play begins.",
-  "currentChange": {
-    "summary": "Tansy teaches Fabrication at Rusk Recovery: a Fabrication Station with four Tier-1 recipes, Manual Override for riskier XP, Tinkering to take pieces apart, and the Return the Favor and Break It Down Missions.",
-    "stage": "review",
-    "pullRequestNumber": 238
-  },
   "latestCompleted": {
-    "summary": "Refining and Practice Welding ask how many before starting: a number of batches or welds, or Max to run until materials run out, plus two Refining 5 recipes that make Slag on purpose.",
-    "date": "2026-09-26",
-    "url": "https://github.com/BDubDesigns/RuneSpace/pull/237"
+    "summary": "Tansy teaches Fabrication at Rusk Recovery: a Fabrication Station with four Tier-1 recipes, Manual Override for riskier XP, Tinkering to take pieces apart, and the Return the Favor and Break It Down Missions.",
+    "date": "2026-09-27",
+    "url": "https://github.com/BDubDesigns/RuneSpace/pull/238"
   },
-  "nextStep": "Human review and playtest of Tansy's Fabrication chapter; public gameplay remains closed until an operator deliberately opens it.",
-  "lastMeaningfulUpdate": "2026-09-26",
+  "nextStep": "Human review and playtest of Fabrication 5 and 8: the Loadsteel Cutter, Freight Harness, A Cut Above and Cutting Costs; public gameplay remains closed until an operator deliberately opens it.",
+  "lastMeaningfulUpdate": "2026-09-27",
   "highlights": [
     {
       "summary": "Deep Jag is playable: brace the cave-in for Tansy, mine Galvanite behind it, and refine Galvanic Stock and Galvaferrite at the Processing Yard.",
