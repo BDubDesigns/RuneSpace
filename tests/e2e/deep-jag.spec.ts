@@ -195,13 +195,17 @@ test("the worksite is one generic repair panel, and the last weld opens the mine
   await page.reload();
   await expect(panel.getByText(`${caveIn.repairIncrements - 1} / 15 welds`)).toBeVisible();
   await panel.locator("[data-repair-start-welding]").click();
+  // Stop Welding renders only from the server's committed active action (#243).
+  await expect(panel.locator("[data-repair-stop-welding]")).toBeVisible();
 
   // Fast-forward the final section the way the other journeys do.
   const ago = new Date(Date.now() - balance.welding.attemptDurationTicks * 1_000 - 5_000);
-  await db
+  const moved = await db
     .update(activeActions)
     .set({ startedAt: ago, resolvedThroughAt: ago })
-    .where(eq(activeActions.characterId, characterId));
+    .where(eq(activeActions.characterId, characterId))
+    .returning({ characterId: activeActions.characterId });
+  expect(moved).toHaveLength(1);
   await page.reload();
 
   // The same location is now a mine: no second unlock, no trip to Tansy.
