@@ -52,8 +52,20 @@ export function DialoguePlayer({
   const [reducedMotion, setReducedMotion] = useState(false);
   const [restartGeneration, setRestartGeneration] = useState(0);
   const [portraitGeneration, setPortraitGeneration] = useState(0);
+  const [presentedSequenceId, setPresentedSequenceId] = useState(sequence.id);
   const viewedBeats = useRef(new Set<number>());
-  const previousSequenceId = useRef(sequence.id);
+
+  // A new sequence starts at its first beat in the same render that presents
+  // it. Resetting from an effect instead let one commit show the previous
+  // sequence's beat index against the new sequence's beats (#243).
+  if (presentedSequenceId !== sequence.id) {
+    setPresentedSequenceId(sequence.id);
+    setBeatIndex(0);
+    setRevealedChars(0);
+    setRestartGeneration((generation) => generation + 1);
+    setPortraitGeneration((generation) => generation + 1);
+  }
+
   const beat = sequence.beats[beatIndex] ?? sequence.beats[0];
 
   useEffect(() => {
@@ -65,15 +77,7 @@ export function DialoguePlayer({
   }, []);
 
   useEffect(() => {
-    const sequenceChanged = previousSequenceId.current !== sequence.id;
-    previousSequenceId.current = sequence.id;
     viewedBeats.current.clear();
-    setBeatIndex(0);
-    setRevealedChars(0);
-    setRestartGeneration((generation) => generation + 1);
-    if (sequenceChanged) {
-      setPortraitGeneration((generation) => generation + 1);
-    }
   }, [sequence.id]);
 
   const beatCharacters = beat ? Array.from(beat.text) : [];

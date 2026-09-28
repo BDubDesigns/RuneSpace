@@ -55,10 +55,15 @@ async function carried(characterId: string, itemId: string) {
 /** Move the active action's cursor back so that much work is due on the next command. */
 async function fastForward(characterId: string, ms: number) {
   const ago = new Date(Date.now() - ms);
-  await db
+  const moved = await db
     .update(activeActions)
     .set({ startedAt: ago, resolvedThroughAt: ago })
-    .where(eq(activeActions.characterId, characterId));
+    .where(eq(activeActions.characterId, characterId))
+    .returning({ characterId: activeActions.characterId });
+  // A silent no-op would leave the action running in real time, so a caller
+  // that raced its own start command would pass or fail on wall-clock timing.
+  // Wait for a server-confirmed running state before calling this.
+  if (moved.length !== 1) throw new Error("fastForward: no active action to move yet");
 }
 
 async function expectNoHorizontalOverflow(page: import("@playwright/test").Page) {
