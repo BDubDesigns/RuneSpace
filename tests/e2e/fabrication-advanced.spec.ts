@@ -145,10 +145,15 @@ async function creditsOf(characterId: string) {
 /** Move the running action's cursor back so that much time is due on the next load. */
 async function fastForward(characterId: string, ms: number) {
   const ago = new Date(Date.now() - ms);
-  await db
+  const moved = await db
     .update(activeActions)
     .set({ startedAt: ago, resolvedThroughAt: ago })
-    .where(eq(activeActions.characterId, characterId));
+    .where(eq(activeActions.characterId, characterId))
+    .returning({ characterId: activeActions.characterId });
+  // A silent no-op would leave the action running in real time, so a caller
+  // that raced its own start command would pass or fail on wall-clock timing.
+  // Wait for a server-confirmed running state before calling this.
+  if (moved.length !== 1) throw new Error("fastForward: no active action to move yet");
 }
 
 async function expectNoHorizontalOverflow(page: import("@playwright/test").Page) {
@@ -416,6 +421,8 @@ test("the Loadsteel Cutter: Mining 5 to equip, its own charge, and Mining with b
   await expect(page.getByText("POWER CELL BOOST · 10 / 10")).toBeVisible();
   await expect(page.getByText("Next attempt: 8 ticks")).toBeVisible();
   await page.getByRole("button", { name: "Start Mining" }).click();
+  // Stop Mining renders only from the server's committed active action.
+  await expect(page.getByRole("button", { name: "Stop Mining" })).toBeVisible();
   await fastForward(characterId, 5_000);
   await page.getByRole("button", { name: "Refresh status" }).click();
   const latest = page.getByRole("region", { name: "Latest mining attempt" });

@@ -675,6 +675,8 @@ test("Power Cell loading boosts Mining attempts and falls back after depletion",
   await equipment.getByRole("button", { name: "Close equipment" }).click();
 
   await page.getByRole("button", { name: "Start Mining" }).click();
+  // Rewrite the action only once the server has committed it (Stop Mining).
+  await expect(page.getByRole("button", { name: "Stop Mining" })).toBeVisible();
   const firstBoostedBatch = new Date(Date.now() - 6_100);
   await db
     .update(activeActions)
@@ -693,6 +695,7 @@ test("Power Cell loading boosts Mining attempts and falls back after depletion",
   // refresh timer racing the deterministic depletion boundary below.
   await page.getByRole("button", { name: "Stop Mining" }).click();
   await page.getByRole("button", { name: "Start Mining" }).click();
+  await expect(page.getByRole("button", { name: "Stop Mining" })).toBeVisible();
   const cutterRow = (
     await db
       .select()

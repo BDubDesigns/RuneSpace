@@ -240,6 +240,13 @@ Before removing or weakening a test, record where the behavior remains protected
 - Test duplication across layers.
 - Excessive shallow component tests that assert markup without behavior.
 - Testing implementation details instead of observable outcomes.
+- Rewriting server state from the test process (for example moving an
+  `active_actions` cursor back to fast-forward a timer) straight after a click.
+  The click does not wait for its server command, so the write can land first,
+  match nothing, and leave the test passing or failing on wall-clock timing
+  (#243). Wait for a state only the committed command can render (such as
+  `Stop Mining`) first, and make a fast-forward helper fail when it moves no
+  row.
 
 ## CI scope and event matrix
 
