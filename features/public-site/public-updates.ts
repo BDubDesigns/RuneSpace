@@ -19,10 +19,10 @@ const authoredUpdates = [
     body: [
       "The Fabrication Station has more on it now, and your Fabrication level is the only thing that opens it. Reach Fabrication 5 and four new recipes appear; reach Fabrication 8 and a fifth does. They work Galvanic Stock and Galvaferrite, but you do not need any Refining of your own to use them — stock you bought or were handed works exactly as well.",
       "At Fabrication 5 you can turn one Galvanic Stock into two Scrap Metal, a Galvanic Wire Spool, or two Power Cells. The Cells come off the machine charged and ready — one batch is always two, so the tile says two however many batches you choose, and four batches make eight.",
-      "The fourth Fabrication 5 recipe is the Loadsteel Cutter: two Galvaferrite, a Wire Spool and a Power Cell. It is a second Mining tool rather than a better Salvage Cutter, and it needs Mining 5 to equip. It is faster whether or not it is charged, a Power Cell still speeds it up on top of that, and while it is charged a success can give one more ore than usual. One Cell is still ten charged attempts, and a new one comes off the machine empty.",
+      "The fourth Fabrication 5 recipe is the Loadsteel Cutter: two Galvaferrite, a Wire Spool and a Power Cell. It is a second Mining tool rather than a better Salvage Cutter, and it needs Mining 5 to equip. It is faster whether or not it is charged. A Power Cell does not speed it up further the way it does a Salvage Cutter; instead, every successful charged attempt gives one more ore than usual — two or three instead of one or two. One Cell is still ten charged attempts, and a new one comes off the machine empty.",
       "Fabrication 8 adds the Freight Harness, a heavy container that fits either container attachment and adds six Inventory slots. It weighs 9 kg, and that weight is carried like any other gear.",
       "Everything new can be taken apart by Tinkering on the same terms as before. Power Cells go two at a time, and Tinkering still will not take your last usable Mining Cutter, whichever kind it is.",
-      "Once Brace Yourself is behind you, Tansy has one more lesson at The Jag when you reach Fabrication 5: build a Loadsteel Cutter yourself and show her. Renn Calder, meanwhile, has been saving for one. Bring him any Loadsteel Cutter and he will pay for it.",
+      "Once Brace Yourself is behind you, Tansy has one more lesson at The Jag when you reach Fabrication 5: get your hands on a Loadsteel Cutter and show her. However you came by it, carried or equipped, she only wants to look, and you keep it. Renn Calder, meanwhile, has been saving for one. Bring him any Loadsteel Cutter and he will pay for it.",
     ],
     patchNotes: [
       {
@@ -30,7 +30,7 @@ const authoredUpdates = [
         items: [
           "Fabrication 5 recipes: Scrap Metal from Galvanic Stock, Galvanic Wire Spool, Power Cells (two per batch) and the Loadsteel Cutter.",
           "Fabrication 8 recipe: the Freight Harness, a 9 kg container attachment that adds six Inventory slots.",
-          "The Loadsteel Cutter: a second Mining tool that needs Mining 5, mines faster charged or not, and gives up to one more ore per success while charged.",
+          "The Loadsteel Cutter: a second Mining tool that needs Mining 5, mines faster charged or not, and gives one more ore on every successful charged attempt.",
           "Tinkering for the Galvanic Wire Spool, Power Cells (as a pair), the Loadsteel Cutter and the Freight Harness.",
           "A Cut Above, from Tansy at The Jag after Brace Yourself at Fabrication 5 — 500 Fabrication XP.",
           "Cutting Costs, an optional job from Renn in Holo Hollow after Brace Yourself — 500 Credits for a Loadsteel Cutter.",

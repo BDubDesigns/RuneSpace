@@ -361,13 +361,12 @@ export function InventoryPanel({
               <ul className="mt-2 space-y-1 text-sm text-[color:var(--rs-text-secondary)]">
                 {!loadTool ? (
                   <li>Loads into an equipped Mining Cutter</li>
-                ) : loadTool.chargedYieldMaximumBonus > 0 ? (
+                ) : loadTool.chargedEffect.kind === "extra_yield" ? (
                   // What loading does is the equipped tool's own definition (#233).
                   <>
-                    <li>{loadTool.maximumCharge} boosted attempts</li>
-                    <li>Speeds attempt timing</li>
-                    <li>+{loadTool.chargedYieldMaximumBonus} maximum yield per success</li>
-                    <li>Success chance and XP remain unchanged</li>
+                    <li>{loadTool.maximumCharge} charged attempts</li>
+                    <li>+{loadTool.chargedEffect.units} ore per successful attempt</li>
+                    <li>Attempt timing, success chance, and XP remain unchanged</li>
                   </>
                 ) : (
                   <>

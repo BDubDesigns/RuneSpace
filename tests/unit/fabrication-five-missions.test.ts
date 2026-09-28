@@ -20,6 +20,7 @@ import {
 import { resolveNpcConversation, type NpcConversationProjection } from "@/game/domain/conversation";
 import {
   projectMission,
+  uniqueItemRequirementHolds,
   validateMissionDefinitions,
   type MissionObservation,
 } from "@/game/domain/missions";
@@ -89,27 +90,45 @@ describe("A Cut Above", () => {
     expect(A_CUT_ABOVE.offers[0]).not.toHaveProperty("acceptEffect");
   });
 
-  it("counts only a Loadsteel Cutter genuinely fabricated while it is active, and takes nothing", () => {
+  it("only asks to be shown a Loadsteel Cutter — no provenance, no fabrication tracking, nothing taken", () => {
     expect(A_CUT_ABOVE.requirements).toEqual([
       {
-        kind: "tracked_activity",
-        progressKey: "loadsteel-cutter-fabricated",
-        activity: "fabrication",
-        metric: "completions",
-        actionId: ACTION_IDS.loadsteelCutterFabrication,
-        target: 1,
-        objective: "Fabricate a Loadsteel Cutter — {current} / {target}",
-        recommendedActionId: ACTION_IDS.loadsteelCutterFabrication,
+        kind: "carried_unique_item",
+        itemId: ITEM_IDS.loadsteelCutter,
+        turnIn: "show",
+        objective: "Show Tansy a {item}",
       },
     ]);
-    // No hand-in requirement at all: Tansy never consumes the Cutter.
-    expect(A_CUT_ABOVE.requirements.some((each) => each.kind === "carried_unique_item")).toBe(
-      false,
-    );
+    expect(A_CUT_ABOVE.requirements.some((each) => each.kind === "tracked_activity")).toBe(false);
+    expect(A_CUT_ABOVE.reactiveFacts).toBeUndefined();
     expect(A_CUT_ABOVE.turnIn).toMatchObject({
       npcId: NPC_IDS.tansyRusk,
       locationId: LOCATION_IDS.theJag,
+      objective: "Show Tansy a Loadsteel Cutter",
     });
+  });
+
+  it("is shown a Cutter that is carried or equipped, never one left in the Cargo Hold", () => {
+    const [show] = A_CUT_ABOVE.requirements as [
+      Extract<MissionDefinition["requirements"][number], { kind: "carried_unique_item" }>,
+    ];
+    const holds = (carried: number, equipped: boolean) =>
+      uniqueItemRequirementHolds(show, {
+        carriedUniqueItems: new Map([[ITEM_IDS.loadsteelCutter, carried]]),
+        equippedItemIds: new Set(equipped ? [ITEM_IDS.loadsteelCutter] : []),
+      });
+    expect(holds(1, false)).toBe(true);
+    expect(holds(0, true)).toBe(true);
+    // Cargo Hold contents are in neither: nothing is with the character.
+    expect(holds(0, false)).toBe(false);
+    // A hand-in still never reaches the tool in the player's hand.
+    const [handIn] = CUTTING_COSTS.requirements as [typeof show];
+    expect(
+      uniqueItemRequirementHolds(handIn, {
+        carriedUniqueItems: new Map(),
+        equippedItemIds: new Set([ITEM_IDS.loadsteelCutter]),
+      }),
+    ).toBe(false);
   });
 
   it("pays exactly 500 Fabrication XP", () => {
@@ -146,12 +165,8 @@ describe("A Cut Above", () => {
         EXPRESSION_IDS.smile,
         "And if you feed it a Power Cell, it'll pull a little more out of the rock.",
       ],
-      [t, EXPRESSION_IDS.neutral, "Go make one."],
-      [
-        t,
-        EXPRESSION_IDS.neutral,
-        "Bring it back when you're done. I want to see what you can do with higher tier materials.",
-      ],
+      [t, EXPRESSION_IDS.neutral, "Get your hands on one."],
+      [t, EXPRESSION_IDS.neutral, "Bring it by when you've got it. I want to take a look."],
     ]);
   });
 
@@ -168,7 +183,7 @@ describe("A Cut Above", () => {
         EXPRESSION_IDS.neutral,
         "The better you get, the more useful things you'll be able to make.",
       ],
-      [t, EXPRESSION_IDS.smile, "And keep the Cutter. You earned it."],
+      [t, EXPRESSION_IDS.smile, "And keep the Cutter. You'll get more use out of it than I will."],
       ["skill_xp"],
     ]);
     expect(beats(DIALOGUE_IDS.tansyACutAboveCompletion).at(-1)).toMatchObject({
@@ -298,7 +313,7 @@ describe("what each NPC says at each stage", () => {
       stage: {
         requirementsSatisfied: false,
         turnInAvailable: false,
-        nextObjectiveKind: "tracked_activity",
+        nextObjectiveKind: "carried_unique_item",
       },
     });
     expect(reminder).toMatchObject({

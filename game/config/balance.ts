@@ -607,7 +607,8 @@ const balanceSchema = z.object({
     /**
      * The starter Mining tool. Its `equipment` block (#233) is the one home of
      * everything that makes it a Mining tool — see `EquipmentDefinition`. At
-     * 1.00× duration and no charged yield bonus, charge only speeds it up.
+     * 1.00× duration, and charged it takes the global Power Cell speed rule:
+     * a charged Salvage Cutter is faster attempts.
      */
     salvageCutter: z.object({
       itemId: z.literal(ITEM_IDS.salvageCutter),
@@ -617,14 +618,15 @@ const balanceSchema = z.object({
         requiredMiningLevel: z.literal(1),
         maximumCharge: z.literal(10),
         baseDurationMultiplierBps: z.literal(10_000),
-        chargedYieldMaximumBonus: z.literal(0),
+        chargedEffect: z.object({ kind: z.literal("speed") }),
       }),
     }),
     /**
      * The Fabrication 5 Mining tool (#233). A permanent 0.8× base duration,
-     * charged or not; while charged, the shared Power Cell speed rule still
-     * applies on top and the source's maximum yield rises by one. Same ten
-     * charges per Cell as the Salvage Cutter.
+     * charged or not, is its speed. Charged, it does not take the Power Cell
+     * speed rule; instead each successful charged attempt adds one ore to the
+     * source's ordinary yield — a charged Loadsteel Cutter is more ore per
+     * success. Same ten charges per Cell as the Salvage Cutter.
      */
     loadsteelCutter: z.object({
       itemId: z.literal(ITEM_IDS.loadsteelCutter),
@@ -634,7 +636,7 @@ const balanceSchema = z.object({
         requiredMiningLevel: z.literal(5),
         maximumCharge: z.literal(10),
         baseDurationMultiplierBps: z.literal(8_000),
-        chargedYieldMaximumBonus: z.literal(1),
+        chargedEffect: z.object({ kind: z.literal("extra_yield"), units: z.literal(1) }),
       }),
     }),
     powerCell: z.object({
@@ -1076,7 +1078,7 @@ const defaults = balanceSchema.parse({
         requiredMiningLevel: 1,
         maximumCharge: 10,
         baseDurationMultiplierBps: 10_000,
-        chargedYieldMaximumBonus: 0,
+        chargedEffect: { kind: "speed" },
       },
     },
     loadsteelCutter: {
@@ -1087,7 +1089,7 @@ const defaults = balanceSchema.parse({
         requiredMiningLevel: 5,
         maximumCharge: 10,
         baseDurationMultiplierBps: 8_000,
-        chargedYieldMaximumBonus: 1,
+        chargedEffect: { kind: "extra_yield", units: 1 },
       },
     },
     powerCell: { itemId: ITEM_IDS.powerCell, massGrams: 500, stackLimit: 5 },
@@ -1431,9 +1433,22 @@ export type MiningToolDefinition = {
   maximumCharge: number;
   /** Permanent multiplier on a source's attempt duration, charged or not. */
   baseDurationMultiplierBps: number;
-  /** Added to a source's maximum yield while the tool is charged. */
-  chargedYieldMaximumBonus: number;
+  /** What a loaded Power Cell does for this tool, one charge per attempt. */
+  chargedEffect: MiningToolChargedEffect;
 };
+
+/**
+ * A Mining tool's charged identity (#233), deliberately a closed choice: a
+ * charged attempt is either faster, under the one global Power Cell speed
+ * multiplier, or yields extra ore on success. Never both.
+ */
+export type MiningToolChargedEffect =
+  | { kind: "speed" }
+  | {
+      kind: "extra_yield";
+      /** Ore added to a successful charged attempt's ordinarily resolved yield. */
+      units: number;
+    };
 
 export type ContainerDefinition = {
   kind: "container";

@@ -111,23 +111,25 @@ export type MiningResolvedAttempt = {
 
 /**
  * One attempt's duration at one source with one Mining tool (#233), under the
- * shared whole-tick rules. The tool's permanent multiplier applies first,
- * charged or not; while charged, the global Power Cell speed multiplier then
- * applies to that tool duration. The Salvage Cutter's 1.00× leaves every
- * source's authored duration exactly as it was — Ferrite Shale 10, or 5
- * charged; Galvanite 15, or 8 charged — and the Loadsteel Cutter's 0.8× makes
- * them 8 / 4 and 12 / 6. No tool at all means the source's own duration.
+ * shared whole-tick rules. The tool's permanent multiplier applies charged or
+ * not; only a tool whose charged effect is speed then takes the global Power
+ * Cell speed multiplier. The Salvage Cutter's 1.00× leaves every source's
+ * authored duration exactly as it was — Ferrite Shale 10, or 5 charged;
+ * Galvanite 15, or 8 charged. The Loadsteel Cutter's 0.8× makes them 8 and 12,
+ * charged or not, because its charge buys ore rather than speed. No tool named
+ * means the global rule alone.
  */
 export function miningAttemptDurationTicks(
   balance: EffectiveGameBalance,
   source: MiningSourceBalance,
-  tool: Pick<MiningToolDefinition, "baseDurationMultiplierBps"> | undefined,
+  tool: Pick<MiningToolDefinition, "baseDurationMultiplierBps" | "chargedEffect"> | undefined,
   charged: boolean,
 ): number {
   const toolTicks = tool
     ? scaledAttemptDurationTicks(source.attemptDurationTicks, tool.baseDurationMultiplierBps)
     : source.attemptDurationTicks;
-  return charged
+  const faster = charged && (tool === undefined || tool.chargedEffect.kind === "speed");
+  return faster
     ? effectiveAttemptDurationTicks(toolTicks, balance.mining.powerCellBoost.speedMultiplier)
     : toolTicks;
 }
@@ -140,25 +142,35 @@ export function miningAttemptDurationTicks(
 export function boostedMiningAttemptDurationTicks(
   balance: EffectiveGameBalance,
   source: MiningSourceBalance,
-  tool?: Pick<MiningToolDefinition, "baseDurationMultiplierBps">,
+  tool?: Pick<MiningToolDefinition, "baseDurationMultiplierBps" | "chargedEffect">,
 ): number {
   return miningAttemptDurationTicks(balance, source, tool, true);
 }
 
 /**
- * The yield range one successful attempt rolls between (#233). A charged tool
- * may raise the source's maximum; the minimum never changes, and the roll
- * itself is the source's existing one.
+ * The ore a charged tool adds to a successful attempt's ordinarily resolved
+ * yield (#233): the Loadsteel Cutter's one, and nothing for a tool whose
+ * charge buys speed or for an uncharged attempt.
+ */
+export function miningChargedExtraYield(
+  tool: Pick<MiningToolDefinition, "chargedEffect"> | undefined,
+  charged: boolean,
+): number {
+  return charged && tool?.chargedEffect.kind === "extra_yield" ? tool.chargedEffect.units : 0;
+}
+
+/**
+ * The range a successful attempt yields, as players read it (#233): the
+ * source's own 1-or-2 roll, plus any charged extra ore — 2 or 3 for a charged
+ * Loadsteel Cutter at today's sources.
  */
 export function miningYieldRange(
   source: Pick<MiningSourceBalance, "yieldMinimum" | "yieldMaximum">,
-  tool: Pick<MiningToolDefinition, "chargedYieldMaximumBonus"> | undefined,
+  tool: Pick<MiningToolDefinition, "chargedEffect"> | undefined,
   charged: boolean,
 ): { minimum: number; maximum: number } {
-  return {
-    minimum: source.yieldMinimum,
-    maximum: source.yieldMaximum + (charged && tool ? tool.chargedYieldMaximumBonus : 0),
-  };
+  const extra = miningChargedExtraYield(tool, charged);
+  return { minimum: source.yieldMinimum + extra, maximum: source.yieldMaximum + extra };
 }
 
 /** Whether a Mining tool's own level requirement lets this character use it (#233). */
@@ -310,10 +322,7 @@ export function resolveMining<Id>(input: {
       continue;
     }
     const award = miningAwardFacts(balance, source);
-    // The source's own roll between its minimum and maximum; a charged tool may
-    // only raise that maximum (#233).
-    const yieldRange = miningYieldRange(award, tool, boosted);
-    const rolledQuantity = random.nextUnit() < 0.5 ? yieldRange.minimum : yieldRange.maximum;
+    const rolledQuantity = random.nextUnit() < 0.5 ? award.yieldMinimum : award.yieldMaximum;
     let quantity = rolledQuantity;
     let plan = planStackAddition(
       stacks,
@@ -327,7 +336,7 @@ export function resolveMining<Id>(input: {
     // The minimum-fit check authorizes this success. At a final partial stack or
     // mass boundary, retain a valid one-unit yield rather than partially adding a two-unit roll.
     if (plan.remainingQuantity > 0) {
-      quantity = yieldRange.minimum;
+      quantity = award.yieldMinimum;
       plan = planStackAddition(
         stacks,
         award.itemId,
@@ -337,6 +346,25 @@ export function resolveMining<Id>(input: {
         massAvailableGrams,
         award.massGrams,
       );
+    }
+    // A charged tool's extra ore comes on top of that ordinarily resolved yield
+    // (#233), and only when it fits too: no room for the bonus keeps the
+    // ordinary result rather than falling back any further.
+    const extra = miningChargedExtraYield(tool, boosted);
+    if (extra > 0) {
+      const withExtra = planStackAddition(
+        stacks,
+        award.itemId,
+        quantity + extra,
+        award.stackLimit,
+        slotsAvailable,
+        massAvailableGrams,
+        award.massGrams,
+      );
+      if (withExtra.remainingQuantity === 0) {
+        quantity += extra;
+        plan = withExtra;
+      }
     }
     for (const update of plan.updatedStacks) {
       const stack = stacks.find((candidate) => candidate.id === update.id);

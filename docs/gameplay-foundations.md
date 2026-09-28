@@ -56,25 +56,30 @@ resolved attempt awards is recovered from the durable action ID.
 | Galvanite | Deep Jag, once braced | 15 | 35% at 1 → 100% at 40 | 1–2 | 25 |
 
 **The Mining tool is authored too (#233).** Whichever Cutter is in the one
-Mining-tool slot supplies its own requirement, charge ceiling and effects
-through the equipment-definition boundary (see "Inventory and equipment"); the
-Power Cell speed multiplier stays one global Mining rule applied on top of the
-tool's own base duration, under the same whole-tick rounding.
+Mining-tool slot supplies its own requirement, charge ceiling, permanent
+duration multiplier and **charged effect** through the equipment-definition
+boundary (see "Inventory and equipment"). A charged effect is one of two closed
+identities: `speed` — the one global Power Cell speed multiplier, applied to the
+tool's duration under the same whole-tick rounding — or `extra_yield` — ore
+added to each successful charged attempt. Never both.
 
-| Tool | Requires | Base duration | Charged | Charge | Charged yield |
+| Tool | Requires | Duration, uncharged | Duration, charged | Charge | Charged success |
 | --- | --- | --- | --- | --- | --- |
-| Salvage Cutter | Mining 1 | 1.00× — Ferrite 10, Galvanite 15 ticks | ÷2 — 5 / 8 ticks | 10 per Cell | unchanged |
-| Loadsteel Cutter | Mining 5 | 0.8×, charged or not — 8 / 12 ticks | ÷2 — 4 / 6 ticks | 10 per Cell | maximum +1 |
+| Salvage Cutter | Mining 1 | 1.00× — Ferrite 10, Galvanite 15 ticks | `speed`: ÷2 — 5 / 8 ticks | 10 per Cell | ordinary 1–2 |
+| Loadsteel Cutter | Mining 5 | 0.8× — 8 / 12 ticks | unchanged — 8 / 12 ticks | 10 per Cell | `extra_yield`: ordinary roll +1 — 2–3 |
 
-A charged attempt consumes one charge whether it succeeds or fails, and one
-Cell still funds ten charged attempts. The Salvage Cutter's charge changes
-neither success chance, XP nor yield. The Loadsteel Cutter's charge also raises
-the source's **maximum** yield by one — Ferrite Shale and Galvanite roll 1–3
-instead of 1–2 — through the source's existing roll, which picks the minimum or
-the maximum; the minimum, success chance and XP are unchanged. Depleted, a
-Loadsteel Cutter keeps its permanent 0.8× and loses only the charged speed and
-the yield bonus. Below its Mining 5 requirement a Loadsteel Cutter can neither
-be equipped nor used: Mining treats it as no usable tool.
+A charged Salvage Cutter is faster attempts (better Mining XP per hour); a
+charged Loadsteel Cutter is more ore per successful attempt (better ore and
+Power Cell efficiency). A charged attempt consumes one charge whether it
+succeeds or fails, and one Cell still funds ten charged attempts. Neither tool's
+charge changes success chance or the XP an attempt pays. The Loadsteel Cutter's
+extra ore comes after the source's ordinary successful yield has resolved under
+the existing roll and fit rules (1 or 2, falling back to the minimum at a full
+stack or mass boundary), and is added only if that extra unit fits too — no
+room for the bonus keeps the ordinary result rather than falling back any
+further. Depleted, a Loadsteel Cutter keeps its permanent 0.8× and loses only
+the extra ore. Below its Mining 5 requirement a Loadsteel Cutter can neither be
+equipped nor used: Mining treats it as no usable tool.
 
 ### Ferrite Shale
 
@@ -789,7 +794,7 @@ kinds, not an item-effect language:
 
 | Kind | Fits | Authors | Items |
 | --- | --- | --- | --- |
-| `mining_tool` | the one `mining_tool` gear slot | Mining level to equip and use, maximum charge, base-duration multiplier, charged maximum-yield bonus | Salvage Cutter, Loadsteel Cutter |
+| `mining_tool` | the one `mining_tool` gear slot | Mining level to equip and use, maximum charge, base-duration multiplier, charged effect (`speed` or `extra_yield`) | Salvage Cutter, Loadsteel Cutter |
 | `container` | either container attachment slot | Inventory slots contributed | MYKEA SCHLEPPRAUM-8 (8), Scrap Box (3), Freight Harness (6) |
 
 The suit's slots are authored once in `balance.carrying` (one Mining-tool slot,
@@ -1418,9 +1423,10 @@ server-side even against a stale or manipulated client.
 
 This section was written for the Salvage Cutter and holds unchanged for it.
 Since #233 it applies to whichever Mining tool is equipped, each against its own
-authored definition (see "Equipment definitions" and the Mining slice): the
-Loadsteel Cutter's charged attempt applies the same global 2× to its own 0.8×
-base duration and adds its charged yield bonus.
+authored definition (see "Equipment definitions" and the Mining slice): loading
+and charge consumption are identical for both Cutters, but only a `speed` tool —
+the Salvage Cutter — takes the 2× below. A charged Loadsteel Cutter keeps its
+0.8× duration and adds one ore to each successful attempt instead.
 
 - A loose `power_cell` is a 500 g fungible stack item with a stack limit of five.
   Issue #47's DeWhat? Emergency Power Annex is the renewable source; there are no
@@ -1436,7 +1442,8 @@ base duration and adds its charged yield bonus.
   `ceil(toolAttemptTicks / 2)` (currently 5 ticks / 3 seconds with the Salvage
   Cutter at Ferrite Shale). For the Salvage Cutter the boost changes timing only:
   success chance, random rolls, yield, XP, inventory planning, and progression are
-  unchanged. A Loadsteel Cutter's charge also raises the maximum yield by one.
+  unchanged. A Loadsteel Cutter's charge changes no timing; it adds one ore to
+  each successful attempt's ordinary yield when that ore fits.
 - Every resolved boosted success or failure consumes exactly one charge. A
   preflight stop consumes no charge. When the tenth boosted attempt reaches zero,
   the same Mining action continues automatically at its normal 10-tick duration.

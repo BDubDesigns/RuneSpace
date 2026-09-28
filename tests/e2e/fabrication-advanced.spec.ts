@@ -194,6 +194,16 @@ async function playToAction(
   return action;
 }
 
+/** A tile shows the item's committed artwork — loaded, not initials (#233). */
+async function expectArtwork(tile: import("@playwright/test").Locator, file: string) {
+  const art = tile.locator(`[data-testid="item-artwork"][src*="${file}"]`).first();
+  await art.scrollIntoViewIfNeeded();
+  await expect(art).toBeVisible();
+  await expect
+    .poll(() => art.evaluate((img: HTMLImageElement) => img.complete && img.naturalWidth > 0))
+    .toBe(true);
+}
+
 async function openStation(page: import("@playwright/test").Page) {
   await page.locator('[data-work-area="fabrication"]').click();
   const station = page.locator("[data-fabrication-station]");
@@ -239,6 +249,14 @@ test("Fabrication 5 and 8: recipes by level, the x2 Cell batch, and advanced Tin
   await expect(
     recipes.locator(`[data-fabricate-recipe="${ACTION_IDS.freightHarnessFabrication}"]`),
   ).toHaveCount(0);
+  await expectArtwork(
+    recipes.locator(`[data-fabricate-recipe="${ACTION_IDS.galvanicWireSpoolFabrication}"]`),
+    "galvanic-wire-spool.webp",
+  );
+  await expectArtwork(
+    recipes.locator(`[data-fabricate-recipe="${ACTION_IDS.loadsteelCutterFabrication}"]`),
+    "loadsteel-cutter.webp",
+  );
   await station.locator('[data-station-mode-select="recipes"]').click();
   const catalog = station.locator("[data-fabrication-recipes-catalog]");
   await expect(catalog.locator("[data-recipes-catalog-entry]")).toHaveCount(8);
@@ -319,12 +337,19 @@ test("Fabrication 5 and 8: recipes by level, the x2 Cell batch, and advanced Tin
   await expect(
     station.locator("[data-fabrication-recipes-catalog]").locator("[data-recipes-catalog-entry]"),
   ).toHaveCount(9);
+  // The Recipes view is what is on screen now.
+  await expectArtwork(
+    station
+      .locator("[data-fabrication-recipes-catalog]")
+      .locator(`[data-recipes-catalog-entry="${ACTION_IDS.freightHarnessFabrication}"]`),
+    "freight-harness.webp",
+  );
   await station.locator('[data-station-mode-select="tinker"]').click();
-  await expect(
-    page
-      .locator("[data-tinker-mode]")
-      .locator(`[data-tinker-target="${ACTION_IDS.freightHarnessTinkering}"]`),
-  ).toContainText("1 Freight Harness → 3 Scrap Metal");
+  const harnessTarget = page
+    .locator("[data-tinker-mode]")
+    .locator(`[data-tinker-target="${ACTION_IDS.freightHarnessTinkering}"]`);
+  await expect(harnessTarget).toContainText("1 Freight Harness → 3 Scrap Metal");
+  await expectArtwork(harnessTarget, "freight-harness.webp");
   await expectNoHorizontalOverflow(page);
   await captureReviewScreenshot(page, "fabrication-advanced-tinker-desktop.png");
 });
@@ -367,27 +392,38 @@ test("the Loadsteel Cutter: Mining 5 to equip, its own charge, and Mining with b
   await expect(tool).toContainText(
     "Normal attempt: 8 ticks / 4.8 seconds (0.8× base time, charged or not)",
   );
-  await expect(tool).toContainText("Boosted attempt: 4 ticks / 2.4 seconds");
-  await expect(tool).toContainText("While charged: +1 maximum yield per success");
+  // Its charge buys ore, not the Salvage Cutter's faster attempts.
+  await expect(tool).not.toContainText("Boosted attempt:");
+  await expect(tool).toContainText(
+    "While charged: +1 ore per successful attempt · attempt time unchanged",
+  );
+  await expectArtwork(
+    equipment.getByRole("region", { name: "Mining tool" }),
+    "loadsteel-cutter.webp",
+  );
   await tool.getByRole("button", { name: "Load Power Cell" }).click();
   await expect(tool.getByText("Loaded · 10 / 10", { exact: true })).toBeVisible();
   await expectNoHorizontalOverflow(page);
   await captureReviewScreenshot(page, "loadsteel-equipment-phone.png");
   await equipment.getByRole("button", { name: "Close equipment" }).click();
 
-  // Mining with it: the tool's own effects, and 4-tick charged attempts.
+  // Mining with it: the tool's own effects, 8-tick attempts charged or not,
+  // and one more ore on the ordinary roll.
   const effects = page.locator(`[data-mining-tool-effects="${ITEM_IDS.loadsteelCutter}"]`);
   await expect(effects).toHaveText(
-    "Loadsteel Cutter · 0.8× attempt time, charged or not · charged successes yield 1–3 Ferrite Shale",
+    "Loadsteel Cutter · 0.8× attempt time, charged or not · charged successes yield 2–3 Ferrite Shale",
   );
   await expect(page.getByText("POWER CELL BOOST · 10 / 10")).toBeVisible();
+  await expect(page.getByText("Next attempt: 8 ticks")).toBeVisible();
   await page.getByRole("button", { name: "Start Mining" }).click();
-  await fastForward(characterId, 2_500);
+  await fastForward(characterId, 5_000);
   await page.getByRole("button", { name: "Refresh status" }).click();
   const latest = page.getByRole("region", { name: "Latest mining attempt" });
   await expect(latest).toContainText(
-    "Power Cell boosted · 4 ticks · Power Cell charge consumed · 9 / 10 remaining",
+    "Power Cell boosted · 8 ticks · Power Cell charge consumed · 9 / 10 remaining",
   );
+  // The deterministic browser roll is the low side: 1 ore, plus the one.
+  await expect(latest.getByLabel("2 Ferrite Shale earned")).toBeVisible();
   await expect(page.getByText(/POWER CELL BOOST · 9 \/ 10/)).toBeVisible();
   await page.getByRole("button", { name: "Stop Mining" }).click();
   await expectNoHorizontalOverflow(page);
@@ -420,7 +456,8 @@ test("the Loadsteel Cutter: Mining 5 to equip, its own charge, and Mining with b
   const details = inventory.getByRole("region", { name: "Loadsteel Cutter details" });
   await expect(details.locator('[data-stat="required-mining-level"]')).toContainText("Mining 5");
   await expect(details.locator('[data-stat="mining-time"]')).toContainText("0.8×");
-  await expect(details.locator('[data-stat="charged-yield"]')).toContainText("+1 maximum yield");
+  await expect(details.locator('[data-stat="charged-yield"]')).toContainText("+1 ore per success");
+  await expectArtwork(tile, "loadsteel-cutter.webp");
   await expect(details.getByText("9 of 10 charges remaining").first()).toBeVisible();
   await expectNoHorizontalOverflow(page);
   await page.setViewportSize(DESKTOP);
@@ -444,9 +481,11 @@ test("the Freight Harness equips as a container for six more Inventory slots", a
   await expect(equipment.getByText("8 slots", { exact: true })).toBeVisible();
   const second = equipment.getByRole("region", { name: "Container attachment 2" });
   await expect(second).toContainText("+6 Inventory slots");
+  await expectArtwork(second, "freight-harness.webp");
   await second.getByRole("button", { name: "Equip in Container attachment 2" }).click();
   await expect(equipment.getByText("14 slots", { exact: true })).toBeVisible();
   await expect(second).toContainText("Freight Harness");
+  await expectArtwork(second, "freight-harness.webp");
   await expectNoHorizontalOverflow(page);
   await captureReviewScreenshot(page, "freight-harness-equipment-desktop.png");
   await page.setViewportSize(PHONE);
@@ -459,7 +498,7 @@ test("the Freight Harness equips as a container for six more Inventory slots", a
   ).toBeVisible();
 });
 
-test("A Cut Above: Tansy's lesson, one Loadsteel Cutter made, and the Cutter kept", async ({
+test("A Cut Above: show Tansy the Loadsteel Cutter in your hand, and keep it", async ({
   page,
   testCharacter,
 }) => {
@@ -467,8 +506,16 @@ test("A Cut Above: Tansy's lesson, one Loadsteel Cutter made, and the Cutter kep
   const characterId = testCharacter.id;
   await page.setViewportSize(PHONE);
   await completeThroughBrace(characterId);
-  await equipStarterCutter(characterId);
   await setLevel(characterId, SKILL_IDS.fabrication, 5);
+  await setLevel(characterId, SKILL_IDS.mining, 5);
+  // Owned before the job and not made by this player: it is already equipped.
+  const cutter = await addInstance(characterId, ITEM_IDS.loadsteelCutter, 3);
+  await db.insert(equippedItems).values({
+    characterId,
+    assignmentKind: "gear",
+    suitSlotId: balance.carrying.miningToolSuitSlotId,
+    itemInstanceId: cutter.id,
+  });
   await standAt(characterId, LOCATION_IDS.theJag);
   await openTestCharacter(page, characterId);
   await page.emulateMedia({ reducedMotion: "reduce" });
@@ -479,43 +526,15 @@ test("A Cut Above: Tansy's lesson, one Loadsteel Cutter made, and the Cutter kep
   await offerEntry.click();
   await playToDialogueText(offer, /starting to trust you/);
   await playToDialogueText(offer, /Better frame\. Better drive\./);
-  await playToDialogueText(offer, /higher tier materials/);
+  await playToDialogueText(offer, /Get your hands on one\./);
+  await playToDialogueText(offer, /Bring it by when you've got it\. I want to take a look\./);
   await expectNoHorizontalOverflow(page);
   await (await playToAction(offer, "TAKE THE JOB")).click();
   await page.keyboard.press("Escape");
+  // The Cutter in hand satisfies the objective at once: no trip to the station.
   await expect(page.locator("[data-mission-strip-objective]").first()).toContainText(
-    "Fabricate a Loadsteel Cutter — 0 / 1",
+    "Show Tansy a Loadsteel Cutter",
   );
-
-  // Make one, at the station in Wade's yard.
-  await give(characterId, ITEM_IDS.galvaferrite, 2);
-  await give(characterId, ITEM_IDS.galvanicWireSpool, 1);
-  await give(characterId, ITEM_IDS.powerCell, 1);
-  await standAt(characterId, LOCATION_IDS.ruskRecovery);
-  await page.reload();
-  const station = await openStation(page);
-  const cutterTile = station.locator(
-    `[data-fabricate-recipe="${ACTION_IDS.loadsteelCutterFabrication}"]`,
-  );
-  await expect(cutterTile.locator('[data-mission-guidance="active"]')).toHaveCount(1);
-  await expect(
-    station.locator(`[data-fabricate-selected="${ACTION_IDS.loadsteelCutterFabrication}"]`),
-  ).toBeVisible();
-  await station.locator("[data-fabricate-start]").click();
-  await expect(station.locator("[data-live-workpiece]")).toContainText("Loadsteel Cutter");
-  // Back after the timer: the workpiece resolves at the station, then the
-  // player walks to The Jag.
-  await fastForward(characterId, 28_000);
-  await page.reload();
-  await expect(page.locator("[data-live-workpiece]")).toHaveCount(0);
-  await standAt(characterId, LOCATION_IDS.theJag);
-  await page.reload();
-  await expect(page.locator("[data-mission-strip-objective]").first()).toContainText(
-    "Show Tansy Rusk the Loadsteel Cutter at The Jag",
-  );
-  const made = await instancesOf(characterId, ITEM_IDS.loadsteelCutter);
-  expect(made).toHaveLength(1);
-  expect(made[0]!.currentCharge).toBe(0);
 
   const xpBefore = await skillXp(characterId, SKILL_IDS.fabrication);
   const turnIn = await openNpcConversation(page, "Tansy Rusk");
@@ -523,12 +542,17 @@ test("A Cut Above: Tansy's lesson, one Loadsteel Cutter made, and the Cutter kep
   await playToDialogueText(turnIn, /There it is\./);
   await (await playToAction(turnIn, "SHOW HER THE CUTTER")).click();
   await playToDialogueText(turnIn, /Keep checking that recipe list/);
-  await playToDialogueText(turnIn, /And keep the Cutter\. You earned it\./);
+  await playToDialogueText(
+    turnIn,
+    /And keep the Cutter\. You'll get more use out of it than I will\./,
+  );
   await expectNoHorizontalOverflow(page);
   await captureReviewScreenshot(page, "a-cut-above-turn-in-phone.png");
   await page.keyboard.press("Escape");
   expect((await skillXp(characterId, SKILL_IDS.fabrication)) - xpBefore).toBe(500);
-  expect(await instancesOf(characterId, ITEM_IDS.loadsteelCutter)).toHaveLength(1);
+  // Kept, still equipped, charge untouched.
+  const kept = await instancesOf(characterId, ITEM_IDS.loadsteelCutter);
+  expect(kept.map((row) => [row.id, row.currentCharge])).toEqual([[cutter.id, 3]]);
 });
 
 test("Cutting Costs: Renn buys any Loadsteel Cutter for 500 Credits", async ({

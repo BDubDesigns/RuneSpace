@@ -16,6 +16,7 @@ import {
 import {
   boostedMiningAttemptDurationTicks,
   miningAttemptDurationTicks,
+  miningChargedExtraYield,
   miningSuccessChanceBps,
   miningYieldRange,
   normalizeCutterCharge,
@@ -29,10 +30,11 @@ import { scaledAttemptDurationTicks } from "@/game/domain/timing";
  * The equipment-definition boundary and the Loadsteel Cutter's Mining (#233).
  *
  * Every Mining tool and every container resolves through one authored
- * boundary; the Salvage Cutter's behaviour is exactly what it was; and the
- * Loadsteel Cutter's permanent 0.8×, the shared charged 2× on top of it, its
- * +1 charged maximum yield, its ten-attempt Cell and its Mining 5 requirement
- * hold at both sources.
+ * boundary; the Salvage Cutter's behaviour is exactly what it was — charged, it
+ * is faster; and the Loadsteel Cutter's identity holds at both sources: a
+ * permanent 0.8× that charge does not speed up any further, +1 ore on each
+ * charged success on top of the ordinary roll (and only when it fits), a
+ * ten-attempt Cell, and its Mining 5 requirement.
  */
 
 const balance = getEffectiveGameBalance();
@@ -81,7 +83,7 @@ describe("the canonical equipment-definition boundary", () => {
       requiredMiningLevel: 1,
       maximumCharge: 10,
       baseDurationMultiplierBps: 10_000,
-      chargedYieldMaximumBonus: 0,
+      chargedEffect: { kind: "speed" },
     });
   });
 
@@ -94,7 +96,7 @@ describe("the canonical equipment-definition boundary", () => {
       requiredMiningLevel: 5,
       maximumCharge: 10,
       baseDurationMultiplierBps: 8_000,
-      chargedYieldMaximumBonus: 1,
+      chargedEffect: { kind: "extra_yield", units: 1 },
     });
     expect(getItemMaximumCharge(ITEM_IDS.loadsteelCutter, balance)).toBe(10);
     expect(getItemMaximumCharge(ITEM_IDS.scrapBox, balance)).toBeUndefined();
@@ -236,15 +238,16 @@ describe("Mining durations under the shared whole-tick rules", () => {
     expect(miningAttemptDurationTicks(balance, galvanite, salvage, true)).toBe(8);
     expect(boostedMiningAttemptDurationTicks(balance, ferrite)).toBe(5);
     expect(boostedMiningAttemptDurationTicks(balance, galvanite)).toBe(8);
+    expect(balance.mining.powerCellBoost.speedMultiplier).toBe(2);
   });
 
-  it("makes the Loadsteel Cutter 8 / 4 at Ferrite Shale and 12 / 6 at Galvanite", () => {
+  it("makes the Loadsteel Cutter 8 at Ferrite Shale and 12 at Galvanite, charged or not", () => {
     expect(miningAttemptDurationTicks(balance, ferrite, loadsteel, false)).toBe(8);
-    expect(miningAttemptDurationTicks(balance, ferrite, loadsteel, true)).toBe(4);
+    expect(miningAttemptDurationTicks(balance, ferrite, loadsteel, true)).toBe(8);
     expect(miningAttemptDurationTicks(balance, galvanite, loadsteel, false)).toBe(12);
-    expect(miningAttemptDurationTicks(balance, galvanite, loadsteel, true)).toBe(6);
-    // The global charged rule is the shared 2×, applied on top — not replaced.
-    expect(balance.mining.powerCellBoost.speedMultiplier).toBe(2);
+    expect(miningAttemptDurationTicks(balance, galvanite, loadsteel, true)).toBe(12);
+    // Its charge buys ore, never the Salvage Cutter's 2× speed.
+    expect(boostedMiningAttemptDurationTicks(balance, ferrite, loadsteel)).toBe(8);
   });
 });
 
@@ -252,55 +255,47 @@ describe("Loadsteel Mining resolution", () => {
   it.each([
     ["Ferrite Shale", ferrite, 8],
     ["Galvanite", galvanite, 12],
-  ] as const)("resolves an uncharged %s attempt in %i ticks", (_, source, ticks) => {
-    const early = resolveMining({
-      elapsedTicks: ticks - 1,
-      snapshot: ready,
-      balance,
-      source,
-      random: rolls([0]),
-    });
-    expect(early.attempts).toHaveLength(0);
-    const done = resolveMining({
-      elapsedTicks: ticks,
-      snapshot: ready,
-      balance,
-      source,
-      random: rolls([0]),
-    });
-    expect(done.attempts).toEqual([
-      expect.objectContaining({ boosted: false, durationTicks: ticks }),
-    ]);
-    expect(done.remainingCutterCharge).toBe(0);
-  });
-
-  it.each([
-    ["Ferrite Shale", ferrite, 4],
-    ["Galvanite", galvanite, 6],
-  ] as const)("resolves a charged %s attempt in %i ticks", (_, source, ticks) => {
-    const done = resolveMining({
-      elapsedTicks: ticks,
-      snapshot: { ...ready, cutterCharge: 10 },
-      balance,
-      source,
-      random: rolls([0]),
-    });
-    expect(done.attempts).toEqual([
-      expect.objectContaining({ boosted: true, durationTicks: ticks, chargeConsumed: true }),
-    ]);
-    expect(done.remainingCutterCharge).toBe(9);
-  });
+  ] as const)(
+    "resolves a %s attempt in %i ticks, uncharged and charged alike",
+    (_, source, ticks) => {
+      for (const cutterCharge of [0, 10]) {
+        const early = resolveMining({
+          elapsedTicks: ticks - 1,
+          snapshot: { ...ready, cutterCharge },
+          balance,
+          source,
+          random: rolls([0]),
+        });
+        expect(early.attempts).toHaveLength(0);
+        const done = resolveMining({
+          elapsedTicks: ticks,
+          snapshot: { ...ready, cutterCharge },
+          balance,
+          source,
+          random: rolls([0]),
+        });
+        expect(done.attempts).toEqual([
+          expect.objectContaining({
+            boosted: cutterCharge > 0,
+            durationTicks: ticks,
+            chargeConsumed: cutterCharge > 0,
+          }),
+        ]);
+        expect(done.remainingCutterCharge).toBe(Math.max(0, cutterCharge - 1));
+      }
+    },
+  );
 
   it("consumes exactly one charge on a charged success and on a charged failure", () => {
     const success = resolveMining({
-      elapsedTicks: 4,
+      elapsedTicks: 8,
       snapshot: { ...ready, cutterCharge: 3 },
       balance,
       source: ferrite,
       random: rolls([0]),
     });
     const failure = resolveMining({
-      elapsedTicks: 4,
+      elapsedTicks: 8,
       snapshot: { ...ready, cutterCharge: 3 },
       balance,
       source: ferrite,
@@ -310,51 +305,58 @@ describe("Loadsteel Mining resolution", () => {
     expect(failure).toMatchObject({ failures: 1, remainingCutterCharge: 2 });
   });
 
-  it("gives ten charged attempts from one Cell's ten charge, then continues uncharged at 0.8×", () => {
+  it("gives ten charged attempts from one Cell's ten charge, all at 8 ticks", () => {
     expect(normalizeCutterCharge(10, loadsteel)).toBe(10);
     expect(() => normalizeCutterCharge(11, loadsteel)).toThrow(RangeError);
     const run = resolveMining({
-      elapsedTicks: 10 * 4 + 8,
+      elapsedTicks: 11 * 8,
       snapshot: { ...ready, cutterCharge: 10, massAvailableGrams: 100_000, slotsAvailable: 20 },
       balance,
       source: ferrite,
       random: rolls(Array(11).fill(9_999)),
     });
-    expect(run.attempts.map((attempt) => attempt.durationTicks)).toEqual([...Array(10).fill(4), 8]);
+    expect(run.attempts.map((attempt) => attempt.durationTicks)).toEqual(Array(11).fill(8));
     expect(run.attempts.filter((attempt) => attempt.chargeConsumed)).toHaveLength(10);
     expect(run.remainingCutterCharge).toBe(0);
-    expect(run.consumedTicks).toBe(48);
+    expect(run.consumedTicks).toBe(88);
   });
 
-  it("raises only the maximum yield by one while charged: 1–3 at a 1–2 source", () => {
-    expect(miningYieldRange(ferrite, loadsteel, true)).toEqual({ minimum: 1, maximum: 3 });
+  it("adds exactly one ore to the ordinary 1-or-2 roll on a charged success: 2 or 3", () => {
+    expect(miningChargedExtraYield(loadsteel, true)).toBe(1);
+    expect(miningChargedExtraYield(loadsteel, false)).toBe(0);
+    expect(miningChargedExtraYield(salvage, true)).toBe(0);
+    expect(miningYieldRange(ferrite, loadsteel, true)).toEqual({ minimum: 2, maximum: 3 });
+    expect(miningYieldRange(galvanite, loadsteel, true)).toEqual({ minimum: 2, maximum: 3 });
     expect(miningYieldRange(ferrite, loadsteel, false)).toEqual({ minimum: 1, maximum: 2 });
-    expect(miningYieldRange(galvanite, loadsteel, true)).toEqual({ minimum: 1, maximum: 3 });
     expect(miningYieldRange(ferrite, salvage, true)).toEqual({ minimum: 1, maximum: 2 });
 
-    // The source's own roll: the low side is still the minimum, the high side
-    // is the raised maximum.
-    const high = resolveMining({
-      elapsedTicks: 4,
+    const resolve = (unit: number) =>
+      resolveMining({
+        elapsedTicks: 8,
+        snapshot: { ...ready, cutterCharge: 1 },
+        balance,
+        source: ferrite,
+        random: rolls([0], [unit]),
+      }).attempts[0];
+    // The source's own roll resolves first, then the tool adds its one.
+    expect(resolve(0)).toMatchObject({ success: true, quantityAwarded: 2, xpAwarded: 15 });
+    expect(resolve(0.5)).toMatchObject({ success: true, quantityAwarded: 3, xpAwarded: 15 });
+  });
+
+  it("adds nothing to a charged failure", () => {
+    const failed = resolveMining({
+      elapsedTicks: 8,
       snapshot: { ...ready, cutterCharge: 1 },
       balance,
       source: ferrite,
-      random: rolls([0], [0.5]),
+      random: rolls([9_999], [0.5]),
     });
-    expect(high.attempts[0]).toMatchObject({ success: true, quantityAwarded: 3, xpAwarded: 15 });
-    const low = resolveMining({
-      elapsedTicks: 4,
-      snapshot: { ...ready, cutterCharge: 1 },
-      balance,
-      source: ferrite,
-      random: rolls([0], [0]),
-    });
-    expect(low.attempts[0]).toMatchObject({ success: true, quantityAwarded: 1, xpAwarded: 15 });
+    expect(failed.attempts[0]).toMatchObject({ success: false, quantityAwarded: 0 });
   });
 
   it("changes neither the success chance nor the XP", () => {
     const charged = resolveMining({
-      elapsedTicks: 6,
+      elapsedTicks: 12,
       snapshot: { ...ready, cutterCharge: 1 },
       balance,
       source: galvanite,
@@ -368,7 +370,7 @@ describe("Loadsteel Mining resolution", () => {
     expect(charged.awardedXp).toBe(25);
   });
 
-  it("keeps the 0.8× once depleted, but loses the charged speed and the yield bonus", () => {
+  it("keeps the 0.8× once depleted and loses only the extra ore", () => {
     const depleted = resolveMining({
       elapsedTicks: 8,
       snapshot: { ...ready, cutterCharge: 0 },
@@ -384,20 +386,40 @@ describe("Loadsteel Mining resolution", () => {
     });
   });
 
-  it("falls back to the minimum at a stack or mass boundary, exactly as before", () => {
-    const tight = resolveMining({
-      elapsedTicks: 4,
-      snapshot: {
-        ...ready,
-        cutterCharge: 1,
-        existingStacks: [{ id: "f", itemId: ITEM_IDS.ferriteShale, quantity: 8 }],
-        slotsAvailable: 0,
-      },
+  it("keeps the ordinary fitted yield when the extra ore will not fit", () => {
+    const tight = (existing: number, unit: number) =>
+      resolveMining({
+        elapsedTicks: 8,
+        snapshot: {
+          ...ready,
+          cutterCharge: 1,
+          existingStacks: [{ id: "f", itemId: ITEM_IDS.ferriteShale, quantity: existing }],
+          slotsAvailable: 0,
+        },
+        balance,
+        source: ferrite,
+        random: rolls([0], [unit]),
+      }).attempts[0];
+    // 8 carried of 10: the rolled 2 fits and stays 2; only the bonus is lost.
+    expect(tight(8, 0.5)).toMatchObject({
+      success: true,
+      quantityAwarded: 2,
+      chargeConsumed: true,
+    });
+    // A rolled 1 with room for 2 still gets its bonus.
+    expect(tight(8, 0)).toMatchObject({ success: true, quantityAwarded: 2 });
+    // 9 carried: the rolled 2 falls back to 1 exactly as before, and no bonus fits.
+    expect(tight(9, 0.5)).toMatchObject({ success: true, quantityAwarded: 1 });
+
+    // The same boundary by mass: room for exactly two more ore.
+    const byMass = resolveMining({
+      elapsedTicks: 8,
+      snapshot: { ...ready, cutterCharge: 1, massAvailableGrams: 200 },
       balance,
       source: ferrite,
       random: rolls([0], [0.5]),
-    });
-    expect(tight.attempts[0]).toMatchObject({ success: true, quantityAwarded: 1 });
+    }).attempts[0];
+    expect(byMass).toMatchObject({ success: true, quantityAwarded: 2 });
   });
 
   it("refuses to mine with a Loadsteel Cutter below Mining 5, charged or not", () => {
@@ -416,7 +438,7 @@ describe("Loadsteel Mining resolution", () => {
     });
   });
 
-  it("uses exactly the tool it is given: the Salvage Cutter gains no Loadsteel effect", () => {
+  it("uses exactly the tool it is given: a charged Salvage Cutter is faster, never richer", () => {
     const salvageRun = resolveMining({
       elapsedTicks: 5,
       snapshot: { ...ready, tool: salvage, cutterCharge: 1 },
@@ -424,6 +446,10 @@ describe("Loadsteel Mining resolution", () => {
       source: ferrite,
       random: rolls([0], [0.5]),
     });
-    expect(salvageRun.attempts[0]).toMatchObject({ durationTicks: 5, quantityAwarded: 2 });
+    expect(salvageRun.attempts[0]).toMatchObject({
+      boosted: true,
+      durationTicks: 5,
+      quantityAwarded: 2,
+    });
   });
 });

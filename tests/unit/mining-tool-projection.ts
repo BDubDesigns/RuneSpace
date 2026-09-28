@@ -25,7 +25,7 @@ export function miningToolProjection(
     requiredMiningLevel: tool.requiredMiningLevel,
     usable: miningLevel >= tool.requiredMiningLevel,
     baseDurationMultiplierBps: tool.baseDurationMultiplierBps,
-    chargedYieldMaximumBonus: tool.chargedYieldMaximumBonus,
+    chargedEffect: tool.chargedEffect,
     attemptDurationTicks: miningAttemptDurationTicks(balance, source, tool, false),
     boostedAttemptDurationTicks: miningAttemptDurationTicks(balance, source, tool, true),
   };

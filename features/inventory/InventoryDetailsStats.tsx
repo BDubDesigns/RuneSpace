@@ -80,11 +80,11 @@ export function InventoryDetailsStats({ selection }: { selection: ResolvedInvent
           value={`${equipment.baseDurationMultiplierBps / 10_000}×, charged or not`}
         />
       ) : null}
-      {equipment?.kind === "mining_tool" && equipment.chargedYieldMaximumBonus > 0 ? (
+      {equipment?.kind === "mining_tool" && equipment.chargedEffect.kind === "extra_yield" ? (
         <StatRow
           dataStat="charged-yield"
           label="While charged"
-          value={`+${equipment.chargedYieldMaximumBonus} maximum yield`}
+          value={`+${equipment.chargedEffect.units} ore per success`}
         />
       ) : null}
     </>

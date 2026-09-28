@@ -22,6 +22,7 @@ import {
   getItemDefinition,
   getMiningToolDefinition,
   getRepairTargetBalance,
+  type MiningToolChargedEffect,
   fabricationRecipeForActionId,
   fabricationRecipes,
   miningActionIds,
@@ -510,7 +511,8 @@ export type MiningSourceProjection = {
   successXp: number;
   yieldMinimum: number;
   yieldMaximum: number;
-  /** The maximum yield of a charged attempt with the equipped tool (#233). */
+  /** A charged success's yield with the equipped tool: its ordinary range plus any extra ore (#233). */
+  chargedYieldMinimum: number;
   chargedYieldMaximum: number;
 };
 
@@ -525,8 +527,8 @@ export type EquippedMiningToolProjection = {
   usable: boolean;
   /** Permanent base-duration multiplier, in basis points (10,000 is 1.00×). */
   baseDurationMultiplierBps: number;
-  /** Added to the source's maximum yield while charged. */
-  chargedYieldMaximumBonus: number;
+  /** What a loaded Power Cell does for this tool: speed, or extra ore per success. */
+  chargedEffect: MiningToolChargedEffect;
   /** Uncharged and charged attempts at the source in reach, or its baseline source. */
   attemptDurationTicks: number;
   boostedAttemptDurationTicks: number;
@@ -2145,11 +2147,10 @@ export async function stateFromTransaction(
           successXp: locationMiningSource.successXp,
           yieldMinimum: locationMiningSource.yieldMinimum,
           yieldMaximum: locationMiningSource.yieldMaximum,
-          chargedYieldMaximum: miningYieldRange(
-            locationMiningSource,
-            equippedTool?.definition,
-            true,
-          ).maximum,
+          ...(() => {
+            const charged = miningYieldRange(locationMiningSource, equippedTool?.definition, true);
+            return { chargedYieldMinimum: charged.minimum, chargedYieldMaximum: charged.maximum };
+          })(),
         }
       : undefined,
     refiningRecipes: refiningRecipes(balance).map((recipe) => {
@@ -2244,7 +2245,7 @@ export async function stateFromTransaction(
               requiredMiningLevel: tool.requiredMiningLevel,
               usable: miningToolUsable(tool, miningProgress.level),
               baseDurationMultiplierBps: tool.baseDurationMultiplierBps,
-              chargedYieldMaximumBonus: tool.chargedYieldMaximumBonus,
+              chargedEffect: tool.chargedEffect,
               attemptDurationTicks: miningAttemptDurationTicks(balance, source, tool, false),
               boostedAttemptDurationTicks: miningAttemptDurationTicks(balance, source, tool, true),
             };

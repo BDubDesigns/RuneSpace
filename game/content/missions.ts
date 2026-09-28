@@ -187,15 +187,18 @@ export type MissionRequirement =
     }
   | {
       /**
-       * One unique item instance carried and unequipped (#232): the smallest
-       * unique-item counterpart to `carried_stack`. Equipped items and items in
-       * the Cargo Hold never count, so a turn-in can never take the tool in the
-       * player's hand. No provenance: any instance of the item satisfies it, so
+       * One unique item instance with the character (#232): the smallest
+       * unique-item counterpart to `carried_stack`. Items in the Cargo Hold
+       * never count. No provenance: any instance of the item satisfies it, so
        * a Cutter bought, found or kept since the start is as good as a new one.
+       *
+       * `consume_one` hands one carried, unequipped instance over at turn-in,
+       * so it can never take the tool in the player's hand. `show` takes
+       * nothing, so an equipped instance counts for it too (#233).
        */
       kind: "carried_unique_item";
       itemId: ItemId;
-      /** `show` inspects it; `consume_one` hands one eligible instance over at turn-in. */
+      /** `show` inspects it, carried or equipped; `consume_one` hands one unequipped instance over. */
       turnIn: "show" | "consume_one";
       /** Player-facing copy; `{item}` receives the authoritative display name. */
       objective: string;
@@ -1206,12 +1209,12 @@ export const BRACE_YOURSELF: MissionDefinition = {
  * there is no Refining requirement at all, because Fabrication and Refining are
  * separate professions.
  *
- * The objective is personal: only a Loadsteel Cutter the player genuinely
- * fabricates while the Mission is active counts, through the same
- * recipe-specific completion seam Return the Favor uses. A bought, gifted or
- * already-owned Cutter cannot satisfy it, and a busted workpiece is not a
- * Cutter. Tansy only wants to see it made — the turn-in takes nothing, and the
- * player keeps the tool.
+ * Return the Favor already proved the player can fabricate a Cutter, so this
+ * only asks to see one: any Loadsteel Cutter carried or equipped counts,
+ * however it was come by and whatever its charge — including one owned before
+ * accepting, which satisfies the objective at once. One left in the Cargo Hold
+ * is not with the player and does not. Showing takes nothing: the player keeps
+ * the tool.
  */
 export const A_CUT_ABOVE: MissionDefinition = {
   id: MISSION_IDS.aCutAbove,
@@ -1230,27 +1233,23 @@ export const A_CUT_ABOVE: MissionDefinition = {
   ],
   requirements: [
     {
-      kind: "tracked_activity",
-      progressKey: "loadsteel-cutter-fabricated",
-      activity: "fabrication",
-      metric: "completions",
-      actionId: ACTION_IDS.loadsteelCutterFabrication,
-      target: 1,
-      objective: "Fabricate a Loadsteel Cutter — {current} / {target}",
-      recommendedActionId: ACTION_IDS.loadsteelCutterFabrication,
+      kind: "carried_unique_item",
+      itemId: ITEM_IDS.loadsteelCutter,
+      turnIn: "show",
+      objective: "Show Tansy a {item}",
     },
   ],
   turnIn: {
     npcId: NPC_IDS.tansyRusk,
     locationId: LOCATION_IDS.theJag,
     requiresStationary: true,
-    objective: "Show Tansy Rusk the Loadsteel Cutter at The Jag",
+    objective: "Show Tansy a Loadsteel Cutter",
     dialogueId: DIALOGUE_IDS.tansyACutAboveTurnIn,
     actionLabel: "SHOW HER THE CUTTER",
   },
   reward: { kind: "skill_xp", skillId: SKILL_IDS.fabrication, amount: 500 },
   dialogue: {
-    trackedActivityReminderDialogueId: DIALOGUE_IDS.tansyACutAboveReminder,
+    carriedReminderDialogueId: DIALOGUE_IDS.tansyACutAboveReminder,
     // Her ordinary "finish what you're doing" beat at The Jag.
     busyDialogueId: DIALOGUE_IDS.tansyBraceYourselfBusy,
     completionPresentationDialogueId: DIALOGUE_IDS.tansyACutAboveCompletion,

@@ -14,7 +14,6 @@ import {
   type LocationId,
 } from "@/game/config/foundations";
 import { resolveNpcConversation } from "@/game/domain/conversation";
-import type { OverrideRandom } from "@/game/domain/manual-override";
 import type { MiningRandom } from "@/game/domain/mining";
 import type { PlayGameplayState } from "@/server/play";
 import { cleanupTestUser, createCharacterForUser, createTestUser } from "./fixtures";
@@ -29,12 +28,13 @@ const suite = DATABASE_URL ? describe : describe.skip;
  * What only the database proves: the recipes open by Fabrication level alone;
  * Power Cells come off the machine two to a batch; a fabricated Loadsteel
  * Cutter starts at 0/10; Mining 5 is enforced when equipping and when mining;
- * a Loadsteel run — live, charged, depleted and resolved offline — uses the
- * tool really in the slot, and a swap can never leave a stale effect behind;
+ * a Loadsteel run — live, charged (no faster, one more ore per success),
+ * depleted and resolved offline — uses the tool really in the slot, and a swap
+ * can never leave a stale effect behind;
  * the Freight Harness adds its six slots and its nine kilograms; advanced
  * Tinkering takes complete batches and guards the last usable Cutter; and A
- * Cut Above and Cutting Costs keep their different provenance rules and pay
- * exactly once.
+ * Cut Above (shown, carried or equipped, and kept) and Cutting Costs (handed
+ * over unequipped) each pay exactly once.
  */
 suite("issue #233 Fabrication 5 and 8 (real PostgreSQL)", () => {
   let db: (typeof import("@/db"))["db"];
@@ -57,7 +57,6 @@ suite("issue #233 Fabrication 5 and 8 (real PostgreSQL)", () => {
   const at = (tick: number) => new Date(start.getTime() + tick * GAME_TICK_MS);
   /** Every Mining roll succeeds, on the high side of the yield range. */
   const high = (): MiningRandom => ({ nextBasisPoints: () => 0, nextUnit: () => 0.5 });
-  const lowest: OverrideRandom = { nextInt: () => 0 };
   const toolSlot = { assignmentKind: "gear" as const, suitSlotId: "mining_tool" };
 
   beforeAll(async () => {
@@ -427,7 +426,7 @@ suite("issue #233 Fabrication 5 and 8 (real PostgreSQL)", () => {
       expect(row!.currentCharge).toBe(10);
     });
 
-    it("mines at 8 ticks uncharged, 4 charged for ten attempts on one Cell, then 8 again", async () => {
+    it("mines at 8 ticks charged or not; each charged success adds one ore to the ordinary roll", async () => {
       const { userId, character } = await veteran("Loadsteel run", {
         mining: 5,
         location: LOCATION_IDS.theJag,
@@ -446,14 +445,15 @@ suite("issue #233 Fabrication 5 and 8 (real PostgreSQL)", () => {
         maximumCharge: 10,
         usable: true,
         attemptDurationTicks: 8,
-        boostedAttemptDurationTicks: 4,
-        chargedYieldMaximumBonus: 1,
+        boostedAttemptDurationTicks: 8,
+        chargedEffect: { kind: "extra_yield", units: 1 },
       });
       expect(equipped.miningSource).toMatchObject({
         attemptDurationTicks: 8,
-        boostedAttemptDurationTicks: 4,
+        boostedAttemptDurationTicks: 8,
         yieldMinimum: 1,
         yieldMaximum: 2,
+        chargedYieldMinimum: 2,
         chargedYieldMaximum: 3,
       });
 
@@ -468,21 +468,23 @@ suite("issue #233 Fabrication 5 and 8 (real PostgreSQL)", () => {
       const loaded = await mining.loadMiningToolPowerCell(userId, character.id, at(8), high());
       expect(loaded.load).toEqual({ status: "loaded", remainingCharge: 10 });
       expect(loaded.state.equipment.miningTool?.currentCharge).toBe(10);
-      expect(loaded.state.activeAction?.nextAttemptDurationTicks).toBe(4);
+      // Charge buys ore, not speed: the next attempt is still 8 ticks.
+      expect(loaded.state.activeAction).toMatchObject({
+        nextAttemptBoosted: true,
+        nextAttemptDurationTicks: 8,
+      });
 
-      // Resolved offline in one go: ten charged attempts, then the depleted
-      // Cutter carries on at its permanent 0.8×.
+      // Resolved offline in one go: ten charged attempts, then one uncharged.
       const later = await play.getPlayGameplayState(
         userId,
         character.id,
-        at(8 + 10 * 4 + 8),
+        at(8 + 10 * 8 + 8),
         high(),
       );
       expect(later.run.attempts).toBe(12);
-      expect(later.run.recentAttempts.map((attempt) => attempt.durationTicks)).toEqual([
-        ...Array(9).fill(4),
-        8,
-      ]);
+      expect(later.run.recentAttempts.map((attempt) => attempt.durationTicks)).toEqual(
+        Array(10).fill(8),
+      );
       expect(
         later.run.recentAttempts.filter((attempt) => attempt.boosted).map((a) => a.quantityAwarded),
       ).toEqual(Array(9).fill(3));
@@ -492,6 +494,7 @@ suite("issue #233 Fabrication 5 and 8 (real PostgreSQL)", () => {
         quantityAwarded: 2,
       });
       expect(later.run.itemsGained[ITEM_IDS.ferriteShale]).toBe(2 + 10 * 3 + 2);
+      // XP is per attempt and unchanged by the extra ore.
       expect(later.run.xpGained).toBe(12 * 15);
       expect(later.equipment.miningTool?.currentCharge).toBe(0);
       const [row] = await instancesOf(character.id, ITEM_IDS.loadsteelCutter);
@@ -519,20 +522,20 @@ suite("issue #233 Fabrication 5 and 8 (real PostgreSQL)", () => {
         userId,
         character.id,
         { kind: "equip", itemInstanceId: salvage!.id, target: toolSlot },
-        at(9),
+        at(17),
         high(),
       );
       expect(swapped.stop).toEqual({ activity: "mining", reason: "mining_tool_replaced" });
       expect(swapped.activeAction).toBeUndefined();
       expect(swapped.run.recentAttempts).toEqual([
-        expect.objectContaining({ durationTicks: 4, quantityAwarded: 3, remainingCharge: 9 }),
-        expect.objectContaining({ durationTicks: 4, quantityAwarded: 3, remainingCharge: 8 }),
+        expect.objectContaining({ durationTicks: 8, quantityAwarded: 3, remainingCharge: 9 }),
+        expect.objectContaining({ durationTicks: 8, quantityAwarded: 3, remainingCharge: 8 }),
       ]);
       expect(swapped.equipment.miningTool).toMatchObject({
         itemId: ITEM_IDS.salvageCutter,
         attemptDurationTicks: 10,
         boostedAttemptDurationTicks: 5,
-        chargedYieldMaximumBonus: 0,
+        chargedEffect: { kind: "speed" },
       });
       // Time passing afterwards resolves nothing, and the stored Loadsteel
       // Cutter keeps exactly the charge it had.
@@ -540,12 +543,27 @@ suite("issue #233 Fabrication 5 and 8 (real PostgreSQL)", () => {
       expect(idle.run.attempts).toBe(2);
       expect((await instancesOf(character.id, ITEM_IDS.loadsteelCutter))[0]!.currentCharge).toBe(8);
 
-      // A new run with the Salvage Cutter is the Salvage Cutter's, unchanged.
+      // A new run with the Salvage Cutter is the Salvage Cutter's, unchanged:
+      // 10 ticks uncharged, and charged it is faster — 5 ticks — never richer.
       await mining.startMining(userId, character.id, at(1_000), high());
       const salvageRun = await play.getPlayGameplayState(userId, character.id, at(1_010), high());
       expect(salvageRun.run.recentAttempts).toEqual([
         expect.objectContaining({ boosted: false, durationTicks: 10, quantityAwarded: 2 }),
       ]);
+      await give(character.id, ITEM_IDS.powerCell, 1);
+      await mining.loadMiningToolPowerCell(userId, character.id, at(1_010), high());
+      const chargedSalvage = await play.getPlayGameplayState(
+        userId,
+        character.id,
+        at(1_015),
+        high(),
+      );
+      expect(chargedSalvage.run.recentAttempts.at(-1)).toMatchObject({
+        boosted: true,
+        durationTicks: 5,
+        quantityAwarded: 2,
+        remainingCharge: 9,
+      });
       expect((await instancesOf(character.id, ITEM_IDS.loadsteelCutter))[0]!.currentCharge).toBe(8);
     });
   });
@@ -687,28 +705,18 @@ suite("issue #233 Fabrication 5 and 8 (real PostgreSQL)", () => {
       expect(refused.mission.status).toBe("refused");
     });
 
-    it("counts only a Cutter fabricated while active, keeps the Cutter, and pays 500 XP once", async () => {
+    it("is satisfied at once by a Cutter made before accepting, keeps it, and pays 500 XP once", async () => {
       const { userId, character } = await veteran("Cut above", {
         fabrication: 5,
         brace: true,
-        location: LOCATION_IDS.theJag,
+        location: LOCATION_IDS.ruskRecovery,
       });
-      const giveCutterInputs = async () => {
-        await give(character.id, ITEM_IDS.galvaferrite, 2);
-        await give(character.id, ITEM_IDS.galvanicWireSpool, 1);
-        await give(character.id, ITEM_IDS.powerCell, 1);
-      };
+      // The recipe is open at Fabrication 5 before the Mission is ever offered.
       let state = await play.getPlayGameplayState(userId, character.id, at(0));
-      // The recipe is already open, before the Mission is even offered.
       expect(recipeOf(state, ACTION_IDS.loadsteelCutterFabrication).unlocked).toBe(true);
-      expect(tansyEntry(state)).toMatchObject({
-        role: "offer",
-        dialogueId: DIALOGUE_IDS.tansyACutAboveOffer,
-      });
-
-      // A Cutter made before accepting, and one bought or given, do not count.
-      await moveTo(character.id, LOCATION_IDS.ruskRecovery);
-      await giveCutterInputs();
+      await give(character.id, ITEM_IDS.galvaferrite, 2);
+      await give(character.id, ITEM_IDS.galvanicWireSpool, 1);
+      await give(character.id, ITEM_IDS.powerCell, 1);
       await fabrication.startFabrication(
         userId,
         character.id,
@@ -717,111 +725,126 @@ suite("issue #233 Fabrication 5 and 8 (real PostgreSQL)", () => {
         at(1),
       );
       await play.getPlayGameplayState(userId, character.id, at(1 + 45));
-      await addInstance(character.id, ITEM_IDS.loadsteelCutter, 0);
+      expect(await instancesOf(character.id, ITEM_IDS.loadsteelCutter)).toHaveLength(1);
+
       await moveTo(character.id, LOCATION_IDS.theJag);
-      const accepted = await missions.acceptMission(
-        userId,
-        character.id,
-        MISSION_IDS.aCutAbove,
-        NPC_IDS.tansyRusk,
-        at(100),
-      );
-      expect(accepted.mission.status).toBe("accepted");
-      state = accepted.state;
-      expect(recipeOf(state, ACTION_IDS.loadsteelCutterFabrication).unlocked).toBe(true);
-      expect(mission(state, MISSION_IDS.aCutAbove).requirements?.[0]).toMatchObject({
-        satisfied: false,
-        progress: { current: 0, target: 1 },
-      });
+      state = await play.getPlayGameplayState(userId, character.id, at(100));
       expect(tansyEntry(state)).toMatchObject({
-        role: "active",
-        dialogueId: DIALOGUE_IDS.tansyACutAboveReminder,
+        role: "offer",
+        dialogueId: DIALOGUE_IDS.tansyACutAboveOffer,
       });
-      expect(tansyEntry(state)).not.toHaveProperty("action");
-      const refused = await missions.completeMission(
+      const accepted = await missions.acceptMission(
         userId,
         character.id,
         MISSION_IDS.aCutAbove,
         NPC_IDS.tansyRusk,
         at(101),
       );
-      expect(refused.mission.status).toBe("refused");
-
-      // A Manual Override bust is not a Cutter.
-      await moveTo(character.id, LOCATION_IDS.ruskRecovery);
-      await giveCutterInputs();
-      await fabrication.setManualOverride(userId, character.id, true, at(200), high(), lowest);
-      const onMachine = await fabrication.startFabrication(
-        userId,
-        character.id,
-        ACTION_IDS.loadsteelCutterFabrication,
-        1,
-        at(201),
-        high(),
-        lowest,
-      );
-      const busted = await fabrication.pushFabricationOverride(
-        userId,
-        character.id,
-        10,
-        onMachine.fabricationStation.workpiece!.sequence,
-        0,
-        at(202),
-        high(),
-        lowest,
-      );
-      expect(busted.fabricationStation.run.busts).toBe(1);
-      expect(busted.carriedByItemId[ITEM_IDS.galvaferrite]).toBeUndefined();
-      expect(mission(busted, MISSION_IDS.aCutAbove).requirements?.[0]).toMatchObject({
-        satisfied: false,
+      expect(accepted.mission.status).toBe("accepted");
+      expect(recipeOf(accepted.state, ACTION_IDS.loadsteelCutterFabrication).unlocked).toBe(true);
+      // The Cutter already carried satisfies the objective immediately.
+      expect(mission(accepted.state, MISSION_IDS.aCutAbove)).toMatchObject({
+        state: "ready_for_completion",
+        requirements: [
+          expect.objectContaining({
+            kind: "carried_unique_item",
+            objective: "Show Tansy a Loadsteel Cutter",
+            satisfied: true,
+          }),
+        ],
       });
-      await fabrication.setManualOverride(userId, character.id, false, at(203), high(), lowest);
-
-      // A real one, made now, does.
-      await giveCutterInputs();
-      await fabrication.startFabrication(
-        userId,
-        character.id,
-        ACTION_IDS.loadsteelCutterFabrication,
-        1,
-        at(300),
-      );
-      state = await play.getPlayGameplayState(userId, character.id, at(300 + 45));
-      expect(mission(state, MISSION_IDS.aCutAbove).requirements?.[0]).toMatchObject({
-        satisfied: true,
-        progress: { current: 1, target: 1 },
-      });
-      const cuttersBefore = await instancesOf(character.id, ITEM_IDS.loadsteelCutter);
-      expect(cuttersBefore).toHaveLength(3);
-
-      await moveTo(character.id, LOCATION_IDS.theJag);
-      state = await play.getPlayGameplayState(userId, character.id, at(400));
-      expect(tansyEntry(state)).toMatchObject({
+      expect(tansyEntry(accepted.state)).toMatchObject({
         role: "turn_in",
         dialogueId: DIALOGUE_IDS.tansyACutAboveTurnIn,
         action: { kind: "complete_mission" },
       });
+
       const xpBefore = await xp(character.id, SKILL_IDS.fabrication);
       const completed = await missions.completeMission(
         userId,
         character.id,
         MISSION_IDS.aCutAbove,
         NPC_IDS.tansyRusk,
-        at(401),
+        at(102),
       );
       expect(completed.mission.status).toBe("completed");
       expect((await xp(character.id, SKILL_IDS.fabrication)) - xpBefore).toBe(500);
-      // Tansy keeps nothing: every Cutter is still the player's.
-      expect(await instancesOf(character.id, ITEM_IDS.loadsteelCutter)).toHaveLength(3);
+      // Tansy keeps nothing.
+      expect(await instancesOf(character.id, ITEM_IDS.loadsteelCutter)).toHaveLength(1);
       const retried = await missions.completeMission(
         userId,
         character.id,
         MISSION_IDS.aCutAbove,
         NPC_IDS.tansyRusk,
-        at(402),
+        at(103),
       );
       expect(retried.mission.status).toBe("already_completed");
       expect((await xp(character.id, SKILL_IDS.fabrication)) - xpBefore).toBe(500);
+    });
+
+    it("counts a Cutter in hand, of any source or charge, but never one left in the Cargo Hold", async () => {
+      const { userId, character } = await veteran("Shown in hand", {
+        fabrication: 5,
+        mining: 5,
+        brace: true,
+        location: LOCATION_IDS.theJag,
+      });
+      // Bought or given — nothing records where it came from — and stowed.
+      const stowed = await addInstance(character.id, ITEM_IDS.loadsteelCutter, 7);
+      await db
+        .insert(rune.cargoHoldItemInstances)
+        .values({ characterId: character.id, itemInstanceId: stowed.id });
+      const accepted = await missions.acceptMission(
+        userId,
+        character.id,
+        MISSION_IDS.aCutAbove,
+        NPC_IDS.tansyRusk,
+        at(0),
+      );
+      expect(accepted.mission.status).toBe("accepted");
+      expect(mission(accepted.state, MISSION_IDS.aCutAbove).requirements?.[0]?.satisfied).toBe(
+        false,
+      );
+      expect(tansyEntry(accepted.state)).toMatchObject({
+        role: "active",
+        dialogueId: DIALOGUE_IDS.tansyACutAboveReminder,
+      });
+      expect(tansyEntry(accepted.state)).not.toHaveProperty("action");
+      const refused = await missions.completeMission(
+        userId,
+        character.id,
+        MISSION_IDS.aCutAbove,
+        NPC_IDS.tansyRusk,
+        at(1),
+      );
+      expect(refused.mission.status).toBe("refused");
+
+      // Taken out of the Cargo Hold and equipped: in the player's hand, it counts.
+      await db
+        .delete(rune.cargoHoldItemInstances)
+        .where(eq(rune.cargoHoldItemInstances.itemInstanceId, stowed.id));
+      const inHand = await equipment.changeEquipment(
+        userId,
+        character.id,
+        { kind: "equip", itemInstanceId: stowed.id, target: toolSlot },
+        at(2),
+      );
+      expect(inHand.equipment.miningTool?.itemId).toBe(ITEM_IDS.loadsteelCutter);
+      expect(inHand.inventory.uniqueItems.some((item) => item.id === stowed.id)).toBe(false);
+      expect(mission(inHand, MISSION_IDS.aCutAbove).requirements?.[0]?.satisfied).toBe(true);
+      const completed = await missions.completeMission(
+        userId,
+        character.id,
+        MISSION_IDS.aCutAbove,
+        NPC_IDS.tansyRusk,
+        at(3),
+      );
+      expect(completed.mission.status).toBe("completed");
+      // Still equipped, still charged: showing it took nothing.
+      expect(completed.state.equipment.miningTool).toMatchObject({
+        itemId: ITEM_IDS.loadsteelCutter,
+        currentCharge: 7,
+      });
     });
   });
 

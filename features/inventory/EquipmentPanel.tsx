@@ -138,15 +138,19 @@ export function EquipmentPanel({
                         {tool.baseDurationMultiplierBps / 10_000}× base time, charged or not)
                       </p>
                     ) : null}
-                    <p className="mt-2 text-sm text-[color:var(--rs-text-secondary)]">
-                      Boosted attempt: {tool.boostedAttemptDurationTicks} ticks /{" "}
-                      {secondsForTicks(tool.boostedAttemptDurationTicks)} seconds
-                    </p>
-                    {tool.chargedYieldMaximumBonus > 0 ? (
-                      <p className="mt-1 text-sm text-[color:var(--rs-text-secondary)]">
-                        While charged: +{tool.chargedYieldMaximumBonus} maximum yield per success
+                    {tool.chargedEffect.kind === "speed" ? (
+                      <p className="mt-2 text-sm text-[color:var(--rs-text-secondary)]">
+                        Boosted attempt: {tool.boostedAttemptDurationTicks} ticks /{" "}
+                        {secondsForTicks(tool.boostedAttemptDurationTicks)} seconds
                       </p>
-                    ) : null}
+                    ) : (
+                      // A tool whose charge buys ore says so, and that its
+                      // attempts are no faster for it (#233).
+                      <p className="mt-2 text-sm text-[color:var(--rs-text-secondary)]">
+                        While charged: +{tool.chargedEffect.units} ore per successful attempt ·
+                        attempt time unchanged
+                      </p>
+                    )}
                     {!tool.usable ? (
                       <Feedback tone="danger">
                         Requires Mining {tool.requiredMiningLevel} to use.

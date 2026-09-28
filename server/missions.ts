@@ -35,7 +35,11 @@ import {
   type ExactStackRemovalPlan,
   type StackAdditionPlan,
 } from "@/game/domain/inventory";
-import { unmetMissionSkillPrerequisite, type MissionObservation } from "@/game/domain/missions";
+import {
+  uniqueItemRequirementHolds,
+  unmetMissionSkillPrerequisite,
+  type MissionObservation,
+} from "@/game/domain/missions";
 import { orderInstancesForConsumption } from "@/game/domain/tinkering";
 import { getSkillPresentation } from "@/game/content/skill-presentation";
 import { characterSkillLevel } from "@/server/skill-levels";
@@ -743,7 +747,7 @@ async function completeMissionForDefinition(input: {
       continue;
     }
     if (requirement.kind === "carried_unique_item") {
-      if ((observation.carriedUniqueItems?.get(requirement.itemId) ?? 0) < 1) {
+      if (!uniqueItemRequirementHolds(requirement, observation)) {
         return stateFor({
           status: "refused",
           reason: "insufficient_items",

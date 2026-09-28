@@ -172,8 +172,9 @@ const authoredWikiArticles = [
             { text: "Fabrication Station", articleSlug: "fabrication-and-tinkering" },
             ". It is its own tool rather than an improved Salvage Cutter, and it needs Mining 5 to equip or use. It is heavier, at 8 kg.",
           ],
-          "It mines faster whether or not it is charged: a Ferrite Shale attempt takes about 4.8 seconds instead of six, and a Galvanite attempt about 7.2 instead of nine. A charged Power Cell speeds it up further, the same way it does any Cutter — about 2.4 seconds at Ferrite Shale and 3.6 at Galvanite — and while it is charged a success can give up to one more ore than usual: one to three instead of one or two. Your chance of success and the XP a success pays stay the same.",
-          "One Power Cell gives it ten charged attempts, used up one per attempt whether it succeeds or not, just like the Salvage Cutter. A new Loadsteel Cutter comes off the machine with no charge. Once its charge runs out it keeps its faster base speed and loses only the extra charged speed and the extra ore.",
+          "It mines faster whether or not it is charged: a Ferrite Shale attempt takes about 4.8 seconds instead of six, and a Galvanite attempt about 7.2 instead of nine.",
+          "A Power Cell does something different for it than for the Salvage Cutter. A charged Salvage Cutter mines faster; a charged Loadsteel Cutter mines at the same speed, but every successful attempt gives one more ore than usual — two or three instead of one or two. If you only have room for the usual amount, you still get the usual amount. Your chance of success and the XP an attempt pays stay the same.",
+          "One Power Cell gives it ten charged attempts, used up one per attempt whether it succeeds or not, just like the Salvage Cutter. A new Loadsteel Cutter comes off the machine with no charge. Once its charge runs out it keeps its faster base speed and loses only the extra ore.",
         ],
       },
       {
@@ -328,7 +329,7 @@ const authoredWikiArticles = [
           [
             "A charged ",
             { text: "Loadsteel Cutter", articleSlug: "mining-and-refining" },
-            " is sped up the same way on top of its own faster base speed, and while it is charged a success can also give one more ore than usual.",
+            " is not sped up. Instead, every successful attempt while it has charge gives one more ore than usual.",
           ],
         ],
       },
@@ -827,7 +828,7 @@ const authoredWikiArticles = [
           [
             "A Cut Above — once you have finished Brace Yourself and reached Fabrication 5, Tansy at The Jag wants to see you build a ",
             { text: "Loadsteel Cutter", articleSlug: "fabrication-and-tinkering" },
-            ". The recipe is already open at Fabrication 5 — taking the job doesn't unlock it, and you don't need any Refining. Fabricate one yourself while the job is open, then show her. She lets you keep it. Worth 500 Fabrication XP.",
+            ". The recipe is already open at Fabrication 5 — taking the job doesn't unlock it, and you don't need any Refining. Show her a Loadsteel Cutter you're carrying or have equipped, however you came by it. She lets you keep it. Worth 500 Fabrication XP.",
           ],
         ],
       },
@@ -930,7 +931,7 @@ const authoredWikiArticles = [
       {
         heading: "A Cut Above and Cutting Costs",
         paragraphs: [
-          "A Cut Above is about making one yourself: only a Loadsteel Cutter you fabricate while the job is open counts, so one you made earlier, bought, or were given does not, and a piece wrecked by Manual Override is not a Cutter. Tansy only wants to see it — nothing is taken when you show her.",
+          "A Cut Above only asks to see one. Any Loadsteel Cutter you have with you counts — one you made before taking the job, made since, bought, or were given, carried or equipped, charged or not. If you already have one when you take the job, you can show her straight away. One left in the Cargo Hold isn't with you, so it doesn't count. Tansy only looks — nothing is taken.",
           "Cutting Costs is the opposite: Renn is buying a Cutter, not checking who built it, so any Loadsteel Cutter you are carrying and not wearing will do. He will not take the one in your hand, and he pays his 500 Credits once.",
         ],
       },

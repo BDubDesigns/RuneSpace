@@ -2061,24 +2061,18 @@ const dialogue = {
         EXPRESSION_IDS.smile,
         "And if you feed it a Power Cell, it'll pull a little more out of the rock.",
       ),
-      tansyLocal(EXPRESSION_IDS.neutral, "Go make one."),
-      tansyLocal(
-        EXPRESSION_IDS.neutral,
-        "Bring it back when you're done. I want to see what you can do with higher tier materials.",
-      ),
+      tansyLocal(EXPRESSION_IDS.neutral, "Get your hands on one."),
+      tansyLocal(EXPRESSION_IDS.neutral, "Bring it by when you've got it. I want to take a look."),
     ],
   },
-  // While the Cutter is still to be made, she repeats the offer's own closing
+  // Until there is a Cutter to show, she repeats the offer's own closing
   // instruction rather than saying anything the locked scene does not.
   [DIALOGUE_IDS.tansyACutAboveReminder]: {
     id: DIALOGUE_IDS.tansyACutAboveReminder,
     npcId: NPC_IDS.tansyRusk,
     beats: [
-      tansyLocal(EXPRESSION_IDS.neutral, "Go make one."),
-      tansyLocal(
-        EXPRESSION_IDS.neutral,
-        "Bring it back when you're done. I want to see what you can do with higher tier materials.",
-      ),
+      tansyLocal(EXPRESSION_IDS.neutral, "Get your hands on one."),
+      tansyLocal(EXPRESSION_IDS.neutral, "Bring it by when you've got it. I want to take a look."),
     ],
   },
   [DIALOGUE_IDS.tansyACutAboveTurnIn]: {
@@ -2103,7 +2097,10 @@ const dialogue = {
         EXPRESSION_IDS.neutral,
         "The better you get, the more useful things you'll be able to make.",
       ),
-      tansyLocal(EXPRESSION_IDS.smile, "And keep the Cutter. You earned it."),
+      tansyLocal(
+        EXPRESSION_IDS.smile,
+        "And keep the Cutter. You'll get more use out of it than I will.",
+      ),
       tansySkillXpBeat(SKILL_IDS.fabrication, 500),
     ],
   },

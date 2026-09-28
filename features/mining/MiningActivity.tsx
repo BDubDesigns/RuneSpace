@@ -365,7 +365,7 @@ export function MiningActivity({ characterName }: { characterName: string }) {
         Success chance: {percentage(source.successChanceBps)}%
       </p>
       {cutter &&
-      (cutter.baseDurationMultiplierBps !== 10_000 || cutter.chargedYieldMaximumBonus > 0) ? (
+      (cutter.baseDurationMultiplierBps !== 10_000 || cutter.chargedEffect.kind !== "speed") ? (
         // A tool's own authored effects, read from its definition (#233). A
         // tool with none — the Salvage Cutter — adds no line at all.
         <p
@@ -376,8 +376,8 @@ export function MiningActivity({ characterName }: { characterName: string }) {
           {cutter.baseDurationMultiplierBps !== 10_000
             ? ` · ${durationMultiplierLabel(cutter.baseDurationMultiplierBps)} attempt time, charged or not`
             : ""}
-          {cutter.chargedYieldMaximumBonus > 0
-            ? ` · charged successes yield ${source.yieldMinimum}–${source.chargedYieldMaximum} ${source.itemName}`
+          {cutter.chargedEffect.kind === "extra_yield"
+            ? ` · charged successes yield ${source.chargedYieldMinimum}–${source.chargedYieldMaximum} ${source.itemName}`
             : ""}
         </p>
       ) : null}
