@@ -391,7 +391,7 @@ suite("issue #232 Fabrication (real PostgreSQL)", () => {
         target: { assignmentKind: "container", suitSlotId: "container_attachment_2" },
       });
       expect(equipped.equipment.aggregateContainerSlots).toBe(
-        slots + balance.items.scrapBox.slotCapacity,
+        slots + balance.items.scrapBox.equipment.slotCapacity,
       );
     });
 
@@ -593,7 +593,7 @@ suite("issue #232 Fabrication (real PostgreSQL)", () => {
       );
       const mining = await import("@/server/mining-commands");
       await expect(
-        mining.loadSalvageCutterPowerCell(userId, character.id, at(ticks(1))),
+        mining.loadMiningToolPowerCell(userId, character.id, at(ticks(1))),
       ).rejects.toBeInstanceOf(reservation.FabricationReservationError);
       expect(await carried(character.id, ITEM_IDS.powerCell)).toBe(1);
     });

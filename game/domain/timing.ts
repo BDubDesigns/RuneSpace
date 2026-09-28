@@ -25,6 +25,25 @@ export function effectiveAttemptDurationTicks(baseTicks: number, speedMultiplier
   return Math.max(1, Math.ceil(baseTicks / speedMultiplier));
 }
 
+/**
+ * A duration multiplier authored in basis points (#233) — a Loadsteel Cutter's
+ * permanent 0.8× is 8,000 — under the same whole-tick rule as a speed
+ * multiplier: the result always rounds up to a whole tick and is never below
+ * one. Integer arithmetic, so no fractional multiplier drifts a tick.
+ */
+export function scaledAttemptDurationTicks(
+  baseTicks: number,
+  durationMultiplierBps: number,
+): number {
+  if (!Number.isInteger(baseTicks) || baseTicks <= 0) {
+    throw new RangeError("Base attempt duration must be a positive whole tick count");
+  }
+  if (!Number.isInteger(durationMultiplierBps) || durationMultiplierBps <= 0) {
+    throw new RangeError("Duration multiplier must be a positive whole basis-point value");
+  }
+  return Math.max(1, Math.ceil((baseTicks * durationMultiplierBps) / 10_000));
+}
+
 export function resolvableAttemptCount(elapsedTicks: number, attemptDurationTicks: number): number {
   if (!Number.isInteger(elapsedTicks) || elapsedTicks < 0) {
     throw new RangeError("Elapsed ticks must be a non-negative integer");

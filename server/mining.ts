@@ -14,6 +14,7 @@ import {
   miningActionIds,
   miningSourceForActionId,
   type MiningSourceBalance,
+  type MiningToolDefinition,
 } from "@/game/config/balance";
 import { SKILL_IDS } from "@/game/config/foundations";
 import {
@@ -91,7 +92,8 @@ export type MiningRunState = {
 
 export type MiningSnapshot = {
   miningLevel: number;
-  hasCompatibleTool: boolean;
+  /** The equipped Mining tool's authored definition, or undefined (#233). */
+  tool?: MiningToolDefinition;
   existingStacks: readonly import("@/game/domain/inventory").StackState<string>[];
   slotsAvailable: number;
   massAvailableGrams: number;
@@ -126,6 +128,11 @@ export type PersistedMiningOutcome = MiningResolution<string> & {
  * Load the Mining-specific resolver snapshot, deriving the shared
  * carried/equipment/play-state rows from `loadPlaySnapshot` (the generic
  * loader) and adding the Mining-specific fields (cutter, tool, level).
+ *
+ * The tool is whichever authored Mining tool the loadout says is equipped
+ * right now (#233), read under the same character lock as the resolution
+ * itself: a refreshed or offline-resolved attempt can only ever use the tool
+ * really in the slot, and a swap stops the run before a new tool is read.
  */
 export async function loadMiningSnapshot(
   transaction: DatabaseTransaction,
@@ -134,21 +141,13 @@ export async function loadMiningSnapshot(
   const balance = getEffectiveGameBalance();
   const play = await loadPlaySnapshot(transaction, characterId);
   const miningXp = play.xpRows.find((row) => row.skillId === SKILL_IDS.mining)?.totalXp ?? 0;
-  const cutterAssignment = play.equipmentLoadout.assignments.find(
-    (assignment) =>
-      assignment.assignmentKind === "gear" &&
-      assignment.suitSlotId === balance.items.salvageCutter.suitSlotId,
-  );
-  const cutter = cutterAssignment
-    ? play.carriedInstances.find(
-        (instance) =>
-          instance.id === cutterAssignment.itemInstanceId &&
-          instance.itemId === balance.items.salvageCutter.itemId,
-      )
+  const tool = play.equipmentLoadout.miningTool;
+  const cutter = tool
+    ? play.carriedInstances.find((instance) => instance.id === tool.itemInstanceId)
     : undefined;
   return {
     miningLevel: levelFromXp(miningXp, miningLevelThresholds(balance)),
-    hasCompatibleTool: play.equipmentLoadout.hasCompatibleMiningTool,
+    ...(tool ? { tool: tool.definition } : {}),
     existingStacks: play.stacks,
     slotsAvailable: play.slotsAvailable,
     massAvailableGrams: play.massAvailableGrams,
@@ -158,7 +157,7 @@ export async function loadMiningSnapshot(
     allItemInstances: play.allItemInstances,
     itemInstances: play.carriedInstances,
     equippedCutterInstanceId: cutter?.id,
-    cutterCharge: normalizeCutterCharge(cutter?.currentCharge, balance),
+    cutterCharge: tool ? normalizeCutterCharge(cutter?.currentCharge, tool.definition) : 0,
   };
 }
 

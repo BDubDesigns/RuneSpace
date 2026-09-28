@@ -1,6 +1,7 @@
 import {
   getEffectiveGameBalance,
   getItemDefinition,
+  getMiningToolDefinition,
   type EffectiveGameBalance,
   type FabricationRecipeBalance,
   type TinkeringTargetBalance,
@@ -8,6 +9,7 @@ import {
 import { BOUNDED_RUN_QUANTITY_CEILING, type ItemId } from "@/game/config/foundations";
 import type { BoundedRunAllowance } from "@/game/domain/bounded-run";
 import type { StackState } from "@/game/domain/inventory";
+import { miningToolUsable } from "@/game/domain/mining";
 import {
   addStackExact,
   addStackKeepingWhatFits,
@@ -64,15 +66,18 @@ export type TinkeringCycle = { targetActionId: string; ticksCompleted: number };
 
 export type TinkeringSnapshot = {
   fabricationLevel: number;
+  /** Decides which owned Mining Cutters are usable, for the last-Cutter guard (#233). */
+  miningLevel: number;
   stacks: readonly StackState<string>[];
   /** Unequipped carried unique instances; equipped and stored items are never selectable. */
   carriedUniqueItems: readonly TinkeringUniqueInstance[];
   /**
-   * Every Mining Cutter the character owns, wherever it is: equipped,
-   * carried, or in the Cargo Hold. The first-alpha last-Cutter guard counts
-   * all of them, even the ones Tinkering could never select.
+   * Every usable Mining Cutter the character owns, wherever it is: equipped,
+   * carried, or in the Cargo Hold (`usableMiningCutterCount`). The first-alpha
+   * last-Cutter guard counts all of them, even the ones Tinkering could never
+   * select.
    */
-  ownedMiningCutters: number;
+  usableMiningCutters: number;
   slotsAvailable: number;
   massAvailableGrams: number;
   /** The persistent per-character preference, read at each cycle. */
@@ -109,11 +114,30 @@ export function tinkeringUnlocked(
   return level >= recipe.minimumLevel;
 }
 
-export function isMiningCutter(
+/**
+ * Whether an item is a Mining Cutter this character can actually use (#233):
+ * any authored Mining tool whose Mining requirement they meet. The Salvage
+ * Cutter always is; a Loadsteel Cutter is from Mining 5. Only a usable Cutter
+ * keeps a character able to mine, so only a usable one counts — and only
+ * taking a usable one apart can leave them without.
+ */
+export function isUsableMiningCutter(
   itemId: string,
+  miningLevel: number,
   balance: EffectiveGameBalance = getEffectiveGameBalance(),
 ): boolean {
-  return itemId === balance.items.salvageCutter.itemId;
+  const tool = getMiningToolDefinition(itemId, balance);
+  return tool !== undefined && miningToolUsable(tool, miningLevel);
+}
+
+/** How many usable Mining Cutters are among these owned instances. */
+export function usableMiningCutterCount(
+  instances: readonly { itemId: string }[],
+  miningLevel: number,
+  balance: EffectiveGameBalance = getEffectiveGameBalance(),
+): number {
+  return instances.filter((instance) => isUsableMiningCutter(instance.itemId, miningLevel, balance))
+    .length;
 }
 
 /**
@@ -135,7 +159,7 @@ export function orderInstancesForConsumption<Instance extends TinkeringUniqueIns
 type TinkeringWorkingState = {
   inventory: WorkingInventory;
   uniques: readonly TinkeringUniqueInstance[];
-  ownedMiningCutters: number;
+  usableMiningCutters: number;
 };
 
 /** Why a batch cannot begin — the ordinary Tinkering rules, not the run's own limits. */
@@ -157,6 +181,7 @@ type BatchCheck =
 function checkTinkeringBatch(
   state: TinkeringWorkingState,
   level: number,
+  miningLevel: number,
   target: TinkeringTargetBalance,
   autoDiscardScrap: boolean,
   balance: EffectiveGameBalance,
@@ -190,10 +215,10 @@ function checkTinkeringBatch(
       inventory = removeUnique(inventory, recipe.outputItemId, balance);
     }
   }
-  let ownedMiningCutters = state.ownedMiningCutters;
-  if (isMiningCutter(recipe.outputItemId, balance)) {
-    ownedMiningCutters -= recipe.outputQuantity;
-    if (ownedMiningCutters < 1) return { ok: false, reason: "last_cutter" };
+  let usableMiningCutters = state.usableMiningCutters;
+  if (isUsableMiningCutter(recipe.outputItemId, miningLevel, balance)) {
+    usableMiningCutters -= recipe.outputQuantity;
+    if (usableMiningCutters < 1) return { ok: false, reason: "last_cutter" };
   }
   if (!autoDiscardScrap) {
     const scrap = addStackExact(
@@ -204,7 +229,7 @@ function checkTinkeringBatch(
     );
     if (!scrap.ok) return { ok: false, reason: "no_room_for_scrap" };
   }
-  return { ok: true, state: { inventory, uniques, ownedMiningCutters }, consumedInstanceIds };
+  return { ok: true, state: { inventory, uniques, usableMiningCutters }, consumedInstanceIds };
 }
 
 /** Start's preflight: whether a fresh cycle of `target` can be committed right now. */
@@ -217,9 +242,10 @@ export function tinkeringStartCheck(
     {
       inventory: workingInventory(snapshot),
       uniques: snapshot.carriedUniqueItems,
-      ownedMiningCutters: snapshot.ownedMiningCutters,
+      usableMiningCutters: snapshot.usableMiningCutters,
     },
     snapshot.fabricationLevel,
+    snapshot.miningLevel,
     target,
     snapshot.autoDiscardScrap,
     balance,
@@ -237,7 +263,7 @@ export function tinkeringStartCheck(
 export function tinkeringAffordableBatches(
   snapshot: Pick<
     TinkeringSnapshot,
-    "fabricationLevel" | "stacks" | "carriedUniqueItems" | "ownedMiningCutters"
+    "fabricationLevel" | "miningLevel" | "stacks" | "carriedUniqueItems" | "usableMiningCutters"
   >,
   target: TinkeringTargetBalance,
   balance: EffectiveGameBalance = getEffectiveGameBalance(),
@@ -254,10 +280,10 @@ export function tinkeringAffordableBatches(
       : snapshot.carriedUniqueItems.filter((instance) => instance.itemId === recipe.outputItemId)
           .length;
   let batches = Math.floor(carried / recipe.outputQuantity);
-  if (isMiningCutter(recipe.outputItemId, balance)) {
+  if (isUsableMiningCutter(recipe.outputItemId, snapshot.miningLevel, balance)) {
     batches = Math.min(
       batches,
-      Math.floor(Math.max(0, snapshot.ownedMiningCutters - 1) / recipe.outputQuantity),
+      Math.floor(Math.max(0, snapshot.usableMiningCutters - 1) / recipe.outputQuantity),
     );
   }
   return Math.min(BOUNDED_RUN_QUANTITY_CEILING, batches);
@@ -312,7 +338,7 @@ export function resolveTinkering(input: {
   let state: TinkeringWorkingState = {
     inventory: workingInventory(snapshot),
     uniques: snapshot.carriedUniqueItems,
-    ownedMiningCutters: snapshot.ownedMiningCutters,
+    usableMiningCutters: snapshot.usableMiningCutters,
   };
   let cycle = snapshot.cycle;
   let remainingTicks = input.elapsedTicks;
@@ -338,6 +364,7 @@ export function resolveTinkering(input: {
       const check = checkTinkeringBatch(
         state,
         snapshot.fabricationLevel,
+        snapshot.miningLevel,
         target,
         snapshot.autoDiscardScrap,
         balance,

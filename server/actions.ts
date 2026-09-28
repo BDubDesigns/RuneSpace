@@ -24,7 +24,7 @@ import {
 import {
   startMining,
   stopMining,
-  loadSalvageCutterPowerCell,
+  loadMiningToolPowerCell,
   type LoadPowerCellResult,
 } from "@/server/mining-commands";
 import { startRefining, stopRefining } from "@/server/refining-commands";
@@ -702,7 +702,7 @@ export async function loadPowerCellAction(input: unknown): Promise<LoadPowerCell
             expectedQuantity: request.data.expectedQuantity,
           }
         : undefined;
-    return await loadSalvageCutterPowerCell(
+    return await loadMiningToolPowerCell(
       user.id,
       request.data.characterId,
       undefined,

@@ -18,8 +18,11 @@ import {
 } from "@/db/rune-space";
 import {
   getEffectiveGameBalance,
+  getEquipmentDefinition,
   getItemDefinition,
+  getMiningToolDefinition,
   getRepairTargetBalance,
+  type MiningToolChargedEffect,
   fabricationRecipeForActionId,
   fabricationRecipes,
   miningActionIds,
@@ -74,6 +77,7 @@ import { loadMerchantDailyPurchases } from "@/server/merchant-daily-purchases";
 import {
   carriedItemMassGrams,
   isCompatibleEquipmentAssignment,
+  unmetEquipRequirement,
   type EquipmentTarget,
 } from "@/game/domain/equipment";
 import {
@@ -82,9 +86,11 @@ import {
   planPossibleAwardAdditions,
 } from "@/game/domain/inventory";
 import {
+  miningAttemptDurationTicks,
   miningSuccessChanceBps,
+  miningToolUsable,
+  miningYieldRange,
   normalizeCutterCharge,
-  boostedMiningAttemptDurationTicks,
   type MiningRandom,
   type MiningStopReason,
 } from "@/game/domain/mining";
@@ -220,18 +226,50 @@ import {
   type OverrideTrend,
 } from "@/game/domain/manual-override";
 import {
-  isMiningCutter,
+  isUsableMiningCutter,
   tinkeringAffordableBatches,
   tinkeringDurationTicks,
   tinkeringScrapYield,
   tinkeringUnlocked,
   tinkeringXp,
+  usableMiningCutterCount,
   type TinkeringStopReason,
 } from "@/game/domain/tinkering";
 
 function itemStackLimit(itemId: string, balance = getEffectiveGameBalance()): number {
   const definition = getItemDefinition(itemId, balance);
   return definition?.kind === "stack" ? definition.stackLimit : 1;
+}
+
+/**
+ * A unique instance's displayable charge (#233): present for any authored
+ * Mining tool, validated against that tool's own maximum, and absent for
+ * everything else.
+ */
+function chargeOf(
+  instance: { itemId: string; currentCharge: number | null },
+  balance: EffectiveGameBalance,
+): number | undefined {
+  const tool = getMiningToolDefinition(instance.itemId, balance);
+  return tool ? normalizeCutterCharge(instance.currentCharge, tool) : undefined;
+}
+
+/** One instance as an equipment slot presents it, from its equipment definition (#233). */
+function slotItemProjection(
+  instance: { id: string; itemId: string },
+  miningLevel: number,
+  balance: EffectiveGameBalance,
+): EquipmentSlotItemProjection {
+  const definition = getEquipmentDefinition(instance.itemId, balance);
+  const unmet = unmetEquipRequirement(instance.itemId, miningLevel, balance);
+  return {
+    itemInstanceId: instance.id,
+    itemId: instance.itemId,
+    name: resolveItemPresentation(instance.itemId, instance.itemId).displayName,
+    massGrams: carriedItemMassGrams(instance.itemId, balance),
+    ...(definition?.kind === "container" ? { slotCapacity: definition.slotCapacity } : {}),
+    ...(unmet ? { requiredMiningLevel: unmet.requiredMiningLevel } : {}),
+  };
 }
 
 export type CargoHoldStackState = {
@@ -247,6 +285,7 @@ export type CargoHoldUniqueItemState = {
   itemId: string;
   name: string;
   massGrams: number;
+  /** Present only for a Mining tool, against its own authored maximum (#233). */
   currentCharge?: number;
 };
 
@@ -464,12 +503,47 @@ export type MiningSourceProjection = {
   actionId: string;
   itemId: string;
   itemName: string;
+  /** An uncharged attempt here with the Mining tool actually equipped (#233). */
   attemptDurationTicks: number;
+  /** A charged attempt here with the Mining tool actually equipped (#233). */
   boostedAttemptDurationTicks: number;
   successChanceBps: number;
   successXp: number;
   yieldMinimum: number;
   yieldMaximum: number;
+  /** A charged success's yield with the equipped tool: its ordinary range plus any extra ore (#233). */
+  chargedYieldMinimum: number;
+  chargedYieldMaximum: number;
+};
+
+/** The equipped Mining tool as Equipment and Mining present it (#233). */
+export type EquippedMiningToolProjection = {
+  itemId: string;
+  name: string;
+  currentCharge: number;
+  maximumCharge: number;
+  requiredMiningLevel: number;
+  /** The character's Mining level meets the tool's own requirement. */
+  usable: boolean;
+  /** Permanent base-duration multiplier, in basis points (10,000 is 1.00×). */
+  baseDurationMultiplierBps: number;
+  /** What a loaded Power Cell does for this tool: speed, or extra ore per success. */
+  chargedEffect: MiningToolChargedEffect;
+  /** Uncharged and charged attempts at the source in reach, or its baseline source. */
+  attemptDurationTicks: number;
+  boostedAttemptDurationTicks: number;
+};
+
+/** An item in, or eligible for, one equipment slot (#233: from its equipment definition). */
+export type EquipmentSlotItemProjection = {
+  itemInstanceId: string;
+  itemId: string;
+  name: string;
+  massGrams: number;
+  /** A container's Inventory slot contribution. */
+  slotCapacity?: number;
+  /** Present only while the character's Mining level is below the item's requirement. */
+  requiredMiningLevel?: number;
 };
 
 /** One authored Refining recipe as the console presents it (#209). */
@@ -768,21 +842,17 @@ export type PlayGameplayState = {
   equipment: {
     aggregateContainerSlots: number;
     carriedPowerCellQuantity: number;
-    salvageCutter?: {
-      currentCharge: number;
-      maximumCharge: number;
-      boostedAttemptDurationTicks: number;
-    };
+    /**
+     * Whichever authored Mining tool is equipped (#233) — its own identity,
+     * charge against its own maximum, and its own effects at the source in
+     * reach. Never "the Salvage Cutter" by assumption.
+     */
+    miningTool?: EquippedMiningToolProjection;
     slots: readonly {
       target: EquipmentTarget;
       label: string;
-      item?: { itemInstanceId: string; itemId: string; name: string; massGrams: number };
-      eligibleItems: readonly {
-        itemInstanceId: string;
-        itemId: string;
-        name: string;
-        massGrams: number;
-      }[];
+      item?: EquipmentSlotItemProjection;
+      eligibleItems: readonly EquipmentSlotItemProjection[];
     }[];
   };
   run: MiningRunState;
@@ -1521,6 +1591,7 @@ async function projectTinkering(
     characterId: string;
     action: typeof activeActions.$inferSelect | undefined;
     level: number;
+    miningLevel: number;
     snapshot: Awaited<ReturnType<typeof loadPlaySnapshot>>;
     carriedByItemId: Readonly<Record<string, number>>;
     balance: EffectiveGameBalance;
@@ -1539,9 +1610,11 @@ async function projectTinkering(
       currentCharge: instance.currentCharge,
       createdAt: instance.createdAt.toISOString(),
     }));
-  const ownedMiningCutters = snapshot.allItemInstances.filter((instance) =>
-    isMiningCutter(instance.itemId, balance),
-  ).length;
+  const usableMiningCutters = usableMiningCutterCount(
+    snapshot.allItemInstances,
+    input.miningLevel,
+    balance,
+  );
   return {
     unlocked: await loadTinkeringUnlocked(transaction, input.characterId),
     active: isTinkeringAction(input.action?.actionId),
@@ -1567,9 +1640,10 @@ async function projectTinkering(
       const affordableBatches = tinkeringAffordableBatches(
         {
           fabricationLevel: input.level,
+          miningLevel: input.miningLevel,
           stacks: snapshot.stacks,
           carriedUniqueItems,
-          ownedMiningCutters,
+          usableMiningCutters,
         },
         target,
         balance,
@@ -1588,7 +1662,7 @@ async function projectTinkering(
         carriedBatches,
         affordableBatches,
         lastCutterBlocked:
-          isMiningCutter(recipe.outputItemId, balance) &&
+          isUsableMiningCutter(recipe.outputItemId, input.miningLevel, balance) &&
           carriedBatches > 0 &&
           affordableBatches === 0,
       };
@@ -1816,6 +1890,7 @@ export async function stateFromTransaction(
     characterId,
     action,
     level: fabricationProgress.level,
+    miningLevel: miningProgress.level,
     snapshot,
     carriedByItemId,
     balance,
@@ -1829,10 +1904,7 @@ export async function stateFromTransaction(
       itemId: instance.itemId,
       name: resolveItemPresentation(instance.itemId, instance.itemId).displayName,
       massGrams: carriedItemMassGrams(instance.itemId, balance),
-      currentCharge:
-        instance.itemId === balance.items.salvageCutter.itemId
-          ? normalizeCutterCharge(instance.currentCharge, balance)
-          : undefined,
+      currentCharge: chargeOf(instance, balance),
     }));
   const currentLocationId = character[0]?.currentLocationId ?? LOCATION_IDS.crashSite;
   // Work Orders (#207). Projected after the character's location is known,
@@ -1902,15 +1974,15 @@ export async function stateFromTransaction(
               : undefined,
         }
       : undefined;
-  const cutterAssignment = snapshot.equipmentLoadout.assignments.find(
-    (assignment) =>
-      assignment.assignmentKind === "gear" &&
-      assignment.suitSlotId === balance.items.salvageCutter.suitSlotId,
-  );
-  const cutterInstance = cutterAssignment
-    ? snapshot.carriedInstances.find((instance) => instance.id === cutterAssignment.itemInstanceId)
+  // Whichever authored Mining tool is equipped (#233); its own definition
+  // decides its charge ceiling, its durations and its yield.
+  const equippedTool = snapshot.equipmentLoadout.miningTool;
+  const cutterInstance = equippedTool
+    ? snapshot.carriedInstances.find((instance) => instance.id === equippedTool.itemInstanceId)
     : undefined;
-  const cutterCharge = normalizeCutterCharge(cutterInstance?.currentCharge, balance);
+  const cutterCharge = equippedTool
+    ? normalizeCutterCharge(cutterInstance?.currentCharge, equippedTool.definition)
+    : 0;
   // Which ore or recipe is actually running, resolved from the durable action
   // row rather than from a single hardcoded Ferrite/Refining identity (#209).
   const activeMiningSource = action ? miningSourceForActionId(action.actionId, balance) : undefined;
@@ -1940,9 +2012,12 @@ export async function stateFromTransaction(
         : activeTinkeringTarget
           ? tinkeringDurationTicks(activeTinkeringTarget.recipe, balance)
           : activeMiningSource
-            ? nextAttemptBoosted
-              ? boostedMiningAttemptDurationTicks(balance, activeMiningSource)
-              : activeMiningSource.attemptDurationTicks
+            ? miningAttemptDurationTicks(
+                balance,
+                activeMiningSource,
+                equippedTool?.definition,
+                nextAttemptBoosted,
+              )
             : balance.welding.attemptDurationTicks;
   // A workpiece's timer runs from the cursor, which always stands at its start.
   // A Tinkering cycle's cursor moves with every resolution, so its timer runs
@@ -2056,15 +2131,26 @@ export async function stateFromTransaction(
             locationMiningSource.itemId,
             locationMiningSource.itemId,
           ).displayName,
-          attemptDurationTicks: locationMiningSource.attemptDurationTicks,
-          boostedAttemptDurationTicks: boostedMiningAttemptDurationTicks(
+          attemptDurationTicks: miningAttemptDurationTicks(
             balance,
             locationMiningSource,
+            equippedTool?.definition,
+            false,
+          ),
+          boostedAttemptDurationTicks: miningAttemptDurationTicks(
+            balance,
+            locationMiningSource,
+            equippedTool?.definition,
+            true,
           ),
           successChanceBps: miningSuccessChanceBps(miningProgress.level, locationMiningSource),
           successXp: locationMiningSource.successXp,
           yieldMinimum: locationMiningSource.yieldMinimum,
           yieldMaximum: locationMiningSource.yieldMaximum,
+          ...(() => {
+            const charged = miningYieldRange(locationMiningSource, equippedTool?.definition, true);
+            return { chargedYieldMinimum: charged.minimum, chargedYieldMaximum: charged.maximum };
+          })(),
         }
       : undefined,
     refiningRecipes: refiningRecipes(balance).map((recipe) => {
@@ -2131,36 +2217,45 @@ export async function stateFromTransaction(
         itemId: item.itemId,
         name: resolveItemPresentation(item.itemId, item.itemId).displayName,
         massGrams: carriedItemMassGrams(item.itemId, balance),
-        currentCharge:
-          item.itemId === balance.items.salvageCutter.itemId
-            ? normalizeCutterCharge(
-                snapshot.carriedInstances.find((instance) => instance.id === item.id)
-                  ?.currentCharge,
-                balance,
-              )
-            : undefined,
+        currentCharge: chargeOf(
+          {
+            itemId: item.itemId,
+            currentCharge:
+              snapshot.carriedInstances.find((instance) => instance.id === item.id)
+                ?.currentCharge ?? null,
+          },
+          balance,
+        ),
       })),
     },
     equipment: {
       aggregateContainerSlots: snapshot.equipmentLoadout.containerSlotCapacity,
       carriedPowerCellQuantity,
-      salvageCutter: cutterAssignment
-        ? {
-            currentCharge: cutterCharge,
-            maximumCharge: balance.items.salvageCutter.maximumCharge,
+      miningTool: equippedTool
+        ? (() => {
+            const tool = equippedTool.definition;
             // Describes the source the character can actually mine right now;
             // with none in reach, the Cutter's own baseline source (#209).
-            boostedAttemptDurationTicks: boostedMiningAttemptDurationTicks(
-              balance,
-              locationMiningSource ?? balance.mining.sources.ferriteShale,
-            ),
-          }
+            const source = locationMiningSource ?? balance.mining.sources.ferriteShale;
+            return {
+              itemId: equippedTool.itemId,
+              name: resolveItemPresentation(equippedTool.itemId, equippedTool.itemId).displayName,
+              currentCharge: cutterCharge,
+              maximumCharge: tool.maximumCharge,
+              requiredMiningLevel: tool.requiredMiningLevel,
+              usable: miningToolUsable(tool, miningProgress.level),
+              baseDurationMultiplierBps: tool.baseDurationMultiplierBps,
+              chargedEffect: tool.chargedEffect,
+              attemptDurationTicks: miningAttemptDurationTicks(balance, source, tool, false),
+              boostedAttemptDurationTicks: miningAttemptDurationTicks(balance, source, tool, true),
+            };
+          })()
         : undefined,
       slots: [
         {
           target: {
             assignmentKind: "gear" as const,
-            suitSlotId: balance.items.salvageCutter.suitSlotId,
+            suitSlotId: balance.carrying.miningToolSuitSlotId,
           },
           label: "Mining tool",
         },
@@ -2183,22 +2278,10 @@ export async function stateFromTransaction(
               !snapshot.equipmentLoadout.equippedItemInstanceIds.has(instance.id) &&
               isCompatibleEquipmentAssignment(instance.itemId, slot.target, balance),
           )
-          .map((instance) => ({
-            itemInstanceId: instance.id,
-            itemId: instance.itemId,
-            name: resolveItemPresentation(instance.itemId, instance.itemId).displayName,
-            massGrams: carriedItemMassGrams(instance.itemId, balance),
-          }));
+          .map((instance) => slotItemProjection(instance, miningProgress.level, balance));
         return {
           ...slot,
-          item: item
-            ? {
-                itemInstanceId: item.id,
-                itemId: item.itemId,
-                name: resolveItemPresentation(item.itemId, item.itemId).displayName,
-                massGrams: carriedItemMassGrams(item.itemId, balance),
-              }
-            : undefined,
+          item: item ? slotItemProjection(item, miningProgress.level, balance) : undefined,
           eligibleItems,
         };
       }),

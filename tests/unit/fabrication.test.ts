@@ -67,7 +67,12 @@ function snapshot(
 
 describe("the exact Tier-1 recipes", () => {
   it("authors exactly four Fabrication-1 recipes", () => {
-    expect(fabricationActionIds(balance)).toEqual([
+    // Fabrication 5 and 8 (#233) follow them; see fabrication-advanced.test.ts.
+    expect(
+      fabricationActionIds(balance).filter(
+        (actionId) => fabricationRecipeForActionId(actionId, balance)!.minimumLevel === 1,
+      ),
+    ).toEqual([
       ACTION_IDS.mountingBracketFabrication,
       ACTION_IDS.scrapMetalFabrication,
       ACTION_IDS.scrapBoxFabrication,
@@ -121,7 +126,7 @@ describe("the exact Tier-1 recipes", () => {
       kind: "unique",
       massGrams: 5_000,
     });
-    expect(balance.items.scrapBox.slotCapacity).toBe(3);
+    expect(balance.items.scrapBox.equipment.slotCapacity).toBe(3);
   });
 
   it("the Scrap Box is a container in the existing two container slots, never a third", () => {

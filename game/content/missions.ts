@@ -187,15 +187,18 @@ export type MissionRequirement =
     }
   | {
       /**
-       * One unique item instance carried and unequipped (#232): the smallest
-       * unique-item counterpart to `carried_stack`. Equipped items and items in
-       * the Cargo Hold never count, so a turn-in can never take the tool in the
-       * player's hand. No provenance: any instance of the item satisfies it, so
+       * One unique item instance with the character (#232): the smallest
+       * unique-item counterpart to `carried_stack`. Items in the Cargo Hold
+       * never count. No provenance: any instance of the item satisfies it, so
        * a Cutter bought, found or kept since the start is as good as a new one.
+       *
+       * `consume_one` hands one carried, unequipped instance over at turn-in,
+       * so it can never take the tool in the player's hand. `show` takes
+       * nothing, so an equipped instance counts for it too (#233).
        */
       kind: "carried_unique_item";
       itemId: ItemId;
-      /** `show` inspects it; `consume_one` hands one eligible instance over at turn-in. */
+      /** `show` inspects it, carried or equipped; `consume_one` hands one unequipped instance over. */
       turnIn: "show" | "consume_one";
       /** Player-facing copy; `{item}` receives the authoritative display name. */
       objective: string;
@@ -1197,6 +1200,110 @@ export const BRACE_YOURSELF: MissionDefinition = {
   ],
 };
 
+/**
+ * A Cut Above — Tansy's Fabrication 5 lesson at The Jag (#233).
+ *
+ * What it teaches is a rule, not a recipe: new recipes unlock as Fabrication
+ * improves. So the Loadsteel Cutter recipe is already open at Fabrication 5
+ * whether or not this is ever accepted — accepting it unlocks nothing — and
+ * there is no Refining requirement at all, because Fabrication and Refining are
+ * separate professions.
+ *
+ * Return the Favor already proved the player can fabricate a Cutter, so this
+ * only asks to see one: any Loadsteel Cutter carried or equipped counts,
+ * however it was come by and whatever its charge — including one owned before
+ * accepting, which satisfies the objective at once. One left in the Cargo Hold
+ * is not with the player and does not. Showing takes nothing: the player keeps
+ * the tool.
+ */
+export const A_CUT_ABOVE: MissionDefinition = {
+  id: MISSION_IDS.aCutAbove,
+  title: "A Cut Above",
+  summary:
+    "Fabricate a Loadsteel Cutter at Rusk Recovery's Fabrication Station, then show Tansy Rusk at The Jag.",
+  prerequisiteMissionId: MISSION_IDS.braceYourself,
+  prerequisiteSkillLevels: [{ skillId: SKILL_IDS.fabrication, level: 5 }],
+  offers: [
+    {
+      npcId: NPC_IDS.tansyRusk,
+      locationId: LOCATION_IDS.theJag,
+      dialogueId: DIALOGUE_IDS.tansyACutAboveOffer,
+      actionLabel: "TAKE THE JOB",
+    },
+  ],
+  requirements: [
+    {
+      kind: "carried_unique_item",
+      itemId: ITEM_IDS.loadsteelCutter,
+      turnIn: "show",
+      objective: "Show Tansy a {item}",
+    },
+  ],
+  turnIn: {
+    npcId: NPC_IDS.tansyRusk,
+    locationId: LOCATION_IDS.theJag,
+    requiresStationary: true,
+    objective: "Show Tansy a Loadsteel Cutter",
+    dialogueId: DIALOGUE_IDS.tansyACutAboveTurnIn,
+    actionLabel: "SHOW HER THE CUTTER",
+  },
+  reward: { kind: "skill_xp", skillId: SKILL_IDS.fabrication, amount: 500 },
+  dialogue: {
+    carriedReminderDialogueId: DIALOGUE_IDS.tansyACutAboveReminder,
+    // Her ordinary "finish what you're doing" beat at The Jag.
+    busyDialogueId: DIALOGUE_IDS.tansyBraceYourselfBusy,
+    completionPresentationDialogueId: DIALOGUE_IDS.tansyACutAboveCompletion,
+  },
+};
+
+/**
+ * Cutting Costs — Renn buys a Loadsteel Cutter (#233).
+ *
+ * An optional purchase, deliberately open to anyone past Brace Yourself: no
+ * Fabrication level, and no A Cut Above. Renn wants the Cutter, not proof of
+ * who made it, so any Loadsteel Cutter the player is carrying and not wearing
+ * will do — made, traded, gifted or otherwise legitimately theirs — through the
+ * same unique-item turn-in Return the Favor uses. He keeps it, because he is
+ * buying it, and pays once through the ordinary exactly-once Credit reward.
+ */
+export const CUTTING_COSTS: MissionDefinition = {
+  id: MISSION_IDS.cuttingCosts,
+  title: "Cutting Costs",
+  summary: "Bring Renn Calder a Loadsteel Cutter in Holo Hollow. He'll pay for it.",
+  prerequisiteMissionId: MISSION_IDS.braceYourself,
+  offers: [
+    {
+      npcId: NPC_IDS.rennCalder,
+      locationId: LOCATION_IDS.holoHollow,
+      dialogueId: DIALOGUE_IDS.rennCuttingCostsOffer,
+      actionLabel: "TAKE THE JOB",
+    },
+  ],
+  requirements: [
+    {
+      kind: "carried_unique_item",
+      itemId: ITEM_IDS.loadsteelCutter,
+      turnIn: "consume_one",
+      objective: "Bring Renn a {item}",
+    },
+  ],
+  turnIn: {
+    npcId: NPC_IDS.rennCalder,
+    locationId: LOCATION_IDS.holoHollow,
+    requiresStationary: true,
+    objective: "Bring Renn Calder the Loadsteel Cutter in Holo Hollow",
+    dialogueId: DIALOGUE_IDS.rennCuttingCostsTurnIn,
+    actionLabel: "HAND OVER THE CUTTER",
+  },
+  reward: { kind: "credits", amount: 500 },
+  dialogue: {
+    carriedReminderDialogueId: DIALOGUE_IDS.rennCuttingCostsReminder,
+    // His ordinary "finish it, I'll be here" beat.
+    busyDialogueId: DIALOGUE_IDS.rennOutOfTheWeatherBusy,
+    completionPresentationDialogueId: DIALOGUE_IDS.rennCuttingCostsCompletion,
+  },
+};
+
 export const MISSIONS: readonly MissionDefinition[] = [
   WALK_IT_OFF,
   CUT_YOUR_TEETH,
@@ -1212,9 +1319,14 @@ export const MISSIONS: readonly MissionDefinition[] = [
   // Deep Jag's branch is 10,001 Hours' sibling, not its successor: neither
   // needs the other (#209). Its story gate is Break It Down (#232).
   BRACE_YOURSELF,
+  // Tansy's Fabrication 5 lesson (#233): after Brace Yourself, at Fabrication 5.
+  A_CUT_ABOVE,
   // The optional branch sits after the main chain: it is never a prerequisite
   // for anything, and completing or ignoring it changes nothing upstream.
   OUT_OF_THE_WEATHER,
+  // Renn's optional purchase (#233): after Brace Yourself, at any Fabrication
+  // level and whether or not A Cut Above was ever taken.
+  CUTTING_COSTS,
 ];
 
 const missions = new Map<string, MissionDefinition>(

@@ -5,12 +5,17 @@ import {
   equippedItems,
   inventoryStacks,
 } from "@/db/rune-space";
-import { getEffectiveGameBalance, miningActionIds } from "@/game/config/balance";
+import {
+  getEffectiveGameBalance,
+  miningActionIds,
+  miningLevelThresholds,
+} from "@/game/config/balance";
 import { planEquipmentChange, type EquipmentChange } from "@/game/domain/equipment";
-import { ACTION_IDS } from "@/game/config/foundations";
+import { ACTION_IDS, SKILL_IDS } from "@/game/config/foundations";
 import { withResolvedOwnedCharacter } from "@/server/action-resolution";
 import { loadOwnedItemInstances } from "@/server/carried-inventory";
 import { assertActiveWorkpieceResolvable } from "@/server/fabrication-reservation";
+import { characterSkillLevel } from "@/server/skill-levels";
 import {
   createPlayResolver,
   ensurePlayProvisioning,
@@ -101,7 +106,7 @@ export async function changeEquipment(
           .for("update"),
       ]);
       const balance = getEffectiveGameBalance();
-      const miningToolSlotId = balance.items.salvageCutter.suitSlotId;
+      const miningToolSlotId = balance.carrying.miningToolSuitSlotId;
       const previousToolAssignment = assignments.find(
         (a) => a.assignmentKind === "gear" && a.suitSlotId === miningToolSlotId,
       );
@@ -112,6 +117,14 @@ export async function changeEquipment(
         stacks,
         balance,
         change,
+        // A Mining tool's own requirement (#233): a Loadsteel Cutter below
+        // Mining 5 is refused here, never merely hidden by the client.
+        miningLevel: await characterSkillLevel(
+          transaction,
+          context.character.id,
+          SKILL_IDS.mining,
+          miningLevelThresholds(balance),
+        ),
       });
 
       // The whole assignment set is tiny and is replaced inside this transaction,

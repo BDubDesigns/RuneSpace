@@ -15,9 +15,10 @@ import {
   getEffectiveGameBalance,
   getItemDefinition,
   getItemMaximumCharge,
+  miningLevelThresholds,
   skillLevelThresholds,
 } from "@/game/config/balance";
-import { LOCATION_IDS } from "@/game/config/foundations";
+import { LOCATION_IDS, SKILL_IDS } from "@/game/config/foundations";
 import { getLocation } from "@/game/content/locations";
 import { MISSIONS, getMission } from "@/game/content/missions";
 import { missionChainResetScope } from "@/game/domain/missions";
@@ -44,6 +45,7 @@ import {
   FabricationReservationError,
 } from "@/server/fabrication-reservation";
 import { invalidateMiningActionForChangedTool } from "@/server/equipment";
+import { characterSkillLevel } from "@/server/skill-levels";
 import { removeCargoStack } from "@/server/cargo-hold";
 import { defaultMiningRandom } from "@/server/mining";
 import type { MiningRandom } from "@/game/domain/mining";
@@ -425,6 +427,13 @@ export async function forceUnequipItemAsAdmin(
           instances: itemState.carriedInstances,
           stacks,
           balance,
+          // Only an equip reads it (#233); an unequip is never level-gated.
+          miningLevel: await characterSkillLevel(
+            transaction,
+            character.id,
+            SKILL_IDS.mining,
+            miningLevelThresholds(balance),
+          ),
           change: {
             kind: "unequip",
             target: {
@@ -456,7 +465,7 @@ export async function forceUnequipItemAsAdmin(
       // is live, apply the shared authoritative Mining-loadout invalidation so
       // an active `ferrite_shale_mining` action can never be committed with a
       // missing tool.
-      const miningToolSlotId = balance.items.salvageCutter.suitSlotId;
+      const miningToolSlotId = balance.carrying.miningToolSuitSlotId;
       if (assignment.assignmentKind === "gear" && assignment.suitSlotId === miningToolSlotId) {
         await invalidateMiningActionForChangedTool(transaction, {
           characterId: character.id,

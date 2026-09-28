@@ -9,7 +9,7 @@ import { ActivityPanel } from "@/features/shared/ActivityPanel";
 import { ActivityContextRow, SkillProgressRow } from "@/features/shared/activity-context";
 import { ItemVisual } from "@/components/items/ItemVisual";
 import { InventoryStackVisual } from "@/components/items/InventoryStackVisual";
-import { getEffectiveGameBalance } from "@/game/config/balance";
+import { getEffectiveGameBalance, getItemMaximumCharge } from "@/game/config/balance";
 import { ACTION_IDS, GAME_TICK_MS, REPAIR_TARGET_IDS } from "@/game/config/foundations";
 import type {
   CargoHoldTransferActionResult,
@@ -376,12 +376,12 @@ export function CargoHoldPanel() {
                 accessibleLabel={item.name}
                 additionalDescription={
                   item.currentCharge !== undefined
-                    ? `${item.currentCharge} of ${balance.items.salvageCutter.maximumCharge} charges remaining`
+                    ? `${item.currentCharge} of ${getItemMaximumCharge(item.itemId)} charges remaining`
                     : undefined
                 }
                 badge={
                   item.currentCharge !== undefined
-                    ? `${item.currentCharge}/${balance.items.salvageCutter.maximumCharge}`
+                    ? `${item.currentCharge}/${getItemMaximumCharge(item.itemId)}`
                     : undefined
                 }
                 interactive
@@ -444,12 +444,12 @@ export function CargoHoldPanel() {
                 accessibleLabel={item.name}
                 additionalDescription={
                   item.currentCharge !== undefined
-                    ? `${item.currentCharge} of ${balance.items.salvageCutter.maximumCharge} charges remaining`
+                    ? `${item.currentCharge} of ${getItemMaximumCharge(item.itemId)} charges remaining`
                     : undefined
                 }
                 badge={
                   item.currentCharge !== undefined
-                    ? `${item.currentCharge}/${balance.items.salvageCutter.maximumCharge}`
+                    ? `${item.currentCharge}/${getItemMaximumCharge(item.itemId)}`
                     : undefined
                 }
                 interactive
@@ -510,7 +510,7 @@ export function CargoHoldPanel() {
             <ItemVisual
               additionalDescription={
                 resolvedSelection.entry.currentCharge !== undefined
-                  ? `${resolvedSelection.entry.currentCharge} of ${balance.items.salvageCutter.maximumCharge} charges remaining`
+                  ? `${resolvedSelection.entry.currentCharge} of ${getItemMaximumCharge(resolvedSelection.entry.itemId)} charges remaining`
                   : undefined
               }
               className="h-20 w-20 shrink-0"

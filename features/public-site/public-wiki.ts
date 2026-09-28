@@ -158,10 +158,23 @@ const authoredWikiArticles = [
         heading: "Mining at The Jag",
         paragraphs: [
           [
-            "The Jag gives Ferrite Shale, and Mining needs a Salvage Cutter equipped. Each attempt takes about six seconds; a success gives you one or two shale. Your chance of success improves as your Mining skill grows, and Mining stops on its own if you run out of room to carry more. A charged ",
+            "The Jag gives Ferrite Shale, and Mining needs a Mining Cutter equipped. With the starter Salvage Cutter each attempt takes about six seconds; a success gives you one or two shale. Your chance of success improves as your Mining skill grows, and Mining stops on its own if you run out of room to carry more. A charged ",
             { text: "Power Cell", articleSlug: "power-cells" },
             " can speed this up.",
           ],
+        ],
+      },
+      {
+        heading: "The Loadsteel Cutter",
+        paragraphs: [
+          [
+            "The Loadsteel Cutter is a second Mining tool, made at Fabrication 5 on the ",
+            { text: "Fabrication Station", articleSlug: "fabrication-and-tinkering" },
+            ". It is its own tool rather than an improved Salvage Cutter, and it needs Mining 5 to equip or use. It is heavier, at 8 kg.",
+          ],
+          "It mines faster whether or not it is charged: a Ferrite Shale attempt takes about 4.8 seconds instead of six, and a Galvanite attempt about 7.2 instead of nine.",
+          "A Power Cell does something different for it than for the Salvage Cutter. A charged Salvage Cutter mines faster; a charged Loadsteel Cutter mines at the same speed, but every successful attempt gives one more ore than usual — two or three instead of one or two. If you only have room for the usual amount, you still get the usual amount. Your chance of success and the XP an attempt pays stay the same.",
+          "One Power Cell gives it ten charged attempts, used up one per attempt whether it succeeds or not, just like the Salvage Cutter. A new Loadsteel Cutter comes off the machine with no charge. Once its charge runs out it keeps its faster base speed and loses only the extra ore.",
         ],
       },
       {
@@ -172,7 +185,7 @@ const authoredWikiArticles = [
             { text: "Brace Yourself", articleSlug: "missions" },
             ". It is harder rock and slower going: about nine seconds an attempt, with a lower chance of success that keeps improving until Mining 40. A success gives one or two Galvanite and noticeably more Mining experience than shale does.",
           ],
-          "Galvanite is unusually conductive, but it does not generate power on its own. Your starter Salvage Cutter handles it, and a charged Power Cell speeds it up the same way.",
+          "Galvanite is unusually conductive, but it does not generate power on its own. Your starter Salvage Cutter handles it, and a charged Power Cell speeds it up the same way. So does a Loadsteel Cutter.",
         ],
       },
       {
@@ -199,7 +212,8 @@ const authoredWikiArticles = [
       {
         heading: "Practical tips",
         list: [
-          "Keep a Salvage Cutter equipped before you try to start Mining — it won't start without one.",
+          "Keep a Mining Cutter you can use equipped before you try to start Mining — it won't start without one.",
+          "Swapping Cutters stops a Mining run; start it again to mine with the one you just equipped.",
           "Refining needs its inputs on hand; stock up before heading to the Processing Yard.",
           "Galvanite is heavy — 400g a piece against shale's 100g — so a full trip out of Deep Jag is a much shorter one.",
           "Both activities stop cleanly if you start walking somewhere else — whatever you've already finished is kept.",
@@ -216,7 +230,7 @@ const authoredWikiArticles = [
       {
         heading: "Stacks and unique items",
         paragraphs: [
-          "Ordinary material — Ferrite Shale, Refined Ferrite, Slag, Power Cells — stacks together in a single Inventory tile up to that item's stack limit. Gear like your Salvage Cutter is a unique item: it gets its own tile and remembers its own state, such as how much charge it has left.",
+          "Ordinary material — Ferrite Shale, Refined Ferrite, Slag, Power Cells — stacks together in a single Inventory tile up to that item's stack limit. Gear like your Salvage Cutter is a unique item: it gets its own tile and remembers its own state, such as how much charge it has left. Selecting a piece of gear shows what it does — the slots a container adds, or the Mining level a Cutter needs and how it changes Mining.",
         ],
       },
       {
@@ -226,7 +240,7 @@ const authoredWikiArticles = [
           [
             "You have two container attachments. A ",
             { text: "Scrap Box", articleSlug: "fabrication-and-tinkering" },
-            " you fabricate yourself fits either one and adds three more slots, at a heavy 5 kg.",
+            " you fabricate yourself fits either one and adds three more slots, at a heavy 5 kg. A Freight Harness, made at Fabrication 8, fits either one too and adds six slots — but it weighs 9 kg, and that weight counts toward your limit like any other gear.",
           ],
         ],
       },
@@ -237,6 +251,11 @@ const authoredWikiArticles = [
             "Open Inventory or Equipment to equip an item, such as your ",
             { text: "Salvage Cutter", articleSlug: "mining-and-refining" },
             ", into its matching slot. Equipped items disappear from the Inventory grid while they're worn — they're not gone, just equipped.",
+          ],
+          [
+            "There is one Mining tool slot, which takes either the Salvage Cutter or the ",
+            { text: "Loadsteel Cutter", articleSlug: "mining-and-refining" },
+            ". The Loadsteel Cutter needs Mining 5; below that, Equipment lists it but will not equip it, and says why.",
           ],
         ],
       },
@@ -257,12 +276,23 @@ const authoredWikiArticles = [
     slug: "power-cells",
     title: "Power Cells",
     category: "gear-and-credits",
-    summary: "Claiming Power Cells at the Annex and using one to charge your Salvage Cutter.",
+    summary:
+      "Claiming Power Cells at the Annex, making them at Fabrication 5, and using one to charge your Mining Cutter.",
     sections: [
       {
         heading: "Claiming your daily cells",
         paragraphs: [
           "Travel to the DeWhat? Emergency Power Annex and claim your allotment of five Power Cells. You can claim once per Pacific-time day; the allotment resets at local midnight.",
+        ],
+      },
+      {
+        heading: "Making your own",
+        paragraphs: [
+          [
+            "From Fabrication 5 the ",
+            { text: "Fabrication Station", articleSlug: "fabrication-and-tinkering" },
+            " makes two ordinary, ready-to-use Power Cells from one Galvanic Stock. The station charges them as part of making them, so there is nothing more to do before they go into a Cutter.",
+          ],
         ],
       },
       {
@@ -288,13 +318,18 @@ const authoredWikiArticles = [
         ],
       },
       {
-        heading: "Charging the Salvage Cutter",
+        heading: "Charging a Cutter",
         paragraphs: [
-          "Load one carried Power Cell into an equipped, empty Salvage Cutter from Inventory or Equipment. This sets the Cutter's charge to ten uses and consumes the cell completely — a Cutter that already has charge can't be topped up early.",
+          "Load one carried Power Cell into your equipped, empty Mining Cutter from Inventory or Equipment. This sets the Cutter's charge to ten uses and consumes the cell completely — a Cutter that already has charge can't be topped up early.",
           [
-            "While the Cutter has charge, each ",
+            "While a Salvage Cutter has charge, each ",
             { text: "Mining", articleSlug: "mining-and-refining" },
-            " attempt takes about three seconds instead of six — everything else about Mining (chance of success, what you find, XP) stays the same. Once the charge runs out, Mining automatically goes back to its normal speed.",
+            " attempt at The Jag takes about three seconds instead of six — everything else about Mining (chance of success, what you find, XP) stays the same. Once the charge runs out, Mining automatically goes back to its normal speed.",
+          ],
+          [
+            "A charged ",
+            { text: "Loadsteel Cutter", articleSlug: "mining-and-refining" },
+            " is not sped up. Instead, every successful attempt while it has charge gives one more ore than usual.",
           ],
         ],
       },
@@ -649,7 +684,36 @@ const authoredWikiArticles = [
           ],
         ],
         paragraphs: [
-          "Every current recipe needs only Fabrication level 1. Fabricate lists what you can make right now with what you are carrying — plus any recipe a job is pointing you at, with what it is still missing. Recipes, beside it, lists every recipe you know, whether or not you have the materials. When a piece finishes, the station tells you what you made and the XP it paid.",
+          "These four need only Fabrication level 1. Fabricate lists what you can make right now with what you are carrying — plus any recipe a job is pointing you at, with what it is still missing. Recipes, beside it, lists every recipe you know, whether or not you have the materials. When a piece finishes, the station tells you what you made and the XP it paid.",
+        ],
+      },
+      {
+        heading: "Fabrication 5 and 8",
+        paragraphs: [
+          [
+            "More recipes open as your Fabrication level rises — nothing else unlocks them. They use ",
+            { text: "Galvanic Stock and Galvaferrite", articleSlug: "mining-and-refining" },
+            ", but you do not need any Refining level of your own to use them: stock you bought or were given works just as well as stock you refined.",
+          ],
+        ],
+        list: [
+          "Scrap Metal from Galvanic Stock (Fabrication 5) — 1 Galvanic Stock into 2 Scrap Metal. 8.4 seconds, 15 Fabrication XP. Another way to make scrap, not meant as training.",
+          "Galvanic Wire Spool (Fabrication 5) — 1 Galvanic Stock. 14.4 seconds, 45 Fabrication XP. Wiring for bigger builds; it weighs 1 kg and stacks only three to a slot.",
+          [
+            "Power Cells (Fabrication 5) — 1 Galvanic Stock into 2 ",
+            { text: "Power Cells", articleSlug: "power-cells" },
+            ". 18 seconds, 75 Fabrication XP. One batch always makes two ready-to-use cells, so the tile shows two however many batches you choose — four batches make eight.",
+          ],
+          [
+            "Loadsteel Cutter (Fabrication 5) — 2 Galvaferrite, 1 Galvanic Wire Spool and 1 Power Cell. 27 seconds, 180 Fabrication XP. A second, faster ",
+            { text: "Mining tool", articleSlug: "mining-and-refining" },
+            " that needs Mining 5 to use. The Power Cell goes into building it, so it comes off the machine with no charge.",
+          ],
+          [
+            "Freight Harness (Fabrication 8) — 4 Galvaferrite and 2 Mounting Brackets. 36 seconds, 270 Fabrication XP. An advanced container that adds six ",
+            { text: "Inventory", articleSlug: "inventory-and-equipment" },
+            " slots in either container attachment, at a hefty 9 kg.",
+          ],
         ],
       },
       {
@@ -684,6 +748,10 @@ const authoredWikiArticles = [
           "Salvage Cutter — 65 Fabrication XP, 24 seconds, 3 Scrap Metal.",
           "Scrap Box — 81 Fabrication XP, 43.2 seconds, 3 Scrap Metal.",
           "Mounting Bracket — 25 Fabrication XP, 14.4 seconds, 1 Scrap Metal.",
+          "Galvanic Wire Spool (Fabrication 5) — 45 Fabrication XP, 28.8 seconds, 1 Scrap Metal.",
+          "Power Cells (Fabrication 5) — a pair at a time, never one alone: 75 Fabrication XP, 36 seconds, 1 Scrap Metal.",
+          "Loadsteel Cutter (Fabrication 5) — 180 Fabrication XP, 54 seconds, 2 Scrap Metal.",
+          "Freight Harness (Fabrication 8) — 270 Fabrication XP, 72 seconds, 3 Scrap Metal.",
         ],
       },
       {
@@ -692,7 +760,7 @@ const authoredWikiArticles = [
           "Tinkering uses the same run control: a number of pieces, or Max until there is nothing left to take apart. Only pieces you are carrying and not wearing can be taken apart, and only those are listed — unequip something first if you want to Tinker it.",
           "The piece is gone the moment its Tinkering starts. Stop keeps that piece exactly where it was, and Resume carries on with it without taking another; walking away from the yard does the same. Finish Current Item finishes it — full XP and Scrap — and then stops.",
           "By default Tinkering keeps its Scrap, and a piece will not start if there is no room for the Scrap it gives back. Turn on Auto-discard Scrap to keep going regardless: the piece is still taken apart and still pays its XP, but the Scrap is thrown away. The setting stays until you change it.",
-          "Tinkering will not take apart your last Mining Cutter. Cutters you are wearing or have stored in the Cargo Hold count, so you can take one apart as long as you have another somewhere — otherwise make or get another Cutter first.",
+          "Tinkering will not take apart your last Mining Cutter you can use — Salvage or Loadsteel. Cutters you are wearing or have stored in the Cargo Hold count, so you can take one apart as long as you have another somewhere — otherwise make or get another Cutter first. A Loadsteel Cutter only counts once you are Mining 5, because before then you cannot mine with it.",
         ],
       },
     ],
@@ -757,6 +825,11 @@ const authoredWikiArticles = [
             { text: "Work Orders", articleSlug: "work-orders" },
             " terminal at Rusk Recovery. Accepting it is what makes the board yours for good; finishing the job and showing him the work is just the formality. It does not need Return the Favor or Break It Down.",
           ],
+          [
+            "A Cut Above — once you have finished Brace Yourself and reached Fabrication 5, Tansy at The Jag wants to see you build a ",
+            { text: "Loadsteel Cutter", articleSlug: "fabrication-and-tinkering" },
+            ". The recipe is already open at Fabrication 5 — taking the job doesn't unlock it, and you don't need any Refining. Show her a Loadsteel Cutter you're carrying or have equipped, however you came by it. She lets you keep it. Worth 500 Fabrication XP.",
+          ],
         ],
       },
       {
@@ -774,6 +847,11 @@ const authoredWikiArticles = [
             "Brace Yourself — Tansy Rusk has known about the cave-in below The Jag for years. Once you have finished Break It Down and reached both Mining 5 and Welding 5, she will ask you to help her reopen it back at The Jag: 25 Refined Ferrite and 5 ",
             { text: "Power Cells", articleSlug: "power-cells" },
             " hauled down to Deep Jag, then fifteen welding passes to set the brace. You do not need 10,001 Hours first — Work Orders and Deep Jag are two separate directions out of the same point.",
+          ],
+          [
+            "Cutting Costs — once Brace Yourself is done, Renn Calder in Holo Hollow will pay 500 Credits for a ",
+            { text: "Loadsteel Cutter", articleSlug: "mining-and-refining" },
+            ". He doesn't care where it came from: one you made, one you were given or traded for, any you are carrying and not wearing. You don't need any Fabrication level or A Cut Above for it. He keeps the Cutter — he's buying it.",
           ],
         ],
       },
@@ -803,7 +881,7 @@ const authoredWikiArticles = [
       {
         heading: "How missions work in practice",
         paragraphs: [
-          "Objectives update live as you meet them. Every job you've accepted gets its own strip at the top of the screen, on the Map and while travelling too — green while there's still work to do, blue once it's ready to hand in — and the Mission Log keeps the full checklist. Finishing Walk It Off, Cut Your Teeth, or Waste Not hands you the next job in the chain automatically — there's nothing extra to accept. Keep the Change works differently: after Hold It Together, go back and talk to Wade to take it on. 10,000 Hours and 10,001 Hours work the same way — Wade won't come find you, so walk out to Rusk Recovery and take each one on once it's available. Return the Favor is the same again, taken from Tansy in that yard, and Break It Down follows it automatically. Brace Yourself comes after Break It Down; 10,001 Hours is a separate branch that needs neither. When every objective on a job is met, talk to the NPC named in it to turn it in.",
+          "Objectives update live as you meet them. Every job you've accepted gets its own strip at the top of the screen, on the Map and while travelling too — green while there's still work to do, blue once it's ready to hand in — and the Mission Log keeps the full checklist. Finishing Walk It Off, Cut Your Teeth, or Waste Not hands you the next job in the chain automatically — there's nothing extra to accept. Keep the Change works differently: after Hold It Together, go back and talk to Wade to take it on. 10,000 Hours and 10,001 Hours work the same way — Wade won't come find you, so walk out to Rusk Recovery and take each one on once it's available. Return the Favor is the same again, taken from Tansy in that yard, and Break It Down follows it automatically. Brace Yourself comes after Break It Down; 10,001 Hours is a separate branch that needs neither. After Brace Yourself, Tansy offers A Cut Above at The Jag once you reach Fabrication 5, and Renn offers Cutting Costs in town. When every objective on a job is met, talk to the NPC named in it to turn it in.",
         ],
       },
       {
@@ -848,6 +926,13 @@ const authoredWikiArticles = [
             { text: "Manual Override", articleSlug: "fabrication-and-tinkering" },
             " on the job. If a push wrecks the Cutter, the job just waits for another one.",
           ],
+        ],
+      },
+      {
+        heading: "A Cut Above and Cutting Costs",
+        paragraphs: [
+          "A Cut Above only asks to see one. Any Loadsteel Cutter you have with you counts — one you made before taking the job, made since, bought, or were given, carried or equipped, charged or not. If you already have one when you take the job, you can show her straight away. One left in the Cargo Hold isn't with you, so it doesn't count. Tansy only looks — nothing is taken.",
+          "Cutting Costs is the opposite: Renn is buying a Cutter, not checking who built it, so any Loadsteel Cutter you are carrying and not wearing will do. He will not take the one in your hand, and he pays his 500 Credits once.",
         ],
       },
       {
@@ -1030,11 +1115,15 @@ const authoredWikiArticles = [
             { text: "Out of the Weather", articleSlug: "missions" },
             " grants +250 Welding XP on top of what the welding itself paid. ",
             { text: "Return the Favor", articleSlug: "missions" },
-            " grants +100 Fabrication XP and ",
+            " grants +100 Fabrication XP, ",
             { text: "Break It Down", articleSlug: "missions" },
-            " +250. Not every mission pays in XP — ",
+            " +250, and ",
+            { text: "A Cut Above", articleSlug: "missions" },
+            " +500. Not every mission pays in XP — ",
             { text: "10,000 Hours", articleSlug: "missions" },
-            " pays 50 Credits instead, because its practice welds already earned their own Welding XP as you did them.",
+            " pays 50 Credits instead, because its practice welds already earned their own Welding XP as you did them, and Renn pays 500 Credits for the Loadsteel Cutter in ",
+            { text: "Cutting Costs", articleSlug: "missions" },
+            ".",
           ],
         ],
       },

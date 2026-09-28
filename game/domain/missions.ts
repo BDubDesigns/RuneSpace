@@ -411,7 +411,7 @@ function requirementSatisfied(
       return carried >= requiredCarriedQuantity(requirement, observation);
     }
     case "carried_unique_item":
-      return (observation?.carriedUniqueItems?.get(requirement.itemId) ?? 0) >= 1;
+      return uniqueItemRequirementHolds(requirement, observation);
     case "tracked_activity":
       return (
         (observation?.trackedProgress?.get(requirement.progressKey) ?? 0) >= requirement.target
@@ -423,6 +423,23 @@ function requirementSatisfied(
       // evidence; the conversation itself is never replayed as proof.
       return (observation?.trackedProgress?.get(requirement.progressKey) ?? 0) >= 1;
   }
+}
+
+/**
+ * Whether a unique-item requirement holds (#232, #233). A carried, unequipped
+ * instance always does. Showing takes nothing, so for `show` an equipped
+ * instance counts as well — it is physically with the character — while a
+ * hand-in (`consume_one`) still never reaches the tool in the player's hand.
+ * The Cargo Hold never counts: equipped gear is always carried.
+ */
+export function uniqueItemRequirementHolds(
+  requirement: Extract<MissionRequirement, { kind: "carried_unique_item" }>,
+  observation: Pick<MissionObservation, "carriedUniqueItems" | "equippedItemIds"> | undefined,
+): boolean {
+  if ((observation?.carriedUniqueItems?.get(requirement.itemId) ?? 0) >= 1) return true;
+  return (
+    requirement.turnIn === "show" && (observation?.equippedItemIds.has(requirement.itemId) ?? false)
+  );
 }
 
 function firstUnsatisfiedRequirement(

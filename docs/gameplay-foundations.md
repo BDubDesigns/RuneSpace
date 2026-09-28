@@ -55,9 +55,31 @@ resolved attempt awards is recovered from the durable action ID.
 | Ferrite Shale | The Jag | 10 | 35% at 1 → 100% at 30 | 1–2 | 15 |
 | Galvanite | Deep Jag, once braced | 15 | 35% at 1 → 100% at 40 | 1–2 | 25 |
 
-A charged starter Salvage Cutter halves both under the shared whole-tick ceiling
-rule, so Ferrite Shale becomes 5 ticks and Galvanite 8, consuming one charge per
-charged attempt and changing neither success chance, XP nor yield.
+**The Mining tool is authored too (#233).** Whichever Cutter is in the one
+Mining-tool slot supplies its own requirement, charge ceiling, permanent
+duration multiplier and **charged effect** through the equipment-definition
+boundary (see "Inventory and equipment"). A charged effect is one of two closed
+identities: `speed` — the one global Power Cell speed multiplier, applied to the
+tool's duration under the same whole-tick rounding — or `extra_yield` — ore
+added to each successful charged attempt. Never both.
+
+| Tool | Requires | Duration, uncharged | Duration, charged | Charge | Charged success |
+| --- | --- | --- | --- | --- | --- |
+| Salvage Cutter | Mining 1 | 1.00× — Ferrite 10, Galvanite 15 ticks | `speed`: ÷2 — 5 / 8 ticks | 10 per Cell | ordinary 1–2 |
+| Loadsteel Cutter | Mining 5 | 0.8× — 8 / 12 ticks | unchanged — 8 / 12 ticks | 10 per Cell | `extra_yield`: ordinary roll +1 — 2–3 |
+
+A charged Salvage Cutter is faster attempts (better Mining XP per hour); a
+charged Loadsteel Cutter is more ore per successful attempt (better ore and
+Power Cell efficiency). A charged attempt consumes one charge whether it
+succeeds or fails, and one Cell still funds ten charged attempts. Neither tool's
+charge changes success chance or the XP an attempt pays. The Loadsteel Cutter's
+extra ore comes after the source's ordinary successful yield has resolved under
+the existing roll and fit rules (1 or 2, falling back to the minimum at a full
+stack or mass boundary), and is added only if that extra unit fits too — no
+room for the bonus keeps the ordinary result rather than falling back any
+further. Depleted, a Loadsteel Cutter keeps its permanent 0.8× and loses only
+the extra ore. Below its Mining 5 requirement a Loadsteel Cutter can neither be
+equipped nor used: Mining treats it as no usable tool.
 
 ### Ferrite Shale
 
@@ -69,13 +91,16 @@ success; 100 g shale units with a 10-unit stack limit; and the approved level-1
 shale nor XP. Server-generated randomness is resolved in the locked action
 transaction, so refreshes and retries cannot replay an outcome.
 
-Mining stops before a roll when the minimum yield cannot fit, when its equipped
-Salvage Cutter is missing, when manually stopped, or when replaced. New
+Mining stops before a roll when the minimum yield cannot fit, when no usable
+Mining Cutter is equipped, when manually stopped, or when replaced. New
 characters are provisioned once transactionally with one 10 kg MYKEA
 SCHLEPPRAUM-8 eight-slot container and the approved 50 kg carry capacity; the
 first Salvage Cutter is the Walk It Off mission reward (see `docs/missions.md`).
 The equipped Cutter remains required for Mining, whether obtained through that
-mission or later means.
+mission or later means. A resolution always reads the tool actually in the slot
+under the character lock, and changing the tool mid-run resolves any due work
+with the old one and then stops the run (`mining_tool_replaced`), so no refresh
+or offline resolution can apply one Cutter's effects to another (#233).
 
 The current Mining run is bounded per-character state. Aggregate totals survive
 refreshes and stopping; only the latest ten immutable server-resolved attempt
@@ -527,7 +552,7 @@ Fabrication turns processed stock into discrete items. It is a standard skill on
 the shared level curve (`skillLevelCurves` in `game/config/balance.ts`), starts
 at level 1, appears on every progression surface through the canonical skill
 projection, and carries its approved Shop Olive accent (`#7FA347`) there like
-every other skill. Tier 1 ships here; Fabrication 5 and 8 are the next slice.
+every other skill. Tier 1 shipped with #232; Fabrication 5 and 8 follow (#233).
 
 ### Rusk Recovery's two work areas
 
@@ -584,6 +609,37 @@ slots — there is no third. A fabricated Salvage Cutter is another ordinary
 Cutter instance at the Cutter's ordinary uncharged state; the recipe's Power
 Cell is a construction component, not stored charge. Direct Scrap is a utility
 recipe and not a Tinkering target.
+
+### Fabrication 5 and 8 recipes (issue #233)
+
+| Recipe | Level | Inputs → output | Duration | Base XP |
+| --- | ---: | --- | --- | ---: |
+| Direct Galvanic Scrap | 5 | 1 Galvanic Stock → 2 Scrap Metal | 14 ticks / 8.4 s | 15 |
+| Galvanic Wire Spool | 5 | 1 Galvanic Stock → 1 Galvanic Wire Spool (1,000 g, stack 3) | 24 ticks / 14.4 s | 45 |
+| Power Cells | 5 | 1 Galvanic Stock → 2 Power Cells | 30 ticks / 18 s | 75 |
+| Loadsteel Cutter | 5 | 2 Galvaferrite + 1 Galvanic Wire Spool + 1 Power Cell → 1 Loadsteel Cutter (8,000 g, unique) | 45 ticks / 27 s | 180 |
+| Freight Harness | 8 | 4 Galvaferrite + 2 Mounting Brackets → 1 Freight Harness (9,000 g, unique) | 60 ticks / 36 s | 270 |
+
+Reaching the level is the whole gate: no Mission, NPC permission or personal
+Refining level is involved, so Galvanic Stock or Galvaferrite acquired from
+anywhere is valid input. Accepting A Cut Above unlocks nothing. The station
+supplies mundane winding cores, insulation, casings and charging hardware, so
+none of those is an inventory item.
+
+- **Power Cells** are one authored two-output batch of ordinary, usable Power
+  Cells — there is no uncharged Cell and no charging step. A run counts batches,
+  and the recipe tile always shows the one batch (x2): four batches still show
+  x2 while the run summary totals eight Cells. Bix's prices and daily limit are
+  unchanged (#230).
+- **Direct Galvanic Scrap** is the Galvanic-tier utility counterpart of Direct
+  Scrap: material access, not training, and not a Tinkering target.
+- **The Loadsteel Cutter** is a separate second Mining tool, not an upgrade or
+  transformation of the Salvage Cutter. A new one comes off the machine at 0/10:
+  its Power Cell commissions the tool and is not stored charge. See the Mining
+  slice for its behaviour.
+- **The Freight Harness** is an advanced container attachment: +6 Inventory
+  slots in either of the two existing container slots, carried at its full
+  9 kg — not a carry-capacity upgrade.
 
 ### The workpiece is binding
 
@@ -672,6 +728,13 @@ units rounded up: Salvage Cutter 65 XP / 24 s / 3 Scrap, Scrap Box 81 XP /
 43.2 s / 3 Scrap, Mounting Bracket 25 XP / 14.4 s / 1 Scrap. Scrap only, never
 original ingredients, and no Override multiplier travels with an item.
 
+The Fabrication 5 and 8 targets (#233) follow from the same rules with no item
+exception: Galvanic Wire Spool 45 XP / 28.8 s / 1 Scrap and Power Cells 75 XP /
+36 s / 1 Scrap (a complete batch of **two** Cells — one Cell alone is never
+Tinkered) and Loadsteel Cutter 180 XP / 54 s / 2 Scrap, all at Fabrication 5;
+Freight Harness 270 XP / 72 s / 3 Scrap at Fabrication 8. Neither Direct Scrap
+recipe is a target.
+
 It follows Practice Welding's cycle model: a cycle commits — destroys — its batch
 the instant it begins, so a refresh can neither duplicate nor dodge the
 destruction; ordinary Stop (and Travel) keeps the committed cycle and its worked
@@ -689,7 +752,11 @@ mid-cycle, what fits is kept and the rest is reported as discarded.
 **Last-Cutter safety (first-alpha provisional):** a Cutter batch that would
 leave the character with zero usable Mining Cutters across equipped gear,
 carried Inventory and the Cargo Hold is refused, and a Cutter that would be the
-last never counts as a batch the selector may offer.
+last never counts as a batch the selector may offer. Since #233 either Mining
+tool is a Cutter, and "usable" is the tool's own Mining requirement: a Loadsteel
+Cutter keeps a Mining 5 character able to mine, but not a Mining 4 one — so
+below Mining 5 the Salvage Cutter beside it is still the last usable Cutter,
+and the Loadsteel Cutter itself may be taken apart.
 
 State lives in `character_tinkering_state` (migration 0030): the preference, the
 committed cycle's target and worked ticks, the Finish Current intent, and the
@@ -717,6 +784,33 @@ run.
 - Item names, weights, stack limits, maximum charges, container capacities, and
   equipment classification belong to validated typed content, not player rows.
 
+### Equipment definitions (issue #233)
+
+Every piece of equipment is described by one authored **equipment definition**
+on its item entry in `game/config/balance.ts`, resolved through
+`getEquipmentDefinition` (with `getMiningToolDefinition` and
+`getItemMaximumCharge` as its narrow readers). It is deliberately two closed
+kinds, not an item-effect language:
+
+| Kind | Fits | Authors | Items |
+| --- | --- | --- | --- |
+| `mining_tool` | the one `mining_tool` gear slot | Mining level to equip and use, maximum charge, base-duration multiplier, charged effect (`speed` or `extra_yield`) | Salvage Cutter, Loadsteel Cutter |
+| `container` | either container attachment slot | Inventory slots contributed | MYKEA SCHLEPPRAUM-8 (8), Scrap Box (3), Freight Harness (6) |
+
+The suit's slots are authored once in `balance.carrying` (one Mining-tool slot,
+two container attachments); an item names its kind, never a slot. Slot
+compatibility, container capacity and the equipped Mining tool
+(`EquipmentLoadout.miningTool`) are derived in `game/domain/equipment.ts`; Mining
+reads the equipped tool's durations, charge and yield from `game/domain/mining.ts`;
+the last-usable-Cutter guard, Power Cell loading, and every Inventory, Equipment,
+Cargo Hold and Mining presentation of charge read the same definition. No
+consumer branches on a particular item ID.
+
+Equipping a Mining tool whose Mining requirement the character has not met is
+refused by the equipment command (the Equipment surface lists it, disabled, with
+the requirement); an equipped tool whose requirement is not met is treated by
+Mining as no usable tool.
+
 ### Inventory item actions (issue #58)
 
 - Selecting an occupied Inventory tile (mouse, touch, or keyboard) opens one
@@ -742,7 +836,7 @@ run.
   NPC merchant is a separate authoritative command (see Credits below), not a
   drop or a transfer.
 - Inventory Power Cell loading is a convenience route to the same
-  server-authoritative `loadSalvageCutterPowerCell` command and transaction the
+  server-authoritative `loadMiningToolPowerCell` command and transaction the
   Equipment surface uses, via the same `loadPowerCellAction` client action. It
   is enabled only when the authoritative state shows a loose cell, an equipped
   depleted Cutter, and no conflicting command in flight, and it explains the
@@ -1325,20 +1419,31 @@ server-side even against a stale or manipulated client.
   persistence was introduced.
 - Power Cell boosting is defined in the Issue #24 section below.
 
-### Salvage Cutter Power Cell boost (issue #24)
+### Mining Cutter Power Cell boost (issues #24 and #233)
+
+This section was written for the Salvage Cutter and holds unchanged for it.
+Since #233 it applies to whichever Mining tool is equipped, each against its own
+authored definition (see "Equipment definitions" and the Mining slice): loading
+and charge consumption are identical for both Cutters, but only a `speed` tool —
+the Salvage Cutter — takes the 2× below. A charged Loadsteel Cutter keeps its
+0.8× duration and adds one ore to each successful attempt instead.
 
 - A loose `power_cell` is a 500 g fungible stack item with a stack limit of five.
   Issue #47's DeWhat? Emergency Power Annex is the renewable source; there are no
-  starter or backfilled cells.
-- Loading one carried Power Cell into the equipped, depleted Salvage Cutter
-  consumes the cell completely and sets the Cutter's durable charge to ten.
+  starter or backfilled cells. Since #233 Fabrication 5 also makes them, two per
+  batch.
+- Loading one carried Power Cell into the equipped, depleted Mining Cutter
+  consumes the cell completely and sets the Cutter's durable charge to its own
+  maximum — ten for both current Cutters.
   Loading is allowed while idle or while another action is active; if Mining is
   active, due Mining work is resolved first in the same transaction. A nonzero
   charge cannot be overwritten.
 - While charge is greater than zero, each next Mining attempt uses
-  `ceil(normalAttemptTicks / 2)` (currently 5 ticks / 3 seconds). The boost changes
-  timing only: success chance, random rolls, yield, XP, inventory planning, and
-  progression are unchanged.
+  `ceil(toolAttemptTicks / 2)` (currently 5 ticks / 3 seconds with the Salvage
+  Cutter at Ferrite Shale). For the Salvage Cutter the boost changes timing only:
+  success chance, random rolls, yield, XP, inventory planning, and progression are
+  unchanged. A Loadsteel Cutter's charge changes no timing; it adds one ore to
+  each successful attempt's ordinary yield when that ore fits.
 - Every resolved boosted success or failure consumes exactly one charge. A
   preflight stop consumes no charge. When the tenth boosted attempt reaches zero,
   the same Mining action continues automatically at its normal 10-tick duration.

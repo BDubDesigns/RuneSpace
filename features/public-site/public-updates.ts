@@ -5,6 +5,48 @@ export type { PublicUpdate } from "@/game/schemas/public-updates";
 
 const authoredUpdates = [
   {
+    slug: "a-cut-above",
+    title: "A Cut Above",
+    publishedAt: "2026-09-27T16:00:00-07:00",
+    summary:
+      "Fabrication 5 and 8: make your own Power Cells, Galvanic Wire Spools and a second Mining tool, the Loadsteel Cutter, then a Freight Harness for six more Inventory slots. Tansy and Renn both have a job about that Cutter.",
+    hero: {
+      src: "/updates/deep-jag-opened.webp",
+      alt: "Cleared mine passage held open by a welded header beam on two yellow hydraulic braces, rubble pushed to the sides, tunnel running away into the dark",
+      width: 1536,
+      height: 384,
+    },
+    body: [
+      "The Fabrication Station has more on it now, and your Fabrication level is the only thing that opens it. Reach Fabrication 5 and four new recipes appear; reach Fabrication 8 and a fifth does. They work Galvanic Stock and Galvaferrite, but you do not need any Refining of your own to use them — stock you bought or were handed works exactly as well.",
+      "At Fabrication 5 you can turn one Galvanic Stock into two Scrap Metal, a Galvanic Wire Spool, or two Power Cells. The Cells come off the machine charged and ready — one batch is always two, so the tile says two however many batches you choose, and four batches make eight.",
+      "The fourth Fabrication 5 recipe is the Loadsteel Cutter: two Galvaferrite, a Wire Spool and a Power Cell. It is a second Mining tool rather than a better Salvage Cutter, and it needs Mining 5 to equip. It is faster whether or not it is charged. A Power Cell does not speed it up further the way it does a Salvage Cutter; instead, every successful charged attempt gives one more ore than usual — two or three instead of one or two. One Cell is still ten charged attempts, and a new one comes off the machine empty.",
+      "Fabrication 8 adds the Freight Harness, a heavy container that fits either container attachment and adds six Inventory slots. It weighs 9 kg, and that weight is carried like any other gear.",
+      "Everything new can be taken apart by Tinkering on the same terms as before. Power Cells go two at a time, and Tinkering still will not take your last usable Mining Cutter, whichever kind it is.",
+      "Once Brace Yourself is behind you, Tansy has one more lesson at The Jag when you reach Fabrication 5: get your hands on a Loadsteel Cutter and show her. However you came by it, carried or equipped, she only wants to look, and you keep it. Renn Calder, meanwhile, has been saving for one. Bring him any Loadsteel Cutter and he will pay for it.",
+    ],
+    patchNotes: [
+      {
+        heading: "Added",
+        items: [
+          "Fabrication 5 recipes: Scrap Metal from Galvanic Stock, Galvanic Wire Spool, Power Cells (two per batch) and the Loadsteel Cutter.",
+          "Fabrication 8 recipe: the Freight Harness, a 9 kg container attachment that adds six Inventory slots.",
+          "The Loadsteel Cutter: a second Mining tool that needs Mining 5, mines faster charged or not, and gives one more ore on every successful charged attempt.",
+          "Tinkering for the Galvanic Wire Spool, Power Cells (as a pair), the Loadsteel Cutter and the Freight Harness.",
+          "A Cut Above, from Tansy at The Jag after Brace Yourself at Fabrication 5 — 500 Fabrication XP.",
+          "Cutting Costs, an optional job from Renn in Holo Hollow after Brace Yourself — 500 Credits for a Loadsteel Cutter.",
+        ],
+      },
+      {
+        heading: "Changed",
+        items: [
+          "Loading a Power Cell, Cutter charge, and Mining timing now follow whichever Mining Cutter you have equipped.",
+          "Selecting a piece of gear in your Inventory shows what it does, such as the slots a container adds or the Mining level a Cutter needs.",
+          "Swapping one Mining Cutter for another stops a Mining run; start again to mine with the new one.",
+        ],
+      },
+    ],
+  },
+  {
     slug: "return-the-favor",
     title: "Return the Favor",
     publishedAt: "2026-09-26T21:00:00-07:00",

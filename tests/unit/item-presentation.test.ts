@@ -87,6 +87,28 @@ describe("item presentation content", () => {
     }
   });
 
+  it("resolves the Fabrication 5 and 8 outputs (#233) to their committed artwork, not initials", () => {
+    for (const [itemId, displayName, src] of [
+      [ITEM_IDS.galvanicWireSpool, "Galvanic Wire Spool", "/item-art/galvanic-wire-spool.webp"],
+      [ITEM_IDS.loadsteelCutter, "Loadsteel Cutter", "/item-art/loadsteel-cutter.webp"],
+      [ITEM_IDS.freightHarness, "Freight Harness", "/item-art/freight-harness.webp"],
+    ] as const) {
+      expect(getItemPresentation(itemId)).toMatchObject({ displayName, artworkSrc: src });
+      expect(existsSync(join(process.cwd(), "public", src))).toBe(true);
+    }
+  });
+
+  it("gives every item with an inventory definition committed artwork", () => {
+    for (const itemId of Object.values(ITEM_IDS)) {
+      const presentation = getItemPresentation(itemId);
+      if (!presentation) continue;
+      expect(presentation.artworkSrc, itemId).toBeDefined();
+      expect(existsSync(join(process.cwd(), "public", presentation.artworkSrc!)), itemId).toBe(
+        true,
+      );
+    }
+  });
+
   it("uses the supplied item name as text fallback when artwork metadata is unavailable", () => {
     expect(getItemPresentation("unknown_item_xyz" as string)).toBeUndefined();
     expect(resolveItemPresentation("unknown_item_xyz" as string, "Unknown")).toEqual({

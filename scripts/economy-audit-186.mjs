@@ -209,7 +209,7 @@ function scavengeSlotCost(haul) {
 // Mining, measured through the authoritative resolver.
 // ---------------------------------------------------------------------------
 
-const STARTER_SLOTS = balance.items.starterContainer.slotCapacity;
+const STARTER_SLOTS = balance.items.starterContainer.equipment.slotCapacity;
 // A mining-capable loadout carries the container and the Cutter it needs.
 const MINING_MASS_AVAILABLE =
   balance.carrying.startingCapacityGrams -
@@ -634,7 +634,7 @@ function refineSellLoopCreditsPerHour(miningLevel, refiningLevel) {
 
 out("## Power Cell boost");
 out();
-const cellCharges = balance.items.salvageCutter.maximumCharge;
+const cellCharges = balance.items.salvageCutter.equipment.maximumCharge;
 const normalAttemptSeconds = seconds(balance.mining.attemptDurationTicks);
 const boostedAttemptSeconds = seconds(
   Math.max(

@@ -5,7 +5,7 @@ import { miningNearMissBasisPoints } from "@/game/domain/mining";
 import { resolveItemPresentation } from "@/game/content/item-presentation";
 import type { MiningRunAttempt, MiningRunState } from "@/server/mining";
 import type { MiningSourceProjection } from "@/server/play";
-import type { EffectiveGameBalance } from "@/game/config/balance";
+import { remainingChargeLabel } from "./latest-result";
 
 function percentage(bps: number) {
   return (bps / 100).toFixed(2);
@@ -29,11 +29,12 @@ function itemName(itemId: string): string {
  */
 export function MiningRunPanel({
   run,
-  balance,
+  maximumCharge,
   source,
 }: {
   run: MiningRunState;
-  balance: EffectiveGameBalance;
+  /** The equipped Mining tool's own maximum charge, when one is equipped (#233). */
+  maximumCharge: number | undefined;
   /** The source being worked, so an empty run still names what it would yield. */
   source: MiningSourceProjection;
 }) {
@@ -63,7 +64,11 @@ export function MiningRunPanel({
             history: [...priorAttempts]
               .reverse()
               .map((attempt) => (
-                <MiningAttemptRow attempt={attempt} balance={balance} key={attempt.sequence} />
+                <MiningAttemptRow
+                  attempt={attempt}
+                  key={attempt.sequence}
+                  maximumCharge={maximumCharge}
+                />
               )),
           }
         : {})}
@@ -73,10 +78,10 @@ export function MiningRunPanel({
 
 function MiningAttemptRow({
   attempt,
-  balance,
+  maximumCharge,
 }: {
   attempt: MiningRunAttempt;
-  balance: EffectiveGameBalance;
+  maximumCharge: number | undefined;
 }) {
   return (
     <article className="border-l-2 border-[color:var(--rs-border-structural)] bg-[color:var(--rs-surface-panel)] px-3 py-2 text-sm">
@@ -89,7 +94,7 @@ function MiningAttemptRow({
       </p>
       <p className="text-xs uppercase tracking-wide text-[color:var(--rs-text-muted)]">
         {attempt.boosted
-          ? `Boosted · ${attempt.durationTicks} ticks · charge consumed: ${attempt.chargeConsumed ? "yes" : "no"} · ${attempt.remainingCharge} / ${balance.items.salvageCutter.maximumCharge} remaining`
+          ? `Boosted · ${attempt.durationTicks} ticks · charge consumed: ${attempt.chargeConsumed ? "yes" : "no"} · ${remainingChargeLabel(attempt.remainingCharge, maximumCharge)}`
           : `Normal · ${attempt.durationTicks} ticks`}
       </p>
       <p className="text-xs text-[color:var(--rs-text-muted)]">

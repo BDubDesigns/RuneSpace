@@ -85,7 +85,7 @@ describe("server play orchestration ownership (#127)", () => {
       "acknowledgeScavengeReveal",
       "startMining",
       "stopMining",
-      "loadSalvageCutterPowerCell",
+      "loadMiningToolPowerCell",
       "startRefining",
       "stopRefining",
       "RefiningRunAttempt",

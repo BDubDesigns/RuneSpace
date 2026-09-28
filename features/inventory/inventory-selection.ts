@@ -75,9 +75,10 @@ export type PowerCellLoadAvailability =
     };
 
 /**
- * Client-advisory enablement for `Load into Salvage Cutter`. The server
- * command remains authoritative; this only decides whether the control is
- * offered and which clear reason is shown when it is not.
+ * Client-advisory enablement for loading a Power Cell into the equipped Mining
+ * tool — whichever authored Cutter it is (#233). The server command remains
+ * authoritative; this only decides whether the control is offered and which
+ * clear reason is shown when it is not.
  */
 export function derivePowerCellLoadAvailability(
   state: PlayGameplayState,
@@ -87,7 +88,7 @@ export function derivePowerCellLoadAvailability(
   if (!selection || selection.kind !== "stack") return undefined;
   if (selection.entry.itemId !== ITEM_IDS.powerCell) return undefined;
   if (busy) return { enabled: false, reason: "busy" };
-  const cutter = state.equipment.salvageCutter;
+  const cutter = state.equipment.miningTool;
   if (!cutter) return { enabled: false, reason: "no_cutter" };
   if (cutter.currentCharge > 0)
     return {
@@ -101,7 +102,9 @@ export function derivePowerCellLoadAvailability(
 
 export type InventoryEquipAvailability =
   | { enabled: true; target: EquipmentTarget; itemInstanceId: string; slotLabel: string }
-  | { enabled: false; reason: "busy" };
+  | { enabled: false; reason: "busy" }
+  /** The tool's own Mining requirement is unmet (#233); the server refuses it too. */
+  | { enabled: false; reason: "mining_level"; requiredMiningLevel: number };
 
 /**
  * Client-advisory equip availability for a carried unique item selected in
@@ -129,14 +132,20 @@ export function deriveInventoryEquipAvailability(
   busy: boolean,
 ): InventoryEquipAvailability | undefined {
   if (!selection || selection.kind !== "unique") return undefined;
-  const toolSlotId = getEffectiveGameBalance().items.salvageCutter.suitSlotId;
+  const toolSlotId = getEffectiveGameBalance().carrying.miningToolSuitSlotId;
   const toolSlot = state.equipment.slots.find(
     (slot) => slot.target.assignmentKind === "gear" && slot.target.suitSlotId === toolSlotId,
   );
-  const eligible = toolSlot?.eligibleItems.some(
+  const eligible = toolSlot?.eligibleItems.find(
     (item) => item.itemInstanceId === selection.entry.id,
   );
   if (!toolSlot || !eligible) return undefined;
+  if (eligible.requiredMiningLevel !== undefined)
+    return {
+      enabled: false,
+      reason: "mining_level",
+      requiredMiningLevel: eligible.requiredMiningLevel,
+    };
   if (busy) return { enabled: false, reason: "busy" };
   return {
     enabled: true,

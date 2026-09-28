@@ -1,4 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import { getMiningToolDefinition } from "@/game/config/balance";
 import { ACTION_IDS, ITEM_IDS } from "@/game/config/foundations";
 
 /**
@@ -48,14 +49,13 @@ describe("createPlayResolver RNG wiring (#127)", () => {
   function miningSnapshot() {
     return {
       miningLevel: 1,
-      hasCompatibleTool: true,
+      tool: getMiningToolDefinition(ITEM_IDS.salvageCutter)!,
       existingStacks: [],
       slotsAvailable: 8,
       massAvailableGrams: 100_000,
       slotsUsed: 0,
       slotCapacity: 8,
       equipmentLoadout: {
-        hasCompatibleMiningTool: true,
         containerSlotCapacity: 8,
         inventorySlotsUsed: 0,
         maximumCarryCapacityGrams: 100_000,

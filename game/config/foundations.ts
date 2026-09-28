@@ -51,6 +51,12 @@ const itemIds = {
   // installation hardware; the Scrap Box is a unique container attachment.
   mountingBracket: asContentId("mounting_bracket"),
   scrapBox: asContentId("scrap_box"),
+  // Fabrication 5 and 8 outputs (#233). The Wire Spool is stackable Galvanic
+  // wiring; the Loadsteel Cutter is a second, separate Mining tool; the Freight
+  // Harness is a third container attachment.
+  galvanicWireSpool: asContentId("galvanic_wire_spool"),
+  loadsteelCutter: asContentId("loadsteel_cutter"),
+  freightHarness: asContentId("freight_harness"),
 } as const satisfies Record<string, ContentId>;
 
 const npcIds = {
@@ -84,6 +90,11 @@ const missionIds = {
   // continuation, and completing it is Brace Yourself's story prerequisite.
   returnTheFavor: asContentId("return_the_favor"),
   breakItDown: asContentId("break_it_down"),
+  // Fabrication 5 (#233). A Cut Above is Tansy's lesson that recipes unlock as
+  // Fabrication improves; Cutting Costs is Renn buying a Loadsteel Cutter from
+  // whoever brings him one.
+  aCutAbove: asContentId("a_cut_above"),
+  cuttingCosts: asContentId("cutting_costs"),
 } as const satisfies Record<string, ContentId>;
 
 const dialogueIds = {
@@ -211,6 +222,16 @@ const dialogueIds = {
   tansyBreakItDownReminder: asContentId("tansy_rusk_break_it_down_reminder"),
   tansyBreakItDownTurnIn: asContentId("tansy_rusk_break_it_down_turn_in"),
   tansyBreakItDownCompletion: asContentId("tansy_rusk_break_it_down_completion"),
+  // A Cut Above (#233): Tansy at The Jag, once the character is Fabrication 5.
+  tansyACutAboveOffer: asContentId("tansy_rusk_a_cut_above_offer"),
+  tansyACutAboveReminder: asContentId("tansy_rusk_a_cut_above_reminder"),
+  tansyACutAboveTurnIn: asContentId("tansy_rusk_a_cut_above_turn_in"),
+  tansyACutAboveCompletion: asContentId("tansy_rusk_a_cut_above_completion"),
+  // Cutting Costs (#233): Renn's optional purchase of a Loadsteel Cutter.
+  rennCuttingCostsOffer: asContentId("renn_calder_cutting_costs_offer"),
+  rennCuttingCostsReminder: asContentId("renn_calder_cutting_costs_reminder"),
+  rennCuttingCostsTurnIn: asContentId("renn_calder_cutting_costs_turn_in"),
+  rennCuttingCostsCompletion: asContentId("renn_calder_cutting_costs_completion"),
   // Replayable social/worldbuilding topics (#164). These are ordinary NPC
   // conversations: they never carry a Mission action and never gate progression.
   wadeRecoveryWorkTopic: asContentId("wade_rusk_topic_recovery_work"),
@@ -326,6 +347,18 @@ export const ACTION_IDS = {
   mountingBracketTinkering: asContentId("mounting_bracket_tinkering"),
   scrapBoxTinkering: asContentId("scrap_box_tinkering"),
   salvageCutterTinkering: asContentId("salvage_cutter_tinkering"),
+  // Fabrication 5 and 8 recipes and their Tinkering targets (#233), under the
+  // same one-action-per-recipe rule. The two direct-Scrap recipes have no
+  // Tinkering target.
+  galvanicScrapFabrication: asContentId("galvanic_scrap_fabrication"),
+  galvanicWireSpoolFabrication: asContentId("galvanic_wire_spool_fabrication"),
+  powerCellFabrication: asContentId("power_cell_fabrication"),
+  loadsteelCutterFabrication: asContentId("loadsteel_cutter_fabrication"),
+  freightHarnessFabrication: asContentId("freight_harness_fabrication"),
+  galvanicWireSpoolTinkering: asContentId("galvanic_wire_spool_tinkering"),
+  powerCellTinkering: asContentId("power_cell_tinkering"),
+  loadsteelCutterTinkering: asContentId("loadsteel_cutter_tinkering"),
+  freightHarnessTinkering: asContentId("freight_harness_tinkering"),
   travel: asContentId("travel"),
 } as const satisfies Record<string, ContentId>;
 

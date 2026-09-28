@@ -291,10 +291,10 @@ export function AdminInspector({ initial }: { initial: AdminInspectorState }) {
         <dl className="mt-2 grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
           <EquipmentSlotRows play={play} />
         </dl>
-        {play.equipment.salvageCutter ? (
+        {play.equipment.miningTool ? (
           <div className="mt-2 text-xs text-[color:var(--rs-text-muted)]">
-            Salvage Cutter charge {play.equipment.salvageCutter.currentCharge}/
-            {play.equipment.salvageCutter.maximumCharge}
+            {play.equipment.miningTool.name} charge {play.equipment.miningTool.currentCharge}/
+            {play.equipment.miningTool.maximumCharge}
           </div>
         ) : null}
       </Panel>

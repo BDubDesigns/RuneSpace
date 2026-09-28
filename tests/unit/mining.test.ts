@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   getEffectiveGameBalance,
+  getMiningToolDefinition,
   miningLevelThresholds,
   miningSourceForActionId,
 } from "@/game/config/balance";
@@ -37,9 +38,12 @@ function resolveFerriteShaleMining(
   return resolveMining({ ...input, source: ferriteShale });
 }
 
+/** The starter Salvage Cutter, resolved through the equipment boundary (#233). */
+const salvageCutter = getMiningToolDefinition(ITEM_IDS.salvageCutter, balance)!;
+
 const ready = {
   miningLevel: 1,
-  hasCompatibleTool: true,
+  tool: salvageCutter,
   existingStacks: [],
   slotsAvailable: 8,
   massAvailableGrams: 35_000,
@@ -267,7 +271,7 @@ describe("Ferrite Shale Mining resolution", () => {
     expect(noMass).toMatchObject({ consumedTicks: 0, stopReason: "carried_mass_capacity_reached" });
     const noTool = resolveFerriteShaleMining({
       elapsedTicks: 10,
-      snapshot: { ...ready, hasCompatibleTool: false },
+      snapshot: { ...ready, tool: undefined },
       balance,
       random: rolls([0]),
     });

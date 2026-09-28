@@ -360,6 +360,85 @@ const balanceSchema = z.object({
           z.object({ itemId: z.literal(ITEM_IDS.powerCell), quantity: z.literal(1) }),
         ]),
       }),
+      /**
+       * Fabrication 5 direct Scrap (#233): 1 Galvanic Stock -> 2 Scrap Metal.
+       * The Galvanic-tier counterpart of the Refined Ferrite recipe above — a
+       * utility recipe, not training, and not a Tinkering target.
+       */
+      galvanicScrap: z.object({
+        actionId: z.literal(ACTION_IDS.galvanicScrapFabrication),
+        outputItemId: z.literal(ITEM_IDS.scrapMetal),
+        outputQuantity: z.literal(2),
+        minimumLevel: z.literal(5),
+        durationTicks: z.literal(14),
+        baseXp: z.literal(15),
+        inputs: z.tuple([
+          z.object({ itemId: z.literal(ITEM_IDS.galvanicStock), quantity: z.literal(1) }),
+        ]),
+      }),
+      /**
+       * 1 Galvanic Stock -> 1 Galvanic Wire Spool (#233). The station supplies
+       * the winding core, insulation and terminals, so nothing else is an input.
+       */
+      galvanicWireSpool: z.object({
+        actionId: z.literal(ACTION_IDS.galvanicWireSpoolFabrication),
+        outputItemId: z.literal(ITEM_IDS.galvanicWireSpool),
+        outputQuantity: z.literal(1),
+        minimumLevel: z.literal(5),
+        durationTicks: z.literal(24),
+        baseXp: z.literal(45),
+        inputs: z.tuple([
+          z.object({ itemId: z.literal(ITEM_IDS.galvanicStock), quantity: z.literal(1) }),
+        ]),
+      }),
+      /**
+       * 1 Galvanic Stock -> 2 Power Cells (#233): one authored two-output
+       * batch. The station charges them as part of the cycle, so they are
+       * ordinary usable Power Cells — there is no uncharged Cell and no
+       * charging step. A run's size counts these batches.
+       */
+      powerCells: z.object({
+        actionId: z.literal(ACTION_IDS.powerCellFabrication),
+        outputItemId: z.literal(ITEM_IDS.powerCell),
+        outputQuantity: z.literal(2),
+        minimumLevel: z.literal(5),
+        durationTicks: z.literal(30),
+        baseXp: z.literal(75),
+        inputs: z.tuple([
+          z.object({ itemId: z.literal(ITEM_IDS.galvanicStock), quantity: z.literal(1) }),
+        ]),
+      }),
+      /**
+       * The Loadsteel Cutter (#233): a separate Mining tool, not an upgrade of
+       * the Salvage Cutter. Its Power Cell commissions the tool and is not
+       * stored charge — a new Loadsteel Cutter comes off the machine at 0.
+       */
+      loadsteelCutter: z.object({
+        actionId: z.literal(ACTION_IDS.loadsteelCutterFabrication),
+        outputItemId: z.literal(ITEM_IDS.loadsteelCutter),
+        outputQuantity: z.literal(1),
+        minimumLevel: z.literal(5),
+        durationTicks: z.literal(45),
+        baseXp: z.literal(180),
+        inputs: z.tuple([
+          z.object({ itemId: z.literal(ITEM_IDS.galvaferrite), quantity: z.literal(2) }),
+          z.object({ itemId: z.literal(ITEM_IDS.galvanicWireSpool), quantity: z.literal(1) }),
+          z.object({ itemId: z.literal(ITEM_IDS.powerCell), quantity: z.literal(1) }),
+        ]),
+      }),
+      /** The Fabrication 8 capstone (#233): an advanced +6-slot container attachment. */
+      freightHarness: z.object({
+        actionId: z.literal(ACTION_IDS.freightHarnessFabrication),
+        outputItemId: z.literal(ITEM_IDS.freightHarness),
+        outputQuantity: z.literal(1),
+        minimumLevel: z.literal(8),
+        durationTicks: z.literal(60),
+        baseXp: z.literal(270),
+        inputs: z.tuple([
+          z.object({ itemId: z.literal(ITEM_IDS.galvaferrite), quantity: z.literal(4) }),
+          z.object({ itemId: z.literal(ITEM_IDS.mountingBracket), quantity: z.literal(2) }),
+        ]),
+      }),
     }),
     /**
      * Manual Override (#232): the optional per-workpiece push-your-luck layer.
@@ -406,6 +485,24 @@ const balanceSchema = z.object({
       salvageCutter: z.object({
         actionId: z.literal(ACTION_IDS.salvageCutterTinkering),
         recipeActionId: z.literal(ACTION_IDS.salvageCutterFabrication),
+      }),
+      // Fabrication 5 and 8 (#233). Every value still derives from the recipe;
+      // the Power Cell target dismantles its whole two-Cell batch.
+      galvanicWireSpool: z.object({
+        actionId: z.literal(ACTION_IDS.galvanicWireSpoolTinkering),
+        recipeActionId: z.literal(ACTION_IDS.galvanicWireSpoolFabrication),
+      }),
+      powerCells: z.object({
+        actionId: z.literal(ACTION_IDS.powerCellTinkering),
+        recipeActionId: z.literal(ACTION_IDS.powerCellFabrication),
+      }),
+      loadsteelCutter: z.object({
+        actionId: z.literal(ACTION_IDS.loadsteelCutterTinkering),
+        recipeActionId: z.literal(ACTION_IDS.loadsteelCutterFabrication),
+      }),
+      freightHarness: z.object({
+        actionId: z.literal(ACTION_IDS.freightHarnessTinkering),
+        recipeActionId: z.literal(ACTION_IDS.freightHarnessFabrication),
       }),
     }),
   }),
@@ -507,11 +604,40 @@ const balanceSchema = z.object({
       massGrams: z.literal(300),
       stackLimit: z.literal(3),
     }),
+    /**
+     * The starter Mining tool. Its `equipment` block (#233) is the one home of
+     * everything that makes it a Mining tool — see `EquipmentDefinition`. At
+     * 1.00× duration, and charged it takes the global Power Cell speed rule:
+     * a charged Salvage Cutter is faster attempts.
+     */
     salvageCutter: z.object({
       itemId: z.literal(ITEM_IDS.salvageCutter),
       massGrams: z.literal(5_000),
-      suitSlotId: z.literal("mining_tool"),
-      maximumCharge: z.literal(10),
+      equipment: z.object({
+        kind: z.literal("mining_tool"),
+        requiredMiningLevel: z.literal(1),
+        maximumCharge: z.literal(10),
+        baseDurationMultiplierBps: z.literal(10_000),
+        chargedEffect: z.object({ kind: z.literal("speed") }),
+      }),
+    }),
+    /**
+     * The Fabrication 5 Mining tool (#233). A permanent 0.8× base duration,
+     * charged or not, is its speed. Charged, it does not take the Power Cell
+     * speed rule; instead each successful charged attempt adds one ore to the
+     * source's ordinary yield — a charged Loadsteel Cutter is more ore per
+     * success. Same ten charges per Cell as the Salvage Cutter.
+     */
+    loadsteelCutter: z.object({
+      itemId: z.literal(ITEM_IDS.loadsteelCutter),
+      massGrams: z.literal(8_000),
+      equipment: z.object({
+        kind: z.literal("mining_tool"),
+        requiredMiningLevel: z.literal(5),
+        maximumCharge: z.literal(10),
+        baseDurationMultiplierBps: z.literal(8_000),
+        chargedEffect: z.object({ kind: z.literal("extra_yield"), units: z.literal(1) }),
+      }),
     }),
     powerCell: z.object({
       itemId: z.literal(ITEM_IDS.powerCell),
@@ -541,7 +667,7 @@ const balanceSchema = z.object({
     starterContainer: z.object({
       itemId: z.literal(ITEM_IDS.mykeaSchleppraum8),
       massGrams: z.literal(10_000),
-      slotCapacity: z.literal(8),
+      equipment: z.object({ kind: z.literal("container"), slotCapacity: z.literal(8) }),
     }),
     /**
      * Tier-1 Fabrication outputs (#232). The Bracket's 300 g is exactly its
@@ -557,11 +683,34 @@ const balanceSchema = z.object({
     scrapBox: z.object({
       itemId: z.literal(ITEM_IDS.scrapBox),
       massGrams: z.literal(5_000),
-      slotCapacity: z.literal(3),
+      equipment: z.object({ kind: z.literal("container"), slotCapacity: z.literal(3) }),
+    }),
+    /**
+     * Fabrication 5 and 8 outputs (#233). The Wire Spool's 1 kg is its 800 g of
+     * Galvanic Stock plus the station's own winding and insulation, and it
+     * stacks only three deep, so bulk wire stays heavy. The Freight Harness is
+     * an advanced container, not a carry-capacity upgrade: its 9 kg is carried
+     * like any other equipment.
+     */
+    galvanicWireSpool: z.object({
+      itemId: z.literal(ITEM_IDS.galvanicWireSpool),
+      massGrams: z.literal(1_000),
+      stackLimit: z.literal(3),
+    }),
+    freightHarness: z.object({
+      itemId: z.literal(ITEM_IDS.freightHarness),
+      massGrams: z.literal(9_000),
+      equipment: z.object({ kind: z.literal("container"), slotCapacity: z.literal(6) }),
     }),
   }),
   carrying: z.object({
     startingCapacityGrams: z.literal(50_000),
+    /**
+     * The suit's authored equipment slots: one Mining-tool gear slot and two
+     * container attachments. An item's equipment kind decides which of them
+     * it fits (`getEquipmentDefinition`); no item names a slot of its own.
+     */
+    miningToolSuitSlotId: z.literal("mining_tool"),
     containerSuitSlotIds: z.tuple([
       z.literal("container_attachment_1"),
       z.literal("container_attachment_2"),
@@ -789,6 +938,58 @@ const defaults = balanceSchema.parse({
           { itemId: ITEM_IDS.powerCell, quantity: 1 },
         ],
       },
+      galvanicScrap: {
+        actionId: ACTION_IDS.galvanicScrapFabrication,
+        outputItemId: ITEM_IDS.scrapMetal,
+        outputQuantity: 2,
+        minimumLevel: 5,
+        durationTicks: 14,
+        baseXp: 15,
+        inputs: [{ itemId: ITEM_IDS.galvanicStock, quantity: 1 }],
+      },
+      galvanicWireSpool: {
+        actionId: ACTION_IDS.galvanicWireSpoolFabrication,
+        outputItemId: ITEM_IDS.galvanicWireSpool,
+        outputQuantity: 1,
+        minimumLevel: 5,
+        durationTicks: 24,
+        baseXp: 45,
+        inputs: [{ itemId: ITEM_IDS.galvanicStock, quantity: 1 }],
+      },
+      powerCells: {
+        actionId: ACTION_IDS.powerCellFabrication,
+        outputItemId: ITEM_IDS.powerCell,
+        outputQuantity: 2,
+        minimumLevel: 5,
+        durationTicks: 30,
+        baseXp: 75,
+        inputs: [{ itemId: ITEM_IDS.galvanicStock, quantity: 1 }],
+      },
+      loadsteelCutter: {
+        actionId: ACTION_IDS.loadsteelCutterFabrication,
+        outputItemId: ITEM_IDS.loadsteelCutter,
+        outputQuantity: 1,
+        minimumLevel: 5,
+        durationTicks: 45,
+        baseXp: 180,
+        inputs: [
+          { itemId: ITEM_IDS.galvaferrite, quantity: 2 },
+          { itemId: ITEM_IDS.galvanicWireSpool, quantity: 1 },
+          { itemId: ITEM_IDS.powerCell, quantity: 1 },
+        ],
+      },
+      freightHarness: {
+        actionId: ACTION_IDS.freightHarnessFabrication,
+        outputItemId: ITEM_IDS.freightHarness,
+        outputQuantity: 1,
+        minimumLevel: 8,
+        durationTicks: 60,
+        baseXp: 270,
+        inputs: [
+          { itemId: ITEM_IDS.galvaferrite, quantity: 4 },
+          { itemId: ITEM_IDS.mountingBracket, quantity: 2 },
+        ],
+      },
     },
     manualOverride: {
       loadMinimum: 1,
@@ -818,6 +1019,22 @@ const defaults = balanceSchema.parse({
       salvageCutter: {
         actionId: ACTION_IDS.salvageCutterTinkering,
         recipeActionId: ACTION_IDS.salvageCutterFabrication,
+      },
+      galvanicWireSpool: {
+        actionId: ACTION_IDS.galvanicWireSpoolTinkering,
+        recipeActionId: ACTION_IDS.galvanicWireSpoolFabrication,
+      },
+      powerCells: {
+        actionId: ACTION_IDS.powerCellTinkering,
+        recipeActionId: ACTION_IDS.powerCellFabrication,
+      },
+      loadsteelCutter: {
+        actionId: ACTION_IDS.loadsteelCutterTinkering,
+        recipeActionId: ACTION_IDS.loadsteelCutterFabrication,
+      },
+      freightHarness: {
+        actionId: ACTION_IDS.freightHarnessTinkering,
+        recipeActionId: ACTION_IDS.freightHarnessFabrication,
       },
     },
   },
@@ -856,8 +1073,24 @@ const defaults = balanceSchema.parse({
     salvageCutter: {
       itemId: ITEM_IDS.salvageCutter,
       massGrams: 5_000,
-      suitSlotId: "mining_tool",
-      maximumCharge: 10,
+      equipment: {
+        kind: "mining_tool",
+        requiredMiningLevel: 1,
+        maximumCharge: 10,
+        baseDurationMultiplierBps: 10_000,
+        chargedEffect: { kind: "speed" },
+      },
+    },
+    loadsteelCutter: {
+      itemId: ITEM_IDS.loadsteelCutter,
+      massGrams: 8_000,
+      equipment: {
+        kind: "mining_tool",
+        requiredMiningLevel: 5,
+        maximumCharge: 10,
+        baseDurationMultiplierBps: 8_000,
+        chargedEffect: { kind: "extra_yield", units: 1 },
+      },
     },
     powerCell: { itemId: ITEM_IDS.powerCell, massGrams: 500, stackLimit: 5 },
     galvanite: { itemId: ITEM_IDS.galvanite, massGrams: 400, stackLimit: 10 },
@@ -866,13 +1099,24 @@ const defaults = balanceSchema.parse({
     starterContainer: {
       itemId: ITEM_IDS.mykeaSchleppraum8,
       massGrams: 10_000,
-      slotCapacity: 8,
+      equipment: { kind: "container", slotCapacity: 8 },
     },
     mountingBracket: { itemId: ITEM_IDS.mountingBracket, massGrams: 300, stackLimit: 5 },
-    scrapBox: { itemId: ITEM_IDS.scrapBox, massGrams: 5_000, slotCapacity: 3 },
+    scrapBox: {
+      itemId: ITEM_IDS.scrapBox,
+      massGrams: 5_000,
+      equipment: { kind: "container", slotCapacity: 3 },
+    },
+    galvanicWireSpool: { itemId: ITEM_IDS.galvanicWireSpool, massGrams: 1_000, stackLimit: 3 },
+    freightHarness: {
+      itemId: ITEM_IDS.freightHarness,
+      massGrams: 9_000,
+      equipment: { kind: "container", slotCapacity: 6 },
+    },
   },
   carrying: {
     startingCapacityGrams: 50_000,
+    miningToolSuitSlotId: "mining_tool",
     containerSuitSlotIds: ["container_attachment_1", "container_attachment_2"],
   },
   credits: { startingBalance: 10 },
@@ -1167,13 +1411,113 @@ export function skillLevelThresholds(skillId: string): readonly LevelThreshold[]
 }
 
 /**
- * The charge capacity an item definition authors, or undefined when the item
- * has no charge state at all. Charge is currently authored only on the
- * Salvage Cutter; readers must consult this instead of assuming every unique
- * item carries charge semantics.
+ * One item's authored equipment facts (#233): the canonical equipment-definition
+ * boundary. Every generic equipment and Mining consumer — slot compatibility,
+ * container capacity, the equipped Mining tool's requirement, charge and
+ * effects — resolves an item through here rather than naming an item ID.
+ *
+ * Deliberately two closed kinds, each with a small fixed set of authored facts,
+ * because that is what the game has: Mining tools and container attachments.
+ * It is not an item-effect scripting language; a new kind of effect is a
+ * deliberate extension of the kind that has it.
  */
-export function getItemMaximumCharge(itemId: string): number | undefined {
-  const item = Object.values(defaults.items).find((candidate) => candidate.itemId === itemId);
-  if (!item) return undefined;
-  return "maximumCharge" in item ? item.maximumCharge : undefined;
+export type MiningToolDefinition = {
+  kind: "mining_tool";
+  itemId: string;
+  assignmentKind: "gear";
+  /** The suit slots this tool may occupy — the one Mining-tool slot. */
+  suitSlotIds: readonly string[];
+  /** The Mining level required to equip and to use this tool. */
+  requiredMiningLevel: number;
+  /** Charge a loaded Power Cell gives, and the most the tool can hold. */
+  maximumCharge: number;
+  /** Permanent multiplier on a source's attempt duration, charged or not. */
+  baseDurationMultiplierBps: number;
+  /** What a loaded Power Cell does for this tool, one charge per attempt. */
+  chargedEffect: MiningToolChargedEffect;
+};
+
+/**
+ * A Mining tool's charged identity (#233), deliberately a closed choice: a
+ * charged attempt is either faster, under the one global Power Cell speed
+ * multiplier, or yields extra ore on success. Never both.
+ */
+export type MiningToolChargedEffect =
+  | { kind: "speed" }
+  | {
+      kind: "extra_yield";
+      /** Ore added to a successful charged attempt's ordinarily resolved yield. */
+      units: number;
+    };
+
+export type ContainerDefinition = {
+  kind: "container";
+  itemId: string;
+  assignmentKind: "container";
+  /** Either container attachment slot. */
+  suitSlotIds: readonly string[];
+  /** Inventory slots this container contributes while equipped. */
+  slotCapacity: number;
+};
+
+export type EquipmentDefinition = MiningToolDefinition | ContainerDefinition;
+
+/**
+ * The equipment definition an item authors, or undefined for an item that is
+ * not equipment. The compatible slots follow from the kind and the suit's own
+ * authored slots, so no item restates a slot ID.
+ */
+export function getEquipmentDefinition(
+  itemId: string,
+  balance = getEffectiveGameBalance(),
+): EquipmentDefinition | undefined {
+  const item = Object.values(balance.items).find((candidate) => candidate.itemId === itemId);
+  if (!item || !("equipment" in item)) return undefined;
+  const { equipment } = item;
+  if (equipment.kind === "mining_tool") {
+    return {
+      ...equipment,
+      itemId,
+      assignmentKind: "gear",
+      suitSlotIds: [balance.carrying.miningToolSuitSlotId],
+    };
+  }
+  return {
+    ...equipment,
+    itemId,
+    assignmentKind: "container",
+    suitSlotIds: balance.carrying.containerSuitSlotIds,
+  };
+}
+
+/** The Mining-tool definition an item authors, or undefined for anything else. */
+export function getMiningToolDefinition(
+  itemId: string,
+  balance = getEffectiveGameBalance(),
+): MiningToolDefinition | undefined {
+  const definition = getEquipmentDefinition(itemId, balance);
+  return definition?.kind === "mining_tool" ? definition : undefined;
+}
+
+/** Every authored equipment definition, in authored item order. */
+export function equipmentDefinitions(
+  balance = getEffectiveGameBalance(),
+): readonly EquipmentDefinition[] {
+  return Object.values(balance.items).flatMap((item) => {
+    const definition = getEquipmentDefinition(item.itemId, balance);
+    return definition ? [definition] : [];
+  });
+}
+
+/**
+ * The charge capacity an item definition authors, or undefined when the item
+ * has no charge state at all. Charge belongs to Mining tools (#233); readers
+ * must consult this instead of assuming every unique item carries charge
+ * semantics, or that every chargeable item is a Salvage Cutter.
+ */
+export function getItemMaximumCharge(
+  itemId: string,
+  balance = getEffectiveGameBalance(),
+): number | undefined {
+  return getMiningToolDefinition(itemId, balance)?.maximumCharge;
 }

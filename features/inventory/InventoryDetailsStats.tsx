@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { getEquipmentDefinition } from "@/game/config/balance";
 import { formatMassGrams } from "@/game/domain/mass";
 import type { ResolvedInventorySelection } from "./inventory-selection";
 
@@ -21,9 +22,11 @@ function StatRow({ label, value, dataStat }: { label: string; value: string; dat
  * Stack entries render Quantity, Stack limit, Unit mass, and Total mass
  * purely from the authoritative projection — no per-item branch.
  * Unique entries keep their existing Identity + Mass path, also via the
- * canonical formatter. This component is the real UI contract for #119 and
- * exists so focused unit coverage can assert against it without needing a
- * browser harness.
+ * canonical formatter, plus whatever their authored equipment definition
+ * says (#233) — a container's slots, a Mining tool's requirement and effects —
+ * so no item gets a row of its own. This component is the real UI contract
+ * for #119 and exists so focused unit coverage can assert against it without
+ * needing a browser harness.
  */
 export function InventoryDetailsStats({ selection }: { selection: ResolvedInventorySelection }) {
   if (selection.kind === "stack") {
@@ -50,11 +53,40 @@ export function InventoryDetailsStats({ selection }: { selection: ResolvedInvent
     );
   }
 
+  const equipment = getEquipmentDefinition(selection.entry.itemId);
   return (
     <>
       <StatRow dataStat="item" label="Item" value={selection.entry.name} />
       <StatRow dataStat="identity" label="Identity" value="Unique item" />
       <StatRow dataStat="mass" label="Mass" value={formatMassGrams(selection.entry.massGrams)} />
+      {equipment?.kind === "container" ? (
+        <StatRow
+          dataStat="container-slots"
+          label="Inventory slots"
+          value={`+${equipment.slotCapacity}`}
+        />
+      ) : null}
+      {equipment?.kind === "mining_tool" && equipment.requiredMiningLevel > 1 ? (
+        <StatRow
+          dataStat="required-mining-level"
+          label="Requires"
+          value={`Mining ${equipment.requiredMiningLevel}`}
+        />
+      ) : null}
+      {equipment?.kind === "mining_tool" && equipment.baseDurationMultiplierBps !== 10_000 ? (
+        <StatRow
+          dataStat="mining-time"
+          label="Mining time"
+          value={`${equipment.baseDurationMultiplierBps / 10_000}×, charged or not`}
+        />
+      ) : null}
+      {equipment?.kind === "mining_tool" && equipment.chargedEffect.kind === "extra_yield" ? (
+        <StatRow
+          dataStat="charged-yield"
+          label="While charged"
+          value={`+${equipment.chargedEffect.units} ore per success`}
+        />
+      ) : null}
     </>
   );
 }
