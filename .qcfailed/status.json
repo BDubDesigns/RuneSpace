@@ -3,6 +3,11 @@
   "projectSlug": "runespace",
   "workState": "active",
   "currentFocus": "Preparing the October 27 Soft Alpha: verified players can reserve characters; account-level Early Access and a closed-by-default public gameplay gate control when play begins.",
+  "currentChange": {
+    "summary": "Fabrication 5 and 8: Power Cells, the Loadsteel Cutter as a second Mining tool, the Freight Harness, advanced Tinkering, and Tansy's A Cut Above and Renn's Cutting Costs Missions.",
+    "stage": "review",
+    "pullRequestNumber": 241
+  },
   "latestCompleted": {
     "summary": "Tansy teaches Fabrication at Rusk Recovery: a Fabrication Station with four Tier-1 recipes, Manual Override for riskier XP, Tinkering to take pieces apart, and the Return the Favor and Break It Down Missions.",
     "date": "2026-09-27",
