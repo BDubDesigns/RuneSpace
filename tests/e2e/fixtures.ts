@@ -443,10 +443,10 @@ async function diffElementScreenshots(
       for (let y = 0; y < a.height; y += 1) {
         for (let x = 0; x < a.width; x += 1) {
           const i = (y * a.width + x) * 4;
-          const delta =
-            Math.abs(a.data[i]! - b.data[i]!) +
-            Math.abs(a.data[i + 1]! - b.data[i + 1]!) +
-            Math.abs(a.data[i + 2]! - b.data[i + 2]!);
+          let delta = 0;
+          for (let channel = 0; channel < 3; channel += 1) {
+            delta += Math.abs((a.data[i + channel] ?? 0) - (b.data[i + channel] ?? 0));
+          }
           if (delta <= 60) continue;
           changed += 1;
           if (y < band) sides[0] += 1;
