@@ -318,11 +318,13 @@ export function PracticeWeldingPanel() {
           aria-pressed={practice.autoDiscardSlag}
           data-practice-slag-toggle
           disabled={foregroundBusy && pending !== "slag"}
-          intent="secondary"
+          // A persistent toggle latches in its activity's accent while on
+          // (#239): Welding's is primary. It stays enabled to switch back.
+          intent={practice.autoDiscardSlag ? "primary" : "secondary"}
           loading={pending === "slag"}
           onClick={() => run("slag", !practice.autoDiscardSlag)}
         >
-          {practice.autoDiscardSlag ? "Auto-discard Slag" : "Keep Slag"}
+          Auto-discard Slag: {practice.autoDiscardSlag ? "On" : "Off"}
         </ActionButton>
         <p className="text-xs uppercase tracking-wide text-[color:var(--rs-text-muted)]">
           Applied when a weld finishes

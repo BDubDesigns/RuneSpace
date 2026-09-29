@@ -7,7 +7,7 @@ import { MissionActionButton } from "@/components/ui/MissionActionButton";
 import { BoundedRunSelector } from "@/features/shared/BoundedRunControl";
 import { FabricationRunPanel } from "@/features/fabrication/FabricationRunPanel";
 import { LiveWorkpiecePanel } from "@/features/fabrication/LiveWorkpiecePanel";
-import { StationRecipeTile } from "@/features/fabrication/StationRecipeTile";
+import { RecipeTile } from "@/features/shared/RecipeTile";
 import { fabricateVisibleRecipes } from "@/features/fabrication/station-lists";
 import {
   BATCH_UNIT,
@@ -128,7 +128,7 @@ export function FabricateMode() {
     <div className="space-y-3" data-fabricate-mode>
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4" data-fabricate-recipes>
         {visible.map((candidate) => (
-          <StationRecipeTile
+          <RecipeTile
             data-fabricate-recipe={candidate.actionId}
             data-fabricate-recipe-ready={String(candidate.unlocked && candidate.inputsAvailable)}
             guided={guidance.actionIds.has(candidate.actionId)}

@@ -98,7 +98,9 @@ export function BoundedRunSelector({
           aria-pressed={isMax}
           data-bounded-run-max
           disabled={unavailable}
-          intent="secondary"
+          // Latched while chosen (#239): the shared selected treatment, not any
+          // one skill's accent, and still enabled — Max stays a choice.
+          intent={isMax ? "primary" : "secondary"}
           onClick={() => onChange(BOUNDED_RUN_MAX)}
           type="button"
         >

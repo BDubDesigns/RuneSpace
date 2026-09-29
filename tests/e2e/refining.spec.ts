@@ -89,6 +89,7 @@ test("Processing Yard Refining journey — Ferrite and Slag both branches, artwo
     .where(eq(activeActions.characterId, characterId));
   await page.getByRole("button", { name: "Refresh status" }).click();
   const latestRefining = page.getByRole("region", { name: "Latest refining attempt", exact: true });
+  await expect(latestRefining).toHaveAttribute("data-result-outcome", "success");
   await expect(latestRefining).toContainText("Latest attempt: 1 Refined Ferrite");
   await expect(latestRefining.getByLabel("1 Refined Ferrite produced")).toBeVisible();
   await expect(latestRefining.getByLabel("15 Refining XP earned")).toBeVisible();
@@ -103,8 +104,11 @@ test("Processing Yard Refining journey — Ferrite and Slag both branches, artwo
     .set({ resolvedThroughAt: secondAttemptAgo })
     .where(eq(activeActions.characterId, characterId));
   await page.getByRole("button", { name: "Refresh status" }).click();
-  await expect(latestRefining).toContainText("Latest attempt: 1 Slag");
-  await expect(latestRefining.getByLabel("1 Slag produced")).toBeVisible();
+  // A failure's Slag is what the failure left, never the recipe's output
+  // (#239): the result is headed as a failure, and its tile says so too.
+  await expect(latestRefining).toHaveAttribute("data-result-outcome", "failed");
+  await expect(latestRefining).toContainText("Latest attempt failed: 1 Slag produced");
+  await expect(latestRefining.getByLabel("1 Slag produced by the failed attempt")).toBeVisible();
   await expect(latestRefining.getByLabel("3 Refining XP earned")).toBeVisible();
   await expect(page.getByText("2 attempts · Max", { exact: true })).toBeVisible();
 
@@ -147,7 +151,7 @@ test("Processing Yard Refining journey — Ferrite and Slag both branches, artwo
   await page.reload();
   await expect(page.getByRole("button", { name: "Stop Refining" })).toBeVisible();
   await expect(page.getByText("2 attempts · Max", { exact: true })).toBeVisible();
-  await expect(latestRefining).toContainText("Latest attempt: 1 Slag");
+  await expect(latestRefining).toContainText("Latest attempt failed: 1 Slag produced");
 
   // 9. Travel while Refining resolves only completed attempts; incomplete <7 tick discarded
   // Finish all Map navigation and the destination choice first, record the
@@ -234,6 +238,10 @@ test("Processing Yard Refining journey — Ferrite and Slag both branches, artwo
     .insert(inventoryStacks)
     .values({ characterId, itemId: ITEM_IDS.refinedFerrite, quantity: 5 });
   await db.insert(inventoryStacks).values({ characterId, itemId: ITEM_IDS.slag, quantity: 10 });
+  // The refusal above left one Shale, so Refine had nothing to start (#239);
+  // the fresh status lists Refined Ferrite again for the capacity refusal.
+  await page.getByRole("button", { name: "Refresh status" }).click();
+  await expect(page.getByRole("button", { name: "Start Refining" })).toBeEnabled();
   await page.getByRole("button", { name: "Start Refining" }).click();
   await expect(page.getByText(/make room for the resulting material/)).toBeVisible();
 });

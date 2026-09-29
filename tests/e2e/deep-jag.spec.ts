@@ -28,7 +28,7 @@ import { captureReviewScreenshot } from "./review-screenshot";
  * blocked without a wasted Walk button, that the collapsed worksite presents
  * one generic repair panel with both materials, that the finished weld turns
  * the same location into a mine without a reload, that the Refining console
- * shows all three recipes with the locked ones legible, and that the map is
+ * lists what can be refined now beside the Recipes it knows (#239), and that the map is
  * usable at phone width now that it has grown south as well as west.
  */
 
@@ -220,7 +220,7 @@ test("the worksite is one generic repair panel, and the last weld opens the mine
   );
 });
 
-test("the Refining console shows every recipe, with the locked ones legible", async ({
+test("the Refining console lists what can be refined now, and Recipes lists what is known", async ({
   page,
   testCharacter,
 }) => {
@@ -232,36 +232,111 @@ test("the Refining console shows every recipe, with the locked ones legible", as
     .where(eq(characters.id, characterId));
   await openTestCharacter(page, characterId);
 
-  const recipes = page.locator("[data-refining-recipes]");
-  // The three productive recipes (#209) and the two deliberate Slag ones (#229).
-  await expect(recipes.locator("[data-refining-recipe]")).toHaveCount(5);
-  const stock = recipes.locator(`[data-refining-recipe="${ACTION_IDS.galvanicStockRefining}"]`);
-  const alloy = recipes.locator(`[data-refining-recipe="${ACTION_IDS.galvaferriteRefining}"]`);
+  const panel = page.locator("[data-refining-activity]");
+  const refineMode = panel.locator('[data-refining-mode-select="refine"]');
+  const recipesMode = panel.locator('[data-refining-mode-select="recipes"]');
+  const recipes = panel.locator("[data-refining-recipes]");
+  const catalog = panel.locator("[data-refining-recipes-catalog]");
 
-  // Visible from the beginning, clearly locked, and not selectable.
-  await expect(stock).toHaveAttribute("data-refining-recipe-locked", "true");
-  await expect(stock).toBeDisabled();
-  await expect(stock).toContainText("Requires Refining 5");
-  await expect(alloy).toHaveAttribute("data-refining-recipe-locked", "true");
-  await expect(alloy).toContainText("Requires Refining 8");
-  // The shipped recipe is open and selected.
-  await expect(recipes.locator(`[data-refining-recipe="${ACTION_IDS.refining}"]`)).toHaveAttribute(
-    "data-refining-recipe-locked",
-    "false",
-  );
+  // #239: Refine answers "what can I refine right now?". Carrying nothing,
+  // it lists nothing — no locked or unaffordable rows above the run controls.
+  await expect(refineMode).toHaveAttribute("aria-pressed", "true");
+  await expect(recipes.locator("[data-refining-recipe]")).toHaveCount(0);
+  await expect(panel.locator("[data-refining-empty]")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Start Refining" })).toBeDisabled();
+
+  // Recipes answers "what do I know?": Refining 1 knows Refined Ferrite only.
+  // Galvanic Stock (5), Galvaferrite (8) and the Slag recipes (5) are the
+  // Wiki's to describe, not this console's.
+  await recipesMode.click();
+  await expect(recipesMode).toHaveAttribute("aria-pressed", "true");
+  await expect(refineMode).toHaveAttribute("aria-pressed", "false");
+  await expect(catalog.locator("[data-refining-catalog-entry]")).toHaveCount(1);
+  const knownFerrite = catalog.locator(`[data-refining-catalog-entry="${ACTION_IDS.refining}"]`);
+  await expect(knownFerrite).toContainText("2 Ferrite Shale → 1 Refined Ferrite");
+  await expect(knownFerrite).toContainText("+15 XP");
+  // Its canonical item artwork, not a text row.
+  await expect(knownFerrite.getByTestId("item-artwork")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Start Refining" })).toHaveCount(0);
   await captureReviewScreenshot(page, "refining-recipes-mobile.png");
 
-  // At Refining 5 the second recipe becomes selectable, in the same console.
+  // At Refining 5 carrying Galvanite, Refine lists the two Galvanite recipes
+  // and nothing the Galvanite cannot pay for.
   await setSkillXp(characterId, SKILL_IDS.refining, xpForLevel(5));
+  await db.insert(inventoryStacks).values({ characterId, itemId: ITEM_IDS.galvanite, quantity: 4 });
   await page.reload();
-  await expect(stock).toHaveAttribute("data-refining-recipe-locked", "false");
-  await expect(stock).toBeEnabled();
-  await stock.click();
-  await expect(stock).toHaveAttribute("aria-pressed", "true");
-  // So do both deliberate Slag recipes, which never roll (#229).
-  for (const actionId of [ACTION_IDS.ferriteShaleSlagRefining, ACTION_IDS.galvaniteSlagRefining]) {
-    const slag = recipes.locator(`[data-refining-recipe="${actionId}"]`);
-    await expect(slag).toHaveAttribute("data-refining-recipe-locked", "false");
-    await expect(slag).toContainText("Certain");
-  }
+  await expect(refineMode).toHaveAttribute("aria-pressed", "true");
+  await expect(recipes.locator("[data-refining-recipe]")).toHaveCount(2);
+  const stock = recipes.locator(`[data-refining-recipe="${ACTION_IDS.galvanicStockRefining}"]`);
+  const galvaniteSlag = recipes.locator(
+    `[data-refining-recipe="${ACTION_IDS.galvaniteSlagRefining}"]`,
+  );
+  await expect(stock).toContainText("2 Galvanite → 1 Galvanic Stock");
+  // The deliberate Slag recipe never rolls (#229).
+  await expect(galvaniteSlag).toContainText("Certain");
+  // Selecting a tile is visible and announced; the selection drives the run.
+  const stockTile = stock.getByRole("button", { name: /^Galvanic Stock:/ });
+  await stockTile.click();
+  await expect(stockTile).toHaveAttribute("aria-pressed", "true");
+  await expect(panel.locator("[data-refining-selected]")).toHaveAttribute(
+    "data-refining-selected",
+    ACTION_IDS.galvanicStockRefining,
+  );
+  await expect(galvaniteSlag.getByRole("button", { name: /^Slag:/ })).toHaveAttribute(
+    "aria-pressed",
+    "false",
+  );
+  expect(
+    await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth),
+  ).toBeLessThanOrEqual(0);
+  await captureReviewScreenshot(page, "refining-refine-mobile.png");
+
+  // Recipes now holds all four Refining 5 recipes, carried or not; never
+  // Galvaferrite, which is still above the character's level.
+  await recipesMode.click();
+  await expect(catalog.locator("[data-refining-catalog-entry]")).toHaveCount(4);
+  await page.setViewportSize({ width: 1280, height: 800 });
+  expect(
+    await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth),
+  ).toBeLessThanOrEqual(0);
+  await captureReviewScreenshot(page, "refining-recipes-desktop.png");
+  await refineMode.click();
+  await captureReviewScreenshot(page, "refining-refine-desktop.png");
+  await recipesMode.click();
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect(
+    catalog.locator(`[data-refining-catalog-entry="${ACTION_IDS.galvaferriteRefining}"]`),
+  ).toHaveCount(0);
+  await expect(
+    catalog.locator(`[data-refining-catalog-entry="${ACTION_IDS.refining}"]`),
+  ).toContainText("Need 2 more Ferrite Shale");
+
+  // The one exception (#239): a recipe a Mission is guiding stays on Refine
+  // without its materials, saying what it is missing, so guidance never
+  // points at a hidden recipe. Waste Not guides Refined Ferrite.
+  const now = new Date();
+  await db.insert(characterMissions).values(
+    [MISSION_IDS.walkItOff, MISSION_IDS.cutYourTeeth].map((missionId) => ({
+      characterId,
+      missionId,
+      acceptedAt: now,
+      completedAt: now,
+    })),
+  );
+  await db
+    .insert(characterMissions)
+    .values({ characterId, missionId: MISSION_IDS.wasteNot, acceptedAt: now });
+  await page.reload();
+  await expect(refineMode).toHaveAttribute("aria-pressed", "true");
+  await expect(recipes.locator("[data-refining-recipe]")).toHaveCount(3);
+  const guided = recipes.locator(`[data-refining-recipe="${ACTION_IDS.refining}"]`);
+  await expect(guided).toHaveAttribute("data-refining-recipe-ready", "false");
+  await expect(guided).toContainText("Need 2 more Ferrite Shale");
+  await expect(guided.locator('[data-mission-guidance="active"]')).toBeVisible();
+  // It comes first when nothing is chosen, and cannot start without Shale.
+  await expect(guided.getByRole("button", { name: /^Refined Ferrite:/ })).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
+  await expect(page.getByRole("button", { name: "Start Refining" })).toBeDisabled();
 });

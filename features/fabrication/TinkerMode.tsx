@@ -7,7 +7,7 @@ import { MissionActionButton } from "@/components/ui/MissionActionButton";
 import { StatusMeter } from "@/components/ui/StatusMeter";
 import { BoundedRunProgress, BoundedRunSelector } from "@/features/shared/BoundedRunControl";
 import { TinkeringRunPanel } from "@/features/fabrication/FabricationRunPanel";
-import { StationRecipeTile } from "@/features/fabrication/StationRecipeTile";
+import { RecipeTile } from "@/features/shared/RecipeTile";
 import { tinkerVisibleTargets } from "@/features/fabrication/station-lists";
 import {
   BATCH_UNIT,
@@ -193,7 +193,7 @@ export function TinkerMode() {
         <>
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4" data-tinker-targets>
             {visible.map((candidate) => (
-              <StationRecipeTile
+              <RecipeTile
                 data-tinker-target={candidate.actionId}
                 data-tinker-target-ready={String(candidate.affordableBatches > 0)}
                 itemId={candidate.itemId}

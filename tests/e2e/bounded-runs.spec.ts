@@ -66,6 +66,10 @@ async function fastForward(characterId: string, ms: number) {
   if (moved.length !== 1) throw new Error("fastForward: no active action to move yet");
 }
 
+// `--rs-accent-primary` and `--rs-border-structural`, as the browser computes
+// them: a latched control's frame is the selected accent, an idle one is not.
+const PRIMARY_BORDER = "rgb(75, 216, 245)";
+
 async function expectNoHorizontalOverflow(page: import("@playwright/test").Page) {
   expect(
     await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth),
@@ -103,19 +107,29 @@ test("Refining runs a number of batches, or Max until blocked, through the share
   await expect(value).toContainText("3");
   await expect(increase).toBeDisabled();
 
-  // Max is its own choice, shown as Max rather than a computed number.
-  await max.click();
+  // Max is its own choice, shown as Max rather than a computed number. It
+  // latches visibly while chosen (#239), not by aria-pressed alone, and it is
+  // chosen from the keyboard like any other button.
+  await expect(max).toHaveAttribute("aria-pressed", "false");
+  await expect(max).not.toHaveCSS("border-top-color", PRIMARY_BORDER);
+  await max.focus();
+  await page.keyboard.press("Enter");
   await expect(selector).toHaveAttribute("data-bounded-run-quantity", "max");
   await expect(value).toContainText("Max");
   await expect(max).toHaveAttribute("aria-pressed", "true");
+  await expect(max).toHaveCSS("border-top-color", PRIMARY_BORDER);
+  // Latched, not spent: still an enabled choice.
+  await expect(max).toBeEnabled();
   await expect(increase).toBeDisabled();
   await expect(summary).toContainText("Max · 2 Ferrite Shale per batch");
   await expect(summary).toContainText("runs until materials or space run out");
   await expectNoHorizontalOverflow(page);
   await captureReviewScreenshot(page, "bounded-run-refining-mobile-selector.png");
-  // − leaves Max for the largest number.
+  // − leaves Max for the largest number, and Max unlatches.
   await decrease.click();
   await expect(selector).toHaveAttribute("data-bounded-run-quantity", "3");
+  await expect(max).toHaveAttribute("aria-pressed", "false");
+  await expect(max).not.toHaveCSS("border-top-color", PRIMARY_BORDER);
 
   // The Shale shrinks behind the player's back: Start revalidates the number
   // and refuses rather than refining fewer batches than were chosen.
@@ -158,12 +172,15 @@ test("Refining runs a number of batches, or Max until blocked, through the share
   await expect(panel.getByText("3 attempts · Max", { exact: true })).toBeVisible();
   expect(await carried(characterId, ITEM_IDS.ferriteShale)).toBe(0);
 
-  // The deliberate Slag recipes are listed, and locked below Refining 5.
-  const recipes = panel.locator("[data-refining-recipes]");
+  // With the Shale gone, Refine has nothing to start (#239), and Recipes holds
+  // only what Refining 1 knows: the deliberate Slag recipes need Refining 5,
+  // so neither view lists them.
+  await expect(panel.locator("[data-refining-recipe]")).toHaveCount(0);
+  await panel.locator('[data-refining-mode-select="recipes"]').click();
+  const catalog = panel.locator("[data-refining-recipes-catalog]");
+  await expect(catalog.locator("[data-refining-catalog-entry]")).toHaveCount(1);
   for (const recipe of ["ferrite_shale_slag_refining", "galvanite_slag_refining"]) {
-    const tile = recipes.locator(`[data-refining-recipe="${recipe}"]`);
-    await expect(tile).toHaveAttribute("data-refining-recipe-locked", "true");
-    await expect(tile).toContainText("Requires Refining 5");
+    await expect(catalog.locator(`[data-refining-catalog-entry="${recipe}"]`)).toHaveCount(0);
   }
 
   await page.setViewportSize(DESKTOP);
@@ -205,6 +222,28 @@ test("Practice Welding runs a number of complete welds, or Max until the Scrap r
   const panel = page.locator("[data-practice-panel]");
   const selector = panel.locator("[data-bounded-run]");
   await expect(panel).toBeVisible();
+
+  // The Slag preference is a persistent toggle (#239): its label names one
+  // setting, aria-pressed says whether it is on, and ON latches visibly in
+  // Welding's accent while staying enabled so it can be switched back.
+  const slagToggle = panel.locator("[data-practice-slag-toggle]");
+  await expect(slagToggle).toHaveText("Auto-discard Slag: Off");
+  await expect(slagToggle).toHaveAttribute("aria-pressed", "false");
+  await expect(slagToggle).not.toHaveCSS("border-top-color", PRIMARY_BORDER);
+  await slagToggle.focus();
+  await page.keyboard.press("Enter");
+  await expect(slagToggle).toHaveText("Auto-discard Slag: On");
+  await expect(slagToggle).toHaveAttribute("aria-pressed", "true");
+  await expect(slagToggle).toHaveCSS("border-top-color", PRIMARY_BORDER);
+  await expect(slagToggle).toBeEnabled();
+  await captureReviewScreenshot(page, "practice-slag-toggle-on-mobile.png");
+  // Persisted, not a client latch.
+  await page.reload();
+  await expect(slagToggle).toHaveAttribute("aria-pressed", "true");
+  await slagToggle.click();
+  await expect(slagToggle).toHaveText("Auto-discard Slag: Off");
+  await expect(slagToggle).toHaveAttribute("aria-pressed", "false");
+  await expect(slagToggle).not.toHaveCSS("border-top-color", PRIMARY_BORDER);
 
   // The same interaction as Refining, counting complete welds. Practice
   // totals a number exactly: every weld costs the same Scrap and pays 100 XP.

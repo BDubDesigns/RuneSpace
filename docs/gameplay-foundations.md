@@ -214,9 +214,25 @@ later attempt, so gross use can exceed what was ever carried at once; the
 resolver's end state, computed under the same transaction's row locks, is the
 authoritative inventory.
 
-Every recipe is visible in the console from the beginning; a recipe the
-character's level does not authorize renders as `Requires Refining N` and is
-refused server-side, not merely disabled in the browser.
+The console has two views (#239), mirroring the Fabrication Station's split,
+through the pure rules in `features/refining/refining-lists.ts`:
+
+- **Refine** answers "what can I refine right now?": level-unlocked recipes
+  whose materials are carried for one batch, as selectable output-item tiles
+  (the canonical item visual, shared with the station as
+  `features/shared/RecipeTile.tsx`), plus any recipe a Mission is guiding,
+  shown with what it is missing, so guidance never points at a hidden recipe.
+  Unavailable recipes are not listed above the run controls, and there are no
+  list filters. While a run is under way the list gives way to the run.
+- **Recipes** is the read-only catalog of every recipe the character's Refining
+  level unlocks, carried materials or not; nothing above the character's
+  level. The public Wiki remains the whole skill's reference.
+
+A recipe the character's level does not authorize is still refused
+server-side, not merely hidden in the browser. A failed attempt's Slag or
+returned input is presented as what the failure left — headed as a failure and
+labelled `produced by` / `returned by the failed attempt` — never as the
+recipe's crafted output.
 
 A failure is one of two authored shapes. **Fixed outputs** produce what the
 recipe names — 1 Slag for Refined Ferrite, 2 Slag for Galvanic Stock. **One
@@ -409,9 +425,10 @@ Pass roll. An untouched bench is an absent row, so nothing needs backfilling.
 - **Travel** stops the bench through the same Practice interruption helper the
   player's own Stop uses (`interruptPracticeWelding`), and Practice is on the
   explicit travel-replaceable action list. There is no remote Welding.
-- **Slag at completion time** honours the persistent per-character setting:
-  Keep Slag adds as much as ordinary capacity allows and discards only the
-  overflow; Auto-discard discards both. Output capacity can never block or fail
+- **Slag at completion time** honours the persistent per-character setting,
+  shown as the latched `Auto-discard Slag: On/Off` toggle (#239): Off (keep
+  Slag) adds as much as ordinary capacity allows and discards only the
+  overflow; On discards both. Output capacity can never block or fail
   a completed weld.
 - **The Mission counts completed welds**, through the same generic
   `tracked_activity` path Mining and Refining use — never sections, starts, or

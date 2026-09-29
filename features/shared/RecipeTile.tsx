@@ -4,15 +4,19 @@ import { InventoryStackVisual } from "@/components/items/InventoryStackVisual";
 import { ItemVisual } from "@/components/items/ItemVisual";
 
 /**
- * One authored recipe batch as a station tile (#232): the canonical item
- * visual — `InventoryStackVisual` for a stackable output, with its per-batch
- * quantity badge and stack fill, `ItemVisual` for a unique item — and the
- * recipe and any unmet requirement directly beneath it.
+ * One authored recipe batch as a tile (#232): the canonical item visual —
+ * `InventoryStackVisual` for a stackable output, with its per-batch quantity
+ * badge and stack fill, `ItemVisual` for a unique item — and the recipe and any
+ * unmet requirement directly beneath it.
+ *
+ * Shared by the Fabrication Station and the Refining console (#239). Only the
+ * presentation is shared: each activity decides for itself which recipes it
+ * lists, what the recipe line says, and what a requirement is.
  *
  * The badge is always the one authored batch. A run's size is the selector's
  * business, never the tile's: four batches of a two-item recipe still show x2.
  */
-export function StationRecipeTile({
+export function RecipeTile({
   guided,
   itemId,
   name,

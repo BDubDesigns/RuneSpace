@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { getEffectiveGameBalance } from "@/game/config/balance";
-import { describeFailureOutcome, describeQuantities } from "@/features/refining/attempt-copy";
+import {
+  describeFailureOutcome,
+  describeQuantities,
+  failedAttemptAwardLabel,
+} from "@/features/refining/attempt-copy";
 import type { RefiningRunAttempt } from "@/server/refining";
 
 /**
@@ -85,6 +89,31 @@ describe("a failed Refining attempt says what it did", () => {
   it("does not claim anything came back when nothing did", () => {
     expect(describeFailureOutcome(failedAttempt([{ itemId: shale, quantity: 2 }], []))).toBe(
       "nothing recovered",
+    );
+  });
+});
+
+describe("a failed attempt's item tiles are never its crafted output (#239)", () => {
+  it("labels Slag as what the failure produced", () => {
+    const attempt = failedAttempt(
+      [{ itemId: shale, quantity: 2 }],
+      [{ itemId: slag, quantity: 1 }],
+    );
+    expect(failedAttemptAwardLabel(attempt, { itemId: slag, quantity: 1 })).toBe(
+      "1 Slag produced by the failed attempt",
+    );
+  });
+
+  it("labels a handed-back input as returned by the failure", () => {
+    const attempt = failedAttempt(
+      [
+        { itemId: refinedFerrite, quantity: 1 },
+        { itemId: galvanicStock, quantity: 1 },
+      ],
+      [{ itemId: galvanicStock, quantity: 1 }],
+    );
+    expect(failedAttemptAwardLabel(attempt, { itemId: galvanicStock, quantity: 1 })).toBe(
+      "1 Galvanic Stock returned by the failed attempt",
     );
   });
 });
