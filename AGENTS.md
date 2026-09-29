@@ -193,7 +193,9 @@ product owner, `Preview / Playtest` belongs to the linked-PR workflow, and
 hand. Do not reconfigure the Project's own workflows or fields. If a transition
 cannot be performed — missing Projects scope, an issue absent from the board, an
 ambiguous project — report the exact blocker and continue the issue rather than
-inventing a workaround. `docs/development-workflow.md` has the `gh` procedure,
+inventing a workaround. On Hermes the `gh` token lacks `read:project` and
+`RUNESPACE_PROJECT_TOKEN` is unset, so expect that blocker and report it in the
+PR. `docs/development-workflow.md` has the `gh` procedure,
 and `scripts/project-status.mjs` for environments without `gh`.
 
 ## QC Failed status manifest

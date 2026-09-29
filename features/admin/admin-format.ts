@@ -1,6 +1,7 @@
 import { getLocation, LOCATIONS } from "@/game/content/locations";
 import { skillLevelThresholds } from "@/game/config/balance";
-import { getSkillPresentation, SKILL_PRESENTATIONS } from "@/game/content/skill-presentation";
+import { getSkillPresentation } from "@/game/content/skill-presentation";
+import { presentedSkills } from "@/game/domain/character-progression";
 import { getItemPresentation } from "@/game/content/item-presentation";
 import { getMission } from "@/game/content/missions";
 
@@ -158,18 +159,18 @@ function suitSlotLabel(suitSlotId: string): string {
 }
 
 /**
- * The skills the operator console can SET TOTAL XP on: every skill with
- * canonical player-facing presentation AND an approved progression curve — the
- * same intersection the Character surface presents. Derived from the canonical
- * registries, never listed here, so a future approved skill appears with no
- * edit; a skill without a curve (Strength) is absent. The command still
- * validates the curve server-side, so this list is presentation only.
+ * The skills the operator console can SET TOTAL XP on: exactly the skills the
+ * Character surface presents (`presentedSkills` — an approved curve AND
+ * canonical presentation), in the same order. Never listed here, so a future
+ * approved skill appears with no edit and a skill without a curve (Strength)
+ * is absent. The command still validates the curve server-side, so this list
+ * is presentation only.
  */
-export function xpSettableSkills(
-  presentations: readonly { id: string; displayName: string }[] = SKILL_PRESENTATIONS,
-  levelThresholds: (skillId: string) => unknown = skillLevelThresholds,
-): readonly { id: string; displayName: string }[] {
-  return presentations.filter((skill) => levelThresholds(skill.id) !== undefined);
+export function xpSettableSkills(): readonly { skillId: string; displayName: string }[] {
+  return presentedSkills({
+    levelThresholds: skillLevelThresholds,
+    skillDisplayName: (skillId) => getSkillPresentation(skillId)?.displayName,
+  });
 }
 
 /**

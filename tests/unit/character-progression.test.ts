@@ -4,6 +4,7 @@ import { SKILL_IDS } from "@/game/config/foundations";
 import { getSkillPresentation } from "@/game/content/skill-presentation";
 import {
   characterLevelFromSkillLevels,
+  presentedSkills,
   projectCharacterProgression,
 } from "@/game/domain/character-progression";
 import type { LevelThreshold } from "@/game/domain/progression";
@@ -210,5 +211,41 @@ describe("character progression projection (issue #213)", () => {
         "xpToNextLevel",
       ]);
     }
+  });
+});
+
+describe("presentedSkills — the one presentation rule (issue #242)", () => {
+  const sources = {
+    levelThresholds: (skillId: string) =>
+      skillId === "second" ? SECOND_CURVE : skillId === "metallurgy" ? undefined : THRESHOLDS,
+    skillDisplayName: (skillId: string) => testSkillNames.get(skillId),
+  };
+
+  it("admits only skills with both a curve and a name, in stable-ID order", () => {
+    const skills = presentedSkills({
+      ...sources,
+      skillIds: ["second", "metallurgy", "mining", "x"],
+    });
+    expect(skills.map((skill) => [skill.skillId, skill.displayName])).toEqual([
+      ["mining", "Mining"],
+      ["second", "Second Skill"],
+    ]);
+    expect(skills[1]!.thresholds).toBe(SECOND_CURVE);
+  });
+
+  it("admits a future skill the moment both boundaries define it", () => {
+    const future = presentedSkills({
+      levelThresholds: (skillId) => (skillId === "future" ? SECOND_CURVE : undefined),
+      skillDisplayName: (skillId) => (skillId === "future" ? "Future" : undefined),
+      skillIds: ["future", "mining"],
+    });
+    expect(future.map((skill) => skill.displayName)).toEqual(["Future"]);
+  });
+
+  it("is the set projectCharacterProgression presents", () => {
+    const projected = project([]).skills.map((skill) => skill.displayName);
+    expect(
+      presentedSkills({ ...sources, skillIds: testSkillIds }).map((s) => s.displayName),
+    ).toEqual(projected);
   });
 });

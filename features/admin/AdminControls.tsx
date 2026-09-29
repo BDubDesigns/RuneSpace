@@ -697,7 +697,7 @@ function MissionSection(props: AdminControlProps) {
 function XpSection(props: AdminControlProps) {
   const { characterId, characterName, play, applyState, refreshAll, bus } = props;
   const xpSkills = xpSettableSkills();
-  const [skillId, setSkillId] = useState<string>(xpSkills[0]?.id ?? "");
+  const [skillId, setSkillId] = useState<string>(xpSkills[0]?.skillId ?? "");
   const [value, setValue] = useState("0");
   const [pending, setPending] = useState(false);
 
@@ -727,8 +727,9 @@ function XpSection(props: AdminControlProps) {
 
   // The progression projection omits stable skill IDs by design (they stay
   // internal to it), so match on the canonical display name it is built from.
-  const totalXpOf = (id: string) =>
-    play.progression.skills.find((skill) => skill.displayName === skillLabel(id))?.totalXp ?? 0;
+  // Both lists come from `presentedSkills`; a miss is shown, never read as 0.
+  const totalXpOf = (id: string): number | undefined =>
+    play.progression.skills.find((skill) => skill.displayName === skillLabel(id))?.totalXp;
   const currentInSkill = totalXpOf(skillId);
   const parsedForConfirm = Number(value);
   const differs =
@@ -739,9 +740,9 @@ function XpSection(props: AdminControlProps) {
   return (
     <Section title="Skill total XP">
       <ul className="space-y-1 text-xs text-[color:var(--rs-text-muted)]">
-        {xpSkills.map(({ id, displayName }) => (
+        {xpSkills.map(({ skillId: id, displayName }) => (
           <li key={id}>
-            {displayName}: {totalXpOf(id)}
+            {displayName}: {totalXpOf(id) ?? "unknown"}
           </li>
         ))}
       </ul>
@@ -753,7 +754,7 @@ function XpSection(props: AdminControlProps) {
             value={skillId}
             onChange={(event) => setSkillId(event.target.value)}
           >
-            {xpSkills.map(({ id, displayName }) => (
+            {xpSkills.map(({ skillId: id, displayName }) => (
               <option key={id} value={id}>
                 {displayName}
               </option>
@@ -774,7 +775,7 @@ function XpSection(props: AdminControlProps) {
             label="Set"
             confirmLabel="Confirm set"
             intent="secondary"
-            prompt={`Set ${skillLabel(skillId)} total XP for "${characterName}" from ${currentInSkill} to ${parsedForConfirm}.`}
+            prompt={`Set ${skillLabel(skillId)} total XP for "${characterName}" from ${currentInSkill ?? "an unknown total"} to ${parsedForConfirm}.`}
             onConfirm={setXp}
           />
         ) : (

@@ -338,6 +338,14 @@ cd /opt/data/workspace/RuneSpace
 ./scripts/managed-host-run.sh node scripts/runespace-db.mjs drop issue-84
 ```
 
+On Hermes, `gh` is at `$HOME/.local/bin/gh`, which is **not** on the default
+`PATH`: prefix each call with `PATH=$HOME/.local/bin:$PATH`. That directory also
+holds a broken `python3` shim (it points at a missing `/app/venv`), so with it on
+`PATH` call `/usr/bin/python3` explicitly for any script. The host's `gh` token
+carries `repo` and `workflow` but not `read:project`, and `RUNESPACE_PROJECT_TOKEN`
+is not set, so the Project-board transitions below cannot be performed there;
+report that exact blocker in the PR and continue the issue.
+
 Run `pnpm exec playwright install --with-deps chromium` through the wrapper before
 the first browser test on a fresh Hermes image. The browser download uses the
 private environment's persistent `PLAYWRIGHT_BROWSERS_PATH`. Playwright 1.51 may
