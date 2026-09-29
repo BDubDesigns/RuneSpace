@@ -271,7 +271,9 @@ The `CI` workflow always runs the fast job (frozen install, typecheck of the app
 and every test including `tests/e2e`, lint, format check, unit tests, and one
 production build) for PR revisions and pushes
 to `main`. PostgreSQL integration and canonical E2E are selected by the explicit
-full-gate policy:
+full-gate policy and start only after the fast job succeeds, so a typecheck, lint,
+unit, or build failure (including in `tests/e2e`) never spends integration or
+browser minutes:
 
 | Event | Fast checks | PostgreSQL + canonical E2E | Merge gate |
 | --- | --- | --- | --- |
