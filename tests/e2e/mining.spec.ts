@@ -1,4 +1,4 @@
-import { expect } from "@playwright/test";
+import { expect, type Locator } from "@playwright/test";
 import { and, eq } from "drizzle-orm";
 import { db } from "@/db";
 import {
@@ -15,6 +15,14 @@ import { seedLegacyStarterCutter } from "./legacy-starter";
 import { captureReviewScreenshot } from "./review-screenshot";
 
 const RESULT_FEEDBACK_DURATION_MS = 3_600;
+
+/**
+ * `Locator.evaluate` types its element as `HTMLElement | SVGElement`; artwork
+ * checks read `<img>` properties, so narrow the element type here.
+ */
+function evaluateImage<R>(locator: Locator, read: (image: HTMLImageElement) => R): Promise<R> {
+  return locator.evaluate<R, HTMLImageElement>(read);
+}
 
 function animationDurationSeconds(value: string): number {
   const duration = Number.parseFloat(value);
@@ -99,10 +107,10 @@ test("owned character can start, observe, stop, and restore Ferrite Mining at Th
   await expect(ferriteArtwork).toHaveCount(2);
   await expect
     .poll(() =>
-      ferriteArtwork.first().evaluate((image) => image.complete && image.naturalWidth > 0),
+      evaluateImage(ferriteArtwork.first(), (image) => image.complete && image.naturalWidth > 0),
     )
     .toBe(true);
-  const artworkState = await ferriteArtwork.first().evaluate((image) => ({
+  const artworkState = await evaluateImage(ferriteArtwork.first(), (image) => ({
     assetPath: new URL(image.currentSrc).searchParams.get("url"),
     complete: image.complete,
     naturalWidth: image.naturalWidth,
@@ -812,9 +820,9 @@ test("equipment and inventory rendering shows artwork for illustrated items and 
   const cutterArt = miningTool.getByTestId("item-artwork");
   await expect(cutterArt).toHaveCount(1);
   await expect
-    .poll(() => cutterArt.evaluate((image) => image.complete && image.naturalWidth > 0))
+    .poll(() => evaluateImage(cutterArt, (image) => image.complete && image.naturalWidth > 0))
     .toBe(true);
-  const cutterState = await cutterArt.evaluate((image) => ({
+  const cutterState = await evaluateImage(cutterArt, (image) => ({
     src: image.getAttribute("src"),
     naturalWidth: image.naturalWidth,
     naturalHeight: image.naturalHeight,
@@ -838,9 +846,9 @@ test("equipment and inventory rendering shows artwork for illustrated items and 
   const mykeaArt = firstContainer.getByTestId("item-artwork");
   await expect(mykeaArt).toHaveCount(1);
   await expect
-    .poll(() => mykeaArt.evaluate((image) => image.complete && image.naturalWidth > 0))
+    .poll(() => evaluateImage(mykeaArt, (image) => image.complete && image.naturalWidth > 0))
     .toBe(true);
-  const mykeaState = await mykeaArt.evaluate((image) => ({
+  const mykeaState = await evaluateImage(mykeaArt, (image) => ({
     naturalWidth: image.naturalWidth,
     naturalHeight: image.naturalHeight,
     cssWidth: getComputedStyle(image).width,
@@ -878,7 +886,7 @@ test("equipment and inventory rendering shows artwork for illustrated items and 
   const ferriteArt = ferriteTile.getByTestId("item-artwork");
   await expect(ferriteArt).toHaveCount(1);
   await expect
-    .poll(() => ferriteArt.evaluate((image) => image.complete && image.naturalWidth > 0))
+    .poll(() => evaluateImage(ferriteArt, (image) => image.complete && image.naturalWidth > 0))
     .toBe(true);
   const ferriteDescId = await ferriteTile.getAttribute("aria-describedby");
   expect(ferriteDescId).toBeTruthy();
@@ -897,7 +905,7 @@ test("equipment and inventory rendering shows artwork for illustrated items and 
   const refinedArt = refinedTile.getByTestId("item-artwork");
   await expect(refinedArt).toHaveCount(1);
   await expect
-    .poll(() => refinedArt.evaluate((image) => image.complete && image.naturalWidth > 0))
+    .poll(() => evaluateImage(refinedArt, (image) => image.complete && image.naturalWidth > 0))
     .toBe(true);
   // Accessible description from the presentation boundary
   const refinedDescId = await refinedTile.getAttribute("aria-describedby");
@@ -940,7 +948,7 @@ test("equipment and inventory rendering shows artwork for illustrated items and 
   await expect(inventory.getByLabel(/Empty inventory slot/)).toHaveCount(5);
 
   // Verify artwork sizing in inventory context
-  const invArtState = await ferriteArt.evaluate((image) => ({
+  const invArtState = await evaluateImage(ferriteArt, (image) => ({
     naturalWidth: image.naturalWidth,
     naturalHeight: image.naturalHeight,
     cssWidth: getComputedStyle(image).width,
@@ -957,7 +965,7 @@ test("equipment and inventory rendering shows artwork for illustrated items and 
   await captureReviewScreenshot(page, "mining-desktop-inventory-mixed.png");
 
   await page.setViewportSize({ width: 390, height: 844 });
-}, 30_000);
+});
 
 test("a carried unequipped Cutter occupies one visible Inventory slot and leaves on re-equip", async ({
   page,
@@ -1015,7 +1023,7 @@ test("a carried unequipped Cutter occupies one visible Inventory slot and leaves
   const cutterArt = cutterTile.getByTestId("item-artwork");
   await expect(cutterArt).toHaveCount(1);
   await expect
-    .poll(() => cutterArt.evaluate((image) => image.complete && image.naturalWidth > 0))
+    .poll(() => evaluateImage(cutterArt, (image) => image.complete && image.naturalWidth > 0))
     .toBe(true);
   await expect(cutterArt).toHaveAttribute("src", /salvage-cutter/);
   // Persistent charge is shown compactly and no fake stack quantity appears.
@@ -1112,7 +1120,7 @@ test("an interrupted Mining action preserves confirmed state and retries only st
   const recoveredRequest = page.waitForRequest(
     (request) => isMiningAction(request) && request.headers()["next-action"] === refreshActionId,
   );
-  await retry.evaluate((button) => {
+  await retry.evaluate<void, HTMLElement>((button) => {
     button.click();
     button.click();
   });
@@ -1174,7 +1182,7 @@ test("an uncertain Start retries status refresh without replaying the mutation",
   const recoveredRequest = page.waitForRequest(
     (request) => isMiningAction(request) && request.headers()["next-action"] === refreshActionId,
   );
-  await retry.evaluate((button) => {
+  await retry.evaluate<void, HTMLElement>((button) => {
     button.click();
     button.click();
   });
@@ -1220,7 +1228,7 @@ test("production header is one full-width panel with the larger lockup and Sign 
   const lockup = header.getByRole("img", { name: "RuneSpace" });
   await expect(lockup).toBeVisible();
   await expect
-    .poll(() => lockup.evaluate((image) => image.complete && image.naturalWidth > 0))
+    .poll(() => evaluateImage(lockup, (image) => image.complete && image.naturalWidth > 0))
     .toBe(true);
 
   // The single header panel spans the full game-shell content width.

@@ -133,7 +133,7 @@ Phaser experiences live in `minigames/`, isolated from the main React tree. They
 
 ## Strict TypeScript & SSOT
 
-- Strict TypeScript is enabled project-wide (`tsconfig.json`, `strict: true`, plus `noUncheckedIndexedAccess`, `noImplicitOverride`, `verbatimModuleSyntax`).
+- Strict TypeScript is enabled project-wide (`tsconfig.json`, `strict: true`, plus `noUncheckedIndexedAccess`, `noImplicitOverride`, `verbatimModuleSyntax`). The one `tsconfig.json` covers every committed `.ts`/`.tsx` file, including `tests/unit/`, `tests/integration/`, and the Playwright sources under `tests/e2e/`, so `pnpm typecheck` is the single strict-typing boundary.
 - Single source of truth: every rule, identifier, content definition, and persistence shape has one home. Derived values are computed from authoritative inputs, not redundantly stored. See `AGENTS.md` and `docs/component-boundaries.md`.
 - Equipment is one such home (#233): each item's equipment facts — which slot kind it fits, a container's Inventory slots, a Mining tool's level requirement, charge ceiling and effects — are authored once on its item entry and resolved through `getEquipmentDefinition` (`game/config/balance.ts`). Equipment, Mining, Tinkering's last-Cutter guard, Power Cell loading, and every presentation of charge consume that boundary; none branches on a particular item ID. It is two closed kinds, not an item-effect scripting engine (`docs/gameplay-foundations.md`, "Equipment definitions").
 

@@ -54,12 +54,13 @@ export async function expectElementsInsideHexes(
       let upper = 1;
       const dx = end.x - start.x;
       const dy = end.y - start.y;
-      for (const [coefficient, constant] of [
+      const clips: Array<[coefficient: number, constant: number]> = [
         [-dx, start.x - rect.left],
         [dx, rect.right - start.x],
         [-dy, start.y - rect.top],
         [dy, rect.bottom - start.y],
-      ]) {
+      ];
+      for (const [coefficient, constant] of clips) {
         if (coefficient === 0) {
           if (constant < 0) return false;
           continue;
@@ -130,7 +131,7 @@ export async function expectElementsInsideHexes(
     });
 
     return {
-      labels: plateChecks.map((plate) => plate.label),
+      labels: plateChecks.map((plate) => plate.label ?? "unknown"),
       allInside: plateChecks.every((plate) => plate.inside),
       routeOverlaps,
     };

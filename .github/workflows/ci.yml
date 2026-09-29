@@ -55,7 +55,7 @@ jobs:
       - name: Install (frozen lockfile)
         run: pnpm install --frozen-lockfile
 
-      - name: Typecheck
+      - name: Typecheck (app and all tests, including tests/e2e)
         run: pnpm typecheck
 
       - name: Lint
@@ -108,7 +108,9 @@ jobs:
   integration:
     name: PostgreSQL integration tests
     if: ${{ needs.gate-decision.outputs.full == 'true' }}
-    needs: gate-decision
+    # Expensive jobs start only after the cheap fast-checks job (including the
+    # typecheck of tests/e2e) succeeds.
+    needs: [gate-decision, fast-checks]
     runs-on: ubuntu-latest
     services:
       postgres:
@@ -155,7 +157,7 @@ jobs:
   canonical-e2e:
     name: Canonical E2E shard ${{ matrix.shard }}/3
     if: ${{ needs.gate-decision.outputs.full == 'true' }}
-    needs: gate-decision
+    needs: [gate-decision, fast-checks]
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -216,7 +218,7 @@ jobs:
   canonical-screenshots:
     name: Canonical E2E review screenshots
     if: ${{ needs.gate-decision.outputs.screenshots == 'true' }}
-    needs: gate-decision
+    needs: [gate-decision, fast-checks]
     runs-on: ubuntu-latest
     services:
       postgres:
