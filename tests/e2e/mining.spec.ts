@@ -1120,7 +1120,7 @@ test("an interrupted Mining action preserves confirmed state and retries only st
   const recoveredRequest = page.waitForRequest(
     (request) => isMiningAction(request) && request.headers()["next-action"] === refreshActionId,
   );
-  await retry.evaluate<void, HTMLButtonElement>((button) => {
+  await retry.evaluate<void, HTMLElement>((button) => {
     button.click();
     button.click();
   });
@@ -1182,7 +1182,7 @@ test("an uncertain Start retries status refresh without replaying the mutation",
   const recoveredRequest = page.waitForRequest(
     (request) => isMiningAction(request) && request.headers()["next-action"] === refreshActionId,
   );
-  await retry.evaluate<void, HTMLButtonElement>((button) => {
+  await retry.evaluate<void, HTMLElement>((button) => {
     button.click();
     button.click();
   });
