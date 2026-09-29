@@ -139,7 +139,9 @@ Grep for these before re-deriving them from scratch; a recent session spent
 
 1. Implement one approved issue only and stop after that issue is done.
 2. Fetch the remote and create one fresh branch from the latest `origin/main`,
-   not an assumed local branch.
+   not an assumed local branch. On a shared host use your own git
+   worktree and `issue-<n>` database key; never edit another agent's worktree or
+   depend on an unmerged sibling branch.
 3. Read the issue, this file, relevant docs, code, tests, package scripts, and
    CI workflow before planning. Do not invent unspecified behavior.
 4. Track acceptance criteria against evidence. For boundary, SSOT, concurrency,
@@ -164,9 +166,11 @@ Grep for these before re-deriving them from scratch; a recent session spent
    limitations, unresolved questions, and whether gameplay, persistence, or
    player-facing behavior changed. Stop for human review; do not merge without
    explicit product-owner instruction.
-8. Follow triggered workflows to terminal state. Draft PRs intentionally skip
-   PostgreSQL/canonical jobs unless `full-ci` is applied, and the draft-only
-   Merge gate is expected to remain unsatisfied. Inspect failed logs, repair on
+8. Follow triggered workflows to terminal state. Draft PRs skip
+   PostgreSQL/canonical jobs and the draft-only Merge gate is expected to stay
+   unsatisfied; prove the full gate with the manual `workflow_dispatch` run in
+   `docs/development-workflow.md`. Do not apply `full-ci` or mark a PR Ready;
+   Brandon decides. Inspect failed logs, repair on
    the same branch, push, and follow replacement runs.
 
 ## Project board status
@@ -193,7 +197,9 @@ product owner, `Preview / Playtest` belongs to the linked-PR workflow, and
 hand. Do not reconfigure the Project's own workflows or fields. If a transition
 cannot be performed — missing Projects scope, an issue absent from the board, an
 ambiguous project — report the exact blocker and continue the issue rather than
-inventing a workaround. `docs/development-workflow.md` has the `gh` procedure,
+inventing a workaround. On Hermes the `gh` token lacks `read:project` and
+`RUNESPACE_PROJECT_TOKEN` is unset, so expect that blocker and report it in the
+PR. `docs/development-workflow.md` has the `gh` procedure,
 and `scripts/project-status.mjs` for environments without `gh`.
 
 ## QC Failed status manifest

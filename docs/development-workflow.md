@@ -307,7 +307,8 @@ command output must never include the file contents or complete connection strin
 `scripts/runespace-db.mjs` reuses the shared localhost URL validator and adds the
 RuneSpace control-role and disposable-name boundary:
 
-- `issue-84` selects `runespace_issue_84`;
+- `issue-<positive-number>` (for example `issue-84`) selects
+  `runespace_issue_<number>`;
 - `scratch` selects `runespace_scratch`;
 - `scratch-isolation` selects `runespace_scratch_isolation`;
 - every other key format is refused before a database operation.
@@ -319,14 +320,17 @@ selected database exists, then launches the requested argument vector without a
 shell and with only the child process's `DATABASE_URL` changed.
 
 ```bash
-cd /opt/data/workspace/RuneSpace
+cd <your dedicated worktree>   # see "Concurrent agent work on Hermes" below
 ./scripts/managed-host-run.sh pnpm install --frozen-lockfile
-./scripts/managed-host-run.sh node scripts/runespace-db.mjs create issue-84
 
-./scripts/managed-host-run.sh node scripts/runespace-db.mjs run issue-84 -- pnpm typecheck
-./scripts/managed-host-run.sh node scripts/runespace-db.mjs run issue-84 -- pnpm lint
-./scripts/managed-host-run.sh node scripts/runespace-db.mjs run issue-84 -- pnpm format:check
-./scripts/managed-host-run.sh node scripts/runespace-db.mjs run issue-84 -- pnpm test
+# Static and unit checks need Node 22 but no database: the wrapper alone is enough.
+./scripts/managed-host-run.sh pnpm typecheck
+./scripts/managed-host-run.sh pnpm lint
+./scripts/managed-host-run.sh pnpm format:check
+./scripts/managed-host-run.sh pnpm test
+
+# Database-backed commands run against a validated disposable database.
+./scripts/managed-host-run.sh node scripts/runespace-db.mjs create issue-84
 ./scripts/managed-host-run.sh node scripts/runespace-db.mjs run issue-84 -- pnpm drizzle-kit migrate
 ./scripts/managed-host-run.sh node scripts/runespace-db.mjs run issue-84 -- pnpm test:integration
 ./scripts/managed-host-run.sh node scripts/runespace-db.mjs run issue-84 -- env \
@@ -337,6 +341,32 @@ cd /opt/data/workspace/RuneSpace
 
 ./scripts/managed-host-run.sh node scripts/runespace-db.mjs drop issue-84
 ```
+
+#### Concurrent agent work on Hermes
+
+Several agents share this host. Keep them from colliding:
+
+- Work in a dedicated git worktree on its own branch, never in the shared primary
+  checkout: `git fetch origin main`, then
+  `git worktree add <path> -b <branch> origin/main` (or use the worktree your
+  session was given). Run every command from that worktree.
+- Use a unique `issue-<n>` database key per concurrent worktree; the helper
+  refuses to overwrite an existing database, and `drop` targets only that name.
+- Never modify, rebase, or clean up another agent's worktree or branch, and do not
+  touch its disposable database, processes, or `/tmp/runespace-e2e.lock`.
+- Sibling branches must not depend on one another before merge: branch from
+  `origin/main`, and if a sibling merges first, rebase onto the new `origin/main`
+  rather than onto the sibling's branch.
+- Local browser runs go through `pnpm test:e2e:focused <phase>` only, which queues
+  on the host-wide lock (see "Shared-host E2E"); prove canonical on GitHub.
+
+On Hermes, `gh` is at `$HOME/.local/bin/gh`, which is **not** on the default
+`PATH`: prefix each call with `PATH=$HOME/.local/bin:$PATH`. That directory also
+holds a broken `python3` shim (it points at a missing `/app/venv`), so with it on
+`PATH` call `/usr/bin/python3` explicitly for any script. The host's `gh` token
+carries `repo` and `workflow` but not `read:project`, and `RUNESPACE_PROJECT_TOKEN`
+is not set, so the Project-board transitions below cannot be performed there;
+report that exact blocker in the PR and continue the issue.
 
 Run `pnpm exec playwright install --with-deps chromium` through the wrapper before
 the first browser test on a fresh Hermes image. The browser download uses the
@@ -391,11 +421,23 @@ minutes across GitHub's three shards. So on Hermes:
   does not re-run on later pushes:
 
   ```bash
-  gh workflow run ci.yml -f ref=<branch-or-sha>
-  gh run list --workflow ci.yml --event workflow_dispatch --limit 1 \
-    --json databaseId -q '.[0].databaseId'
+  git push -u origin <branch>          # the run can only see pushed commits
+  gh workflow run ci.yml --ref <branch> -f ref=<branch-or-sha>
+  gh run list --workflow ci.yml --event workflow_dispatch --branch <branch> \
+    --limit 1 --json databaseId,headSha -q '.[0]'
   gh run watch <run-id> --exit-status
   ```
+
+  The two refs do different jobs. `--ref` chooses which branch's copy of
+  `ci.yml` GitHub executes; the `ref` input chooses what RuneSpace checks out and
+  tests. Give both. With only the input, GitHub runs the workflow definition from
+  the default branch, so a branch that edits `ci.yml` is validated by main's
+  workflow (reproduced during #242). Pass the pushed branch name, not a local-only
+  SHA. To confirm the run tested your head, check that `headSha` equals
+  `git rev-parse HEAD`; if it shows main's SHA, `--ref` was omitted. Either way,
+  the checkout step in each job log records the SHA actually tested:
+  `gh run view <run-id> --log | grep -m1 <head-sha-prefix>`. Cancel a run that
+  tested the wrong revision.
 
   Run `gh run watch` from a background shell so it reports once, when the run
   finishes. A manual run is evidence for the agent, not the PR's checks: marking
@@ -548,8 +590,9 @@ During implementation, run checks proportional to the touched boundary: unit
 tests for pure rules, the relevant integration test for a persistence boundary,
 or a focused Playwright spec for a browser change. When a change adds or touches
 E2E specs, validate the new/targeted spec(s) first in isolation
-(`pnpm test:e2e:focused <phase>` or `pnpm test:e2e -- <spec> --project=chromium`)
-to catch fixture errors quickly, then prove the **full** canonical suite — the
+(`pnpm test:e2e:focused <phase>`; on hosts without the managed-host lock,
+`pnpm test:e2e -- <spec> --project=chromium` also works — never on Hermes, where
+it bypasses the host-wide lock) to catch fixture errors quickly, then prove the **full** canonical suite — the
 exact `pnpm test:e2e:canonical` command GitHub's Full gate runs — before assuming
 the work will pass. From the shared Hermes host, run it on GitHub rather than
 locally (see "Shared-host E2E"). `fast-checks` (typecheck/lint/unit/build) intentionally skips
@@ -565,8 +608,10 @@ rather than pushing after every tiny edit.
 
 A draft PR push always runs the fast CI job (frozen install, typecheck, lint,
 format check, unit tests, and one production build). It intentionally does not
-run PostgreSQL integration or canonical E2E unless the PR has the `full-ci`
-label. A coherent, focused-validated draft push is therefore allowed before
+run PostgreSQL integration or canonical E2E. An agent proves the full gate for a
+draft with the manual `workflow_dispatch` run in "Shared-host E2E" and does not
+apply the `full-ci` label itself; the product owner decides when to apply it or
+mark the PR Ready. A coherent, focused-validated draft push is therefore allowed before
 full local parity when the purpose is real-device phone/desktop review. The
 Coolify branch preview deploys pushed checkpoints independently of this CI
 split; it is visual-review evidence, not the merge gate.
@@ -656,7 +701,7 @@ does not create competing instructions.
 
 ### Ready-for-review and merge-gate validation
 
-The same workflow requests the full gate when `full-ci` is applied, when a draft
+The same workflow requests the full gate when the product owner applies `full-ci`, when a draft
 is marked ready without a code push, on every new commit to a ready PR, on every
 push to `main`, and through `workflow_dispatch` (with an explicit ref or SHA).
 The full gate keeps the PostgreSQL integration and canonical E2E jobs separately

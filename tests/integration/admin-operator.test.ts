@@ -891,6 +891,21 @@ suite("issue #113 admin operator console (real PostgreSQL)", () => {
     expect(audit.some((a) => a.operation === "set_skill_xp")).toBe(true);
   });
 
+  it("SET TOTAL XP accepts Fabrication, which the operator picker now offers (#242)", async () => {
+    const { character } = await makeCharacter();
+    const result = await adminCommands.setSkillTotalXpAsAdmin(
+      ADMIN,
+      character.id,
+      SKILL_IDS.fabrication,
+      5000,
+    );
+    expect(result.outcome.kind).toBe("set");
+    expect(result.state.fabrication.totalXp).toBe(5000);
+    expect(result.state.skillTotalXp[SKILL_IDS.fabrication]).toBe(5000);
+    const audit = await auditFor(character.id);
+    expect(audit.filter((a) => a.operation === "set_skill_xp")).toHaveLength(1);
+  });
+
   it("SET TOTAL XP to the same value is a no-op with no audit", async () => {
     const { character } = await makeCharacter();
     await adminCommands.setSkillTotalXpAsAdmin(ADMIN, character.id, SKILL_IDS.mining, 5000);

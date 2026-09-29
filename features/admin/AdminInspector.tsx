@@ -10,7 +10,7 @@ import { adminLoadInspector } from "@/server/admin-actions";
 import { AdminControls } from "./AdminControls";
 import { AdminAuditTrail } from "./AdminAuditTrail";
 import { AdminAccountAccessPanel } from "./AdminAccountAccessPanel";
-import { itemLabel, locationLabel, skillLabel } from "./admin-format";
+import { itemLabel, locationLabel } from "./admin-format";
 
 /**
  * Operator inspector for one character (Issue #113). Holds the authoritative
@@ -208,13 +208,13 @@ export function AdminInspector({ initial }: { initial: AdminInspectorState }) {
             </>
           ) : null}
 
-          {(["mining", "refining", "welding"] as const).map((key) => (
-            <Field key={key} label={skillLabel(key)}>
-              {play[key].totalXp} XP · level {play[key].level}
+          {play.progression.skills.map((skill) => (
+            <Field key={skill.displayName} label={skill.displayName}>
+              {skill.totalXp} XP · level {skill.level}
               <span className="block text-xs text-[color:var(--rs-text-muted)]">
-                {play[key].xpIntoLevel}
-                {play[key].xpToNextLevel !== undefined
-                  ? ` / ${play[key].xpToNextLevel} into next level`
+                {skill.xpIntoLevel}
+                {skill.xpToNextLevel !== undefined
+                  ? ` / ${skill.xpToNextLevel} into next level`
                   : ""}
               </span>
             </Field>

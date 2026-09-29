@@ -88,6 +88,38 @@ export function characterLevelFromSkillLevels(skillLevels: Iterable<number>): nu
   return level;
 }
 
+/** A skill that passes the presentation rule, with the curve it was admitted on. */
+export type PresentedSkill = {
+  skillId: string;
+  displayName: string;
+  thresholds: readonly LevelThreshold[];
+};
+
+/**
+ * The one rule for which skills a surface presents: a skill in the catalog
+ * (`skillIds`, default every `SKILL_IDS` entry) with BOTH an approved level
+ * curve and an approved player-facing name, in deterministic stable-ID order.
+ * `projectCharacterProgression` and every other consumer that needs the
+ * presented set (the operator SET TOTAL XP picker) call this instead of
+ * restating the rule.
+ */
+export function presentedSkills(input: {
+  levelThresholds: (skillId: string) => readonly LevelThreshold[] | undefined;
+  skillDisplayName: (skillId: string) => string | undefined;
+  /** Defaults to every skill the game defines. */
+  skillIds?: readonly string[];
+}): readonly PresentedSkill[] {
+  return (input.skillIds ?? Object.values(SKILL_IDS))
+    .flatMap((skillId) => {
+      const thresholds = input.levelThresholds(skillId);
+      const displayName = input.skillDisplayName(skillId);
+      return thresholds && displayName ? [{ skillId, displayName, thresholds }] : [];
+    })
+    .sort((first, second) =>
+      first.skillId < second.skillId ? -1 : first.skillId > second.skillId ? 1 : 0,
+    );
+}
+
 /**
  * Project a character's canonical level and per-skill progression from its
  * persisted XP rows.
@@ -113,22 +145,13 @@ export function projectCharacterProgression(input: {
   skillIds?: readonly string[];
 }): CharacterProgression {
   const totalXpBySkillId = new Map(input.skillXp.map((row) => [row.skillId, row.totalXp]));
-  const skillIds = input.skillIds ?? Object.values(SKILL_IDS);
   const skillAccentTone = input.skillAccentTone ?? (() => undefined);
 
-  const skills = skillIds
-    .map((skillId) => {
-      const thresholds = input.levelThresholds(skillId);
-      const displayName = input.skillDisplayName(skillId);
-      if (!thresholds || !displayName) return undefined;
-      const progress = skillLevelProgress(totalXpBySkillId.get(skillId) ?? 0, thresholds);
-      const accentTone = skillAccentTone(skillId);
-      return { skillId, displayName, accentTone, ...progress };
-    })
-    .filter((skill) => skill !== undefined)
-    .sort((first, second) =>
-      first.skillId < second.skillId ? -1 : first.skillId > second.skillId ? 1 : 0,
-    );
+  const skills = presentedSkills(input).map(({ skillId, displayName, thresholds }) => {
+    const progress = skillLevelProgress(totalXpBySkillId.get(skillId) ?? 0, thresholds);
+    const accentTone = skillAccentTone(skillId);
+    return { skillId, displayName, accentTone, ...progress };
+  });
 
   return {
     characterLevel: characterLevelFromSkillLevels(skills.map((skill) => skill.level)),
