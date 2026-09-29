@@ -21,10 +21,10 @@ import {
 import {
   ADMIN_DESTINATIONS,
   ADMIN_OFFERED_ITEMS,
-  XP_SHAPED_SKILLS,
   locationLabel,
   missionStateLabel,
   skillLabel,
+  xpSettableSkills,
 } from "./admin-format";
 
 /**
@@ -696,7 +696,8 @@ function MissionSection(props: AdminControlProps) {
 
 function XpSection(props: AdminControlProps) {
   const { characterId, characterName, play, applyState, refreshAll, bus } = props;
-  const [skillId, setSkillId] = useState<string>(XP_SHAPED_SKILLS[0]);
+  const xpSkills = xpSettableSkills();
+  const [skillId, setSkillId] = useState<string>(xpSkills[0]?.id ?? "");
   const [value, setValue] = useState("0");
   const [pending, setPending] = useState(false);
 
@@ -724,12 +725,11 @@ function XpSection(props: AdminControlProps) {
     }
   }
 
-  const totals: Record<string, number> = {
-    mining: play.mining.totalXp,
-    refining: play.refining.totalXp,
-    welding: play.welding.totalXp,
-  };
-  const currentInSkill = totals[skillId] ?? 0;
+  // The progression projection omits stable skill IDs by design (they stay
+  // internal to it), so match on the canonical display name it is built from.
+  const totalXpOf = (id: string) =>
+    play.progression.skills.find((skill) => skill.displayName === skillLabel(id))?.totalXp ?? 0;
+  const currentInSkill = totalXpOf(skillId);
   const parsedForConfirm = Number(value);
   const differs =
     Number.isInteger(parsedForConfirm) &&
@@ -739,9 +739,9 @@ function XpSection(props: AdminControlProps) {
   return (
     <Section title="Skill total XP">
       <ul className="space-y-1 text-xs text-[color:var(--rs-text-muted)]">
-        {XP_SHAPED_SKILLS.map((id) => (
+        {xpSkills.map(({ id, displayName }) => (
           <li key={id}>
-            {skillLabel(id)}: {totals[id]}
+            {displayName}: {totalXpOf(id)}
           </li>
         ))}
       </ul>
@@ -753,9 +753,9 @@ function XpSection(props: AdminControlProps) {
             value={skillId}
             onChange={(event) => setSkillId(event.target.value)}
           >
-            {XP_SHAPED_SKILLS.map((id) => (
+            {xpSkills.map(({ id, displayName }) => (
               <option key={id} value={id}>
-                {skillLabel(id)}
+                {displayName}
               </option>
             ))}
           </select>

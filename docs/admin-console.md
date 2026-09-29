@@ -128,7 +128,7 @@ entering a command is **not** an operator mutation and is never logged.
 | ADD ITEM | `added_stackable_item` / `added_unique_item` | Canonical item ids, capacity-preflighted, unique charge initialized canonically. v1 carries only. |
 | Reset from here (per mission) | `reset_mission_chain` | Console control shown on each authored-mission row; clears the selected mission and its transitive prerequisite descendants (`missionChainResetScope`). |
 | RESET ALL MISSIONS | `reset_all_missions` | Clears only the selected character's mission rows. |
-| SET TOTAL XP | `set_skill_xp` | Absolute value; only skills with an approved progression curve (`skillLevelThresholds`). |
+| SET TOTAL XP | `set_skill_xp` | Absolute value; only skills with an approved progression curve (`skillLevelThresholds`). The picker lists every skill with canonical presentation and such a curve (`xpSettableSkills`), so a new approved skill appears without an admin edit. |
 
 Every command returns the refreshed authoritative `PlayGameplayState`, which the
 inspector swaps in place.

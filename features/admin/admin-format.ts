@@ -1,8 +1,8 @@
 import { getLocation, LOCATIONS } from "@/game/content/locations";
-import { getSkillPresentation } from "@/game/content/skill-presentation";
+import { skillLevelThresholds } from "@/game/config/balance";
+import { getSkillPresentation, SKILL_PRESENTATIONS } from "@/game/content/skill-presentation";
 import { getItemPresentation } from "@/game/content/item-presentation";
 import { getMission } from "@/game/content/missions";
-import { SKILL_IDS } from "@/game/config/foundations";
 
 /** Human label for a canonical location id, falling back to the raw id. */
 export function locationLabel(locationId: string): string {
@@ -158,10 +158,19 @@ function suitSlotLabel(suitSlotId: string): string {
 }
 
 /**
- * The rewritten skills the operator console can SET TOTAL XP on (commands
- * reject anything without an approved progression curve).
+ * The skills the operator console can SET TOTAL XP on: every skill with
+ * canonical player-facing presentation AND an approved progression curve — the
+ * same intersection the Character surface presents. Derived from the canonical
+ * registries, never listed here, so a future approved skill appears with no
+ * edit; a skill without a curve (Strength) is absent. The command still
+ * validates the curve server-side, so this list is presentation only.
  */
-export const XP_SHAPED_SKILLS = [SKILL_IDS.mining, SKILL_IDS.refining, SKILL_IDS.welding] as const;
+export function xpSettableSkills(
+  presentations: readonly { id: string; displayName: string }[] = SKILL_PRESENTATIONS,
+  levelThresholds: (skillId: string) => unknown = skillLevelThresholds,
+): readonly { id: string; displayName: string }[] {
+  return presentations.filter((skill) => levelThresholds(skill.id) !== undefined);
+}
 
 /**
  * Canonical items the ADD ITEM control offers, with human labels for the
