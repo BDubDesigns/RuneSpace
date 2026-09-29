@@ -37,6 +37,39 @@ export function assertLocalDatabaseUrl(databaseUrl: string | undefined): void;
 
 export function assertNode22(version?: string): void;
 
+export const E2E_LOCK_PATH: string;
+export const DEFAULT_E2E_LOCK_WAIT_MS: number;
+export const E2E_LOCK_POLL_MS: number;
+
+export interface E2eLockOwner {
+  pid: number;
+  processStart: string | null;
+  label: string;
+  worktree: string;
+  acquiredAt: string;
+  token: string;
+}
+
+export interface E2eLockHandle {
+  owner: E2eLockOwner | null;
+  release(): void;
+}
+
+export interface AcquireE2eLockOptions {
+  label: string;
+  log(msg: string): void;
+  signal?: AbortSignal;
+  env?: Record<string, string | undefined>;
+  path?: string;
+  maxWaitMs?: number;
+  pollMs?: number;
+}
+
+export function readProcessStartTime(pid: number): string | null;
+export function isE2eLockOwnerAlive(owner: Partial<E2eLockOwner> | null | undefined): boolean;
+export function readE2eLockOwner(path?: string): E2eLockOwner | null;
+export function acquireE2eLock(options: AcquireE2eLockOptions): Promise<E2eLockHandle>;
+
 export interface E2eRuntimeOptions {
   label: string;
   port: number;
@@ -48,6 +81,7 @@ export interface E2eRuntime {
   log(msg: string): void;
   fail(msg: string): never;
   abort(reason: string): void;
+  readonly signal: AbortSignal;
   throwIfAborted(): void;
   runCommand(args: string[], label: string, command?: string): Promise<void>;
   runTimedCommand(args: string[], label: string, command?: string): Promise<void>;

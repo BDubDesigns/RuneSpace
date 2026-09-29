@@ -147,13 +147,17 @@ Grep for these before re-deriving them from scratch; a recent session spent
    separate model review when available; otherwise self-review carefully.
 5. Validate proportionally. Use unit, integration, or E2E according to the
    ownership guide. If E2E specs change, run the targeted spec first and then
-   `pnpm test:e2e:canonical`; zero retries and deterministic fixtures are part
-   of the proof, not problems to hide with sleeps or retries.
+   the full canonical suite; zero retries and deterministic fixtures are part
+   of the proof, not problems to hide with sleeps or retries. On the shared
+   Hermes host, prove canonical with a manual GitHub CI run, not locally; both
+   local E2E runners queue on one host-wide lock (see
+   `docs/development-workflow.md`).
 6. Use `./scripts/managed-host-run.sh` for managed-host and Node-22-bound
    commands. On Hermes, every DB-backed command must run through
    `scripts/runespace-db.mjs` after creating a validated disposable database.
-   Run the full local CI-parity sequence before marking a PR ready when the
-   environment is available; report unavailable checks as unexecuted.
+   Run the full CI-parity sequence (canonical on GitHub from Hermes) before
+   marking a PR ready when the environment is available; report unavailable
+   checks as unexecuted.
 7. Open or update exactly one Draft PR, only after completing the final
    self-review and validation pass. Include `closes #<issue>`, branch and
    PR identity, local and remote validation, architectural decisions,

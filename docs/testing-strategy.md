@@ -137,7 +137,8 @@ small number of critical mobile player journeys.
   in `docs/development-workflow.md`). The focused runner
   reuses the canonical primitives from `scripts/e2e-shared.mjs` (localhost-only
   database safety, Node 22 validation, port availability, targeted process
-  termination) and owns a separate high port (default `3310`, never `3000` or
+  termination, and the host-wide lock that runs one local E2E lifecycle at a
+  time across worktrees) and owns a separate high port (default `3310`, never `3000` or
   `3200`), a local build-and-runtime auth placeholder, and a small lifecycle:
   per-invocation output cleanup, migrations, one production build and server, the
   selected phase, then deterministic teardown of only its own processes.
@@ -178,7 +179,8 @@ surface. The final CI-parity sequence follows `docs/development-workflow.md`:
 run the normal committed migration check (`pnpm drizzle-kit migrate`) when the
 managed disposable database is available, then typecheck, lint, format check,
 unit tests, `pnpm test:integration`, build, focused E2E, and the full
-`pnpm test:e2e:canonical` run.
+`pnpm test:e2e:canonical` run, which runs on GitHub when working from the shared
+Hermes host.
 
 - Uploading an artifact is not proof that promised evidence exists. Verify each
   expected evidence file before upload, and inspect artifact contents whenever
