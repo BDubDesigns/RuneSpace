@@ -39,9 +39,9 @@ small number of critical mobile player journeys.
   default and may reuse an existing server outside CI; set
   `PLAYWRIGHT_DEV_SERVER=true` for a development server. It does **not** count
   as CI-parity validation. On the managed RuneSpace host, plain `pnpm test:e2e`
-  defaults to port `3000`, which belongs to OpenChamber; never run it there
-  without a different `PLAYWRIGHT_PORT` — use `pnpm test:e2e:focused <phase>`
-  for managed-host iteration instead.
+  does not take the host-wide E2E lock (#251) and defaults to port `3000`, so do
+  not run it on a managed host or on Hermes at all — use
+  `pnpm test:e2e:focused <phase>` for managed-host iteration instead.
 - The canonical CI-parity command: `pnpm test:e2e:canonical`. This is the single
   source of truth for local and CI behavioral verification. Its canonical
   selection is an explicit allowlist of behavioral specs — `canonicalSpecPattern`
@@ -133,7 +133,8 @@ small number of critical mobile player journeys.
 - The canonical command is expensive by design: one invocation performs one
   full production `next build`, one `next start`, and the complete allowlisted
   selection, so it spans several minutes. For focused local iteration, run the
-  affected spec (`pnpm test:e2e <spec> --project=chromium`).
+  affected spec (`pnpm test:e2e <spec> --project=chromium` on an unmanaged
+  machine; on a managed host use `pnpm test:e2e:focused <phase>`).
   Ordinary `pnpm test:e2e` owns its server: it uses production build/start by
   default, or a development server when `PLAYWRIGHT_DEV_SERVER=true` is set.
   Focused evidence is never a substitute for the canonical command — only
@@ -283,7 +284,7 @@ browser minutes:
 | Draft converted to ready | Yes | Yes, without a code push | Required |
 | Push to a ready PR | Yes | Yes | Required |
 | Push to `main` | Yes | Yes | Required |
-| Manual `workflow_dispatch` with an explicit ref/SHA | Yes | Yes | Required |
+| Manual `workflow_dispatch` (`--ref <branch>` plus the `ref` input) | Yes | Yes | Required |
 
 Labels on ready PRs request the full gate; adding `e2e-screenshots` also runs the
 separate deterministic screenshot lane without adding its output to behavioral
