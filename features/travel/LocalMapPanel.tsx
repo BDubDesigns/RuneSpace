@@ -1,11 +1,19 @@
 "use client";
 
-import { useEffect, useState, useTransition, type CSSProperties } from "react";
+import {
+  useEffect,
+  useRef,
+  useState,
+  useTransition,
+  type CSSProperties,
+  type KeyboardEvent,
+  type MouseEvent,
+} from "react";
 import { ActionButton } from "@/components/ui/ActionButton";
 import { Feedback } from "@/components/ui/Feedback";
 import { Panel } from "@/components/ui/Panel";
 import { SectionHeader } from "@/components/ui/SectionHeader";
-import { ACTION_IDS, GAME_TICK_MS, LOCATION_IDS } from "@/game/config/foundations";
+import { GAME_TICK_MS, LOCATION_IDS } from "@/game/config/foundations";
 import { getEffectiveGameBalance } from "@/game/config/balance";
 import { areLocationsAdjacent, getLocation } from "@/game/content/locations";
 import { beginTravelAction } from "@/server/actions";
@@ -20,9 +28,13 @@ import {
 } from "./local-map-layout";
 import {
   useLocalMapScrollAffordances,
+  type LocalMapMissionEdgeCues,
+  type LocalMapMissionTarget,
   type LocalMapScrollAffordances,
   type LocalMapScrollDirection,
 } from "./local-map-scroll-affordances";
+import { mapDestinationStatus } from "./map-destination";
+import { MapDestinationPanel } from "./MapDestinationPanel";
 import { routeProgressSegment } from "./route-progress";
 import { resolveMapIdentifierAsset } from "./local-map-identifiers";
 
@@ -443,10 +455,19 @@ const LOCAL_MAP_SCROLL_DIRECTIONS: readonly LocalMapScrollDirection[] = [
   "bottom",
 ];
 
+/**
+ * One canonical arrow for every edge (#240): the wrapper owns only position and
+ * rotation, the inner arrow owns the shape and the centered breathing scale, so
+ * no direction can end up squatter or pulse from a corner. An accepted
+ * Mission's guided hex beyond an edge tints that edge's arrow green (active) or
+ * blue (turn-in); the arrow stays a scroll hint, never a travel command.
+ */
 function LocalMapScrollAffordanceLayer({
   affordances,
+  missionCues,
 }: {
   affordances: LocalMapScrollAffordances;
+  missionCues: LocalMapMissionEdgeCues;
 }) {
   return (
     <div
@@ -460,7 +481,10 @@ function LocalMapScrollAffordanceLayer({
             key={direction}
             className={`rs-map-scroll-affordance rs-map-scroll-affordance--${direction}`}
             data-map-scroll-affordance={direction}
-          />
+            data-map-scroll-mission={missionCues[direction]}
+          >
+            <span className="rs-map-scroll-affordance__arrow" data-map-scroll-arrow />
+          </span>
         ) : null,
       )}
     </div>
@@ -487,14 +511,15 @@ export function LocalMapPanel({
     foregroundBusy: busy,
     requestAutoRefresh,
   } = usePlay();
-  const [selected, setSelected] = useState<string | undefined>();
+  const [selectedLocationId, setSelected] = useState<string | undefined>();
+  // Details belongs to one destination: selecting another hex starts compact.
+  const [detailsFor, setDetailsFor] = useState<string | undefined>();
   const [message, setMessage] = useState<string | undefined>();
+  const mapCanvasRef = useRef<HTMLDivElement | null>(null);
   const [now, setNow] = useState(Date.now());
   const [mapGeometry, setMapGeometry] = useState<LocalMapGeometry>(LOCAL_MAP_GEOMETRY);
   const [, startTransition] = useTransition();
   const [transitioning, setTransitioning] = useState(false);
-  const { viewportRef: localMapViewportRef, affordances: localMapAffordances } =
-    useLocalMapScrollAffordances(true);
 
   const currentLocationId = state.location.currentLocationId;
   // Accepted Missions only: available offers never reach the map.
@@ -502,6 +527,23 @@ export function LocalMapPanel({
   const travel = state.travelState;
   const inTransit = Boolean(travel);
   const workActive = Boolean(state.activeAction);
+  // The map is read-only in transit, so no pending destination survives it.
+  const selected = inTransit ? undefined : selectedLocationId;
+  const detailsOpen = selected !== undefined && detailsFor === selected;
+
+  // Each guided hex's center, with the hex's own active-over-turn-in tone; the
+  // scroll hook projects these onto whichever edges they currently lie beyond.
+  const missionEdgeTargets: LocalMapMissionTarget[] = mapGeometry.layouts.flatMap((layout) => {
+    const marker = missionMarkerFor(missionTargets, layout.locationId);
+    return marker
+      ? [{ x: layout.center.x, y: layout.center.y, tone: missionMarkerTone(marker) }]
+      : [];
+  });
+  const {
+    viewportRef: localMapViewportRef,
+    affordances: localMapAffordances,
+    missionCues: localMapMissionCues,
+  } = useLocalMapScrollAffordances(true, missionEdgeTargets);
 
   useEffect(() => {
     function updateMapGeometry() {
@@ -569,20 +611,47 @@ export function LocalMapPanel({
       : 0;
   const selectedLocation = selected ? getLocation(selected) : undefined;
   const selectedState = selected ? state.locationStates[selected] : undefined;
-  const selectedIsDirectlyReachable =
-    selectedLocation && !inTransit && areLocationsAdjacent(currentLocationId, selectedLocation.id);
   // An authored walking edge is necessary and no longer sufficient (#209): the
   // destination's own derived state decides whether that edge is usable right
   // now, which is what keeps a collapsed Deep Jag from offering a Walk control
   // the server would only refuse.
-  const selectedIsBlocked = Boolean(
-    selectedIsDirectlyReachable &&
-      selected !== currentLocationId &&
-      selectedState &&
-      !selectedState.travelable,
-  );
-  const selectedIsDestination =
-    selectedIsDirectlyReachable && selected !== currentLocationId && !selectedIsBlocked;
+  const selectedStatus = selectedLocation
+    ? mapDestinationStatus({
+        locationId: selectedLocation.id,
+        currentLocationId,
+        travelable: selectedState?.travelable,
+      })
+    : undefined;
+
+  // Every new destination opens compact, so its travel action is in view.
+  function selectLocation(locationId: string) {
+    if (locationId !== selected) setDetailsFor(undefined);
+    setSelected(locationId);
+  }
+
+  // Selection is map-local (#240): a hex selects or moves the selection, a tap
+  // on empty map space clears it, and nothing here scrolls the page. The
+  // destination panel is outside this viewport, so its clicks never land here.
+  function clearSelectionOnEmptyMap(event: MouseEvent<HTMLDivElement>) {
+    if (event.target instanceof Element && event.target.closest("[data-map-location]")) return;
+    setSelected(undefined);
+  }
+
+  // Keyboard dismissal: Escape clears the selection from the map or the panel,
+  // returning focus to the hex it came from rather than dropping it on <body>.
+  function clearSelectionOnEscape(event: KeyboardEvent<HTMLElement>) {
+    if (event.key !== "Escape" || event.defaultPrevented || !selected) return;
+    event.preventDefault();
+    const focusWasInPanel =
+      document.activeElement instanceof Element &&
+      document.activeElement.closest("[data-map-destination-panel]") !== null;
+    if (focusWasInPanel) {
+      mapCanvasRef.current
+        ?.querySelector<HTMLElement>(`[data-map-location="${selected}"]`)
+        ?.focus({ preventScroll: true });
+    }
+    setSelected(undefined);
+  }
   // The tile's short gameplay status comes from the location's derived state, so
   // Deep Jag reads CAVE-IN before the brace is in and MINING after it, from the
   // same resolution the scene and the travel gate use.
@@ -604,7 +673,7 @@ export function LocalMapPanel({
   }
 
   return (
-    <Panel tone="raised">
+    <Panel tone="raised" onKeyDown={clearSelectionOnEscape}>
       <div className="flex items-start justify-between gap-2">
         <SectionHeader eyebrow="Local area">Map</SectionHeader>
         {onBack ? (
@@ -637,8 +706,10 @@ export function LocalMapPanel({
           ref={localMapViewportRef}
           className="max-h-[72dvh] overflow-auto px-1 pb-1"
           data-map-scroll-viewport
+          onClick={clearSelectionOnEmptyMap}
         >
           <div
+            ref={mapCanvasRef}
             className="relative mx-auto"
             role="group"
             aria-label="Local map"
@@ -680,79 +751,49 @@ export function LocalMapPanel({
                     areLocationsAdjacent(currentLocationId, location.id) || isCurrent
                   }
                   missionMarker={missionMarkerFor(missionTargets, location.id)}
-                  onSelect={() => !inTransit && setSelected(location.id)}
+                  onSelect={() => !inTransit && selectLocation(location.id)}
                   style={hexButtonStyle(location.id)}
                 />
               );
             })}
           </div>
         </div>
-        <LocalMapScrollAffordanceLayer affordances={localMapAffordances} />
+        <LocalMapScrollAffordanceLayer
+          affordances={localMapAffordances}
+          missionCues={localMapMissionCues}
+        />
       </div>
 
-      {selectedLocation ? (
-        <div className="mt-4 border border-[color:var(--rs-border-structural)] bg-[color:var(--rs-surface-panel)] p-3">
-          <p className="font-display text-sm font-bold text-[color:var(--rs-text-primary)]">
-            {selectedLocation.displayName}
-          </p>
-          <p className="mt-1 text-sm text-[color:var(--rs-text-secondary)]">
-            {selectedState?.description ?? selectedLocation.description}
-          </p>
-          {selectedIsBlocked ? (
-            <p
-              className="mt-3 font-display text-xs uppercase tracking-wide text-[color:var(--rs-accent-danger)]"
-              data-map-route-blocked={selectedLocation.id}
-            >
-              {selectedState?.mapStatus
-                ? `${selectedState.mapStatus} — the way through is blocked.`
-                : "The way through is blocked."}
-            </p>
-          ) : null}
-          {selectedIsDestination ? (
-            <div className="mt-3">
-              <p className="text-xs uppercase tracking-wide text-[color:var(--rs-text-muted)]">
-                Walking time: {WALK_SECONDS} seconds
-              </p>
-              {workActive ? (
-                <p className="mt-2 text-xs text-[color:var(--rs-text-secondary)]">
-                  Departing resolves your completed work and stops the active activity before the
-                  journey begins.
-                </p>
-              ) : null}
-              <ActionButton
-                className="mt-3"
-                disabled={busy || transitioning}
-                intent="primary"
-                onClick={() => travelTo(selectedLocation.id)}
-              >
-                Walk to {selectedLocation.displayName} — {WALK_SECONDS} sec
-              </ActionButton>
-            </div>
-          ) : selectedLocation && !selectedIsDirectlyReachable && selected !== currentLocationId ? (
-            <p className="mt-2 text-xs text-[color:var(--rs-text-secondary)]">
-              Not directly reachable from here.
-            </p>
-          ) : (
-            <p className="mt-2 text-xs text-[color:var(--rs-text-secondary)]">
-              {selectedLocation?.availableActionIds.includes(ACTION_IDS.refining)
-                ? "Refining is available here — feed Ferrite Shale to produce Refined Ferrite or Slag."
-                : selectedLocation?.availableActionIds.includes(ACTION_IDS.ferriteShaleMining)
-                  ? "Mining is available here."
-                  : selectedLocation?.id === LOCATION_IDS.emergencyPowerAnnex
-                    ? "Claim five Power Cells here once per Pacific reset day."
-                    : selectedLocation?.id === LOCATION_IDS.theLongScramble
-                      ? "No production activity — this is the barren traversal to The Jag."
-                      : "No production activity is available here."}
-            </p>
-          )}
-        </div>
+      {message && !selectedLocation ? (
+        <Feedback tone={state.travelError ? "danger" : "muted"}>{message}</Feedback>
       ) : null}
-
       <p aria-live="polite" className="sr-only">
         {message ?? ""}
       </p>
-      {message ? (
-        <Feedback tone={state.travelError ? "danger" : "muted"}>{message}</Feedback>
+
+      {/* Last in the panel so it sticks to the bottom of the screen while the
+          map is in view, and rests in flow under the map at the end of the
+          page instead of covering anything there. */}
+      {selectedLocation && selectedStatus ? (
+        <MapDestinationPanel
+          description={selectedState?.description ?? selectedLocation.description}
+          detailsOpen={detailsOpen}
+          feedback={
+            message ? (
+              <Feedback tone={state.travelError ? "danger" : "muted"}>{message}</Feedback>
+            ) : null
+          }
+          id="map-destination-panel"
+          locationId={selectedLocation.id}
+          mapStatus={selectedState?.mapStatus}
+          name={selectedLocation.displayName}
+          onToggleDetails={() => setDetailsFor(detailsOpen ? undefined : selectedLocation.id)}
+          onWalk={() => travelTo(selectedLocation.id)}
+          status={selectedStatus}
+          walkDisabled={busy || transitioning}
+          walkSeconds={WALK_SECONDS}
+          workActive={workActive}
+        />
       ) : null}
     </Panel>
   );

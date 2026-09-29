@@ -6,6 +6,7 @@ import {
   deriveJourneyFeed,
   deriveJourneyFlavorBeats,
   getEligibleTravelFlavorPool,
+  newestJourneyEventsFirst,
 } from "@/features/travel/journey-feed";
 
 type TravelState = NonNullable<PlayGameplayState["travelState"]>;
@@ -197,5 +198,32 @@ describe("Journey feed presentation", () => {
     deriveJourneyFeed(travel, new Date(startedAt.getTime() + 10_000));
 
     expect(travel).toEqual(before);
+  });
+
+  it("reads newest first, keeping every older beat below in reverse order (#240)", () => {
+    const travel = makeTravel();
+    const scavengeOpen = new Date(startedAt.getTime() + 1_800);
+    const chronological = deriveJourneyFeed(travel, scavengeOpen);
+    const reading = newestJourneyEventsFirst(chronological);
+
+    // The live Scavenge beat leads, so its control is the first thing reached.
+    expect(reading.map((event) => event.id)).toEqual(["scavenge-available", "departure"]);
+    expect(reading[0]).toMatchObject({ interactive: true, kind: "scavenge" });
+
+    const beats = deriveJourneyFlavorBeats(travel);
+    const later = deriveJourneyFeed(travel, new Date(beats[1]!.presentationAt));
+    expect(newestJourneyEventsFirst(later).map((event) => event.id)).toEqual([
+      beats[1]!.id,
+      beats[0]!.id,
+      "scavenge-missed",
+      "departure",
+    ]);
+    // Presentation order never rewrites the chronological projection.
+    expect(later.map((event) => event.id)).toEqual([
+      "departure",
+      "scavenge-missed",
+      beats[0]!.id,
+      beats[1]!.id,
+    ]);
   });
 });

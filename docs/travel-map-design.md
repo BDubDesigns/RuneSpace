@@ -78,8 +78,8 @@ than duplicating it in map tiles.
 - `current` / `reachable` / `selected` / `origin` / `destination` / `readOnly while inTransit`
   vs `YOU ARE HERE` / `SELECTED` / `Origin` / `Destination` labels and `aria-current` / `aria-pressed`
   / `disabled` are unmistakable; location identity is silhouette/markings/label, not semantic color assignment.
-- Selection never begins travel. Master-detail flow: select hex → detail card → explicit `Walk` confirm
-  (`beginTravelAction`, `WALK_SECONDS`). All adjacency/route math (`axial`, `deriveRouteEndpoints` apothem +
+- Selection never begins travel. Master-detail flow: select hex → selected-destination panel → explicit
+  `Walk` confirm (`beginTravelAction`, `WALK_SECONDS`); see "The selected-destination panel" below. All adjacency/route math (`axial`, `deriveRouteEndpoints` apothem +
   `LOCAL_MAP_ROUTE_GAP`, `routeProgressSegment` forward/reverse equality) unchanged.
 - Map's read-only state is derived solely from accepted `state.travelState`; there is no separate client
   flag recording that Map was opened during Travel. While that state exists, route progress and transit
@@ -93,6 +93,11 @@ than duplicating it in map tiles.
   and Scavenge appears only at its existing authoritative window. Future beats remain hidden until
   their presentation moment, so a refresh reconstructs the same chronological feed without durable
   flavor history or a generic event-scripting engine.
+- Journey **presents** that feed newest first (#240, `newestJourneyEventsFirst`): the latest beat
+  leads with a brighter `--rs-accent-secondary` border and a small `LATEST` tag
+  (`data-journey-latest`), and older beats follow in reverse order. `deriveJourneyFeed` itself stays
+  chronological. `LATEST` is a position, not read/unread state, and nothing is persisted, so a live
+  Scavenge control is always the first thing in the list rather than under earlier history.
 - Travel flavor uses a modest authored pool of general lines plus a separate Holo Hollow pool. The
   current locations all declare the narrow `holo_hollow` region eligibility in the location registry;
   optional directed route lines are keyed by origin and destination, with no implicit reverse reuse.
@@ -199,8 +204,8 @@ recognizable yet subordinate to gameplay state.
 
 A location whose current state is not travelable still renders as a full hex:
 identifier, nameplate, and its own status plate. Selecting it opens the ordinary
-detail card with the location's name and its state's description, and in place
-of the Walk button the card states why the way is shut
+selected-destination panel with the location's name (and its state's description
+under Details), and in place of the Walk button the panel states why the way is shut
 (`data-map-route-blocked`, e.g. "CAVE-IN — the way through is blocked."). There
 is no disabled Walk button to press and no silent hex that simply does nothing.
 
@@ -221,6 +226,60 @@ The viewport is bounded (`max-h-[72dvh]`) so the map cannot push the rest of the
 page off a phone, and deliberately not shorter than that: a nested scroller
 small enough to trap ordinary vertical page scrolling would be worse than a tall
 map. Verified at 390×844 and at desktop width with no horizontal page overflow.
+
+## The selected-destination panel (issue #240)
+
+Selecting a hex opens `MapDestinationPanel` (`data-map-destination-panel`), the last child of the
+Map panel, `position: sticky` just above the fixed bottom navigation
+(`.rs-map-destination-panel`, `bottom: --rs-bottom-nav-box-height + --rs-space-2`). While the map
+is in view it floats over the map's lower edge; at the end of the page it rests in flow under the
+map, so it never permanently hides anything. It is not a modal: no backdrop, no focus move, no
+document scroll, and no map pan or nudge when it opens.
+
+- **Selection is map-local.** A hex selects, or moves the selection and updates the same panel in
+  place. A click on empty map space inside `data-map-scroll-viewport` (any target that is not inside
+  a `data-map-location` button) clears it. The panel is outside that viewport, so interacting with
+  it can never bubble into the clear; clicks elsewhere on the page are not dismissals. `Escape`
+  inside the Map panel clears the selection and, if focus was in the panel, returns it to the hex
+  (`focus({ preventScroll: true })`). Starting travel clears the pending destination, and the map
+  holds none while `state.travelState` exists. The map has no paging controls on current `main`;
+  it is one bounded two-axis scroller, and scrolling it never clears a selection.
+- **State comes from the existing facts.** `mapDestinationStatus` (`features/travel/map-destination.ts`)
+  reads registry adjacency plus the server-derived `locationStates[id].travelable`, the same facts
+  the travel gate enforces: `current` shows "You are here", `unreachable` shows "No route from
+  here", `blocked` keeps the named refusal (`data-map-route-blocked`), and only `reachable` offers
+  Walk. There is never a disabled Walk button.
+- **Compact by default.** Name, the location's resolved status plus walking time
+  (`data-map-destination-meta`, e.g. `Refining · 24 sec walk`), then `Details` and Walk. The visible
+  Walk label is `Walk — 24 sec`; its accessible name keeps the destination (`Walk to … — 24 sec`).
+  The flavor description appears only while Details is on (`data-map-destination-details`).
+- **Details is a latched toggle** (`docs/design-system.md`): `secondary` while off, `primary` plus
+  an inset rim while on, always enabled, `aria-pressed` carrying the same state. It belongs to one
+  destination — selecting any other hex starts compact again.
+- Verified at 390×844 and 1440×900: the panel sits wholly above the navigation, the Walk control
+  is fully in view with Details on or off, and there is no horizontal overflow. On `sm` and wider
+  the panel is capped at `max-w-xl` and centered under the map.
+
+## Edge arrows: one geometry, Mission cues (issue #240)
+
+All four edge arrows are one canonical shape. `.rs-map-scroll-affordance` is a wrapper that owns
+only placement — centered on its anchor with `translate: -50% -50%`, `--rs-map-scroll-arrow-inset`
+from its edge — and direction, via `rotate` (`0` / `180deg` / `90deg` / `270deg` for left / right /
+top / bottom). The inner `.rs-map-scroll-affordance__arrow` (`data-map-scroll-arrow`) is the same
+`1.5rem × 3rem` left-pointing clip, border, and fill in every direction and owns the breathing
+`scale`, so the pulse grows from the arrow's own center with no drift; there are no per-direction
+sizes. Reduced motion removes the breath from the inner arrow exactly as before.
+
+When an accepted Mission's guided World Location lies beyond an edge, that edge's arrow carries
+`data-map-scroll-mission="active" | "turn_in"` and re-derives its fill, border, and halo tokens from
+`--rs-mission-guidance-*` (green) or `--rs-mission-available-*` (blue). The projection is
+`getLocalMapMissionEdgeCues` in `features/travel/local-map-scroll-affordances.ts`: each guided hex's
+center (from the same `deriveMissionGuidanceTargets` sets and hex precedence the rings use) is
+compared with the visible part of the canvas, measured on every scroll and resize. A center beyond
+an edge cues that edge, so a diagonal target cues two; a center on screen clears the cue. Active
+work wins an edge shared with a turn-in. Available offers never reach the map, so they never tint
+an arrow. The cue is decoration on an existing scroll hint — the layer stays `pointer-events: none`,
+and it adds no routing, command, or persisted state.
 
 ## Responsiveness
 - Primary constraint 390px mobile (compact `108` hexes where the current tile shows `YOU ARE HERE` plus a

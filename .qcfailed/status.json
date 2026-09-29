@@ -4,17 +4,17 @@
   "workState": "active",
   "currentFocus": "Preparing the October 27 Soft Alpha: verified players can reserve characters; account-level Early Access and a closed-by-default public gameplay gate control when play begins.",
   "currentChange": {
-    "summary": "Fabrication 5 and 8: Power Cells, the Loadsteel Cutter as a second Mining tool, the Freight Harness, advanced Tinkering, and Tansy's A Cut Above and Renn's Cutting Costs Missions.",
+    "summary": "Map travel UX: a sticky destination panel keeps the Walk button in reach, edge arrows share one shape and point toward off-screen Mission targets, and the Journey shows its newest event first.",
     "stage": "review",
-    "pullRequestNumber": 241
+    "pullRequestNumber": 252
   },
   "latestCompleted": {
-    "summary": "Tansy teaches Fabrication at Rusk Recovery: a Fabrication Station with four Tier-1 recipes, Manual Override for riskier XP, Tinkering to take pieces apart, and the Return the Favor and Break It Down Missions.",
-    "date": "2026-09-27",
-    "url": "https://github.com/BDubDesigns/RuneSpace/pull/238"
+    "summary": "The Refining console lists what you can refine now as item tiles, with every known recipe on a separate Recipes view, and Max and Auto-discard Slag visibly latch when on.",
+    "date": "2026-09-28",
+    "url": "https://github.com/BDubDesigns/RuneSpace/pull/250"
   },
-  "nextStep": "Human review and playtest of Fabrication 5 and 8: the Loadsteel Cutter, Freight Harness, A Cut Above and Cutting Costs; public gameplay remains closed until an operator deliberately opens it.",
-  "lastMeaningfulUpdate": "2026-09-27",
+  "nextStep": "Human review and phone playtest of the Map destination panel, Mission edge arrows, and newest-first Journey; public gameplay remains closed until an operator deliberately opens it.",
+  "lastMeaningfulUpdate": "2026-09-28",
   "highlights": [
     {
       "summary": "Deep Jag is playable: brace the cave-in for Tansy, mine Galvanite behind it, and refine Galvanic Stock and Galvaferrite at the Processing Yard.",

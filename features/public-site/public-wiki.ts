@@ -115,6 +115,7 @@ const authoredWikiArticles = [
         heading: "Selecting and confirming a walk",
         paragraphs: [
           "Select a location on the Map to look at it, then use the separate confirmation control to actually start walking there. Each leg between two connected locations takes about 24 seconds, and your progress is safe if you refresh or lose connection partway through.",
+          "Selecting a location opens a small panel just above the navigation bar with its name, what's there, the walking time, and the Walk button, so you never have to scroll away from the map to leave. Details shows the location's full description in the same panel; select Details again to put it away. Selecting where you're standing says You are here, and a location with no path from where you are says No route from here — neither offers a walk. Select another location to switch, or tap an empty part of the map (or press Escape) to close the panel.",
         ],
       },
       {
@@ -133,6 +134,7 @@ const authoredWikiArticles = [
         heading: "Scavenging while you walk",
         paragraphs: [
           "Every ordinary walk gives you one chance to scavenge along the way. The opportunity opens at some point during the walk and stays open for a few seconds before it's gone for good — there's no way to trigger it early or get a second chance on the same leg. Riding the Crew Hauler gives you none at all.",
+          "The Journey lists the newest thing that happened first, marked Latest, with the rest of the walk below it — so when something catches your eye, the Scavenge button is at the top rather than under the rest of the trip.",
           [
             "Claiming it can turn up a little Ferrite Shale, a ",
             { text: "Power Cell", articleSlug: "power-cells" },
@@ -890,6 +892,7 @@ const authoredWikiArticles = [
         paragraphs: [
           "Once you've accepted a job, green and blue highlights point you toward whatever's next, wherever that actually is — the place on the Map, a building's Enter, a person, a piece of equipment, or an action control.",
           "Green means work still to do: the destination on the Map, a building's Enter once you've arrived, the person to talk to, the equipment to equip, or the action to start. Blue means a conversation — either someone has a new job for you, or a finished job is ready to hand in. The moment every objective on a job is met, it turns blue: the person you hand it in to lights up blue instead of green, and the Map labels their location TURN IN in plain text, even before you've arrived there. An accepted job's own destination is labeled MISSION the same way.",
+          "If that destination is scrolled out of view, the arrow at the edge of the Map pointing toward it turns green or blue to match, and goes back to normal once the place is on screen. A job someone is only offering never lights up the Map.",
           "When a job can be finished more than one legitimate way — three Power Cells can come from your Inventory, the Annex, or Bix's shelf — nothing gets highlighted for that step. It's your call.",
         ],
       },

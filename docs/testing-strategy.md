@@ -154,6 +154,12 @@ cannot be proven by server tests alone:
 - `tests/unit/journey-feed.test.ts` proves that Journey feed entries derive
   presentation from the authoritative Travel/Scavenge projection without
   owning commands or persistence.
+- `tests/unit/map-destination.test.ts` and the Mission edge-cue cases in
+  `tests/unit/local-map-scroll-affordances.test.ts` (#240) prove the Map's
+  selected-destination state and off-screen Mission cues are projections of
+  existing adjacency, location-state, and Mission-guidance facts; the browser
+  behaviour (sticky panel, dismissal, Details, arrow geometry, cues, newest-first
+  Journey) is proven in `tests/e2e/travel.spec.ts`.
 - Location Population and Character Profile E2E coverage proves that
   same-location browsing remains on Location and is absent from Map; the
   stationary Long Scramble composition has scene/description/population and no

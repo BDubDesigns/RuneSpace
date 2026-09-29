@@ -188,3 +188,15 @@ export function deriveJourneyFeed(travel: TravelState, now: Date): readonly Jour
     )
     .map(({ presentationAt: _presentationAt, sequence: _sequence, ...event }) => event);
 }
+
+/**
+ * The Journey feed in reading order (#240): newest first, so the current beat —
+ * and a live Scavenge control inside it — leads the list rather than sitting
+ * under older history. `deriveJourneyFeed` stays a chronological projection;
+ * only the order the player reads it in changes, and nothing is dropped.
+ */
+export function newestJourneyEventsFirst(
+  feed: readonly JourneyFeedEvent[],
+): readonly JourneyFeedEvent[] {
+  return [...feed].reverse();
+}

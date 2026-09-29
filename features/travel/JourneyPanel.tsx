@@ -7,7 +7,7 @@ import { StatusMeter } from "@/components/ui/StatusMeter";
 import { getLocation } from "@/game/content/locations";
 import { TRANSPORT_ROUTES } from "@/game/content/transport-routes";
 import { ScavengeControl } from "./ScavengeControl";
-import { deriveJourneyFeed } from "./journey-feed";
+import { deriveJourneyFeed, newestJourneyEventsFirst } from "./journey-feed";
 import { usePlay } from "@/features/play/PlayContext";
 
 function progressBetween(startedAt: string, arrivesAt: string, now: number): number {
@@ -40,7 +40,7 @@ export function JourneyPanel() {
       ? undefined
       : (TRANSPORT_ROUTES.find((route) => route.mode === travel.mode)?.displayName ?? "transport");
   const remainingSeconds = Math.max(0, (new Date(travel.arrivesAt).getTime() - now) / 1_000);
-  const feed = deriveJourneyFeed(travel, new Date(now));
+  const feed = newestJourneyEventsFirst(deriveJourneyFeed(travel, new Date(now)));
 
   return (
     <Panel tone="raised" data-journey-surface>
@@ -73,20 +73,38 @@ export function JourneyPanel() {
           : "The active work stopped before departure. No new activity can begin until you arrive."}
       </p>
 
+      {/* Newest first (#240): the latest beat leads, so a live Scavenge control
+          is reachable without scrolling past older history, which stays below
+          in reverse order. "Latest" is a position, not read/unread state. */}
       <ol aria-label="Journey events" className="mt-5 space-y-3" data-journey-feed>
-        {feed.map((event) => (
-          <li
-            className="border border-[color:var(--rs-border-structural)] bg-[color:var(--rs-surface-panel)] p-3"
-            data-journey-event={event.kind}
-            key={event.id}
-          >
-            <p className="font-display text-xs uppercase tracking-[0.16em] text-[color:var(--rs-accent-arcane)]">
-              {event.title}
-            </p>
-            <p className="mt-1 text-sm text-[color:var(--rs-text-secondary)]">{event.detail}</p>
-            {event.interactive ? <ScavengeControl /> : null}
-          </li>
-        ))}
+        {feed.map((event, index) => {
+          const latest = index === 0;
+          return (
+            <li
+              className={`border bg-[color:var(--rs-surface-panel)] p-3 ${
+                latest
+                  ? "border-[color:var(--rs-accent-secondary)]"
+                  : "border-[color:var(--rs-border-structural)]"
+              }`}
+              data-journey-event={event.kind}
+              data-journey-latest={latest ? "true" : undefined}
+              key={event.id}
+            >
+              <div className="flex items-baseline justify-between gap-3">
+                <p className="font-display text-xs uppercase tracking-[0.16em] text-[color:var(--rs-accent-arcane)]">
+                  {event.title}
+                </p>
+                {latest ? (
+                  <span className="shrink-0 font-display text-[10px] font-bold uppercase tracking-[0.16em] text-[color:var(--rs-accent-secondary)]">
+                    Latest
+                  </span>
+                ) : null}
+              </div>
+              <p className="mt-1 text-sm text-[color:var(--rs-text-secondary)]">{event.detail}</p>
+              {event.interactive ? <ScavengeControl /> : null}
+            </li>
+          );
+        })}
       </ol>
     </Panel>
   );
