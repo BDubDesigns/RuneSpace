@@ -1,15 +1,24 @@
-import { expect, test, openMapSurface, openTestCharacter } from "./fixtures";
+import {
+  expect,
+  expectKeyboardFocusRingPaints,
+  openMapSurface,
+  openTestCharacter,
+  resolvedCssVarColor,
+  test,
+} from "./fixtures";
 import { writeFile } from "node:fs/promises";
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import {
   activeActions,
+  characterMissionProgress,
+  characterMissions,
   characterScavengeReveals,
   characterTravelState,
   characters,
   inventoryStacks,
 } from "@/db/rune-space";
-import { ACTION_IDS, ITEM_IDS, LOCATION_IDS } from "@/game/config/foundations";
+import { ACTION_IDS, ITEM_IDS, LOCATION_IDS, MISSION_IDS } from "@/game/config/foundations";
 import { LOCAL_MAP_LOCATION_IDS } from "@/game/content/locations";
 import { POWER_CELL_DAILY_ALLOTMENT } from "@/game/domain/power-annex";
 import { seedLegacyStarterCutter } from "./legacy-starter";
@@ -326,7 +335,7 @@ test("selecting a destination does not begin travel; confirmation is required", 
   await expect(
     page.getByRole("button", { name: /Walk to Abandoned Processing Yard/ }),
   ).toBeVisible();
-  await expect(page.getByText("Walking time: 24 seconds")).toBeVisible();
+  await expect(page.locator("[data-map-destination-meta]")).toContainText("24 sec walk");
   // The map remains read-only: no IN TRANSIT yet.
   await expect(page.getByText("In transit", { exact: false })).toHaveCount(0);
   // Selecting again does not create a journey server-side.
@@ -405,10 +414,9 @@ test("directional map affordances follow native scroll truth", async ({ page }) 
   // directions, and removes the breathing animation entirely.
   await page.emulateMedia({ reducedMotion: "reduce" });
   await expectMapScrollAffordances(page, ["left", "right", "top"]);
-  await expect(page.locator('[data-map-scroll-affordance="top"]')).toHaveCSS(
-    "animation-name",
-    "none",
-  );
+  await expect(
+    page.locator('[data-map-scroll-affordance="top"] [data-map-scroll-arrow]'),
+  ).toHaveCSS("animation-name", "none");
 
   // A real hex remains activatable while the markers are present.
   await viewport.evaluate((element) => {
@@ -557,7 +565,7 @@ test("the full journey walks, arrives, and returns between the original location
   // original triangle remains intact after the Scramble/Jag branch).
   await openMapSurface(page);
   await page.getByRole("button", { name: /Abandoned Processing Yard/ }).click();
-  await expect(page.getByText(/Walking time: 24 seconds/)).toBeVisible();
+  await expect(page.locator("[data-map-destination-meta]")).toContainText("24 sec walk");
   await page.getByRole("button", { name: /Walk to Abandoned Processing Yard/ }).click();
   // The authoritative state is applied immediately — verify the transit UI.
   await expect(page.getByText("Journey progress")).toBeVisible();
@@ -744,7 +752,7 @@ test("reduced-motion presentation retains equivalent travel information", async 
 
   // Select the Processing Yard — details visible without animation.
   await page.getByRole("button", { name: /Abandoned Processing Yard/ }).click();
-  await expect(page.getByText("Walking time: 24 seconds")).toBeVisible();
+  await expect(page.locator("[data-map-destination-meta]")).toContainText("24 sec walk");
   await expect(
     page.getByRole("button", { name: /Walk to Abandoned Processing Yard/ }),
   ).toBeVisible();
@@ -1128,4 +1136,491 @@ test("rides the Crew Hauler as a real Journey with no Scavenge, and opens the Ma
     "true",
     { timeout: 15_000 },
   );
+});
+
+// ---------------------------------------------------------------------------
+// Issue #240: the travel decision and the current travel event stay in reach.
+// ---------------------------------------------------------------------------
+
+async function expectNoHorizontalOverflow(page: import("@playwright/test").Page) {
+  const overflow = await page.evaluate(
+    () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+  );
+  expect(overflow).toBeLessThanOrEqual(0);
+}
+
+/** A point inside the map viewport that is map background, not a hex. */
+async function emptyMapPoint(page: import("@playwright/test").Page) {
+  return page.locator("[data-map-scroll-viewport]").evaluate((viewport) => {
+    const rect = viewport.getBoundingClientRect();
+    const bottom = Math.min(rect.bottom, window.innerHeight);
+    for (let y = rect.top + 4; y < bottom - 4; y += 6) {
+      for (let x = rect.left + 4; x < rect.right - 4; x += 6) {
+        const hit = document.elementFromPoint(x, y);
+        if (hit && viewport.contains(hit) && !hit.closest("[data-map-location]")) return { x, y };
+      }
+    }
+    throw new Error("No empty map space is in view");
+  });
+}
+
+/** The panel sits wholly on screen, above the fixed bottom navigation. */
+async function expectPanelAboveBottomNav(page: import("@playwright/test").Page) {
+  const panelBox = (await page.locator("[data-map-destination-panel]").boundingBox())!;
+  const navBox = (await page.getByRole("navigation", { name: "Primary" }).boundingBox())!;
+  expect(panelBox.y).toBeGreaterThanOrEqual(0);
+  expect(panelBox.y + panelBox.height).toBeLessThanOrEqual(navBox.y + 0.5);
+  return panelBox;
+}
+
+test("the destination panel keeps the travel decision in reach without leaving the map (#240)", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  const panel = page.locator("[data-map-destination-panel]");
+  const yard = page.getByRole("button", { name: /Abandoned Processing Yard/ }).first();
+  const annex = page.getByRole("button", { name: /DeWhat\? Emergency Power Annex/ }).first();
+  const crash = page.getByRole("button", { name: /Crash Site/ }).first();
+  const jag = page.locator(`[data-map-location="${LOCATION_IDS.theJag}"]`);
+  await expect(panel).toHaveCount(0);
+
+  // Tap a reachable hex: the compact panel opens and the page does not move.
+  await yard.scrollIntoViewIfNeeded();
+  const scrollBefore = await page.evaluate(() => window.scrollY);
+  await yard.click();
+  await expect(panel).toHaveAttribute(
+    "data-map-destination-panel",
+    LOCATION_IDS.abandonedProcessingYard,
+  );
+  await expect(panel).toHaveAttribute("data-map-destination-status", "reachable");
+  await expect(yard).toHaveAttribute("aria-pressed", "true");
+  await expect(panel.locator("[data-map-destination-meta]")).toHaveText("Refining · 24 sec walk");
+  const walk = panel.getByRole("button", { name: "Walk to Abandoned Processing Yard — 24 sec" });
+  await expect(walk).toBeInViewport({ ratio: 1 });
+  expect(await page.evaluate(() => window.scrollY)).toBe(scrollBefore);
+  const compactBox = await expectPanelAboveBottomNav(page);
+  // Compact: the decision, not the flavor paragraph.
+  await expect(panel.locator("[data-map-destination-details]")).toHaveCount(0);
+  expect(compactBox.height).toBeLessThan(844 * 0.2);
+  await expectNoHorizontalOverflow(page);
+  await captureReviewScreenshot(page, "travel-mobile-destination-reachable.png");
+
+  // Details is a latched toggle: pressed, visibly on, still enabled, reversible.
+  const details = panel.getByRole("button", { name: "Details" });
+  await expect(details).toHaveAttribute("aria-pressed", "false");
+  // ActionButton transitions its colors, so read the settled paint, not a frame.
+  const borderColor = () => details.evaluate((element) => getComputedStyle(element).borderTopColor);
+  const primary = await resolvedCssVarColor(page, "--rs-accent-primary");
+  const offBorder = await borderColor();
+  expect(offBorder).not.toBe(primary);
+  await details.click();
+  await expect(details).toHaveAttribute("aria-pressed", "true");
+  await expect(details).toBeEnabled();
+  await expect(panel.locator("[data-map-destination-details]")).toBeVisible();
+  await expect.poll(borderColor).toBe(primary);
+  await expect(walk).toBeInViewport({ ratio: 1 });
+  await expectPanelAboveBottomNav(page);
+  await captureReviewScreenshot(page, "travel-mobile-destination-details.png");
+  await details.click();
+  await expect(details).toHaveAttribute("aria-pressed", "false");
+  await expect(panel.locator("[data-map-destination-details]")).toHaveCount(0);
+
+  // Another hex moves the selection and updates the same panel, compact again,
+  // while the panel is open — the map stays usable underneath it.
+  await details.click();
+  await expect(details).toHaveAttribute("aria-pressed", "true");
+  await annex.click();
+  await expect(panel).toHaveAttribute(
+    "data-map-destination-panel",
+    LOCATION_IDS.emergencyPowerAnnex,
+  );
+  await expect(panel.locator("[data-map-destination-meta]")).toHaveText(
+    "Daily cells · 24 sec walk",
+  );
+  await expect(panel.getByRole("button", { name: "Details" })).toHaveAttribute(
+    "aria-pressed",
+    "false",
+  );
+  await expect(yard).toHaveAttribute("aria-pressed", "false");
+  await expect(annex).toHaveAttribute("aria-pressed", "true");
+
+  // Clicks inside the panel, or elsewhere on the page, are not map dismissals.
+  await panel.locator("[data-map-destination-meta]").click();
+  await expect(panel).toBeVisible();
+  await page.getByText("Locations are hexes connected by routes.", { exact: false }).click();
+  await expect(panel).toBeVisible();
+
+  // Empty map space clears the selection and closes the panel.
+  const empty = await emptyMapPoint(page);
+  await page.mouse.click(empty.x, empty.y);
+  await expect(panel).toHaveCount(0);
+  await expect(page.locator('[data-map-location][aria-pressed="true"]')).toHaveCount(0);
+
+  // The current hex can be inspected but offers no redundant travel.
+  await crash.click();
+  await expect(panel).toHaveAttribute("data-map-destination-status", "current");
+  await expect(panel.locator("[data-map-destination-state]")).toHaveText("You are here");
+  await expect(panel.getByRole("button", { name: /^Walk/ })).toHaveCount(0);
+  await captureReviewScreenshot(page, "travel-mobile-destination-current.png");
+
+  // A visible hex with no route from here is inspectable, with no Walk path.
+  await jag.click();
+  await expect(panel).toHaveAttribute("data-map-destination-status", "unreachable");
+  await expect(panel.locator("[data-map-destination-state]")).toHaveText("No route from here");
+  await expect(panel.getByRole("button", { name: /^Walk/ })).toHaveCount(0);
+  await panel.getByRole("button", { name: "Details" }).click();
+  await expect(panel.locator("[data-map-destination-details]")).toBeVisible();
+  await expectPanelAboveBottomNav(page);
+  await captureReviewScreenshot(page, "travel-mobile-destination-unreachable.png");
+
+  // Desktop keeps the same compact panel, not an oversized modal.
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await yard.click();
+  await expect(panel).toHaveAttribute("data-map-destination-status", "reachable");
+  const desktopBox = await expectPanelAboveBottomNav(page);
+  expect(desktopBox.height).toBeLessThan(900 * 0.2);
+  await expect(walk).toBeInViewport({ ratio: 1 });
+  await expectNoHorizontalOverflow(page);
+  await captureReviewScreenshot(page, "travel-desktop-destination-reachable.png");
+
+  // Starting travel clears the pending destination: none survives into the
+  // read-only in-transit map.
+  await page.setViewportSize({ width: 390, height: 844 });
+  await walk.click();
+  await expect(page.getByText("Journey progress")).toBeVisible();
+  await openMapSurface(page);
+  await expect(page.locator("[data-route-progress]")).toHaveCount(1);
+  await expect(panel).toHaveCount(0);
+});
+
+test("keyboard users can toggle Details and dismiss the destination panel (#240)", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  const panel = page.locator("[data-map-destination-panel]");
+  const yard = page.getByRole("button", { name: /Abandoned Processing Yard/ }).first();
+
+  await yard.focus();
+  await page.keyboard.press("Enter");
+  await expect(panel).toBeVisible();
+  const details = panel.getByRole("button", { name: "Details" });
+  await expectKeyboardFocusRingPaints(details);
+
+  await details.focus();
+  await page.keyboard.press("Enter");
+  await expect(details).toHaveAttribute("aria-pressed", "true");
+  await expect(details).toBeFocused();
+  await page.keyboard.press("Space");
+  await expect(details).toHaveAttribute("aria-pressed", "false");
+
+  // Escape from inside the panel clears it and hands focus back to its hex.
+  await page.keyboard.press("Escape");
+  await expect(panel).toHaveCount(0);
+  await expect(yard).toBeFocused();
+
+  // Escape from the map itself clears a selection too.
+  await page.keyboard.press("Enter");
+  await expect(panel).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(panel).toHaveCount(0);
+  await expect(yard).toHaveAttribute("aria-pressed", "false");
+});
+
+test("all four map edge arrows share one rotated geometry and breathe from their own centers (#240)", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  const viewport = page.locator("[data-map-scroll-viewport]");
+  await scrollMapIntoView(page);
+  // Grow the canvas in both axes and park mid-scroll so every edge has an arrow.
+  await viewport.evaluate((element) => {
+    element.style.height = "360px";
+    const canvas = element.firstElementChild;
+    if (!(canvas instanceof HTMLElement)) throw new Error("Missing local map canvas");
+    canvas.style.width = "1200px";
+    canvas.style.height = "1200px";
+    element.scrollLeft = (element.scrollWidth - element.clientWidth) / 2;
+    element.scrollTop = (element.scrollHeight - element.clientHeight) / 2;
+  });
+  await expectMapScrollAffordances(page, ["bottom", "left", "right", "top"]);
+  await captureReviewScreenshot(page, "travel-mobile-map-edge-arrows.png");
+
+  const arrows = await page.locator("[data-map-scroll-affordance]").evaluateAll((wrappers) => {
+    const viewportRect = document
+      .querySelector("[data-map-scroll-viewport]")!
+      .parentElement!.getBoundingClientRect();
+    return wrappers.map((wrapper) => {
+      const arrow = wrapper.querySelector<HTMLElement>("[data-map-scroll-arrow]")!;
+      const animation = arrow.getAnimations()[0]!;
+      animation.pause();
+      const measure = () => {
+        const rect = arrow.getBoundingClientRect();
+        return {
+          width: rect.width,
+          height: rect.height,
+          cx: rect.left + rect.width / 2,
+          cy: rect.top + rect.height / 2,
+          inside:
+            rect.left >= viewportRect.left &&
+            rect.right <= viewportRect.right &&
+            rect.top >= viewportRect.top &&
+            rect.bottom <= viewportRect.bottom,
+        };
+      };
+      animation.currentTime = 0;
+      const rest = measure();
+      const duration = Number(animation.effect!.getComputedTiming().duration);
+      animation.currentTime = duration / 2;
+      const peak = measure();
+      const style = getComputedStyle(arrow);
+      return {
+        direction: wrapper.getAttribute("data-map-scroll-affordance")!,
+        box: `${arrow.offsetWidth}x${arrow.offsetHeight}`,
+        clipPath: style.clipPath,
+        background: style.backgroundColor,
+        rotate: getComputedStyle(wrapper).rotate,
+        wrapperScale: getComputedStyle(wrapper).scale,
+        rest,
+        peak,
+      };
+    });
+  });
+  expect(arrows.map((arrow) => arrow.direction).sort()).toEqual(["bottom", "left", "right", "top"]);
+  const [first] = arrows;
+  for (const arrow of arrows) {
+    // One canonical shape: identical box, clip, and paint in every direction…
+    expect(arrow.box).toBe("24x48");
+    expect(arrow.clipPath).toBe(first!.clipPath);
+    expect(arrow.background).toBe(first!.background);
+    expect(arrow.wrapperScale).toBe("none");
+    // …turned only by rotation, so its footprint is the same box on its side.
+    const vertical = arrow.direction === "top" || arrow.direction === "bottom";
+    expect(Math.round(arrow.rest.width)).toBe(vertical ? 48 : 24);
+    expect(Math.round(arrow.rest.height)).toBe(vertical ? 24 : 48);
+    // The breath scales about the arrow's own center with no drift.
+    expect(arrow.peak.width / arrow.rest.width).toBeCloseTo(1.15, 2);
+    expect(Math.abs(arrow.peak.cx - arrow.rest.cx)).toBeLessThan(0.5);
+    expect(Math.abs(arrow.peak.cy - arrow.rest.cy)).toBeLessThan(0.5);
+    // Inside the map's edge even at the peak of the breath.
+    expect(arrow.rest.inside).toBe(true);
+    expect(arrow.peak.inside).toBe(true);
+  }
+  expect(Object.fromEntries(arrows.map((arrow) => [arrow.direction, arrow.rotate]))).toEqual({
+    left: "none",
+    right: "180deg",
+    top: "90deg",
+    bottom: "270deg",
+  });
+});
+
+/**
+ * Shrink the map viewport to a small window and scroll so the given hex's
+ * center sits before, inside, or after it on each axis. The canvas is given a
+ * wide margin so any hex can be parked beyond any edge.
+ */
+async function parkMapAroundHex(
+  page: import("@playwright/test").Page,
+  locationId: string,
+  placement: { x: "before" | "inside" | "after"; y: "before" | "inside" | "after" },
+) {
+  await page.locator("[data-map-scroll-viewport]").evaluate(
+    (element, { locationId, placement }) => {
+      const canvas = element.firstElementChild;
+      if (!(canvas instanceof HTMLElement)) throw new Error("Missing local map canvas");
+      element.parentElement!.style.width = "176px";
+      element.style.height = "176px";
+      canvas.style.margin = "400px";
+      const hex = canvas.querySelector(`[data-map-location="${locationId}"]`)!;
+      const hexRect = hex.getBoundingClientRect();
+      const viewportRect = element.getBoundingClientRect();
+      const cx =
+        hexRect.left +
+        hexRect.width / 2 -
+        viewportRect.left -
+        element.clientLeft +
+        element.scrollLeft;
+      const cy =
+        hexRect.top + hexRect.height / 2 - viewportRect.top - element.clientTop + element.scrollTop;
+      const scrollFor = (center: number, size: number, where: string) =>
+        where === "before"
+          ? center + 40
+          : where === "after"
+            ? center - size - 40
+            : center - size / 2;
+      element.scrollLeft = scrollFor(cx, element.clientWidth, placement.x);
+      element.scrollTop = scrollFor(cy, element.clientHeight, placement.y);
+    },
+    { locationId, placement },
+  );
+}
+
+async function expectMissionEdgeCues(
+  page: import("@playwright/test").Page,
+  expected: Record<string, string>,
+) {
+  await expect
+    .poll(
+      async () =>
+        Object.fromEntries(
+          await page
+            .locator("[data-map-scroll-affordance][data-map-scroll-mission]")
+            .evaluateAll((arrows) =>
+              arrows.map((arrow) => [
+                arrow.getAttribute("data-map-scroll-affordance"),
+                arrow.getAttribute("data-map-scroll-mission"),
+              ]),
+            ),
+        ),
+      { message: "Mission edge cues to follow the guided hex's viewport position" },
+    )
+    .toEqual(expected);
+}
+
+test("an off-screen accepted Mission target tints the edge arrows toward it (#240)", async ({
+  page,
+  testCharacter,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  const jag = page.locator(`[data-map-location="${LOCATION_IDS.theJag}"]`);
+
+  // Wade's Walk It Off offer is only available, not accepted: no hex guidance,
+  // and no arrow tint even while The Jag lies off-screen to the right.
+  await expectMapScrollAffordances(page, ["right"]);
+  await expect(page.locator("[data-map-location][data-mission-guidance]")).toHaveCount(0);
+  await parkMapAroundHex(page, LOCATION_IDS.theJag, { x: "after", y: "inside" });
+  await expectMapScrollAffordances(page, ["left", "right", "top", "bottom"]);
+  await expectMissionEdgeCues(page, {});
+
+  await db.insert(characterMissions).values({
+    characterId: testCharacter.id,
+    missionId: MISSION_IDS.walkItOff,
+    acceptedAt: new Date(),
+  });
+  await page.reload();
+  await expect(jag).toHaveAttribute("data-mission-guidance", "active");
+
+  // Real phone geometry: looking east toward the Processing Yard puts The Jag
+  // behind the left edge, so that arrow alone carries the green cue.
+  await scrollMapIntoView(page);
+  await expectMissionEdgeCues(page, {});
+  await page.locator("[data-map-scroll-viewport]").evaluate((element) => {
+    element.scrollLeft = element.scrollWidth;
+  });
+  await expectMapScrollAffordances(page, ["left"]);
+  await expectMissionEdgeCues(page, { left: "active" });
+  await captureReviewScreenshot(page, "travel-mobile-mission-cue-phone-active.png");
+
+  // Beyond each edge in turn: that edge, and only that edge, turns green.
+  await parkMapAroundHex(page, LOCATION_IDS.theJag, { x: "before", y: "inside" });
+  await expectMissionEdgeCues(page, { left: "active" });
+  await captureReviewScreenshot(page, "travel-mobile-mission-cue-left.png");
+  await parkMapAroundHex(page, LOCATION_IDS.theJag, { x: "after", y: "inside" });
+  await expectMissionEdgeCues(page, { right: "active" });
+  await parkMapAroundHex(page, LOCATION_IDS.theJag, { x: "inside", y: "before" });
+  await expectMissionEdgeCues(page, { top: "active" });
+  await parkMapAroundHex(page, LOCATION_IDS.theJag, { x: "inside", y: "after" });
+  await expectMissionEdgeCues(page, { bottom: "active" });
+  await captureReviewScreenshot(page, "travel-mobile-mission-cue-bottom.png");
+
+  // Diagonal: both edges between here and there carry the cue.
+  await parkMapAroundHex(page, LOCATION_IDS.theJag, { x: "after", y: "after" });
+  await expectMissionEdgeCues(page, { right: "active", bottom: "active" });
+  await captureReviewScreenshot(page, "travel-mobile-mission-cue-diagonal.png");
+
+  // The painted arrow really is the Mission green, not only an attribute.
+  const rightArrowPaint = await page
+    .locator('[data-map-scroll-affordance="right"] [data-map-scroll-arrow]')
+    .evaluate((arrow) => getComputedStyle(arrow, "::after").backgroundColor);
+  const plainArrowPaint = await page
+    .locator('[data-map-scroll-affordance="left"] [data-map-scroll-arrow]')
+    .evaluate((arrow) => getComputedStyle(arrow, "::after").backgroundColor);
+  expect(rightArrowPaint).not.toBe(plainArrowPaint);
+
+  // Scrolled into view, the cue clears and the Mission itself is untouched.
+  await parkMapAroundHex(page, LOCATION_IDS.theJag, { x: "inside", y: "inside" });
+  await expectMissionEdgeCues(page, {});
+  await expectMapScrollAffordances(page, ["left", "right", "top", "bottom"]);
+  await expect(jag).toHaveAttribute("data-mission-guidance", "active");
+});
+
+test("an off-screen Mission turn-in tints the edge arrows blue (#240)", async ({
+  page,
+  testCharacter,
+}) => {
+  const characterId = testCharacter.id;
+  await page.setViewportSize({ width: 390, height: 844 });
+  // Keep the Change with Bix met and three Cells carried: every requirement
+  // holds, so The Jag is the blue TURN IN destination from the Crash Site.
+  const now = new Date();
+  await db
+    .insert(characterMissions)
+    .values([
+      ...[
+        MISSION_IDS.walkItOff,
+        MISSION_IDS.cutYourTeeth,
+        MISSION_IDS.wasteNot,
+        MISSION_IDS.holdItTogether,
+      ].map((missionId) => ({ characterId, missionId, acceptedAt: now, completedAt: now })),
+      { characterId, missionId: MISSION_IDS.keepTheChange, acceptedAt: now },
+    ]);
+  await db.insert(characterMissionProgress).values({
+    characterId,
+    missionId: MISSION_IDS.keepTheChange,
+    progressKey: "bix-introduction",
+    progress: 1,
+  });
+  await db.insert(inventoryStacks).values({ characterId, itemId: ITEM_IDS.powerCell, quantity: 3 });
+  await page.reload();
+  const jag = page.locator(`[data-map-location="${LOCATION_IDS.theJag}"]`);
+  await expect(jag).toHaveAttribute("data-mission-guidance", "turn_in");
+
+  await scrollMapIntoView(page);
+  await page.locator("[data-map-scroll-viewport]").evaluate((element) => {
+    element.scrollLeft = element.scrollWidth;
+  });
+  await expectMissionEdgeCues(page, { left: "turn_in" });
+  await captureReviewScreenshot(page, "travel-mobile-mission-cue-phone-turn-in.png");
+
+  await parkMapAroundHex(page, LOCATION_IDS.theJag, { x: "after", y: "inside" });
+  await expectMissionEdgeCues(page, { right: "turn_in" });
+  await captureReviewScreenshot(page, "travel-mobile-mission-cue-turn-in.png");
+  await parkMapAroundHex(page, LOCATION_IDS.theJag, { x: "before", y: "before" });
+  await expectMissionEdgeCues(page, { left: "turn_in", top: "turn_in" });
+  await parkMapAroundHex(page, LOCATION_IDS.theJag, { x: "inside", y: "inside" });
+  await expectMissionEdgeCues(page, {});
+  await expect(jag).toHaveAttribute("data-mission-guidance", "turn_in");
+});
+
+test("the Journey feed leads with the newest event and its live Scavenge action (#240)", async ({
+  page,
+}) => {
+  const characterId = new URL(page.url()).pathname.split("/").at(-1)!;
+  await page.setViewportSize({ width: 390, height: 844 });
+  const opportunity = await openScavengeOpportunity(page, characterId);
+
+  const events = page.locator("[data-journey-feed] > li");
+  await expect(events).toHaveCount(2);
+  const latest = events.first();
+  await expect(latest).toHaveAttribute("data-journey-event", "scavenge");
+  await expect(latest).toHaveAttribute("data-journey-latest", "true");
+  await expect(latest).toContainText("Latest");
+  await expect(latest.locator('[data-scavenge-state="available"]')).toBeVisible();
+  // Older history stays, below, without the emphasis.
+  await expect(events.nth(1)).toContainText("Journey underway");
+  await expect(events.nth(1)).not.toHaveAttribute("data-journey-latest", "true");
+  await expect(events.nth(1)).not.toContainText("Latest");
+  expect(await latest.evaluate((element) => getComputedStyle(element).borderTopColor)).toBe(
+    await resolvedCssVarColor(page, "--rs-accent-secondary"),
+  );
+  expect(await events.nth(1).evaluate((element) => getComputedStyle(element).borderTopColor)).toBe(
+    await resolvedCssVarColor(page, "--rs-border-structural"),
+  );
+
+  // The live Scavenge action is reachable without scrolling past history.
+  expect(await page.evaluate(() => window.scrollY)).toBe(0);
+  const actionBox = (await opportunity.boundingBox())!;
+  const navBox = (await page.getByRole("navigation", { name: "Primary" }).boundingBox())!;
+  expect(actionBox.y + actionBox.height).toBeLessThanOrEqual(navBox.y);
+  await expectNoHorizontalOverflow(page);
+  await captureReviewScreenshot(page, "travel-mobile-journey-newest-first.png");
 });

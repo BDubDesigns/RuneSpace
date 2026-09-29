@@ -5,6 +5,32 @@ export type { PublicUpdate } from "@/game/schemas/public-updates";
 
 const authoredUpdates = [
   {
+    slug: "eyes-on-the-map",
+    title: "Eyes on the Map",
+    publishedAt: "2026-09-28T18:00:00-07:00",
+    summary:
+      "Choosing where to walk no longer sends you scrolling: the Map keeps your destination and its Walk button just above the navigation bar. Edge arrows point toward an off-screen job, and the Journey shows its newest event first.",
+    body: [
+      "Picking a destination on the Map used to open its details underneath the map. On a phone that could mean scrolling a long way down to find the Walk button, and losing sight of the map you had just used to choose. Now a small panel appears just above the navigation bar the moment you select a location: its name, what's there, how long the walk takes, and the Walk button. The page does not move and the map stays usable — select another location to switch, or tap an empty part of the map to close the panel.",
+      "The panel stays short on purpose. Details opens the location's full description inside the same panel, and selecting Details again puts it away; every new location starts short again, so the Walk button is always in view. Select the place you are standing and it says You are here; select somewhere with no path from where you are and it says No route from here. Neither pretends you can walk there.",
+      "The arrows at the edges of the Map now all share one shape, turned to face their direction, and each one breathes from its own centre. When a job you have accepted points to a place that is scrolled out of view, the arrow toward it turns green for work still to do or blue for a hand-in, and goes back to normal once the place is on screen. A job someone is only offering never lights them up.",
+      "On a Journey, the newest thing that happened is now at the top, marked Latest, with the rest of the walk below it. When something catches your eye, the Scavenge button is right there instead of under the rest of the trip.",
+    ],
+    patchNotes: [
+      {
+        heading: "Changed",
+        items: [
+          "Selecting a location on the Map opens a compact panel above the navigation bar with the Walk button, instead of details below the map.",
+          "Details expands the location's description in the same panel; tap empty map space, or press Escape, to close the panel.",
+          "The current location reads You are here, and a location you cannot walk to from here reads No route from here, with no Walk button.",
+          "All four Map edge arrows share one shape and breathe from their own centre.",
+          "An edge arrow turns green or blue when an accepted job's destination lies off-screen in that direction.",
+          "The Journey lists its newest event first, marked Latest.",
+        ],
+      },
+    ],
+  },
+  {
     slug: "what-can-i-refine",
     title: "What Can I Refine?",
     publishedAt: "2026-09-28T17:00:00-07:00",

@@ -12,7 +12,7 @@ Translucent tokens: a Tailwind slash-opacity modifier such as `bg-[color:var(--r
 
 ## Primitives
 
-`components/ui/` contains presentational primitives only: panels, headings, actions, form fields, feedback, status meters, and the responsive shell. Intent variants use `primary`, `secondary`, `success`, `mining`, `arcane`, `fabrication`, and `danger`; use the semantic intent, never a visual hex value. A persistent on/off toggle is latched visibly, not by `aria-pressed` alone: `secondary` while off, its activity's accent intent while on, and it stays enabled so it can be switched back. The Fabrication Station's Manual Override and Auto-discard Scrap toggles use `fabrication` (Shop Olive, with an inset glow because `.rs-bevel` clips anything outside); Practice Welding's `Auto-discard Slag: On/Off` uses `primary`, Welding's accent (#239). A toggle's label names one setting and `aria-pressed` says whether it is on, never a label that swaps between two settings. A shared control that belongs to no one skill — the bounded-run selector's **Max** — latches in `primary`, the same selected treatment as a pressed mode switch, and never borrows a skill's accent. A one-shot request such as Finish Current is not a toggle and keeps its own disabled confirmation.
+`components/ui/` contains presentational primitives only: panels, headings, actions, form fields, feedback, status meters, and the responsive shell. Intent variants use `primary`, `secondary`, `success`, `mining`, `arcane`, `fabrication`, and `danger`; use the semantic intent, never a visual hex value. A persistent on/off toggle is latched visibly, not by `aria-pressed` alone: `secondary` while off, its activity's accent intent while on, and it stays enabled so it can be switched back. The Fabrication Station's Manual Override and Auto-discard Scrap toggles use `fabrication` (Shop Olive, with an inset glow because `.rs-bevel` clips anything outside); Practice Welding's `Auto-discard Slag: On/Off` uses `primary`, Welding's accent (#239). A toggle's label names one setting and `aria-pressed` says whether it is on, never a label that swaps between two settings. A shared control that belongs to no one skill — the bounded-run selector's **Max** — latches in `primary`, the same selected treatment as a pressed mode switch, and never borrows a skill's accent. A one-shot request such as Finish Current is not a toggle and keeps its own disabled confirmation. The Map destination panel's **Details** toggle (#240) follows the same no-skill rule: it latches in `primary`, with an inset rim so it does not read as a second primary action beside Walk.
 
 ## Canonical skill accent identity (Issue #215)
 
@@ -48,8 +48,9 @@ rules are defined once in `docs/architecture.md`.
 Location, Map, and Journey are separate compositions: Location presents the
 stationary scene, activity, and same-location population/profile flow; Map is
 the dedicated `?surface=map` navigation surface; Journey is the in-transit
-status/feed surface. Journey feed entries are presentation only, while Travel
-and Scavenge actions remain server-authoritative. Map is read-only only while
+status/feed surface. Journey feed entries are presentation only, listed newest
+first with the latest one emphasised (#240), while Travel and Scavenge actions
+remain server-authoritative. Map is read-only only while
 `state.travelState` exists, including after a refresh/reconciliation; it must
 not retain an "opened while traveling" client latch. Map hexes render MISSION
 and TURN IN Mission-guidance markers (Issue #143); see `docs/missions.md` §10

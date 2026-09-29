@@ -501,11 +501,31 @@ body {
   pointer-events: none;
 }
 
+/* One canonical arrow for all four edges (#240). Every direction is the same
+   left-pointing box, clip, and border, turned about its own center — so no
+   edge can read squatter or blunter than another. The edge wrapper owns only
+   placement (centered on its anchor with `translate`) and direction
+   (`rotate`); it never scales. The inner arrow owns the breathing `scale`, so
+   the pulse grows from the arrow's own center in every direction instead of
+   compounding with the wrapper's translation. */
 .rs-map-scroll-affordance {
+  --rs-map-scroll-arrow-length: 1.5rem;
+  --rs-map-scroll-arrow-span: 3rem;
+  --rs-map-scroll-arrow-inset: 0.25rem;
+  --rs-map-scroll-arrow-anchor: calc(
+    var(--rs-map-scroll-arrow-inset) + var(--rs-map-scroll-arrow-length) / 2
+  );
   position: absolute;
   display: block;
-  width: 1.5rem;
-  height: 3rem;
+  width: var(--rs-map-scroll-arrow-length);
+  height: var(--rs-map-scroll-arrow-span);
+  translate: -50% -50%;
+}
+
+.rs-map-scroll-affordance__arrow {
+  position: absolute;
+  inset: 0;
+  display: block;
   background: var(--rs-map-scroll-affordance-border);
   clip-path: polygon(0 50%, 100% 0, 100% 100%);
   filter: drop-shadow(0 0 0.3rem var(--rs-map-scroll-affordance-glow))
@@ -515,7 +535,7 @@ body {
     ease-in-out infinite;
 }
 
-.rs-map-scroll-affordance::after {
+.rs-map-scroll-affordance__arrow::after {
   position: absolute;
   inset: 0.125rem;
   content: "";
@@ -525,30 +545,67 @@ body {
 
 .rs-map-scroll-affordance--left {
   top: 50%;
-  left: 0.25rem;
-  transform: translateY(-50%);
+  left: var(--rs-map-scroll-arrow-anchor);
 }
 
 .rs-map-scroll-affordance--right {
   top: 50%;
-  right: 0.25rem;
-  transform: translateY(-50%) rotate(180deg);
+  left: calc(100% - var(--rs-map-scroll-arrow-anchor));
+  rotate: 180deg;
 }
 
 .rs-map-scroll-affordance--top {
-  top: 0.25rem;
+  top: var(--rs-map-scroll-arrow-anchor);
   left: 50%;
-  width: 2.25rem;
-  height: 2rem;
-  transform: translateX(-50%) rotate(90deg);
+  rotate: 90deg;
 }
 
 .rs-map-scroll-affordance--bottom {
-  bottom: 0.25rem;
+  top: calc(100% - var(--rs-map-scroll-arrow-anchor));
   left: 50%;
-  width: 2.25rem;
-  height: 2rem;
-  transform: translateX(-50%) rotate(270deg);
+  rotate: 270deg;
+}
+
+/* An accepted Mission's guided hex lies beyond this edge (#240): the same
+   arrow re-derives its fill, border, and halo from the shared Mission tokens —
+   active green, turn-in blue — exactly as the hex ring does. */
+.rs-map-scroll-affordance[data-map-scroll-mission="active"] {
+  --rs-map-scroll-affordance-fill: color-mix(
+    in srgb,
+    var(--rs-mission-guidance-color) 82%,
+    transparent
+  );
+  --rs-map-scroll-affordance-border: color-mix(
+    in srgb,
+    var(--rs-mission-guidance-color) 52%,
+    var(--rs-surface-page)
+  );
+  --rs-map-scroll-affordance-glow: var(--rs-mission-guidance-color);
+  --rs-map-scroll-affordance-glow-outer: var(--rs-mission-guidance-glow);
+}
+
+.rs-map-scroll-affordance[data-map-scroll-mission="turn_in"] {
+  --rs-map-scroll-affordance-fill: color-mix(
+    in srgb,
+    var(--rs-mission-available-color) 82%,
+    transparent
+  );
+  --rs-map-scroll-affordance-border: color-mix(
+    in srgb,
+    var(--rs-mission-available-color) 52%,
+    var(--rs-surface-page)
+  );
+  --rs-map-scroll-affordance-glow: var(--rs-mission-available-color);
+  --rs-map-scroll-affordance-glow-outer: var(--rs-mission-available-glow);
+}
+
+/* The selected-destination panel (#240) sticks just above the fixed bottom
+   navigation while the map is in view, over the map's own panel — above its
+   hex buttons and edge arrows — and never behind the navigation. */
+.rs-map-destination-panel {
+  position: sticky;
+  z-index: 30;
+  bottom: calc(var(--rs-bottom-nav-box-height) + var(--rs-space-2));
 }
 
 @keyframes rs-map-scroll-affordance-breathe {
@@ -692,7 +749,7 @@ body {
   .rs-overlay-panel,
   .rs-overlay-backdrop-exit,
   .rs-overlay-panel-exit,
-  .rs-map-scroll-affordance,
+  .rs-map-scroll-affordance__arrow,
   .rs-dialogue-scene[data-presentation-mode="comms"] .rs-dialogue-scene__comms-overlay,
   .rs-dialogue-cursor {
     animation: none;
