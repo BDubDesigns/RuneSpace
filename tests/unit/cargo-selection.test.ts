@@ -45,6 +45,7 @@ function cargoState(): PlayGameplayState {
   return {
     characterId: "character-1",
     progression: { characterLevel: 1, skills: [] },
+    skillTotalXp: {},
     missions: [],
     location: { currentLocationId: "crash_site" },
     repairs: {},

@@ -725,11 +725,7 @@ function XpSection(props: AdminControlProps) {
     }
   }
 
-  // The progression projection omits stable skill IDs by design (they stay
-  // internal to it), so match on the canonical display name it is built from.
-  // Both lists come from `presentedSkills`; a miss is shown, never read as 0.
-  const totalXpOf = (id: string): number | undefined =>
-    play.progression.skills.find((skill) => skill.displayName === skillLabel(id))?.totalXp;
+  const totalXpOf = (id: string) => play.skillTotalXp[id] ?? 0;
   const currentInSkill = totalXpOf(skillId);
   const parsedForConfirm = Number(value);
   const differs =
@@ -742,7 +738,7 @@ function XpSection(props: AdminControlProps) {
       <ul className="space-y-1 text-xs text-[color:var(--rs-text-muted)]">
         {xpSkills.map(({ skillId: id, displayName }) => (
           <li key={id}>
-            {displayName}: {totalXpOf(id) ?? "unknown"}
+            {displayName}: {totalXpOf(id)}
           </li>
         ))}
       </ul>
@@ -775,7 +771,7 @@ function XpSection(props: AdminControlProps) {
             label="Set"
             confirmLabel="Confirm set"
             intent="secondary"
-            prompt={`Set ${skillLabel(skillId)} total XP for "${characterName}" from ${currentInSkill ?? "an unknown total"} to ${parsedForConfirm}.`}
+            prompt={`Set ${skillLabel(skillId)} total XP for "${characterName}" from ${currentInSkill} to ${parsedForConfirm}.`}
             onConfirm={setXp}
           />
         ) : (

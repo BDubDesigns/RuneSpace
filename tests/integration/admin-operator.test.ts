@@ -901,6 +901,7 @@ suite("issue #113 admin operator console (real PostgreSQL)", () => {
     );
     expect(result.outcome.kind).toBe("set");
     expect(result.state.fabrication.totalXp).toBe(5000);
+    expect(result.state.skillTotalXp[SKILL_IDS.fabrication]).toBe(5000);
     const audit = await auditFor(character.id);
     expect(audit.filter((a) => a.operation === "set_skill_xp")).toHaveLength(1);
   });

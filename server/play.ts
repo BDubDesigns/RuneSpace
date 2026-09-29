@@ -784,6 +784,12 @@ export type PlayGameplayState = {
    * there the moment the game defines it.
    */
   progression: CharacterProgression;
+  /**
+   * The character's persisted total XP keyed by stable skill ID; an absent
+   * skill is authoritative zero. The projection above deliberately omits IDs,
+   * so the operator console reads per-skill totals here (#242).
+   */
+  skillTotalXp: Readonly<Record<string, number>>;
   mining: { totalXp: number; level: number; xpToNextLevel?: number; xpIntoLevel: number };
   refining: { totalXp: number; level: number; xpToNextLevel?: number; xpIntoLevel: number };
   welding: { totalXp: number; level: number; xpToNextLevel?: number; xpIntoLevel: number };
@@ -2096,6 +2102,7 @@ export async function stateFromTransaction(
           }
         : undefined,
     progression,
+    skillTotalXp: Object.fromEntries(xpRows.map((row) => [row.skillId, row.totalXp])),
     mining: {
       totalXp,
       level: miningProgress.level,
