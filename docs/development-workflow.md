@@ -333,7 +333,7 @@ cd /opt/data/workspace/RuneSpace
   BETTER_AUTH_SECRET="insecure-ci-build-only-secret-do-not-use-in-prod-0000000000" \
   pnpm build
 ./scripts/managed-host-run.sh node scripts/runespace-db.mjs run issue-84 -- pnpm test:e2e:focused mining
-./scripts/managed-host-run.sh node scripts/runespace-db.mjs run issue-84 -- pnpm test:e2e:canonical
+# Canonical E2E runs on GitHub from this host; see "Shared-host E2E" below.
 
 ./scripts/managed-host-run.sh node scripts/runespace-db.mjs drop issue-84
 ```
@@ -349,6 +349,60 @@ canonical run as the browser launch proof. Do not install guessed replacement
 packages. If the private mount, Node toolchain, PostgreSQL service, or selected
 database is unavailable, stop and report that exact blocker; do not inspect
 secrets, substitute another database, or silently fall back to GitHub Actions.
+
+### Shared-host E2E: one run at a time, canonical on GitHub
+
+Several agent sessions work from separate worktrees on the Hermes host, which has
+one vCPU. Both local runners (`pnpm test:e2e:canonical` and
+`pnpm test:e2e:focused`) therefore take one host-wide lock,
+`/tmp/runespace-e2e.lock` (issue #251), before migrations and the production
+build, and hold it until their own teardown finishes.
+
+- A runner that finds the lock held logs the holder's PID, runner label,
+  worktree, and how long it has held the lock, then waits and starts
+  automatically once it is released. It logs again every five minutes while it
+  waits.
+- Queue time does not count against `RUNESPACE_CANONICAL_TIMEOUT_MS` or
+  `RUNESPACE_FOCUSED_TIMEOUT_MS`; those timers start once the lock is held. The
+  wait has its own limit, `RUNESPACE_E2E_LOCK_WAIT_MS` (default 60 minutes),
+  after which the runner fails and names the holder.
+- Ctrl-C or SIGTERM while waiting exits promptly without taking the lock; after
+  acquisition, the runner's normal teardown releases it.
+- A holder that died without cleanup (for example SIGKILL) is detected by PID and
+  process start time, and the next runner reclaims the lock and logs that it did.
+  Do not delete the lock file by hand: if its holder is alive, a run is in
+  progress.
+- GitHub Actions skips the lock. The bypass is keyed on `GITHUB_ACTIONS=true`,
+  never `CI`, because both local runners set `CI=true` in their child
+  environment for CI parity.
+- `pnpm test:e2e` and `pnpm test:e2e:studio` start their own server through
+  Playwright's `webServer` and do not take the lock; use the focused or canonical
+  runner on this host.
+
+A serialized canonical run on the otherwise idle Hermes host measured 11 min 45 s
+on 2026-09-28 (2 min 17 s build, 9 min 24 s of Playwright), against about three
+minutes across GitHub's three shards. So on Hermes:
+
+- During implementation, run unit, integration, and focused E2E proportional to
+  the touched boundary.
+- Prove the full canonical gate on GitHub. While iterating on a draft, push and
+  start a manual run of the branch. `workflow_dispatch` always selects the full
+  gate, so it needs neither the `full-ci` label nor a draft/Ready change, and it
+  does not re-run on later pushes:
+
+  ```bash
+  gh workflow run ci.yml -f ref=<branch-or-sha>
+  gh run list --workflow ci.yml --event workflow_dispatch --limit 1 \
+    --json databaseId -q '.[0].databaseId'
+  gh run watch <run-id> --exit-status
+  ```
+
+  Run `gh run watch` from a background shell so it reports once, when the run
+  finishes. A manual run is evidence for the agent, not the PR's checks: marking
+  the PR Ready remains the product owner's call and the authoritative merge gate.
+- Do not start a local canonical run because another worktree is running one.
+  Run canonical locally only to reproduce or debug a CI failure; the lock then
+  queues it behind every other local run.
 
 ### Managed-host ports, cleanup, and focused E2E
 
@@ -391,8 +445,8 @@ simply an unclaimed port here.
   ./scripts/managed-host-run.sh pnpm test:e2e:focused travel
   ```
 
-  This is focused iteration evidence only; run
-  `./scripts/managed-host-run.sh pnpm test:e2e:canonical` for CI-parity proof.
+  This is focused iteration evidence only; prove CI parity with a manual GitHub
+  run (see "Shared-host E2E" above).
 - In a restricted coding harness, a `listen EPERM` error before Playwright
   starts means the harness blocked the local test-server port. Allow loopback
   server binding and rerun the same command; it is a startup-environment
@@ -495,9 +549,10 @@ tests for pure rules, the relevant integration test for a persistence boundary,
 or a focused Playwright spec for a browser change. When a change adds or touches
 E2E specs, validate the new/targeted spec(s) first in isolation
 (`pnpm test:e2e:focused <phase>` or `pnpm test:e2e -- <spec> --project=chromium`)
-to catch fixture errors quickly, then run the **full** `pnpm test:e2e:canonical`
-suite — the exact command GitHub's Full gate runs — before assuming the work
-will pass. `fast-checks` (typecheck/lint/unit/build) intentionally skips
+to catch fixture errors quickly, then prove the **full** canonical suite — the
+exact `pnpm test:e2e:canonical` command GitHub's Full gate runs — before assuming
+the work will pass. From the shared Hermes host, run it on GitHub rather than
+locally (see "Shared-host E2E"). `fast-checks` (typecheck/lint/unit/build) intentionally skips
 PostgreSQL integration and canonical E2E; a green fast run is not evidence the
 merge gate will pass. Run typecheck, lint, and format checks early enough to
 avoid pushing an obviously broken checkpoint. Batch related local commits into a

@@ -57,14 +57,22 @@ timeout. Poll the run's log for its terminal line instead, e.g.
 until grep -q "All canonical E2E checks passed\|FAIL" run.log; do sleep 15; done
 ```
 
-Approximate timings in this container, so nothing looks hung: `pnpm test` ~12s,
-`pnpm test:integration` ~25s, `pnpm test:e2e:canonical` ~3 min end to end
-(44s production build, then 88 specs on a single worker).
+Approximate timings in an isolated cloud container, so nothing looks hung:
+`pnpm test` ~12s, `pnpm test:integration` ~25s, `pnpm test:e2e:canonical` ~3 min
+end to end (44s production build, then 88 specs on a single worker). On the
+shared one-vCPU Hermes host, the production build alone takes ~2.3 min and an
+uncontended canonical run ~12 min.
 
-## Local validation in the remote container
+## Local validation in an isolated cloud container
 
-`./scripts/managed-host-run.sh` does **not** work here: it expects Brandon's
-private environment file on the managed host and exits. This container has its
+Sessions whose worktree is under `/opt/data/workspace/RuneSpace` are on the
+shared Hermes host instead, not in an isolated container: there,
+`./scripts/managed-host-run.sh` works, and canonical E2E runs on GitHub. Follow
+"Shared-host E2E" in `docs/development-workflow.md`.
+
+In an isolated cloud container, `./scripts/managed-host-run.sh` does **not**
+work: it expects Brandon's private environment file on the managed host and
+exits. This container has its
 own PostgreSQL instead. Start it as its owner and pass a localhost URL to the
 disposable-database wrapper, which creates and drops its own database:
 
