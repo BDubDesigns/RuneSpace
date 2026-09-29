@@ -86,7 +86,7 @@ test("walks from Wade to Tansy, presents approved dialogue, and claims one carri
   const visibleDialogueText = dialogue.locator('[data-dialogue-text] [aria-hidden="true"]');
   const secondBeatText = await dialogue.locator("[data-dialogue-text] .sr-only").textContent();
   await expect
-    .poll(async () => (await visibleDialogueText.textContent()).replace("_", "").length)
+    .poll(async () => ((await visibleDialogueText.textContent()) ?? "").replace("_", "").length)
     .toBeLessThan(secondBeatText?.length ?? 0);
   await visibleDialogueText.click();
   await dialogue.getByRole("button", { name: "Next" }).click();

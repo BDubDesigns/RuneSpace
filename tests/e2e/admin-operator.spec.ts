@@ -47,7 +47,7 @@ test.describe("admin operator console", () => {
         .insert(playerAccounts)
         .values({ userId: ADMIN_USER_ID })
         .returning({ id: playerAccounts.id });
-      accountId = created.id;
+      accountId = created!.id;
     }
 
     const normalized = normalizeCharacterName(FIXTURE_CHARACTER);

@@ -55,7 +55,7 @@ jobs:
       - name: Install (frozen lockfile)
         run: pnpm install --frozen-lockfile
 
-      - name: Typecheck
+      - name: Typecheck (app and all tests, including tests/e2e)
         run: pnpm typecheck
 
       - name: Lint

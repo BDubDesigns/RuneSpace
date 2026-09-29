@@ -554,14 +554,16 @@ exact `pnpm test:e2e:canonical` command GitHub's Full gate runs — before assum
 the work will pass. From the shared Hermes host, run it on GitHub rather than
 locally (see "Shared-host E2E"). `fast-checks` (typecheck/lint/unit/build) intentionally skips
 PostgreSQL integration and canonical E2E; a green fast run is not evidence the
-merge gate will pass. Run typecheck, lint, and format checks early enough to
+merge gate will pass. Its `pnpm typecheck` step does cover the Playwright source
+under `tests/e2e/`, so a type error in a spec or helper surfaces there rather than
+during browser validation. Run typecheck, lint, and format checks early enough to
 avoid pushing an obviously broken checkpoint. Batch related local commits into a
 coherent state rather than pushing after every tiny edit.
 
 ### Draft preview checkpoint
 
-A draft PR push always runs the fast CI job (frozen install, typecheck, lint,
-format check, unit tests, and one production build). It intentionally does not
+A draft PR push always runs the fast CI job (frozen install, typecheck including
+`tests/e2e`, lint, format check, unit tests, and one production build). It intentionally does not
 run PostgreSQL integration or canonical E2E unless the PR has the `full-ci`
 label. A coherent, focused-validated draft push is therefore allowed before
 full local parity when the purpose is real-device phone/desktop review. The

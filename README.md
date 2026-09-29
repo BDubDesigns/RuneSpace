@@ -72,7 +72,7 @@ See `.env.example`. Validated at startup by `server/env.ts` (Zod).
 | `pnpm lint`        | ESLint (next lint)                   |
 | `pnpm format`      | Prettier write                       |
 | `pnpm format:check`| Prettier check                       |
-| `pnpm typecheck`   | `tsc --noEmit` (strict)              |
+| `pnpm typecheck`   | `tsc --noEmit` (strict; app and all tests, including `tests/e2e`) |
 | `pnpm test`        | Vitest unit tests                    |
 | `pnpm test:integration` | Disposable PostgreSQL integration tests |
 | `pnpm test:e2e`    | Playwright browser tests (local)     |

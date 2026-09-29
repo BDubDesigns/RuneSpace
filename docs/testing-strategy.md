@@ -26,6 +26,12 @@ small number of critical mobile player journeys.
   screen, then core loops as they ship). Avoid large suites of shallow UI tests.
 - The landing page has a minimal app-loading smoke test
   (`tests/e2e/smoke.spec.ts`) that protects durable landing identity and entry navigation.
+- Playwright source is type-checked before it is ever run. `tests/e2e/**` is part
+  of the strict `tsconfig.json` program (issue #212), so a stale import, renamed
+  export, or impossible type in a spec or helper fails `pnpm typecheck` (and the
+  always-on `fast-checks` CI job) in seconds, not deep inside a canonical E2E
+  run. There is no separate E2E typecheck command; do not exclude E2E files from
+  `tsconfig.json` or silence them with `any` or `@ts-nocheck`.
 - Quick local development: `pnpm test:e2e`. It uses the production server by
   default and may reuse an existing server outside CI; set
   `PLAYWRIGHT_DEV_SERVER=true` for a development server. It does **not** count
@@ -258,8 +264,9 @@ Before removing or weakening a test, record where the behavior remains protected
 
 ## CI scope and event matrix
 
-The `CI` workflow always runs the fast job (frozen install, typecheck, lint,
-format check, unit tests, and one production build) for PR revisions and pushes
+The `CI` workflow always runs the fast job (frozen install, typecheck of the app
+and every test including `tests/e2e`, lint, format check, unit tests, and one
+production build) for PR revisions and pushes
 to `main`. PostgreSQL integration and canonical E2E are selected by the explicit
 full-gate policy:
 
