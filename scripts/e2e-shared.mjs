@@ -11,10 +11,18 @@
 // production server startup, readiness polling, owned-child teardown) lives in
 // createE2eRuntime, parameterized by label/port/env so each runner keeps its
 // own log and failure prefix.
+//
+// acquireE2eLock is the host-wide lock (issue #251) that serializes local
+// runners across worktrees, so only one production-style E2E lifecycle uses
+// the shared host at a time.
 
 import { spawn } from "node:child_process";
+import { randomUUID } from "node:crypto";
+import { linkSync, readFileSync, renameSync, unlinkSync, writeFileSync } from "node:fs";
 import { createConnection } from "node:net";
-import { resolve, dirname } from "node:path";
+import { tmpdir } from "node:os";
+import { resolve, dirname, join } from "node:path";
+import { setTimeout as sleep } from "node:timers/promises";
 import { fileURLToPath } from "node:url";
 
 export const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
@@ -153,6 +161,207 @@ export function assertNode22(version = process.versions.node) {
   }
 }
 
+// A fixed path rather than os.tmpdir(): TMPDIR can differ between sessions on
+// the same host, and the lock only works if every runner agrees on one file.
+export const E2E_LOCK_PATH =
+  process.platform === "win32" ? join(tmpdir(), "runespace-e2e.lock") : "/tmp/runespace-e2e.lock";
+export const DEFAULT_E2E_LOCK_WAIT_MS = 60 * 60_000;
+export const E2E_LOCK_POLL_MS = 5_000;
+const E2E_LOCK_PROGRESS_MS = 5 * 60_000;
+
+/** Kernel start time of a process (field 22 of /proc/<pid>/stat), or null where unavailable. */
+export function readProcessStartTime(pid) {
+  try {
+    const stat = readFileSync(`/proc/${pid}/stat`, "utf8");
+    // Field 2 (comm) may contain spaces, so count fields after its closing paren.
+    return stat.slice(stat.lastIndexOf(")") + 2).split(" ")[19] ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/** True while the recorded owner process still exists and is the same process (not a reused PID). */
+export function isE2eLockOwnerAlive(owner) {
+  if (!owner || !Number.isInteger(owner.pid) || owner.pid <= 0) return false;
+  try {
+    process.kill(owner.pid, 0);
+  } catch (error) {
+    if (error.code !== "EPERM") return false;
+  }
+  if (!owner.processStart) return true;
+  const current = readProcessStartTime(owner.pid);
+  return current === null || current === owner.processStart;
+}
+
+function readLockFile(path) {
+  let raw;
+  try {
+    raw = readFileSync(path, "utf8");
+  } catch (error) {
+    if (error.code === "ENOENT") return null;
+    throw error;
+  }
+  try {
+    return { raw, owner: JSON.parse(raw) };
+  } catch {
+    return { raw, owner: null };
+  }
+}
+
+/** The current lock owner's metadata, or null when the lock is free or unreadable. */
+export function readE2eLockOwner(path = E2E_LOCK_PATH) {
+  return readLockFile(path)?.owner ?? null;
+}
+
+function tryCreateLockFile(path, raw) {
+  // link() publishes a fully written file atomically and fails if the lock
+  // exists, so readers never observe a partially written owner record.
+  const staging = `${path}.${process.pid}.${randomUUID()}.tmp`;
+  writeFileSync(staging, raw, { encoding: "utf8", flag: "wx" });
+  try {
+    linkSync(staging, path);
+    return true;
+  } catch (error) {
+    if (error.code === "EEXIST") return false;
+    throw error;
+  } finally {
+    unlinkSync(staging);
+  }
+}
+
+function reclaimStaleLockFile(path, staleRaw) {
+  // Move the file aside before deleting it, then confirm it is the stale record
+  // that was judged dead. Another contender may already have reclaimed it and
+  // acquired a fresh lock in between; that live lock is put back untouched.
+  const aside = `${path}.stale-${process.pid}-${randomUUID()}`;
+  try {
+    renameSync(path, aside);
+  } catch (error) {
+    if (error.code === "ENOENT") return false;
+    throw error;
+  }
+  const movedRaw = readLockFile(aside)?.raw;
+  if (movedRaw === staleRaw) {
+    unlinkSync(aside);
+    return true;
+  }
+  try {
+    linkSync(aside, path);
+  } catch (error) {
+    if (error.code !== "EEXIST") throw error;
+  }
+  unlinkSync(aside);
+  return false;
+}
+
+function releaseLockFile(path, raw) {
+  if (readLockFile(path)?.raw !== raw) return;
+  try {
+    unlinkSync(path);
+  } catch (error) {
+    if (error.code !== "ENOENT") throw error;
+  }
+}
+
+function formatDuration(ms) {
+  return ms < 120_000
+    ? `${Math.max(0, Math.round(ms / 1_000))}s`
+    : `${Math.round(ms / 60_000)} min`;
+}
+
+function describeLockOwner(owner, nowMs) {
+  if (!owner) return "an unreadable lock record";
+  const acquiredAt = Date.parse(owner.acquiredAt);
+  const age = Number.isNaN(acquiredAt) ? "" : `, held for ${formatDuration(nowMs - acquiredAt)}`;
+  return `PID ${owner.pid} (${owner.label}) from ${owner.worktree}${age}`;
+}
+
+/**
+ * Waits for and takes the host-wide local E2E lock, so only one canonical or
+ * focused runner performs migrations, build, server, and Playwright at a time
+ * across every worktree on the host. GitHub Actions runners are isolated
+ * machines and skip it. The caller must invoke release() in its cleanup path.
+ */
+export async function acquireE2eLock({
+  label,
+  log,
+  signal,
+  env = process.env,
+  path = E2E_LOCK_PATH,
+  maxWaitMs = readPositiveInteger(
+    env.RUNESPACE_E2E_LOCK_WAIT_MS,
+    DEFAULT_E2E_LOCK_WAIT_MS,
+    "RUNESPACE_E2E_LOCK_WAIT_MS",
+  ),
+  pollMs = E2E_LOCK_POLL_MS,
+}) {
+  // Keyed on GITHUB_ACTIONS, never CI: both local runners deliberately set
+  // CI=true in their child environment for CI parity.
+  if (env.GITHUB_ACTIONS === "true") {
+    log("GitHub Actions runner: the host-wide local E2E lock is not used.");
+    return { owner: null, release() {} };
+  }
+
+  const owner = {
+    pid: process.pid,
+    processStart: readProcessStartTime(process.pid),
+    label,
+    worktree: ROOT,
+    acquiredAt: new Date().toISOString(),
+    token: randomUUID(),
+  };
+  const raw = `${JSON.stringify(owner)}\n`;
+  const startedAt = Date.now();
+  let reportedRaw = null;
+  let lastReportAt = 0;
+
+  for (;;) {
+    if (signal?.aborted) throw signal.reason;
+    if (tryCreateLockFile(path, raw)) {
+      log(
+        reportedRaw === null
+          ? `Acquired the host-wide E2E lock (${path}).`
+          : `Acquired the host-wide E2E lock after waiting ${formatDuration(Date.now() - startedAt)}.`,
+      );
+      return { owner, release: () => releaseLockFile(path, raw) };
+    }
+
+    const current = readLockFile(path);
+    if (current === null) continue;
+    if (!isE2eLockOwnerAlive(current.owner)) {
+      if (reclaimStaleLockFile(path, current.raw)) {
+        log(
+          `Reclaimed a stale host-wide E2E lock from ${describeLockOwner(current.owner, Date.now())}; that process is no longer running.`,
+        );
+      }
+      continue;
+    }
+
+    const waited = Date.now() - startedAt;
+    const holder = describeLockOwner(current.owner, Date.now());
+    if (waited >= maxWaitMs) {
+      throw new Error(
+        `[${label}] FAIL: timed out after ${formatDuration(maxWaitMs)} waiting for the host-wide E2E lock (${path}) held by ${holder}. Set RUNESPACE_E2E_LOCK_WAIT_MS to wait longer.`,
+      );
+    }
+    if (current.raw !== reportedRaw) {
+      log(
+        `Waiting for the host-wide E2E lock held by ${holder}. Migrations, build, and tests start once it is released.`,
+      );
+      reportedRaw = current.raw;
+      lastReportAt = Date.now();
+    } else if (Date.now() - lastReportAt >= E2E_LOCK_PROGRESS_MS) {
+      log(
+        `Still waiting for the host-wide E2E lock (${formatDuration(waited)} so far), held by ${holder}.`,
+      );
+      lastReportAt = Date.now();
+    }
+    await sleep(Math.min(pollMs, maxWaitMs - waited), undefined, { signal }).catch(() => {
+      throw signal.reason;
+    });
+  }
+}
+
 /**
  * Builds the small production-E2E process supervisor shared by the canonical
  * and focused runners. It owns exactly two kinds of children (the currently
@@ -171,13 +380,16 @@ export function createE2eRuntime({ label, port, env, readyTimeoutMs }) {
   let serverProcess = null;
   let cleanupPromise = null;
   let abortReason = null;
+  const abortController = new AbortController();
 
   const throwIfAborted = () => {
     if (abortReason) fail(abortReason);
   };
 
   const abort = (reason) => {
-    if (!abortReason) abortReason = reason;
+    if (abortReason) return;
+    abortReason = reason;
+    abortController.abort(new Error(`[${label}] FAIL: ${reason}`));
   };
 
   function runCommand(args, commandLabel, command = PACKAGE_MANAGER) {
@@ -277,6 +489,7 @@ export function createE2eRuntime({ label, port, env, readyTimeoutMs }) {
     log,
     fail,
     abort,
+    signal: abortController.signal,
     throwIfAborted,
     runCommand,
     runTimedCommand,

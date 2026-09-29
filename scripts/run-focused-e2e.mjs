@@ -28,6 +28,7 @@ import { fileURLToPath } from "node:url";
 import {
   accountBoundaryE2eEnv,
   E2E_ADMIN_USER_IDS,
+  acquireE2eLock,
   assertLocalDatabaseUrl,
   assertNode22,
   assertPortAvailable,
@@ -160,8 +161,8 @@ if (fileURLToPath(import.meta.url) === process.argv[1]) {
   assertNode22();
   const baseDatabaseUrl = resolveDatabaseUrl();
   const port = resolveFocusedPort(process.env.RUNESPACE_FOCUSED_E2E_PORT);
-  await assertPortAvailable(port);
   let disposableDatabase;
+  let e2eLock;
   let runtime;
   let timeout;
   let workerStateDirectory;
@@ -187,9 +188,6 @@ if (fileURLToPath(import.meta.url) === process.argv[1]) {
       env,
       readyTimeoutMs: READY_TIMEOUT_MS,
     });
-    runtime.log(
-      `Focused test port ${port} is available (OpenChamber port 3000 and canonical port 3200 are never used).`,
-    );
 
     const onSignal = (signal) => {
       runtime.abort(`Received ${signal}; focused E2E teardown requested`);
@@ -200,6 +198,17 @@ if (fileURLToPath(import.meta.url) === process.argv[1]) {
     signalHandlers.push(["SIGINT", onSigint], ["SIGTERM", onSigterm]);
     process.once("SIGINT", onSigint);
     process.once("SIGTERM", onSigterm);
+    // Take the host-wide lock before any expensive work, and start the overall
+    // timeout only once it is held so queue time never counts against it.
+    e2eLock = await acquireE2eLock({
+      label: `focused-e2e ${spec}`,
+      log: runtime.log,
+      signal: runtime.signal,
+    });
+    await assertPortAvailable(port);
+    runtime.log(
+      `Focused test port ${port} is available (OpenChamber port 3000 and canonical port 3200 are never used).`,
+    );
     const startedAt = Date.now();
     timeout = setTimeout(() => {
       runtime.abort(`Focused E2E exceeded ${OVERALL_TIMEOUT_MS} ms`);
@@ -225,6 +234,7 @@ if (fileURLToPath(import.meta.url) === process.argv[1]) {
       // run's state and curated artifacts untouched.
       if (workerStateDirectory) rmSync(workerStateDirectory, { force: true, recursive: true });
       if (powerAnnexClockPath) rmSync(powerAnnexClockPath, { force: true });
+      e2eLock?.release();
     }
   }
 }

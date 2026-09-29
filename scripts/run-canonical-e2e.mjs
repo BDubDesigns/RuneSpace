@@ -4,6 +4,7 @@ import { copyFileSync, existsSync, mkdirSync, rmSync, statSync, writeFileSync } 
 import { resolve } from "node:path";
 import {
   accountBoundaryE2eEnv,
+  acquireE2eLock,
   E2E_ADMIN_USER_IDS,
   assertNode22,
   assertPortAvailable,
@@ -47,6 +48,7 @@ let timeout;
 let powerAnnexClockPath;
 let workerStateDirectory;
 let runId;
+let e2eLock;
 const signalHandlers = [];
 
 const cleanupPaths = [
@@ -266,8 +268,9 @@ async function main() {
       PORT: String(PORT),
       ...accountBoundaryE2eEnv({ port: PORT, runId }),
     };
+    const label = screenshotLane ? "canonical-e2e-screenshots" : "canonical-e2e";
     runtime = createE2eRuntime({
-      label: screenshotLane ? "canonical-e2e-screenshots" : "canonical-e2e",
+      label,
       port: PORT,
       env,
       readyTimeoutMs: READY_TIMEOUT_MS,
@@ -278,6 +281,9 @@ async function main() {
     signalHandlers.push(["SIGINT", onSigint], ["SIGTERM", onSigterm]);
     process.once("SIGINT", onSigint);
     process.once("SIGTERM", onSigterm);
+    // The overall timeout starts only once the lock is held, so queue time
+    // behind another worktree's run never counts against it.
+    e2eLock = await acquireE2eLock({ label, log, signal: runtime.signal });
     const startedAt = Date.now();
     timeout = setTimeout(() => {
       runtime.abort(`Canonical E2E exceeded ${OVERALL_TIMEOUT_MS} ms`);
@@ -300,6 +306,7 @@ async function main() {
       // worker storage and Power Annex clock after all child processes stop.
       if (workerStateDirectory) rmSync(workerStateDirectory, { force: true, recursive: true });
       if (powerAnnexClockPath) rmSync(powerAnnexClockPath, { force: true });
+      e2eLock?.release();
     }
   }
 }
