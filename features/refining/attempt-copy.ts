@@ -42,3 +42,16 @@ export function describeFailureOutcome(attempt: RefiningRunAttempt): string {
   if (returned.length > 0) clauses.push(`${describeQuantities(returned, ", ")} returned`);
   return clauses.length > 0 ? clauses.join(", ") : "nothing recovered";
 }
+
+/**
+ * One awarded item of a failed attempt, as its tile names it (#239): what a
+ * failure hands back or leaves behind is a consequence of the failure, never
+ * the recipe's crafted output, so the label says which it was.
+ */
+export function failedAttemptAwardLabel(
+  attempt: RefiningRunAttempt,
+  award: { itemId: string; quantity: number },
+): string {
+  const returned = attempt.consumed.some((input) => input.itemId === award.itemId);
+  return `${award.quantity} ${itemName(award.itemId)} ${returned ? "returned" : "produced"} by the failed attempt`;
+}

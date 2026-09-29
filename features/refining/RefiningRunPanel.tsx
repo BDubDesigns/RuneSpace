@@ -1,5 +1,6 @@
 "use client";
 
+import { describeFailureOutcome } from "@/features/refining/attempt-copy";
 import { RunSummary } from "@/features/shared/RunSummary";
 import { resolveItemPresentation } from "@/game/content/item-presentation";
 import { BOUNDED_RUN_MAX } from "@/game/domain/bounded-run";
@@ -85,8 +86,10 @@ function RefiningAttemptRow({ attempt }: { attempt: RefiningRunAttempt }) {
       <p className="text-xs text-[color:var(--rs-text-muted)]">
         Resolved {new Date(attempt.resolvedAt).toLocaleTimeString()}
       </p>
+      {/* A failure's awards are what it left behind, not a crafted output (#239). */}
       <p>
-        {describeQuantities(attempt.awarded)} | {attempt.xpAwarded} Refining XP
+        {attempt.success ? describeQuantities(attempt.awarded) : describeFailureOutcome(attempt)} |{" "}
+        {attempt.xpAwarded} Refining XP
       </p>
     </article>
   );

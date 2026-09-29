@@ -1,6 +1,6 @@
 "use client";
 
-import { StationRecipeTile } from "@/features/fabrication/StationRecipeTile";
+import { RecipeTile } from "@/features/shared/RecipeTile";
 import { recipeLine, seconds, unmetRequirements } from "@/features/fabrication/station-copy";
 import { learnedRecipes } from "@/features/fabrication/station-lists";
 import { usePlay } from "@/features/play/PlayContext";
@@ -24,7 +24,7 @@ export function RecipesCatalog() {
       </p>
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         {recipes.map((recipe) => (
-          <StationRecipeTile
+          <RecipeTile
             data-recipes-catalog-entry={recipe.actionId}
             itemId={recipe.outputItemId}
             key={recipe.actionId}

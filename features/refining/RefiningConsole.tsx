@@ -15,11 +15,26 @@ import { ItemVisual } from "@/components/items/ItemVisual";
 import { VisualTile } from "@/components/items/VisualTile";
 import { Feedback } from "@/components/ui/Feedback";
 import { MissionActionButton } from "@/components/ui/MissionActionButton";
+import { MissionGuidanceHalo, missionGuidanceClassName } from "@/components/ui/MissionGuidanceHalo";
 import { StatusMeter } from "@/components/ui/StatusMeter";
+import { RecipeTile } from "@/features/shared/RecipeTile";
+import { RefiningRecipesCatalog } from "@/features/refining/RefiningRecipesCatalog";
+import {
+  learnedRefiningRecipes,
+  refineVisibleRecipes,
+  refiningChance,
+  refiningRecipeLine,
+  refiningSeconds,
+  refiningUnmetRequirements,
+} from "@/features/refining/refining-lists";
 import { refiningActionIds } from "@/game/config/balance";
 import { GAME_TICK_MS } from "@/game/config/foundations";
 import { resolveItemPresentation } from "@/game/content/item-presentation";
-import { describeFailureOutcome, describeQuantities } from "@/features/refining/attempt-copy";
+import {
+  describeFailureOutcome,
+  describeQuantities,
+  failedAttemptAwardLabel,
+} from "@/features/refining/attempt-copy";
 import { deriveMissionGuidanceTargets } from "@/game/domain/missions";
 import type { RefiningRunAttempt } from "@/server/refining";
 import type { RefiningRecipeProjection } from "@/server/play";
@@ -34,6 +49,8 @@ function percentage(bps: number) {
 }
 
 const BATCH_UNIT = { singular: "batch", plural: "batches" };
+
+type RefiningMode = "refine" | "recipes";
 
 function refiningStopMessage(
   reason: Extract<import("@/server/play").ActivityStop, { activity: "refining" }>["reason"],
@@ -51,14 +68,16 @@ function refiningStopMessage(
   }
   // The authoritative reason says the inputs ran out; the recipe says which
   // ones and how many, so the copy is right for all three recipes (#209).
-  const inputs = recipe
-    ? recipe.inputs.map((input) => `${input.quantity} ${input.name}`).join(" + ")
-    : "the required inputs";
+  // With nothing left to refine there may be no recipe on the Refine list to
+  // name (#239), and the copy says only what the server did.
+  const inputs = recipe?.inputs.map((input) => `${input.quantity} ${input.name}`).join(" + ");
   return (
     (
       {
         manually_stopped: "Refining stopped.",
-        insufficient_inputs: `Not enough material \u2014 each attempt requires ${inputs}.`,
+        insufficient_inputs: inputs
+          ? `Not enough material \u2014 each attempt requires ${inputs}.`
+          : "Not enough material for another attempt.",
         inventory_slots_full:
           "Processing stopped \u2014 make room for the resulting material before refining more.",
         carried_mass_capacity_reached:
@@ -184,9 +203,10 @@ export function RefiningConsole() {
   const refiningRun = state.refiningRun;
   // The recipe the player has chosen. It defaults to whatever is already
   // running, so a refresh mid-run lands back on the right recipe; otherwise it
-  // is the first authored one, and the authored order puts Refined Ferrite —
-  // the only recipe a new character can work — first.
+  // is the recipe a Mission is guiding, then the first the Refine list shows.
   const [selectedActionId, setSelectedActionId] = useState<string | undefined>();
+  // Refine is what can start now; Recipes is what the character knows (#239).
+  const [mode, setMode] = useState<RefiningMode>("refine");
   // The run's selection (#229): always starts at one, and resets to one
   // whenever the recipe changes, because a count means batches OF a recipe.
   const [selection, setSelection] = useState<BoundedRunSelection>(BOUNDED_RUN_DEFAULT_QUANTITY);
@@ -203,19 +223,27 @@ export function RefiningConsole() {
       ? state.activeAction
       : undefined;
   const activeRecipe = recipes.find((recipe) => recipe.actionId === active?.actionId);
+  // Mission guidance consumes the ONE derived target set: a Refining mission
+  // authors `recommendedActionId` naming one recipe's action, and only that
+  // recipe's tile and Start receive the treatment — no mission-ID branching.
+  const missionGuidanceTargets = deriveMissionGuidanceTargets(state.missions);
+  // Refine lists only what can begin now, plus a Mission-guided recipe with
+  // what it is missing (#239); everything else the character knows is on
+  // Recipes, so learned-but-unavailable recipes never push the run down.
+  const visible = refineVisibleRecipes(recipes, missionGuidanceTargets.actionIds);
   const recipe =
     activeRecipe ??
-    recipes.find((candidate) => candidate.actionId === selectedActionId) ??
-    recipes[0];
+    visible.find((candidate) => candidate.actionId === selectedActionId) ??
+    visible.find((candidate) => missionGuidanceTargets.actionIds.has(candidate.actionId)) ??
+    visible[0];
+  // The carried-materials row still names a recipe's inputs when nothing can
+  // be refined, so an empty Refine list shows what is short.
+  const contextRecipe = recipe ?? learnedRefiningRecipes(recipes)[0];
   const [message, setMessage] = useState<string | undefined>(
     state.stop?.activity === "refining"
       ? refiningStopMessage(state.stop.reason, recipe, refiningRun)
       : undefined,
   );
-  // Mission guidance consumes the ONE derived target set: a Refining mission
-  // authors `recommendedActionId` naming one recipe's action, and only that
-  // recipe's Start receives the treatment — no mission-ID branching.
-  const missionGuidanceTargets = deriveMissionGuidanceTargets(state.missions);
   const startRefiningGuided =
     !active && recipe !== undefined && missionGuidanceTargets.actionIds.has(recipe.actionId);
   const durationTicks = active?.nextAttemptDurationTicks ?? recipe?.attemptDurationTicks ?? 0;
@@ -316,235 +344,263 @@ export function RefiningConsole() {
   const isActive = Boolean(active);
 
   // Every new selection starts at one (#229): once a run is under way the
-  // selector is hidden, and when it next appears it is for a fresh run.
+  // selector is hidden, and when it next appears it is for a fresh run. A run
+  // that starts also brings the console back to Refine, where it is shown.
   useEffect(() => {
-    if (isActive) setSelection(BOUNDED_RUN_DEFAULT_QUANTITY);
+    if (isActive) {
+      setSelection(BOUNDED_RUN_DEFAULT_QUANTITY);
+      setMode("refine");
+    }
   }, [isActive]);
 
+  const refineGuided =
+    mode === "recipes" &&
+    !isActive &&
+    visible.some((candidate) => missionGuidanceTargets.actionIds.has(candidate.actionId));
+
   return (
-    <ActivityPanel title="Refining" data-refining-activity>
-      {/* The run (#229): choose how many batches to attempt, or Max to run
-          until blocked, before Start; then follow the run through them. The
-          affordable count and the running counts are both the server's;
-          nothing here computes either or predicts how long Max will run. */}
-      {isActive ? (
-        <BoundedRunProgress
-          completed={refiningRun.attempts}
-          selection={refiningRun.selection}
-          unit={BATCH_UNIT}
-        />
-      ) : recipe?.unlocked ? (
-        <BoundedRunSelector
-          affordable={recipe.affordableBatches}
-          disabled={foregroundBusy || Boolean(state.activeAction)}
-          onChange={setSelection}
-          selection={selection}
-          summary={refiningRunSummary(recipe, selection)}
-          unit={BATCH_UNIT}
-        />
-      ) : null}
-      <div className="flex flex-wrap gap-3">
-        {isActive || pendingCommand === "stop" ? (
+    <ActivityPanel title="Refining" data-refining-activity data-refining-mode={mode}>
+      <div className="flex flex-wrap gap-2" role="group" aria-label="Refining view">
+        <MissionGuidanceHalo guidance={refineGuided ? "active" : undefined}>
           <ActionButton
-            intent="danger"
-            loading={foregroundBusy && pendingCommand === "stop"}
-            onClick={() => runForeground("stop", stopRefiningAction)}
+            aria-pressed={mode === "refine"}
+            className={missionGuidanceClassName(refineGuided ? "active" : undefined)}
+            data-mission-guidance={refineGuided ? "active" : undefined}
+            data-refining-mode-select="refine"
+            intent={mode === "refine" ? "primary" : "secondary"}
+            onClick={() => setMode("refine")}
           >
-            Stop Refining
+            Refine
           </ActionButton>
-        ) : (
-          <MissionActionButton
-            disabled={!recipe?.unlocked}
-            guidance={startRefiningGuided ? "active" : undefined}
-            intent="mining"
-            loading={foregroundBusy && pendingCommand === "start"}
-            onClick={() =>
-              runForeground("start", (characterId) =>
-                startRefiningAction({
-                  characterId,
-                  recipeActionId: recipe?.actionId,
-                  quantity: selection,
-                }),
-              )
-            }
-          >
-            Start Refining
-          </MissionActionButton>
-        )}
+        </MissionGuidanceHalo>
         <ActionButton
-          intent="secondary"
-          disabled={foregroundBusy}
-          loading={foregroundBusy && pendingCommand === "refresh"}
-          onClick={() => runForeground("refresh", refreshPlayAction)}
+          aria-pressed={mode === "recipes"}
+          data-refining-mode-select="recipes"
+          intent={mode === "recipes" ? "primary" : "secondary"}
+          onClick={() => setMode("recipes")}
         >
-          Refresh status
+          Recipes
         </ActionButton>
       </div>
-      {/* Every authored recipe, locked ones included (#209): a player at
-          Refining 1 can see that Galvanic Stock and Galvaferrite exist and what
-          they will cost, which is the whole reason the locked rows render at
-          all. Selection is disabled while a run is active, because changing the
-          recipe mid-run is a stop, not a toggle. */}
-      <div className="grid gap-2 sm:grid-cols-2" data-refining-recipes>
-        {recipes.map((candidate) => {
-          const chosen = candidate.actionId === recipe?.actionId;
-          return (
-            <button
-              aria-pressed={chosen}
-              className={`border p-3 text-left ${
-                chosen
-                  ? "border-[color:var(--rs-accent-arcane)] bg-[color:var(--rs-surface-panel)]"
-                  : "border-[color:var(--rs-border-structural)] bg-[color:var(--rs-surface-panel)]"
-              } ${candidate.unlocked ? "" : "opacity-60"}`}
-              data-refining-recipe={candidate.actionId}
-              data-refining-recipe-locked={candidate.unlocked ? "false" : "true"}
-              disabled={Boolean(active) || !candidate.unlocked}
-              key={candidate.actionId}
-              onClick={() => {
-                if (candidate.actionId !== recipe?.actionId)
-                  setSelection(BOUNDED_RUN_DEFAULT_QUANTITY);
-                setSelectedActionId(candidate.actionId);
-              }}
-              type="button"
+      {mode === "recipes" ? (
+        <RefiningRecipesCatalog level={refining.level} recipes={recipes} />
+      ) : (
+        <>
+          {/* What can be refined right now (#239), as output-item tiles. While
+              a run is under way the recipe is fixed — changing it is a stop,
+              not a toggle — so the list gives way to the run itself. */}
+          {isActive ? null : (
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4" data-refining-recipes>
+              {visible.map((candidate) => (
+                <RecipeTile
+                  data-refining-recipe={candidate.actionId}
+                  data-refining-recipe-ready={String(
+                    candidate.unlocked && candidate.inputsAvailable,
+                  )}
+                  guided={missionGuidanceTargets.actionIds.has(candidate.actionId)}
+                  itemId={candidate.outputItemId}
+                  key={candidate.actionId}
+                  name={candidate.outputName}
+                  onSelect={() => {
+                    if (candidate.actionId !== recipe?.actionId)
+                      setSelection(BOUNDED_RUN_DEFAULT_QUANTITY);
+                    setSelectedActionId(candidate.actionId);
+                  }}
+                  quantity={candidate.outputQuantity}
+                  recipe={`${refiningRecipeLine(candidate)} · ${refiningSeconds(candidate.attemptDurationTicks)} · ${refiningChance(candidate)}`}
+                  requirements={refiningUnmetRequirements(candidate, refining.level)}
+                  selected={candidate.actionId === recipe?.actionId}
+                  {...(candidate.outputStackLimit !== undefined
+                    ? { stackLimit: candidate.outputStackLimit }
+                    : {})}
+                  tileLabel={`${candidate.outputName}: ${refiningRecipeLine(candidate)}`}
+                />
+              ))}
+            </div>
+          )}
+          {!isActive && visible.length === 0 ? (
+            <Feedback tone="muted">
+              <span data-refining-empty>
+                Nothing you are carrying can be refined right now. Recipes shows everything you know
+                how to refine.
+              </span>
+            </Feedback>
+          ) : null}
+          {recipe ? (
+            <p
+              className="font-display text-sm uppercase tracking-wide text-[color:var(--rs-accent-arcane)]"
+              data-refining-selected={recipe.actionId}
             >
-              <p className="font-display text-sm uppercase tracking-wide">
-                {candidate.outputQuantity} {candidate.outputName}
-              </p>
-              <p className="mt-1 text-xs text-[color:var(--rs-text-secondary)]">
-                {describeQuantities(candidate.inputs)} &rarr; {candidate.outputQuantity}{" "}
-                {candidate.outputName}
-              </p>
-              {candidate.unlocked ? (
-                <p className="mt-1 text-xs uppercase tracking-wide text-[color:var(--rs-text-muted)]">
-                  {candidate.attemptDurationTicks} ticks /{" "}
-                  {(candidate.attemptDurationTicks * GAME_TICK_MS) / 1000}s &middot;{" "}
-                  {candidate.deterministic
-                    ? "Certain"
-                    : `${percentage(candidate.successChanceBps)}%`}{" "}
-                  &middot; +{candidate.successXp} XP
+              {recipe.outputName} &middot;{" "}
+              {recipe.deterministic
+                ? "Deterministic: every batch succeeds"
+                : `Success chance: ${percentage(recipe.successChanceBps)}%`}{" "}
+              &middot; +{recipe.successXp} Refining XP
+            </p>
+          ) : null}
+          {/* The run (#229): choose how many batches to attempt, or Max to run
+              until blocked, before Start; then follow the run through them. The
+              affordable count and the running counts are both the server's;
+              nothing here computes either or predicts how long Max will run. */}
+          {isActive ? (
+            <BoundedRunProgress
+              completed={refiningRun.attempts}
+              selection={refiningRun.selection}
+              unit={BATCH_UNIT}
+            />
+          ) : recipe?.unlocked ? (
+            <BoundedRunSelector
+              affordable={recipe.affordableBatches}
+              disabled={foregroundBusy || Boolean(state.activeAction)}
+              onChange={setSelection}
+              selection={selection}
+              summary={refiningRunSummary(recipe, selection)}
+              unit={BATCH_UNIT}
+            />
+          ) : null}
+          <div className="flex flex-wrap gap-3">
+            {isActive || pendingCommand === "stop" ? (
+              <ActionButton
+                intent="danger"
+                loading={foregroundBusy && pendingCommand === "stop"}
+                onClick={() => runForeground("stop", stopRefiningAction)}
+              >
+                Stop Refining
+              </ActionButton>
+            ) : (
+              <MissionActionButton
+                disabled={!recipe?.unlocked || recipe.affordableBatches < 1}
+                guidance={startRefiningGuided ? "active" : undefined}
+                intent="mining"
+                loading={foregroundBusy && pendingCommand === "start"}
+                onClick={() =>
+                  runForeground("start", (characterId) =>
+                    startRefiningAction({
+                      characterId,
+                      recipeActionId: recipe?.actionId,
+                      quantity: selection,
+                    }),
+                  )
+                }
+              >
+                Start Refining
+              </MissionActionButton>
+            )}
+            <ActionButton
+              intent="secondary"
+              disabled={foregroundBusy}
+              loading={foregroundBusy && pendingCommand === "refresh"}
+              onClick={() => runForeground("refresh", refreshPlayAction)}
+            >
+              Refresh status
+            </ActionButton>
+          </div>
+          {isActive ? (
+            <div>
+              <StatusMeter
+                label="Refining attempt"
+                value={progress}
+                detail={`${secondsRemaining.toFixed(1)}s to next attempt`}
+              />
+            </div>
+          ) : recipe ? (
+            <Feedback>
+              Refining is idle. Each {recipe.outputName} attempt takes {recipe.attemptDurationTicks}{" "}
+              ticks / {(recipe.attemptDurationTicks * GAME_TICK_MS) / 1000} seconds and resolves on
+              the server.
+            </Feedback>
+          ) : null}
+          {latestAttempt ? (
+            <section
+              aria-label="Latest refining attempt"
+              className={`border border-[color:var(--rs-border-structural)] bg-[color:var(--rs-surface-panel)] p-3 ${feedback?.sequence === latestAttempt.sequence ? (latestAttempt.success ? "rs-result-feedback-success" : "rs-result-feedback-danger") : ""}`}
+              data-feedback-state={feedback?.sequence === latestAttempt.sequence ? "new" : "calm"}
+              data-result-outcome={latestAttempt.success ? "success" : "failed"}
+            >
+              <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+                {/* A failure's Slag or returned input is what the failure left,
+                    not what was refined (#239), so it is never headed as the
+                    attempt's output. */}
+                <p className="font-display text-sm uppercase tracking-wide">
+                  {latestAttempt.success
+                    ? `Latest attempt: ${describeQuantities(latestAttempt.awarded, ", ")}`
+                    : `Latest attempt failed: ${describeFailureOutcome(latestAttempt)}`}
                 </p>
-              ) : (
-                <p className="mt-1 font-display text-xs uppercase tracking-wide text-[color:var(--rs-accent-danger)]">
-                  Requires Refining {candidate.minimumLevel}
+                {feedback?.sequence === latestAttempt.sequence && feedback.attempts > 1 ? (
+                  <p className="text-xs text-[color:var(--rs-text-secondary)]">
+                    {feedback.attempts} attempts resolved while away
+                  </p>
+                ) : null}
+              </div>
+              {latestAttempt.deterministic ? null : (
+                <p className="mt-2 text-sm text-[color:var(--rs-text-secondary)]">
+                  Roll {percentage(latestAttempt.rolledBasisPoints)} | Needed below{" "}
+                  {percentage(latestAttempt.thresholdBasisPoints)}
                 </p>
               )}
-            </button>
-          );
-        })}
-      </div>
-      {recipe ? (
-        <>
-          <p className="font-display text-sm uppercase tracking-wide text-[color:var(--rs-accent-arcane)]">
-            {recipe.deterministic
-              ? "Deterministic: every batch succeeds"
-              : `Success chance: ${percentage(recipe.successChanceBps)}%`}
-          </p>
-          <p className="!mt-2 text-xs uppercase tracking-wide text-[color:var(--rs-text-muted)]">
-            {recipe.attemptDurationTicks} ticks /{" "}
-            {(recipe.attemptDurationTicks * GAME_TICK_MS) / 1000}s per attempt &middot;{" "}
-            {describeQuantities(recipe.inputs)} &rarr; {recipe.outputQuantity} {recipe.outputName}
-          </p>
-        </>
-      ) : null}
-      {isActive ? (
-        <div>
-          <StatusMeter
-            label="Refining attempt"
-            value={progress}
-            detail={`${secondsRemaining.toFixed(1)}s to next attempt`}
-          />
-        </div>
-      ) : (
-        <Feedback>
-          Refining is idle. Each {recipe?.outputName ?? "attempt"} attempt takes{" "}
-          {recipe?.attemptDurationTicks ?? 0} ticks /{" "}
-          {((recipe?.attemptDurationTicks ?? 0) * GAME_TICK_MS) / 1000} seconds and resolves on the
-          server.
-        </Feedback>
-      )}
-      {latestAttempt ? (
-        <section
-          aria-label="Latest refining attempt"
-          className={`border border-[color:var(--rs-border-structural)] bg-[color:var(--rs-surface-panel)] p-3 ${feedback?.sequence === latestAttempt.sequence ? (latestAttempt.success ? "rs-result-feedback-success" : "rs-result-feedback-danger") : ""}`}
-          data-feedback-state={feedback?.sequence === latestAttempt.sequence ? "new" : "calm"}
-          data-result-outcome={latestAttempt.success ? "success" : "failed"}
-        >
-          <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-            <p className="font-display text-sm uppercase tracking-wide">
-              Latest attempt: {describeQuantities(latestAttempt.awarded, ", ")}
-            </p>
-            {feedback?.sequence === latestAttempt.sequence && feedback.attempts > 1 ? (
-              <p className="text-xs text-[color:var(--rs-text-secondary)]">
-                {feedback.attempts} attempts resolved while away
+              <p className="mt-2 text-xs uppercase tracking-wide text-[color:var(--rs-text-muted)]">
+                {latestAttempt.durationTicks} ticks &middot;{" "}
+                {describeQuantities(latestAttempt.consumed, ", ")} consumed
               </p>
-            ) : null}
-          </div>
-          {latestAttempt.deterministic ? null : (
-            <p className="mt-2 text-sm text-[color:var(--rs-text-secondary)]">
-              Roll {percentage(latestAttempt.rolledBasisPoints)} | Needed below{" "}
-              {percentage(latestAttempt.thresholdBasisPoints)}
-            </p>
-          )}
-          <p className="mt-2 text-xs uppercase tracking-wide text-[color:var(--rs-text-muted)]">
-            {latestAttempt.durationTicks} ticks &middot;{" "}
-            {describeQuantities(latestAttempt.consumed, ", ")} consumed
-          </p>
-          {/* One tile per awarded item, from the attempt's own awards: a
-              Galvaferrite failure hands back one input rather than producing
-              Slag, so nothing here may assume which item appears (#209). */}
-          <div className="mt-3 grid max-w-sm grid-cols-2 gap-2 sm:grid-cols-3">
-            {latestAttempt.awarded.map((award) => (
-              <ItemVisual
-                accessibleLabel={`${award.quantity} ${itemName(award.itemId)} produced`}
-                className={
-                  feedback?.sequence === latestAttempt.sequence ? "rs-reward-feedback" : ""
-                }
-                itemId={award.itemId}
-                key={award.itemId}
-                name={itemName(award.itemId)}
-                quantity={award.quantity}
-              />
-            ))}
-            <VisualTile
-              accessibleLabel={`${latestAttempt.xpAwarded} Refining XP earned`}
-              badge={`+${latestAttempt.xpAwarded}`}
-              className={
-                feedback?.sequence === latestAttempt.sequence
-                  ? "rs-reward-feedback [animation-delay:90ms]"
-                  : ""
+              {/* One tile per awarded item, from the attempt's own awards: a
+                  Galvaferrite failure hands back one input rather than producing
+                  Slag, so nothing here may assume which item appears (#209). */}
+              <div className="mt-3 grid max-w-sm grid-cols-2 gap-2 sm:grid-cols-3">
+                {latestAttempt.awarded.map((award) => (
+                  <ItemVisual
+                    accessibleLabel={
+                      latestAttempt.success
+                        ? `${award.quantity} ${itemName(award.itemId)} produced`
+                        : failedAttemptAwardLabel(latestAttempt, award)
+                    }
+                    className={
+                      feedback?.sequence === latestAttempt.sequence ? "rs-reward-feedback" : ""
+                    }
+                    itemId={award.itemId}
+                    key={award.itemId}
+                    name={itemName(award.itemId)}
+                    quantity={award.quantity}
+                  />
+                ))}
+                <VisualTile
+                  accessibleLabel={`${latestAttempt.xpAwarded} Refining XP earned`}
+                  badge={`+${latestAttempt.xpAwarded}`}
+                  className={
+                    feedback?.sequence === latestAttempt.sequence
+                      ? "rs-reward-feedback [animation-delay:90ms]"
+                      : ""
+                  }
+                  fallbackText="XP"
+                  name="Refining"
+                />
+              </div>
+            </section>
+          ) : null}
+          {message ? (
+            <Feedback
+              tone={
+                state.stop?.activity === "refining" &&
+                !active &&
+                !refiningStopIsExpected(state.stop.reason, refiningRun.selection)
+                  ? "danger"
+                  : "muted"
               }
-              fallbackText="XP"
-              name="Refining"
-            />
-          </div>
-        </section>
-      ) : null}
+            >
+              {message}
+            </Feedback>
+          ) : null}
+          {recovery ? (
+            <ActionButton disabled={foregroundBusy} intent="secondary" onClick={recovery}>
+              Retry status check
+            </ActionButton>
+          ) : null}
+        </>
+      )}
       <p aria-live="polite" className="sr-only">
         {feedback && latestAttempt && feedback.sequence === latestAttempt.sequence
           ? latestAnnouncement(latestAttempt, feedback.attempts)
           : ""}
       </p>
-      {message ? (
-        <Feedback
-          tone={
-            state.stop?.activity === "refining" &&
-            !active &&
-            !refiningStopIsExpected(state.stop.reason, refiningRun.selection)
-              ? "danger"
-              : "muted"
-          }
-        >
-          {message}
-        </Feedback>
-      ) : null}
-      {recovery ? (
-        <ActionButton disabled={foregroundBusy} intent="secondary" onClick={recovery}>
-          Retry status check
-        </ActionButton>
-      ) : null}
-      {/* The selected recipe's own inputs and output: Refining stops on carried
-          capacity as readily as it stops on running out of input, and which
-          material that is depends on the recipe. */}
       <SkillProgressRow
         level={refining.level}
         skill="Refining"
@@ -552,6 +608,9 @@ export function RefiningConsole() {
         xpIntoLevel={refining.xpIntoLevel}
         {...(refining.xpToNextLevel === undefined ? {} : { xpToNextLevel: refining.xpToNextLevel })}
       />
+      {/* The selected recipe's own inputs and output: Refining stops on carried
+          capacity as readily as it stops on running out of input, and which
+          material that is depends on the recipe. */}
       <ActivityContextRow
         carry={{
           slotsUsed: state.inventory.slotsUsed,
@@ -560,21 +619,21 @@ export function RefiningConsole() {
           capacityGrams: state.inventory.capacityGrams,
         }}
         items={
-          recipe
+          contextRecipe
             ? [
-                ...recipe.inputs.map((input) => ({
+                ...contextRecipe.inputs.map((input) => ({
                   label: input.name,
                   quantity: input.carried,
                 })),
                 {
-                  label: recipe.outputName,
-                  quantity: state.carriedByItemId[recipe.outputItemId] ?? 0,
+                  label: contextRecipe.outputName,
+                  quantity: state.carriedByItemId[contextRecipe.outputItemId] ?? 0,
                 },
               ]
             : []
         }
       />
-      <RefiningRunPanel run={refiningRun} />
+      {mode === "refine" ? <RefiningRunPanel run={refiningRun} /> : null}
     </ActivityPanel>
   );
 }

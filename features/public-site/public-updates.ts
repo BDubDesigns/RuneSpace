@@ -5,6 +5,31 @@ export type { PublicUpdate } from "@/game/schemas/public-updates";
 
 const authoredUpdates = [
   {
+    slug: "what-can-i-refine",
+    title: "What Can I Refine?",
+    publishedAt: "2026-09-28T17:00:00-07:00",
+    summary:
+      "The Refining console now shows what you can refine right now as item tiles, with everything you know on a separate Recipes view — and Max and the bench's Auto-discard Slag setting now look switched on when they are.",
+    body: [
+      "The Refining console used to list every recipe it had, all the way up to Refining 8, as a column of text above the part you actually use. On a phone that pushed Start and the run's progress well down the screen, just to tell you about pours you could not make yet.",
+      "Now it works like the Fabrication Station. Refine shows only what you can refine right now with what you are carrying, as item tiles with the artwork you already know from your Inventory, and the one you have picked is clearly marked. If a Mission is pointing you at a recipe you are short for, that one stays too, saying what it is missing. Recipes, beside it, lists everything your Refining level knows, whether or not you have the materials. What unlocks later is in the Wiki.",
+      "A failed attempt now reads as one. The Slag a bad pour leaves, or the input a failed Galvaferrite pour hands back, is shown as what the failure left rather than looking like the thing you were making.",
+      "Two small controls got the same treatment. Max, on the run-size control at the Yard, the bench, and the Fabrication Station, now lights up while it is chosen instead of only saying Max in the readout. The bench's Slag setting is now labelled Auto-discard Slag: On or Off, and it lights up when it is on. Neither one works any differently.",
+    ],
+    patchNotes: [
+      {
+        heading: "Changed",
+        items: [
+          "The Refining console has Refine and Recipes views. Refine lists the recipes you can start now as item tiles; Recipes lists every recipe your Refining level knows.",
+          "Recipes you cannot start no longer sit above the Refining run controls. A recipe a Mission is guiding stays on Refine with what it is missing.",
+          "A failed Refining attempt is headed as a failure, and its Slag or returned input is labelled as what the failure left.",
+          "Max stays visibly selected on the run-size control while it is chosen.",
+          "The Practice Welding bench's Slag setting reads Auto-discard Slag: On/Off and is visibly switched on when on.",
+        ],
+      },
+    ],
+  },
+  {
     slug: "a-cut-above",
     title: "A Cut Above",
     publishedAt: "2026-09-27T16:00:00-07:00",

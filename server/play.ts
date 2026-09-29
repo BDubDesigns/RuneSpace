@@ -551,7 +551,10 @@ export type RefiningRecipeProjection = {
   actionId: string;
   outputItemId: string;
   outputName: string;
+  /** Per-batch output: the recipe tile's badge, never the selected run's total. */
   outputQuantity: number;
+  /** Stack limit for a stackable output's tile (#239); absent for a unique item. */
+  outputStackLimit?: number;
   minimumLevel: number;
   /** Whether the character's Refining level authorizes starting it. */
   unlocked: boolean;
@@ -2155,11 +2158,13 @@ export async function stateFromTransaction(
       : undefined,
     refiningRecipes: refiningRecipes(balance).map((recipe) => {
       const award = refiningAwardFacts(balance, recipe);
+      const output = getItemDefinition(recipe.outputItemId, balance);
       return {
         actionId: recipe.actionId,
         outputItemId: recipe.outputItemId,
         outputName: resolveItemPresentation(recipe.outputItemId, recipe.outputItemId).displayName,
         outputQuantity: recipe.outputQuantity,
+        ...(output?.kind === "stack" ? { outputStackLimit: output.stackLimit } : {}),
         minimumLevel: recipe.minimumLevel,
         unlocked: refiningRecipeUnlocked(refiningProgress.level, recipe),
         attemptDurationTicks: recipe.attemptDurationTicks,

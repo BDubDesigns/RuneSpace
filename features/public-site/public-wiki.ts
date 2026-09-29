@@ -191,7 +191,8 @@ const authoredWikiArticles = [
       {
         heading: "Refining at the Abandoned Processing Yard",
         paragraphs: [
-          "Refining is only available at the Abandoned Processing Yard, and every recipe is listed there from the start — including ones your Refining skill is not high enough for yet, so you can see what is coming.",
+          "Refining is only available at the Abandoned Processing Yard. Refine lists what you can refine right now with what you are carrying — plus any recipe a Mission is pointing you at, with what it is still missing. Recipes, beside it, lists every recipe your Refining level knows, whether or not you have the materials. The recipes below show what is still to come.",
+          "A failed attempt says so: any Slag it makes, or any input a failed Galvaferrite pour hands back, is shown as what the failure left, not as something you refined.",
         ],
         list: [
           "Refined Ferrite — two Ferrite Shale, a little over four seconds. A failure still produces one Slag, which isn't wasted: the Cargo Hold repair needs both.",
@@ -552,7 +553,7 @@ const authoredWikiArticles = [
             ".",
           ],
           [
-            "Slag is yours to keep or throw out: the bench has a setting for it, applied as each weld finishes. Bix pays 1 Credit apiece for ",
+            "Slag is yours to keep or throw out: the bench's Auto-discard Slag setting decides, applied as each weld finishes. Bix pays 1 Credit apiece for ",
             { text: "Slag", articleSlug: "mining-and-refining" },
             " in town, so an 8-Credit weld can return 2 if you keep both and sell them. If you keep Slag and run out of room for it, the overflow is thrown out rather than stopping the weld. Scrap stacks three to a slot, so using two pieces only frees a slot for Slag when it empties a stack.",
           ],
