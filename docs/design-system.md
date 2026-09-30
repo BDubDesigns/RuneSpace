@@ -48,8 +48,9 @@ rules are defined once in `docs/architecture.md`.
 Chat/Social (#245) is a utility over Play, not a fifth footer destination and
 not a header control. Its launcher is one compact 44px icon button that floats
 at the bottom right, one gap above the footer, through `GameShell`'s
-`floatingAction` slot. That slot owns the geometry: `--rs-floating-action-bottom`
-places the control above the footer (the nav height already includes the
+`floatingAction` slot. That slot owns the geometry: `--rs-above-bottom-nav`
+(the one resting height above the footer, shared with the Map's sticky
+selected-destination panel) places the control above the footer (the nav height already includes the
 bottom safe-area inset, and the right edge respects the right inset), and
 `--rs-floating-action-clearance` grows the page's bottom padding by the control
 plus a gap so it never covers the last Play content. The four footer

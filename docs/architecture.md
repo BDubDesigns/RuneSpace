@@ -162,8 +162,9 @@ only — never gameplay or social authority.
   `fetch` (so a 403 `GAMEPLAY_ACCESS_REQUIRED` stops and recovers to
   Characters instead of retrying), reconnects immediately after a deliberate
   close and with capped, jittered backoff after a failure, drops a half-open
-  stream after two silent heartbeats, and reconnects at once when the tab
-  becomes visible or the network returns. One stream per open Play tab; there
+  stream after two silent heartbeats, and reconnects at once when the network
+  returns or the tab becomes visible (a resumed tab whose "live" stream missed
+  a heartbeat is treated as dead, not trusted). One stream per open Play tab; there
   is no tab-leader election.
 - **Reconciliation, not replay.** The stream carries no SSE `id:` and never
   replays. After every connect, reconnect, and tab resume the seam calls its

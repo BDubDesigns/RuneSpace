@@ -25,6 +25,7 @@ import {
   createDeliveryDeduper,
   createRealtimeConnection,
   realtimeRetryDelay,
+  REALTIME_RESUME_STALE_MS,
   REALTIME_WATCHDOG_MS,
   type ReconcileReason,
   type RealtimeRefusal,
@@ -344,6 +345,43 @@ describe("browser connection lifecycle", () => {
     streams[1]!.send(formatRealtimeFrame(REALTIME_FRAME.ready, {}));
     await settle();
     expect(events.reconciles).toEqual(["connect", "reconnect"]);
+    connection.stop();
+  });
+
+  it("reconnects on resume when a live stream has gone silent, instead of waiting for the watchdog", async () => {
+    const streams = [streamingResponse(), streamingResponse()];
+    let clock = 1_000_000;
+    let requests = 0;
+    const reconciles: ReconcileReason[] = [];
+    const connection = createRealtimeConnection({
+      characterId: "11111111-1111-4111-8111-111111111111",
+      callbacks: {
+        onStatus: () => {},
+        onReconcile: (reason) => reconciles.push(reason),
+        onDelivery: () => {},
+        onRefused: () => {},
+      },
+      fetch: async () => streams[requests++]!.response,
+      timers: { setTimeout: () => 0, clearTimeout: () => {} },
+      now: () => clock,
+    });
+    connection.start();
+    await settle();
+    streams[0]!.send(formatRealtimeFrame(REALTIME_FRAME.ready, {}));
+    await settle();
+
+    clock += REALTIME_RESUME_STALE_MS; // a heartbeat is due or just late: still fresh
+    connection.resume();
+    expect(reconciles).toEqual(["connect", "resume"]);
+    expect(requests).toBe(1);
+
+    clock += 1; // the phone slept through a heartbeat
+    connection.resume();
+    await settle();
+    expect(requests).toBe(2);
+    streams[1]!.send(formatRealtimeFrame(REALTIME_FRAME.ready, {}));
+    await settle();
+    expect(reconciles).toEqual(["connect", "resume", "reconnect"]);
     connection.stop();
   });
 

@@ -55,6 +55,12 @@ export function isolated(callback: () => void) {
   }
 }
 
+/**
+ * On resume, a live stream silent for longer than this has missed a heartbeat
+ * (plus slack for a late one) and is treated as dead rather than trusted.
+ */
+export const REALTIME_RESUME_STALE_MS = REALTIME_HEARTBEAT_MS + 5_000;
+
 const RETRY_BASE_MS = 1_000;
 const RETRY_MAX_MS = 30_000;
 
@@ -93,6 +99,7 @@ export type RealtimeConnectionOptions = {
   fetch?: typeof fetch;
   timers?: Timers;
   random?: () => number;
+  now?: () => number;
 };
 
 export function createRealtimeConnection({
@@ -104,6 +111,7 @@ export function createRealtimeConnection({
     clearTimeout: (handle) => globalThis.clearTimeout(handle as ReturnType<typeof setTimeout>),
   },
   random = Math.random,
+  now = Date.now,
 }: RealtimeConnectionOptions) {
   const url = `${REALTIME_STREAM_PATH}?characterId=${encodeURIComponent(characterId)}`;
   const firstDelivery = createDeliveryDeduper();
@@ -114,6 +122,7 @@ export function createRealtimeConnection({
   let current: AbortController | undefined;
   let retryTimer: unknown;
   let watchdogTimer: unknown;
+  let lastByteAt = 0;
 
   function setStatus(next: RealtimeStatus) {
     if (status === next) return;
@@ -126,6 +135,7 @@ export function createRealtimeConnection({
   }
 
   function armWatchdog(attempt: AbortController) {
+    lastByteAt = now();
     clearTimer(watchdogTimer);
     watchdogTimer = timers.setTimeout(() => attempt.abort(), REALTIME_WATCHDOG_MS);
   }
@@ -235,13 +245,14 @@ export function createRealtimeConnection({
     },
     stop,
     /**
-     * The tab became visible or the network came back. A live stream just
-     * reconciles; anything else reconnects immediately instead of waiting out
-     * its backoff (and reconciles once it is live).
+     * The tab became visible or the network came back. A live stream that is
+     * still hearing heartbeats just reconciles; a silent one (a phone that
+     * slept through them) or any other state reconnects immediately instead
+     * of waiting out the watchdog or backoff, and reconciles once it is live.
      */
     resume() {
       if (stopped) return;
-      if (status === "live") {
+      if (status === "live" && now() - lastByteAt <= REALTIME_RESUME_STALE_MS) {
         isolated(() => callbacks.onReconcile("resume"));
         return;
       }
