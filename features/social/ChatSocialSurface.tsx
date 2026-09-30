@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import type { SocialCard } from "./social-state";
 
 /**
@@ -7,10 +8,17 @@ import type { SocialCard } from "./social-state";
  * Current actionable social cards are pinned above ordinary conversation
  * content so they are never buried in a channel. Each card's content and
  * actions belong to its owning domain (trade requests are #225's); the
- * surface only places them. General, Trade, and Whispers fill the
- * conversation region in #246 and #247; until then it says so plainly.
+ * surface only places them. The conversation region renders whatever
+ * conversations Play composes into it — General and Trade (#246), later
+ * Whispers (#247) — so the shell itself imports no chat model.
  */
-export function ChatSocialSurface({ cards }: { cards: readonly SocialCard[] }) {
+export function ChatSocialSurface({
+  cards,
+  conversations,
+}: {
+  cards: readonly SocialCard[];
+  conversations: ReactNode;
+}) {
   return (
     <div className="mt-4 space-y-4">
       {cards.length > 0 ? (
@@ -25,7 +33,7 @@ export function ChatSocialSurface({ cards }: { cards: readonly SocialCard[] }) {
         </section>
       ) : null}
       <section aria-label="Conversations" data-social-conversations="">
-        <p className="text-sm text-[color:var(--rs-text-muted)]">Chat coming soon.</p>
+        {conversations}
       </section>
     </div>
   );

@@ -1189,6 +1189,62 @@ export const accountAbuseEvents = pgTable(
   ],
 );
 
+/**
+ * Public General/Trade chat (issue #246). One immutable row per successful
+ * send; players can neither edit nor delete. `server/chat.ts` is its only
+ * writer.
+ *
+ * - `seq` is the durable feed order and pagination cursor. It is unique even
+ *   when many messages share an instant, so "older than this" pages never skip
+ *   or repeat a row.
+ * - Sender identity is stable ids plus the character's name at send time, all
+ *   derived server-side; renames never rewrite history.
+ * - A promoted Trade ad is ONE row in `trade` carrying the price it paid; the
+ *   General feed reads it too. Price and channel are CHECKed together.
+ * - Ordinary retention (90 days) deletes rows outright — see
+ *   `pruneExpiredChatMessages` — rather than only hiding them.
+ * - Each row is also one successful send in the account-wide rate window and,
+ *   when promoted, the account's ad cooldown; neither is stored twice.
+ */
+export const chatMessages = pgTable(
+  "chat_messages",
+  {
+    id: text("id")
+      .primaryKey()
+      .default(sql`gen_random_uuid()`),
+    seq: bigint("seq", { mode: "number" }).generatedAlwaysAsIdentity().notNull().unique(),
+    channel: text("channel").notNull(),
+    senderPlayerAccountId: text("sender_player_account_id")
+      .notNull()
+      .references(() => playerAccounts.id, { onDelete: "restrict" }),
+    senderCharacterId: text("sender_character_id")
+      .notNull()
+      .references(() => characters.id, { onDelete: "restrict" }),
+    senderCharacterName: text("sender_character_name").notNull(),
+    body: text("body").notNull(),
+    // Null for an ordinary message; the Credits paid for a promoted Trade ad.
+    promotedPriceCredits: integer("promoted_price_credits"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    check("chat_messages_channel_check", sql`${table.channel} in ('general', 'trade')`),
+    check("chat_messages_body_length_check", sql`char_length(${table.body}) between 1 and 280`),
+    check(
+      "chat_messages_promoted_check",
+      sql`${table.promotedPriceCredits} is null or (${table.promotedPriceCredits} > 0 and ${table.channel} = 'trade')`,
+    ),
+    index("chat_messages_channel_seq_idx").on(table.channel, table.seq),
+    index("chat_messages_promoted_seq_idx")
+      .on(table.seq)
+      .where(sql`${table.promotedPriceCredits} is not null`),
+    index("chat_messages_sender_account_created_idx").on(
+      table.senderPlayerAccountId,
+      table.createdAt,
+    ),
+    index("chat_messages_created_idx").on(table.createdAt),
+  ],
+);
+
 export type PlayerAccount = typeof playerAccounts.$inferSelect;
 export type NewPlayerAccount = typeof playerAccounts.$inferInsert;
 export type PlayerPortraitUnlock = typeof playerPortraitUnlocks.$inferSelect;
@@ -1213,3 +1269,4 @@ export type CargoHoldItemInstance = typeof cargoHoldItemInstances.$inferSelect;
 export type OperatorAuditLog = typeof operatorAuditLogs.$inferSelect;
 export type NewOperatorAuditLog = typeof operatorAuditLogs.$inferInsert;
 export type RuneSpaceAccessState = typeof runespaceAccessState.$inferSelect;
+export type ChatMessage = typeof chatMessages.$inferSelect;

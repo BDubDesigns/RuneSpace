@@ -77,22 +77,23 @@ const APP_ENTRYPOINTS: Record<string, string> = {
   "app/api/character-profile/route.ts": "GAMEPLAY: same-location profile read",
   "app/api/realtime/route.ts": "GAMEPLAY: realtime/social stream (#245)",
   "app/api/e2e/realtime/route.ts": "local E2E hook (404 outside the gate)",
+  "app/api/chat/route.ts": "GAMEPLAY: public chat history read (#246)",
 };
 
 describe("player server actions (server/actions.ts)", () => {
   const source = read("server/actions.ts");
   const bodies = exportedFunctionBodies(source);
 
-  it("enumerates exactly the 46 production player actions", () => {
+  it("enumerates exactly the 48 production player actions", () => {
     // #232 adds nine: Fabrication's start, finish-current, Override toggle,
     // push and Lock In, and Tinkering's start, stop, finish-current and
-    // Auto-discard Scrap preference.
-    expect(bodies.size).toBe(46);
+    // Auto-discard Scrap preference. #246 adds the chat send and promoted ad.
+    expect(bodies.size).toBe(48);
   });
 
   it("classifies every export as gameplay or named account management", () => {
     const gameplay = [...bodies.keys()].filter((name) => !(name in ACCOUNT_MANAGEMENT_ACTIONS));
-    expect(gameplay).toHaveLength(43);
+    expect(gameplay).toHaveLength(45);
     for (const name of Object.keys(ACCOUNT_MANAGEMENT_ACTIONS)) {
       expect(bodies.has(name), `unknown account action ${name}`).toBe(true);
     }
@@ -154,6 +155,7 @@ describe("app pages and route handlers", () => {
       ["app/api/location-population/route.ts", "server/location-population.ts"],
       ["app/api/character-profile/route.ts", "server/character-profile.ts"],
       ["app/api/realtime/route.ts", "server/realtime-stream.ts"],
+      ["app/api/chat/route.ts", "server/chat.ts"],
     ] as const) {
       expect(read(server)).toContain("requirePlayableOwnedCharacter(");
       expect(read(route)).toContain("error instanceof GameplayAccessError");

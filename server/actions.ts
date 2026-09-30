@@ -79,6 +79,12 @@ import { EquipmentRuleError } from "@/game/domain/equipment";
 import { TravelRuleError } from "@/server/travel";
 import { claimPowerCells, type PowerAnnexClaimResult } from "@/server/power-annex";
 import { tradeWithMerchant, type TradeResult } from "@/server/trade";
+import { postPromotedTradeAd, sendChatMessage } from "@/server/chat";
+import {
+  PostPromotedTradeAdRequestSchema,
+  SendChatMessageRequestSchema,
+  type ChatSendResult,
+} from "@/game/schemas/chat";
 import {
   acceptMission,
   acknowledgeMissionConversation,
@@ -893,6 +899,41 @@ export async function tradeWithMerchantAction(input: unknown): Promise<TradeActi
     const user = await requireCurrentUser(await headers());
     const { characterId, ...trade } = request.data;
     return await tradeWithMerchant(user.id, characterId, trade);
+  } catch (error) {
+    redirectOnGameplayRefusal(error);
+    if (error instanceof OwnershipError) return { error: error.message };
+    throw error;
+  }
+}
+
+export type ChatActionResult = ChatSendResult | { error: string };
+
+/**
+ * Public chat sends (issue #246). The browser names its active character and
+ * what to say; sender identity, the shared account-wide budget, and every
+ * refusal are decided by `server/chat.ts`.
+ */
+export async function sendChatMessageAction(input: unknown): Promise<ChatActionResult> {
+  const request = SendChatMessageRequestSchema.safeParse(input);
+  if (!request.success) return { error: "Invalid chat message." };
+  try {
+    const user = await requireCurrentUser(await headers());
+    const { characterId, ...message } = request.data;
+    return await sendChatMessage(user.id, characterId, message);
+  } catch (error) {
+    redirectOnGameplayRefusal(error);
+    if (error instanceof OwnershipError) return { error: error.message };
+    throw error;
+  }
+}
+
+export async function postPromotedTradeAdAction(input: unknown): Promise<ChatActionResult> {
+  const request = PostPromotedTradeAdRequestSchema.safeParse(input);
+  if (!request.success) return { error: "Invalid promoted ad." };
+  try {
+    const user = await requireCurrentUser(await headers());
+    const { characterId, text } = request.data;
+    return await postPromotedTradeAd(user.id, characterId, { text });
   } catch (error) {
     redirectOnGameplayRefusal(error);
     if (error instanceof OwnershipError) return { error: error.message };

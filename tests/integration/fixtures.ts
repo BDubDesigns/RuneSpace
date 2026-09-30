@@ -266,6 +266,8 @@ export async function cleanupTestCharacter(db: Db, rune: Rune, characterId: stri
       .delete(rune.operatorAuditLogs)
       .where(eq(rune.operatorAuditLogs.characterId, characterId));
     await tx.delete(rune.itemInstances).where(eq(rune.itemInstances.characterId, characterId));
+    // Public chat (#246) keeps the sending character's identity on each row.
+    await tx.delete(rune.chatMessages).where(eq(rune.chatMessages.senderCharacterId, characterId));
     await tx.delete(rune.characters).where(eq(rune.characters.id, characterId));
   });
 }

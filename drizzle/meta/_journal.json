@@ -225,6 +225,13 @@
       "when": 1790735584394,
       "tag": "0031_character_auto_discard_slag",
       "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "7",
+      "when": 1790742510281,
+      "tag": "0032_public_chat",
+      "breakpoints": true
     }
   ]
 }

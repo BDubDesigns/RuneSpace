@@ -42,9 +42,11 @@ export type RealtimeCloseReason = "lifetime" | "overflow";
 
 /**
  * The typed event registry. Each social domain registers its own event types
- * and payloads here when it ships — chat (#246), Whispers (#247), and trade
- * requests (#225) — keyed by a namespaced type such as `"chat.message"`. The
- * substrate itself imports no chat or trading model, and #245 registers none.
+ * and payloads into this interface when it ships — chat (#246), Whispers
+ * (#247), and trade requests (#225) — keyed by a namespaced type such as
+ * `"chat.message"`, by augmenting it from its own schema module (public chat's
+ * is `game/schemas/chat.ts`). The substrate itself imports no chat or trading
+ * model, and #245 registers none.
  */
 // eslint-disable-next-line @typescript-eslint/no-empty-object-type -- populated by downstream slices
 export interface RealtimeEventMap {}
