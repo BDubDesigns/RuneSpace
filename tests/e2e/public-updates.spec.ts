@@ -4,7 +4,7 @@ const updateSlug = "runespace-is-starting-to-feel-like-a-game";
 const updateTitle = "RuneSpace Is Starting to Feel Like a Game";
 
 test.describe("public Updates", () => {
-  test("lists the latest Update and renders its article and patch notes", async ({ page }) => {
+  test("lists published Updates and renders an article and its patch notes", async ({ page }) => {
     await page.goto("/updates");
 
     await expect(page).toHaveTitle("Updates — RuneSpace");
