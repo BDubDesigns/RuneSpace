@@ -11,6 +11,7 @@
   "scripts": {
     "dev": "next dev",
     "studio": "node scripts/run-studio.mjs",
+    "studio:apply": "node --experimental-strip-types scripts/studio-apply.mjs",
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
@@ -18,7 +19,7 @@
     "format:check": "prettier --check .",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "test:studio": "vitest run tests/unit/qc-studio.test.ts tests/unit/qc-studio-adapter.test.ts",
+    "test:studio": "vitest run tests/unit/qc-studio.test.ts tests/unit/qc-studio-adapter.test.ts tests/unit/qc-studio-apply.test.ts",
     "test:watch": "vitest",
     "test:integration": "node scripts/disposable-test-db.mjs -- pnpm run test:integration:raw",
     "test:integration:raw": "vitest run --config vitest.integration.config.ts",

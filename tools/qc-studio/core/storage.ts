@@ -2,6 +2,8 @@ import { cloneDraft } from "./draft";
 import {
   QC_STUDIO_MIGRATABLE_SCHEMA_VERSION,
   QC_STUDIO_SCHEMA_VERSION,
+  STUDIO_DIALOGUE_ACTIONS,
+  STUDIO_PRESENTATION_MODES,
   type DialogueCheckpoint,
   type DialogueDraft,
   type PersistedDialogueStudio,
@@ -43,11 +45,11 @@ export type PersistedLoadResult =
   | { kind: "loaded"; state: PersistedDialogueStudio };
 
 function isPresentationMode(value: unknown): value is StudioDialoguePresentationMode {
-  return value === "local" || value === "comms";
+  return (STUDIO_PRESENTATION_MODES as readonly unknown[]).includes(value);
 }
 
 function isAction(value: unknown): value is StudioDialogueAction {
-  return value === "accept_mission" || value === "complete_mission";
+  return (STUDIO_DIALOGUE_ACTIONS as readonly unknown[]).includes(value);
 }
 
 function isItemBeat(beat: Record<string, unknown>): boolean {

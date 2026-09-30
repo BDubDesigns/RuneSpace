@@ -121,20 +121,97 @@ can be inspected and restored.
 `Copy for RuneSpace` produces a structured export containing the adapter,
 source sequence identity or new-draft context, sequence metadata, action, and
 every beat — including each item beat's deterministic `itemId` and `quantity`.
-It does not write source files, register stable IDs, create commits, or publish
-content. A developer or agent applies the reviewed export to typed RuneSpace
-content through the normal repository and PR workflow.
+The Studio itself does not write source files, register stable IDs, create
+commits, or publish content. The reviewed export is applied to typed RuneSpace
+content on the repository side with `pnpm studio:apply` (see
+[Applying QC Studio exports](#applying-qc-studio-exports)), through the normal
+repository and PR workflow.
 
 ## Applying QC Studio exports
 
 A QC Studio Dialogue export is approved authoring input for a human-reviewed
 repository change. It is not executable code, a source-file patch, or a publish
-command. The current V1 shape is:
+command.
+
+### Preferred path: `pnpm studio:apply`
+
+The mechanical step — resolve the stable sequence, translate the reviewed beats
+back into RuneSpace's typed helpers, edit only that sequence — is deterministic,
+so it is done by a repository command rather than by an LLM. Writing or polishing
+the dialogue is still creative work; applying an already-reviewed export is not.
+
+```bash
+pnpm studio:apply export.json            # dry run (default): target + diff, writes nothing
+pnpm studio:apply export.json --write    # apply, verify, restore on failure
+pbpaste | pnpm studio:apply -            # read the export from stdin
+```
+
+What it does, in order:
+
+1. Requires exactly `qcStudio.schemaVersion` 3, `module: "dialogue"`,
+   `adapterId: "runespace"`, and `source.kind: "authoritative_sequence"` with a
+   `sequenceId` that exists in the catalog. Parsing is strict: unknown fields,
+   unknown beat kinds, and mixed beat shapes are refused, not ignored.
+2. Runs the same validation Studio runs before export (`validateDialogueDraft`):
+   every NPC, expression, background, item, quantity, and skill must exist in
+   the authoritative registries.
+3. Requires `sequence.npcId` to equal the sequence's current NPC. A different
+   NPC is an identity change, not a text edit, and is refused.
+4. If the export already equals the authoritative sequence it reports no change
+   and exits 0 — re-applying is idempotent.
+5. Locates the one `[DIALOGUE_IDS.*]` entry in `game/content/dialogue.ts`,
+   diffs the exported beats against the current ones, and splices only the
+   beats that changed: an edited argument of the existing helper call
+   (`wadeLocal(EXPRESSION_IDS.neutral, "…")`), a newly emitted helper call for an
+   added beat, or a removed element. Unchanged beats keep their source text,
+   including computed lines and comments. Prettier then formats the file, and
+   the command refuses if formatting would touch anything outside the target
+   entry.
+6. Dry run prints the target, a beat-level summary, and the diff. `--write`
+   writes that exact result, then loads it in a fresh process and requires the
+   target to resolve to exactly the exported beats and **every other sequence to
+   be unchanged**; otherwise it restores the original file and fails.
+
+It never edits Mission rewards, actions, requirements, progression, NPC
+identity, or any other sequence, and it ignores `sequence.title` and
+`sequence.action` (reporting that it did) because sequences carry neither.
+
+After a `--write`, run `pnpm typecheck && pnpm format:check && pnpm test:studio`
+(and `pnpm test` for the content suites) before opening the PR.
+
+It **refuses, changing nothing**, whenever it cannot be exact. Do those by hand
+using the contract below:
+
+- `source.kind: "new_draft"` — registering a stable ID is a content decision.
+- Editing the text of a beat whose copy is computed in source (e.g. a template
+  literal quoting a shop price from the registry): the export only has the
+  rendered string, and freezing it would silently break the single source of
+  truth for that number.
+- A beat the source writes as an inline object, a `{ ...helper(), … }` override,
+  or a spread such as `...rewardItemBeats(...)`, or any beat that carries a
+  source comment when it would be removed. Editing beats *around* those is fine.
+- A new or changed NPC beat for which no helper fixes that speaker, background,
+  and presentation mode. Add the helper by hand; the tool will not write an
+  inline beat.
+- Adding or changing a reward-total item beat (`isRewardTotal`).
+
+If a future export field is needed for deterministic application, version it in
+the export contract (`QC_STUDIO_SCHEMA_VERSION`) rather than adding heuristics to
+the tool. The implementation lives in
+`tools/qc-studio/adapters/runespace/dialogue-apply.ts` (plan and verify) and
+`dialogue-source.ts` (read-only source locator), with `scripts/studio-apply.mjs`
+as the entry point. It is not a general TypeScript rewriting framework: the
+TypeScript compiler is used only to find spans, and every edit is a text splice.
+
+### Export contract
+
+The rest of this section is the contract the command implements and the
+fallback for cases it refuses. The current V1 shape is:
 
 ```json
 {
   "qcStudio": {
-    "schemaVersion": 2,
+    "schemaVersion": 3,
     "module": "dialogue",
     "adapterId": "runespace"
   },
@@ -202,6 +279,8 @@ For `source.kind: "new_draft"`:
     repository's canonical inventory definitions and the quantity must be
     within that item's authoritative range (`1..stackLimit` for stacks, exactly
     `1` for unique items).
+  - `kind: "skill_xp"` — approved `skillId`, positive-integer `amount`,
+    `backgroundId`, and an optional caption `text`. Presentation only.
 - An item beat's `itemId`/`quantity` describe **presentation only**. Applying
   an export never authorizes item-granting gameplay code; reward/ownership
   changes require a separate approved issue and stay in RuneSpace's
@@ -241,6 +320,9 @@ normalized JSON.
 
 ### Safe application workflow
 
+`pnpm studio:apply` performs the mechanical steps below. Follow them by hand only
+for what it refuses.
+
 ```text
 receive QC Studio export
   → validate schema, module, and adapter
@@ -277,6 +359,8 @@ scene.
 
 The first version intentionally has no plugin loader, second game contract,
 database persistence, cloud sync, authentication/admin role, AI authoring,
-branching DSL, source mutation, or separate repository/package. A second
+branching DSL, source mutation from the Studio itself (the repository-side
+`pnpm studio:apply` command is the only source writer), or separate
+repository/package. A second
 substantial Studio module or a real second game consumer should provide the
 evidence for future extraction and shared-module design.
