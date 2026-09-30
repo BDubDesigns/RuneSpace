@@ -4,27 +4,32 @@ import { characters, type Character } from "@/db/rune-space";
 import { validateCharacterName } from "@/game/domain/character-name";
 import type { CharacterTarget } from "@/game/schemas/whispers";
 
-type Executor = Pick<typeof db, "select">;
-
 /** The one refusal for any character a social command cannot address. */
 export const CHARACTER_TARGET_NOT_FOUND = "Character not found.";
 
 /**
- * Resolve the other character named by a character-facing surface (#247): by
- * stable id from a chat sender or Whisper, or by public name from the
- * same-location profile and Nearby Players list. A name resolves only to a
- * character at the viewer's current location — the same boundary as the
- * profile it came from — so names are never a game-wide player lookup.
+ * Where a public name may resolve. `same-location` is the same-location
+ * profile and Nearby Players boundary, used for Block and Report by name;
+ * `anywhere` is the Whispers tab's exact-name start, which reaches any
+ * character by its current (globally unique) name, online or not.
+ */
+export type NameScope = "same-location" | "anywhere";
+
+/**
+ * Resolve the other character named by a social surface (#247): by stable id
+ * from a chat sender or Whisper, or by exact current name. Names match the
+ * folded unique key characters are stored under — never a prefix or a search
+ * — and, unless `names` is `anywhere`, only at the viewer's current location.
  * Undefined for anything else; callers answer with one generic refusal so a
- * guess reveals nothing.
+ * guess reveals nothing beyond whether that exact name exists.
  */
 export async function resolveCharacterTarget(
   target: CharacterTarget,
   viewer: Pick<Character, "currentLocationId">,
-  executor: Executor = db,
+  { names = "same-location" }: { names?: NameScope } = {},
 ): Promise<Character | undefined> {
   if ("characterId" in target) {
-    const [row] = await executor
+    const [row] = await db
       .select()
       .from(characters)
       .where(eq(characters.id, target.characterId))
@@ -33,13 +38,15 @@ export async function resolveCharacterTarget(
   }
   const validation = validateCharacterName(target.name);
   if (!validation.ok) return undefined;
-  const [row] = await executor
+  const [row] = await db
     .select()
     .from(characters)
     .where(
       and(
         eq(characters.normalizedName, validation.normalized),
-        eq(characters.currentLocationId, viewer.currentLocationId),
+        names === "anywhere"
+          ? undefined
+          : eq(characters.currentLocationId, viewer.currentLocationId),
       ),
     )
     .limit(1);

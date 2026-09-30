@@ -10,8 +10,9 @@ function formatTime(iso: string): string {
 /**
  * One chat message in a log (General, Trade, or a Whisper conversation). Plain
  * text, wrapped anywhere so a long word never overflows. Another player's
- * message has an actions toggle; when expanded, the owning view's actions
- * (Whisper, Report, Block — issue #247) sit under the body.
+ * message opens its actions from its sender's name or a "…" toggle; when
+ * expanded, the owning view's actions (Whisper, Report, Block — issue #247)
+ * sit under the body.
  */
 export function ChatMessageRow({
   id,
@@ -47,12 +48,26 @@ export function ChatMessageRow({
     >
       <div className="flex items-start gap-1">
         <p className="flex min-w-0 flex-1 flex-wrap items-baseline gap-x-2 text-xs text-[color:var(--rs-text-muted)]">
-          <span
-            className={`break-words font-semibold [overflow-wrap:anywhere] ${own ? "text-[color:var(--rs-accent-primary)]" : "text-[color:var(--rs-text-secondary)]"}`}
-          >
-            {senderName}
-            {own ? <span className="sr-only"> (you)</span> : null}
-          </span>
+          {onToggleActions ? (
+            // Tapping a name is the natural way in on a phone: it opens the
+            // same Whisper / Report / Block actions as the "…" control.
+            <button
+              aria-expanded={actionsOpen}
+              className="rs-focus break-words font-semibold text-[color:var(--rs-text-secondary)] underline decoration-dotted underline-offset-2 outline-none [overflow-wrap:anywhere] hover:text-[color:var(--rs-text-primary)]"
+              data-chat-sender=""
+              onClick={onToggleActions}
+              type="button"
+            >
+              {senderName}
+            </button>
+          ) : (
+            <span
+              className={`break-words font-semibold [overflow-wrap:anywhere] ${own ? "text-[color:var(--rs-accent-primary)]" : "text-[color:var(--rs-text-secondary)]"}`}
+            >
+              {senderName}
+              {own ? <span className="sr-only"> (you)</span> : null}
+            </span>
+          )}
           {promoted ? (
             <span className="font-display uppercase tracking-[0.12em] text-[color:var(--rs-chat-promoted-border)]">
               Promoted ad

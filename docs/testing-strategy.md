@@ -267,8 +267,9 @@ Hermes host.
   10-before/10-after window from the right feed, no unrelated Whisper leakage,
   same-account dedupe, Report + Block, and evidence surviving retention.
 - `tests/e2e/whispers-safety.spec.ts` proves with two real accounts at phone
-  and desktop widths: starting a Whisper from a chat sender and from the
-  same-location profile without leaving Play, live arrival with unread on the
+  and desktop widths: starting a Whisper from a chat sender (its name), from
+  the same-location profile, and by exact name with a character who is
+  elsewhere, offline, and silent in public, without leaving Play, live arrival with unread on the
   launcher and the Whispers tab, reading on one tab clearing the other, the
   Block / Report / Report + Block flows, blocked public messages disappearing
   for the blocker only, Blocked Players unblocking, and no horizontal overflow.

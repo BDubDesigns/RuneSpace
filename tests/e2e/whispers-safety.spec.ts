@@ -4,10 +4,10 @@ import { and, eq } from "drizzle-orm";
 import { db } from "@/db";
 import * as authSchema from "@/db/auth-schema";
 import * as rune from "@/db/rune-space";
-import { PORTRAIT_IDS } from "@/game/config/foundations";
 import * as characters from "@/server/characters";
 import * as ownership from "@/server/ownership";
-import { cleanupTestUser, createCharacterForUser } from "../integration/fixtures";
+import { LOCATION_IDS, PORTRAIT_IDS } from "@/game/config/foundations";
+import { cleanupTestUser, createCharacterForUser, createTestUser } from "../integration/fixtures";
 import { establishAuthenticatedSession, expect, openTestCharacter, test } from "./fixtures";
 import { populationDisclosure } from "./population-disclosure";
 import { captureReviewScreenshot } from "./review-screenshot";
@@ -181,7 +181,13 @@ async function whisperJourney(page: Page, width: number) {
   const playUrl = page.url();
   const dialog = await openChat(page);
   await expect(messageRow(dialog, `anyone selling ore ${tag}`)).toHaveCount(1);
-  await openMessageActions(dialog, bName, `anyone selling ore ${tag}`);
+  // Tapping the sender's name opens the same actions as the "…" control.
+  const sender = messageRow(dialog, `anyone selling ore ${tag}`).getByRole("button", {
+    name: bName,
+    exact: true,
+  });
+  await expect(sender).toHaveAttribute("aria-expanded", "false");
+  await sender.click();
   const actions = dialog.getByRole("group", { name: `Actions for ${bName}'s message` });
   await expect(actions.getByRole("button", { name: "Whisper" })).toBeVisible();
   await expect(actions.getByRole("button", { name: "Report" })).toBeVisible();
@@ -483,4 +489,93 @@ test("Report Message, Report + Block from a Whisper, and Report Player from a pr
     );
   expect(playerReports).toMatchObject([{ reason: "offensive_name_profile", evidence: null }]);
   await b.context.close();
+});
+
+test("a Whisper starts by exact name with a character who is elsewhere, offline, and silent in public", async ({
+  page,
+}, testInfo) => {
+  test.skip(testInfo.project.name !== "chromium", "covers the phone width from chromium");
+  await page.setViewportSize(WIDTHS[0]);
+  const tag = randomUUID().slice(0, 8);
+  const a = await signIn(page.context().browser()!, page.context(), "Pell");
+  const alt = await createCharacterForUser(
+    db,
+    rune,
+    ownership,
+    characters,
+    a.userId,
+    `Pell Alt ${tag.slice(0, 6)}`,
+    PORTRAIT_IDS.evaSalvageWelder,
+    { seedLegacyStarterCutter: false },
+  );
+  // Another account's character: never signed in, at another location, and
+  // with no public chat history — reachable only by its exact name.
+  const farUser = await createTestUser(db, authSchema, `far-${tag}`);
+  users.push(farUser);
+  const far = await createCharacterForUser(
+    db,
+    rune,
+    ownership,
+    characters,
+    farUser,
+    `Quill ${tag.slice(0, 6)}`,
+    PORTRAIT_IDS.evaSalvageWelder,
+    { seedLegacyStarterCutter: false },
+  );
+  await db
+    .update(rune.characters)
+    .set({ currentLocationId: LOCATION_IDS.abandonedProcessingYard })
+    .where(eq(rune.characters.id, far.id));
+
+  await openPlay(page, a.character.id);
+  const playUrl = page.url();
+  const dialog = await openChat(page);
+  await tab(dialog, "Whispers").click();
+  const start = dialog.getByRole("form", { name: "Start a Whisper" });
+  const nameInput = start.getByRole("textbox", { name: "Character name" });
+  const go = start.getByRole("button", { name: "Whisper" });
+  await expect(go).toBeDisabled();
+
+  // Clean refusals: an unknown name, a prefix, and your own character.
+  for (const [typed, refusal] of [
+    [`Nobody ${tag}`, "No character has that name."],
+    [far.displayName.slice(0, -1), "No character has that name."],
+    [alt.displayName, "You can't whisper your own characters."],
+  ] as const) {
+    await nameInput.fill(typed);
+    await go.click();
+    await expect(start.getByRole("alert")).toHaveText(refusal);
+  }
+  await expectNoHorizontalOverflow(page, dialog);
+  await captureReviewScreenshot(page, "issue-247-start-whisper-393.png");
+
+  // The exact name opens the conversation; nothing is saved until a Whisper is.
+  await nameInput.fill(far.displayName);
+  await go.click();
+  await expect(dialog.getByRole("log", { name: `Whispers with ${far.displayName}` })).toBeVisible();
+  const participants = () =>
+    db
+      .select()
+      .from(rune.whisperParticipants)
+      .where(eq(rune.whisperParticipants.characterId, far.id));
+  expect(await participants()).toHaveLength(0);
+  await sendWhisper(dialog, `found you by name ${tag}`);
+  const [participant] = await participants();
+  expect(participant?.lastReadSeq).toBe(0);
+  const [stored] = await db
+    .select()
+    .from(rune.chatMessages)
+    .where(
+      and(
+        eq(rune.chatMessages.conversationId, participant!.conversationId),
+        eq(rune.chatMessages.body, `found you by name ${tag}`),
+      ),
+    );
+  expect(stored).toMatchObject({ channel: "whisper", senderCharacterId: a.character.id });
+  // The conversation is listed, and Play never moved.
+  await dialog.getByRole("button", { name: "All Whispers" }).click();
+  await expect(
+    dialog.getByRole("button", { name: new RegExp(`^${far.displayName}`) }),
+  ).toBeVisible();
+  expect(page.url()).toBe(playUrl);
 });

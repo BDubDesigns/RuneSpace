@@ -14,9 +14,10 @@ import type { ChatSendBudget } from "@/game/schemas/chat";
 const MessageTextSchema = z.string().max(4_000);
 
 /**
- * The other character, as an existing character-facing surface knows it: a
- * chat sender or Whisper carries a character id; the same-location profile
- * and Nearby Players list deliberately expose only the public name.
+ * The other character, as a social surface knows it: a chat sender or Whisper
+ * carries a character id; the same-location profile, Nearby Players, and the
+ * Whispers tab's "Start a Whisper" name the character by its exact public
+ * name. Where a name may resolve is the server's decision per command.
  */
 export const CharacterTargetSchema = z.union([
   z.object({ characterId: z.string().uuid() }),

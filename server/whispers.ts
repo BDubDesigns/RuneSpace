@@ -55,6 +55,7 @@ export class WhisperError extends Error {
 }
 
 const SELF_REFUSAL = "You can't whisper your own characters.";
+const NO_SUCH_CHARACTER = "No character has that name.";
 const UNDELIVERABLE = "Your Whisper couldn't be delivered.";
 
 function toView(row: ChatMessage, recipientCharacterId: string): WhisperMessageView {
@@ -100,9 +101,13 @@ async function conversationIdFor(
 }
 
 /**
- * Resolve the character a character-facing surface wants to Whisper. Nothing
- * is persisted: a conversation begins with its first Whisper, so merely
- * opening one never makes contact.
+ * Resolve the character a player wants to Whisper: a chat sender, the
+ * same-location profile, or an exact character name typed in the Whispers
+ * tab. A Whisper may go to any character by name — nearby or not, online or
+ * not — so names resolve game-wide here (exact match only, never a search).
+ * Nothing is persisted: a conversation begins with its first Whisper, so
+ * merely opening one never makes contact, and a Block by the other account
+ * is not revealed here either.
  */
 export async function openWhisper(
   userId: string,
@@ -110,8 +115,8 @@ export async function openWhisper(
   target: CharacterTarget,
 ): Promise<OpenWhisperResult> {
   const me = await requirePlayableOwnedCharacter(userId, characterId);
-  const other = await resolveCharacterTarget(target, me);
-  if (!other) return { error: CHARACTER_TARGET_NOT_FOUND };
+  const other = await resolveCharacterTarget(target, me, { names: "anywhere" });
+  if (!other) return { error: NO_SUCH_CHARACTER };
   if (other.playerAccountId === me.playerAccountId) return { error: SELF_REFUSAL };
   return { status: "ready", peer: await peerOf(me, other) };
 }

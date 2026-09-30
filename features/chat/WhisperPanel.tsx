@@ -1,7 +1,7 @@
 "use client";
 
 import { ChevronLeft } from "lucide-react";
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { ActionButton } from "@/components/ui/ActionButton";
 import { Feedback } from "@/components/ui/Feedback";
@@ -54,11 +54,85 @@ function formatWhen(iso: string): string {
     : date.toLocaleDateString([], { month: "short", day: "numeric" });
 }
 
+/**
+ * Start a Whisper with any character by exact name — nearby or not, online
+ * or not. The server resolves the name; nothing is saved until the first
+ * Whisper is sent. Deliberately one exact name, never a search or directory.
+ */
+function StartWhisperForm() {
+  const { startWhisper } = useChat();
+  const [name, setName] = useState("");
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState<string>();
+  const inputId = "start-whisper-name";
+
+  async function submit(event: FormEvent) {
+    event.preventDefault();
+    const target = name.trim();
+    if (!target || pending) return;
+    setPending(true);
+    setError(undefined);
+    const refusal = await startWhisper({ name: target });
+    setPending(false);
+    if (refusal) setError(refusal);
+  }
+
+  return (
+    <form
+      aria-labelledby="start-whisper-heading"
+      className="space-y-2 border border-[color:var(--rs-border-structural)] bg-[color:var(--rs-surface-panel)] p-3"
+      data-start-whisper=""
+      onSubmit={(event) => void submit(event)}
+    >
+      <h3
+        className="font-display text-xs uppercase tracking-[0.14em] text-[color:var(--rs-text-secondary)]"
+        id="start-whisper-heading"
+      >
+        Start a Whisper
+      </h3>
+      <div className="flex flex-wrap gap-2">
+        <label className="sr-only" htmlFor={inputId}>
+          Character name
+        </label>
+        <input
+          aria-describedby={error ? `${inputId}-error` : undefined}
+          aria-invalid={error ? true : undefined}
+          autoCapitalize="words"
+          autoComplete="off"
+          className="rs-bevel rs-focus min-h-[var(--rs-touch-target)] min-w-0 flex-1 border bg-[color:var(--rs-surface-control)] px-3 text-sm text-[color:var(--rs-text-primary)] placeholder:text-[color:var(--rs-text-muted)] focus:border-[color:var(--rs-accent-primary)]"
+          id={inputId}
+          maxLength={64}
+          onChange={(event) => {
+            setName(event.target.value);
+            setError(undefined);
+          }}
+          placeholder="Exact character name"
+          spellCheck={false}
+          value={name}
+        />
+        <ActionButton className="px-4" disabled={!name.trim()} loading={pending} type="submit">
+          Whisper
+        </ActionButton>
+      </div>
+      {error ? (
+        <p
+          className="text-sm text-[color:var(--rs-accent-danger)]"
+          id={`${inputId}-error`}
+          role="alert"
+        >
+          {error}
+        </p>
+      ) : null}
+    </form>
+  );
+}
+
 function WhisperInboxList() {
   const { characterId, inbox, setView } = useChat();
   const conversations = inbox?.conversations ?? [];
   return (
     <div className="space-y-3" data-whisper-inbox="">
+      <StartWhisperForm />
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h3 className="font-display text-xs uppercase tracking-[0.14em] text-[color:var(--rs-text-secondary)]">
           Conversations
@@ -75,8 +149,8 @@ function WhisperInboxList() {
         <p className="text-sm text-[color:var(--rs-text-muted)]">Loading Whispers…</p>
       ) : conversations.length === 0 ? (
         <p className="text-sm text-[color:var(--rs-text-muted)]">
-          No Whispers yet. To start one, open a player&apos;s message actions in General or Trade,
-          or their profile from the characters at your location.
+          No Whispers yet. Start one above with a character&apos;s exact name, or tap a
+          player&apos;s name in General or Trade.
         </p>
       ) : (
         <ul

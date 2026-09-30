@@ -256,9 +256,13 @@ item.
 - **Identity:** player-facing identity is character-to-character; safety
   identity is the account underneath. Whisper participants, Blocks, and
   Reports store stable character and account ids, never names, so renames and
-  character switching change nothing. A character-facing surface names its
-  target by stable id (a chat sender) or by public name (the same-location
-  profile); `server/social-targets.ts` resolves both with one generic refusal.
+  character switching change nothing. A surface names its target by stable id
+  (a chat sender) or by exact public name; `server/social-targets.ts` resolves
+  both. A name is an exact match on the folded unique key, never a prefix,
+  search, or directory. Opening a Whisper resolves names game-wide (the
+  Whispers tab's "Start a Whisper" reaches any character, nearby or not,
+  online or not); Block and Report by name keep the same-location profile's
+  boundary.
 - **Whispers:** `server/whispers.ts`. A Whisper is a `whisper` row in
   `chat_messages` bound to one `whisper_conversations` pair (unique
   `participant_key` of the two character ids), so it shares the immutable

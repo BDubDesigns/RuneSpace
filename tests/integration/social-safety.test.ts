@@ -174,28 +174,26 @@ suite("issue #247 Whispers, Block, and Report (real PostgreSQL)", () => {
       }
       expect(
         await whispers.openWhisper(a.userId, a.character.id, { name: "NoSuchCaptain" }),
-      ).toEqual({ error: "Character not found." });
-      // A name is the same-location profile's identity, never a game-wide
-      // lookup: elsewhere, it names no one for Whisper, Block, or Report.
+      ).toEqual({ error: "No character has that name." });
+      // Exact names only: never a prefix or search.
+      expect(
+        await whispers.openWhisper(a.userId, a.character.id, {
+          name: b.character.displayName.slice(0, -1),
+        }),
+      ).toEqual({ error: "No character has that name." });
+      // Block and Report by name keep the same-location profile's boundary.
       const far = await player();
       await db
         .update(rune.characters)
         .set({ currentLocationId: LOCATION_IDS.abandonedProcessingYard })
         .where(eq(rune.characters.id, far.character.id));
       const byName = { name: far.character.displayName };
-      expect(await whispers.openWhisper(a.userId, a.character.id, byName)).toEqual({
-        error: "Character not found.",
-      });
       expect(await blocks.blockPlayer(a.userId, a.character.id, byName)).toEqual({
         error: "Character not found.",
       });
       expect(
         await reports.reportPlayer(a.userId, a.character.id, { target: byName, reason: "other" }),
       ).toEqual({ error: "Character not found." });
-      // A chat sender's stable id still reaches them.
-      expect(
-        await whispers.openWhisper(a.userId, a.character.id, { characterId: far.character.id }),
-      ).toMatchObject({ status: "ready" });
       const conversations = await db
         .select()
         .from(rune.whisperParticipants)
@@ -205,6 +203,61 @@ suite("issue #247 Whispers, Block, and Report (real PostgreSQL)", () => {
         conversations: [],
         unreadTotal: 0,
       });
+    });
+
+    it("starts by exact name with a remote, offline character who never spoke publicly", async () => {
+      const a = await player();
+      const far = await player();
+      // Elsewhere, with no open stream and no public chat history.
+      await db
+        .update(rune.characters)
+        .set({ currentLocationId: LOCATION_IDS.abandonedProcessingYard })
+        .where(eq(rune.characters.id, far.character.id));
+      const typed = far.character.displayName.toUpperCase();
+      expect(await whispers.openWhisper(a.userId, a.character.id, { name: typed })).toEqual({
+        status: "ready",
+        peer: {
+          characterId: far.character.id,
+          name: far.character.displayName,
+          blockedByMe: false,
+        },
+      });
+      // Resolving a name persists nothing; the first Whisper does.
+      const participants = () =>
+        db
+          .select()
+          .from(rune.whisperParticipants)
+          .where(eq(rune.whisperParticipants.characterId, far.character.id));
+      expect(await participants()).toHaveLength(0);
+      const message = whispered(
+        await whispers.sendWhisper(a.userId, a.character.id, {
+          recipientCharacterId: far.character.id,
+          text: "found you by name",
+        }),
+      );
+      expect(await participants()).toHaveLength(1);
+      const inbox = await whispers.readWhisperInbox(far.userId, far.character.id);
+      expect(inbox.unreadTotal).toBe(1);
+      expect(inbox.conversations[0]!.lastMessage.id).toBe(message.id);
+
+      // Your own characters are refused by name too.
+      const alt = await altOf(a.userId);
+      expect(
+        await whispers.openWhisper(a.userId, a.character.id, { name: alt.displayName }),
+      ).toEqual({ error: "You can't whisper your own characters." });
+
+      // A Block is still never revealed: the name resolves, the send refuses
+      // generically.
+      await blocks.blockPlayer(far.userId, far.character.id, { characterId: a.character.id });
+      expect(
+        await whispers.openWhisper(a.userId, a.character.id, { name: far.character.displayName }),
+      ).toMatchObject({ status: "ready", peer: { blockedByMe: false } });
+      expect(
+        await whispers.sendWhisper(a.userId, a.character.id, {
+          recipientCharacterId: far.character.id,
+          text: "still there?",
+        }),
+      ).toMatchObject({ status: "refused", error: "Your Whisper couldn't be delivered." });
     });
 
     it("delivers after commit to both participants only; offline recipients read history", async () => {
