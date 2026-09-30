@@ -8,6 +8,7 @@ import { RuneSpaceBrand } from "@/components/branding/RuneSpaceBrand";
 import { SignOutButton } from "@/features/auth/SignOutButton";
 import { PlayBoundaryTestTrigger } from "@/features/diagnostics/PlayBoundaryTestTrigger";
 import { LOCAL_PLACE_PARAM } from "@/features/local-places/navigation";
+import { PublicChat } from "@/features/chat/PublicChat";
 import { ChatSocialDrawer } from "@/features/social/ChatSocialDrawer";
 import { SocialLauncher } from "@/features/social/ChatSocialLauncher";
 import { SocialProvider } from "@/features/social/SocialContext";
@@ -183,7 +184,8 @@ export function PlayScreen({
     <PlayProvider initialState={initialState}>
       {/* Chat/Social (#245) is a utility over Play, like Inventory: its
           launcher floats above the footer and its Drawer opens over the
-          current surface without navigating. It never feeds Play state. */}
+          current surface without navigating. It never feeds Play state; a
+          promoted Trade ad (#246) only asks Play to re-read its Credits. */}
       <SocialProvider characterId={initialState.characterId}>
         <GameShell
           bottomNav={<PlayFooter />}
@@ -198,7 +200,7 @@ export function PlayScreen({
             onMapExit={() => router.replace(pathname)}
             surface={mapActive ? "map" : "primary"}
           />
-          <ChatSocialDrawer />
+          <ChatSocialDrawer conversations={<PublicChat characterId={initialState.characterId} />} />
         </GameShell>
       </SocialProvider>
     </PlayProvider>

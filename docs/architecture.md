@@ -195,6 +195,54 @@ tab hide/show and a network drop. The response already sends
 deployment configuration only when a failure is reproduced unchanged and
 isolated to a deterministic proxy or configuration defect.
 
+## Public chat: General and Trade (Issue #246)
+
+General and Trade are the two game-wide public channels, built on the
+realtime substrate above. There is no Local/Nearby/Zone channel.
+
+- **Rules:** `game/domain/chat.ts` owns the content contract (trim, refuse
+  empty, 280 code points, plain text), the shared send budget, the composer's
+  pressure bands, and the promoted-ad cooldown. `CHAT_POLICY` there is the one
+  home of every tunable number (length, page size, 90-day retention, the
+  10-second window with General 5 / Trade 3, ad price and cooldown).
+- **Contract:** `game/schemas/chat.ts` holds the request schemas, the
+  `ChatMessageView` a viewer receives (no account identity ever leaves the
+  server), and registers `"chat.message"` on `RealtimeEventMap` by module
+  augmentation, so the substrate still imports no chat model.
+- **Persistence:** `chat_messages` (`db/rune-space.ts`) holds one immutable row
+  per successful send with the server-derived sender account, character, and
+  name at send time. `seq` (an identity column) is the feed order and the
+  "older than" cursor, so equal timestamps never skip or repeat a row. A
+  promoted Trade ad is one `trade` row carrying the price it paid; the General
+  feed reads it too. The row is also the send: the rolling window and the ad
+  cooldown are read from it, never stored twice.
+- **Commands and reads:** `server/chat.ts`. Every entry re-runs
+  `requirePlayableOwnedCharacter`. A send (`sendChatMessageAction`,
+  `postPromotedTradeAdAction`) takes a per-account transaction-scoped advisory
+  lock, so every tab, device, and character of one account shares one
+  serialized budget and one ad cooldown; content, the severe-term guardrail,
+  the budget, the cooldown, and the Credit charge are all decided inside that
+  transaction, and the charge and the row commit together or not at all. Only
+  after commit does it publish `"chat.message"` to everyone. History is the
+  `GET /api/chat` route. Both halves pass through a viewer seam: reads through
+  `visibleToViewer` (in SQL, so pages stay full) and live deliveries through
+  `publishChatMessage`. Block (#247) must suppress blocked senders at both,
+  server-side, because no account identity reaches the browser.
+- **Retention:** each send deletes at most a bounded batch of rows older than
+  90 days (`SKIP LOCKED`, so concurrent sends never contend), and reads never
+  return expired rows even before they are pruned. No scheduler is needed.
+- **Guardrail:** `server/chat-guardrail.ts` refuses a message containing a
+  listed severe slur before persistence or delivery. It matches whole folded
+  tokens only, keeps the list as SHA-256 digests, and records nothing about the
+  sender; it is not a toxicity classifier or a sanction.
+- **Browser:** `features/chat/PublicChat.tsx` renders inside the Chat/Social
+  Drawer (Play composes it into `ChatSocialSurface`'s conversation region).
+  `features/chat/chat-feed.ts` merges every source — latest page, older page,
+  delivery, reconnect re-read — by message id in `seq` order, restarts from the
+  latest page when a reconnect cannot reach what it holds, and counts the
+  authoritative send budget down locally with no polling. General and Trade
+  raise no attention or unread count.
+
 ## Where minigames fit
 
 Phaser experiences live in `minigames/`, isolated from the main React tree. They communicate through small typed contracts; any progression result is server-validated. They are not part of this foundation issue.

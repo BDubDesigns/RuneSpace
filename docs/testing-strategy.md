@@ -51,7 +51,8 @@ small number of critical mobile player journeys.
   Runs, Cargo Hold, Deep Jag, Fabrication (Tier 1, and Fabrication 5 and 8 with the Loadsteel
   Cutter, the Freight Harness and their Missions — #233), Holo Hollow, Rusk Recovery, Admin Operator, Sign-out,
   Account News, Account Verification, Gameplay Access, and the Chat/Social shell and
-  realtime stream (`social-shell`, #245). It intentionally excludes noncanonical `smoke`, `ownership`,
+  realtime stream (`social-shell`, #245), and General/Trade public chat
+  (`public-chat`, #246). It intentionally excludes noncanonical `smoke`, `ownership`,
   `design-system`, `work-orders`, `public-*`, and QC Studio specs. It:
   - requires Node 22.x
   - requires a localhost-only disposable PostgreSQL database (refuses remote)
@@ -220,6 +221,33 @@ Hermes host.
   ends streams through the local-E2E-only `POST /api/e2e/realtime` hook instead
   of waiting out the 5-minute lifetime, and reaches the seam from the page's
   React fiber because no production feature raises attention yet.
+
+### Issue #246 public chat coverage
+
+- `tests/unit/chat.test.ts` owns the content contract (trim, empty, 280 code
+  points, matching the database CHECK), the shared budget (General 5 / Trade 3
+  on one count), the composer bands, the ad cooldown, the severe-term
+  guardrail's whole-token matching against a stand-in term, and the browser
+  feed's merge, ordering, gap restart, and dual-feed ad projection.
+- `tests/integration/chat.test.ts` proves against PostgreSQL: server-derived
+  immutable identity, foreign-character / gated / anonymous refusals, the
+  budget across characters and concurrent requests, the promoted ad's atomic
+  charge, one record in both feeds, its one shared send and account-wide
+  cooldown (including a concurrent race), refused ads spending nothing,
+  guardrail refusals persisting and delivering nothing, publish-after-commit,
+  stable seq pagination across identical timestamps, and bounded 90-day
+  retention.
+- `tests/e2e/public-chat.spec.ts` proves at phone and desktop widths: switching
+  channels in place, own/long messages without horizontal overflow, the
+  promoted ad's treatment and its one record in both feeds, the 280-character
+  and rate states counting down with no request, another tab's sends
+  correcting the indicator through the server's refusal, load-older, live
+  delivery, and a reconnect catching a missed message without duplicates. Each
+  journey signs in a fresh account (its own budget) and looks only for its own
+  tagged messages, because the feeds are game-wide. Canonical runs the
+  chromium project only, so the journeys set the phone (393px) and desktop
+  widths themselves; the multi-width ones skip the mobile project so the
+  shared feed is never seeded twice at once.
 
 ## What to test when systems arrive
 For progression-sensitive systems, prioritize:

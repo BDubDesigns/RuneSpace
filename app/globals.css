@@ -119,6 +119,17 @@
      (#245) reuses it for its attention state: the same account-level
      "something to notice" meaning, not a gameplay one. */
   --rs-glow-news-unread: 0 0 6px rgb(75 216 245 / 0.65), 0 0 18px rgb(75 216 245 / 0.32);
+  /* Public chat (#246). The composer's send-pressure indicator runs green →
+     yellow → orange → red as the account's shared rolling send count nears a
+     channel's limit; orange exists only for this scale. A promoted Trade ad
+     reads a little brighter than ordinary chat without becoming an alert. */
+  --rs-chat-pressure-clear: var(--rs-accent-success);
+  --rs-chat-pressure-low: var(--rs-accent-mining);
+  --rs-chat-pressure-high: #f59a51;
+  --rs-chat-pressure-full: var(--rs-accent-danger);
+  --rs-chat-promoted-border: var(--rs-accent-primary);
+  --rs-chat-promoted-surface: var(--rs-accent-primary-subtle);
+  --rs-chat-promoted-glow: 0 0 14px rgb(75 216 245 / 0.22);
   /* Semantic mission guidance (issue #124): one high-contrast neon-green
      treatment marks "this interaction advances your active mission". It is a
      distinct guidance affordance — not success/error state — and stays

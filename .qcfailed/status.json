@@ -4,17 +4,17 @@
   "workState": "active",
   "currentFocus": "Preparing the October 27 Soft Alpha: verified players can reserve characters; account-level Early Access and a closed-by-default public gameplay gate control when play begins.",
   "currentChange": {
-    "summary": "Map travel UX: a sticky destination panel keeps the Walk button in reach, edge arrows share one shape and point toward off-screen Mission targets, and the Journey shows its newest event first.",
+    "summary": "General and Trade chat: persisted public channels in the Chat/Social drawer, a shared account-wide send limit with a live composer indicator, and 50-Credit promoted Trade ads.",
     "stage": "review",
-    "pullRequestNumber": 252
+    "pullRequestNumber": 260
   },
   "latestCompleted": {
-    "summary": "The Refining console lists what you can refine now as item tiles, with every known recipe on a separate Recipes view, and Max and Auto-discard Slag visibly latch when on.",
-    "date": "2026-09-28",
-    "url": "https://github.com/BDubDesigns/RuneSpace/pull/250"
+    "summary": "Refining and Practice Welding can auto-discard byproduct Slag through one character-wide setting, without reserving inventory space for it.",
+    "date": "2026-09-29",
+    "url": "https://github.com/BDubDesigns/RuneSpace/pull/259"
   },
-  "nextStep": "Human review and phone playtest of the Map destination panel, Mission edge arrows, and newest-first Journey; public gameplay remains closed until an operator deliberately opens it.",
-  "lastMeaningfulUpdate": "2026-09-28",
+  "nextStep": "Human review and phone playtest of General and Trade chat; its community rules and safety disclosure (#248) are still to ship before chat opens publicly.",
+  "lastMeaningfulUpdate": "2026-09-29",
   "highlights": [
     {
       "summary": "Deep Jag is playable: brace the cave-in for Tansy, mine Galvanite behind it, and refine Galvanic Stock and Galvaferrite at the Processing Yard.",

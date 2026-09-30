@@ -510,13 +510,17 @@ describe("Chat/Social shell presentation", () => {
   });
 
   it("pins actionable cards above ordinary conversation content", () => {
-    const empty = renderToStaticMarkup(React.createElement(ChatSocialSurface, { cards: [] }));
+    const conversations = React.createElement("p", null, "composed conversations");
+    const empty = renderToStaticMarkup(
+      React.createElement(ChatSocialSurface, { cards: [], conversations }),
+    );
     expect(empty).not.toContain("data-social-pinned-cards");
     expect(empty).toContain('aria-label="Conversations"');
-    expect(empty).toContain("Chat coming soon.");
+    expect(empty).toContain("composed conversations");
 
     const withCards = renderToStaticMarkup(
       React.createElement(ChatSocialSurface, {
+        conversations,
         cards: [
           {
             key: "trade-request:1",

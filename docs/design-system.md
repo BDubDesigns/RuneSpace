@@ -63,8 +63,20 @@ small count badge (`9+` beyond nine) and the static `--rs-glow-news-unread`
 halo on an unclipped wrapper — with the count folded into the accessible name
 ("Chat, 2 items need attention"). A later drag-and-snap would only change the
 stored `{ side, y }`; a docked desktop presentation would render the same
-`ChatSocialSurface` without depending on the floating button. Until #246 ships,
-the Drawer's conversation region says "Chat coming soon."
+`ChatSocialSurface` without depending on the floating button.
+
+General and Trade (#246) fill the Drawer's conversation region as two tabs in
+the Inventory/Equipment tab style, above a fixed-height message log and the
+composer. The composer states the 280-character limit with a live counter
+(and "N over" instead of silently cutting text), and a send-pressure indicator
+of one segment per allowed send: `--rs-chat-pressure-clear` (green),
+`-low` (yellow), `-high` (orange), and `-full` (red), where red disables Send
+and reads "Slow down · Ns". The label text always carries the state, so color
+only supplements it. Trade's **Promote** is a latched toggle (`secondary` off,
+`primary` on) that turns Send into "Post ad · 50 Credits". A promoted ad is
+slightly larger text on `--rs-chat-promoted-surface` with a
+`--rs-chat-promoted-border` rim and soft `--rs-chat-promoted-glow`, labelled
+"Promoted ad" — brighter than ordinary chat, never an alert.
 
 Location, Map, and Journey are separate compositions: Location presents the
 stationary scene, activity, and same-location population/profile flow; Map is
