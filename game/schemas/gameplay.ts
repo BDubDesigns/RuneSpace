@@ -192,8 +192,11 @@ export const WorkOrderCommandRequestSchema = z.object({
   characterId: z.string().uuid(),
 });
 
-/** The persistent per-character Slag preference. */
-export const PracticeSlagPreferenceRequestSchema = z.object({
+/**
+ * The character-wide Auto-discard Slag preference (#256), shared by Practice
+ * Welding and Refining.
+ */
+export const AutoDiscardSlagPreferenceRequestSchema = z.object({
   characterId: z.string().uuid(),
   autoDiscardSlag: z.boolean(),
 });

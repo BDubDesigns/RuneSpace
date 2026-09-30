@@ -38,7 +38,13 @@ import {
 import { deriveMissionGuidanceTargets } from "@/game/domain/missions";
 import type { RefiningRunAttempt } from "@/server/refining";
 import type { RefiningRecipeProjection } from "@/server/play";
-import { refreshPlayAction, startRefiningAction, stopRefiningAction } from "@/server/actions";
+import {
+  refreshPlayAction,
+  setAutoDiscardSlagPreferenceAction,
+  startRefiningAction,
+  stopRefiningAction,
+} from "@/server/actions";
+import { AutoDiscardSlagToggle } from "@/features/shared/AutoDiscardSlagToggle";
 import { reportClientDiagnostic } from "@/features/diagnostics/client";
 import { usePlay } from "@/features/play/PlayContext";
 
@@ -213,7 +219,7 @@ export function RefiningConsole() {
   const [now, setNow] = useState(Date.now());
   const [, startTransition] = useTransition();
   const [recovery, setRecovery] = useState<(() => void) | undefined>();
-  const [pendingCommand, setPendingCommand] = useState<"start" | "stop" | "refresh">();
+  const [pendingCommand, setPendingCommand] = useState<"start" | "stop" | "refresh" | "slag">();
   const observedAttempts = useRef(refiningRun.attempts);
   const observedSequence = useRef(latestRefiningAttempt(refiningRun.recentAttempts)?.sequence);
   const [feedback, setFeedback] = useState<{ sequence: number; attempts: number }>();
@@ -274,7 +280,7 @@ export function RefiningConsole() {
   }
 
   function runForeground(
-    intent: "start" | "stop" | "refresh",
+    intent: "start" | "stop" | "refresh" | "slag",
     action: (id: string) => ReturnType<typeof refreshPlayAction>,
   ) {
     enqueueForeground(() => {
@@ -495,6 +501,22 @@ export function RefiningConsole() {
               Refresh status
             </ActionButton>
           </div>
+          {/* The character's shared Slag preference (#256), the same value the
+              Practice Welding toggle reads and writes. It covers only Slag a
+              failed attempt leaves behind: a deliberate Slag recipe's output
+              and a Galvaferrite failure's returned input are never affected. */}
+          <AutoDiscardSlagToggle
+            autoDiscardSlag={state.autoDiscardSlag}
+            data-refining-slag-toggle
+            disabled={foregroundBusy && pendingCommand !== "slag"}
+            hint="Applied to Slag from failed attempts"
+            loading={foregroundBusy && pendingCommand === "slag"}
+            onToggle={(next) =>
+              runForeground("slag", (characterId) =>
+                setAutoDiscardSlagPreferenceAction({ characterId, autoDiscardSlag: next }),
+              )
+            }
+          />
           {isActive ? (
             <div>
               <StatusMeter
@@ -545,6 +567,14 @@ export function RefiningConsole() {
               {/* One tile per awarded item, from the attempt's own awards: a
                   Galvaferrite failure hands back one input rather than producing
                   Slag, so nothing here may assume which item appears (#209). */}
+              {/* Discarded Slag never reached inventory (#256), so it is said in
+                  words rather than shown as a carried-item tile. */}
+              {latestAttempt.discarded?.length ? (
+                <p className="mt-2 text-sm text-[color:var(--rs-text-secondary)]">
+                  {describeQuantities(latestAttempt.discarded, ", ")} discarded, not added to your
+                  inventory
+                </p>
+              ) : null}
               <div className="mt-3 grid max-w-sm grid-cols-2 gap-2 sm:grid-cols-3">
                 {latestAttempt.awarded.map((award) => (
                   <ItemVisual

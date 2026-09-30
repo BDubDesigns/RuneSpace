@@ -27,6 +27,7 @@ const slag = balance.items.slag.itemId;
 function failedAttempt(
   consumed: readonly { itemId: string; quantity: number }[],
   awarded: readonly { itemId: string; quantity: number }[],
+  discarded?: readonly { itemId: string; quantity: number }[],
 ): RefiningRunAttempt {
   return {
     sequence: 1,
@@ -36,12 +37,39 @@ function failedAttempt(
     thresholdBasisPoints: 4_000,
     consumed,
     awarded,
+    ...(discarded ? { discarded } : {}),
     xpAwarded: 3,
     durationTicks: 7,
   };
 }
 
 describe("a failed Refining attempt says what it did", () => {
+  it("says discarded Slag was discarded, never produced or carried (#256)", () => {
+    const shaleIn = [{ itemId: shale, quantity: 2 }];
+    // Auto-discard On: nothing reached inventory.
+    expect(
+      describeFailureOutcome(failedAttempt(shaleIn, [], [{ itemId: slag, quantity: 1 }])),
+    ).toBe("1 Slag discarded");
+    // Partial room: what was kept is produced, the overflow is discarded.
+    expect(
+      describeFailureOutcome(
+        failedAttempt(
+          [{ itemId: galvanite, quantity: 2 }],
+          [{ itemId: slag, quantity: 1 }],
+          [{ itemId: slag, quantity: 1 }],
+        ),
+      ),
+    ).toBe("1 Slag produced, 1 Slag discarded");
+  });
+
+  it("reads an attempt saved before discarding existed as one that discarded nothing", () => {
+    expect(
+      describeFailureOutcome(
+        failedAttempt([{ itemId: shale, quantity: 2 }], [{ itemId: slag, quantity: 1 }]),
+      ),
+    ).not.toContain("discarded");
+  });
+
   it("calls Slag from a ruined Ferrite pour produced, not returned", () => {
     expect(
       describeFailureOutcome(

@@ -54,6 +54,12 @@ export function RefiningRunPanel({ run }: { run: RefiningRunState }) {
           label: `${itemName(itemId)} gained`,
           value: quantity,
         })),
+        // Byproduct Slag that was produced but never carried (#256), kept
+        // apart from "gained" so a discarded Slag is not counted as carried.
+        ...Object.entries(run.outputsDiscarded).map(([itemId, quantity]) => ({
+          label: `${itemName(itemId)} discarded`,
+          value: quantity,
+        })),
         { label: "Refining XP", value: run.xpGained },
       ]}
       title="This refining run"

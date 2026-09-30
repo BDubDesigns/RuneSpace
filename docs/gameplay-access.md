@@ -85,8 +85,9 @@ actions and their seams:
 | Missions | `acceptMissionAction`, `completeMissionAction`, `acknowledgeMissionConversationAction` | lock + reconcile |
 | Mining | `startMiningAction`, `stopMiningAction`, `loadPowerCellAction` | lock + reconcile |
 | Refining | `startRefiningAction`, `stopRefiningAction` | lock + reconcile |
+| Character preferences | `setAutoDiscardSlagPreferenceAction` (shared by Practice and Refining) | lock + reconcile |
 | Repair Welding | `startWeldingAction`, `stopWeldingAction`, `contributeRepairMaterialsAction` | lock + reconcile |
-| Practice | `startPracticeWeldingAction`, `stopPracticeWeldingAction`, `finishCurrentPracticeWeldAction`, `setPracticeSlagPreferenceAction`, `claimCleanPassAction` | lock + reconcile |
+| Practice | `startPracticeWeldingAction`, `stopPracticeWeldingAction`, `finishCurrentPracticeWeldAction`, `claimCleanPassAction` | lock + reconcile |
 | Work Orders | `acceptWorkOrderAction`, `startWorkOrderWeldingAction`, `stopWorkOrderWeldingAction`, `refreshWorkOrderBoardAction` | lock + reconcile |
 | Cargo Hold | `depositCargoStackAction`, `withdrawCargoStackAction`, `depositCargoUniqueItemAction`, `withdrawCargoUniqueItemAction` | lock + reconcile |
 | Inventory / Equipment | `discardInventoryStackAction`, `equipEquipmentAction`, `unequipEquipmentAction` | lock + reconcile |

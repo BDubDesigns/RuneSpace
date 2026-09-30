@@ -344,37 +344,3 @@ export async function finishCurrentPracticeWeld(
     now,
   );
 }
-
-/**
- * Set the persistent per-character Slag preference.
- *
- * Read at each weld's completion, so flipping it mid-weld applies to the weld
- * that is finishing. It is a preference, not progression: changing it never
- * touches the run, the partial weld, or the action.
- */
-export async function setPracticeSlagPreference(
-  userId: string,
-  characterId: string,
-  autoDiscardSlag: boolean,
-  now = new Date(),
-  random: MiningRandom = defaultMiningRandom(),
-): Promise<PlayGameplayState> {
-  return withResolvedOwnedCharacter(
-    userId,
-    characterId,
-    createPlayResolver(random),
-    async (transaction, context) => {
-      await ensurePlayProvisioning(transaction, context.character.id);
-      if (!(await loadPracticeUnlocked(transaction, context.character.id))) {
-        return stateWith(transaction, context.character.id, now, "practice_locked");
-      }
-      await ensurePracticeState(transaction, context.character.id);
-      await transaction
-        .update(characterPracticeWelds)
-        .set({ autoDiscardSlag, updatedAt: now })
-        .where(eq(characterPracticeWelds.characterId, context.character.id));
-      return stateWith(transaction, context.character.id, now);
-    },
-    now,
-  );
-}

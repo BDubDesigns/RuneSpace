@@ -272,6 +272,7 @@ function measureRefiningRun(refiningLevel, shaleStacks, slotsFree) {
   let blocked = 0;
   for (let trial = 0; trial < TRIALS; trial += 1) {
     const result = resolveRefining({
+      autoDiscardSlag: false,
       elapsedTicks: 1_000_000,
       snapshot: {
         refiningLevel,

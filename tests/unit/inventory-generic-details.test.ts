@@ -62,7 +62,6 @@ function baseState(inventory: PlayGameplayState["inventory"]): PlayGameplayState
       scrapAvailable: 0,
       scrapPerWeld: 2,
       affordableWelds: 0,
-      autoDiscardSlag: false,
       finishCurrentWeld: false,
       run: {
         selection: 1,
@@ -123,12 +122,14 @@ function baseState(inventory: PlayGameplayState["inventory"]): PlayGameplayState
       xpGained: 0,
       recentAttempts: [],
     },
+    autoDiscardSlag: false,
     refiningRun: {
       selection: 1,
       attempts: 0,
       successes: 0,
       failures: 0,
       outputsGained: {},
+      outputsDiscarded: {},
       inputsConsumed: {},
       xpGained: 0,
       recentAttempts: [],

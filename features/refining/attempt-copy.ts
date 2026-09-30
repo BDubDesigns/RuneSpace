@@ -32,14 +32,20 @@ export function describeQuantities(
  * appears among this attempt's own consumed inputs came back and anything else
  * was made — no recipe lookup, and a future failure shape that does both at
  * once reads correctly without another branch here.
+ *
+ * Byproduct Slag that was not carried (#256) is a third thing: `awarded` is
+ * only what reached inventory, and `discarded` is what did not. It is worded as
+ * discarded so a discarded Slag is never read as carried.
  */
 export function describeFailureOutcome(attempt: RefiningRunAttempt): string {
   const consumedItemIds = new Set(attempt.consumed.map((input) => input.itemId));
   const returned = attempt.awarded.filter((award) => consumedItemIds.has(award.itemId));
   const produced = attempt.awarded.filter((award) => !consumedItemIds.has(award.itemId));
+  const discarded = attempt.discarded ?? [];
   const clauses: string[] = [];
   if (produced.length > 0) clauses.push(`${describeQuantities(produced, ", ")} produced`);
   if (returned.length > 0) clauses.push(`${describeQuantities(returned, ", ")} returned`);
+  if (discarded.length > 0) clauses.push(`${describeQuantities(discarded, ", ")} discarded`);
   return clauses.length > 0 ? clauses.join(", ") : "nothing recovered";
 }
 

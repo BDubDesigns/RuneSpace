@@ -6,6 +6,7 @@ import { Feedback } from "@/components/ui/Feedback";
 import { MissionActionButton } from "@/components/ui/MissionActionButton";
 import { StatusMeter } from "@/components/ui/StatusMeter";
 import { ActivityPanel } from "@/features/shared/ActivityPanel";
+import { AutoDiscardSlagToggle } from "@/features/shared/AutoDiscardSlagToggle";
 import { ActivityContextRow, SkillProgressRow } from "@/features/shared/activity-context";
 import { PracticeRunPanel } from "@/features/practice/PracticeRunPanel";
 import { BoundedRunProgress, BoundedRunSelector } from "@/features/shared/BoundedRunControl";
@@ -21,7 +22,7 @@ import { CleanPassControl } from "@/features/welding/CleanPassControl";
 import { usePlay } from "@/features/play/PlayContext";
 import {
   finishCurrentPracticeWeldAction,
-  setPracticeSlagPreferenceAction,
+  setAutoDiscardSlagPreferenceAction,
   startPracticeWeldingAction,
   stopPracticeWeldingAction,
   type PlayActionResult,
@@ -147,7 +148,7 @@ export function PracticeWeldingPanel() {
                 ? await stopPracticeWeldingAction({ characterId: state.characterId })
                 : intent === "finish"
                   ? await finishCurrentPracticeWeldAction({ characterId: state.characterId })
-                  : await setPracticeSlagPreferenceAction({
+                  : await setAutoDiscardSlagPreferenceAction({
                       characterId: state.characterId,
                       autoDiscardSlag: Boolean(autoDiscardSlag),
                     }),
@@ -313,23 +314,14 @@ export function PracticeWeldingPanel() {
         {`${practice.scrapPerWeld} Scrap Metal, ${practice.sectionsPerWeld} sections, nominal up to ${balance.practiceWelding.slagPerWeld} Slag. Each section is worth ${practiceSectionXp(balance)} Welding XP.`}
       </p>
 
-      <div className="flex flex-wrap items-center gap-3">
-        <ActionButton
-          aria-pressed={practice.autoDiscardSlag}
-          data-practice-slag-toggle
-          disabled={foregroundBusy && pending !== "slag"}
-          // A persistent toggle latches in its activity's accent while on
-          // (#239): Welding's is primary. It stays enabled to switch back.
-          intent={practice.autoDiscardSlag ? "primary" : "secondary"}
-          loading={pending === "slag"}
-          onClick={() => run("slag", !practice.autoDiscardSlag)}
-        >
-          Auto-discard Slag: {practice.autoDiscardSlag ? "On" : "Off"}
-        </ActionButton>
-        <p className="text-xs uppercase tracking-wide text-[color:var(--rs-text-muted)]">
-          Applied when a weld finishes
-        </p>
-      </div>
+      <AutoDiscardSlagToggle
+        autoDiscardSlag={state.autoDiscardSlag}
+        data-practice-slag-toggle
+        disabled={foregroundBusy && pending !== "slag"}
+        hint="Applied when a weld finishes"
+        loading={pending === "slag"}
+        onToggle={(next) => run("slag", next)}
+      />
 
       {practice.lastStopReason === "out_of_scrap" && !active ? (
         <Feedback tone="muted">Out of Scrap Metal</Feedback>

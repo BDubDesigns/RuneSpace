@@ -245,3 +245,48 @@ test("Processing Yard Refining journey — Ferrite and Slag both branches, artwo
   await page.getByRole("button", { name: "Start Refining" }).click();
   await expect(page.getByText(/make room for the resulting material/)).toBeVisible();
 });
+
+test("Refining's Auto-discard Slag is the character's shared, persisted setting (#256)", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  const characterId = page.url().split("/").at(-1)!;
+  await db
+    .update(characters)
+    .set({ currentLocationId: LOCATION_IDS.abandonedProcessingYard })
+    .where(eq(characters.id, characterId));
+  await db
+    .insert(inventoryStacks)
+    .values({ characterId, itemId: ITEM_IDS.ferriteShale, quantity: 4 });
+  await page.reload();
+
+  // A persistent toggle (#239): the label names one setting, aria-pressed says
+  // whether it is on, and it latches in `primary` (it belongs to no one skill).
+  const toggle = page.locator("[data-refining-slag-toggle]");
+  await expect(toggle).toBeVisible();
+  await expect(toggle).toHaveText("Auto-discard Slag: Off");
+  await expect(toggle).toHaveAttribute("aria-pressed", "false");
+  await toggle.click();
+  await expect(toggle).toHaveText("Auto-discard Slag: On");
+  await expect(toggle).toHaveAttribute("aria-pressed", "true");
+  await expect(toggle).toBeEnabled();
+  await captureReviewScreenshot(page, "refining-slag-toggle-on-mobile.png");
+
+  // The character's own durable preference, not a browser latch: it is the
+  // same column Practice Welding reads.
+  await expect
+    .poll(async () =>
+      db
+        .select({ autoDiscardSlag: characters.autoDiscardSlag })
+        .from(characters)
+        .where(eq(characters.id, characterId))
+        .then((rows) => rows[0]?.autoDiscardSlag),
+    )
+    .toBe(true);
+  await page.reload();
+  await expect(toggle).toHaveAttribute("aria-pressed", "true");
+
+  await toggle.click();
+  await expect(toggle).toHaveText("Auto-discard Slag: Off");
+  await expect(toggle).toHaveAttribute("aria-pressed", "false");
+});

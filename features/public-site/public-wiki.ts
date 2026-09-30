@@ -195,6 +195,8 @@ const authoredWikiArticles = [
         paragraphs: [
           "Refining is only available at the Abandoned Processing Yard. Refine lists what you can refine right now with what you are carrying — plus any recipe a Mission is pointing you at, with what it is still missing. Recipes, beside it, lists every recipe your Refining level knows, whether or not you have the materials. The recipes below show what is still to come.",
           "A failed attempt says so: any Slag it makes, or any input a failed Galvaferrite pour hands back, is shown as what the failure left, not as something you refined.",
+          "The Slag a failed Refined Ferrite or Galvanic Stock attempt makes is a bonus, never a requirement. You do not need room for it to start or keep refining; the attempt still finishes, spends its ore and pays its Refining XP. Slag is kept for as long as you have room, and whatever will not fit is thrown out. Turn Auto-discard Slag on and every bit of it is thrown out instead. It is the same setting as the Practice Welding bench's, so changing it in one place changes it in the other, and it stays until you change it. The result and history say when Slag was discarded, so it is never counted as something you are carrying.",
+          "Auto-discard Slag only covers Slag from a failure. A pour that makes Slag on purpose still puts it in your Inventory and needs room for it, and a failed Galvaferrite pour always gives back the input it returns. The product you are actually refining still needs room too, and Slag you keep can use up that room.",
         ],
         list: [
           "Refined Ferrite — two Ferrite Shale, a little over four seconds. A failure still produces one Slag, which isn't wasted: the Cargo Hold repair needs both.",
@@ -555,7 +557,7 @@ const authoredWikiArticles = [
             ".",
           ],
           [
-            "Slag is yours to keep or throw out: the bench's Auto-discard Slag setting decides, applied as each weld finishes. Bix pays 1 Credit apiece for ",
+            "Slag is yours to keep or throw out: the Auto-discard Slag setting decides, applied as each weld finishes. It is the same setting Refining uses, so changing it at the bench changes it at the Yard too. Bix pays 1 Credit apiece for ",
             { text: "Slag", articleSlug: "mining-and-refining" },
             " in town, so an 8-Credit weld can return 2 if you keep both and sell them. If you keep Slag and run out of room for it, the overflow is thrown out rather than stopping the weld. Scrap stacks three to a slot, so using two pieces only frees a slot for Slag when it empties a stack.",
           ],

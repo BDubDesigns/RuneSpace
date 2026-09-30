@@ -40,6 +40,7 @@ suite("issue #229 bounded runs (real PostgreSQL)", () => {
   let progression: typeof import("@/server/progression");
   let refiningCommands: typeof import("@/server/refining-commands");
   let practiceCommands: typeof import("@/server/practice-commands");
+  let preferenceCommands: typeof import("@/server/character-preference-commands");
   const createdUsers: string[] = [];
   const start = new Date("2026-09-20T00:00:00.000Z");
   const balance = getEffectiveGameBalance();
@@ -58,6 +59,7 @@ suite("issue #229 bounded runs (real PostgreSQL)", () => {
     progression = await import("@/server/progression");
     refiningCommands = await import("@/server/refining-commands");
     practiceCommands = await import("@/server/practice-commands");
+    preferenceCommands = await import("@/server/character-preference-commands");
   });
 
   afterEach(async () => {
@@ -692,7 +694,7 @@ suite("issue #229 bounded runs (real PostgreSQL)", () => {
 
     it("Auto-discard never changes how many welds the run completes", async () => {
       const { userId, character } = await welder([3, 3]);
-      await practiceCommands.setPracticeSlagPreference(
+      await preferenceCommands.setAutoDiscardSlagPreference(
         userId,
         character.id,
         true,

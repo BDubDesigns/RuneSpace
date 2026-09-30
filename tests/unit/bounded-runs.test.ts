@@ -215,6 +215,7 @@ describe("the shared bounded-run selection rule", () => {
 describe("numeric Refining runs", () => {
   it("attempts exactly the selected count and stops with run_completed", () => {
     const resolved = resolveRefining({
+      autoDiscardSlag: false,
       elapsedTicks: refinedFerrite.attemptDurationTicks * 50,
       snapshot: snapshot(stacks([ITEM_IDS.ferriteShale, 10], [ITEM_IDS.ferriteShale, 10])),
       balance,
@@ -232,6 +233,7 @@ describe("numeric Refining runs", () => {
     const rolls = [0, 9_999, 9_999, 0];
     let index = 0;
     const resolved = resolveRefining({
+      autoDiscardSlag: false,
       elapsedTicks: refinedFerrite.attemptDurationTicks * 50,
       snapshot: snapshot(stacks([ITEM_IDS.ferriteShale, 10], [ITEM_IDS.ferriteShale, 10]), {
         refiningLevel: 1,
@@ -255,6 +257,7 @@ describe("numeric Refining runs", () => {
 
   it("an exhausted selection writes nothing and reports completion, not a shortage", () => {
     const resolved = resolveRefining({
+      autoDiscardSlag: false,
       elapsedTicks: 100,
       snapshot: snapshot([]),
       balance,
@@ -269,6 +272,7 @@ describe("numeric Refining runs", () => {
 
   it("keeps the existing stop reason when inputs run out before the selection", () => {
     const resolved = resolveRefining({
+      autoDiscardSlag: false,
       elapsedTicks: refinedFerrite.attemptDurationTicks * 50,
       snapshot: snapshot(stacks([ITEM_IDS.ferriteShale, 5])),
       balance,
@@ -283,6 +287,7 @@ describe("numeric Refining runs", () => {
   it("keeps the existing stop reason when capacity runs out before the selection", () => {
     // Every slot taken, the only Refined Ferrite stack full: nothing fits.
     const resolved = resolveRefining({
+      autoDiscardSlag: false,
       elapsedTicks: refinedFerrite.attemptDurationTicks * 50,
       snapshot: snapshot(stacks([ITEM_IDS.ferriteShale, 10], [ITEM_IDS.refinedFerrite, 5]), {
         slotsAvailable: 0,
@@ -300,6 +305,7 @@ describe("numeric Refining runs", () => {
     for (const remaining of [-1, 1.5]) {
       expect(() =>
         resolveRefining({
+          autoDiscardSlag: false,
           elapsedTicks: 0,
           snapshot: snapshot([]),
           balance,
@@ -319,6 +325,7 @@ describe("Max Refining runs: until blocked, from the real results", () => {
   const alloy = snapshot(alloyStart, { refiningLevel: 8 });
   const runAlloy = (outcomes: readonly ("success" | number)[]) =>
     resolveRefining({
+      autoDiscardSlag: false,
       elapsedTicks: galvaferrite.attemptDurationTicks * 50,
       snapshot: alloy,
       balance,
@@ -383,6 +390,7 @@ describe("Max Refining runs: until blocked, from the real results", () => {
         return state / 2_147_483_648;
       };
       const ran = resolveRefining({
+        autoDiscardSlag: false,
         elapsedTicks: galvaferrite.attemptDurationTicks * 50,
         snapshot: alloy,
         balance,
@@ -397,6 +405,7 @@ describe("Max Refining runs: until blocked, from the real results", () => {
 
   it("at certain success runs until its real inputs are spent", () => {
     const ran = resolveRefining({
+      autoDiscardSlag: false,
       elapsedTicks: refinedFerrite.attemptDurationTicks * 50,
       snapshot: snapshot(stacks([ITEM_IDS.ferriteShale, 10], [ITEM_IDS.ferriteShale, 7])),
       balance,
@@ -414,6 +423,7 @@ describe("Max Refining runs: until blocked, from the real results", () => {
     // The Refined Ferrite stack has room for two and no slot is free: two
     // batches fill it, and the third has nowhere to go.
     const ran = resolveRefining({
+      autoDiscardSlag: false,
       elapsedTicks: refinedFerrite.attemptDurationTicks * 50,
       snapshot: snapshot(
         stacks([ITEM_IDS.ferriteShale, 10], [ITEM_IDS.refinedFerrite, 3], [ITEM_IDS.slag, 5]),
@@ -434,6 +444,7 @@ describe("Max Refining runs: until blocked, from the real results", () => {
       [galvaniteSlag, ITEM_IDS.galvanite],
     ] as const) {
       const ran = resolveRefining({
+        autoDiscardSlag: false,
         elapsedTicks: candidate.attemptDurationTicks * 50,
         snapshot: snapshot(stacks([input, 10], [input, 7]), { refiningLevel: 5 }),
         balance,
@@ -451,6 +462,7 @@ describe("Max Refining runs: until blocked, from the real results", () => {
     // Plenty of Shale: only the guard can end these.
     const plenty = snapshot(stacks([ITEM_IDS.ferriteShale, 10], [ITEM_IDS.ferriteShale, 10]));
     const nearly = resolveRefining({
+      autoDiscardSlag: false,
       elapsedTicks: refinedFerrite.attemptDurationTicks * 50,
       snapshot: plenty,
       balance,
@@ -461,6 +473,7 @@ describe("Max Refining runs: until blocked, from the real results", () => {
     expect(nearly.attempts).toBe(2);
     expect(nearly.stopReason).toBe("run_safety_limit");
     const reached = resolveRefining({
+      autoDiscardSlag: false,
       elapsedTicks: refinedFerrite.attemptDurationTicks * 50,
       snapshot: plenty,
       balance,
@@ -575,6 +588,7 @@ describe("the deliberate Slag recipes (#229)", () => {
     for (const { candidate, input, slagPerBatch, xp } of cases) {
       let rolled = 0;
       const resolved = resolveRefining({
+        autoDiscardSlag: false,
         elapsedTicks: candidate.attemptDurationTicks * 4,
         snapshot: snapshot(stacks([input, 10]), { refiningLevel: 5 }),
         balance,
@@ -605,6 +619,7 @@ describe("the deliberate Slag recipes (#229)", () => {
 
   it("leave a rolled recipe's attempts unmarked", () => {
     const resolved = resolveRefining({
+      autoDiscardSlag: false,
       elapsedTicks: refinedFerrite.attemptDurationTicks,
       snapshot: snapshot(stacks([ITEM_IDS.ferriteShale, 2])),
       balance,

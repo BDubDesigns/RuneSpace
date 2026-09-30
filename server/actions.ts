@@ -27,6 +27,7 @@ import {
   loadMiningToolPowerCell,
   type LoadPowerCellResult,
 } from "@/server/mining-commands";
+import { setAutoDiscardSlagPreference } from "@/server/character-preference-commands";
 import { startRefining, stopRefining } from "@/server/refining-commands";
 import {
   finishCurrentFabrication,
@@ -60,7 +61,6 @@ import {
 } from "@/server/repair-commands";
 import {
   finishCurrentPracticeWeld,
-  setPracticeSlagPreference,
   startPracticeWelding,
   stopPracticeWelding,
 } from "@/server/practice-commands";
@@ -110,7 +110,7 @@ import {
   WeldingCommandRequestSchema,
   PracticeCommandRequestSchema,
   StartPracticeRequestSchema,
-  PracticeSlagPreferenceRequestSchema,
+  AutoDiscardSlagPreferenceRequestSchema,
   WorkOrderAcceptRequestSchema,
   WorkOrderCommandRequestSchema,
   CleanPassClaimRequestSchema,
@@ -553,13 +553,15 @@ export async function refreshWorkOrderBoardAction(
   }
 }
 
-export async function setPracticeSlagPreferenceAction(input: unknown): Promise<PlayActionResult> {
-  const request = PracticeSlagPreferenceRequestSchema.safeParse(input);
-  if (!request.success) return { error: "Invalid Practice setting." };
+export async function setAutoDiscardSlagPreferenceAction(
+  input: unknown,
+): Promise<PlayActionResult> {
+  const request = AutoDiscardSlagPreferenceRequestSchema.safeParse(input);
+  if (!request.success) return { error: "Invalid Auto-discard Slag setting." };
   try {
     const user = await requireCurrentUser(await headers());
     return {
-      state: await setPracticeSlagPreference(
+      state: await setAutoDiscardSlagPreference(
         user.id,
         request.data.characterId,
         request.data.autoDiscardSlag,

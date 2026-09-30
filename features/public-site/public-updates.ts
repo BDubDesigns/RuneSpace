@@ -5,6 +5,30 @@ export type { PublicUpdate } from "@/game/schemas/public-updates";
 
 const authoredUpdates = [
   {
+    slug: "slag-without-the-shuffle",
+    title: "Slag Without the Shuffle",
+    publishedAt: "2026-09-29T19:00:00-07:00",
+    summary:
+      "Refining no longer stops because there is nowhere to put the Slag a failure might make. Auto-discard Slag is now one setting, shared by the Practice bench and the Refining console.",
+    body: [
+      "A long walk to the Abandoned Processing Yard could end with Refining refusing to run, because the game wanted room for the Slag a failed attempt might leave, even when you had no use for it. That was a trap, and it hit hardest right after the walk.",
+      "Now the Slag from a failed Refined Ferrite or Galvanic Stock attempt is a bonus. You only need room for what you are actually refining. A failure still finishes the attempt, spends its ore and pays its Refining XP; the Slag is kept while there is room and thrown out where there is not.",
+      "Refining also has the Auto-discard Slag switch the Practice bench already had, and it is one setting: change it at the Yard and the bench follows, and the other way around. Turn it on and the Slag from failed attempts is thrown out. The results say when Slag was discarded, so it never looks like you are carrying something you are not.",
+      "The switch only covers the Slag a failure makes. The two Slag recipes still hand you the Slag you asked for and need room for it, and a failed Galvaferrite pour still gives back its input.",
+    ],
+    patchNotes: [
+      {
+        heading: "Changed",
+        items: [
+          "Refined Ferrite and Galvanic Stock attempts no longer need free room for the Slag a failure might make.",
+          "A failed attempt keeps as much Slag as fits and throws out the rest, and it still finishes, spends its ore and pays its Refining XP.",
+          "Auto-discard Slag is now one setting for your character, shared by the Practice bench and the Refining console.",
+          "Refining results and history say when Slag was discarded instead of counting it as carried.",
+        ],
+      },
+    ],
+  },
+  {
     slug: "eyes-on-the-map",
     title: "Eyes on the Map",
     publishedAt: "2026-09-28T18:00:00-07:00",
