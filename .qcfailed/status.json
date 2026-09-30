@@ -3,6 +3,11 @@
   "projectSlug": "runespace",
   "workState": "active",
   "currentFocus": "Preparing the October 27 Soft Alpha: chat, Whispers, Block, and Report are in, and moderation plus published Community Rules and Safety & Privacy pages complete the alpha social stack.",
+  "currentChange": {
+    "summary": "Moderation and player safety: operator case review with audited access, account-wide social restrictions and suspensions, in-game appeals, and published Community Rules and Safety & Privacy pages.",
+    "stage": "review",
+    "pullRequestNumber": 264
+  },
   "latestCompleted": {
     "summary": "Whispers, Block, and Report: 1:1 character Whispers with durable unread, account-level Block with a Blocked Players list, and message and player reports that preserve evidence for review.",
     "date": "2026-09-30",
