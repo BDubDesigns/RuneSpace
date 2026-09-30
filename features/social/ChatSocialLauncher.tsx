@@ -11,8 +11,9 @@ export function chatSocialLauncherLabel(attentionCount: number): string {
 }
 
 /**
- * The compact floating Chat/Social launcher (issue #245): the phone launcher
- * pattern, fixed above the Play footer by `GameShell`'s `floatingAction` slot.
+ * The compact floating Chat/Social launcher (issue #245), pinned flush to the
+ * right edge and centred in the usable viewport by `GameShell`'s
+ * `floatingAction` slot.
  * It opens the Chat/Social Drawer over whatever the player is doing and never
  * navigates. Presentational: the attention count and open handler come from
  * `SocialContext`, so a later docked desktop presentation does not need it.

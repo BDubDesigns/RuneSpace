@@ -10,8 +10,10 @@ import { captureReviewScreenshot } from "./review-screenshot";
  *
  * Unit coverage owns the frame format, the lifecycle state machine, and the
  * attention rendering; PostgreSQL coverage owns stream authorization and
- * fanout. This proves the parts only a browser can: the floating launcher
- * sits clear of the footer and of the last Play content, the Drawer opens over
+ * fanout. This proves the parts only a browser can: the launcher rests flush to
+ * the right edge, centred in the usable viewport through a rotation, without
+ * reserving page space or colliding with the Map's destination panel, the
+ * Drawer opens over
  * the current surface without navigating, and a real tab's stream connects,
  * reconnects after the deliberate lifetime close, survives a
  * suspended/offline tab, and stays one-stream-per-tab across several tabs.
@@ -30,6 +32,31 @@ async function closeStreams(page: Page, characterId: string): Promise<number> {
   const response = await page.request.post("/api/e2e/realtime", { data: { characterId } });
   expect(response.status()).toBe(200);
   return ((await response.json()) as { closed: number }).closed;
+}
+
+/**
+ * The launcher's placement contract: a 44px target flush to the right edge,
+ * vertically centred between the top of the viewport and the fixed nav, and
+ * wholly on screen.
+ */
+async function expectEdgeCentred(page: Page) {
+  const box = (await launcher(page).boundingBox())!;
+  const navBox = (await page.getByRole("navigation", { name: "Primary" }).boundingBox())!;
+  const viewport = page.viewportSize()!;
+  expect(box.width).toBeGreaterThanOrEqual(44);
+  expect(box.height).toBeGreaterThanOrEqual(44);
+  expect(Math.abs(viewport.width - (box.x + box.width))).toBeLessThanOrEqual(1);
+  expect(Math.abs(box.y + box.height / 2 - navBox.y / 2)).toBeLessThanOrEqual(1);
+  expect(box.y).toBeGreaterThanOrEqual(0);
+  expect(box.y + box.height).toBeLessThanOrEqual(navBox.y);
+  return box;
+}
+
+function intersects(
+  a: { x: number; y: number; width: number; height: number },
+  b: { x: number; y: number; width: number; height: number },
+) {
+  return a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height;
 }
 
 function nextStreamRequest(page: Page) {
@@ -51,28 +78,57 @@ test("the floating Chat/Social launcher opens over Play without moving the playe
   await expect(nav.getByRole("link")).toHaveCount(1);
   await expect(nav.getByRole("button", { name: "Chat" })).toHaveCount(0);
 
-  // It floats above the footer, and the page's clearance keeps the last Play
-  // content above it once scrolled to the bottom.
-  await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
-  const launcherBox = (await control.boundingBox())!;
-  const navBox = (await nav.boundingBox())!;
-  const mainBox = (await page.locator("main").boundingBox())!;
-  const viewport = page.viewportSize()!;
-  expect(launcherBox.width).toBeGreaterThanOrEqual(44);
-  expect(launcherBox.height).toBeGreaterThanOrEqual(44);
-  expect(launcherBox.y + launcherBox.height).toBeLessThanOrEqual(navBox.y);
-  expect(launcherBox.x + launcherBox.width).toBeLessThanOrEqual(viewport.width);
-  expect(mainBox.y + mainBox.height).toBeLessThanOrEqual(launcherBox.y);
+  // It rests on the right edge, centred in the usable viewport, however far
+  // the page is scrolled and through a rotation.
+  await expectEdgeCentred(page);
   await captureReviewScreenshot(page, `issue-245-launcher-${testInfo.project.name}.png`);
+  const viewport = page.viewportSize()!;
+  await page.setViewportSize({ width: viewport.height, height: viewport.width });
+  await expectEdgeCentred(page);
+  await page.setViewportSize(viewport);
+  await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
+  await expectEdgeCentred(page);
+
+  // It reserves no page space: at the document's end the content keeps the
+  // ordinary shared space-3 gap above the footer, with no parking strip.
+  const bottom = await page.evaluate(() => {
+    const probe = document.createElement("div");
+    probe.style.position = "absolute";
+    probe.style.height = "var(--rs-space-3)";
+    document.body.append(probe);
+    const gap = probe.getBoundingClientRect().height;
+    probe.remove();
+    return {
+      gap,
+      contentBottom: document.querySelector("main")!.getBoundingClientRect().bottom,
+      navTop: document.querySelector('nav[aria-label="Primary"]')!.getBoundingClientRect().top,
+    };
+  });
+  expect(Math.abs(bottom.navTop - bottom.contentBottom - bottom.gap)).toBeLessThanOrEqual(2);
+
+  // The Map's sticky selected-destination panel keeps its own bottom
+  // position and never meets the launcher: Walk stays clickable.
+  await openMapSurface(page);
+  const yard = page.getByRole("button", { name: /Abandoned Processing Yard/ }).first();
+  await yard.scrollIntoViewIfNeeded();
+  await yard.click();
+  const panel = page.locator("[data-map-destination-panel]");
+  await expect(panel).toBeVisible();
+  const panelBox = (await panel.boundingBox())!;
+  expect(intersects(panelBox, await expectEdgeCentred(page))).toBe(false);
+  await panel
+    .getByRole("button", { name: "Walk to Abandoned Processing Yard — 24 sec" })
+    .click({ trial: true });
 
   // Opening it is a Drawer over the current surface, not a navigation.
-  await openMapSurface(page);
   const mapUrl = page.url();
   await launcher(page).click();
   const dialog = page.getByRole("dialog", { name: "Chat" });
   await expect(dialog).toBeVisible();
   await expect(dialog).toHaveAttribute("aria-modal", "true");
-  await expect(dialog.getByRole("region", { name: "Conversations" })).toBeVisible();
+  await expect(dialog.getByRole("region", { name: "Conversations" })).toHaveText(
+    "Chat coming soon.",
+  );
   // No domain has populated it yet, so there is no pinned region to show.
   await expect(dialog.getByRole("region", { name: "Needs your attention" })).toHaveCount(0);
   expect(page.url()).toBe(mapUrl);
@@ -92,6 +148,7 @@ test("the floating Chat/Social launcher opens over Play without moving the playe
   await expect(launcher(page)).toBeFocused();
   expect(page.url()).toBe(mapUrl);
   await expect(page.getByRole("group", { name: "Local map" })).toBeVisible();
+  await expect(panel).toBeVisible();
 });
 
 /**

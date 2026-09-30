@@ -173,17 +173,6 @@
       max(var(--rs-space-2), env(safe-area-inset-bottom))
   );
   --rs-bottom-nav-clearance: calc(var(--rs-bottom-nav-box-height) + var(--rs-space-3));
-  /* The one resting height for anything fixed or sticky just above the
-     BottomNav: one space-2 gap over the nav's box, which already carries the
-     safe-area inset. The Map's selected-destination panel (#240) and the
-     floating Chat/Social launcher (#245) both rest here; the panel layers
-     above the launcher (docs/design-system.md). */
-  --rs-above-bottom-nav: calc(var(--rs-bottom-nav-box-height) + var(--rs-space-2));
-  /* A page showing a floating action adds its height and gap to its bottom
-     clearance, so the action never covers the last content or control. */
-  --rs-floating-action-clearance: calc(
-    var(--rs-bottom-nav-clearance) + var(--rs-touch-target) + var(--rs-space-2)
-  );
 }
 
 html {
@@ -618,7 +607,7 @@ body {
 .rs-map-destination-panel {
   position: sticky;
   z-index: 30;
-  bottom: var(--rs-above-bottom-nav);
+  bottom: calc(var(--rs-bottom-nav-box-height) + var(--rs-space-2));
 }
 
 @keyframes rs-map-scroll-affordance-breathe {

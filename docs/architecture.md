@@ -177,8 +177,8 @@ only — never gameplay or social authority.
   actionable-card region (`upsertCard` / `removeCard`), and attention
   (`setAttention`). `ChatSocialSurface` is the content; today
   `ChatSocialDrawer` presents it as a Drawer over the current Play surface,
-  opened by the floating `ChatSocialLauncher` in `GameShell`'s
-  `floatingAction` slot. Open state lives in the context, so a later docked
+  opened by the `ChatSocialLauncher` that `GameShell`'s `floatingAction` slot
+  pins to the right edge at a normalized `{ side, y }` position. Open state lives in the context, so a later docked
   desktop presentation can render the same surface without the launcher.
   Trade-request cards are domain-owned content placed in the pinned region,
   never chat messages and never gameplay-blocking modals.

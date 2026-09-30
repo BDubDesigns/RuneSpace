@@ -513,6 +513,7 @@ describe("Chat/Social shell presentation", () => {
     const empty = renderToStaticMarkup(React.createElement(ChatSocialSurface, { cards: [] }));
     expect(empty).not.toContain("data-social-pinned-cards");
     expect(empty).toContain('aria-label="Conversations"');
+    expect(empty).toContain("Chat coming soon.");
 
     const withCards = renderToStaticMarkup(
       React.createElement(ChatSocialSurface, {
