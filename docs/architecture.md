@@ -127,6 +127,74 @@ context and run summary. That grammar is owned by `docs/design-system.md`
 ("Stationary Location composition"). See also `docs/location-scenes.md` and
 `docs/travel-map-design.md` for their surface-specific presentation rules.
 
+## Realtime/social delivery (Issue #245)
+
+Server → browser realtime delivery is **Server-Sent Events**. It is the one
+substrate that chat (#246), Whispers (#247), and incoming trade requests (#225)
+reuse; none of them opens its own transport. It is delivery and invalidation
+only — never gameplay or social authority.
+
+- **Mutations stay ordinary commands.** A chat send or trade response is an
+  authenticated server action or route, validated and persisted like any other
+  command. A delivery only prompts a browser to show or re-read durable state.
+- **Contract:** `game/schemas/realtime.ts` is the single wire format shared by
+  server and browser — the stream path, the ~25-second heartbeat (an SSE
+  comment), the ~5-minute stream lifetime, the named frames (`ready`,
+  `delivery`, `close`), the incremental frame parser, and the typed
+  `RealtimeEventMap` registry. Each downstream domain registers its own
+  namespaced event types there; #245 registers none, and the substrate imports
+  no chat or trading model.
+- **Publisher:** `server/realtime.ts` owns `publishRealtimeEvent(audience, type,
+  data)` and the audience model (`character`, `account`, `everyone`). Alpha
+  fanout is single-process and in-memory, anchored on `globalThis` so every
+  route and action in the process shares it. A future multi-process deployment
+  replaces only `createInMemoryRealtimeFanout`; there is deliberately no Redis,
+  PostgreSQL LISTEN/NOTIFY, or durable event ledger. Publish only after the
+  authoritative change commits.
+- **Stream:** `GET /api/realtime?characterId=…` (`app/api/realtime/route.ts` →
+  `server/realtime-stream.ts`). Every stream creation re-runs Better Auth and
+  `requirePlayableOwnedCharacter`, and derives the delivery scope (account and
+  character) from that authoritative row; the browser names only its active
+  character and cannot choose rooms, locations, players, or accounts. The
+  stream holds no lock or transaction, closes itself after its lifetime so the
+  reconnect re-authorizes, and closes a client that falls too far behind.
+- **Browser:** `features/social/realtime-connection.ts` reads the stream with
+  `fetch` (so a 403 `GAMEPLAY_ACCESS_REQUIRED` stops and recovers to
+  Characters instead of retrying), reconnects immediately after a deliberate
+  close and with capped, jittered backoff after a failure, drops a half-open
+  stream after two silent heartbeats, and reconnects at once when the network
+  returns or the tab becomes visible (a resumed tab whose "live" stream missed
+  a heartbeat is treated as dead, not trusted). One stream per open Play tab; there
+  is no tab-leader election.
+- **Reconciliation, not replay.** The stream carries no SSE `id:` and never
+  replays. After every connect, reconnect, and tab resume the seam calls its
+  `onReconcile` handlers, and each domain re-reads its durable state through
+  its ordinary authoritative reads. A missed delivery never means lost state.
+  Duplicate deliveries (several tabs, a delivery racing a reconcile read) are
+  harmless because shell state is keyed by durable domain identity.
+- **Chat/Social shell:** `features/social/SocialContext.tsx` is the seam
+  downstream features consume — `subscribe`, `onReconcile`, the pinned
+  actionable-card region (`upsertCard` / `removeCard`), and attention
+  (`setAttention`). `ChatSocialSurface` is the content; today
+  `ChatSocialDrawer` presents it as a Drawer over the current Play surface,
+  opened by the `ChatSocialLauncher` that `GameShell`'s `floatingAction` slot
+  pins to the right edge at a normalized `{ side, y }` position. Open state lives in the context, so a later docked
+  desktop presentation can render the same surface without the launcher.
+  Trade-request cards are domain-owned content placed in the pinned region,
+  never chat messages and never gameplay-blocking modals.
+- **Play is unchanged.** PlayContext's bounded boundary refresh still owns
+  gameplay timers; the realtime seam never drives it.
+
+Before any Coolify, Nixpacks, or proxy change, verify the minimal stream on the
+real preview unchanged: signed in with a playable character, `/play/<id>`
+shows the launcher's `data-realtime-status="live"`, and the browser's network
+panel shows `/api/realtime` streaming `ready` then a `: keepalive` comment
+about every 25 seconds, closing near 5 minutes and reconnecting. Also check
+tab hide/show and a network drop. The response already sends
+`cache-control: no-store, no-transform` and `x-accel-buffering: no`. Change
+deployment configuration only when a failure is reproduced unchanged and
+isolated to a deterministic proxy or configuration defect.
+
 ## Where minigames fit
 
 Phaser experiences live in `minigames/`, isolated from the main React tree. They communicate through small typed contracts; any progression result is server-validated. They are not part of this foundation issue.

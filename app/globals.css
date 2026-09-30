@@ -115,7 +115,9 @@
      panel-ambiance opacity so it reads as an attention affordance at a
      glance rather than blending into it. Two layers — a tight, brighter core
      plus a softer, wider halo — read as more distinct than one wide blur at
-     an equivalent strength. Static (no animation). */
+     an equivalent strength. Static (no animation). The Chat/Social launcher
+     (#245) reuses it for its attention state: the same account-level
+     "something to notice" meaning, not a gameplay one. */
   --rs-glow-news-unread: 0 0 6px rgb(75 216 245 / 0.65), 0 0 18px rgb(75 216 245 / 0.32);
   /* Semantic mission guidance (issue #124): one high-contrast neon-green
      treatment marks "this interaction advances your active mission". It is a

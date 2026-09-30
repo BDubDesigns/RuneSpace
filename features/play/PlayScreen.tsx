@@ -8,6 +8,9 @@ import { RuneSpaceBrand } from "@/components/branding/RuneSpaceBrand";
 import { SignOutButton } from "@/features/auth/SignOutButton";
 import { PlayBoundaryTestTrigger } from "@/features/diagnostics/PlayBoundaryTestTrigger";
 import { LOCAL_PLACE_PARAM } from "@/features/local-places/navigation";
+import { ChatSocialDrawer } from "@/features/social/ChatSocialDrawer";
+import { SocialLauncher } from "@/features/social/ChatSocialLauncher";
+import { SocialProvider } from "@/features/social/SocialContext";
 import { acknowledgeNewsAction } from "@/server/actions";
 import type { CharacterPortraitPresentation } from "@/game/domain/character-portrait";
 import type { PlayGameplayState } from "@/server/play";
@@ -178,16 +181,26 @@ export function PlayScreen({
 
   return (
     <PlayProvider initialState={initialState}>
-      <GameShell bottomNav={<PlayFooter />} topBar={<PlayTopBar newsUnread={newsUnread} />}>
-        <PlayBoundaryTestTrigger />
-        <PlayConsole
-          characterName={characterName}
-          characterPortrait={characterPortrait}
-          localPlaceId={localPlaceId}
-          onMapExit={() => router.replace(pathname)}
-          surface={mapActive ? "map" : "primary"}
-        />
-      </GameShell>
+      {/* Chat/Social (#245) is a utility over Play, like Inventory: its
+          launcher floats above the footer and its Drawer opens over the
+          current surface without navigating. It never feeds Play state. */}
+      <SocialProvider characterId={initialState.characterId}>
+        <GameShell
+          bottomNav={<PlayFooter />}
+          floatingAction={<SocialLauncher />}
+          topBar={<PlayTopBar newsUnread={newsUnread} />}
+        >
+          <PlayBoundaryTestTrigger />
+          <PlayConsole
+            characterName={characterName}
+            characterPortrait={characterPortrait}
+            localPlaceId={localPlaceId}
+            onMapExit={() => router.replace(pathname)}
+            surface={mapActive ? "map" : "primary"}
+          />
+          <ChatSocialDrawer />
+        </GameShell>
+      </SocialProvider>
     </PlayProvider>
   );
 }
