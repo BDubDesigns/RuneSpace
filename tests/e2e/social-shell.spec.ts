@@ -86,7 +86,14 @@ test("the floating Chat/Social launcher opens over Play without moving the playe
   await page.setViewportSize({ width: viewport.height, height: viewport.width });
   await expectEdgeCentred(page);
   await page.setViewportSize(viewport);
-  await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
+  // The Crash Site page's natural height depends on the host's fonts and can
+  // land within a few pixels of the viewport, so whether it scrolls at all is
+  // environmental. Stretch <main> to two viewports so the page always
+  // overflows, then scroll to the document's true end.
+  await page.evaluate(() => {
+    document.querySelector("main")!.style.minHeight = `${window.innerHeight * 2}px`;
+    window.scrollTo(0, document.documentElement.scrollHeight);
+  });
   await expectEdgeCentred(page);
 
   // It reserves no page space: at the document's end the content keeps the
@@ -100,10 +107,13 @@ test("the floating Chat/Social launcher opens over Play without moving the playe
     probe.remove();
     return {
       gap,
+      atEnd:
+        Math.abs(window.scrollY + window.innerHeight - document.documentElement.scrollHeight) <= 1,
       contentBottom: document.querySelector("main")!.getBoundingClientRect().bottom,
       navTop: document.querySelector('nav[aria-label="Primary"]')!.getBoundingClientRect().top,
     };
   });
+  expect(bottom.atEnd).toBe(true);
   expect(Math.abs(bottom.navTop - bottom.contentBottom - bottom.gap)).toBeLessThanOrEqual(2);
 
   // The Map's sticky selected-destination panel keeps its own bottom
