@@ -80,6 +80,24 @@ import { TravelRuleError } from "@/server/travel";
 import { claimPowerCells, type PowerAnnexClaimResult } from "@/server/power-annex";
 import { tradeWithMerchant, type TradeResult } from "@/server/trade";
 import { postPromotedTradeAd, sendChatMessage } from "@/server/chat";
+import { markWhisperRead, openWhisper, sendWhisper, WhisperError } from "@/server/whispers";
+import { blockPlayer, unblockPlayer } from "@/server/player-blocks";
+import { reportMessage, reportPlayer } from "@/server/player-reports";
+import {
+  MarkWhisperReadRequestSchema,
+  OpenWhisperRequestSchema,
+  SendWhisperRequestSchema,
+  type OpenWhisperResult,
+  type WhisperSendResult,
+} from "@/game/schemas/whispers";
+import {
+  BlockRequestSchema,
+  ReportMessageRequestSchema,
+  ReportPlayerRequestSchema,
+  UnblockRequestSchema,
+  type BlockResult,
+  type ReportResult,
+} from "@/game/schemas/social-safety";
 import {
   PostPromotedTradeAdRequestSchema,
   SendChatMessageRequestSchema,
@@ -934,6 +952,117 @@ export async function postPromotedTradeAdAction(input: unknown): Promise<ChatAct
     const user = await requireCurrentUser(await headers());
     const { characterId, text } = request.data;
     return await postPromotedTradeAd(user.id, characterId, { text });
+  } catch (error) {
+    redirectOnGameplayRefusal(error);
+    if (error instanceof OwnershipError) return { error: error.message };
+    throw error;
+  }
+}
+
+export type WhisperActionResult = WhisperSendResult | { error: string };
+
+/**
+ * Whispers (issue #247). Opening resolves the character a character-facing
+ * surface named and persists nothing; sending shares public chat's account-
+ * wide budget; reading advances the active character's durable read position.
+ */
+export async function openWhisperAction(input: unknown): Promise<OpenWhisperResult> {
+  const request = OpenWhisperRequestSchema.safeParse(input);
+  if (!request.success) return { error: "Invalid Whisper." };
+  try {
+    const user = await requireCurrentUser(await headers());
+    return await openWhisper(user.id, request.data.characterId, request.data.target);
+  } catch (error) {
+    redirectOnGameplayRefusal(error);
+    if (error instanceof OwnershipError) return { error: error.message };
+    throw error;
+  }
+}
+
+export async function sendWhisperAction(input: unknown): Promise<WhisperActionResult> {
+  const request = SendWhisperRequestSchema.safeParse(input);
+  if (!request.success) return { error: "Invalid Whisper." };
+  try {
+    const user = await requireCurrentUser(await headers());
+    const { characterId, ...message } = request.data;
+    return await sendWhisper(user.id, characterId, message);
+  } catch (error) {
+    redirectOnGameplayRefusal(error);
+    if (error instanceof OwnershipError) return { error: error.message };
+    throw error;
+  }
+}
+
+export async function markWhisperReadAction(
+  input: unknown,
+): Promise<{ status: "read" } | { error: string }> {
+  const request = MarkWhisperReadRequestSchema.safeParse(input);
+  if (!request.success) return { error: "Invalid request." };
+  try {
+    const user = await requireCurrentUser(await headers());
+    const { characterId, ...read } = request.data;
+    return await markWhisperRead(user.id, characterId, read);
+  } catch (error) {
+    redirectOnGameplayRefusal(error);
+    if (error instanceof OwnershipError || error instanceof WhisperError) {
+      return { error: error.message };
+    }
+    throw error;
+  }
+}
+
+/**
+ * Block, Unblock, and Report (issue #247). Every account identity is resolved
+ * server-side; the browser names only its active character and a
+ * character-facing target.
+ */
+export async function blockPlayerAction(input: unknown): Promise<BlockResult> {
+  const request = BlockRequestSchema.safeParse(input);
+  if (!request.success) return { error: "Invalid request." };
+  try {
+    const user = await requireCurrentUser(await headers());
+    return await blockPlayer(user.id, request.data.characterId, request.data.target);
+  } catch (error) {
+    redirectOnGameplayRefusal(error);
+    if (error instanceof OwnershipError) return { error: error.message };
+    throw error;
+  }
+}
+
+export async function unblockPlayerAction(input: unknown): Promise<BlockResult> {
+  const request = UnblockRequestSchema.safeParse(input);
+  if (!request.success) return { error: "Invalid request." };
+  try {
+    const user = await requireCurrentUser(await headers());
+    return await unblockPlayer(user.id, request.data.characterId, request.data.blockedCharacterId);
+  } catch (error) {
+    redirectOnGameplayRefusal(error);
+    if (error instanceof OwnershipError) return { error: error.message };
+    throw error;
+  }
+}
+
+export async function reportMessageAction(input: unknown): Promise<ReportResult> {
+  const request = ReportMessageRequestSchema.safeParse(input);
+  if (!request.success) return { error: "Choose a reason for the report." };
+  try {
+    const user = await requireCurrentUser(await headers());
+    const { characterId, ...report } = request.data;
+    return await reportMessage(user.id, characterId, report);
+  } catch (error) {
+    redirectOnGameplayRefusal(error);
+    if (error instanceof OwnershipError) return { error: error.message };
+    throw error;
+  }
+}
+
+export async function reportPlayerAction(input: unknown): Promise<ReportResult> {
+  const request = ReportPlayerRequestSchema.safeParse(input);
+  if (!request.success) return { error: "Choose a reason for the report." };
+  try {
+    const user = await requireCurrentUser(await headers());
+    const { characterId, ...report } = request.data;
+    return await reportPlayer(user.id, characterId, report);
   } catch (error) {
     redirectOnGameplayRefusal(error);
     if (error instanceof OwnershipError) return { error: error.message };

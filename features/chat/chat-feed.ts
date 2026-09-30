@@ -1,14 +1,15 @@
-import { CHAT_POLICY, chatSendPressure, type ChatChannel } from "@/game/domain/chat";
-import type {
-  ChatHistoryPage,
-  ChatMessageView,
-  ChatSendBudget,
-  PromotedAdStatus,
-} from "@/game/schemas/chat";
+import {
+  CHAT_POLICY,
+  chatSendPressure,
+  type ChatChannel,
+  type ChatSendChannel,
+} from "@/game/domain/chat";
+import type { ChatMessageView, ChatSendBudget, PromotedAdStatus } from "@/game/schemas/chat";
 
 /**
- * Browser-side public chat state (issue #246). Framework-free so it is
- * unit-testable; `PublicChat` owns the React wiring.
+ * Browser-side chat state (issue #246; Whisper conversations #247).
+ * Framework-free so it is unit-testable; `PublicChat` and `WhisperPanel` own
+ * the React wiring.
  *
  * A feed is a projection of durable messages keyed by message id and ordered
  * by `seq`. Every source — the latest page, an older page, a realtime delivery,
@@ -16,9 +17,15 @@ import type {
  * (several tabs, a delivery racing a read) is still rendered once.
  */
 
-export type ChatFeed = {
+/** Anything a feed can hold: a public message or a Whisper. */
+type Sequenced = { id: string; seq: number };
+
+/** The page shape both public history and Whisper history return. */
+type FeedPage<Message extends Sequenced> = { messages: readonly Message[]; hasOlder: boolean };
+
+export type Feed<Message extends Sequenced> = {
   /** Oldest first, unique by id. */
-  messages: readonly ChatMessageView[];
+  messages: readonly Message[];
   hasOlder: boolean;
   loaded: boolean;
   /**
@@ -28,17 +35,20 @@ export type ChatFeed = {
   syncedThrough?: number;
 };
 
-export const EMPTY_CHAT_FEED: ChatFeed = { messages: [], hasOlder: false, loaded: false };
+export type ChatFeed = Feed<ChatMessageView>;
+
+export const EMPTY_FEED: Feed<never> = { messages: [], hasOlder: false, loaded: false };
+export const EMPTY_CHAT_FEED: ChatFeed = EMPTY_FEED;
 
 /** Whether a message belongs in a channel's feed: an ad shows in both. */
 export function feedIncludes(channel: ChatChannel, message: ChatMessageView): boolean {
   return message.channel === channel || (channel === "general" && message.promoted);
 }
 
-function merge(
-  current: readonly ChatMessageView[],
-  incoming: readonly ChatMessageView[],
-): ChatMessageView[] {
+function merge<Message extends Sequenced>(
+  current: readonly Message[],
+  incoming: readonly Message[],
+): Message[] {
   const byId = new Map(current.map((message) => [message.id, message]));
   for (const message of incoming) byId.set(message.id, message);
   return [...byId.values()].sort((a, b) => a.seq - b.seq);
@@ -51,7 +61,10 @@ function merge(
  * (keeping only live messages from its span on) rather than render a silent
  * gap, and older ones load on request.
  */
-export function applyLatestPage(feed: ChatFeed, page: ChatHistoryPage): ChatFeed {
+export function applyLatestPage<Message extends Sequenced>(
+  feed: Feed<Message>,
+  page: FeedPage<Message>,
+): Feed<Message> {
   const oldestInPage = page.messages[0]?.seq;
   const newestInPage = page.messages.at(-1)?.seq;
   const syncedThrough = Math.max(feed.syncedThrough ?? 0, newestInPage ?? 0) || undefined;
@@ -82,7 +95,10 @@ export function applyLatestPage(feed: ChatFeed, page: ChatHistoryPage): ChatFeed
 }
 
 /** Apply a load-older page. */
-export function applyOlderPage(feed: ChatFeed, page: ChatHistoryPage): ChatFeed {
+export function applyOlderPage<Message extends Sequenced>(
+  feed: Feed<Message>,
+  page: FeedPage<Message>,
+): Feed<Message> {
   return { ...feed, messages: merge(feed.messages, page.messages), hasOlder: page.hasOlder };
 }
 
@@ -97,6 +113,17 @@ export function applyMessage(
   message: ChatMessageView,
 ): ChatFeed {
   if (!feedIncludes(channel, message)) return feed;
+  return insertMessage(feed, message);
+}
+
+/**
+ * Add one message to a feed it belongs in: a send result, a delivery, or a
+ * Whisper in its conversation.
+ */
+export function insertMessage<Message extends Sequenced>(
+  feed: Feed<Message>,
+  message: Message,
+): Feed<Message> {
   if (feed.messages.some((existing) => existing.id === message.id)) return feed;
   return { ...feed, messages: merge(feed.messages, [message]) };
 }
@@ -130,7 +157,7 @@ export type ComposerPressure = {
 /** The composer indicator for a channel at `now`, from the local budget. */
 export function composerPressure(
   budget: LocalChatBudget,
-  channel: ChatChannel,
+  channel: ChatSendChannel,
   now: number,
 ): ComposerPressure {
   const live = budget.expiresAt.filter((at) => at > now);

@@ -6,11 +6,17 @@ import { ActionButton } from "@/components/ui/ActionButton";
 import { Feedback } from "@/components/ui/Feedback";
 import { CharacterPortrait } from "@/components/portraits/CharacterPortrait";
 import { CharacterSkillList } from "@/features/shared/CharacterSkillList";
+import { useChat } from "@/features/chat/ChatContext";
+import { SafetyFlow, type SafetyOutcome } from "@/features/chat/SafetyFlow";
 import type { CharacterProfile } from "@/game/domain/character-profile";
 import { GAMEPLAY_ACCESS_REQUIRED_CODE } from "@/game/domain/gameplay-access";
 
 /** Public same-location profile presentation. The server remains the authority
- * for visibility and only returns the approved public projection. */
+ * for visibility and only returns the approved public projection.
+ *
+ * It is also a character-facing social surface (#247): Whisper opens the
+ * conversation inside Chat/Social without leaving the Location, and Report and
+ * Block act on this character's account by its public name only. */
 export function CharacterProfilePanel({
   activeCharacterId,
   targetName,
@@ -34,6 +40,24 @@ export function CharacterProfilePanel({
   const requestToken = useRef(0);
   const headingRef = useRef<HTMLHeadingElement>(null);
   const openedFor = useRef<string | undefined>(undefined);
+  const { startWhisper } = useChat();
+  const [safety, setSafety] = useState<"report" | "block">();
+  const [socialFeedback, setSocialFeedback] = useState<SafetyOutcome>();
+  const [whispering, setWhispering] = useState(false);
+
+  // A different profile never inherits the last one's open flow or outcome.
+  useEffect(() => {
+    setSafety(undefined);
+    setSocialFeedback(undefined);
+  }, [targetName]);
+
+  async function whisper(name: string) {
+    setWhispering(true);
+    setSocialFeedback(undefined);
+    const error = await startWhisper({ name });
+    setWhispering(false);
+    if (error) setSocialFeedback({ tone: "danger", text: error });
+  }
 
   useEffect(() => {
     if (targetName && openedFor.current === undefined) headingRef.current?.focus();
@@ -166,6 +190,55 @@ export function CharacterProfilePanel({
                   </p>
                 </div>
               </div>
+              <div
+                aria-label={`Interact with ${profile.displayName}`}
+                className="mt-3 flex flex-wrap gap-2"
+                data-profile-social-actions=""
+                role="group"
+              >
+                <ActionButton
+                  className="min-h-9 px-3 py-1 text-xs"
+                  loading={whispering}
+                  onClick={() => void whisper(profile.displayName)}
+                >
+                  Whisper
+                </ActionButton>
+                <ActionButton
+                  className="min-h-9 px-3 py-1 text-xs"
+                  intent="secondary"
+                  onClick={() => {
+                    setSocialFeedback(undefined);
+                    setSafety("report");
+                  }}
+                >
+                  Report
+                </ActionButton>
+                <ActionButton
+                  className="min-h-9 px-3 py-1 text-xs"
+                  intent="danger"
+                  onClick={() => {
+                    setSocialFeedback(undefined);
+                    setSafety("block");
+                  }}
+                >
+                  Block
+                </ActionButton>
+              </div>
+              {safety ? (
+                <div className="mt-3">
+                  <SafetyFlow
+                    mode={safety}
+                    onDone={(outcome) => {
+                      setSafety(undefined);
+                      setSocialFeedback(outcome);
+                    }}
+                    subject={{ name: profile.displayName, target: { name: profile.displayName } }}
+                  />
+                </div>
+              ) : null}
+              {socialFeedback ? (
+                <Feedback tone={socialFeedback.tone}>{socialFeedback.text}</Feedback>
+              ) : null}
               <CharacterSkillList className="mt-4" skills={profile.skills} />
             </>
           ) : null}

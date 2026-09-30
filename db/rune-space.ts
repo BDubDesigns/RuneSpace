@@ -1205,6 +1205,10 @@ export const accountAbuseEvents = pgTable(
  *   `pruneExpiredChatMessages` — rather than only hiding them.
  * - Each row is also one successful send in the account-wide rate window and,
  *   when promoted, the account's ad cooldown; neither is stored twice.
+ * - A Whisper (issue #247) is a `whisper` row bound to exactly one
+ *   `whisper_conversations` pair, so Whispers share the one immutable message
+ *   contract, the one send budget, and the one retention sweep. Public feeds
+ *   select by channel and never read a `whisper` row.
  */
 export const chatMessages = pgTable(
   "chat_messages",
@@ -1224,10 +1228,18 @@ export const chatMessages = pgTable(
     body: text("body").notNull(),
     // Null for an ordinary message; the Credits paid for a promoted Trade ad.
     promotedPriceCredits: integer("promoted_price_credits"),
+    // Set exactly when `channel` is `whisper` (#247).
+    conversationId: text("conversation_id").references(() => whisperConversations.id, {
+      onDelete: "restrict",
+    }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [
-    check("chat_messages_channel_check", sql`${table.channel} in ('general', 'trade')`),
+    check("chat_messages_channel_check", sql`${table.channel} in ('general', 'trade', 'whisper')`),
+    check(
+      "chat_messages_conversation_check",
+      sql`(${table.channel} = 'whisper') = (${table.conversationId} is not null)`,
+    ),
     check("chat_messages_body_length_check", sql`char_length(${table.body}) between 1 and 280`),
     check(
       "chat_messages_promoted_check",
@@ -1242,6 +1254,191 @@ export const chatMessages = pgTable(
       table.createdAt,
     ),
     index("chat_messages_created_idx").on(table.createdAt),
+    index("chat_messages_conversation_seq_idx")
+      .on(table.conversationId, table.seq)
+      .where(sql`${table.conversationId} is not null`),
+  ],
+);
+
+/**
+ * One 1:1 Whisper conversation (issue #247) between two characters of two
+ * different accounts. Player-facing identity is character-to-character, so the
+ * pair is two character ids — stable across renames — and `participant_key`
+ * (the two ids, lower first, joined by `:`) makes each pair unique. A
+ * conversation is created by its first Whisper, never merely by opening one,
+ * and is never deleted: ordinary retention removes its messages only.
+ */
+export const whisperConversations = pgTable("whisper_conversations", {
+  id: text("id")
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  participantKey: text("participant_key").notNull().unique(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+/**
+ * Each side of a Whisper conversation (#247): the participant character, its
+ * account (the safety identity Block and Report use), and that character's
+ * durable read position. Unread is derived, never counted: the other
+ * character's retained messages with `seq` above `last_read_seq`. Reading on
+ * any tab or device advances it, so unread clears everywhere.
+ */
+export const whisperParticipants = pgTable(
+  "whisper_participants",
+  {
+    conversationId: text("conversation_id")
+      .notNull()
+      .references(() => whisperConversations.id, { onDelete: "cascade" }),
+    characterId: text("character_id")
+      .notNull()
+      .references(() => characters.id, { onDelete: "restrict" }),
+    playerAccountId: text("player_account_id")
+      .notNull()
+      .references(() => playerAccounts.id, { onDelete: "restrict" }),
+    lastReadSeq: bigint("last_read_seq", { mode: "number" }).notNull().default(0),
+  },
+  (table) => [
+    primaryKey({ columns: [table.conversationId, table.characterId] }),
+    index("whisper_participants_character_idx").on(table.characterId),
+  ],
+);
+
+/**
+ * Current account-level Blocks (issue #247): the blocker account does not want
+ * the blocked account interacting with it. One row per pair while the Block
+ * stands; unblocking deletes it. The characters are the ones the player acted
+ * on and through — context only, since the Block covers every character of
+ * both accounts. History lives in `player_block_events`.
+ */
+export const playerBlocks = pgTable(
+  "player_blocks",
+  {
+    blockerPlayerAccountId: text("blocker_player_account_id")
+      .notNull()
+      .references(() => playerAccounts.id, { onDelete: "restrict" }),
+    blockedPlayerAccountId: text("blocked_player_account_id")
+      .notNull()
+      .references(() => playerAccounts.id, { onDelete: "restrict" }),
+    blockerCharacterId: text("blocker_character_id")
+      .notNull()
+      .references(() => characters.id, { onDelete: "restrict" }),
+    blockedCharacterId: text("blocked_character_id")
+      .notNull()
+      .references(() => characters.id, { onDelete: "restrict" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.blockerPlayerAccountId, table.blockedPlayerAccountId] }),
+    check(
+      "player_blocks_distinct_accounts_check",
+      sql`${table.blockerPlayerAccountId} <> ${table.blockedPlayerAccountId}`,
+    ),
+    index("player_blocks_blocked_idx").on(table.blockedPlayerAccountId),
+  ],
+);
+
+/**
+ * Append-only Block/Unblock history (#247): interpretable safety signals for
+ * operator review (#248), with stable account and character identities and
+ * the instant. Never a score, and nothing acts on it automatically.
+ */
+export const playerBlockEvents = pgTable(
+  "player_block_events",
+  {
+    id: text("id")
+      .primaryKey()
+      .default(sql`gen_random_uuid()`),
+    kind: text("kind").notNull(),
+    blockerPlayerAccountId: text("blocker_player_account_id")
+      .notNull()
+      .references(() => playerAccounts.id, { onDelete: "restrict" }),
+    blockedPlayerAccountId: text("blocked_player_account_id")
+      .notNull()
+      .references(() => playerAccounts.id, { onDelete: "restrict" }),
+    blockerCharacterId: text("blocker_character_id")
+      .notNull()
+      .references(() => characters.id, { onDelete: "restrict" }),
+    blockedCharacterId: text("blocked_character_id")
+      .notNull()
+      .references(() => characters.id, { onDelete: "restrict" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    check("player_block_events_kind_check", sql`${table.kind} in ('block', 'unblock')`),
+    index("player_block_events_blocked_created_idx").on(
+      table.blockedPlayerAccountId,
+      table.createdAt,
+    ),
+    index("player_block_events_blocker_created_idx").on(
+      table.blockerPlayerAccountId,
+      table.createdAt,
+    ),
+  ],
+);
+
+/**
+ * Player reports (issue #247): "RuneSpace should review this". Each row is a
+ * self-contained piece of moderation evidence for operator review (#248).
+ *
+ * - A `message` report names the immutable message id and snapshots the exact
+ *   message plus a bounded window of its own channel or Whisper conversation
+ *   into `evidence`, so the case survives ordinary 90-day retention deleting
+ *   the chat rows. `message_id` deliberately has no foreign key for the same
+ *   reason. A Whisper's window never reaches another conversation.
+ * - A `player` report names only the reported character; its name at report
+ *   time is kept for offensive-name reports.
+ * - One account can report one message once (the partial unique index).
+ * - The reported player is never told, and nothing here sanctions anyone.
+ */
+export const playerReports = pgTable(
+  "player_reports",
+  {
+    id: text("id")
+      .primaryKey()
+      .default(sql`gen_random_uuid()`),
+    kind: text("kind").notNull(),
+    reporterPlayerAccountId: text("reporter_player_account_id")
+      .notNull()
+      .references(() => playerAccounts.id, { onDelete: "restrict" }),
+    reporterCharacterId: text("reporter_character_id")
+      .notNull()
+      .references(() => characters.id, { onDelete: "restrict" }),
+    reportedPlayerAccountId: text("reported_player_account_id")
+      .notNull()
+      .references(() => playerAccounts.id, { onDelete: "restrict" }),
+    reportedCharacterId: text("reported_character_id")
+      .notNull()
+      .references(() => characters.id, { onDelete: "restrict" }),
+    reportedCharacterName: text("reported_character_name").notNull(),
+    reason: text("reason").notNull(),
+    note: text("note"),
+    messageId: text("message_id"),
+    // `general`, `trade`, or `whisper` for a message report.
+    channel: text("channel"),
+    conversationId: text("conversation_id").references(() => whisperConversations.id, {
+      onDelete: "restrict",
+    }),
+    evidence: jsonb("evidence"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    check("player_reports_kind_check", sql`${table.kind} in ('message', 'player')`),
+    check(
+      "player_reports_reason_check",
+      sql`${table.reason} in ('harassment_hate', 'threats', 'spam_scam', 'sexual_inappropriate', 'offensive_name_profile', 'other')`,
+    ),
+    check(
+      "player_reports_message_check",
+      sql`(${table.kind} = 'message') = (${table.messageId} is not null and ${table.channel} is not null and ${table.evidence} is not null)`,
+    ),
+    check(
+      "player_reports_conversation_check",
+      sql`(${table.channel} = 'whisper') = (${table.conversationId} is not null)`,
+    ),
+    uniqueIndex("player_reports_reporter_message_idx")
+      .on(table.reporterPlayerAccountId, table.messageId)
+      .where(sql`${table.messageId} is not null`),
+    index("player_reports_reported_created_idx").on(table.reportedPlayerAccountId, table.createdAt),
   ],
 );
 
@@ -1270,3 +1467,4 @@ export type OperatorAuditLog = typeof operatorAuditLogs.$inferSelect;
 export type NewOperatorAuditLog = typeof operatorAuditLogs.$inferInsert;
 export type RuneSpaceAccessState = typeof runespaceAccessState.$inferSelect;
 export type ChatMessage = typeof chatMessages.$inferSelect;
+export type PlayerReport = typeof playerReports.$inferSelect;

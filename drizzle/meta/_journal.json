@@ -232,6 +232,13 @@
       "when": 1790742510281,
       "tag": "0032_public_chat",
       "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "7",
+      "when": 1790764353856,
+      "tag": "0033_whispers_blocks_reports",
+      "breakpoints": true
     }
   ]
 }

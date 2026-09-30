@@ -109,6 +109,15 @@ describe("in-process publisher", () => {
     expect(audienceIncludes({ kind: "account", playerAccountId: "account-a" }, own)).toBe(true);
     expect(audienceIncludes({ kind: "account", playerAccountId: "account-b" }, own)).toBe(false);
     expect(audienceIncludes({ kind: "everyone" }, own)).toBe(true);
+    // A public message skips the accounts that blocked its sender (#247).
+    const blockers = new Set(["account-a"]);
+    expect(audienceIncludes({ kind: "everyone", exceptAccountIds: blockers }, own)).toBe(false);
+    expect(
+      audienceIncludes(
+        { kind: "everyone", exceptAccountIds: blockers },
+        scope("account-b", "char-b1"),
+      ),
+    ).toBe(true);
   });
 
   it("delivers one publish to every matching stream, including several tabs of one character", () => {

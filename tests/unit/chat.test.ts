@@ -9,6 +9,7 @@ import {
   decideChatSend,
   normalizeChatMessage,
   promotedAdCooldownRemaining,
+  whisperParticipantKey,
 } from "@/game/domain/chat";
 import type { ChatHistoryPage, ChatMessageView } from "@/game/schemas/chat";
 import {
@@ -17,6 +18,8 @@ import {
   applyOlderPage,
   composerPressure,
   EMPTY_CHAT_FEED,
+  EMPTY_FEED,
+  insertMessage,
   localBudget,
 } from "@/features/chat/chat-feed";
 import { containsSevereTerm, SEVERE_TERM_DIGESTS, severeTermDigest } from "@/server/chat-guardrail";
@@ -92,6 +95,22 @@ describe("shared account-wide send budget", () => {
     const old = [now - 10_000, now - 10_001, now - 20_000, now - 30_000, now - 40_000];
     expect(decideChatSend("general", old, now)).toEqual({ allowed: true });
     expect(decideChatSend("trade", old, now)).toEqual({ allowed: true });
+  });
+
+  it("lets Whispers (#247) share General's limit of five on the same count", () => {
+    const three = [now - 8_000, now - 3_000, now - 100];
+    // Three sends of any kind close Trade, never Whispers.
+    expect(decideChatSend("trade", three, now)).toMatchObject({ allowed: false });
+    expect(decideChatSend("whisper", three, now)).toEqual({ allowed: true });
+    const five = [...three, now - 60, now - 50];
+    expect(decideChatSend("whisper", five, now)).toEqual({ allowed: false, retryAfterMs: 2_000 });
+    expect(decideChatSend("general", five, now)).toEqual({ allowed: false, retryAfterMs: 2_000 });
+    expect([0, 1, 3, 5].map((count) => chatSendPressure("whisper", count))).toEqual([
+      "clear",
+      "low",
+      "high",
+      "full",
+    ]);
   });
 
   it("colours the composer by the #226 bands", () => {
@@ -274,5 +293,30 @@ describe("composer send pressure", () => {
       pressure: "clear",
       nextChangeAt: undefined,
     });
+  });
+});
+
+describe("Whisper conversations (#247)", () => {
+  it("names a pair by its two stable character ids, in either order", () => {
+    expect(whisperParticipantKey("b-char", "a-char")).toBe("a-char:b-char");
+    expect(whisperParticipantKey("a-char", "b-char")).toBe("a-char:b-char");
+  });
+
+  it("merges a Whisper once, in seq order, from any source", () => {
+    const whisper = (id: string, seq: number) => ({
+      id,
+      seq,
+      senderCharacterId: "a",
+      recipientCharacterId: "b",
+      senderName: "A",
+      body: id,
+      sentAt: new Date(0).toISOString(),
+    });
+    let feed = applyLatestPage(EMPTY_FEED, { messages: [whisper("one", 1)], hasOlder: false });
+    feed = insertMessage(feed, whisper("three", 3));
+    feed = insertMessage(feed, whisper("two", 2));
+    // The same delivery again (another tab, a reconnect racing a read).
+    feed = insertMessage(feed, whisper("three", 3));
+    expect(feed.messages.map((message) => message.id)).toEqual(["one", "two", "three"]);
   });
 });

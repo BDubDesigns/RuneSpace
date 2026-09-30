@@ -4,17 +4,17 @@
   "workState": "active",
   "currentFocus": "Preparing the October 27 Soft Alpha: verified players can reserve characters; account-level Early Access and a closed-by-default public gameplay gate control when play begins.",
   "currentChange": {
-    "summary": "General and Trade chat: persisted public channels in the Chat/Social drawer, a shared account-wide send limit with a live composer indicator, and 50-Credit promoted Trade ads.",
+    "summary": "Whispers, Block, and Report: 1:1 character Whispers with durable unread in the Chat/Social drawer, account-level Block with a Blocked Players list, and message and player reports that preserve evidence for review.",
     "stage": "review",
-    "pullRequestNumber": 260
+    "pullRequestNumber": 262
   },
   "latestCompleted": {
-    "summary": "Refining and Practice Welding can auto-discard byproduct Slag through one character-wide setting, without reserving inventory space for it.",
-    "date": "2026-09-29",
-    "url": "https://github.com/BDubDesigns/RuneSpace/pull/259"
+    "summary": "General and Trade chat: persisted public channels in the Chat/Social drawer, a shared account-wide send limit with a live composer indicator, and 50-Credit promoted Trade ads.",
+    "date": "2026-09-30",
+    "url": "https://github.com/BDubDesigns/RuneSpace/pull/260"
   },
-  "nextStep": "Human review and phone playtest of General and Trade chat; its community rules and safety disclosure (#248) are still to ship before chat opens publicly.",
-  "lastMeaningfulUpdate": "2026-09-29",
+  "nextStep": "Human review and phone playtest of Whispers, Block, and Report; community rules, safety disclosure, and operator moderation (#248) still ship before chat opens publicly.",
+  "lastMeaningfulUpdate": "2026-09-30",
   "highlights": [
     {
       "summary": "Deep Jag is playable: brace the cave-in for Tansy, mine Galvanite behind it, and refine Galvanic Stock and Galvaferrite at the Processing Yard.",

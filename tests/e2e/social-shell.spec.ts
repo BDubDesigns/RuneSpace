@@ -126,11 +126,11 @@ test("the floating Chat/Social launcher opens over Play without moving the playe
   const dialog = page.getByRole("dialog", { name: "Chat" });
   await expect(dialog).toBeVisible();
   await expect(dialog).toHaveAttribute("aria-modal", "true");
-  // The conversation region holds General and Trade (#246).
+  // The conversation region holds General and Trade (#246) and Whispers (#247).
   await expect(
     dialog
       .getByRole("region", { name: "Conversations" })
-      .getByRole("tablist", { name: "Public chat channels" }),
+      .getByRole("tablist", { name: "Chat channels" }),
   ).toBeVisible();
   // No domain has populated it yet, so there is no pinned region to show.
   await expect(dialog.getByRole("region", { name: "Needs your attention" })).toHaveCount(0);

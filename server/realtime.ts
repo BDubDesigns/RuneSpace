@@ -30,12 +30,13 @@ export type RealtimeScope = {
  * Who a publish is addressed to. Streams match by their server-derived scope:
  * - `character` — every open tab of one character (e.g. a Whisper recipient);
  * - `account` — every open tab of every character on one account;
- * - `everyone` — every open playable stream (e.g. a public channel).
+ * - `everyone` — every open playable stream (e.g. a public channel), less any
+ *   accounts in `exceptAccountIds` (the sender's blockers, #247).
  */
 export type RealtimeAudience =
   | { kind: "character"; characterId: string }
   | { kind: "account"; playerAccountId: string }
-  | { kind: "everyone" };
+  | { kind: "everyone"; exceptAccountIds?: ReadonlySet<string> };
 
 export type RealtimeSubscriber = {
   scope: RealtimeScope;
@@ -61,7 +62,7 @@ export function audienceIncludes(audience: RealtimeAudience, scope: RealtimeScop
     case "account":
       return audience.playerAccountId === scope.playerAccountId;
     case "everyone":
-      return true;
+      return !audience.exceptAccountIds?.has(scope.playerAccountId);
   }
 }
 
