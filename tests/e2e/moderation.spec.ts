@@ -10,7 +10,12 @@ import { PORTRAIT_IDS } from "@/game/config/foundations";
 import { auth } from "@/server/auth";
 import * as characters from "@/server/characters";
 import * as ownership from "@/server/ownership";
-import { issueSanctionAs, openModerationCaseAs } from "@/server/moderation-seams";
+import {
+  changeSanctionDurationAs,
+  issueSanctionAs,
+  openModerationCaseAs,
+  reverseSanctionAs,
+} from "@/server/moderation-seams";
 import { reportMessage } from "@/server/player-reports";
 import { cleanupTestUser, createCharacterForUser, createTestUser } from "../integration/fixtures";
 import { ADMIN_USER_ID, seedAdminOperator, seedNonAdminUser } from "./admin-session";
@@ -564,9 +569,9 @@ for (const viewport of VIEWPORTS) {
  * (the journey above proves the console path), so the drawer opens with the
  * pinned notice already there.
  */
-async function restrictAccount(subject: Player) {
+async function restrictAccount(subject: Player): Promise<string> {
   const now = new Date();
-  await db.transaction(async (tx) => {
+  return db.transaction(async (tx) => {
     const opened = await openModerationCaseAs(
       tx,
       ADMIN_USER_ID,
@@ -574,7 +579,7 @@ async function restrictAccount(subject: Player) {
       "Phone scrolling check",
       now,
     );
-    await issueSanctionAs(
+    const issued = await issueSanctionAs(
       tx,
       ADMIN_USER_ID,
       {
@@ -585,6 +590,7 @@ async function restrictAccount(subject: Player) {
       },
       now,
     );
+    return issued.sanctionId;
   });
 }
 
@@ -602,7 +608,13 @@ function history(sender: Player, channel: "general" | "trade", tag: string, coun
 }
 
 /** A long Whisper conversation between two characters, oldest first. */
-async function seedWhispers(me: Player, peer: Player, tag: string, count: number) {
+async function seedWhispers(
+  me: Player,
+  peer: Player,
+  tag: string,
+  count: number,
+  { unreadForMe = false }: { unreadForMe?: boolean } = {},
+) {
   await db.transaction(async (tx) => {
     const [conversation] = await tx
       .insert(rune.whisperConversations)
@@ -613,7 +625,7 @@ async function seedWhispers(me: Player, peer: Player, tag: string, count: number
         conversationId: conversation!.id,
         characterId: me.character.id,
         playerAccountId: me.character.playerAccountId,
-        lastReadSeq: Number.MAX_SAFE_INTEGER,
+        lastReadSeq: unreadForMe ? 0 : Number.MAX_SAFE_INTEGER,
       },
       {
         conversationId: conversation!.id,
@@ -755,6 +767,72 @@ test("a phone player with a pinned notice can scroll General, Trade, and a long 
   );
   await expectNoHorizontalOverflow(page, dialog);
   await phone.close();
+});
+
+/** The launcher's accessible name: "Chat", or its attention count. */
+function launcherName(count: number) {
+  if (count === 0) return "Chat";
+  return `Chat, ${count} ${count === 1 ? "item needs" : "items need"} attention`;
+}
+
+test("a pinned notice lights the launcher until seen, and never clears Whisper unread", async ({
+  browser,
+}, testInfo) => {
+  test.skip(testInfo.project.name !== "chromium", "two-account journey; runs once");
+  const tag = randomUUID().slice(0, 8);
+  const { player: me, context } = await player(browser, PHONE, "Noticed");
+  const peer = await reporterAccount("Notice peer");
+  // Two unread Whispers from the peer (four lines, alternating, peer first).
+  await seedWhispers(me, peer, tag, 4, { unreadForMe: true });
+  const sanctionId = await restrictAccount(me);
+  const page = await context.newPage();
+
+  // A new notice asks for attention alongside the unread Whispers.
+  await openPlay(page, me.character.id);
+  await expect(launcher(page)).toHaveAccessibleName(launcherName(3));
+
+  // Opening Chat/Social presents the notice; closing leaves only the Whispers.
+  let dialog = await openChat(page);
+  await expect(noticeCard(dialog)).toBeVisible();
+  await dialog.getByRole("button", { name: "Close chat" }).click();
+  await expect(dialog).toBeHidden();
+  await expect(launcher(page)).toHaveAccessibleName(launcherName(2));
+
+  // Seen stays seen on this device across a reload, and the notice stays pinned.
+  await page.reload();
+  await expect(launcher(page)).toHaveAttribute("data-realtime-status", "live");
+  await expect(launcher(page)).toHaveAccessibleName(launcherName(2));
+  dialog = await openChat(page);
+  await expect(noticeCard(dialog)).toBeVisible();
+
+  // Reading the Whispers clears only their unread; the notice is untouched.
+  await dialog.getByRole("tab", { name: /^Whispers/ }).click();
+  await dialog.getByRole("button", { name: new RegExp(`^${peer.character.displayName}`) }).click();
+  await expect(
+    dialog.locator(`[data-whisper-log="${peer.character.id}"]`).getByText(`whisper line 4 ${tag}`),
+  ).toBeVisible();
+  await dialog.getByRole("button", { name: "Close chat" }).click();
+  await expect(launcher(page)).toHaveAccessibleName(launcherName(0));
+  dialog = await openChat(page);
+  await expect(noticeCard(dialog)).toBeVisible();
+  await dialog.getByRole("button", { name: "Close chat" }).click();
+
+  // A changed notice (a new end) is new again.
+  await db.transaction((tx) =>
+    changeSanctionDurationAs(tx, ADMIN_USER_ID, sanctionId, "30d", new Date()),
+  );
+  await page.reload();
+  await expect(launcher(page)).toHaveAttribute("data-realtime-status", "live");
+  await expect(launcher(page)).toHaveAccessibleName(launcherName(1));
+
+  // Reversal removes the notice and its card as before.
+  await db.transaction((tx) => reverseSanctionAs(tx, ADMIN_USER_ID, sanctionId, new Date()));
+  await page.reload();
+  await expect(launcher(page)).toHaveAttribute("data-realtime-status", "live");
+  await expect(launcher(page)).toHaveAccessibleName(launcherName(0));
+  dialog = await openChat(page);
+  await expect(dialog.getByRole("region", { name: "Needs your attention" })).toHaveCount(0);
+  await context.close();
 });
 
 // -- 2. Suspension -------------------------------------------------------------

@@ -244,6 +244,25 @@ describe("client seam: duplicate delivery is harmless", () => {
       socialShellReducer(cleared, { type: "setAttention", source: "whispers", count: 0 }),
     ).toBe(cleared);
   });
+
+  it("keeps a seen card pinned without its attention, and never touches a source (#248)", () => {
+    const notice = { key: "moderation-notice:1", label: "Moderation notice", content: "notice" };
+    const actions: SocialShellAction[] = [
+      { type: "upsertCard", card: notice },
+      { type: "setAttention", source: "whispers", count: 2 },
+    ];
+    const unseen = actions.reduce(socialShellReducer, INITIAL_SOCIAL_SHELL_STATE);
+    expect(socialAttentionCount(unseen)).toBe(3);
+
+    const seen = socialShellReducer(unseen, {
+      type: "upsertCard",
+      card: { ...notice, attention: false },
+    });
+    expect(seen.cards.map((card) => card.key)).toEqual(["moderation-notice:1"]);
+    // Only the notice's own contribution goes; unread Whispers still count.
+    expect(socialAttentionCount(seen)).toBe(2);
+    expect(seen.attention).toEqual({ whispers: 2 });
+  });
 });
 
 type FakeTimer = { fn: () => void; ms: number };

@@ -139,7 +139,12 @@ read a notice and appeal. Every read is scoped to that account.
   (in effect, or a warning issued in the last 30 days); for a suspended account
   that callout replaces the Soft Alpha, Play, Reserve, and New character
   treatments. In Play, each current notice is a pinned "Moderation notice"
-  card in Chat/Social, and a social restriction holds the composers' Send. All
+  card in Chat/Social for as long as it is current, and a social restriction
+  holds the composers' Send. The card lights the Chat/Social launcher only
+  until the open panel has shown it: that acknowledgement is presentation
+  kept on the device (`features/moderation/notice-acknowledgement.ts`, keyed
+  by sanction and end, so a changed duration asks again), not moderation
+  state, and it never touches durable Whisper unread. All
   notices are listed at `/moderation`; `/moderation/{sanctionId}` shows one
   with its appeal form. The server pushes `"moderation.notices"` to the
   account's tabs after any sanction or appeal change.

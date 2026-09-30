@@ -177,7 +177,9 @@ only — never gameplay or social authority.
 - **Chat/Social shell:** `features/social/SocialContext.tsx` is the seam
   downstream features consume — `subscribe`, `onReconcile`, the pinned
   actionable-card region (`upsertCard` / `removeCard`), and attention
-  (`setAttention`). `ChatSocialSurface` is the content; today
+  (`setAttention`). A pinned card counts toward the launcher's attention unless
+  its owner marks it `attention: false` — a seen moderation notice stays pinned
+  without lighting the launcher (#248). `ChatSocialSurface` is the content; today
   `ChatSocialDrawer` presents it as a Drawer over the current Play surface,
   opened by the `ChatSocialLauncher` that `GameShell`'s `floatingAction` slot
   pins to the right edge at a normalized `{ side, y }` position. Open state lives in the context, so a later docked

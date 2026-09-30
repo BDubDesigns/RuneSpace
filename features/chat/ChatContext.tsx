@@ -15,6 +15,11 @@ import { GAMEPLAY_ACCESS_REQUIRED_CODE } from "@/game/domain/gameplay-access";
 import type { SanctionNoticeView, SanctionNoticesView } from "@/game/schemas/moderation";
 import type { CharacterTarget, WhisperInbox, WhisperPeer } from "@/game/schemas/whispers";
 import { isSocialRestriction } from "@/features/moderation/notice-format";
+import {
+  acknowledgeNotices,
+  noticeAcknowledgementKey,
+  readAcknowledgedNotices,
+} from "@/features/moderation/notice-acknowledgement";
 import { SocialNoticeCard } from "@/features/moderation/SocialNoticeCard";
 import { useSocial } from "@/features/social/SocialContext";
 import { openWhisperAction } from "@/server/actions";
@@ -34,7 +39,8 @@ import { openWhisperAction } from "@/server/actions";
  *   Block actions and by `"safety.blocks"` from the account's other tabs;
  * - the account's current moderation notices (#248), re-read on mount,
  *   reconnect, tab resume, and `"moderation.notices"`. Each current notice is
- *   a pinned social card, and a current social restriction tells the
+ *   a pinned social card that lights the launcher only until the panel has
+ *   shown it on this device, and a current social restriction tells the
  *   composers to hold Send (presentation only; the server refuses the send).
  *
  * Every number here mirrors server state; nothing is authority.
@@ -119,11 +125,17 @@ export function ChatProvider({
   const router = useRouter();
   const routerRef = useRef(router);
   routerRef.current = router;
-  const { openSocial, onReconcile, removeCard, setAttention, subscribe, upsertCard } = useSocial();
+  const { open, openSocial, onReconcile, removeCard, setAttention, subscribe, upsertCard } =
+    useSocial();
   const [view, setView] = useState<ChatView>({ tab: "general" });
   const [inbox, setInbox] = useState<WhisperInbox>();
   const [blocksRevision, setBlocksRevision] = useState(0);
   const [notices, setNotices] = useState<SanctionNoticeView[]>([]);
+  // Notices this device has already shown in the open panel (#248). Notices
+  // are only fetched after mount, so the server render never depends on it.
+  const [seenNotices, setSeenNotices] = useState<ReadonlySet<string>>(() =>
+    typeof window === "undefined" ? new Set() : readAcknowledgedNotices(),
+  );
   // Inbox answers can arrive out of order; only the newest request applies.
   const requestCounter = useRef(0);
   const noticeRequestCounter = useRef(0);
@@ -172,11 +184,25 @@ export function ChatProvider({
         key,
         label: "Moderation notice",
         content: <SocialNoticeCard notice={notice} />,
+        // Pinned while current; lights the launcher only until it is seen.
+        attention: !seenNotices.has(noticeAcknowledgementKey(notice)),
       });
     }
     for (const key of noticeCardKeys.current) if (!keys.has(key)) remove(key);
     noticeCardKeys.current = keys;
-  }, [notices]);
+  }, [notices, seenNotices]);
+
+  // Opening Chat/Social presents every current notice at the top of the
+  // panel, so each one has now been seen on this device. Whisper unread is a
+  // separate source and is untouched.
+  useEffect(() => {
+    if (!open) return;
+    const unseen = notices
+      .filter((notice) => notice.current)
+      .map(noticeAcknowledgementKey)
+      .filter((key) => !seenNotices.has(key));
+    if (unseen.length > 0) setSeenNotices(acknowledgeNotices(seenNotices, unseen));
+  }, [notices, open, seenNotices]);
 
   useEffect(
     () =>
