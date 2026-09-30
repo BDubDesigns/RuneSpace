@@ -1,4 +1,4 @@
-import { expect, type Locator } from "@playwright/test";
+import { expect, type Locator, type Page } from "@playwright/test";
 import { and, eq } from "drizzle-orm";
 import { db } from "@/db";
 import {
@@ -20,6 +20,46 @@ const RESULT_FEEDBACK_DURATION_MS = 3_600;
  * `Locator.evaluate` types its element as `HTMLElement | SVGElement`; artwork
  * checks read `<img>` properties, so narrow the element type here.
  */
+/**
+ * Scroll to the document's real end and check Play's fixed bottom chrome.
+ * Since #245 the first fixed control under the content is the floating
+ * Chat/Social launcher, one space-2 gap above the nav, and the page reserves
+ * the shared space-3 breathing room above the launcher, so neither covers the
+ * last content and the nav's own box height is unchanged.
+ */
+async function expectPlayBottomChrome(page: Page) {
+  await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
+  const geometry = await page.evaluate(() => {
+    const probe = document.createElement("div");
+    probe.style.position = "absolute";
+    document.body.append(probe);
+    probe.style.height = "var(--rs-space-3)";
+    const contentGap = probe.getBoundingClientRect().height;
+    probe.style.height = "var(--rs-space-2)";
+    const launcherGap = probe.getBoundingClientRect().height;
+    probe.remove();
+    const content = document.querySelector("main");
+    const nav = document.querySelector('nav[aria-label="Primary"]');
+    const launcher = document.querySelector("[data-chat-social-launcher]");
+    return {
+      contentBottom: content?.getBoundingClientRect().bottom ?? 0,
+      launcherTop: launcher?.getBoundingClientRect().top ?? 0,
+      launcherBottom: launcher?.getBoundingClientRect().bottom ?? 0,
+      navTop: nav?.getBoundingClientRect().top ?? 0,
+      navPosition: nav ? getComputedStyle(nav).position : "",
+      contentGap,
+      launcherGap,
+    };
+  });
+  expect(geometry.navPosition).toBe("fixed");
+  expect(
+    Math.abs(geometry.launcherTop - geometry.contentBottom - geometry.contentGap),
+  ).toBeLessThanOrEqual(2);
+  expect(
+    Math.abs(geometry.navTop - geometry.launcherBottom - geometry.launcherGap),
+  ).toBeLessThanOrEqual(2);
+}
+
 function evaluateImage<R>(locator: Locator, read: (image: HTMLImageElement) => R): Promise<R> {
   return locator.evaluate<R, HTMLImageElement>(read);
 }
@@ -502,23 +542,10 @@ test("shell reserves the fixed footer once and keeps the global background fixed
   // The Yard used to be assumed taller than the viewport; since #193 compacted
   // the Refining stack it very nearly fits one. The footer contract does not
   // depend on that either way — what follows scrolls to the end of whatever
-  // the document is and checks the nav stays fixed with the shared space-3
-  // gap, and the global background stays fixed.
+  // the document is and checks the fixed chrome keeps the shared space-3 gap
+  // (see expectPlayBottomChrome), and the global background stays fixed.
   expect(yardGeometry.scrollHeight).toBeGreaterThanOrEqual(yardGeometry.clientHeight);
-  await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
-  const yardBottomGeometry = await page.evaluate(() => {
-    const content = document.querySelector("main");
-    const nav = document.querySelector('nav[aria-label="Primary"]');
-    return {
-      contentBottom: content?.getBoundingClientRect().bottom ?? 0,
-      navTop: nav?.getBoundingClientRect().top ?? 0,
-    };
-  });
-  expect(
-    Math.abs(
-      yardBottomGeometry.navTop - yardBottomGeometry.contentBottom - yardGeometry.expectedGap,
-    ),
-  ).toBeLessThanOrEqual(2);
+  await expectPlayBottomChrome(page);
   await captureReviewScreenshot(page, "layout-mobile-play-yard.png");
 
   const background = await page.evaluate(() => ({
@@ -544,54 +571,20 @@ test("shell reserves the fixed footer once and keeps the global background fixed
     scrollHeight: document.documentElement.scrollHeight,
   }));
   expect(crashGeometry.scrollHeight - crashGeometry.clientHeight).toBeGreaterThan(10);
-  await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
-  const bottomGeometry = await page.evaluate(() => {
-    const content = document.querySelector("main");
-    const nav = document.querySelector('nav[aria-label="Primary"]');
-    const spacingProbe = document.createElement("div");
-    spacingProbe.style.height = "var(--rs-space-3)";
-    spacingProbe.style.position = "absolute";
-    document.body.append(spacingProbe);
-    const expectedGap = spacingProbe.getBoundingClientRect().height;
-    spacingProbe.remove();
-    return {
-      contentBottom: content?.getBoundingClientRect().bottom ?? 0,
-      navTop: nav?.getBoundingClientRect().top ?? 0,
-      navPosition: nav ? getComputedStyle(nav).position : "",
-      expectedGap,
-    };
-  });
-  expect(bottomGeometry.navPosition).toBe("fixed");
-  // The document's real end keeps the shared space-3 breathing room above the
-  // fixed toolbar without changing the toolbar's own box height.
-  const bottomGap = bottomGeometry.navTop - bottomGeometry.contentBottom;
-  expect(Math.abs(bottomGap - bottomGeometry.expectedGap)).toBeLessThanOrEqual(2);
+  // The document's real end keeps the shared breathing room above the fixed
+  // chrome without changing the toolbar's own box height.
+  await expectPlayBottomChrome(page);
   await captureReviewScreenshot(page, "layout-mobile-play-bottom.png");
 
   // A viewport-height change (a proxy for browser-chrome/orientation changes)
   // must not create a tail, while the genuinely tall Crash Site state remains
   // scrollable. Real mobile Chrome is the decisive dynamic-viewport check.
   await page.setViewportSize({ width: 844, height: 390 });
-  await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
-  const landscapeGeometry = await page.evaluate(() => {
-    const content = document.querySelector("main");
-    const nav = document.querySelector('nav[aria-label="Primary"]');
-    const spacingProbe = document.createElement("div");
-    spacingProbe.style.height = "var(--rs-space-3)";
-    spacingProbe.style.position = "absolute";
-    document.body.append(spacingProbe);
-    const expectedGap = spacingProbe.getBoundingClientRect().height;
-    spacingProbe.remove();
-    return {
-      contentBottom: content?.getBoundingClientRect().bottom ?? 0,
-      navTop: nav?.getBoundingClientRect().top ?? 0,
-      scrollRange: document.documentElement.scrollHeight - document.documentElement.clientHeight,
-      expectedGap,
-    };
-  });
-  expect(landscapeGeometry.scrollRange).toBeGreaterThan(10);
-  const landscapeGap = landscapeGeometry.navTop - landscapeGeometry.contentBottom;
-  expect(Math.abs(landscapeGap - landscapeGeometry.expectedGap)).toBeLessThanOrEqual(2);
+  const scrollRange = await page.evaluate(
+    () => document.documentElement.scrollHeight - document.documentElement.clientHeight,
+  );
+  expect(scrollRange).toBeGreaterThan(10);
+  await expectPlayBottomChrome(page);
   await captureReviewScreenshot(page, "layout-mobile-play-scrolled-background.png");
 });
 

@@ -212,10 +212,15 @@ Hermes host.
   lifetime.
 - `tests/e2e/social-shell.spec.ts` proves, at phone and desktop widths, the
   floating launcher's placement and clearance, the Drawer over the current
-  surface, reconnect after the deliberate close, one stream per tab across
-  several tabs, and recovery of a suspended, offline tab. It ends streams
-  through the local-E2E-only `POST /api/e2e/realtime` hook instead of waiting
-  out the 5-minute lifetime.
+  surface, the accessible attention state and a pinned card driven through the
+  real `SocialContext` seam, reconnect after the deliberate close, one stream
+  per tab across several tabs, and recovery of a suspended, offline tab. It
+  ends streams through the local-E2E-only `POST /api/e2e/realtime` hook instead
+  of waiting out the 5-minute lifetime, and reaches the seam from the page's
+  React fiber because no production feature raises attention yet.
+- `tests/e2e/mining.spec.ts` ("shell reserves the fixed footer once") owns
+  Play's bottom-chrome geometry: the shared space-3 gap above the floating
+  launcher and the space-2 gap between the launcher and the nav.
 
 ## What to test when systems arrive
 For progression-sensitive systems, prioritize:

@@ -198,7 +198,8 @@ export function createRealtimeConnection({
       const decoder = new TextDecoder();
       for (;;) {
         const { done, value } = await reader.read();
-        if (done) break;
+        // A replaced attempt must never touch the current attempt's watchdog.
+        if (done || attempt !== current) break;
         armWatchdog(attempt);
         parser.push(decoder.decode(value, { stream: true }));
       }

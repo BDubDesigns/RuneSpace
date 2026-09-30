@@ -94,6 +94,94 @@ test("the floating Chat/Social launcher opens over Play without moving the playe
   await expect(page.getByRole("group", { name: "Local map" })).toBeVisible();
 });
 
+/**
+ * Drive the live Play tab's real `SocialContext` — the seam downstream
+ * features will call — from the browser. No production feature raises
+ * attention or pins a card until #246/#247/#225, and the app has no test-only
+ * path for it, so this finds the context value on the launcher's React fiber
+ * (property names survive minification) and calls its public methods.
+ */
+async function callSocialSeam(
+  page: Page,
+  call: { attention?: [string, number]; card?: { key: string; label: string; text: string } },
+) {
+  await page.locator("[data-chat-social-launcher]").evaluate((element, request) => {
+    type Seam = {
+      setAttention: (source: string, count: number) => void;
+      upsertCard: (card: { key: string; label: string; content: string }) => void;
+    };
+    type Fiber = { return: Fiber | null; memoizedProps?: { value?: Partial<Seam> } };
+    const key = Object.keys(element).find((name) => name.startsWith("__reactFiber$"));
+    let fiber = key ? (element as unknown as Record<string, Fiber>)[key]! : null;
+    while (fiber && typeof fiber.memoizedProps?.value?.setAttention !== "function") {
+      fiber = fiber.return;
+    }
+    const seam = fiber?.memoizedProps?.value as Seam | undefined;
+    if (!seam) throw new Error("SocialContext not found");
+    if (request.attention) seam.setAttention(...request.attention);
+    if (request.card) {
+      seam.upsertCard({
+        key: request.card.key,
+        label: request.card.label,
+        content: request.card.text,
+      });
+    }
+  }, call);
+}
+
+test("attention and pinned cards render accessibly through the real seam", async ({
+  page,
+  testCharacter,
+}, testInfo) => {
+  await openTestCharacter(page, testCharacter.id);
+  await expectLive(page);
+
+  await callSocialSeam(page, { attention: ["e2e-source", 2] });
+  // Setting the same count again (a duplicate delivery) changes nothing.
+  await callSocialSeam(page, { attention: ["e2e-source", 2] });
+  const control = page.getByRole("button", { name: "Chat, 2 items need attention" });
+  await expect(control).toBeVisible();
+  const badge = control.locator("[data-chat-social-attention]");
+  await expect(badge).toHaveText("2");
+  await expect(badge).toHaveAttribute("aria-hidden", "true");
+
+  const controlBox = (await control.boundingBox())!;
+  const badgeBox = (await badge.boundingBox())!;
+  const navBox = (await page.getByRole("navigation", { name: "Primary" }).boundingBox())!;
+  // The badge sits inside the button's own top-right corner, so the bevel
+  // never clips it, and the control still clears the footer.
+  expect(badgeBox.x).toBeGreaterThanOrEqual(controlBox.x + controlBox.width / 2);
+  expect(badgeBox.x + badgeBox.width).toBeLessThanOrEqual(controlBox.x + controlBox.width);
+  expect(badgeBox.y).toBeGreaterThanOrEqual(controlBox.y);
+  expect(badgeBox.y + badgeBox.height).toBeLessThanOrEqual(controlBox.y + controlBox.height / 2);
+  expect(controlBox.y + controlBox.height).toBeLessThanOrEqual(navBox.y);
+  // The halo is painted by the unclipped wrapper, not the beveled button.
+  expect(
+    await control.evaluate((button) => getComputedStyle(button.parentElement!).boxShadow),
+  ).not.toBe("none");
+  await captureReviewScreenshot(page, `issue-245-attention-${testInfo.project.name}.png`);
+
+  // A domain-owned card is pinned above conversations and adds to attention;
+  // the same card delivered twice is still one card.
+  const card = { key: "e2e-card:1", label: "Example actionable card", text: "Needs a response" };
+  await callSocialSeam(page, { card });
+  await callSocialSeam(page, { card });
+  const withCard = page.getByRole("button", { name: "Chat, 3 items need attention" });
+  await expect(withCard).toBeVisible();
+  await withCard.click();
+  const dialog = page.getByRole("dialog", { name: "Chat" });
+  const pinned = dialog.getByRole("region", { name: "Needs your attention" });
+  await expect(pinned.getByRole("listitem")).toHaveCount(1);
+  await expect(pinned.getByRole("listitem", { name: "Example actionable card" })).toHaveText(
+    "Needs a response",
+  );
+  const pinnedBox = (await pinned.boundingBox())!;
+  const conversationsBox = (await dialog
+    .getByRole("region", { name: "Conversations" })
+    .boundingBox())!;
+  expect(pinnedBox.y + pinnedBox.height).toBeLessThanOrEqual(conversationsBox.y);
+});
+
 test("the stream reconnects after its deliberate close, and several tabs stay one stream each", async ({
   page,
   testCharacter,

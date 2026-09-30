@@ -67,7 +67,7 @@ export function GameShell({
       </div>
       {aside ? <aside className="mt-4 lg:mt-0">{aside}</aside> : null}
       {floatingAction ? (
-        <div className="fixed bottom-[var(--rs-floating-action-bottom)] right-[max(0.75rem,env(safe-area-inset-right))] z-20">
+        <div className="fixed bottom-[var(--rs-floating-action-bottom)] right-[max(0.75rem,env(safe-area-inset-right))] z-20 flex">
           {floatingAction}
         </div>
       ) : null}
