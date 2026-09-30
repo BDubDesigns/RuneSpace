@@ -84,6 +84,7 @@ export type ChatSendRefusalReason =
   | "too_long"
   | "rate_limited"
   | "prohibited_term"
+  | "socially_restricted"
   | "insufficient_credits"
   | "ad_cooldown";
 

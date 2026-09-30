@@ -13,6 +13,8 @@ import { createCharacter, changeCharacterPortrait, CharacterError } from "@/serv
 import { GameplayAccessError, loadAccountGameplayAccess } from "@/server/gameplay-access";
 import { db } from "@/db";
 import { acknowledgeNews } from "@/server/account-news";
+import { SubmitAppealRequestSchema, type SubmitAppealResult } from "@/game/schemas/moderation";
+import { submitAppeal } from "@/server/moderation-notices";
 import {
   getPlayGameplayState,
   beginTransportTravel,
@@ -224,6 +226,24 @@ export async function acknowledgeNewsAction(): Promise<void> {
   const user = await requireCurrentUser(await headers());
   await acknowledgeNews(user.id);
   redirect("/updates");
+}
+
+/**
+ * Appeal one moderation sanction on the player's own account (issue #248).
+ * Account management, not gameplay: a suspended player must still be able to
+ * appeal, so this needs only an authenticated session and never enters the
+ * gameplay-access gate.
+ */
+export async function submitModerationAppealAction(input: unknown): Promise<SubmitAppealResult> {
+  const request = SubmitAppealRequestSchema.safeParse(input);
+  if (!request.success) return { error: "Invalid appeal." };
+  try {
+    const user = await requireCurrentUser(await headers());
+    return await submitAppeal(user.id, request.data);
+  } catch (error) {
+    if (error instanceof OwnershipError) return { error: error.message };
+    throw error;
+  }
 }
 
 export type ChangeCharacterPortraitActionResult = { characterId?: string; error?: string };

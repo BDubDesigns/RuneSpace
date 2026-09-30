@@ -919,8 +919,13 @@ suite("issue #247 Whispers, Block, and Report (real PostgreSQL)", () => {
         ),
       ).toBe(false);
       // The database refuses an unknown reason even from a buggy writer.
+      const [filed] = await db
+        .select({ caseId: rune.playerReports.caseId })
+        .from(rune.playerReports)
+        .where(eq(rune.playerReports.reporterCharacterId, reporter.character.id));
       await expect(
         db.insert(rune.playerReports).values({
+          caseId: filed!.caseId,
           kind: "player",
           reporterPlayerAccountId: reporter.character.playerAccountId,
           reporterCharacterId: reporter.character.id,

@@ -1,12 +1,20 @@
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { user } from "@/db/auth-schema";
-import { characters, playerAccounts, runespaceAccessState, type Character } from "@/db/rune-space";
+import {
+  characters,
+  moderationSanctions,
+  playerAccounts,
+  runespaceAccessState,
+  type Character,
+} from "@/db/rune-space";
 import {
   decideGameplayAccess,
   GAMEPLAY_ACCESS_REQUIRED_CODE,
   type GameplayAccessDecision,
+  type GameplayAccessRefusal,
 } from "@/game/domain/gameplay-access";
+import { hasSanctionInEffect } from "@/game/domain/moderation";
 import { OwnershipError } from "@/server/ownership";
 
 /**
@@ -15,9 +23,11 @@ import { OwnershipError } from "@/server/ownership";
  * `decideGameplayAccess` (`game/domain/gameplay-access.ts`) is the one rule;
  * this module is the one place that loads its inputs. Every load is a single
  * fresh query per request — the account row, `user.email_verified` read from
- * the database (never the session payload), and the global access singleton —
- * so revoking Early Access or closing public gameplay takes effect on the very
- * next authoritative request. Nothing here caches entitlement.
+ * the database (never the session payload), the global access singleton, and
+ * the account's unreversed suspensions (issue #248) — so revoking Early
+ * Access, closing public gameplay, or suspending an account takes effect on
+ * the very next authoritative request, and a suspension ends at its exact end
+ * instant with no job. Nothing here caches entitlement.
  *
  * Enforcement seams (the only two; see the inventory in docs/admin-console.md):
  * - `requireGameplayAccess` runs inside the shared owned-character lock
@@ -42,7 +52,7 @@ export const GAMEPLAY_ACCESS_REQUIRED_MESSAGE = "Gameplay is not open for this a
  */
 export class GameplayAccessError extends OwnershipError {
   readonly code = GAMEPLAY_ACCESS_REQUIRED_CODE;
-  constructor(readonly reason: "email_unverified" | "gameplay_closed") {
+  constructor(readonly reason: GameplayAccessRefusal) {
     super(GAMEPLAY_ACCESS_REQUIRED_MESSAGE, 403);
     this.name = "GameplayAccessError";
   }
@@ -58,13 +68,19 @@ export type AccountGameplayAccess = {
   publicGameplayOpen: boolean;
   /** Presentation only; null only if the singleton row is missing. */
   launchTargetAt: Date | null;
+  /** An account suspension is in effect (issue #248). */
+  suspended: boolean;
   decision: GameplayAccessDecision;
 };
 
-/** Load one account's authoritative access inputs and decision in one query. */
+/**
+ * Load one account's authoritative access inputs and decision in one query.
+ * `now` decides whether a suspension is still in effect; it never grants.
+ */
 export async function loadAccountGameplayAccess(
   executor: Executor,
   userId: string,
+  now: Date = new Date(),
 ): Promise<AccountGameplayAccess> {
   const rows = await executor
     .select({
@@ -74,6 +90,17 @@ export async function loadAccountGameplayAccess(
       earlyAccessGrantedByAdminUserId: playerAccounts.earlyAccessGrantedByAdminUserId,
       publicGameplayOpen: runespaceAccessState.publicGameplayOpen,
       launchTargetAt: runespaceAccessState.softAlphaLaunchTargetAt,
+      // Unreversed suspensions' start/end, as epoch milliseconds; whether one
+      // is in effect is the moderation rule's call, not this query's.
+      suspensions: sql<{ startsAt: number; endsAt: number | null }[]>`coalesce((
+        select json_agg(json_build_object(
+          'startsAt', extract(epoch from ${moderationSanctions.startsAt}) * 1000,
+          'endsAt', extract(epoch from ${moderationSanctions.endsAt}) * 1000))
+        from ${moderationSanctions}
+        where ${moderationSanctions.playerAccountId} = ${playerAccounts.id}
+          and ${moderationSanctions.kind} = 'suspension'
+          and ${moderationSanctions.reversedAt} is null
+      ), '[]'::json)`,
     })
     .from(playerAccounts)
     .innerJoin(user, eq(user.id, playerAccounts.userId))
@@ -84,6 +111,16 @@ export async function loadAccountGameplayAccess(
   if (!row) throw new OwnershipError("Player account not found", 404);
   // Fail closed: only an explicit persisted `true` opens public gameplay.
   const publicGameplayOpen = row.publicGameplayOpen === true;
+  const suspended = hasSanctionInEffect(
+    row.suspensions.map((suspension) => ({
+      kind: "suspension" as const,
+      startsAt: new Date(suspension.startsAt),
+      endsAt: suspension.endsAt === null ? null : new Date(suspension.endsAt),
+      reversedAt: null,
+    })),
+    "suspension",
+    now,
+  );
   return {
     playerAccountId: row.playerAccountId,
     emailVerified: row.emailVerified,
@@ -91,10 +128,12 @@ export async function loadAccountGameplayAccess(
     earlyAccessGrantedByAdminUserId: row.earlyAccessGrantedByAdminUserId,
     publicGameplayOpen,
     launchTargetAt: row.launchTargetAt,
+    suspended,
     decision: decideGameplayAccess({
       emailVerified: row.emailVerified,
       earlyAccessGranted: row.earlyAccessGrantedAt !== null,
       publicGameplayOpen,
+      suspended,
     }),
   };
 }

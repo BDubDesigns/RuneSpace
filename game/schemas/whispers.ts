@@ -104,6 +104,7 @@ export type WhisperSendRefusalReason =
   | "too_long"
   | "rate_limited"
   | "prohibited_term"
+  | "socially_restricted"
   | "blocked_by_you"
   | "undeliverable";
 

@@ -35,6 +35,7 @@ import type {
 import { containsSevereTerm } from "@/server/chat-guardrail";
 import { lockAccountChatSends } from "@/server/chat-send-lock";
 import { requirePlayableOwnedCharacter } from "@/server/gameplay-access";
+import { isSociallyRestricted, SOCIALLY_RESTRICTED_MESSAGE } from "@/server/moderation-sanctions";
 import { accountsBlocking, notBlockedByViewer } from "@/server/player-blocks";
 import { publishRealtimeEvent } from "@/server/realtime";
 
@@ -175,6 +176,7 @@ const REFUSAL_COPY: Record<
   Exclude<ChatSendRefusalReason, "rate_limited" | "ad_cooldown">,
   string
 > = {
+  socially_restricted: SOCIALLY_RESTRICTED_MESSAGE,
   empty: "Type a message first.",
   too_long: `Messages can be up to ${CHAT_POLICY.maxLength} characters.`,
   prohibited_term: "That message wasn't sent: it contains a slur RuneSpace blocks.",
@@ -249,7 +251,7 @@ export type ChatSendCheck =
   | { ok: true; body: string; sends: number[] }
   | {
       ok: false;
-      reason: "empty" | "too_long" | "prohibited_term" | "rate_limited";
+      reason: "socially_restricted" | "empty" | "too_long" | "prohibited_term" | "rate_limited";
       error: string;
       sends: number[];
     };
@@ -258,8 +260,11 @@ export type ChatSendCheck =
  * The shared first half of every chat send — General, Trade, promoted ads, and
  * Whispers (#247) — inside the caller's transaction: take the account's send
  * lock (so every tab, device, and character is serialized onto one budget),
- * prune a bounded batch of expired rows, then check content, the severe-term
- * guardrail, and the shared rolling budget for `channel`. A refusal here is
+ * prune a bounded batch of expired rows, then check the account's social
+ * restriction (#248), content, the severe-term guardrail, and the shared
+ * rolling budget for `channel`. Issuing a sanction takes the same lock, so a
+ * send in flight either commits before the restriction or is refused by it.
+ * A refusal here is
  * never persisted or delivered and records nothing about the sender. The
  * caller persists the send in the same transaction, so it counts at once.
  */
@@ -274,7 +279,17 @@ export async function beginChatSend(
   await pruneExpiredChatMessages(tx, now);
   const sends = await recentSendTimes(tx, accountId, now);
 
-  // Content first.
+  // A socially restricted account sends nothing, on any character (#248).
+  if (await isSociallyRestricted(tx, accountId, now)) {
+    return {
+      ok: false,
+      reason: "socially_restricted",
+      error: REFUSAL_COPY.socially_restricted,
+      sends,
+    };
+  }
+
+  // Content next.
   const content = normalizeChatMessage(text);
   if (!content.ok) {
     return { ok: false, reason: content.reason, error: REFUSAL_COPY[content.reason], sends };
