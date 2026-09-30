@@ -3,8 +3,11 @@ export const QC_STUDIO_SCHEMA_VERSION = 3 as const;
 /** The last schema version this build can migrate from. */
 export const QC_STUDIO_MIGRATABLE_SCHEMA_VERSION = 2 as const;
 
-export type StudioDialoguePresentationMode = "local" | "comms";
-export type StudioDialogueAction = "accept_mission" | "complete_mission";
+/** Runtime tuples so storage validation and export parsing share these with the types. */
+export const STUDIO_PRESENTATION_MODES = ["local", "comms"] as const;
+export type StudioDialoguePresentationMode = (typeof STUDIO_PRESENTATION_MODES)[number];
+export const STUDIO_DIALOGUE_ACTIONS = ["accept_mission", "complete_mission"] as const;
+export type StudioDialogueAction = (typeof STUDIO_DIALOGUE_ACTIONS)[number];
 
 /**
  * A beat presents exactly one visual subject: an NPC portrait, an item

@@ -39,7 +39,6 @@ registerHooks({
   },
 });
 
-const foundations = await import("@/game/config/foundations");
 const { DIALOGUE_SEQUENCES } = await import("@/game/content/dialogue");
 
 /** The authoritative catalog as this process loaded it. */
@@ -66,21 +65,12 @@ if (unknownFlags.length > 0 || positional.length !== 1) {
   process.exit(64);
 }
 
-const { applyDialogueExport, ApplyRefusal } = await import(
+const { applyDialogueExport, ApplyRefusal, RUNESPACE_SOURCE_CONSTANTS } = await import(
   "@/tools/qc-studio/adapters/runespace/dialogue-apply"
 );
 const { runespaceDialogueAdapter } = await import(
   "@/tools/qc-studio/adapters/runespace/dialogue-adapter"
 );
-
-const constants = {
-  NPC_IDS: foundations.NPC_IDS,
-  EXPRESSION_IDS: foundations.EXPRESSION_IDS,
-  ITEM_IDS: foundations.ITEM_IDS,
-  SKILL_IDS: foundations.SKILL_IDS,
-  CONVERSATION_BACKGROUND_IDS: foundations.CONVERSATION_BACKGROUND_IDS,
-  DIALOGUE_IDS: foundations.DIALOGUE_IDS,
-};
 
 function readExport(source) {
   return readFileSync(source === "-" ? 0 : path.resolve(source), "utf8");
@@ -109,7 +99,7 @@ try {
       mode: write ? "write" : "dry-run",
       sourceFileName: SOURCE_FILE,
       adapter: runespaceDialogueAdapter,
-      constants,
+      constants: RUNESPACE_SOURCE_CONSTANTS,
     },
     io,
   );

@@ -2,10 +2,20 @@ import { format as prettierFormat, resolveConfig } from "prettier";
 import ts from "typescript";
 import { z } from "zod";
 import {
+  CONVERSATION_BACKGROUND_IDS,
+  DIALOGUE_IDS,
+  EXPRESSION_IDS,
+  ITEM_IDS,
+  NPC_IDS,
+  SKILL_IDS,
+} from "@/game/config/foundations";
+import type { DialogueExportPayload } from "../../core/export";
+import {
   QC_STUDIO_SCHEMA_VERSION,
+  STUDIO_DIALOGUE_ACTIONS,
+  STUDIO_PRESENTATION_MODES,
   type DialogueAdapter,
   type DialogueDraft,
-  type StudioDialogueAction,
   type StudioDialogueBeat,
 } from "../../core/types";
 import { validateDialogueDraft } from "../../core/validation";
@@ -52,7 +62,7 @@ const npcBeatSchema = z
     speakerNpcId: z.string(),
     expressionId: z.string(),
     backgroundId: z.string(),
-    presentationMode: z.enum(["local", "comms"]),
+    presentationMode: z.enum(STUDIO_PRESENTATION_MODES),
     text: z.string(),
   })
   .strict();
@@ -101,11 +111,18 @@ const exportSchema = z
         beats: z.array(
           z.discriminatedUnion("kind", [npcBeatSchema, itemBeatSchema, skillXpBeatSchema]),
         ),
-        action: z.enum(["accept_mission", "complete_mission"]).optional(),
+        action: z.enum(STUDIO_DIALOGUE_ACTIONS).optional(),
       })
       .strict(),
   })
   .strict();
+
+// The schema and the Studio's own export/beat types must describe the same
+// shape in both directions; a change to either side fails to compile here
+// instead of silently drifting.
+type Equal<A, B> = [A] extends [B] ? ([B] extends [A] ? true : false) : false;
+const exportShapeInSync: Equal<DialogueExportPayload, z.infer<typeof exportSchema>> = true;
+void exportShapeInSync;
 
 export type ParsedDialogueExport = {
   sequenceId: string;
@@ -166,7 +183,7 @@ export function parseDialogueExport(
     throw new ApplyRefusal(["An authoritative_sequence export must not carry proposedStableId."]);
   }
 
-  const beats = data.sequence.beats as StudioDialogueBeat[];
+  const { beats } = data.sequence;
   const draft: DialogueDraft = {
     schemaVersion: QC_STUDIO_SCHEMA_VERSION,
     adapterId: adapter.adapterId,
@@ -175,7 +192,7 @@ export function parseDialogueExport(
     sourceSequenceId: sequenceId,
     npcId: data.sequence.npcId,
     beats,
-    ...(data.sequence.action ? { action: data.sequence.action as StudioDialogueAction } : {}),
+    ...(data.sequence.action ? { action: data.sequence.action } : {}),
   };
   const validation = validateDialogueDraft(adapter, draft);
   if (!validation.valid) {
@@ -266,6 +283,63 @@ function renderLineDiff(before: string, after: string, context = 2): string {
   return out.join("\n");
 }
 
+type HunkStep =
+  | { type: "pair"; r: number; a: number }
+  | { type: "remove"; r: number }
+  | { type: "add"; a: number };
+
+/** How alike two beats are: 0 when they are different kinds or share no field. */
+function similarity(a: BeatRecord, b: BeatRecord): number {
+  if (a.kind !== b.kind) return 0;
+  const keys = new Set([...Object.keys(a), ...Object.keys(b)]);
+  keys.delete("kind");
+  return [...keys].filter((key) => a[key] === b[key]).length;
+}
+
+/**
+ * Orders one run of removed and added beats as pair / remove / add steps,
+ * pairing in order (never crossing) so the total similarity is highest.
+ */
+function alignHunk(
+  removes: readonly number[],
+  adds: readonly number[],
+  oldBeats: readonly BeatRecord[],
+  newBeats: readonly BeatRecord[],
+): HunkStep[] {
+  const rows = removes.length;
+  const cols = adds.length;
+  const sim = (i: number, j: number) => similarity(oldBeats[removes[i]!]!, newBeats[adds[j]!]!);
+  const best: number[][] = Array.from({ length: rows + 1 }, () =>
+    new Array<number>(cols + 1).fill(0),
+  );
+  for (let i = rows - 1; i >= 0; i--) {
+    for (let j = cols - 1; j >= 0; j--) {
+      const paired = sim(i, j);
+      best[i]![j] = Math.max(
+        best[i + 1]![j]!,
+        best[i]![j + 1]!,
+        paired > 0 ? best[i + 1]![j + 1]! + paired : 0,
+      );
+    }
+  }
+  const steps: HunkStep[] = [];
+  let i = 0;
+  let j = 0;
+  while (i < rows && j < cols) {
+    const paired = sim(i, j);
+    if (paired > 0 && best[i]![j] === best[i + 1]![j + 1]! + paired) {
+      steps.push({ type: "pair", r: removes[i++]!, a: adds[j++]! });
+    } else if (best[i]![j] === best[i + 1]![j]) {
+      steps.push({ type: "remove", r: removes[i++]! });
+    } else {
+      steps.push({ type: "add", a: adds[j++]! });
+    }
+  }
+  while (i < rows) steps.push({ type: "remove", r: removes[i++]! });
+  while (j < cols) steps.push({ type: "add", a: adds[j++]! });
+  return steps;
+}
+
 function describeBeat(beat: BeatRecord): string {
   const subject =
     beat.kind === "npc"
@@ -286,8 +360,18 @@ function changedFields(before: BeatRecord, after: BeatRecord): string[] {
 // Source emission
 // ---------------------------------------------------------------------------
 
+/** The authoritative registries `game/content/dialogue.ts` refers to by name. */
+export const RUNESPACE_SOURCE_CONSTANTS = {
+  NPC_IDS,
+  EXPRESSION_IDS,
+  ITEM_IDS,
+  SKILL_IDS,
+  CONVERSATION_BACKGROUND_IDS,
+  DIALOGUE_IDS,
+} as const satisfies ConstantMaps;
+
 /** Which authoritative registry a beat field's identifier belongs to. */
-const FIELD_REGISTRY: Readonly<Record<string, string>> = {
+const FIELD_REGISTRY: Readonly<Record<string, keyof typeof RUNESPACE_SOURCE_CONSTANTS>> = {
   speakerNpcId: "NPC_IDS",
   expressionId: "EXPRESSION_IDS",
   itemId: "ITEM_IDS",
@@ -458,6 +542,11 @@ function replaceElement(
       if (newBeat[param.field] !== param.defaultValue) last = i;
     });
     const lastArgument = call.arguments[call.arguments.length - 1];
+    if (last >= 0 && !lastArgument) {
+      return refuse(
+        `Beat ${position} calls \`${helper.name}\` with no arguments and cannot be extended exactly. Edit it by hand.`,
+      );
+    }
     if (last >= 0 && lastArgument) {
       edits.push({
         start: lastArgument.end,
@@ -587,53 +676,37 @@ export async function planDialogueApply(input: PlanInput): Promise<ApplyPlan> {
     }
     const nextKept = cursor < ops.length ? (ops[cursor] as { i: number }).i : -1;
 
-    const paired = Math.min(removes.length, adds.length);
-    for (let p = 0; p < paired; p++) {
-      const oldIndex = removes[p]!;
-      const newIndex = adds[p]!;
-      push(
-        replaceElement(
-          elements[oldIndex]!,
-          oldBeats[oldIndex]!,
-          newBeats[newIndex]!,
-          oldIndex + 1,
-          ctx,
-        ),
-      );
-      changes.push(
-        `~ beat ${oldIndex + 1}: ${changedFields(oldBeats[oldIndex]!, newBeats[newIndex]!).join(", ")} changed → ${describeBeat(newBeats[newIndex]!)}`,
-      );
-    }
-    for (let p = paired; p < removes.length; p++) {
-      const oldIndex = removes[p]!;
-      push([deleteElement(elements[oldIndex]!, oldIndex + 1, ctx)]);
-      changes.push(`- beat ${oldIndex + 1}: removed ${describeBeat(oldBeats[oldIndex]!)}`);
-    }
-    if (adds.length > paired) {
-      const extra = adds.slice(paired);
-      const snippets = extra.map((newIndex) => emitBeat(newBeats[newIndex]!, ctx));
-      for (const newIndex of extra) {
-        changes.push(`+ beat ${newIndex + 1}: added ${describeBeat(newBeats[newIndex]!)}`);
-      }
-      const afterElement =
-        paired > 0
-          ? elements[removes[paired - 1]!]!.node
-          : lastKept >= 0
-            ? elements[lastKept]!.node
-            : undefined;
-      if (afterElement) {
-        push([
-          {
-            start: afterElement.end,
-            end: afterElement.end,
-            text: snippets.map((s) => `, ${s}`).join(""),
-          },
-        ]);
-      } else if (nextKept >= 0) {
-        const before = elements[nextKept]!.node.pos;
-        push([{ start: before, end: before, text: snippets.map((s) => `${s}, `).join("") }]);
+    // Pair each new beat with the removed beat it most resembles; never by bare
+    // position, which would attribute an edit (and any source comment) to the
+    // wrong element when the run has unequal numbers of removals and additions.
+    const steps = alignHunk(removes, adds, oldBeats, newBeats);
+    const firstPaired = steps.find((step) => step.type === "pair");
+    const followingSurvivor = firstPaired?.type === "pair" ? firstPaired.r : nextKept;
+    let survivor = lastKept;
+    for (const step of steps) {
+      if (step.type === "pair") {
+        push(
+          replaceElement(elements[step.r]!, oldBeats[step.r]!, newBeats[step.a]!, step.r + 1, ctx),
+        );
+        changes.push(
+          `~ beat ${step.r + 1}: ${changedFields(oldBeats[step.r]!, newBeats[step.a]!).join(", ")} changed → ${describeBeat(newBeats[step.a]!)}`,
+        );
+        survivor = step.r;
+      } else if (step.type === "remove") {
+        push([deleteElement(elements[step.r]!, step.r + 1, ctx)]);
+        changes.push(`- beat ${step.r + 1}: removed ${describeBeat(oldBeats[step.r]!)}`);
       } else {
-        throw new ApplyRefusal(["The source sequence has no beats to anchor an insertion to."]);
+        const snippet = emitBeat(newBeats[step.a]!, ctx);
+        changes.push(`+ beat ${step.a + 1}: added ${describeBeat(newBeats[step.a]!)}`);
+        if (survivor >= 0) {
+          const after = elements[survivor]!.node.end;
+          push([{ start: after, end: after, text: `, ${snippet}` }]);
+        } else if (followingSurvivor >= 0) {
+          const before = elements[followingSurvivor]!.node.pos;
+          push([{ start: before, end: before, text: `${snippet}, ` }]);
+        } else {
+          throw new ApplyRefusal(["The source sequence has no beat to anchor an insertion to."]);
+        }
       }
     }
   }

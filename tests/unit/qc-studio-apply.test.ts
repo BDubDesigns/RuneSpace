@@ -4,18 +4,12 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { format } from "prettier";
 import { describe, expect, it } from "vitest";
-import {
-  CONVERSATION_BACKGROUND_IDS,
-  DIALOGUE_IDS,
-  EXPRESSION_IDS,
-  ITEM_IDS,
-  NPC_IDS,
-  SKILL_IDS,
-} from "@/game/config/foundations";
+import { DIALOGUE_IDS } from "@/game/config/foundations";
 import { DIALOGUE_SEQUENCES } from "@/game/content/dialogue";
 import { runespaceDialogueAdapter } from "@/tools/qc-studio/adapters/runespace/dialogue-adapter";
 import {
   ApplyRefusal,
+  RUNESPACE_SOURCE_CONSTANTS,
   applyDialogueExport,
   canonicalize,
   planDialogueApply,
@@ -32,14 +26,6 @@ import type {
 const ROOT = path.resolve(__dirname, "../..");
 const DIALOGUE_FILE = path.join(ROOT, "game/content/dialogue.ts");
 const REAL_SOURCE = readFileSync(DIALOGUE_FILE, "utf8");
-const REAL_CONSTANTS = {
-  NPC_IDS,
-  EXPRESSION_IDS,
-  ITEM_IDS,
-  SKILL_IDS,
-  CONVERSATION_BACKGROUND_IDS,
-  DIALOGUE_IDS,
-};
 
 // ---------------------------------------------------------------------------
 // A small fixture dialogue file with the same shapes as game/content/dialogue.ts:
@@ -571,6 +557,43 @@ describe("QC Studio apply: refusals change nothing", () => {
     expect(await refusal(planFixture(exportText("first_seq", beats)))).toMatch(/comment/);
   });
 
+  it("attributes an edit to the beat it resembles, so a removed commented beat is refused", async () => {
+    // Removing "Two." (which carries a source comment) while revising "Three."
+    // must not rewrite the commented element in place and delete its neighbour.
+    const beats = [FIRST_BEATS[0]!, ann("neutral", "Three, revised.", "comms"), FIRST_BEATS[3]!];
+    expect(await refusal(planFixture(exportText("first_seq", beats)))).toMatch(/comment/);
+  });
+
+  it("keeps the comment on the beat it belongs to when a neighbour is removed and another is edited", async () => {
+    const beats = [FIRST_BEATS[0]!, ann("happy", "Two, revised."), FIRST_BEATS[3]!];
+    const plan = await planFixture(exportText("first_seq", beats));
+    if (plan.status !== "changed") throw new Error("expected a change");
+    expect(plan.changes).toEqual([
+      expect.stringMatching(/^~ beat 2: text changed/),
+      expect.stringMatching(/^- beat 3: removed .*Three/),
+    ]);
+    expect(plan.newSource).toMatch(
+      /\/\/ A note about the middle beat\.\s+annLocal\(EXPRESSION_IDS\.happy, "Two, revised\."\)/,
+    );
+    expect(plan.newSource).not.toContain('"Three."');
+  });
+
+  it("writes a skill XP beat as the source's inline object when no helper fits its background", async () => {
+    const beats = [
+      ...FIRST_BEATS,
+      {
+        kind: "skill_xp",
+        skillId: "mining",
+        amount: 75,
+        backgroundId: "bg_yard",
+        text: "Level up.",
+      } as const,
+    ];
+    expect(await changedSource(exportText("first_seq", beats))).toMatch(
+      /\{\s*kind: "skill_xp",\s*skillId: SKILL_IDS\.mining,\s*amount: 75,\s*backgroundId: yard,\s*text: "Level up\.",?\s*\}/,
+    );
+  });
+
   it("refuses when the source array does not line up 1:1 with the resolved beats", async () => {
     const misaligned = fixtureAdapter();
     misaligned.sequences = misaligned.sequences.map((sequence) =>
@@ -691,7 +714,7 @@ async function planReal(text: string) {
     sourceText: REAL_SOURCE,
     sourceFileName: DIALOGUE_FILE,
     adapter: runespaceDialogueAdapter,
-    constants: REAL_CONSTANTS,
+    constants: RUNESPACE_SOURCE_CONSTANTS,
   });
 }
 
