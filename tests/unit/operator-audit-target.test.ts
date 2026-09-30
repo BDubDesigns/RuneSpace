@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  MODERATION_OPERATIONS,
   OPERATOR_OPERATIONS,
   OPERATOR_OPERATION_TARGET_KINDS,
   operatorAuditTargetColumns,
@@ -40,7 +41,8 @@ describe("operator audit targets", () => {
   });
 
   it("keeps every #113 operation character-scoped and adds the four #223 operations", () => {
-    expect(OPERATOR_OPERATIONS).toHaveLength(14);
+    // 14 through #223, plus the seven #248 moderation operations.
+    expect(OPERATOR_OPERATIONS).toHaveLength(21);
     expect(OPERATOR_OPERATION_TARGET_KINDS).toMatchObject({
       grant_early_access: "player_account",
       revoke_early_access: "player_account",
@@ -62,5 +64,20 @@ describe("operator audit targets", () => {
       "reset_all_missions",
       "set_skill_xp",
     ]);
+  });
+
+  it("scopes every #248 moderation operation to the case subject's account", () => {
+    expect(MODERATION_OPERATIONS).toEqual([
+      "open_moderation_case",
+      "set_moderation_case_status",
+      "add_moderation_case_note",
+      "issue_moderation_sanction",
+      "change_moderation_sanction_duration",
+      "reverse_moderation_sanction",
+      "decide_moderation_appeal",
+    ]);
+    for (const operation of MODERATION_OPERATIONS) {
+      expect(OPERATOR_OPERATION_TARGET_KINDS[operation]).toBe("player_account");
+    }
   });
 });

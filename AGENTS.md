@@ -31,6 +31,9 @@ boundary.** This file is the repository's normative agent-behavior contract;
   - UI tokens and motion: `docs/design-system.md`.
   - Art generation, asset preparation, and visual QA: `docs/art-cookbook.md`.
   - Authentication and trusted hosts: `docs/authentication.md`.
+  - Chat moderation, sanctions, appeals, and privileged-access audit:
+    `docs/moderation.md`; the Community Rules and Safety & Privacy Wiki pages
+    must stay true to shipped safety-data storage and access.
   - Tests and canonical E2E: `docs/testing-strategy.md`.
   - Branches, PRs, validation, and CI: `docs/development-workflow.md`.
   - Database and deployment operations: `docs/deployment-database.md`.

@@ -183,6 +183,10 @@ export async function cleanupTestUser(db: Db, authSchema: AuthSchema, rune: Rune
     for (const character of characterRows) {
       await cleanupTestCharacter(db, rune, character.id);
     }
+    // Moderation (#248) hangs off the account's cases and off the account
+    // itself; every child goes before its case, and the cases before the
+    // account. Cases are never deleted by the application, only here.
+    await cleanupModerationForAccount(db, rune, account.id);
     await db.delete(rune.characters).where(eq(rune.characters.playerAccountId, account.id));
     await db
       .delete(rune.playerPortraitUnlocks)
@@ -194,6 +198,54 @@ export async function cleanupTestUser(db: Db, authSchema: AuthSchema, rune: Rune
   }
   await db.delete(rune.playerAccounts).where(eq(rune.playerAccounts.userId, userId));
   await db.delete(authSchema.user).where(eq(authSchema.user.id, userId));
+}
+
+/**
+ * FK-safe teardown of one account's moderation footprint (issue #248): the
+ * privileged-access rows naming the account or one of its cases, the operator
+ * audit rows carrying one of its case ids, appeals, sanctions, and notes, the
+ * reports filed into its cases, and finally the cases themselves. Every
+ * moderation FK is `restrict`, so this order is required, and deleting rows
+ * that were never created is a harmless no-op.
+ */
+export async function cleanupModerationForAccount(db: Db, rune: Rune, playerAccountId: string) {
+  const cases = db
+    .select({ id: rune.moderationCases.id })
+    .from(rune.moderationCases)
+    .where(eq(rune.moderationCases.subjectPlayerAccountId, playerAccountId));
+  await db
+    .delete(rune.privilegedAccessLogs)
+    .where(
+      or(
+        eq(rune.privilegedAccessLogs.targetPlayerAccountId, playerAccountId),
+        inArray(rune.privilegedAccessLogs.caseId, cases),
+      ),
+    );
+  await db
+    .delete(rune.operatorAuditLogs)
+    .where(inArray(rune.operatorAuditLogs.moderationCaseId, cases));
+  // Appeals and sanctions name the case and the account; either scope goes.
+  await db
+    .delete(rune.moderationAppeals)
+    .where(
+      or(
+        eq(rune.moderationAppeals.playerAccountId, playerAccountId),
+        inArray(rune.moderationAppeals.caseId, cases),
+      ),
+    );
+  await db
+    .delete(rune.moderationSanctions)
+    .where(
+      or(
+        eq(rune.moderationSanctions.playerAccountId, playerAccountId),
+        inArray(rune.moderationSanctions.caseId, cases),
+      ),
+    );
+  await db.delete(rune.moderationCaseNotes).where(inArray(rune.moderationCaseNotes.caseId, cases));
+  await db.delete(rune.playerReports).where(inArray(rune.playerReports.caseId, cases));
+  await db
+    .delete(rune.moderationCases)
+    .where(eq(rune.moderationCases.subjectPlayerAccountId, playerAccountId));
 }
 
 /**
@@ -265,6 +317,10 @@ export async function cleanupTestCharacter(db: Db, rune: Rune, characterId: stri
     await tx
       .delete(rune.operatorAuditLogs)
       .where(eq(rune.operatorAuditLogs.characterId, characterId));
+    // Privileged access rows (#248) may name the inspected character.
+    await tx
+      .delete(rune.privilegedAccessLogs)
+      .where(eq(rune.privilegedAccessLogs.targetCharacterId, characterId));
     await tx.delete(rune.itemInstances).where(eq(rune.itemInstances.characterId, characterId));
     // Reports and Blocks (#247) keep both characters' identities.
     await tx

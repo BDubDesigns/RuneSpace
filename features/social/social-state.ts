@@ -22,6 +22,13 @@ export type SocialCard = {
   /** Accessible name of the card within the pinned region. */
   label: string;
   content: ReactNode;
+  /**
+   * Whether the card still asks for the launcher's attention (default: yes).
+   * The owning domain may clear it once the player has seen the card while
+   * leaving it pinned — a current moderation notice stays visible for as long
+   * as it applies, but lights the launcher only until it has been seen (#248).
+   */
+  attention?: boolean;
 };
 
 export type SocialShellState = {
@@ -66,7 +73,11 @@ export function socialShellReducer(
   }
 }
 
-/** Everything that wants the player's attention: each card, plus every source. */
+/**
+ * Everything that wants the player's attention: each card that still asks for
+ * it, plus every source.
+ */
 export function socialAttentionCount(state: SocialShellState): number {
-  return Object.values(state.attention).reduce((sum, count) => sum + count, state.cards.length);
+  const cards = state.cards.filter((card) => card.attention !== false).length;
+  return Object.values(state.attention).reduce((sum, count) => sum + count, cards);
 }

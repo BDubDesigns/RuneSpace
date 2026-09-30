@@ -27,7 +27,11 @@ Every object requires:
   boundary (issue #156) identifies "the newest published Update" by this same
   instant and cannot distinguish two Updates that share one.
 - `summary`: the short excerpt shown on the index and homepage.
-- `body`: an ordered array of prose paragraphs.
+- `body`: an ordered array of prose paragraphs. A paragraph may instead be an
+  array of text and Wiki link segments (`{ text, articleSlug }`, the same
+  shape and rules as the Wiki's, see `docs/public-wiki.md`) when an Update
+  should link a phrase to a Wiki article such as the Community Rules; every
+  `articleSlug` must be a real authored Wiki article.
 - `patchNotes`: an ordered array of sections, each with a `heading` such as
   `Added`, `Changed`, or `Fixed`, and one or more player-facing `items`.
 

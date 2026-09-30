@@ -8,8 +8,13 @@ boundary from issue #221 (`docs/authentication.md`) and the Operator Console
 ## The rule
 
 ```text
-canEnterGameplay = emailVerified && (publicGameplayOpen || earlyAccessGranted)
+canEnterGameplay = emailVerified && !suspended && (publicGameplayOpen || earlyAccessGranted)
 ```
+
+`suspended` (issue #248) is true while an account suspension is in effect; see
+`docs/moderation.md`. It outranks Early Access and public gameplay, and it is
+loaded in the same per-request query as the other inputs, so a suspension, its
+expiry, and its reversal all apply on the very next authoritative request.
 
 `decideGameplayAccess` in `game/domain/gameplay-access.ts` is the only
 implementation. It has no clock input and no operator input:
@@ -94,13 +99,16 @@ actions and their seams:
 | Travel / Scavenge | `beginTravelAction`, `beginTransportTravelAction`, `claimScavengeAction` | lock + reconcile |
 | Instant interactions | `acknowledgeScavengeRevealAction`, `claimPowerCellsAction`, `tradeWithMerchantAction` | lock only (deliberately no reconcile) |
 
-The three remaining actions are account/character management and stay
-available while public gameplay is closed:
+The remaining actions are account/character management and stay
+available while public gameplay is closed (and while an account is
+suspended):
 
 - `createCharacterAction` — character reservation (verified email still
   required through `requireVerifiedUser`);
 - `changeCharacterPortraitAction` — pre-game character presentation;
-- `acknowledgeNewsAction` — account-level Update news.
+- `acknowledgeNewsAction` — account-level Update news;
+- `submitModerationAppealAction` — appealing a moderation sanction on the
+  player's own account (#248).
 
 **Pages and route handlers.**
 
@@ -110,9 +118,10 @@ available while public gameplay is closed:
 | `GET /api/location-population`, `GET /api/character-profile` | gameplay reads — `requirePlayableOwnedCharacter`; refusal is 403 `GAMEPLAY_ACCESS_REQUIRED` |
 | `GET /api/realtime` | gameplay realtime stream (#245) — `requirePlayableOwnedCharacter` on every stream creation; refusal is 403 `GAMEPLAY_ACCESS_REQUIRED`, and a stream re-authorizes at least every ~5 minutes |
 | `/characters`, `/characters/new` | account/character management (reservation and presentation) |
+| `/moderation`, `/moderation/[sanctionId]`, `GET /api/moderation-notices` | account: the player's own moderation notices and appeal (#248); session only, so a suspended player can appeal |
 | `/`, `/updates/*`, `/wiki/*`, `/api/build-info`, `/api/diagnostics` | public; the landing reads only the public launch state |
 | `/sign-in`, `/register`, `/api/auth/*` | account (Better Auth) |
-| `/admin/*` | operator (`requireAdmin`); never player gameplay |
+| `/admin/*` | operator (`requireAdmin`); never player gameplay; moderation reads are access-audited (#248) |
 | `/design-system`, `/qc-studio`, `/api/e2e/turnstile-siteverify`, `/api/e2e/realtime` | dev/test only, gated off in production |
 
 The realtime stream is the only SSE entrypoint (see `docs/architecture.md`,

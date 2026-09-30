@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { WikiLinkSegmentSchema } from "@/game/schemas/public-wiki";
 
 const updateSlug = z
   .string()
@@ -33,6 +34,19 @@ export const PublicUpdatePatchSectionSchema = z
   })
   .strict();
 
+/**
+ * One body paragraph: plain prose, or — only where an author deliberately
+ * links a phrase to a Wiki article (issue #248: the Community Rules and the
+ * Safety & Privacy disclosure) — ordered text and Wiki link segments that
+ * concatenate into the same prose. This is the Wiki's own link segment; its
+ * `articleSlug` is checked against the authored Wiki in
+ * `validatePublicUpdates`. Segment text keeps its load-bearing spaces.
+ */
+export const PublicUpdateParagraphSchema = z.union([
+  updateText,
+  z.array(z.union([z.string().min(1), WikiLinkSegmentSchema])).min(1),
+]);
+
 /** The complete repository-authored Update contract. */
 export const PublicUpdateSchema = z
   .object({
@@ -40,10 +54,11 @@ export const PublicUpdateSchema = z
     title: updateText,
     publishedAt: z.string().datetime({ offset: true }),
     summary: updateText,
-    body: z.array(updateText).min(1),
+    body: z.array(PublicUpdateParagraphSchema).min(1),
     patchNotes: z.array(PublicUpdatePatchSectionSchema).min(1),
     hero: PublicUpdateHeroSchema.optional(),
   })
   .strict();
 
 export type PublicUpdate = z.infer<typeof PublicUpdateSchema>;
+export type PublicUpdateParagraph = z.infer<typeof PublicUpdateParagraphSchema>;

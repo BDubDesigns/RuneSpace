@@ -172,6 +172,19 @@ one transaction. Reads for the panels live in `server/admin-access-state.ts`.
 Operator status never grants gameplay: an operator's own account plays early
 only with an explicit Early Access grant.
 
+## Moderation (Issue #248)
+
+The console also hosts moderation: the queue at `/admin/moderation`, each case
+at `/admin/moderation/{caseId}`, the privileged access log at
+`/admin/moderation/access-log`, and a Moderation panel on the inspector (the
+account's cases, and "Open a case" with a stated reason). The contract —
+cases, sanctions, appeals, the legitimate-access boundary for retained chat,
+and the privileged-access audit that records every view of sensitive safety
+data — is `docs/moderation.md`. Moderation commands follow the same stance as
+every other operator command: `server/moderation-commands.ts` calls
+`requireAdmin(headers)` and then the internal seams in
+`server/moderation-seams.ts`.
+
 ## Audit history
 
 `operatorAuditLogs` (`db/rune-space.ts`, migration `0015`; target
@@ -185,6 +198,13 @@ inspector shows is still exactly that character's rows. One row is
 written **atomically inside the same transaction** as the mutation it records, so
 a success and its audit commit or roll back together. Rows are immutable; there
 is no update or delete path, and the operator console only ever reads them.
+
+Issue #248 adds seven moderation operations. They target the case subject's
+`player_account`, and each carries the case in `moderation_case_id`; they are
+shown in that case's history, not in the inspector's account history, because
+viewing moderation data is itself audited (`docs/moderation.md`). Operator
+*views* of sensitive safety data are recorded separately, in
+`privileged_access_logs`, so this table keeps meaning "successful mutations".
 
 An audit row is written **only for a genuine operator mutation** (correction D6):
 

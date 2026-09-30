@@ -2,18 +2,18 @@
   "schemaVersion": 1,
   "projectSlug": "runespace",
   "workState": "active",
-  "currentFocus": "Preparing the October 27 Soft Alpha: verified players can reserve characters; account-level Early Access and a closed-by-default public gameplay gate control when play begins.",
+  "currentFocus": "Preparing the October 27 Soft Alpha: chat, Whispers, Block, and Report are in, and moderation plus published Community Rules and Safety & Privacy pages complete the alpha social stack.",
   "currentChange": {
-    "summary": "Whispers, Block, and Report: 1:1 character Whispers with durable unread in the Chat/Social drawer, account-level Block with a Blocked Players list, and message and player reports that preserve evidence for review.",
+    "summary": "Moderation and player safety: operator case review with audited access, account-wide social restrictions and suspensions, in-game appeals, and published Community Rules and Safety & Privacy pages.",
     "stage": "review",
-    "pullRequestNumber": 262
+    "pullRequestNumber": 264
   },
   "latestCompleted": {
-    "summary": "General and Trade chat: persisted public channels in the Chat/Social drawer, a shared account-wide send limit with a live composer indicator, and 50-Credit promoted Trade ads.",
+    "summary": "Whispers, Block, and Report: 1:1 character Whispers with durable unread, account-level Block with a Blocked Players list, and message and player reports that preserve evidence for review.",
     "date": "2026-09-30",
-    "url": "https://github.com/BDubDesigns/RuneSpace/pull/260"
+    "url": "https://github.com/BDubDesigns/RuneSpace/pull/262"
   },
-  "nextStep": "Human review and phone playtest of Whispers, Block, and Report; community rules, safety disclosure, and operator moderation (#248) still ship before chat opens publicly.",
+  "nextStep": "Human review and playtest of operator moderation, sanctions, and in-game appeals; then player-to-player trading (#225) on the shared social and sanction seams.",
   "lastMeaningfulUpdate": "2026-09-30",
   "highlights": [
     {

@@ -32,15 +32,22 @@ export type PublicSiteNavItem = {
 
 const defaultNavigation: readonly PublicSiteNavItem[] = [];
 
-/** Presentational header, page frame, and footer for public RuneSpace pages. */
+/**
+ * Presentational header, page frame, and footer for public RuneSpace pages.
+ * `footerLinks` are internal pages every public page should reach, such as
+ * the published player policies (issue #248); the header navigation stays
+ * unchanged.
+ */
 export function PublicSiteShell({
   children,
   headerActions,
   navigation = defaultNavigation,
+  footerLinks = defaultNavigation,
 }: {
   children: ReactNode;
   headerActions?: ReactNode;
   navigation?: readonly PublicSiteNavItem[];
+  footerLinks?: readonly PublicSiteNavItem[];
 }) {
   return (
     <div className="rs-viewport-shell flex min-w-0 flex-col">
@@ -104,6 +111,15 @@ export function PublicSiteShell({
             </p>
           </div>
           <div className="flex flex-wrap gap-x-5 gap-y-2">
+            {footerLinks.map((item) => (
+              <Link
+                className="rs-focus inline-flex min-h-[var(--rs-touch-target)] items-center text-[color:var(--rs-accent-primary)] underline"
+                href={item.href}
+                key={`${item.href}-${item.label}`}
+              >
+                {item.label}
+              </Link>
+            ))}
             <a
               className="rs-focus inline-flex min-h-[var(--rs-touch-target)] items-center text-[color:var(--rs-accent-primary)] underline"
               href="https://github.com/BDubDesigns/RuneSpace"

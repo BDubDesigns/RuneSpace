@@ -2,8 +2,8 @@ import { describe, expect, it } from "vitest";
 import { decideGameplayAccess } from "@/game/domain/gameplay-access";
 
 /**
- * Issue #223 — the one gameplay-access rule:
- * canEnterGameplay = emailVerified && (publicGameplayOpen || earlyAccessGranted).
+ * Issue #223 — the one gameplay-access rule, with the issue #248 suspension:
+ * canEnterGameplay = emailVerified && !suspended && (publicGameplayOpen || earlyAccessGranted).
  */
 describe("decideGameplayAccess", () => {
   it.each([
@@ -18,7 +18,9 @@ describe("decideGameplayAccess", () => {
   ])(
     "verified=$emailVerified earlyAccess=$earlyAccessGranted open=$publicGameplayOpen → $allowed",
     ({ allowed, ...input }) => {
-      expect(decideGameplayAccess(input).allowed).toBe(allowed);
+      expect(decideGameplayAccess({ ...input, suspended: false }).allowed).toBe(allowed);
+      // A suspension refuses every combination.
+      expect(decideGameplayAccess({ ...input, suspended: true }).allowed).toBe(false);
     },
   );
 
@@ -28,6 +30,7 @@ describe("decideGameplayAccess", () => {
         emailVerified: false,
         earlyAccessGranted: true,
         publicGameplayOpen: true,
+        suspended: false,
       }),
     ).toEqual({ allowed: false, reason: "email_unverified" });
     expect(
@@ -35,6 +38,7 @@ describe("decideGameplayAccess", () => {
         emailVerified: true,
         earlyAccessGranted: false,
         publicGameplayOpen: false,
+        suspended: false,
       }),
     ).toEqual({ allowed: false, reason: "gameplay_closed" });
     expect(
@@ -42,6 +46,7 @@ describe("decideGameplayAccess", () => {
         emailVerified: true,
         earlyAccessGranted: true,
         publicGameplayOpen: false,
+        suspended: false,
       }),
     ).toEqual({ allowed: true, via: "early_access" });
     // Once public gameplay is open, an Early Access grant is preserved but no
@@ -51,7 +56,19 @@ describe("decideGameplayAccess", () => {
         emailVerified: true,
         earlyAccessGranted: true,
         publicGameplayOpen: true,
+        suspended: false,
       }),
     ).toEqual({ allowed: true, via: "public" });
+  });
+
+  it("a suspension outranks Early Access and public gameplay", () => {
+    expect(
+      decideGameplayAccess({
+        emailVerified: true,
+        earlyAccessGranted: true,
+        publicGameplayOpen: true,
+        suspended: true,
+      }),
+    ).toEqual({ allowed: false, reason: "suspended" });
   });
 });

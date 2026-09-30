@@ -52,8 +52,9 @@ small number of critical mobile player journeys.
   Cutter, the Freight Harness and their Missions — #233), Holo Hollow, Rusk Recovery, Admin Operator, Sign-out,
   Account News, Account Verification, Gameplay Access, and the Chat/Social shell and
   realtime stream (`social-shell`, #245), and General/Trade public chat
-  (`public-chat`, #246), and Whispers, Block, and Report (`whispers-safety`,
-  #247). It intentionally excludes noncanonical `smoke`, `ownership`,
+  (`public-chat`, #246), Whispers, Block, and Report (`whispers-safety`,
+  #247), and moderation review, sanctions, notices, and appeals (`moderation`,
+  #248). It intentionally excludes noncanonical `smoke`, `ownership`,
   `design-system`, `work-orders`, `public-*`, and QC Studio specs. It:
   - requires Node 22.x
   - requires a localhost-only disposable PostgreSQL database (refuses remote)
@@ -274,6 +275,33 @@ Hermes host.
   Block / Report / Report + Block flows, blocked public messages disappearing
   for the blocker only, Blocked Players unblocking, and no horizontal overflow.
   Like `public-chat`, its two-account journeys run in chromium only.
+
+### Issue #248 moderation coverage
+
+- `tests/unit/moderation.test.ts` owns the pure rules (sanction state,
+  durations, exact-end expiry, reversal, appealability, notice currency,
+  labels) and the production surface's guards: every export of
+  `server/moderation-commands.ts` calls `requireAdmin`, none exposes an `*As`
+  seam, and nothing under `server/`, `app/`, or `features/` updates or deletes
+  an audit or note row.
+- `tests/integration/moderation.test.ts` proves against PostgreSQL: non-admin
+  refusal with no data and no audit row; one privileged-access row per
+  sensitive read, written before data and rolled back with it; audited
+  mutations and silent no-ops; reports joining and opening cases; preserved
+  context and retained Whispers never reaching a third conversation;
+  interpretable report/block counts; no reporter or moderator in any player
+  view; a social restriction on every character of the account (sends, ads
+  without a charge, Whispers, and the #225 trade seam) with public reads still
+  allowed; suspension through the gameplay-access boundary; deterministic
+  expiry, reversal, and duration changes; evidence kept under permanent
+  suspension; and one appeal per sanction, decided once.
+  `tests/integration/moderation-migration.test.ts` replays 0034's backfill.
+- `tests/e2e/moderation.spec.ts` proves at phone and desktop widths: an
+  operator reviewing, restricting, and deciding an appeal, with the live
+  notice card and held composer for the player on every character; suspension
+  returning an open Play tab to Characters while the appeal still works; the
+  403 for ordinary players; the access log; and the published policies, footer
+  links, the "Open Channels" Update, and its News attention.
 
 ## What to test when systems arrive
 For progression-sensitive systems, prioritize:

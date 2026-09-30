@@ -50,6 +50,8 @@ const ACCOUNT_MANAGEMENT_ACTIONS: Record<string, string> = {
   createCharacterAction: "character reservation (verified email required)",
   changeCharacterPortraitAction: "pre-game character presentation",
   acknowledgeNewsAction: "account-level Update news",
+  // #248: a suspended player must still be able to appeal.
+  submitModerationAppealAction: "moderation appeal on the player's own account",
 };
 
 /** Every page and route handler, classified. */
@@ -81,19 +83,26 @@ const APP_ENTRYPOINTS: Record<string, string> = {
   "app/api/whispers/route.ts": "GAMEPLAY: Whisper inbox read (#247)",
   "app/api/whispers/conversation/route.ts": "GAMEPLAY: Whisper conversation read (#247)",
   "app/api/blocked-players/route.ts": "GAMEPLAY: Blocked Players read (#247)",
+  // #248 — a suspended player must still reach their notice and appeal.
+  "app/moderation/page.tsx": "account: the player's own moderation notices",
+  "app/moderation/[sanctionId]/page.tsx": "account: one notice and its appeal",
+  "app/api/moderation-notices/route.ts": "account: the player's own moderation notices",
+  "app/admin/moderation/page.tsx": "operator (requireAdmin); audited moderation queue",
+  "app/admin/moderation/[caseId]/page.tsx": "operator (requireAdmin); audited case review",
+  "app/admin/moderation/access-log/page.tsx": "operator (requireAdmin); audited access log",
 };
 
 describe("player server actions (server/actions.ts)", () => {
   const source = read("server/actions.ts");
   const bodies = exportedFunctionBodies(source);
 
-  it("enumerates exactly the 55 production player actions", () => {
+  it("enumerates exactly the 56 production player actions", () => {
     // #232 adds nine: Fabrication's start, finish-current, Override toggle,
     // push and Lock In, and Tinkering's start, stop, finish-current and
     // Auto-discard Scrap preference. #246 adds the chat send and promoted ad.
     // #247 adds Whisper open, send, and read, Block, Unblock, and the two
-    // Reports.
-    expect(bodies.size).toBe(55);
+    // Reports. #248 adds the moderation appeal (account management).
+    expect(bodies.size).toBe(56);
   });
 
   it("classifies every export as gameplay or named account management", () => {
@@ -136,7 +145,11 @@ describe("server action modules", () => {
     const modules = ["app", "features", "server", "components"]
       .flatMap((root) => sourceFilesUnder(root))
       .filter((path) => /^\s*["']use server["']/m.test(read(path)));
-    expect(modules.sort()).toEqual(["server/actions.ts", "server/admin-actions.ts"]);
+    expect(modules.sort()).toEqual([
+      "server/actions.ts",
+      "server/admin-actions.ts",
+      "server/moderation-actions.ts",
+    ]);
   });
 });
 
@@ -164,6 +177,22 @@ describe("app pages and route handlers", () => {
     ] as const) {
       expect(read(server)).toContain("requirePlayableOwnedCharacter(");
       expect(read(route)).toContain("error instanceof GameplayAccessError");
+    }
+  });
+
+  it("keeps the moderation pages account-scoped and the operator pages admin-only", () => {
+    // A suspended player reaches their notice with only a session: never the
+    // gameplay gate, and only their own account's sanctions.
+    for (const page of ["app/moderation/page.tsx", "app/moderation/[sanctionId]/page.tsx"]) {
+      expect(read(page), page).not.toContain("requirePlayableOwnedCharacter(");
+    }
+    expect(read("server/moderation-notices.ts")).toContain("requirePlayerAccount(userId)");
+    for (const page of [
+      "app/admin/moderation/page.tsx",
+      "app/admin/moderation/[caseId]/page.tsx",
+      "app/admin/moderation/access-log/page.tsx",
+    ]) {
+      expect(read(page), page).toContain("authorizeAdminPage(");
     }
   });
 

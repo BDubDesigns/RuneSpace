@@ -2,8 +2,11 @@
  * The one authoritative gameplay-access rule (issue #223).
  *
  * ```
- * canEnterGameplay = emailVerified && (publicGameplayOpen || earlyAccessGranted)
+ * canEnterGameplay = emailVerified && !suspended && (publicGameplayOpen || earlyAccessGranted)
  * ```
+ *
+ * `suspended` (issue #248) is true while an account suspension is in effect
+ * (`game/domain/moderation.ts`); it outranks Early Access and public gameplay.
  *
  * Every server boundary that decides whether a request may read or mutate
  * in-world character state calls this function with authoritative inputs loaded
@@ -20,14 +23,18 @@ export type GameplayAccessInput = {
   emailVerified: boolean;
   earlyAccessGranted: boolean;
   publicGameplayOpen: boolean;
+  suspended: boolean;
 };
 
 export type GameplayAccessDecision =
   | { allowed: true; via: "public" | "early_access" }
-  | { allowed: false; reason: "email_unverified" | "gameplay_closed" };
+  | { allowed: false; reason: GameplayAccessRefusal };
+
+export type GameplayAccessRefusal = "email_unverified" | "suspended" | "gameplay_closed";
 
 export function decideGameplayAccess(input: GameplayAccessInput): GameplayAccessDecision {
   if (!input.emailVerified) return { allowed: false, reason: "email_unverified" };
+  if (input.suspended) return { allowed: false, reason: "suspended" };
   if (input.publicGameplayOpen) return { allowed: true, via: "public" };
   if (input.earlyAccessGranted) return { allowed: true, via: "early_access" };
   return { allowed: false, reason: "gameplay_closed" };

@@ -4,6 +4,13 @@ import { getSkillPresentation } from "@/game/content/skill-presentation";
 import { presentedSkills } from "@/game/domain/character-progression";
 import { getItemPresentation } from "@/game/content/item-presentation";
 import { getMission } from "@/game/content/missions";
+import {
+  APPEAL_OUTCOME_LABEL,
+  MODERATION_CASE_STATUS_LABEL,
+  MODERATION_RULE_LABEL,
+  SANCTION_DURATION_LABEL,
+  SANCTION_KIND_LABEL,
+} from "@/game/domain/moderation";
 
 /** Human label for a canonical location id, falling back to the raw id. */
 export function locationLabel(locationId: string): string {
@@ -39,6 +46,27 @@ export function missionStateLabel(state: string): string {
     default:
       return state;
   }
+}
+
+/** Domain label for a moderation token, falling back to the raw token. */
+function labelOf(labels: Record<string, string>, token: unknown): string {
+  return typeof token === "string" ? (labels[token] ?? token) : "";
+}
+
+/** A sanction duration key as its label; `null` (permanent or none) is omitted by callers. */
+function durationText(token: unknown): string {
+  return labelOf(SANCTION_DURATION_LABEL, token);
+}
+
+/**
+ * A stored ISO instant as a deterministic operator-facing UTC time
+ * (`2026-09-30 14:03:05 UTC`). Deterministic on purpose: the moderation pages
+ * render on the server and must not differ between server and browser.
+ */
+export function formatOperatorTime(iso: string): string {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return iso;
+  return `${date.toISOString().slice(0, 19).replace("T", " ")} UTC`;
 }
 
 /**
@@ -147,6 +175,59 @@ export function formatAuditSummary(
       return "Opened public gameplay.";
     case "close_public_gameplay":
       return "Closed public gameplay.";
+    // Issue #248 — moderation operations.
+    case "open_moderation_case": {
+      const reason = str(d.reason);
+      return reason ? `Opened the case. Reason: "${reason}"` : "Opened the case.";
+    }
+    case "set_moderation_case_status": {
+      const from = labelOf(MODERATION_CASE_STATUS_LABEL, d.from);
+      const to = labelOf(MODERATION_CASE_STATUS_LABEL, d.to);
+      return from && to ? `Set case status ${from} → ${to}.` : "Set the case status.";
+    }
+    case "add_moderation_case_note":
+      return "Added a case note.";
+    case "issue_moderation_sanction": {
+      const kind = labelOf(SANCTION_KIND_LABEL, d.kind) || "sanction";
+      const reference = str(d.reference);
+      const facts = [
+        labelOf(MODERATION_RULE_LABEL, d.ruleCategory),
+        durationText(d.duration),
+        str(d.endsAt) ? `ends ${formatOperatorTime(str(d.endsAt))}` : "",
+      ].filter(Boolean);
+      const caseStatus = d.caseStatus as { from?: unknown; to?: unknown } | undefined;
+      const from = labelOf(MODERATION_CASE_STATUS_LABEL, caseStatus?.from);
+      const to = labelOf(MODERATION_CASE_STATUS_LABEL, caseStatus?.to);
+      return `Issued ${kind}${reference ? ` on ${reference}` : ""}${
+        facts.length > 0 ? ` (${facts.join(", ")})` : ""
+      }${from && to ? `; case ${from} → ${to}` : ""}.`;
+    }
+    case "change_moderation_sanction_duration": {
+      const kind = labelOf(SANCTION_KIND_LABEL, d.kind) || "sanction";
+      const duration = d.duration as { from?: unknown; to?: unknown } | undefined;
+      const endsAt = d.endsAt as { from?: unknown; to?: unknown } | undefined;
+      const from = durationText(duration?.from) || "no duration";
+      const to = durationText(duration?.to) || "no duration";
+      const ends = (value: unknown) =>
+        typeof value === "string" ? formatOperatorTime(value) : "never";
+      return `Changed ${kind} duration ${from} → ${to} (ends ${ends(endsAt?.from)} → ${ends(
+        endsAt?.to,
+      )})${d.appealId ? " while deciding an appeal" : ""}.`;
+    }
+    case "reverse_moderation_sanction": {
+      const kind = labelOf(SANCTION_KIND_LABEL, d.kind) || "sanction";
+      const rule = labelOf(MODERATION_RULE_LABEL, d.ruleCategory);
+      return `Reversed ${kind}${rule ? ` (${rule})` : ""}${
+        d.appealId ? " while deciding an appeal" : ""
+      }.`;
+    }
+    case "decide_moderation_appeal": {
+      const outcome = labelOf(APPEAL_OUTCOME_LABEL, d.outcome) || "Decided";
+      const duration = durationText(d.duration);
+      return `Decided an appeal: ${outcome}${duration ? ` (new duration ${duration})` : ""}${
+        d.hasNote ? ", with an internal note" : ""
+      }.`;
+    }
     default:
       return `${operation}${targetIdentity ? ` (${targetIdentity})` : ""}.`;
   }

@@ -1,4 +1,4 @@
-import { and, desc, eq } from "drizzle-orm";
+import { and, asc, desc, eq, isNull } from "drizzle-orm";
 import { operatorAuditLogs, type NewOperatorAuditLog } from "@/db/rune-space";
 import type { DatabaseTransaction } from "@/server/action-resolution";
 
@@ -13,7 +13,8 @@ import type { DatabaseTransaction } from "@/server/action-resolution";
  *
  * One successful mutation targets exactly one of:
  * - a `character` (the #113 console commands),
- * - a `player_account` (account-level Early Access), or
+ * - a `player_account` (account-level Early Access, and every moderation
+ *   action on a case about that account — issue #248), or
  * - the RuneSpace `system` (the global public-gameplay switch).
  *
  * This is explicitly not event-sourcing, a generic observability store, or the
@@ -37,7 +38,27 @@ export const OPERATOR_OPERATION_TARGET_KINDS = {
   revoke_early_access: "player_account",
   open_public_gameplay: "system",
   close_public_gameplay: "system",
+  // Issue #248 — moderation actions, each against the case's subject account
+  // and carrying the case id.
+  open_moderation_case: "player_account",
+  set_moderation_case_status: "player_account",
+  add_moderation_case_note: "player_account",
+  issue_moderation_sanction: "player_account",
+  change_moderation_sanction_duration: "player_account",
+  reverse_moderation_sanction: "player_account",
+  decide_moderation_appeal: "player_account",
 } as const;
+
+/** The moderation operations (#248); each row names its moderation case. */
+export const MODERATION_OPERATIONS = [
+  "open_moderation_case",
+  "set_moderation_case_status",
+  "add_moderation_case_note",
+  "issue_moderation_sanction",
+  "change_moderation_sanction_duration",
+  "reverse_moderation_sanction",
+  "decide_moderation_appeal",
+] as const satisfies readonly (keyof typeof OPERATOR_OPERATION_TARGET_KINDS)[];
 
 export type OperatorOperation = keyof typeof OPERATOR_OPERATION_TARGET_KINDS;
 export const OPERATOR_OPERATIONS = Object.keys(
@@ -93,14 +114,21 @@ export async function recordOperatorAudit(
     operation: OperatorOperation;
     targetIdentity?: string;
     details: OperatorAuditDetails;
+    /** Required for, and only for, a moderation operation (#248). */
+    moderationCaseId?: string;
   },
 ): Promise<void> {
+  const isModeration = (MODERATION_OPERATIONS as readonly string[]).includes(input.operation);
+  if (isModeration !== (input.moderationCaseId !== undefined)) {
+    throw new Error(`Operator operation ${input.operation} has the wrong moderation case scope`);
+  }
   const row: NewOperatorAuditLog = {
     adminUserId: input.adminUserId,
     ...operatorAuditTargetColumns(input.operation, input.target),
     operation: input.operation,
     targetIdentity: input.targetIdentity ?? null,
     details: input.details,
+    moderationCaseId: input.moderationCaseId ?? null,
   };
   await transaction.insert(operatorAuditLogs).values(row);
 }
@@ -128,7 +156,11 @@ export async function loadCharacterAuditLog(
     .limit(boundedLimit(limit));
 }
 
-/** Compact append-only history for one player account, most recent first. */
+/**
+ * Compact append-only history for one player account, most recent first.
+ * Moderation actions are excluded: they are shown only inside their case,
+ * where viewing them is itself audited (#248).
+ */
 export async function loadPlayerAccountAuditLog(
   transaction: DatabaseTransaction,
   playerAccountId: string,
@@ -141,10 +173,23 @@ export async function loadPlayerAccountAuditLog(
       and(
         eq(operatorAuditLogs.targetKind, "player_account"),
         eq(operatorAuditLogs.playerAccountId, playerAccountId),
+        isNull(operatorAuditLogs.moderationCaseId),
       ),
     )
     .orderBy(desc(operatorAuditLogs.createdAt), desc(operatorAuditLogs.id))
     .limit(boundedLimit(limit));
+}
+
+/** One moderation case's action history, oldest first. */
+export async function loadModerationCaseAuditLog(
+  transaction: DatabaseTransaction,
+  moderationCaseId: string,
+): Promise<readonly (typeof operatorAuditLogs.$inferSelect)[]> {
+  return transaction
+    .select()
+    .from(operatorAuditLogs)
+    .where(eq(operatorAuditLogs.moderationCaseId, moderationCaseId))
+    .orderBy(asc(operatorAuditLogs.createdAt), asc(operatorAuditLogs.id));
 }
 
 /** Compact append-only history of RuneSpace system-state changes, most recent first. */

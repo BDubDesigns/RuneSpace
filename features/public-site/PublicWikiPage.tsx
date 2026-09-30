@@ -2,7 +2,6 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import { PublicSiteShell } from "@/components/public-site/PublicSiteShell";
 import { Panel } from "@/components/ui/Panel";
-import type { WikiParagraph } from "@/game/schemas/public-wiki";
 import {
   getWikiArticleGroups,
   getWikiArticlePath,
@@ -10,37 +9,14 @@ import {
   type WikiArticle,
 } from "./public-wiki";
 
-const wikiLinkClassName =
-  "rs-focus rounded-sm underline decoration-[color:var(--rs-accent-primary)] decoration-2 underline-offset-2 hover:text-[color:var(--rs-accent-primary)]";
-
-function WikiParagraphText({ paragraph }: { paragraph: WikiParagraph }) {
-  if (typeof paragraph === "string") return <>{paragraph}</>;
-
-  return (
-    <>
-      {paragraph.map((segment, index) =>
-        typeof segment === "string" ? (
-          <span key={index}>{segment}</span>
-        ) : (
-          <Link
-            className={wikiLinkClassName}
-            href={getWikiArticlePath({ slug: segment.articleSlug })}
-            key={index}
-          >
-            {segment.text}
-          </Link>
-        ),
-      )}
-    </>
-  );
-}
-import { publicSiteNavigation } from "./public-site-content";
+import { publicSiteFooterLinks, publicSiteNavigation } from "./public-site-content";
+import { WikiLinkedText } from "./WikiLinkedText";
 
 /**
  * The Wiki landing page.
  *
  * Deliberately navigational rather than a catalog: an intro, one prominent way
- * in for somebody who does not know what to read, and the five categories as
+ * in for somebody who does not know what to read, and the categories as
  * compact panels of direct article links. Every article stays one tap from
  * here, so there are no category routes to click through and no second table
  * of contents above the panels — the panels are the contents.
@@ -164,7 +140,7 @@ export function PublicWikiArticlePage({ article }: { article: WikiArticle }) {
                 >
                   {section.paragraphs.map((paragraph, index) => (
                     <p key={index}>
-                      <WikiParagraphText paragraph={paragraph} />
+                      <WikiLinkedText paragraph={paragraph} />
                     </p>
                   ))}
                 </div>
@@ -179,7 +155,7 @@ export function PublicWikiArticlePage({ article }: { article: WikiArticle }) {
                 >
                   {section.list.map((item, index) => (
                     <li key={index}>
-                      <WikiParagraphText paragraph={item} />
+                      <WikiLinkedText paragraph={item} />
                     </li>
                   ))}
                 </ul>
@@ -194,7 +170,7 @@ export function PublicWikiArticlePage({ article }: { article: WikiArticle }) {
 
 function PublicWikiFrame({ children }: { children: ReactNode }) {
   return (
-    <PublicSiteShell navigation={publicSiteNavigation}>
+    <PublicSiteShell footerLinks={publicSiteFooterLinks} navigation={publicSiteNavigation}>
       <div className="mx-auto w-full max-w-5xl px-4 pb-16 pt-12 sm:px-6 sm:pb-24 sm:pt-16">
         {children}
       </div>

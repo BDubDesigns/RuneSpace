@@ -177,7 +177,9 @@ only — never gameplay or social authority.
 - **Chat/Social shell:** `features/social/SocialContext.tsx` is the seam
   downstream features consume — `subscribe`, `onReconcile`, the pinned
   actionable-card region (`upsertCard` / `removeCard`), and attention
-  (`setAttention`). `ChatSocialSurface` is the content; today
+  (`setAttention`). A pinned card counts toward the launcher's attention unless
+  its owner marks it `attention: false` — a seen moderation notice stays pinned
+  without lighting the launcher (#248). `ChatSocialSurface` is the content; today
   `ChatSocialDrawer` presents it as a Drawer over the current Play surface,
   opened by the `ChatSocialLauncher` that `GameShell`'s `floatingAction` slot
   pins to the right edge at a normalized `{ side, y }` position. Open state lives in the context, so a later docked
@@ -303,6 +305,27 @@ item.
   General, Trade, and Whispers as tabs; `SafetyFlow` is the one Block / Report
   / Report + Block flow used by message actions, Whisper conversations, and
   the same-location profile.
+
+## Moderation (Issue #248)
+
+Operator review, sanctions, appeals, and privileged-access audit sit on top of
+Block and Report; `docs/moderation.md` is the contract.
+
+- **Rules:** `game/domain/moderation.ts` (case statuses, sanction kinds and
+  durations, derived sanction state, notices, appeals). Whether a sanction is
+  in effect is always derived from stored facts and the request clock.
+- **Enforcement seams:** a suspension is an input to `decideGameplayAccess`,
+  loaded by `server/gameplay-access.ts`; a social restriction is refused in
+  `beginChatSend` (every chat send) and by
+  `requireTradeRequestInitiationAllowed` for #225. Both are account-wide.
+- **Operator surface:** `server/moderation-commands.ts` (`requireAdmin`) over
+  the internal `server/moderation-seams.ts`. Every sensitive read writes a
+  `privileged_access_logs` row first (`server/privileged-access.ts`); every
+  mutation writes an `operator_audit_logs` row with its case id.
+- **Player surface:** `server/moderation-notices.ts` (session only, own
+  account), `/moderation` pages, the Characters callout, and pinned
+  "Moderation notice" cards in Chat/Social, refreshed by
+  `"moderation.notices"`.
 
 ## Where minigames fit
 

@@ -24,6 +24,7 @@ export function ChatComposer({
   sending,
   sendLabel = "Send",
   sendBlocked = false,
+  socialRestricted = false,
   controls,
   children,
   dataChannel,
@@ -40,6 +41,11 @@ export function ChatComposer({
   sendLabel?: string;
   /** Extra reasons Send is unavailable (for example an ad cooldown). */
   sendBlocked?: boolean;
+  /**
+   * A social restriction is in effect (#248): Send is held and a line points
+   * at the pinned notice. Presentation only; the server refuses the send.
+   */
+  socialRestricted?: boolean;
   controls?: ReactNode;
   /** Notes and feedback under the controls. */
   children?: ReactNode;
@@ -48,7 +54,13 @@ export function ChatComposer({
   const trimmedLength = chatMessageLength(draft.trim());
   const overLimit = trimmedLength > CHAT_POLICY.maxLength;
   const rateBlocked = pressure.pressure === "full";
-  const canSend = trimmedLength > 0 && !overLimit && !rateBlocked && !sending && !sendBlocked;
+  const canSend =
+    trimmedLength > 0 &&
+    !overLimit &&
+    !rateBlocked &&
+    !sending &&
+    !sendBlocked &&
+    !socialRestricted;
   const composerId = `${idPrefix}-composer`;
   const pressureId = `${idPrefix}-pressure`;
   const counterId = `${idPrefix}-counter`;
@@ -105,6 +117,15 @@ export function ChatComposer({
           {sendLabel}
         </ActionButton>
       </div>
+      {socialRestricted ? (
+        <p
+          className="text-xs text-[color:var(--rs-accent-danger)]"
+          data-chat-restricted=""
+          role="note"
+        >
+          You have a social restriction. See the notice above.
+        </p>
+      ) : null}
       {children}
     </form>
   );

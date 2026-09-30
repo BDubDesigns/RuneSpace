@@ -1,4 +1,5 @@
 import { WIKI_CATEGORIES, WikiArticleSchema } from "@/game/schemas/public-wiki";
+import { COMMUNITY_RULES_SLUG, SAFETY_PRIVACY_SLUG } from "./policy-links";
 import type { WikiArticle, WikiCategoryId, WikiParagraph } from "@/game/schemas/public-wiki";
 
 export type { WikiArticle, WikiCategoryId } from "@/game/schemas/public-wiki";
@@ -1383,6 +1384,211 @@ const authoredWikiArticles = [
             " have known each other since they were children running between their two buildings, and it shows in about four seconds of conversation.",
           ],
           "She is the practical half of that pair. It was never the business her parents built — she is clear about that — but it is the one this town needed, and she would rather run that than keep a museum.",
+        ],
+      },
+    ],
+  },
+  {
+    // Issue #248 — the locked Chat & Community Rules copy from planning #226.
+    // Keep its casual, human tone; do not rewrite it into legal or HR voice.
+    slug: COMMUNITY_RULES_SLUG,
+    title: "Chat & Community Rules",
+    category: "community",
+    summary:
+      "Argue, trash talk, swear at the RNG. Don't attack people for who they are, harass them, threaten them, creep on them, or scam them.",
+    sections: [
+      {
+        paragraphs: [
+          "RuneSpace is supposed to be a place where people can hang out, trade, argue about dumb stuff, swear occasionally, and generally act like humans.",
+          "You do not have to be endlessly polite. You can disagree with people. You can talk trash. You can tell somebody their idea is terrible.",
+          "Just don't make the game miserable for other people.",
+        ],
+      },
+      {
+        heading: "Don't target people for who they are",
+        paragraphs: [
+          "Don't attack someone because of their race, ethnicity, nationality, sex, gender identity, sexual orientation, disability, religion, faith, or similar parts of their identity.",
+          "Aside from being harmful, it's also just lazy.",
+          "If you're going to give someone shit, at least give them shit for something they actually said, did, or believe. Their terrible trade offer is fair game. Their outdated worldview is fair game. Who they are isn't.",
+          "You can disagree with religions, beliefs, politics, opinions, or ideas. You cannot use that disagreement as an excuse to harass or demean the people who hold them.",
+        ],
+      },
+      {
+        heading: "Don't harass people",
+        paragraphs: [
+          "Arguments happen. One disagreement isn't harassment.",
+          "Repeatedly targeting someone, following them around to bother them, continuing to contact them after they've made it clear they want you to stop, evading blocks, or organizing other people to pile onto them is not okay.",
+          "If someone blocks you, that's the end of the interaction. Move on.",
+        ],
+      },
+      {
+        heading: "No threats or real-world intimidation",
+        paragraphs: [
+          "Don't threaten real-world violence, encourage someone to hurt themselves or someone else, share someone's private information, or try to scare somebody with information about their real life.",
+          "RuneSpace drama stays in RuneSpace.",
+        ],
+      },
+      {
+        heading: "Don't be creepy",
+        paragraphs: [
+          "Sexual harassment, unwanted sexual comments directed at another player, exploitative sexual content, or sexual content involving minors is not allowed.",
+        ],
+      },
+      {
+        heading: "Don't scam or spam people",
+        paragraphs: [
+          "Don't impersonate other players or staff, run phishing scams, deliberately misrepresent trades, flood chat, or use chat primarily to annoy everyone else.",
+          "Trade chat is there for buying, selling, price checks, and other marketplace stuff. General chat is for everything else.",
+        ],
+      },
+      {
+        heading: "Swearing isn't the problem",
+        paragraphs: [
+          "RuneSpace does not need a swear jar.",
+          "Profanity by itself isn't a violation. Context matters. Saying \u201cthis fucking drop rate hates me\u201d is very different from directing hateful or threatening abuse at another person.",
+          "Some particularly severe slurs may simply be blocked from being sent.",
+        ],
+      },
+      {
+        heading: "Use Block and Report",
+        paragraphs: [
+          "If you don't want to interact with someone, block them.",
+          "If someone is breaking these rules, report the message or player. You can report without blocking, or do both.",
+          [
+            "Blocks, reports, chat messages, and related safety information may be retained and reviewed to keep RuneSpace safe. Direct messages aren't public to other players, but they may still be reviewed when necessary for moderation or safety. ",
+            { text: "Safety & Privacy", articleSlug: SAFETY_PRIVACY_SLUG },
+            " explains exactly what's kept and for how long.",
+          ],
+        ],
+      },
+      {
+        heading: "Moderation isn't a game",
+        paragraphs: [
+          "Don't abuse the report system, organize false reports, or try to manipulate moderation against somebody you dislike.",
+          "RuneSpace may use patterns such as reports and blocks to help identify things worth reviewing, but those signals aren't automatic proof that someone did something wrong.",
+        ],
+      },
+      {
+        heading: "What happens if you break the rules?",
+        paragraphs: [
+          "It depends on what happened.",
+          "Sometimes a warning makes sense. Sometimes it doesn't.",
+          "RuneSpace may temporarily or permanently restrict someone's ability to chat, DM, advertise, or initiate trades. More serious behavior\u2014such as credible threats, doxxing, serious scams, repeated harassment, or attempts to evade moderation\u2014can result in temporary or permanent account suspension.",
+          "You do not necessarily get a warning first for serious behavior.",
+          "The goal isn't to punish people for having a bad day. The goal is to stop people from making RuneSpace unsafe or miserable for everyone else.",
+          [
+            "If it happens to you, you'll get a notice that says which rule, what's affected, for how long, and a case reference \u2014 and you can appeal it. ",
+            { text: "Safety & Privacy", articleSlug: SAFETY_PRIVACY_SLUG },
+            " covers how appeals work.",
+          ],
+        ],
+      },
+      {
+        heading: "The short version",
+        paragraphs: [
+          "Argue about ideas. Roast bad decisions. Complain about prices. Swear at the RNG.",
+          "Don't attack people for who they are, don't harass them, don't threaten them, and don't be creepy.",
+          "We're all here to play a game.",
+        ],
+      },
+    ],
+  },
+  {
+    // Issue #248 — the Safety / Privacy disclosure. Every sentence must stay
+    // true to shipped storage and access. Never publish thresholds, signal
+    // weights, or trigger logic here, and update this page before RuneSpace
+    // collects a new kind of safety data or uses it for something new.
+    slug: SAFETY_PRIVACY_SLUG,
+    title: "Safety & Privacy",
+    category: "community",
+    summary:
+      "What RuneSpace keeps when you chat, Whisper, block, or report, how long it keeps it, who can see it, and how moderation and appeals work.",
+    sections: [
+      {
+        paragraphs: [
+          "Chat, Whispers, Block, and Report only work if RuneSpace keeps some information about them. This page says what that information is, why it's kept, how long it's kept, and who can look at it. It's here so nothing about it is a surprise.",
+          [
+            "The short version: messages are kept for 90 days, reports are kept longer as evidence, Whispers are private from other players but not from moderators with a real reason to look, and every time a moderator looks, it's recorded. The ",
+            { text: "Chat & Community Rules", articleSlug: COMMUNITY_RULES_SLUG },
+            " say what's allowed.",
+          ],
+        ],
+      },
+      {
+        heading: "Public chat and promoted ads",
+        paragraphs: [
+          "Every General and Trade message is saved with its text, the channel, when it was sent, the character that sent it, that character's name at the time, and the player account the character belongs to. A promoted Trade ad is saved the same way, plus the Credits it cost. Everyone playing can read public messages while they're kept.",
+          "RuneSpace keeps these so chat history loads when you open it, so the shared send limit and the promoted-ad cooldown can be applied to your account across all your characters and tabs, and so reported messages can be checked.",
+        ],
+      },
+      {
+        heading: "Whispers",
+        paragraphs: [
+          "A Whisper is saved with its text, when it was sent, the character that sent it and its name at the time, the player account behind it, and the conversation it belongs to. RuneSpace also keeps a record of which two characters share each conversation and how far each has read, so unread Whispers clear on every device.",
+          "Whispers aren't public: other players can't read a conversation they aren't in. They are not end-to-end encrypted, though. RuneSpace stores them and can read them, and a moderator may review them for a legitimate safety or moderation reason \u2014 a report, a serious safety concern, or an active investigation. There is no tool for casually browsing people's Whispers.",
+        ],
+      },
+      {
+        heading: "How long messages are kept",
+        paragraphs: [
+          "General, Trade, promoted ads, and Whispers are all kept for 90 days, then deleted. Nobody can edit or delete a message before then, including you.",
+          "The one exception is evidence attached to a report, below. A message that the slur filter stops is never sent or saved.",
+        ],
+      },
+      {
+        heading: "Blocks",
+        paragraphs: [
+          "When you block someone, RuneSpace saves which account blocked which, the characters involved, and when. It also keeps a history of every block and unblock. The blocked player is never told.",
+          "Blocks are kept so they keep working across every character on both accounts, and as safety information for moderators. They aren't on the 90-day message timer. Blocking someone doesn't keep any extra chat on its own.",
+        ],
+      },
+      {
+        heading: "Reports",
+        paragraphs: [
+          "A report saves who reported (account and character), who was reported (account, character, and the character's name at the time), the reason you picked, your optional note, and when. Reporting a message also saves a copy of that exact message and up to 10 messages before and 10 after it from the same channel \u2014 or, for a Whisper, from that one conversation only. Other conversations are never swept in.",
+          "That copy is evidence, so it's kept after the original messages are deleted at 90 days. The reported player is never told who reported them, or that a report was made.",
+        ],
+      },
+      {
+        heading: "Moderation cases",
+        paragraphs: [
+          "Reports about the same account are reviewed together in a moderation case. A case holds those reports and their evidence, a moderator's internal notes, any sanction, and any appeal you send. Cases and their evidence are kept after they're closed, and a suspension \u2014 even a permanent one \u2014 doesn't delete them, so decisions can be checked later.",
+        ],
+      },
+      {
+        heading: "Safety signals",
+        paragraphs: [
+          "Patterns of reports and blocks \u2014 for example, several different players reporting or blocking the same account \u2014 can help moderators notice what's worth reviewing first and understand what they're looking at.",
+          "They are context for a person, not a verdict. Nothing in RuneSpace warns, restricts, or suspends anyone automatically because of reports or blocks, and there's no hidden score. RuneSpace doesn't publish the details of how moderators prioritize reviews, because that would help people game the system or pile onto someone.",
+        ],
+      },
+      {
+        heading: "Who can see it, and how that's checked",
+        paragraphs: [
+          "Only RuneSpace's operators can open moderation cases, report evidence, or retained chat and Whispers. Every time one of them views that information, RuneSpace records who looked, when, which case or account it was about, and what kind of information they opened \u2014 even when they don't take any action. Every warning, restriction, suspension, change, reversal, and appeal decision is recorded the same way. Those records can't be edited or deleted from inside RuneSpace.",
+          "Retained Whispers can only be opened from a moderation case, and only the conversations between the players in that report, around the time of the incident.",
+        ],
+      },
+      {
+        heading: "What this information is used for",
+        paragraphs: ["RuneSpace uses everything on this page for these things only:"],
+        list: [
+          "Delivering chat and Whispers, loading history, and keeping unread counts in sync.",
+          "Applying the shared send limit, the promoted-ad cooldown, the slur filter, and your blocks.",
+          "Reviewing reports, enforcing the Chat & Community Rules, and handling appeals.",
+        ],
+      },
+      {
+        heading: "If this changes",
+        paragraphs: [
+          "If RuneSpace starts keeping a new kind of safety information, or starts using it for something new, this page will say so first.",
+        ],
+      },
+      {
+        heading: "Moderation notices and appeals",
+        paragraphs: [
+          "If a moderator acts on your account, you'll get a notice with the rule it's about, what you can't do, how long it lasts, and a case reference. A warning restricts nothing. A social restriction stops you from sending General and Trade messages, Whispers, and promoted ads, but you can keep playing and reading public chat. A suspension stops you from entering the game at all.",
+          "You can appeal each notice once. Open the notice from your Characters page or the Chat panel, choose Appeal, and tell us briefly why it should be reviewed. That works even while you're suspended \u2014 you only need to sign in. A moderator will uphold the decision, change it, or reverse it, and your notice will show the outcome. Notices never say who reported you, and they don't name the moderator.",
         ],
       },
     ],

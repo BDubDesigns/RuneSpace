@@ -19,10 +19,21 @@ const articleTitles = [
   "Bix Weller",
   "Renn Calder",
   "Mara Kells",
+  "Work Orders",
+  "Fabrication & Tinkering",
+  "Chat & Community Rules",
+  "Safety & Privacy",
 ];
 
 /** The index's category headings, in the order the page renders them. */
-const categoryHeadings = ["Getting Started", "Work", "Gear & Credits", "Places & Travel", "People"];
+const categoryHeadings = [
+  "Getting Started",
+  "Work",
+  "Gear & Credits",
+  "Places & Travel",
+  "People",
+  "Community & Safety",
+];
 
 test.describe("public Wiki", () => {
   test("lists every article and renders one with its sections", async ({ page }) => {
@@ -64,7 +75,7 @@ test.describe("public Wiki", () => {
   }) => {
     await page.goto("/wiki");
 
-    // Two sections, not sixteen article cards.
+    // Two sections, not twenty article cards.
     await expect(page.getByRole("heading", { level: 2 })).toHaveText([
       "Start here",
       "Browse by category",
@@ -78,7 +89,7 @@ test.describe("public Wiki", () => {
       startHere.getByRole("link", { name: "Getting Started", exact: true }),
     ).toHaveAttribute("href", "/wiki/getting-started");
 
-    // The five categories are the page's navigation, each with its own copy.
+    // The six categories are the page's navigation, each with its own copy.
     await expect(page.getByRole("heading", { level: 3 })).toHaveText(categoryHeadings);
 
     const browse = page.locator("section", {

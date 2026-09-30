@@ -1,5 +1,6 @@
 import { relations, sql } from "drizzle-orm";
 import {
+  type AnyPgColumn,
   bigint,
   boolean,
   check,
@@ -1096,6 +1097,11 @@ export const operatorAuditLogs = pgTable(
     operation: text("operation").notNull(),
     targetIdentity: text("target_identity"),
     details: jsonb("details").notNull(),
+    // Issue #248 — the moderation case a moderation action belongs to, so a
+    // case shows its own action history. Null for every non-moderation row.
+    moderationCaseId: text("moderation_case_id").references((): AnyPgColumn => moderationCases.id, {
+      onDelete: "restrict",
+    }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [
@@ -1115,6 +1121,9 @@ export const operatorAuditLogs = pgTable(
     index("operator_audit_logs_system_created_idx")
       .on(table.createdAt)
       .where(sql`${table.targetKind} = 'system'`),
+    index("operator_audit_logs_moderation_case_created_idx")
+      .on(table.moderationCaseId, table.createdAt)
+      .where(sql`${table.moderationCaseId} is not null`),
   ],
 );
 
@@ -1419,6 +1428,11 @@ export const playerReports = pgTable(
       onDelete: "restrict",
     }),
     evidence: jsonb("evidence"),
+    // Issue #248 — the moderation case this report is reviewed in. A report
+    // joins its reported account's one open-or-reviewed case, or opens one.
+    caseId: text("case_id")
+      .notNull()
+      .references((): AnyPgColumn => moderationCases.id, { onDelete: "restrict" }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [
@@ -1439,6 +1453,238 @@ export const playerReports = pgTable(
       .on(table.reporterPlayerAccountId, table.messageId)
       .where(sql`${table.messageId} is not null`),
     index("player_reports_reported_created_idx").on(table.reportedPlayerAccountId, table.createdAt),
+    index("player_reports_case_created_idx").on(table.caseId, table.createdAt),
+  ],
+);
+
+/**
+ * Moderation cases (issue #248): the unit an operator reviews and actions.
+ * Each case is about one subject account — the reported account, the safety
+ * identity behind every character — and moves Open → Reviewed → Actioned or
+ * Dismissed (`game/domain/moderation.ts`).
+ *
+ * - A report joins its subject's one open-or-reviewed case (the partial
+ *   unique index), or opens one; a report after that case closes opens a new
+ *   case. An operator may also open a case with a stated reason, for an
+ *   investigation that no report started.
+ * - `case_number` is the durable source of the player-facing reference
+ *   (`MOD-00042`) that sanction notices and appeals cite.
+ * - Status changes are the only mutation, each audited in
+ *   `operator_audit_logs` with this case's id. Cases are never deleted, so
+ *   permanent suspension never erases evidence.
+ */
+export const moderationCases = pgTable(
+  "moderation_cases",
+  {
+    id: text("id")
+      .primaryKey()
+      .default(sql`gen_random_uuid()`),
+    caseNumber: bigint("case_number", { mode: "number" })
+      .generatedAlwaysAsIdentity()
+      .notNull()
+      .unique(),
+    subjectPlayerAccountId: text("subject_player_account_id")
+      .notNull()
+      .references(() => playerAccounts.id, { onDelete: "restrict" }),
+    status: text("status").notNull().default("open"),
+    // `report` when the first report opened it; `operator` when an operator did.
+    openedBy: text("opened_by").notNull(),
+    openedByAdminUserId: text("opened_by_admin_user_id"),
+    openingReason: text("opening_reason"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    check(
+      "moderation_cases_status_check",
+      sql`${table.status} in ('open', 'reviewed', 'actioned', 'dismissed')`,
+    ),
+    check(
+      "moderation_cases_opened_by_check",
+      sql`(${table.openedBy} = 'report' and ${table.openedByAdminUserId} is null and ${table.openingReason} is null) or (${table.openedBy} = 'operator' and ${table.openedByAdminUserId} is not null and ${table.openingReason} is not null)`,
+    ),
+    uniqueIndex("moderation_cases_one_active_per_subject_idx")
+      .on(table.subjectPlayerAccountId)
+      .where(sql`${table.status} in ('open', 'reviewed')`),
+    index("moderation_cases_status_updated_idx").on(table.status, table.updatedAt),
+    index("moderation_cases_subject_created_idx").on(table.subjectPlayerAccountId, table.createdAt),
+  ],
+);
+
+/**
+ * Append-only operator notes on a case (#248). Internal only: a sanctioned
+ * player never sees them. There is no update or delete path.
+ */
+export const moderationCaseNotes = pgTable(
+  "moderation_case_notes",
+  {
+    id: text("id")
+      .primaryKey()
+      .default(sql`gen_random_uuid()`),
+    caseId: text("case_id")
+      .notNull()
+      .references(() => moderationCases.id, { onDelete: "restrict" }),
+    adminUserId: text("admin_user_id").notNull(),
+    body: text("body").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    check("moderation_case_notes_body_check", sql`char_length(${table.body}) between 1 and 2000`),
+    index("moderation_case_notes_case_created_idx").on(table.caseId, table.createdAt),
+  ],
+);
+
+/**
+ * Sanctions (#248): an operator's explicit action on a case against its
+ * subject account. Account-wide by construction — every character of the
+ * account is covered, so switching characters never evades one.
+ *
+ * - `warning` restricts nothing; `social_restriction` stops outbound social
+ *   contact (`server/moderation-sanctions.ts`); `suspension` stops gameplay
+ *   through the gameplay-access rule.
+ * - `duration` is the preset it was issued (or last changed) with; `ends_at`
+ *   is derived from `starts_at` and that preset, null when permanent. Changing
+ *   the duration rewrites both; reversing sets the reversal pair. Every change
+ *   is audited in `operator_audit_logs`; the row keeps only current state.
+ * - Whether a sanction is in effect is always derived from these facts and
+ *   the request's clock, never stored, so expiry needs no job.
+ */
+export const moderationSanctions = pgTable(
+  "moderation_sanctions",
+  {
+    id: text("id")
+      .primaryKey()
+      .default(sql`gen_random_uuid()`),
+    caseId: text("case_id")
+      .notNull()
+      .references(() => moderationCases.id, { onDelete: "restrict" }),
+    playerAccountId: text("player_account_id")
+      .notNull()
+      .references(() => playerAccounts.id, { onDelete: "restrict" }),
+    kind: text("kind").notNull(),
+    ruleCategory: text("rule_category").notNull(),
+    duration: text("duration"),
+    startsAt: timestamp("starts_at", { withTimezone: true }).notNull(),
+    endsAt: timestamp("ends_at", { withTimezone: true }),
+    issuedByAdminUserId: text("issued_by_admin_user_id").notNull(),
+    reversedAt: timestamp("reversed_at", { withTimezone: true }),
+    reversedByAdminUserId: text("reversed_by_admin_user_id"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    check(
+      "moderation_sanctions_kind_check",
+      sql`${table.kind} in ('warning', 'social_restriction', 'suspension')`,
+    ),
+    check(
+      "moderation_sanctions_rule_check",
+      sql`${table.ruleCategory} in ('identity_hate', 'harassment', 'threats_private_info', 'sexual_content', 'scams_spam', 'moderation_abuse', 'block_or_sanction_evasion', 'offensive_name')`,
+    ),
+    check(
+      "moderation_sanctions_duration_check",
+      sql`(${table.kind} = 'warning' and ${table.duration} is null and ${table.endsAt} is null) or (${table.kind} <> 'warning' and ${table.duration} is not null and ${table.duration} in ('24h', '7d', '30d', '90d', '1y', 'permanent') and (${table.duration} = 'permanent') = (${table.endsAt} is null))`,
+    ),
+    check(
+      "moderation_sanctions_reversal_paired_check",
+      sql`(${table.reversedAt} is null) = (${table.reversedByAdminUserId} is null)`,
+    ),
+    index("moderation_sanctions_account_kind_idx").on(table.playerAccountId, table.kind),
+    index("moderation_sanctions_case_idx").on(table.caseId),
+  ],
+);
+
+/**
+ * A player's appeal of one sanction (#248), submitted from the authenticated
+ * in-game appeal form. One appeal per sanction. The submission (`body`,
+ * `submitted_at`) is never changed; the operator's decision is set once —
+ * Upheld, Modified, or Reversed — and audited with any resulting sanction
+ * change in the same transaction. `decision_note` is internal.
+ */
+export const moderationAppeals = pgTable(
+  "moderation_appeals",
+  {
+    id: text("id")
+      .primaryKey()
+      .default(sql`gen_random_uuid()`),
+    sanctionId: text("sanction_id")
+      .notNull()
+      .unique()
+      .references(() => moderationSanctions.id, { onDelete: "restrict" }),
+    caseId: text("case_id")
+      .notNull()
+      .references(() => moderationCases.id, { onDelete: "restrict" }),
+    playerAccountId: text("player_account_id")
+      .notNull()
+      .references(() => playerAccounts.id, { onDelete: "restrict" }),
+    body: text("body").notNull(),
+    submittedAt: timestamp("submitted_at", { withTimezone: true }).notNull().defaultNow(),
+    outcome: text("outcome"),
+    decidedAt: timestamp("decided_at", { withTimezone: true }),
+    decidedByAdminUserId: text("decided_by_admin_user_id"),
+    decisionNote: text("decision_note"),
+  },
+  (table) => [
+    check("moderation_appeals_body_check", sql`char_length(${table.body}) between 1 and 1000`),
+    check(
+      "moderation_appeals_outcome_check",
+      sql`${table.outcome} is null or ${table.outcome} in ('upheld', 'modified', 'reversed')`,
+    ),
+    check(
+      "moderation_appeals_decision_paired_check",
+      sql`(${table.outcome} is null) = (${table.decidedAt} is null) and (${table.outcome} is null) = (${table.decidedByAdminUserId} is null)`,
+    ),
+    index("moderation_appeals_case_idx").on(table.caseId),
+    index("moderation_appeals_pending_idx")
+      .on(table.submittedAt)
+      .where(sql`${table.outcome} is null`),
+  ],
+);
+
+/**
+ * Privileged access audit (#248): one immutable row for every operator view
+ * of sensitive safety data — the moderation queue, a case's reports and
+ * preserved evidence, retained public chat or Whispers, an account's
+ * moderation history, and this log itself — written in the same transaction
+ * as the read, before any data is returned, even when nothing is changed.
+ *
+ * It is separate from `operator_audit_logs` on purpose: that table's contract
+ * is "one row per successful mutation", and mixing reads into it would make
+ * that contract misleading. `admin_user_id` is always the server-derived
+ * operator identity. There is no update or delete path, and only the
+ * allowlisted operators can read it.
+ */
+export const privilegedAccessLogs = pgTable(
+  "privileged_access_logs",
+  {
+    id: text("id")
+      .primaryKey()
+      .default(sql`gen_random_uuid()`),
+    adminUserId: text("admin_user_id").notNull(),
+    accessKind: text("access_kind").notNull(),
+    caseId: text("case_id").references(() => moderationCases.id, { onDelete: "restrict" }),
+    targetPlayerAccountId: text("target_player_account_id").references(() => playerAccounts.id, {
+      onDelete: "restrict",
+    }),
+    targetCharacterId: text("target_character_id").references(() => characters.id, {
+      onDelete: "restrict",
+    }),
+    // What exactly was viewed: filters, windows, conversation ids. Never data.
+    context: jsonb("context").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    check(
+      "privileged_access_logs_kind_check",
+      sql`${table.accessKind} in ('case_queue', 'case_detail', 'retained_public_chat', 'retained_whispers', 'account_moderation_history', 'privileged_access_log')`,
+    ),
+    index("privileged_access_logs_created_idx").on(table.createdAt),
+    index("privileged_access_logs_case_created_idx")
+      .on(table.caseId, table.createdAt)
+      .where(sql`${table.caseId} is not null`),
+    index("privileged_access_logs_account_created_idx")
+      .on(table.targetPlayerAccountId, table.createdAt)
+      .where(sql`${table.targetPlayerAccountId} is not null`),
   ],
 );
 
@@ -1468,3 +1714,8 @@ export type NewOperatorAuditLog = typeof operatorAuditLogs.$inferInsert;
 export type RuneSpaceAccessState = typeof runespaceAccessState.$inferSelect;
 export type ChatMessage = typeof chatMessages.$inferSelect;
 export type PlayerReport = typeof playerReports.$inferSelect;
+export type ModerationCase = typeof moderationCases.$inferSelect;
+export type ModerationCaseNote = typeof moderationCaseNotes.$inferSelect;
+export type ModerationSanction = typeof moderationSanctions.$inferSelect;
+export type ModerationAppeal = typeof moderationAppeals.$inferSelect;
+export type PrivilegedAccessLog = typeof privilegedAccessLogs.$inferSelect;

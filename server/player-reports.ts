@@ -3,6 +3,7 @@ import { db } from "@/db";
 import {
   characters,
   chatMessages,
+  moderationCases,
   playerReports,
   whisperParticipants,
   type Character,
@@ -14,6 +15,7 @@ import type { CharacterTarget } from "@/game/schemas/whispers";
 import type { ReportResult } from "@/game/schemas/social-safety";
 import { channelFeed } from "@/server/chat";
 import { requirePlayableOwnedCharacter } from "@/server/gameplay-access";
+import { caseForNewReport } from "@/server/moderation-cases";
 import { publishBlocksChanged, recordBlock } from "@/server/player-blocks";
 import { CHARACTER_TARGET_NOT_FOUND, resolveCharacterTarget } from "@/server/social-targets";
 
@@ -28,7 +30,8 @@ import { CHARACTER_TARGET_NOT_FOUND, resolveCharacterTarget } from "@/server/soc
  *
  * Reporting never blocks by itself; `alsoBlock` is the combined Report + Block
  * path and commits with the report. The reported player is never told, and a
- * report is a signal for human review (#248), never a score or a sanction.
+ * report is a signal for human review, never a score or a sanction: it joins
+ * the reported account's moderation case (#248) for an operator to review.
  */
 
 /** One preserved message, with the stable identities operators need. */
@@ -106,6 +109,71 @@ async function captureEvidence(row: ChatMessage, now: Date): Promise<MessageRepo
   };
 }
 
+type Transaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
+type ReportValues = Omit<
+  typeof playerReports.$inferInsert,
+  | "reporterPlayerAccountId"
+  | "reporterCharacterId"
+  | "reportedPlayerAccountId"
+  | "reportedCharacterId"
+  | "reportedCharacterName"
+  | "caseId"
+>;
+
+/** Whether this account already reported this message. */
+async function isRepeatReport(
+  tx: Transaction,
+  reporter: Character,
+  messageId: string | null | undefined,
+): Promise<boolean> {
+  if (!messageId) return false;
+  const [row] = await tx
+    .select({ id: playerReports.id })
+    .from(playerReports)
+    .where(
+      and(
+        eq(playerReports.reporterPlayerAccountId, reporter.playerAccountId),
+        eq(playerReports.messageId, messageId),
+      ),
+    )
+    .limit(1);
+  return row !== undefined;
+}
+
+/**
+ * Insert the report into its moderation case (#248): the reported account's
+ * open-or-reviewed case, or a new one. A concurrent repeat of the same report
+ * stores nothing and leaves no empty case behind.
+ */
+async function insertReport(
+  tx: Transaction,
+  reporter: Character,
+  reported: Character,
+  values: ReportValues,
+  now: Date,
+): Promise<boolean> {
+  const moderationCase = await caseForNewReport(tx, reported.playerAccountId, now);
+  const inserted = await tx
+    .insert(playerReports)
+    .values({
+      ...values,
+      caseId: moderationCase.caseId,
+      reporterPlayerAccountId: reporter.playerAccountId,
+      reporterCharacterId: reporter.id,
+      reportedPlayerAccountId: reported.playerAccountId,
+      reportedCharacterId: reported.id,
+      reportedCharacterName: reported.displayName,
+      createdAt: now,
+    })
+    .onConflictDoNothing()
+    .returning({ id: playerReports.id });
+  if (inserted.length > 0) return true;
+  if (moderationCase.created) {
+    await tx.delete(moderationCases).where(eq(moderationCases.id, moderationCase.caseId));
+  }
+  return false;
+}
+
 /**
  * Store one report, and for Report + Block the Block, in one transaction.
  * A repeat of the same account's report on the same message stores nothing.
@@ -113,33 +181,16 @@ async function captureEvidence(row: ChatMessage, now: Date): Promise<MessageRepo
 async function commitReport(
   reporter: Character,
   reported: Character,
-  values: Omit<
-    typeof playerReports.$inferInsert,
-    | "reporterPlayerAccountId"
-    | "reporterCharacterId"
-    | "reportedPlayerAccountId"
-    | "reportedCharacterId"
-    | "reportedCharacterName"
-  >,
+  values: ReportValues,
   alsoBlock: boolean,
   now: Date,
 ): Promise<ReportResult> {
   const { created, blockCreated } = await db.transaction(async (tx) => {
-    const inserted = await tx
-      .insert(playerReports)
-      .values({
-        ...values,
-        reporterPlayerAccountId: reporter.playerAccountId,
-        reporterCharacterId: reporter.id,
-        reportedPlayerAccountId: reported.playerAccountId,
-        reportedCharacterId: reported.id,
-        reportedCharacterName: reported.displayName,
-        createdAt: now,
-      })
-      .onConflictDoNothing()
-      .returning({ id: playerReports.id });
+    const created = (await isRepeatReport(tx, reporter, values.messageId))
+      ? false
+      : await insertReport(tx, reporter, reported, values, now);
     const blockCreated = alsoBlock ? await recordBlock(tx, reporter, reported, now) : false;
-    return { created: inserted.length > 0, blockCreated };
+    return { created, blockCreated };
   });
   if (blockCreated) publishBlocksChanged(reporter.playerAccountId);
   return {
