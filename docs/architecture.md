@@ -145,7 +145,9 @@ only — never gameplay or social authority.
   namespaced event types there; #245 registers none, and the substrate imports
   no chat or trading model.
 - **Publisher:** `server/realtime.ts` owns `publishRealtimeEvent(audience, type,
-  data)` and the audience model (`character`, `account`, `everyone`). Alpha
+  data)` and the audience model (`character`, `account`, `everyone`, which
+  may exclude named accounts — a public message skips its sender's blockers,
+  #247). Alpha
   fanout is single-process and in-memory, anchored on `globalThis` so every
   route and action in the process shares it. A future multi-process deployment
   replaces only `createInMemoryRealtimeFanout`; there is deliberately no Redis,
@@ -226,8 +228,10 @@ realtime substrate above. There is no Local/Nearby/Zone channel.
   after commit does it publish `"chat.message"` to everyone. History is the
   `GET /api/chat` route. Both halves pass through a viewer seam: reads through
   `visibleToViewer` (in SQL, so pages stay full) and live deliveries through
-  `publishChatMessage`. Block (#247) must suppress blocked senders at both,
-  server-side, because no account identity reaches the browser.
+  `publishChatMessage`. Block (#247) suppresses blocked senders at both,
+  server-side, because no account identity reaches the browser. The send path
+  itself — lock, prune, content, guardrail, budget — is `beginChatSend`, which
+  Whispers share.
 - **Retention:** each send deletes at most a bounded batch of rows older than
   90 days (`SKIP LOCKED`, so concurrent sends never contend), and reads never
   return expired rows even before they are pruned. No scheduler is needed.
@@ -242,6 +246,59 @@ realtime substrate above. There is no Local/Nearby/Zone channel.
   latest page when a reconnect cannot reach what it holds, and counts the
   authoritative send budget down locally with no polling. General and Trade
   raise no attention or unread count.
+
+## Whispers, Block, and Report (Issue #247)
+
+1:1 Whispers, account-level Block, and player Report extend public chat and
+the realtime substrate; they add no transport, route destination, or footer
+item.
+
+- **Identity:** player-facing identity is character-to-character; safety
+  identity is the account underneath. Whisper participants, Blocks, and
+  Reports store stable character and account ids, never names, so renames and
+  character switching change nothing. A character-facing surface names its
+  target by stable id (a chat sender) or by public name (the same-location
+  profile); `server/social-targets.ts` resolves both with one generic refusal.
+- **Whispers:** `server/whispers.ts`. A Whisper is a `whisper` row in
+  `chat_messages` bound to one `whisper_conversations` pair (unique
+  `participant_key` of the two character ids), so it shares the immutable
+  message contract, `beginChatSend` (the one account-wide budget: General and
+  Whispers below 5, Trade below 3 on the same count), the severe-term
+  guardrail, and 90-day retention. A conversation is created by its first
+  Whisper, never by opening one. After commit, `"whisper.message"` goes to both
+  participant characters; an offline recipient reads it from
+  `GET /api/whispers/conversation` on return. Unread is durable per recipient
+  character: `whisper_participants.last_read_seq`, and unread is derived (the
+  other character's retained messages above it), never counted. Reading
+  advances it (capped, never backwards) and publishes `"whisper.read"` to that
+  character's other tabs, which re-read `GET /api/whispers`. General and Trade
+  have no durable unread.
+- **Block:** `server/player-blocks.ts`. `player_blocks` holds the current
+  account pairs; `player_block_events` appends every block and unblock with
+  both accounts, the characters involved, and the instant. A Block hides the
+  blocked account's public messages from the blocker only (reads and live
+  delivery), prevents Whispers in both directions, keeps prior history, and is
+  never disclosed to the blocked account — its refused Whisper reads like any
+  undeliverable one. `blockBetween` / `isBlockedBetween` are the seam trade
+  requests (#225) reuse. A Block publishes `"safety.blocks"` to the blocker's
+  own account only, so its other tabs restart their feeds.
+- **Report:** `server/player-reports.ts`. `player_reports` is self-contained
+  evidence: a message report binds the immutable message id (no foreign key,
+  so retention cannot remove it) and snapshots the exact message plus up to 10
+  before and 10 after from the same public feed or that one Whisper
+  conversation, never another. One account reports one message once (a
+  partial unique index); a player report keeps the character's name at report
+  time. Report + Block commits both in one transaction. Nothing notifies the
+  reported player, scores anyone, or sanctions anyone; #248 builds operator
+  review on these rows.
+- **Browser:** `features/chat/ChatContext.tsx` lives for the whole Play tab
+  (the Drawer unmounts when closed): it owns the Drawer's view, the Whisper
+  inbox and its unread attention on the launcher, the Block revision, and
+  `startWhisper`, which opens a conversation inside Chat/Social from any
+  character-facing surface without navigating. `ChatConversations` renders
+  General, Trade, and Whispers as tabs; `SafetyFlow` is the one Block / Report
+  / Report + Block flow used by message actions, Whisper conversations, and
+  the same-location profile.
 
 ## Where minigames fit
 

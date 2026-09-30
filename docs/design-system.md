@@ -78,6 +78,22 @@ slightly larger text on `--rs-chat-promoted-surface` with a
 `--rs-chat-promoted-border` rim and soft `--rs-chat-promoted-glow`, labelled
 "Promoted ad" — brighter than ordinary chat, never an alert.
 
+Whispers (#247) are the third tab. Unread Whispers use the News unread
+language on both the launcher and the tab (count badge plus
+`--rs-glow-news-unread`, count in the accessible name). The tab lists
+conversations (name, latest line, time, unread badge), with a **Blocked
+players** control at the top of the list; a conversation has an **All
+Whispers** back control, the other character's current name, and **Report** /
+**Block** beside it, above the same log and composer as public chat. Another
+player's message carries a compact "…" actions toggle that expands **Whisper**
+(public feeds only), **Report**, and **Block** under the body. Block and Report
+open inline in place of the composer (or inside the profile), never as a
+separate route: Block is a `danger`-rimmed confirmation that says what it does
+and that the other player isn't told; Report is a reason radio list, an
+optional note with a counter, and an **Also block** checkbox that turns the
+submit into "Report and block". The same-location character profile gains
+**Whisper**, **Report**, and **Block** under its identity.
+
 Location, Map, and Journey are separate compositions: Location presents the
 stationary scene, activity, and same-location population/profile flow; Map is
 the dedicated `?surface=map` navigation surface; Journey is the in-transit

@@ -22,6 +22,7 @@ import {
   promotedAdCooldownRemaining,
   recentChatSends,
   type ChatChannel,
+  type ChatSendChannel,
 } from "@/game/domain/chat";
 import type {
   ChatHistoryPage,
@@ -32,12 +33,15 @@ import type {
   PromotedAdStatus,
 } from "@/game/schemas/chat";
 import { containsSevereTerm } from "@/server/chat-guardrail";
+import { lockAccountChatSends } from "@/server/chat-send-lock";
 import { requirePlayableOwnedCharacter } from "@/server/gameplay-access";
+import { accountsBlocking, notBlockedByViewer } from "@/server/player-blocks";
 import { publishRealtimeEvent } from "@/server/realtime";
 
 /**
  * The authoritative public chat boundary (issue #246): General and Trade
- * history, sends, and promoted Trade ads.
+ * history, sends, and promoted Trade ads. It also owns the send path every
+ * chat surface shares — Whispers (#247) send through `beginChatSend` too.
  *
  * Every entry re-runs `requirePlayableOwnedCharacter`, so the session, the
  * owned character, and the gameplay-access gate are checked on each request,
@@ -55,9 +59,6 @@ import { publishRealtimeEvent } from "@/server/realtime";
 type Transaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
 type Executor = Pick<Transaction, "select" | "execute">;
 
-/** Names this module's advisory locks; the second key is the account. */
-const CHAT_SEND_LOCK_NAMESPACE = 246;
-
 /**
  * At most this many expired rows are deleted per send, so retention never
  * makes one send slow; any backlog clears over the following sends.
@@ -74,17 +75,19 @@ export type ChatSendOptions = {
 };
 
 /**
- * The per-viewer visibility seam for public chat reads. Today every viewer
- * sees every retained message. Block (#247) adds its suppression of blocked
- * accounts here, in SQL, so pages stay full and cursors stay exact.
+ * The per-viewer visibility seam for public chat reads: a viewer never sees
+ * messages from an account they blocked (#247). Applied in SQL so pages stay
+ * full and cursors stay exact.
  */
-function visibleToViewer(viewer: ChatViewer): SQL | undefined {
-  void viewer;
-  return undefined;
+function visibleToViewer(viewer: ChatViewer): SQL {
+  return notBlockedByViewer(viewer.playerAccountId, chatMessages.senderPlayerAccountId);
 }
 
-/** Which rows a channel's feed shows: its own, and in General every ad. */
-function channelFeed(channel: ChatChannel): SQL {
+/**
+ * Which rows a channel's feed shows: its own, and in General every ad. Report
+ * context (#247) reads the same feed the reporter saw.
+ */
+export function channelFeed(channel: ChatChannel): SQL {
   return channel === "general"
     ? or(eq(chatMessages.channel, "general"), isNotNull(chatMessages.promotedPriceCredits))!
     : eq(chatMessages.channel, "trade");
@@ -103,8 +106,11 @@ function toView(row: ChatMessage): ChatMessageView {
   };
 }
 
-/** The account's successful sends still inside the rolling window. */
-async function recentSendTimes(
+/**
+ * The account's successful sends still inside the rolling window: every chat
+ * row it sent, General, Trade, and Whispers alike.
+ */
+export async function recentSendTimes(
   executor: Executor,
   playerAccountId: string,
   now: Date,
@@ -142,7 +148,7 @@ async function lastPromotedAt(
   return rows[0]?.at?.getTime() ?? null;
 }
 
-function budgetFrom(sends: readonly number[], now: Date): ChatSendBudget {
+export function budgetFrom(sends: readonly number[], now: Date): ChatSendBudget {
   return {
     recentSendExpiresInMs: sends.map((sentAt) => sentAt + CHAT_POLICY.sendWindowMs - now.getTime()),
   };
@@ -239,6 +245,56 @@ export async function readChatHistory(
   };
 }
 
+export type ChatSendCheck =
+  | { ok: true; body: string; sends: number[] }
+  | {
+      ok: false;
+      reason: "empty" | "too_long" | "prohibited_term" | "rate_limited";
+      error: string;
+      sends: number[];
+    };
+
+/**
+ * The shared first half of every chat send — General, Trade, promoted ads, and
+ * Whispers (#247) — inside the caller's transaction: take the account's send
+ * lock (so every tab, device, and character is serialized onto one budget),
+ * prune a bounded batch of expired rows, then check content, the severe-term
+ * guardrail, and the shared rolling budget for `channel`. A refusal here is
+ * never persisted or delivered and records nothing about the sender. The
+ * caller persists the send in the same transaction, so it counts at once.
+ */
+export async function beginChatSend(
+  tx: Transaction,
+  accountId: string,
+  channel: ChatSendChannel,
+  text: string,
+  { now = new Date(), denylist }: ChatSendOptions,
+): Promise<ChatSendCheck> {
+  await lockAccountChatSends(tx, accountId);
+  await pruneExpiredChatMessages(tx, now);
+  const sends = await recentSendTimes(tx, accountId, now);
+
+  // Content first.
+  const content = normalizeChatMessage(text);
+  if (!content.ok) {
+    return { ok: false, reason: content.reason, error: REFUSAL_COPY[content.reason], sends };
+  }
+  if (containsSevereTerm(content.body, denylist)) {
+    return { ok: false, reason: "prohibited_term", error: REFUSAL_COPY.prohibited_term, sends };
+  }
+
+  const decision = decideChatSend(channel, sends, now.getTime());
+  if (!decision.allowed) {
+    return {
+      ok: false,
+      reason: "rate_limited",
+      error: `Slow down. You can send again in ${secondsLabel(decision.retryAfterMs)}.`,
+      sends,
+    };
+  }
+  return { ok: true, body: content.body, sends };
+}
+
 type SendKind =
   | { channel: "general" | "trade"; promoted: false }
   | { channel: "trade"; promoted: true };
@@ -254,11 +310,8 @@ async function commitSend(
   const accountId = character.playerAccountId;
 
   const result = await db.transaction(async (tx): Promise<ChatSendResult> => {
-    await tx.execute(
-      sql`select pg_advisory_xact_lock(${CHAT_SEND_LOCK_NAMESPACE}, hashtext(${accountId}))`,
-    );
-    await pruneExpiredChatMessages(tx, now);
-    const sends = await recentSendTimes(tx, accountId, now);
+    const begun = await beginChatSend(tx, accountId, kind.channel, text, { now, denylist });
+    const sends = begun.sends;
     const lastAd = await lastPromotedAt(tx, accountId, now);
     const refuse = (reason: ChatSendRefusalReason, error: string): ChatSendResult => ({
       status: "refused",
@@ -267,22 +320,7 @@ async function commitSend(
       budget: budgetFrom(sends, now),
       promotedAd: adStatus(lastAd, now),
     });
-
-    // Content first: a refused message is never persisted or delivered, and
-    // no refusal here records anything about the sender.
-    const content = normalizeChatMessage(text);
-    if (!content.ok) return refuse(content.reason, REFUSAL_COPY[content.reason]);
-    if (containsSevereTerm(content.body, denylist)) {
-      return refuse("prohibited_term", REFUSAL_COPY.prohibited_term);
-    }
-
-    const decision = decideChatSend(kind.channel, sends, now.getTime());
-    if (!decision.allowed) {
-      return refuse(
-        "rate_limited",
-        `Slow down. You can send again in ${secondsLabel(decision.retryAfterMs)}.`,
-      );
-    }
+    if (!begun.ok) return refuse(begun.reason, begun.error);
 
     let promotedPriceCredits: number | null = null;
     if (kind.promoted) {
@@ -317,7 +355,7 @@ async function commitSend(
         senderPlayerAccountId: accountId,
         senderCharacterId: character.id,
         senderCharacterName: character.displayName,
-        body: content.body,
+        body: begun.body,
         promotedPriceCredits,
         createdAt: now,
       })
@@ -331,20 +369,30 @@ async function commitSend(
     };
   });
 
-  if (result.status === "sent") publishChatMessage(result.message);
+  if (result.status === "sent") await publishChatMessage(result.message, accountId);
   return result;
 }
 
 /**
  * The live-delivery half of the viewer seam (`visibleToViewer` is the read
- * half). Called only after the message committed: it prompts every open tab,
- * and a promoted ad is one delivery of one record that each feed places.
- * Block (#247) must suppress blocked senders here too, server-side — the
- * payload deliberately carries no account identity a browser could filter on
- * — for example by delivering per recipient scope instead of to everyone.
+ * half). Called only after the message committed: it prompts every open tab
+ * except those of accounts that blocked the sender (#247) — server-side,
+ * because the payload deliberately carries no account identity a browser
+ * could filter on. A promoted ad is one delivery of one record that each feed
+ * places. Best-effort: the message is already durable, so a failure here only
+ * leaves open tabs to catch up on their next reconcile read.
  */
-function publishChatMessage(message: ChatMessageView) {
-  publishRealtimeEvent({ kind: "everyone" }, "chat.message", message);
+async function publishChatMessage(message: ChatMessageView, senderAccountId: string) {
+  try {
+    const blockers = await accountsBlocking(senderAccountId);
+    publishRealtimeEvent(
+      { kind: "everyone", exceptAccountIds: new Set(blockers) },
+      "chat.message",
+      message,
+    );
+  } catch {
+    // Delivery is a prompt, never the ledger; reconcile reads recover it.
+  }
 }
 
 /** Send one ordinary General or Trade message as the active character. */

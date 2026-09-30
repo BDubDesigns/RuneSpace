@@ -65,6 +65,7 @@ export const FOCUSED_PHASES = [
   "account-verification",
   "social-shell",
   "public-chat",
+  "whispers-safety",
 ];
 // Local E2E build-and-runtime placeholder only: the production build and
 // `next start` both run as production, so server/env.ts requires a

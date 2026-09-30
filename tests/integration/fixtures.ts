@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { and, eq, isNull } from "drizzle-orm";
+import { and, eq, inArray, isNull, or } from "drizzle-orm";
 import { LOCATION_IDS, PORTRAIT_IDS } from "@/game/config/foundations";
 import { normalizeCharacterName } from "@/game/domain/character-name";
 import { SLOT_MIN } from "@/db/rune-space";
@@ -266,6 +266,34 @@ export async function cleanupTestCharacter(db: Db, rune: Rune, characterId: stri
       .delete(rune.operatorAuditLogs)
       .where(eq(rune.operatorAuditLogs.characterId, characterId));
     await tx.delete(rune.itemInstances).where(eq(rune.itemInstances.characterId, characterId));
+    // Reports and Blocks (#247) keep both characters' identities.
+    await tx
+      .delete(rune.playerReports)
+      .where(
+        or(
+          eq(rune.playerReports.reporterCharacterId, characterId),
+          eq(rune.playerReports.reportedCharacterId, characterId),
+        ),
+      );
+    for (const table of [rune.playerBlocks, rune.playerBlockEvents]) {
+      await tx
+        .delete(table)
+        .where(
+          or(eq(table.blockerCharacterId, characterId), eq(table.blockedCharacterId, characterId)),
+        );
+    }
+    // A Whisper conversation (#247) goes with either participant, with every
+    // message in it; its participant rows cascade.
+    const conversations = tx
+      .select({ id: rune.whisperParticipants.conversationId })
+      .from(rune.whisperParticipants)
+      .where(eq(rune.whisperParticipants.characterId, characterId));
+    await tx
+      .delete(rune.chatMessages)
+      .where(inArray(rune.chatMessages.conversationId, conversations));
+    await tx
+      .delete(rune.whisperConversations)
+      .where(inArray(rune.whisperConversations.id, conversations));
     // Public chat (#246) keeps the sending character's identity on each row.
     await tx.delete(rune.chatMessages).where(eq(rune.chatMessages.senderCharacterId, characterId));
     await tx.delete(rune.characters).where(eq(rune.characters.id, characterId));

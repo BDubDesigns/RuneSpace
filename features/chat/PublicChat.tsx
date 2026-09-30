@@ -1,18 +1,10 @@
 "use client";
 
-import {
-  useCallback,
-  useEffect,
-  useLayoutEffect,
-  useRef,
-  useState,
-  type FormEvent,
-  type KeyboardEvent,
-} from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ActionButton } from "@/components/ui/ActionButton";
 import { Feedback } from "@/components/ui/Feedback";
-import { CHAT_POLICY, chatMessageLength, type ChatChannel } from "@/game/domain/chat";
+import { CHAT_POLICY, type ChatChannel } from "@/game/domain/chat";
 import { GAMEPLAY_ACCESS_REQUIRED_CODE } from "@/game/domain/gameplay-access";
 import {
   ChatMessageViewSchema,
@@ -31,13 +23,17 @@ import {
   EMPTY_CHAT_FEED,
   localAdReadyAt,
   localBudget,
-  secondsUntil,
   type ChatFeed,
   type LocalChatBudget,
 } from "./chat-feed";
+import { ChatComposer } from "./ChatComposer";
+import { useChat } from "./ChatContext";
+import { ChatMessageRow, MessageActionButton } from "./ChatMessageRow";
+import { SafetyFlow, type SafetyOutcome, type SafetySubject } from "./SafetyFlow";
 
 /**
- * General and Trade (issue #246), rendered inside the Chat/Social surface.
+ * General and Trade (issue #246), rendered inside the Chat/Social surface as
+ * the channel `ChatConversations` has selected.
  *
  * Every message shown is durable: the latest page loads on open, older pages
  * on request, and after each stream (re)connect or tab resume the latest page
@@ -45,6 +41,11 @@ import {
  * message id, so nothing renders twice. Sends are ordinary server actions whose
  * responses carry the account's authoritative send budget and ad cooldown,
  * which this tab then counts down locally without polling.
+ *
+ * Another player's message offers Whisper, Report, and Block (#247). A Block
+ * on any tab of the account restarts both feeds from the server, so the
+ * blocked account's messages disappear here at once; the server never sends
+ * them again.
  */
 
 const CHANNEL_LABEL: Record<ChatChannel, string> = { general: "General", trade: "Trade" };
@@ -77,21 +78,25 @@ async function fetchPage(
   }
 }
 
-function formatTime(iso: string): string {
-  return new Date(iso).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-}
-
 function formatWait(ms: number): string {
   const seconds = Math.max(1, Math.ceil(ms / 1000));
   const minutes = Math.floor(seconds / 60);
   return minutes > 0 ? `${minutes}m ${String(seconds % 60).padStart(2, "0")}s` : `${seconds}s`;
 }
 
-export function PublicChat({ characterId }: { characterId: string }) {
+type SafetyAction = { mode: "report" | "block"; subject: SafetySubject };
+
+export function PublicChat({
+  characterId,
+  channel,
+}: {
+  characterId: string;
+  channel: ChatChannel;
+}) {
   const router = useRouter();
   const { subscribe, onReconcile } = useSocial();
+  const { blocksRevision, startWhisper } = useChat();
   const { requestAutoRefresh, state } = usePlay();
-  const [channel, setChannel] = useState<ChatChannel>("general");
   const [feeds, setFeeds] = useState<Feeds>({ general: EMPTY_CHAT_FEED, trade: EMPTY_CHAT_FEED });
   const [loadError, setLoadError] = useState<string>();
   const [loadingOlder, setLoadingOlder] = useState(false);
@@ -101,7 +106,9 @@ export function PublicChat({ characterId }: { characterId: string }) {
   const [draft, setDraft] = useState("");
   const [promote, setPromote] = useState(false);
   const [sending, setSending] = useState(false);
-  const [feedback, setFeedback] = useState<{ tone: "danger" | "success"; text: string }>();
+  const [feedback, setFeedback] = useState<SafetyOutcome>();
+  const [actionsFor, setActionsFor] = useState<string>();
+  const [safety, setSafety] = useState<SafetyAction>();
   const [now, setNow] = useState(() => Date.now());
   const feedsRef = useRef(feeds);
   feedsRef.current = feeds;
@@ -116,6 +123,9 @@ export function PublicChat({ characterId }: { characterId: string }) {
   // replace it.
   const requestCounter = useRef(0);
   const appliedRequest = useRef(0);
+  // Bumped when a Block restarts the feeds: pages requested before it may
+  // still hold the blocked account's messages and are dropped.
+  const feedGeneration = useRef(0);
 
   const absorbAccount = useCallback(
     (result: Pick<ChatHistoryPage, "budget" | "promotedAd">, request: number) => {
@@ -133,7 +143,9 @@ export function PublicChat({ characterId }: { characterId: string }) {
   const loadLatest = useCallback(
     async (target: ChatChannel) => {
       const request = ++requestCounter.current;
+      const generation = feedGeneration.current;
       const result = await fetchPage(characterId, target);
+      if (generation !== feedGeneration.current) return;
       if ("error" in result) {
         // Issue #223: access closed since this page loaded; recover like
         // every other gameplay read.
@@ -166,6 +178,22 @@ export function PublicChat({ characterId }: { characterId: string }) {
       }),
     [loadLatest, onReconcile],
   );
+
+  // A Block or Unblock (#247) changes which messages this account may see,
+  // including ones already on screen: restart from the server's pages.
+  const seenRevision = useRef(blocksRevision);
+  useEffect(() => {
+    if (seenRevision.current === blocksRevision) return;
+    seenRevision.current = blocksRevision;
+    const open = (["general", "trade"] as const).filter(
+      (target) => feedsRef.current[target].loaded,
+    );
+    feedGeneration.current += 1;
+    setFeeds({ general: EMPTY_CHAT_FEED, trade: EMPTY_CHAT_FEED });
+    setActionsFor(undefined);
+    for (const target of open) void loadLatest(target);
+    if (!open.includes(channelRef.current)) void loadLatest(channelRef.current);
+  }, [blocksRevision, loadLatest]);
 
   // Live deliveries: one promoted ad lands in both feeds from one record.
   useEffect(
@@ -208,6 +236,9 @@ export function PublicChat({ characterId }: { characterId: string }) {
 
   useLayoutEffect(() => {
     stickToBottom.current = true;
+    setActionsFor(undefined);
+    setSafety(undefined);
+    setFeedback(undefined);
     const log = logRef.current;
     if (log) log.scrollTop = log.scrollHeight;
   }, [channel]);
@@ -218,8 +249,10 @@ export function PublicChat({ characterId }: { characterId: string }) {
     const target = channel;
     setLoadingOlder(true);
     const request = ++requestCounter.current;
+    const generation = feedGeneration.current;
     const result = await fetchPage(characterId, target, oldest.seq);
     setLoadingOlder(false);
+    if (generation !== feedGeneration.current) return;
     if ("error" in result) {
       if (result.code === GAMEPLAY_ACCESS_REQUIRED_CODE) router.replace("/characters");
       else setLoadError(result.error);
@@ -234,19 +267,14 @@ export function PublicChat({ characterId }: { characterId: string }) {
     setFeeds((current) => ({ ...current, [target]: applyOlderPage(current[target], result.page) }));
   }
 
-  const trimmedLength = chatMessageLength(draft.trim());
-  const overLimit = trimmedLength > CHAT_POLICY.maxLength;
   const pressure = composerPressure(budget, channel, now);
-  const rateBlocked = pressure.pressure === "full";
   const promoting = channel === "trade" && promote;
   const adWaitMs = Math.max(0, adReadyAt - now);
   const credits = state.credits;
   const canAfford = credits >= adPrice;
-  const canSend = trimmedLength > 0 && !overLimit && !rateBlocked && !sending;
 
-  async function submit(event?: FormEvent) {
-    event?.preventDefault();
-    if (!canSend || (promoting && (adWaitMs > 0 || !canAfford))) return;
+  async function submit() {
+    if (promoting && (adWaitMs > 0 || !canAfford)) return;
     const request = ++requestCounter.current;
     setSending(true);
     setFeedback(undefined);
@@ -284,143 +312,124 @@ export function PublicChat({ characterId }: { characterId: string }) {
     }
   }
 
-  function onComposerKeyDown(event: KeyboardEvent<HTMLTextAreaElement>) {
-    if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) {
-      event.preventDefault();
-      void submit();
-    }
+  async function whisper(message: ChatMessageView) {
+    setActionsFor(undefined);
+    const error = await startWhisper({ characterId: message.senderCharacterId });
+    if (error) setFeedback({ tone: "danger", text: error });
+  }
+
+  function beginSafety(mode: SafetyAction["mode"], message: ChatMessageView) {
+    setActionsFor(undefined);
+    setFeedback(undefined);
+    setSafety({
+      mode,
+      subject: {
+        name: message.senderName,
+        target: { characterId: message.senderCharacterId },
+        messageId: mode === "report" ? message.id : undefined,
+      },
+    });
   }
 
   const label = CHANNEL_LABEL[channel];
-  const composerId = "public-chat-composer";
-  const pressureId = "public-chat-pressure";
-  const counterId = "public-chat-counter";
 
   return (
     <div className="space-y-3" data-public-chat="">
       <div
-        aria-label="Public chat channels"
-        className="grid grid-cols-2 gap-1 border-b border-[color:var(--rs-border-structural)] pb-1"
-        role="tablist"
+        aria-label={`${label} messages`}
+        className="h-[min(38dvh,22rem)] overflow-y-auto overscroll-contain border border-[color:var(--rs-border-subtle)] bg-[color:var(--rs-surface-panel)] p-2"
+        data-chat-log={channel}
+        onScroll={(event) => {
+          const log = event.currentTarget;
+          stickToBottom.current = log.scrollHeight - log.scrollTop - log.clientHeight < 24;
+        }}
+        ref={logRef}
+        role="log"
+        tabIndex={0}
       >
-        {(["general", "trade"] as const).map((option) => {
-          const selected = option === channel;
-          return (
-            <button
-              aria-controls="public-chat-panel"
-              aria-selected={selected}
-              className={`rs-focus min-h-[var(--rs-touch-target)] border px-3 py-2 font-display text-xs uppercase tracking-[0.12em] outline-none ${selected ? "border-[color:var(--rs-accent-primary)] text-[color:var(--rs-accent-primary)]" : "border-[color:var(--rs-border-structural)] text-[color:var(--rs-text-secondary)]"}`}
-              data-chat-channel-tab={option}
-              id={`public-chat-tab-${option}`}
-              key={option}
-              onClick={() => {
-                setChannel(option);
-                setFeedback(undefined);
-              }}
-              role="tab"
-              type="button"
-            >
-              {CHANNEL_LABEL[option]}
-            </button>
-          );
-        })}
-      </div>
-
-      <div
-        aria-labelledby={`public-chat-tab-${channel}`}
-        className="space-y-3"
-        id="public-chat-panel"
-        role="tabpanel"
-      >
-        <div
-          aria-label={`${label} messages`}
-          className="h-[min(38dvh,22rem)] overflow-y-auto overscroll-contain border border-[color:var(--rs-border-subtle)] bg-[color:var(--rs-surface-panel)] p-2"
-          data-chat-log={channel}
-          onScroll={(event) => {
-            const log = event.currentTarget;
-            stickToBottom.current = log.scrollHeight - log.scrollTop - log.clientHeight < 24;
-          }}
-          ref={logRef}
-          role="log"
-          tabIndex={0}
-        >
-          {feed.hasOlder ? (
-            <div className="mb-2 flex justify-center">
-              <ActionButton
-                className="min-h-9 px-3 py-1 text-xs"
-                intent="secondary"
-                loading={loadingOlder}
-                onClick={() => void loadOlder()}
-              >
-                Load older messages
-              </ActionButton>
-            </div>
-          ) : null}
-          {!feed.loaded && !loadError ? (
-            <p className="p-2 text-sm text-[color:var(--rs-text-muted)]">Loading {label}…</p>
-          ) : null}
-          {feed.loaded && feed.messages.length === 0 ? (
-            <p className="p-2 text-sm text-[color:var(--rs-text-muted)]">
-              No messages in {label} yet.
-            </p>
-          ) : null}
-          <ol className="space-y-2">
-            {feed.messages.map((message) => (
-              <ChatMessageRow
-                key={message.id}
-                message={message}
-                own={message.senderCharacterId === characterId}
-              />
-            ))}
-          </ol>
-        </div>
-
-        {loadError ? (
-          <div className="flex flex-wrap items-center gap-2">
-            <Feedback tone="danger">{loadError}</Feedback>
+        {feed.hasOlder ? (
+          <div className="mb-2 flex justify-center">
             <ActionButton
-              className="mt-3 min-h-9 px-3 py-1 text-xs"
+              className="min-h-9 px-3 py-1 text-xs"
               intent="secondary"
-              onClick={() => void loadLatest(channel)}
+              loading={loadingOlder}
+              onClick={() => void loadOlder()}
             >
-              Try again
+              Load older messages
             </ActionButton>
           </div>
         ) : null}
+        {!feed.loaded && !loadError ? (
+          <p className="p-2 text-sm text-[color:var(--rs-text-muted)]">Loading {label}…</p>
+        ) : null}
+        {feed.loaded && feed.messages.length === 0 ? (
+          <p className="p-2 text-sm text-[color:var(--rs-text-muted)]">
+            No messages in {label} yet.
+          </p>
+        ) : null}
+        <ol className="space-y-2">
+          {feed.messages.map((message) => {
+            const own = message.senderCharacterId === characterId;
+            return (
+              <ChatMessageRow
+                actions={
+                  <>
+                    <MessageActionButton onClick={() => void whisper(message)}>
+                      Whisper
+                    </MessageActionButton>
+                    <MessageActionButton onClick={() => beginSafety("report", message)}>
+                      Report
+                    </MessageActionButton>
+                    <MessageActionButton danger onClick={() => beginSafety("block", message)}>
+                      Block
+                    </MessageActionButton>
+                  </>
+                }
+                actionsOpen={actionsFor === message.id}
+                body={message.body}
+                id={message.id}
+                key={message.id}
+                onToggleActions={
+                  own
+                    ? undefined
+                    : () => setActionsFor((open) => (open === message.id ? undefined : message.id))
+                }
+                own={own}
+                promoted={message.promoted}
+                senderName={message.senderName}
+                sentAt={message.sentAt}
+              />
+            );
+          })}
+        </ol>
+      </div>
 
-        <form
-          className="space-y-2"
-          data-chat-composer={channel}
-          onSubmit={(event) => void submit(event)}
-        >
-          <label className="sr-only" htmlFor={composerId}>
-            {promoting ? "Promoted Trade ad" : `Message ${label}`}
-          </label>
-          <textarea
-            aria-describedby={`${counterId} ${pressureId}`}
-            aria-invalid={overLimit || undefined}
-            className="rs-bevel rs-focus block min-h-[4.5rem] w-full resize-none border bg-[color:var(--rs-surface-control)] px-3 py-2 text-sm text-[color:var(--rs-text-primary)] placeholder:text-[color:var(--rs-text-muted)] focus:border-[color:var(--rs-accent-primary)]"
-            id={composerId}
-            onChange={(event) => setDraft(event.target.value)}
-            onKeyDown={onComposerKeyDown}
-            placeholder={promoting ? "Write your promoted ad" : `Message ${label}`}
-            rows={2}
-            value={draft}
-          />
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <SendPressureIndicator id={pressureId} now={now} pressure={pressure} />
-            <span
-              className={`text-xs tabular-nums ${overLimit ? "text-[color:var(--rs-accent-danger)]" : "text-[color:var(--rs-text-muted)]"}`}
-              data-chat-counter=""
-              id={counterId}
-            >
-              {overLimit
-                ? `${trimmedLength - CHAT_POLICY.maxLength} over the ${CHAT_POLICY.maxLength}-character limit`
-                : `${trimmedLength}/${CHAT_POLICY.maxLength}`}
-            </span>
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
-            {channel === "trade" ? (
+      {loadError ? (
+        <div className="flex flex-wrap items-center gap-2">
+          <Feedback tone="danger">{loadError}</Feedback>
+          <ActionButton
+            className="mt-3 min-h-9 px-3 py-1 text-xs"
+            intent="secondary"
+            onClick={() => void loadLatest(channel)}
+          >
+            Try again
+          </ActionButton>
+        </div>
+      ) : null}
+
+      {safety ? (
+        <SafetyFlow
+          mode={safety.mode}
+          onDone={(outcome) => {
+            setSafety(undefined);
+            setFeedback(outcome);
+          }}
+          subject={safety.subject}
+        />
+      ) : (
+        <ChatComposer
+          controls={
+            channel === "trade" ? (
               <ActionButton
                 aria-pressed={promote}
                 className="px-3"
@@ -431,17 +440,21 @@ export function PublicChat({ characterId }: { characterId: string }) {
               >
                 Promote
               </ActionButton>
-            ) : null}
-            <ActionButton
-              className="ml-auto px-5"
-              data-chat-send=""
-              disabled={!canSend || (promoting && (adWaitMs > 0 || !canAfford))}
-              loading={sending}
-              type="submit"
-            >
-              {promoting ? `Post ad · ${adPrice} Credits` : "Send"}
-            </ActionButton>
-          </div>
+            ) : null
+          }
+          dataChannel={channel}
+          draft={draft}
+          idPrefix="public-chat"
+          label={promoting ? "Promoted Trade ad" : `Message ${label}`}
+          now={now}
+          onDraftChange={setDraft}
+          onSubmit={() => void submit()}
+          placeholder={promoting ? "Write your promoted ad" : `Message ${label}`}
+          pressure={pressure}
+          sendBlocked={promoting && (adWaitMs > 0 || !canAfford)}
+          sendLabel={promoting ? `Post ad · ${adPrice} Credits` : "Send"}
+          sending={sending}
+        >
           {promoting ? (
             <p className="text-xs text-[color:var(--rs-text-secondary)]" data-chat-promote-note="">
               {adWaitMs > 0
@@ -451,86 +464,9 @@ export function PublicChat({ characterId }: { characterId: string }) {
                   : `Shown in General and Trade. Costs ${adPrice} Credits (you have ${credits}); one ad every ${Math.round(CHAT_POLICY.promotedAd.cooldownMs / 60_000)} minutes.`}
             </p>
           ) : null}
-          {feedback ? <Feedback tone={feedback.tone}>{feedback.text}</Feedback> : null}
-        </form>
-      </div>
+        </ChatComposer>
+      )}
+      {feedback ? <Feedback tone={feedback.tone}>{feedback.text}</Feedback> : null}
     </div>
-  );
-}
-
-function ChatMessageRow({ message, own }: { message: ChatMessageView; own: boolean }) {
-  return (
-    <li
-      className={
-        message.promoted
-          ? "border border-[color:var(--rs-chat-promoted-border)] bg-[color:var(--rs-chat-promoted-surface)] px-3 py-2 [box-shadow:var(--rs-chat-promoted-glow)]"
-          : "px-1"
-      }
-      data-chat-message={message.id}
-      data-chat-promoted={message.promoted ? "" : undefined}
-    >
-      <p className="flex flex-wrap items-baseline gap-x-2 text-xs text-[color:var(--rs-text-muted)]">
-        <span
-          className={`font-semibold ${own ? "text-[color:var(--rs-accent-primary)]" : "text-[color:var(--rs-text-secondary)]"}`}
-        >
-          {message.senderName}
-          {own ? <span className="sr-only"> (you)</span> : null}
-        </span>
-        {message.promoted ? (
-          <span className="font-display uppercase tracking-[0.12em] text-[color:var(--rs-chat-promoted-border)]">
-            Promoted ad
-          </span>
-        ) : null}
-        <time dateTime={message.sentAt}>{formatTime(message.sentAt)}</time>
-      </p>
-      <p
-        className={`whitespace-pre-wrap break-words text-[color:var(--rs-text-primary)] [overflow-wrap:anywhere] ${message.promoted ? "text-base" : "text-sm"}`}
-      >
-        {message.body}
-      </p>
-    </li>
-  );
-}
-
-function SendPressureIndicator({
-  id,
-  now,
-  pressure,
-}: {
-  id: string;
-  now: number;
-  pressure: ReturnType<typeof composerPressure>;
-}) {
-  const color = `var(--rs-chat-pressure-${pressure.pressure})`;
-  const full = pressure.pressure === "full" && pressure.readyAt !== undefined;
-  const text = full
-    ? `Slow down · ${secondsUntil(pressure.readyAt!, now)}s`
-    : `${pressure.count}/${pressure.limit} in ${CHAT_POLICY.sendWindowMs / 1000}s`;
-  return (
-    <span
-      className="flex items-center gap-2 text-xs"
-      data-chat-pressure={pressure.pressure}
-      id={id}
-    >
-      <span aria-hidden="true" className="flex gap-0.5">
-        {Array.from({ length: pressure.limit }, (_, index) => (
-          <span
-            className="h-2 w-3 border"
-            key={index}
-            style={{
-              borderColor: color,
-              background: index < pressure.count ? color : "transparent",
-            }}
-          />
-        ))}
-      </span>
-      <span
-        style={{ color: full ? color : undefined }}
-        className={full ? "font-semibold" : "text-[color:var(--rs-text-muted)]"}
-      >
-        <span className="sr-only">Send rate: </span>
-        {text}
-      </span>
-    </span>
   );
 }

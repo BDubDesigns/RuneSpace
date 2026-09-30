@@ -1,7 +1,7 @@
 /**
- * Public chat rules (issue #246): the message content contract, the shared
- * account-wide send budget, the composer's send-pressure bands, and the
- * promoted Trade ad. Framework-free and deterministic; `server/chat.ts`
+ * Chat rules (issue #246, Whispers #247): the message content contract, the
+ * shared account-wide send budget, the composer's send-pressure bands, and
+ * the promoted Trade ad. Framework-free and deterministic; `server/chat.ts`
  * enforces them and the composer only presents them.
  *
  * `CHAT_POLICY` is the one home of every tunable number. The server returns the
@@ -13,25 +13,33 @@
 export const CHAT_CHANNELS = ["general", "trade"] as const;
 export type ChatChannel = (typeof CHAT_CHANNELS)[number];
 
+/**
+ * Everything that spends the one shared send budget: the public channels and
+ * 1:1 Whispers (#247). Whispers are never a public feed.
+ */
+export type ChatSendChannel = ChatChannel | "whisper";
+
 export const CHAT_POLICY = {
   /** Every public message, promoted ads included. Counted in code points. */
   maxLength: 280,
-  /** Latest page on open, and each older page. */
+  /** Latest page on open, and each older page — per channel or Whisper conversation. */
   pageSize: 50,
-  /** Ordinary chat retention. */
+  /** Ordinary chat retention, Whispers included. */
   retentionMs: 90 * 24 * 60 * 60_000,
   /**
    * One account-wide rolling count of successful sends across General, Trade,
-   * and (later) Whispers. A send to a channel is allowed only while that count
-   * is below the channel's limit; Trade's lower limit reads the same count.
+   * and Whispers. A send is allowed only while that count is below its
+   * channel's limit; Trade's lower limit reads the same count, and Whispers
+   * share General's limit with no separate per-recipient state.
    */
   sendWindowMs: 10_000,
-  sendLimit: { general: 5, trade: 3 } satisfies Record<ChatChannel, number>,
+  sendLimit: { general: 5, trade: 3, whisper: 5 } satisfies Record<ChatSendChannel, number>,
   /** Where the composer's indicator turns yellow and orange, per channel. */
   pressureBands: {
     general: { lowFrom: 1, highFrom: 3 },
     trade: { lowFrom: 1, highFrom: 2 },
-  } satisfies Record<ChatChannel, { lowFrom: number; highFrom: number }>,
+    whisper: { lowFrom: 1, highFrom: 3 },
+  } satisfies Record<ChatSendChannel, { lowFrom: number; highFrom: number }>,
   promotedAd: {
     /** Paid by the active character. */
     priceCredits: 50,
@@ -55,13 +63,21 @@ export function chatMessageLength(text: string): number {
 const NON_TEXT_CONTROLS = /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g;
 
 /**
+ * Player-typed plain text with line breaks as `\n`, non-text controls dropped,
+ * and surrounding whitespace trimmed. Shared by chat bodies and report notes.
+ */
+export function toPlainText(text: string): string {
+  return text.replace(/\r\n?/g, "\n").replace(NON_TEXT_CONTROLS, "").trim();
+}
+
+/**
  * Trim surrounding whitespace and check the one content contract. The body is
  * otherwise stored as typed: plain text, never parsed as markup.
  */
 export function normalizeChatMessage(
   text: string,
 ): { ok: true; body: string } | { ok: false; reason: ChatMessageRefusal } {
-  const body = text.replace(/\r\n?/g, "\n").replace(NON_TEXT_CONTROLS, "").trim();
+  const body = toPlainText(text);
   if (body.length === 0) return { ok: false, reason: "empty" };
   if (chatMessageLength(body) > CHAT_POLICY.maxLength) return { ok: false, reason: "too_long" };
   return { ok: true, body };
@@ -77,7 +93,7 @@ export function recentChatSends(sentAt: readonly number[], now: number): number[
  * long until enough recent sends age out of the window for it to fit.
  */
 export function decideChatSend(
-  channel: ChatChannel,
+  channel: ChatSendChannel,
   sentAt: readonly number[],
   now: number,
 ): { allowed: true } | { allowed: false; retryAfterMs: number } {
@@ -92,7 +108,7 @@ export function decideChatSend(
 export type ChatSendPressure = "clear" | "low" | "high" | "full";
 
 /** The composer indicator band for a shared recent-send count. */
-export function chatSendPressure(channel: ChatChannel, recentCount: number): ChatSendPressure {
+export function chatSendPressure(channel: ChatSendChannel, recentCount: number): ChatSendPressure {
   const bands = CHAT_POLICY.pressureBands[channel];
   if (recentCount >= CHAT_POLICY.sendLimit[channel]) return "full";
   if (recentCount >= bands.highFrom) return "high";
@@ -104,6 +120,14 @@ export function chatSendPressure(channel: ChatChannel, recentCount: number): Cha
 export function promotedAdCooldownRemaining(lastPromotedAt: number | null, now: number): number {
   if (lastPromotedAt === null) return 0;
   return Math.max(0, lastPromotedAt + CHAT_POLICY.promotedAd.cooldownMs - now);
+}
+
+/**
+ * The unordered identity of a Whisper pair (#247): two character ids, lower
+ * first. Stable across renames because it never contains a name.
+ */
+export function whisperParticipantKey(characterA: string, characterB: string): string {
+  return characterA < characterB ? `${characterA}:${characterB}` : `${characterB}:${characterA}`;
 }
 
 /** Messages older than this instant are past ordinary retention. */

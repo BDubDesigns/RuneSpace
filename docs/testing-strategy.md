@@ -52,7 +52,8 @@ small number of critical mobile player journeys.
   Cutter, the Freight Harness and their Missions — #233), Holo Hollow, Rusk Recovery, Admin Operator, Sign-out,
   Account News, Account Verification, Gameplay Access, and the Chat/Social shell and
   realtime stream (`social-shell`, #245), and General/Trade public chat
-  (`public-chat`, #246). It intentionally excludes noncanonical `smoke`, `ownership`,
+  (`public-chat`, #246), and Whispers, Block, and Report (`whispers-safety`,
+  #247). It intentionally excludes noncanonical `smoke`, `ownership`,
   `design-system`, `work-orders`, `public-*`, and QC Studio specs. It:
   - requires Node 22.x
   - requires a localhost-only disposable PostgreSQL database (refuses remote)
@@ -248,6 +249,30 @@ Hermes host.
   chromium project only, so the journeys set the phone (393px) and desktop
   widths themselves; the multi-width ones skip the mobile project so the
   shared feed is never seeded twice at once.
+
+### Issue #247 Whispers, Block, and Report coverage
+
+- `tests/unit/chat.test.ts`, `tests/unit/social-safety.test.ts`, and
+  `tests/unit/realtime.test.ts` own the pure rules: Whispers on General's limit
+  of the shared count, the pair key, Whisper feed merging, the six report
+  reasons, the optional note, and the publish audience that skips blockers.
+- `tests/integration/social-safety.test.ts` proves against PostgreSQL: only an
+  owned playable character sends; identity survives renames; offline
+  recipients read durable history; latest 50 and pagination; unread durable
+  per recipient character, cleared everywhere and never moved backwards; the
+  shared budget across General, Whispers, and Trade; the guardrail on Whispers;
+  Block across every character of both accounts, public suppression for the
+  blocker only, Whispers refused both ways without disclosure, history kept,
+  unblock, and the block/unblock signals; message and player reports, the
+  10-before/10-after window from the right feed, no unrelated Whisper leakage,
+  same-account dedupe, Report + Block, and evidence surviving retention.
+- `tests/e2e/whispers-safety.spec.ts` proves with two real accounts at phone
+  and desktop widths: starting a Whisper from a chat sender and from the
+  same-location profile without leaving Play, live arrival with unread on the
+  launcher and the Whispers tab, reading on one tab clearing the other, the
+  Block / Report / Report + Block flows, blocked public messages disappearing
+  for the blocker only, Blocked Players unblocking, and no horizontal overflow.
+  Like `public-chat`, its two-account journeys run in chromium only.
 
 ## What to test when systems arrive
 For progression-sensitive systems, prioritize:
