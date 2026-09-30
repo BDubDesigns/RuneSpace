@@ -3,6 +3,11 @@
   "projectSlug": "runespace",
   "workState": "active",
   "currentFocus": "Preparing the October 27 Soft Alpha: verified players can reserve characters; account-level Early Access and a closed-by-default public gameplay gate control when play begins.",
+  "currentChange": {
+    "summary": "Whispers, Block, and Report: 1:1 character Whispers with durable unread in the Chat/Social drawer, account-level Block with a Blocked Players list, and message and player reports that preserve evidence for review.",
+    "stage": "review",
+    "pullRequestNumber": 262
+  },
   "latestCompleted": {
     "summary": "General and Trade chat: persisted public channels in the Chat/Social drawer, a shared account-wide send limit with a live composer indicator, and 50-Credit promoted Trade ads.",
     "date": "2026-09-30",
