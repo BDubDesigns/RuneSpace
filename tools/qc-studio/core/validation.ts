@@ -1,10 +1,11 @@
-import type {
-  DialogueAdapter,
-  DialogueDraft,
-  DialogueValidationResult,
-  StudioDialogueBeat,
-  StudioItem,
-  StudioNpc,
+import {
+  STUDIO_PRESENTATION_MODES,
+  type DialogueAdapter,
+  type DialogueDraft,
+  type DialogueValidationResult,
+  type StudioDialogueBeat,
+  type StudioItem,
+  type StudioNpc,
 } from "./types";
 
 const FALLBACK_STABLE_ID_PATTERN = /^[a-z][a-z0-9_]*$/;
@@ -187,7 +188,7 @@ export function validateDialogueDraft(
         message: "Choose an authored conversation background.",
       });
     }
-    if (beat.presentationMode !== "local" && beat.presentationMode !== "comms") {
+    if (!STUDIO_PRESENTATION_MODES.includes(beat.presentationMode)) {
       issues.push({
         path: `${path}.presentationMode`,
         message: "Choose local or comms presentation.",

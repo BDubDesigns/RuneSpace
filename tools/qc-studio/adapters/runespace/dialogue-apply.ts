@@ -117,11 +117,22 @@ const exportSchema = z
   })
   .strict();
 
-// The schema and the Studio's own export/beat types must describe the same
-// shape in both directions; a change to either side fails to compile here
-// instead of silently drifting.
-type Equal<A, B> = [A] extends [B] ? ([B] extends [A] ? true : false) : false;
-const exportShapeInSync: Equal<DialogueExportPayload, z.infer<typeof exportSchema>> = true;
+// The schema and the Studio's own export/beat types must describe exactly the
+// same shape. Mutual assignability is not enough — TypeScript accepts an extra
+// optional property on either side — so this is an exact, deep identity check:
+// adding, removing, or re-typing any field (optional included) on one side only
+// fails to compile here instead of silently drifting.
+type Exact<A, B> =
+  (<T>() => T extends A ? 1 : 2) extends <T>() => T extends B ? 1 : 2 ? true : false;
+type Deep<T> = T extends readonly (infer U)[]
+  ? Deep<U>[]
+  : T extends object
+    ? { [K in keyof T]: Deep<T[K]> }
+    : T;
+const exportShapeInSync: Exact<
+  Deep<DialogueExportPayload>,
+  Deep<z.infer<typeof exportSchema>>
+> = true;
 void exportShapeInSync;
 
 export type ParsedDialogueExport = {
@@ -293,7 +304,21 @@ function similarity(a: BeatRecord, b: BeatRecord): number {
   if (a.kind !== b.kind) return 0;
   const keys = new Set([...Object.keys(a), ...Object.keys(b)]);
   keys.delete("kind");
-  return [...keys].filter((key) => a[key] === b[key]).length;
+  keys.delete("text");
+  const shared = [...keys].filter((key) => a[key] === b[key]).length;
+  // Wording breaks ties between otherwise identical candidates (< 1 so it can
+  // never outweigh a shared field): "Three, revised." resembles "Three."
+  return shared + 0.99 * wordOverlap(a.text, b.text);
+}
+
+function wordOverlap(a: unknown, b: unknown): number {
+  const words = (value: unknown) =>
+    new Set(typeof value === "string" ? (value.toLowerCase().match(/[\p{L}\p{N}']+/gu) ?? []) : []);
+  const left = words(a);
+  const right = words(b);
+  const union = new Set([...left, ...right]).size;
+  if (union === 0) return 0;
+  return [...left].filter((word) => right.has(word)).length / union;
 }
 
 /**
@@ -461,7 +486,7 @@ function emitBeat(beat: BeatRecord, ctx: Context, preferred?: BeatHelper): strin
     return `{ kind: "skill_xp", skillId: ${renderValue("skillId", beat.skillId, ctx)}, amount: ${renderValue("amount", beat.amount, ctx)}, backgroundId: ${renderValue("backgroundId", beat.backgroundId, ctx)}, text: ${renderValue("text", beat.text, ctx)} }`;
   }
   return refuse(
-    `No beat helper in the source produces ${describeBeat(beat)} (background ${String(beat.backgroundId)}). Add a helper or edit it by hand; the tool will not invent an inline beat.`,
+    `No beat helper in the source produces ${describeBeat(beat)} (background ${String(beat.backgroundId)}). Add a helper or edit it by hand; the tool will not invent an inline NPC beat.`,
   );
 }
 

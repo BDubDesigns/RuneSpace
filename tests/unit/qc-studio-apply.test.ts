@@ -43,6 +43,7 @@ const FIXTURE_CONSTANTS = {
     second: "second_seq",
     computed: "computed_seq",
     spread: "spread_seq",
+    tie: "tie_seq",
   },
 };
 
@@ -122,6 +123,16 @@ const dialogue = {
       annLocal(EXPRESSION_IDS.happy, "Plain."),
     ],
   },
+  [DIALOGUE_IDS.tie]: {
+    id: DIALOGUE_IDS.tie,
+    npcId: NPC_IDS.ann,
+    beats: [
+      annLocal(EXPRESSION_IDS.happy, "Alpha."),
+      // A note about Beta.
+      annLocal(EXPRESSION_IDS.happy, "Beta."),
+      annLocal(EXPRESSION_IDS.happy, "Gamma."),
+    ],
+  },
   [DIALOGUE_IDS.spread]: {
     id: DIALOGUE_IDS.spread,
     npcId: NPC_IDS.ann,
@@ -180,6 +191,12 @@ function fixtureSequences(first: StudioDialogueBeat[] = FIRST_BEATS): StudioDial
       beats: [ann("neutral", "Costs 5."), ann("happy", "Plain.")],
     },
     {
+      id: "tie_seq",
+      title: "Tie",
+      npcId: "npc_ann",
+      beats: [ann("happy", "Alpha."), ann("happy", "Beta."), ann("happy", "Gamma.")],
+    },
+    {
       id: "spread_seq",
       title: "Spread",
       npcId: "npc_ann",
@@ -196,6 +213,10 @@ function fixtureSequences(first: StudioDialogueBeat[] = FIRST_BEATS): StudioDial
       ],
     },
   ];
+}
+
+function spreadSequence(): StudioDialogueSequence {
+  return fixtureSequences().find((sequence) => sequence.id === "spread_seq")!;
 }
 
 function fixtureAdapter(first?: StudioDialogueBeat[]): DialogueAdapter {
@@ -544,9 +565,9 @@ describe("QC Studio apply: refusals change nothing", () => {
     expect(await refusal(planFixture(exportText("first_seq", beats)))).toMatch(/rewardItemBeats/);
 
     // Editing the plain beat beside a spread is fine; editing the spread's own output is not.
-    const around = [ann("neutral", "Before, revised."), fixtureSequences()[3]!.beats[1]!];
+    const around = [ann("neutral", "Before, revised."), spreadSequence().beats[1]!];
     expect(await changedSource(exportText("spread_seq", around))).toContain('"Before, revised."');
-    const into = [ann("neutral", "Before."), { ...fixtureSequences()[3]!.beats[1]!, quantity: 4 }];
+    const into = [ann("neutral", "Before."), { ...spreadSequence().beats[1]!, quantity: 4 }];
     expect(await refusal(planFixture(exportText("spread_seq", into)))).toMatch(
       /spread|edit it by hand/,
     );
@@ -578,6 +599,25 @@ describe("QC Studio apply: refusals change nothing", () => {
     expect(plan.newSource).not.toContain('"Three."');
   });
 
+  it("breaks ties between identical helpers by wording, so the commented beat is the one removed", async () => {
+    // "Beta." carries the comment. Both later beats share helper and expression,
+    // so only the wording says "Gamma, revised." is the edited "Gamma.".
+    const beats = [ann("happy", "Alpha."), ann("happy", "Gamma, revised.")];
+    expect(await refusal(planFixture(exportText("tie_seq", beats)))).toMatch(/comment/);
+
+    // Removing the uncommented beat and revising the commented one attributes correctly.
+    const kept = [ann("happy", "Alpha."), ann("happy", "Beta, revised.")];
+    const plan = await planFixture(exportText("tie_seq", kept));
+    if (plan.status !== "changed") throw new Error("expected a change");
+    expect(plan.changes).toEqual([
+      expect.stringMatching(/^~ beat 2: text changed/),
+      expect.stringMatching(/^- beat 3: removed .*Gamma/),
+    ]);
+    expect(plan.newSource).toMatch(
+      /\/\/ A note about Beta\.\s+annLocal\(EXPRESSION_IDS\.happy, "Beta, revised\."\)/,
+    );
+  });
+
   it("writes a skill XP beat as the source's inline object when no helper fits its background", async () => {
     const beats = [
       ...FIRST_BEATS,
@@ -601,7 +641,7 @@ describe("QC Studio apply: refusals change nothing", () => {
         ? { ...sequence, beats: [...sequence.beats, ann("happy", "Ghost.")] }
         : sequence,
     );
-    const beats = [ann("neutral", "Before, revised."), ...fixtureSequences()[3]!.beats.slice(1)];
+    const beats = [ann("neutral", "Before, revised."), ...spreadSequence().beats.slice(1)];
     expect(
       await refusal(planFixture(exportText("spread_seq", beats), FIXTURE_SOURCE, misaligned)),
     ).toMatch(/1:1|resolves to|lists 2/);
