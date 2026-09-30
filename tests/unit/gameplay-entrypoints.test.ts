@@ -75,6 +75,8 @@ const APP_ENTRYPOINTS: Record<string, string> = {
   "app/api/e2e/turnstile-siteverify/route.ts": "local E2E stub (404 outside the gate)",
   "app/api/location-population/route.ts": "GAMEPLAY: location population read",
   "app/api/character-profile/route.ts": "GAMEPLAY: same-location profile read",
+  "app/api/realtime/route.ts": "GAMEPLAY: realtime/social stream (#245)",
+  "app/api/e2e/realtime/route.ts": "local E2E hook (404 outside the gate)",
 };
 
 describe("player server actions (server/actions.ts)", () => {
@@ -147,13 +149,20 @@ describe("app pages and route handlers", () => {
     expect(page).toContain('if (err instanceof OwnershipError) redirect("/characters")');
   });
 
-  it("guards both gameplay reads and reports the refusal code", () => {
+  it("guards every gameplay read and reports the refusal code", () => {
     for (const [route, server] of [
       ["app/api/location-population/route.ts", "server/location-population.ts"],
       ["app/api/character-profile/route.ts", "server/character-profile.ts"],
+      ["app/api/realtime/route.ts", "server/realtime-stream.ts"],
     ] as const) {
       expect(read(server)).toContain("requirePlayableOwnedCharacter(");
       expect(read(route)).toContain("error instanceof GameplayAccessError");
+    }
+  });
+
+  it("keeps every local E2E hook behind the runtime gate", () => {
+    for (const route of entrypoints.filter((path) => path.startsWith("app/api/e2e/"))) {
+      expect(read(route), route).toContain("if (!isLocalE2eRuntime())");
     }
   });
 });

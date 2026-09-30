@@ -107,13 +107,16 @@ available while public gameplay is closed:
 | --- | --- |
 | `/play/[characterId]` | gameplay — `requirePlayableOwnedCharacter`, then the lock + reconcile Play load; any refusal redirects to `/characters` |
 | `GET /api/location-population`, `GET /api/character-profile` | gameplay reads — `requirePlayableOwnedCharacter`; refusal is 403 `GAMEPLAY_ACCESS_REQUIRED` |
+| `GET /api/realtime` | gameplay realtime stream (#245) — `requirePlayableOwnedCharacter` on every stream creation; refusal is 403 `GAMEPLAY_ACCESS_REQUIRED`, and a stream re-authorizes at least every ~5 minutes |
 | `/characters`, `/characters/new` | account/character management (reservation and presentation) |
 | `/`, `/updates/*`, `/wiki/*`, `/api/build-info`, `/api/diagnostics` | public; the landing reads only the public launch state |
 | `/sign-in`, `/register`, `/api/auth/*` | account (Better Auth) |
 | `/admin/*` | operator (`requireAdmin`); never player gameplay |
-| `/design-system`, `/qc-studio`, `/api/e2e/turnstile-siteverify` | dev/test only, gated off in production |
+| `/design-system`, `/qc-studio`, `/api/e2e/turnstile-siteverify`, `/api/e2e/realtime` | dev/test only, gated off in production |
 
-There are no middleware, SSE, socket, polling-timer, or minigame entrypoints.
+The realtime stream is the only SSE entrypoint (see `docs/architecture.md`,
+"Realtime/social delivery"). There are no middleware, socket, polling-timer,
+or minigame entrypoints.
 
 ## Stale already-open pages
 
@@ -124,7 +127,8 @@ visible until its next authoritative request, which the server refuses:
   error handler (directly or through `runPlayAction` / `runEquipmentAction`),
   turning the refusal into `redirect("/characters")`. That covers the Play
   console's own boundary `refreshPlayAction` as well as player commands;
-- the two gameplay read panels navigate to `/characters` when a route answers
+- the two gameplay read panels, and the Play tab's realtime stream when it
+  reconnects, navigate to `/characters` when a route answers
   `GAMEPLAY_ACCESS_REQUIRED`;
 - a navigation or reload of `/play/...` redirects on the server.
 

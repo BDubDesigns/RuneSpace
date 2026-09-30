@@ -115,7 +115,9 @@
      panel-ambiance opacity so it reads as an attention affordance at a
      glance rather than blending into it. Two layers — a tight, brighter core
      plus a softer, wider halo — read as more distinct than one wide blur at
-     an equivalent strength. Static (no animation). */
+     an equivalent strength. Static (no animation). The Chat/Social launcher
+     (#245) reuses it for its attention state: the same account-level
+     "something to notice" meaning, not a gameplay one. */
   --rs-glow-news-unread: 0 0 6px rgb(75 216 245 / 0.65), 0 0 18px rgb(75 216 245 / 0.32);
   /* Semantic mission guidance (issue #124): one high-contrast neon-green
      treatment marks "this interaction advances your active mission". It is a
@@ -171,6 +173,14 @@
       max(var(--rs-space-2), env(safe-area-inset-bottom))
   );
   --rs-bottom-nav-clearance: calc(var(--rs-bottom-nav-box-height) + var(--rs-space-3));
+  /* A floating action (the Chat/Social launcher, #245) sits one gap above the
+     BottomNav at the right edge. Pages that show one add its height and gap
+     to their bottom clearance, so it never covers the last content or
+     control. The nav box height already carries the safe-area inset. */
+  --rs-floating-action-bottom: calc(var(--rs-bottom-nav-box-height) + var(--rs-space-2));
+  --rs-floating-action-clearance: calc(
+    var(--rs-bottom-nav-clearance) + var(--rs-touch-target) + var(--rs-space-2)
+  );
 }
 
 html {

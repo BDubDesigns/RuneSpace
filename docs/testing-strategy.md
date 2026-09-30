@@ -50,7 +50,8 @@ small number of critical mobile player journeys.
   Location Population, Character Profile, Character Portraits, Refining, Bounded
   Runs, Cargo Hold, Deep Jag, Fabrication (Tier 1, and Fabrication 5 and 8 with the Loadsteel
   Cutter, the Freight Harness and their Missions — #233), Holo Hollow, Rusk Recovery, Admin Operator, Sign-out,
-  Account News, Account Verification, and Gameplay Access. It intentionally excludes noncanonical `smoke`, `ownership`,
+  Account News, Account Verification, Gameplay Access, and the Chat/Social shell and
+  realtime stream (`social-shell`, #245). It intentionally excludes noncanonical `smoke`, `ownership`,
   `design-system`, `work-orders`, `public-*`, and QC Studio specs. It:
   - requires Node 22.x
   - requires a localhost-only disposable PostgreSQL database (refuses remote)
@@ -195,6 +196,26 @@ Hermes host.
 - Uploading an artifact is not proof that promised evidence exists. Verify each
   expected evidence file before upload, and inspect artifact contents whenever
   evidence is part of the definition of done.
+
+### Issue #245 realtime/social coverage
+
+- `tests/unit/realtime.test.ts` owns the wire format and incremental parser,
+  audience matching and in-process fanout, the publisher's independence from
+  chat/trading models, the browser connection lifecycle (reconcile on connect
+  and reconnect, immediate reconnect after a deliberate close, backoff,
+  watchdog, refusal stops), duplicate-safe shell state, and the launcher's
+  accessible attention state.
+- `tests/integration/realtime.test.ts` proves stream authorization against
+  PostgreSQL: unauthenticated, foreign-character, and gameplay-access refusals
+  (including revocation between streams), the server-derived scope, delivery
+  only to matching streams across several tabs, heartbeat, and the bounded
+  lifetime.
+- `tests/e2e/social-shell.spec.ts` proves, at phone and desktop widths, the
+  floating launcher's placement and clearance, the Drawer over the current
+  surface, reconnect after the deliberate close, one stream per tab across
+  several tabs, and recovery of a suspended, offline tab. It ends streams
+  through the local-E2E-only `POST /api/e2e/realtime` hook instead of waiting
+  out the 5-minute lifetime.
 
 ## What to test when systems arrive
 For progression-sensitive systems, prioritize:

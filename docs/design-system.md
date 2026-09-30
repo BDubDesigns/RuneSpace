@@ -45,6 +45,27 @@ sibling of Inventory in the same Drawer, with a sticky footer action so Switch
 Character never scrolls out of reach (#213). The surface ownership and state
 rules are defined once in `docs/architecture.md`.
 
+Chat/Social (#245) is a utility over Play, not a fifth footer destination and
+not a header control. Its launcher is one compact 44px icon button that floats
+at the bottom right, one gap above the footer, through `GameShell`'s
+`floatingAction` slot. That slot owns the geometry: `--rs-floating-action-bottom`
+places the control above the footer (the nav height already includes the
+bottom safe-area inset, and the right edge respects the right inset), and
+`--rs-floating-action-clearance` grows the page's bottom padding by the control
+plus a gap so it never covers the last Play content. The four footer
+destinations and the header are unchanged. The launcher opens the Chat/Social
+Drawer over the current Location, Map, or Journey without navigating; closing
+it returns focus to the launcher. Attention reuses the News control's unread
+language — a small count badge (`9+` beyond nine) and the static
+`--rs-glow-news-unread` halo on an unclipped wrapper — with the count folded
+into the accessible name ("Chat, 2 items need attention"). This is the phone
+launcher pattern; a docked desktop presentation would render the same
+`ChatSocialSurface` without depending on the floating button. The Map's sticky
+selected-destination panel (#240) sticks at the same height and layers above
+the launcher (z-index 30 over 20), so on a phone, while a destination is
+selected, the full-width panel hides the launcher rather than the launcher
+covering Walk; the launcher is visible beside the narrower panel from `sm` up.
+
 Location, Map, and Journey are separate compositions: Location presents the
 stationary scene, activity, and same-location population/profile flow; Map is
 the dedicated `?surface=map` navigation surface; Journey is the in-transit
