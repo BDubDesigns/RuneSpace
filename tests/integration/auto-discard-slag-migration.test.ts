@@ -94,6 +94,8 @@ suite("issue #256 Auto-discard Slag migration (real PostgreSQL)", () => {
       `SELECT column_default FROM information_schema.columns
        WHERE table_name = 'character_refining_state' AND column_name = 'run_outputs_discarded'`,
     );
+    // Replaying every migration into a scratch database outlasts the default
+    // 5s test timeout under full-suite load, as the other migration replays do.
     expect(refining.rowCount).toBe(1);
-  });
+  }, 120_000);
 });
