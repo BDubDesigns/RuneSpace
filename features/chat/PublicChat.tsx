@@ -337,9 +337,15 @@ export function PublicChat({
 
   return (
     <div className="space-y-3" data-public-chat="">
+      {/* The log scrolls inside the Chat/Social panel, which scrolls too. It
+          deliberately keeps the browser's default scroll chaining: once the
+          log is at its end, the same swipe moves the panel, so with a pinned
+          card above it a phone player can still reach the newest message, the
+          composer, and the panel footer without a nested-scroll dead end
+          (#248). */}
       <div
         aria-label={`${label} messages`}
-        className="h-[min(38dvh,22rem)] overflow-y-auto overscroll-contain border border-[color:var(--rs-border-subtle)] bg-[color:var(--rs-surface-panel)] p-2"
+        className="h-[min(38dvh,22rem)] overflow-y-auto border border-[color:var(--rs-border-subtle)] bg-[color:var(--rs-surface-panel)] p-2"
         data-chat-log={channel}
         onScroll={(event) => {
           const log = event.currentTarget;

@@ -495,9 +495,15 @@ function WhisperConversation({ peer: initialPeer }: { peer: WhisperPeer }) {
         </div>
       </div>
 
+      {/* The conversation scrolls inside the Chat/Social panel, which scrolls
+          too. It deliberately keeps the browser's default scroll chaining:
+          once the conversation is at its end, the same swipe moves the panel,
+          so with a pinned card above it a phone player can still reach the
+          newest Whisper, the composer, and the panel footer without a
+          nested-scroll dead end (#248). */}
       <div
         aria-label={`Whispers with ${peer.name}`}
-        className="h-[min(34dvh,20rem)] overflow-y-auto overscroll-contain border border-[color:var(--rs-border-subtle)] bg-[color:var(--rs-surface-panel)] p-2"
+        className="h-[min(34dvh,20rem)] overflow-y-auto border border-[color:var(--rs-border-subtle)] bg-[color:var(--rs-surface-panel)] p-2"
         data-whisper-log={peerId}
         onScroll={(event) => {
           const log = event.currentTarget;

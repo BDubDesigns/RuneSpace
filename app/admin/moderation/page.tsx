@@ -141,6 +141,8 @@ function QueueCard({ entry }: { entry: ModerationQueueEntry }) {
         ) : null}
       </div>
       <p className="mt-2 break-words text-sm text-[color:var(--rs-text-primary)]">
+        {/* The case's subject, never the reporter: reporters are in the case's Identities. */}
+        <span className="text-[color:var(--rs-text-muted)]">Reported account: </span>
         {subject.playerName ?? "Unnamed player"}
         <span className="text-[color:var(--rs-text-muted)]">
           {" · "}

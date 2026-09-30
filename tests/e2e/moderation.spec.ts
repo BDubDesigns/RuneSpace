@@ -10,6 +10,7 @@ import { PORTRAIT_IDS } from "@/game/config/foundations";
 import { auth } from "@/server/auth";
 import * as characters from "@/server/characters";
 import * as ownership from "@/server/ownership";
+import { issueSanctionAs, openModerationCaseAs } from "@/server/moderation-seams";
 import { reportMessage } from "@/server/player-reports";
 import { cleanupTestUser, createCharacterForUser, createTestUser } from "../integration/fixtures";
 import { ADMIN_USER_ID, seedAdminOperator, seedNonAdminUser } from "./admin-session";
@@ -555,6 +556,206 @@ for (const viewport of VIEWPORTS) {
     await subject.context.close();
   });
 }
+
+// -- 1b. Phone scrolling with a pinned notice --------------------------------------
+
+/**
+ * Put a current social restriction on the account through the operator seams
+ * (the journey above proves the console path), so the drawer opens with the
+ * pinned notice already there.
+ */
+async function restrictAccount(subject: Player) {
+  const now = new Date();
+  await db.transaction(async (tx) => {
+    const opened = await openModerationCaseAs(
+      tx,
+      ADMIN_USER_ID,
+      subject.character.id,
+      "Phone scrolling check",
+      now,
+    );
+    await issueSanctionAs(
+      tx,
+      ADMIN_USER_ID,
+      {
+        caseId: opened.caseId,
+        kind: "social_restriction",
+        ruleCategory: "harassment",
+        duration: "7d",
+      },
+      now,
+    );
+  });
+}
+
+/** Enough tagged history to overflow a feed's log several times over. */
+function history(sender: Player, channel: "general" | "trade", tag: string, count: number) {
+  const at = Date.now();
+  return Array.from({ length: count }, (_, index) => ({
+    channel,
+    senderPlayerAccountId: sender.character.playerAccountId,
+    senderCharacterId: sender.character.id,
+    senderCharacterName: sender.character.displayName,
+    body: `${channel} line ${index + 1} ${tag}`,
+    createdAt: new Date(at - (count - index) * 1_000),
+  }));
+}
+
+/** A long Whisper conversation between two characters, oldest first. */
+async function seedWhispers(me: Player, peer: Player, tag: string, count: number) {
+  await db.transaction(async (tx) => {
+    const [conversation] = await tx
+      .insert(rune.whisperConversations)
+      .values({ participantKey: [me.character.id, peer.character.id].sort().join(":") })
+      .returning();
+    await tx.insert(rune.whisperParticipants).values([
+      {
+        conversationId: conversation!.id,
+        characterId: me.character.id,
+        playerAccountId: me.character.playerAccountId,
+        lastReadSeq: Number.MAX_SAFE_INTEGER,
+      },
+      {
+        conversationId: conversation!.id,
+        characterId: peer.character.id,
+        playerAccountId: peer.character.playerAccountId,
+      },
+    ]);
+    const at = Date.now();
+    await tx.insert(rune.chatMessages).values(
+      Array.from({ length: count }, (_, index) => {
+        const sender = index % 2 === 0 ? peer : me;
+        return {
+          channel: "whisper",
+          conversationId: conversation!.id,
+          senderPlayerAccountId: sender.character.playerAccountId,
+          senderCharacterId: sender.character.id,
+          senderCharacterName: sender.character.displayName,
+          body: `whisper line ${index + 1} ${tag}`,
+          createdAt: new Date(at - (count - index) * 1_000),
+        };
+      }),
+    );
+  });
+}
+
+/**
+ * One real touch swipe that STARTS over `start` (a chat log), moving the
+ * content up by `distance` px (negative: back toward older content), as raw
+ * touch events so Chromium's own touch scrolling — latching and scroll
+ * chaining included — applies exactly as on a phone.
+ */
+async function swipeUpFrom(page: Page, start: Locator, distance = 300) {
+  const box = await start.boundingBox();
+  if (!box) throw new Error("swipe start is not rendered");
+  const viewport = page.viewportSize()!;
+  // The middle of the part of `start` that is on screen.
+  const top = Math.max(box.y, 0);
+  const bottom = Math.min(box.y + box.height, viewport.height);
+  expect(bottom - top, "the chat log is on screen to start the swipe from").toBeGreaterThan(40);
+  const x = Math.round(box.x + box.width / 2);
+  const y0 = Math.round((top + bottom) / 2);
+  const client = await page.context().newCDPSession(page);
+  const touch = (type: "touchStart" | "touchMove" | "touchEnd", y: number) =>
+    client.send("Input.dispatchTouchEvent", {
+      type,
+      touchPoints: type === "touchEnd" ? [] : [{ x, y }],
+    });
+  await touch("touchStart", y0);
+  const steps = 12;
+  for (let step = 1; step <= steps; step += 1) {
+    await touch("touchMove", Math.round(y0 - (distance * step) / steps));
+  }
+  await touch("touchEnd", y0 - distance);
+  await client.detach();
+}
+
+/** Whether `target` is fully inside the visible viewport. */
+async function onScreen(page: Page, target: Locator): Promise<boolean> {
+  const box = await target.boundingBox();
+  const viewport = page.viewportSize()!;
+  return box !== null && box.y >= 0 && box.y + box.height <= viewport.height;
+}
+
+/**
+ * The review's acceptance: with the pinned notice above it, swiping with the
+ * finger over the chat log alone reaches the newest message, the composer,
+ * and the panel's footer — no nested-scroll dead end.
+ */
+async function expectReachableFromLog(
+  page: Page,
+  dialog: Locator,
+  log: Locator,
+  newest: Locator,
+  composerForm: Locator,
+) {
+  const footer = dialog.locator("[data-social-policy-links]");
+  // A bounded number of swipes; a dead end never gets there.
+  for (let swipe = 0; swipe < 8; swipe += 1) {
+    if ((await onScreen(page, composerForm)) && (await onScreen(page, footer))) break;
+    await swipeUpFrom(page, log);
+  }
+  await expect
+    .poll(() => onScreen(page, composerForm), { message: "composer reachable" })
+    .toBe(true);
+  await expect.poll(() => onScreen(page, footer), { message: "footer reachable" }).toBe(true);
+  await expect(newest).toBeInViewport();
+  await expect(composerForm.getByText(RESTRICTED)).toBeVisible();
+}
+
+test("a phone player with a pinned notice can scroll General, Trade, and a long Whisper to the end", async ({
+  browser,
+}, testInfo) => {
+  test.skip(testInfo.project.name !== "chromium", "two-account journey; runs once");
+  const tag = randomUUID().slice(0, 8);
+  const { player: me, context } = await player(browser, PHONE, "Scroller");
+  const cookies = await context.cookies();
+  await context.close();
+  // A phone: touch input and mobile viewport semantics, not only a narrow width.
+  const phone = await browser.newContext({ viewport: PHONE, hasTouch: true, isMobile: true });
+  await phone.addCookies(cookies);
+  const peer = await reporterAccount("Scroll peer");
+
+  await db
+    .insert(rune.chatMessages)
+    .values([...history(peer, "general", tag, 60), ...history(peer, "trade", tag, 60)]);
+  await seedWhispers(me, peer, tag, 60);
+  await restrictAccount(me);
+
+  const page = await phone.newPage();
+  await openPlay(page, me.character.id);
+  const dialog = await openChat(page);
+  await expect(noticeCard(dialog)).toBeVisible();
+
+  for (const channel of ["general", "trade"] as const) {
+    if (channel === "trade") await dialog.getByRole("tab", { name: /^Trade/ }).click();
+    const log = dialog.locator(`[data-chat-log="${channel}"]`);
+    const newest = log.getByText(`${channel} line 60 ${tag}`, { exact: true });
+    await expect(newest).toBeVisible();
+    // The newest message stays pinned to the bottom of the log (stick-to-bottom).
+    await expectReachableFromLog(page, dialog, log, newest, composer(dialog, channel));
+    // Reading older history still works from the same log.
+    await swipeUpFrom(page, log, -600);
+    await expect(log.getByRole("button", { name: "Load older messages" })).toBeVisible();
+    // Back to the top of the panel for the next tab.
+    await dialog.evaluate((panel) => panel.scrollTo(0, 0));
+  }
+
+  await dialog.getByRole("tab", { name: /^Whispers/ }).click();
+  await dialog.getByRole("button", { name: new RegExp(`^${peer.character.displayName}`) }).click();
+  const whisperLog = dialog.locator(`[data-whisper-log="${peer.character.id}"]`);
+  const newestWhisper = whisperLog.getByText(`whisper line 60 ${tag}`, { exact: true });
+  await expect(newestWhisper).toBeVisible();
+  await expectReachableFromLog(
+    page,
+    dialog,
+    whisperLog,
+    newestWhisper,
+    dialog.locator('[data-chat-composer="whisper"]'),
+  );
+  await expectNoHorizontalOverflow(page, dialog);
+  await phone.close();
+});
 
 // -- 2. Suspension -------------------------------------------------------------
 
