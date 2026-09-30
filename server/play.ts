@@ -129,6 +129,7 @@ import {
 } from "@/server/action-resolution";
 import { addStackableItem, loadOwnedItemInstances } from "@/server/carried-inventory";
 import { createTravelResolver, type TravelResolution, type TravelSnapshot } from "@/server/travel";
+import { loadAutoDiscardSlag } from "@/server/character-preferences";
 import {
   createRefiningResolver,
   e2eRefiningRandom,
@@ -445,7 +446,6 @@ export type PracticeProjection = {
    * does — Max runs until the Scrap cannot pay for another weld.
    */
   affordableWelds: number;
-  autoDiscardSlag: boolean;
   /**
    * The durable "finish this weld, then stop" intent (#207 follow-up). The
    * authoritative armed state for "Stop After Current Weld" — the UI reads
@@ -874,6 +874,12 @@ export type PlayGameplayState = {
   repairs: Readonly<Record<string, RepairProjection>>;
   /** Repeatable Practice Welding state (#190). */
   practice: PracticeProjection;
+  /**
+   * The character-wide Auto-discard Slag preference (#256). One value that both
+   * Practice Welding and Refining read and both toggles write; neither
+   * projection carries its own copy.
+   */
+  autoDiscardSlag: boolean;
   /** The Work Orders terminal's authoritative visibility and state (#190). */
   workOrders: WorkOrdersProjection;
   cargoHold: CargoHoldState;
@@ -1829,6 +1835,8 @@ export async function stateFromTransaction(
     successes: refiningState?.runSuccesses ?? 0,
     failures: (refiningState?.runAttempts ?? 0) - (refiningState?.runSuccesses ?? 0),
     outputsGained: (refiningState?.runOutputsGained as Record<string, number> | undefined) ?? {},
+    outputsDiscarded:
+      (refiningState?.runOutputsDiscarded as Record<string, number> | undefined) ?? {},
     inputsConsumed: (refiningState?.runInputsConsumed as Record<string, number> | undefined) ?? {},
     xpGained: refiningState?.runXpGained ?? 0,
     recentAttempts: normalizePersistedRefiningAttempts(refiningState?.recentAttempts, balance),
@@ -1881,7 +1889,6 @@ export async function stateFromTransaction(
       },
       balance,
     ),
-    autoDiscardSlag: practiceRow?.autoDiscardSlag ?? false,
     finishCurrentWeld: practiceRow?.finishCurrentWeld ?? false,
     ...(practiceRow?.lastStopReason ? { lastStopReason: practiceRow.lastStopReason } : {}),
     run: practiceRunStateFromRow(practiceRow),
@@ -2302,6 +2309,7 @@ export async function stateFromTransaction(
     refiningRun,
     repairs,
     practice,
+    autoDiscardSlag: await loadAutoDiscardSlag(transaction, characterId),
     workOrders,
     practiceError,
     cargoHold: {

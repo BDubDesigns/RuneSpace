@@ -218,6 +218,13 @@
       "when": 1790471916456,
       "tag": "0030_fabrication_tinkering",
       "breakpoints": true
+    },
+    {
+      "idx": 31,
+      "version": "7",
+      "when": 1790735584394,
+      "tag": "0031_character_auto_discard_slag",
+      "breakpoints": true
     }
   ]
 }

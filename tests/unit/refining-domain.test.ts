@@ -9,6 +9,7 @@ import {
 import { ACTION_IDS, SKILL_IDS } from "@/game/config/foundations";
 import { BOUNDED_RUN_MAX, boundedRunAllowance } from "@/game/domain/bounded-run";
 import {
+  refiningAwardFacts,
   refiningRecipeUnlocked,
   refiningSuccessChanceBps,
   refiningPreflightStopReason,
@@ -38,9 +39,11 @@ describe("refining domain", () => {
   const UNBOUNDED = boundedRunAllowance(BOUNDED_RUN_MAX, 0);
 
   function resolveFerriteRefining(
-    input: Omit<Parameters<typeof resolveRefining<string>>[0], "recipe">,
+    input: Omit<Parameters<typeof resolveRefining<string>>[0], "recipe" | "autoDiscardSlag"> & {
+      autoDiscardSlag?: boolean;
+    },
   ) {
-    return resolveRefining({ ...input, recipe: refinedFerrite });
+    return resolveRefining({ autoDiscardSlag: false, ...input, recipe: refinedFerrite });
   }
 
   function ferritePreflight(snapshot: Parameters<typeof refiningPreflightStopReason<string>>[0]) {
@@ -193,10 +196,11 @@ describe("refining domain", () => {
       expect(random.nextBasisPoints).toHaveBeenCalledTimes(1);
     });
 
-    it("only Refined Ferrite would fit but Slag would not: no attempt occurs", () => {
+    it("Refined Ferrite fits but failure Slag would not: the attempt is not blocked (#256)", () => {
       // Shale stack has 3 (so after removing 2, 1 remains - no slot freed).
       // Refined Ferrite has a partial stack (4/5) with room for 1 more — fits without a new slot.
-      // Slag has no existing stack and slotsAvailable is 0 — needs a slot but none available.
+      // Slag has no existing stack and slotsAvailable is 0 — a failure's Slag has
+      // nowhere to go, but that is optional inventory and never gates the attempt.
       const snapshot = {
         refiningLevel: 1,
         existingStacks: [
@@ -206,27 +210,40 @@ describe("refining domain", () => {
         slotsAvailable: 0,
         massAvailableGrams: 50_000,
       };
-      const reason = ferritePreflight(snapshot);
-      expect(reason).toBe("inventory_slots_full");
+      expect(ferritePreflight(snapshot)).toBeUndefined();
 
-      const random = { nextBasisPoints: vi.fn(() => 0) };
-      const res = resolveFerriteRefining({
+      // A success still lands in the partial stack.
+      const succeeds = resolveFerriteRefining({
         allowance: UNBOUNDED,
         elapsedTicks: 7,
         snapshot,
         balance,
-        random,
+        random: { nextBasisPoints: () => 0 },
       });
-      expect(res.stopReason).toBe("inventory_slots_full");
-      expect(res.attempts).toBe(0);
-      expect(shaleConsumed(res)).toBe(0);
-      expect(res.awardedXp).toBe(0);
-      expect(ferriteGained(res)).toBe(0);
-      expect(slagGained(res)).toBe(0);
-      expect(random.nextBasisPoints).not.toHaveBeenCalled();
-      expect(res.stackUpdates).toEqual([]);
-      expect(res.deletedStackIds).toEqual([]);
-      expect(res.createdStacks).toEqual([]);
+      expect(succeeds.successes).toBe(1);
+      expect(ferriteGained(succeeds)).toBe(1);
+      expect(slagGained(succeeds)).toBe(0);
+
+      // A failure completes the attempt: inputs spent, failure XP paid, and the
+      // Slag that has no room is discarded rather than blocking anything.
+      const fails = resolveFerriteRefining({
+        allowance: boundedRunAllowance(1, 0),
+        elapsedTicks: 7,
+        snapshot,
+        balance,
+        random: { nextBasisPoints: () => 9_999 },
+      });
+      expect(fails.failures).toBe(1);
+      expect(fails.attempts).toBe(1);
+      expect(shaleConsumed(fails)).toBe(2);
+      expect(fails.awardedXp).toBe(3);
+      expect(slagGained(fails)).toBe(0);
+      expect(fails.outputsDiscarded).toEqual({ [balance.items.slag.itemId]: 1 });
+      expect(fails.createdStacks).toEqual([]);
+      expect(fails.resolvedAttempts[0]?.awarded).toEqual([]);
+      expect(fails.resolvedAttempts[0]?.discarded).toEqual([
+        { itemId: balance.items.slag.itemId, quantity: 1 },
+      ]);
     });
 
     it("only Slag would fit but Refined Ferrite would not: no attempt occurs", () => {
@@ -346,10 +363,12 @@ describe("refining domain", () => {
     expect(res.consumedTicks).toBe(14);
   });
 
-  it("multiple offline attempts stop when inventory can no longer accept both outputs", () => {
+  it("multiple offline attempts stop when inventory can no longer accept the product", () => {
     // Shale 6, one partial ferrite (4/5) with room, no slag stack, no spare slots.
-    // First attempt: ferrite -> fills 4/5 to 5/5, still has 4 shale.
-    // Second attempt: both outputs need a new stack (ferrite full, slag missing) with 0 slots → stop.
+    // First attempt: a success fills 4/5 to 5/5 and 4 shale remain; the failure
+    // Slag that would have no room never gated it (#256).
+    // Second attempt: the product now needs a new stack (ferrite full) with 0
+    // slots free → the ordinary preflight stops the run.
     const snapshot = {
       refiningLevel: 1,
       existingStacks: [
@@ -359,9 +378,7 @@ describe("refining domain", () => {
       slotsAvailable: 0,
       massAvailableGrams: 50_000,
     };
-    // First preflight: after removing 2 from 6 -> shale 4, rf 4/5 needs 1 internal slot -> ferrite fits, slag needs slot -> would this pass? Actually first snapshot is shale 6, rf 4/5, slots 0, mass ok.
-    // After simulating removal of 2, stacksAfter = shale 4, rf 4/5, slotsAfter 0. refinedPlan: can add to rf -> remaining 0. slagPlan: needs new stack -> remaining 1. So refinedPlan 0 but slagPlan 1 => NOT both zero => stop before rolling. So this inventory should stop immediately, 0 attempts.
-    expect(ferritePreflight(snapshot)).toBe("inventory_slots_full");
+    expect(ferritePreflight(snapshot)).toBeUndefined();
     const random = { nextBasisPoints: vi.fn(() => 0) };
     const res = resolveFerriteRefining({
       allowance: UNBOUNDED,
@@ -370,8 +387,10 @@ describe("refining domain", () => {
       balance,
       random,
     });
-    expect(res.attempts).toBe(0);
-    expect(random.nextBasisPoints).not.toHaveBeenCalled();
+    expect(res.attempts).toBe(1);
+    expect(ferriteGained(res)).toBe(1);
+    expect(res.stopReason).toBe("inventory_slots_full");
+    expect(random.nextBasisPoints).toHaveBeenCalledTimes(1);
   });
 
   it("incomplete <7 tick work after completed attempts remains non-consuming", () => {
@@ -487,6 +506,7 @@ describe("refining domain", () => {
 
     it("a failed Galvanic Stock pour is 2 Slag", () => {
       const res = resolveRefining({
+        autoDiscardSlag: false,
         allowance: UNBOUNDED,
         elapsedTicks: galvanicStock.attemptDurationTicks,
         snapshot: {
@@ -518,6 +538,7 @@ describe("refining domain", () => {
       };
       const runWith = (unit: number) =>
         resolveRefining({
+          autoDiscardSlag: false,
           allowance: UNBOUNDED,
           elapsedTicks: galvaferrite.attemptDurationTicks,
           snapshot,
@@ -542,6 +563,7 @@ describe("refining domain", () => {
 
     it("a successful Galvaferrite alloy consumes both inputs for one Galvaferrite", () => {
       const res = resolveRefining({
+        autoDiscardSlag: false,
         allowance: UNBOUNDED,
         elapsedTicks: galvaferrite.attemptDurationTicks,
         snapshot: {
@@ -574,6 +596,290 @@ describe("refining domain", () => {
       expect(refiningPreflightStopReason(snapshot, balance, galvaferrite)).toBe(
         "insufficient_inputs",
       );
+    });
+  });
+
+  describe("byproduct Slag and the shared Auto-discard Slag preference (#256)", () => {
+    const slagId = balance.items.slag.itemId;
+    const ferriteSlag = refiningRecipeForActionId(ACTION_IDS.ferriteShaleSlagRefining, balance)!;
+    const galvaniteSlag = refiningRecipeForActionId(ACTION_IDS.galvaniteSlagRefining, balance)!;
+    const FAIL = { nextBasisPoints: () => 9_999 };
+    const stack = (id: string, itemId: string, quantity: number) =>
+      ({ id, itemId, quantity }) as StackState<string>;
+    const galvaniteOnly = (slotsAvailable: number, massAvailableGrams = 50_000) => ({
+      refiningLevel: 5,
+      existingStacks: [stack("g", balance.items.galvanite.itemId, 2)],
+      slotsAvailable,
+      massAvailableGrams,
+    });
+    const oneGalvanicPour = (autoDiscardSlag: boolean, slotsAvailable: number, mass?: number) =>
+      resolveRefining({
+        autoDiscardSlag,
+        allowance: boundedRunAllowance(1, 0),
+        elapsedTicks: galvanicStock.attemptDurationTicks,
+        snapshot: galvaniteOnly(slotsAvailable, mass),
+        balance,
+        recipe: galvanicStock,
+        random: FAIL,
+      });
+
+    it("marks only a fixed-output failure's Slag as a byproduct", () => {
+      const byproducts = (recipe: Parameters<typeof refiningAwardFacts>[1]) => {
+        const facts = refiningAwardFacts(balance, recipe);
+        return {
+          success: facts.successOutputs.map((output) => output.byproduct),
+          failure: facts.failureOutcomes.map((branch) => branch.map((output) => output.byproduct)),
+        };
+      };
+      expect(byproducts(refinedFerrite)).toEqual({ success: [false], failure: [[true]] });
+      expect(byproducts(galvanicStock)).toEqual({ success: [false], failure: [[true]] });
+      // Returned inputs are not byproducts, and neither is a deliberate Slag
+      // recipe's own output, even though that output is also the Slag item.
+      expect(byproducts(galvaferrite)).toEqual({ success: [false], failure: [[false], [false]] });
+      expect(byproducts(ferriteSlag)).toEqual({ success: [false], failure: [] });
+      expect(byproducts(galvaniteSlag)).toEqual({ success: [false], failure: [] });
+    });
+
+    it("a Galvanic Stock attempt starts with no room at all for its failure Slag", () => {
+      // Two Galvanite is the whole inventory: the pour frees its slot, and the
+      // Galvanic Stock takes it. The 2 Slag of a failure have nowhere to go.
+      const snapshot = galvaniteOnly(0);
+      expect(refiningPreflightStopReason(snapshot, balance, galvanicStock)).toBeUndefined();
+    });
+
+    it("keeps failure Slag up to ordinary capacity and discards only the overflow", () => {
+      // The emptied Galvanite stack frees a slot, so one stack of Slag fits: both.
+      const roomy = oneGalvanicPour(false, 0);
+      expect(roomy.outputsGained).toEqual({ [slagId]: 2 });
+      expect(roomy.outputsDiscarded).toEqual({});
+      expect(roomy.resolvedAttempts[0]?.discarded).toBeUndefined();
+
+      // One Slag of room only: 3 Galvanite frees no slot, and the only Slag
+      // stack has room for one more (9 of 10). One is kept, the other is
+      // discarded, and the attempt completes exactly as a full-room failure does.
+      const tight = resolveRefining({
+        autoDiscardSlag: false,
+        allowance: boundedRunAllowance(1, 0),
+        elapsedTicks: galvanicStock.attemptDurationTicks,
+        snapshot: {
+          refiningLevel: 5,
+          existingStacks: [
+            stack("g", balance.items.galvanite.itemId, 3),
+            stack("gs", balance.items.galvanicStock.itemId, 4),
+            stack("sl", slagId, 9),
+          ],
+          slotsAvailable: 0,
+          massAvailableGrams: 50_000,
+        },
+        balance,
+        recipe: galvanicStock,
+        random: FAIL,
+      });
+      expect(tight.outputsGained).toEqual({ [slagId]: 1 });
+      expect(tight.outputsDiscarded).toEqual({ [slagId]: 1 });
+      expect(tight.stackUpdates.find((update) => update.id === "sl")?.quantity).toBe(10);
+      expect(tight.failures).toBe(1);
+      expect(tight.awardedXp).toBe(galvanicStock.failureXp);
+      expect(tight.resolvedAttempts[0]?.awarded).toEqual([{ itemId: slagId, quantity: 1 }]);
+      expect(tight.resolvedAttempts[0]?.discarded).toEqual([{ itemId: slagId, quantity: 1 }]);
+    });
+
+    it("Auto-discard On throws away all failure Slag and changes nothing else", () => {
+      const kept = oneGalvanicPour(false, 5);
+      const discarded = oneGalvanicPour(true, 5);
+      expect(discarded.outputsGained).toEqual({});
+      expect(discarded.outputsDiscarded).toEqual({ [slagId]: 2 });
+      expect(discarded.createdStacks).toEqual([]);
+      expect(discarded.resolvedAttempts[0]?.awarded).toEqual([]);
+      // Everything that is not the Slag itself — outcome, XP, consumed inputs,
+      // ticks, run counts, deleted stacks — is identical to keeping it.
+      const withoutSlag = (res: typeof kept) => ({
+        ...res,
+        outputsGained: undefined,
+        outputsDiscarded: undefined,
+        createdStacks: undefined,
+        resolvedAttempts: res.resolvedAttempts.map((attempt) => ({
+          ...attempt,
+          awarded: undefined,
+          discarded: undefined,
+        })),
+      });
+      expect(withoutSlag(discarded)).toEqual(withoutSlag(kept));
+    });
+
+    it("Auto-discard never touches a successful product", () => {
+      for (const autoDiscardSlag of [false, true]) {
+        const res = resolveRefining({
+          autoDiscardSlag,
+          allowance: boundedRunAllowance(1, 0),
+          elapsedTicks: galvanicStock.attemptDurationTicks,
+          snapshot: galvaniteOnly(0),
+          balance,
+          recipe: galvanicStock,
+          random: { nextBasisPoints: () => 0 },
+        });
+        expect(res.outputsGained).toEqual({ [balance.items.galvanicStock.itemId]: 1 });
+        expect(res.outputsDiscarded).toEqual({});
+      }
+    });
+
+    it("a successful product still needs ordinary room", () => {
+      // One more input than the recipe spends, so the pour frees no slot and the
+      // product would need a new stack that does not exist.
+      for (const recipe of [refinedFerrite, galvanicStock]) {
+        const input = recipe.inputs[0]!;
+        const snapshot = {
+          refiningLevel: 5,
+          existingStacks: [stack("in", input.itemId, input.quantity + 1)],
+          slotsAvailable: 0,
+          massAvailableGrams: 50_000,
+        };
+        expect(refiningPreflightStopReason(snapshot, balance, recipe)).toBe("inventory_slots_full");
+      }
+    });
+
+    it("Galvaferrite's returned input is never discarded, whatever the preference", () => {
+      for (const autoDiscardSlag of [false, true]) {
+        const res = resolveRefining({
+          autoDiscardSlag,
+          allowance: boundedRunAllowance(1, 0),
+          elapsedTicks: galvaferrite.attemptDurationTicks,
+          snapshot: {
+            refiningLevel: 8,
+            existingStacks: [
+              stack("rf", balance.items.refinedFerrite.itemId, 1),
+              stack("gs", balance.items.galvanicStock.itemId, 1),
+            ],
+            slotsAvailable: 0,
+            massAvailableGrams: 50_000,
+          },
+          balance,
+          recipe: galvaferrite,
+          random: { nextBasisPoints: () => 9_999, nextUnit: () => 0.1 },
+        });
+        expect(res.failures).toBe(1);
+        expect(res.outputsGained).toEqual({ [balance.items.refinedFerrite.itemId]: 1 });
+        expect(res.outputsDiscarded).toEqual({});
+        expect(res.resolvedAttempts[0]?.discarded).toBeUndefined();
+      }
+    });
+
+    it("deliberate Slag recipes ignore the preference and need room for their output", () => {
+      for (const recipe of [ferriteSlag, galvaniteSlag]) {
+        const input = recipe.inputs[0]!;
+        for (const autoDiscardSlag of [false, true]) {
+          const roomy = resolveRefining({
+            autoDiscardSlag,
+            allowance: boundedRunAllowance(1, 0),
+            elapsedTicks: recipe.attemptDurationTicks,
+            snapshot: {
+              refiningLevel: 5,
+              existingStacks: [stack("in", input.itemId, input.quantity)],
+              slotsAvailable: 5,
+              massAvailableGrams: 50_000,
+            },
+            balance,
+            recipe,
+            random: FAIL,
+          });
+          expect(roomy.successes).toBe(1);
+          expect(roomy.failures).toBe(0);
+          expect(roomy.resolvedAttempts[0]?.deterministic).toBe(true);
+          expect(roomy.outputsGained).toEqual({ [slagId]: recipe.outputQuantity });
+          expect(roomy.outputsDiscarded).toEqual({});
+          expect(roomy.awardedXp).toBe(recipe.successXp);
+
+          // Slag has nowhere to go: the recipe does not run, whatever the toggle.
+          const cramped = resolveRefining({
+            autoDiscardSlag,
+            allowance: boundedRunAllowance(1, 0),
+            elapsedTicks: recipe.attemptDurationTicks,
+            snapshot: {
+              refiningLevel: 5,
+              existingStacks: [stack("in", input.itemId, input.quantity + 1)],
+              slotsAvailable: 0,
+              massAvailableGrams: 50_000,
+            },
+            balance,
+            recipe,
+            random: FAIL,
+          });
+          expect(cramped.attempts).toBe(0);
+          expect(cramped.stopReason).toBe("inventory_slots_full");
+        }
+      }
+    });
+
+    it("both deliberate Slag recipes stay deterministic and never consult the random source", () => {
+      for (const recipe of [ferriteSlag, galvaniteSlag]) {
+        const random = { nextBasisPoints: vi.fn(() => 9_999) };
+        const input = recipe.inputs[0]!;
+        const res = resolveRefining({
+          autoDiscardSlag: true,
+          allowance: boundedRunAllowance(3, 0),
+          elapsedTicks: recipe.attemptDurationTicks * 3,
+          snapshot: {
+            refiningLevel: 5,
+            existingStacks: [stack("in", input.itemId, input.quantity * 3)],
+            slotsAvailable: 5,
+            massAvailableGrams: 50_000,
+          },
+          balance,
+          recipe,
+          random,
+        });
+        expect(res.successes).toBe(3);
+        expect(res.failures).toBe(0);
+        expect(random.nextBasisPoints).not.toHaveBeenCalled();
+      }
+    });
+
+    it("a Max run keeps going when failure Slag has no room, and counts every attempt", () => {
+      // Ten shale in one stack and no free slot: every failure's
+      // Slag is thrown away for want of room until the last pour empties the
+      // stack and frees one. Lack of Slag room alone never stops the run.
+      const res = resolveFerriteRefining({
+        allowance: UNBOUNDED,
+        elapsedTicks: refinedFerrite.attemptDurationTicks * 10,
+        snapshot: {
+          refiningLevel: 1,
+          existingStacks: [
+            stack("shale", balance.items.ferriteShale.itemId, 10),
+            // A partial product stack, so a success would still fit.
+            stack("rf", balance.items.refinedFerrite.itemId, 4),
+          ],
+          slotsAvailable: 0,
+          massAvailableGrams: 50_000,
+        },
+        balance,
+        random: FAIL,
+      });
+      expect(res.attempts).toBe(5);
+      expect(res.failures).toBe(5);
+      expect(res.stopReason).toBe("insufficient_inputs");
+      expect(res.awardedXp).toBe(5 * refinedFerrite.failureXp);
+      expect(slagGained(res) + (res.outputsDiscarded[slagId] ?? 0)).toBe(5);
+      expect(res.outputsDiscarded[slagId]).toBe(4);
+    });
+
+    it("a numeric run counts a Slag-discarding failure like any other attempt", () => {
+      const res = resolveFerriteRefining({
+        autoDiscardSlag: true,
+        allowance: boundedRunAllowance(3, 0),
+        elapsedTicks: refinedFerrite.attemptDurationTicks * 10,
+        snapshot: {
+          refiningLevel: 1,
+          existingStacks: [stack("shale", balance.items.ferriteShale.itemId, 10)],
+          slotsAvailable: 5,
+          massAvailableGrams: 50_000,
+        },
+        balance,
+        random: FAIL,
+      });
+      expect(res.attempts).toBe(3);
+      expect(res.stopReason).toBe("run_completed");
+      expect(res.outputsDiscarded).toEqual({ [slagId]: 3 });
+      expect(res.outputsGained).toEqual({});
     });
   });
 

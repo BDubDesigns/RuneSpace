@@ -3,7 +3,7 @@ import {
   type EffectiveGameBalance,
   type RefiningRecipeBalance,
 } from "@/game/config/balance";
-import { BOUNDED_RUN_QUANTITY_CEILING } from "@/game/config/foundations";
+import { BOUNDED_RUN_QUANTITY_CEILING, ITEM_IDS } from "@/game/config/foundations";
 import type { BoundedRunAllowance } from "@/game/domain/bounded-run";
 import {
   planPossibleAwardAdditions,
@@ -52,6 +52,14 @@ function stackFacts(balance: EffectiveGameBalance, itemId: string) {
   return { itemId, stackLimit: item.stackLimit, massGrams: item.massGrams };
 }
 
+export type RefiningAwardFact = {
+  itemId: string;
+  stackLimit: number;
+  massGrams: number;
+  quantity: number;
+  byproduct: boolean;
+};
+
 /**
  * The authoritative facts for one Refining recipe: what it consumes, what a
  * success produces, and every mutually exclusive thing a failure can produce.
@@ -63,28 +71,45 @@ function stackFacts(balance: EffectiveGameBalance, itemId: string) {
  * list of simultaneous awards. A fixed-output failure has one branch (Slag);
  * a one-input-returned failure has one branch per input, because exactly one
  * of them comes back.
+ *
+ * Every award says whether it is a `byproduct` (#256): optional material a
+ * FAILURE leaves behind, which the player's Auto-discard Slag preference may
+ * throw away and whose lack of room can never block an attempt. That is a
+ * property of where the award comes from, never of the item's ID — a success
+ * output is always the thing the player asked for (so a deliberate Slag recipe
+ * keeps its Slag), and a Galvaferrite failure hands an input back, which is
+ * returned rather than made.
  */
 export function refiningAwardFacts(balance: EffectiveGameBalance, recipe: RefiningRecipeBalance) {
   const inputs = recipe.inputs.map((input) => ({
     ...stackFacts(balance, input.itemId),
     quantity: input.quantity,
   }));
-  const successOutputs = [
-    { ...stackFacts(balance, recipe.outputItemId), quantity: recipe.outputQuantity },
+  const successOutputs: RefiningAwardFact[] = [
+    {
+      ...stackFacts(balance, recipe.outputItemId),
+      quantity: recipe.outputQuantity,
+      byproduct: false,
+    },
   ];
   // A deterministic recipe (#229) has no failure, so nothing else can happen.
-  const failureOutcomes =
+  // Only the Slag a fixed-output failure produces is a byproduct; that is the
+  // single material the shared preference (#256) covers.
+  const failureOutcomes: RefiningAwardFact[][] =
     recipe.failure.kind === "fixed_outputs"
       ? [
           recipe.failure.outputs.map((output) => ({
             ...stackFacts(balance, output.itemId),
             quantity: output.quantity,
+            byproduct: output.itemId === ITEM_IDS.slag,
           })),
         ]
       : recipe.failure.kind === "one_input_returned"
-        ? recipe.inputs.map((input) => [{ ...stackFacts(balance, input.itemId), quantity: 1 }])
+        ? recipe.inputs.map((input) => [
+            { ...stackFacts(balance, input.itemId), quantity: 1, byproduct: false },
+          ])
         : [];
-  return { inputs, successOutputs, failureOutcomes } as const;
+  return { inputs, successOutputs, failureOutcomes };
 }
 
 /**
@@ -134,7 +159,15 @@ export type RefiningResolvedAttempt = {
   rolledBasisPoints: number;
   thresholdBasisPoints: number;
   consumed: readonly RefiningItemQuantity[];
+  /** What the attempt actually put into carried inventory. */
   awarded: readonly RefiningItemQuantity[];
+  /**
+   * Byproduct Slag the attempt produced but did not carry (#256): thrown away
+   * by Auto-discard Slag, or for want of room. Omitted when there was none, so
+   * an attempt persisted before this existed reads as one that discarded
+   * nothing, and a surface must never fold it into `awarded`.
+   */
+  discarded?: readonly RefiningItemQuantity[];
   xpAwarded: number;
   durationTicks: number;
 };
@@ -147,6 +180,8 @@ export type RefiningResolution<Id = string> = {
   /** Totals for this resolution window, keyed by item ID. */
   inputsConsumed: Readonly<Record<string, number>>;
   outputsGained: Readonly<Record<string, number>>;
+  /** Byproduct Slag produced but not carried, keyed by item ID (#256). */
+  outputsDiscarded: Readonly<Record<string, number>>;
   awardedXp: number;
   stackUpdates: readonly { id: Id; quantity: number }[];
   /** Stacks whose quantity dropped to zero and must be deleted. */
@@ -289,18 +324,24 @@ export function refiningPreflightStopReason<Id>(
   // After removing inputs, every mutually exclusive outcome must fit
   // independently before the success roll is requested. A branch that awards
   // several items at once must fit all of them together.
+  //
+  // Only what the attempt must PRESERVE gates it (#256): a success output, or
+  // an input a failure hands back. A failure's byproduct Slag is optional
+  // inventory — the resolver keeps what room allows after the attempt resolves
+  // and discards the rest — so reserving room for it here would strand a
+  // player over material they may not even want.
   let slotsShortfall = false;
   for (const outcome of [award.successOutputs, ...award.failureOutcomes]) {
+    const required = outcome.filter((output) => !output.byproduct);
+    if (required.length === 0) continue;
     const possible = planPossibleAwardAdditions(
       removal.stacksAfter,
-      [
-        outcome.map((output) => ({
-          itemId: output.itemId,
-          quantity: output.quantity,
-          stackLimit: output.stackLimit,
-          itemWeight: output.massGrams,
-        })),
-      ].flat(),
+      required.map((output) => ({
+        itemId: output.itemId,
+        quantity: output.quantity,
+        stackLimit: output.stackLimit,
+        itemWeight: output.massGrams,
+      })),
       removal.slotsAvailableAfter,
       removal.massAvailableAfter,
     );
@@ -312,15 +353,29 @@ export function refiningPreflightStopReason<Id>(
   return slotsShortfall ? "inventory_slots_full" : undefined;
 }
 
+/**
+ * Add awards to the working inventory. A required award must fit in full —
+ * the preflight proved it would, so a shortfall here is a defect. A partial
+ * award (a byproduct) takes whatever room there is and reports the rest as
+ * unplaced, so the caller can say it was discarded.
+ */
 function addAwards<Id>(
   stacks: WorkingStack<Id>[],
   awards: readonly { itemId: string; quantity: number; stackLimit: number; massGrams: number }[],
   slotsAvailable: number,
   massAvailableGrams: number,
   attemptIndex: number,
-): { slotsAvailable: number; massAvailableGrams: number } {
+  mode: "required" | "partial",
+): {
+  slotsAvailable: number;
+  massAvailableGrams: number;
+  placed: RefiningItemQuantity[];
+  unplaced: RefiningItemQuantity[];
+} {
   let slots = slotsAvailable;
   let mass = massAvailableGrams;
+  const placed: RefiningItemQuantity[] = [];
+  const unplaced: RefiningItemQuantity[] = [];
   for (const awarded of awards) {
     const plan = planStackAddition(
       stacks,
@@ -331,7 +386,7 @@ function addAwards<Id>(
       mass,
       awarded.massGrams,
     );
-    if (plan.remainingQuantity !== 0) {
+    if (mode === "required" && plan.remainingQuantity !== 0) {
       throw new Error(`Refining award plan for "${awarded.itemId}" failed after preflight`);
     }
     for (const update of plan.updatedStacks) {
@@ -345,18 +400,18 @@ function addAwards<Id>(
         persisted: false,
       });
     }
+    const placedQuantity = awarded.quantity - plan.remainingQuantity;
     slots -= plan.createdStacks.length;
-    mass -= awarded.quantity * awarded.massGrams;
+    mass -= placedQuantity * awarded.massGrams;
+    if (placedQuantity > 0) placed.push({ itemId: awarded.itemId, quantity: placedQuantity });
+    if (plan.remainingQuantity > 0) {
+      unplaced.push({ itemId: awarded.itemId, quantity: plan.remainingQuantity });
+    }
   }
-  return { slotsAvailable: slots, massAvailableGrams: mass };
+  return { slotsAvailable: slots, massAvailableGrams: mass, placed, unplaced };
 }
 
-type RefiningOutcomeBranch = readonly {
-  itemId: string;
-  quantity: number;
-  stackLimit: number;
-  massGrams: number;
-}[];
+type RefiningOutcomeBranch = readonly RefiningAwardFact[];
 
 type RefiningWorkingState<Id> = {
   stacks: WorkingStack<Id>[];
@@ -365,15 +420,23 @@ type RefiningWorkingState<Id> = {
 };
 
 /**
- * One attempt's effect on carried inventory: remove the recipe's inputs, then
- * add the outcome branch the attempt actually produced.
+ * One attempt's effect on carried inventory: remove the recipe's inputs, add
+ * the outcome branch's required awards in full, then give its byproducts
+ * whatever room is left — or none, when the player auto-discards them (#256).
+ * `kept` and `discarded` together are exactly the branch, so nothing a surface
+ * reports as produced can exceed what was actually carried.
  */
 function applyRefiningAttempt<Id>(
   state: RefiningWorkingState<Id>,
   award: ReturnType<typeof refiningAwardFacts>,
   branch: RefiningOutcomeBranch,
+  autoDiscardSlag: boolean,
   attemptIndex: number,
-): RefiningWorkingState<Id> {
+): {
+  state: RefiningWorkingState<Id>;
+  kept: RefiningItemQuantity[];
+  discarded: RefiningItemQuantity[];
+} {
   const removal = planRecipeInputRemoval(
     state.stacks,
     state.slotsAvailable,
@@ -382,14 +445,43 @@ function applyRefiningAttempt<Id>(
   );
   if (!removal) throw new Error("Refining consumed more input than available after preflight");
   const stacks = removal.stacksAfter;
-  const applied = addAwards(
+  const required = addAwards(
     stacks,
-    branch,
+    branch.filter((output) => !output.byproduct),
     removal.slotsAvailableAfter,
     removal.massAvailableAfter,
     attemptIndex,
+    "required",
   );
-  return { stacks, ...applied };
+  const byproducts = branch.filter((output) => output.byproduct);
+  if (autoDiscardSlag) {
+    return {
+      state: {
+        stacks,
+        slotsAvailable: required.slotsAvailable,
+        massAvailableGrams: required.massAvailableGrams,
+      },
+      kept: required.placed,
+      discarded: byproducts.map(({ itemId, quantity }) => ({ itemId, quantity })),
+    };
+  }
+  const optional = addAwards(
+    stacks,
+    byproducts,
+    required.slotsAvailable,
+    required.massAvailableGrams,
+    attemptIndex,
+    "partial",
+  );
+  return {
+    state: {
+      stacks,
+      slotsAvailable: optional.slotsAvailable,
+      massAvailableGrams: optional.massAvailableGrams,
+    },
+    kept: [...required.placed, ...optional.placed],
+    discarded: optional.unplaced,
+  };
 }
 
 /**
@@ -429,8 +521,15 @@ export function resolveRefining<Id>(input: {
    * against the inventory the real results left behind.
    */
   allowance: BoundedRunAllowance;
+  /**
+   * The character's shared Auto-discard Slag preference (#256). It decides only
+   * whether a failure's byproduct Slag is kept when there is room; it never
+   * touches a success output, a deliberate Slag recipe's output, or an input a
+   * failure hands back.
+   */
+  autoDiscardSlag: boolean;
 }): RefiningResolution<Id> {
-  const { balance, snapshot, recipe, random } = input;
+  const { balance, snapshot, recipe, random, autoDiscardSlag } = input;
   if (!Number.isInteger(input.elapsedTicks) || input.elapsedTicks < 0)
     throw new RangeError("Elapsed ticks must be a non-negative integer");
   const { allowance } = input;
@@ -442,6 +541,7 @@ export function resolveRefining<Id>(input: {
 
   const inputsConsumed: Record<string, number> = {};
   const outputsGained: Record<string, number> = {};
+  const outputsDiscarded: Record<string, number> = {};
   let stacks: WorkingStack<Id>[] = snapshot.existingStacks.map((stack) => ({
     ...stack,
     persisted: true,
@@ -469,6 +569,7 @@ export function resolveRefining<Id>(input: {
       failures,
       inputsConsumed,
       outputsGained,
+      outputsDiscarded,
       awardedXp: awardedXp(),
       stackUpdates: stacks
         .filter((stack) => stack.persisted)
@@ -501,6 +602,7 @@ export function resolveRefining<Id>(input: {
       failures: 0,
       inputsConsumed: {},
       outputsGained: {},
+      outputsDiscarded: {},
       awardedXp: 0,
       stackUpdates: [],
       deletedStackIds: [],
@@ -562,14 +664,19 @@ export function resolveRefining<Id>(input: {
       { stacks, slotsAvailable, massAvailableGrams },
       award,
       branch,
+      autoDiscardSlag,
       resolvedAttempts.length,
     );
-    stacks = applied.stacks;
-    slotsAvailable = applied.slotsAvailable;
-    massAvailableGrams = applied.massAvailableGrams;
-    const awarded = branch.map((item) => ({ itemId: item.itemId, quantity: item.quantity }));
+    stacks = applied.state.stacks;
+    slotsAvailable = applied.state.slotsAvailable;
+    massAvailableGrams = applied.state.massAvailableGrams;
+    const awarded = applied.kept;
+    const discarded = applied.discarded;
     for (const item of awarded) {
       outputsGained[item.itemId] = (outputsGained[item.itemId] ?? 0) + item.quantity;
+    }
+    for (const item of discarded) {
+      outputsDiscarded[item.itemId] = (outputsDiscarded[item.itemId] ?? 0) + item.quantity;
     }
 
     if (success) successes += 1;
@@ -581,6 +688,7 @@ export function resolveRefining<Id>(input: {
       thresholdBasisPoints,
       consumed,
       awarded,
+      ...(discarded.length > 0 ? { discarded } : {}),
       xpAwarded: success ? recipe.successXp : failureXp,
       durationTicks,
     });

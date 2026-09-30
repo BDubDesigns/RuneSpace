@@ -37,6 +37,7 @@ import { levelFromXp } from "@/game/domain/progression";
 import { ticksToMilliseconds } from "@/game/domain/timing";
 import type { ActionResolver, DatabaseTransaction } from "@/server/action-resolution";
 import { loadOwnedItemInstances } from "@/server/carried-inventory";
+import { loadAutoDiscardSlag } from "@/server/character-preferences";
 import { grantCharacterSkillXp } from "@/server/progression";
 
 export type RefiningSnapshot = {
@@ -49,6 +50,8 @@ export type RefiningSnapshot = {
    * its attempts, or for Max only the internal safety ceiling.
    */
   allowance: BoundedRunAllowance;
+  /** The character-wide Auto-discard Slag preference (#256), read under the lock. */
+  autoDiscardSlag: boolean;
 };
 
 export type RefiningRunAttempt = RefiningResolvedAttempt & {
@@ -67,6 +70,12 @@ export type RefiningRunState = {
   failures: number;
   /** This run's totals, keyed by item ID (#209). */
   outputsGained: Readonly<Record<string, number>>;
+  /**
+   * This run's byproduct Slag that was produced but not carried (#256), keyed
+   * by item ID. Separate from `outputsGained` so nothing reads discarded
+   * material as carried.
+   */
+  outputsDiscarded: Readonly<Record<string, number>>;
   inputsConsumed: Readonly<Record<string, number>>;
   xpGained: number;
   recentAttempts: readonly RefiningRunAttempt[];
@@ -148,7 +157,7 @@ async function loadRefiningSnapshot(
   characterId: string,
 ): Promise<RefiningSnapshot> {
   const balance = getEffectiveGameBalance();
-  const [xpRows, stacks, itemState, assignments, runRows] = await Promise.all([
+  const [xpRows, stacks, itemState, assignments, runRows, autoDiscardSlag] = await Promise.all([
     transaction
       .select()
       .from(characterSkillXp)
@@ -173,6 +182,7 @@ async function loadRefiningSnapshot(
       .from(characterRefiningState)
       .where(eq(characterRefiningState.characterId, characterId))
       .for("update"),
+    loadAutoDiscardSlag(transaction, characterId),
   ]);
   const run = runRows[0];
   const refiningXp = xpRows.find((row) => row.skillId === SKILL_IDS.refining)?.totalXp ?? 0;
@@ -197,6 +207,7 @@ async function loadRefiningSnapshot(
     allowance: run
       ? boundedRunAllowance(boundedRunSelectionFromColumn(run.runSelectedAttempts), run.runAttempts)
       : { remaining: 0, exhaustedReason: "run_completed" },
+    autoDiscardSlag,
   };
 }
 
@@ -235,6 +246,7 @@ export function createRefiningResolver(
         recipe,
         random,
         allowance: snapshot.allowance,
+        autoDiscardSlag: snapshot.autoDiscardSlag,
       });
       let cumulativeAttemptTicks = 0;
       const outcome: PersistedRefiningOutcome = {
@@ -355,6 +367,10 @@ export function createRefiningResolver(
             runOutputsGained: mergeTotals(
               state.runOutputsGained as Record<string, number> | null,
               outcome.outputsGained,
+            ),
+            runOutputsDiscarded: mergeTotals(
+              state.runOutputsDiscarded as Record<string, number> | null,
+              outcome.outputsDiscarded,
             ),
             runInputsConsumed: mergeTotals(
               state.runInputsConsumed as Record<string, number> | null,

@@ -41,6 +41,7 @@ suite("issue #190 Practice Welding (real PostgreSQL)", () => {
   let play: typeof import("@/server/play");
   let missions: typeof import("@/server/missions");
   let practiceCommands: typeof import("@/server/practice-commands");
+  let preferenceCommands: typeof import("@/server/character-preference-commands");
   let cleanPass: typeof import("@/server/clean-pass");
   let repairCommands: typeof import("@/server/repair-commands");
   const createdUsers: string[] = [];
@@ -59,6 +60,7 @@ suite("issue #190 Practice Welding (real PostgreSQL)", () => {
     play = await import("@/server/play");
     missions = await import("@/server/missions");
     practiceCommands = await import("@/server/practice-commands");
+    preferenceCommands = await import("@/server/character-preference-commands");
     cleanPass = await import("@/server/clean-pass");
     repairCommands = await import("@/server/repair-commands");
   });
@@ -379,7 +381,7 @@ suite("issue #190 Practice Welding (real PostgreSQL)", () => {
 
   it("discards both Slag when the player has chosen Auto-discard", async () => {
     const { userId, character } = await apprentice({ scrap: 2 });
-    await practiceCommands.setPracticeSlagPreference(
+    await preferenceCommands.setAutoDiscardSlagPreference(
       userId,
       character.id,
       true,
@@ -393,7 +395,7 @@ suite("issue #190 Practice Welding (real PostgreSQL)", () => {
     expect(state.practice.run.slagDiscarded).toBe(balance.practiceWelding.slagPerWeld);
     expect(await carried(character.id, ITEM_IDS.slag)).toBe(0);
     // The preference is persistent, not a per-run choice.
-    expect(state.practice.autoDiscardSlag).toBe(true);
+    expect(state.autoDiscardSlag).toBe(true);
   });
 
   it("preserves the partial weld and its Scrap across a manual Stop and Resume", async () => {

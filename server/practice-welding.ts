@@ -45,6 +45,7 @@ import {
   consumeStackableItem,
   loadOwnedItemInstances,
 } from "@/server/carried-inventory";
+import { loadAutoDiscardSlag } from "@/server/character-preferences";
 import { isMissionAccepted } from "@/server/mission-state";
 import { grantCharacterSkillXp } from "@/server/progression";
 
@@ -182,7 +183,7 @@ export async function loadPracticeSnapshot(
       .map((stack) => stack.quantity),
     slotsAvailable: Math.max(0, loadout.containerSlotCapacity - loadout.inventorySlotsUsed),
     massAvailableGrams: Math.max(0, loadout.maximumCarryCapacityGrams - loadout.carriedMassGrams),
-    autoDiscardSlag: row?.autoDiscardSlag ?? false,
+    autoDiscardSlag: await loadAutoDiscardSlag(transaction, characterId),
     finishCurrentWeld: row?.finishCurrentWeld ?? false,
     runAllowance: row
       ? boundedRunAllowance(boundedRunSelectionFromColumn(row.runSelectedWelds), row.runWelds)

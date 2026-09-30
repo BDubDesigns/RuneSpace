@@ -162,7 +162,8 @@ export async function startRefining(
           "refining_unavailable_here",
         );
       }
-      // Preflight: the recipe's inputs, and room for every outcome it can have.
+      // Preflight: the recipe's inputs, and room for every outcome that must be
+      // preserved. A failure's byproduct Slag is not one of them (#256).
       const balance = getEffectiveGameBalance();
       // Build snapshot for preflight: same as refining resolver would
       const [xpRows, stacks, itemState, assignments] = await Promise.all([
@@ -268,6 +269,7 @@ export async function startRefining(
         runAttempts: 0,
         runSuccesses: 0,
         runOutputsGained: {},
+        runOutputsDiscarded: {},
         runInputsConsumed: {},
         runXpGained: 0,
         recentAttempts: [],

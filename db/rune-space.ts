@@ -156,6 +156,12 @@ export const characters = pgTable(
     // both start at the approved ten Credits. The database refuses a negative
     // balance outright, so an arithmetic mistake cannot quietly mint debt.
     credits: integer("credits").notNull().default(STARTING_CREDITS),
+    // The character-wide Auto-discard Slag preference (issue #256). Practice
+    // Welding and Refining both read this one value, and either surface's
+    // toggle writes it, so it lives with the character rather than with any
+    // one activity's state. Default Off; read when an activity resolves, so a
+    // change applies to work that resolves after it.
+    autoDiscardSlag: boolean("auto_discard_slag").notNull().default(false),
   },
   (table) => [
     check(
@@ -520,6 +526,13 @@ export const characterRefiningState = pgTable(
      */
     runOutputsGained: jsonb("run_outputs_gained").notNull().default({}),
     runInputsConsumed: jsonb("run_inputs_consumed").notNull().default({}),
+    /**
+     * Byproduct Slag this run produced but did not carry (#256), as an
+     * `{ itemId: quantity }` map: thrown away by Auto-discard Slag or for want
+     * of room. Kept apart from `run_outputs_gained`, which is only what was
+     * actually added to carried inventory.
+     */
+    runOutputsDiscarded: jsonb("run_outputs_discarded").notNull().default({}),
     runXpGained: integer("run_xp_gained").notNull().default(0),
     /** Latest ten immutable server-resolved refining attempt summaries for the current run. */
     recentAttempts: jsonb("recent_attempts").notNull().default([]),
@@ -619,8 +632,8 @@ export const characterRepairTargets = pgTable(
  * one finite physical job that permanently completes, while Practice repeats
  * forever. This row therefore carries only Practice-owned facts — the partial
  * weld the player has already paid two Scrap for, that weld's Clean Pass roll,
- * the persistent Slag preference, and the bounded `This Run` totals that mirror
- * Mining and Refining.
+ * and the bounded `This Run` totals that mirror Mining and Refining. (The Slag
+ * preference is character-wide since #256 and lives on `characters`.)
  *
  * Nothing here duplicates an unlock: whether Practice is available at all is
  * derived from the accepted 10,000 Hours Mission, not from this table. A
@@ -636,8 +649,6 @@ export const characterPracticeWelds = pgTable(
     sectionsCompleted: integer("sections_completed").notNull().default(0),
     /** The current weld's two Scrap are already spent; Resume continues it free. */
     cycleActive: boolean("cycle_active").notNull().default(false),
-    /** Persistent per-character preference, read at each weld's completion. */
-    autoDiscardSlag: boolean("auto_discard_slag").notNull().default(false),
     /** This weld's Clean Pass roll; see `characterRepairTargets.cleanPass`. */
     cleanPass: jsonb("clean_pass"),
     /**

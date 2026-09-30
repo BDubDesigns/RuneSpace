@@ -241,8 +241,51 @@ the other; that is the Galvaferrite pour, and it is why the resolution's totals
 are item-keyed maps rather than a fixed trio of counters.
 
 The preflight simulates removing every input and then requires each mutually
-exclusive outcome to fit independently before any roll is requested, so no
-attempt can ever partially commit.
+exclusive outcome's **preserved** awards to fit independently before any roll is
+requested, so no attempt can ever partially commit. A success output and an
+input a failure hands back are preserved; a failure's **byproduct Slag** is not
+(#256, below).
+
+#### Byproduct Slag and Auto-discard Slag (#256)
+
+Slag a *failure* leaves behind is optional inventory, never a prerequisite for
+refining. `refiningAwardFacts` marks each award `byproduct` by where it comes
+from, not by item ID: only the Slag of a `fixed_outputs` failure (Refined
+Ferrite, Galvanic Stock) is a byproduct. A success output is never one — so the
+two deliberate Slag recipes keep their Slag as an ordinary, capacity-checked
+output — and neither is the input a Galvaferrite failure hands back.
+
+- The preflight requires room for preserved awards only. A player can start and
+  continue an attempt whose failure Slag has no slot or mass capacity, and a
+  failure still completes the attempt: inputs consumed, failure XP awarded,
+  cursor advanced, and the run counts it like any other attempt.
+- After the attempt resolves, byproduct Slag is added with the same partial
+  stack planner Mining uses: **Auto-discard Slag Off** keeps as much as
+  ordinary slot/mass capacity allows and discards only the overflow;
+  **On** discards all of it. The attempt is otherwise identical either way.
+- What was produced but not carried is recorded, never folded into what was
+  gained: each attempt carries `discarded` (omitted when empty, so attempts
+  saved before #256 read as discarding nothing) and the run carries
+  `outputsDiscarded` (`character_refining_state.run_outputs_discarded`).
+  Result and history copy says "discarded", and the latest-attempt tiles show
+  only what reached inventory.
+- Kept Slag does take real capacity, so a later success can find no room for
+  its product and stop the run with the ordinary `inventory_slots_full` /
+  `carried_mass_capacity_reached` reason. That is the product's capacity rule
+  working as written; Slag room alone never stops a run.
+
+**The preference is one value per character**, shared with Practice Welding:
+`characters.auto_discard_slag` (default Off), written only by
+`setAutoDiscardSlagPreference` (`server/character-preference-commands.ts`) and
+projected once as `PlayGameplayState.autoDiscardSlag` — neither the Practice nor
+the Refining projection carries a copy. Both consoles render the same
+`features/shared/AutoDiscardSlagToggle.tsx`, latched in `primary` because it
+belongs to no single skill. It is read when work resolves, inside the
+character's transaction, so flipping it applies to attempts (or welds) that
+resolve after the change; work already due resolves first under the value it
+was earned under. Migration `0031` moved each existing Practice choice onto its
+character and dropped `character_practice_welds.auto_discard_slag`. Tinkering's
+separate `Auto-discard Scrap` remains its own setting.
 
 ### Refined Ferrite
 
@@ -260,8 +303,9 @@ active resolves only already-completed work exactly once, persists it
 atomically, discards any partial attempt, stops the work action with
 `action_replaced`, and begins Travel. The preflight for each attempt
 simulates removal of the 2 shale and validates that the resulting inventory can
-accept either possible 1-item output (stack/mass/capacity); if only one branch
-would fit, no roll is made. All input removal, output addition, XP, run
+accept the 1 Refined Ferrite a success produces (stack/mass/capacity); if it
+would not fit, no roll is made. The failure's Slag is optional (#256) and never
+gates the attempt. All input removal, output addition, XP, run
 history, and cursor changes commit atomically.
 
 The refining run mirrors Mining: current Refining level/XP, success chance,
@@ -425,8 +469,9 @@ Pass roll. An untouched bench is an absent row, so nothing needs backfilling.
 - **Travel** stops the bench through the same Practice interruption helper the
   player's own Stop uses (`interruptPracticeWelding`), and Practice is on the
   explicit travel-replaceable action list. There is no remote Welding.
-- **Slag at completion time** honours the persistent per-character setting,
-  shown as the latched `Auto-discard Slag: On/Off` toggle (#239): Off (keep
+- **Slag at completion time** honours the character-wide Auto-discard Slag
+  setting shared with Refining (#256), shown as the latched
+  `Auto-discard Slag: On/Off` toggle (#239): Off (keep
   Slag) adds as much as ordinary capacity allows and discards only the
   overflow; On discards both. Output capacity can never block or fail
   a completed weld.
