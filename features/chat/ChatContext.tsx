@@ -12,7 +12,10 @@ import {
 } from "react";
 import { useRouter } from "next/navigation";
 import { GAMEPLAY_ACCESS_REQUIRED_CODE } from "@/game/domain/gameplay-access";
+import type { SanctionNoticeView, SanctionNoticesView } from "@/game/schemas/moderation";
 import type { CharacterTarget, WhisperInbox, WhisperPeer } from "@/game/schemas/whispers";
+import { isSocialRestriction } from "@/features/moderation/notice-format";
+import { SocialNoticeCard } from "@/features/moderation/SocialNoticeCard";
 import { useSocial } from "@/features/social/SocialContext";
 import { openWhisperAction } from "@/server/actions";
 
@@ -28,7 +31,11 @@ import { openWhisperAction } from "@/server/actions";
  *   reconnect, tab resume, each Whisper delivery, and each read on another
  *   tab, whose unread total feeds the launcher's attention state;
  * - a Block revision that every chat view re-reads on, bumped by this tab's
- *   Block actions and by `"safety.blocks"` from the account's other tabs.
+ *   Block actions and by `"safety.blocks"` from the account's other tabs;
+ * - the account's current moderation notices (#248), re-read on mount,
+ *   reconnect, tab resume, and `"moderation.notices"`. Each current notice is
+ *   a pinned social card, and a current social restriction tells the
+ *   composers to hold Send (presentation only; the server refuses the send).
  *
  * Every number here mirrors server state; nothing is authority.
  */
@@ -48,6 +55,10 @@ type ChatContextValue = {
   blocksRevision: number;
   /** A Block or Unblock committed on this tab. */
   blocksChanged: () => void;
+  /** A social restriction is in effect: composers hold Send (the server enforces). */
+  socialRestricted: boolean;
+  /** Re-read the account's moderation notices (for example after a refused send). */
+  refreshNotices: () => void;
   /**
    * Open a Whisper with a character inside Chat/Social. Resolves with a
    * player-facing error when that character cannot be whispered.
@@ -59,6 +70,22 @@ const ChatContext = createContext<ChatContextValue | undefined>(undefined);
 
 /** Attention source key for unread Whispers on the Chat/Social launcher. */
 const WHISPER_ATTENTION = "whispers";
+
+const NOTICE_CARD_PREFIX = "moderation-notice:";
+
+async function fetchNotices(): Promise<SanctionNoticeView[] | undefined> {
+  try {
+    const response = await fetch("/api/moderation-notices", {
+      cache: "no-store",
+      headers: { accept: "application/json" },
+    });
+    if (!response.ok) return undefined;
+    const body = (await response.json().catch(() => null)) as SanctionNoticesView | null;
+    return Array.isArray(body?.notices) ? body.notices : undefined;
+  } catch {
+    return undefined;
+  }
+}
 
 async function fetchInbox(
   characterId: string,
@@ -92,12 +119,19 @@ export function ChatProvider({
   const router = useRouter();
   const routerRef = useRef(router);
   routerRef.current = router;
-  const { openSocial, onReconcile, setAttention, subscribe } = useSocial();
+  const { openSocial, onReconcile, removeCard, setAttention, subscribe, upsertCard } = useSocial();
   const [view, setView] = useState<ChatView>({ tab: "general" });
   const [inbox, setInbox] = useState<WhisperInbox>();
   const [blocksRevision, setBlocksRevision] = useState(0);
+  const [notices, setNotices] = useState<SanctionNoticeView[]>([]);
   // Inbox answers can arrive out of order; only the newest request applies.
   const requestCounter = useRef(0);
+  const noticeRequestCounter = useRef(0);
+  // The shell's card setters change identity with its state; read them through
+  // refs so a card update never re-runs the effect that produced it.
+  const cardsRef = useRef({ upsertCard, removeCard });
+  cardsRef.current = { upsertCard, removeCard };
+  const noticeCardKeys = useRef(new Set<string>());
 
   const refreshInbox = useCallback(() => {
     const request = ++requestCounter.current;
@@ -115,7 +149,47 @@ export function ChatProvider({
     refreshInbox();
   }, [refreshInbox]);
 
-  useEffect(() => onReconcile(() => refreshInbox()), [onReconcile, refreshInbox]);
+  const refreshNotices = useCallback(() => {
+    const request = ++noticeRequestCounter.current;
+    void fetchNotices().then((next) => {
+      // A failed read leaves what is shown; only the newest answer applies.
+      if (next && request === noticeRequestCounter.current) setNotices(next);
+    });
+  }, []);
+
+  useEffect(() => {
+    refreshNotices();
+  }, [refreshNotices]);
+
+  useEffect(() => {
+    const { upsertCard: upsert, removeCard: remove } = cardsRef.current;
+    const keys = new Set<string>();
+    for (const notice of notices) {
+      if (!notice.current) continue;
+      const key = `${NOTICE_CARD_PREFIX}${notice.sanctionId}`;
+      keys.add(key);
+      upsert({
+        key,
+        label: "Moderation notice",
+        content: <SocialNoticeCard notice={notice} />,
+      });
+    }
+    for (const key of noticeCardKeys.current) if (!keys.has(key)) remove(key);
+    noticeCardKeys.current = keys;
+  }, [notices]);
+
+  useEffect(
+    () =>
+      onReconcile(() => {
+        refreshInbox();
+        refreshNotices();
+      }),
+    [onReconcile, refreshInbox, refreshNotices],
+  );
+  useEffect(
+    () => subscribe("moderation.notices", () => refreshNotices()),
+    [refreshNotices, subscribe],
+  );
   useEffect(() => subscribe("whisper.message", () => refreshInbox()), [refreshInbox, subscribe]);
   useEffect(() => subscribe("whisper.read", () => refreshInbox()), [refreshInbox, subscribe]);
   useEffect(
@@ -127,6 +201,7 @@ export function ChatProvider({
     [refreshInbox, subscribe],
   );
 
+  const socialRestricted = notices.some(isSocialRestriction);
   const unreadTotal = inbox?.unreadTotal ?? 0;
   useEffect(() => {
     setAttention(WHISPER_ATTENTION, unreadTotal);
@@ -162,9 +237,21 @@ export function ChatProvider({
       refreshInbox,
       blocksRevision,
       blocksChanged,
+      socialRestricted,
+      refreshNotices,
       startWhisper,
     }),
-    [blocksChanged, blocksRevision, characterId, inbox, refreshInbox, startWhisper, view],
+    [
+      blocksChanged,
+      blocksRevision,
+      characterId,
+      inbox,
+      refreshInbox,
+      refreshNotices,
+      socialRestricted,
+      startWhisper,
+      view,
+    ],
   );
 
   return <ChatContext.Provider value={value}>{children}</ChatContext.Provider>;

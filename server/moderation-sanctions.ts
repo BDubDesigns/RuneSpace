@@ -31,7 +31,10 @@ import { getRealtimeFanout, publishRealtimeEvent } from "@/server/realtime";
 type Executor = Pick<DatabaseTransaction, "select">;
 
 export const SOCIALLY_RESTRICTED_MESSAGE =
-  "Your account has a social restriction, so you can't send messages or start trades right now. Your moderation notice has the details and how to appeal.";
+  "Your account has a social restriction, so you can't send messages right now. Your moderation notice has the details and how to appeal.";
+
+const TRADE_RESTRICTED_MESSAGE =
+  "Your account has a social restriction, so you can't start trades right now. Your moderation notice has the details and how to appeal.";
 
 function toFacts(row: ModerationSanction): SanctionFacts {
   return {
@@ -87,7 +90,7 @@ export async function requireTradeRequestInitiationAllowed(
   now: Date = new Date(),
 ): Promise<TradeRequestInitiationDecision> {
   if (await isSociallyRestricted(executor, playerAccountId, now)) {
-    return { allowed: false, reason: "socially_restricted", error: SOCIALLY_RESTRICTED_MESSAGE };
+    return { allowed: false, reason: "socially_restricted", error: TRADE_RESTRICTED_MESSAGE };
   }
   return { allowed: true };
 }

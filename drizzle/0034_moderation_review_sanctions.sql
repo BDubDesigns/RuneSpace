@@ -55,7 +55,7 @@ CREATE TABLE "moderation_sanctions" (
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
 	CONSTRAINT "moderation_sanctions_kind_check" CHECK ("moderation_sanctions"."kind" in ('warning', 'social_restriction', 'suspension')),
 	CONSTRAINT "moderation_sanctions_rule_check" CHECK ("moderation_sanctions"."rule_category" in ('identity_hate', 'harassment', 'threats_private_info', 'sexual_content', 'scams_spam', 'moderation_abuse', 'block_or_sanction_evasion', 'offensive_name')),
-	CONSTRAINT "moderation_sanctions_duration_check" CHECK (("moderation_sanctions"."kind" = 'warning' and "moderation_sanctions"."duration" is null and "moderation_sanctions"."ends_at" is null) or ("moderation_sanctions"."kind" <> 'warning' and "moderation_sanctions"."duration" in ('24h', '7d', '30d', '90d', '1y', 'permanent') and ("moderation_sanctions"."duration" = 'permanent') = ("moderation_sanctions"."ends_at" is null))),
+	CONSTRAINT "moderation_sanctions_duration_check" CHECK (("moderation_sanctions"."kind" = 'warning' and "moderation_sanctions"."duration" is null and "moderation_sanctions"."ends_at" is null) or ("moderation_sanctions"."kind" <> 'warning' and "moderation_sanctions"."duration" is not null and "moderation_sanctions"."duration" in ('24h', '7d', '30d', '90d', '1y', 'permanent') and ("moderation_sanctions"."duration" = 'permanent') = ("moderation_sanctions"."ends_at" is null))),
 	CONSTRAINT "moderation_sanctions_reversal_paired_check" CHECK (("moderation_sanctions"."reversed_at" is null) = ("moderation_sanctions"."reversed_by_admin_user_id" is null))
 );
 --> statement-breakpoint

@@ -95,7 +95,7 @@ export function PublicChat({
 }) {
   const router = useRouter();
   const { subscribe, onReconcile } = useSocial();
-  const { blocksRevision, startWhisper } = useChat();
+  const { blocksRevision, refreshNotices, socialRestricted, startWhisper } = useChat();
   const { requestAutoRefresh, state } = usePlay();
   const [feeds, setFeeds] = useState<Feeds>({ general: EMPTY_CHAT_FEED, trade: EMPTY_CHAT_FEED });
   const [loadError, setLoadError] = useState<string>();
@@ -295,6 +295,8 @@ export function PublicChat({
     absorbAccount(result, request);
     if (result.status === "refused") {
       setFeedback({ tone: "danger", text: result.error });
+      // A restriction this tab has not seen yet: read the notice so it shows.
+      if (result.reason === "socially_restricted") refreshNotices();
       return;
     }
     const message: ChatMessageView = result.message;
@@ -452,6 +454,7 @@ export function PublicChat({
           placeholder={promoting ? "Write your promoted ad" : `Message ${label}`}
           pressure={pressure}
           sendBlocked={promoting && (adWaitMs > 0 || !canAfford)}
+          socialRestricted={socialRestricted}
           sendLabel={promoting ? `Post ad · ${adPrice} Credits` : "Send"}
           sending={sending}
         >

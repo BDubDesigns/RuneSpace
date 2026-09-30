@@ -1,9 +1,50 @@
 import { PublicUpdateSchema } from "@/game/schemas/public-updates";
+import { COMMUNITY_RULES_SLUG, SAFETY_PRIVACY_SLUG } from "./policy-links";
+import { getWikiArticle } from "./public-wiki";
 import type { PublicUpdate } from "@/game/schemas/public-updates";
 
 export type { PublicUpdate } from "@/game/schemas/public-updates";
 
 const authoredUpdates = [
+  {
+    // Issue #248 — the one alpha announcement for the whole social stack
+    // (#246 General/Trade, #247 Whispers/Block/Report) and its policies.
+    slug: "open-channels",
+    title: "Open Channels",
+    publishedAt: "2026-09-30T09:00:00-07:00",
+    summary:
+      "General chat, Trade chat, and 1:1 Whispers are live in the Chat/Social panel, with Block and Report built in — and RuneSpace now has Community Rules and a moderation process behind them.",
+    body: [
+      "Holo Hollow has other people in it now, and you can finally talk to them. The Chat/Social button in Play opens a panel over whatever you are doing — the Map, a job, a walk — and closing it puts you right back where you were.",
+      "General is for everything. Trade is for buying, selling, and price checks. If you want more eyes on a Trade post, a promoted ad costs 50 Credits, stands out, and shows up in both channels. Every account shares one send limit across its characters, and the indicator by the message box tells you when to slow down.",
+      "Whispers are 1:1 conversations between characters. Start one from a name in chat, from a nearby player's profile, or by typing a character's exact name in the Whispers tab. A Whisper waits if the other player is offline, and unread Whispers light up the Chat/Social button.",
+      "Block and Report sit next to every message and player. Block covers all of someone's characters: their public messages disappear for you, Whispers between you stop, and they are never told. Report sends the message, with a little of the conversation around it, to a real person for review. You can do both at once.",
+      [
+        "All of this comes with the ",
+        { text: "Chat & Community Rules", articleSlug: COMMUNITY_RULES_SLUG },
+        ". The short version: argue, trash talk, swear at the RNG — just don't attack people for who they are, harass, threaten, creep, scam, or spam. Reports are read by a person, not a bot. If a moderator acts on your account, you get a notice that says which rule, what's affected, for how long, and how to appeal.",
+      ],
+      [
+        "Messages are kept for 90 days. Whispers are private from other players, but they are not end-to-end encrypted, and a moderator may review them when there is a real safety reason such as a report — and every time a moderator looks, it is recorded. ",
+        { text: "Safety & Privacy", articleSlug: SAFETY_PRIVACY_SLUG },
+        " spells out exactly what is kept, for how long, and who can see it.",
+      ],
+    ],
+    patchNotes: [
+      {
+        heading: "Added",
+        items: [
+          "General and Trade chat in the Chat/Social panel, with recent history and older messages on demand.",
+          "Promoted Trade ads: 50 Credits, shown in both General and Trade, one every 10 minutes per account.",
+          "1:1 Whispers between characters, with unread counts that clear on every device.",
+          "Block, with a Blocked Players list to undo it.",
+          "Report Message and Report Player, with an optional note, plus Report + Block in one step.",
+          "Chat & Community Rules and a Safety & Privacy page in the Wiki.",
+          "Moderation notices with a case reference and an appeal you can send from inside RuneSpace.",
+        ],
+      },
+    ],
+  },
   {
     slug: "slag-without-the-shuffle",
     title: "Slag Without the Shuffle",
@@ -769,6 +810,17 @@ export function validatePublicUpdates(input: readonly unknown[]): readonly Publi
       );
     }
     seenInstants.set(instant, update.slug);
+
+    for (const paragraph of update.body) {
+      if (typeof paragraph === "string") continue;
+      for (const segment of paragraph) {
+        if (typeof segment !== "string" && !getWikiArticle(segment.articleSlug)) {
+          throw new Error(
+            `Update "${update.slug}" links to unknown Wiki article slug: ${segment.articleSlug}`,
+          );
+        }
+      }
+    }
   }
 
   return [...updates].sort((left, right) => {

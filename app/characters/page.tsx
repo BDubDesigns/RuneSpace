@@ -1,4 +1,5 @@
 import { headers } from "next/headers";
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { ScaffoldScreen } from "@/components/ScaffoldScreen";
 import { ActionLink } from "@/components/ui/ActionLink";
@@ -11,9 +12,11 @@ import {
   type CharactersAccess,
 } from "@/features/characters/CharactersAccessCallout";
 import { ManageCharacterPortrait } from "@/features/characters/ManageCharacterPortrait";
+import { CharactersModerationNotices } from "@/features/moderation/CharactersModerationNotices";
 import { db } from "@/db";
 import { auth } from "@/server/auth";
 import { loadAccountGameplayAccess } from "@/server/gameplay-access";
+import { loadSanctionNotices } from "@/server/moderation-notices";
 import {
   EMAIL_VERIFICATION_REQUIRED_MESSAGE,
   ensurePlayerAccount,
@@ -49,6 +52,11 @@ export const metadata = { title: "Characters — RuneSpace" };
  * fake disabled Play control. Early Access and public-open accounts keep the
  * normal Play actions. Hiding Play is presentation only; the Play page and
  * every gameplay command enforce the gate server-side.
+ *
+ * Issue #248: current moderation notices show as a prominent callout, and a
+ * suspended account (the authoritative decision's `suspended` refusal) sees
+ * its suspension notice instead of any waiting, early-access, Play, Reserve,
+ * or New character treatment. Notices stay reachable from `/moderation`.
  */
 export default async function CharactersPage({
   searchParams,
@@ -64,20 +72,24 @@ export default async function CharactersPage({
 
   const user = await requireCurrentUser(await headers());
   const account = await ensurePlayerAccount(user.id);
-  const [chars, used, ownedPortraitIds, gameplayAccess] = await Promise.all([
+  const [chars, used, ownedPortraitIds, gameplayAccess, moderation] = await Promise.all([
     listCharacters(account.id),
     occupiedSlots(account.id),
     loadPlayerPortraitUnlockIds(account.id),
     loadAccountGameplayAccess(db, user.id),
+    loadSanctionNotices(user.id),
   ]);
   const verified = gameplayAccess.emailVerified;
-  const access: CharactersAccess | null = !verified
-    ? null
-    : !gameplayAccess.decision.allowed
-      ? "waiting"
-      : gameplayAccess.decision.via === "early_access"
-        ? "early_access"
-        : "open";
+  const suspended =
+    !gameplayAccess.decision.allowed && gameplayAccess.decision.reason === "suspended";
+  const access: CharactersAccess | null =
+    !verified || suspended
+      ? null
+      : !gameplayAccess.decision.allowed
+        ? "waiting"
+        : gameplayAccess.decision.via === "early_access"
+          ? "early_access"
+          : "open";
   const canPlay = gameplayAccess.decision.allowed;
   const portraitOptions = getSelectablePortraitOptions(ownedPortraitIds);
 
@@ -97,6 +109,7 @@ export default async function CharactersPage({
       <p className="mt-2 text-sm text-[color:var(--rs-text-secondary)]">
         Signed in as <span className="text-[color:var(--rs-text-primary)]">{user.email}</span>.
       </p>
+      <CharactersModerationNotices notices={moderation.notices} suspended={suspended} />
       {access ? (
         <CharactersAccessCallout
           access={access}
@@ -171,7 +184,7 @@ export default async function CharactersPage({
         <p className="mt-6 text-center text-sm text-[color:var(--rs-text-muted)]">
           {EMAIL_VERIFICATION_REQUIRED_MESSAGE}
         </p>
-      ) : access === "waiting" ? null : hasFreeSlot ? (
+      ) : suspended || access === "waiting" ? null : hasFreeSlot ? (
         <ActionLink href="/characters/new" intent="secondary" className="mt-6 flex w-full">
           New character
         </ActionLink>
@@ -180,6 +193,16 @@ export default async function CharactersPage({
           All character slots are full.
         </p>
       )}
+      {moderation.notices.length > 0 ? (
+        <p className="mt-4 text-center text-sm">
+          <Link
+            className="rs-focus inline-flex min-h-[var(--rs-touch-target)] items-center text-[color:var(--rs-accent-primary)] underline underline-offset-2"
+            href="/moderation"
+          >
+            Moderation notices
+          </Link>
+        </p>
+      ) : null}
     </ScaffoldScreen>
   );
 }

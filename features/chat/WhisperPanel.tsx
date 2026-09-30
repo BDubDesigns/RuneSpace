@@ -257,7 +257,15 @@ type SafetyAction = { mode: "report" | "block"; subject: SafetySubject };
 function WhisperConversation({ peer: initialPeer }: { peer: WhisperPeer }) {
   const router = useRouter();
   const { subscribe, onReconcile } = useSocial();
-  const { blocksChanged, blocksRevision, characterId, refreshInbox, setView } = useChat();
+  const {
+    blocksChanged,
+    blocksRevision,
+    characterId,
+    refreshInbox,
+    refreshNotices,
+    setView,
+    socialRestricted,
+  } = useChat();
   const [peer, setPeer] = useState(initialPeer);
   const [feed, setFeed] = useState<Feed<WhisperMessageView>>(EMPTY_FEED);
   const [loadError, setLoadError] = useState<string>();
@@ -426,6 +434,8 @@ function WhisperConversation({ peer: initialPeer }: { peer: WhisperPeer }) {
     if (result.status === "refused") {
       setFeedback({ tone: "danger", text: result.error });
       if (result.reason === "blocked_by_you") void loadLatest();
+      // A restriction this tab has not seen yet: read the notice so it shows.
+      if (result.reason === "socially_restricted") refreshNotices();
       return;
     }
     stickToBottom.current = true;
@@ -603,6 +613,7 @@ function WhisperConversation({ peer: initialPeer }: { peer: WhisperPeer }) {
           placeholder={`Whisper to ${peer.name}`}
           pressure={pressure}
           sending={sending}
+          socialRestricted={socialRestricted}
         />
       )}
       {feedback ? <Feedback tone={feedback.tone}>{feedback.text}</Feedback> : null}

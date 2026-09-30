@@ -73,6 +73,7 @@ export const WIKI_CATEGORY_IDS = [
   "gear-and-credits",
   "places-and-travel",
   "people",
+  "community",
 ] as const;
 
 export type WikiCategoryId = (typeof WIKI_CATEGORY_IDS)[number];
@@ -112,6 +113,12 @@ export const WIKI_CATEGORIES: readonly {
     id: "people",
     label: "People",
     description: "The residents of Holo Hollow: what they do, and where you will run into them.",
+  },
+  {
+    id: "community",
+    label: "Community & Safety",
+    description:
+      "How to treat other players in chat and Whispers, and what RuneSpace keeps to keep it safe.",
   },
 ];
 

@@ -21,7 +21,10 @@ export type ModerationCaseStatus = (typeof MODERATION_CASE_STATUSES)[number];
  * at a time; a new report joins it, and a report after the case closes opens
  * a new one.
  */
-export const ACTIVE_CASE_STATUSES = ["open", "reviewed"] as const satisfies readonly ModerationCaseStatus[];
+export const ACTIVE_CASE_STATUSES = [
+  "open",
+  "reviewed",
+] as const satisfies readonly ModerationCaseStatus[];
 
 export function isActiveCaseStatus(status: ModerationCaseStatus): boolean {
   return (ACTIVE_CASE_STATUSES as readonly ModerationCaseStatus[]).includes(status);
@@ -75,11 +78,16 @@ export const SANCTION_KIND_LABEL: Record<SanctionKind, string> = {
   suspension: "Account suspension",
 };
 
-/** What each kind takes away while it is in effect, in the player's words. */
+/**
+ * What each kind takes away while it is in effect, in the player's words.
+ * Only shipped features are named.
+ */
 export const SANCTION_ACCESS_AFFECTED: Record<SanctionKind, string> = {
   warning: "Nothing is restricted. This is a warning on your account.",
+  // Player trading (#225) will also refuse starting a trade request through
+  // `requireTradeRequestInitiationAllowed`; name it here when it ships.
   social_restriction:
-    "You can't send General, Trade, or Whisper messages, post promoted Trade ads, or start trades. You can still play, read public chat, and accept a trade someone else offers.",
+    "You can't send General, Trade, or Whisper messages, or post promoted Trade ads. You can still play and read public chat.",
   suspension: "You can't enter RuneSpace gameplay on any character on this account.",
 };
 

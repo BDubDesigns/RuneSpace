@@ -1507,10 +1507,7 @@ export const moderationCases = pgTable(
       .on(table.subjectPlayerAccountId)
       .where(sql`${table.status} in ('open', 'reviewed')`),
     index("moderation_cases_status_updated_idx").on(table.status, table.updatedAt),
-    index("moderation_cases_subject_created_idx").on(
-      table.subjectPlayerAccountId,
-      table.createdAt,
-    ),
+    index("moderation_cases_subject_created_idx").on(table.subjectPlayerAccountId, table.createdAt),
   ],
 );
 
@@ -1586,7 +1583,7 @@ export const moderationSanctions = pgTable(
     ),
     check(
       "moderation_sanctions_duration_check",
-      sql`(${table.kind} = 'warning' and ${table.duration} is null and ${table.endsAt} is null) or (${table.kind} <> 'warning' and ${table.duration} in ('24h', '7d', '30d', '90d', '1y', 'permanent') and (${table.duration} = 'permanent') = (${table.endsAt} is null))`,
+      sql`(${table.kind} = 'warning' and ${table.duration} is null and ${table.endsAt} is null) or (${table.kind} <> 'warning' and ${table.duration} is not null and ${table.duration} in ('24h', '7d', '30d', '90d', '1y', 'permanent') and (${table.duration} = 'permanent') = (${table.endsAt} is null))`,
     ),
     check(
       "moderation_sanctions_reversal_paired_check",

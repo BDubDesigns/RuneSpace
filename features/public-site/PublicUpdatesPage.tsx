@@ -10,7 +10,8 @@ import {
   getPublishedUpdates,
   type PublicUpdate,
 } from "./public-updates";
-import { publicSiteNavigation } from "./public-site-content";
+import { publicSiteFooterLinks, publicSiteNavigation } from "./public-site-content";
+import { WikiLinkedText } from "./WikiLinkedText";
 
 function PublicationDate({ publishedAt }: { publishedAt: string }) {
   return (
@@ -108,8 +109,10 @@ export function PublicUpdateArticlePage({ update }: { update: PublicUpdate }) {
         ) : null}
 
         <div className="mt-10 max-w-3xl space-y-6 text-base leading-8 text-[color:var(--rs-text-secondary)]">
-          {update.body.map((paragraph) => (
-            <p key={paragraph}>{paragraph}</p>
+          {update.body.map((paragraph, index) => (
+            <p key={index}>
+              <WikiLinkedText paragraph={paragraph} />
+            </p>
           ))}
         </div>
 
@@ -142,7 +145,7 @@ export function PublicUpdateArticlePage({ update }: { update: PublicUpdate }) {
 
 function PublicUpdatesFrame({ children }: { children: ReactNode }) {
   return (
-    <PublicSiteShell navigation={publicSiteNavigation}>
+    <PublicSiteShell footerLinks={publicSiteFooterLinks} navigation={publicSiteNavigation}>
       <div className="mx-auto w-full max-w-5xl px-4 pb-16 pt-12 sm:px-6 sm:pb-24 sm:pt-16">
         {children}
       </div>

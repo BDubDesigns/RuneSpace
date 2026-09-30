@@ -10,6 +10,7 @@ import { adminLoadInspector } from "@/server/admin-actions";
 import { AdminControls } from "./AdminControls";
 import { AdminAuditTrail } from "./AdminAuditTrail";
 import { AdminAccountAccessPanel } from "./AdminAccountAccessPanel";
+import { AdminModerationPanel } from "./AdminModerationPanel";
 import { itemLabel, locationLabel } from "./admin-format";
 
 /**
@@ -405,6 +406,8 @@ export function AdminInspector({ initial }: { initial: AdminInspectorState }) {
         onChange={(accountAccess) => setState((prev) => ({ ...prev, accountAccess }))}
         bus={bus}
       />
+
+      <AdminModerationPanel characterId={state.characterId} />
 
       <AdminControls
         characterId={state.characterId}

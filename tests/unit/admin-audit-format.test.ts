@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   formatAuditSummary,
+  formatOperatorTime,
   missionLabel,
   missionStateLabel,
   itemLabel,
@@ -201,6 +202,153 @@ describe("formatAuditSummary", () => {
     expect(formatAuditSummary("set_skill_xp", { skillId: "mining" }, "mining")).toBe(
       "Set Mining total XP.",
     );
+  });
+});
+
+describe("formatAuditSummary — moderation operations (issue #248)", () => {
+  it("formats open_moderation_case with the stored reason", () => {
+    expect(
+      formatAuditSummary(
+        "open_moderation_case",
+        { reason: "Seen scamming in chat", fromCharacterId: "c-1" },
+        "MOD-00007",
+      ),
+    ).toBe('Opened the case. Reason: "Seen scamming in chat"');
+    expect(formatAuditSummary("open_moderation_case", {}, "MOD-00007")).toBe("Opened the case.");
+  });
+
+  it("formats set_moderation_case_status with domain labels", () => {
+    expect(
+      formatAuditSummary("set_moderation_case_status", { from: "open", to: "dismissed" }, null),
+    ).toBe("Set case status Open → Dismissed.");
+    expect(formatAuditSummary("set_moderation_case_status", {}, null)).toBe("Set the case status.");
+  });
+
+  it("formats add_moderation_case_note without leaking the note body", () => {
+    expect(formatAuditSummary("add_moderation_case_note", { noteId: "n-1" }, null)).toBe(
+      "Added a case note.",
+    );
+  });
+
+  it("formats a timed sanction with rule, duration, end, and case transition", () => {
+    expect(
+      formatAuditSummary(
+        "issue_moderation_sanction",
+        {
+          reference: "MOD-00003",
+          kind: "social_restriction",
+          ruleCategory: "harassment",
+          duration: "7d",
+          endsAt: "2026-10-07T12:00:00.000Z",
+          caseStatus: { from: "reviewed", to: "actioned" },
+        },
+        "s-1",
+      ),
+    ).toBe(
+      "Issued Social restriction on MOD-00003 (Harassment, 7 days, ends 2026-10-07 12:00:00 UTC); case Reviewed → Actioned.",
+    );
+  });
+
+  it("formats a warning and a permanent suspension", () => {
+    expect(
+      formatAuditSummary(
+        "issue_moderation_sanction",
+        {
+          reference: "MOD-00003",
+          kind: "warning",
+          ruleCategory: "scams_spam",
+          duration: null,
+          endsAt: null,
+          caseStatus: { from: "open", to: "actioned" },
+        },
+        "s-1",
+      ),
+    ).toBe("Issued Warning on MOD-00003 (Scams, impersonation, or spam); case Open → Actioned.");
+    expect(
+      formatAuditSummary(
+        "issue_moderation_sanction",
+        {
+          reference: "MOD-00004",
+          kind: "suspension",
+          ruleCategory: "threats_private_info",
+          duration: "permanent",
+          endsAt: null,
+          caseStatus: { from: "open", to: "actioned" },
+        },
+        "s-2",
+      ),
+    ).toBe(
+      "Issued Account suspension on MOD-00004 (Threats or sharing private information, Permanent); case Open → Actioned.",
+    );
+  });
+
+  it("formats change_moderation_sanction_duration, noting an appeal", () => {
+    expect(
+      formatAuditSummary(
+        "change_moderation_sanction_duration",
+        {
+          kind: "suspension",
+          duration: { from: "30d", to: "7d" },
+          endsAt: { from: "2026-10-30T00:00:00.000Z", to: "2026-10-07T00:00:00.000Z" },
+          appealId: "a-1",
+        },
+        "s-1",
+      ),
+    ).toBe(
+      "Changed Account suspension duration 30 days → 7 days (ends 2026-10-30 00:00:00 UTC → 2026-10-07 00:00:00 UTC) while deciding an appeal.",
+    );
+    expect(
+      formatAuditSummary(
+        "change_moderation_sanction_duration",
+        {
+          kind: "social_restriction",
+          duration: { from: "7d", to: "permanent" },
+          endsAt: { from: "2026-10-07T00:00:00.000Z", to: null },
+        },
+        "s-1",
+      ),
+    ).toBe(
+      "Changed Social restriction duration 7 days → Permanent (ends 2026-10-07 00:00:00 UTC → never).",
+    );
+  });
+
+  it("formats reverse_moderation_sanction", () => {
+    expect(
+      formatAuditSummary(
+        "reverse_moderation_sanction",
+        { kind: "warning", ruleCategory: "harassment" },
+        "s-1",
+      ),
+    ).toBe("Reversed Warning (Harassment).");
+    expect(
+      formatAuditSummary(
+        "reverse_moderation_sanction",
+        { kind: "suspension", ruleCategory: "harassment", appealId: "a-1" },
+        "s-1",
+      ),
+    ).toBe("Reversed Account suspension (Harassment) while deciding an appeal.");
+  });
+
+  it("formats decide_moderation_appeal outcomes", () => {
+    expect(
+      formatAuditSummary(
+        "decide_moderation_appeal",
+        { sanctionId: "s-1", outcome: "modified", duration: "7d", hasNote: true },
+        "a-1",
+      ),
+    ).toBe("Decided an appeal: Modified (new duration 7 days), with an internal note.");
+    expect(
+      formatAuditSummary(
+        "decide_moderation_appeal",
+        { sanctionId: "s-1", outcome: "upheld", hasNote: false },
+        "a-1",
+      ),
+    ).toBe("Decided an appeal: Upheld.");
+  });
+
+  it("formatOperatorTime renders deterministic UTC and passes through garbage", () => {
+    expect(formatOperatorTime("2026-09-30T14:03:05.123Z")).toBe("2026-09-30 14:03:05 UTC");
+    expect(formatOperatorTime("not a date")).toBe("not a date");
   });
 });
 

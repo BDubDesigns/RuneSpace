@@ -141,7 +141,9 @@ export type SanctionNoticeView = {
 
 export type SanctionNoticesView = { notices: SanctionNoticeView[] };
 
-export type SubmitAppealResult = { status: "submitted"; notice: SanctionNoticeView } | { error: string };
+export type SubmitAppealResult =
+  | { status: "submitted"; notice: SanctionNoticeView }
+  | { error: string };
 
 // ---------------------------------------------------------------------------
 // Operator views
@@ -264,7 +266,13 @@ export type ModerationCaseView = {
     /** Distinct accounts that blocked the subject during the window. */
     independentBlockersInWindow: number;
     /** The subject's other cases, newest first. */
-    otherCases: { caseId: string; reference: string; status: ModerationCaseStatus; createdAt: string; reportCount: number }[];
+    otherCases: {
+      caseId: string;
+      reference: string;
+      status: ModerationCaseStatus;
+      createdAt: string;
+      reportCount: number;
+    }[];
   };
   /** Every name the subject's characters have been seen under in this case, and now. */
   nameHistory: { characterId: string; currentName: string | null; seenAs: string[] }[];

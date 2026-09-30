@@ -304,6 +304,27 @@ item.
   / Report + Block flow used by message actions, Whisper conversations, and
   the same-location profile.
 
+## Moderation (Issue #248)
+
+Operator review, sanctions, appeals, and privileged-access audit sit on top of
+Block and Report; `docs/moderation.md` is the contract.
+
+- **Rules:** `game/domain/moderation.ts` (case statuses, sanction kinds and
+  durations, derived sanction state, notices, appeals). Whether a sanction is
+  in effect is always derived from stored facts and the request clock.
+- **Enforcement seams:** a suspension is an input to `decideGameplayAccess`,
+  loaded by `server/gameplay-access.ts`; a social restriction is refused in
+  `beginChatSend` (every chat send) and by
+  `requireTradeRequestInitiationAllowed` for #225. Both are account-wide.
+- **Operator surface:** `server/moderation-commands.ts` (`requireAdmin`) over
+  the internal `server/moderation-seams.ts`. Every sensitive read writes a
+  `privileged_access_logs` row first (`server/privileged-access.ts`); every
+  mutation writes an `operator_audit_logs` row with its case id.
+- **Player surface:** `server/moderation-notices.ts` (session only, own
+  account), `/moderation` pages, the Characters callout, and pinned
+  "Moderation notice" cards in Chat/Social, refreshed by
+  `"moderation.notices"`.
+
 ## Where minigames fit
 
 Phaser experiences live in `minigames/`, isolated from the main React tree. They communicate through small typed contracts; any progression result is server-validated. They are not part of this foundation issue.

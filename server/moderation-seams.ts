@@ -1,4 +1,17 @@
-import { and, asc, count, countDistinct, desc, eq, gte, inArray, isNull, lte, max, sql } from "drizzle-orm";
+import {
+  and,
+  asc,
+  count,
+  countDistinct,
+  desc,
+  eq,
+  gte,
+  inArray,
+  isNull,
+  lte,
+  max,
+  sql,
+} from "drizzle-orm";
 import { user } from "@/db/auth-schema";
 import {
   characters,
@@ -208,10 +221,20 @@ function sanctionView(
 // Audited reads
 // ---------------------------------------------------------------------------
 
+/**
+ * `moderation_cases.id`, table-qualified. Drizzle renders a column of a
+ * single-table select unqualified, so inside a correlated subquery a bare
+ * `"id"` would bind to the subquery's own table instead of the case.
+ */
+const caseIdColumn = sql`${moderationCases}.${sql.identifier("id")}`;
+
+/** How many reports a case holds, as a correlated subquery. */
+const caseReportCount = sql<number>`(select count(*) from ${playerReports} where ${playerReports}.${sql.identifier("case_id")} = ${caseIdColumn})`;
+
 function queueWhere(filter: ModerationQueueFilter) {
   if (filter === "active") return inArray(moderationCases.status, [...ACTIVE_CASE_STATUSES]);
   if (filter === "appeals") {
-    return sql`exists (select 1 from ${moderationAppeals} where ${moderationAppeals.caseId} = ${moderationCases.id} and ${moderationAppeals.outcome} is null)`;
+    return sql`exists (select 1 from ${moderationAppeals} where ${moderationAppeals}.${sql.identifier("case_id")} = ${caseIdColumn} and ${moderationAppeals}.${sql.identifier("outcome")} is null)`;
   }
   return eq(moderationCases.status, filter);
 }
@@ -236,10 +259,9 @@ export async function readModerationQueueAs(
     .select({ count: countDistinct(moderationAppeals.caseId) })
     .from(moderationAppeals)
     .where(isNull(moderationAppeals.outcome));
-  const counts = Object.fromEntries(MODERATION_CASE_STATUSES.map((status) => [status, 0])) as Record<
-    ModerationCaseStatus,
-    number
-  >;
+  const counts = Object.fromEntries(
+    MODERATION_CASE_STATUSES.map((status) => [status, 0]),
+  ) as Record<ModerationCaseStatus, number>;
   for (const row of statusCounts) counts[row.status as ModerationCaseStatus] = Number(row.count);
 
   const cases = await tx
@@ -331,7 +353,12 @@ export async function readModerationCaseAs(
     ? await tx
         .select({ id: characters.id, name: characters.displayName })
         .from(characters)
-        .where(inArray(characters.id, reports.map((report) => report.reporterCharacterId)))
+        .where(
+          inArray(
+            characters.id,
+            reports.map((report) => report.reporterCharacterId),
+          ),
+        )
     : [];
   const blockersNow = new Set(
     (
@@ -406,7 +433,7 @@ export async function readModerationCaseAs(
       caseNumber: moderationCases.caseNumber,
       status: moderationCases.status,
       createdAt: moderationCases.createdAt,
-      reportCount: sql<number>`(select count(*) from ${playerReports} where ${playerReports.caseId} = ${moderationCases.id})`,
+      reportCount: caseReportCount,
     })
     .from(moderationCases)
     .where(
@@ -648,7 +675,13 @@ export async function readRetainedWhispersAs(
 
 export type AccountModerationHistory = {
   playerAccountId: string;
-  cases: { caseId: string; reference: string; status: ModerationCaseStatus; createdAt: string; reportCount: number }[];
+  cases: {
+    caseId: string;
+    reference: string;
+    status: ModerationCaseStatus;
+    createdAt: string;
+    reportCount: number;
+  }[];
   activeCaseId: string | null;
 };
 
@@ -677,7 +710,7 @@ export async function readAccountModerationHistoryAs(
       caseNumber: moderationCases.caseNumber,
       status: moderationCases.status,
       createdAt: moderationCases.createdAt,
-      reportCount: sql<number>`(select count(*) from ${playerReports} where ${playerReports.caseId} = ${moderationCases.id})`,
+      reportCount: caseReportCount,
     })
     .from(moderationCases)
     .where(eq(moderationCases.subjectPlayerAccountId, character.playerAccountId))
@@ -1124,7 +1157,9 @@ export async function decideAppealAs(
     throw new ModerationCommandError("Modify needs a new duration; Uphold and Reverse take none.");
   }
   const note =
-    request.note && request.note.trim().length > 0 ? noteText(request.note, "A decision note") : null;
+    request.note && request.note.trim().length > 0
+      ? noteText(request.note, "A decision note")
+      : null;
   const [appeal] = await tx
     .select()
     .from(moderationAppeals)

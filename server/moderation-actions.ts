@@ -1,6 +1,7 @@
 "use server";
 
 import { headers } from "next/headers";
+import { z } from "zod";
 import {
   AddCaseNoteRequestSchema,
   ChangeSanctionDurationRequestSchema,
@@ -18,6 +19,7 @@ import {
   changeSanctionDuration,
   decideAppeal,
   issueSanction,
+  loadAccountModerationHistory,
   loadRetainedPublicChat,
   loadRetainedWhispers,
   ModerationCommandError,
@@ -26,6 +28,7 @@ import {
   setModerationCaseStatus,
   type ModerationMutationResult,
 } from "@/server/moderation-commands";
+import type { AccountModerationHistory } from "@/server/moderation-seams";
 import { OwnershipError } from "@/server/ownership";
 
 /**
@@ -130,7 +133,11 @@ export async function loadRetainedPublicChatAction(
   const request = RetainedChatRequestSchema.safeParse(input);
   if (!request.success) return { error: "Invalid request." };
   try {
-    return await loadRetainedPublicChat(await headers(), request.data.caseId, request.data.reportId);
+    return await loadRetainedPublicChat(
+      await headers(),
+      request.data.caseId,
+      request.data.reportId,
+    );
   } catch (error) {
     return moderationError(error);
   }
@@ -144,6 +151,21 @@ export async function loadRetainedWhispersAction(
   if (!request.success) return { error: "Invalid request." };
   try {
     return await loadRetainedWhispers(await headers(), request.data.caseId, request.data.reportId);
+  } catch (error) {
+    return moderationError(error);
+  }
+}
+
+export type AccountModerationHistoryActionResult = AccountModerationHistory | { error: string };
+
+/** Load (and audit) an inspected character's account moderation cases. */
+export async function loadAccountModerationHistoryAction(
+  input: unknown,
+): Promise<AccountModerationHistoryActionResult> {
+  const request = z.object({ characterId: z.string().uuid() }).safeParse(input);
+  if (!request.success) return { error: "Invalid request." };
+  try {
+    return await loadAccountModerationHistory(await headers(), request.data.characterId);
   } catch (error) {
     return moderationError(error);
   }

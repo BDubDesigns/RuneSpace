@@ -1,7 +1,15 @@
+import { COMMUNITY_RULES_PATH, SAFETY_PRIVACY_PATH } from "./policy-links";
+
 export const publicSiteNavigation = [
   { href: "/", label: "Home" },
   { href: "/updates", label: "Updates" },
   { href: "/wiki", label: "Wiki" },
+] as const;
+
+/** The published player policies, linked from every public page's footer (issue #248). */
+export const publicSiteFooterLinks = [
+  { href: COMMUNITY_RULES_PATH, label: "Community Rules" },
+  { href: SAFETY_PRIVACY_PATH, label: "Safety & Privacy" },
 ] as const;
 
 export const publicLandingContent = {

@@ -3709,7 +3709,7 @@
         },
         "moderation_sanctions_duration_check": {
           "name": "moderation_sanctions_duration_check",
-          "value": "(\"moderation_sanctions\".\"kind\" = 'warning' and \"moderation_sanctions\".\"duration\" is null and \"moderation_sanctions\".\"ends_at\" is null) or (\"moderation_sanctions\".\"kind\" <> 'warning' and \"moderation_sanctions\".\"duration\" in ('24h', '7d', '30d', '90d', '1y', 'permanent') and (\"moderation_sanctions\".\"duration\" = 'permanent') = (\"moderation_sanctions\".\"ends_at\" is null))"
+          "value": "(\"moderation_sanctions\".\"kind\" = 'warning' and \"moderation_sanctions\".\"duration\" is null and \"moderation_sanctions\".\"ends_at\" is null) or (\"moderation_sanctions\".\"kind\" <> 'warning' and \"moderation_sanctions\".\"duration\" is not null and \"moderation_sanctions\".\"duration\" in ('24h', '7d', '30d', '90d', '1y', 'permanent') and (\"moderation_sanctions\".\"duration\" = 'permanent') = (\"moderation_sanctions\".\"ends_at\" is null))"
         },
         "moderation_sanctions_reversal_paired_check": {
           "name": "moderation_sanctions_reversal_paired_check",

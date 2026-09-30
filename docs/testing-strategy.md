@@ -52,8 +52,9 @@ small number of critical mobile player journeys.
   Cutter, the Freight Harness and their Missions — #233), Holo Hollow, Rusk Recovery, Admin Operator, Sign-out,
   Account News, Account Verification, Gameplay Access, and the Chat/Social shell and
   realtime stream (`social-shell`, #245), and General/Trade public chat
-  (`public-chat`, #246), and Whispers, Block, and Report (`whispers-safety`,
-  #247). It intentionally excludes noncanonical `smoke`, `ownership`,
+  (`public-chat`, #246), Whispers, Block, and Report (`whispers-safety`,
+  #247), and moderation review, sanctions, notices, and appeals (`moderation`,
+  #248). It intentionally excludes noncanonical `smoke`, `ownership`,
   `design-system`, `work-orders`, `public-*`, and QC Studio specs. It:
   - requires Node 22.x
   - requires a localhost-only disposable PostgreSQL database (refuses remote)
