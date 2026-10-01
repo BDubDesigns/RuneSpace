@@ -1257,7 +1257,11 @@ suite("issue #267 player trade offers, settlement, and audit (real PostgreSQL)",
       expect(forA.session).toBeNull();
       expect(forA.ended).toMatchObject({
         id: sessionId,
-        counterpart: { characterId: b.character.id, name: b.character.displayName },
+        counterpart: {
+          characterId: b.character.id,
+          name: b.character.displayName,
+          playerName: expect.stringMatching(/^settle-/),
+        },
         outcome: "completed",
         canceledByYou: false,
       });

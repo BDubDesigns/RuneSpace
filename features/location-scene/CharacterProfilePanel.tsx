@@ -8,6 +8,7 @@ import { CharacterPortrait } from "@/components/portraits/CharacterPortrait";
 import { CharacterSkillList } from "@/features/shared/CharacterSkillList";
 import { useChat } from "@/features/chat/ChatContext";
 import { SafetyFlow, type SafetyOutcome } from "@/features/chat/SafetyFlow";
+import { ProfileTradeAction } from "@/features/player-trade/ProfileTradeAction";
 import type { CharacterProfile } from "@/game/domain/character-profile";
 import { GAMEPLAY_ACCESS_REQUIRED_CODE } from "@/game/domain/gameplay-access";
 
@@ -16,7 +17,10 @@ import { GAMEPLAY_ACCESS_REQUIRED_CODE } from "@/game/domain/gameplay-access";
  *
  * It is also a character-facing social surface (#247): Whisper opens the
  * conversation inside Chat/Social without leaving the Location, and Report and
- * Block act on this character's account by its public name only. */
+ * Block act on this character's account by its public name only. Trade (#268)
+ * leads the row and sends a trade request; for another character on the
+ * player's own account — which the server says, never a name comparison — the
+ * row is Trade alone, since Whisper, Report, and Block could only refuse. */
 export function CharacterProfilePanel({
   activeCharacterId,
   targetName,
@@ -190,40 +194,39 @@ export function CharacterProfilePanel({
                   </p>
                 </div>
               </div>
-              <div
-                aria-label={`Interact with ${profile.displayName}`}
-                className="mt-3 flex flex-wrap gap-2"
-                data-profile-social-actions=""
-                role="group"
-              >
-                <ActionButton
-                  className="min-h-9 px-3 py-1 text-xs"
-                  loading={whispering}
-                  onClick={() => void whisper(profile.displayName)}
-                >
-                  Whisper
-                </ActionButton>
-                <ActionButton
-                  className="min-h-9 px-3 py-1 text-xs"
-                  intent="secondary"
-                  onClick={() => {
-                    setSocialFeedback(undefined);
-                    setSafety("report");
-                  }}
-                >
-                  Report
-                </ActionButton>
-                <ActionButton
-                  className="min-h-9 px-3 py-1 text-xs"
-                  intent="danger"
-                  onClick={() => {
-                    setSocialFeedback(undefined);
-                    setSafety("block");
-                  }}
-                >
-                  Block
-                </ActionButton>
-              </div>
+              <ProfileTradeAction targetName={profile.displayName}>
+                {profile.sameAccount ? null : (
+                  <>
+                    <ActionButton
+                      className="min-h-9 px-3 py-1 text-xs"
+                      loading={whispering}
+                      onClick={() => void whisper(profile.displayName)}
+                    >
+                      Whisper
+                    </ActionButton>
+                    <ActionButton
+                      className="min-h-9 px-3 py-1 text-xs"
+                      intent="secondary"
+                      onClick={() => {
+                        setSocialFeedback(undefined);
+                        setSafety("report");
+                      }}
+                    >
+                      Report
+                    </ActionButton>
+                    <ActionButton
+                      className="min-h-9 px-3 py-1 text-xs"
+                      intent="danger"
+                      onClick={() => {
+                        setSocialFeedback(undefined);
+                        setSafety("block");
+                      }}
+                    >
+                      Block
+                    </ActionButton>
+                  </>
+                )}
+              </ProfileTradeAction>
               {safety ? (
                 <div className="mt-3">
                   <SafetyFlow

@@ -878,10 +878,15 @@ suite("issue #266 player trade requests and sessions (real PostgreSQL)", () => {
 
       const state = ok(await accept(b, requestId));
 
+      // Same account, so the counterpart's public Player name is this player's own.
       expect(state.session?.counterpart).toEqual({
         characterId: a.character.id,
         name: a.character.displayName,
+        playerName: expect.stringMatching(/^trade-/),
       });
+      expect((await stateOf(a)).session?.counterpart.playerName).toBe(
+        state.session?.counterpart.playerName,
+      );
       expect((await stateOf(a)).session?.counterpart.characterId).toBe(b.character.id);
       expect(await gate.findTradeEngagement(db, a.character.id, new Date())).toBe("session");
       expect(await gate.findTradeEngagement(db, b.character.id, new Date())).toBe("session");

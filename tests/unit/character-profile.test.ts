@@ -180,8 +180,11 @@ describe("issue #64 character profile projection", () => {
       "displayName",
       "ownerName",
       "portrait",
+      // A boolean relationship to the viewer (#268), never an account id.
+      "sameAccount",
       "skills",
     ]);
+    expect(profile.sameAccount).toBe(false);
     for (const skill of profile.skills) {
       // No skillId, character database ID, account ID, email, or timestamp
       // may leak; skill IDs stay internal to the server boundary.

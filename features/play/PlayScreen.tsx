@@ -10,6 +10,8 @@ import { PlayBoundaryTestTrigger } from "@/features/diagnostics/PlayBoundaryTest
 import { LOCAL_PLACE_PARAM } from "@/features/local-places/navigation";
 import { ChatConversations } from "@/features/chat/ChatConversations";
 import { ChatProvider } from "@/features/chat/ChatContext";
+import { PlayerTradeProvider } from "@/features/player-trade/PlayerTradeContext";
+import { PlayerTradeSurface } from "@/features/player-trade/PlayerTradeSurface";
 import { ChatSocialDrawer } from "@/features/social/ChatSocialDrawer";
 import { SocialLauncher } from "@/features/social/ChatSocialLauncher";
 import { SocialProvider } from "@/features/social/SocialContext";
@@ -188,26 +190,32 @@ export function PlayScreen({
           current surface without navigating. It never feeds Play state; a
           promoted Trade ad (#246) only asks Play to re-read its Credits.
           ChatProvider (#247) keeps Whisper unread and the Drawer's view live
-          while the Drawer is closed, so character surfaces can open a Whisper. */}
+          while the Drawer is closed, so character surfaces can open a Whisper.
+          PlayerTradeProvider (#268) mirrors the durable trade state: request
+          cards pinned in Chat/Social, the profile's Trade action, and the
+          accepted-trade surface over Play. */}
       <SocialProvider characterId={initialState.characterId}>
         <ChatProvider characterId={initialState.characterId}>
-          <GameShell
-            bottomNav={<PlayFooter />}
-            floatingAction={<SocialLauncher />}
-            topBar={<PlayTopBar newsUnread={newsUnread} />}
-          >
-            <PlayBoundaryTestTrigger />
-            <PlayConsole
-              characterName={characterName}
-              characterPortrait={characterPortrait}
-              localPlaceId={localPlaceId}
-              onMapExit={() => router.replace(pathname)}
-              surface={mapActive ? "map" : "primary"}
-            />
-            <ChatSocialDrawer
-              conversations={<ChatConversations characterId={initialState.characterId} />}
-            />
-          </GameShell>
+          <PlayerTradeProvider characterId={initialState.characterId}>
+            <GameShell
+              bottomNav={<PlayFooter />}
+              floatingAction={<SocialLauncher />}
+              topBar={<PlayTopBar newsUnread={newsUnread} />}
+            >
+              <PlayBoundaryTestTrigger />
+              <PlayConsole
+                characterName={characterName}
+                characterPortrait={characterPortrait}
+                localPlaceId={localPlaceId}
+                onMapExit={() => router.replace(pathname)}
+                surface={mapActive ? "map" : "primary"}
+              />
+              <ChatSocialDrawer
+                conversations={<ChatConversations characterId={initialState.characterId} />}
+              />
+              <PlayerTradeSurface />
+            </GameShell>
+          </PlayerTradeProvider>
         </ChatProvider>
       </SocialProvider>
     </PlayProvider>

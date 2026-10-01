@@ -1,6 +1,7 @@
 import { and, asc, desc, eq, gt, inArray, lte, or, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { db } from "@/db";
+import { user } from "@/db/auth-schema";
 import {
   activeActions,
   cargoHoldItemInstances,
@@ -1659,7 +1660,7 @@ function requestView(
 ): TradeRequestView {
   return {
     id: request.id,
-    counterpart: { characterId: counterpart.id, name: counterpart.displayName },
+    counterpart: { characterId: counterpart.id, name: counterpart.displayName, playerName: null },
     createdAt: request.createdAt.toISOString(),
     expiresAt: request.expiresAt.toISOString(),
   };
@@ -1759,6 +1760,7 @@ async function readTradeState(
       counterpart: {
         characterId: counterpartId,
         name: counterpart?.displayName ?? "",
+        playerName: null,
       },
       startedAt: claim.session.createdAt.toISOString(),
       expiresAt: tradeSessionExpiresAt(claim.session.lastActivityAt).toISOString(),
@@ -1771,12 +1773,43 @@ async function readTradeState(
     if (refusal) session.settlementRefusal = refusal;
   }
 
-  return {
+  const state: TradeStateView = {
     outgoing: outgoingRow ? requestView(outgoingRow.request, outgoingRow.recipient) : null,
     incoming,
     session,
     ended: session ? null : await readEndedTrade(reader, character, now),
   };
+  await attachPlayerNames(reader, state);
+  return state;
+}
+
+/**
+ * Fill in every counterpart's public Player name (#268) in one read: the name
+ * Nearby Players and the profile already show for that character.
+ */
+async function attachPlayerNames(reader: Reader, state: TradeStateView) {
+  const counterparts = [
+    state.outgoing?.counterpart,
+    ...state.incoming.map((request) => request.counterpart),
+    state.session?.counterpart,
+    state.ended?.counterpart,
+  ].filter((counterpart) => counterpart !== undefined);
+  if (counterparts.length === 0) return;
+  const rows = await reader
+    .select({ id: characters.id, playerName: user.displayUsername })
+    .from(characters)
+    .innerJoin(playerAccounts, eq(playerAccounts.id, characters.playerAccountId))
+    .innerJoin(user, eq(user.id, playerAccounts.userId))
+    .where(
+      inArray(
+        characters.id,
+        counterparts.map((counterpart) => counterpart.characterId),
+      ),
+    );
+  const names = new Map(rows.map((row) => [row.id, row.playerName]));
+  for (const counterpart of counterparts) {
+    counterpart.playerName = names.get(counterpart.characterId) ?? null;
+  }
 }
 
 function offerLines(offer: TradeOfferView): TradeOfferLines {
@@ -1832,7 +1865,11 @@ async function readEndedTrade(
   }
   return {
     id: latest.id,
-    counterpart: { characterId: counterpartId, name: counterpart?.displayName ?? "" },
+    counterpart: {
+      characterId: counterpartId,
+      name: counterpart?.displayName ?? "",
+      playerName: null,
+    },
     outcome: status,
     endedAt: endedAt.toISOString(),
     canceledByYou: status === "canceled" && latest.endedByCharacterId === character.id,

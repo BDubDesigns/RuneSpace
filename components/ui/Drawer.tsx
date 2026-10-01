@@ -30,8 +30,9 @@ const EXIT_FALLBACK_MS = 400;
  * and above everything, wherever the triggering surface is mounted.
  *
  * The `size` variant is narrow and explicit: `"wide"` exists only for the
- * portrait chooser's desktop master-detail layout; every other surface keeps
- * the default width.
+ * portrait chooser's desktop master-detail layout, and `"full"` only for the
+ * near-full-screen accepted player trade (#268), which keeps its primary
+ * actions in a sticky footer; every other surface keeps the default width.
  */
 export function Drawer({
   children,
@@ -50,7 +51,7 @@ export function Drawer({
   eyebrow: string;
   onClose?: () => void;
   triggerRef?: RefObject<HTMLButtonElement | null>;
-  size?: "default" | "wide";
+  size?: "default" | "wide" | "full";
   /** Some committed-result surfaces must be acknowledged before dismissal. */
   dismissible?: boolean;
   initialFocusRef?: RefObject<HTMLElement | null>;
@@ -232,10 +233,12 @@ export function Drawer({
       <section
         aria-label={label}
         aria-modal="true"
-        className={`${panelAnim} max-h-[min(78dvh,42rem)] w-full overflow-y-auto border border-[color:var(--rs-border-structural)] bg-[color:var(--rs-surface-raised)] p-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-[max(1rem,env(safe-area-inset-top))] [box-shadow:var(--rs-shadow-panel),0_0_28px_rgb(75_216_245_/_0.28)] sm:max-h-[calc(100dvh-2rem)] ${
-          size === "wide"
-            ? "sm:w-[min(56rem,calc(100vw-2rem))] sm:max-w-4xl"
-            : "max-w-xl sm:w-[min(34rem,calc(100vw-2rem))]"
+        className={`${panelAnim} w-full overflow-y-auto border border-[color:var(--rs-border-structural)] bg-[color:var(--rs-surface-raised)] p-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-[max(1rem,env(safe-area-inset-top))] [box-shadow:var(--rs-shadow-panel),0_0_28px_rgb(75_216_245_/_0.28)] sm:max-h-[calc(100dvh-2rem)] ${
+          size === "full"
+            ? "flex h-[calc(100dvh-1.5rem)] max-h-[calc(100dvh-1.5rem)] flex-col sm:h-[min(calc(100dvh-2rem),52rem)] sm:w-[min(60rem,calc(100vw-2rem))] sm:max-w-5xl"
+            : size === "wide"
+              ? "max-h-[min(78dvh,42rem)] sm:w-[min(56rem,calc(100vw-2rem))] sm:max-w-4xl"
+              : "max-h-[min(78dvh,42rem)] max-w-xl sm:w-[min(34rem,calc(100vw-2rem))]"
         }`}
         onAnimationEnd={onPanelAnimationEnd}
         ref={panel}

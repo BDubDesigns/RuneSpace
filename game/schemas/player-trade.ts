@@ -64,8 +64,12 @@ export const TradeStateQuerySchema = z.object({
   characterId: z.string().uuid(),
 });
 
-/** The other character in a request or session. */
-export type TradeCounterpart = { characterId: string; name: string };
+/**
+ * The other character in a request or session, with its owner's public Player
+ * name (#268) — the same name Nearby Players and the profile already show;
+ * null only for a not-yet-migrated pre-cutover account.
+ */
+export type TradeCounterpart = { characterId: string; name: string; playerName: string | null };
 
 export type TradeRequestView = {
   id: string;
