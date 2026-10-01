@@ -1688,6 +1688,162 @@ export const privilegedAccessLogs = pgTable(
   ],
 );
 
+/**
+ * Same-location player trade requests (issue #266). One row per request the
+ * server actually created — a refused attempt never writes one — so the rows
+ * are also the short-lived ledger behind the account's rolling request budget
+ * and the repeated-recipient escalation. Both characters and both accounts
+ * are stored as stable ids; `location_id` is the World Location the two shared
+ * when the request was made.
+ *
+ * `status` is the durable terminal outcome once one is written. A `pending`
+ * row is only effectively pending while it has not expired and both
+ * characters are still at `location_id` (`game/domain/player-trade.ts`); the
+ * derived outcome is written down before the requester's slot is reused and
+ * at acceptance. The partial unique index is the persistence-level arbiter of
+ * one outgoing pending request per character. Terminal rows older than the
+ * rolling window are pruned when a request is created.
+ */
+export const playerTradeRequests = pgTable(
+  "player_trade_requests",
+  {
+    id: text("id")
+      .primaryKey()
+      .default(sql`gen_random_uuid()`),
+    requesterCharacterId: text("requester_character_id")
+      .notNull()
+      .references(() => characters.id, { onDelete: "restrict" }),
+    requesterPlayerAccountId: text("requester_player_account_id")
+      .notNull()
+      .references(() => playerAccounts.id, { onDelete: "restrict" }),
+    recipientCharacterId: text("recipient_character_id")
+      .notNull()
+      .references(() => characters.id, { onDelete: "restrict" }),
+    recipientPlayerAccountId: text("recipient_player_account_id")
+      .notNull()
+      .references(() => playerAccounts.id, { onDelete: "restrict" }),
+    locationId: text("location_id").notNull(),
+    status: text("status").notNull().default("pending"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    resolvedAt: timestamp("resolved_at", { withTimezone: true }),
+    // The session an accepted request began.
+    sessionId: text("session_id").references(() => playerTradeSessions.id, {
+      onDelete: "restrict",
+    }),
+  },
+  (table) => [
+    check(
+      "player_trade_requests_status_check",
+      sql`${table.status} in ('pending', 'accepted', 'canceled', 'declined', 'expired', 'invalidated')`,
+    ),
+    check(
+      "player_trade_requests_distinct_characters_check",
+      sql`${table.requesterCharacterId} <> ${table.recipientCharacterId}`,
+    ),
+    check(
+      "player_trade_requests_resolved_check",
+      sql`(${table.status} = 'pending') = (${table.resolvedAt} is null)`,
+    ),
+    check(
+      "player_trade_requests_session_check",
+      sql`(${table.status} = 'accepted') = (${table.sessionId} is not null)`,
+    ),
+    check("player_trade_requests_expiry_check", sql`${table.expiresAt} > ${table.createdAt}`),
+    uniqueIndex("player_trade_requests_one_pending_per_requester")
+      .on(table.requesterCharacterId)
+      .where(sql`${table.status} = 'pending'`),
+    index("player_trade_requests_recipient_pending_idx")
+      .on(table.recipientCharacterId)
+      .where(sql`${table.status} = 'pending'`),
+    index("player_trade_requests_account_created_idx").on(
+      table.requesterPlayerAccountId,
+      table.createdAt,
+    ),
+    index("player_trade_requests_account_pair_created_idx").on(
+      table.requesterPlayerAccountId,
+      table.recipientPlayerAccountId,
+      table.createdAt,
+    ),
+    index("player_trade_requests_created_idx").on(table.createdAt),
+  ],
+);
+
+/**
+ * One accepted player trade session (issue #266): durable identity and
+ * lifecycle only. Offers, consent, and settlement belong to #267. A session is
+ * database state, so it survives refresh and reconnect; it expires after five
+ * minutes without trade activity (derived from `last_activity_at`, written
+ * down when it matters), and either participant may cancel it. `ended_at` is
+ * the authoritative end instant; for an inactivity expiry it is the moment the
+ * session went idle-expired, not the moment that was noticed.
+ */
+export const playerTradeSessions = pgTable(
+  "player_trade_sessions",
+  {
+    id: text("id")
+      .primaryKey()
+      .default(sql`gen_random_uuid()`),
+    requesterCharacterId: text("requester_character_id")
+      .notNull()
+      .references(() => characters.id, { onDelete: "restrict" }),
+    requesterPlayerAccountId: text("requester_player_account_id")
+      .notNull()
+      .references(() => playerAccounts.id, { onDelete: "restrict" }),
+    recipientCharacterId: text("recipient_character_id")
+      .notNull()
+      .references(() => characters.id, { onDelete: "restrict" }),
+    recipientPlayerAccountId: text("recipient_player_account_id")
+      .notNull()
+      .references(() => playerAccounts.id, { onDelete: "restrict" }),
+    locationId: text("location_id").notNull(),
+    status: text("status").notNull().default("active"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
+    lastActivityAt: timestamp("last_activity_at", { withTimezone: true }).notNull(),
+    endedAt: timestamp("ended_at", { withTimezone: true }),
+    // The participant who canceled; null for an inactivity expiry.
+    endedByCharacterId: text("ended_by_character_id").references(() => characters.id, {
+      onDelete: "restrict",
+    }),
+  },
+  (table) => [
+    check(
+      "player_trade_sessions_status_check",
+      sql`${table.status} in ('active', 'canceled', 'expired')`,
+    ),
+    check(
+      "player_trade_sessions_distinct_characters_check",
+      sql`${table.requesterCharacterId} <> ${table.recipientCharacterId}`,
+    ),
+    check(
+      "player_trade_sessions_ended_check",
+      sql`(${table.status} = 'active') = (${table.endedAt} is null)`,
+    ),
+    index("player_trade_sessions_requester_idx").on(table.requesterCharacterId),
+    index("player_trade_sessions_recipient_idx").on(table.recipientCharacterId),
+  ],
+);
+
+/**
+ * A character's claim on its one active trade session (issue #266). The
+ * primary key on `character_id` is the persistence-level arbiter: a character
+ * can hold at most one claim, so it can never be in two accepted sessions,
+ * whichever accounts are involved. Acceptance inserts both claims in the same
+ * transaction that creates the session; ending the session deletes them.
+ */
+export const playerTradeClaims = pgTable(
+  "player_trade_claims",
+  {
+    characterId: text("character_id")
+      .primaryKey()
+      .references(() => characters.id, { onDelete: "restrict" }),
+    sessionId: text("session_id")
+      .notNull()
+      .references(() => playerTradeSessions.id, { onDelete: "restrict" }),
+  },
+  (table) => [index("player_trade_claims_session_idx").on(table.sessionId)],
+);
+
 export type PlayerAccount = typeof playerAccounts.$inferSelect;
 export type NewPlayerAccount = typeof playerAccounts.$inferInsert;
 export type PlayerPortraitUnlock = typeof playerPortraitUnlocks.$inferSelect;
@@ -1719,3 +1875,5 @@ export type ModerationCaseNote = typeof moderationCaseNotes.$inferSelect;
 export type ModerationSanction = typeof moderationSanctions.$inferSelect;
 export type ModerationAppeal = typeof moderationAppeals.$inferSelect;
 export type PrivilegedAccessLog = typeof privilegedAccessLogs.$inferSelect;
+export type PlayerTradeRequest = typeof playerTradeRequests.$inferSelect;
+export type PlayerTradeSession = typeof playerTradeSessions.$inferSelect;

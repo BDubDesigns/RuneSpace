@@ -83,6 +83,7 @@ const APP_ENTRYPOINTS: Record<string, string> = {
   "app/api/whispers/route.ts": "GAMEPLAY: Whisper inbox read (#247)",
   "app/api/whispers/conversation/route.ts": "GAMEPLAY: Whisper conversation read (#247)",
   "app/api/blocked-players/route.ts": "GAMEPLAY: Blocked Players read (#247)",
+  "app/api/trade/route.ts": "GAMEPLAY: trade request/session read (#266)",
   // #248 — a suspended player must still reach their notice and appeal.
   "app/moderation/page.tsx": "account: the player's own moderation notices",
   "app/moderation/[sanctionId]/page.tsx": "account: one notice and its appeal",
@@ -96,18 +97,19 @@ describe("player server actions (server/actions.ts)", () => {
   const source = read("server/actions.ts");
   const bodies = exportedFunctionBodies(source);
 
-  it("enumerates exactly the 56 production player actions", () => {
+  it("enumerates exactly the 61 production player actions", () => {
     // #232 adds nine: Fabrication's start, finish-current, Override toggle,
     // push and Lock In, and Tinkering's start, stop, finish-current and
     // Auto-discard Scrap preference. #246 adds the chat send and promoted ad.
     // #247 adds Whisper open, send, and read, Block, Unblock, and the two
-    // Reports. #248 adds the moderation appeal (account management).
-    expect(bodies.size).toBe(56);
+    // Reports. #248 adds the moderation appeal (account management). #266 adds
+    // trade request create, cancel, decline, accept, and session cancel.
+    expect(bodies.size).toBe(61);
   });
 
   it("classifies every export as gameplay or named account management", () => {
     const gameplay = [...bodies.keys()].filter((name) => !(name in ACCOUNT_MANAGEMENT_ACTIONS));
-    expect(gameplay).toHaveLength(52);
+    expect(gameplay).toHaveLength(57);
     for (const name of Object.keys(ACCOUNT_MANAGEMENT_ACTIONS)) {
       expect(bodies.has(name), `unknown account action ${name}`).toBe(true);
     }
@@ -122,10 +124,15 @@ describe("player server actions (server/actions.ts)", () => {
       const recovers =
         body.includes("redirectOnGameplayRefusal(error)") ||
         body.includes("runPlayAction(") ||
-        body.includes("runEquipmentAction(");
+        body.includes("runEquipmentAction(") ||
+        body.includes("runTradeRequestCommand(");
       expect(recovers, `${name} must recover from a gameplay refusal`).toBe(true);
     }
-    for (const helper of ["async function runPlayAction", "async function runEquipmentAction"]) {
+    for (const helper of [
+      "async function runPlayAction",
+      "async function runEquipmentAction",
+      "async function runTradeRequestCommand",
+    ]) {
       const start = source.indexOf(helper);
       const body = source.slice(start, source.indexOf("\n}\n", start));
       expect(body, helper).toContain("redirectOnGameplayRefusal(error)");
@@ -174,6 +181,7 @@ describe("app pages and route handlers", () => {
       ["app/api/character-profile/route.ts", "server/character-profile.ts"],
       ["app/api/realtime/route.ts", "server/realtime-stream.ts"],
       ["app/api/chat/route.ts", "server/chat.ts"],
+      ["app/api/trade/route.ts", "server/player-trades.ts"],
     ] as const) {
       expect(read(server)).toContain("requirePlayableOwnedCharacter(");
       expect(read(route)).toContain("error instanceof GameplayAccessError");
@@ -206,13 +214,17 @@ describe("app pages and route handlers", () => {
 describe("the gameplay-access seams", () => {
   it("both owned-character lock boundaries require gameplay access before locking", () => {
     const source = read("server/action-resolution.ts");
+    // Both enter through one shared helper (#266 added the trade gate to it).
     for (const boundary of ["withLockedOwnedCharacter", "withResolvedOwnedCharacter"]) {
       const start = source.indexOf(`export async function ${boundary}`);
       const body = source.slice(start, source.indexOf("\n}\n", start));
-      const gate = body.indexOf("resolvePlayableAccountId(transaction, userId)");
-      expect(gate, boundary).toBeGreaterThan(-1);
-      expect(gate, boundary).toBeLessThan(body.indexOf("lockCharacterRow("));
+      expect(body, boundary).toContain("lockPlayableOwnedCharacter(");
     }
+    const start = source.indexOf("async function lockPlayableOwnedCharacter");
+    const body = source.slice(start, source.indexOf("\n}\n", start));
+    const gate = body.indexOf("resolvePlayableAccountId(transaction, userId)");
+    expect(gate).toBeGreaterThan(-1);
+    expect(gate).toBeLessThan(body.indexOf("lockCharacterRow("));
     expect(source).toContain("return requireGameplayAccess(transaction, userId);");
   });
 

@@ -86,6 +86,19 @@ import { markWhisperRead, openWhisper, sendWhisper, WhisperError } from "@/serve
 import { blockPlayer, unblockPlayer } from "@/server/player-blocks";
 import { reportMessage, reportPlayer } from "@/server/player-reports";
 import {
+  acceptTradeRequest,
+  cancelTradeRequest,
+  cancelTradeSession,
+  createTradeRequest,
+  declineTradeRequest,
+} from "@/server/player-trades";
+import {
+  CreateTradeRequestSchema,
+  TradeRequestCommandSchema,
+  TradeSessionCommandSchema,
+  type TradeCommandResult,
+} from "@/game/schemas/player-trade";
+import {
   MarkWhisperReadRequestSchema,
   OpenWhisperRequestSchema,
   SendWhisperRequestSchema,
@@ -1083,6 +1096,68 @@ export async function reportPlayerAction(input: unknown): Promise<ReportResult> 
     const user = await requireCurrentUser(await headers());
     const { characterId, ...report } = request.data;
     return await reportPlayer(user.id, characterId, report);
+  } catch (error) {
+    redirectOnGameplayRefusal(error);
+    if (error instanceof OwnershipError) return { error: error.message };
+    throw error;
+  }
+}
+
+export type PlayerTradeActionResult = TradeCommandResult | { error: string };
+
+/**
+ * Same-location player trade requests and sessions (issue #266). The browser
+ * names only its active character and a target, request, or session; every
+ * eligibility, ownership, and participant check is server-side in
+ * `server/player-trades.ts`.
+ */
+export async function createTradeRequestAction(input: unknown): Promise<PlayerTradeActionResult> {
+  const request = CreateTradeRequestSchema.safeParse(input);
+  if (!request.success) return { error: "Invalid trade request." };
+  try {
+    const user = await requireCurrentUser(await headers());
+    return await createTradeRequest(user.id, request.data.characterId, request.data.target);
+  } catch (error) {
+    redirectOnGameplayRefusal(error);
+    if (error instanceof OwnershipError) return { error: error.message };
+    throw error;
+  }
+}
+
+async function runTradeRequestCommand(
+  input: unknown,
+  command: typeof cancelTradeRequest,
+): Promise<PlayerTradeActionResult> {
+  const request = TradeRequestCommandSchema.safeParse(input);
+  if (!request.success) return { error: "Invalid trade request." };
+  try {
+    const user = await requireCurrentUser(await headers());
+    return await command(user.id, request.data.characterId, request.data.requestId);
+  } catch (error) {
+    redirectOnGameplayRefusal(error);
+    if (error instanceof OwnershipError) return { error: error.message };
+    throw error;
+  }
+}
+
+export async function cancelTradeRequestAction(input: unknown): Promise<PlayerTradeActionResult> {
+  return runTradeRequestCommand(input, cancelTradeRequest);
+}
+
+export async function declineTradeRequestAction(input: unknown): Promise<PlayerTradeActionResult> {
+  return runTradeRequestCommand(input, declineTradeRequest);
+}
+
+export async function acceptTradeRequestAction(input: unknown): Promise<PlayerTradeActionResult> {
+  return runTradeRequestCommand(input, acceptTradeRequest);
+}
+
+export async function cancelTradeSessionAction(input: unknown): Promise<PlayerTradeActionResult> {
+  const request = TradeSessionCommandSchema.safeParse(input);
+  if (!request.success) return { error: "Invalid trade." };
+  try {
+    const user = await requireCurrentUser(await headers());
+    return await cancelTradeSession(user.id, request.data.characterId, request.data.sessionId);
   } catch (error) {
     redirectOnGameplayRefusal(error);
     if (error instanceof OwnershipError) return { error: error.message };

@@ -246,6 +246,13 @@
       "when": 1790784442294,
       "tag": "0034_moderation_review_sanctions",
       "breakpoints": true
+    },
+    {
+      "idx": 35,
+      "version": "7",
+      "when": 1790813883679,
+      "tag": "0035_player_trade_requests_sessions",
+      "breakpoints": true
     }
   ]
 }

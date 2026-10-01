@@ -8,6 +8,7 @@ import {
 } from "@/game/domain/timing";
 import { requireGameplayAccess } from "@/server/gameplay-access";
 import { OwnershipError, requireCurrentUser } from "@/server/ownership";
+import { assertNotTradeEngaged } from "@/server/player-trade-gate";
 
 export type DatabaseTransaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
@@ -191,19 +192,56 @@ async function reconcileActiveAction<Snapshot, Outcome>(
 }
 
 /**
+ * How an owned-character command treats a trade-engaged character (issue
+ * #266). Every player command is refused while its character holds a pending
+ * outgoing trade request or an active trade session, unless it opts out with
+ * `allowDuringTrade` — reserved for reads and presentation-only dismissals
+ * that cannot change Credits, carried Inventory, or Equipment.
+ * `tests/unit/player-trade-gate.test.ts` keeps the opt-out list exact.
+ */
+export type OwnedCharacterCommandOptions = {
+  allowDuringTrade?: boolean;
+};
+
+/**
+ * The shared owned-character entry: gameplay access, the ownership-scoped row
+ * lock, then the trade gate. The gate runs under the row lock, so it is
+ * serialized with trade acceptance, which locks both participants' rows.
+ */
+async function lockPlayableOwnedCharacter(
+  transaction: DatabaseTransaction,
+  userId: string,
+  characterId: string,
+  now: Date,
+  options: OwnedCharacterCommandOptions,
+): Promise<Character> {
+  const playerAccountId = await resolvePlayableAccountId(transaction, userId);
+  const character = await lockCharacterRow(transaction, characterId, playerAccountId);
+  if (!options.allowDuringTrade) await assertNotTradeEngaged(transaction, character.id, now);
+  return character;
+}
+
+/**
  * Authorize an owned character without resolving its active action.
  * Instantaneous location interactions use this boundary so an expired Mining or
  * Travel row cannot be implicitly progressed as a side effect of the interaction.
- * Gameplay access (issue #223) is required before the row is locked.
+ * Gameplay access (issue #223) is required before the row is locked, and a
+ * trade-engaged character is refused unless the command opts out (#266).
  */
 export async function withLockedOwnedCharacter<Result>(
   userId: string,
   characterId: string,
   command: (transaction: DatabaseTransaction, context: { character: Character }) => Promise<Result>,
+  options: OwnedCharacterCommandOptions & { now?: Date } = {},
 ): Promise<Result> {
   return db.transaction(async (transaction) => {
-    const playerAccountId = await resolvePlayableAccountId(transaction, userId);
-    const character = await lockCharacterRow(transaction, characterId, playerAccountId);
+    const character = await lockPlayableOwnedCharacter(
+      transaction,
+      userId,
+      characterId,
+      options.now ?? new Date(),
+      options,
+    );
     return command(transaction, { character });
   });
 }
@@ -218,7 +256,9 @@ export async function withLockedOwnedCharacter<Result>(
  * account id), so a forged or foreign character id matches nothing and yields
  * the existing safe `404` semantics without locking another player's row.
  * Gameplay access (issue #223) is required first, so a refused account never
- * locks the row or reconciles due activity work.
+ * locks the row or reconciles due activity work. A trade-engaged character is
+ * refused before reconciliation unless the command opts out (#266); it is idle
+ * by construction, so there is nothing for it to reconcile.
  */
 export async function withResolvedOwnedCharacter<Snapshot, Outcome, Result>(
   userId: string,
@@ -226,10 +266,16 @@ export async function withResolvedOwnedCharacter<Snapshot, Outcome, Result>(
   resolver: ActionResolver<Snapshot, Outcome>,
   command: (transaction: DatabaseTransaction, context: ResolvedCharacterContext) => Promise<Result>,
   now: Date = new Date(),
+  options: OwnedCharacterCommandOptions = {},
 ): Promise<Result> {
   return db.transaction(async (transaction) => {
-    const playerAccountId = await resolvePlayableAccountId(transaction, userId);
-    const character = await lockCharacterRow(transaction, characterId, playerAccountId);
+    const character = await lockPlayableOwnedCharacter(
+      transaction,
+      userId,
+      characterId,
+      now,
+      options,
+    );
     const action = await reconcileActiveAction(transaction, character, resolver, now);
     return command(transaction, { character, action });
   });

@@ -37,6 +37,7 @@ import { lockAccountChatSends } from "@/server/chat-send-lock";
 import { requirePlayableOwnedCharacter } from "@/server/gameplay-access";
 import { isSociallyRestricted, SOCIALLY_RESTRICTED_MESSAGE } from "@/server/moderation-sanctions";
 import { accountsBlocking, notBlockedByViewer } from "@/server/player-blocks";
+import { assertNotTradeEngaged } from "@/server/player-trade-gate";
 import { publishRealtimeEvent } from "@/server/realtime";
 
 /**
@@ -346,6 +347,14 @@ async function commitSend(
           `You can post another promoted ad in ${minutesLabel(readyInMs)}.`,
         );
       }
+      // The ad spends Credits, so a trade-engaged character may not post one
+      // (#266). Lock the row first so acceptance cannot claim it in between.
+      await tx
+        .select({ id: characters.id })
+        .from(characters)
+        .where(eq(characters.id, character.id))
+        .for("update");
+      await assertNotTradeEngaged(tx, character.id, now);
       promotedPriceCredits = CHAT_POLICY.promotedAd.priceCredits;
       const charged = await tx
         .update(characters)
