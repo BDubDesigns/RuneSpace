@@ -235,7 +235,11 @@ while developing.
   still available, account-wide grant, paired fields, atomic audit, no-op
   silence, rollback when the audit write fails, non-admin refusal, allowlist
   grants nothing) and `tests/integration/gameplay-access-migration.test.ts`
-  (replay from the pre-#223 schema with existing character audit rows).
+  (replay from the pre-#223 schema with existing character audit rows). The
+  first is the only integration file that changes the switch; it holds the
+  switch lock for each test, and the gated-account and `via: "early_access"`
+  assertions in other files wait for Closed under `withPublicGameplayClosed`
+  (issue #277, `docs/testing-strategy.md`).
 - Browser: `tests/e2e/gameplay-access.spec.ts` covers the issue's eight
   journeys. It is the only spec that changes the global switch; it runs
   serially in the chromium project only and restores Closed and the migrated

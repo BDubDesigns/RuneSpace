@@ -12,7 +12,12 @@ import type {
   SanctionDuration,
   SanctionKind,
 } from "@/game/domain/moderation";
-import { cleanupTestUser, createCharacterForUser, createTestUser } from "./fixtures";
+import {
+  cleanupTestUser,
+  createCharacterForUser,
+  createTestUser,
+  withPublicGameplayClosed,
+} from "./fixtures";
 
 /**
  * The production moderation surface authenticates through the real Better Auth
@@ -1881,7 +1886,9 @@ suite("issue #248 moderation review, sanctions, and appeals (real PostgreSQL)", 
     it("suspends every character from gameplay even with Early Access, and ends at the exact instant", async () => {
       const { subject, moderationCase } = await reportedSubject();
       const alt = await altOf(subject.userId);
-      const before = await access.loadAccountGameplayAccess(db, subject.userId);
+      const before = await withPublicGameplayClosed(db, rune, () =>
+        access.loadAccountGameplayAccess(db, subject.userId),
+      );
       expect(before).toMatchObject({
         suspended: false,
         decision: { allowed: true, via: "early_access" },
@@ -1929,7 +1936,7 @@ suite("issue #248 moderation review, sanctions, and appeals (real PostgreSQL)", 
       expect(endsAt.getTime() - row!.startsAt.getTime()).toBe(24 * HOUR_MS);
       const at = (when: Date) => access.loadAccountGameplayAccess(db, subject.userId, when);
       expect((await at(new Date(endsAt.getTime() - 1))).suspended).toBe(true);
-      const atEnd = await at(endsAt);
+      const atEnd = await withPublicGameplayClosed(db, rune, () => at(endsAt));
       expect(atEnd).toMatchObject({
         suspended: false,
         decision: { allowed: true, via: "early_access" },

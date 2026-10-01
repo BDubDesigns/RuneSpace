@@ -20,6 +20,17 @@ small number of critical mobile player journeys.
 - These assert that domain outcomes are actually persisted and that the server
   is the authority. Ownership and gameplay-foundation tests run against the
   PostgreSQL service in the dedicated CI job and via `pnpm test:integration`.
+- Vitest runs integration files in parallel workers against **one** disposable
+  database, so a file's assertions must not depend on global state another file
+  can change mid-run. The global public-gameplay switch is the coordinated case
+  (issue #277): `tests/integration/gameplay-access.test.ts` is its only writer
+  and holds `holdPublicGameplaySwitch` (a PostgreSQL advisory lock) for each
+  test, restoring Closed before releasing it. Any assertion elsewhere that is
+  only true while gameplay is Closed — a gated account is refused, access is
+  granted `via: "early_access"` — runs inside `withPublicGameplayClosed`
+  (`tests/integration/fixtures.ts`), which waits for the writer and confirms
+  Closed. Fixture accounts carry fixture Early Access, so ordinary gameplay
+  assertions need neither.
 
 ## 3. Browser tests (Playwright)
 - Target: a **small number** of important mobile player journeys (the smoke

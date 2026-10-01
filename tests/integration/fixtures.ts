@@ -87,6 +87,79 @@ export async function grantFixtureEarlyAccess(db: Db, rune: Rune, playerAccountI
 }
 
 /**
+ * Advisory-lock key coordinating the global public-gameplay switch across the
+ * parallel integration workers, which share one database (issue #277).
+ * `gameplay-access.test.ts` is the only suite that writes the switch and holds
+ * this lock exclusively while it may be Open; an assertion elsewhere that is
+ * only true while gameplay is Closed — a gated account is refused, access is
+ * granted `via: "early_access"` — runs under the shared lock through
+ * `withPublicGameplayClosed`. Without it, the switch can be Open mid-assertion
+ * and the gate correctly admits the account through public gameplay.
+ */
+export const PUBLIC_GAMEPLAY_SWITCH_LOCK_KEY = 277_0001;
+
+async function holdSwitchLock(db: Db, mode: "exclusive" | "shared") {
+  const client = await db.$client.connect();
+  try {
+    await client.query(
+      mode === "exclusive" ? "select pg_advisory_lock($1)" : "select pg_advisory_lock_shared($1)",
+      [PUBLIC_GAMEPLAY_SWITCH_LOCK_KEY],
+    );
+  } catch (error) {
+    client.release();
+    throw error;
+  }
+  let released = false;
+  return async () => {
+    if (released) return;
+    released = true;
+    try {
+      await client.query(
+        mode === "exclusive"
+          ? "select pg_advisory_unlock($1)"
+          : "select pg_advisory_unlock_shared($1)",
+        [PUBLIC_GAMEPLAY_SWITCH_LOCK_KEY],
+      );
+    } finally {
+      client.release();
+    }
+  };
+}
+
+/**
+ * Takes the public-gameplay switch for writing. Waits for every
+ * `withPublicGameplayClosed` section in flight; the caller must restore Closed
+ * before calling the returned release, which is idempotent.
+ */
+export function holdPublicGameplaySwitch(db: Db) {
+  return holdSwitchLock(db, "exclusive");
+}
+
+/**
+ * Runs an assertion that depends on public gameplay being Closed while no
+ * switch writer can open it, after confirming it is Closed.
+ */
+export async function withPublicGameplayClosed<T>(
+  db: Db,
+  rune: Rune,
+  run: () => Promise<T>,
+): Promise<T> {
+  const release = await holdSwitchLock(db, "shared");
+  try {
+    const [state] = await db
+      .select({ open: rune.runespaceAccessState.publicGameplayOpen })
+      .from(rune.runespaceAccessState)
+      .where(eq(rune.runespaceAccessState.id, 1));
+    if (state?.open !== false) {
+      throw new Error("Public gameplay is not Closed; a switch writer bypassed the switch lock");
+    }
+    return await run();
+  } finally {
+    await release();
+  }
+}
+
+/**
  * Ensures the player account for a user and creates one character through the
  * authoritative command. Portraits are required at the creation boundary
  * (issue #65), so suites that do not care about portraits get a stable default

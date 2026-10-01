@@ -1,6 +1,11 @@
 import { eq } from "drizzle-orm";
 import { afterEach, beforeAll, describe, expect, it } from "vitest";
-import { cleanupTestUser, createCharacterForUser, createTestUser } from "./fixtures";
+import {
+  cleanupTestUser,
+  createCharacterForUser,
+  createTestUser,
+  withPublicGameplayClosed,
+} from "./fixtures";
 
 const DATABASE_URL = process.env.DATABASE_URL;
 const suite = DATABASE_URL ? describe : describe.skip;
@@ -115,9 +120,11 @@ suite("issue #245 realtime stream boundary (real PostgreSQL)", () => {
   it("refuses an account without gameplay access, and re-checks it on every stream", async () => {
     const fanout = realtime.createInMemoryRealtimeFanout();
     const waiting = await player({ gameplayAccess: false });
-    await expect(
-      streams.openRealtimeStream(waiting.userId, waiting.character.id, { fanout }),
-    ).rejects.toMatchObject({ name: "GameplayAccessError", status: 403 });
+    await withPublicGameplayClosed(db, rune, () =>
+      expect(
+        streams.openRealtimeStream(waiting.userId, waiting.character.id, { fanout }),
+      ).rejects.toMatchObject({ name: "GameplayAccessError", status: 403 }),
+    );
 
     const unverified = await player({ emailVerified: false });
     await expect(
@@ -134,9 +141,11 @@ suite("issue #245 realtime stream boundary (real PostgreSQL)", () => {
       .update(rune.playerAccounts)
       .set({ earlyAccessGrantedAt: null, earlyAccessGrantedByAdminUserId: null })
       .where(eq(rune.playerAccounts.id, playing.character.playerAccountId));
-    await expect(
-      streams.openRealtimeStream(playing.userId, playing.character.id, { fanout }),
-    ).rejects.toMatchObject({ name: "GameplayAccessError", status: 403 });
+    await withPublicGameplayClosed(db, rune, () =>
+      expect(
+        streams.openRealtimeStream(playing.userId, playing.character.id, { fanout }),
+      ).rejects.toMatchObject({ name: "GameplayAccessError", status: 403 }),
+    );
     expect(fanout.size()).toBe(0);
   });
 
