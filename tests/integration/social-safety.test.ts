@@ -5,7 +5,12 @@ import type { WhisperMessageView, WhisperSendResult } from "@/game/schemas/whisp
 import type { RealtimeEnvelope } from "@/game/schemas/realtime";
 import type { MessageReportEvidence } from "@/server/player-reports";
 import { LOCATION_IDS } from "@/game/config/foundations";
-import { cleanupTestUser, createCharacterForUser, createTestUser } from "./fixtures";
+import {
+  cleanupTestUser,
+  createCharacterForUser,
+  createTestUser,
+  withChatRetentionWindow,
+} from "./fixtures";
 
 const DATABASE_URL = process.env.DATABASE_URL;
 const suite = DATABASE_URL ? describe : describe.skip;
@@ -968,57 +973,59 @@ suite("issue #247 Whispers, Block, and Report (real PostgreSQL)", () => {
     });
 
     it("keeps preserved evidence after ordinary retention deletes the messages", async () => {
-      const reporter = await player();
-      const reported = await player();
-      const now = new Date();
-      // One hour inside retention, so a prune just after it expires cannot
-      // touch the other suites' deliberately still-retained rows.
-      const old = new Date(now.getTime() - 90 * DAY_MS + 60 * 60_000);
-      const [target] = await db
-        .insert(rune.chatMessages)
-        .values({
-          channel: "general",
-          senderPlayerAccountId: reported.character.playerAccountId,
-          senderCharacterId: reported.character.id,
-          senderCharacterName: reported.character.displayName,
-          body: "old but reportable",
-          createdAt: old,
-        })
-        .returning();
-      await reports.reportMessage(
-        reporter.userId,
-        reporter.character.id,
-        { messageId: target!.id, reason: "other" },
-        { now },
-      );
-      // Two hours later ordinary retention removes the chat row.
-      const later = new Date(now.getTime() + 2 * 60 * 60_000);
-      await chat.pruneExpiredChatMessages(db, later, 10_000);
-      const remaining = await db
-        .select()
-        .from(rune.chatMessages)
-        .where(inArray(rune.chatMessages.id, [target!.id]));
-      expect(remaining).toHaveLength(0);
-      const [row] = await db
-        .select()
-        .from(rune.playerReports)
-        .where(
-          and(
-            eq(rune.playerReports.messageId, target!.id),
-            eq(rune.playerReports.reporterCharacterId, reporter.character.id),
-          ),
-        );
-      expect((row!.evidence as MessageReportEvidence).message.body).toBe("old but reportable");
-      // An expired message can no longer be reported.
-      const other = await player();
-      expect(
+      await withChatRetentionWindow(db, async () => {
+        const reporter = await player();
+        const reported = await player();
+        const now = new Date();
+        // One hour inside retention, so a prune just after it expires cannot
+        // touch the other suites' deliberately still-retained rows.
+        const old = new Date(now.getTime() - 90 * DAY_MS + 60 * 60_000);
+        const [target] = await db
+          .insert(rune.chatMessages)
+          .values({
+            channel: "general",
+            senderPlayerAccountId: reported.character.playerAccountId,
+            senderCharacterId: reported.character.id,
+            senderCharacterName: reported.character.displayName,
+            body: "old but reportable",
+            createdAt: old,
+          })
+          .returning();
         await reports.reportMessage(
-          other.userId,
-          other.character.id,
+          reporter.userId,
+          reporter.character.id,
           { messageId: target!.id, reason: "other" },
-          { now: later },
-        ),
-      ).toEqual({ error: "That message can't be reported." });
+          { now },
+        );
+        // Two hours later ordinary retention removes the chat row.
+        const later = new Date(now.getTime() + 2 * 60 * 60_000);
+        await chat.pruneExpiredChatMessages(db, later, 10_000);
+        const remaining = await db
+          .select()
+          .from(rune.chatMessages)
+          .where(inArray(rune.chatMessages.id, [target!.id]));
+        expect(remaining).toHaveLength(0);
+        const [row] = await db
+          .select()
+          .from(rune.playerReports)
+          .where(
+            and(
+              eq(rune.playerReports.messageId, target!.id),
+              eq(rune.playerReports.reporterCharacterId, reporter.character.id),
+            ),
+          );
+        expect((row!.evidence as MessageReportEvidence).message.body).toBe("old but reportable");
+        // An expired message can no longer be reported.
+        const other = await player();
+        expect(
+          await reports.reportMessage(
+            other.userId,
+            other.character.id,
+            { messageId: target!.id, reason: "other" },
+            { now: later },
+          ),
+        ).toEqual({ error: "That message can't be reported." });
+      });
     });
   });
 });

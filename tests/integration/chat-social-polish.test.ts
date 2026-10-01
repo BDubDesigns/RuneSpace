@@ -5,7 +5,12 @@ import { CHAT_POLICY } from "@/game/domain/chat";
 import type { ChatMessageView, ChatSendResult, VisibleChatMessageView } from "@/game/schemas/chat";
 import type { RealtimeEnvelope } from "@/game/schemas/realtime";
 import type { WhisperMessageView, WhisperSendResult } from "@/game/schemas/whispers";
-import { cleanupTestUser, createCharacterForUser, createTestUser } from "./fixtures";
+import {
+  cleanupTestUser,
+  createCharacterForUser,
+  createTestUser,
+  withChatRetentionWindow,
+} from "./fixtures";
 
 const DATABASE_URL = process.env.DATABASE_URL;
 const suite = DATABASE_URL ? describe : describe.skip;
@@ -459,31 +464,33 @@ suite("issue #261 Chat/Social polish (real PostgreSQL)", () => {
     });
 
     it("deletes mentions with their message under ordinary retention", async () => {
-      const sender = await player();
-      const target = await player();
-      const old = new Date(Date.now() - CHAT_POLICY.retentionMs + 60 * 60_000);
-      const message = posted(
-        await chat.sendChatMessage(
-          sender.userId,
-          sender.character.id,
-          {
-            channel: "general",
-            text: `@${target.character.displayName} old`,
-            mentions: [{ characterId: target.character.id }],
-          },
-          { now: old },
-        ),
-      );
-      expect(await mentionRows(message.id)).toHaveLength(1);
-      // Expired mentions never count, even before a prune removes them.
-      const later = new Date(Date.now() + 2 * 60 * 60_000);
-      expect(
-        (await chat.readChatMentions(target.userId, target.character.id, later)).unreadTotal,
-      ).toBe(0);
-      // Deleting the message (as the retention sweep does) takes its
-      // mentions with it. Deleted directly so no other suite's rows are swept.
-      await db.delete(rune.chatMessages).where(eq(rune.chatMessages.id, message.id));
-      expect(await mentionRows(message.id)).toEqual([]);
+      await withChatRetentionWindow(db, async () => {
+        const sender = await player();
+        const target = await player();
+        const old = new Date(Date.now() - CHAT_POLICY.retentionMs + 60 * 60_000);
+        const message = posted(
+          await chat.sendChatMessage(
+            sender.userId,
+            sender.character.id,
+            {
+              channel: "general",
+              text: `@${target.character.displayName} old`,
+              mentions: [{ characterId: target.character.id }],
+            },
+            { now: old },
+          ),
+        );
+        expect(await mentionRows(message.id)).toHaveLength(1);
+        // Expired mentions never count, even before a prune removes them.
+        const later = new Date(Date.now() + 2 * 60 * 60_000);
+        expect(
+          (await chat.readChatMentions(target.userId, target.character.id, later)).unreadTotal,
+        ).toBe(0);
+        // Deleting the message (as the retention sweep does) takes its
+        // mentions with it. Deleted directly so no other suite's rows are swept.
+        await db.delete(rune.chatMessages).where(eq(rune.chatMessages.id, message.id));
+        expect(await mentionRows(message.id)).toEqual([]);
+      });
     });
   });
 

@@ -98,12 +98,18 @@ export async function grantFixtureEarlyAccess(db: Db, rune: Rune, playerAccountI
  */
 export const PUBLIC_GAMEPLAY_SWITCH_LOCK_KEY = 277_0001;
 
-async function holdSwitchLock(db: Db, mode: "exclusive" | "shared") {
+/**
+ * Holds a session-level advisory lock on a dedicated pooled connection until
+ * the returned (idempotent) release is called. Integration files run in
+ * parallel workers against one database; these locks coordinate the few tests
+ * that touch genuinely global state.
+ */
+async function holdAdvisoryLock(db: Db, key: number, mode: "exclusive" | "shared") {
   const client = await db.$client.connect();
   try {
     await client.query(
       mode === "exclusive" ? "select pg_advisory_lock($1)" : "select pg_advisory_lock_shared($1)",
-      [PUBLIC_GAMEPLAY_SWITCH_LOCK_KEY],
+      [key],
     );
   } catch (error) {
     client.release();
@@ -118,7 +124,7 @@ async function holdSwitchLock(db: Db, mode: "exclusive" | "shared") {
         mode === "exclusive"
           ? "select pg_advisory_unlock($1)"
           : "select pg_advisory_unlock_shared($1)",
-        [PUBLIC_GAMEPLAY_SWITCH_LOCK_KEY],
+        [key],
       );
     } finally {
       client.release();
@@ -132,7 +138,7 @@ async function holdSwitchLock(db: Db, mode: "exclusive" | "shared") {
  * before calling the returned release, which is idempotent.
  */
 export function holdPublicGameplaySwitch(db: Db) {
-  return holdSwitchLock(db, "exclusive");
+  return holdAdvisoryLock(db, PUBLIC_GAMEPLAY_SWITCH_LOCK_KEY, "exclusive");
 }
 
 /**
@@ -144,7 +150,7 @@ export async function withPublicGameplayClosed<T>(
   rune: Rune,
   run: () => Promise<T>,
 ): Promise<T> {
-  const release = await holdSwitchLock(db, "shared");
+  const release = await holdAdvisoryLock(db, PUBLIC_GAMEPLAY_SWITCH_LOCK_KEY, "shared");
   try {
     const [state] = await db
       .select({ open: rune.runespaceAccessState.publicGameplayOpen })
@@ -153,6 +159,28 @@ export async function withPublicGameplayClosed<T>(
     if (state?.open !== false) {
       throw new Error("Public gameplay is not Closed; a switch writer bypassed the switch lock");
     }
+    return await run();
+  } finally {
+    await release();
+  }
+}
+
+/**
+ * Advisory-lock key for the chat retention window (issue #278).
+ * `pruneExpiredChatMessages` sweeps the whole `chat_messages` table, so a test
+ * that prunes with a clock ahead of real time deletes every other test's rows
+ * near the 90-day boundary, and a test holding such rows can lose them to it.
+ * Every test that keeps chat rows within a day of the boundary, or prunes (or
+ * sends) with a clock ahead of real time, runs inside `withChatRetentionWindow`.
+ * Ordinary sends prune only rows already expired in real time, so a test must
+ * also keep its rows inside real retention, expiring them only on its own clock.
+ */
+export const CHAT_RETENTION_WINDOW_LOCK_KEY = 278_0001;
+
+/** Runs a chat-retention test while no other retention test can sweep or seed the boundary. */
+export async function withChatRetentionWindow<T>(db: Db, run: () => Promise<T>): Promise<T> {
+  const release = await holdAdvisoryLock(db, CHAT_RETENTION_WINDOW_LOCK_KEY, "exclusive");
+  try {
     return await run();
   } finally {
     await release();
