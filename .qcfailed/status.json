@@ -3,6 +3,11 @@
   "projectSlug": "runespace",
   "workState": "active",
   "currentFocus": "Preparing the October 27 Soft Alpha: chat, Whispers, Block, Report, and moderation are in; same-location player trading is getting its player-facing experience.",
+  "currentChange": {
+    "summary": "Player trading experience: Trade from a nearby player's profile, request cards in Chat/Social, a trade screen with Ready and Confirm, same-account trades, and a Player Trading Wiki page.",
+    "stage": "review",
+    "pullRequestNumber": 272
+  },
   "latestCompleted": {
     "summary": "Player trade settlement: Credits and item offers, Ready and Confirm on an exact version, an all-or-nothing commit that respects carry capacity and last-Cutter safety, and a permanent trade audit.",
     "date": "2026-09-30",
