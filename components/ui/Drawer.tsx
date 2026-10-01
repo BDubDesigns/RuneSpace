@@ -18,6 +18,14 @@ const FOCUSABLE_SELECTOR =
 const EXIT_FALLBACK_MS = 400;
 
 /**
+ * Open Drawers, oldest first. Only the newest owns the keyboard: a surface
+ * that opens over another one (an accepted player trade over an NPC
+ * conversation, #268) must not have the older Drawer's focus trap pull focus
+ * back out of it, or the two traps would bounce focus between them.
+ */
+const openDrawers: object[] = [];
+
+/**
  * Shared modal overlay used by Inventory, Equipment, and the character
  * portrait chooser.
  *
@@ -63,6 +71,18 @@ export function Drawer({
   const finishedRef = useRef(false); // true once we return focus + unmount
   const exitTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [exiting, setExiting] = useState(false);
+  const stackEntry = useRef<object>({});
+
+  useEffect(() => {
+    const entry = stackEntry.current;
+    openDrawers.push(entry);
+    return () => {
+      const index = openDrawers.indexOf(entry);
+      if (index !== -1) openDrawers.splice(index, 1);
+    };
+  }, []);
+
+  const isTopmost = () => openDrawers[openDrawers.length - 1] === stackEntry.current;
 
   const focusFirstAvailable = useCallback(() => {
     const panelElement = panel.current;
@@ -123,6 +143,7 @@ export function Drawer({
   // Keyboard: Escape dismisses, Tab cycles within the modal.
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
+      if (!isTopmost()) return;
       if (event.key === "Escape") {
         if (!dismissible) return;
         close();
@@ -151,7 +172,7 @@ export function Drawer({
   // the (about-to-unmount) panel.
   useEffect(() => {
     function onFocusIn(event: FocusEvent) {
-      if (finishedRef.current) return;
+      if (finishedRef.current || !isTopmost()) return;
       if (panel.current && event.target instanceof Node && !panel.current.contains(event.target)) {
         focusFirstAvailable();
       }

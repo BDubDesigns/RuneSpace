@@ -49,6 +49,7 @@ import {
 import {
   isEmptyTradeOffer,
   planTradeSettlement,
+  type SettledTradeOffer,
   type TradeOfferContent,
   type TradeSettlementFailure,
   type TradeSettlementSide,
@@ -58,7 +59,7 @@ import type {
   EndedTradeView,
   IncomingTradeRequestView,
   TradeCommandResult,
-  TradeOfferLines,
+  TradeExchangeLines,
   TradeOfferView,
   TradeRefusalReason,
   TradeRequestChange,
@@ -78,7 +79,7 @@ import { requireTradeRequestInitiationAllowed } from "@/server/moderation-sancti
 import { applyCarriedStackDiff } from "@/server/carried-inventory";
 import { OwnershipError } from "@/server/ownership";
 import { blockBetween } from "@/server/player-blocks";
-import { insertTradeAudit } from "@/server/player-trade-audit";
+import { findTradeAudit, insertTradeAudit } from "@/server/player-trade-audit";
 import { loadPlaySnapshot } from "@/server/play-state";
 import { publishRealtimeEvent } from "@/server/realtime";
 import { resolveCharacterTarget } from "@/server/social-targets";
@@ -1359,15 +1360,10 @@ async function loadOfferContent(
   };
 }
 
-/**
- * Both offers with each unique instance's current facts, for the participants.
- * A completed session's instances belong to the other side now, so its view
- * (`settled`) keeps every offered instance whoever owns it.
- */
+/** Both offers with each unique instance's current facts, for the participants. */
 async function readOfferViews(
   reader: Reader,
   session: PlayerTradeSession,
-  { settled = false }: { settled?: boolean } = {},
 ): Promise<Record<TradeSide, TradeOfferView>> {
   const content = await loadOfferContent(reader, session);
   const instanceIds = [...content.requester.itemInstanceIds, ...content.recipient.itemInstanceIds];
@@ -1390,7 +1386,7 @@ async function readOfferViews(
     // offered; settlement would refuse it anyway.
     items: content[side].itemInstanceIds.flatMap((id) => {
       const instance = instances.find(
-        (candidate) => candidate.id === id && (settled || candidate.characterId === characterId),
+        (candidate) => candidate.id === id && candidate.characterId === characterId,
       );
       return instance
         ? [{ itemInstanceId: id, itemId: instance.itemId, currentCharge: instance.currentCharge }]
@@ -1606,6 +1602,8 @@ async function settleTrade(context: OfferContext): Promise<TradeCommandResult> {
       endedByCharacterId: null,
       requesterConfirmed: true,
       recipientConfirmed: true,
+      settlementRefusal: null,
+      settlementRefusalSide: null,
       lastActivityAt: now,
     })
     .where(eq(playerTradeSessions.id, session.id));
@@ -1812,14 +1810,10 @@ async function attachPlayerNames(reader: Reader, state: TradeStateView) {
   }
 }
 
-function offerLines(offer: TradeOfferView): TradeOfferLines {
-  return { credits: offer.credits, stacks: offer.stacks, items: offer.items };
-}
-
 /**
  * The character's most recent session, if it has ended (#268): how it ended,
- * and for a completed trade exactly what moved, from the stored offer lines
- * the settlement committed. A stored `active` session past its inactivity
+ * and for a completed trade exactly what moved, from the trade's audit row —
+ * the committed snapshot. A stored `active` session past its inactivity
  * expiry reads as expired, the same derivation every other check uses.
  */
 async function readEndedTrade(
@@ -1856,11 +1850,38 @@ async function readEndedTrade(
       ? tradeSessionExpiresAt(latest.lastActivityAt)
       : (latest.endedAt ?? latest.lastActivityAt);
   let exchange: EndedTradeView["exchange"];
-  if (status === "completed") {
-    const offers = await readOfferViews(reader, latest, { settled: true });
+  const audit = status === "completed" ? await findTradeAudit(latest.id, reader) : undefined;
+  if (audit) {
+    const [mine, theirs] =
+      side === "requester"
+        ? [audit.requester, audit.recipient]
+        : [audit.recipient, audit.requester];
+    const ids = [...mine.offer.items, ...theirs.offer.items].map((item) => item.itemInstanceId);
+    const held = ids.length
+      ? await reader
+          .select({
+            id: itemInstances.id,
+            characterId: itemInstances.characterId,
+            currentCharge: itemInstances.currentCharge,
+          })
+          .from(itemInstances)
+          .where(inArray(itemInstances.id, ids))
+      : [];
+    // An item's state is shown only while the character that received it in
+    // this trade still holds it: never the state of something since passed on.
+    const lines = (offer: SettledTradeOffer, receiverId: string): TradeExchangeLines => ({
+      credits: offer.credits,
+      stacks: offer.stacks.map((stack) => ({ ...stack })),
+      items: offer.items.map((item) => {
+        const holding = held.find(
+          (row) => row.id === item.itemInstanceId && row.characterId === receiverId,
+        );
+        return holding ? { ...item, currentCharge: holding.currentCharge } : { ...item };
+      }),
+    });
     exchange = {
-      gave: offerLines(offers[side]),
-      received: offerLines(offers[otherTradeSide(side)]),
+      gave: lines(mine.offer, counterpartId),
+      received: lines(theirs.offer, character.id),
     };
   }
   return {

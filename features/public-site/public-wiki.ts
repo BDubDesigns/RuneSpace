@@ -444,7 +444,7 @@ const authoredWikiArticles = [
           [
             "Choose Accept to start trading or Decline to turn it down. Several requests can wait at once; accepting one ends the others. If one player keeps sending you requests, the card offers Decline & Block, which ",
             { text: "blocks them", articleSlug: COMMUNITY_RULES_SLUG },
-            " the same way Block does everywhere else. They aren't told.",
+            " the same way Block does everywhere else. They aren't told you blocked them.",
           ],
           "You need to be idle to accept: if you're in the middle of something, Accept tells you to finish it first.",
         ],

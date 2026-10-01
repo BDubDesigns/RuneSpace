@@ -71,8 +71,8 @@ export function IncomingTradeRequestCard({ request }: { request: IncomingTradeRe
       </p>
       {request.blockProminent ? (
         <p className="text-xs text-[color:var(--rs-text-secondary)]">
-          This player keeps sending you trade requests. You can decline and block them — they
-          won&apos;t be told.
+          This player keeps sending you trade requests. You can decline and block them; they
+          won&apos;t be told you blocked them.
         </p>
       ) : null}
       {blocking ? (

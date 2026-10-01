@@ -1276,6 +1276,16 @@ suite("issue #267 player trade offers, settlement, and audit (real PostgreSQL)",
       expect(forB.ended).toMatchObject({ id: sessionId, outcome: "completed" });
       expect(forB.ended!.exchange).toEqual({ gave: nothing, received: gave });
       expect(forB.ended!.endedAt).toBe(forA.ended!.endedAt);
+
+      // Once the Cutter moves on, the exchange still names it but no longer
+      // reports the state of something neither participant holds.
+      const elsewhere = await player();
+      await db
+        .update(rune.itemInstances)
+        .set({ characterId: elsewhere.character.id, currentCharge: 2 })
+        .where(eq(rune.itemInstances.id, cutter));
+      const later = (await ta.state()).ended!.exchange!.gave.items;
+      expect(later).toEqual([{ itemInstanceId: cutter, itemId: SALVAGE }]);
     });
 
     it("says who canceled, reads an idle session as expired, and never leaks another trade", async () => {

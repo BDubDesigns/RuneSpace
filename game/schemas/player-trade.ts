@@ -117,8 +117,19 @@ export type TradeSessionView = {
   settlementRefusal?: { reason: TradeRefusalReason; message: string };
 };
 
-/** The offered lines of one side, without consent: what a finished trade moved. */
+/** The offered lines of one side, without consent. */
 export type TradeOfferLines = Omit<TradeOfferView, "ready" | "confirmed">;
+
+/**
+ * What one side of a completed trade moved, from its committed audit row
+ * (#268). An item's `currentCharge` is present only while the character that
+ * received it still holds it; otherwise its state is no longer this trade's.
+ */
+export type TradeExchangeLines = {
+  credits: number;
+  stacks: { itemId: string; quantity: number }[];
+  items: { itemInstanceId: string; itemId: string; currentCharge?: number | null }[];
+};
 
 /**
  * The acting character's most recent accepted session once it has ended
@@ -133,7 +144,7 @@ export type EndedTradeView = {
   /** For a canceled trade: whether the acting character canceled it. */
   canceledByYou: boolean;
   /** For a completed trade: exactly what the acting character gave and received. */
-  exchange?: { gave: TradeOfferLines; received: TradeOfferLines };
+  exchange?: { gave: TradeExchangeLines; received: TradeExchangeLines };
 };
 
 /** A committed trade, as either participant may learn it from Confirm. */

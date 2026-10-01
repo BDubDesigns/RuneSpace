@@ -198,7 +198,7 @@ function requestCard(dialog: Locator, fromName: string) {
 }
 
 function surface(page: Page) {
-  return page.getByRole("dialog", { name: "Trade" });
+  return page.getByRole("dialog", { name: "Trade", exact: true });
 }
 
 function offer(trade: Locator, side: "yours" | "theirs") {
@@ -493,13 +493,14 @@ journey(
     // 11b. Cancel Trade: the other player is told, and nothing moved.
     await bTrade.getByRole("button", { name: "Cancel Trade" }).click();
     await expect(bTrade).toHaveCount(0);
-    await expect(b.page.getByRole("dialog", { name: "Trade result" })).toHaveCount(0);
     const aEnded = page.getByRole("dialog", { name: "Trade result" });
     await expect(aEnded.locator("[data-trade-ended]")).toHaveAttribute(
       "data-trade-ended",
       "canceled",
     );
     await expect(aEnded).toContainText(`${bName} canceled the trade. Nothing moved.`);
+    // The player who canceled just leaves; there is nothing to explain to them.
+    await expect(b.page.getByRole("dialog", { name: "Trade result" })).toHaveCount(0);
     expect(await creditsOf(a)).toBe(20);
     await aEnded.getByRole("button", { name: "Done" }).click();
     await expect(aEnded).toHaveCount(0);
@@ -571,6 +572,10 @@ journey(
     const altPage = await page.context().newPage();
     await openPlay(altPage, alt.character.id);
     await openPlay(page, a.character.id);
+    // Both of A's profiles of B are open before the first request: the
+    // request window and expiry are real time by design, so every step that
+    // depends on them runs back to back.
+    await openProfile(altPage, bName);
     await openProfile(page, bName);
     const bChat = await openChat(b.page);
 
@@ -581,17 +586,8 @@ journey(
       await expect(profileWaiting(page)).toHaveCount(0);
     }
     await requestTrade(page, bName);
-    const card = requestCard(bChat, aName);
-    await expect(card.locator("[data-trade-request-card]")).toHaveAttribute(
-      "data-block-prominent",
-      "",
-    );
-    await expect(card.getByRole("button", { name: "Decline & Block" })).toBeVisible();
-    await expectNoHorizontalOverflow(b.page, bChat);
-    await captureReviewScreenshot(b.page, "issue-268-block-prominent-393.png");
 
     // The same account's fifth request inside the window is refused, from any character.
-    await openProfile(altPage, bName);
     await altPage
       .getByRole("group", { name: `Interact with ${bName}` })
       .getByRole("button", { name: "Trade", exact: true })
@@ -600,6 +596,15 @@ journey(
       "You've sent a lot of trade requests.",
     );
     await expect(profileWaiting(altPage)).toHaveCount(0);
+
+    const card = requestCard(bChat, aName);
+    await expect(card.locator("[data-trade-request-card]")).toHaveAttribute(
+      "data-block-prominent",
+      "",
+    );
+    await expect(card.getByRole("button", { name: "Decline & Block" })).toBeVisible();
+    await expectNoHorizontalOverflow(b.page, bChat);
+    await captureReviewScreenshot(b.page, "issue-268-block-prominent-393.png");
 
     // Decline & Block runs the ordinary Block confirmation.
     await card.getByRole("button", { name: "Decline & Block" }).click();

@@ -5,11 +5,12 @@ import { ActionButton } from "@/components/ui/ActionButton";
 import { Drawer } from "@/components/ui/Drawer";
 import { Feedback } from "@/components/ui/Feedback";
 import { usePlay } from "@/features/play/PlayContext";
-import type { TradeOfferLines, TradeSessionView } from "@/game/schemas/player-trade";
+import type { TradeExchangeLines, TradeSessionView } from "@/game/schemas/player-trade";
 import {
   usePlayerTrade,
   type EndedTradeNotice,
   type TradeCommandError,
+  type TradeSessionCommands,
 } from "./PlayerTradeContext";
 import {
   formatCredits,
@@ -60,16 +61,19 @@ function stageStatus(stage: TradeStage, session: TradeSessionView): string {
 }
 
 function TradeSessionSurface({ session }: { session: TradeSessionView }) {
-  const { session: commands } = usePlayerTrade();
+  const { sessionCommands } = usePlayerTrade();
+  // Every command names the version this render shows, never a newer one.
+  const commands = sessionCommands(session);
   const stage = tradeStage(session);
   const [pending, setPending] = useState<string>();
   const [error, setError] = useState<string>();
   const name = session.counterpart.name;
 
-  // A new version is a new proposal: a refusal about the old one is stale.
+  // A refusal stays until the player acts again or the trade moves on to
+  // another stage; a stale-offer refusal must survive the re-read it causes.
   useEffect(() => {
     setError(undefined);
-  }, [session.offerVersion]);
+  }, [stage]);
 
   async function exec(key: string, command: () => Promise<TradeCommandError>) {
     if (pending) return;
@@ -112,7 +116,7 @@ function TradeSessionSurface({ session }: { session: TradeSessionView }) {
               {stageStatus(stage, session)}
             </p>
           </div>
-          {session.settlementRefusal ? (
+          {session.settlementRefusal && stage === "compose" ? (
             <div data-trade-settlement-refusal={session.settlementRefusal.reason}>
               <Feedback tone="danger">{session.settlementRefusal.message}</Feedback>
             </div>
@@ -122,7 +126,13 @@ function TradeSessionSurface({ session }: { session: TradeSessionView }) {
             <FrozenReview session={session} />
           ) : (
             <div className="grid gap-3 sm:grid-cols-2">
-              <YourOffer exec={exec} pending={pending} session={session} stage={stage} />
+              <YourOffer
+                commands={commands}
+                exec={exec}
+                pending={pending}
+                session={session}
+                stage={stage}
+              />
               <OfferPanel
                 heading="They offer"
                 kind="theirs"
@@ -189,14 +199,15 @@ function YourOffer({
   session,
   stage,
   pending,
+  commands,
   exec,
 }: {
   session: TradeSessionView;
   stage: TradeStage;
   pending: string | undefined;
+  commands: TradeSessionCommands;
   exec: (key: string, command: () => Promise<TradeCommandError>) => Promise<void>;
 }) {
-  const { session: commands } = usePlayerTrade();
   const { state } = usePlay();
   const editable = stage === "compose";
   const busy = pending !== undefined;
@@ -451,7 +462,7 @@ function OfferLinesList({
   onRemoveItem,
   removeDisabled,
 }: {
-  lines: TradeOfferLines;
+  lines: TradeExchangeLines;
   emptyText: string;
   onRemoveStack?: (itemId: string, quantity: number) => void;
   onRemoveItem?: (itemInstanceId: string) => void;
@@ -531,7 +542,7 @@ function OfferPanel({
 }: {
   heading: string;
   kind: "yours" | "theirs";
-  lines: TradeOfferLines;
+  lines: TradeExchangeLines;
   status: string;
   locked?: boolean;
   onRemoveStack?: (itemId: string, quantity: number) => void;
@@ -606,7 +617,7 @@ function ExchangeColumn({
 }: {
   heading: string;
   kind: "give" | "receive";
-  lines: TradeOfferLines;
+  lines: TradeExchangeLines;
   consent?: string;
 }) {
   return (

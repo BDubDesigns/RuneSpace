@@ -14,7 +14,9 @@ import { useRouter } from "next/navigation";
 import { GAMEPLAY_ACCESS_REQUIRED_CODE } from "@/game/domain/gameplay-access";
 import type {
   EndedTradeView,
+  TradeRefusalReason,
   TradeRequestChange,
+  TradeSessionView,
   TradeStateView,
 } from "@/game/schemas/player-trade";
 import { useChat } from "@/features/chat/ChatContext";
@@ -69,7 +71,7 @@ export type EndedTradeNotice = Pick<EndedTradeView, "exchange"> & {
   outcome: EndedTradeView["outcome"] | "ended";
 };
 
-type SessionCommands = {
+export type TradeSessionCommands = {
   setCredits: (credits: number) => Promise<TradeCommandError>;
   addStack: (itemId: string, quantity: number) => Promise<TradeCommandError>;
   removeStack: (itemId: string, quantity: number) => Promise<TradeCommandError>;
@@ -91,7 +93,8 @@ type PlayerTradeContextValue = {
   cancelRequest: () => Promise<TradeCommandError>;
   acceptRequest: (requestId: string) => Promise<TradeCommandError>;
   declineRequest: (requestId: string) => Promise<TradeCommandError>;
-  session: SessionCommands;
+  /** Commands on one session, acting on exactly the version the caller renders. */
+  sessionCommands: (session: Pick<TradeSessionView, "id" | "offerVersion">) => TradeSessionCommands;
 };
 
 const PlayerTradeContext = createContext<PlayerTradeContextValue | undefined>(undefined);
@@ -102,6 +105,19 @@ const CONNECTION_ERROR = "That didn't reach RuneSpace. Check your connection and
 /** A lapse is derived on the next read; re-read just after it is due. */
 const LAPSE_GRACE_MS = 300;
 const MIN_LAPSE_DELAY_MS = 1_000;
+/**
+ * A final Confirm refused by settlement: the session itself now carries the
+ * reason for both participants, so the control adds no second copy of it.
+ */
+const SETTLEMENT_REFUSALS: ReadonlySet<TradeRefusalReason> = new Set([
+  "offer_unavailable",
+  "inventory_full",
+  "too_heavy",
+  "last_cutter",
+  "credit_limit",
+  "ineligible",
+  "empty_trade",
+]);
 
 type ReadResult = { state: TradeStateView } | { error: string; code?: string };
 
@@ -209,7 +225,11 @@ export function PlayerTradeProvider({
     if (next.outgoing) {
       setRequestNote(undefined);
     } else if (lapsed && !next.session) {
-      const text = endedRequestNote(lapsed.counterpart.name, requestChanges.current.get(lapsed.id));
+      // Expiry is never published, so a lapsed deadline is its own hint.
+      const change =
+        requestChanges.current.get(lapsed.id) ??
+        (Date.parse(lapsed.expiresAt) <= Date.now() ? "expired" : undefined);
+      const text = endedRequestNote(lapsed.counterpart.name, change);
       setRequestNote(text ? { name: lapsed.counterpart.name, text } : undefined);
     }
 
@@ -276,10 +296,11 @@ export function PlayerTradeProvider({
         return CONNECTION_ERROR;
       }
       if (!("status" in result) || result.status === "refused") {
-        if ("reason" in result && result.reason === "socially_restricted") refreshNotices();
+        const reason = "reason" in result ? result.reason : undefined;
+        if (reason === "socially_restricted") refreshNotices();
         // The answer carries no state; re-read what the server now holds.
         refresh();
-        return result.error;
+        return reason && SETTLEMENT_REFUSALS.has(reason) ? undefined : result.error;
       }
       apply(sequence, result.state);
       return undefined;
@@ -298,9 +319,15 @@ export function PlayerTradeProvider({
   const cancelRequest = useCallback(() => {
     const outgoing = stateRef.current?.outgoing;
     if (!outgoing) return Promise.resolve(undefined);
-    // The player withdrew it; no note is owed.
-    requestChanges.current.set(outgoing.id, "canceled");
-    return run(() => cancelTradeRequestAction({ characterId, requestId: outgoing.id }));
+    return run(async () => {
+      const result = await cancelTradeRequestAction({ characterId, requestId: outgoing.id });
+      // Withdrawn by the player, so no note is owed — unless the answer says
+      // it had already ended some other way (a decline that got there first).
+      if ("status" in result && result.status === "ok") {
+        requestChanges.current.set(outgoing.id, "canceled");
+      }
+      return result;
+    });
   }, [characterId, run]);
 
   const acceptRequest = useCallback(
@@ -313,38 +340,31 @@ export function PlayerTradeProvider({
     [characterId, run],
   );
 
-  const session = useMemo<SessionCommands>(() => {
-    /** The session and the exact version the player is looking at. */
-    const target = () => {
-      const current = stateRef.current?.session;
-      return current
-        ? { characterId, sessionId: current.id, offerVersion: current.offerVersion }
-        : undefined;
-    };
-    const onSession = (
-      command: (base: NonNullable<ReturnType<typeof target>>) => Promise<PlayerTradeActionResult>,
-    ) => {
-      const base = target();
-      return base ? run(() => command(base)) : Promise.resolve("That trade is no longer open.");
-    };
-    return {
-      setCredits: (credits) =>
-        onSession((base) => setTradeOfferCreditsAction({ ...base, credits })),
-      addStack: (itemId, quantity) =>
-        onSession((base) => addTradeOfferStackAction({ ...base, itemId, quantity })),
-      removeStack: (itemId, quantity) =>
-        onSession((base) => removeTradeOfferStackAction({ ...base, itemId, quantity })),
-      addItem: (itemInstanceId) =>
-        onSession((base) => addTradeOfferItemAction({ ...base, itemInstanceId })),
-      removeItem: (itemInstanceId) =>
-        onSession((base) => removeTradeOfferItemAction({ ...base, itemInstanceId })),
-      ready: () => onSession((base) => readyTradeOfferAction(base)),
-      changeOffer: () => onSession((base) => changeTradeOfferAction(base)),
-      confirm: () => onSession((base) => confirmTradeAction(base)),
-      cancel: () =>
-        onSession(({ sessionId }) => cancelTradeSessionAction({ characterId, sessionId })),
-    };
-  }, [characterId, run]);
+  const sessionCommands = useCallback(
+    (session: Pick<TradeSessionView, "id" | "offerVersion">): TradeSessionCommands => {
+      const base = { characterId, sessionId: session.id, offerVersion: session.offerVersion };
+      const onSession = (command: (target: typeof base) => Promise<PlayerTradeActionResult>) =>
+        run(() => command(base));
+      return {
+        setCredits: (credits) =>
+          onSession((base) => setTradeOfferCreditsAction({ ...base, credits })),
+        addStack: (itemId, quantity) =>
+          onSession((base) => addTradeOfferStackAction({ ...base, itemId, quantity })),
+        removeStack: (itemId, quantity) =>
+          onSession((base) => removeTradeOfferStackAction({ ...base, itemId, quantity })),
+        addItem: (itemInstanceId) =>
+          onSession((base) => addTradeOfferItemAction({ ...base, itemInstanceId })),
+        removeItem: (itemInstanceId) =>
+          onSession((base) => removeTradeOfferItemAction({ ...base, itemInstanceId })),
+        ready: () => onSession((base) => readyTradeOfferAction(base)),
+        changeOffer: () => onSession((base) => changeTradeOfferAction(base)),
+        confirm: () => onSession((base) => confirmTradeAction(base)),
+        cancel: () =>
+          onSession(({ sessionId }) => cancelTradeSessionAction({ characterId, sessionId })),
+      };
+    },
+    [characterId, run],
+  );
 
   // Mirror the requests into the pinned Chat/Social card region. The shell's
   // setters change identity with its state, so read them through a ref.
@@ -388,7 +408,7 @@ export function PlayerTradeProvider({
       cancelRequest,
       acceptRequest,
       declineRequest,
-      session,
+      sessionCommands,
     }),
     [
       acceptRequest,
@@ -397,7 +417,7 @@ export function PlayerTradeProvider({
       ended,
       requestNote,
       requestTrade,
-      session,
+      sessionCommands,
       state,
     ],
   );

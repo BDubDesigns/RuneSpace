@@ -1,7 +1,7 @@
 import { getItemMaximumCharge } from "@/game/config/balance";
 import { resolveItemPresentation } from "@/game/content/item-presentation";
 import type {
-  TradeOfferLines,
+  TradeExchangeLines,
   TradeRequestChange,
   TradeSessionView,
 } from "@/game/schemas/player-trade";
@@ -36,11 +36,12 @@ export function itemDisplayName(itemId: string): string {
 /**
  * The mutable state that matters to a unique item's value or function, such
  * as a Cutter's charge against its own authored maximum. Undefined for an
- * item with no such state.
+ * item with no such state, or when the state is not known (`undefined`); a
+ * stored `null` charge is an empty Cutter.
  */
 export function itemStateLabel(itemId: string, currentCharge: number | null | undefined) {
   const maximum = getItemMaximumCharge(itemId);
-  if (maximum === undefined) return undefined;
+  if (maximum === undefined || currentCharge === undefined) return undefined;
   return `Charge ${currentCharge ?? 0}/${maximum}`;
 }
 
@@ -48,7 +49,7 @@ export function formatCredits(credits: number): string {
   return `${credits.toLocaleString("en-US")} ${credits === 1 ? "Credit" : "Credits"}`;
 }
 
-export function isEmptyOfferLines(offer: TradeOfferLines): boolean {
+export function isEmptyOfferLines(offer: TradeExchangeLines): boolean {
   return offer.credits === 0 && offer.stacks.length === 0 && offer.items.length === 0;
 }
 

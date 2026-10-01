@@ -115,7 +115,8 @@ scroll away. **You offer** and **They offer** stack on a phone and sit side by
 side from `sm`; a Ready side is locked behind a 1px `--rs-accent-success`
 inset ring with a "Ready — locked" chip — the success language, not a fill.
 Both Ready replaces them with the frozen **You Give** / **You Receive**
-review. A unique item's charge reads "Charge 7/10" in `--rs-accent-mining`
+review. A refused final Confirm shows its reason as a `danger` line above the
+offers while that player is composing, never next to Ready or Confirm. A unique item's charge reads "Charge 7/10" in `--rs-accent-mining`
 wherever it appears. Names use `overflow-wrap: anywhere`, so no name or item
 label can force horizontal overflow.
 

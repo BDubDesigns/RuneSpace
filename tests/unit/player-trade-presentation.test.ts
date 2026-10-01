@@ -57,6 +57,8 @@ describe("player trade presentation", () => {
     expect(itemStateLabel(CUTTER, 7)).toBe(`Charge 7/${maximum}`);
     expect(itemStateLabel(CUTTER, null)).toBe(`Charge 0/${maximum}`);
     expect(itemStateLabel(items.scrapBox.itemId, null)).toBeUndefined();
+    // Unknown state (an item since passed on) shows no state at all.
+    expect(itemStateLabel(CUTTER, undefined)).toBeUndefined();
   });
 
   it("formats Credits and recognizes an empty side", () => {

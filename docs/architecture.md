@@ -504,18 +504,25 @@ control asks a #266/#267 server action, and the browser renders only what
   confirmation, then declines. The accepted trade is `PlayerTradeSurface`, a
   non-dismissible `Drawer` (`size="full"`) with a footer of primary actions;
   starting a session closes Chat/Social, Inventory, Character, and Missions,
-  and a completed trade asks Play to re-read Inventory and Credits.
+  and a completed trade asks Play to re-read Inventory and Credits. Every
+  session command names the offer version the surface rendered. `Drawer`
+  keeps a stack of open Drawers and only the newest one traps focus and
+  handles Escape, so the trade surface can open over a feature-owned Drawer.
 - **Durable outcomes:** `TradeStateView.ended` is the character's latest
   session once it has ended (completed, canceled — and by whom — or expired),
-  with exactly what a completed trade moved, from the stored offer lines. The
-  client shows it only for the session that tab was displaying, so a missed
-  `completed` prompt still converges on the same result.
+  with exactly what a completed trade moved, read from its audit row (an
+  item's state is included only while the character that received it still
+  holds it). The client shows it only for the session that tab was
+  displaying, so a missed `completed` prompt still converges on the same
+  result.
 - **Refused settlement:** `player_trade_sessions.settlement_refusal` and
   `settlement_refusal_side` (migration 0037) record why the latest final
   Confirm could not settle and whose side failed; `advanceOffer` writes them
   with the refused settlement's new version and clears them on every other
-  offer change. The session view renders it per participant
-  (`settlementRefusal`), so the first confirmer also learns what to correct.
+  offer change and at completion. The session view renders it per
+  participant (`settlementRefusal`), so the first confirmer also learns what
+  to correct; the surface shows it only while that participant is composing,
+  and a refused final Confirm adds no second copy of it.
 - **Identity:** trade counterparts carry their owner's public Player name.
   The character profile carries `sameAccount`, compared by account id on the
   server; a same-account profile shows Trade without Whisper, Report, or
