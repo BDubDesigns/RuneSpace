@@ -523,6 +523,10 @@ control asks a #266/#267 server action, and the browser renders only what
   participant (`settlementRefusal`), so the first confirmer also learns what
   to correct; the surface shows it only while that participant is composing,
   and a refused final Confirm adds no second copy of it.
+- **Reads after commit:** `ended` and counterpart Player names are filled in
+  by `completeTradeState` after a command's transaction commits (and on
+  `GET /api/trade`), so they add nothing to the row locks trade commands and
+  the gameplay gate serialize on.
 - **Identity:** trade counterparts carry their owner's public Player name.
   The character profile carries `sameAccount`, compared by account id on the
   server; a same-account profile shows Trade without Whisper, Report, or

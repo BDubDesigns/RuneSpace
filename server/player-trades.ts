@@ -470,7 +470,7 @@ export async function createTradeRequest(
     return { status: "ok", state: await readTradeState(tx, requester, now) };
   });
   events.publish();
-  return result;
+  return completeTradeResult(result, characterId, now);
 }
 
 /**
@@ -552,7 +552,7 @@ async function respondToRequest(
     return { status: "ok", state: await readTradeState(tx, character, now) };
   });
   events.publish();
-  return result;
+  return completeTradeResult(result, characterId, now);
 }
 
 async function ownedCharacter(tx: Tx, characterId: string, accountId: string): Promise<Character> {
@@ -744,7 +744,7 @@ export async function acceptTradeRequest(
     return { status: "ok", state: await readTradeState(tx, recipient, now) };
   });
   events.publish();
-  return result;
+  return completeTradeResult(result, characterId, now);
 }
 
 /**
@@ -805,7 +805,7 @@ export async function cancelTradeSession(
     return { status: "ok", state: await readTradeState(tx, character, now) };
   });
   events.publish();
-  return result;
+  return completeTradeResult(result, characterId, now);
 }
 
 // --- Offers, consent, and settlement (#267) --------------------------------
@@ -1020,7 +1020,7 @@ async function runOfferCommand(
     });
   });
   events.publish();
-  return result;
+  return completeTradeResult(result, characterId, now);
 }
 
 /** Offer edits apply only while composing; a frozen review needs Change Offer first. */
@@ -1647,7 +1647,7 @@ export async function getTradeState(
   now: Date = new Date(),
 ): Promise<TradeStateView> {
   const character = await requirePlayableOwnedCharacter(userId, characterId);
-  return readTradeState(db, character, now);
+  return completeTradeState(await readTradeState(db, character, now), characterId, now);
 }
 
 type Reader = Pick<Tx, "select">;
@@ -1771,14 +1771,39 @@ async function readTradeState(
     if (refusal) session.settlementRefusal = refusal;
   }
 
-  const state: TradeStateView = {
+  // `ended` and Player names are filled in by `completeTradeState`, after any
+  // command's transaction has committed and released its locks.
+  return {
     outgoing: outgoingRow ? requestView(outgoingRow.request, outgoingRow.recipient) : null,
     incoming,
     session,
-    ended: session ? null : await readEndedTrade(reader, character, now),
+    ended: null,
   };
-  await attachPlayerNames(reader, state);
+}
+
+/**
+ * The presentation-only parts of a trade state (#268): the latest ended
+ * session and every counterpart's Player name. Read after a command commits,
+ * never inside its transaction, so they add no time to the row locks every
+ * trade command and the gameplay gate serialize on.
+ */
+async function completeTradeState(
+  state: TradeStateView,
+  characterId: string,
+  now: Date,
+): Promise<TradeStateView> {
+  if (!state.session) state.ended = await readEndedTrade(db, characterId, now);
+  await attachPlayerNames(db, state);
   return state;
+}
+
+async function completeTradeResult(
+  result: TradeCommandResult,
+  characterId: string,
+  now: Date,
+): Promise<TradeCommandResult> {
+  if (result.status === "ok") await completeTradeState(result.state, characterId, now);
+  return result;
 }
 
 /**
@@ -1818,7 +1843,7 @@ async function attachPlayerNames(reader: Reader, state: TradeStateView) {
  */
 async function readEndedTrade(
   reader: Reader,
-  character: Character,
+  characterId: string,
   now: Date,
 ): Promise<EndedTradeView | null> {
   const [latest] = await reader
@@ -1826,8 +1851,8 @@ async function readEndedTrade(
     .from(playerTradeSessions)
     .where(
       or(
-        eq(playerTradeSessions.requesterCharacterId, character.id),
-        eq(playerTradeSessions.recipientCharacterId, character.id),
+        eq(playerTradeSessions.requesterCharacterId, characterId),
+        eq(playerTradeSessions.recipientCharacterId, characterId),
       ),
     )
     .orderBy(desc(playerTradeSessions.createdAt), desc(playerTradeSessions.id))
@@ -1838,7 +1863,7 @@ async function readEndedTrade(
     now,
   );
   if (status === "active") return null;
-  const side = sideOf(latest, character.id);
+  const side = sideOf(latest, characterId);
   const counterpartId =
     side === "requester" ? latest.recipientCharacterId : latest.requesterCharacterId;
   const [counterpart] = await reader
@@ -1881,7 +1906,7 @@ async function readEndedTrade(
     });
     exchange = {
       gave: lines(mine.offer, counterpartId),
-      received: lines(theirs.offer, character.id),
+      received: lines(theirs.offer, characterId),
     };
   }
   return {
@@ -1893,7 +1918,7 @@ async function readEndedTrade(
     },
     outcome: status,
     endedAt: endedAt.toISOString(),
-    canceledByYou: status === "canceled" && latest.endedByCharacterId === character.id,
+    canceledByYou: status === "canceled" && latest.endedByCharacterId === characterId,
     ...(exchange ? { exchange } : {}),
   };
 }

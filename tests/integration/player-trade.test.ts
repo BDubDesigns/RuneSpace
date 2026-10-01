@@ -937,7 +937,10 @@ suite("issue #266 player trade requests and sessions (real PostgreSQL)", () => {
         }
         await expectConsistent(ring);
       }
-    });
+      // Five sequential rounds of fresh players, sends, and a four-way race:
+      // heavy by construction, so it gets an explicit budget rather than the
+      // default, which a loaded full-suite run can exceed without any hang.
+    }, 20_000);
   });
 
   // --- authorization and exclusivity ---------------------------------------------
