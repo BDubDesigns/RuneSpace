@@ -419,7 +419,14 @@ state is part of `GET /api/trade`.
   or further past it — or take a side from at least one usable Mining Cutter
   to none, counted across Equipment, carried Inventory, and the Cargo Hold by
   that character's own Mining level (`usableMiningCutterCount`, the same count
-  Tinkering's last-Cutter guard uses).
+  Tinkering's last-Cutter guard uses). These rules are deliberately "never make
+  it worse": a character already over capacity from elsewhere may still trade
+  in a way that reduces the problem without curing it, and one that already
+  has no usable Cutter may still trade other things, so trading never traps a
+  character in an already-invalid state. Settlement also proves every
+  post-trade Credit balance fits `MAXIMUM_CHARACTER_CREDITS` (the PostgreSQL
+  `integer` behind `characters.credits`), and a trade in which neither side
+  offers anything is never committed or audited; a one-sided gift is.
 - **Offers:** only carried Inventory is offerable. A participant may set its
   own Credits and add or remove its own carried stack quantities and carried,
   unequipped, non-Cargo unique instances; the browser names an id and a
@@ -434,7 +441,9 @@ state is part of `GET /api/trade`.
   refused before anything is written, so it never advances the version, clears
   consent, or moves anything. A valid edit advances the version and clears
   both participants' Ready and Confirm (one write, `advanceOffer`). Ready and
-  Confirm record consent on the current version without changing it. Change
+  Confirm record consent on the current version without changing it; Ready is
+  refused while both offers are empty. Setting Credits to the amount already
+  offered is a no-op — no new version, no cleared consent, no prompt. Change
   Offer leaves Ready or the frozen review, advancing the version. CHECK
   constraints keep Confirm impossible without both Ready and `completed`
   impossible without both Confirmed.

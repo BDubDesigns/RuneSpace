@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { getEffectiveGameBalance } from "@/game/config/balance";
 import {
+  MAXIMUM_CHARACTER_CREDITS,
   planTradeSettlement,
   type TradeOfferContent,
   type TradeSettlementSide,
@@ -291,5 +292,25 @@ describe("player-trade settlement planning", () => {
         { requester: offer({ itemInstanceIds: [spare.id] }) },
       ),
     ).toEqual({ ok: false, reason: "last_cutter", side: "requester" });
+  });
+
+  it("refuses a trade where neither side offers anything, but not a gift", () => {
+    const sides = { requester: character("a"), recipient: character("b") };
+    expect(plan(sides, {})).toEqual({ ok: false, reason: "empty" });
+    expect(plan(sides, { recipient: offer({ credits: 1 }) }).ok).toBe(true);
+  });
+
+  it("refuses a post-trade Credit balance beyond what a character can hold", () => {
+    const sides = {
+      requester: character("a", { credits: 5 }),
+      recipient: character("b", { credits: MAXIMUM_CHARACTER_CREDITS - 2 }),
+    };
+    expect(plan(sides, { requester: offer({ credits: 3 }) })).toEqual({
+      ok: false,
+      reason: "credits",
+      side: "recipient",
+    });
+    const atLimit = plan(sides, { requester: offer({ credits: 2 }) });
+    expect(atLimit.ok && atLimit.sides.recipient.creditsAfter).toBe(MAXIMUM_CHARACTER_CREDITS);
   });
 });

@@ -140,6 +140,8 @@ export type TradeRefusalReason =
   | "offer_frozen"
   /** Confirm needs both participants Ready on the current version. */
   | "not_ready"
+  /** Neither participant offers anything; one-sided gifts are fine. */
+  | "empty_trade"
   /**
    * Settlement refusals (#267). Nothing moved, both participants' consent was
    * cleared, and the session is back in compose on a new version.
@@ -148,6 +150,8 @@ export type TradeRefusalReason =
   | "inventory_full"
   | "too_heavy"
   | "last_cutter"
+  /** A participant's Credits after the trade would exceed what a character can hold. */
+  | "credit_limit"
   /** A participant is no longer at the trade's World Location or free to trade. */
   | "ineligible";
 

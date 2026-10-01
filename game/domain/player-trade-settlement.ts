@@ -80,7 +80,12 @@ export type TradeSideSettlement = {
 
 export type TradeSettlementFailure =
   /** An offered asset is no longer this side's to give, as offered. */
-  "offer_unavailable" | "slots" | "mass" | "last_cutter";
+  | "offer_unavailable"
+  /** This side's Credits after the trade would not fit `MAXIMUM_CHARACTER_CREDITS`. */
+  | "credits"
+  | "slots"
+  | "mass"
+  | "last_cutter";
 
 export type TradeSettlementPlan =
   | {
@@ -88,7 +93,21 @@ export type TradeSettlementPlan =
       sides: Record<TradeSide, TradeSideSettlement>;
       offers: Record<TradeSide, SettledTradeOffer>;
     }
-  | { ok: false; reason: TradeSettlementFailure; side: TradeSide };
+  | { ok: false; reason: TradeSettlementFailure; side: TradeSide }
+  /** Neither side offers anything: there is no trade to commit or audit. */
+  | { ok: false; reason: "empty" };
+
+/**
+ * The most Credits one character can hold: `characters.credits` is a
+ * PostgreSQL `integer`. Settlement proves every post-trade balance fits before
+ * it writes, so an overflow is a correctable refusal, never a database error.
+ */
+export const MAXIMUM_CHARACTER_CREDITS = 2_147_483_647;
+
+/** An offer of no Credits, no stacks, and no unique items. */
+export function isEmptyTradeOffer(offer: TradeOfferContent): boolean {
+  return offer.credits === 0 && offer.stacks.length === 0 && offer.itemInstanceIds.length === 0;
+}
 
 const SIDES: readonly TradeSide[] = ["requester", "recipient"];
 
@@ -153,6 +172,9 @@ function planSide(
 ):
   | { ok: true; settlement: TradeSideSettlement }
   | { ok: false; reason: Exclude<TradeSettlementFailure, "offer_unavailable"> } {
+  const creditsAfter = side.credits - outgoing.credits + incoming.credits;
+  if (creditsAfter > MAXIMUM_CHARACTER_CREDITS) return { ok: false, reason: "credits" };
+
   // Room is judged on the finished state below, so the working inventory is
   // only asked to merge: every incoming unit could at worst need its own row.
   const incomingUnits = incoming.stacks.reduce((total, line) => total + line.quantity, 0);
@@ -202,7 +224,7 @@ function planSide(
     ok: true,
     settlement: {
       characterId: side.characterId,
-      creditsAfter: side.credits - outgoing.credits + incoming.credits,
+      creditsAfter,
       stacks: workingInventoryDiff(side.stacks, inventory),
       receivedInstanceIds: incoming.items.map((item) => item.itemInstanceId),
     },
@@ -213,13 +235,17 @@ function planSide(
  * Plan the settlement of two offers against both participants' current
  * authoritative state. Either both sides' post-trade states are valid and the
  * plan describes exactly what to write, or nothing may move and the first
- * failure (requester side first) is named.
+ * failure (requester side first) is named. A gift one way is a trade; nothing
+ * either way is not.
  */
 export function planTradeSettlement(
   participants: Record<TradeSide, TradeSettlementSide>,
   offers: Record<TradeSide, TradeOfferContent>,
   balance: EffectiveGameBalance,
 ): TradeSettlementPlan {
+  if (isEmptyTradeOffer(offers.requester) && isEmptyTradeOffer(offers.recipient)) {
+    return { ok: false, reason: "empty" };
+  }
   const settled = {} as Record<TradeSide, SettledTradeOffer>;
   for (const side of SIDES) {
     const offer = settleableOffer(participants[side], offers[side], balance);

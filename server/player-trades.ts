@@ -46,6 +46,7 @@ import {
   type TradeSide,
 } from "@/game/domain/player-trade";
 import {
+  isEmptyTradeOffer,
   planTradeSettlement,
   type TradeOfferContent,
   type TradeSettlementFailure,
@@ -821,6 +822,7 @@ const OFFER_COPY = {
   stale: "That trade changed. Check the latest offers and try again.",
   frozen: "You're both Ready, so the offers are locked. Choose Change Offer to edit them.",
   notReady: "You both need to be Ready on these offers before confirming.",
+  empty: "Add something to the trade first. Either of you can offer Credits or items.",
   credits: "You can offer whole Credits, up to what you have.",
   stackItem: "You can only offer stackable items you're carrying.",
   stackQuantity: "You can offer a whole quantity, up to what you're carrying.",
@@ -1052,6 +1054,9 @@ export async function setTradeOfferCredits(
   now: Date = new Date(),
 ): Promise<TradeCommandResult> {
   return runOfferCommand(userId, characterId, sessionId, offerVersion, now, async (context) => {
+    // Setting the amount already offered is no edit at all: the version,
+    // both participants' consent, and the activity clock stay as they are.
+    if (credits === context.session[CREDITS_COLUMN[context.side]]) return okOffer(context);
     const frozen = refuseUnlessComposing(context);
     if (frozen) return frozen;
     if (!isValidCreditOffer(credits, context.character.credits)) {
@@ -1252,6 +1257,12 @@ export async function readyTradeOffer(
 ): Promise<TradeCommandResult> {
   return runOfferCommand(userId, characterId, sessionId, offerVersion, now, async (context) => {
     if (sideReady(consentOf(context.session), context.side)) return okOffer(context);
+    // Nothing either way is not a trade. Every edit clears Ready, so a review
+    // can never be frozen on two empty offers; settlement re-checks anyway.
+    const offers = await loadOfferContent(context.tx, context.session);
+    if (isEmptyTradeOffer(offers.requester) && isEmptyTradeOffer(offers.recipient)) {
+      return refused("empty_trade", OFFER_COPY.empty);
+    }
     return recordConsent(context, READY_COLUMN[context.side]);
   });
 }
@@ -1386,6 +1397,11 @@ const SETTLEMENT_REFUSALS: Record<
   TradeSettlementFailure,
   { reason: TradeRefusalReason; yours: string; theirs: (name: string) => string }
 > = {
+  credits: {
+    reason: "credit_limit",
+    yours: "This trade would leave you with more Credits than a character can hold.",
+    theirs: (name) => `This trade would leave ${name} with more Credits than a character can hold.`,
+  },
   offer_unavailable: {
     reason: "offer_unavailable",
     yours: "Something in your offer is no longer yours to give as offered.",
@@ -1496,6 +1512,9 @@ async function settleTrade(context: OfferContext): Promise<TradeCommandResult> {
     await loadOfferContent(tx, session),
     getEffectiveGameBalance(),
   );
+  if (!plan.ok && plan.reason === "empty") {
+    return refuseSettlement(context, "empty_trade", OFFER_COPY.empty);
+  }
   if (!plan.ok) {
     const copy = SETTLEMENT_REFUSALS[plan.reason];
     return refuseSettlement(

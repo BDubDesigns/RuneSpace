@@ -4,6 +4,7 @@ import { afterEach, beforeAll, describe, expect, it } from "vitest";
 import type { Character } from "@/db/rune-space";
 import { getEffectiveGameBalance } from "@/game/config/balance";
 import { LOCATION_IDS } from "@/game/config/foundations";
+import { MAXIMUM_CHARACTER_CREDITS } from "@/game/domain/player-trade-settlement";
 import type { TradeCommandResult, TradeStateView } from "@/game/schemas/player-trade";
 import { cleanupTestUser, createCharacterForUser, createTestUser } from "./fixtures";
 
@@ -309,6 +310,25 @@ suite("issue #267 player trade offers, settlement, and audit (real PostgreSQL)",
     return rows;
   }
 
+  /** Every realtime prompt these players' characters receive while `run` executes. */
+  async function watchPrompts(players: Player[], run: () => Promise<unknown>) {
+    const received: { characterId: string; type: string; data: unknown }[] = [];
+    const unsubscribes = players.map(({ character }) =>
+      realtime.getRealtimeFanout().subscribe({
+        scope: { playerAccountId: character.playerAccountId, characterId: character.id },
+        deliver: (envelope) =>
+          received.push({ characterId: character.id, type: envelope.type, data: envelope.data }),
+        close: () => {},
+      }),
+    );
+    try {
+      await run();
+    } finally {
+      for (const unsubscribe of unsubscribes) unsubscribe();
+    }
+    return received;
+  }
+
   // --- offers, versions, and consent ---------------------------------------
 
   it("owns the offer version and clears both participants' consent on every edit", async () => {
@@ -330,16 +350,16 @@ suite("issue #267 player trade offers, settlement, and audit (real PostgreSQL)",
       confirmed: false,
     });
 
-    ok(await tb.ready());
-    expect((await sessionRow(sessionId)).recipientReady).toBe(true);
     ok(await ta.credits(7));
     let row = await sessionRow(sessionId);
     expect(row.offerVersion).toBe(2);
     expect(row.requesterCredits).toBe(7);
-    // Any edit clears the counterpart's Ready.
-    expect(row.recipientReady).toBe(false);
+    ok(await tb.ready());
+    expect((await sessionRow(sessionId)).recipientReady).toBe(true);
 
+    // Any edit clears the counterpart's Ready.
     ok(await ta.addStack(SHALE, 4));
+    expect((await sessionRow(sessionId)).recipientReady).toBe(false);
     ok(await ta.ready());
     const bState = ok(await tb.ready());
     expect(bState.session!.phase).toBe("review");
@@ -450,6 +470,97 @@ suite("issue #267 player trade offers, settlement, and audit (real PostgreSQL)",
 
     expect(await world([a, b])).toEqual(assets);
     expect(await auditsFor(sessionId)).toEqual([]);
+  });
+
+  it("refuses to Ready or commit a trade where neither side offers anything", async () => {
+    const now = new Date();
+    const [a, b] = [await player(), await player()];
+    const sessionId = await openSession(a, b, now);
+    const [ta, tb] = [trader(a, sessionId, now), trader(b, sessionId, now)];
+    const empty = await tradeState(sessionId);
+    expect(refusal(await ta.ready())).toBe("empty_trade");
+    expect(refusal(await tb.ready())).toBe("empty_trade");
+    expect(await tradeState(sessionId)).toEqual(empty);
+
+    // Settlement re-checks it too, should a frozen review ever hold two empty
+    // offers (forced here directly; no command can produce it).
+    await db
+      .update(rune.playerTradeSessions)
+      .set({ requesterReady: true, recipientReady: true, requesterConfirmed: true })
+      .where(eq(rune.playerTradeSessions.id, sessionId));
+    const assets = await world([a, b]);
+    expect(refusal(await tb.confirm())).toBe("empty_trade");
+    const row = await sessionRow(sessionId);
+    expect(row.status).toBe("active");
+    expect(row.offerVersion).toBe(empty.row.offerVersion + 1);
+    expect([row.requesterReady, row.recipientReady, row.requesterConfirmed]).toEqual([
+      false,
+      false,
+      false,
+    ]);
+    expect(await world([a, b])).toEqual(assets);
+    expect(await auditsFor(sessionId)).toEqual([]);
+
+    // A one-sided gift is still a trade.
+    ok(await tb.credits(1));
+    ok(await ta.ready());
+    ok(await tb.ready());
+    ok(await ta.confirm());
+    const done = await tb.confirm();
+    expect(done.status === "ok" && done.completed?.tradeId).toBe(sessionId);
+  });
+
+  it("treats setting Credits to the amount already offered as a no-op", async () => {
+    const now = new Date();
+    const [a, b] = [await player(), await player()];
+    await setCredits(a, 10);
+    const sessionId = await openSession(a, b, now);
+    const [ta, tb] = [trader(a, sessionId, now), trader(b, sessionId, now)];
+    ok(await ta.credits(4));
+    ok(await tb.ready());
+    let before = await tradeState(sessionId);
+    const watched = await watchPrompts([a, b], () => ta.credits(4));
+    expect(await tradeState(sessionId)).toEqual(before);
+    expect(watched).toEqual([]);
+
+    // In the frozen review, and after a Confirm, it still changes nothing.
+    ok(await ta.ready());
+    ok(await tb.confirm());
+    before = await tradeState(sessionId);
+    ok(await ta.credits(4));
+    ok(await tb.credits(0));
+    expect(await tradeState(sessionId)).toEqual(before);
+    // A different amount is still refused while frozen.
+    expect(refusal(await ta.credits(5))).toBe("offer_frozen");
+  });
+
+  it("refuses a settlement that would overflow a stored Credit balance", async () => {
+    const now = new Date();
+    const [a, b] = [await player(), await player()];
+    await setCredits(a, 10);
+    await setCredits(b, MAXIMUM_CHARACTER_CREDITS - 1);
+    const sessionId = await openSession(a, b, now);
+    const [ta, tb] = [trader(a, sessionId, now), trader(b, sessionId, now)];
+    ok(await ta.credits(2));
+    ok(await ta.ready());
+    ok(await tb.ready());
+    ok(await ta.confirm());
+    const assets = await world([a, b]);
+    const refused = await tb.confirm();
+    expect(refusal(refused)).toBe("credit_limit");
+    expect(refused.status === "refused" && refused.error).toContain("leave you");
+    expect(await world([a, b])).toEqual(assets);
+    expect((await sessionRow(sessionId)).status).toBe("active");
+    expect(await auditsFor(sessionId)).toEqual([]);
+
+    // Exactly to the limit is fine.
+    ok(await ta.credits(1));
+    ok(await ta.ready());
+    ok(await tb.ready());
+    ok(await ta.confirm());
+    const done = await tb.confirm();
+    expect(done.status === "ok" && done.completed).toBeTruthy();
+    expect((await holdings(b)).credits).toBe(MAXIMUM_CHARACTER_CREDITS);
   });
 
   it("never lets a stale Ready or Confirm consent to a newer proposal", async () => {

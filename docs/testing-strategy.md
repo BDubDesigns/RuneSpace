@@ -341,13 +341,18 @@ Hermes host.
   returns for the audit, a full-Inventory one-for-one swap, stack merging into
   a partial stack, slot and mass overflow, a received container adding no
   capacity, and the last-Cutter guard (Cargo Cutters count, a Loadsteel Cutter
-  only counts at Mining 5, Cutter-for-Cutter swaps).
+  only counts at Mining 5, Cutter-for-Cutter swaps), the empty-for-empty
+  refusal, and the stored Credit limit.
 - `tests/integration/player-trade-settlement.test.ts` is the primary proof,
   against PostgreSQL, of the adversarial invariants: every malformed, foreign,
   counterpart-side, nonparticipant, wrong-account, and stale mutation is
   refused with the session row and offer lines byte-for-byte unchanged; the
   server-owned version advances on every valid edit and clears both sides'
-  consent; stale Ready/Confirm cannot consent to a newer proposal;
+  consent, while setting Credits to the amount already offered changes and
+  publishes nothing; stale Ready/Confirm cannot consent to a newer proposal;
+  Ready and settlement both refuse a trade with nothing on either side, and a
+  settlement that would overflow a stored Credit balance is a correctable
+  refusal, not a database error;
   `Promise.all` races of both final Confirms, a duplicated final Confirm, and
   final Confirm against Cancel each end in exactly one legal world (one commit
   and one audit row, or no movement and no audit row); a commit moves exactly
