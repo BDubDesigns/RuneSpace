@@ -354,6 +354,26 @@ test("renders a dense Cargo Hold as a compact selectable grid (Issue #151)", asy
   await cargoPanel.getByRole("tab", { name: /^CARGO/ }).click();
   await expect(cargoSection).toBeVisible();
 
+  // The phone view belongs to the Cargo Hold host, not the storage surface:
+  // closing and reopening the hold keeps the CARGO tab, while the selection is
+  // still cleared (#282).
+  await cargoSection.getByRole("button", { name: /Ferrite Shale/ }).click();
+  await expect(selection).toBeVisible();
+  await cargoPanel.getByRole("button", { name: "CLOSE CARGO HOLD" }).click();
+  await expect(cargoPanel.locator("[data-cargo-storage]")).toHaveCount(0);
+  await cargoPanel.getByRole("button", { name: "OPEN CARGO HOLD" }).click();
+  await expect(cargoPanel.getByRole("tab", { name: /^CARGO/ })).toHaveAttribute(
+    "aria-selected",
+    "true",
+  );
+  await expect(cargoPanel.getByRole("tab", { name: /^CARRIED/ })).toHaveAttribute(
+    "aria-selected",
+    "false",
+  );
+  await expect(cargoSection).toBeVisible();
+  await expect(carriedSection).toBeHidden();
+  await expect(selection).toHaveCount(0);
+
   // Nine occupied Cargo Hold entries (4 stacks + 5 unique instances) render as
   // a compact tile grid, never as one large row per item.
   await expect(cargoSection).toContainText("9 / 32");
@@ -510,5 +530,34 @@ test("renders a dense Cargo Hold as a compact selectable grid (Issue #151)", asy
   await expect(carriedSection).toContainText("No occupied carried items.");
   await expect
     .poll(() => carriedSection.evaluate((element) => element === document.activeElement))
+    .toBe(true);
+
+  // Withdrawing a unique item completes the round trip through the extracted
+  // callbacks: one of the three Cargo Salvage Cutters (the deposited one is
+  // indistinguishable by name) moves back to Carried, the selection reconciles
+  // away, both occupancies update from the authoritative state, and focus
+  // returns to a surviving Cargo tile.
+  const cargoCutterTile = cargoSection.getByRole("button", { name: "Salvage Cutter" }).first();
+  await expect(cargoSection.getByRole("button", { name: "Salvage Cutter" })).toHaveCount(3);
+  await cargoCutterTile.click();
+  await expect(selection).toContainText("Salvage Cutter");
+  await expect(selection.getByRole("button", { name: "WITHDRAW ITEM" })).toBeVisible();
+  await expect(selection.getByRole("button", { name: /DEPOSIT/ })).toHaveCount(0);
+  await selection.getByRole("button", { name: "WITHDRAW ITEM" }).click();
+  await expect(cargoPanel).toContainText("Cargo Hold transfer complete.");
+  await expect(selection).toHaveCount(0);
+  await expect(cargoSection).toContainText("9 / 32");
+  await expect(cargoSection.locator("button[aria-pressed]")).toHaveCount(9);
+  await expect(cargoSection.getByRole("button", { name: "Salvage Cutter" })).toHaveCount(2);
+  await expect(carriedSection).toContainText("1 / 8");
+  await expect(carriedSection.getByRole("button", { name: "Salvage Cutter" })).toHaveCount(1);
+  await expect(carriedSection).not.toContainText("No occupied carried items.");
+  await expect
+    .poll(() =>
+      cargoSection.evaluate((element) => {
+        const active = document.activeElement;
+        return active instanceof HTMLButtonElement && element.contains(active);
+      }),
+    )
     .toBe(true);
 });

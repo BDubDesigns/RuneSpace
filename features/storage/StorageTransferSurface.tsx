@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState, type ReactNode, type RefObject } from "react";
+import { useRef, type ReactNode, type RefObject } from "react";
 import { ActionButton } from "@/components/ui/ActionButton";
 import { Feedback } from "@/components/ui/Feedback";
 import { ItemVisual } from "@/components/items/ItemVisual";
@@ -79,6 +79,13 @@ type StorageTransferSurfaceProps = {
   projection: StorageProjection;
   labels: StorageDestinationLabels;
   transfers: StorageTransferAdapter;
+  /**
+   * Which region the narrow-screen switcher shows. Controlled by the host, so
+   * the choice survives the host closing and reopening its storage panel; the
+   * surface clears any selection whenever it changes it.
+   */
+  mode: StorageArea;
+  onModeChange: (mode: StorageArea) => void;
   /** True while the host's command is in flight; disables every transfer control. */
   pending: boolean;
   /** Called on every explicit tile selection, so a host can clear stale feedback. */
@@ -90,8 +97,6 @@ type StorageTransferSurfaceProps = {
    */
   renderRegionActions?: (context: StorageRegionActionsContext) => ReactNode;
 };
-
-type StorageMode = StorageArea;
 
 /**
  * The two storage regions are two inventories, so each one is drawn as its own
@@ -214,18 +219,20 @@ function StorageRegionSection({
  * destination's authorization, slot limits and persistence stay with its host.
  * Selection is always re-resolved from `projection` on render.
  *
- * Its mobile switcher state is its own, so a host that unmounts it (closing a
- * storage panel) also discards the selection and starts on the carried tab.
+ * Selection state is the surface's own, so a host that unmounts it (closing a
+ * storage panel) discards the selection; the narrow-screen region choice is the
+ * host's, passed as `mode`, so it persists across that unmount.
  */
 export function StorageTransferSurface({
   projection,
   labels,
   transfers,
+  mode,
+  onModeChange,
   pending,
   onSelectItem,
   renderRegionActions,
 }: StorageTransferSurfaceProps) {
-  const [mode, setMode] = useState<StorageMode>("carried");
   const carriedRef = useRef<HTMLElement>(null);
   const storedRef = useRef<HTMLElement>(null);
   const {
@@ -255,8 +262,8 @@ export function StorageTransferSurface({
     };
   }
 
-  function switchMode(next: StorageMode) {
-    setMode(next);
+  function switchMode(next: StorageArea) {
+    onModeChange(next);
     clearSelection();
   }
 

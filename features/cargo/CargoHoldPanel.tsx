@@ -28,6 +28,7 @@ import { deriveMissionGuidanceTargets } from "@/game/domain/missions";
 import { CleanPassControl } from "@/features/welding/CleanPassControl";
 import { usePlay } from "@/features/play/PlayContext";
 import { CARGO_HOLD_STORAGE_LABELS, projectCargoHoldStorage } from "@/features/cargo/cargo-storage";
+import type { StorageArea } from "@/features/storage/storage-selection";
 import {
   StorageTransferSurface,
   type StorageTransferAdapter,
@@ -74,6 +75,9 @@ export function CargoHoldPanel() {
   const { enqueueForeground, releaseCommand, acceptState, state } = usePlay();
   const [confirmation, setConfirmation] = useState<Confirmation>();
   const [storageOpen, setStorageOpen] = useState(false);
+  // Held here, not in the surface, so the phone view survives closing and
+  // reopening the hold exactly as it did before the extraction.
+  const [storageMode, setStorageMode] = useState<StorageArea>("carried");
   const [message, setMessage] = useState<string>();
   const [pending, setPending] = useState<string>();
   const [completionFeedbackVisible, setCompletionFeedbackVisible] = useState(false);
@@ -317,6 +321,8 @@ export function CargoHoldPanel() {
             <div className="mt-4" data-cargo-storage>
               <StorageTransferSurface
                 labels={CARGO_HOLD_STORAGE_LABELS}
+                mode={storageMode}
+                onModeChange={setStorageMode}
                 onSelectItem={() => setMessage(undefined)}
                 pending={Boolean(pending)}
                 projection={projectCargoHoldStorage(state)}

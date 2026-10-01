@@ -361,6 +361,8 @@ describe("StorageTransferSurface", () => {
     renderToStaticMarkup(
       React.createElement(StorageTransferSurface, {
         labels: CARGO_HOLD_STORAGE_LABELS,
+        mode: "carried",
+        onModeChange: () => undefined,
         pending: false,
         projection: projectCargoHoldStorage(state),
         transfers,
@@ -386,6 +388,17 @@ describe("StorageTransferSurface", () => {
     // Charged unique tiles keep their charge badge and description.
     expect(html).toContain("0/");
     expect(html).toContain("charges remaining");
+  });
+
+  it("shows the region the host's mode names and marks its tab selected", () => {
+    const stored = render(cargoState(), { mode: "stored" });
+    expect(stored).toMatch(/aria-selected="true"[^>]*>CARGO /);
+    expect(stored).toMatch(/aria-selected="false"[^>]*>CARRIED /);
+    // The hidden-on-phone wrapper moves to the carried region.
+    expect(stored).toMatch(/hidden sm:block"><section aria-label="Carried Inventory"/);
+    const carriedMode = render(cargoState(), { mode: "carried" });
+    expect(carriedMode).toMatch(/aria-selected="true"[^>]*>CARRIED /);
+    expect(carriedMode).toMatch(/hidden sm:block"><section aria-label="Cargo Hold storage"/);
   });
 
   it("offers no transfer control and no details until a tile is selected", () => {
