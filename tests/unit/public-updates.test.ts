@@ -91,18 +91,34 @@ describe("public Updates content boundary", () => {
     });
   });
 
-  it("publishes the player-trading Update as the newest, linking the Player Trading Wiki page", () => {
-    const latest = getLatestPublishedUpdate();
-    expect(latest.slug).toBe("meet-me-there");
-    // Newest by instant, so the account news boundary surfaces it (#156).
-    expect(Date.parse(latest.publishedAt)).toBeGreaterThan(
+  it("publishes the player-trading Update, linking the Player Trading Wiki page", () => {
+    // Newer Updates have shipped since (#274), so it is found by slug.
+    const trading = getPublicUpdate("meet-me-there")!;
+    expect(Date.parse(trading.publishedAt)).toBeGreaterThan(
       Date.parse(getPublicUpdate("open-channels")!.publishedAt),
     );
-    const links = latest.body
+    const links = trading.body
       .flatMap((paragraph) => (typeof paragraph === "string" ? [] : paragraph))
       .filter((segment) => typeof segment !== "string");
     expect(links).toContainEqual({ text: "Player Trading", articleSlug: "player-trading" });
     expect(getWikiArticle("player-trading")?.category).toBe("gear-and-credits");
+  });
+
+  it("publishes the recipe-unlock Update as the newest, linking both recipe Wiki pages", () => {
+    const latest = getLatestPublishedUpdate();
+    expect(latest.slug).toBe("something-new-to-make");
+    // Newest by instant, so the account news boundary surfaces it (#156).
+    expect(Date.parse(latest.publishedAt)).toBeGreaterThan(
+      Date.parse(getPublicUpdate("meet-me-there")!.publishedAt),
+    );
+    const links = latest.body
+      .flatMap((paragraph) => (typeof paragraph === "string" ? [] : paragraph))
+      .filter((segment) => typeof segment !== "string");
+    expect(links).toContainEqual({ text: "Mining & Refining", articleSlug: "mining-and-refining" });
+    expect(links).toContainEqual({
+      text: "Fabrication & Tinkering",
+      articleSlug: "fabrication-and-tinkering",
+    });
   });
 
   it("uses one stable route projection for lookup and links", () => {

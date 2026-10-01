@@ -1313,6 +1313,54 @@ export const whisperParticipants = pgTable(
 );
 
 /**
+ * One System recipe-unlock notice (issue #274): a read-only message the
+ * Chat/Social "System" conversation shows a character after a gameplay XP
+ * award raised a skill level past one or more recipes' `minimumLevel`.
+ *
+ * Deliberately separate from Whispers: System is not a player, so there is no
+ * sender account, sender character, conversation pair, Block, or Report here,
+ * and no fake identity is ever created to fit the Whisper tables.
+ *
+ * - Written only by `grantCharacterSkillXp`, in the transaction that commits
+ *   the XP, so the XP and its notice commit or roll back together. The level
+ *   crossing is the only state boundary: there is no sent flag or per-recipe
+ *   ledger, and a later award starts above the crossed level.
+ * - One row per progression event, however many recipes it unlocked. It
+ *   stores the crossing and the unlocked recipes' action IDs, never their
+ *   names: names are rendered from current item presentation when read.
+ * - `seq` is the durable display order. `read_at` is set once, when the
+ *   character first reads the notice, so it never lights the launcher again.
+ * - Not on the chat retention sweep: these are the character's own
+ *   progression notices, bounded by how many recipe levels a skill has.
+ */
+export const recipeUnlockNotices = pgTable(
+  "recipe_unlock_notices",
+  {
+    id: text("id")
+      .primaryKey()
+      .default(sql`gen_random_uuid()`),
+    seq: bigint("seq", { mode: "number" }).generatedAlwaysAsIdentity().notNull().unique(),
+    characterId: text("character_id")
+      .notNull()
+      .references(() => characters.id, { onDelete: "restrict" }),
+    skillId: text("skill_id").notNull(),
+    previousLevel: integer("previous_level").notNull(),
+    level: integer("level").notNull(),
+    recipeActionIds: text("recipe_action_ids").array().notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    readAt: timestamp("read_at", { withTimezone: true }),
+  },
+  (table) => [
+    check(
+      "recipe_unlock_notices_levels_check",
+      sql`${table.previousLevel} >= 1 and ${table.level} > ${table.previousLevel}`,
+    ),
+    check("recipe_unlock_notices_recipes_check", sql`cardinality(${table.recipeActionIds}) >= 1`),
+    index("recipe_unlock_notices_character_seq_idx").on(table.characterId, table.seq),
+  ],
+);
+
+/**
  * Current account-level Blocks (issue #247): the blocker account does not want
  * the blocked account interacting with it. One row per pair while the Block
  * stands; unblocking deletes it. The characters are the ones the player acted
@@ -2034,6 +2082,7 @@ export type OperatorAuditLog = typeof operatorAuditLogs.$inferSelect;
 export type NewOperatorAuditLog = typeof operatorAuditLogs.$inferInsert;
 export type RuneSpaceAccessState = typeof runespaceAccessState.$inferSelect;
 export type ChatMessage = typeof chatMessages.$inferSelect;
+export type RecipeUnlockNotice = typeof recipeUnlockNotices.$inferSelect;
 export type PlayerReport = typeof playerReports.$inferSelect;
 export type ModerationCase = typeof moderationCases.$inferSelect;
 export type ModerationCaseNote = typeof moderationCaseNotes.$inferSelect;

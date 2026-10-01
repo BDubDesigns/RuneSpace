@@ -267,6 +267,13 @@
       "when": 1790823629184,
       "tag": "0037_player_trade_settlement_refusal",
       "breakpoints": true
+    },
+    {
+      "idx": 38,
+      "version": "7",
+      "when": 1790833239477,
+      "tag": "0038_recipe_unlock_notices",
+      "breakpoints": true
     }
   ]
 }

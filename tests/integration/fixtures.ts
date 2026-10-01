@@ -313,6 +313,9 @@ export async function cleanupTestCharacter(db: Db, rune: Rune, characterId: stri
     await tx
       .delete(rune.characterSkillXp)
       .where(eq(rune.characterSkillXp.characterId, characterId));
+    await tx
+      .delete(rune.recipeUnlockNotices)
+      .where(eq(rune.recipeUnlockNotices.characterId, characterId));
     await tx.delete(rune.inventoryStacks).where(eq(rune.inventoryStacks.characterId, characterId));
     await tx
       .delete(rune.operatorAuditLogs)

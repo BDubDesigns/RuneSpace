@@ -8,7 +8,6 @@ import * as characters from "@/server/characters";
 import * as ownership from "@/server/ownership";
 import { getEffectiveGameBalance, getItemMaximumCharge } from "@/game/config/balance";
 import { PORTRAIT_IDS } from "@/game/config/foundations";
-import { getPublishedUpdates } from "@/features/public-site/public-updates";
 import { cleanupTestUser, createCharacterForUser } from "../integration/fixtures";
 import { establishAuthenticatedSession, expect, openTestCharacter, test } from "./fixtures";
 import { populationDisclosure } from "./population-disclosure";
@@ -642,22 +641,17 @@ journey(
 // --- public communication -------------------------------------------------------
 
 test.describe("trading on the public site", () => {
-  test("Meet Me There is the newest Update and links the Player Trading Wiki page", async ({
-    page,
-  }) => {
-    expect(getPublishedUpdates()[0]?.slug).toBe("meet-me-there");
+  test("Meet Me There is published and links the Player Trading Wiki page", async ({ page }) => {
+    // Newer Updates have shipped since (#274), so it is found by name, not position.
     await page.goto("/updates");
-    const newest = page
+    const listed = page
       .getByRole("list", { name: "Published Updates" })
       .getByRole("listitem")
-      .first();
-    await expect(newest.getByRole("link", { name: "Meet Me There", exact: true })).toHaveAttribute(
+      .filter({ has: page.getByRole("link", { name: "Meet Me There", exact: true }) });
+    await expect(listed.getByRole("link", { name: "Meet Me There", exact: true })).toHaveAttribute(
       "href",
       "/updates/meet-me-there",
     );
-    // The homepage's latest-Update section names it too.
-    await page.goto("/");
-    await expect(page.getByRole("heading", { name: "Meet Me There", level: 2 })).toBeVisible();
 
     await page.goto("/updates/meet-me-there");
     await expect(page).toHaveTitle("Meet Me There — RuneSpace");
@@ -686,47 +680,6 @@ test.describe("trading on the public site", () => {
     for (const path of ["/updates/meet-me-there", "/wiki/player-trading"]) {
       await page.goto(path);
       await expectNoHorizontalOverflow(page);
-    }
-  });
-
-  test("News points a returning player at Meet Me There", async ({ browser }, testInfo) => {
-    test.skip(testInfo.project.name !== "chromium", "runs once");
-    const [latest, previous] = getPublishedUpdates();
-    expect(latest?.slug).toBe("meet-me-there");
-    const tag = randomUUID().slice(0, 6);
-    const { userId, context } = await establishAuthenticatedSession(
-      browser,
-      `News ${tag}`,
-      `trade-news-${tag}-${randomUUID().slice(0, 8)}@example.com`,
-    );
-    users.push(userId);
-    try {
-      const created = await character(userId, "Newsy", { cutter: false });
-      // Everything before Meet Me There is already read, so only it is news.
-      await db
-        .update(rune.playerAccounts)
-        .set({ newsReadThroughAt: new Date(previous!.publishedAt) })
-        .where(eq(rune.playerAccounts.id, created.playerAccountId));
-      const page = await context.newPage();
-      await openTestCharacter(page, created.id);
-      const banner = page.getByRole("banner");
-      await banner
-        .getByRole("button", { name: "News, unread update available", exact: true })
-        .click();
-      await expect(page).toHaveURL(/\/updates$/);
-      await expect(
-        page
-          .getByRole("list", { name: "Published Updates" })
-          .getByRole("listitem")
-          .first()
-          .getByRole("link", { name: "Meet Me There", exact: true }),
-      ).toBeVisible();
-      // Reading it cleared the account's unread state.
-      await openTestCharacter(page, created.id);
-      await expect(banner.getByRole("button", { name: "News", exact: true })).toBeVisible();
-      await expect(banner.getByRole("button", { name: /unread/i })).toHaveCount(0);
-    } finally {
-      await context.close();
     }
   });
 });

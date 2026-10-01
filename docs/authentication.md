@@ -72,6 +72,15 @@ adjacent words after folding diacritics, digit look-alikes, and a small table
 of Cyrillic/Greek look-alikes; it deliberately never matches a protected term
 inside an ordinary word (`ModularMike`, `Staffan`, `Cooperator`).
 
+**System** is a protected identity too (issue #274): it is the sender of the
+read-only System conversation in Chat/Social. `isSystemIdentityName` in the
+same module refuses a *whole* name that folds to System through the same
+normalization and look-alike folding (`SYSTEM`, `S y s t e m`, `Syst3m`), and
+never a name that merely contains it (`Solar System`, `Systematic`). It is the
+one rule for both identities: `validatePlayerName` calls it, and so does
+`validateCharacterName` in `game/domain/character-name.ts`, which otherwise has
+no authority-name policy of its own.
+
 `server/account-guards.ts` (Better Auth's user-level `before` hook, which runs
 ahead of every plugin hook) makes the submitted Player name the single value
 for `username`, `displayUsername`, and `name` on `/sign-up/email`, so a crafted

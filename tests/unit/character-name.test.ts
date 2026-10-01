@@ -102,4 +102,28 @@ describe("validateCharacterName", () => {
     expect(CHARACTER_NAME_MIN).toBe(2);
     expect(CHARACTER_NAME_MAX).toBe(24);
   });
+
+  it.each([
+    "System",
+    "system",
+    "SYSTEM",
+    "Ｓｙｓｔｅｍ",
+    "S y s t e m",
+    "Syst3m",
+    "Ѕystem",
+    "SYSТEM",
+    "SΥSTEM",
+  ])("refuses the reserved System identity %s (#274)", (name) => {
+    expect(validateCharacterName(name)).toEqual({
+      ok: false,
+      error: "That name is reserved. Please choose another.",
+    });
+  });
+
+  it.each(["Systematic", "Ecosystem", "Solar System", "System Shock"])(
+    "does not substring-block %s",
+    (name) => {
+      expect(validateCharacterName(name).ok).toBe(true);
+    },
+  );
 });

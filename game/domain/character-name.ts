@@ -16,6 +16,7 @@
  */
 
 import { z } from "zod";
+import { isSystemIdentityName } from "@/game/domain/player-name";
 
 export const CHARACTER_NAME_MIN = 2;
 export const CHARACTER_NAME_MAX = 24;
@@ -84,6 +85,12 @@ export function validateCharacterName(raw: string): CharacterNameValidation {
       .replace(/[^\p{L}\p{N}]/gu, "").length === 0
   ) {
     return { ok: false, error: "Name must contain at least one letter or number" };
+  }
+
+  // System is RuneSpace's own Chat/Social identity (#274); the Player-name
+  // policy owns the one rule for it.
+  if (isSystemIdentityName(display)) {
+    return { ok: false, error: "That name is reserved. Please choose another." };
   }
 
   return { ok: true, display, normalized: normalizeCharacterName(display) };

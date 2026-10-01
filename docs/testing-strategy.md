@@ -54,7 +54,8 @@ small number of critical mobile player journeys.
   realtime stream (`social-shell`, #245), and General/Trade public chat
   (`public-chat`, #246), Whispers, Block, and Report (`whispers-safety`,
   #247), moderation review, sanctions, notices, and appeals (`moderation`,
-  #248), and player trading (`player-trading`, #268). It intentionally excludes noncanonical `smoke`, `ownership`,
+  #248), player trading (`player-trading`, #268), and the read-only System
+  conversation for recipe unlocks (`system-notices`, #274). It intentionally excludes noncanonical `smoke`, `ownership`,
   `design-system`, `work-orders`, `public-*`, and QC Studio specs. It:
   - requires Node 22.x
   - requires a localhost-only disposable PostgreSQL database (refuses remote)
@@ -278,6 +279,34 @@ Hermes host.
   for the blocker only, Blocked Players unblocking, and no horizontal overflow.
   Like `public-chat`, its two-account journeys run in chromium only.
 
+### Issue #274 System recipe-unlock coverage
+
+- `tests/unit/recipe-unlocks.test.ts` owns derivation from the canonical
+  recipe registries: no unlock without a level rise, every recipe at an exactly
+  crossed level, nothing skipped when an award skips levels, nothing repeated
+  below the previous level, nothing for a rise with no recipe or a skill with no
+  registry, a newly authored recipe discovered with no notification-specific
+  registration, output-plus-inputs naming for shared outputs, and one grouped
+  message per progression event.
+- `tests/unit/player-name.test.ts` and `tests/unit/character-name.test.ts`
+  prove both validators refuse the whole-name System identity in its case,
+  NFKC, spacing, digit, and Cyrillic look-alike forms, and do not
+  substring-block `Systematic`, `Ecosystem`, or `Solar System`.
+- `tests/integration/recipe-unlock-notices.test.ts` proves through the shared
+  character command boundary: one grouped row for an exact or skipped-level
+  crossing and none for a non-crossing or recipe-less rise, no repeat on later
+  XP, the notice rolling back with its XP, the `"system.notice"` prompt only
+  after commit, one row for two concurrent crossing commands, no row for the
+  operator's SET TOTAL XP, durable once-only read state with a newer notice left
+  unread, and owner-only reads.
+- `tests/e2e/system-notices.spec.ts` proves at phone width that an ordinary
+  Refining attempt crossing Refining 5 lights the launcher and Whispers tab
+  live, System is pinned above a player conversation, it opens to the grouped
+  notice with no composer, profile, Block, or Report, and reading it stays read
+  across a reload — with no horizontal overflow. It also proves Something New to Make is
+  the newest Update, linking the Mining & Refining and Fabrication & Tinkering
+  Wiki pages, and that News surfaces it.
+
 ### Issue #248 moderation coverage
 
 - `tests/unit/moderation.test.ts` owns the pure rules (sanction state,
@@ -398,8 +427,8 @@ Hermes host.
   four rapid requests making Decline & Block prominent with the account's
   fifth refused, Block stopping further requests, and no horizontal overflow
   with the footer actions in view at 393px and 1280px. It also proves Meet Me
-  There is the newest Update linking the Player Trading Wiki page, and that
-  News surfaces it. It never waits out the 20-second or 5-minute timers; the
+  There is published and links the Player Trading Wiki page (found by name
+  since #274 shipped a newer Update). It never waits out the 20-second or 5-minute timers; the
   integration suites own those with injected clocks.
 
 ## What to test when systems arrive

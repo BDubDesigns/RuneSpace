@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { ActionButton } from "@/components/ui/ActionButton";
 import { Feedback } from "@/components/ui/Feedback";
 import { GAMEPLAY_ACCESS_REQUIRED_CODE } from "@/game/domain/gameplay-access";
+import { SYSTEM_IDENTITY_NAME } from "@/game/domain/player-name";
 import type { BlockedPlayersView } from "@/game/schemas/social-safety";
 import {
   WhisperMessageViewSchema,
@@ -15,7 +16,12 @@ import {
   type WhisperSendResult,
 } from "@/game/schemas/whispers";
 import { useSocial } from "@/features/social/SocialContext";
-import { markWhisperReadAction, sendWhisperAction, unblockPlayerAction } from "@/server/actions";
+import {
+  markSystemNoticesReadAction,
+  markWhisperReadAction,
+  sendWhisperAction,
+  unblockPlayerAction,
+} from "@/server/actions";
 import {
   applyLatestPage,
   applyOlderPage,
@@ -34,14 +40,16 @@ import { SafetyFlow, type SafetyOutcome, type SafetySubject } from "./SafetyFlow
 /**
  * Whispers inside the Chat/Social surface (issue #247): the active
  * character's conversations with their durable unread counts, one open
- * conversation, and the account's Blocked Players list. Which of the three
- * shows is `ChatContext`'s view, so a character-facing surface elsewhere in
- * Play can open a conversation here without navigating.
+ * conversation, the read-only System conversation (#274), and the account's
+ * Blocked Players list. Which one shows is `ChatContext`'s view, so a
+ * character-facing surface elsewhere in Play can open a conversation here
+ * without navigating.
  */
 export function WhisperPanel() {
   const { view } = useChat();
   if (view.tab !== "whispers") return null;
   if (view.blockedPlayers) return <BlockedPlayers />;
+  if (view.system) return <SystemConversation />;
   if (view.peer) return <WhisperConversation key={view.peer.characterId} peer={view.peer} />;
   return <WhisperInboxList />;
 }
@@ -127,9 +135,65 @@ function StartWhisperForm() {
   );
 }
 
+function UnreadBadge({ unread }: { unread: number }) {
+  return (
+    <span
+      aria-hidden="true"
+      className="mt-0.5 flex min-h-5 min-w-5 shrink-0 items-center justify-center rounded-full border border-[color:var(--rs-accent-primary)] px-1 font-display text-[10px] font-bold text-[color:var(--rs-accent-primary)] [box-shadow:var(--rs-glow-news-unread)]"
+    >
+      {unread > 9 ? "9+" : unread}
+    </span>
+  );
+}
+
+/**
+ * The System conversation's row (#274), pinned above every player Whisper.
+ * It looks like a conversation, but System is not a player: there is no
+ * profile, Block, or Report behind it.
+ */
+function SystemConversationRow() {
+  const { setView, system } = useChat();
+  const latest = system?.notices.at(-1);
+  if (!system || !latest) return null;
+  const unread = system.unread;
+  return (
+    <li>
+      <button
+        aria-label={`${SYSTEM_IDENTITY_NAME}${unread > 0 ? `, ${unread} unread` : ""}`}
+        className="rs-focus flex min-h-[var(--rs-touch-target)] w-full items-start gap-2 px-2 py-2 text-left outline-none hover:bg-[color:var(--rs-accent-primary-subtle)]"
+        data-system-conversation=""
+        data-system-unread={unread}
+        onClick={() => setView({ tab: "whispers", system: true })}
+        type="button"
+      >
+        <span className="min-w-0 flex-1">
+          <span className="flex min-w-0 items-baseline gap-2">
+            <span
+              className={`min-w-0 truncate font-display text-sm ${unread > 0 ? "font-bold text-[color:var(--rs-text-primary)]" : "text-[color:var(--rs-text-secondary)]"}`}
+            >
+              {SYSTEM_IDENTITY_NAME}
+            </span>
+            <time
+              className="ml-auto shrink-0 text-xs text-[color:var(--rs-text-muted)]"
+              dateTime={latest.sentAt}
+            >
+              {formatWhen(latest.sentAt)}
+            </time>
+          </span>
+          <span className="block truncate text-xs text-[color:var(--rs-text-muted)]">
+            {latest.body.split("\n")[0]}
+          </span>
+        </span>
+        {unread > 0 ? <UnreadBadge unread={unread} /> : null}
+      </button>
+    </li>
+  );
+}
+
 function WhisperInboxList() {
-  const { characterId, inbox, setView } = useChat();
+  const { characterId, inbox, setView, system } = useChat();
   const conversations = inbox?.conversations ?? [];
+  const hasSystem = (system?.notices.length ?? 0) > 0;
   return (
     <div className="space-y-3" data-whisper-inbox="">
       <StartWhisperForm />
@@ -145,18 +209,15 @@ function WhisperInboxList() {
           Blocked players
         </ActionButton>
       </div>
-      {!inbox ? (
+      {!inbox && !hasSystem ? (
         <p className="text-sm text-[color:var(--rs-text-muted)]">Loading Whispers…</p>
-      ) : conversations.length === 0 ? (
-        <p className="text-sm text-[color:var(--rs-text-muted)]">
-          No Whispers yet. Start one above with a character&apos;s exact name, or tap a
-          player&apos;s name in General or Trade.
-        </p>
-      ) : (
+      ) : null}
+      {hasSystem || conversations.length > 0 ? (
         <ul
           aria-label="Whisper conversations"
           className="divide-y divide-[color:var(--rs-border-subtle)] border border-[color:var(--rs-border-structural)] bg-[color:var(--rs-surface-panel)]"
         >
+          <SystemConversationRow />
           {conversations.map((conversation) => {
             const { peer, unread, lastMessage } = conversation;
             const fromMe = lastMessage.senderCharacterId === characterId;
@@ -194,20 +255,19 @@ function WhisperInboxList() {
                       {lastMessage.body}
                     </span>
                   </span>
-                  {unread > 0 ? (
-                    <span
-                      aria-hidden="true"
-                      className="mt-0.5 flex min-h-5 min-w-5 shrink-0 items-center justify-center rounded-full border border-[color:var(--rs-accent-primary)] px-1 font-display text-[10px] font-bold text-[color:var(--rs-accent-primary)] [box-shadow:var(--rs-glow-news-unread)]"
-                    >
-                      {unread > 9 ? "9+" : unread}
-                    </span>
-                  ) : null}
+                  {unread > 0 ? <UnreadBadge unread={unread} /> : null}
                 </button>
               </li>
             );
           })}
         </ul>
-      )}
+      ) : null}
+      {inbox && conversations.length === 0 ? (
+        <p className="text-sm text-[color:var(--rs-text-muted)]">
+          No Whispers yet. Start one above with a character&apos;s exact name, or tap a
+          player&apos;s name in General or Trade.
+        </p>
+      ) : null}
     </div>
   );
 }
@@ -623,6 +683,94 @@ function WhisperConversation({ peer: initialPeer }: { peer: WhisperPeer }) {
         />
       )}
       {feedback ? <Feedback tone={feedback.tone}>{feedback.text}</Feedback> : null}
+    </div>
+  );
+}
+
+/**
+ * The read-only System conversation (#274): the character's recipe-unlock
+ * notices, oldest first. It deliberately has no composer, Reply, profile,
+ * Block, or Report — System is RuneSpace, not a player. Reading it marks the
+ * shown notices read on every tab and device, but only while the page is
+ * actually visible.
+ */
+function SystemConversation() {
+  const { characterId, refreshSystem, setView, system } = useChat();
+  const logRef = useRef<HTMLDivElement>(null);
+  const markedThrough = useRef(0);
+  const notices = system?.notices ?? [];
+  const newest = notices.at(-1)?.seq;
+  const unread = system?.unread ?? 0;
+
+  // Opening System re-reads it, so a notice that committed while the panel
+  // was closed is never missing from what is marked read.
+  useEffect(() => {
+    refreshSystem();
+  }, [refreshSystem]);
+
+  const [pageVisible, setPageVisible] = useState(true);
+  useEffect(() => {
+    const update = () => setPageVisible(document.visibilityState === "visible");
+    update();
+    document.addEventListener("visibilitychange", update);
+    return () => document.removeEventListener("visibilitychange", update);
+  }, []);
+  useEffect(() => {
+    if (!pageVisible || unread === 0) return;
+    if (newest === undefined || newest <= markedThrough.current) return;
+    const through = newest;
+    markedThrough.current = through;
+    const retryLater = () => {
+      if (markedThrough.current === through) markedThrough.current = 0;
+    };
+    markSystemNoticesReadAction({ characterId, throughSeq: through }).then((result) => {
+      if ("error" in result) retryLater();
+      else refreshSystem();
+    }, retryLater);
+  }, [characterId, newest, pageVisible, refreshSystem, unread]);
+
+  useLayoutEffect(() => {
+    const log = logRef.current;
+    if (log) log.scrollTop = log.scrollHeight;
+  }, [notices.length]);
+
+  return (
+    <div className="space-y-3" data-system-conversation-view="">
+      <div className="flex flex-wrap items-center gap-2">
+        <BackButton onClick={() => setView({ tab: "whispers" })}>All Whispers</BackButton>
+        <h3 className="min-w-0 flex-1 truncate font-display text-sm font-bold text-[color:var(--rs-text-primary)]">
+          {SYSTEM_IDENTITY_NAME}
+        </h3>
+      </div>
+      <div
+        aria-label={`Messages from ${SYSTEM_IDENTITY_NAME}`}
+        className="h-[min(34dvh,20rem)] overflow-y-auto border border-[color:var(--rs-border-subtle)] bg-[color:var(--rs-surface-panel)] p-2"
+        data-system-log=""
+        ref={logRef}
+        role="log"
+        tabIndex={0}
+      >
+        {!system ? (
+          <p className="p-2 text-sm text-[color:var(--rs-text-muted)]">Loading…</p>
+        ) : notices.length === 0 ? (
+          <p className="p-2 text-sm text-[color:var(--rs-text-muted)]">No System messages yet.</p>
+        ) : null}
+        <ol className="space-y-2">
+          {notices.map((notice) => (
+            <ChatMessageRow
+              body={notice.body}
+              id={notice.id}
+              key={notice.id}
+              own={false}
+              senderName={SYSTEM_IDENTITY_NAME}
+              sentAt={notice.sentAt}
+            />
+          ))}
+        </ol>
+      </div>
+      <p className="text-xs text-[color:var(--rs-text-muted)]" data-system-read-only="">
+        System messages are sent automatically. You can&apos;t reply to them.
+      </p>
     </div>
   );
 }
