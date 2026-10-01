@@ -97,6 +97,27 @@ export function RegisterForm({ siteKey }: { siteKey: string }) {
         You’ll need to verify your email before you can create characters or enter the game.
       </p>
 
+      <section
+        aria-labelledby="one-account-policy"
+        data-testid="one-account-policy"
+        className="mt-5 border border-l-4 border-[color:var(--rs-border-structural)] border-l-[color:var(--rs-accent-primary)] bg-[color:var(--rs-surface-raised)] p-4"
+      >
+        <h2
+          id="one-account-policy"
+          className="text-sm font-semibold text-[color:var(--rs-text-primary)]"
+        >
+          One player, one account
+        </h2>
+        <ul className="mt-2 list-disc space-y-1.5 pl-5 text-sm text-[color:var(--rs-text-secondary)] marker:text-[color:var(--rs-accent-primary)]">
+          <li>RuneSpace allows one account per player.</li>
+          <li>Each account supports up to three characters.</li>
+          <li>
+            Creating or using multiple accounts breaks the game rules and may get every account you
+            control banned.
+          </li>
+        </ul>
+      </section>
+
       <form onSubmit={onSubmit} className="mt-6 space-y-4">
         <FormField
           id="playerName"
@@ -131,10 +152,6 @@ export function RegisterForm({ siteKey }: { siteKey: string }) {
           {pending ? "Creating account" : "Create account"}
         </ActionButton>
       </form>
-
-      <p className="mt-4 text-sm text-[color:var(--rs-text-muted)]">
-        One person, one RuneSpace account. Every account includes three character slots.
-      </p>
 
       <section className="mt-6 border-t border-[color:var(--rs-border-subtle)] pt-4">
         <h2 className="text-sm font-semibold text-[color:var(--rs-text-primary)]">
