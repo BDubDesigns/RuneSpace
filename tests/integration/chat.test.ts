@@ -1,7 +1,12 @@
 import { eq, inArray } from "drizzle-orm";
 import { afterEach, beforeAll, describe, expect, it } from "vitest";
 import type { ChatMessageView, ChatSendResult, VisibleChatMessageView } from "@/game/schemas/chat";
-import { cleanupTestUser, createCharacterForUser, createTestUser } from "./fixtures";
+import {
+  cleanupTestUser,
+  createCharacterForUser,
+  createTestUser,
+  withPublicGameplayClosed,
+} from "./fixtures";
 
 const DATABASE_URL = process.env.DATABASE_URL;
 const suite = DATABASE_URL ? describe : describe.skip;
@@ -149,12 +154,14 @@ suite("issue #246 public chat (real PostgreSQL)", () => {
     ).rejects.toMatchObject({ name: "OwnershipError", status: 404 });
 
     const waiting = await player({ gameplayAccess: false });
-    await expect(
-      chat.sendChatMessage(waiting.userId, waiting.character.id, {
-        channel: "general",
-        text: "hi",
-      }),
-    ).rejects.toMatchObject({ name: "GameplayAccessError", status: 403 });
+    await withPublicGameplayClosed(db, rune, () =>
+      expect(
+        chat.sendChatMessage(waiting.userId, waiting.character.id, {
+          channel: "general",
+          text: "hi",
+        }),
+      ).rejects.toMatchObject({ name: "GameplayAccessError", status: 403 }),
+    );
 
     const headers = { host: "localhost:3000" };
     const anonymous = await route.GET(

@@ -1,12 +1,15 @@
 import { and, count, eq, sql } from "drizzle-orm";
 import { parseSetCookieHeader } from "better-auth/cookies";
-import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { ACTION_IDS, PORTRAIT_IDS } from "@/game/config/foundations";
 import {
   cleanupTestUser,
   createCharacterForUser,
   createTestUser,
   grantFixtureEarlyAccess,
+  holdPublicGameplaySwitch,
+  PUBLIC_GAMEPLAY_SWITCH_LOCK_KEY,
+  withPublicGameplayClosed,
 } from "./fixtures";
 
 /** The locked launch target: 2026-10-27 09:00 America/Los_Angeles. */
@@ -21,8 +24,11 @@ const suite = DATABASE_URL ? describe : describe.skip;
  *
  * This is the ONLY integration file that changes the global
  * `runespace_access_state` switch. Vitest runs one file's tests sequentially,
- * and every other suite's fixture accounts carry fixture Early Access, so no
- * other suite depends on the switch. It is restored to Closed after each test.
+ * but other files run at the same time against the same database, and a few of
+ * their assertions are only true while the switch is Closed (issue #277). Each
+ * test here therefore holds the switch lock (`holdPublicGameplaySwitch`) and
+ * restores Closed before releasing it; those assertions run under
+ * `withPublicGameplayClosed`.
  */
 suite("issue #223 gameplay access (real PostgreSQL)", () => {
   let db: (typeof import("@/db"))["db"];
@@ -73,8 +79,18 @@ suite("issue #223 gameplay access (real PostgreSQL)", () => {
       .where(eq(rune.runespaceAccessState.id, 1));
   }
 
+  let releaseSwitch: (() => Promise<void>) | undefined;
+
+  beforeEach(async () => {
+    releaseSwitch = await holdPublicGameplaySwitch(db);
+  });
+
   afterEach(async () => {
-    await setPublicGameplayOpen(false);
+    try {
+      await setPublicGameplayOpen(false);
+    } finally {
+      await releaseSwitch?.();
+    }
     for (const userId of createdUsers.splice(0))
       await cleanupTestUser(db, authSchema, rune, userId);
   });
@@ -148,6 +164,39 @@ suite("issue #223 gameplay access (real PostgreSQL)", () => {
       }
     },
   );
+
+  it("holds another suite's Closed-dependent assertion until the switch is Closed again (issue #277)", async () => {
+    // This test holds the switch (beforeEach). A parallel suite's assertion
+    // that needs Closed — e.g. a gated account's chat send is refused — must
+    // wait here instead of observing Open, then see Closed once released.
+    const gated = await makePlayer();
+    await setPublicGameplayOpen(true);
+    let settled = false;
+    const refusal = withPublicGameplayClosed(db, rune, () =>
+      access.requireGameplayAccess(db, gated.userId),
+    ).finally(() => {
+      settled = true;
+    });
+    refusal.catch(() => {});
+    const queuedBehindWriter = async () => {
+      const result = await db.execute(sql`
+        select 1 from pg_locks
+        where locktype = 'advisory' and objsubid = 1 and objid = ${PUBLIC_GAMEPLAY_SWITCH_LOCK_KEY}
+          and mode = 'ShareLock' and not granted
+          and database = (select oid from pg_database where datname = current_database())`);
+      return result.rows.length > 0;
+    };
+    while (!settled && !(await queuedBehindWriter()));
+    expect(settled).toBe(false);
+
+    await setPublicGameplayOpen(false);
+    await releaseSwitch!();
+    await expect(refusal).rejects.toMatchObject({
+      name: "GameplayAccessError",
+      status: 403,
+      reason: "gameplay_closed",
+    });
+  });
 
   it("refuses a verified closed account at every seam before locking or reconciling", async () => {
     const player = await makePlayer();
