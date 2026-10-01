@@ -94,7 +94,7 @@ characters never evades one.
 | Kind | Effect while in effect | Enforced at |
 | --- | --- | --- |
 | Warning | None; a notice on record | — |
-| Social restriction | No General, Trade, promoted Trade ads, or Whispers; no starting a player trade request | `beginChatSend` (every chat send, `server/chat.ts`); `requireTradeRequestInitiationAllowed` (`server/moderation-sanctions.ts`) for #225 |
+| Social restriction | No General, Trade, promoted Trade ads, or Whispers; no starting a player trade request | `beginChatSend` (every chat send, `server/chat.ts`); `requireTradeRequestInitiationAllowed` (`server/moderation-sanctions.ts`), called by `createTradeRequest` (`server/player-trades.ts`, #266) |
 | Account suspension | No gameplay on any character | `decideGameplayAccess` via `server/gameplay-access.ts` |
 
 - **Durations:** 24 hours, 7 days, 30 days, 90 days, 1 year, or permanent
@@ -106,8 +106,8 @@ characters never evades one.
   needs no job and reversal applies on the next request. A sanction stops
   applying at its exact `ends_at`.
 - **A socially restricted player** keeps ordinary gameplay, reading public
-  chat, reporting, blocking, and (once #225 ships) accepting a trade someone
-  else starts. Issuing or changing a sanction takes the subject's chat send
+  chat, reporting, blocking, and accepting a trade request someone else
+  starts (#266). Issuing or changing a sanction takes the subject's chat send
   lock, so a send already in flight commits before the restriction and none
   after it.
 - **A suspended account** is refused by every gameplay command, gameplay read,
@@ -121,9 +121,10 @@ characters never evades one.
   Actioned.
 
 `requireTradeRequestInitiationAllowed(executor, playerAccountId, now)` is the
-seam the #225 trade-request command must call inside its transaction, next to
-the Block seam `isBlockedBetween`. When trading ships, also name it in
-`SANCTION_ACCESS_AFFECTED`, which lists only shipped features.
+seam `createTradeRequest` (`server/player-trades.ts`, #266) calls inside its
+transaction, next to the Block seam `blockBetween`. Accepting a request is
+not gated by it. Name trading in `SANCTION_ACCESS_AFFECTED`, which lists only
+features players can use, once #268 lets players start a trade.
 
 ## Player notices and appeals
 

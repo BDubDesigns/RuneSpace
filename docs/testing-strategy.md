@@ -305,6 +305,31 @@ Hermes host.
   403 for ordinary players; the access log; and the published policies, footer
   links, the "Open Channels" Update, and its News attention.
 
+### Issue #266 player trade request and session coverage
+
+- `tests/unit/player-trade.test.ts` owns the pure rules: the policy numbers,
+  exact 20-second expiry, movement invalidation, 5-minute session inactivity,
+  and the rolling 4/30 budget. `tests/unit/player-trade-gate.test.ts` keeps
+  the accepted-trade gate deny-by-default: the exact `allowDuringTrade`
+  opt-outs, the gate under the row lock and before reconciliation, and the
+  promoted-ad gate before its charge.
+- `tests/integration/player-trade.test.ts` proves against PostgreSQL, with
+  injected clocks and `Promise.all` races rather than sleeps: forged, remote,
+  and blocked targets create nothing and publish nothing; Block across every
+  character of both accounts; social restriction refusing initiation but not
+  acceptance; one outgoing request under concurrent tabs (and the partial
+  unique index itself); immediate, idempotent Cancel without cooldown;
+  deterministic expiry; the account-wide 4/30 budget across characters and
+  concurrent sends, untouched by refusals; same-recipient escalation;
+  concurrent competing, chained, and crossed acceptances leaving each
+  character in exactly one session; Accept-vs-Cancel and Accept-vs-expiry;
+  movement invalidation; the accepting character's own outgoing request
+  released; same-account sessions; guessed, foreign, and wrong-account ids;
+  representative gameplay commands refused during a session or a pending
+  outgoing request and allowed again after cancel or expiry; and the
+  realtime prompts after commit.
+- Browser coverage arrives with the trade UI in #268.
+
 ## What to test when systems arrive
 For progression-sensitive systems, prioritize:
 - **exploit-sensitive transitions** (e.g., granting rewards)
