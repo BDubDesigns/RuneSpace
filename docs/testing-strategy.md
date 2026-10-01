@@ -34,7 +34,7 @@ small number of critical mobile player journeys.
 - Chat retention is the other global case (issue #278): every send prunes the
   oldest expired rows in the whole `chat_messages` table. A test's chat rows must
   stay inside real retention, expiring only on the test's own injected clock, or
-  any parallel send can delete them. A test that keeps rows within a day of the
+  any parallel send can delete them. A test that keeps rows within two days of the
   90-day boundary, or prunes or sends with a clock ahead of real time, runs
   inside `withChatRetentionWindow`.
 - A multi-row read compared to an ordered expectation needs an `ORDER BY`

@@ -170,12 +170,12 @@ export async function withPublicGameplayClosed<T>(
  * `pruneExpiredChatMessages` sweeps the whole `chat_messages` table, so a test
  * that prunes with a clock ahead of real time deletes every other test's rows
  * near the 90-day boundary, and a test holding such rows can lose them to it.
- * Every test that keeps chat rows within a day of the boundary, or prunes (or
+ * Every test that keeps chat rows within two days of the boundary, or prunes (or
  * sends) with a clock ahead of real time, runs inside `withChatRetentionWindow`.
  * Ordinary sends prune only rows already expired in real time, so a test must
  * also keep its rows inside real retention, expiring them only on its own clock.
  */
-export const CHAT_RETENTION_WINDOW_LOCK_KEY = 278_0001;
+const CHAT_RETENTION_WINDOW_LOCK_KEY = 278_0001;
 
 /** Runs a chat-retention test while no other retention test can sweep or seed the boundary. */
 export async function withChatRetentionWindow<T>(db: Db, run: () => Promise<T>): Promise<T> {
