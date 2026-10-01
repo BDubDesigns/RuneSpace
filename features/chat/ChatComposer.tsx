@@ -101,6 +101,10 @@ export function ChatComposer({
     if (queryStart !== undefined) onMentionQueryRef.current?.();
   }, [queryStart]);
   useEffect(() => setActiveIndex(0), [queryKey]);
+  // Leaving a query forgets that it was closed, so typing it again reopens.
+  useEffect(() => {
+    if (queryKey === undefined) setClosed(undefined);
+  }, [queryKey]);
 
   // Put the caret after an inserted mention once React has rendered it.
   useLayoutEffect(() => {
@@ -155,7 +159,7 @@ export function ChatComposer({
         setActiveIndex((active + step + options.length) % options.length);
         return;
       }
-      if ((event.key === "Enter" && !event.shiftKey) || event.key === "Tab") {
+      if ((event.key === "Enter" || event.key === "Tab") && !event.shiftKey) {
         event.preventDefault();
         // Tab chooses here; the Drawer's focus cycling must not also move.
         event.stopPropagation();

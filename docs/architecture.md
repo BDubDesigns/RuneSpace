@@ -274,10 +274,13 @@ realtime substrate above. There is no Local/Nearby/Zone channel.
   `resolveMentions` resolves each target with `resolveCharacterTarget` (an id
   anywhere, a name only at the sender's location) and requires another
   account's character whose *current* name the body shows after `@`
-  (`bodyShowsMention`). Anything else refuses the whole send as
-  `invalid_mention`, before any ad charge; mentioning an account the sender
-  blocked is `blocked_by_you`. A target whose account blocked the sender is
-  accepted and never alerted, so the Block is not disclosed.
+  (`mentionSpans` in `game/domain/chat.ts`, which the composer and renderer
+  share: exact, ending at a word boundary, and each `@` going to the longest
+  resolved name, so `@Alice` never mentions `Al`). Anything else refuses the
+  whole send as `invalid_mention`, before any ad charge; mentioning an account
+  the sender blocked is `blocked_by_you`. A target whose account blocked the
+  sender is accepted, stored already read, and never alerted, so the Block is
+  not disclosed and an Unblock never surfaces it.
 - **Persistence:** `chat_message_mentions` rows (message, character, account,
   name at send, `read_at`) commit with their message and cascade with it
   under retention. A message is still one canonical row and one send; a
@@ -285,8 +288,9 @@ realtime substrate above. There is no Local/Nearby/Zone channel.
 - **Attention:** derived, never counted: `readChatMentions` (`GET
   /api/chat/mentions`) counts the character's unread mentions on retained
   messages per feed (an ad counts in both, once in the total), excluding any
-  whose sender and target accounts have a Block either way — so a later Block
-  silences mentions already sent. `markChatMentionsRead` marks the
+  whose sender and target accounts have a Block either way. A new Block
+  (`recordBlock`) also marks every unread mention between the two accounts
+  read, both ways, so lifting it never brings silenced attention back. `markChatMentionsRead` marks the
   character's mentions in one feed through the `seq` a tab showed and
   publishes `"chat.mentions.read"`; a send publishes `"chat.mention"` to each
   unblocked target. Both are invalidations; `ChatContext` re-reads on them,

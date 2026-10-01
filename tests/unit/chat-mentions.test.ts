@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { bodyShowsMention, CHAT_POLICY } from "@/game/domain/chat";
+import { CHAT_POLICY, mentionSpans, namesShownAsMentions } from "@/game/domain/chat";
 import {
   ChatMessageViewSchema,
   SendChatMessageRequestSchema,
@@ -8,6 +8,7 @@ import {
 import { applyMessage, EMPTY_CHAT_FEED } from "@/features/chat/chat-feed";
 import {
   activeMentionQuery,
+  atMentionLimit,
   insertMention,
   matchMentionCandidates,
   mentionSegments,
@@ -28,10 +29,27 @@ const candidate = (name: string, id = name): MentionCandidate => ({
 });
 
 describe("mention text rule", () => {
-  it("requires the exact @Name in the body", () => {
-    expect(bodyShowsMention("hi @Zoë O'Ná-7 there", "Zoë O'Ná-7")).toBe(true);
-    expect(bodyShowsMention("hi @zoë o'ná-7", "Zoë O'Ná-7")).toBe(false);
-    expect(bodyShowsMention("hi Zoë O'Ná-7", "Zoë O'Ná-7")).toBe(false);
+  it("requires the exact @Name, ending at a word boundary", () => {
+    const zoe = "Zoë O'Ná-7";
+    expect(namesShownAsMentions(`hi @${zoe} there`, [zoe])).toEqual(new Set([zoe]));
+    expect(namesShownAsMentions(`@${zoe}.`, [zoe])).toEqual(new Set([zoe]));
+    expect(namesShownAsMentions("hi @zoë o'ná-7", [zoe]).size).toBe(0);
+    expect(namesShownAsMentions(`hi ${zoe}`, [zoe]).size).toBe(0);
+    // A longer name never shows a shorter one it starts with.
+    expect(namesShownAsMentions("@Alice wts ore", ["Al"]).size).toBe(0);
+    expect(namesShownAsMentions("@Al_ice", ["Al"]).size).toBe(0);
+    expect(namesShownAsMentions("@Al's ore", ["Al"])).toEqual(new Set(["Al"]));
+  });
+
+  it("gives each @ to the longest name that fits", () => {
+    expect(mentionSpans("@Bob Smith and @Bob", ["Bob", "Bob Smith"])).toEqual([
+      { start: 0, end: 10, name: "Bob Smith" },
+      { start: 15, end: 19, name: "Bob" },
+    ]);
+    // Bob Smith's text alone does not also show Bob.
+    expect(namesShownAsMentions("@Bob Smith hi", ["Bob", "Bob Smith"])).toEqual(
+      new Set(["Bob Smith"]),
+    );
   });
 });
 
@@ -87,14 +105,25 @@ describe("insertMention and mentionsShown", () => {
     expect(insertMention("hi @Zo!", 3, 6, "Zoë")).toEqual({ draft: "hi @Zoë !", caret: 8 });
   });
 
-  it("names only chosen mentions the draft still shows, once each, up to the limit", () => {
+  it("names only chosen mentions the draft still shows, once each", () => {
     const zoe = candidate("Zoë", "1");
     const rook = candidate("Rook", "2");
     expect(mentionsShown("@Zoë and @Zoë", [zoe, zoe, rook])).toEqual([zoe]);
     expect(mentionsShown("edited away", [zoe])).toEqual([]);
-    const many = Array.from({ length: 8 }, (_, i) => candidate(`P${i}`, String(i)));
+    // Edited into a longer name, or covered by a longer chosen name: dropped.
+    const bob = candidate("Bob", "3");
+    const bobSmith = candidate("Bob Smith", "4");
+    expect(mentionsShown("@Bobby hi", [bob])).toEqual([]);
+    expect(mentionsShown("@Bob Smith hi", [bob, bobSmith])).toEqual([bobSmith]);
+  });
+
+  it("reports the limit once the draft shows the most mentions one message may carry", () => {
+    const many = Array.from({ length: CHAT_POLICY.maxMentions }, (_, i) =>
+      candidate(`P${i}`, String(i)),
+    );
     const draft = many.map((c) => `@${c.name}`).join(" ");
-    expect(mentionsShown(draft, many)).toHaveLength(CHAT_POLICY.maxMentions);
+    expect(atMentionLimit(draft, many)).toBe(true);
+    expect(atMentionLimit(draft, many.slice(1))).toBe(false);
   });
 });
 

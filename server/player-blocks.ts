@@ -1,8 +1,10 @@
-import { and, desc, eq, or, sql, type SQL, type SQLWrapper } from "drizzle-orm";
+import { and, desc, eq, inArray, isNull, or, sql, type SQL, type SQLWrapper } from "drizzle-orm";
 import { db } from "@/db";
 import { user } from "@/db/auth-schema";
 import {
   characters,
+  chatMessageMentions,
+  chatMessages,
   playerAccounts,
   playerBlockEvents,
   playerBlocks,
@@ -110,9 +112,13 @@ export async function isBlockedBetween(
  * Record a Block inside the caller's transaction. Idempotent: an existing
  * Block is left as it was and appends no second event. Returns whether this
  * call created it.
+ *
+ * A new Block also settles every unread `@mention` between the two accounts,
+ * in both directions, as read (#261): attention the Block silenced never
+ * comes back as a pile of unread mentions when it is lifted.
  */
 export async function recordBlock(
-  tx: Pick<Transaction, "insert" | "execute">,
+  tx: Pick<Transaction, "insert" | "execute" | "update" | "select">,
   blocker: Pick<Character, "id" | "playerAccountId">,
   blocked: Pick<Character, "id" | "playerAccountId">,
   now: Date,
@@ -132,6 +138,29 @@ export async function recordBlock(
     .onConflictDoNothing()
     .returning({ blocker: playerBlocks.blockerPlayerAccountId });
   if (inserted.length === 0) return false;
+  const sentBy = (accountId: string) =>
+    tx
+      .select({ id: chatMessages.id })
+      .from(chatMessages)
+      .where(eq(chatMessages.senderPlayerAccountId, accountId));
+  await tx
+    .update(chatMessageMentions)
+    .set({ readAt: now })
+    .where(
+      and(
+        isNull(chatMessageMentions.readAt),
+        or(
+          and(
+            eq(chatMessageMentions.mentionedPlayerAccountId, blocker.playerAccountId),
+            inArray(chatMessageMentions.messageId, sentBy(blocked.playerAccountId)),
+          ),
+          and(
+            eq(chatMessageMentions.mentionedPlayerAccountId, blocked.playerAccountId),
+            inArray(chatMessageMentions.messageId, sentBy(blocker.playerAccountId)),
+          ),
+        ),
+      ),
+    );
   await tx.insert(playerBlockEvents).values({
     kind: "block",
     blockerPlayerAccountId: blocker.playerAccountId,

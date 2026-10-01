@@ -191,6 +191,12 @@ suite("issue #261 Chat/Social polish (real PostgreSQL)", () => {
           mentions: [{ characterId: "00000000-0000-4000-8000-000000000000" }],
           error: /couldn't be matched/,
         },
+        // A longer word that merely starts with the target's name.
+        {
+          text: `@${name}x hi`,
+          mentions: [{ characterId: target.character.id }],
+          error: /matched/,
+        },
         // A real target the body does not show.
         { text: "hello there", mentions: [{ characterId: target.character.id }], error: /matched/ },
         // The body shows a different capitalization than the current name.
@@ -405,11 +411,34 @@ suite("issue #261 Chat/Social polish (real PostgreSQL)", () => {
       });
       expect(JSON.stringify(targetPage)).not.toContain(target.character.id);
 
-      // Unblocking restores the message, and with it the unread mention.
+      // Unblocking restores the message, but never the attention the Block
+      // silenced: it was stored already read.
       await blocks.unblockPlayer(target.userId, target.character.id, sender.character.id);
+      expect((await unread(target.userId, target.character.id)).unreadTotal).toBe(0);
+      expect(
+        (
+          await chat.readChatHistory(target.userId, target.character.id, { channel: "general" })
+        ).messages.find((m) => m.id === message.id),
+      ).toMatchObject({ redacted: false, body: `@${name} you there?` });
+
+      // An unread mention sent before a Block is settled by it, so an Unblock
+      // later does not bring it back.
+      posted(
+        await chat.sendChatMessage(
+          sender.userId,
+          sender.character.id,
+          {
+            channel: "general",
+            text: `@${name} before the block`,
+            mentions: [{ characterId: target.character.id }],
+          },
+          { now: new Date(Date.now() + 11_000) },
+        ),
+      );
       expect((await unread(target.userId, target.character.id)).unreadTotal).toBe(1);
 
-      // The sender blocks the target: mentioning them is refused like a Whisper.
+      // The sender blocks the target: attention clears both ways, and
+      // mentioning them is refused like a Whisper.
       await blocks.blockPlayer(sender.userId, sender.character.id, {
         characterId: target.character.id,
       });
@@ -422,9 +451,11 @@ suite("issue #261 Chat/Social polish (real PostgreSQL)", () => {
           text: `@${name} again`,
           mentions: [{ characterId: target.character.id }],
         },
-        { now: new Date(Date.now() + 11_000) },
+        { now: new Date(Date.now() + 22_000) },
       );
       expect(refused).toMatchObject({ status: "refused", reason: "blocked_by_you" });
+      await blocks.unblockPlayer(sender.userId, sender.character.id, target.character.id);
+      expect((await unread(target.userId, target.character.id)).unreadTotal).toBe(0);
     });
 
     it("deletes mentions with their message under ordinary retention", async () => {

@@ -1,5 +1,5 @@
 import { CHARACTER_NAME_MAX, normalizeCharacterName } from "@/game/domain/character-name";
-import { CHAT_POLICY, mentionText } from "@/game/domain/chat";
+import { CHAT_POLICY, mentionSpans, mentionText, namesShownAsMentions } from "@/game/domain/chat";
 import type { ChatMentionView } from "@/game/schemas/chat";
 import type { CharacterTarget } from "@/game/schemas/whispers";
 
@@ -112,20 +112,29 @@ export function insertMention(
 }
 
 /**
- * The chosen mentions the draft still shows, one per character and at most
- * the policy's limit — what Send names. Editing `@Name` out of the text drops
- * its mention.
+ * The chosen mentions the draft still shows, one per character, by the same
+ * span rule the server applies (`mentionSpans`): editing `@Name` out of the
+ * text, or into a longer name, drops its mention. Not capped: the composer
+ * stops offering names at the limit, and the server refuses more.
  */
 export function mentionsShown(
   draft: string,
   chosen: readonly MentionCandidate[],
 ): MentionCandidate[] {
+  const visible = namesShownAsMentions(
+    draft,
+    chosen.map((candidate) => candidate.name),
+  );
   const shown = new Map<string, MentionCandidate>();
   for (const candidate of chosen) {
-    if (!draft.includes(mentionText(candidate.name))) continue;
-    shown.set(normalizeCharacterName(candidate.name), candidate);
+    if (visible.has(candidate.name)) shown.set(normalizeCharacterName(candidate.name), candidate);
   }
-  return [...shown.values()].slice(0, CHAT_POLICY.maxMentions);
+  return [...shown.values()];
+}
+
+/** Whether a draft already shows as many mentions as one message may carry. */
+export function atMentionLimit(draft: string, chosen: readonly MentionCandidate[]): boolean {
+  return mentionsShown(draft, chosen).length >= CHAT_POLICY.maxMentions;
 }
 
 /** One run of a rendered message body: plain text, or a resolved mention. */
@@ -133,31 +142,19 @@ export type BodySegment = { text: string; mention?: ChatMentionView };
 
 /**
  * Split a message body into text and the mentions the server resolved, by
- * each mention's name at send. Only those names are marked: other `@` text in
- * the body stays plain. Longer names win where one name begins another.
+ * each mention's name at send and the same span rule the server checked.
+ * Only those names are marked: other `@` text in the body stays plain.
  */
 export function mentionSegments(body: string, mentions: readonly ChatMentionView[]): BodySegment[] {
   if (mentions.length === 0) return [{ text: body }];
-  const byLength = [...mentions].sort((a, b) => b.name.length - a.name.length);
+  const byName = new Map(mentions.map((mention) => [mention.name, mention]));
   const segments: BodySegment[] = [];
-  let text = "";
-  let index = 0;
-  while (index < body.length) {
-    const mention =
-      body[index] === "@"
-        ? byLength.find((candidate) => body.startsWith(mentionText(candidate.name), index))
-        : undefined;
-    if (!mention) {
-      text += body[index];
-      index += 1;
-      continue;
-    }
-    if (text) segments.push({ text });
-    text = "";
-    const marked = mentionText(mention.name);
-    segments.push({ text: marked, mention });
-    index += marked.length;
+  let at = 0;
+  for (const span of mentionSpans(body, [...byName.keys()])) {
+    if (span.start > at) segments.push({ text: body.slice(at, span.start) });
+    segments.push({ text: body.slice(span.start, span.end), mention: byName.get(span.name) });
+    at = span.end;
   }
-  if (text) segments.push({ text });
+  if (at < body.length) segments.push({ text: body.slice(at) });
   return segments;
 }

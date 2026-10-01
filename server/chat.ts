@@ -26,10 +26,10 @@ import {
   type ChatMessage,
 } from "@/db/rune-space";
 import {
-  bodyShowsMention,
   CHAT_POLICY,
   chatRetentionCutoff,
   decideChatSend,
+  namesShownAsMentions,
   normalizeChatMessage,
   promotedAdCooldownRemaining,
   recentChatSends,
@@ -400,10 +400,12 @@ export async function beginChatSend(
  * transaction. Each target is what the composer's selection named — a stable
  * id, or a Nearby Player's exact name at the sender's location — and must be
  * another account's character whose current name the body shows after `@`.
- * Anything else refuses the whole send, so a mention is never silently
- * dropped or guessed. A target the sender blocked is refused like a Whisper
- * would be; a target who blocked the sender is accepted and simply never
- * alerted, so the Block is not disclosed.
+ * The body is checked against every resolved name at once, so a longer
+ * name's `@Name` never counts for a shorter one. Anything else refuses the
+ * whole send, so a mention is never silently dropped or guessed. A target the
+ * sender blocked is refused like a Whisper would be; a target who blocked the
+ * sender is accepted, stored already read, and never alerted, so the Block is
+ * not disclosed and Unblocking never brings it back as attention.
  */
 async function resolveMentions(
   tx: Transaction,
@@ -411,16 +413,25 @@ async function resolveMentions(
   body: string,
   targets: readonly CharacterTarget[],
 ): Promise<
-  | { ok: true; mentioned: Character[] }
+  | { ok: true; mentioned: { character: Character; silenced: boolean }[] }
   | { ok: false; reason: "invalid_mention" | "blocked_by_you"; error: string }
 > {
   if (targets.length > CHAT_POLICY.maxMentions) {
     return { ok: false, reason: "invalid_mention", error: MENTION_TOO_MANY };
   }
-  const mentioned = new Map<string, Character>();
+  const resolved = new Map<string, Character>();
   for (const target of targets) {
     const character = await resolveCharacterTarget(target, sender, { executor: tx });
-    if (!character || !bodyShowsMention(body, character.displayName)) {
+    if (!character) return { ok: false, reason: "invalid_mention", error: MENTION_UNMATCHED };
+    resolved.set(character.id, character);
+  }
+  const shown = namesShownAsMentions(
+    body,
+    [...resolved.values()].map((character) => character.displayName),
+  );
+  const mentioned: { character: Character; silenced: boolean }[] = [];
+  for (const character of resolved.values()) {
+    if (!shown.has(character.displayName)) {
       return { ok: false, reason: "invalid_mention", error: MENTION_UNMATCHED };
     }
     if (character.playerAccountId === sender.playerAccountId) {
@@ -434,9 +445,9 @@ async function resolveMentions(
         error: `You blocked ${character.displayName}. Unblock them to mention them.`,
       };
     }
-    mentioned.set(character.id, character);
+    mentioned.push({ character, silenced: block.theyBlockedMe });
   }
-  return { ok: true, mentioned: [...mentioned.values()] };
+  return { ok: true, mentioned };
 }
 
 type SendKind =
@@ -519,22 +530,26 @@ async function commitSend(
     // The mentions commit with their message, or neither does.
     if (resolved.mentioned.length > 0) {
       await tx.insert(chatMessageMentions).values(
-        resolved.mentioned.map((target) => ({
+        resolved.mentioned.map(({ character: target, silenced }) => ({
           messageId: row!.id,
           mentionedCharacterId: target.id,
           mentionedPlayerAccountId: target.playerAccountId,
           mentionedCharacterName: target.displayName,
+          // A mention of someone who blocked the sender is never attention.
+          readAt: silenced ? now : null,
         })),
       );
     }
-    mentioned = resolved.mentioned;
+    mentioned = resolved.mentioned
+      .filter((target) => !target.silenced)
+      .map((target) => target.character);
     const sentAt = now.getTime();
     return {
       status: "sent",
       message: toView(
         row!,
         resolved.mentioned
-          .map((target) => ({ characterId: target.id, name: target.displayName }))
+          .map(({ character: target }) => ({ characterId: target.id, name: target.displayName }))
           .sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0)),
       ),
       budget: budgetFrom([...sends, sentAt], now),

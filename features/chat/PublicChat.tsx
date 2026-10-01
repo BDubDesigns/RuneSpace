@@ -33,7 +33,12 @@ import {
 import { ChatComposer } from "./ChatComposer";
 import { useChat } from "./ChatContext";
 import { ChatMessageRow, MessageActionButton, RedactedChatMessageRow } from "./ChatMessageRow";
-import { mentionsShown, mergeMentionCandidates, type MentionCandidate } from "./mention-draft";
+import {
+  atMentionLimit,
+  mentionsShown,
+  mergeMentionCandidates,
+  type MentionCandidate,
+} from "./mention-draft";
 import { SafetyFlow, type SafetyOutcome, type SafetySubject } from "./SafetyFlow";
 
 /**
@@ -341,6 +346,15 @@ export function PublicChat({
     return mergeMentionCandidates([senders, peers, nearby]);
   }, [characterId, feeds, inbox, nearby]);
 
+  // A chosen mention lives only while the draft still shows it: once its
+  // `@Name` is edited away it is forgotten, so retyping that text by hand
+  // later stays plain text.
+  const changeDraft = useCallback((next: string) => {
+    setDraft(next);
+    setChosenMentions((chosen) => mentionsShown(next, chosen));
+  }, []);
+  const mentionLimitReached = atMentionLimit(draft, chosenMentions);
+
   const loadNearby = useCallback(() => {
     const at = Date.now();
     if (at - nearbyReadAt.current < NEARBY_REFRESH_MS) return;
@@ -587,9 +601,9 @@ export function PublicChat({
           draft={draft}
           idPrefix="public-chat"
           label={promoting ? "Promoted Trade ad" : `Message ${label}`}
-          mentionCandidates={mentionCandidates}
+          mentionCandidates={mentionLimitReached ? [] : mentionCandidates}
           now={now}
-          onDraftChange={setDraft}
+          onDraftChange={changeDraft}
           onMentionChosen={(candidate) => setChosenMentions((chosen) => [...chosen, candidate])}
           onMentionQuery={loadNearby}
           onSubmit={() => void submit()}
@@ -602,6 +616,11 @@ export function PublicChat({
           sendLabel={promoting ? `Post ad · ${adPrice} Credits` : "Send"}
           sending={sending}
         >
+          {mentionLimitReached ? (
+            <p className="text-xs text-[color:var(--rs-text-secondary)]" data-chat-mention-limit="">
+              A message can mention up to {CHAT_POLICY.maxMentions} players.
+            </p>
+          ) : null}
           {promoting ? (
             <p className="text-xs text-[color:var(--rs-text-secondary)]" data-chat-promote-note="">
               {adWaitMs > 0
