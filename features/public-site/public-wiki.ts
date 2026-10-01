@@ -346,11 +346,16 @@ const authoredWikiArticles = [
     title: "Credits & Trading",
     category: "gear-and-credits",
     summary:
-      "Your character's Credits, buying and selling at Bix Weller's shop, and Wade's scrap counter at Rusk Recovery.",
+      "Your character's Credits, buying and selling at Bix Weller's shop, Wade's scrap counter at Rusk Recovery, and trading with other players.",
     sections: [
       {
         paragraphs: [
           "Credits are your character's money. Each character has their own balance — Credits aren't shared between the characters on your account. Every character starts with 10 Credits.",
+          [
+            "You can also hand Credits and items to another player — or to another of your own characters — by meeting them and ",
+            { text: "trading directly", articleSlug: "player-trading" },
+            ".",
+          ],
           [
             "You can see your balance on your ",
             { text: "Character screen", articleSlug: "skills-and-progression" },
@@ -404,6 +409,93 @@ const authoredWikiArticles = [
           ],
           "He sells each character at most 12 Scrap Metal a day, counted and reset exactly like Bix's Power Cells: the counter shows what's left today, it starts again at midnight Pacific time, and selling scrap back doesn't add to it. Scrap stacks up to three to an inventory slot.",
           "He buys spare Scrap Metal back at 1 Credit a piece, and structural material at the same prices Bix pays where they both buy the same thing: Refined Ferrite at 10 Credits, Galvanic Stock at 18, and Galvaferrite at 45. He still leaves Slag to Bix.",
+        ],
+      },
+    ],
+  },
+  {
+    // Issue #268 — direct player trading. Player-facing behaviour only: never
+    // publish request limits, escalation thresholds, or how trades are
+    // recorded internally.
+    slug: "player-trading",
+    title: "Player Trading",
+    category: "gear-and-credits",
+    summary:
+      "Meet another player at the same location and swap Credits and items directly: request, offer, Ready, Confirm — and nothing moves until you both confirm.",
+    sections: [
+      {
+        paragraphs: [
+          "You can trade directly with another player's character. There's no auction house, mail, or trading from across the map: you both have to be standing at the same location, and the trade happens there and then.",
+          "Two characters on the same account can trade with each other too, exactly the same way. It's how you move Credits or gear between your own characters.",
+        ],
+      },
+      {
+        heading: "Starting a trade",
+        paragraphs: [
+          "Open the list of characters at your location, choose the character you want to trade with to open their profile, and choose Trade. Your character waits for an answer while the request is open, so you can't start anything else — Cancel Request withdraws it at any time.",
+          "A request only lasts about 20 seconds. If it isn't answered by then it simply ends, and you're free again. It also ends if either of you leaves the location.",
+          "Trade won't work if you've blocked that player, if one of you has moved on, or while you're busy doing something. A moderation restriction on your account can stop you starting trades too, though you can still accept one. If you send a lot of requests in a short time, you'll be asked to wait a moment before sending another.",
+        ],
+      },
+      {
+        heading: "Getting a request",
+        paragraphs: [
+          "An incoming request never interrupts you. It appears as a card at the top of the Chat/Social panel, and the Chat/Social button lights up so you know it's there. You can keep doing whatever you were doing and answer when you're ready — or let it run out.",
+          [
+            "Choose Accept to start trading or Decline to turn it down. Several requests can wait at once; accepting one ends the others. If one player keeps sending you requests, the card offers Decline & Block, which ",
+            { text: "blocks them", articleSlug: COMMUNITY_RULES_SLUG },
+            " the same way Block does everywhere else. They aren't told you blocked them.",
+          ],
+          "You need to be idle to accept: if you're in the middle of something, Accept tells you to finish it first.",
+        ],
+      },
+      {
+        heading: "Building the offers",
+        paragraphs: [
+          "Accepting opens the trade screen for both of you. Your side is You offer; theirs is They offer, which you can see but never change. While the trade is open, neither of you can travel, work, or start anything else.",
+        ],
+        list: [
+          "Credits — any whole amount up to what your character has.",
+          "Stackable items you're carrying, in any quantity you have.",
+          "Gear and other unique items you're carrying, such as a spare Cutter or a container. Each one moves as the same item, so a Cutter keeps exactly the charge it has — the trade screen shows it.",
+        ],
+      },
+      {
+        paragraphs: [
+          [
+            "Only what's in your carried ",
+            { text: "Inventory", articleSlug: "inventory-and-equipment" },
+            " can be offered. Unequip gear and take things out of the ",
+            { text: "Cargo Hold", articleSlug: "cargo-hold-and-welding" },
+            " before the trade if you want to offer them. A gift is fine: one side can offer nothing at all, as long as somebody offers something.",
+          ],
+        ],
+      },
+      {
+        heading: "Ready, then Confirm",
+        paragraphs: [
+          "When you're happy with both offers, choose Ready. Your side locks; Change Offer unlocks it. Any change to either offer clears both players' Ready, so nobody can agree to one deal and be held to another.",
+          "Once you're both Ready, the offers freeze into a final You Give / You Receive review. Check it, then choose Confirm Trade. The first player to confirm waits for the other, and can still Cancel Trade until the second confirmation goes through.",
+          "Nothing moves until both of you have confirmed. Then everything moves at once, for both of you, and the trade screen shows what you gave and received.",
+        ],
+      },
+      {
+        heading: "When a trade can't finish",
+        paragraphs: [
+          "At the final Confirm, RuneSpace checks the whole trade again. If either Inventory wouldn't have room or would end up too heavy, if a trade would leave either character without a usable Mining Cutter, or if something offered is no longer there, nothing moves. Both players see what went wrong, both lose Ready, and you can fix the offers and try again.",
+          "A container you receive doesn't add room until you equip it, so it can't make space for the rest of the same trade.",
+          "Either of you can Cancel Trade at any time before it completes, and nothing moves. A trade that sits for five minutes without anyone doing anything ends on its own, also with nothing moved.",
+        ],
+      },
+      {
+        heading: "Refreshing and reconnecting",
+        paragraphs: [
+          "A trade isn't tied to your browser tab. If you refresh, lose your connection, or come back on another device, you return to the same trade with the same offers — never a second copy of it.",
+          [
+            "RuneSpace keeps a record of every completed trade — which characters and accounts traded, where, when, and what each side gave — so trades can be looked into if something goes wrong. ",
+            { text: "Safety & Privacy", articleSlug: SAFETY_PRIVACY_SLUG },
+            " has the details.",
+          ],
         ],
       },
     ],
@@ -1550,6 +1642,13 @@ const authoredWikiArticles = [
         ],
       },
       {
+        heading: "Player trades",
+        paragraphs: [
+          "Every completed trade between characters is recorded permanently: both characters and the player accounts behind them, the location, when it happened, and exactly what each side offered — Credits, items and quantities, and which individual pieces of gear. It's kept so trades can be checked later if someone reports a scam or something looks wrong, and it isn't on the 90-day message timer.",
+          "Trade requests are kept so request limits can work across all of your characters and so a player who keeps sending you requests can be spotted; requests that went nowhere are cleared out as new ones are made. Once a request is accepted, RuneSpace also keeps that trade's offers and how it ended, even if it was canceled.",
+        ],
+      },
+      {
         heading: "Moderation cases",
         paragraphs: [
           "Reports about the same account are reviewed together in a moderation case. A case holds those reports and their evidence, a moderator's internal notes, any sanction, and any appeal you send. Cases and their evidence are kept after they're closed, and a suspension \u2014 even a permanent one \u2014 doesn't delete them, so decisions can be checked later.",
@@ -1575,6 +1674,7 @@ const authoredWikiArticles = [
         list: [
           "Delivering chat and Whispers, loading history, and keeping unread counts in sync.",
           "Applying the shared send limit, the promoted-ad cooldown, the slur filter, and your blocks.",
+          "Applying trade request limits, and checking completed trades when something goes wrong.",
           "Reviewing reports, enforcing the Chat & Community Rules, and handling appeals.",
         ],
       },
@@ -1587,7 +1687,7 @@ const authoredWikiArticles = [
       {
         heading: "Moderation notices and appeals",
         paragraphs: [
-          "If a moderator acts on your account, you'll get a notice with the rule it's about, what you can't do, how long it lasts, and a case reference. A warning restricts nothing. A social restriction stops you from sending General and Trade messages, Whispers, and promoted ads, but you can keep playing and reading public chat. A suspension stops you from entering the game at all.",
+          "If a moderator acts on your account, you'll get a notice with the rule it's about, what you can't do, how long it lasts, and a case reference. A warning restricts nothing. A social restriction stops you from sending General and Trade messages, Whispers, and promoted ads, and from starting a trade with another player, but you can keep playing, reading public chat, and accepting a trade someone else starts. A suspension stops you from entering the game at all.",
           "You can appeal each notice once. Open the notice from your Characters page or the Chat panel, choose Appeal, and tell us briefly why it should be reviewed. That works even while you're suspended \u2014 you only need to sign in. A moderator will uphold the decision, change it, or reverse it, and your notice will show the outcome. Notices never say who reported you, and they don't name the moderator.",
         ],
       },

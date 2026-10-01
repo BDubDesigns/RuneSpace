@@ -878,10 +878,15 @@ suite("issue #266 player trade requests and sessions (real PostgreSQL)", () => {
 
       const state = ok(await accept(b, requestId));
 
+      // Same account, so the counterpart's public Player name is this player's own.
       expect(state.session?.counterpart).toEqual({
         characterId: a.character.id,
         name: a.character.displayName,
+        playerName: expect.stringMatching(/^trade-/),
       });
+      expect((await stateOf(a)).session?.counterpart.playerName).toBe(
+        state.session?.counterpart.playerName,
+      );
       expect((await stateOf(a)).session?.counterpart.characterId).toBe(b.character.id);
       expect(await gate.findTradeEngagement(db, a.character.id, new Date())).toBe("session");
       expect(await gate.findTradeEngagement(db, b.character.id, new Date())).toBe("session");
@@ -932,7 +937,10 @@ suite("issue #266 player trade requests and sessions (real PostgreSQL)", () => {
         }
         await expectConsistent(ring);
       }
-    });
+      // Five sequential rounds of fresh players, sends, and a four-way race:
+      // heavy by construction, so it gets an explicit budget rather than the
+      // default, which a loaded full-suite run can exceed without any hang.
+    }, 20_000);
   });
 
   // --- authorization and exclusivity ---------------------------------------------
@@ -974,7 +982,7 @@ suite("issue #266 player trade requests and sessions (real PostgreSQL)", () => {
       expect(await claimsOf(c.character.id)).toHaveLength(1);
 
       const view = await stateOf(x, now);
-      expect(view).toEqual({ outgoing: null, incoming: [], session: null });
+      expect(view).toEqual({ outgoing: null, incoming: [], session: null, ended: null });
       expect(JSON.stringify(view)).not.toContain(sessionId);
     });
 

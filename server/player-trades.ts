@@ -1,6 +1,7 @@
-import { and, asc, eq, gt, inArray, lte, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gt, inArray, lte, or, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { db } from "@/db";
+import { user } from "@/db/auth-schema";
 import {
   activeActions,
   cargoHoldItemInstances,
@@ -48,14 +49,17 @@ import {
 import {
   isEmptyTradeOffer,
   planTradeSettlement,
+  type SettledTradeOffer,
   type TradeOfferContent,
   type TradeSettlementFailure,
   type TradeSettlementSide,
 } from "@/game/domain/player-trade-settlement";
 import { levelFromXp } from "@/game/domain/progression";
 import type {
+  EndedTradeView,
   IncomingTradeRequestView,
   TradeCommandResult,
+  TradeExchangeLines,
   TradeOfferView,
   TradeRefusalReason,
   TradeRequestChange,
@@ -75,7 +79,7 @@ import { requireTradeRequestInitiationAllowed } from "@/server/moderation-sancti
 import { applyCarriedStackDiff } from "@/server/carried-inventory";
 import { OwnershipError } from "@/server/ownership";
 import { blockBetween } from "@/server/player-blocks";
-import { insertTradeAudit } from "@/server/player-trade-audit";
+import { findTradeAudit, insertTradeAudit } from "@/server/player-trade-audit";
 import { loadPlaySnapshot } from "@/server/play-state";
 import { publishRealtimeEvent } from "@/server/realtime";
 import { resolveCharacterTarget } from "@/server/social-targets";
@@ -466,7 +470,7 @@ export async function createTradeRequest(
     return { status: "ok", state: await readTradeState(tx, requester, now) };
   });
   events.publish();
-  return result;
+  return completeTradeResult(result, characterId, now);
 }
 
 /**
@@ -548,7 +552,7 @@ async function respondToRequest(
     return { status: "ok", state: await readTradeState(tx, character, now) };
   });
   events.publish();
-  return result;
+  return completeTradeResult(result, characterId, now);
 }
 
 async function ownedCharacter(tx: Tx, characterId: string, accountId: string): Promise<Character> {
@@ -740,7 +744,7 @@ export async function acceptTradeRequest(
     return { status: "ok", state: await readTradeState(tx, recipient, now) };
   });
   events.publish();
-  return result;
+  return completeTradeResult(result, characterId, now);
 }
 
 /**
@@ -801,7 +805,7 @@ export async function cancelTradeSession(
     return { status: "ok", state: await readTradeState(tx, character, now) };
   });
   events.publish();
-  return result;
+  return completeTradeResult(result, characterId, now);
 }
 
 // --- Offers, consent, and settlement (#267) --------------------------------
@@ -896,6 +900,7 @@ async function recordConsent(
 async function advanceOffer(
   context: OfferContext,
   credits?: { side: TradeSide; credits: number },
+  refusal?: SettlementRefusal,
 ): Promise<void> {
   await context.tx
     .update(playerTradeSessions)
@@ -903,6 +908,9 @@ async function advanceOffer(
       ...(credits ? { [CREDITS_COLUMN[credits.side]]: credits.credits } : {}),
       offerVersion: context.session.offerVersion + 1,
       ...NO_TRADE_CONSENT,
+      // Only a refused settlement leaves a reason; every other change clears it.
+      settlementRefusal: refusal?.reason ?? null,
+      settlementRefusalSide: refusal?.side ?? null,
       lastActivityAt: activityAt(context),
     })
     .where(eq(playerTradeSessions.id, context.session.id));
@@ -1012,7 +1020,7 @@ async function runOfferCommand(
     });
   });
   events.publish();
-  return result;
+  return completeTradeResult(result, characterId, now);
 }
 
 /** Offer edits apply only while composing; a frozen review needs Change Offer first. */
@@ -1395,7 +1403,7 @@ async function readOfferViews(
 
 const SETTLEMENT_REFUSALS: Record<
   TradeSettlementFailure,
-  { reason: TradeRefusalReason; yours: string; theirs: (name: string) => string }
+  { reason: SettlementRefusalReason; yours: string; theirs: (name: string) => string }
 > = {
   credits: {
     reason: "credit_limit",
@@ -1426,18 +1434,56 @@ const SETTLEMENT_REFUSALS: Record<
 
 const NOTHING_MOVED = "Nothing moved. Adjust the offers and Ready again.";
 
+/** The settlement refusals the session records, and whose side each was. */
+type SettlementRefusalReason = Extract<
+  TradeRefusalReason,
+  | "offer_unavailable"
+  | "inventory_full"
+  | "too_heavy"
+  | "last_cutter"
+  | "credit_limit"
+  | "ineligible"
+  | "empty_trade"
+>;
+type SettlementRefusal = { reason: SettlementRefusalReason; side: TradeSide | null };
+
+const INELIGIBLE_COPY = "You both need to still be here and free to trade.";
+
+/**
+ * A recorded settlement refusal in one participant's words (#268): the same
+ * copy the refused Confirm returned, from that participant's side, so the
+ * first confirmer learns what to correct as well as the second.
+ */
+function settlementRefusalMessage(
+  session: PlayerTradeSession,
+  viewerSide: TradeSide,
+  counterpartName: string,
+): { reason: SettlementRefusalReason; message: string } | undefined {
+  const reason = session.settlementRefusal as SettlementRefusalReason | null;
+  if (!reason) return undefined;
+  let text: string;
+  if (reason === "ineligible") text = INELIGIBLE_COPY;
+  else if (reason === "empty_trade") text = OFFER_COPY.empty;
+  else {
+    const copy = Object.values(SETTLEMENT_REFUSALS).find((entry) => entry.reason === reason)!;
+    text = session.settlementRefusalSide === viewerSide ? copy.yours : copy.theirs(counterpartName);
+  }
+  return { reason, message: `${text} ${NOTHING_MOVED}` };
+}
+
 /**
  * A final Confirm that cannot settle: nothing moves, consent is cleared, and
  * the session returns to compose on a new version, so the players can correct
- * the offers and no earlier Ready or Confirm can apply to them.
+ * the offers and no earlier Ready or Confirm can apply to them. The reason is
+ * recorded on the session for both participants until the next offer change.
  */
 async function refuseSettlement(
   context: OfferContext,
-  reason: TradeRefusalReason,
+  refusal: SettlementRefusal,
   error: string,
 ): Promise<TradeCommandResult> {
-  await advanceOffer(context);
-  return refused(reason, `${error} ${NOTHING_MOVED}`);
+  await advanceOffer(context, undefined, refusal);
+  return refused(refusal.reason, `${error} ${NOTHING_MOVED}`);
 }
 
 function settlementSide(
@@ -1492,11 +1538,7 @@ async function settleTrade(context: OfferContext): Promise<TradeCommandResult> {
     !(await accountMayPlay(tx, context.counterpart.playerAccountId)) ||
     blocked
   ) {
-    return refuseSettlement(
-      context,
-      "ineligible",
-      "You both need to still be here and free to trade.",
-    );
+    return refuseSettlement(context, { reason: "ineligible", side: null }, INELIGIBLE_COPY);
   }
 
   // Inventory rows lock in character-id order, after both character rows.
@@ -1513,13 +1555,13 @@ async function settleTrade(context: OfferContext): Promise<TradeCommandResult> {
     getEffectiveGameBalance(),
   );
   if (!plan.ok && plan.reason === "empty") {
-    return refuseSettlement(context, "empty_trade", OFFER_COPY.empty);
+    return refuseSettlement(context, { reason: "empty_trade", side: null }, OFFER_COPY.empty);
   }
   if (!plan.ok) {
     const copy = SETTLEMENT_REFUSALS[plan.reason];
     return refuseSettlement(
       context,
-      copy.reason,
+      { reason: copy.reason, side: plan.side },
       plan.side === context.side ? copy.yours : copy.theirs(context.counterpart.displayName),
     );
   }
@@ -1560,6 +1602,8 @@ async function settleTrade(context: OfferContext): Promise<TradeCommandResult> {
       endedByCharacterId: null,
       requesterConfirmed: true,
       recipientConfirmed: true,
+      settlementRefusal: null,
+      settlementRefusalSide: null,
       lastActivityAt: now,
     })
     .where(eq(playerTradeSessions.id, session.id));
@@ -1603,7 +1647,7 @@ export async function getTradeState(
   now: Date = new Date(),
 ): Promise<TradeStateView> {
   const character = await requirePlayableOwnedCharacter(userId, characterId);
-  return readTradeState(db, character, now);
+  return completeTradeState(await readTradeState(db, character, now), characterId, now);
 }
 
 type Reader = Pick<Tx, "select">;
@@ -1614,7 +1658,7 @@ function requestView(
 ): TradeRequestView {
   return {
     id: request.id,
-    counterpart: { characterId: counterpart.id, name: counterpart.displayName },
+    counterpart: { characterId: counterpart.id, name: counterpart.displayName, playerName: null },
     createdAt: request.createdAt.toISOString(),
     expiresAt: request.expiresAt.toISOString(),
   };
@@ -1714,6 +1758,7 @@ async function readTradeState(
       counterpart: {
         characterId: counterpartId,
         name: counterpart?.displayName ?? "",
+        playerName: null,
       },
       startedAt: claim.session.createdAt.toISOString(),
       expiresAt: tradeSessionExpiresAt(claim.session.lastActivityAt).toISOString(),
@@ -1722,11 +1767,158 @@ async function readTradeState(
       yours: offers[side],
       theirs: offers[otherTradeSide(side)],
     };
+    const refusal = settlementRefusalMessage(claim.session, side, counterpart?.displayName ?? "");
+    if (refusal) session.settlementRefusal = refusal;
   }
 
+  // `ended` and Player names are filled in by `completeTradeState`, after any
+  // command's transaction has committed and released its locks.
   return {
     outgoing: outgoingRow ? requestView(outgoingRow.request, outgoingRow.recipient) : null,
     incoming,
     session,
+    ended: null,
+  };
+}
+
+/**
+ * The presentation-only parts of a trade state (#268): the latest ended
+ * session and every counterpart's Player name. Read after a command commits,
+ * never inside its transaction, so they add no time to the row locks every
+ * trade command and the gameplay gate serialize on.
+ */
+async function completeTradeState(
+  state: TradeStateView,
+  characterId: string,
+  now: Date,
+): Promise<TradeStateView> {
+  if (!state.session) state.ended = await readEndedTrade(db, characterId, now);
+  await attachPlayerNames(db, state);
+  return state;
+}
+
+async function completeTradeResult(
+  result: TradeCommandResult,
+  characterId: string,
+  now: Date,
+): Promise<TradeCommandResult> {
+  if (result.status === "ok") await completeTradeState(result.state, characterId, now);
+  return result;
+}
+
+/**
+ * Fill in every counterpart's public Player name (#268) in one read: the name
+ * Nearby Players and the profile already show for that character.
+ */
+async function attachPlayerNames(reader: Reader, state: TradeStateView) {
+  const counterparts = [
+    state.outgoing?.counterpart,
+    ...state.incoming.map((request) => request.counterpart),
+    state.session?.counterpart,
+    state.ended?.counterpart,
+  ].filter((counterpart) => counterpart !== undefined);
+  if (counterparts.length === 0) return;
+  const rows = await reader
+    .select({ id: characters.id, playerName: user.displayUsername })
+    .from(characters)
+    .innerJoin(playerAccounts, eq(playerAccounts.id, characters.playerAccountId))
+    .innerJoin(user, eq(user.id, playerAccounts.userId))
+    .where(
+      inArray(
+        characters.id,
+        counterparts.map((counterpart) => counterpart.characterId),
+      ),
+    );
+  const names = new Map(rows.map((row) => [row.id, row.playerName]));
+  for (const counterpart of counterparts) {
+    counterpart.playerName = names.get(counterpart.characterId) ?? null;
+  }
+}
+
+/**
+ * The character's most recent session, if it has ended (#268): how it ended,
+ * and for a completed trade exactly what moved, from the trade's audit row —
+ * the committed snapshot. A stored `active` session past its inactivity
+ * expiry reads as expired, the same derivation every other check uses.
+ */
+async function readEndedTrade(
+  reader: Reader,
+  characterId: string,
+  now: Date,
+): Promise<EndedTradeView | null> {
+  const [latest] = await reader
+    .select()
+    .from(playerTradeSessions)
+    .where(
+      or(
+        eq(playerTradeSessions.requesterCharacterId, characterId),
+        eq(playerTradeSessions.recipientCharacterId, characterId),
+      ),
+    )
+    .orderBy(desc(playerTradeSessions.createdAt), desc(playerTradeSessions.id))
+    .limit(1);
+  if (!latest) return null;
+  const status = effectiveTradeSessionStatus(
+    { status: latest.status as TradeSessionStatus, lastActivityAt: latest.lastActivityAt },
+    now,
+  );
+  if (status === "active") return null;
+  const side = sideOf(latest, characterId);
+  const counterpartId =
+    side === "requester" ? latest.recipientCharacterId : latest.requesterCharacterId;
+  const [counterpart] = await reader
+    .select({ id: characters.id, displayName: characters.displayName })
+    .from(characters)
+    .where(eq(characters.id, counterpartId));
+  const endedAt =
+    latest.status === "active"
+      ? tradeSessionExpiresAt(latest.lastActivityAt)
+      : (latest.endedAt ?? latest.lastActivityAt);
+  let exchange: EndedTradeView["exchange"];
+  const audit = status === "completed" ? await findTradeAudit(latest.id, reader) : undefined;
+  if (audit) {
+    const [mine, theirs] =
+      side === "requester"
+        ? [audit.requester, audit.recipient]
+        : [audit.recipient, audit.requester];
+    const ids = [...mine.offer.items, ...theirs.offer.items].map((item) => item.itemInstanceId);
+    const held = ids.length
+      ? await reader
+          .select({
+            id: itemInstances.id,
+            characterId: itemInstances.characterId,
+            currentCharge: itemInstances.currentCharge,
+          })
+          .from(itemInstances)
+          .where(inArray(itemInstances.id, ids))
+      : [];
+    // An item's state is shown only while the character that received it in
+    // this trade still holds it: never the state of something since passed on.
+    const lines = (offer: SettledTradeOffer, receiverId: string): TradeExchangeLines => ({
+      credits: offer.credits,
+      stacks: offer.stacks.map((stack) => ({ ...stack })),
+      items: offer.items.map((item) => {
+        const holding = held.find(
+          (row) => row.id === item.itemInstanceId && row.characterId === receiverId,
+        );
+        return holding ? { ...item, currentCharge: holding.currentCharge } : { ...item };
+      }),
+    });
+    exchange = {
+      gave: lines(mine.offer, counterpartId),
+      received: lines(theirs.offer, characterId),
+    };
+  }
+  return {
+    id: latest.id,
+    counterpart: {
+      characterId: counterpartId,
+      name: counterpart?.displayName ?? "",
+      playerName: null,
+    },
+    outcome: status,
+    endedAt: endedAt.toISOString(),
+    canceledByYou: status === "canceled" && latest.endedByCharacterId === characterId,
+    ...(exchange ? { exchange } : {}),
   };
 }

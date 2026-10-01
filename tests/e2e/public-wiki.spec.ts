@@ -12,6 +12,7 @@ const articleTitles = [
   "Inventory & Equipment",
   "Power Cells",
   "Credits & Trading",
+  "Player Trading",
   "Travel & Scavenging",
   "Holo Hollow",
   "Wade Rusk",

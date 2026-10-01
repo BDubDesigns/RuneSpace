@@ -2,18 +2,18 @@
   "schemaVersion": 1,
   "projectSlug": "runespace",
   "workState": "active",
-  "currentFocus": "Preparing the October 27 Soft Alpha: chat, Whispers, Block, Report, and moderation are in; same-location player trading is being built server-first.",
+  "currentFocus": "Preparing the October 27 Soft Alpha: chat, Whispers, Block, Report, and moderation are in; same-location player trading is getting its player-facing experience.",
   "currentChange": {
-    "summary": "Player trade settlement: offers of Credits and items, Ready and Confirm on an exact version, an all-or-nothing commit that respects carry capacity and last-Cutter safety, and a permanent audit of every trade.",
+    "summary": "Player trading experience: Trade from a nearby player's profile, request cards in Chat/Social, a trade screen with Ready and Confirm, same-account trades, and a Player Trading Wiki page.",
     "stage": "review",
-    "pullRequestNumber": 271
+    "pullRequestNumber": 272
   },
   "latestCompleted": {
-    "summary": "Player trading foundation: server-authoritative same-location trade requests with expiry and rate limits, and exclusive trade sessions that pause other gameplay.",
+    "summary": "Player trade settlement: Credits and item offers, Ready and Confirm on an exact version, an all-or-nothing commit that respects carry capacity and last-Cutter safety, and a permanent trade audit.",
     "date": "2026-09-30",
-    "url": "https://github.com/BDubDesigns/RuneSpace/pull/270"
+    "url": "https://github.com/BDubDesigns/RuneSpace/pull/271"
   },
-  "nextStep": "Human review of trade offers, settlement, and audit; then the player trading UI with Chat/Social request cards (#268).",
+  "nextStep": "Human preview and playtest of the player trading experience: Trade from a profile, request cards in Chat/Social, and the trade screen (#268).",
   "lastMeaningfulUpdate": "2026-09-30",
   "highlights": [
     {

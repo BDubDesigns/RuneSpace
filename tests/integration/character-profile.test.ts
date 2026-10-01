@@ -216,6 +216,8 @@ suite("issue #64 character profile read boundary (real PostgreSQL)", () => {
         derivativeHeight: gramma.derivativeHeight,
         accessibleDescription: gramma.accessibleDescription,
       },
+      // Both characters belong to this one account (#268).
+      sameAccount: true,
     });
     // No email, account ID, character database ID, skill ID, category, master
     // path, timestamp, or raw portrait ID may leave the server.
@@ -226,6 +228,25 @@ suite("issue #64 character profile read boundary (real PostgreSQL)", () => {
     expect(serialized).not.toContain("portraitId");
     expect(serialized).not.toContain("category");
     expect(serialized).not.toContain("masterPath");
+  });
+
+  it("reports whether the viewer's own account owns the target, by account identity (#268)", async () => {
+    const owner = await makeUser("Shared Name");
+    const other = await makeUser("Shared Name");
+    const active = await makeCharacterAt(owner, `Own Active ${token()}`, LOCATION_IDS.crashSite);
+    const altName = `Own Alt ${token()}`;
+    const strangerName = `Stranger ${token()}`;
+    await makeCharacterAt(owner, altName, LOCATION_IDS.crashSite);
+    await makeCharacterAt(other, strangerName, LOCATION_IDS.crashSite);
+
+    // Two accounts that display the same Player name are still different
+    // accounts: the relationship never comes from comparing names.
+    const alt = await profile.getCharacterProfile(owner, active.id, altName);
+    const stranger = await profile.getCharacterProfile(owner, active.id, strangerName);
+    expect(alt.sameAccount).toBe(true);
+    expect(stranger.sameAccount).toBe(false);
+    expect(stranger.ownerName).toBe(alt.ownerName);
+    expect(JSON.stringify(stranger)).not.toContain(active.playerAccountId);
   });
 
   it("derives Mining level and next-level progress from persisted XP", async () => {

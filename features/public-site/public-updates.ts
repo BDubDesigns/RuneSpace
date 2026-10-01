@@ -7,6 +7,46 @@ export type { PublicUpdate } from "@/game/schemas/public-updates";
 
 const authoredUpdates = [
   {
+    // Issue #268 — the one announcement for direct player trading (#266
+    // requests and sessions, #267 settlement, #268 the trading experience).
+    // Never publish request limits, escalation thresholds, or how trades are
+    // recorded or serialized.
+    slug: "meet-me-there",
+    title: "Meet Me There",
+    publishedAt: "2026-09-30T20:00:00-07:00",
+    summary:
+      "You can now trade Credits and items directly with other players — in person, at the same location, with nothing moving until you both confirm.",
+    body: [
+      "You can finally hand things to other people. Trading in RuneSpace is face to face: find the player where they actually are, stand at the same location, and swap there. No auction house, no mail, no trading from across the map.",
+      "Open the list of characters at your location, pick theirs, and choose Trade on their profile. They get a card at the top of their Chat/Social panel — it doesn't interrupt whatever they're doing — and they can Accept or Decline. A request only waits a short while, and you can cancel yours any time.",
+      "Accepting opens the trade screen for both of you. Put in Credits, stacks of material, or gear you're carrying — a spare Cutter keeps exactly the charge it has, and the screen shows it. Choose Ready when the offers look right. Change anything and both of you have to Ready again, so nobody can agree to one deal and get another.",
+      "When you're both Ready, the offers freeze into a final You Give / You Receive review, and you each Confirm. Nothing moves until both of you have confirmed; then it all moves at once. If something doesn't fit — a full Inventory, too much weight, or a trade that would leave someone without a working Cutter — nothing moves, you both see why, and you can fix it and try again.",
+      [
+        "Your own characters can trade with each other too, the same way, so moving Credits or gear between them is just a short walk. Refreshing or reconnecting puts you right back into the same trade. Everything else — what can be offered, Decline & Block for persistent requests, and what happens if a trade stalls — is in ",
+        { text: "Player Trading", articleSlug: "player-trading" },
+        " on the Wiki.",
+      ],
+    ],
+    patchNotes: [
+      {
+        heading: "Added",
+        items: [
+          "Direct player trading between characters at the same location, started with Trade on a character's profile.",
+          "Trade requests as cards in the Chat/Social panel, with Accept and Decline, and Decline & Block for a player who keeps asking.",
+          "A trade screen for offering Credits, carried stacks, and carried gear, with Ready, Change Offer, and a final You Give / You Receive review before Confirm Trade.",
+          "Trading between your own characters.",
+          "A Player Trading page in the Wiki.",
+        ],
+      },
+      {
+        heading: "Changed",
+        items: [
+          "A profile for one of your own characters now offers Trade only, without Whisper, Report, or Block.",
+        ],
+      },
+    ],
+  },
+  {
     // Issue #248 — the one alpha announcement for the whole social stack
     // (#246 General/Trade, #247 Whispers/Block/Report) and its policies.
     slug: "open-channels",

@@ -1819,8 +1819,17 @@ export const playerTradeSessions = pgTable(
     recipientReady: boolean("recipient_ready").notNull().default(false),
     requesterConfirmed: boolean("requester_confirmed").notNull().default(false),
     recipientConfirmed: boolean("recipient_confirmed").notNull().default(false),
+    // Why the latest final Confirm could not settle (#268), and whose side it
+    // was, so both participants see what to correct. Written with the refused
+    // settlement's new version; any later offer change clears it.
+    settlementRefusal: text("settlement_refusal"),
+    settlementRefusalSide: text("settlement_refusal_side"),
   },
   (table) => [
+    check(
+      "player_trade_sessions_settlement_refusal_check",
+      sql`(${table.settlementRefusal} is null or ${table.settlementRefusal} in ('offer_unavailable', 'inventory_full', 'too_heavy', 'last_cutter', 'credit_limit', 'ineligible', 'empty_trade')) and (${table.settlementRefusalSide} is null or (${table.settlementRefusal} is not null and ${table.settlementRefusalSide} in ('requester', 'recipient')))`,
+    ),
     check(
       "player_trade_sessions_status_check",
       sql`${table.status} in ('active', 'canceled', 'expired', 'completed')`,

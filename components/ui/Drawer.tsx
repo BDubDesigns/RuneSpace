@@ -18,6 +18,14 @@ const FOCUSABLE_SELECTOR =
 const EXIT_FALLBACK_MS = 400;
 
 /**
+ * Open Drawers, oldest first. Only the newest owns the keyboard: a surface
+ * that opens over another one (an accepted player trade over an NPC
+ * conversation, #268) must not have the older Drawer's focus trap pull focus
+ * back out of it, or the two traps would bounce focus between them.
+ */
+const openDrawers: object[] = [];
+
+/**
  * Shared modal overlay used by Inventory, Equipment, and the character
  * portrait chooser.
  *
@@ -30,8 +38,9 @@ const EXIT_FALLBACK_MS = 400;
  * and above everything, wherever the triggering surface is mounted.
  *
  * The `size` variant is narrow and explicit: `"wide"` exists only for the
- * portrait chooser's desktop master-detail layout; every other surface keeps
- * the default width.
+ * portrait chooser's desktop master-detail layout, and `"full"` only for the
+ * near-full-screen accepted player trade (#268), which keeps its primary
+ * actions in a sticky footer; every other surface keeps the default width.
  */
 export function Drawer({
   children,
@@ -50,7 +59,7 @@ export function Drawer({
   eyebrow: string;
   onClose?: () => void;
   triggerRef?: RefObject<HTMLButtonElement | null>;
-  size?: "default" | "wide";
+  size?: "default" | "wide" | "full";
   /** Some committed-result surfaces must be acknowledged before dismissal. */
   dismissible?: boolean;
   initialFocusRef?: RefObject<HTMLElement | null>;
@@ -62,6 +71,18 @@ export function Drawer({
   const finishedRef = useRef(false); // true once we return focus + unmount
   const exitTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [exiting, setExiting] = useState(false);
+  const stackEntry = useRef<object>({});
+
+  useEffect(() => {
+    const entry = stackEntry.current;
+    openDrawers.push(entry);
+    return () => {
+      const index = openDrawers.indexOf(entry);
+      if (index !== -1) openDrawers.splice(index, 1);
+    };
+  }, []);
+
+  const isTopmost = () => openDrawers[openDrawers.length - 1] === stackEntry.current;
 
   const focusFirstAvailable = useCallback(() => {
     const panelElement = panel.current;
@@ -122,6 +143,7 @@ export function Drawer({
   // Keyboard: Escape dismisses, Tab cycles within the modal.
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
+      if (!isTopmost()) return;
       if (event.key === "Escape") {
         if (!dismissible) return;
         close();
@@ -150,7 +172,7 @@ export function Drawer({
   // the (about-to-unmount) panel.
   useEffect(() => {
     function onFocusIn(event: FocusEvent) {
-      if (finishedRef.current) return;
+      if (finishedRef.current || !isTopmost()) return;
       if (panel.current && event.target instanceof Node && !panel.current.contains(event.target)) {
         focusFirstAvailable();
       }
@@ -232,10 +254,12 @@ export function Drawer({
       <section
         aria-label={label}
         aria-modal="true"
-        className={`${panelAnim} max-h-[min(78dvh,42rem)] w-full overflow-y-auto border border-[color:var(--rs-border-structural)] bg-[color:var(--rs-surface-raised)] p-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-[max(1rem,env(safe-area-inset-top))] [box-shadow:var(--rs-shadow-panel),0_0_28px_rgb(75_216_245_/_0.28)] sm:max-h-[calc(100dvh-2rem)] ${
-          size === "wide"
-            ? "sm:w-[min(56rem,calc(100vw-2rem))] sm:max-w-4xl"
-            : "max-w-xl sm:w-[min(34rem,calc(100vw-2rem))]"
+        className={`${panelAnim} w-full overflow-y-auto border border-[color:var(--rs-border-structural)] bg-[color:var(--rs-surface-raised)] p-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-[max(1rem,env(safe-area-inset-top))] [box-shadow:var(--rs-shadow-panel),0_0_28px_rgb(75_216_245_/_0.28)] sm:max-h-[calc(100dvh-2rem)] ${
+          size === "full"
+            ? "flex h-[calc(100dvh-1.5rem)] max-h-[calc(100dvh-1.5rem)] flex-col sm:h-[min(calc(100dvh-2rem),52rem)] sm:w-[min(60rem,calc(100vw-2rem))] sm:max-w-5xl"
+            : size === "wide"
+              ? "max-h-[min(78dvh,42rem)] sm:w-[min(56rem,calc(100vw-2rem))] sm:max-w-4xl"
+              : "max-h-[min(78dvh,42rem)] max-w-xl sm:w-[min(34rem,calc(100vw-2rem))]"
         }`}
         onAnimationEnd={onPanelAnimationEnd}
         ref={panel}

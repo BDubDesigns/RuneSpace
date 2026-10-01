@@ -67,6 +67,7 @@ export const FOCUSED_PHASES = [
   "public-chat",
   "whispers-safety",
   "moderation",
+  "player-trading",
 ];
 // Local E2E build-and-runtime placeholder only: the production build and
 // `next start` both run as production, so server/env.ts requires a

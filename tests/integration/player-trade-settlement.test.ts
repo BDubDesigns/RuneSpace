@@ -1230,4 +1230,136 @@ suite("issue #267 player trade offers, settlement, and audit (real PostgreSQL)",
     // A retry after completion changes nothing, so it prompts no one.
     expect(await watch(() => ta.confirm())).toEqual([]);
   });
+
+  // --- #268: what the trade UI reconciles from durable state ----------------
+
+  describe("issue #268 durable trade outcomes", () => {
+    it("tells both participants how their last trade ended, and exactly what a commit moved", async () => {
+      const now = new Date();
+      const [a, b] = [await player(), await player()];
+      await setCredits(a, 30);
+      await addStack(a, SHALE, 6);
+      const cutter = await addUnique(a, SALVAGE, 7);
+      const sessionId = await openSession(a, b, now);
+      const [ta, tb] = [trader(a, sessionId, now), trader(b, sessionId, now)];
+      // Nothing has ended while the session is active.
+      expect((await ta.state()).ended).toBeNull();
+
+      ok(await ta.credits(12));
+      ok(await ta.addStack(SHALE, 4));
+      ok(await ta.addItem(cutter));
+      ok(await ta.ready());
+      ok(await tb.ready());
+      ok(await tb.confirm());
+      ok(await ta.confirm());
+
+      const [forA, forB] = [await ta.state(), await tb.state()];
+      expect(forA.session).toBeNull();
+      expect(forA.ended).toMatchObject({
+        id: sessionId,
+        counterpart: {
+          characterId: b.character.id,
+          name: b.character.displayName,
+          playerName: expect.stringMatching(/^settle-/),
+        },
+        outcome: "completed",
+        canceledByYou: false,
+      });
+      const gave = {
+        credits: 12,
+        stacks: [{ itemId: SHALE, quantity: 4 }],
+        // The instance now belongs to B, with its charge intact.
+        items: [{ itemInstanceId: cutter, itemId: SALVAGE, currentCharge: 7 }],
+      };
+      const nothing = { credits: 0, stacks: [], items: [] };
+      expect(forA.ended!.exchange).toEqual({ gave, received: nothing });
+      expect(forB.ended).toMatchObject({ id: sessionId, outcome: "completed" });
+      expect(forB.ended!.exchange).toEqual({ gave: nothing, received: gave });
+      expect(forB.ended!.endedAt).toBe(forA.ended!.endedAt);
+
+      // Once the Cutter moves on, the exchange still names it but no longer
+      // reports the state of something neither participant holds.
+      const elsewhere = await player();
+      await db
+        .update(rune.itemInstances)
+        .set({ characterId: elsewhere.character.id, currentCharge: 2 })
+        .where(eq(rune.itemInstances.id, cutter));
+      const later = (await ta.state()).ended!.exchange!.gave.items;
+      expect(later).toEqual([{ itemInstanceId: cutter, itemId: SALVAGE }]);
+    });
+
+    it("says who canceled, reads an idle session as expired, and never leaks another trade", async () => {
+      const now = new Date();
+      const [a, b, c] = [await player(), await player(), await player()];
+      const first = await openSession(a, b, now);
+      ok(await trader(b, first, now).cancel());
+      expect((await trader(a, first, now).state()).ended).toMatchObject({
+        id: first,
+        outcome: "canceled",
+        canceledByYou: false,
+      });
+      expect((await trader(b, first, now).state()).ended).toMatchObject({
+        id: first,
+        outcome: "canceled",
+        canceledByYou: true,
+      });
+      expect((await trader(a, first, now).state()).ended!.exchange).toBeUndefined();
+
+      // A later session is the one reported, and an idle one reads as expired
+      // before anything has written the expiry down.
+      const second = await openSession(a, c, plus(now, 1_000));
+      const later = plus(now, 6 * MINUTE);
+      const view = await trader(a, second, later).state();
+      expect(view.session).toBeNull();
+      expect(view.ended).toMatchObject({ id: second, outcome: "expired" });
+      expect((await sessionRow(second)).status).toBe("active");
+      // B's last trade is still the canceled one; it never sees A and C's.
+      const forB = await trader(b, first, later).state();
+      expect(forB.ended?.id).toBe(first);
+      expect(JSON.stringify(forB)).not.toContain(second);
+    });
+
+    it("explains a refused settlement to both participants until an offer changes", async () => {
+      const now = new Date();
+      const [a, b] = [await player(), await player()];
+      const box = await addUnique(a, SCRAP_BOX);
+      await fillInventory(b);
+      const sessionId = await openSession(a, b, now);
+      const [ta, tb] = [trader(a, sessionId, now), trader(b, sessionId, now)];
+      ok(await ta.addItem(box));
+      ok(await ta.ready());
+      ok(await tb.ready());
+      // B confirms first; A's final Confirm finds B's Inventory full.
+      ok(await tb.confirm());
+      expect(refusal(await ta.confirm())).toBe("inventory_full");
+
+      const [forA, forB] = [(await ta.state()).session!, (await tb.state()).session!];
+      expect(forA.phase).toBe("compose");
+      expect([forA.yours.ready, forA.theirs.ready, forB.yours.confirmed]).toEqual([
+        false,
+        false,
+        false,
+      ]);
+      // Each participant reads it from its own side; the first confirmer learns
+      // its own Inventory is the problem.
+      expect(forA.settlementRefusal).toEqual({
+        reason: "inventory_full",
+        message: `${b.character.displayName}'s Inventory wouldn't have room for this trade. Nothing moved. Adjust the offers and Ready again.`,
+      });
+      expect(forB.settlementRefusal).toEqual({
+        reason: "inventory_full",
+        message:
+          "Your Inventory wouldn't have room for this trade. Nothing moved. Adjust the offers and Ready again.",
+      });
+
+      // Ready again on the same offers keeps it; the next offer change clears it.
+      ok(await tb.ready());
+      expect((await tb.state()).session!.settlementRefusal?.reason).toBe("inventory_full");
+      ok(await ta.removeItem(box));
+      expect((await ta.state()).session!.settlementRefusal).toBeUndefined();
+      expect((await tb.state()).session!.settlementRefusal).toBeUndefined();
+      const row = await sessionRow(sessionId);
+      expect([row.settlementRefusal, row.settlementRefusalSide]).toEqual([null, null]);
+    });
+  });
 });
