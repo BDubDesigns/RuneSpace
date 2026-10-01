@@ -2,18 +2,18 @@
   "schemaVersion": 1,
   "projectSlug": "runespace",
   "workState": "active",
-  "currentFocus": "Preparing the October 27 Soft Alpha: chat, Whispers, Block, Report, and moderation are in; same-location player trading is getting its player-facing experience.",
+  "currentFocus": "Preparing the October 27 Soft Alpha: chat, Whispers, moderation, and player trading are in; level-ups now announce newly unlocked recipes through a System conversation.",
   "currentChange": {
-    "summary": "Player trading experience: Trade from a nearby player's profile, request cards in Chat/Social, a trade screen with Ready and Confirm, same-account trades, and a Player Trading Wiki page.",
+    "summary": "Recipe-unlock notices: reaching a Refining or Fabrication level that unlocks recipes sends one grouped, read-only System message, pinned in Chat/Social Whispers.",
     "stage": "review",
-    "pullRequestNumber": 272
+    "pullRequestNumber": 275
   },
   "latestCompleted": {
-    "summary": "Player trade settlement: Credits and item offers, Ready and Confirm on an exact version, an all-or-nothing commit that respects carry capacity and last-Cutter safety, and a permanent trade audit.",
+    "summary": "Player trading experience: Trade from a nearby player's profile, request cards in Chat/Social, a trade screen with Ready and Confirm, same-account trades, and a Player Trading Wiki page.",
     "date": "2026-09-30",
-    "url": "https://github.com/BDubDesigns/RuneSpace/pull/271"
+    "url": "https://github.com/BDubDesigns/RuneSpace/pull/272"
   },
-  "nextStep": "Human preview and playtest of the player trading experience: Trade from a profile, request cards in Chat/Social, and the trade screen (#268).",
+  "nextStep": "Human preview and playtest of recipe-unlock System notices: cross Refining 5 or Fabrication 5 through normal play and read System in Whispers (#274).",
   "lastMeaningfulUpdate": "2026-09-30",
   "highlights": [
     {
