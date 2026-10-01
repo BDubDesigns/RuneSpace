@@ -16,10 +16,16 @@ const TAB_LABEL: Record<ChatTab, string> = {
  * Whispers (#247) as three tabs. The selected tab lives in `ChatContext`, so
  * closing and reopening the Drawer — or a character-facing surface opening a
  * Whisper — lands on the right view. Unread Whispers and unread System
- * notices (#274) show on the Whispers tab as well as on the launcher.
+ * notices (#274) show on the Whispers tab as well as on the launcher, and
+ * unread `@mentions` (#261) on the General or Trade tab whose feed shows them.
  */
 export function ChatConversations({ characterId }: { characterId: string }) {
-  const { setView, view, whispersTabUnread: unread } = useChat();
+  const { mentions, setView, view, whispersTabUnread } = useChat();
+  const unreadFor: Record<ChatTab, number> = {
+    general: mentions?.unread.general ?? 0,
+    trade: mentions?.unread.trade ?? 0,
+    whispers: whispersTabUnread,
+  };
   return (
     <div className="space-y-3">
       <div
@@ -29,11 +35,16 @@ export function ChatConversations({ characterId }: { characterId: string }) {
       >
         {(["general", "trade", "whispers"] as const).map((option) => {
           const selected = option === view.tab;
-          const badge = option === "whispers" && unread > 0;
+          const unread = unreadFor[option];
+          const badge = unread > 0;
+          const unreadLabel =
+            option === "whispers"
+              ? `${unread} unread`
+              : `${unread} unread ${unread === 1 ? "mention" : "mentions"}`;
           return (
             <button
               aria-controls="chat-panel"
-              aria-label={badge ? `${TAB_LABEL[option]}, ${unread} unread` : undefined}
+              aria-label={badge ? `${TAB_LABEL[option]}, ${unreadLabel}` : undefined}
               aria-selected={selected}
               className={`rs-focus relative min-h-[var(--rs-touch-target)] border px-2 py-2 font-display text-xs uppercase tracking-[0.12em] outline-none ${selected ? "border-[color:var(--rs-accent-primary)] text-[color:var(--rs-accent-primary)]" : "border-[color:var(--rs-border-structural)] text-[color:var(--rs-text-secondary)]"}`}
               data-chat-channel-tab={option}
@@ -51,7 +62,8 @@ export function ChatConversations({ characterId }: { characterId: string }) {
                 <span
                   aria-hidden="true"
                   className="absolute right-1 top-1 flex min-h-4 min-w-4 items-center justify-center rounded-full border border-[color:var(--rs-accent-primary)] bg-[color:var(--rs-surface-control)] px-0.5 text-[9px] font-bold leading-none text-[color:var(--rs-accent-primary)] [box-shadow:var(--rs-glow-news-unread)]"
-                  data-whisper-unread-total={unread}
+                  data-chat-mention-unread={option === "whispers" ? undefined : unread}
+                  data-whisper-unread-total={option === "whispers" ? unread : undefined}
                 >
                   {unread > 9 ? "9+" : unread}
                 </span>

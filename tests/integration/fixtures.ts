@@ -398,6 +398,11 @@ export async function cleanupTestCharacter(db: Db, rune: Rune, characterId: stri
         ),
       );
     await tx.delete(rune.playerTradeSessions).where(inArray(rune.playerTradeSessions.id, sessions));
+    // A public mention (#261) names its target; its own messages' mentions
+    // cascade with them.
+    await tx
+      .delete(rune.chatMessageMentions)
+      .where(eq(rune.chatMessageMentions.mentionedCharacterId, characterId));
     // Public chat (#246) keeps the sending character's identity on each row.
     await tx.delete(rune.chatMessages).where(eq(rune.chatMessages.senderCharacterId, characterId));
     await tx.delete(rune.characters).where(eq(rune.characters.id, characterId));

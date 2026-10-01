@@ -40,6 +40,11 @@ export const CHAT_POLICY = {
     trade: { lowFrom: 1, highFrom: 2 },
     whisper: { lowFrom: 1, highFrom: 3 },
   } satisfies Record<ChatSendChannel, { lowFrom: number; highFrom: number }>,
+  /**
+   * The most characters one public message may `@mention` (#261). A mention is
+   * personal attention, so this bounds how many players one send can ping.
+   */
+  maxMentions: 5,
   promotedAd: {
     /** Paid by the active character. */
     priceCredits: 50,
@@ -81,6 +86,20 @@ export function normalizeChatMessage(
   if (body.length === 0) return { ok: false, reason: "empty" };
   if (chatMessageLength(body) > CHAT_POLICY.maxLength) return { ok: false, reason: "too_long" };
   return { ok: true, body };
+}
+
+/**
+ * The visible text a public `@mention` of `name` must contain (#261). A mention
+ * is a target the composer selected AND this text in the body: the selection
+ * alone never creates one, and neither does text that merely looks like one.
+ */
+export function mentionText(name: string): string {
+  return `@${name}`;
+}
+
+/** Whether a normalized message body shows a mention of the name, exactly. */
+export function bodyShowsMention(body: string, name: string): boolean {
+  return body.includes(mentionText(name));
 }
 
 /** Successful sends still inside the rolling window at `now`. */

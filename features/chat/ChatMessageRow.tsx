@@ -2,6 +2,8 @@
 
 import { MoreHorizontal } from "lucide-react";
 import type { ReactNode } from "react";
+import type { ChatMentionView } from "@/game/schemas/chat";
+import { mentionSegments } from "./mention-draft";
 
 function formatTime(iso: string): string {
   return new Date(iso).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
@@ -13,6 +15,10 @@ function formatTime(iso: string): string {
  * message opens its actions from its sender's name or a "…" toggle; when
  * expanded, the owning view's actions (Whisper, Report, Block — issue #247)
  * sit under the body.
+ *
+ * A public message's resolved `@mentions` (#261) are marked in the body, and
+ * one that mentions the viewer's character carries the mention rim and a
+ * "Mentions you" label — personal, but never an alert.
  */
 export function ChatMessageRow({
   id,
@@ -24,6 +30,8 @@ export function ChatMessageRow({
   actionsOpen = false,
   onToggleActions,
   actions,
+  mentions = [],
+  viewerCharacterId,
 }: {
   id: string;
   senderName: string;
@@ -34,15 +42,22 @@ export function ChatMessageRow({
   actionsOpen?: boolean;
   onToggleActions?: () => void;
   actions?: ReactNode;
+  mentions?: readonly ChatMentionView[];
+  /** The viewer's character, to tell whether a mention is theirs. */
+  viewerCharacterId?: string;
 }) {
   const actionsId = `chat-message-actions-${id}`;
+  const mentionsMe =
+    viewerCharacterId !== undefined &&
+    mentions.some((mention) => mention.characterId === viewerCharacterId);
   return (
     <li
-      className={
+      className={`${
         promoted
           ? "border border-[color:var(--rs-chat-promoted-border)] bg-[color:var(--rs-chat-promoted-surface)] px-3 py-2 [box-shadow:var(--rs-chat-promoted-glow)]"
           : "px-1"
-      }
+      } ${mentionsMe ? "border-l-4 border-l-[color:var(--rs-chat-mention-accent)] pl-2" : ""}`}
+      data-chat-mentions-me={mentionsMe ? "" : undefined}
       data-chat-message={id}
       data-chat-promoted={promoted ? "" : undefined}
     >
@@ -73,6 +88,14 @@ export function ChatMessageRow({
               Promoted ad
             </span>
           ) : null}
+          {mentionsMe ? (
+            <span
+              className="font-display uppercase tracking-[0.12em] text-[color:var(--rs-chat-mention-accent)]"
+              data-chat-mention-label=""
+            >
+              Mentions you
+            </span>
+          ) : null}
           <time dateTime={sentAt}>{formatTime(sentAt)}</time>
         </p>
         {onToggleActions ? (
@@ -92,7 +115,19 @@ export function ChatMessageRow({
       <p
         className={`whitespace-pre-wrap break-words text-[color:var(--rs-text-primary)] [overflow-wrap:anywhere] ${promoted ? "text-base" : "text-sm"}`}
       >
-        {body}
+        {mentionSegments(body, mentions).map((segment, index) =>
+          segment.mention ? (
+            <span
+              className={`font-semibold ${segment.mention.characterId === viewerCharacterId ? "text-[color:var(--rs-chat-mention-accent)]" : "text-[color:var(--rs-chat-mention-other)]"}`}
+              data-chat-mention={segment.mention.characterId}
+              key={index}
+            >
+              {segment.text}
+            </span>
+          ) : (
+            segment.text
+          ),
+        )}
       </p>
       {actionsOpen && actions ? (
         <div
@@ -109,19 +144,52 @@ export function ChatMessageRow({
   );
 }
 
+/**
+ * A public message from an account the viewer blocked (#261). The server sent
+ * only its place, sender name at send, and time, so there is nothing to
+ * reveal: no body, no actions, and no tap target. The hidden line is subdued,
+ * not a warning — it only explains whom the surrounding replies answer.
+ */
+export function RedactedChatMessageRow({
+  id,
+  senderName,
+  sentAt,
+}: {
+  id: string;
+  senderName: string;
+  sentAt: string;
+}) {
+  return (
+    <li className="px-1" data-chat-message={id} data-chat-redacted="">
+      <p className="flex min-w-0 flex-wrap items-baseline gap-x-2 text-xs text-[color:var(--rs-text-muted)]">
+        <span className="break-words font-semibold text-[color:var(--rs-text-secondary)] [overflow-wrap:anywhere]">
+          {senderName}
+        </span>
+        <time dateTime={sentAt}>{formatTime(sentAt)}</time>
+      </p>
+      <p className="text-sm italic text-[color:var(--rs-text-muted)]">
+        Message hidden — blocked player
+      </p>
+    </li>
+  );
+}
+
 /** A compact action button for the message-actions row. */
 export function MessageActionButton({
   children,
   danger = false,
+  disabled = false,
   onClick,
 }: {
   children: ReactNode;
   danger?: boolean;
+  disabled?: boolean;
   onClick: () => void;
 }) {
   return (
     <button
-      className={`rs-focus min-h-9 border px-3 py-1 text-xs font-semibold outline-none ${danger ? "border-[color:var(--rs-accent-danger)] text-[color:var(--rs-accent-danger)] hover:bg-[color:var(--rs-accent-danger-subtle)]" : "border-[color:var(--rs-border-structural)] text-[color:var(--rs-text-primary)] hover:border-[color:var(--rs-accent-secondary)]"}`}
+      disabled={disabled}
+      className={`rs-focus min-h-9 border px-3 py-1 text-xs font-semibold outline-none disabled:opacity-60 ${danger ? "border-[color:var(--rs-accent-danger)] text-[color:var(--rs-accent-danger)] hover:bg-[color:var(--rs-accent-danger-subtle)]" : "border-[color:var(--rs-border-structural)] text-[color:var(--rs-text-primary)] hover:border-[color:var(--rs-accent-secondary)]"}`}
       onClick={onClick}
       type="button"
     >

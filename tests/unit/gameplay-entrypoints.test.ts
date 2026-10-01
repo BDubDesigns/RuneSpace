@@ -80,6 +80,7 @@ const APP_ENTRYPOINTS: Record<string, string> = {
   "app/api/realtime/route.ts": "GAMEPLAY: realtime/social stream (#245)",
   "app/api/e2e/realtime/route.ts": "local E2E hook (404 outside the gate)",
   "app/api/chat/route.ts": "GAMEPLAY: public chat history read (#246)",
+  "app/api/chat/mentions/route.ts": "GAMEPLAY: public @mention attention read (#261)",
   "app/api/whispers/route.ts": "GAMEPLAY: Whisper inbox read (#247)",
   "app/api/whispers/conversation/route.ts": "GAMEPLAY: Whisper conversation read (#247)",
   "app/api/blocked-players/route.ts": "GAMEPLAY: Blocked Players read (#247)",
@@ -98,7 +99,7 @@ describe("player server actions (server/actions.ts)", () => {
   const source = read("server/actions.ts");
   const bodies = exportedFunctionBodies(source);
 
-  it("enumerates exactly the 70 production player actions", () => {
+  it("enumerates exactly the 72 production player actions", () => {
     // #232 adds nine: Fabrication's start, finish-current, Override toggle,
     // push and Lock In, and Tinkering's start, stop, finish-current and
     // Auto-discard Scrap preference. #246 adds the chat send and promoted ad.
@@ -107,12 +108,13 @@ describe("player server actions (server/actions.ts)", () => {
     // trade request create, cancel, decline, accept, and session cancel. #267
     // adds the trade offer's Credits, stack add/remove, item add/remove,
     // Ready, Change Offer, and Confirm. #274 adds the System conversation read.
-    expect(bodies.size).toBe(70);
+    // #261 adds the public mention read and Whisper conversation hide.
+    expect(bodies.size).toBe(72);
   });
 
   it("classifies every export as gameplay or named account management", () => {
     const gameplay = [...bodies.keys()].filter((name) => !(name in ACCOUNT_MANAGEMENT_ACTIONS));
-    expect(gameplay).toHaveLength(66);
+    expect(gameplay).toHaveLength(68);
     for (const name of Object.keys(ACCOUNT_MANAGEMENT_ACTIONS)) {
       expect(bodies.has(name), `unknown account action ${name}`).toBe(true);
     }
@@ -186,6 +188,7 @@ describe("app pages and route handlers", () => {
       ["app/api/character-profile/route.ts", "server/character-profile.ts"],
       ["app/api/realtime/route.ts", "server/realtime-stream.ts"],
       ["app/api/chat/route.ts", "server/chat.ts"],
+      ["app/api/chat/mentions/route.ts", "server/chat.ts"],
       ["app/api/trade/route.ts", "server/player-trades.ts"],
       ["app/api/system-notices/route.ts", "server/system-notices.ts"],
     ] as const) {

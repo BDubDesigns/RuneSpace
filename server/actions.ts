@@ -81,8 +81,14 @@ import { EquipmentRuleError } from "@/game/domain/equipment";
 import { TravelRuleError } from "@/server/travel";
 import { claimPowerCells, type PowerAnnexClaimResult } from "@/server/power-annex";
 import { tradeWithMerchant, type TradeResult } from "@/server/trade";
-import { postPromotedTradeAd, sendChatMessage } from "@/server/chat";
-import { markWhisperRead, openWhisper, sendWhisper, WhisperError } from "@/server/whispers";
+import { markChatMentionsRead, postPromotedTradeAd, sendChatMessage } from "@/server/chat";
+import {
+  hideWhisperConversation,
+  markWhisperRead,
+  openWhisper,
+  sendWhisper,
+  WhisperError,
+} from "@/server/whispers";
 import { markSystemNoticesRead } from "@/server/system-notices";
 import { blockPlayer, unblockPlayer } from "@/server/player-blocks";
 import { reportMessage, reportPlayer } from "@/server/player-reports";
@@ -112,6 +118,7 @@ import {
   type TradeCommandResult,
 } from "@/game/schemas/player-trade";
 import {
+  HideWhisperConversationRequestSchema,
   MarkWhisperReadRequestSchema,
   OpenWhisperRequestSchema,
   SendWhisperRequestSchema,
@@ -128,6 +135,7 @@ import {
   type ReportResult,
 } from "@/game/schemas/social-safety";
 import {
+  MarkChatMentionsReadRequestSchema,
   PostPromotedTradeAdRequestSchema,
   SendChatMessageRequestSchema,
   type ChatSendResult,
@@ -974,8 +982,9 @@ export async function tradeWithMerchantAction(input: unknown): Promise<TradeActi
 export type ChatActionResult = ChatSendResult | { error: string };
 
 /**
- * Public chat sends (issue #246). The browser names its active character and
- * what to say; sender identity, the shared account-wide budget, and every
+ * Public chat sends (issue #246). The browser names its active character,
+ * what to say, and which characters it selected to `@mention` (#261); sender
+ * identity, mention resolution, the shared account-wide budget, and every
  * refusal are decided by `server/chat.ts`.
  */
 export async function sendChatMessageAction(input: unknown): Promise<ChatActionResult> {
@@ -997,8 +1006,28 @@ export async function postPromotedTradeAdAction(input: unknown): Promise<ChatAct
   if (!request.success) return { error: "Invalid promoted ad." };
   try {
     const user = await requireCurrentUser(await headers());
-    const { characterId, text } = request.data;
-    return await postPromotedTradeAd(user.id, characterId, { text });
+    const { characterId, text, mentions } = request.data;
+    return await postPromotedTradeAd(user.id, characterId, { text, mentions });
+  } catch (error) {
+    redirectOnGameplayRefusal(error);
+    if (error instanceof OwnershipError) return { error: error.message };
+    throw error;
+  }
+}
+
+/**
+ * Public `@mention` attention (#261): reading a channel marks the active
+ * character's mentions in it read through what this tab showed.
+ */
+export async function markChatMentionsReadAction(
+  input: unknown,
+): Promise<{ status: "read" } | { error: string }> {
+  const request = MarkChatMentionsReadRequestSchema.safeParse(input);
+  if (!request.success) return { error: "Invalid request." };
+  try {
+    const user = await requireCurrentUser(await headers());
+    const { characterId, ...read } = request.data;
+    return await markChatMentionsRead(user.id, characterId, read);
   } catch (error) {
     redirectOnGameplayRefusal(error);
     if (error instanceof OwnershipError) return { error: error.message };
@@ -1049,6 +1078,28 @@ export async function markWhisperReadAction(
     const user = await requireCurrentUser(await headers());
     const { characterId, ...read } = request.data;
     return await markWhisperRead(user.id, characterId, read);
+  } catch (error) {
+    redirectOnGameplayRefusal(error);
+    if (error instanceof OwnershipError || error instanceof WhisperError) {
+      return { error: error.message };
+    }
+    throw error;
+  }
+}
+
+/**
+ * Hide a Whisper conversation from the active character's own inbox (#261).
+ * Nothing is deleted and the other participant sees no change.
+ */
+export async function hideWhisperConversationAction(
+  input: unknown,
+): Promise<{ status: "hidden" } | { error: string }> {
+  const request = HideWhisperConversationRequestSchema.safeParse(input);
+  if (!request.success) return { error: "Invalid request." };
+  try {
+    const user = await requireCurrentUser(await headers());
+    const { characterId, ...hide } = request.data;
+    return await hideWhisperConversation(user.id, characterId, hide);
   } catch (error) {
     redirectOnGameplayRefusal(error);
     if (error instanceof OwnershipError || error instanceof WhisperError) {

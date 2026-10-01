@@ -17,6 +17,7 @@ import {
 } from "@/game/schemas/whispers";
 import { useSocial } from "@/features/social/SocialContext";
 import {
+  hideWhisperConversationAction,
   markSystemNoticesReadAction,
   markWhisperReadAction,
   sendWhisperAction,
@@ -43,7 +44,8 @@ import { SafetyFlow, type SafetyOutcome, type SafetySubject } from "./SafetyFlow
  * conversation, the read-only System conversation (#274), and the account's
  * Blocked Players list. Which one shows is `ChatContext`'s view, so a
  * character-facing surface elsewhere in Play can open a conversation here
- * without navigating.
+ * without navigating. A conversation can be hidden from this character's list
+ * (#261) — never deleted — and returns with the next Whisper or by reopening.
  */
 export function WhisperPanel() {
   const { view } = useChat();
@@ -51,7 +53,7 @@ export function WhisperPanel() {
   if (view.blockedPlayers) return <BlockedPlayers />;
   if (view.system) return <SystemConversation />;
   if (view.peer) return <WhisperConversation key={view.peer.characterId} peer={view.peer} />;
-  return <WhisperInboxList />;
+  return <WhisperInboxList hiddenName={view.hiddenName} />;
 }
 
 function formatWhen(iso: string): string {
@@ -190,7 +192,7 @@ function SystemConversationRow() {
   );
 }
 
-function WhisperInboxList() {
+function WhisperInboxList({ hiddenName }: { hiddenName?: string }) {
   const { characterId, inbox, setView, system } = useChat();
   const conversations = inbox?.conversations ?? [];
   const hasSystem = (system?.notices.length ?? 0) > 0;
@@ -209,6 +211,12 @@ function WhisperInboxList() {
           Blocked players
         </ActionButton>
       </div>
+      {hiddenName ? (
+        <Feedback tone="success">
+          Hid your conversation with {hiddenName}. A new Whisper from either of you brings it back,
+          or start one by name to reopen it.
+        </Feedback>
+      ) : null}
       {!inbox && !hasSystem ? (
         <p className="text-sm text-[color:var(--rs-text-muted)]">Loading Whispers…</p>
       ) : null}
@@ -334,6 +342,7 @@ function WhisperConversation({ peer: initialPeer }: { peer: WhisperPeer }) {
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
   const [unblocking, setUnblocking] = useState(false);
+  const [hiding, setHiding] = useState(false);
   const [feedback, setFeedback] = useState<SafetyOutcome>();
   const [actionsFor, setActionsFor] = useState<string>();
   const [safety, setSafety] = useState<SafetyAction>();
@@ -522,6 +531,34 @@ function WhisperConversation({ peer: initialPeer }: { peer: WhisperPeer }) {
     setFeedback({ tone: "success", text: `Unblocked ${result.name}.` });
   }
 
+  /**
+   * Hide this conversation from this character's list (#261) through the
+   * newest Whisper shown here; a newer one keeps it listed.
+   */
+  async function hide() {
+    const newest = feed.messages.at(-1);
+    if (!newest) return;
+    setHiding(true);
+    setFeedback(undefined);
+    let result: Awaited<ReturnType<typeof hideWhisperConversationAction>>;
+    try {
+      result = await hideWhisperConversationAction({
+        characterId,
+        withCharacterId: peerId,
+        throughSeq: newest.seq,
+      });
+    } catch {
+      result = { error: "Couldn't hide the conversation. Check your connection and try again." };
+    }
+    setHiding(false);
+    if ("error" in result) {
+      setFeedback({ tone: "danger", text: result.error });
+      return;
+    }
+    refreshInbox();
+    setView({ tab: "whispers", hiddenName: peer.name });
+  }
+
   function beginSafety(mode: SafetyAction["mode"], message?: WhisperMessageView) {
     setActionsFor(undefined);
     setFeedback(undefined);
@@ -545,7 +582,12 @@ function WhisperConversation({ peer: initialPeer }: { peer: WhisperPeer }) {
           <span className="sr-only">Whispers with </span>
           {peer.name}
         </h3>
-        <div className="flex gap-1">
+        <div className="flex flex-wrap gap-1">
+          {feed.messages.length > 0 ? (
+            <MessageActionButton disabled={hiding} onClick={() => void hide()}>
+              Hide
+            </MessageActionButton>
+          ) : null}
           <MessageActionButton onClick={() => beginSafety("report")}>Report</MessageActionButton>
           {peer.blockedByMe ? null : (
             <MessageActionButton danger onClick={() => beginSafety("block")}>

@@ -1,6 +1,6 @@
 import { eq, inArray } from "drizzle-orm";
 import { afterEach, beforeAll, describe, expect, it } from "vitest";
-import type { ChatMessageView, ChatSendResult } from "@/game/schemas/chat";
+import type { ChatMessageView, ChatSendResult, VisibleChatMessageView } from "@/game/schemas/chat";
 import { cleanupTestUser, createCharacterForUser, createTestUser } from "./fixtures";
 
 const DATABASE_URL = process.env.DATABASE_URL;
@@ -9,7 +9,7 @@ const suite = DATABASE_URL ? describe : describe.skip;
 const token = () => Math.random().toString(36).slice(2, 8);
 const DAY_MS = 24 * 60 * 60_000;
 
-function sent(result: ChatSendResult): ChatMessageView {
+function sent(result: ChatSendResult): VisibleChatMessageView {
   if (result.status !== "sent") throw new Error(`expected a send, got ${result.reason}`);
   return result.message;
 }
@@ -120,6 +120,7 @@ suite("issue #246 public chat (real PostgreSQL)", () => {
     });
     expect(row!.createdAt.getTime()).toBe(now.getTime());
     expect(message).toEqual({
+      redacted: false,
       id: row!.id,
       seq: row!.seq,
       channel: "general",
@@ -128,6 +129,7 @@ suite("issue #246 public chat (real PostgreSQL)", () => {
       body: "hello RuneSpace",
       sentAt: now.toISOString(),
       promoted: false,
+      mentions: [],
     });
     // Account identity never leaves the server.
     expect(JSON.stringify(message)).not.toContain(character.playerAccountId);
@@ -466,7 +468,7 @@ suite("issue #246 public chat (real PostgreSQL)", () => {
     // Every row exactly once, in insertion order, with no skip or repeat.
     expect(ours).toHaveLength(120);
     expect(new Set(ours.map((message) => message.id)).size).toBe(120);
-    expect(ours.map((message) => message.body)).toEqual(
+    expect(ours.map((message) => (message.redacted ? null : message.body))).toEqual(
       Array.from({ length: 120 }, (_, index) => `same instant ${index}`),
     );
     const seqs = seen.map((message) => message.seq);

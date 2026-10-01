@@ -21,10 +21,12 @@ import { CHARACTER_TARGET_NOT_FOUND, resolveCharacterTarget } from "@/server/soc
  * between accounts, so it covers every character of both and switching
  * characters never evades it.
  *
- * A Block hides the blocked account's General/Trade messages from the blocker
- * only (`notBlockedByViewer` for reads, `accountsBlocking` for live delivery),
- * prevents Whispers in either direction (`isBlockedBetween`), and is the seam
- * trade requests (#225) reuse to refuse direct contact. It never erases prior
+ * A Block redacts the blocked account's General/Trade messages for the blocker
+ * only — each keeps its place in the timeline as a placeholder with no content
+ * (#261; `blockedByViewer` for reads, `accountsBlocking` for live delivery) —
+ * prevents Whispers in either direction (`isBlockedBetween`), suppresses
+ * `@mention` attention in either direction (`blockedEitherWay`), and is the
+ * seam trade requests (#225) reuse to refuse direct contact. It never erases prior
  * Whisper history, is never disclosed to the blocked player, and lasts until
  * the blocker unblocks. Every block and unblock appends a `player_block_events`
  * row as an interpretable safety signal; nothing here sanctions anyone.
@@ -34,12 +36,21 @@ type Transaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
 type Executor = Pick<Transaction, "select">;
 
 /**
- * SQL that is true for a row whose sender account the viewer has NOT blocked.
- * Public chat reads (`server/chat.ts`) filter with it so pages stay full and
- * cursors stay exact.
+ * SQL that is true for a row whose sender account the viewer HAS blocked.
+ * Public chat reads (`server/chat.ts`) select it per row and redact those rows
+ * for the viewer, so the timeline, pages, and cursors are the same for
+ * everyone and only the content differs (#261).
  */
-export function notBlockedByViewer(viewerAccountId: string, senderAccountColumn: SQLWrapper): SQL {
-  return sql`not exists (select 1 from ${playerBlocks} where ${playerBlocks.blockerPlayerAccountId} = ${viewerAccountId} and ${playerBlocks.blockedPlayerAccountId} = ${senderAccountColumn})`;
+export function blockedByViewer(
+  viewerAccountId: string,
+  senderAccountColumn: SQLWrapper,
+): SQL<boolean> {
+  return sql<boolean>`exists (select 1 from ${playerBlocks} where ${playerBlocks.blockerPlayerAccountId} = ${viewerAccountId} and ${playerBlocks.blockedPlayerAccountId} = ${senderAccountColumn})`;
+}
+
+/** SQL that is true when either account blocks the other: no direct contact. */
+export function blockedEitherWay(accountA: SQLWrapper, accountB: SQLWrapper): SQL<boolean> {
+  return sql<boolean>`exists (select 1 from ${playerBlocks} where (${playerBlocks.blockerPlayerAccountId} = ${accountA} and ${playerBlocks.blockedPlayerAccountId} = ${accountB}) or (${playerBlocks.blockerPlayerAccountId} = ${accountB} and ${playerBlocks.blockedPlayerAccountId} = ${accountA}))`;
 }
 
 /** Every account that currently blocks `blockedAccountId`. */

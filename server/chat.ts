@@ -1,20 +1,32 @@
 import {
   and,
+  asc,
+  count,
   desc,
   eq,
   gt,
   gte,
   inArray,
   isNotNull,
+  isNull,
   lt,
+  lte,
   max,
+  not,
   or,
   sql,
   type SQL,
 } from "drizzle-orm";
 import { db } from "@/db";
-import { characters, chatMessages, type ChatMessage } from "@/db/rune-space";
 import {
+  characters,
+  chatMessageMentions,
+  chatMessages,
+  type Character,
+  type ChatMessage,
+} from "@/db/rune-space";
+import {
+  bodyShowsMention,
   CHAT_POLICY,
   chatRetentionCutoff,
   decideChatSend,
@@ -26,19 +38,29 @@ import {
 } from "@/game/domain/chat";
 import type {
   ChatHistoryPage,
-  ChatMessageView,
+  ChatMentionsView,
+  ChatMentionView,
   ChatSendBudget,
   ChatSendRefusalReason,
   ChatSendResult,
   PromotedAdStatus,
+  RedactedChatMessageView,
+  VisibleChatMessageView,
 } from "@/game/schemas/chat";
+import type { CharacterTarget } from "@/game/schemas/whispers";
 import { containsSevereTerm } from "@/server/chat-guardrail";
 import { lockAccountChatSends } from "@/server/chat-send-lock";
 import { requirePlayableOwnedCharacter } from "@/server/gameplay-access";
 import { isSociallyRestricted, SOCIALLY_RESTRICTED_MESSAGE } from "@/server/moderation-sanctions";
-import { accountsBlocking, notBlockedByViewer } from "@/server/player-blocks";
+import {
+  accountsBlocking,
+  blockBetween,
+  blockedByViewer,
+  blockedEitherWay,
+} from "@/server/player-blocks";
 import { assertNotTradeEngaged } from "@/server/player-trade-gate";
 import { publishRealtimeEvent } from "@/server/realtime";
+import { resolveCharacterTarget } from "@/server/social-targets";
 
 /**
  * The authoritative public chat boundary (issue #246): General and Trade
@@ -56,6 +78,13 @@ import { publishRealtimeEvent } from "@/server/realtime";
  * rolling window, it is the ad's cooldown, and for an ad it commits together
  * with the Credit charge or not at all. Realtime delivery is published only
  * after that commit; the stream is never the message ledger.
+ *
+ * Issue #261 adds two per-viewer refinements. A message may `@mention`
+ * characters: each target is resolved and checked inside the send's
+ * transaction and stored with it in `chat_message_mentions`, whose durable
+ * read state is the mentioned character's mention attention. And a message
+ * from an account the viewer blocked is redacted for that viewer — on reads
+ * and on live delivery — rather than removed, so the timeline stays whole.
  */
 
 type Transaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
@@ -67,23 +96,11 @@ type Executor = Pick<Transaction, "select" | "execute">;
  */
 export const CHAT_RETENTION_PRUNE_BATCH = 500;
 
-/** Who is reading. Public feeds are projected per viewer, never globally. */
-export type ChatViewer = { playerAccountId: string; characterId: string };
-
 export type ChatSendOptions = {
   now?: Date;
   /** The severe-term list; tests inject their own. */
   denylist?: ReadonlySet<string>;
 };
-
-/**
- * The per-viewer visibility seam for public chat reads: a viewer never sees
- * messages from an account they blocked (#247). Applied in SQL so pages stay
- * full and cursors stay exact.
- */
-function visibleToViewer(viewer: ChatViewer): SQL {
-  return notBlockedByViewer(viewer.playerAccountId, chatMessages.senderPlayerAccountId);
-}
 
 /**
  * Which rows a channel's feed shows: its own, and in General every ad. Report
@@ -95,8 +112,9 @@ export function channelFeed(channel: ChatChannel): SQL {
     : eq(chatMessages.channel, "trade");
 }
 
-function toView(row: ChatMessage): ChatMessageView {
+function toView(row: ChatMessage, mentions: readonly ChatMentionView[]): VisibleChatMessageView {
   return {
+    redacted: false,
     id: row.id,
     seq: row.seq,
     channel: row.channel as ChatChannel,
@@ -105,7 +123,54 @@ function toView(row: ChatMessage): ChatMessageView {
     body: row.body,
     sentAt: row.createdAt.toISOString(),
     promoted: row.promotedPriceCredits !== null,
+    mentions: [...mentions],
   };
+}
+
+/**
+ * A message as a viewer who blocked its sender's account receives it (#261):
+ * its timeline place and sender name at send, and nothing it said. Built from
+ * an allow-list, so a field added to messages later is never leaked by default.
+ */
+function redact(
+  message: Pick<
+    VisibleChatMessageView,
+    "id" | "seq" | "channel" | "promoted" | "senderName" | "sentAt"
+  >,
+): RedactedChatMessageView {
+  return {
+    redacted: true,
+    id: message.id,
+    seq: message.seq,
+    channel: message.channel,
+    promoted: message.promoted,
+    senderName: message.senderName,
+    sentAt: message.sentAt,
+  };
+}
+
+/** Each listed message's mentions, by message id, in a stable order. */
+async function mentionsOf(
+  executor: Executor,
+  messageIds: readonly string[],
+): Promise<Map<string, ChatMentionView[]>> {
+  const byMessage = new Map<string, ChatMentionView[]>();
+  if (messageIds.length === 0) return byMessage;
+  const rows = await executor
+    .select({
+      messageId: chatMessageMentions.messageId,
+      characterId: chatMessageMentions.mentionedCharacterId,
+      name: chatMessageMentions.mentionedCharacterName,
+    })
+    .from(chatMessageMentions)
+    .where(inArray(chatMessageMentions.messageId, [...messageIds]))
+    .orderBy(asc(chatMessageMentions.mentionedCharacterName));
+  for (const row of rows) {
+    const list = byMessage.get(row.messageId) ?? [];
+    list.push({ characterId: row.characterId, name: row.name });
+    byMessage.set(row.messageId, list);
+  }
+  return byMessage;
 }
 
 /**
@@ -174,7 +239,10 @@ function minutesLabel(ms: number): string {
 }
 
 const REFUSAL_COPY: Record<
-  Exclude<ChatSendRefusalReason, "rate_limited" | "ad_cooldown">,
+  Exclude<
+    ChatSendRefusalReason,
+    "rate_limited" | "ad_cooldown" | "invalid_mention" | "blocked_by_you"
+  >,
   string
 > = {
   socially_restricted: SOCIALLY_RESTRICTED_MESSAGE,
@@ -183,6 +251,10 @@ const REFUSAL_COPY: Record<
   prohibited_term: "That message wasn't sent: it contains a slur RuneSpace blocks.",
   insufficient_credits: `A promoted ad costs ${CHAT_POLICY.promotedAd.priceCredits} Credits.`,
 };
+
+const MENTION_UNMATCHED = "That mention couldn't be matched. Choose the name again from the list.";
+const MENTION_OWN = "You can't mention your own characters.";
+const MENTION_TOO_MANY = `A message can mention up to ${CHAT_POLICY.maxMentions} characters.`;
 
 /**
  * Delete messages past ordinary retention, oldest first, at most `limit` per
@@ -211,7 +283,9 @@ export async function pruneExpiredChatMessages(
 /**
  * One page of a channel's feed for the viewer: the latest page, or with
  * `before` the page strictly older than that message. Oldest first. Expired
- * rows never render even before a send prunes them.
+ * rows never render even before a send prunes them. Every viewer pages the
+ * same rows; one from an account the viewer blocked arrives redacted (#261),
+ * its content never read into the response.
  */
 export async function readChatHistory(
   userId: string,
@@ -220,28 +294,38 @@ export async function readChatHistory(
   now: Date = new Date(),
 ): Promise<ChatHistoryPage> {
   const character = await requirePlayableOwnedCharacter(userId, characterId);
-  const viewer = { playerAccountId: character.playerAccountId, characterId: character.id };
+  const accountId = character.playerAccountId;
   const rows = await db
-    .select()
+    .select({
+      message: chatMessages,
+      redacted: blockedByViewer(accountId, chatMessages.senderPlayerAccountId),
+    })
     .from(chatMessages)
     .where(
       and(
         channelFeed(request.channel),
         gte(chatMessages.createdAt, new Date(chatRetentionCutoff(now.getTime()))),
         request.before === undefined ? undefined : lt(chatMessages.seq, request.before),
-        visibleToViewer(viewer),
       ),
     )
     .orderBy(desc(chatMessages.seq))
     .limit(CHAT_POLICY.pageSize + 1);
   const page = rows.slice(0, CHAT_POLICY.pageSize);
-  const [sends, lastAd] = await Promise.all([
-    recentSendTimes(db, viewer.playerAccountId, now),
-    lastPromotedAt(db, viewer.playerAccountId, now),
+  const [sends, lastAd, mentions] = await Promise.all([
+    recentSendTimes(db, accountId, now),
+    lastPromotedAt(db, accountId, now),
+    mentionsOf(
+      db,
+      page.filter((row) => !row.redacted).map((row) => row.message.id),
+    ),
   ]);
   return {
     channel: request.channel,
-    messages: page.reverse().map(toView),
+    messages: page
+      .reverse()
+      .map(({ message, redacted }) =>
+        redacted ? redact(toView(message, [])) : toView(message, mentions.get(message.id) ?? []),
+      ),
     hasOlder: rows.length > CHAT_POLICY.pageSize,
     budget: budgetFrom(sends, now),
     promotedAd: adStatus(lastAd, now),
@@ -311,6 +395,50 @@ export async function beginChatSend(
   return { ok: true, body: content.body, sends };
 }
 
+/**
+ * Resolve the characters a public message mentions (#261), inside the send's
+ * transaction. Each target is what the composer's selection named — a stable
+ * id, or a Nearby Player's exact name at the sender's location — and must be
+ * another account's character whose current name the body shows after `@`.
+ * Anything else refuses the whole send, so a mention is never silently
+ * dropped or guessed. A target the sender blocked is refused like a Whisper
+ * would be; a target who blocked the sender is accepted and simply never
+ * alerted, so the Block is not disclosed.
+ */
+async function resolveMentions(
+  tx: Transaction,
+  sender: Character,
+  body: string,
+  targets: readonly CharacterTarget[],
+): Promise<
+  | { ok: true; mentioned: Character[] }
+  | { ok: false; reason: "invalid_mention" | "blocked_by_you"; error: string }
+> {
+  if (targets.length > CHAT_POLICY.maxMentions) {
+    return { ok: false, reason: "invalid_mention", error: MENTION_TOO_MANY };
+  }
+  const mentioned = new Map<string, Character>();
+  for (const target of targets) {
+    const character = await resolveCharacterTarget(target, sender, { executor: tx });
+    if (!character || !bodyShowsMention(body, character.displayName)) {
+      return { ok: false, reason: "invalid_mention", error: MENTION_UNMATCHED };
+    }
+    if (character.playerAccountId === sender.playerAccountId) {
+      return { ok: false, reason: "invalid_mention", error: MENTION_OWN };
+    }
+    const block = await blockBetween(sender.playerAccountId, character.playerAccountId, tx);
+    if (block.iBlockedThem) {
+      return {
+        ok: false,
+        reason: "blocked_by_you",
+        error: `You blocked ${character.displayName}. Unblock them to mention them.`,
+      };
+    }
+    mentioned.set(character.id, character);
+  }
+  return { ok: true, mentioned: [...mentioned.values()] };
+}
+
 type SendKind =
   | { channel: "general" | "trade"; promoted: false }
   | { channel: "trade"; promoted: true };
@@ -320,11 +448,13 @@ async function commitSend(
   characterId: string,
   kind: SendKind,
   text: string,
+  mentions: readonly CharacterTarget[],
   { now = new Date(), denylist }: ChatSendOptions,
 ): Promise<ChatSendResult> {
   const character = await requirePlayableOwnedCharacter(userId, characterId);
   const accountId = character.playerAccountId;
 
+  let mentioned: Character[] = [];
   const result = await db.transaction(async (tx): Promise<ChatSendResult> => {
     const begun = await beginChatSend(tx, accountId, kind.channel, text, { now, denylist });
     const sends = begun.sends;
@@ -337,6 +467,8 @@ async function commitSend(
       promotedAd: adStatus(lastAd, now),
     });
     if (!begun.ok) return refuse(begun.reason, begun.error);
+    const resolved = await resolveMentions(tx, character, begun.body, mentions);
+    if (!resolved.ok) return refuse(resolved.reason, resolved.error);
 
     let promotedPriceCredits: number | null = null;
     if (kind.promoted) {
@@ -384,36 +516,66 @@ async function commitSend(
         createdAt: now,
       })
       .returning();
+    // The mentions commit with their message, or neither does.
+    if (resolved.mentioned.length > 0) {
+      await tx.insert(chatMessageMentions).values(
+        resolved.mentioned.map((target) => ({
+          messageId: row!.id,
+          mentionedCharacterId: target.id,
+          mentionedPlayerAccountId: target.playerAccountId,
+          mentionedCharacterName: target.displayName,
+        })),
+      );
+    }
+    mentioned = resolved.mentioned;
     const sentAt = now.getTime();
     return {
       status: "sent",
-      message: toView(row!),
+      message: toView(
+        row!,
+        resolved.mentioned
+          .map((target) => ({ characterId: target.id, name: target.displayName }))
+          .sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0)),
+      ),
       budget: budgetFrom([...sends, sentAt], now),
       promotedAd: adStatus(kind.promoted ? sentAt : lastAd, now),
     };
   });
 
-  if (result.status === "sent") await publishChatMessage(result.message, accountId);
+  if (result.status === "sent") await publishChatMessage(result.message, accountId, mentioned);
   return result;
 }
 
 /**
- * The live-delivery half of the viewer seam (`visibleToViewer` is the read
- * half). Called only after the message committed: it prompts every open tab
- * except those of accounts that blocked the sender (#247) — server-side,
- * because the payload deliberately carries no account identity a browser
- * could filter on. A promoted ad is one delivery of one record that each feed
- * places. Best-effort: the message is already durable, so a failure here only
- * leaves open tabs to catch up on their next reconcile read.
+ * The live-delivery half of the viewer seam (`blockedByViewer` is the read
+ * half). Called only after the message committed: every open tab receives it,
+ * except that each account blocking the sender (#247) receives only its
+ * redacted form (#261) — decided server-side, because the payload carries no
+ * account identity a browser could filter on, and a blocker's browser must
+ * never hold the content. A promoted ad is one delivery of one record that
+ * each feed places. Each mentioned character with no Block either way is
+ * prompted to re-read its mention attention. Best-effort: the message is
+ * already durable, so a failure here only leaves open tabs to catch up on
+ * their next reconcile read.
  */
-async function publishChatMessage(message: ChatMessageView, senderAccountId: string) {
+async function publishChatMessage(
+  message: VisibleChatMessageView,
+  senderAccountId: string,
+  mentioned: readonly Pick<Character, "id" | "playerAccountId">[],
+) {
   try {
-    const blockers = await accountsBlocking(senderAccountId);
-    publishRealtimeEvent(
-      { kind: "everyone", exceptAccountIds: new Set(blockers) },
-      "chat.message",
-      message,
-    );
+    const blockers = new Set(await accountsBlocking(senderAccountId));
+    publishRealtimeEvent({ kind: "everyone", exceptAccountIds: blockers }, "chat.message", message);
+    if (blockers.size > 0) {
+      const redacted = redact(message);
+      for (const playerAccountId of blockers) {
+        publishRealtimeEvent({ kind: "account", playerAccountId }, "chat.message", redacted);
+      }
+    }
+    for (const target of mentioned) {
+      if (blockers.has(target.playerAccountId)) continue;
+      publishRealtimeEvent({ kind: "character", characterId: target.id }, "chat.mention", {});
+    }
   } catch {
     // Delivery is a prompt, never the ledger; reconcile reads recover it.
   }
@@ -423,7 +585,7 @@ async function publishChatMessage(message: ChatMessageView, senderAccountId: str
 export async function sendChatMessage(
   userId: string,
   characterId: string,
-  request: { channel: ChatChannel; text: string },
+  request: { channel: ChatChannel; text: string; mentions?: readonly CharacterTarget[] },
   options: ChatSendOptions = {},
 ): Promise<ChatSendResult> {
   return commitSend(
@@ -431,6 +593,7 @@ export async function sendChatMessage(
     characterId,
     { channel: request.channel, promoted: false },
     request.text,
+    request.mentions ?? [],
     options,
   );
 }
@@ -443,7 +606,7 @@ export async function sendChatMessage(
 export async function postPromotedTradeAd(
   userId: string,
   characterId: string,
-  request: { text: string },
+  request: { text: string; mentions?: readonly CharacterTarget[] },
   options: ChatSendOptions = {},
 ): Promise<ChatSendResult> {
   return commitSend(
@@ -451,6 +614,83 @@ export async function postPromotedTradeAd(
     characterId,
     { channel: "trade", promoted: true },
     request.text,
+    request.mentions ?? [],
     options,
   );
+}
+
+/**
+ * The active character's unread `@mentions` (#261): mentions it has not read
+ * on messages still inside retention, never one whose sender and target
+ * accounts have a Block between them in either direction — so a blocked
+ * player can never reach the blocker through mention attention, and a Block
+ * placed later silences mentions already sent. Derived from durable rows, so
+ * every tab, device, and reconnect reads the same count.
+ */
+export async function readChatMentions(
+  userId: string,
+  characterId: string,
+  now: Date = new Date(),
+): Promise<ChatMentionsView> {
+  const me = await requirePlayableOwnedCharacter(userId, characterId);
+  const [row] = await db
+    .select({
+      total: count(),
+      general: sql<number>`count(*) filter (where ${channelFeed("general")})`.mapWith(Number),
+      trade: sql<number>`count(*) filter (where ${channelFeed("trade")})`.mapWith(Number),
+    })
+    .from(chatMessageMentions)
+    .innerJoin(chatMessages, eq(chatMessages.id, chatMessageMentions.messageId))
+    .where(
+      and(
+        eq(chatMessageMentions.mentionedCharacterId, me.id),
+        isNull(chatMessageMentions.readAt),
+        gte(chatMessages.createdAt, new Date(chatRetentionCutoff(now.getTime()))),
+        not(
+          blockedEitherWay(
+            chatMessageMentions.mentionedPlayerAccountId,
+            chatMessages.senderPlayerAccountId,
+          ),
+        ),
+      ),
+    );
+  return {
+    unread: { general: row?.general ?? 0, trade: row?.trade ?? 0 },
+    unreadTotal: row?.total ?? 0,
+  };
+}
+
+/**
+ * Mark the active character's mentions read through `throughSeq` in one
+ * channel's feed — what that tab has shown. A promoted ad shows in both feeds,
+ * so reading either clears it. Read once, read everywhere: the character's
+ * other tabs are told to re-read. A mention newer than what was shown stays
+ * unread.
+ */
+export async function markChatMentionsRead(
+  userId: string,
+  characterId: string,
+  request: { channel: ChatChannel; throughSeq: number },
+  now: Date = new Date(),
+): Promise<{ status: "read" }> {
+  const me = await requirePlayableOwnedCharacter(userId, characterId);
+  const shown = db
+    .select({ id: chatMessages.id })
+    .from(chatMessages)
+    .where(and(channelFeed(request.channel), lte(chatMessages.seq, request.throughSeq)));
+  const marked = await db
+    .update(chatMessageMentions)
+    .set({ readAt: now })
+    .where(
+      and(
+        eq(chatMessageMentions.mentionedCharacterId, me.id),
+        isNull(chatMessageMentions.readAt),
+        inArray(chatMessageMentions.messageId, shown),
+      ),
+    )
+    .returning({ messageId: chatMessageMentions.messageId });
+  if (marked.length > 0) {
+    publishRealtimeEvent({ kind: "character", characterId: me.id }, "chat.mentions.read", {});
+  }
+  return { status: "read" };
 }

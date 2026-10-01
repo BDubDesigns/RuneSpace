@@ -1,6 +1,6 @@
 import { and, eq, inArray } from "drizzle-orm";
 import { afterEach, beforeAll, describe, expect, it } from "vitest";
-import type { ChatMessageView, ChatSendResult } from "@/game/schemas/chat";
+import type { ChatSendResult, VisibleChatMessageView } from "@/game/schemas/chat";
 import type { WhisperMessageView, WhisperSendResult } from "@/game/schemas/whispers";
 import type { RealtimeEnvelope } from "@/game/schemas/realtime";
 import type { MessageReportEvidence } from "@/server/player-reports";
@@ -18,7 +18,7 @@ function whispered(result: WhisperSendResult): WhisperMessageView {
   return result.message;
 }
 
-function posted(result: ChatSendResult): ChatMessageView {
+function posted(result: ChatSendResult): VisibleChatMessageView {
   if (result.status !== "sent") throw new Error(`expected a send, got ${result.reason}`);
   return result.message;
 }
@@ -27,7 +27,7 @@ function posted(result: ChatSendResult): ChatMessageView {
  * Issue #247 acceptance against real PostgreSQL: Whispers are durable,
  * character-to-character, share the account-wide send budget and guardrail,
  * keep durable per-character unread state, and survive renames; Block is
- * account-level, suppresses public chat for the blocker only, prevents
+ * account-level, redacts public chat for the blocker only (#261), prevents
  * Whispers both ways without disclosure or erasing history, and records
  * signals; Report preserves bounded evidence that outlives retention.
  */
@@ -520,20 +520,32 @@ suite("issue #247 Whispers, Block, and Report (real PostgreSQL)", () => {
         await blocks.blockPlayer(a.userId, a.character.id, { name: b.character.displayName }),
       ).toEqual({ status: "blocked", name: b.character.displayName });
 
-      // B's other character is hidden too, including history sent before the Block.
+      // B's other character is redacted too, including history sent before
+      // the Block (#261): A's tabs get only the placeholder, never the text.
       const { result, received } = await observe(
         [scopeOf(a.character), scopeOf(aAlt), scopeOf(bystander.character), scopeOf(bAlt)],
         () => chat.sendChatMessage(b.userId, bAlt.id, { channel: "general", text: "after block" }),
       );
       const after = posted(result);
-      expect(received.get(a.character.id)).toEqual([]);
-      expect(received.get(aAlt.id)).toEqual([]);
+      const placeholder = (message: VisibleChatMessageView) => ({
+        redacted: true,
+        id: message.id,
+        seq: message.seq,
+        channel: message.channel,
+        promoted: message.promoted,
+        senderName: message.senderName,
+        sentAt: message.sentAt,
+      });
+      expect(received.get(a.character.id)!.map((e) => e.data)).toEqual([placeholder(after)]);
+      expect(received.get(aAlt.id)!.map((e) => e.data)).toEqual([placeholder(after)]);
       expect(received.get(bystander.character.id)!.map((e) => e.data)).toEqual([after]);
       expect(received.get(bAlt.id)!.map((e) => e.data)).toEqual([after]);
 
       for (const viewer of [a.character.id, aAlt.id]) {
         const page = await chat.readChatHistory(a.userId, viewer, { channel: "general" });
-        expect(page.messages.some((m) => m.id === before.id || m.id === after.id)).toBe(false);
+        const ours = page.messages.filter((m) => m.id === before.id || m.id === after.id);
+        expect(ours).toEqual([placeholder(before), placeholder(after)]);
+        expect(JSON.stringify(page)).not.toMatch(/pre-block|after block/);
       }
       const seen = await chat.readChatHistory(bystander.userId, bystander.character.id, {
         channel: "general",
@@ -702,7 +714,7 @@ suite("issue #247 Whispers, Block, and Report (real PostgreSQL)", () => {
       count: number,
     ) {
       const start = Date.now() - 60 * 60_000;
-      const out: ChatMessageView[] = [];
+      const out: VisibleChatMessageView[] = [];
       for (let index = 0; index < count; index += 1) {
         out.push(
           posted(
@@ -937,7 +949,7 @@ suite("issue #247 Whispers, Block, and Report (real PostgreSQL)", () => {
       ).rejects.toThrow();
     });
 
-    it("Report + Block on a message blocks and hides the sender at once", async () => {
+    it("Report + Block on a message blocks and redacts the sender at once", async () => {
       const reporter = await player();
       const reported = await player();
       const [message] = await publicRun(reported, "general", "rb", 1);
@@ -951,7 +963,8 @@ suite("issue #247 Whispers, Block, and Report (real PostgreSQL)", () => {
       const page = await chat.readChatHistory(reporter.userId, reporter.character.id, {
         channel: "general",
       });
-      expect(page.messages.some((m) => m.id === message!.id)).toBe(false);
+      expect(page.messages.find((m) => m.id === message!.id)).toMatchObject({ redacted: true });
+      expect(JSON.stringify(page)).not.toContain(message!.body);
     });
 
     it("keeps preserved evidence after ordinary retention deletes the messages", async () => {

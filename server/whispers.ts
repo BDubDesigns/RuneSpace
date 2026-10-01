@@ -1,4 +1,4 @@
-import { and, count, desc, eq, gt, gte, inArray, lt, ne, sql } from "drizzle-orm";
+import { and, count, desc, eq, gt, gte, inArray, isNotNull, lt, ne, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { db } from "@/db";
 import {
@@ -44,6 +44,12 @@ import { CHARACTER_TARGET_NOT_FOUND, resolveCharacterTarget } from "@/server/soc
  * any undeliverable Whisper. A send commits first and only then is published
  * to both participant characters; a recipient who is offline reads it from
  * history on return. Unread is durable per recipient character.
+ *
+ * Either side may hide a conversation from its own inbox (#261). Hiding is a
+ * marker on that side's participant row only: no message is deleted or
+ * altered, the other side sees no change, and Report evidence and moderation
+ * reads are untouched. The next message from either character, or reopening
+ * the conversation by name or from a chat sender, brings it back.
  */
 
 /** Refusal for a Whisper read that names no addressable character. */
@@ -118,7 +124,29 @@ export async function openWhisper(
   const other = await resolveCharacterTarget(target, me, { names: "anywhere" });
   if (!other) return { error: NO_SUCH_CHARACTER };
   if (other.playerAccountId === me.playerAccountId) return { error: SELF_REFUSAL };
+  // Reopening a conversation this character hid (#261) puts it back in its
+  // own inbox. Nothing is sent and the other side is not touched.
+  const conversationId = await conversationIdFor(db, me.id, other.id);
+  if (conversationId) {
+    const unhidden = await db
+      .update(whisperParticipants)
+      .set({ hiddenThroughSeq: null })
+      .where(
+        and(
+          eq(whisperParticipants.conversationId, conversationId),
+          eq(whisperParticipants.characterId, me.id),
+          isNotNull(whisperParticipants.hiddenThroughSeq),
+        ),
+      )
+      .returning({ conversationId: whisperParticipants.conversationId });
+    if (unhidden.length > 0) publishInboxChanged(me.id, other.id);
+  }
   return { status: "ready", peer: await peerOf(me, other) };
+}
+
+/** Tell the character's tabs to re-read their inbox. An invalidation only. */
+function publishInboxChanged(characterId: string, withCharacterId: string) {
+  publishRealtimeEvent({ kind: "character", characterId }, "whisper.read", { withCharacterId });
 }
 
 /** Send one Whisper from the active character. */
@@ -275,17 +303,49 @@ export async function markWhisperRead(
       ),
     )
     .returning({ lastReadSeq: whisperParticipants.lastReadSeq });
-  if (advanced.length > 0) {
-    publishRealtimeEvent({ kind: "character", characterId: me.id }, "whisper.read", {
-      withCharacterId: other.id,
-    });
-  }
+  if (advanced.length > 0) publishInboxChanged(me.id, other.id);
   return { status: "read" };
 }
 
 /**
+ * Hide the conversation with `withCharacterId` from the active character's
+ * inbox (#261) through `throughSeq` — the newest message this tab showed,
+ * capped at the conversation's newest — and mark everything through it read,
+ * so a hidden conversation never holds unread. A message newer than that, from
+ * either side, shows the conversation again; so does reopening it. Only this
+ * character's participant row changes: no message is deleted, and the other
+ * side's inbox and unread are exactly as they were.
+ */
+export async function hideWhisperConversation(
+  userId: string,
+  characterId: string,
+  request: { withCharacterId: string; throughSeq: number },
+): Promise<{ status: "hidden" }> {
+  const me = await requirePlayableOwnedCharacter(userId, characterId);
+  const other = await requirePeer(me, request.withCharacterId);
+  const conversationId = await conversationIdFor(db, me.id, other.id);
+  if (!conversationId) return { status: "hidden" };
+  const target = sql`least(${request.throughSeq}::bigint, (select coalesce(max(${chatMessages.seq}), 0) from ${chatMessages} where ${chatMessages.conversationId} = ${conversationId}))`;
+  await db
+    .update(whisperParticipants)
+    .set({
+      hiddenThroughSeq: target,
+      lastReadSeq: sql`greatest(${whisperParticipants.lastReadSeq}, ${target})`,
+    })
+    .where(
+      and(
+        eq(whisperParticipants.conversationId, conversationId),
+        eq(whisperParticipants.characterId, me.id),
+      ),
+    );
+  publishInboxChanged(me.id, other.id);
+  return { status: "hidden" };
+}
+
+/**
  * The active character's conversations with at least one retained Whisper,
- * most recent first, with each one's durable unread count.
+ * most recent first, with each one's durable unread count. A conversation the
+ * character hid (#261) is left out until a newer message arrives.
  */
 export async function readWhisperInbox(
   userId: string,
@@ -300,6 +360,7 @@ export async function readWhisperInbox(
     .select({
       conversationId: whisperParticipants.conversationId,
       lastReadSeq: whisperParticipants.lastReadSeq,
+      hiddenThroughSeq: whisperParticipants.hiddenThroughSeq,
       peerId: characters.id,
       peerName: characters.displayName,
       peerAccountId: other.playerAccountId,
@@ -360,6 +421,7 @@ export async function readWhisperInbox(
     .flatMap((row) => {
       const last = latestBy.get(row.conversationId);
       if (!last) return [];
+      if (row.hiddenThroughSeq !== null && last.seq <= row.hiddenThroughSeq) return [];
       return [
         {
           peer: {

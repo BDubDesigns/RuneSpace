@@ -1,5 +1,6 @@
 import { z } from "zod";
-import { CHAT_CHANNELS } from "@/game/domain/chat";
+import { CHAT_CHANNELS, CHAT_POLICY } from "@/game/domain/chat";
+import { CharacterTargetSchema } from "@/game/schemas/whispers";
 
 /**
  * Public chat request and wire contracts (issue #246), shared by the server
@@ -17,15 +18,36 @@ export const ChatChannelSchema = z.enum(CHAT_CHANNELS);
  */
 const MessageTextSchema = z.string().max(4_000);
 
+/**
+ * The characters a message `@mentions` (#261), as the composer's selection
+ * named them: a chat sender or Whisper peer by stable id, a Nearby Player by
+ * exact name. The server resolves each one and refuses the send unless the
+ * body shows `@` and that character's current name.
+ */
+const MentionsSchema = z.array(CharacterTargetSchema).max(CHAT_POLICY.maxMentions).optional();
+
 export const SendChatMessageRequestSchema = z.object({
   characterId: z.string().uuid(),
   channel: ChatChannelSchema,
   text: MessageTextSchema,
+  mentions: MentionsSchema,
 });
 
 export const PostPromotedTradeAdRequestSchema = z.object({
   characterId: z.string().uuid(),
   text: MessageTextSchema,
+  mentions: MentionsSchema,
+});
+
+export const ChatMentionsQuerySchema = z.object({
+  characterId: z.string().uuid(),
+});
+
+export const MarkChatMentionsReadRequestSchema = z.object({
+  characterId: z.string().uuid(),
+  channel: ChatChannelSchema,
+  /** The newest message `seq` this tab has shown in that feed. */
+  throughSeq: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER),
 });
 
 export const ChatHistoryQuerySchema = z.object({
@@ -36,11 +58,22 @@ export const ChatHistoryQuerySchema = z.object({
 });
 
 /**
+ * One character a public message mentions (#261): its stable id, and its name
+ * as the message showed it at send — never its current name.
+ */
+export const ChatMentionViewSchema = z.object({
+  characterId: z.string().min(1),
+  name: z.string().min(1),
+});
+export type ChatMentionView = z.infer<typeof ChatMentionViewSchema>;
+
+/**
  * One public message as a viewer receives it. `seq` is the durable feed order
  * and pagination cursor; `id` is the stable message identity. Account identity
  * is deliberately absent: it never leaves the server.
  */
-export const ChatMessageViewSchema = z.object({
+export const VisibleChatMessageViewSchema = z.object({
+  redacted: z.literal(false),
   id: z.string().min(1),
   seq: z.number().int().positive(),
   channel: ChatChannelSchema,
@@ -50,9 +83,44 @@ export const ChatMessageViewSchema = z.object({
   sentAt: z.string().datetime(),
   /** A promoted Trade ad: one record, shown in both General and Trade. */
   promoted: z.boolean(),
+  /** The characters it mentions; empty for an ordinary message. */
+  mentions: z.array(ChatMentionViewSchema),
 });
+export type VisibleChatMessageView = z.infer<typeof VisibleChatMessageViewSchema>;
 
+/**
+ * A message from an account the viewer blocked (#261), redacted by the server
+ * for that viewer alone: it keeps its place in the timeline and its sender's
+ * name at send, and carries no body, ad text, mentions, or sender id. `channel`
+ * and `promoted` say only which feeds it occupies; it renders the same either
+ * way.
+ */
+export const RedactedChatMessageViewSchema = z.object({
+  redacted: z.literal(true),
+  id: z.string().min(1),
+  seq: z.number().int().positive(),
+  channel: ChatChannelSchema,
+  promoted: z.boolean(),
+  senderName: z.string().min(1),
+  sentAt: z.string().datetime(),
+});
+export type RedactedChatMessageView = z.infer<typeof RedactedChatMessageViewSchema>;
+
+export const ChatMessageViewSchema = z.discriminatedUnion("redacted", [
+  VisibleChatMessageViewSchema,
+  RedactedChatMessageViewSchema,
+]);
 export type ChatMessageView = z.infer<typeof ChatMessageViewSchema>;
+
+/**
+ * The viewer character's unread `@mentions` (#261). Each feed counts the
+ * unread mentions it shows — a promoted ad shows in both — and `unreadTotal`
+ * counts each mentioned message once.
+ */
+export type ChatMentionsView = {
+  unread: Record<z.infer<typeof ChatChannelSchema>, number>;
+  unreadTotal: number;
+};
 
 /**
  * The account's authoritative send budget at response time: for each recent
@@ -86,12 +154,14 @@ export type ChatSendRefusalReason =
   | "prohibited_term"
   | "socially_restricted"
   | "insufficient_credits"
-  | "ad_cooldown";
+  | "ad_cooldown"
+  | "invalid_mention"
+  | "blocked_by_you";
 
 export type ChatSendResult =
   | {
       status: "sent";
-      message: ChatMessageView;
+      message: VisibleChatMessageView;
       budget: ChatSendBudget;
       promotedAd: PromotedAdStatus;
     }
@@ -108,7 +178,17 @@ export type ChatSendResult =
 // `"chat.message"` is typed with this payload everywhere.
 declare module "@/game/schemas/realtime" {
   interface RealtimeEventMap {
-    /** A public General/Trade message committed; a promoted ad arrives once. */
+    /**
+     * A public General/Trade message committed; a promoted ad arrives once.
+     * The sender's blockers receive the redacted form instead (#261).
+     */
     "chat.message": ChatMessageView;
+    /**
+     * A message mentioning this character committed (#261). An invalidation
+     * only: the browser re-reads its mention attention.
+     */
+    "chat.mention": Record<string, never>;
+    /** The character read its mentions on some tab; its other tabs re-read. */
+    "chat.mentions.read": Record<string, never>;
   }
 }

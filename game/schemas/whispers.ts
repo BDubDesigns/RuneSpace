@@ -43,6 +43,16 @@ export const MarkWhisperReadRequestSchema = z.object({
   throughSeq: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER),
 });
 
+/**
+ * Hide a conversation from the active character's inbox (#261) through the
+ * newest message this tab showed; anything newer keeps it visible.
+ */
+export const HideWhisperConversationRequestSchema = z.object({
+  characterId: z.string().uuid(),
+  withCharacterId: z.string().uuid(),
+  throughSeq: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER),
+});
+
 export const WhisperInboxQuerySchema = z.object({
   characterId: z.string().uuid(),
 });
@@ -125,8 +135,8 @@ declare module "@/game/schemas/realtime" {
     /** A Whisper committed; sent to both participant characters. */
     "whisper.message": WhisperMessageView;
     /**
-     * The character read a conversation on some tab; its other tabs re-read
-     * their unread state. An invalidation only: it carries no state.
+     * The character read or hid (#261) a conversation on some tab; its other
+     * tabs re-read their inbox. An invalidation only: it carries no state.
      */
     "whisper.read": { withCharacterId: string };
   }
