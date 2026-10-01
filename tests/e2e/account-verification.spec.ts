@@ -100,6 +100,40 @@ test.describe("account verification", () => {
     await expect(page.getByText(hero, { exact: true }).first()).toBeVisible();
   });
 
+  test("the one-account policy is visible above the form at phone and desktop widths", async ({
+    page,
+  }) => {
+    for (const viewport of [
+      { width: 390, height: 844 },
+      { width: 1280, height: 800 },
+    ]) {
+      await page.setViewportSize(viewport);
+      await page.goto("/register");
+
+      const policy = page.getByTestId("one-account-policy");
+      await expect(policy.getByRole("heading", { name: "One player, one account" })).toBeVisible();
+      await expect(policy.getByText("RuneSpace allows one account per player.")).toBeVisible();
+      await expect(policy.getByText("Each account supports up to three characters.")).toBeVisible();
+      await expect(
+        policy.getByText(
+          "Creating or using multiple accounts breaks the game rules and may get every account you control banned.",
+        ),
+      ).toBeVisible();
+
+      // The rule precedes the primary action rather than trailing it.
+      const policyBox = await policy.boundingBox();
+      const submitBox = await page.getByRole("button", { name: "Create account" }).boundingBox();
+      expect(policyBox).not.toBeNull();
+      expect(submitBox).not.toBeNull();
+      expect(policyBox!.y + policyBox!.height).toBeLessThan(submitBox!.y);
+
+      const noOverflow = await page.evaluate(
+        () => document.documentElement.scrollWidth <= window.innerWidth,
+      );
+      expect(noOverflow).toBe(true);
+    }
+  });
+
   test("an unverified sign-in sends no email and offers the explicit resend with its cooldown", async ({
     page,
   }) => {
