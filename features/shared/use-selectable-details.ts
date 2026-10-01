@@ -5,7 +5,7 @@ import { toggleSelection } from "./selectable-details";
 
 /**
  * The one shared selectable-item interaction contract behind the Inventory
- * drawer and the Cargo Hold storage grids: a grid of selectable tiles plus a
+ * drawer and the shared storage transfer surface (Cargo Hold today): a grid of selectable tiles plus a
  * single contextual details/action area for whatever is currently selected.
  *
  * It owns exactly the behavior both surfaces must keep identical:
@@ -24,7 +24,7 @@ import { toggleSelection } from "./selectable-details";
  * loading, capacity and mass validation, and every server mutation stay with
  * the feature that owns those rules. Selection identity stays there too —
  * callers supply `resolve` and `isSameSelection` — because an Inventory
- * selection and a Cargo selection are deliberately different shapes.
+ * selection and a storage selection are deliberately different shapes.
  */
 export type SelectableDetails<TSelection, TResolved> = {
   /** The current advisory selection identity, or `undefined` when nothing is open. */

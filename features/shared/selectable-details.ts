@@ -1,10 +1,10 @@
 /**
  * The pure half of the shared selectable-item interaction contract used by the
- * Inventory drawer and the Cargo Hold storage grids (see
+ * Inventory drawer and the shared storage transfer surface (see
  * `features/shared/use-selectable-details.ts` for the interaction behavior).
  *
  * Selection identity deliberately stays with each domain: an Inventory
- * selection is a kind plus an id, while a Cargo selection also carries the
+ * selection is a kind plus an id, while a storage selection also carries the
  * storage area it belongs to. Only the toggle rule itself is shared, so the
  * two surfaces cannot drift apart on what re-selecting an open tile means.
  */

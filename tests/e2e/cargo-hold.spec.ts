@@ -92,7 +92,7 @@ test("keeps damaged Cargo Hold locked and transfers completed storage on mobile 
   );
 
   const cargoPanel = page.locator("[data-cargo-hold]");
-  const selection = cargoPanel.locator("[data-cargo-selection]");
+  const selection = cargoPanel.locator("[data-storage-selection]");
   const lockedStatus = cargoPanel.locator('[data-cargo-hold-status="locked"]');
   const restoredStatus = cargoPanel.locator('[data-cargo-hold-status="restored"]');
   const operationalStatus = cargoPanel.locator('[data-cargo-hold-status="operational"]');
@@ -218,7 +218,7 @@ test("keeps damaged Cargo Hold locked and transfers completed storage on mobile 
   await cargoPanel.getByRole("button", { name: "OPEN CARGO HOLD" }).click();
   await expect(cargoPanel.locator("[data-cargo-storage]")).toBeVisible();
   await expect(cargoPanel.getByRole("button", { name: "CLOSE CARGO HOLD" })).toBeVisible();
-  await expect(cargoPanel.locator("[data-cargo-mode='cargo']")).toContainText(
+  await expect(cargoPanel.locator("[data-storage-area='stored']")).toContainText(
     "No occupied Cargo Hold items",
   );
 
@@ -234,23 +234,23 @@ test("keeps damaged Cargo Hold locked and transfers completed storage on mobile 
   await expect(cargoPanel.getByRole("button", { name: "DEPOSIT STACK" })).toHaveCount(0);
   await expect(cargoPanel.getByRole("button", { name: "DEPOSIT 1" })).toHaveCount(0);
   await expect(selection).toHaveCount(0);
-  const carriedSection = cargoPanel.locator("[data-cargo-mode='carried']");
+  const carriedSection = cargoPanel.locator("[data-storage-area='carried']");
   await carriedSection.getByRole("button", { name: /Ferrite Shale/ }).click();
   await expect(selection).toBeVisible();
   await expect(selection.getByRole("button", { name: "DEPOSIT 1" })).toBeVisible();
   await selection.getByRole("button", { name: "DEPOSIT STACK" }).click();
   await expect(cargoPanel).toContainText("Cargo Hold transfer complete.");
-  await expect(cargoPanel.locator("[data-cargo-mode='cargo']")).toContainText("Ferrite Shale");
-  await expect(cargoPanel.locator("[data-cargo-mode='cargo']")).toContainText("1 / 32");
+  await expect(cargoPanel.locator("[data-storage-area='stored']")).toContainText("Ferrite Shale");
+  await expect(cargoPanel.locator("[data-storage-area='stored']")).toContainText("1 / 32");
   // Fully deposited: the selection reconciles away and its action area closes.
   await expect(selection).toHaveCount(0);
-  await expect(cargoPanel.locator("[data-cargo-mode='carried']")).toContainText(
+  await expect(cargoPanel.locator("[data-storage-area='carried']")).toContainText(
     "No occupied carried items.",
   );
 
   await page.setViewportSize({ width: 1280, height: 800 });
-  await expect(cargoPanel.locator("[data-cargo-mode='carried']")).toBeVisible();
-  await expect(cargoPanel.locator("[data-cargo-mode='cargo']")).toBeVisible();
+  await expect(cargoPanel.locator("[data-storage-area='carried']")).toBeVisible();
+  await expect(cargoPanel.locator("[data-storage-area='stored']")).toBeVisible();
   await captureReviewScreenshot(page, "cargo-desktop-storage.png");
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(1280);
 
@@ -269,15 +269,15 @@ test("keeps damaged Cargo Hold locked and transfers completed storage on mobile 
   await expect(cargoPanel).toBeVisible();
   await expectSteadyState("1 / 32");
   await cargoPanel.getByRole("button", { name: "OPEN CARGO HOLD" }).click();
-  await expect(cargoPanel.locator("[data-cargo-mode='cargo']")).toContainText("Ferrite Shale");
+  await expect(cargoPanel.locator("[data-storage-area='stored']")).toContainText("Ferrite Shale");
   await expect(cargoPanel.getByRole("button", { name: "WITHDRAW STACK" })).toHaveCount(0);
-  const cargoSection = cargoPanel.locator("[data-cargo-mode='cargo']");
+  const cargoSection = cargoPanel.locator("[data-storage-area='stored']");
   await cargoSection.getByRole("button", { name: /Ferrite Shale/ }).click();
   await expect(selection).toBeVisible();
   await expect(selection.getByRole("button", { name: "WITHDRAW 1" })).toBeVisible();
   await selection.getByRole("button", { name: "WITHDRAW STACK" }).click();
   await expect(cargoPanel).toContainText("Cargo Hold transfer complete.");
-  await expect(cargoPanel.locator("[data-cargo-mode='carried']")).toContainText("Ferrite Shale");
+  await expect(cargoPanel.locator("[data-storage-area='carried']")).toContainText("Ferrite Shale");
   await expect(selection).toHaveCount(0);
 });
 
@@ -344,15 +344,35 @@ test("renders a dense Cargo Hold as a compact selectable grid (Issue #151)", asy
 
   await page.reload();
   const cargoPanel = page.locator("[data-cargo-hold]");
-  const selection = cargoPanel.locator("[data-cargo-selection]");
+  const selection = cargoPanel.locator("[data-storage-selection]");
   await expect(cargoPanel.locator('[data-cargo-hold-status="operational"]')).toBeVisible();
   await cargoPanel.getByRole("button", { name: "OPEN CARGO HOLD" }).click();
-  const cargoSection = cargoPanel.locator("[data-cargo-mode='cargo']");
-  const carriedSection = cargoPanel.locator("[data-cargo-mode='carried']");
+  const cargoSection = cargoPanel.locator("[data-storage-area='stored']");
+  const carriedSection = cargoPanel.locator("[data-storage-area='carried']");
 
   // Mobile portrait: switch to the CARGO tab to view the dense grid.
   await cargoPanel.getByRole("tab", { name: /^CARGO/ }).click();
   await expect(cargoSection).toBeVisible();
+
+  // The phone view belongs to the Cargo Hold host, not the storage surface:
+  // closing and reopening the hold keeps the CARGO tab, while the selection is
+  // still cleared (#282).
+  await cargoSection.getByRole("button", { name: /Ferrite Shale/ }).click();
+  await expect(selection).toBeVisible();
+  await cargoPanel.getByRole("button", { name: "CLOSE CARGO HOLD" }).click();
+  await expect(cargoPanel.locator("[data-cargo-storage]")).toHaveCount(0);
+  await cargoPanel.getByRole("button", { name: "OPEN CARGO HOLD" }).click();
+  await expect(cargoPanel.getByRole("tab", { name: /^CARGO/ })).toHaveAttribute(
+    "aria-selected",
+    "true",
+  );
+  await expect(cargoPanel.getByRole("tab", { name: /^CARRIED/ })).toHaveAttribute(
+    "aria-selected",
+    "false",
+  );
+  await expect(cargoSection).toBeVisible();
+  await expect(carriedSection).toBeHidden();
+  await expect(selection).toHaveCount(0);
 
   // Nine occupied Cargo Hold entries (4 stacks + 5 unique instances) render as
   // a compact tile grid, never as one large row per item.
@@ -398,7 +418,7 @@ test("renders a dense Cargo Hold as a compact selectable grid (Issue #151)", asy
   // the selected item's action-area heading, so a keyboard user reaches the
   // Withdraw controls immediately instead of tabbing through the rest of a
   // dense grid (the same reveal the Inventory drawer performs).
-  const selectionHeading = selection.locator("[data-cargo-selection-heading]");
+  const selectionHeading = selection.locator("[data-storage-selection-heading]");
   await expect(selectionHeading).toHaveAttribute("tabindex", "-1");
   await expect
     .poll(() => selectionHeading.evaluate((element) => element === document.activeElement))
@@ -510,5 +530,34 @@ test("renders a dense Cargo Hold as a compact selectable grid (Issue #151)", asy
   await expect(carriedSection).toContainText("No occupied carried items.");
   await expect
     .poll(() => carriedSection.evaluate((element) => element === document.activeElement))
+    .toBe(true);
+
+  // Withdrawing a unique item completes the round trip through the extracted
+  // callbacks: one of the three Cargo Salvage Cutters (the deposited one is
+  // indistinguishable by name) moves back to Carried, the selection reconciles
+  // away, both occupancies update from the authoritative state, and focus
+  // returns to a surviving Cargo tile.
+  const cargoCutterTile = cargoSection.getByRole("button", { name: "Salvage Cutter" }).first();
+  await expect(cargoSection.getByRole("button", { name: "Salvage Cutter" })).toHaveCount(3);
+  await cargoCutterTile.click();
+  await expect(selection).toContainText("Salvage Cutter");
+  await expect(selection.getByRole("button", { name: "WITHDRAW ITEM" })).toBeVisible();
+  await expect(selection.getByRole("button", { name: /DEPOSIT/ })).toHaveCount(0);
+  await selection.getByRole("button", { name: "WITHDRAW ITEM" }).click();
+  await expect(cargoPanel).toContainText("Cargo Hold transfer complete.");
+  await expect(selection).toHaveCount(0);
+  await expect(cargoSection).toContainText("9 / 32");
+  await expect(cargoSection.locator("button[aria-pressed]")).toHaveCount(9);
+  await expect(cargoSection.getByRole("button", { name: "Salvage Cutter" })).toHaveCount(2);
+  await expect(carriedSection).toContainText("1 / 8");
+  await expect(carriedSection.getByRole("button", { name: "Salvage Cutter" })).toHaveCount(1);
+  await expect(carriedSection).not.toContainText("No occupied carried items.");
+  await expect
+    .poll(() =>
+      cargoSection.evaluate((element) => {
+        const active = document.activeElement;
+        return active instanceof HTMLButtonElement && element.contains(active);
+      }),
+    )
     .toBe(true);
 });

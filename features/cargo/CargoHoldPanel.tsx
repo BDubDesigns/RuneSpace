@@ -7,9 +7,7 @@ import { MissionActionButton } from "@/components/ui/MissionActionButton";
 import { StatusMeter } from "@/components/ui/StatusMeter";
 import { ActivityPanel } from "@/features/shared/ActivityPanel";
 import { ActivityContextRow, SkillProgressRow } from "@/features/shared/activity-context";
-import { ItemVisual } from "@/components/items/ItemVisual";
-import { InventoryStackVisual } from "@/components/items/InventoryStackVisual";
-import { getEffectiveGameBalance, getItemMaximumCharge } from "@/game/config/balance";
+import { getEffectiveGameBalance } from "@/game/config/balance";
 import { ACTION_IDS, GAME_TICK_MS, REPAIR_TARGET_IDS } from "@/game/config/foundations";
 import type {
   CargoHoldTransferActionResult,
@@ -29,14 +27,13 @@ import type { PlayGameplayState } from "@/server/play";
 import { deriveMissionGuidanceTargets } from "@/game/domain/missions";
 import { CleanPassControl } from "@/features/welding/CleanPassControl";
 import { usePlay } from "@/features/play/PlayContext";
+import { CARGO_HOLD_STORAGE_LABELS, projectCargoHoldStorage } from "@/features/cargo/cargo-storage";
+import type { StorageArea } from "@/features/storage/storage-selection";
 import {
-  resolveCargoSelection,
-  sameCargoSelection,
-  type CargoArea,
-  type CargoSelection,
-  type ResolvedCargoSelection,
-} from "@/features/cargo/cargo-selection";
-import { useSelectableDetails } from "@/features/shared/use-selectable-details";
+  StorageTransferSurface,
+  type StorageTransferAdapter,
+  type StorageTransferHooks,
+} from "@/features/storage/StorageTransferSurface";
 
 /**
  * The exact contribution the player is being asked to confirm, keyed by item ID
@@ -46,26 +43,7 @@ import { useSelectableDetails } from "@/features/shared/use-selectable-details";
  */
 type Confirmation = Readonly<Record<string, number>>;
 
-type StorageMode = "carried" | "cargo";
-
 const COMPLETION_FEEDBACK_DURATION_MS = 3_600;
-
-/**
- * The two storage regions are two inventories, so each one is drawn as its own
- * bounded sub-panel rather than as a bare heading above a grid (#199). Both
- * regions use the identical treatment — the separation comes from grouping and
- * hierarchy, never from a colour that would imply the items inside differ.
- * Panel surface over the activity's raised surface is the existing nesting step
- * used by every other block inside an activity.
- */
-const CARGO_REGION_CLASS =
-  "h-full border border-[color:var(--rs-border-structural)] bg-[color:var(--rs-surface-panel)] p-3";
-const CARGO_REGION_HEADER_CLASS =
-  "flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 border-b border-[color:var(--rs-border-subtle)] pb-2";
-const CARGO_REGION_TITLE_CLASS =
-  "font-display text-sm font-bold uppercase tracking-[0.16em] text-[color:var(--rs-text-primary)]";
-const CARGO_REGION_COUNT_CLASS =
-  "font-display text-xs uppercase tracking-wide text-[color:var(--rs-text-secondary)]";
 
 function transferMessage(result: CargoHoldTransferActionResult): string | undefined {
   if ("error" in result) return result.error;
@@ -97,32 +75,15 @@ export function CargoHoldPanel() {
   const { enqueueForeground, releaseCommand, acceptState, state } = usePlay();
   const [confirmation, setConfirmation] = useState<Confirmation>();
   const [storageOpen, setStorageOpen] = useState(false);
-  const [storageMode, setStorageMode] = useState<StorageMode>("carried");
+  // Held here, not in the surface, so the phone view survives closing and
+  // reopening the hold exactly as it did before the extraction.
+  const [storageMode, setStorageMode] = useState<StorageArea>("carried");
   const [message, setMessage] = useState<string>();
   const [pending, setPending] = useState<string>();
   const [completionFeedbackVisible, setCompletionFeedbackVisible] = useState(false);
   const [completionAnnouncement, setCompletionAnnouncement] = useState("");
   const [now, setNow] = useState(Date.now());
   const [, startTransition] = useTransition();
-  // Refs the section root (not the inner tile grid) so a fallback focus
-  // target always exists even when the area has no occupied tiles left.
-  const carriedGridRef = useRef<HTMLElement>(null);
-  const cargoGridRef = useRef<HTMLElement>(null);
-  // Selection, authoritative reconciliation, the explicit-selection reveal, and
-  // post-transfer focus restoration all come from the shared selectable-details
-  // contract shared with the Inventory drawer; Deposit/Withdraw stays here.
-  const {
-    armFocusReturn,
-    clear: clearSelection,
-    detailsHeadingRef,
-    detailsRef,
-    resolved: resolvedSelection,
-    select,
-    selection: selected,
-  } = useSelectableDetails<CargoSelection, ResolvedCargoSelection>({
-    resolve: (selection) => resolveCargoSelection(state, selection),
-    isSameSelection: sameCargoSelection,
-  });
   const balance = getEffectiveGameBalance();
   const repair = state.cargoHold.repair;
   const previousCompletion = useRef(repair.complete);
@@ -246,7 +207,13 @@ export function CargoHoldPanel() {
     });
   }
 
-  function runTransfer(area: CargoArea, action: () => Promise<CargoHoldTransferActionResult>) {
+  // The Cargo Hold's authoritative transfer commands, handed to the shared
+  // storage surface. The command gate, pending/error feedback and Play-state
+  // reconciliation stay here with the rest of this ship-specific host.
+  function runTransfer(
+    action: () => Promise<CargoHoldTransferActionResult>,
+    { armFocusReturn }: StorageTransferHooks,
+  ) {
     enqueueForeground(() => {
       setPending("transfer");
       startTransition(async () => {
@@ -258,9 +225,7 @@ export function CargoHoldPanel() {
             // the authoritative state that may vacate the selected tile is
             // accepted — never on submission, so a mid-flight render can never
             // consume the arm before the real reconciliation happens.
-            armFocusReturn(() =>
-              area === "carried" ? carriedGridRef.current : cargoGridRef.current,
-            );
+            armFocusReturn();
             acceptState(result.state);
             setMessage(transferMessage(result));
           }
@@ -274,264 +239,28 @@ export function CargoHoldPanel() {
     });
   }
 
-  // Selecting the already-selected tile toggles its action area closed; any
-  // other selection (including one in the other area) replaces it.
-  function toggleSelect(next: CargoSelection) {
-    setMessage(undefined);
-    select(next);
-  }
-
-  function stackTransferButtons(stackId: string, quantity: number, area: CargoArea) {
-    const direction = area === "carried" ? "deposit" : "withdraw";
-    const action = (mode: "one" | "stack") => {
-      const input = {
-        characterId: state.characterId,
-        stackId,
-        mode,
-        expectedQuantity: quantity,
-      };
-      runTransfer(area, () =>
-        direction === "deposit" ? depositCargoStackAction(input) : withdrawCargoStackAction(input),
-      );
-    };
-    return (
-      <div className="mt-3 flex flex-wrap gap-2">
-        <ActionButton
-          className="px-3"
-          disabled={Boolean(pending)}
-          intent="secondary"
-          onClick={() => action("one")}
-        >
-          {direction === "deposit" ? "DEPOSIT 1" : "WITHDRAW 1"}
-        </ActionButton>
-        <ActionButton
-          className="px-3"
-          disabled={Boolean(pending)}
-          intent="secondary"
-          onClick={() => action("stack")}
-        >
-          {direction === "deposit" ? "DEPOSIT STACK" : "WITHDRAW STACK"}
-        </ActionButton>
-      </div>
-    );
-  }
-
-  function uniqueTransferButton(itemInstanceId: string, area: CargoArea) {
-    return (
-      <div className="mt-3">
-        <ActionButton
-          className="px-3"
-          disabled={Boolean(pending)}
-          intent="secondary"
-          onClick={() =>
-            runTransfer(area, () =>
-              area === "carried"
-                ? depositCargoUniqueItemAction({ characterId: state.characterId, itemInstanceId })
-                : withdrawCargoUniqueItemAction({ characterId: state.characterId, itemInstanceId }),
-            )
-          }
-        >
-          {area === "carried" ? "DEPOSIT ITEM" : "WITHDRAW ITEM"}
-        </ActionButton>
-      </div>
-    );
-  }
-
-  function renderCarried() {
-    const totalSlots = state.inventory.slotsUsed + state.inventory.slotsAvailable;
-    return (
-      <section
-        aria-label="Carried Inventory"
-        className={CARGO_REGION_CLASS}
-        data-cargo-mode="carried"
-        ref={carriedGridRef}
-        tabIndex={-1}
-      >
-        <div className={CARGO_REGION_HEADER_CLASS}>
-          <h3 className={CARGO_REGION_TITLE_CLASS}>CARRIED</h3>
-          <span className={CARGO_REGION_COUNT_CLASS}>
-            {state.inventory.slotsUsed} / {totalSlots}
-          </span>
-        </div>
-        {state.inventory.stacks.length || state.inventory.uniqueItems.length ? (
-          <div aria-label="Carried items" className="mt-3 grid grid-cols-3 gap-2 sm:grid-cols-4">
-            {state.inventory.stacks.map((stack) => (
-              <InventoryStackVisual
-                interactive
-                itemId={stack.itemId}
-                key={stack.id}
-                name={stack.name}
-                onSelect={() => toggleSelect({ area: "carried", kind: "stack", id: stack.id })}
-                quantity={stack.quantity}
-                selected={
-                  selected?.area === "carried" &&
-                  selected.kind === "stack" &&
-                  selected.id === stack.id
-                }
-                stackLimit={stack.stackLimit}
-              />
-            ))}
-            {state.inventory.uniqueItems.map((item) => (
-              <ItemVisual
-                accessibleLabel={item.name}
-                additionalDescription={
-                  item.currentCharge !== undefined
-                    ? `${item.currentCharge} of ${getItemMaximumCharge(item.itemId)} charges remaining`
-                    : undefined
-                }
-                badge={
-                  item.currentCharge !== undefined
-                    ? `${item.currentCharge}/${getItemMaximumCharge(item.itemId)}`
-                    : undefined
-                }
-                interactive
-                itemId={item.itemId}
-                key={item.id}
-                name={item.name}
-                onSelect={() => toggleSelect({ area: "carried", kind: "unique", id: item.id })}
-                selected={
-                  selected?.area === "carried" &&
-                  selected.kind === "unique" &&
-                  selected.id === item.id
-                }
-              />
-            ))}
-          </div>
-        ) : (
-          <div className="mt-3">
-            <Feedback>No occupied carried items.</Feedback>
-          </div>
-        )}
-      </section>
-    );
-  }
-
-  function renderCargo() {
-    return (
-      <section
-        aria-label="Cargo Hold storage"
-        className={CARGO_REGION_CLASS}
-        data-cargo-mode="cargo"
-        ref={cargoGridRef}
-        tabIndex={-1}
-      >
-        <div className={CARGO_REGION_HEADER_CLASS}>
-          <h3 className={CARGO_REGION_TITLE_CLASS}>CARGO</h3>
-          <span className={CARGO_REGION_COUNT_CLASS}>
-            {state.cargoHold.slotsUsed} / {state.cargoHold.capacitySlots}
-          </span>
-        </div>
-        {state.cargoHold.stacks.length || state.cargoHold.uniqueItems.length ? (
-          <div aria-label="Cargo Hold items" className="mt-3 grid grid-cols-3 gap-2 sm:grid-cols-4">
-            {state.cargoHold.stacks.map((stack) => (
-              <InventoryStackVisual
-                interactive
-                itemId={stack.itemId}
-                key={stack.id}
-                name={stack.name}
-                onSelect={() => toggleSelect({ area: "cargo", kind: "stack", id: stack.id })}
-                quantity={stack.quantity}
-                selected={
-                  selected?.area === "cargo" &&
-                  selected.kind === "stack" &&
-                  selected.id === stack.id
-                }
-                stackLimit={stack.stackLimit}
-              />
-            ))}
-            {state.cargoHold.uniqueItems.map((item) => (
-              <ItemVisual
-                accessibleLabel={item.name}
-                additionalDescription={
-                  item.currentCharge !== undefined
-                    ? `${item.currentCharge} of ${getItemMaximumCharge(item.itemId)} charges remaining`
-                    : undefined
-                }
-                badge={
-                  item.currentCharge !== undefined
-                    ? `${item.currentCharge}/${getItemMaximumCharge(item.itemId)}`
-                    : undefined
-                }
-                interactive
-                itemId={item.itemId}
-                key={item.id}
-                name={item.name}
-                onSelect={() => toggleSelect({ area: "cargo", kind: "unique", id: item.id })}
-                selected={
-                  selected?.area === "cargo" &&
-                  selected.kind === "unique" &&
-                  selected.id === item.id
-                }
-              />
-            ))}
-          </div>
-        ) : (
-          <div className="mt-3">
-            <Feedback>No occupied Cargo Hold items.</Feedback>
-          </div>
-        )}
-      </section>
-    );
-  }
-
-  function renderSelectedCargoItem() {
-    if (!resolvedSelection) return null;
-    const area = resolvedSelection.area;
-    return (
-      <section
-        aria-label={`${resolvedSelection.entry.name} selected`}
-        className="mt-4 border border-[color:var(--rs-border-structural)] bg-[color:var(--rs-surface-panel)] p-3"
-        data-cargo-selection
-        ref={detailsRef}
-      >
-        <div className="flex items-center justify-between gap-2">
-          <h3
-            className="font-display text-xs uppercase tracking-[0.16em] text-[color:var(--rs-accent-mining)]"
-            data-cargo-selection-heading
-            ref={detailsHeadingRef}
-            tabIndex={-1}
-          >
-            {area === "carried" ? "Carried item" : "Stored item"}
-          </h3>
-          <ActionButton className="px-3" intent="secondary" onClick={clearSelection}>
-            CLOSE
-          </ActionButton>
-        </div>
-        <div className="mt-3 flex items-center gap-3">
-          {resolvedSelection.kind === "stack" ? (
-            <InventoryStackVisual
-              className="h-20 w-20 shrink-0"
-              itemId={resolvedSelection.entry.itemId}
-              name={resolvedSelection.entry.name}
-              quantity={resolvedSelection.entry.quantity}
-              stackLimit={resolvedSelection.entry.stackLimit}
-            />
-          ) : (
-            <ItemVisual
-              additionalDescription={
-                resolvedSelection.entry.currentCharge !== undefined
-                  ? `${resolvedSelection.entry.currentCharge} of ${getItemMaximumCharge(resolvedSelection.entry.itemId)} charges remaining`
-                  : undefined
-              }
-              className="h-20 w-20 shrink-0"
-              itemId={resolvedSelection.entry.itemId}
-              name={resolvedSelection.entry.name}
-            />
-          )}
-          <div className="min-w-0">
-            <p className="truncate text-sm">{resolvedSelection.entry.name}</p>
-            {resolvedSelection.kind === "stack"
-              ? stackTransferButtons(
-                  resolvedSelection.entry.id,
-                  resolvedSelection.entry.quantity,
-                  area,
-                )
-              : uniqueTransferButton(resolvedSelection.entry.id, area)}
-          </div>
-        </div>
-      </section>
-    );
-  }
+  const cargoTransfers: StorageTransferAdapter = {
+    depositStack: (input, hooks) =>
+      runTransfer(
+        () => depositCargoStackAction({ characterId: state.characterId, ...input }),
+        hooks,
+      ),
+    withdrawStack: (input, hooks) =>
+      runTransfer(
+        () => withdrawCargoStackAction({ characterId: state.characterId, ...input }),
+        hooks,
+      ),
+    depositUniqueItem: (input, hooks) =>
+      runTransfer(
+        () => depositCargoUniqueItemAction({ characterId: state.characterId, ...input }),
+        hooks,
+      ),
+    withdrawUniqueItem: (input, hooks) =>
+      runTransfer(
+        () => withdrawCargoUniqueItemAction({ characterId: state.characterId, ...input }),
+        hooks,
+      ),
+  };
 
   return (
     // No "CRASH SITE INFRASTRUCTURE" eyebrow any more (#193): the scene plate
@@ -570,13 +299,7 @@ export function CargoHoldPanel() {
                 <p className="font-display text-sm uppercase tracking-wide">
                   {state.cargoHold.slotsUsed} / {state.cargoHold.capacitySlots} SLOTS OCCUPIED
                 </p>
-                <ActionButton
-                  intent="mining"
-                  onClick={() => {
-                    setStorageOpen((open) => !open);
-                    clearSelection();
-                  }}
-                >
+                <ActionButton intent="mining" onClick={() => setStorageOpen((open) => !open)}>
                   {storageOpen ? "CLOSE CARGO HOLD" : "OPEN CARGO HOLD"}
                 </ActionButton>
               </div>
@@ -589,65 +312,23 @@ export function CargoHoldPanel() {
               <p className="font-display text-sm uppercase tracking-wide">
                 {state.cargoHold.slotsUsed} / {state.cargoHold.capacitySlots} SLOTS OCCUPIED
               </p>
-              <ActionButton
-                intent="mining"
-                onClick={() => {
-                  setStorageOpen((open) => !open);
-                  clearSelection();
-                }}
-              >
+              <ActionButton intent="mining" onClick={() => setStorageOpen((open) => !open)}>
                 {storageOpen ? "CLOSE CARGO HOLD" : "OPEN CARGO HOLD"}
               </ActionButton>
             </div>
           )}
           {storageOpen ? (
-            <section className="mt-4" data-cargo-storage>
-              <div
-                className="mb-3 flex gap-2 sm:hidden"
-                role="tablist"
-                aria-label="Cargo storage mode"
-              >
-                <ActionButton
-                  aria-selected={storageMode === "carried"}
-                  className="flex-1"
-                  intent={storageMode === "carried" ? "primary" : "secondary"}
-                  onClick={() => {
-                    setStorageMode("carried");
-                    clearSelection();
-                  }}
-                  role="tab"
-                >
-                  CARRIED {state.inventory.slotsUsed} /{" "}
-                  {state.inventory.slotsUsed + state.inventory.slotsAvailable}
-                </ActionButton>
-                <ActionButton
-                  aria-selected={storageMode === "cargo"}
-                  className="flex-1"
-                  intent={storageMode === "cargo" ? "primary" : "secondary"}
-                  onClick={() => {
-                    setStorageMode("cargo");
-                    clearSelection();
-                  }}
-                  role="tab"
-                >
-                  CARGO {state.cargoHold.slotsUsed} / {state.cargoHold.capacitySlots}
-                </ActionButton>
-              </div>
-              {/* Two inventories, not one continuous grid (#199): on desktop
-                  each region is its own bounded sub-panel with a real gap
-                  between them, so the boundary is obvious without colouring
-                  either side differently. Mobile keeps the switcher above and
-                  shows one region at a time. */}
-              <div className="grid gap-4 sm:grid-cols-2 sm:gap-6">
-                <div className={storageMode === "carried" ? "" : "hidden sm:block"}>
-                  {renderCarried()}
-                </div>
-                <div className={storageMode === "cargo" ? "" : "hidden sm:block"}>
-                  {renderCargo()}
-                </div>
-              </div>
-              {renderSelectedCargoItem()}
-            </section>
+            <div className="mt-4" data-cargo-storage>
+              <StorageTransferSurface
+                labels={CARGO_HOLD_STORAGE_LABELS}
+                mode={storageMode}
+                onModeChange={setStorageMode}
+                onSelectItem={() => setMessage(undefined)}
+                pending={Boolean(pending)}
+                projection={projectCargoHoldStorage(state)}
+                transfers={cargoTransfers}
+              />
+            </div>
           ) : null}
         </>
       ) : repair.repairAvailable ? (
