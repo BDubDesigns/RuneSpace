@@ -7,6 +7,42 @@ export type { PublicUpdate } from "@/game/schemas/public-updates";
 
 const authoredUpdates = [
   {
+    // Issue #261 — public @mentions, blocked-player placeholders in General and
+    // Trade, and hiding a Whisper conversation.
+    slug: "heads-up",
+    title: "Heads Up",
+    publishedAt: "2026-10-01T00:15:00-07:00",
+    summary:
+      "You can now @mention a player in General or Trade to get their attention, a blocked player's messages leave a placeholder instead of a gap, and you can hide a Whisper conversation.",
+    body: [
+      "General and Trade are meant to be easy to ignore. Nothing there counts as unread, and that isn't changing. But sometimes you want one particular person to see a message — the player who asked for Shale an hour ago, or the one you're haggling with. Now you can say so.",
+      "Type @ in General or Trade and a list of players appears: people who've been talking in chat, people you Whisper with, and people at your location. Pick one and their name drops into your message. That's what makes it a mention — typing a name by hand doesn't. You can mention up to five players in one message, and it still counts as one message toward the send limit. It works in promoted ads too.",
+      "When someone mentions you, the message is marked as yours, the Chat/Social button lights up, and the General or Trade tab shows how many mentions you haven't seen. Open the channel and they clear, on every device.",
+      "Blocking someone in a busy channel used to cut their messages out entirely, which could leave everyone else's replies looking like they were aimed at nothing. Now each of their messages leaves a short line in its place — their character's name, the time, and \u201cMessage hidden — blocked player\u201d — so you can follow the conversation without seeing a word they wrote. There's no way to reveal it short of unblocking them. Their mentions of you don't light anything up, and they still aren't told you blocked them.",
+      [
+        "Finally, a Whisper conversation you're done with can now be hidden. Hide takes it off your list and clears its unread, but deletes nothing, and the other player's list doesn't change. A new Whisper from either of you brings it back, and so does starting a Whisper with them by name. What all of this keeps, and for how long, is on the ",
+        { text: "Safety & Privacy", articleSlug: SAFETY_PRIVACY_SLUG },
+        " page.",
+      ],
+    ],
+    patchNotes: [
+      {
+        heading: "Added",
+        items: [
+          "@mentions in General, Trade, and promoted ads: type @ and pick a player from the list.",
+          "Mentions of you are marked in chat, light the Chat/Social button, and badge the General or Trade tab until you've read them, on every device.",
+          "Hide on a Whisper conversation, which takes it off your list until the next Whisper or until you open it again.",
+        ],
+      },
+      {
+        heading: "Changed",
+        items: [
+          "A blocked player's General and Trade messages now show as a hidden-message line with their name and the time, instead of disappearing.",
+        ],
+      },
+    ],
+  },
+  {
     // Issue #274 — automatic System notices for recipe unlocks.
     slug: "something-new-to-make",
     title: "Something New to Make",

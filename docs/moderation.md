@@ -70,6 +70,14 @@ names its characters were seen under. Then notes, sanctions with appeals, and
 the case's own action history. Counts are shown as counts — there is no score,
 ratio, or risk level.
 
+A public `@mention` (#261) is ordinary message context, not a new signal: the
+mention is visible in the preserved body as `@Name`, and while the message is
+retained its resolved targets are in `chat_message_mentions`. Nothing scores
+or sanctions on mentions, and a Block's placeholder redaction is a per-viewer
+presentation only — operators, reports, and evidence always see the
+underlying message. Hiding a Whisper conversation deletes nothing, so it never
+affects retained Whispers or evidence.
+
 ### Retained chat — the legitimate-access boundary
 
 Beyond a report's preserved evidence, retained messages are reachable only
