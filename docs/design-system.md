@@ -98,6 +98,27 @@ optional note with a counter, and an **Also block** checkbox that turns the
 submit into "Report and block". The same-location character profile gains
 **Whisper**, **Report**, and **Block** under its identity.
 
+Player trading (#268) adds **Trade** at the head of that profile row
+(Trade · Whisper · Report · Block; Trade alone for one of the player's own
+characters). While a request waits, the row shows "Waiting for <character>…"
+and **Cancel Request** instead of Trade — no countdown. Incoming requests are
+pinned Chat/Social cards with **Accept** and **Decline**, rimmed
+`--rs-accent-primary`; when the server flags repeated requests the card turns
+`--rs-accent-danger`-rimmed and leads with **Decline & Block**, which opens the
+ordinary Block confirmation. The requester's own waiting request is a quiet,
+structural-rimmed card that never lights the launcher. An accepted trade is the
+shared `Drawer` at `size="full"` (near full screen on a phone, at most 60rem
+wide on desktop) and cannot be dismissed: **Cancel Trade** leaves it. Its
+footer of primary actions sits under a scrolling body, so **Cancel Trade**,
+**Ready**, **Change Offer**, and **Confirm Trade** (`success` intent) never
+scroll away. **You offer** and **They offer** stack on a phone and sit side by
+side from `sm`; a Ready side is locked behind a 1px `--rs-accent-success`
+inset ring with a "Ready — locked" chip — the success language, not a fill.
+Both Ready replaces them with the frozen **You Give** / **You Receive**
+review. A unique item's charge reads "Charge 7/10" in `--rs-accent-mining`
+wherever it appears. Names use `overflow-wrap: anywhere`, so no name or item
+label can force horizontal overflow.
+
 Location, Map, and Journey are separate compositions: Location presents the
 stationary scene, activity, and same-location population/profile flow; Map is
 the dedicated `?surface=map` navigation surface; Journey is the in-transit

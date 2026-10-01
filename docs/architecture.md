@@ -341,7 +341,7 @@ The first slice of same-location player trading (#225's contract): durable,
 authoritative requests and exclusive accepted sessions. Offers, Ready/Confirm,
 settlement, and the economic audit are #267 (next section); every
 player-facing surface, including the Chat/Social request cards and the trade
-composition UI, is #268.
+composition UI, is #268 ("Player trading experience" below).
 
 - **Rules:** `game/domain/player-trade.ts`. `PLAYER_TRADE_POLICY` is the one
   home of the numbers (20-second request expiry, 4 requests per account per
@@ -401,8 +401,8 @@ composition UI, is #268.
 ## Player trade offers, settlement, and audit (Issue #267)
 
 The authoritative settlement engine behind an accepted session. There is no
-player-facing trade UI yet (#268); the commands are server actions and the
-state is part of `GET /api/trade`.
+player-facing trade UI in this slice; the commands are server actions and
+the state is part of `GET /api/trade`. #268 (next section) is the UI.
 
 - **Rules:** `game/domain/player-trade.ts` owns the consent model (`compose`
   until both participants are Ready, then a frozen `review`) and the offer
@@ -478,6 +478,48 @@ state is part of `GET /api/trade`.
 - **Realtime:** `"trade.session"` gains `updated` (either offer or either
   participant's consent changed) and `completed`, published to both
   participants after commit; a refused command publishes nothing.
+
+## Player trading experience (Issue #268)
+
+The player-facing slice on top of #266 and #267. It adds no trade rule: every
+control asks a #266/#267 server action, and the browser renders only what
+`GET /api/trade` and the command answers say.
+
+- **Client state:** `features/player-trade/PlayerTradeContext.tsx`
+  (`PlayerTradeProvider`, mounted in `PlayScreen` inside `SocialProvider` and
+  `ChatProvider`) is the one owner of a tab's trade state. It re-reads on
+  mount, on the shared stream's reconcile (connect, reconnect, resume), on
+  each `"trade.request"` / `"trade.session"` prompt, on `"safety.blocks"`, and
+  just after the next pending request or idle session would lapse (lapses are
+  derived and published by no one). Reads and command answers apply
+  newest-issued-first, so duplicate, late, or missed deliveries are harmless.
+  Realtime is never the ledger; a request's realtime `change` only words the
+  requester's note.
+- **Surfaces:** the profile row (`CharacterProfilePanel` +
+  `ProfileTradeAction`) leads with **Trade**, by public name, and shows
+  Waiting + Cancel Request in its place. Incoming requests are pinned
+  Chat/Social cards keyed `trade-request:<id>` (`TradeRequestCards.tsx`) that
+  light the launcher; the requester's own pending request is a quiet
+  `trade-outgoing:<id>` card. **Decline & Block** reuses `SafetyFlow`'s Block
+  confirmation, then declines. The accepted trade is `PlayerTradeSurface`, a
+  non-dismissible `Drawer` (`size="full"`) with a footer of primary actions;
+  starting a session closes Chat/Social, Inventory, Character, and Missions,
+  and a completed trade asks Play to re-read Inventory and Credits.
+- **Durable outcomes:** `TradeStateView.ended` is the character's latest
+  session once it has ended (completed, canceled — and by whom — or expired),
+  with exactly what a completed trade moved, from the stored offer lines. The
+  client shows it only for the session that tab was displaying, so a missed
+  `completed` prompt still converges on the same result.
+- **Refused settlement:** `player_trade_sessions.settlement_refusal` and
+  `settlement_refusal_side` (migration 0037) record why the latest final
+  Confirm could not settle and whose side failed; `advanceOffer` writes them
+  with the refused settlement's new version and clears them on every other
+  offer change. The session view renders it per participant
+  (`settlementRefusal`), so the first confirmer also learns what to correct.
+- **Identity:** trade counterparts carry their owner's public Player name.
+  The character profile carries `sameAccount`, compared by account id on the
+  server; a same-account profile shows Trade without Whisper, Report, or
+  Block.
 
 ## Where minigames fit
 

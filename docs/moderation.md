@@ -123,8 +123,9 @@ characters never evades one.
 `requireTradeRequestInitiationAllowed(executor, playerAccountId, now)` is the
 seam `createTradeRequest` (`server/player-trades.ts`, #266) calls inside its
 transaction, next to the Block seam `blockBetween`. Accepting a request is
-not gated by it. Name trading in `SANCTION_ACCESS_AFFECTED`, which lists only
-features players can use, once #268 lets players start a trade.
+not gated by it. Since #268 players start trades from a profile, so
+`SANCTION_ACCESS_AFFECTED` names starting a trade (and keeps accepting one),
+and the Safety & Privacy page describes the trade records RuneSpace keeps.
 
 ## Player notices and appeals
 

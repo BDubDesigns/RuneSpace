@@ -53,8 +53,8 @@ small number of critical mobile player journeys.
   Account News, Account Verification, Gameplay Access, and the Chat/Social shell and
   realtime stream (`social-shell`, #245), and General/Trade public chat
   (`public-chat`, #246), Whispers, Block, and Report (`whispers-safety`,
-  #247), and moderation review, sanctions, notices, and appeals (`moderation`,
-  #248). It intentionally excludes noncanonical `smoke`, `ownership`,
+  #247), moderation review, sanctions, notices, and appeals (`moderation`,
+  #248), and player trading (`player-trading`, #268). It intentionally excludes noncanonical `smoke`, `ownership`,
   `design-system`, `work-orders`, `public-*`, and QC Studio specs. It:
   - requires Node 22.x
   - requires a localhost-only disposable PostgreSQL database (refuses remote)
@@ -330,7 +330,7 @@ Hermes host.
   representative gameplay commands refused during a session or a pending
   outgoing request and allowed again after cancel or expiry; and the
   realtime prompts after commit.
-- Browser coverage arrives with the trade UI in #268.
+- Browser coverage arrived with the trade UI in #268 (below).
 
 ### Issue #267 player trade offer, settlement, and audit coverage
 
@@ -369,6 +369,38 @@ Hermes host.
   `updated`/`completed` realtime prompts, never sent for a refusal.
 - `tests/unit/gameplay-entrypoints.test.ts` lists the eight #267 server actions
   and their shared stale-page recovery helper.
+
+### Issue #268 player trading experience coverage
+
+- `tests/unit/player-trade-presentation.test.ts` owns the presentation
+  helpers: the stage derived from the server's phase and consent, stacks
+  merged by item against what is offered, charge labels, and the requester's
+  note wording (with a true generic line when the prompt was missed).
+- `tests/integration/player-trade-settlement.test.ts` ("issue #268 durable
+  trade outcomes") proves the reconcile reads: both participants learn how
+  their latest session ended and exactly what a commit moved (the same
+  instance with its charge), who canceled, an idle session reads as expired
+  before anything writes it down, another pair's trade never leaks, and a
+  refused settlement is explained to both participants from their own side
+  until the next offer change. `tests/integration/character-profile.test.ts`
+  proves `sameAccount` comes from account identity, not Player names.
+- `tests/e2e/player-trading.spec.ts` (canonical, focused phase
+  `player-trading`) is the representative browser contract with real
+  accounts on separate contexts at the Crash Site: Nearby Players → profile →
+  Trade, Waiting + Cancel Request, the live pinned card with launcher
+  attention and no navigation or modal, Accept opening the surface for both,
+  Credits + stack + a charged Cutter, independent Ready, an edit clearing
+  consent in both clients, the frozen You Give / You Receive review, first
+  Confirm waiting and the second completing for both (the Cutter keeps its
+  charge), Cancel Request and Cancel Trade, a full-Inventory refusal returning
+  both to a correctable state with the reason, a reload resuming the same
+  session and version, a same-account trade with Trade alone on the profile,
+  four rapid requests making Decline & Block prominent with the account's
+  fifth refused, Block stopping further requests, and no horizontal overflow
+  with the footer actions in view at 393px and 1280px. It also proves Meet Me
+  There is the newest Update linking the Player Trading Wiki page, and that
+  News surfaces it. It never waits out the 20-second or 5-minute timers; the
+  integration suites own those with injected clocks.
 
 ## What to test when systems arrive
 For progression-sensitive systems, prioritize:
