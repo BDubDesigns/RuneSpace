@@ -49,7 +49,8 @@ export class TradeEngagedError extends OwnershipError {
   }
 }
 
-type Executor = Pick<Parameters<Parameters<typeof db.transaction>[0]>[0], "select">;
+type Transaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
+type Executor = Pick<Transaction, "select">;
 
 const requesterRow = alias(characters, "trade_gate_requester");
 const recipientRow = alias(characters, "trade_gate_recipient");
@@ -60,6 +61,18 @@ export async function findTradeEngagement(
   characterId: string,
   now: Date,
 ): Promise<TradeEngagement | null> {
+  return (await inspectTradeEngagement(executor, characterId, now)).engagement;
+}
+
+async function inspectTradeEngagement(
+  executor: Executor,
+  characterId: string,
+  now: Date,
+): Promise<{
+  engagement: TradeEngagement | null;
+  /** A stored-pending outgoing request that is effectively over. */
+  lapsed?: { id: string; status: TradeRequestStatus; resolvedAt: Date };
+}> {
   const [claim] = await executor
     .select({
       status: playerTradeSessions.status,
@@ -75,12 +88,13 @@ export async function findTradeEngagement(
       now,
     ) === "active"
   ) {
-    return "session";
+    return { engagement: "session" };
   }
 
   // At most one row: one pending outgoing request per character.
   const [outgoing] = await executor
     .select({
+      id: playerTradeRequests.id,
       status: playerTradeRequests.status,
       locationId: playerTradeRequests.locationId,
       expiresAt: playerTradeRequests.expiresAt,
@@ -96,33 +110,50 @@ export async function findTradeEngagement(
         eq(playerTradeRequests.status, "pending"),
       ),
     );
-  if (
-    outgoing &&
-    effectiveTradeRequestStatus(
-      {
-        status: outgoing.status as TradeRequestStatus,
-        locationId: outgoing.locationId,
-        expiresAt: outgoing.expiresAt,
-      },
-      outgoing,
-      now,
-    ) === "pending"
-  ) {
-    return "pending_request";
-  }
-  return null;
+  if (!outgoing) return { engagement: null };
+  const effective = effectiveTradeRequestStatus(
+    {
+      status: outgoing.status as TradeRequestStatus,
+      locationId: outgoing.locationId,
+      expiresAt: outgoing.expiresAt,
+    },
+    outgoing,
+    now,
+  );
+  if (effective === "pending") return { engagement: "pending_request" };
+  return {
+    engagement: null,
+    lapsed: {
+      id: outgoing.id,
+      status: effective,
+      resolvedAt: effective === "expired" && outgoing.expiresAt < now ? outgoing.expiresAt : now,
+    },
+  };
 }
 
 /**
  * Refuse a trade-engaged character. The caller must already hold the
  * character's row lock, so acceptance cannot claim it between this check and
  * the command's own writes.
+ *
+ * A released requester's lapsed request is written down here, before its
+ * command runs: an invalidation by movement is derived from current
+ * locations, so without this a recipient who left and came back inside the
+ * 20 seconds would revive a request whose requester had meanwhile started
+ * something. Recording it under the requester's lock makes it final. It is
+ * written silently; the recipient's reads already treat it as over.
  */
 export async function assertNotTradeEngaged(
-  executor: Executor,
+  tx: Pick<Transaction, "select" | "update">,
   characterId: string,
   now: Date,
 ): Promise<void> {
-  const engagement = await findTradeEngagement(executor, characterId, now);
+  const { engagement, lapsed } = await inspectTradeEngagement(tx, characterId, now);
   if (engagement) throw new TradeEngagedError(engagement);
+  if (lapsed) {
+    await tx
+      .update(playerTradeRequests)
+      .set({ status: lapsed.status, resolvedAt: lapsed.resolvedAt })
+      .where(and(eq(playerTradeRequests.id, lapsed.id), eq(playerTradeRequests.status, "pending")));
+  }
 }

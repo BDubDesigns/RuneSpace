@@ -1,4 +1,4 @@
-import { and, asc, eq, gt, inArray, lte, ne, or, sql } from "drizzle-orm";
+import { and, asc, eq, gt, inArray, lte, or, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { db } from "@/db";
 import {
@@ -164,12 +164,19 @@ async function lockAccountTradeRequests(tx: Tx, accountId: string) {
   );
 }
 
+/**
+ * Trade commands lock character rows `FOR NO KEY UPDATE`: it still conflicts
+ * with the gameplay boundary's `FOR UPDATE` and with other trade commands, so
+ * the gate stays serialized with acceptance, but it does not block the
+ * foreign-key `KEY SHARE` checks another trade's inserts take on the same
+ * rows, which would otherwise deadlock crossed requests.
+ */
 async function lockCharacter(tx: Tx, characterId: string): Promise<Character | undefined> {
   const [row] = await tx
     .select()
     .from(characters)
     .where(eq(characters.id, characterId))
-    .for("update");
+    .for("no key update");
   return row;
 }
 
@@ -321,12 +328,12 @@ export async function createTradeRequest(
       .select()
       .from(characters)
       .where(and(eq(characters.id, characterId), eq(characters.playerAccountId, accountId)))
-      .for("update");
+      .for("no key update");
     if (!requester) throw new OwnershipError("Character not found", 404);
     await lockAccountTradeRequests(tx, accountId);
 
-    await settleOutgoingRequest(tx, requester.id, now, events);
     await settleExpiredClaims(tx, [requester.id], now, events);
+    await settleOutgoingRequest(tx, requester.id, now, events);
 
     const recipient = await resolveCharacterTarget(target, requester, { executor: tx });
     if (
@@ -384,13 +391,14 @@ export async function createTradeRequest(
       );
     }
 
-    // The ledger only needs the rolling window; anything older is spent.
+    // The ledger only needs the rolling window; anything older is spent. An
+    // accepted request stays: it is the durable link to its session.
     await tx
       .delete(playerTradeRequests)
       .where(
         and(
           lte(playerTradeRequests.createdAt, windowStart),
-          ne(playerTradeRequests.status, "pending"),
+          inArray(playerTradeRequests.status, ["canceled", "declined", "expired", "invalidated"]),
         ),
       );
 
@@ -562,11 +570,29 @@ export async function acceptTradeRequest(
 
     await settleExpiredClaims(tx, [requester.id, recipient.id], now, events);
 
-    const [request] = await tx
+    // Every request row this acceptance may write — this one, the
+    // recipient's own outgoing request, and any other pending request either
+    // participant is part of — locked in one statement in id order, so
+    // acceptances of disjoint pairs that share requests cannot deadlock.
+    const participants = [requester.id, recipient.id];
+    const requestRows = await tx
       .select()
       .from(playerTradeRequests)
-      .where(eq(playerTradeRequests.id, requestId))
+      .where(
+        or(
+          eq(playerTradeRequests.id, requestId),
+          and(
+            eq(playerTradeRequests.status, "pending"),
+            or(
+              inArray(playerTradeRequests.requesterCharacterId, participants),
+              inArray(playerTradeRequests.recipientCharacterId, participants),
+            ),
+          ),
+        ),
+      )
+      .orderBy(asc(playerTradeRequests.id))
       .for("update");
+    const request = requestRows.find((row) => row.id === requestId);
     if (!request) return refused("unavailable", REFUSAL_COPY.requestUnavailable);
     if (request.status === "accepted") {
       // A retried Accept: the session it began is the answer, if still open.
@@ -612,19 +638,13 @@ export async function acceptTradeRequest(
     const block = await blockBetween(accountId, request.requesterPlayerAccountId, tx);
     if (block.iBlockedThem || block.theyBlockedMe) return invalidate("invalidated");
 
+    const pendingOthers = requestRows.filter(
+      (row) => row.id !== request.id && row.status === "pending",
+    );
     // The recipient's own outgoing request is released first.
-    const ownOutgoing = await tx
-      .select()
-      .from(playerTradeRequests)
-      .where(
-        and(
-          eq(playerTradeRequests.requesterCharacterId, recipient.id),
-          eq(playerTradeRequests.status, "pending"),
-        ),
-      )
-      .orderBy(asc(playerTradeRequests.id))
-      .for("update");
-    for (const outgoing of ownOutgoing) {
+    for (const outgoing of pendingOthers.filter(
+      (row) => row.requesterCharacterId === recipient.id,
+    )) {
       await tx
         .update(playerTradeRequests)
         .set({ status: "canceled", resolvedAt: now })
@@ -658,22 +678,7 @@ export async function acceptTradeRequest(
 
     // Every other request either participant is part of can no longer begin
     // a trade; release their requesters now rather than at expiry.
-    const participants = [requester.id, recipient.id];
-    const others = await tx
-      .select()
-      .from(playerTradeRequests)
-      .where(
-        and(
-          eq(playerTradeRequests.status, "pending"),
-          or(
-            inArray(playerTradeRequests.requesterCharacterId, participants),
-            inArray(playerTradeRequests.recipientCharacterId, participants),
-          ),
-        ),
-      )
-      .orderBy(asc(playerTradeRequests.id))
-      .for("update");
-    for (const other of others) {
+    for (const other of pendingOthers.filter((row) => row.requesterCharacterId !== recipient.id)) {
       await tx
         .update(playerTradeRequests)
         .set({ status: "invalidated", resolvedAt: now })

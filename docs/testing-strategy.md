@@ -323,8 +323,10 @@ Hermes host.
   concurrent sends, untouched by refusals; same-recipient escalation;
   concurrent competing, chained, and crossed acceptances leaving each
   character in exactly one session; Accept-vs-Cancel and Accept-vs-expiry;
-  movement invalidation; the accepting character's own outgoing request
-  released; same-account sessions; guessed, foreign, and wrong-account ids;
+  movement invalidation, which stays final once the released requester acts;
+  crossed and ring-shaped concurrent creations and acceptances without
+  deadlock; a retried Accept after pruning; the accepting character's own
+  outgoing request released; same-account sessions; guessed, foreign, and wrong-account ids;
   representative gameplay commands refused during a session or a pending
   outgoing request and allowed again after cancel or expiry; and the
   realtime prompts after commit.

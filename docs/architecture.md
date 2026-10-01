@@ -357,8 +357,8 @@ including the Chat/Social request cards, is #268.
   claim on its one active session, so no character can be in two sessions,
   same-account trades included. Derived outcomes are written down only when
   they matter: before a requester's outgoing slot or a character's claim is
-  reused, and at acceptance; terminal requests older than the rolling window
-  are pruned on creation.
+  reused, and at acceptance; spent requests older than the rolling window are
+  pruned on creation; an accepted request is kept as the link to its session.
 - **Commands and reads:** `server/player-trades.ts` (create, cancel, decline,
   accept, session cancel, and `getTradeState` behind `GET /api/trade`). Every
   one requires gameplay access and proves the acting character is the right
@@ -367,11 +367,18 @@ including the Chat/Social request cards, is #268.
   one account's tabs, devices, and characters share one serialized budget; it
   reuses `resolveCharacterTarget`, `blockBetween` (a Block by the target reads
   like any unavailable target), and `requireTradeRequestInitiationAllowed`.
-  Acceptance locks both characters' rows in id order, then the request row,
-  revalidates co-location, idleness, access, and Block, claims both
-  characters, cancels the recipient's own outgoing request, and invalidates
-  every other pending request involving either participant. Cancel, Decline,
-  and session Cancel lock only their own row.
+  Acceptance locks both characters' rows in id order, then — in one
+  statement, in id order — every request row it may write, revalidates
+  co-location, idleness, access, and Block, claims both characters, cancels
+  the recipient's own outgoing request, and invalidates every other pending
+  request involving either participant. Cancel, Decline, and session Cancel
+  lock only their own row. Trade commands lock characters `FOR NO KEY
+  UPDATE`: that still serializes with the gameplay boundary's `FOR UPDATE`,
+  but not with the foreign-key checks another trade's inserts take, which
+  would otherwise deadlock crossed requests. "Idle" means no
+  `active_actions` row at all: a trade command never reconciles or stops the
+  player's activity, so a finished-but-unresolved run still counts until
+  Play resolves it.
 - **Gate:** a character with an effectively pending outgoing request (sending
   one holds the requester idle) or an active claim is trade-engaged.
   `assertNotTradeEngaged` refuses it in the shared owned-character boundary
@@ -379,7 +386,10 @@ including the Chat/Social request cards, is #268.
   refusal is an `OwnershipError` (409), so every gameplay handler already
   returns its message. Receiving a request never engages anyone. Because the
   gate runs under the character row lock and acceptance holds both rows, no
-  command can slip between acceptance and the gate.
+  command can slip between acceptance and the gate. When the gate finds a
+  requester's request already lapsed, it writes the lapse down before the
+  command runs, so a recipient who walks away and back cannot revive a
+  request whose requester has since started something.
 - **Realtime:** after commit, `"trade.request"` and `"trade.session"`
   (`game/schemas/player-trade.ts`) prompt both participant characters to
   re-read `GET /api/trade`. They carry an id and the change only.

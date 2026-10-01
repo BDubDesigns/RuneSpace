@@ -353,7 +353,7 @@ async function commitSend(
         .select({ id: characters.id })
         .from(characters)
         .where(eq(characters.id, character.id))
-        .for("update");
+        .for("no key update");
       await assertNotTradeEngaged(tx, character.id, now);
       promotedPriceCredits = CHAT_POLICY.promotedAd.priceCredits;
       const charged = await tx
