@@ -339,8 +339,9 @@ Block and Report; `docs/moderation.md` is the contract.
 
 The first slice of same-location player trading (#225's contract): durable,
 authoritative requests and exclusive accepted sessions. Offers, Ready/Confirm,
-settlement, and the economic audit are #267; every player-facing surface,
-including the Chat/Social request cards, is #268.
+settlement, and the economic audit are #267 (next section); every
+player-facing surface, including the Chat/Social request cards and the trade
+composition UI, is #268.
 
 - **Rules:** `game/domain/player-trade.ts`. `PLAYER_TRADE_POLICY` is the one
   home of the numbers (20-second request expiry, 4 requests per account per
@@ -389,10 +390,94 @@ including the Chat/Social request cards, is #268.
   command can slip between acceptance and the gate. When the gate finds a
   requester's request already lapsed, it writes the lapse down before the
   command runs, so a recipient who walks away and back cannot revive a
-  request whose requester has since started something.
+  request whose requester has since started something. Since #267 it does the
+  same for a claimed session past its inactivity expiry (locking the session
+  row after the character row), so a final Confirm already waiting on the
+  locks cannot settle a trade whose characters were released.
 - **Realtime:** after commit, `"trade.request"` and `"trade.session"`
   (`game/schemas/player-trade.ts`) prompt both participant characters to
   re-read `GET /api/trade`. They carry an id and the change only.
+
+## Player trade offers, settlement, and audit (Issue #267)
+
+The authoritative settlement engine behind an accepted session. There is no
+player-facing trade UI yet (#268); the commands are server actions and the
+state is part of `GET /api/trade`.
+
+- **Rules:** `game/domain/player-trade.ts` owns the consent model (`compose`
+  until both participants are Ready, then a frozen `review`) and the offer
+  validators (whole non-negative Credits within balance, positive whole stack
+  quantities). `game/domain/player-trade-settlement.ts` is the pure settlement
+  planner: it re-proves both offers against both characters' loaded state and
+  plans each side's outgoing removals and incoming additions as one
+  hypothetical post-trade state through the existing inventory planners
+  (`game/domain/working-inventory.ts`) and `deriveEquipmentLoadout`, so stack
+  merging and limits count, a full Inventory can complete a one-for-one swap,
+  and a container received in the trade adds a slot and mass but no capacity
+  (only equipped containers do, and equipped items are never offerable). A
+  trade is refused when it would push a side's slots or mass past capacity —
+  or further past it — or take a side from at least one usable Mining Cutter
+  to none, counted across Equipment, carried Inventory, and the Cargo Hold by
+  that character's own Mining level (`usableMiningCutterCount`, the same count
+  Tinkering's last-Cutter guard uses). These rules are deliberately "never make
+  it worse": a character already over capacity from elsewhere may still trade
+  in a way that reduces the problem without curing it, and one that already
+  has no usable Cutter may still trade other things, so trading never traps a
+  character in an already-invalid state. Settlement also proves every
+  post-trade Credit balance fits `MAXIMUM_CHARACTER_CREDITS` (the PostgreSQL
+  `integer` behind `characters.credits`), and a trade in which neither side
+  offers anything is never committed or audited; a one-sided gift is.
+- **Offers:** only carried Inventory is offerable. A participant may set its
+  own Credits and add or remove its own carried stack quantities and carried,
+  unequipped, non-Cargo unique instances; the browser names an id and a
+  quantity, never an owner, balance, location, or item state. Offers are
+  state, not escrow: nothing leaves a character before commit. Credits and
+  consent live on `player_trade_sessions`; stack and unique lines live in
+  `player_trade_offer_stacks` and `player_trade_offer_items` (no foreign key to
+  `item_instances`, so an ended session's lines never constrain the instance).
+- **Version and consent:** `offer_version` is server-owned. Every offer
+  command names the version it acts on and applies only to that exact current
+  version; a stale, replayed, malformed, foreign, or nonparticipant command is
+  refused before anything is written, so it never advances the version, clears
+  consent, or moves anything. A valid edit advances the version and clears
+  both participants' Ready and Confirm (one write, `advanceOffer`). Ready and
+  Confirm record consent on the current version without changing it; Ready is
+  refused while both offers are empty. Setting Credits to the amount already
+  offered is a no-op — no new version, no cleared consent, no prompt. Change
+  Offer leaves Ready or the frozen review, advancing the version. CHECK
+  constraints keep Confirm impossible without both Ready and `completed`
+  impossible without both Confirmed.
+- **Serialization:** every offer command locks both participants' character
+  rows in id order, then the session row — the order every trade command
+  uses — so edits, Ready, Change Offer, Confirm, and Cancel on one session are
+  totally ordered. An expired session is written down (`expired`) by the first
+  offer command or gated gameplay command that finds it; valid commands
+  refresh `last_activity_at`, never moving it backwards.
+- **Settlement:** the second Confirm settles in its own transaction under
+  those locks: it rechecks co-location at the session's World Location,
+  idleness, the counterpart account's gameplay access, and Block, then loads
+  both characters' inventories under lock and plans. A refusal moves nothing,
+  clears all consent, and returns the session to `compose` on a new version
+  with a reason naming whose side failed. Success applies Credits, each side's
+  carried-stack diff (`applyCarriedStackDiff` in `server/carried-inventory.ts`),
+  and each unique instance's change of owner — the same row, id, and mutable
+  state such as Cutter charge — then marks the session `completed`, releases
+  both claims, and writes the audit row, all in that one transaction. A
+  repeated Confirm after completion answers with the completed trade; a
+  Cancel that loses the race is inert; a Cancel that wins leaves the Confirm
+  nothing to settle.
+- **Audit:** `player_trade_audits`, keyed by the trade (session) id, so one
+  trade can never have two rows. It preserves both explicit offers (Credits,
+  stack item ids and quantities, unique instance ids with item ids), both
+  accounts, both characters, the World Location, and the commit instant, and is
+  written only by settlement in the settlement transaction: if the insert
+  fails, nothing moves. It is permanent for alpha operational review, has no
+  update or delete path, and is read through `server/player-trade-audit.ts` by
+  trade id, account, or character. Those reads are internal seams; an operator
+  surface that exposes them must record privileged access.
+- **Realtime:** `"trade.session"` gains `updated` (either offer or either
+  participant's consent changed) and `completed`, published to both
+  participants after commit; a refused command publishes nothing.
 
 ## Where minigames fit
 
@@ -402,7 +487,7 @@ Phaser experiences live in `minigames/`, isolated from the main React tree. They
 
 - Strict TypeScript is enabled project-wide (`tsconfig.json`, `strict: true`, plus `noUncheckedIndexedAccess`, `noImplicitOverride`, `verbatimModuleSyntax`). The one `tsconfig.json` covers every committed `.ts`/`.tsx` file, including `tests/unit/`, `tests/integration/`, and the Playwright sources under `tests/e2e/`, so `pnpm typecheck` is the single strict-typing boundary.
 - Single source of truth: every rule, identifier, content definition, and persistence shape has one home. Derived values are computed from authoritative inputs, not redundantly stored. See `AGENTS.md` and `docs/component-boundaries.md`.
-- Equipment is one such home (#233): each item's equipment facts — which slot kind it fits, a container's Inventory slots, a Mining tool's level requirement, charge ceiling and effects — are authored once on its item entry and resolved through `getEquipmentDefinition` (`game/config/balance.ts`). Equipment, Mining, Tinkering's last-Cutter guard, Power Cell loading, and every presentation of charge consume that boundary; none branches on a particular item ID. It is two closed kinds, not an item-effect scripting engine (`docs/gameplay-foundations.md`, "Equipment definitions").
+- Equipment is one such home (#233): each item's equipment facts — which slot kind it fits, a container's Inventory slots, a Mining tool's level requirement, charge ceiling and effects — are authored once on its item entry and resolved through `getEquipmentDefinition` (`game/config/balance.ts`). Equipment, Mining, the last-Cutter guards of Tinkering and player-trade settlement (#267), Power Cell loading, and every presentation of charge consume that boundary; none branches on a particular item ID. It is two closed kinds, not an item-effect scripting engine (`docs/gameplay-foundations.md`, "Equipment definitions").
 
 ## Current status
 

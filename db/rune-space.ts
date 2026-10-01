@@ -1770,13 +1770,20 @@ export const playerTradeRequests = pgTable(
 );
 
 /**
- * One accepted player trade session (issue #266): durable identity and
- * lifecycle only. Offers, consent, and settlement belong to #267. A session is
- * database state, so it survives refresh and reconnect; it expires after five
- * minutes without trade activity (derived from `last_activity_at`, written
- * down when it matters), and either participant may cancel it. `ended_at` is
- * the authoritative end instant; for an inactivity expiry it is the moment the
- * session went idle-expired, not the moment that was noticed.
+ * One accepted player trade session (issue #266) and its offer state (#267).
+ * A session is database state, so it survives refresh and reconnect; it
+ * expires after five minutes without trade activity (derived from
+ * `last_activity_at`, written down when it matters), and either participant
+ * may cancel it before commit. `ended_at` is the authoritative end instant;
+ * for an inactivity expiry it is the moment the session went idle-expired, not
+ * the moment that was noticed, and for `completed` it is the commit instant.
+ *
+ * The row is also the serialization point for every offer command: each one
+ * locks it. `offer_version` is server-owned and advances on every change to
+ * either offer (Credits here; stacks and unique items in the offer tables
+ * below), and every advance clears all four consent flags, so a Ready or
+ * Confirm can only ever belong to the exact offers it was given for. Confirm
+ * requires both Ready, and `completed` requires both Confirmed.
  */
 export const playerTradeSessions = pgTable(
   "player_trade_sessions",
@@ -1801,15 +1808,35 @@ export const playerTradeSessions = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
     lastActivityAt: timestamp("last_activity_at", { withTimezone: true }).notNull(),
     endedAt: timestamp("ended_at", { withTimezone: true }),
-    // The participant who canceled; null for an inactivity expiry.
+    // The participant who canceled; null for an inactivity expiry or a commit.
     endedByCharacterId: text("ended_by_character_id").references(() => characters.id, {
       onDelete: "restrict",
     }),
+    offerVersion: integer("offer_version").notNull().default(1),
+    requesterCredits: integer("requester_credits").notNull().default(0),
+    recipientCredits: integer("recipient_credits").notNull().default(0),
+    requesterReady: boolean("requester_ready").notNull().default(false),
+    recipientReady: boolean("recipient_ready").notNull().default(false),
+    requesterConfirmed: boolean("requester_confirmed").notNull().default(false),
+    recipientConfirmed: boolean("recipient_confirmed").notNull().default(false),
   },
   (table) => [
     check(
       "player_trade_sessions_status_check",
-      sql`${table.status} in ('active', 'canceled', 'expired')`,
+      sql`${table.status} in ('active', 'canceled', 'expired', 'completed')`,
+    ),
+    check("player_trade_sessions_offer_version_check", sql`${table.offerVersion} >= 1`),
+    check(
+      "player_trade_sessions_credits_check",
+      sql`${table.requesterCredits} >= 0 and ${table.recipientCredits} >= 0`,
+    ),
+    check(
+      "player_trade_sessions_confirm_check",
+      sql`not (${table.requesterConfirmed} or ${table.recipientConfirmed}) or (${table.requesterReady} and ${table.recipientReady})`,
+    ),
+    check(
+      "player_trade_sessions_completed_check",
+      sql`${table.status} <> 'completed' or (${table.requesterConfirmed} and ${table.recipientConfirmed} and ${table.endedByCharacterId} is null)`,
     ),
     check(
       "player_trade_sessions_distinct_characters_check",
@@ -1842,6 +1869,135 @@ export const playerTradeClaims = pgTable(
       .references(() => playerTradeSessions.id, { onDelete: "restrict" }),
   },
   (table) => [index("player_trade_claims_session_idx").on(table.sessionId)],
+);
+
+/**
+ * The stackable part of one participant's offer in one session (#267): an
+ * item id and a whole positive quantity, at most one row per item per side.
+ * Rows are offer state, not a reservation or escrow — nothing leaves the
+ * character's Inventory until commit, which re-proves every quantity against
+ * the carried stacks. Rows of an ended session are inert.
+ */
+export const playerTradeOfferStacks = pgTable(
+  "player_trade_offer_stacks",
+  {
+    sessionId: text("session_id")
+      .notNull()
+      .references(() => playerTradeSessions.id, { onDelete: "restrict" }),
+    characterId: text("character_id")
+      .notNull()
+      .references(() => characters.id, { onDelete: "restrict" }),
+    itemId: text("item_id").notNull(),
+    quantity: integer("quantity").notNull(),
+  },
+  (table) => [
+    primaryKey({
+      columns: [table.sessionId, table.characterId, table.itemId],
+      name: "player_trade_offer_stacks_pk",
+    }),
+    check("player_trade_offer_stacks_quantity_check", sql`${table.quantity} > 0`),
+  ],
+);
+
+/**
+ * The unique-item part of one participant's offer in one session (#267). An
+ * instance appears at most once per session. Deliberately no foreign key to
+ * `item_instances`: the instance's ownership and location are re-proved at
+ * every edit and at commit, and an ended session's rows must never constrain
+ * what later happens to the instance.
+ */
+export const playerTradeOfferItems = pgTable(
+  "player_trade_offer_items",
+  {
+    sessionId: text("session_id")
+      .notNull()
+      .references(() => playerTradeSessions.id, { onDelete: "restrict" }),
+    characterId: text("character_id")
+      .notNull()
+      .references(() => characters.id, { onDelete: "restrict" }),
+    itemInstanceId: text("item_instance_id").notNull(),
+  },
+  (table) => [
+    primaryKey({
+      columns: [table.sessionId, table.itemInstanceId],
+      name: "player_trade_offer_items_pk",
+    }),
+  ],
+);
+
+/**
+ * The permanent economic audit of committed player trades (#267): exactly one
+ * immutable row per completed session, written in the same transaction as the
+ * settlement, so a trade cannot complete without it and it cannot exist for a
+ * trade that did not. The primary key is the trade (session) id, which makes a
+ * second row for one trade impossible. It preserves both explicit offers —
+ * Credits, stack item ids and quantities, and unique instance ids with their
+ * item ids, each side as offered rather than a net delta — with both accounts,
+ * both characters, the World Location, and the commit instant.
+ *
+ * Retained permanently for alpha operational review. Writes happen only
+ * through settlement; there is no `updated_at` and no update or delete path.
+ * Read through `server/player-trade-audit.ts` by trade, account, or character.
+ */
+export const playerTradeAudits = pgTable(
+  "player_trade_audits",
+  {
+    tradeId: text("trade_id")
+      .primaryKey()
+      .references(() => playerTradeSessions.id, { onDelete: "restrict" }),
+    committedAt: timestamp("committed_at", { withTimezone: true }).notNull(),
+    locationId: text("location_id").notNull(),
+    requesterPlayerAccountId: text("requester_player_account_id")
+      .notNull()
+      .references(() => playerAccounts.id, { onDelete: "restrict" }),
+    requesterCharacterId: text("requester_character_id")
+      .notNull()
+      .references(() => characters.id, { onDelete: "restrict" }),
+    recipientPlayerAccountId: text("recipient_player_account_id")
+      .notNull()
+      .references(() => playerAccounts.id, { onDelete: "restrict" }),
+    recipientCharacterId: text("recipient_character_id")
+      .notNull()
+      .references(() => characters.id, { onDelete: "restrict" }),
+    requesterCredits: integer("requester_credits").notNull(),
+    recipientCredits: integer("recipient_credits").notNull(),
+    // [{ itemId, quantity }] as offered by each side.
+    requesterStacks: jsonb("requester_stacks").notNull(),
+    recipientStacks: jsonb("recipient_stacks").notNull(),
+    // [{ itemInstanceId, itemId }] as offered by each side.
+    requesterItems: jsonb("requester_items").notNull(),
+    recipientItems: jsonb("recipient_items").notNull(),
+  },
+  (table) => [
+    check(
+      "player_trade_audits_credits_check",
+      sql`${table.requesterCredits} >= 0 and ${table.recipientCredits} >= 0`,
+    ),
+    check(
+      "player_trade_audits_offers_shape_check",
+      sql`jsonb_typeof(${table.requesterStacks}) = 'array' and jsonb_typeof(${table.recipientStacks}) = 'array' and jsonb_typeof(${table.requesterItems}) = 'array' and jsonb_typeof(${table.recipientItems}) = 'array'`,
+    ),
+    check(
+      "player_trade_audits_distinct_characters_check",
+      sql`${table.requesterCharacterId} <> ${table.recipientCharacterId}`,
+    ),
+    index("player_trade_audits_requester_account_idx").on(
+      table.requesterPlayerAccountId,
+      table.committedAt,
+    ),
+    index("player_trade_audits_recipient_account_idx").on(
+      table.recipientPlayerAccountId,
+      table.committedAt,
+    ),
+    index("player_trade_audits_requester_character_idx").on(
+      table.requesterCharacterId,
+      table.committedAt,
+    ),
+    index("player_trade_audits_recipient_character_idx").on(
+      table.recipientCharacterId,
+      table.committedAt,
+    ),
+  ],
 );
 
 export type PlayerAccount = typeof playerAccounts.$inferSelect;
@@ -1877,3 +2033,6 @@ export type ModerationAppeal = typeof moderationAppeals.$inferSelect;
 export type PrivilegedAccessLog = typeof privilegedAccessLogs.$inferSelect;
 export type PlayerTradeRequest = typeof playerTradeRequests.$inferSelect;
 export type PlayerTradeSession = typeof playerTradeSessions.$inferSelect;
+export type PlayerTradeOfferStack = typeof playerTradeOfferStacks.$inferSelect;
+export type PlayerTradeOfferItem = typeof playerTradeOfferItems.$inferSelect;
+export type PlayerTradeAudit = typeof playerTradeAudits.$inferSelect;

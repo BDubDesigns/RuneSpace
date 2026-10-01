@@ -3,9 +3,15 @@ import { alias } from "drizzle-orm/pg-core";
 import { db } from "@/db";
 import {
   activeActions,
+  cargoHoldItemInstances,
   characters,
+  equippedItems,
+  inventoryStacks,
+  itemInstances,
   playerAccounts,
   playerTradeClaims,
+  playerTradeOfferItems,
+  playerTradeOfferStacks,
   playerTradeRequests,
   playerTradeSessions,
   type Character,
@@ -13,19 +19,44 @@ import {
   type PlayerTradeSession,
 } from "@/db/rune-space";
 import {
+  getEffectiveGameBalance,
+  getItemDefinition,
+  standardSkillLevelThresholds,
+} from "@/game/config/balance";
+import { SKILL_IDS } from "@/game/config/foundations";
+import {
   decideTradeRequestBudget,
   effectiveTradeRequestStatus,
   effectiveTradeSessionStatus,
+  hasTradeConsent,
   isRepeatedTradeRequester,
+  isValidCreditOffer,
+  isValidStackQuantity,
+  NO_TRADE_CONSENT,
+  otherTradeSide,
+  sideConfirmed,
+  sideReady,
+  tradeOfferPhase,
   tradeRequestExpiresAt,
   tradeRequestWindowStart,
   tradeSessionExpiresAt,
+  type TradeConsent,
   type TradeRequestStatus,
   type TradeSessionStatus,
+  type TradeSide,
 } from "@/game/domain/player-trade";
+import {
+  isEmptyTradeOffer,
+  planTradeSettlement,
+  type TradeOfferContent,
+  type TradeSettlementFailure,
+  type TradeSettlementSide,
+} from "@/game/domain/player-trade-settlement";
+import { levelFromXp } from "@/game/domain/progression";
 import type {
   IncomingTradeRequestView,
   TradeCommandResult,
+  TradeOfferView,
   TradeRefusalReason,
   TradeRequestChange,
   TradeRequestView,
@@ -41,13 +72,17 @@ import {
   requirePlayableOwnedCharacter,
 } from "@/server/gameplay-access";
 import { requireTradeRequestInitiationAllowed } from "@/server/moderation-sanctions";
+import { applyCarriedStackDiff } from "@/server/carried-inventory";
 import { OwnershipError } from "@/server/ownership";
 import { blockBetween } from "@/server/player-blocks";
+import { insertTradeAudit } from "@/server/player-trade-audit";
+import { loadPlaySnapshot } from "@/server/play-state";
 import { publishRealtimeEvent } from "@/server/realtime";
 import { resolveCharacterTarget } from "@/server/social-targets";
 
 /**
- * Same-location player trade requests and exclusive sessions (issue #266).
+ * Same-location player trade requests and exclusive sessions (issue #266),
+ * and each accepted session's offers, consent, and settlement (#267).
  *
  * The browser names the acting character and a target or id; everything else
  * is proved here against the database, inside one transaction per command:
@@ -65,6 +100,10 @@ import { resolveCharacterTarget } from "@/server/social-targets";
  *   what serializes acceptance with the gameplay gate
  *   (`server/player-trade-gate.ts`).
  * - Cancel, Decline, and session Cancel lock only the request or session row.
+ * - Offer commands (#267) lock both participants' rows in id order, then the
+ *   session row, which serializes every edit, Ready, Change Offer, Confirm,
+ *   and Cancel on one session. The second Confirm settles inside that same
+ *   transaction; see "Offers, consent, and settlement" below.
  *
  * Lock order is always characters, then request/session rows (several in id
  * order), then claims. Realtime prompts publish only after commit.
@@ -521,12 +560,15 @@ async function ownedCharacter(tx: Tx, characterId: string, accountId: string): P
   return row;
 }
 
-/** Whether the requester's account may still play; its suspension voids the request. */
-async function requesterMayPlay(tx: Tx, requesterAccountId: string): Promise<boolean> {
+/**
+ * Whether another participant's account may still play: a requester's
+ * suspension voids its request, and a counterpart's voids a settlement.
+ */
+async function accountMayPlay(tx: Tx, playerAccountId: string): Promise<boolean> {
   const [owner] = await tx
     .select({ userId: playerAccounts.userId })
     .from(playerAccounts)
-    .where(eq(playerAccounts.id, requesterAccountId));
+    .where(eq(playerAccounts.id, playerAccountId));
   if (!owner) return false;
   const access = await loadAccountGameplayAccess(tx, owner.userId);
   return access.decision.allowed;
@@ -640,7 +682,7 @@ export async function acceptTradeRequest(
     if (
       (await hasClaim(tx, requester.id)) ||
       (await isBusy(tx, requester.id)) ||
-      !(await requesterMayPlay(tx, request.requesterPlayerAccountId))
+      !(await accountMayPlay(tx, request.requesterPlayerAccountId))
     ) {
       return invalidate("invalidated");
     }
@@ -703,8 +745,9 @@ export async function acceptTradeRequest(
 
 /**
  * Either participant cancels the session before commit. Nothing moves; both
- * characters are released. Idempotent: a session that already ended stays as
- * it ended.
+ * characters are released. Idempotent: a session that already ended — a
+ * committed trade included — stays as it ended, so a Cancel that loses the
+ * race to the final Confirm is inert.
  */
 export async function cancelTradeSession(
   userId: string,
@@ -759,6 +802,794 @@ export async function cancelTradeSession(
   });
   events.publish();
   return result;
+}
+
+// --- Offers, consent, and settlement (#267) --------------------------------
+//
+// An accepted session's two offers are offer state, never escrow: nothing
+// leaves either character until the second Confirm settles. Every offer
+// command runs through `runOfferCommand`, which proves the acting character is
+// a participant, locks both characters and then the session row, writes down
+// an inactivity expiry it finds, and applies the command only to the exact
+// current `offer_version`. A refused command writes nothing. A valid edit
+// advances the version and clears both participants' Ready and Confirm; Ready
+// and Confirm never change the version. The final Confirm re-proves the whole
+// trade against both characters' rows, held under lock, and either commits
+// every transfer and the audit row together or moves nothing and returns the
+// session to compose on a new version.
+
+const OFFER_COPY = {
+  stale: "That trade changed. Check the latest offers and try again.",
+  frozen: "You're both Ready, so the offers are locked. Choose Change Offer to edit them.",
+  notReady: "You both need to be Ready on these offers before confirming.",
+  empty: "Add something to the trade first. Either of you can offer Credits or items.",
+  credits: "You can offer whole Credits, up to what you have.",
+  stackItem: "You can only offer stackable items you're carrying.",
+  stackQuantity: "You can offer a whole quantity, up to what you're carrying.",
+  stackRemove: "Your offer doesn't have that many of that item.",
+  uniqueItem:
+    "You can only offer an item in your carried Inventory. Unequip it or take it out of the Cargo Hold first.",
+  uniqueAlready: "That item is already in your offer.",
+  uniqueRemove: "That item isn't in your offer.",
+} as const;
+
+type OfferContext = {
+  tx: Tx;
+  now: Date;
+  events: TradeEvents;
+  character: Character;
+  counterpart: Character;
+  session: PlayerTradeSession;
+  side: TradeSide;
+};
+
+function sideOf(session: PlayerTradeSession, characterId: string): TradeSide {
+  return session.requesterCharacterId === characterId ? "requester" : "recipient";
+}
+
+function consentOf(session: PlayerTradeSession): TradeConsent {
+  return {
+    requesterReady: session.requesterReady,
+    recipientReady: session.recipientReady,
+    requesterConfirmed: session.requesterConfirmed,
+    recipientConfirmed: session.recipientConfirmed,
+  };
+}
+
+const READY_COLUMN = { requester: "requesterReady", recipient: "recipientReady" } as const;
+const CONFIRMED_COLUMN = {
+  requester: "requesterConfirmed",
+  recipient: "recipientConfirmed",
+} as const;
+const CREDITS_COLUMN = { requester: "requesterCredits", recipient: "recipientCredits" } as const;
+
+async function okOffer(context: OfferContext): Promise<TradeCommandResult> {
+  return { status: "ok", state: await readTradeState(context.tx, context.character, context.now) };
+}
+
+/**
+ * The refreshed activity instant. A command whose clock was read before it
+ * waited on the locks never moves the deadline backwards.
+ */
+function activityAt(context: OfferContext): Date {
+  return new Date(Math.max(context.session.lastActivityAt.getTime(), context.now.getTime()));
+}
+
+/** Record one participant's consent without touching the offers or their version. */
+async function recordConsent(
+  context: OfferContext,
+  column: (typeof READY_COLUMN)[TradeSide] | (typeof CONFIRMED_COLUMN)[TradeSide],
+): Promise<TradeCommandResult> {
+  await context.tx
+    .update(playerTradeSessions)
+    .set({ [column]: true, lastActivityAt: activityAt(context) })
+    .where(eq(playerTradeSessions.id, context.session.id));
+  context.events.session(context.session, "updated");
+  return okOffer(context);
+}
+
+/**
+ * Advance the offer version and clear all consent: the one write every offer
+ * change, Change Offer, and failed settlement share, so no consent can survive
+ * onto offers it was not given for.
+ */
+async function advanceOffer(
+  context: OfferContext,
+  credits?: { side: TradeSide; credits: number },
+): Promise<void> {
+  await context.tx
+    .update(playerTradeSessions)
+    .set({
+      ...(credits ? { [CREDITS_COLUMN[credits.side]]: credits.credits } : {}),
+      offerVersion: context.session.offerVersion + 1,
+      ...NO_TRADE_CONSENT,
+      lastActivityAt: activityAt(context),
+    })
+    .where(eq(playerTradeSessions.id, context.session.id));
+  context.events.session(context.session, "updated");
+}
+
+async function runOfferCommand(
+  userId: string,
+  characterId: string,
+  sessionId: string,
+  offerVersion: number,
+  now: Date,
+  command: (context: OfferContext) => Promise<TradeCommandResult>,
+  options: { answersCompleted?: boolean } = {},
+): Promise<TradeCommandResult> {
+  const events = new TradeEvents();
+  const result = await db.transaction(async (tx): Promise<TradeCommandResult> => {
+    const accountId = await requireGameplayAccess(tx, userId);
+    // Unlocked peek, only to learn whose rows to lock. Participants never
+    // change, and the account must match the side the character is on, so a
+    // nonparticipant or a wrong-account character learns nothing here.
+    const [peek] = await tx
+      .select({
+        requesterCharacterId: playerTradeSessions.requesterCharacterId,
+        recipientCharacterId: playerTradeSessions.recipientCharacterId,
+      })
+      .from(playerTradeSessions)
+      .where(
+        and(
+          eq(playerTradeSessions.id, sessionId),
+          or(
+            and(
+              eq(playerTradeSessions.requesterCharacterId, characterId),
+              eq(playerTradeSessions.requesterPlayerAccountId, accountId),
+            ),
+            and(
+              eq(playerTradeSessions.recipientCharacterId, characterId),
+              eq(playerTradeSessions.recipientPlayerAccountId, accountId),
+            ),
+          ),
+        ),
+      );
+    if (!peek) {
+      await ownedCharacter(tx, characterId, accountId);
+      return refused("unavailable", REFUSAL_COPY.sessionUnavailable);
+    }
+
+    const locked = new Map<string, Character>();
+    for (const id of [peek.requesterCharacterId, peek.recipientCharacterId].sort()) {
+      const row = await lockCharacter(tx, id);
+      if (row) locked.set(id, row);
+    }
+    const character = locked.get(characterId);
+    if (!character || character.playerAccountId !== accountId) {
+      throw new OwnershipError("Character not found", 404);
+    }
+    const counterpart = locked.get(
+      characterId === peek.requesterCharacterId
+        ? peek.recipientCharacterId
+        : peek.requesterCharacterId,
+    );
+    const [session] = await tx
+      .select()
+      .from(playerTradeSessions)
+      .where(eq(playerTradeSessions.id, sessionId))
+      .for("update");
+    if (!session || !counterpart) return refused("unavailable", REFUSAL_COPY.sessionUnavailable);
+
+    if (session.status === "completed" && options.answersCompleted) {
+      // A repeated or lost-response Confirm: the trade it asked for is done.
+      return {
+        status: "ok",
+        state: await readTradeState(tx, character, now),
+        completed: { tradeId: session.id, completedAt: session.endedAt!.toISOString() },
+      };
+    }
+    // Every other command against an ended session is inert.
+    if (session.status !== "active") {
+      return refused("unavailable", REFUSAL_COPY.sessionUnavailable);
+    }
+    if (
+      effectiveTradeSessionStatus(
+        { status: "active", lastActivityAt: session.lastActivityAt },
+        now,
+      ) === "expired"
+    ) {
+      await endSession(
+        tx,
+        session,
+        "expired",
+        tradeSessionExpiresAt(session.lastActivityAt),
+        null,
+        events,
+      );
+      return refused("unavailable", REFUSAL_COPY.sessionUnavailable);
+    }
+    if (offerVersion !== session.offerVersion) return refused("stale_offer", OFFER_COPY.stale);
+
+    return command({
+      tx,
+      now,
+      events,
+      character,
+      counterpart,
+      session,
+      side: sideOf(session, character.id),
+    });
+  });
+  events.publish();
+  return result;
+}
+
+/** Offer edits apply only while composing; a frozen review needs Change Offer first. */
+function refuseUnlessComposing(context: OfferContext): TradeCommandResult | undefined {
+  return tradeOfferPhase(consentOf(context.session)) === "review"
+    ? refused("offer_frozen", OFFER_COPY.frozen)
+    : undefined;
+}
+
+async function offeredStackLine(context: OfferContext, itemId: string) {
+  const [line] = await context.tx
+    .select()
+    .from(playerTradeOfferStacks)
+    .where(
+      and(
+        eq(playerTradeOfferStacks.sessionId, context.session.id),
+        eq(playerTradeOfferStacks.characterId, context.character.id),
+        eq(playerTradeOfferStacks.itemId, itemId),
+      ),
+    );
+  return line;
+}
+
+function stackLineWhere(context: OfferContext, itemId: string) {
+  return and(
+    eq(playerTradeOfferStacks.sessionId, context.session.id),
+    eq(playerTradeOfferStacks.characterId, context.character.id),
+    eq(playerTradeOfferStacks.itemId, itemId),
+  );
+}
+
+/** Set the acting character's own Credit offer, up to its current balance. */
+export async function setTradeOfferCredits(
+  userId: string,
+  characterId: string,
+  sessionId: string,
+  offerVersion: number,
+  credits: number,
+  now: Date = new Date(),
+): Promise<TradeCommandResult> {
+  return runOfferCommand(userId, characterId, sessionId, offerVersion, now, async (context) => {
+    // Setting the amount already offered is no edit at all: the version,
+    // both participants' consent, and the activity clock stay as they are.
+    if (credits === context.session[CREDITS_COLUMN[context.side]]) return okOffer(context);
+    const frozen = refuseUnlessComposing(context);
+    if (frozen) return frozen;
+    if (!isValidCreditOffer(credits, context.character.credits)) {
+      return refused("invalid_offer", OFFER_COPY.credits);
+    }
+    await advanceOffer(context, { side: context.side, credits });
+    return okOffer(context);
+  });
+}
+
+/** Add a quantity of one carried stack item to the acting character's own offer. */
+export async function addTradeOfferStack(
+  userId: string,
+  characterId: string,
+  sessionId: string,
+  offerVersion: number,
+  itemId: string,
+  quantity: number,
+  now: Date = new Date(),
+): Promise<TradeCommandResult> {
+  return runOfferCommand(userId, characterId, sessionId, offerVersion, now, async (context) => {
+    const frozen = refuseUnlessComposing(context);
+    if (frozen) return frozen;
+    if (getItemDefinition(itemId)?.kind !== "stack") {
+      return refused("invalid_offer", OFFER_COPY.stackItem);
+    }
+    if (!isValidStackQuantity(quantity)) {
+      return refused("invalid_offer", OFFER_COPY.stackQuantity);
+    }
+    const [carried] = await context.tx
+      .select({ quantity: sql<number>`coalesce(sum(${inventoryStacks.quantity}), 0)::int` })
+      .from(inventoryStacks)
+      .where(
+        and(
+          eq(inventoryStacks.characterId, context.character.id),
+          eq(inventoryStacks.itemId, itemId),
+        ),
+      );
+    const line = await offeredStackLine(context, itemId);
+    const offered = (line?.quantity ?? 0) + quantity;
+    if (offered > (carried?.quantity ?? 0)) {
+      return refused("invalid_offer", OFFER_COPY.stackQuantity);
+    }
+    if (line) {
+      await context.tx
+        .update(playerTradeOfferStacks)
+        .set({ quantity: offered })
+        .where(stackLineWhere(context, itemId));
+    } else {
+      await context.tx.insert(playerTradeOfferStacks).values({
+        sessionId: context.session.id,
+        characterId: context.character.id,
+        itemId,
+        quantity: offered,
+      });
+    }
+    await advanceOffer(context);
+    return okOffer(context);
+  });
+}
+
+/** Take a quantity of one stack item back out of the acting character's own offer. */
+export async function removeTradeOfferStack(
+  userId: string,
+  characterId: string,
+  sessionId: string,
+  offerVersion: number,
+  itemId: string,
+  quantity: number,
+  now: Date = new Date(),
+): Promise<TradeCommandResult> {
+  return runOfferCommand(userId, characterId, sessionId, offerVersion, now, async (context) => {
+    const frozen = refuseUnlessComposing(context);
+    if (frozen) return frozen;
+    if (!isValidStackQuantity(quantity)) {
+      return refused("invalid_offer", OFFER_COPY.stackQuantity);
+    }
+    const line = await offeredStackLine(context, itemId);
+    if (!line || quantity > line.quantity) {
+      return refused("invalid_offer", OFFER_COPY.stackRemove);
+    }
+    if (quantity === line.quantity) {
+      await context.tx.delete(playerTradeOfferStacks).where(stackLineWhere(context, itemId));
+    } else {
+      await context.tx
+        .update(playerTradeOfferStacks)
+        .set({ quantity: line.quantity - quantity })
+        .where(stackLineWhere(context, itemId));
+    }
+    await advanceOffer(context);
+    return okOffer(context);
+  });
+}
+
+/**
+ * Add one of the acting character's unique item instances to its own offer.
+ * Only an instance it owns, carries, and has not equipped or stored in the
+ * Cargo Hold; the id is a request, never proof.
+ */
+export async function addTradeOfferItem(
+  userId: string,
+  characterId: string,
+  sessionId: string,
+  offerVersion: number,
+  itemInstanceId: string,
+  now: Date = new Date(),
+): Promise<TradeCommandResult> {
+  return runOfferCommand(userId, characterId, sessionId, offerVersion, now, async (context) => {
+    const frozen = refuseUnlessComposing(context);
+    if (frozen) return frozen;
+    const { tx } = context;
+    const owned = and(
+      eq(itemInstances.characterId, context.character.id),
+      eq(itemInstances.id, itemInstanceId),
+    );
+    const [[instance], [equipped], [stored], [offered]] = await Promise.all([
+      tx.select().from(itemInstances).where(owned),
+      tx
+        .select({ id: equippedItems.itemInstanceId })
+        .from(equippedItems)
+        .where(
+          and(
+            eq(equippedItems.characterId, context.character.id),
+            eq(equippedItems.itemInstanceId, itemInstanceId),
+          ),
+        ),
+      tx
+        .select({ id: cargoHoldItemInstances.itemInstanceId })
+        .from(cargoHoldItemInstances)
+        .where(
+          and(
+            eq(cargoHoldItemInstances.characterId, context.character.id),
+            eq(cargoHoldItemInstances.itemInstanceId, itemInstanceId),
+          ),
+        ),
+      tx
+        .select({ id: playerTradeOfferItems.itemInstanceId })
+        .from(playerTradeOfferItems)
+        .where(
+          and(
+            eq(playerTradeOfferItems.sessionId, context.session.id),
+            eq(playerTradeOfferItems.itemInstanceId, itemInstanceId),
+          ),
+        ),
+    ]);
+    if (!instance || equipped || stored || getItemDefinition(instance.itemId)?.kind !== "unique") {
+      return refused("invalid_offer", OFFER_COPY.uniqueItem);
+    }
+    if (offered) return refused("invalid_offer", OFFER_COPY.uniqueAlready);
+    await tx.insert(playerTradeOfferItems).values({
+      sessionId: context.session.id,
+      characterId: context.character.id,
+      itemInstanceId,
+    });
+    await advanceOffer(context);
+    return okOffer(context);
+  });
+}
+
+/** Take one unique item instance back out of the acting character's own offer. */
+export async function removeTradeOfferItem(
+  userId: string,
+  characterId: string,
+  sessionId: string,
+  offerVersion: number,
+  itemInstanceId: string,
+  now: Date = new Date(),
+): Promise<TradeCommandResult> {
+  return runOfferCommand(userId, characterId, sessionId, offerVersion, now, async (context) => {
+    const frozen = refuseUnlessComposing(context);
+    if (frozen) return frozen;
+    const removed = await context.tx
+      .delete(playerTradeOfferItems)
+      .where(
+        and(
+          eq(playerTradeOfferItems.sessionId, context.session.id),
+          eq(playerTradeOfferItems.characterId, context.character.id),
+          eq(playerTradeOfferItems.itemInstanceId, itemInstanceId),
+        ),
+      )
+      .returning({ id: playerTradeOfferItems.itemInstanceId });
+    if (removed.length === 0) return refused("invalid_offer", OFFER_COPY.uniqueRemove);
+    await advanceOffer(context);
+    return okOffer(context);
+  });
+}
+
+/**
+ * The acting participant is Ready on the current offers. When both are, the
+ * offers freeze into the review both saw. Repeating it changes nothing.
+ */
+export async function readyTradeOffer(
+  userId: string,
+  characterId: string,
+  sessionId: string,
+  offerVersion: number,
+  now: Date = new Date(),
+): Promise<TradeCommandResult> {
+  return runOfferCommand(userId, characterId, sessionId, offerVersion, now, async (context) => {
+    if (sideReady(consentOf(context.session), context.side)) return okOffer(context);
+    // Nothing either way is not a trade. Every edit clears Ready, so a review
+    // can never be frozen on two empty offers; settlement re-checks anyway.
+    const offers = await loadOfferContent(context.tx, context.session);
+    if (isEmptyTradeOffer(offers.requester) && isEmptyTradeOffer(offers.recipient)) {
+      return refused("empty_trade", OFFER_COPY.empty);
+    }
+    return recordConsent(context, READY_COLUMN[context.side]);
+  });
+}
+
+/**
+ * Change Offer: leave Ready or the frozen review and return to composing. It
+ * advances the version and clears both participants' Ready and Confirm, so
+ * any consent given before it is spent. With no consent to clear, nothing
+ * changes.
+ */
+export async function changeTradeOffer(
+  userId: string,
+  characterId: string,
+  sessionId: string,
+  offerVersion: number,
+  now: Date = new Date(),
+): Promise<TradeCommandResult> {
+  return runOfferCommand(userId, characterId, sessionId, offerVersion, now, async (context) => {
+    if (!hasTradeConsent(consentOf(context.session))) return okOffer(context);
+    await advanceOffer(context);
+    return okOffer(context);
+  });
+}
+
+/**
+ * Confirm the frozen review. The first Confirm moves nothing and waits; the
+ * second settles the trade in this transaction. A repeated Confirm — a double
+ * click, a retry, a lost response — either changes nothing or answers with the
+ * trade that already completed; it can never settle twice, because settlement
+ * marks the session `completed` under the same session-row lock it checked.
+ */
+export async function confirmTrade(
+  userId: string,
+  characterId: string,
+  sessionId: string,
+  offerVersion: number,
+  now: Date = new Date(),
+): Promise<TradeCommandResult> {
+  return runOfferCommand(
+    userId,
+    characterId,
+    sessionId,
+    offerVersion,
+    now,
+    async (context) => {
+      const consent = consentOf(context.session);
+      if (tradeOfferPhase(consent) !== "review") return refused("not_ready", OFFER_COPY.notReady);
+      if (sideConfirmed(consent, context.side)) return okOffer(context);
+      if (!sideConfirmed(consent, otherTradeSide(context.side))) {
+        return recordConsent(context, CONFIRMED_COLUMN[context.side]);
+      }
+      return settleTrade(context);
+    },
+    { answersCompleted: true },
+  );
+}
+
+/** Both offers exactly as stored for this session. */
+async function loadOfferContent(
+  reader: Reader,
+  session: PlayerTradeSession,
+): Promise<Record<TradeSide, TradeOfferContent>> {
+  const [stacks, items] = await Promise.all([
+    reader
+      .select()
+      .from(playerTradeOfferStacks)
+      .where(eq(playerTradeOfferStacks.sessionId, session.id))
+      .orderBy(asc(playerTradeOfferStacks.itemId)),
+    reader
+      .select()
+      .from(playerTradeOfferItems)
+      .where(eq(playerTradeOfferItems.sessionId, session.id))
+      .orderBy(asc(playerTradeOfferItems.itemInstanceId)),
+  ]);
+  const offer = (side: TradeSide, characterId: string, credits: number): TradeOfferContent => ({
+    credits,
+    stacks: stacks
+      .filter((line) => line.characterId === characterId)
+      .map((line) => ({ itemId: line.itemId, quantity: line.quantity })),
+    itemInstanceIds: items
+      .filter((line) => line.characterId === characterId)
+      .map((line) => line.itemInstanceId),
+  });
+  return {
+    requester: offer("requester", session.requesterCharacterId, session.requesterCredits),
+    recipient: offer("recipient", session.recipientCharacterId, session.recipientCredits),
+  };
+}
+
+/** Both offers with each unique instance's current facts, for the participants. */
+async function readOfferViews(
+  reader: Reader,
+  session: PlayerTradeSession,
+): Promise<Record<TradeSide, TradeOfferView>> {
+  const content = await loadOfferContent(reader, session);
+  const instanceIds = [...content.requester.itemInstanceIds, ...content.recipient.itemInstanceIds];
+  const instances = instanceIds.length
+    ? await reader
+        .select({
+          id: itemInstances.id,
+          characterId: itemInstances.characterId,
+          itemId: itemInstances.itemId,
+          currentCharge: itemInstances.currentCharge,
+        })
+        .from(itemInstances)
+        .where(inArray(itemInstances.id, instanceIds))
+    : [];
+  const consent = consentOf(session);
+  const view = (side: TradeSide, characterId: string): TradeOfferView => ({
+    credits: content[side].credits,
+    stacks: [...content[side].stacks],
+    // An instance that is somehow no longer its offerer's is not shown as
+    // offered; settlement would refuse it anyway.
+    items: content[side].itemInstanceIds.flatMap((id) => {
+      const instance = instances.find(
+        (candidate) => candidate.id === id && candidate.characterId === characterId,
+      );
+      return instance
+        ? [{ itemInstanceId: id, itemId: instance.itemId, currentCharge: instance.currentCharge }]
+        : [];
+    }),
+    ready: sideReady(consent, side),
+    confirmed: sideConfirmed(consent, side),
+  });
+  return {
+    requester: view("requester", session.requesterCharacterId),
+    recipient: view("recipient", session.recipientCharacterId),
+  };
+}
+
+const SETTLEMENT_REFUSALS: Record<
+  TradeSettlementFailure,
+  { reason: TradeRefusalReason; yours: string; theirs: (name: string) => string }
+> = {
+  credits: {
+    reason: "credit_limit",
+    yours: "This trade would leave you with more Credits than a character can hold.",
+    theirs: (name) => `This trade would leave ${name} with more Credits than a character can hold.`,
+  },
+  offer_unavailable: {
+    reason: "offer_unavailable",
+    yours: "Something in your offer is no longer yours to give as offered.",
+    theirs: (name) => `Something in ${name}'s offer is no longer theirs to give as offered.`,
+  },
+  slots: {
+    reason: "inventory_full",
+    yours: "Your Inventory wouldn't have room for this trade.",
+    theirs: (name) => `${name}'s Inventory wouldn't have room for this trade.`,
+  },
+  mass: {
+    reason: "too_heavy",
+    yours: "This trade would leave you carrying too much.",
+    theirs: (name) => `This trade would leave ${name} carrying too much.`,
+  },
+  last_cutter: {
+    reason: "last_cutter",
+    yours: "This trade would leave you without a usable Mining Cutter.",
+    theirs: (name) => `This trade would leave ${name} without a usable Mining Cutter.`,
+  },
+};
+
+const NOTHING_MOVED = "Nothing moved. Adjust the offers and Ready again.";
+
+/**
+ * A final Confirm that cannot settle: nothing moves, consent is cleared, and
+ * the session returns to compose on a new version, so the players can correct
+ * the offers and no earlier Ready or Confirm can apply to them.
+ */
+async function refuseSettlement(
+  context: OfferContext,
+  reason: TradeRefusalReason,
+  error: string,
+): Promise<TradeCommandResult> {
+  await advanceOffer(context);
+  return refused(reason, `${error} ${NOTHING_MOVED}`);
+}
+
+function settlementSide(
+  character: Character,
+  snapshot: Awaited<ReturnType<typeof loadPlaySnapshot>>,
+): TradeSettlementSide {
+  const balance = getEffectiveGameBalance();
+  const miningXp = snapshot.xpRows.find((xp) => xp.skillId === SKILL_IDS.mining)?.totalXp ?? 0;
+  const carried = new Set(snapshot.carriedInstances.map((instance) => instance.id));
+  return {
+    characterId: character.id,
+    credits: character.credits,
+    miningLevel: levelFromXp(miningXp, standardSkillLevelThresholds(balance)),
+    stacks: snapshot.stacks,
+    instances: snapshot.allItemInstances,
+    assignments: snapshot.equipmentLoadout.assignments,
+    cargoInstanceIds: new Set(
+      snapshot.allItemInstances
+        .filter((instance) => !carried.has(instance.id))
+        .map((instance) => instance.id),
+    ),
+  };
+}
+
+/**
+ * The final Confirm's commit. Runs under both characters' row locks and the
+ * session row lock, re-proves the whole trade against current authoritative
+ * state, and then — all in this one transaction — moves the Credits, the
+ * stacks, and each unique instance (same id, same mutable state), marks the
+ * session `completed`, releases both claims, and writes the one audit row.
+ * Any failure before the writes moves nothing; any failure during them,
+ * the audit insert included, rolls every write back.
+ */
+async function settleTrade(context: OfferContext): Promise<TradeCommandResult> {
+  const { tx, session, now } = context;
+  const participants: Record<TradeSide, Character> =
+    context.side === "requester"
+      ? { requester: context.character, recipient: context.counterpart }
+      : { requester: context.counterpart, recipient: context.character };
+  const { requester, recipient } = participants;
+
+  const blocked =
+    requester.playerAccountId !== recipient.playerAccountId &&
+    Object.values(
+      await blockBetween(requester.playerAccountId, recipient.playerAccountId, tx),
+    ).some(Boolean);
+  if (
+    requester.currentLocationId !== session.locationId ||
+    recipient.currentLocationId !== session.locationId ||
+    (await isBusy(tx, requester.id)) ||
+    (await isBusy(tx, recipient.id)) ||
+    !(await accountMayPlay(tx, context.counterpart.playerAccountId)) ||
+    blocked
+  ) {
+    return refuseSettlement(
+      context,
+      "ineligible",
+      "You both need to still be here and free to trade.",
+    );
+  }
+
+  // Inventory rows lock in character-id order, after both character rows.
+  const snapshots = new Map<string, Awaited<ReturnType<typeof loadPlaySnapshot>>>();
+  for (const id of [requester.id, recipient.id].sort()) {
+    snapshots.set(id, await loadPlaySnapshot(tx, id));
+  }
+  const plan = planTradeSettlement(
+    {
+      requester: settlementSide(requester, snapshots.get(requester.id)!),
+      recipient: settlementSide(recipient, snapshots.get(recipient.id)!),
+    },
+    await loadOfferContent(tx, session),
+    getEffectiveGameBalance(),
+  );
+  if (!plan.ok && plan.reason === "empty") {
+    return refuseSettlement(context, "empty_trade", OFFER_COPY.empty);
+  }
+  if (!plan.ok) {
+    const copy = SETTLEMENT_REFUSALS[plan.reason];
+    return refuseSettlement(
+      context,
+      copy.reason,
+      plan.side === context.side ? copy.yours : copy.theirs(context.counterpart.displayName),
+    );
+  }
+
+  for (const side of ["requester", "recipient"] as const) {
+    const settlement = plan.sides[side];
+    await tx
+      .update(characters)
+      .set({ credits: settlement.creditsAfter })
+      .where(eq(characters.id, settlement.characterId));
+    await applyCarriedStackDiff(tx, {
+      characterId: settlement.characterId,
+      diff: settlement.stacks,
+      now,
+    });
+  }
+  for (const side of ["requester", "recipient"] as const) {
+    const giver = participants[side];
+    const receiver = participants[otherTradeSide(side)];
+    const ids = plan.offers[side].items.map((item) => item.itemInstanceId);
+    if (ids.length === 0) continue;
+    // Only the owner changes: the row, its id, and its charge travel intact.
+    const moved = await tx
+      .update(itemInstances)
+      .set({ characterId: receiver.id, updatedAt: now })
+      .where(and(eq(itemInstances.characterId, giver.id), inArray(itemInstances.id, ids)))
+      .returning({ id: itemInstances.id });
+    if (moved.length !== ids.length) {
+      throw new Error("A traded item instance changed hands outside the settlement lock");
+    }
+  }
+
+  await tx
+    .update(playerTradeSessions)
+    .set({
+      status: "completed",
+      endedAt: now,
+      endedByCharacterId: null,
+      requesterConfirmed: true,
+      recipientConfirmed: true,
+      lastActivityAt: now,
+    })
+    .where(eq(playerTradeSessions.id, session.id));
+  await tx.delete(playerTradeClaims).where(eq(playerTradeClaims.sessionId, session.id));
+  await insertTradeAudit(tx, {
+    tradeId: session.id,
+    committedAt: now,
+    locationId: session.locationId,
+    requester: {
+      playerAccountId: session.requesterPlayerAccountId,
+      characterId: requester.id,
+      offer: plan.offers.requester,
+    },
+    recipient: {
+      playerAccountId: session.recipientPlayerAccountId,
+      characterId: recipient.id,
+      offer: plan.offers.recipient,
+    },
+  });
+  context.events.session(session, "completed");
+
+  const [character] = await tx
+    .select()
+    .from(characters)
+    .where(eq(characters.id, context.character.id));
+  return {
+    status: "ok",
+    state: await readTradeState(tx, character!, now),
+    completed: { tradeId: session.id, completedAt: now.toISOString() },
+  };
 }
 
 /**
@@ -876,6 +1707,8 @@ async function readTradeState(
       .select({ id: characters.id, displayName: characters.displayName })
       .from(characters)
       .where(eq(characters.id, counterpartId));
+    const side = sideOf(claim.session, character.id);
+    const offers = await readOfferViews(reader, claim.session);
     session = {
       id: claim.session.id,
       counterpart: {
@@ -884,6 +1717,10 @@ async function readTradeState(
       },
       startedAt: claim.session.createdAt.toISOString(),
       expiresAt: tradeSessionExpiresAt(claim.session.lastActivityAt).toISOString(),
+      offerVersion: claim.session.offerVersion,
+      phase: tradeOfferPhase(consentOf(claim.session)),
+      yours: offers[side],
+      theirs: offers[otherTradeSide(side)],
     };
   }
 

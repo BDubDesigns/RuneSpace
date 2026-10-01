@@ -818,7 +818,11 @@ last never counts as a batch the selector may offer. Since #233 either Mining
 tool is a Cutter, and "usable" is the tool's own Mining requirement: a Loadsteel
 Cutter keeps a Mining 5 character able to mine, but not a Mining 4 one — so
 below Mining 5 the Salvage Cutter beside it is still the last usable Cutter,
-and the Loadsteel Cutter itself may be taken apart.
+and the Loadsteel Cutter itself may be taken apart. Player-trade settlement
+(#267) applies the same count at commit: a trade may not take either character
+from a usable Cutter to none, while a Cutter-for-Cutter swap that leaves each
+with one is fine (`docs/architecture.md`, "Player trade offers, settlement, and
+audit").
 
 State lives in `character_tinkering_state` (migration 0030): the preference, the
 committed cycle's target and worked ticks, the Finish Current intent, and the

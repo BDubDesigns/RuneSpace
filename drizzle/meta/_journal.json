@@ -253,6 +253,13 @@
       "when": 1790813883679,
       "tag": "0035_player_trade_requests_sessions",
       "breakpoints": true
+    },
+    {
+      "idx": 36,
+      "version": "7",
+      "when": 1790818543969,
+      "tag": "0036_player_trade_offers_settlement_audit",
+      "breakpoints": true
     }
   ]
 }

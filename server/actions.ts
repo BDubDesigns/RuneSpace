@@ -87,15 +87,27 @@ import { blockPlayer, unblockPlayer } from "@/server/player-blocks";
 import { reportMessage, reportPlayer } from "@/server/player-reports";
 import {
   acceptTradeRequest,
+  addTradeOfferItem,
+  addTradeOfferStack,
   cancelTradeRequest,
   cancelTradeSession,
+  changeTradeOffer,
+  confirmTrade,
   createTradeRequest,
   declineTradeRequest,
+  readyTradeOffer,
+  removeTradeOfferItem,
+  removeTradeOfferStack,
+  setTradeOfferCredits,
 } from "@/server/player-trades";
 import {
   CreateTradeRequestSchema,
+  SetTradeCreditsSchema,
+  TradeConsentCommandSchema,
+  TradeItemOfferSchema,
   TradeRequestCommandSchema,
   TradeSessionCommandSchema,
+  TradeStackOfferSchema,
   type TradeCommandResult,
 } from "@/game/schemas/player-trade";
 import {
@@ -1163,4 +1175,110 @@ export async function cancelTradeSessionAction(input: unknown): Promise<PlayerTr
     if (error instanceof OwnershipError) return { error: error.message };
     throw error;
   }
+}
+
+/**
+ * One accepted trade's offer and consent commands (issue #267). The browser
+ * names its active character, the session, the offer version it is looking
+ * at, and its own intended change; ownership, balances, item state, location,
+ * capacity, and the counterpart's consent are all proved server-side in
+ * `server/player-trades.ts`.
+ */
+async function runTradeOfferAction<Request>(
+  input: unknown,
+  schema: { safeParse(input: unknown): { success: true; data: Request } | { success: false } },
+  command: (userId: string, request: Request) => Promise<TradeCommandResult>,
+): Promise<PlayerTradeActionResult> {
+  const request = schema.safeParse(input);
+  if (!request.success) return { error: "Invalid trade offer." };
+  try {
+    const user = await requireCurrentUser(await headers());
+    return await command(user.id, request.data);
+  } catch (error) {
+    redirectOnGameplayRefusal(error);
+    if (error instanceof OwnershipError) return { error: error.message };
+    throw error;
+  }
+}
+
+export async function setTradeOfferCreditsAction(input: unknown): Promise<PlayerTradeActionResult> {
+  return runTradeOfferAction(input, SetTradeCreditsSchema, (userId, request) =>
+    setTradeOfferCredits(
+      userId,
+      request.characterId,
+      request.sessionId,
+      request.offerVersion,
+      request.credits,
+    ),
+  );
+}
+
+export async function addTradeOfferStackAction(input: unknown): Promise<PlayerTradeActionResult> {
+  return runTradeOfferAction(input, TradeStackOfferSchema, (userId, request) =>
+    addTradeOfferStack(
+      userId,
+      request.characterId,
+      request.sessionId,
+      request.offerVersion,
+      request.itemId,
+      request.quantity,
+    ),
+  );
+}
+
+export async function removeTradeOfferStackAction(
+  input: unknown,
+): Promise<PlayerTradeActionResult> {
+  return runTradeOfferAction(input, TradeStackOfferSchema, (userId, request) =>
+    removeTradeOfferStack(
+      userId,
+      request.characterId,
+      request.sessionId,
+      request.offerVersion,
+      request.itemId,
+      request.quantity,
+    ),
+  );
+}
+
+export async function addTradeOfferItemAction(input: unknown): Promise<PlayerTradeActionResult> {
+  return runTradeOfferAction(input, TradeItemOfferSchema, (userId, request) =>
+    addTradeOfferItem(
+      userId,
+      request.characterId,
+      request.sessionId,
+      request.offerVersion,
+      request.itemInstanceId,
+    ),
+  );
+}
+
+export async function removeTradeOfferItemAction(input: unknown): Promise<PlayerTradeActionResult> {
+  return runTradeOfferAction(input, TradeItemOfferSchema, (userId, request) =>
+    removeTradeOfferItem(
+      userId,
+      request.characterId,
+      request.sessionId,
+      request.offerVersion,
+      request.itemInstanceId,
+    ),
+  );
+}
+
+export async function readyTradeOfferAction(input: unknown): Promise<PlayerTradeActionResult> {
+  return runTradeOfferAction(input, TradeConsentCommandSchema, (userId, request) =>
+    readyTradeOffer(userId, request.characterId, request.sessionId, request.offerVersion),
+  );
+}
+
+export async function changeTradeOfferAction(input: unknown): Promise<PlayerTradeActionResult> {
+  return runTradeOfferAction(input, TradeConsentCommandSchema, (userId, request) =>
+    changeTradeOffer(userId, request.characterId, request.sessionId, request.offerVersion),
+  );
+}
+
+export async function confirmTradeAction(input: unknown): Promise<PlayerTradeActionResult> {
+  return runTradeOfferAction(input, TradeConsentCommandSchema, (userId, request) =>
+    confirmTrade(userId, request.characterId, request.sessionId, request.offerVersion),
+  );
 }

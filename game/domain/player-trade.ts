@@ -1,7 +1,9 @@
 /**
  * Same-location player trading: request and session rules (issue #266, the
- * first slice of the #225 contract). Pure and framework-free; the server
- * loads the stored facts and the request clock and asks these questions.
+ * first slice of the #225 contract) and the offer/consent rules of an accepted
+ * session (#267). Pure and framework-free; the server loads the stored facts
+ * and the request clock and asks these questions. Settlement planning — the
+ * hypothetical post-trade inventories — is `game/domain/player-trade-settlement.ts`.
  *
  * Expiry and movement are never scheduled. Like a sanction, a request's or a
  * session's effective state is derived from stored facts and `now` on every
@@ -37,7 +39,8 @@ export const TRADE_REQUEST_STATUSES = [
 ] as const;
 export type TradeRequestStatus = (typeof TRADE_REQUEST_STATUSES)[number];
 
-export const TRADE_SESSION_STATUSES = ["active", "canceled", "expired"] as const;
+/** `completed` is the one terminal status in which assets moved (#267). */
+export const TRADE_SESSION_STATUSES = ["active", "canceled", "expired", "completed"] as const;
 export type TradeSessionStatus = (typeof TRADE_SESSION_STATUSES)[number];
 
 export function tradeRequestExpiresAt(createdAt: Date): Date {
@@ -120,4 +123,76 @@ export function decideTradeRequestBudget(
 /** Whether a sender account's requests to one recipient account warrant prominent Block. */
 export function isRepeatedTradeRequester(requestsInWindow: number): boolean {
   return requestsInWindow >= PLAYER_TRADE_POLICY.repeatedRecipientThreshold;
+}
+
+/**
+ * The consent recorded on an accepted session (#267). Ready and Confirm are
+ * per participant and always belong to the session's current offer version:
+ * every change to either offer advances the version and clears all four.
+ */
+export type TradeConsent = {
+  requesterReady: boolean;
+  recipientReady: boolean;
+  requesterConfirmed: boolean;
+  recipientConfirmed: boolean;
+};
+
+export const NO_TRADE_CONSENT: TradeConsent = {
+  requesterReady: false,
+  recipientReady: false,
+  requesterConfirmed: false,
+  recipientConfirmed: false,
+};
+
+export type TradeSide = "requester" | "recipient";
+
+export function otherTradeSide(side: TradeSide): TradeSide {
+  return side === "requester" ? "recipient" : "requester";
+}
+
+/**
+ * `compose` while either participant can still edit; `review` once both are
+ * Ready, when the offers are frozen into the exact proposal both reviewed and
+ * only Confirm, Change Offer, or Cancel apply.
+ */
+export type TradeOfferPhase = "compose" | "review";
+
+export function tradeOfferPhase(consent: TradeConsent): TradeOfferPhase {
+  return consent.requesterReady && consent.recipientReady ? "review" : "compose";
+}
+
+export function hasTradeConsent(consent: TradeConsent): boolean {
+  return (
+    consent.requesterReady ||
+    consent.recipientReady ||
+    consent.requesterConfirmed ||
+    consent.recipientConfirmed
+  );
+}
+
+export function sideReady(consent: TradeConsent, side: TradeSide): boolean {
+  return side === "requester" ? consent.requesterReady : consent.recipientReady;
+}
+
+export function sideConfirmed(consent: TradeConsent, side: TradeSide): boolean {
+  return side === "requester" ? consent.requesterConfirmed : consent.recipientConfirmed;
+}
+
+/**
+ * A Credit offer is a whole, non-negative number of Credits no larger than the
+ * offering character's authoritative balance. Anything else — negative,
+ * fractional, non-finite, or not a number at all — is malformed.
+ */
+export function isValidCreditOffer(credits: unknown, balance: number): credits is number {
+  return (
+    typeof credits === "number" &&
+    Number.isSafeInteger(credits) &&
+    credits >= 0 &&
+    credits <= balance
+  );
+}
+
+/** A stack quantity to add or remove is a positive whole number. */
+export function isValidStackQuantity(quantity: unknown): quantity is number {
+  return typeof quantity === "number" && Number.isSafeInteger(quantity) && quantity > 0;
 }

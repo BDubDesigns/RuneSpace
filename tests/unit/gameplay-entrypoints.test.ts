@@ -97,19 +97,21 @@ describe("player server actions (server/actions.ts)", () => {
   const source = read("server/actions.ts");
   const bodies = exportedFunctionBodies(source);
 
-  it("enumerates exactly the 61 production player actions", () => {
+  it("enumerates exactly the 69 production player actions", () => {
     // #232 adds nine: Fabrication's start, finish-current, Override toggle,
     // push and Lock In, and Tinkering's start, stop, finish-current and
     // Auto-discard Scrap preference. #246 adds the chat send and promoted ad.
     // #247 adds Whisper open, send, and read, Block, Unblock, and the two
     // Reports. #248 adds the moderation appeal (account management). #266 adds
-    // trade request create, cancel, decline, accept, and session cancel.
-    expect(bodies.size).toBe(61);
+    // trade request create, cancel, decline, accept, and session cancel. #267
+    // adds the trade offer's Credits, stack add/remove, item add/remove,
+    // Ready, Change Offer, and Confirm.
+    expect(bodies.size).toBe(69);
   });
 
   it("classifies every export as gameplay or named account management", () => {
     const gameplay = [...bodies.keys()].filter((name) => !(name in ACCOUNT_MANAGEMENT_ACTIONS));
-    expect(gameplay).toHaveLength(57);
+    expect(gameplay).toHaveLength(65);
     for (const name of Object.keys(ACCOUNT_MANAGEMENT_ACTIONS)) {
       expect(bodies.has(name), `unknown account action ${name}`).toBe(true);
     }
@@ -125,13 +127,15 @@ describe("player server actions (server/actions.ts)", () => {
         body.includes("redirectOnGameplayRefusal(error)") ||
         body.includes("runPlayAction(") ||
         body.includes("runEquipmentAction(") ||
-        body.includes("runTradeRequestCommand(");
+        body.includes("runTradeRequestCommand(") ||
+        body.includes("runTradeOfferAction(");
       expect(recovers, `${name} must recover from a gameplay refusal`).toBe(true);
     }
     for (const helper of [
       "async function runPlayAction",
       "async function runEquipmentAction",
       "async function runTradeRequestCommand",
+      "async function runTradeOfferAction",
     ]) {
       const start = source.indexOf(helper);
       const body = source.slice(start, source.indexOf("\n}\n", start));
