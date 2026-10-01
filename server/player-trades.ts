@@ -80,6 +80,9 @@ type Tx = DatabaseTransaction;
 /** Names the trade-request creation lock; the second key is the account. */
 const TRADE_REQUEST_LOCK_NAMESPACE = 266;
 
+/** Spent request rows one creation deletes at most. */
+const TRADE_REQUEST_PRUNE_BATCH = 100;
+
 const REFUSAL_COPY = {
   unavailable: "That character can't take a trade request right now.",
   requestUnavailable: "That trade request is no longer available.",
@@ -392,15 +395,21 @@ export async function createTradeRequest(
     }
 
     // The ledger only needs the rolling window; anything older is spent. An
-    // accepted request stays: it is the durable link to its session.
-    await tx
-      .delete(playerTradeRequests)
+    // accepted request stays: it is the durable link to its session. A
+    // bounded batch that skips locked rows, so concurrent creations never
+    // wait on — or deadlock with — each other.
+    const spent = tx
+      .select({ id: playerTradeRequests.id })
+      .from(playerTradeRequests)
       .where(
         and(
           lte(playerTradeRequests.createdAt, windowStart),
           inArray(playerTradeRequests.status, ["canceled", "declined", "expired", "invalidated"]),
         ),
-      );
+      )
+      .limit(TRADE_REQUEST_PRUNE_BATCH)
+      .for("update", { skipLocked: true });
+    await tx.delete(playerTradeRequests).where(inArray(playerTradeRequests.id, spent));
 
     const [created] = await tx
       .insert(playerTradeRequests)
