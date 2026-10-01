@@ -16,7 +16,8 @@
  * - globally unique case-insensitively, while the chosen capitalization is
  *   preserved for display;
  * - never a name that reasonably impersonates RuneSpace / QC Failed
- *   authority (see `isReservedPlayerName`).
+ *   authority (see `isReservedPlayerName`), and never the System identity
+ *   (see `isSystemIdentityName`).
  *
  * Character names keep their own boundary in `character-name.ts`; unifying the
  * two policies is a later slice.
@@ -154,13 +155,35 @@ const DIGIT_AND_STROKE_LOOKALIKES: Readonly<Record<string, string>> = {
 };
 
 /**
- * Reduce a word to the shape used for authority comparison: lowercase,
- * diacritics removed, look-alikes folded, `rn` read as `m`. Applied to both
- * sides of every comparison, so the protected terms go through it too.
+ * Cyrillic and Greek capitals that look like a Latin capital but whose
+ * lowercase form does not look like that Latin letter (`Т`/`т`, `Υ`/`υ`), so
+ * they are folded before lowercasing (#274: `SYSТEM`, `SΥSTEM`).
+ */
+const CAPITAL_LOOKALIKES: Readonly<Record<string, string>> = {
+  В: "b",
+  Н: "h",
+  Т: "t",
+  Β: "b",
+  Η: "h",
+  Ζ: "z",
+  Μ: "m",
+  Ν: "n",
+  Υ: "y",
+};
+
+/**
+ * Reduce a word to the shape used for authority comparison: look-alike
+ * capitals folded, lowercase, diacritics removed, look-alikes folded, `rn`
+ * read as `m`. Applied to both sides of every comparison, so the protected
+ * terms go through it too.
  */
 function authoritySkeleton(word: string): string {
+  const capitalsFolded = Array.from(
+    word,
+    (character) => CAPITAL_LOOKALIKES[character] ?? character,
+  ).join("");
   const folded = Array.from(
-    word.toLowerCase().normalize("NFD").replace(/\p{M}/gu, ""),
+    capitalsFolded.toLowerCase().normalize("NFD").replace(/\p{M}/gu, ""),
     (character) => DIGIT_AND_STROKE_LOOKALIKES[character] ?? LOOKALIKES[character] ?? character,
   ).join("");
   return folded.replace(/rn/g, "m");
@@ -207,6 +230,32 @@ export function isReservedPlayerName(raw: string): boolean {
 }
 
 // ---------------------------------------------------------------------------
+// The System identity
+// ---------------------------------------------------------------------------
+
+/**
+ * The name RuneSpace itself speaks as in Chat/Social (issue #274) — the
+ * read-only System conversation's sender. It is a protected identity: no
+ * Player name and no Character name may claim it.
+ */
+export const SYSTEM_IDENTITY_NAME = "System";
+
+const SYSTEM_IDENTITY_SKELETON = authoritySkeleton(SYSTEM_IDENTITY_NAME);
+
+/**
+ * True when a whole name reads as the System identity once normalized and
+ * folded like the authority terms above — `SYSTEM`, `S y s t e m`, `Syst3m`,
+ * or a Cyrillic look-alike. Only the whole name counts: a name that merely
+ * contains the word or its letters (`Solar System`, `Systematic`, `Ecosystem`)
+ * is not the System identity. Both the Player-name and Character-name
+ * validators call this one rule.
+ */
+export function isSystemIdentityName(raw: string): boolean {
+  const skeleton = words(normalizePlayerNameDisplay(raw)).map(authoritySkeleton).join("");
+  return skeleton === SYSTEM_IDENTITY_SKELETON;
+}
+
+// ---------------------------------------------------------------------------
 // Validation
 // ---------------------------------------------------------------------------
 
@@ -238,6 +287,8 @@ export function validatePlayerName(raw: string): PlayerNameValidation {
   if (!HAS_LETTER_OR_NUMBER.test(display)) {
     return { ok: false, error: PLAYER_NAME_ERRORS.letterOrNumber };
   }
-  if (isReservedPlayerName(display)) return { ok: false, error: PLAYER_NAME_ERRORS.reserved };
+  if (isReservedPlayerName(display) || isSystemIdentityName(display)) {
+    return { ok: false, error: PLAYER_NAME_ERRORS.reserved };
+  }
   return { ok: true, display, key: display.toLowerCase() };
 }

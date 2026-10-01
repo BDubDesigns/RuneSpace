@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
   PLAYER_NAME_ERRORS,
+  SYSTEM_IDENTITY_NAME,
   isReservedPlayerName,
+  isSystemIdentityName,
   normalizePlayerNameDisplay,
   playerNameKey,
   validatePlayerName,
@@ -192,5 +194,36 @@ describe("isReservedPlayerName", () => {
     "Qwen",
   ])("does not falsely reject %s", (name) => {
     expect(isReservedPlayerName(name)).toBe(false);
+  });
+});
+
+describe("the System identity (issue #274)", () => {
+  it.each([
+    "System",
+    "system",
+    "SYSTEM",
+    "  System  ",
+    "Ｓｙｓｔｅｍ",
+    "S y s t e m",
+    "Sys-tem",
+    "Syst3m",
+    "Ѕystem",
+    "SYSТEM",
+    "SΥSTEM",
+  ])("refuses the Player name %s", (name) => {
+    expect(isSystemIdentityName(name)).toBe(true);
+    expect(validatePlayerName(name)).toEqual({ ok: false, error: PLAYER_NAME_ERRORS.reserved });
+  });
+
+  it.each(["Systematic", "Ecosystem", "Solar System", "System Shock", "Mr Systems"])(
+    "does not substring-block %s",
+    (name) => {
+      expect(isSystemIdentityName(name)).toBe(false);
+      expect(validatePlayerName(name).ok).toBe(true);
+    },
+  );
+
+  it("is the name System notices are sent as", () => {
+    expect(SYSTEM_IDENTITY_NAME).toBe("System");
   });
 });

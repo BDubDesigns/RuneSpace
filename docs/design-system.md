@@ -98,6 +98,14 @@ optional note with a counter, and an **Also block** checkbox that turns the
 submit into "Report and block". The same-location character profile gains
 **Whisper**, **Report**, and **Block** under its identity.
 
+The read-only **System** conversation (#274) is a Whisper-styled row pinned
+first in that list, with the same unread badge language; its unread count adds
+to the Whispers tab badge and lights the launcher as its own attention source.
+Opened, it shows the same **All Whispers** back control and log, with
+"System" as the sender, and replaces the composer with a muted line saying
+System messages are automatic and can't be replied to. It has no **Report**,
+**Block**, actions toggle, or tappable sender name.
+
 Player trading (#268) adds **Trade** at the head of that profile row
 (Trade · Whisper · Report · Block; Trade alone for one of the player's own
 characters). While a request waits, the row shows "Waiting for <character>…"

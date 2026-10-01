@@ -36,6 +36,10 @@ unfinished balance values or future activities.
   derived from total XP and a supplied authoritative threshold source.
 - Every future award must use `grantSkillXp`; activities must not implement XP
   arithmetic or level checks themselves.
+- A gameplay award that raises a level past one or more recipes'
+  `minimumLevel` sends one grouped, read-only System notice naming every recipe
+  it unlocked, skipped levels included, in the award's own transaction (#274;
+  `docs/architecture.md`). The operator's SET TOTAL XP repair sends none.
 - The initial Mining, Refining, and Welding curves and their awards are
   approved in the slices below; other skills and activities remain deliberately
   undecided.

@@ -83,6 +83,7 @@ const APP_ENTRYPOINTS: Record<string, string> = {
   "app/api/whispers/route.ts": "GAMEPLAY: Whisper inbox read (#247)",
   "app/api/whispers/conversation/route.ts": "GAMEPLAY: Whisper conversation read (#247)",
   "app/api/blocked-players/route.ts": "GAMEPLAY: Blocked Players read (#247)",
+  "app/api/system-notices/route.ts": "GAMEPLAY: System conversation read (#274)",
   "app/api/trade/route.ts": "GAMEPLAY: trade request/session read (#266)",
   // #248 — a suspended player must still reach their notice and appeal.
   "app/moderation/page.tsx": "account: the player's own moderation notices",
@@ -97,7 +98,7 @@ describe("player server actions (server/actions.ts)", () => {
   const source = read("server/actions.ts");
   const bodies = exportedFunctionBodies(source);
 
-  it("enumerates exactly the 69 production player actions", () => {
+  it("enumerates exactly the 70 production player actions", () => {
     // #232 adds nine: Fabrication's start, finish-current, Override toggle,
     // push and Lock In, and Tinkering's start, stop, finish-current and
     // Auto-discard Scrap preference. #246 adds the chat send and promoted ad.
@@ -105,13 +106,13 @@ describe("player server actions (server/actions.ts)", () => {
     // Reports. #248 adds the moderation appeal (account management). #266 adds
     // trade request create, cancel, decline, accept, and session cancel. #267
     // adds the trade offer's Credits, stack add/remove, item add/remove,
-    // Ready, Change Offer, and Confirm.
-    expect(bodies.size).toBe(69);
+    // Ready, Change Offer, and Confirm. #274 adds the System conversation read.
+    expect(bodies.size).toBe(70);
   });
 
   it("classifies every export as gameplay or named account management", () => {
     const gameplay = [...bodies.keys()].filter((name) => !(name in ACCOUNT_MANAGEMENT_ACTIONS));
-    expect(gameplay).toHaveLength(65);
+    expect(gameplay).toHaveLength(66);
     for (const name of Object.keys(ACCOUNT_MANAGEMENT_ACTIONS)) {
       expect(bodies.has(name), `unknown account action ${name}`).toBe(true);
     }
@@ -186,6 +187,7 @@ describe("app pages and route handlers", () => {
       ["app/api/realtime/route.ts", "server/realtime-stream.ts"],
       ["app/api/chat/route.ts", "server/chat.ts"],
       ["app/api/trade/route.ts", "server/player-trades.ts"],
+      ["app/api/system-notices/route.ts", "server/system-notices.ts"],
     ] as const) {
       expect(read(server)).toContain("requirePlayableOwnedCharacter(");
       expect(read(route)).toContain("error instanceof GameplayAccessError");

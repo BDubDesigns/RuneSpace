@@ -13,6 +13,47 @@ import { assertNotTradeEngaged } from "@/server/player-trade-gate";
 export type DatabaseTransaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
 /**
+ * Best-effort effects a character command queued for after its commit (issue
+ * #274), keyed by the command's own transaction. Only the shared command
+ * boundaries below register one.
+ */
+const committedEffects = new WeakMap<DatabaseTransaction, (() => void)[]>();
+
+/**
+ * Run `effect` — a realtime prompt, never state — only once the character
+ * command that owns `transaction` has committed; a rollback drops it. Only
+ * the boundary's own transaction is registered: a transaction opened outside
+ * the shared command boundaries (a test or maintenance script), or a nested
+ * savepoint inside one, silently has no prompt to give, and its durable state
+ * still reaches clients through their ordinary reconciling reads.
+ */
+export function afterCharacterCommandCommits(
+  transaction: DatabaseTransaction,
+  effect: () => void,
+): void {
+  committedEffects.get(transaction)?.push(effect);
+}
+
+/** One character-command transaction, then its queued post-commit effects. */
+async function characterCommandTransaction<Result>(
+  command: (transaction: DatabaseTransaction) => Promise<Result>,
+): Promise<Result> {
+  const effects: (() => void)[] = [];
+  const result = await db.transaction((transaction) => {
+    committedEffects.set(transaction, effects);
+    return command(transaction);
+  });
+  for (const effect of effects) {
+    try {
+      effect();
+    } catch {
+      // A prompt is best-effort; the committed command has already succeeded.
+    }
+  }
+  return result;
+}
+
+/**
  * This is the intentionally small seam for future activity-specific resolution.
  * It has no registry, scheduler, or production fallback: a caller supplies the
  * action implementation and its atomic persistence work.
@@ -234,7 +275,7 @@ export async function withLockedOwnedCharacter<Result>(
   command: (transaction: DatabaseTransaction, context: { character: Character }) => Promise<Result>,
   options: OwnedCharacterCommandOptions & { now?: Date } = {},
 ): Promise<Result> {
-  return db.transaction(async (transaction) => {
+  return characterCommandTransaction(async (transaction) => {
     const character = await lockPlayableOwnedCharacter(
       transaction,
       userId,
@@ -268,7 +309,7 @@ export async function withResolvedOwnedCharacter<Snapshot, Outcome, Result>(
   now: Date = new Date(),
   options: OwnedCharacterCommandOptions = {},
 ): Promise<Result> {
-  return db.transaction(async (transaction) => {
+  return characterCommandTransaction(async (transaction) => {
     const character = await lockPlayableOwnedCharacter(
       transaction,
       userId,
@@ -290,7 +331,7 @@ export async function withLockedCharacter<Result>(
   characterId: string,
   command: (transaction: DatabaseTransaction, context: { character: Character }) => Promise<Result>,
 ): Promise<Result> {
-  return db.transaction(async (transaction) => {
+  return characterCommandTransaction(async (transaction) => {
     const character = await lockCharacterRow(transaction, characterId);
     return command(transaction, { character });
   });
@@ -308,7 +349,7 @@ export async function withResolvedCharacter<Snapshot, Outcome, Result>(
   command: (transaction: DatabaseTransaction, context: ResolvedCharacterContext) => Promise<Result>,
   now: Date = new Date(),
 ): Promise<Result> {
-  return db.transaction(async (transaction) => {
+  return characterCommandTransaction(async (transaction) => {
     const character = await lockCharacterRow(transaction, characterId);
     const action = await reconcileActiveAction(transaction, character, resolver, now);
     return command(transaction, { character, action });

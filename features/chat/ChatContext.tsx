@@ -13,6 +13,7 @@ import {
 import { useRouter } from "next/navigation";
 import { GAMEPLAY_ACCESS_REQUIRED_CODE } from "@/game/domain/gameplay-access";
 import type { SanctionNoticeView, SanctionNoticesView } from "@/game/schemas/moderation";
+import type { SystemNoticeInbox } from "@/game/schemas/system-notices";
 import type { CharacterTarget, WhisperInbox, WhisperPeer } from "@/game/schemas/whispers";
 import { isSocialRestriction } from "@/features/moderation/notice-format";
 import {
@@ -35,6 +36,9 @@ import { openWhisperAction } from "@/server/actions";
  * - the active character's durable Whisper inbox, re-read on connect,
  *   reconnect, tab resume, each Whisper delivery, and each read on another
  *   tab, whose unread total feeds the launcher's attention state;
+ * - the active character's read-only System conversation (#274), its
+ *   recipe-unlock notices, re-read the same way on `"system.notice"` and
+ *   `"system.read"`; its unread count is a second attention source;
  * - a Block revision that every chat view re-reads on, bumped by this tab's
  *   Block actions and by `"safety.blocks"` from the account's other tabs;
  * - the account's current moderation notices (#248), re-read on mount,
@@ -50,7 +54,7 @@ export type ChatTab = "general" | "trade" | "whispers";
 
 export type ChatView =
   | { tab: "general" | "trade" }
-  | { tab: "whispers"; peer?: WhisperPeer; blockedPlayers?: boolean };
+  | { tab: "whispers"; peer?: WhisperPeer; blockedPlayers?: boolean; system?: boolean };
 
 type ChatContextValue = {
   characterId: string;
@@ -58,6 +62,11 @@ type ChatContextValue = {
   setView: (view: ChatView) => void;
   inbox: WhisperInbox | undefined;
   refreshInbox: () => void;
+  /** The read-only System conversation (#274). */
+  system: SystemNoticeInbox | undefined;
+  refreshSystem: () => void;
+  /** Unread Whispers plus unread System notices: the Whispers tab's badge. */
+  whispersTabUnread: number;
   blocksRevision: number;
   /** A Block or Unblock committed on this tab. */
   blocksChanged: () => void;
@@ -76,6 +85,8 @@ const ChatContext = createContext<ChatContextValue | undefined>(undefined);
 
 /** Attention source key for unread Whispers on the Chat/Social launcher. */
 const WHISPER_ATTENTION = "whispers";
+/** Attention source key for unread System notices (#274). */
+const SYSTEM_ATTENTION = "system";
 
 const NOTICE_CARD_PREFIX = "moderation-notice:";
 
@@ -115,6 +126,31 @@ async function fetchInbox(
   }
 }
 
+async function fetchSystem(
+  characterId: string,
+): Promise<{ system: SystemNoticeInbox } | { error: string; code?: string }> {
+  try {
+    const response = await fetch(`/api/system-notices?${new URLSearchParams({ characterId })}`, {
+      cache: "no-store",
+      headers: { accept: "application/json" },
+    });
+    const body = (await response.json().catch(() => null)) as
+      | (SystemNoticeInbox & { error?: undefined })
+      | { error?: string; code?: string }
+      | null;
+    if (!response.ok || !body || "error" in body) {
+      const refusal = body as { error?: string; code?: string } | null;
+      return {
+        error: refusal?.error ?? "System messages could not be loaded.",
+        code: refusal?.code,
+      };
+    }
+    return { system: body as SystemNoticeInbox };
+  } catch {
+    return { error: "System messages could not be loaded." };
+  }
+}
+
 export function ChatProvider({
   characterId,
   children,
@@ -129,6 +165,7 @@ export function ChatProvider({
     useSocial();
   const [view, setView] = useState<ChatView>({ tab: "general" });
   const [inbox, setInbox] = useState<WhisperInbox>();
+  const [system, setSystem] = useState<SystemNoticeInbox>();
   const [blocksRevision, setBlocksRevision] = useState(0);
   const [notices, setNotices] = useState<SanctionNoticeView[]>([]);
   // Notices this device has already shown in the open panel (#248). Notices
@@ -138,6 +175,7 @@ export function ChatProvider({
   );
   // Inbox answers can arrive out of order; only the newest request applies.
   const requestCounter = useRef(0);
+  const systemRequestCounter = useRef(0);
   const noticeRequestCounter = useRef(0);
   // The shell's card setters change identity with its state; read them through
   // refs so a card update never re-runs the effect that produced it.
@@ -160,6 +198,22 @@ export function ChatProvider({
   useEffect(() => {
     refreshInbox();
   }, [refreshInbox]);
+
+  const refreshSystem = useCallback(() => {
+    const request = ++systemRequestCounter.current;
+    void fetchSystem(characterId).then((result) => {
+      if (request !== systemRequestCounter.current) return;
+      if ("error" in result) {
+        if (result.code === GAMEPLAY_ACCESS_REQUIRED_CODE) routerRef.current.replace("/characters");
+        return;
+      }
+      setSystem(result.system);
+    });
+  }, [characterId]);
+
+  useEffect(() => {
+    refreshSystem();
+  }, [refreshSystem]);
 
   const refreshNotices = useCallback(() => {
     const request = ++noticeRequestCounter.current;
@@ -208,9 +262,10 @@ export function ChatProvider({
     () =>
       onReconcile(() => {
         refreshInbox();
+        refreshSystem();
         refreshNotices();
       }),
-    [onReconcile, refreshInbox, refreshNotices],
+    [onReconcile, refreshInbox, refreshNotices, refreshSystem],
   );
   useEffect(
     () => subscribe("moderation.notices", () => refreshNotices()),
@@ -218,6 +273,8 @@ export function ChatProvider({
   );
   useEffect(() => subscribe("whisper.message", () => refreshInbox()), [refreshInbox, subscribe]);
   useEffect(() => subscribe("whisper.read", () => refreshInbox()), [refreshInbox, subscribe]);
+  useEffect(() => subscribe("system.notice", () => refreshSystem()), [refreshSystem, subscribe]);
+  useEffect(() => subscribe("system.read", () => refreshSystem()), [refreshSystem, subscribe]);
   useEffect(
     () =>
       subscribe("safety.blocks", () => {
@@ -232,6 +289,11 @@ export function ChatProvider({
   useEffect(() => {
     setAttention(WHISPER_ATTENTION, unreadTotal);
   }, [setAttention, unreadTotal]);
+  const systemUnread = system?.unread ?? 0;
+  useEffect(() => {
+    setAttention(SYSTEM_ATTENTION, systemUnread);
+  }, [setAttention, systemUnread]);
+  const whispersTabUnread = unreadTotal + systemUnread;
 
   const blocksChanged = useCallback(() => {
     setBlocksRevision((revision) => revision + 1);
@@ -261,6 +323,9 @@ export function ChatProvider({
       setView,
       inbox,
       refreshInbox,
+      system,
+      refreshSystem,
+      whispersTabUnread,
       blocksRevision,
       blocksChanged,
       socialRestricted,
@@ -274,9 +339,12 @@ export function ChatProvider({
       inbox,
       refreshInbox,
       refreshNotices,
+      refreshSystem,
       socialRestricted,
       startWhisper,
+      system,
       view,
+      whispersTabUnread,
     ],
   );
 

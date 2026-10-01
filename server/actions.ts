@@ -83,6 +83,7 @@ import { claimPowerCells, type PowerAnnexClaimResult } from "@/server/power-anne
 import { tradeWithMerchant, type TradeResult } from "@/server/trade";
 import { postPromotedTradeAd, sendChatMessage } from "@/server/chat";
 import { markWhisperRead, openWhisper, sendWhisper, WhisperError } from "@/server/whispers";
+import { markSystemNoticesRead } from "@/server/system-notices";
 import { blockPlayer, unblockPlayer } from "@/server/player-blocks";
 import { reportMessage, reportPlayer } from "@/server/player-reports";
 import {
@@ -117,6 +118,7 @@ import {
   type OpenWhisperResult,
   type WhisperSendResult,
 } from "@/game/schemas/whispers";
+import { MarkSystemNoticesReadRequestSchema } from "@/game/schemas/system-notices";
 import {
   BlockRequestSchema,
   ReportMessageRequestSchema,
@@ -1052,6 +1054,26 @@ export async function markWhisperReadAction(
     if (error instanceof OwnershipError || error instanceof WhisperError) {
       return { error: error.message };
     }
+    throw error;
+  }
+}
+
+/**
+ * The System conversation (issue #274): reading marks the active character's
+ * recipe-unlock notices read through what this tab showed.
+ */
+export async function markSystemNoticesReadAction(
+  input: unknown,
+): Promise<{ status: "read" } | { error: string }> {
+  const request = MarkSystemNoticesReadRequestSchema.safeParse(input);
+  if (!request.success) return { error: "Invalid request." };
+  try {
+    const user = await requireCurrentUser(await headers());
+    const { characterId, ...read } = request.data;
+    return await markSystemNoticesRead(user.id, characterId, read);
+  } catch (error) {
+    redirectOnGameplayRefusal(error);
+    if (error instanceof OwnershipError) return { error: error.message };
     throw error;
   }
 }

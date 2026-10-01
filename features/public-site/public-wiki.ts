@@ -1230,6 +1230,7 @@ const authoredWikiArticles = [
         heading: "What leveling up does",
         paragraphs: [
           "Higher Mining and Refining levels raise your chance of success on each attempt, up to a level where success is guaranteed. Levels have a cap, and every skill shows its current level and XP right where you use it — Mining at The Jag, Refining at the Processing Yard, and Welding at the Workbench, the Cargo Hold repair, and the Crew Stop repair. The Character screen shows all of them in one place, whichever one you're standing next to.",
+          "Some Refining and Fabrication recipes need a certain level. When you reach a level that unlocks one or more of them, a message from System arrives in the Whispers tab of the Chat/Social panel, listing every recipe that just unlocked — including any you passed on the way, if one big reward carried you up several levels at once. System is pinned at the top of your Whispers and lights the Chat/Social button until you read it. It's RuneSpace itself, not a player, so you can't reply to it, block it, or report it, and no player or character can be named System.",
         ],
       },
     ],

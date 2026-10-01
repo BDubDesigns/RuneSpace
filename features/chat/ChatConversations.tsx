@@ -15,12 +15,11 @@ const TAB_LABEL: Record<ChatTab, string> = {
  * The Chat/Social conversation region: General, Trade (issue #246), and
  * Whispers (#247) as three tabs. The selected tab lives in `ChatContext`, so
  * closing and reopening the Drawer — or a character-facing surface opening a
- * Whisper — lands on the right view. Unread Whispers show on their tab as
- * well as on the launcher.
+ * Whisper — lands on the right view. Unread Whispers and unread System
+ * notices (#274) show on the Whispers tab as well as on the launcher.
  */
 export function ChatConversations({ characterId }: { characterId: string }) {
-  const { inbox, setView, view } = useChat();
-  const unread = inbox?.unreadTotal ?? 0;
+  const { setView, view, whispersTabUnread: unread } = useChat();
   return (
     <div className="space-y-3">
       <div

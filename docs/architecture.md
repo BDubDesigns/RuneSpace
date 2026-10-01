@@ -313,6 +313,49 @@ item.
   / Report + Block flow used by message actions, Whisper conversations, and
   the same-location profile.
 
+## System recipe-unlock notices (Issue #274)
+
+A read-only **System** conversation in Chat/Social → Whispers tells a character
+which recipes a level crossing just unlocked. It deliberately reuses Whisper
+*presentation* and none of Whisper *identity*: System is not a player, so there
+is no fake account or character, no `chat_messages` row, no conversation pair,
+and nothing to reply to, Block, Report, or open a profile for.
+
+- **Derivation:** `game/domain/recipe-unlocks.ts`. A crossing from
+  `previousLevel` to `level` unlocks every recipe in the skill's canonical
+  registry (Refining and Fabrication today) whose `minimumLevel` lies in
+  `(previousLevel, level]`. There is no notification-specific list: authoring
+  a recipe normally is all a future recipe needs. A notice names a recipe by
+  its output's item presentation, adding its inputs only when another recipe
+  of the same skill makes the same output ("Slag from Galvanite").
+- **Writer and atomicity:** `grantCharacterSkillXp` (`server/progression.ts`),
+  the one gameplay XP boundary, inserts at most one grouped
+  `recipe_unlock_notices` row per award, in the transaction that commits the
+  XP — both commit or neither does. The level transition is the only state
+  boundary: no sent flag, no per-recipe ledger, and the character row lock
+  serializes awards, so a crossing is written exactly once. The operator's SET
+  TOTAL XP repair never calls the grant, so it writes no notice.
+- **After commit:** the grant queues its `"system.notice"` prompt with
+  `afterCharacterCommandCommits` (`server/action-resolution.ts`). The shared
+  character command boundaries run queued effects only once their transaction
+  has committed and drop them on rollback; a transaction opened outside them
+  queues nothing. This is a post-commit prompt hook, not an event bus or
+  outbox: durable rows stay the only truth, and clients reconcile.
+- **Read side:** `server/system-notices.ts` behind `GET /api/system-notices`
+  and `markSystemNoticesReadAction`. A notice stores the recipes' action IDs,
+  never their names; the body is rendered from current presentation when
+  read. `read_at` is set once, so a read notice never re-lights, and reading
+  publishes `"system.read"` to the character's other tabs. Notices are not on
+  the chat retention sweep.
+- **Browser:** `ChatContext` holds the System inbox beside the Whisper inbox
+  and feeds a second attention source (`system`) and the Whispers tab badge.
+  `WhisperPanel` pins the System row above player conversations and opens a
+  read-only view with no composer.
+- **Identity:** `SYSTEM_IDENTITY_NAME` and `isSystemIdentityName` in
+  `game/domain/player-name.ts` are the one rule; `validatePlayerName` and
+  `validateCharacterName` both refuse a whole name that folds to System (see
+  `docs/authentication.md`).
+
 ## Moderation (Issue #248)
 
 Operator review, sanctions, appeals, and privileged-access audit sit on top of

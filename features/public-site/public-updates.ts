@@ -7,6 +7,38 @@ export type { PublicUpdate } from "@/game/schemas/public-updates";
 
 const authoredUpdates = [
   {
+    // Issue #274 — automatic System notices for recipe unlocks.
+    slug: "something-new-to-make",
+    title: "Something New to Make",
+    publishedAt: "2026-09-30T22:30:00-07:00",
+    summary:
+      "Reaching a level that unlocks new Refining or Fabrication recipes now sends you a System message in Chat/Social listing exactly what you can make.",
+    body: [
+      "Hitting a new level used to unlock recipes quietly. Unless you went back to the console and looked, you could carry on for a while without knowing you could pour Galvanic Stock or wind a Galvanic Wire Spool. Now RuneSpace tells you.",
+      "When you reach a Refining or Fabrication level that unlocks recipes, a message from System arrives in the Whispers tab of the Chat/Social panel, listing every recipe that just opened up. A big reward that carries you past several levels at once still lists everything you skipped over, in one message, so nothing slips by.",
+      [
+        "System sits pinned at the top of your Whispers and lights the Chat/Social button until you read it. It is RuneSpace itself, not a player, so there is nothing to reply to, block, or report. Which levels unlock what is on the ",
+        { text: "Mining & Refining", articleSlug: "mining-and-refining" },
+        " and ",
+        { text: "Fabrication & Tinkering", articleSlug: "fabrication-and-tinkering" },
+        " pages of the Wiki.",
+      ],
+    ],
+    patchNotes: [
+      {
+        heading: "Added",
+        items: [
+          "A System message in Chat/Social → Whispers whenever a level unlocks new Refining or Fabrication recipes, naming every recipe it unlocked.",
+          "System is pinned above your other Whispers, counts toward unread, and stays read once you have read it, on every device.",
+        ],
+      },
+      {
+        heading: "Changed",
+        items: ['Player names and character names can no longer be "System".'],
+      },
+    ],
+  },
+  {
     // Issue #268 — the one announcement for direct player trading (#266
     // requests and sessions, #267 settlement, #268 the trading experience).
     // Never publish request limits, escalation thresholds, or how trades are
