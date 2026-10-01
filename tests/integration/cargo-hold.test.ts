@@ -1,4 +1,4 @@
-import { and, eq } from "drizzle-orm";
+import { and, asc, eq } from "drizzle-orm";
 import { afterEach, beforeAll, describe, expect, it } from "vitest";
 import { getEffectiveGameBalance, getRepairTargetBalance } from "@/game/config/balance";
 import {
@@ -560,11 +560,15 @@ suite("issue #128 Cargo Hold repair gate and existing Welding mechanics (real Po
       materials: { [ITEM_IDS.refinedFerrite]: 15, [ITEM_IDS.slag]: 6 },
     });
     expect(contribution.state.cargoHold.repair.materialComplete).toBe(true);
+    // Ordered explicitly (issue #280): without ORDER BY, row order follows the
+    // chosen plan and the rows' physical placement, neither of which this
+    // assertion controls.
     expect(
       await db
         .select()
         .from(rune.inventoryStacks)
-        .where(eq(rune.inventoryStacks.characterId, character.id)),
+        .where(eq(rune.inventoryStacks.characterId, character.id))
+        .orderBy(asc(rune.inventoryStacks.itemId)),
     ).toEqual([
       expect.objectContaining({ itemId: ITEM_IDS.refinedFerrite, quantity: 5 }),
       expect.objectContaining({ itemId: ITEM_IDS.slag, quantity: 4 }),

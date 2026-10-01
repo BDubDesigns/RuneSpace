@@ -1,10 +1,12 @@
 import { eq, inArray } from "drizzle-orm";
 import { afterEach, beforeAll, describe, expect, it } from "vitest";
+import { chatRetentionCutoff } from "@/game/domain/chat";
 import type { ChatMessageView, ChatSendResult, VisibleChatMessageView } from "@/game/schemas/chat";
 import {
   cleanupTestUser,
   createCharacterForUser,
   createTestUser,
+  withChatRetentionWindow,
   withPublicGameplayClosed,
 } from "./fixtures";
 
@@ -486,47 +488,59 @@ suite("issue #246 public chat (real PostgreSQL)", () => {
   });
 
   it("deletes messages past 90-day retention, in bounded batches", async () => {
-    const { userId, character } = await player();
-    const now = new Date();
-    const row = (body: string, ageMs: number) => ({
-      channel: "general",
-      senderPlayerAccountId: character.playerAccountId,
-      senderCharacterId: character.id,
-      senderCharacterName: character.displayName,
-      body,
-      createdAt: new Date(now.getTime() - ageMs),
+    await withChatRetentionWindow(db, async () => {
+      const { userId, character } = await player();
+      // This test's clock runs two days ahead (issue #278). Every send anywhere
+      // prunes rows expired in *real* time, so rows expired by the real clock
+      // can vanish under a parallel suite before this test counts them; these
+      // rows expire only on the test's clock. The retention-window lock keeps
+      // the other boundary tests from sweeping them or being swept by this one.
+      const now = new Date(Date.now() + 2 * DAY_MS);
+      const row = (body: string, ageMs: number) => ({
+        channel: "general",
+        senderPlayerAccountId: character.playerAccountId,
+        senderCharacterId: character.id,
+        senderCharacterName: character.displayName,
+        body,
+        createdAt: new Date(now.getTime() - ageMs),
+      });
+      const expiredRows = [row("expired a", 91 * DAY_MS), row("expired b", 90 * DAY_MS + 1)];
+      // Still inside real retention, so no ordinary send can prune them.
+      expect(
+        expiredRows.every((entry) => entry.createdAt.getTime() > chatRetentionCutoff(Date.now())),
+      ).toBe(true);
+      const expired = await db
+        .insert(rune.chatMessages)
+        .values(expiredRows)
+        .returning({ id: rune.chatMessages.id });
+      const [kept] = await db
+        .insert(rune.chatMessages)
+        .values(row("kept", 89 * DAY_MS))
+        .returning({ id: rune.chatMessages.id });
+      const expiredIds = expired.map((entry) => entry.id);
+
+      // Expired rows never render, even before anything prunes them.
+      const before = await chat.readChatHistory(userId, character.id, { channel: "general" }, now);
+      expect(before.messages.some((message) => expiredIds.includes(message.id))).toBe(false);
+      expect(before.messages.some((message) => message.id === kept!.id)).toBe(true);
+
+      // The bounded prune removes at most its batch; a send runs it.
+      const deleted = await chat.pruneExpiredChatMessages(db, now, 1);
+      expect(deleted).toBe(1);
+      sent(
+        await chat.sendChatMessage(
+          userId,
+          character.id,
+          { channel: "general", text: "prunes the rest" },
+          { now },
+        ),
+      );
+      const remaining = await db
+        .select({ id: rune.chatMessages.id })
+        .from(rune.chatMessages)
+        .where(inArray(rune.chatMessages.id, [...expiredIds, kept!.id]));
+      expect(remaining.map((entry) => entry.id)).toEqual([kept!.id]);
     });
-    const expired = await db
-      .insert(rune.chatMessages)
-      .values([row("expired a", 91 * DAY_MS), row("expired b", 90 * DAY_MS + 1)])
-      .returning({ id: rune.chatMessages.id });
-    const [kept] = await db
-      .insert(rune.chatMessages)
-      .values(row("kept", 89 * DAY_MS))
-      .returning({ id: rune.chatMessages.id });
-    const expiredIds = expired.map((entry) => entry.id);
-
-    // Expired rows never render, even before anything prunes them.
-    const before = await chat.readChatHistory(userId, character.id, { channel: "general" }, now);
-    expect(before.messages.some((message) => expiredIds.includes(message.id))).toBe(false);
-    expect(before.messages.some((message) => message.id === kept!.id)).toBe(true);
-
-    // The bounded prune removes at most its batch; a send runs it.
-    const deleted = await chat.pruneExpiredChatMessages(db, now, 1);
-    expect(deleted).toBe(1);
-    sent(
-      await chat.sendChatMessage(
-        userId,
-        character.id,
-        { channel: "general", text: "prunes the rest" },
-        { now },
-      ),
-    );
-    const remaining = await db
-      .select({ id: rune.chatMessages.id })
-      .from(rune.chatMessages)
-      .where(inArray(rune.chatMessages.id, [...expiredIds, kept!.id]));
-    expect(remaining.map((entry) => entry.id)).toEqual([kept!.id]);
   });
 
   it("serves the history route with the viewer's budget and ad status", async () => {

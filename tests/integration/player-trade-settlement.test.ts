@@ -751,9 +751,14 @@ suite("issue #267 player trade offers, settlement, and audit (real PostgreSQL)",
     }
   });
 
-  it("resolves final Confirm against Cancel to exactly one legal world", async () => {
-    const outcomes = new Set<string>();
-    for (let round = 0; round < 4; round += 1) {
+  // Four independent attempts, one per test (issue #279): each round builds
+  // its own two players and session, so bundling all four into one test only
+  // shared one 5-second budget between four rounds of fixture setup and
+  // teardown. Even attempts race the confirmer against the other trader's
+  // Cancel, odd attempts against its own.
+  it.each([0, 1, 2, 3])(
+    "resolves final Confirm against Cancel to exactly one legal world (attempt %i)",
+    async (round) => {
       const now = new Date();
       const [a, b] = [await player(), await player()];
       await setCredits(a, 10);
@@ -772,8 +777,8 @@ suite("issue #267 player trade offers, settlement, and audit (real PostgreSQL)",
       );
       const session = await sessionRow(sessionId);
       const audits = await auditsFor(sessionId);
+      // Either order is legal; no third world is.
       if (session.status === "completed") {
-        outcomes.add("committed");
         expect(confirm.status === "ok" && confirm.completed?.tradeId).toBe(sessionId);
         expect(audits).toHaveLength(1);
         const [afterA, afterB] = await world([a, b]);
@@ -781,18 +786,13 @@ suite("issue #267 player trade offers, settlement, and audit (real PostgreSQL)",
         expect(afterA.instances).toContainEqual({ id: cutter, itemId: SALVAGE, currentCharge: 3 });
         expect(afterB.credits).toBe(15);
       } else {
-        outcomes.add("canceled");
         expect(session.status).toBe("canceled");
         expect(refusal(confirm)).toBe("unavailable");
         expect(audits).toEqual([]);
         expect(await world([a, b])).toEqual(before);
       }
-      for (const userId of createdUsers.splice(0))
-        await cleanupTestUser(db, authSchema, rune, userId);
-    }
-    // Either order is legal; no third world was ever observed above.
-    expect(outcomes.size).toBeGreaterThanOrEqual(1);
-  });
+    },
+  );
 
   it("rolls back every transfer when the audit write fails", async () => {
     const now = new Date();

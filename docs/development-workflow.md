@@ -53,10 +53,23 @@ linked by `AGENTS.md`; do not solve size pressure by weakening critical policy
 or creating a documentation maze. If a harness version or configuration changes,
 repeat the audit and update this record with measured evidence.
 
-## One issue, one branch, one draft PR
+## One coherent change, one branch, one draft PR
 - Fetch `origin`, then create each dedicated branch from the latest `origin/main`.
-- Produce **one draft pull request** per issue. Do not open multiple PRs for the
-  same issue.
+- Each PR is **one coherent, bounded change**. Normally that is one issue. Do not
+  open multiple PRs for the same issue.
+- Several tracked issues may share one PR **only when the product owner
+  explicitly approves that bundle**, for example on the lead issue. Without that
+  approval, a related issue found along the way is reported, or filed with its
+  evidence, not folded in. Approval covers that bundle only; it does not license
+  umbrella PRs or widening feature PRs.
+- A bundle keeps the single-issue discipline: one lead branch and worktree from
+  fresh `origin/main`, one isolated database key (the lead issue's), one Draft
+  PR, and the full required validation once for the combined change. Work each
+  issue through its own evidence and focused tests, and commit it separately
+  where practical.
+- Completion stays truthful per issue. The PR body states each issue's outcome
+  and uses `closes #<n>` only for issues whose done-criteria are met; an issue
+  that is not resolved stays open with its evidence recorded.
 - Work stops at a draft PR for human review. Do not merge unless the product owner
   explicitly instructs it to merge after review.
 
@@ -745,7 +758,8 @@ behavior.
 The PR must include:
 - a clear summary of what changed
 - the exact branch, PR, local validation results, and canonical CI status
-- `closes #<issue number>` in the PR body for the delivered issue. The closing
+- `closes #<issue number>` in the PR body for each delivered issue (only those
+  whose done-criteria are met, in an approved bundle). The closing
   keyword is a body reference that takes effect only when the PR is merged;
   merging remains the product owner's explicit action, and a branch name or PR
   title does not replace the body reference
