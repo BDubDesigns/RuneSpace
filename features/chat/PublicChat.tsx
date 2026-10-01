@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ActionButton } from "@/components/ui/ActionButton";
 import { Feedback } from "@/components/ui/Feedback";
@@ -9,12 +9,16 @@ import { GAMEPLAY_ACCESS_REQUIRED_CODE } from "@/game/domain/gameplay-access";
 import {
   ChatMessageViewSchema,
   type ChatHistoryPage,
-  type ChatMessageView,
   type ChatSendResult,
+  type VisibleChatMessageView,
 } from "@/game/schemas/chat";
 import { usePlay } from "@/features/play/PlayContext";
 import { useSocial } from "@/features/social/SocialContext";
-import { postPromotedTradeAdAction, sendChatMessageAction } from "@/server/actions";
+import {
+  markChatMentionsReadAction,
+  postPromotedTradeAdAction,
+  sendChatMessageAction,
+} from "@/server/actions";
 import {
   applyLatestPage,
   applyMessage,
@@ -28,7 +32,13 @@ import {
 } from "./chat-feed";
 import { ChatComposer } from "./ChatComposer";
 import { useChat } from "./ChatContext";
-import { ChatMessageRow, MessageActionButton } from "./ChatMessageRow";
+import { ChatMessageRow, MessageActionButton, RedactedChatMessageRow } from "./ChatMessageRow";
+import {
+  atMentionLimit,
+  mentionsShown,
+  mergeMentionCandidates,
+  type MentionCandidate,
+} from "./mention-draft";
 import { SafetyFlow, type SafetyOutcome, type SafetySubject } from "./SafetyFlow";
 
 /**
@@ -44,11 +54,46 @@ import { SafetyFlow, type SafetyOutcome, type SafetySubject } from "./SafetyFlow
  *
  * Another player's message offers Whisper, Report, and Block (#247). A Block
  * on any tab of the account restarts both feeds from the server, so the
- * blocked account's messages disappear here at once; the server never sends
- * them again.
+ * blocked account's messages turn into placeholders here at once (#261): the
+ * server sends only their place, sender name, and time from then on, and the
+ * full message again after an Unblock.
+ *
+ * `@mentions` (#261): the composer offers characters already in view — recent
+ * senders in either feed, Whisper peers, and Nearby Players (read when a
+ * mention starts) — and Send names the ones chosen. While a feed with unread
+ * mentions of this character is on screen, they are marked read through the
+ * newest message shown, on every tab and device.
  */
 
 const CHANNEL_LABEL: Record<ChatChannel, string> = { general: "General", trade: "Trade" };
+
+/** Nearby Players are re-read for mentions at most this often. */
+const NEARBY_REFRESH_MS = 30_000;
+
+/** The characters at this character's location, as mention candidates by exact name. */
+async function fetchNearby(characterId: string): Promise<MentionCandidate[] | undefined> {
+  try {
+    const response = await fetch(
+      `/api/location-population?${new URLSearchParams({ characterId })}`,
+      {
+        cache: "no-store",
+        headers: { accept: "application/json" },
+      },
+    );
+    if (!response.ok) return undefined;
+    const body = (await response.json().catch(() => null)) as {
+      characters?: { displayName?: unknown }[];
+    } | null;
+    if (!Array.isArray(body?.characters)) return undefined;
+    return body.characters.flatMap((entry) =>
+      typeof entry.displayName === "string"
+        ? [{ name: entry.displayName, target: { name: entry.displayName } }]
+        : [],
+    );
+  } catch {
+    return undefined;
+  }
+}
 
 type Feeds = Record<ChatChannel, ChatFeed>;
 
@@ -95,7 +140,15 @@ export function PublicChat({
 }) {
   const router = useRouter();
   const { subscribe, onReconcile } = useSocial();
-  const { blocksRevision, refreshNotices, socialRestricted, startWhisper } = useChat();
+  const {
+    blocksRevision,
+    inbox,
+    mentions,
+    refreshMentions,
+    refreshNotices,
+    socialRestricted,
+    startWhisper,
+  } = useChat();
   const { requestAutoRefresh, state } = usePlay();
   const [feeds, setFeeds] = useState<Feeds>({ general: EMPTY_CHAT_FEED, trade: EMPTY_CHAT_FEED });
   const [loadError, setLoadError] = useState<string>();
@@ -110,6 +163,9 @@ export function PublicChat({
   const [actionsFor, setActionsFor] = useState<string>();
   const [safety, setSafety] = useState<SafetyAction>();
   const [now, setNow] = useState(() => Date.now());
+  const [chosenMentions, setChosenMentions] = useState<MentionCandidate[]>([]);
+  const [nearby, setNearby] = useState<MentionCandidate[]>([]);
+  const nearbyReadAt = useRef(0);
   const feedsRef = useRef(feeds);
   feedsRef.current = feeds;
   const logRef = useRef<HTMLDivElement>(null);
@@ -267,6 +323,76 @@ export function PublicChat({
     setFeeds((current) => ({ ...current, [target]: applyOlderPage(current[target], result.page) }));
   }
 
+  // Mention candidates, most relevant first: recent senders in either feed
+  // (newest first), then Whisper peers, then Nearby Players. Placeholders
+  // carry no sender id, so a blocked player is never offered.
+  const mentionCandidates = useMemo(() => {
+    const senders = [...feeds.general.messages, ...feeds.trade.messages]
+      .filter(
+        (message): message is VisibleChatMessageView =>
+          !message.redacted && message.senderCharacterId !== characterId,
+      )
+      .sort((a, b) => b.seq - a.seq)
+      .map((message) => ({
+        name: message.senderName,
+        target: { characterId: message.senderCharacterId },
+      }));
+    const peers = (inbox?.conversations ?? [])
+      .filter((conversation) => !conversation.peer.blockedByMe)
+      .map((conversation) => ({
+        name: conversation.peer.name,
+        target: { characterId: conversation.peer.characterId },
+      }));
+    return mergeMentionCandidates([senders, peers, nearby]);
+  }, [characterId, feeds, inbox, nearby]);
+
+  // A chosen mention lives only while the draft still shows it: once its
+  // `@Name` is edited away it is forgotten, so retyping that text by hand
+  // later stays plain text.
+  const changeDraft = useCallback((next: string) => {
+    setDraft(next);
+    setChosenMentions((chosen) => mentionsShown(next, chosen));
+  }, []);
+  const mentionLimitReached = atMentionLimit(draft, chosenMentions);
+
+  const loadNearby = useCallback(() => {
+    const at = Date.now();
+    if (at - nearbyReadAt.current < NEARBY_REFRESH_MS) return;
+    nearbyReadAt.current = at;
+    void fetchNearby(characterId).then((next) => {
+      if (next) setNearby(next);
+    });
+  }, [characterId]);
+
+  // Reading mentions: while this feed is on screen and holds unread mentions
+  // of this character, mark them read through its newest message. Only while
+  // the page is actually visible; a failed save retries on the next change.
+  const unreadHere = mentions?.unread[channel] ?? 0;
+  const newestShown = feed.loaded ? feed.messages.at(-1)?.seq : undefined;
+  const [pageVisible, setPageVisible] = useState(true);
+  useEffect(() => {
+    const update = () => setPageVisible(document.visibilityState === "visible");
+    update();
+    document.addEventListener("visibilitychange", update);
+    return () => document.removeEventListener("visibilitychange", update);
+  }, []);
+  const markingMentions = useRef<string | undefined>(undefined);
+  useEffect(() => {
+    if (!pageVisible || unreadHere === 0 || newestShown === undefined) return;
+    const key = `${channel}:${newestShown}:${unreadHere}`;
+    if (markingMentions.current === key) return;
+    markingMentions.current = key;
+    markChatMentionsReadAction({ characterId, channel, throughSeq: newestShown }).then(
+      (result) => {
+        if (!("error" in result)) refreshMentions();
+        else if (markingMentions.current === key) markingMentions.current = undefined;
+      },
+      () => {
+        if (markingMentions.current === key) markingMentions.current = undefined;
+      },
+    );
+  }, [channel, characterId, newestShown, pageVisible, refreshMentions, unreadHere]);
+
   const pressure = composerPressure(budget, channel, now);
   const promoting = channel === "trade" && promote;
   const adWaitMs = Math.max(0, adReadyAt - now);
@@ -279,10 +405,18 @@ export function PublicChat({
     setSending(true);
     setFeedback(undefined);
     let result: ChatSendResult | { error: string };
+    const mentionTargets = mentionsShown(draft, chosenMentions).map(
+      (candidate) => candidate.target,
+    );
     try {
       result = promoting
-        ? await postPromotedTradeAdAction({ characterId, text: draft })
-        : await sendChatMessageAction({ characterId, channel, text: draft });
+        ? await postPromotedTradeAdAction({ characterId, text: draft, mentions: mentionTargets })
+        : await sendChatMessageAction({
+            characterId,
+            channel,
+            text: draft,
+            mentions: mentionTargets,
+          });
     } catch {
       result = { error: "Message not sent. Check your connection and try again." };
     }
@@ -299,13 +433,14 @@ export function PublicChat({
       if (result.reason === "socially_restricted") refreshNotices();
       return;
     }
-    const message: ChatMessageView = result.message;
+    const message = result.message;
     stickToBottom.current = true;
     setFeeds((current) => ({
       general: applyMessage(current.general, "general", message),
       trade: applyMessage(current.trade, "trade", message),
     }));
     setDraft("");
+    setChosenMentions([]);
     if (message.promoted) {
       setPromote(false);
       setFeedback({ tone: "success", text: "Promoted ad posted to General and Trade." });
@@ -314,13 +449,13 @@ export function PublicChat({
     }
   }
 
-  async function whisper(message: ChatMessageView) {
+  async function whisper(message: VisibleChatMessageView) {
     setActionsFor(undefined);
     const error = await startWhisper({ characterId: message.senderCharacterId });
     if (error) setFeedback({ tone: "danger", text: error });
   }
 
-  function beginSafety(mode: SafetyAction["mode"], message: ChatMessageView) {
+  function beginSafety(mode: SafetyAction["mode"], message: VisibleChatMessageView) {
     setActionsFor(undefined);
     setFeedback(undefined);
     setSafety({
@@ -377,6 +512,16 @@ export function PublicChat({
         ) : null}
         <ol className="space-y-2">
           {feed.messages.map((message) => {
+            if (message.redacted) {
+              return (
+                <RedactedChatMessageRow
+                  id={message.id}
+                  key={message.id}
+                  senderName={message.senderName}
+                  sentAt={message.sentAt}
+                />
+              );
+            }
             const own = message.senderCharacterId === characterId;
             return (
               <ChatMessageRow
@@ -397,6 +542,7 @@ export function PublicChat({
                 body={message.body}
                 id={message.id}
                 key={message.id}
+                mentions={message.mentions}
                 onToggleActions={
                   own
                     ? undefined
@@ -406,6 +552,7 @@ export function PublicChat({
                 promoted={message.promoted}
                 senderName={message.senderName}
                 sentAt={message.sentAt}
+                viewerCharacterId={characterId}
               />
             );
           })}
@@ -454,16 +601,26 @@ export function PublicChat({
           draft={draft}
           idPrefix="public-chat"
           label={promoting ? "Promoted Trade ad" : `Message ${label}`}
+          mentionCandidates={mentionLimitReached ? [] : mentionCandidates}
           now={now}
-          onDraftChange={setDraft}
+          onDraftChange={changeDraft}
+          onMentionChosen={(candidate) => setChosenMentions((chosen) => [...chosen, candidate])}
+          onMentionQuery={loadNearby}
           onSubmit={() => void submit()}
-          placeholder={promoting ? "Write your promoted ad" : `Message ${label}`}
+          placeholder={
+            promoting ? "Write your promoted ad" : `Message ${label} — type @ to mention`
+          }
           pressure={pressure}
           sendBlocked={promoting && (adWaitMs > 0 || !canAfford)}
           socialRestricted={socialRestricted}
           sendLabel={promoting ? `Post ad · ${adPrice} Credits` : "Send"}
           sending={sending}
         >
+          {mentionLimitReached ? (
+            <p className="text-xs text-[color:var(--rs-text-secondary)]" data-chat-mention-limit="">
+              A message can mention up to {CHAT_POLICY.maxMentions} players.
+            </p>
+          ) : null}
           {promoting ? (
             <p className="text-xs text-[color:var(--rs-text-secondary)]" data-chat-promote-note="">
               {adWaitMs > 0

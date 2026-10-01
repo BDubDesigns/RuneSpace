@@ -104,14 +104,10 @@ describe("public Updates content boundary", () => {
     expect(getWikiArticle("player-trading")?.category).toBe("gear-and-credits");
   });
 
-  it("publishes the recipe-unlock Update as the newest, linking both recipe Wiki pages", () => {
-    const latest = getLatestPublishedUpdate();
-    expect(latest.slug).toBe("something-new-to-make");
-    // Newest by instant, so the account news boundary surfaces it (#156).
-    expect(Date.parse(latest.publishedAt)).toBeGreaterThan(
-      Date.parse(getPublicUpdate("meet-me-there")!.publishedAt),
-    );
-    const links = latest.body
+  it("publishes the recipe-unlock Update, linking both recipe Wiki pages", () => {
+    // Newer Updates have shipped since (#261), so it is found by slug.
+    const unlocks = getPublicUpdate("something-new-to-make")!;
+    const links = unlocks.body
       .flatMap((paragraph) => (typeof paragraph === "string" ? [] : paragraph))
       .filter((segment) => typeof segment !== "string");
     expect(links).toContainEqual({ text: "Mining & Refining", articleSlug: "mining-and-refining" });
@@ -119,6 +115,19 @@ describe("public Updates content boundary", () => {
       text: "Fabrication & Tinkering",
       articleSlug: "fabrication-and-tinkering",
     });
+  });
+
+  it("publishes the Chat/Social polish Update as the newest, linking Safety & Privacy", () => {
+    const latest = getLatestPublishedUpdate();
+    expect(latest.slug).toBe("heads-up");
+    // Newest by instant, so the account news boundary surfaces it (#156).
+    expect(Date.parse(latest.publishedAt)).toBeGreaterThan(
+      Date.parse(getPublicUpdate("something-new-to-make")!.publishedAt),
+    );
+    const links = latest.body
+      .flatMap((paragraph) => (typeof paragraph === "string" ? [] : paragraph))
+      .filter((segment) => typeof segment !== "string");
+    expect(links).toContainEqual({ text: "Safety & Privacy", articleSlug: "safety-and-privacy" });
   });
 
   it("uses one stable route projection for lookup and links", () => {

@@ -23,7 +23,8 @@ import { captureReviewScreenshot } from "./review-screenshot";
  * chat sender and from a profile without leaving Play, arrives live with
  * unread on the launcher and the Whispers tab, reading clears unread on the
  * account's other tab, the Block / Report / Report + Block paths are obvious
- * and work, a blocked player's public messages disappear for the blocker only,
+ * and work, a blocked player's public messages leave the blocker's feed (their
+ * placeholders are #261's `chat-social-polish` spec) for the blocker only,
  * and Blocked Players can unblock — all without horizontal overflow.
  *
  * Public feeds and the Crash Site population are game-wide and other tests

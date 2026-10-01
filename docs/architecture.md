@@ -154,7 +154,7 @@ only — never gameplay or social authority.
 - **Publisher:** `server/realtime.ts` owns `publishRealtimeEvent(audience, type,
   data)` and the audience model (`character`, `account`, `everyone`, which
   may exclude named accounts — a public message skips its sender's blockers,
-  #247). Alpha
+  #247, who each get the redacted form on their `account` instead, #261). Alpha
   fanout is single-process and in-memory, anchored on `globalThis` so every
   route and action in the process shares it. A future multi-process deployment
   replaces only `createInMemoryRealtimeFanout`; there is deliberately no Redis,
@@ -235,10 +235,14 @@ realtime substrate above. There is no Local/Nearby/Zone channel.
   the budget, the cooldown, and the Credit charge are all decided inside that
   transaction, and the charge and the row commit together or not at all. Only
   after commit does it publish `"chat.message"` to everyone. History is the
-  `GET /api/chat` route. Both halves pass through a viewer seam: reads through
-  `visibleToViewer` (in SQL, so pages stay full) and live deliveries through
-  `publishChatMessage`. Block (#247) suppresses blocked senders at both,
-  server-side, because no account identity reaches the browser. The send path
+  `GET /api/chat` route. Both halves pass through a viewer seam: reads select
+  `blockedByViewer` per row (in SQL, so every viewer pages the same rows and
+  cursors) and live deliveries go through `publishChatMessage`. A Block (#247)
+  redacts the blocked sender's rows for the blocker at both (#261): the row
+  keeps its place as a `RedactedChatMessageView` — id, `seq`, which feeds it
+  occupies, sender name at send, and time, built from an allow-list — and its
+  body, ad text, mentions, and sender id never leave the server for that
+  viewer, because no account identity reaches the browser to filter on. The send path
   itself — lock, prune, content, guardrail, budget — is `beginChatSend`, which
   Whispers share.
 - **Retention:** each send deletes at most a bounded batch of rows older than
@@ -253,8 +257,45 @@ realtime substrate above. There is no Local/Nearby/Zone channel.
   `features/chat/chat-feed.ts` merges every source — latest page, older page,
   delivery, reconnect re-read — by message id in `seq` order, restarts from the
   latest page when a reconnect cannot reach what it holds, and counts the
-  authoritative send budget down locally with no polling. General and Trade
-  raise no attention or unread count.
+  authoritative send budget down locally with no polling. Ordinary General and
+  Trade messages raise no attention or unread count; only an `@mention` does
+  (below).
+
+### Public `@mentions` (Issue #261)
+
+- **Identity:** a mention targets a stable character. The composer's `@`
+  list (`features/chat/mention-draft.ts`, `ChatComposer`) offers only
+  characters already in view — recent senders in either feed and Whisper peers
+  by id, Nearby Players (`GET /api/location-population`) by exact name — never
+  a directory. Choosing one inserts `@Name` and records the target; the send
+  names those targets (`mentions`, at most `CHAT_POLICY.maxMentions`).
+  Hand-typed `@Name` text is plain text.
+- **Resolution:** inside the send transaction, after `beginChatSend`,
+  `resolveMentions` resolves each target with `resolveCharacterTarget` (an id
+  anywhere, a name only at the sender's location) and requires another
+  account's character whose *current* name the body shows after `@`
+  (`mentionSpans` in `game/domain/chat.ts`, which the composer and renderer
+  share: exact, ending at a word boundary, and each `@` going to the longest
+  resolved name, so `@Alice` never mentions `Al`). Anything else refuses the
+  whole send as `invalid_mention`, before any ad charge; mentioning an account
+  the sender blocked is `blocked_by_you`. A target whose account blocked the
+  sender is accepted, stored already read, and never alerted, so the Block is
+  not disclosed and an Unblock never surfaces it.
+- **Persistence:** `chat_message_mentions` rows (message, character, account,
+  name at send, `read_at`) commit with their message and cascade with it
+  under retention. A message is still one canonical row and one send; a
+  promoted ad's mentions follow the same rules.
+- **Attention:** derived, never counted: `readChatMentions` (`GET
+  /api/chat/mentions`) counts the character's unread mentions on retained
+  messages per feed (an ad counts in both, once in the total), excluding any
+  whose sender and target accounts have a Block either way. A new Block
+  (`recordBlock`) also marks every unread mention between the two accounts
+  read, both ways, so lifting it never brings silenced attention back. `markChatMentionsRead` marks the
+  character's mentions in one feed through the `seq` a tab showed and
+  publishes `"chat.mentions.read"`; a send publishes `"chat.mention"` to each
+  unblocked target. Both are invalidations; `ChatContext` re-reads on them,
+  on reconnect, and on Block changes, and feeds a third launcher attention
+  source (`mentions`) and the General/Trade tab badges.
 
 ## Whispers, Block, and Report (Issue #247)
 
@@ -285,12 +326,19 @@ item.
   other character's retained messages above it), never counted. Reading
   advances it (capped, never backwards) and publishes `"whisper.read"` to that
   character's other tabs, which re-read `GET /api/whispers`. General and Trade
-  have no durable unread.
+  have no durable unread of their own; only `@mentions` do (#261).
+  **Hide** (#261, `hideWhisperConversation`) sets this side's
+  `whisper_participants.hidden_through_seq` to the newest `seq` its tab showed
+  (capped) and advances `last_read_seq` to it; the inbox omits the
+  conversation until a newer message exists from either side, and
+  `openWhisper` clears the marker. No message, the other side's row, Report
+  evidence, or moderation access is touched.
 - **Block:** `server/player-blocks.ts`. `player_blocks` holds the current
   account pairs; `player_block_events` appends every block and unblock with
-  both accounts, the characters involved, and the instant. A Block hides the
-  blocked account's public messages from the blocker only (reads and live
-  delivery), prevents Whispers in both directions, keeps prior history, and is
+  both accounts, the characters involved, and the instant. A Block redacts the
+  blocked account's public messages for the blocker only — placeholders in
+  place, reads and live delivery (#261) — suppresses `@mention` attention both
+  ways, prevents Whispers in both directions, keeps prior history, and is
   never disclosed to the blocked account — its refused Whisper reads like any
   undeliverable one. `blockBetween` / `isBlockedBetween` are the seam trade
   requests (#266) reuse. A Block publishes `"safety.blocks"` to the blocker's

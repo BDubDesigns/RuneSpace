@@ -55,7 +55,8 @@ small number of critical mobile player journeys.
   (`public-chat`, #246), Whispers, Block, and Report (`whispers-safety`,
   #247), moderation review, sanctions, notices, and appeals (`moderation`,
   #248), player trading (`player-trading`, #268), and the read-only System
-  conversation for recipe unlocks (`system-notices`, #274). It intentionally excludes noncanonical `smoke`, `ownership`,
+  conversation for recipe unlocks (`system-notices`, #274), and public `@mentions`,
+  blocked-player placeholders, and Whisper hide (`chat-social-polish`, #261). It intentionally excludes noncanonical `smoke`, `ownership`,
   `design-system`, `work-orders`, `public-*`, and QC Studio specs. It:
   - requires Node 22.x
   - requires a localhost-only disposable PostgreSQL database (refuses remote)

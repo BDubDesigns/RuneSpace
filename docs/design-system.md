@@ -98,6 +98,26 @@ optional note with a counter, and an **Also block** checkbox that turns the
 submit into "Report and block". The same-location character profile gains
 **Whisper**, **Report**, and **Block** under its identity.
 
+Public `@mentions` (#261) keep General and Trade quiet: only a message that
+mentions your character is personal. Typing `@` in either composer opens an
+in-flow list of matching characters under the box (touch-target rows,
+`--rs-accent-primary-subtle` on the active row; arrows, Enter, or Tab choose,
+Escape closes only the list), and choosing inserts `@Name`. In the log, each
+resolved `@Name` is bold in `--rs-chat-mention-other`, or
+`--rs-chat-mention-accent` when it is you, and a message that mentions you
+gets a 4px `--rs-chat-mention-accent` left rim and a "Mentions you" label —
+personal, never a fill or an alert, so it stays distinct from a promoted ad.
+Unread mentions badge the General or Trade tab and light the launcher in the
+News unread language, with the count in the accessible name ("General, 1
+unread mention").
+
+A blocked player's General/Trade message (#261) keeps its place as a
+placeholder: their name and time in the usual header, then *Message hidden —
+blocked player* in italic `--rs-text-muted`. It has no actions toggle,
+tappable name, or reveal — it is orientation, not a warning. A Whisper
+conversation's header adds a plain **Hide** beside **Report** / **Block**;
+hiding returns to the list with a success line saying how it comes back.
+
 The read-only **System** conversation (#274) is a Whisper-styled row pinned
 first in that list, with the same unread badge language; its unread count adds
 to the Whispers tab badge and lights the launcher as its own attention source.

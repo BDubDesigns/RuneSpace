@@ -2,19 +2,19 @@
   "schemaVersion": 1,
   "projectSlug": "runespace",
   "workState": "active",
-  "currentFocus": "Preparing the October 27 Soft Alpha: chat, Whispers, moderation, and player trading are in; level-ups now announce newly unlocked recipes through a System conversation.",
+  "currentFocus": "Preparing the October 27 Soft Alpha: chat, Whispers, moderation, trading, and recipe-unlock notices are in; polishing Chat/Social with @mentions, blocked-player placeholders, and Whisper Hide.",
   "currentChange": {
-    "summary": "Recipe-unlock notices: reaching a Refining or Fabrication level that unlocks recipes sends one grouped, read-only System message, pinned in Chat/Social Whispers.",
+    "summary": "Chat/Social polish: @mention players in General and Trade, blocked players' messages become placeholders instead of gaps, and Whisper conversations can be hidden.",
     "stage": "review",
-    "pullRequestNumber": 275
+    "pullRequestNumber": 276
   },
   "latestCompleted": {
-    "summary": "Player trading experience: Trade from a nearby player's profile, request cards in Chat/Social, a trade screen with Ready and Confirm, same-account trades, and a Player Trading Wiki page.",
+    "summary": "Recipe-unlock notices: reaching a Refining or Fabrication level that unlocks recipes sends one grouped, read-only System message, pinned in Chat/Social Whispers.",
     "date": "2026-09-30",
-    "url": "https://github.com/BDubDesigns/RuneSpace/pull/272"
+    "url": "https://github.com/BDubDesigns/RuneSpace/pull/275"
   },
-  "nextStep": "Human preview and playtest of recipe-unlock System notices: cross Refining 5 or Fabrication 5 through normal play and read System in Whispers (#274).",
-  "lastMeaningfulUpdate": "2026-09-30",
+  "nextStep": "Human preview and playtest of Chat/Social polish with two accounts: @mention someone in General or Trade, block a talkative player, and hide a Whisper (#261).",
+  "lastMeaningfulUpdate": "2026-10-01",
   "highlights": [
     {
       "summary": "Deep Jag is playable: brace the cave-in for Tansy, mine Galvanite behind it, and refine Galvanic Stock and Galvaferrite at the Processing Yard.",

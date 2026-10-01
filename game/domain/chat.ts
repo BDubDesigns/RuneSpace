@@ -40,6 +40,11 @@ export const CHAT_POLICY = {
     trade: { lowFrom: 1, highFrom: 2 },
     whisper: { lowFrom: 1, highFrom: 3 },
   } satisfies Record<ChatSendChannel, { lowFrom: number; highFrom: number }>,
+  /**
+   * The most characters one public message may `@mention` (#261). A mention is
+   * personal attention, so this bounds how many players one send can ping.
+   */
+  maxMentions: 5,
   promotedAd: {
     /** Paid by the active character. */
     priceCredits: 50,
@@ -81,6 +86,55 @@ export function normalizeChatMessage(
   if (body.length === 0) return { ok: false, reason: "empty" };
   if (chatMessageLength(body) > CHAT_POLICY.maxLength) return { ok: false, reason: "too_long" };
   return { ok: true, body };
+}
+
+/**
+ * The visible text a public `@mention` of `name` must contain (#261). A mention
+ * is a target the composer selected AND this text in the body: the selection
+ * alone never creates one, and neither does text that merely looks like one.
+ */
+export function mentionText(name: string): string {
+  return `@${name}`;
+}
+
+/** One `@Name` the body visibly shows, as a half-open span of the body. */
+export type MentionSpan = { start: number; end: number; name: string };
+
+/** A letter, digit, or `_` right after `@Name` means the name continues. */
+const NAME_CONTINUES = /[\p{L}\p{N}_]/u;
+
+/**
+ * Where a body shows `@Name` for any of `names`, left to right. At each `@`
+ * the longest name that fits wins, and only where the name ends at a word
+ * boundary — so `@Alice` never shows `Al`, and `@Bob Smith` shows Bob Smith,
+ * not Bob. Exact and case-sensitive: the body shows the name as given.
+ */
+export function mentionSpans(body: string, names: readonly string[]): MentionSpan[] {
+  const longestFirst = [...new Set(names)].sort((a, b) => b.length - a.length);
+  const spans: MentionSpan[] = [];
+  let index = body.indexOf("@");
+  while (index !== -1) {
+    const name = longestFirst.find((candidate) => {
+      const end = index + mentionText(candidate).length;
+      return (
+        body.startsWith(mentionText(candidate), index) &&
+        (end === body.length || !NAME_CONTINUES.test(body[end]!))
+      );
+    });
+    if (name) {
+      const end = index + mentionText(name).length;
+      spans.push({ start: index, end, name });
+      index = body.indexOf("@", end);
+    } else {
+      index = body.indexOf("@", index + 1);
+    }
+  }
+  return spans;
+}
+
+/** The names among `names` a body visibly mentions, per `mentionSpans`. */
+export function namesShownAsMentions(body: string, names: readonly string[]): Set<string> {
+  return new Set(mentionSpans(body, names).map((span) => span.name));
 }
 
 /** Successful sends still inside the rolling window at `now`. */

@@ -11,7 +11,7 @@ import {
   promotedAdCooldownRemaining,
   whisperParticipantKey,
 } from "@/game/domain/chat";
-import type { ChatHistoryPage, ChatMessageView } from "@/game/schemas/chat";
+import type { ChatHistoryPage, ChatMessageView, VisibleChatMessageView } from "@/game/schemas/chat";
 import {
   applyLatestPage,
   applyMessage,
@@ -180,8 +180,13 @@ describe("severe-term guardrail matching", () => {
   });
 });
 
-function message(seq: number, overrides: Partial<ChatMessageView> = {}): ChatMessageView {
+function message(
+  seq: number,
+  overrides: Partial<VisibleChatMessageView> = {},
+): VisibleChatMessageView {
   return {
+    redacted: false,
+    mentions: [],
     id: `m${seq}`,
     seq,
     channel: "general",

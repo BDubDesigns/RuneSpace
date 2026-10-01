@@ -1,9 +1,23 @@
 "use client";
 
-import type { FormEvent, KeyboardEvent, ReactNode } from "react";
+import {
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type FormEvent,
+  type KeyboardEvent,
+  type ReactNode,
+} from "react";
 import { ActionButton } from "@/components/ui/ActionButton";
 import { CHAT_POLICY, chatMessageLength } from "@/game/domain/chat";
 import { secondsUntil, type ComposerPressure } from "./chat-feed";
+import {
+  activeMentionQuery,
+  insertMention,
+  matchMentionCandidates,
+  type MentionCandidate,
+} from "./mention-draft";
 
 /**
  * The one chat composer (issues #246 and #247): General, Trade, and Whispers.
@@ -11,6 +25,12 @@ import { secondsUntil, type ComposerPressure } from "./chat-feed";
  * silently cutting text) and shows the account's shared send pressure; the
  * owning view decides what Send does and supplies any extra controls (Trade's
  * Promote). Enter sends, Shift+Enter breaks a line.
+ *
+ * Given `mentionCandidates` (General and Trade, #261), typing `@` opens a list
+ * of matching characters under the box; choosing one — tap, or arrows then
+ * Enter/Tab — inserts `@Name` and reports the choice, which is what makes a
+ * mention. Escape closes the list. The list sits in the form's flow rather
+ * than floating, so the panel's scroll never clips it on a phone.
  */
 export function ChatComposer({
   idPrefix,
@@ -28,6 +48,9 @@ export function ChatComposer({
   controls,
   children,
   dataChannel,
+  mentionCandidates,
+  onMentionChosen,
+  onMentionQuery,
 }: {
   idPrefix: string;
   label: string;
@@ -50,7 +73,64 @@ export function ChatComposer({
   /** Notes and feedback under the controls. */
   children?: ReactNode;
   dataChannel: string;
+  /** Characters `@` can mention, most relevant first; absent turns mentions off. */
+  mentionCandidates?: readonly MentionCandidate[];
+  onMentionChosen?: (candidate: MentionCandidate) => void;
+  /** A mention query just began, for a view that loads candidates lazily. */
+  onMentionQuery?: () => void;
 }) {
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const [caret, setCaret] = useState(0);
+  const [activeIndex, setActiveIndex] = useState(0);
+  // The query the player closed (Escape) or just completed; typing reopens.
+  const [closed, setClosed] = useState<string>();
+  const pendingCaret = useRef<number | undefined>(undefined);
+  const query = mentionCandidates ? activeMentionQuery(draft, caret) : undefined;
+  const queryKey = query ? `${query.start}:${query.query}` : undefined;
+  const options =
+    query && mentionCandidates && queryKey !== closed
+      ? matchMentionCandidates(mentionCandidates, query.query)
+      : [];
+  const listOpen = options.length > 0;
+  const active = Math.min(activeIndex, Math.max(0, options.length - 1));
+
+  const queryStart = query?.start;
+  const onMentionQueryRef = useRef(onMentionQuery);
+  onMentionQueryRef.current = onMentionQuery;
+  useEffect(() => {
+    if (queryStart !== undefined) onMentionQueryRef.current?.();
+  }, [queryStart]);
+  useEffect(() => setActiveIndex(0), [queryKey]);
+  // Leaving a query forgets that it was closed, so typing it again reopens.
+  useEffect(() => {
+    if (queryKey === undefined) setClosed(undefined);
+  }, [queryKey]);
+
+  // Put the caret after an inserted mention once React has rendered it.
+  useLayoutEffect(() => {
+    const at = pendingCaret.current;
+    const box = textareaRef.current;
+    if (at === undefined || !box) return;
+    pendingCaret.current = undefined;
+    box.focus();
+    box.setSelectionRange(at, at);
+    setCaret(at);
+  }, [draft]);
+
+  function trackCaret() {
+    const box = textareaRef.current;
+    if (box) setCaret(box.selectionStart ?? box.value.length);
+  }
+
+  function choose(candidate: MentionCandidate) {
+    if (!query) return;
+    const next = insertMention(draft, query.start, caret, candidate.name);
+    pendingCaret.current = next.caret;
+    setClosed(`${query.start}:${next.draft.slice(query.start + 1, next.caret)}`);
+    onDraftChange(next.draft);
+    onMentionChosen?.(candidate);
+  }
+
   const trimmedLength = chatMessageLength(draft.trim());
   const overLimit = trimmedLength > CHAT_POLICY.maxLength;
   const rateBlocked = pressure.pressure === "full";
@@ -64,6 +144,7 @@ export function ChatComposer({
   const composerId = `${idPrefix}-composer`;
   const pressureId = `${idPrefix}-pressure`;
   const counterId = `${idPrefix}-counter`;
+  const listId = `${idPrefix}-mentions`;
 
   function submit(event?: FormEvent) {
     event?.preventDefault();
@@ -71,6 +152,28 @@ export function ChatComposer({
   }
 
   function onKeyDown(event: KeyboardEvent<HTMLTextAreaElement>) {
+    if (listOpen && !event.nativeEvent.isComposing) {
+      if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+        event.preventDefault();
+        const step = event.key === "ArrowDown" ? 1 : -1;
+        setActiveIndex((active + step + options.length) % options.length);
+        return;
+      }
+      if ((event.key === "Enter" || event.key === "Tab") && !event.shiftKey) {
+        event.preventDefault();
+        // Tab chooses here; the Drawer's focus cycling must not also move.
+        event.stopPropagation();
+        choose(options[active]!);
+        return;
+      }
+      if (event.key === "Escape") {
+        event.preventDefault();
+        // Close the list only; the Drawer's own Escape is for closing it.
+        event.stopPropagation();
+        setClosed(queryKey);
+        return;
+      }
+    }
     if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) {
       event.preventDefault();
       submit();
@@ -83,16 +186,53 @@ export function ChatComposer({
         {label}
       </label>
       <textarea
+        aria-activedescendant={listOpen ? `${listId}-${active}` : undefined}
+        aria-autocomplete={mentionCandidates ? "list" : undefined}
+        aria-controls={listOpen ? listId : undefined}
         aria-describedby={`${counterId} ${pressureId}`}
         aria-invalid={overLimit || undefined}
         className="rs-bevel rs-focus block min-h-[4.5rem] w-full resize-none border bg-[color:var(--rs-surface-control)] px-3 py-2 text-sm text-[color:var(--rs-text-primary)] placeholder:text-[color:var(--rs-text-muted)] focus:border-[color:var(--rs-accent-primary)]"
         id={composerId}
-        onChange={(event) => onDraftChange(event.target.value)}
+        onChange={(event) => {
+          setCaret(event.target.selectionStart ?? event.target.value.length);
+          onDraftChange(event.target.value);
+        }}
+        onClick={trackCaret}
         onKeyDown={onKeyDown}
+        onKeyUp={trackCaret}
+        onSelect={trackCaret}
         placeholder={placeholder}
+        ref={textareaRef}
         rows={2}
         value={draft}
       />
+      {listOpen ? (
+        <div
+          aria-label="Mention a player"
+          className="border border-[color:var(--rs-border-structural)] bg-[color:var(--rs-surface-panel)] p-1"
+          data-chat-mention-options=""
+          id={listId}
+          role="listbox"
+        >
+          {options.map((candidate, index) => (
+            <button
+              aria-selected={index === active}
+              className={`rs-focus flex min-h-[var(--rs-touch-target)] w-full items-center px-2 text-left text-sm outline-none [overflow-wrap:anywhere] ${index === active ? "bg-[color:var(--rs-accent-primary-subtle)] text-[color:var(--rs-chat-mention-accent)]" : "text-[color:var(--rs-text-primary)]"}`}
+              data-chat-mention-option={candidate.name}
+              id={`${listId}-${index}`}
+              key={candidate.name}
+              // Keep focus (and the caret) in the box while choosing.
+              onMouseDown={(event) => event.preventDefault()}
+              onClick={() => choose(candidate)}
+              role="option"
+              tabIndex={-1}
+              type="button"
+            >
+              @{candidate.name}
+            </button>
+          ))}
+        </div>
+      ) : null}
       <div className="flex flex-wrap items-center justify-between gap-2">
         <SendPressureIndicator id={pressureId} now={now} pressure={pressure} />
         <span

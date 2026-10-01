@@ -130,6 +130,10 @@
   --rs-chat-promoted-border: var(--rs-accent-primary);
   --rs-chat-promoted-surface: var(--rs-accent-primary-subtle);
   --rs-chat-promoted-glow: 0 0 14px rgb(75 216 245 / 0.22);
+  /* Public @mentions (#261) reuse the unread-attention accent: a rim and label
+     on a message that mentions you, and the accent on each resolved @Name. */
+  --rs-chat-mention-accent: var(--rs-accent-primary);
+  --rs-chat-mention-other: var(--rs-accent-secondary);
   /* Semantic mission guidance (issue #124): one high-contrast neon-green
      treatment marks "this interaction advances your active mission". It is a
      distinct guidance affordance — not success/error state — and stays

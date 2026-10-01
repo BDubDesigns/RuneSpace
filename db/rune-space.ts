@@ -1291,6 +1291,12 @@ export const whisperConversations = pgTable("whisper_conversations", {
  * durable read position. Unread is derived, never counted: the other
  * character's retained messages with `seq` above `last_read_seq`. Reading on
  * any tab or device advances it, so unread clears everywhere.
+ *
+ * `hidden_through_seq` (#261) is this side's "Hide conversation": the newest
+ * message it hid, or null. The inbox leaves the conversation out until a
+ * message newer than that arrives — from either character — or this side
+ * reopens it. Hiding never deletes or alters a message and never touches the
+ * other side's row.
  */
 export const whisperParticipants = pgTable(
   "whisper_participants",
@@ -1305,10 +1311,48 @@ export const whisperParticipants = pgTable(
       .notNull()
       .references(() => playerAccounts.id, { onDelete: "restrict" }),
     lastReadSeq: bigint("last_read_seq", { mode: "number" }).notNull().default(0),
+    hiddenThroughSeq: bigint("hidden_through_seq", { mode: "number" }),
   },
   (table) => [
     primaryKey({ columns: [table.conversationId, table.characterId] }),
     index("whisper_participants_character_idx").on(table.characterId),
+  ],
+);
+
+/**
+ * The characters one public General/Trade message `@mentions` (issue #261).
+ *
+ * A mention is part of the one canonical message, never a copy of it: the row
+ * commits in the send's transaction and is deleted with its message by
+ * ordinary retention. The target is a stable character (and its account, the
+ * identity Block is checked against); `mentioned_character_name` is the name
+ * the message showed at send, so a later rename never makes it ambiguous.
+ *
+ * `read_at` is the mentioned character's durable read state: unread mention
+ * attention is derived from rows still null, minus any whose sender and target
+ * accounts have a Block between them. Reading the channel on any tab or device
+ * sets it, so attention clears everywhere. Never written for a Whisper.
+ */
+export const chatMessageMentions = pgTable(
+  "chat_message_mentions",
+  {
+    messageId: text("message_id")
+      .notNull()
+      .references(() => chatMessages.id, { onDelete: "cascade" }),
+    mentionedCharacterId: text("mentioned_character_id")
+      .notNull()
+      .references(() => characters.id, { onDelete: "restrict" }),
+    mentionedPlayerAccountId: text("mentioned_player_account_id")
+      .notNull()
+      .references(() => playerAccounts.id, { onDelete: "restrict" }),
+    mentionedCharacterName: text("mentioned_character_name").notNull(),
+    readAt: timestamp("read_at", { withTimezone: true }),
+  },
+  (table) => [
+    primaryKey({ columns: [table.messageId, table.mentionedCharacterId] }),
+    index("chat_message_mentions_unread_idx")
+      .on(table.mentionedCharacterId)
+      .where(sql`${table.readAt} is null`),
   ],
 );
 
@@ -2082,6 +2126,7 @@ export type OperatorAuditLog = typeof operatorAuditLogs.$inferSelect;
 export type NewOperatorAuditLog = typeof operatorAuditLogs.$inferInsert;
 export type RuneSpaceAccessState = typeof runespaceAccessState.$inferSelect;
 export type ChatMessage = typeof chatMessages.$inferSelect;
+export type ChatMessageMention = typeof chatMessageMentions.$inferSelect;
 export type RecipeUnlockNotice = typeof recipeUnlockNotices.$inferSelect;
 export type PlayerReport = typeof playerReports.$inferSelect;
 export type ModerationCase = typeof moderationCases.$inferSelect;

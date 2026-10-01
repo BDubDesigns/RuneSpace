@@ -1612,12 +1612,14 @@ const authoredWikiArticles = [
         paragraphs: [
           "Every General and Trade message is saved with its text, the channel, when it was sent, the character that sent it, that character's name at the time, and the player account the character belongs to. A promoted Trade ad is saved the same way, plus the Credits it cost. Everyone playing can read public messages while they're kept.",
           "RuneSpace keeps these so chat history loads when you open it, so the shared send limit and the promoted-ad cooldown can be applied to your account across all your characters and tabs, and so reported messages can be checked.",
+          "When a message @mentions someone, RuneSpace also saves which characters it mentions, their names at the time, and whether each of them has read it, so the mention lights up for that player and clears on every device once they've seen it. Mentions are part of the message: everyone who can read the message can see who it mentions, and they're deleted along with it.",
         ],
       },
       {
         heading: "Whispers",
         paragraphs: [
           "A Whisper is saved with its text, when it was sent, the character that sent it and its name at the time, the player account behind it, and the conversation it belongs to. RuneSpace also keeps a record of which two characters share each conversation and how far each has read, so unread Whispers clear on every device.",
+          "If you hide a conversation, RuneSpace notes that on your side only, so it stays out of your list until there's a new Whisper or you open it again. Hiding doesn't delete or change any Whisper, and the other player isn't told.",
           "Whispers aren't public: other players can't read a conversation they aren't in. They are not end-to-end encrypted, though. RuneSpace stores them and can read them, and a moderator may review them for a legitimate safety or moderation reason \u2014 a report, a serious safety concern, or an active investigation. There is no tool for casually browsing people's Whispers.",
         ],
       },
@@ -1633,6 +1635,7 @@ const authoredWikiArticles = [
         paragraphs: [
           "When you block someone, RuneSpace saves which account blocked which, the characters involved, and when. It also keeps a history of every block and unblock. The blocked player is never told.",
           "Blocks are kept so they keep working across every character on both accounts, and as safety information for moderators. They aren't on the 90-day message timer. Blocking someone doesn't keep any extra chat on its own.",
+          "While a block stands, the blocked player's General and Trade messages still take their place in your chat as a short \u201cMessage hidden\u201d line with their character's name and the time, so the conversation around them makes sense. What they wrote, and who they mentioned, is never sent to you. Their mentions of you don't light anything up, and you can't mention them until you unblock them.",
         ],
       },
       {

@@ -15,9 +15,8 @@ import {
   SKILL_IDS,
 } from "@/game/config/foundations";
 import { whisperParticipantKey } from "@/game/domain/chat";
-import { getPublishedUpdates } from "@/features/public-site/public-updates";
 import { cleanupTestUser, createCharacterForUser, createTestUser } from "../integration/fixtures";
-import { establishAuthenticatedSession, expect, openTestCharacter, test } from "./fixtures";
+import { expect, openTestCharacter, test } from "./fixtures";
 import { captureReviewScreenshot } from "./review-screenshot";
 
 /**
@@ -204,23 +203,16 @@ test("a real Refining level crossing lights a read-only, pinned System conversat
 });
 
 test.describe("recipe unlocks on the public site", () => {
-  test("Something New to Make is the newest Update and links both recipe Wiki pages", async ({
-    page,
-  }) => {
-    expect(getPublishedUpdates()[0]?.slug).toBe("something-new-to-make");
+  test("Something New to Make is published and links both recipe Wiki pages", async ({ page }) => {
+    // Newer Updates have shipped since (#261), so it is found by name, not position.
     await page.goto("/updates");
-    const newest = page
+    const listed = page
       .getByRole("list", { name: "Published Updates" })
       .getByRole("listitem")
-      .first();
+      .filter({ has: page.getByRole("link", { name: "Something New to Make", exact: true }) });
     await expect(
-      newest.getByRole("link", { name: "Something New to Make", exact: true }),
+      listed.getByRole("link", { name: "Something New to Make", exact: true }),
     ).toHaveAttribute("href", "/updates/something-new-to-make");
-    // The homepage's latest-Update section names it too.
-    await page.goto("/");
-    await expect(
-      page.getByRole("heading", { name: "Something New to Make", level: 2 }),
-    ).toBeVisible();
 
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto("/updates/something-new-to-make");
@@ -239,55 +231,5 @@ test.describe("recipe unlocks on the public site", () => {
         () => document.documentElement.scrollWidth <= document.documentElement.clientWidth,
       ),
     ).toBe(true);
-  });
-
-  test("News points a returning player at Something New to Make", async ({ browser }, testInfo) => {
-    test.skip(testInfo.project.name !== "chromium", "runs once");
-    const [latest, previous] = getPublishedUpdates();
-    expect(latest?.slug).toBe("something-new-to-make");
-    const tag = randomUUID().slice(0, 6);
-    const { userId, context } = await establishAuthenticatedSession(
-      browser,
-      `News ${tag}`,
-      `unlock-news-${tag}-${randomUUID().slice(0, 8)}@example.com`,
-    );
-    users.push(userId);
-    try {
-      const created = await createCharacterForUser(
-        db,
-        rune,
-        ownership,
-        characters,
-        userId,
-        `Newsy ${tag}`,
-        PORTRAIT_IDS.evaSalvageWelder,
-        { seedLegacyStarterCutter: false },
-      );
-      // Everything before Something New to Make is already read, so only it is news.
-      await db
-        .update(rune.playerAccounts)
-        .set({ newsReadThroughAt: new Date(previous!.publishedAt) })
-        .where(eq(rune.playerAccounts.id, created.playerAccountId));
-      const page = await context.newPage();
-      await openTestCharacter(page, created.id);
-      const banner = page.getByRole("banner");
-      await banner
-        .getByRole("button", { name: "News, unread update available", exact: true })
-        .click();
-      await expect(page).toHaveURL(/\/updates$/);
-      await expect(
-        page
-          .getByRole("list", { name: "Published Updates" })
-          .getByRole("listitem")
-          .first()
-          .getByRole("link", { name: "Something New to Make", exact: true }),
-      ).toBeVisible();
-      // Reading it cleared the account's unread state.
-      await openTestCharacter(page, created.id);
-      await expect(banner.getByRole("button", { name: "News", exact: true })).toBeVisible();
-      await expect(banner.getByRole("button", { name: /unread/i })).toHaveCount(0);
-    } finally {
-      await context.close();
-    }
   });
 });
