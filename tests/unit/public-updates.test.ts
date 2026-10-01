@@ -9,6 +9,7 @@ import {
   getPublishedUpdates,
   validatePublicUpdates,
 } from "@/features/public-site/public-updates";
+import { getWikiArticle } from "@/features/public-site/public-wiki";
 
 const baseUpdate = {
   slug: "first-update",
@@ -88,6 +89,20 @@ describe("public Updates content boundary", () => {
       width: 1536,
       height: 384,
     });
+  });
+
+  it("publishes the player-trading Update as the newest, linking the Player Trading Wiki page", () => {
+    const latest = getLatestPublishedUpdate();
+    expect(latest.slug).toBe("meet-me-there");
+    // Newest by instant, so the account news boundary surfaces it (#156).
+    expect(Date.parse(latest.publishedAt)).toBeGreaterThan(
+      Date.parse(getPublicUpdate("open-channels")!.publishedAt),
+    );
+    const links = latest.body
+      .flatMap((paragraph) => (typeof paragraph === "string" ? [] : paragraph))
+      .filter((segment) => typeof segment !== "string");
+    expect(links).toContainEqual({ text: "Player Trading", articleSlug: "player-trading" });
+    expect(getWikiArticle("player-trading")?.category).toBe("gear-and-credits");
   });
 
   it("uses one stable route projection for lookup and links", () => {

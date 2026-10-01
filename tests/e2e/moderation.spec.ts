@@ -1066,20 +1066,20 @@ test.describe("published policies and the Open Channels Update", () => {
     ).toBeVisible();
   });
 
-  test("Open Channels is the newest Update and links both policies", async ({ page }) => {
+  test("Open Channels is published and links both policies", async ({ page }) => {
+    // Newer Updates have shipped since (#268), so it is found by name, not position.
     await page.goto("/updates");
-    const listed = page.getByRole("list", { name: "Published Updates" }).getByRole("listitem");
-    await expect(
-      listed.first().getByRole("link", { name: "Open Channels", exact: true }),
-    ).toHaveAttribute("href", "/updates/open-channels");
-    await expect(listed.first().getByText("September 30, 2026", { exact: true })).toBeVisible();
+    const listed = page
+      .getByRole("list", { name: "Published Updates" })
+      .getByRole("listitem")
+      .filter({ has: page.getByRole("link", { name: "Open Channels", exact: true }) });
+    await expect(listed.getByRole("link", { name: "Open Channels", exact: true })).toHaveAttribute(
+      "href",
+      "/updates/open-channels",
+    );
+    await expect(listed.getByText("September 30, 2026", { exact: true })).toBeVisible();
 
-    // The homepage's latest-Update section names it too.
-    await page.goto("/");
-    await expect(page.getByRole("heading", { name: "Open Channels", level: 2 })).toBeVisible();
-
-    await page.goto("/updates");
-    await listed.first().getByRole("link", { name: "Open Channels", exact: true }).click();
+    await listed.getByRole("link", { name: "Open Channels", exact: true }).click();
     await expect(page).toHaveURL("/updates/open-channels");
     await expect(page).toHaveTitle("Open Channels — RuneSpace");
     await expect(page.getByRole("heading", { name: "Open Channels", level: 1 })).toBeVisible();
@@ -1112,47 +1112,6 @@ test.describe("published policies and the Open Channels Update", () => {
         page.getByRole("contentinfo").getByRole("link", { name: "Community Rules" }),
       ).toBeVisible();
       await expectNoHorizontalOverflow(page);
-    }
-  });
-
-  test("News points a returning player at Open Channels", async ({ browser }, testInfo) => {
-    test.skip(testInfo.project.name !== "chromium", "runs once");
-    const [latest, previous] = getPublishedUpdates();
-    expect(latest?.slug).toBe("open-channels");
-    const tag = randomUUID().slice(0, 6);
-    const { userId, context } = await establishAuthenticatedSession(
-      browser,
-      `News ${tag}`,
-      `moderation-news-${tag}-${randomUUID().slice(0, 8)}@example.com`,
-    );
-    users.push(userId);
-    try {
-      const character = await newCharacter(userId, `Newsy ${tag}`);
-      // Everything before Open Channels is already read, so only it is news.
-      await db
-        .update(rune.playerAccounts)
-        .set({ newsReadThroughAt: new Date(previous!.publishedAt) })
-        .where(eq(rune.playerAccounts.id, character.playerAccountId));
-      const page = await context.newPage();
-      await openTestCharacter(page, character.id);
-      const banner = page.getByRole("banner");
-      await banner
-        .getByRole("button", { name: "News, unread update available", exact: true })
-        .click();
-      await expect(page).toHaveURL(/\/updates$/);
-      await expect(
-        page
-          .getByRole("list", { name: "Published Updates" })
-          .getByRole("listitem")
-          .first()
-          .getByRole("link", { name: "Open Channels", exact: true }),
-      ).toBeVisible();
-      // Reading it cleared the account's unread state.
-      await openTestCharacter(page, character.id);
-      await expect(banner.getByRole("button", { name: "News", exact: true })).toBeVisible();
-      await expect(banner.getByRole("button", { name: /unread/i })).toHaveCount(0);
-    } finally {
-      await context.close();
     }
   });
 });
