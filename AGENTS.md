@@ -43,8 +43,8 @@ boundary.** This file is the repository's normative agent-behavior contract;
 
 ## Scope and pre-beta data compatibility
 
-- Work **only** the assigned issue. Do not begin another issue, expand scope,
-  or perform unrelated cleanup.
+- Work **only** the assigned issue or approved bundle. Do not begin another
+  issue, expand scope, or perform unrelated cleanup.
 - Never invent game mechanics, balance, content, lore, NPCs, quests, resources,
   architecture, or visual direction. Obtain product-owner approval for
   unresolved gameplay or visual choices.
@@ -140,7 +140,8 @@ Grep for these before re-deriving them from scratch; a recent session spent
 
 ## Issue execution workflow
 
-1. Implement one approved issue only and stop after that issue is done.
+1. One coherent, bounded change per PR: one issue, or several the product
+   owner explicitly bundled (`docs/development-workflow.md`). Then stop.
 2. Fetch the remote and create one fresh branch from the latest `origin/main`,
    not an assumed local branch. On a shared host use your own git
    worktree and `issue-<n>` database key; never edit another agent's worktree or
@@ -164,8 +165,8 @@ Grep for these before re-deriving them from scratch; a recent session spent
    marking a PR ready when the environment is available; report unavailable
    checks as unexecuted.
 7. Open or update exactly one Draft PR, only after completing the final
-   self-review and validation pass. Include `closes #<issue>`, branch and
-   PR identity, local and remote validation, architectural decisions,
+   self-review and validation pass. Include `closes #<n>` per finished issue,
+   branch and PR identity, local and remote validation, architectural decisions,
    limitations, unresolved questions, and whether gameplay, persistence, or
    player-facing behavior changed. Stop for human review; do not merge without
    explicit product-owner instruction.
