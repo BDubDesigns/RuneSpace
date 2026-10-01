@@ -865,6 +865,14 @@ async function okOffer(context: OfferContext): Promise<TradeCommandResult> {
   return { status: "ok", state: await readTradeState(context.tx, context.character, context.now) };
 }
 
+/**
+ * The refreshed activity instant. A command whose clock was read before it
+ * waited on the locks never moves the deadline backwards.
+ */
+function activityAt(context: OfferContext): Date {
+  return new Date(Math.max(context.session.lastActivityAt.getTime(), context.now.getTime()));
+}
+
 /** Record one participant's consent without touching the offers or their version. */
 async function recordConsent(
   context: OfferContext,
@@ -872,7 +880,7 @@ async function recordConsent(
 ): Promise<TradeCommandResult> {
   await context.tx
     .update(playerTradeSessions)
-    .set({ [column]: true, lastActivityAt: context.now })
+    .set({ [column]: true, lastActivityAt: activityAt(context) })
     .where(eq(playerTradeSessions.id, context.session.id));
   context.events.session(context.session, "updated");
   return okOffer(context);
@@ -893,7 +901,7 @@ async function advanceOffer(
       ...(credits ? { [CREDITS_COLUMN[credits.side]]: credits.credits } : {}),
       offerVersion: context.session.offerVersion + 1,
       ...NO_TRADE_CONSENT,
-      lastActivityAt: context.now,
+      lastActivityAt: activityAt(context),
     })
     .where(eq(playerTradeSessions.id, context.session.id));
   context.events.session(context.session, "updated");

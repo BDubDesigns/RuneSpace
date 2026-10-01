@@ -390,7 +390,10 @@ composition UI, is #268.
   command can slip between acceptance and the gate. When the gate finds a
   requester's request already lapsed, it writes the lapse down before the
   command runs, so a recipient who walks away and back cannot revive a
-  request whose requester has since started something.
+  request whose requester has since started something. Since #267 it does the
+  same for a claimed session past its inactivity expiry (locking the session
+  row after the character row), so a final Confirm already waiting on the
+  locks cannot settle a trade whose characters were released.
 - **Realtime:** after commit, `"trade.request"` and `"trade.session"`
   (`game/schemas/player-trade.ts`) prompt both participant characters to
   re-read `GET /api/trade`. They carry an id and the change only.
@@ -439,7 +442,8 @@ state is part of `GET /api/trade`.
   rows in id order, then the session row — the order every trade command
   uses — so edits, Ready, Change Offer, Confirm, and Cancel on one session are
   totally ordered. An expired session is written down (`expired`) by the first
-  command that finds it; valid commands refresh `last_activity_at`.
+  offer command or gated gameplay command that finds it; valid commands
+  refresh `last_activity_at`, never moving it backwards.
 - **Settlement:** the second Confirm settles in its own transaction under
   those locks: it rechecks co-location at the session's World Location,
   idleness, the counterpart account's gameplay access, and Block, then loads

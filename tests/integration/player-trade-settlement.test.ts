@@ -41,6 +41,7 @@ suite("issue #267 player trade offers, settlement, and audit (real PostgreSQL)",
   let trades: typeof import("@/server/player-trades");
   let audit: typeof import("@/server/player-trade-audit");
   let realtime: typeof import("@/server/realtime");
+  let inventory: typeof import("@/server/inventory");
   const createdUsers: string[] = [];
 
   beforeAll(async () => {
@@ -52,6 +53,7 @@ suite("issue #267 player trade offers, settlement, and audit (real PostgreSQL)",
     trades = await import("@/server/player-trades");
     audit = await import("@/server/player-trade-audit");
     realtime = await import("@/server/realtime");
+    inventory = await import("@/server/inventory");
   });
 
   afterEach(async () => {
@@ -967,6 +969,38 @@ suite("issue #267 player trade offers, settlement, and audit (real PostgreSQL)",
         .where(eq(rune.playerTradeClaims.sessionId, sessionId)),
     ).toEqual([]);
     expect(refusal(await trader(b, sessionId, idle).confirm())).toBe("unavailable");
+    expect(await world([a, b])).toEqual(assets);
+    expect(await auditsFor(sessionId)).toEqual([]);
+  });
+
+  it("makes an idle release final before the released character acts", async () => {
+    const t0 = new Date();
+    const [a, b] = [await player(), await player()];
+    const shale = await addStack(a, SHALE, 5);
+    const sessionId = await openSession(a, b, t0);
+    const before = plus(t0, 4 * MINUTE);
+    const [ta, tb] = [trader(a, sessionId, before), trader(b, sessionId, before)];
+    ok(await ta.addStack(SHALE, 5));
+    ok(await ta.ready());
+    ok(await tb.ready());
+    ok(await ta.confirm());
+
+    // Past the deadline, A is released and drops the Shale it had offered.
+    const released = plus(before, 5 * MINUTE);
+    const dropped = await inventory.discardInventoryStack(
+      a.userId,
+      a.character.id,
+      { stackId: shale, mode: "stack", expectedQuantity: 5 },
+      released,
+    );
+    expect(dropped.discard.status).toBe("discarded");
+    const row = await sessionRow(sessionId);
+    expect(row.status).toBe("expired");
+    expect(row.endedAt!.getTime()).toBe(plus(before, 5 * MINUTE).getTime());
+
+    // B's final Confirm, its clock read before the deadline, cannot revive it.
+    const assets = await world([a, b]);
+    expect(refusal(await tb.confirm())).toBe("unavailable");
     expect(await world([a, b])).toEqual(assets);
     expect(await auditsFor(sessionId)).toEqual([]);
   });

@@ -357,7 +357,9 @@ Hermes host.
   transfer back; capacity, mass, received-container, and last-Cutter
   refusals return the session to a correctable compose state with nothing
   moved; ownership and location are re-proved at commit; offers, version, and
-  consent survive a reload while idle expiry moves nothing; retries and late
+  consent survive a reload while idle expiry moves nothing, and a released
+  character's gameplay command makes that expiry final before a waiting,
+  earlier-clocked final Confirm can settle; retries and late
   Cancel/Ready/edits after completion are inert; the audit query seams; and the
   `updated`/`completed` realtime prompts, never sent for a refusal.
 - `tests/unit/gameplay-entrypoints.test.ts` lists the eight #267 server actions
