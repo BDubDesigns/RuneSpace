@@ -332,6 +332,37 @@ Hermes host.
   realtime prompts after commit.
 - Browser coverage arrives with the trade UI in #268.
 
+### Issue #267 player trade offer, settlement, and audit coverage
+
+- `tests/unit/player-trade.test.ts` also owns the consent phase rule and the
+  Credit and stack-quantity validators. `tests/unit/player-trade-settlement.test.ts`
+  owns the pure settlement planner: re-proof of both offers (balance, carried
+  quantity, equipped, Cargo, and foreign instances), the explicit offers it
+  returns for the audit, a full-Inventory one-for-one swap, stack merging into
+  a partial stack, slot and mass overflow, a received container adding no
+  capacity, and the last-Cutter guard (Cargo Cutters count, a Loadsteel Cutter
+  only counts at Mining 5, Cutter-for-Cutter swaps).
+- `tests/integration/player-trade-settlement.test.ts` is the primary proof,
+  against PostgreSQL, of the adversarial invariants: every malformed, foreign,
+  counterpart-side, nonparticipant, wrong-account, and stale mutation is
+  refused with the session row and offer lines byte-for-byte unchanged; the
+  server-owned version advances on every valid edit and clears both sides'
+  consent; stale Ready/Confirm cannot consent to a newer proposal;
+  `Promise.all` races of both final Confirms, a duplicated final Confirm, and
+  final Confirm against Cancel each end in exactly one legal world (one commit
+  and one audit row, or no movement and no audit row); a commit moves exactly
+  the agreed Credits, stacks, and the same unique instance with its charge,
+  including a one-sided gift and a same-account trade; a deterministic
+  database failure at the audit insert (a test-only trigger) rolls every
+  transfer back; capacity, mass, received-container, and last-Cutter
+  refusals return the session to a correctable compose state with nothing
+  moved; ownership and location are re-proved at commit; offers, version, and
+  consent survive a reload while idle expiry moves nothing; retries and late
+  Cancel/Ready/edits after completion are inert; the audit query seams; and the
+  `updated`/`completed` realtime prompts, never sent for a refusal.
+- `tests/unit/gameplay-entrypoints.test.ts` lists the eight #267 server actions
+  and their shared stale-page recovery helper.
+
 ## What to test when systems arrive
 For progression-sensitive systems, prioritize:
 - **exploit-sensitive transitions** (e.g., granting rewards)

@@ -362,6 +362,21 @@ export async function cleanupTestCharacter(db: Db, rune: Rune, characterId: stri
           eq(rune.playerTradeSessions.endedByCharacterId, characterId),
         ),
       );
+    // Offer lines and the economic audit (#267) name a session and characters.
+    await tx
+      .delete(rune.playerTradeAudits)
+      .where(
+        or(
+          inArray(rune.playerTradeAudits.tradeId, sessions),
+          eq(rune.playerTradeAudits.requesterCharacterId, characterId),
+          eq(rune.playerTradeAudits.recipientCharacterId, characterId),
+        ),
+      );
+    for (const table of [rune.playerTradeOfferStacks, rune.playerTradeOfferItems]) {
+      await tx
+        .delete(table)
+        .where(or(inArray(table.sessionId, sessions), eq(table.characterId, characterId)));
+    }
     await tx
       .delete(rune.playerTradeClaims)
       .where(

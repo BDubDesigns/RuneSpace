@@ -1,4 +1,4 @@
-import { and, asc, eq } from "drizzle-orm";
+import { and, asc, eq, inArray } from "drizzle-orm";
 import { cargoHoldItemInstances, inventoryStacks, itemInstances } from "@/db/rune-space";
 import type { ItemId } from "@/game/config/foundations";
 import {
@@ -6,6 +6,7 @@ import {
   type ExactStackRemovalPlan,
   type StackAdditionPlan,
 } from "@/game/domain/inventory";
+import type { WorkingInventoryDiff } from "@/game/domain/working-inventory";
 import type { DatabaseTransaction } from "@/server/action-resolution";
 
 /**
@@ -86,6 +87,62 @@ export async function applyStackRemovalPlan(
         ),
     ),
   ]);
+}
+
+/**
+ * Apply one already-planned whole-inventory diff (`workingInventoryDiff`) to a
+ * character's carried stacks: rows deleted, rows resized, rows created.
+ *
+ * The caller planned the diff from rows it loaded under lock in this same
+ * transaction. Every touched row is re-proved to still be that character's;
+ * if one is not, this throws, so the caller's transaction rolls back rather
+ * than writing a plan made against a different inventory.
+ */
+export async function applyCarriedStackDiff(
+  transaction: DatabaseTransaction,
+  input: { characterId: string; diff: WorkingInventoryDiff; now: Date },
+): Promise<void> {
+  const { characterId, diff, now } = input;
+  const touched = [...diff.deletedStackIds, ...diff.stackUpdates.map((update) => update.id)];
+  if (touched.length > 0) {
+    const owned = await transaction
+      .select({ id: inventoryStacks.id })
+      .from(inventoryStacks)
+      .where(
+        and(eq(inventoryStacks.characterId, characterId), inArray(inventoryStacks.id, touched)),
+      )
+      .for("update");
+    if (owned.length !== new Set(touched).size) {
+      throw new Error("A carried-stack diff named a row this character no longer has");
+    }
+  }
+  if (diff.deletedStackIds.length > 0) {
+    await transaction
+      .delete(inventoryStacks)
+      .where(
+        and(
+          eq(inventoryStacks.characterId, characterId),
+          inArray(inventoryStacks.id, [...diff.deletedStackIds]),
+        ),
+      );
+  }
+  for (const update of diff.stackUpdates) {
+    await transaction
+      .update(inventoryStacks)
+      .set({ quantity: update.quantity, updatedAt: now })
+      .where(and(eq(inventoryStacks.id, update.id), eq(inventoryStacks.characterId, characterId)));
+  }
+  if (diff.createdStacks.length > 0) {
+    await transaction.insert(inventoryStacks).values(
+      diff.createdStacks.map((stack) => ({
+        characterId,
+        itemId: stack.itemId,
+        quantity: stack.quantity,
+        createdAt: now,
+        updatedAt: now,
+      })),
+    );
+  }
 }
 
 export type StackableConsumptionResult =
