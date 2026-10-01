@@ -59,6 +59,13 @@ RuneSpace's application-wide play boundary is **Play**, not Mining. Mining was t
 - **Generic transaction/action lifecycle:** `server/action-resolution.ts` owns `withResolvedOwnedCharacter` / `withLockedOwnedCharacter`, the durable action cursor, locking, lazy resolution, and transition (continue/stop/replace) semantics. It knows nothing about Mining, Refining, Travel, or Welding.
 - **Generic Play state assembly:** `server/play.ts` owns `createPlayResolver`, `PlayGameplayState`, and shared state assembly/refresh; `server/play-state.ts` owns the shared `loadPlaySnapshot` read. Play dispatches persistence by the original `context.action.actionId`, hands authoritative resolved Mining/Refining attempt counts to generic mission progress before the action cursor advances, and refuses composed persistence when the original action context is absent.
 - **Activity-specific resolvers:** Mining (`server/mining.ts`), Refining (`server/refining.ts`), Travel (`server/travel.ts`), Welding (`server/welding.ts`), Fabrication (`server/fabrication.ts`), and Tinkering (`server/tinkering.ts`) each retain their own resolver implementation. Fabrication and Tinkering (#232) are deliberately their own authored boundaries — `game/domain/fabrication.ts`, `game/domain/manual-override.ts`, `game/domain/tinkering.ts`, with the shared hypothetical-inventory helper in `game/domain/working-inventory.ts` — not a generic crafting engine and not Refining variants; they reuse the one-active-action boundary, the shared bounded-run selection, the inventory planners, and the Mission framework rather than forking them. A started Fabrication workpiece's reservation is enforced by `server/fabrication-reservation.ts`, which every carried-item command that runs alongside an action calls. Leaf command modules (`server/mining-commands.ts`, `server/refining-commands.ts`, etc.) may depend on both their activity owner and the generic Play layer without creating cycles.
+- **Accepted-trade command gate (#266):** the owned-character boundaries
+  (`lockPlayableOwnedCharacter` in `server/action-resolution.ts`) refuse a
+  trade-engaged character right after locking its row and before any
+  reconciliation, via `assertNotTradeEngaged` (`server/player-trade-gate.ts`).
+  It is deny-by-default: only the Play state read and the Scavenge reveal
+  dismissal opt out with `allowDuringTrade`. See "Player trade requests and
+  sessions" below.
 - **Generic client Play shell:** `features/play/PlayContext.tsx`, `features/play/PlayScreen.tsx`, `features/play/PlayConsole.tsx`, and `features/play/command-gate.ts` own the Play context, shell composition, command gate, and boundary refresh. They compose every activity surface (Mining, Refining, Travel, Scavenging, Cargo Hold, Power Annex, missions, NPC interactions, location presentation) and host the shared Inventory/Equipment drawers.
 - **Feature-specific UI stays feature-owned:** `features/mining/MiningActivity.tsx`, `features/refining/RefiningConsole.tsx`, `features/travel/*`, `features/cargo/*`, etc. remain owned by their feature. Mining-specific concerns such as Salvage Cutter / Power Cell boosting and run-panel collapse behavior are not Play concerns.
 - **Inventory/Equipment are shared surfaces:** global surfaces and generic helpers live under `features/inventory/` rather than `features/mining/`. The carried-inventory mutation boundary lives in `server/carried-inventory.ts`.
@@ -130,7 +137,7 @@ context and run summary. That grammar is owned by `docs/design-system.md`
 ## Realtime/social delivery (Issue #245)
 
 Server → browser realtime delivery is **Server-Sent Events**. It is the one
-substrate that chat (#246), Whispers (#247), and incoming trade requests (#225)
+substrate that chat (#246), Whispers (#247), and player trade requests (#266)
 reuse; none of them opens its own transport. It is delivery and invalidation
 only — never gameplay or social authority.
 
@@ -286,7 +293,7 @@ item.
   delivery), prevents Whispers in both directions, keeps prior history, and is
   never disclosed to the blocked account — its refused Whisper reads like any
   undeliverable one. `blockBetween` / `isBlockedBetween` are the seam trade
-  requests (#225) reuse. A Block publishes `"safety.blocks"` to the blocker's
+  requests (#266) reuse. A Block publishes `"safety.blocks"` to the blocker's
   own account only, so its other tabs restart their feeds.
 - **Report:** `server/player-reports.ts`. `player_reports` is self-contained
   evidence: a message report binds the immutable message id (no foreign key,
@@ -317,7 +324,8 @@ Block and Report; `docs/moderation.md` is the contract.
 - **Enforcement seams:** a suspension is an input to `decideGameplayAccess`,
   loaded by `server/gameplay-access.ts`; a social restriction is refused in
   `beginChatSend` (every chat send) and by
-  `requireTradeRequestInitiationAllowed` for #225. Both are account-wide.
+  `requireTradeRequestInitiationAllowed`, which trade-request creation calls
+  (#266). Both are account-wide.
 - **Operator surface:** `server/moderation-commands.ts` (`requireAdmin`) over
   the internal `server/moderation-seams.ts`. Every sensitive read writes a
   `privileged_access_logs` row first (`server/privileged-access.ts`); every
@@ -326,6 +334,65 @@ Block and Report; `docs/moderation.md` is the contract.
   account), `/moderation` pages, the Characters callout, and pinned
   "Moderation notice" cards in Chat/Social, refreshed by
   `"moderation.notices"`.
+
+## Player trade requests and sessions (Issue #266)
+
+The first slice of same-location player trading (#225's contract): durable,
+authoritative requests and exclusive accepted sessions. Offers, Ready/Confirm,
+settlement, and the economic audit are #267; every player-facing surface,
+including the Chat/Social request cards, is #268.
+
+- **Rules:** `game/domain/player-trade.ts`. `PLAYER_TRADE_POLICY` is the one
+  home of the numbers (20-second request expiry, 4 requests per account per
+  rolling 30 seconds, the same-recipient escalation threshold, 5-minute
+  session inactivity). A request's and a session's effective state is derived
+  from stored facts and the request clock — expiry, and either character
+  leaving the request's World Location, apply on the next check with no job.
+- **Persistence:** `player_trade_requests` holds one row per request the
+  server created (refused attempts write nothing), so it is also the
+  short-lived ledger for the budget and escalation; a partial unique index
+  allows one stored `pending` row per requester. `player_trade_sessions` holds
+  session identity and lifecycle (`active`, `canceled`, `expired`), and
+  `player_trade_claims` — primary key `character_id` — holds each character's
+  claim on its one active session, so no character can be in two sessions,
+  same-account trades included. Derived outcomes are written down only when
+  they matter: before a requester's outgoing slot or a character's claim is
+  reused, and at acceptance; spent requests older than the rolling window are
+  pruned on creation; an accepted request is kept as the link to its session.
+- **Commands and reads:** `server/player-trades.ts` (create, cancel, decline,
+  accept, session cancel, and `getTradeState` behind `GET /api/trade`). Every
+  one requires gameplay access and proves the acting character is the right
+  participant; a foreign, guessed, or ended id reads like a missing one.
+  Creation locks the requester's row, then a per-account advisory lock, so
+  one account's tabs, devices, and characters share one serialized budget; it
+  reuses `resolveCharacterTarget`, `blockBetween` (a Block by the target reads
+  like any unavailable target), and `requireTradeRequestInitiationAllowed`.
+  Acceptance locks both characters' rows in id order, then — in one
+  statement, in id order — every request row it may write, revalidates
+  co-location, idleness, access, and Block, claims both characters, cancels
+  the recipient's own outgoing request, and invalidates every other pending
+  request involving either participant. Cancel, Decline, and session Cancel
+  lock only their own row. Trade commands lock characters `FOR NO KEY
+  UPDATE`: that still serializes with the gameplay boundary's `FOR UPDATE`,
+  but not with the foreign-key checks another trade's inserts take, which
+  would otherwise deadlock crossed requests. "Idle" means no
+  `active_actions` row at all: a trade command never reconciles or stops the
+  player's activity, so a finished-but-unresolved run still counts until
+  Play resolves it.
+- **Gate:** a character with an effectively pending outgoing request (sending
+  one holds the requester idle) or an active claim is trade-engaged.
+  `assertNotTradeEngaged` refuses it in the shared owned-character boundary
+  (see Play orchestration) and before a promoted Trade ad's Credit charge; the
+  refusal is an `OwnershipError` (409), so every gameplay handler already
+  returns its message. Receiving a request never engages anyone. Because the
+  gate runs under the character row lock and acceptance holds both rows, no
+  command can slip between acceptance and the gate. When the gate finds a
+  requester's request already lapsed, it writes the lapse down before the
+  command runs, so a recipient who walks away and back cannot revive a
+  request whose requester has since started something.
+- **Realtime:** after commit, `"trade.request"` and `"trade.session"`
+  (`game/schemas/player-trade.ts`) prompt both participant characters to
+  re-read `GET /api/trade`. They carry an id and the change only.
 
 ## Where minigames fit
 

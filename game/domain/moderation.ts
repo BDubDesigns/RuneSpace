@@ -84,8 +84,9 @@ export const SANCTION_KIND_LABEL: Record<SanctionKind, string> = {
  */
 export const SANCTION_ACCESS_AFFECTED: Record<SanctionKind, string> = {
   warning: "Nothing is restricted. This is a warning on your account.",
-  // Player trading (#225) will also refuse starting a trade request through
-  // `requireTradeRequestInitiationAllowed`; name it here when it ships.
+  // Since #266 the server also refuses starting a player trade request through
+  // `requireTradeRequestInitiationAllowed`; name it here once players can start
+  // one (#268 ships the trade UI).
   social_restriction:
     "You can't send General, Trade, or Whisper messages, or post promoted Trade ads. You can still play and read public chat.",
   suspension: "You can't enter RuneSpace gameplay on any character on this account.",

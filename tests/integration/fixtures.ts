@@ -350,6 +350,36 @@ export async function cleanupTestCharacter(db: Db, rune: Rune, characterId: stri
     await tx
       .delete(rune.whisperConversations)
       .where(inArray(rune.whisperConversations.id, conversations));
+    // Player trades (#266): claims and requests name a session, so they go
+    // first, then every session either side of which is this character.
+    const sessions = tx
+      .select({ id: rune.playerTradeSessions.id })
+      .from(rune.playerTradeSessions)
+      .where(
+        or(
+          eq(rune.playerTradeSessions.requesterCharacterId, characterId),
+          eq(rune.playerTradeSessions.recipientCharacterId, characterId),
+          eq(rune.playerTradeSessions.endedByCharacterId, characterId),
+        ),
+      );
+    await tx
+      .delete(rune.playerTradeClaims)
+      .where(
+        or(
+          eq(rune.playerTradeClaims.characterId, characterId),
+          inArray(rune.playerTradeClaims.sessionId, sessions),
+        ),
+      );
+    await tx
+      .delete(rune.playerTradeRequests)
+      .where(
+        or(
+          eq(rune.playerTradeRequests.requesterCharacterId, characterId),
+          eq(rune.playerTradeRequests.recipientCharacterId, characterId),
+          inArray(rune.playerTradeRequests.sessionId, sessions),
+        ),
+      );
+    await tx.delete(rune.playerTradeSessions).where(inArray(rune.playerTradeSessions.id, sessions));
     // Public chat (#246) keeps the sending character's identity on each row.
     await tx.delete(rune.chatMessages).where(eq(rune.chatMessages.senderCharacterId, characterId));
     await tx.delete(rune.characters).where(eq(rune.characters.id, characterId));

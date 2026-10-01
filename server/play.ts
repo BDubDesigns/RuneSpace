@@ -2419,6 +2419,8 @@ export async function getPlayGameplayState(
       );
     },
     now,
+    // A read: a trade-engaged character still loads and refreshes Play (#266).
+    { allowDuringTrade: true },
   );
 }
 
@@ -2913,28 +2915,34 @@ export async function acknowledgeScavengeReveal(
   revealId: string,
   now = new Date(),
 ): Promise<ScavengeAcknowledgmentResult> {
-  return withLockedOwnedCharacter(userId, characterId, async (transaction, context) => {
-    const deleted = await transaction
-      .delete(characterScavengeReveals)
-      .where(
-        and(
-          eq(characterScavengeReveals.id, revealId),
-          eq(characterScavengeReveals.characterId, context.character.id),
+  return withLockedOwnedCharacter(
+    userId,
+    characterId,
+    async (transaction, context) => {
+      const deleted = await transaction
+        .delete(characterScavengeReveals)
+        .where(
+          and(
+            eq(characterScavengeReveals.id, revealId),
+            eq(characterScavengeReveals.characterId, context.character.id),
+          ),
+        )
+        .returning({ id: characterScavengeReveals.id });
+      return {
+        state: await stateFromTransaction(
+          transaction,
+          context.character.id,
+          { successes: 0, failures: 0, awardedXp: 0 },
+          undefined,
+          undefined,
+          undefined,
+          context.character,
+          now,
         ),
-      )
-      .returning({ id: characterScavengeReveals.id });
-    return {
-      state: await stateFromTransaction(
-        transaction,
-        context.character.id,
-        { successes: 0, failures: 0, awardedXp: 0 },
-        undefined,
-        undefined,
-        undefined,
-        context.character,
-        now,
-      ),
-      acknowledged: deleted.length > 0,
-    };
-  });
+        acknowledged: deleted.length > 0,
+      };
+    },
+    // Presentation only: dismissing a reveal changes no trade-relevant state (#266).
+    { allowDuringTrade: true, now },
+  );
 }

@@ -1,0 +1,123 @@
+/**
+ * Same-location player trading: request and session rules (issue #266, the
+ * first slice of the #225 contract). Pure and framework-free; the server
+ * loads the stored facts and the request clock and asks these questions.
+ *
+ * Expiry and movement are never scheduled. Like a sanction, a request's or a
+ * session's effective state is derived from stored facts and `now` on every
+ * check, so a 20-second expiry or a recipient walking away applies on the very
+ * next request with no job. The server writes the derived outcome down only
+ * when it matters (before reusing a character's outgoing slot or claim, and at
+ * acceptance).
+ */
+
+/** Every tunable number in the request/session contract lives here. */
+export const PLAYER_TRADE_POLICY = {
+  /** An untouched pending request expires after 20 seconds. */
+  requestTtlMs: 20_000,
+  /** One Player account may create at most 4 requests per rolling 30 seconds. */
+  requestBudget: { maxRequests: 4, windowMs: 30_000 },
+  /**
+   * 4 requests from one sender account to one recipient account inside the
+   * same rolling window make Block Player / Decline & Block prominent for the
+   * recipient. Never an automatic Block or sanction.
+   */
+  repeatedRecipientThreshold: 4,
+  /** An accepted session expires after 5 minutes of trade inactivity. */
+  sessionInactivityMs: 5 * 60_000,
+} as const;
+
+export const TRADE_REQUEST_STATUSES = [
+  "pending",
+  "accepted",
+  "canceled",
+  "declined",
+  "expired",
+  "invalidated",
+] as const;
+export type TradeRequestStatus = (typeof TRADE_REQUEST_STATUSES)[number];
+
+export const TRADE_SESSION_STATUSES = ["active", "canceled", "expired"] as const;
+export type TradeSessionStatus = (typeof TRADE_SESSION_STATUSES)[number];
+
+export function tradeRequestExpiresAt(createdAt: Date): Date {
+  return new Date(createdAt.getTime() + PLAYER_TRADE_POLICY.requestTtlMs);
+}
+
+export type TradeRequestFacts = {
+  status: TradeRequestStatus;
+  /** The World Location both characters shared when the request was made. */
+  locationId: string;
+  expiresAt: Date;
+};
+
+/**
+ * A request's effective status at `now`. A stored `pending` request is only
+ * still pending while it has not expired and both characters remain at the
+ * World Location it was made in; otherwise it is effectively `expired` or
+ * `invalidated`. Expiry wins when both apply, since it needs no other fact.
+ */
+export function effectiveTradeRequestStatus(
+  request: TradeRequestFacts,
+  locations: { requesterLocationId: string; recipientLocationId: string },
+  now: Date,
+): TradeRequestStatus {
+  if (request.status !== "pending") return request.status;
+  if (now.getTime() >= request.expiresAt.getTime()) return "expired";
+  if (
+    locations.requesterLocationId !== request.locationId ||
+    locations.recipientLocationId !== request.locationId
+  ) {
+    return "invalidated";
+  }
+  return "pending";
+}
+
+export function tradeSessionExpiresAt(lastActivityAt: Date): Date {
+  return new Date(lastActivityAt.getTime() + PLAYER_TRADE_POLICY.sessionInactivityMs);
+}
+
+/** A session's effective status at `now`: an idle `active` session has expired. */
+export function effectiveTradeSessionStatus(
+  session: { status: TradeSessionStatus; lastActivityAt: Date },
+  now: Date,
+): TradeSessionStatus {
+  if (session.status !== "active") return session.status;
+  return now.getTime() >= tradeSessionExpiresAt(session.lastActivityAt).getTime()
+    ? "expired"
+    : "active";
+}
+
+/** The start of the rolling request window ending at `now` (exclusive). */
+export function tradeRequestWindowStart(now: Date): Date {
+  return new Date(now.getTime() - PLAYER_TRADE_POLICY.requestBudget.windowMs);
+}
+
+export type TradeRequestBudgetDecision =
+  | { allowed: true }
+  | { allowed: false; retryAfterMs: number };
+
+/**
+ * Whether one more request fits the account's rolling budget, given the
+ * creation instants of its requests still inside the window. Only requests the
+ * server actually created count, so a refused attempt never spends allowance.
+ */
+export function decideTradeRequestBudget(
+  createdAtsInWindow: readonly Date[],
+  now: Date,
+): TradeRequestBudgetDecision {
+  const { maxRequests, windowMs } = PLAYER_TRADE_POLICY.requestBudget;
+  const inWindow = createdAtsInWindow
+    .map((createdAt) => createdAt.getTime())
+    .filter((time) => time > now.getTime() - windowMs && time <= now.getTime())
+    .sort((a, b) => a - b);
+  if (inWindow.length < maxRequests) return { allowed: true };
+  // The oldest request that keeps the window full must age out first.
+  const oldestBlocking = inWindow[inWindow.length - maxRequests]!;
+  return { allowed: false, retryAfterMs: oldestBlocking + windowMs - now.getTime() };
+}
+
+/** Whether a sender account's requests to one recipient account warrant prominent Block. */
+export function isRepeatedTradeRequester(requestsInWindow: number): boolean {
+  return requestsInWindow >= PLAYER_TRADE_POLICY.repeatedRecipientThreshold;
+}

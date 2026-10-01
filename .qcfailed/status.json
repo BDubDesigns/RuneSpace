@@ -2,18 +2,18 @@
   "schemaVersion": 1,
   "projectSlug": "runespace",
   "workState": "active",
-  "currentFocus": "Preparing the October 27 Soft Alpha: chat, Whispers, Block, and Report are in, and moderation plus published Community Rules and Safety & Privacy pages complete the alpha social stack.",
+  "currentFocus": "Preparing the October 27 Soft Alpha: chat, Whispers, Block, Report, and moderation are in; same-location player trading is next, starting on the server.",
   "currentChange": {
-    "summary": "Moderation and player safety: operator case review with audited access, account-wide social restrictions and suspensions, in-game appeals, and published Community Rules and Safety & Privacy pages.",
+    "summary": "Player trading foundation: server-authoritative same-location trade requests with expiry and rate limits, and exclusive trade sessions that pause other gameplay.",
     "stage": "review",
-    "pullRequestNumber": 264
+    "pullRequestNumber": 270
   },
   "latestCompleted": {
-    "summary": "Whispers, Block, and Report: 1:1 character Whispers with durable unread, account-level Block with a Blocked Players list, and message and player reports that preserve evidence for review.",
+    "summary": "Moderation and player safety: operator case review with audited access, account-wide social restrictions and suspensions, in-game appeals, and published Community Rules and Safety & Privacy pages.",
     "date": "2026-09-30",
-    "url": "https://github.com/BDubDesigns/RuneSpace/pull/262"
+    "url": "https://github.com/BDubDesigns/RuneSpace/pull/264"
   },
-  "nextStep": "Human review and playtest of operator moderation, sanctions, and in-game appeals; then player-to-player trading (#225) on the shared social and sanction seams.",
+  "nextStep": "Human review of the trade request and session foundation; then trade offers, settlement, and audit (#267) and the player trading UI (#268).",
   "lastMeaningfulUpdate": "2026-09-30",
   "highlights": [
     {
