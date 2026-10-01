@@ -974,7 +974,7 @@ suite("issue #266 player trade requests and sessions (real PostgreSQL)", () => {
       expect(await claimsOf(c.character.id)).toHaveLength(1);
 
       const view = await stateOf(x, now);
-      expect(view).toEqual({ outgoing: null, incoming: [], session: null });
+      expect(view).toEqual({ outgoing: null, incoming: [], session: null, ended: null });
       expect(JSON.stringify(view)).not.toContain(sessionId);
     });
 

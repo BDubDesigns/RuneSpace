@@ -36,6 +36,9 @@ import { requirePlayableOwnedCharacter } from "@/server/gameplay-access";
  *   through the existing progression boundary.
  * - Only approved public identity and progression fields are returned: no
  *   emails, account IDs, character database IDs, or private gameplay state.
+ *   The one relationship fact is `sameAccount` (#268): whether the viewer's
+ *   own account owns the target, compared by account id here and never by
+ *   displayed Player names.
  */
 
 /** Generic refusal for any target the requester may not inspect. */
@@ -56,7 +59,7 @@ export async function getCharacterProfile(
   // character ID itself is immutable, so ownership cannot go stale; access is
   // re-read on every request. The location is NOT read here — the profile
   // statement below resolves it atomically at read time.
-  await requirePlayableOwnedCharacter(userId, activeCharacterId);
+  const viewer = await requirePlayableOwnedCharacter(userId, activeCharacterId);
 
   // Validate through the name boundary (SSOT): malformed or overlong raw query
   // input is refused rather than normalized into a lookup key.
@@ -76,6 +79,7 @@ export async function getCharacterProfile(
   const rows = await db
     .select({
       displayName: characters.displayName,
+      playerAccountId: characters.playerAccountId,
       ownerName: user.displayUsername,
       portraitId: characters.portraitId,
       ownedPortraitId: playerPortraitUnlocks.portraitId,
@@ -126,5 +130,6 @@ export async function getCharacterProfile(
     levelThresholds: skillLevelThresholds,
     skillDisplayName: (skillId) => getSkillPresentation(skillId)?.displayName,
     skillAccentTone: (skillId) => getSkillPresentation(skillId)?.accentTone,
+    sameAccount: rows[0]!.playerAccountId === viewer.playerAccountId,
   });
 }

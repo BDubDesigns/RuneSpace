@@ -1,0 +1,3 @@
+ALTER TABLE "player_trade_sessions" ADD COLUMN "settlement_refusal" text;--> statement-breakpoint
+ALTER TABLE "player_trade_sessions" ADD COLUMN "settlement_refusal_side" text;--> statement-breakpoint
+ALTER TABLE "player_trade_sessions" ADD CONSTRAINT "player_trade_sessions_settlement_refusal_check" CHECK (("player_trade_sessions"."settlement_refusal" is null or "player_trade_sessions"."settlement_refusal" in ('offer_unavailable', 'inventory_full', 'too_heavy', 'last_cutter', 'credit_limit', 'ineligible', 'empty_trade')) and ("player_trade_sessions"."settlement_refusal_side" is null or ("player_trade_sessions"."settlement_refusal" is not null and "player_trade_sessions"."settlement_refusal_side" in ('requester', 'recipient'))));

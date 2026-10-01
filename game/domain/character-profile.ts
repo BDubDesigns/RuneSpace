@@ -48,6 +48,13 @@ export type CharacterProfile = CharacterProgression & {
   ownerName: string | null;
   /** Safe portrait presentation: the selected catalog portrait or the neutral placeholder. */
   portrait: CharacterPortraitPresentation;
+  /**
+   * Whether the viewer's own Player account owns this character (#268). The
+   * server decides it from account identity, never from displayed names; it
+   * lets the profile offer Trade without the social actions (Whisper, Report,
+   * Block) that could only refuse against the player's own account.
+   */
+  sameAccount: boolean;
 };
 
 export function projectCharacterProfile(input: {
@@ -65,6 +72,8 @@ export function projectCharacterProfile(input: {
   portraitId?: string | null;
   /** Stable portrait IDs owned by the target character's player account. */
   ownedPortraitIds?: Iterable<string>;
+  /** The target belongs to the viewer's own Player account (default: no). */
+  sameAccount?: boolean;
 }): CharacterProfile {
   const progression = projectCharacterProgression({
     skillXp: input.skillXp,
@@ -79,5 +88,6 @@ export function projectCharacterProfile(input: {
     ownerName: input.ownerName,
     ...progression,
     portrait: resolveCharacterPortrait(input.portraitId, input.ownedPortraitIds),
+    sameAccount: input.sameAccount ?? false,
   };
 }

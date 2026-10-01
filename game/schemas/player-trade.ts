@@ -105,6 +105,31 @@ export type TradeSessionView = {
   yours: TradeOfferView;
   /** The counterpart's offer; read-only to the acting character. */
   theirs: TradeOfferView;
+  /**
+   * Why the latest final Confirm could not settle, in the acting character's
+   * words (#268). Present until either offer changes, so the participant who
+   * confirmed first also learns what to correct.
+   */
+  settlementRefusal?: { reason: TradeRefusalReason; message: string };
+};
+
+/** The offered lines of one side, without consent: what a finished trade moved. */
+export type TradeOfferLines = Omit<TradeOfferView, "ready" | "confirmed">;
+
+/**
+ * The acting character's most recent accepted session once it has ended
+ * (#268). Durable, so a tab that missed the `trade.session` prompt — or
+ * reconnects afterwards — still learns how the trade it was showing ended.
+ */
+export type EndedTradeView = {
+  id: string;
+  counterpart: TradeCounterpart;
+  outcome: "completed" | "canceled" | "expired";
+  endedAt: string;
+  /** For a canceled trade: whether the acting character canceled it. */
+  canceledByYou: boolean;
+  /** For a completed trade: exactly what the acting character gave and received. */
+  exchange?: { gave: TradeOfferLines; received: TradeOfferLines };
 };
 
 /** A committed trade, as either participant may learn it from Confirm. */
@@ -121,6 +146,8 @@ export type TradeStateView = {
   incoming: IncomingTradeRequestView[];
   /** The accepted session this character is in, if any. */
   session: TradeSessionView | null;
+  /** The character's latest session, when no session is active and it has ended. */
+  ended: EndedTradeView | null;
 };
 
 export type TradeRefusalReason =

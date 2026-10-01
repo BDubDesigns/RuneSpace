@@ -1,4 +1,4 @@
-import { and, asc, eq, gt, inArray, lte, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gt, inArray, lte, or, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { db } from "@/db";
 import {
@@ -54,8 +54,10 @@ import {
 } from "@/game/domain/player-trade-settlement";
 import { levelFromXp } from "@/game/domain/progression";
 import type {
+  EndedTradeView,
   IncomingTradeRequestView,
   TradeCommandResult,
+  TradeOfferLines,
   TradeOfferView,
   TradeRefusalReason,
   TradeRequestChange,
@@ -896,6 +898,7 @@ async function recordConsent(
 async function advanceOffer(
   context: OfferContext,
   credits?: { side: TradeSide; credits: number },
+  refusal?: SettlementRefusal,
 ): Promise<void> {
   await context.tx
     .update(playerTradeSessions)
@@ -903,6 +906,9 @@ async function advanceOffer(
       ...(credits ? { [CREDITS_COLUMN[credits.side]]: credits.credits } : {}),
       offerVersion: context.session.offerVersion + 1,
       ...NO_TRADE_CONSENT,
+      // Only a refused settlement leaves a reason; every other change clears it.
+      settlementRefusal: refusal?.reason ?? null,
+      settlementRefusalSide: refusal?.side ?? null,
       lastActivityAt: activityAt(context),
     })
     .where(eq(playerTradeSessions.id, context.session.id));
@@ -1352,10 +1358,15 @@ async function loadOfferContent(
   };
 }
 
-/** Both offers with each unique instance's current facts, for the participants. */
+/**
+ * Both offers with each unique instance's current facts, for the participants.
+ * A completed session's instances belong to the other side now, so its view
+ * (`settled`) keeps every offered instance whoever owns it.
+ */
 async function readOfferViews(
   reader: Reader,
   session: PlayerTradeSession,
+  { settled = false }: { settled?: boolean } = {},
 ): Promise<Record<TradeSide, TradeOfferView>> {
   const content = await loadOfferContent(reader, session);
   const instanceIds = [...content.requester.itemInstanceIds, ...content.recipient.itemInstanceIds];
@@ -1378,7 +1389,7 @@ async function readOfferViews(
     // offered; settlement would refuse it anyway.
     items: content[side].itemInstanceIds.flatMap((id) => {
       const instance = instances.find(
-        (candidate) => candidate.id === id && candidate.characterId === characterId,
+        (candidate) => candidate.id === id && (settled || candidate.characterId === characterId),
       );
       return instance
         ? [{ itemInstanceId: id, itemId: instance.itemId, currentCharge: instance.currentCharge }]
@@ -1395,7 +1406,7 @@ async function readOfferViews(
 
 const SETTLEMENT_REFUSALS: Record<
   TradeSettlementFailure,
-  { reason: TradeRefusalReason; yours: string; theirs: (name: string) => string }
+  { reason: SettlementRefusalReason; yours: string; theirs: (name: string) => string }
 > = {
   credits: {
     reason: "credit_limit",
@@ -1426,18 +1437,56 @@ const SETTLEMENT_REFUSALS: Record<
 
 const NOTHING_MOVED = "Nothing moved. Adjust the offers and Ready again.";
 
+/** The settlement refusals the session records, and whose side each was. */
+type SettlementRefusalReason = Extract<
+  TradeRefusalReason,
+  | "offer_unavailable"
+  | "inventory_full"
+  | "too_heavy"
+  | "last_cutter"
+  | "credit_limit"
+  | "ineligible"
+  | "empty_trade"
+>;
+type SettlementRefusal = { reason: SettlementRefusalReason; side: TradeSide | null };
+
+const INELIGIBLE_COPY = "You both need to still be here and free to trade.";
+
+/**
+ * A recorded settlement refusal in one participant's words (#268): the same
+ * copy the refused Confirm returned, from that participant's side, so the
+ * first confirmer learns what to correct as well as the second.
+ */
+function settlementRefusalMessage(
+  session: PlayerTradeSession,
+  viewerSide: TradeSide,
+  counterpartName: string,
+): { reason: SettlementRefusalReason; message: string } | undefined {
+  const reason = session.settlementRefusal as SettlementRefusalReason | null;
+  if (!reason) return undefined;
+  let text: string;
+  if (reason === "ineligible") text = INELIGIBLE_COPY;
+  else if (reason === "empty_trade") text = OFFER_COPY.empty;
+  else {
+    const copy = Object.values(SETTLEMENT_REFUSALS).find((entry) => entry.reason === reason)!;
+    text = session.settlementRefusalSide === viewerSide ? copy.yours : copy.theirs(counterpartName);
+  }
+  return { reason, message: `${text} ${NOTHING_MOVED}` };
+}
+
 /**
  * A final Confirm that cannot settle: nothing moves, consent is cleared, and
  * the session returns to compose on a new version, so the players can correct
- * the offers and no earlier Ready or Confirm can apply to them.
+ * the offers and no earlier Ready or Confirm can apply to them. The reason is
+ * recorded on the session for both participants until the next offer change.
  */
 async function refuseSettlement(
   context: OfferContext,
-  reason: TradeRefusalReason,
+  refusal: SettlementRefusal,
   error: string,
 ): Promise<TradeCommandResult> {
-  await advanceOffer(context);
-  return refused(reason, `${error} ${NOTHING_MOVED}`);
+  await advanceOffer(context, undefined, refusal);
+  return refused(refusal.reason, `${error} ${NOTHING_MOVED}`);
 }
 
 function settlementSide(
@@ -1492,11 +1541,7 @@ async function settleTrade(context: OfferContext): Promise<TradeCommandResult> {
     !(await accountMayPlay(tx, context.counterpart.playerAccountId)) ||
     blocked
   ) {
-    return refuseSettlement(
-      context,
-      "ineligible",
-      "You both need to still be here and free to trade.",
-    );
+    return refuseSettlement(context, { reason: "ineligible", side: null }, INELIGIBLE_COPY);
   }
 
   // Inventory rows lock in character-id order, after both character rows.
@@ -1513,13 +1558,13 @@ async function settleTrade(context: OfferContext): Promise<TradeCommandResult> {
     getEffectiveGameBalance(),
   );
   if (!plan.ok && plan.reason === "empty") {
-    return refuseSettlement(context, "empty_trade", OFFER_COPY.empty);
+    return refuseSettlement(context, { reason: "empty_trade", side: null }, OFFER_COPY.empty);
   }
   if (!plan.ok) {
     const copy = SETTLEMENT_REFUSALS[plan.reason];
     return refuseSettlement(
       context,
-      copy.reason,
+      { reason: copy.reason, side: plan.side },
       plan.side === context.side ? copy.yours : copy.theirs(context.counterpart.displayName),
     );
   }
@@ -1722,11 +1767,75 @@ async function readTradeState(
       yours: offers[side],
       theirs: offers[otherTradeSide(side)],
     };
+    const refusal = settlementRefusalMessage(claim.session, side, counterpart?.displayName ?? "");
+    if (refusal) session.settlementRefusal = refusal;
   }
 
   return {
     outgoing: outgoingRow ? requestView(outgoingRow.request, outgoingRow.recipient) : null,
     incoming,
     session,
+    ended: session ? null : await readEndedTrade(reader, character, now),
+  };
+}
+
+function offerLines(offer: TradeOfferView): TradeOfferLines {
+  return { credits: offer.credits, stacks: offer.stacks, items: offer.items };
+}
+
+/**
+ * The character's most recent session, if it has ended (#268): how it ended,
+ * and for a completed trade exactly what moved, from the stored offer lines
+ * the settlement committed. A stored `active` session past its inactivity
+ * expiry reads as expired, the same derivation every other check uses.
+ */
+async function readEndedTrade(
+  reader: Reader,
+  character: Character,
+  now: Date,
+): Promise<EndedTradeView | null> {
+  const [latest] = await reader
+    .select()
+    .from(playerTradeSessions)
+    .where(
+      or(
+        eq(playerTradeSessions.requesterCharacterId, character.id),
+        eq(playerTradeSessions.recipientCharacterId, character.id),
+      ),
+    )
+    .orderBy(desc(playerTradeSessions.createdAt), desc(playerTradeSessions.id))
+    .limit(1);
+  if (!latest) return null;
+  const status = effectiveTradeSessionStatus(
+    { status: latest.status as TradeSessionStatus, lastActivityAt: latest.lastActivityAt },
+    now,
+  );
+  if (status === "active") return null;
+  const side = sideOf(latest, character.id);
+  const counterpartId =
+    side === "requester" ? latest.recipientCharacterId : latest.requesterCharacterId;
+  const [counterpart] = await reader
+    .select({ id: characters.id, displayName: characters.displayName })
+    .from(characters)
+    .where(eq(characters.id, counterpartId));
+  const endedAt =
+    latest.status === "active"
+      ? tradeSessionExpiresAt(latest.lastActivityAt)
+      : (latest.endedAt ?? latest.lastActivityAt);
+  let exchange: EndedTradeView["exchange"];
+  if (status === "completed") {
+    const offers = await readOfferViews(reader, latest, { settled: true });
+    exchange = {
+      gave: offerLines(offers[side]),
+      received: offerLines(offers[otherTradeSide(side)]),
+    };
+  }
+  return {
+    id: latest.id,
+    counterpart: { characterId: counterpartId, name: counterpart?.displayName ?? "" },
+    outcome: status,
+    endedAt: endedAt.toISOString(),
+    canceledByYou: status === "canceled" && latest.endedByCharacterId === character.id,
+    ...(exchange ? { exchange } : {}),
   };
 }
