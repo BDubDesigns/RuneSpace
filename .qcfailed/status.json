@@ -2,18 +2,18 @@
   "schemaVersion": 1,
   "projectSlug": "runespace",
   "workState": "active",
-  "currentFocus": "Preparing the October 27 Soft Alpha: chat, Whispers, Block, Report, and moderation are in; same-location player trading is next, starting on the server.",
+  "currentFocus": "Preparing the October 27 Soft Alpha: chat, Whispers, Block, Report, and moderation are in; same-location player trading is being built server-first.",
   "currentChange": {
-    "summary": "Player trading foundation: server-authoritative same-location trade requests with expiry and rate limits, and exclusive trade sessions that pause other gameplay.",
+    "summary": "Player trade settlement: offers of Credits and items, Ready and Confirm on an exact version, an all-or-nothing commit that respects carry capacity and last-Cutter safety, and a permanent audit of every trade.",
     "stage": "review",
-    "pullRequestNumber": 270
+    "pullRequestNumber": 271
   },
   "latestCompleted": {
-    "summary": "Moderation and player safety: operator case review with audited access, account-wide social restrictions and suspensions, in-game appeals, and published Community Rules and Safety & Privacy pages.",
+    "summary": "Player trading foundation: server-authoritative same-location trade requests with expiry and rate limits, and exclusive trade sessions that pause other gameplay.",
     "date": "2026-09-30",
-    "url": "https://github.com/BDubDesigns/RuneSpace/pull/264"
+    "url": "https://github.com/BDubDesigns/RuneSpace/pull/270"
   },
-  "nextStep": "Human review of the trade request and session foundation; then trade offers, settlement, and audit (#267) and the player trading UI (#268).",
+  "nextStep": "Human review of trade offers, settlement, and audit; then the player trading UI with Chat/Social request cards (#268).",
   "lastMeaningfulUpdate": "2026-09-30",
   "highlights": [
     {
