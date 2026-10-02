@@ -59,6 +59,34 @@ export function SiteStashPanel() {
 
 const COMPLETION_NOTICE_DURATION_MS = 3_600;
 
+/**
+ * Bring newly opened content into view, but only when the player opened it.
+ *
+ * Mining alone can fill a phone screen, so a disclosure opened at the bottom
+ * would grow below the fold and the tap would look ineffective. `requestReveal`
+ * is called from the player's own tap; once React has rendered the opened
+ * content the target is scrolled to the top edge, leaving a long panel to scroll
+ * normally and the fixed bottom navigation clear of its start. Initial mount,
+ * background refreshes, Welding opening the detail by itself and collapsing
+ * never request it, so none of them move the page.
+ */
+function useRevealOnOpen<T extends HTMLElement>(open: boolean) {
+  const target = useRef<T>(null);
+  const requested = useRef(false);
+  useEffect(() => {
+    if (!open || !requested.current) return;
+    requested.current = false;
+    const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    target.current?.scrollIntoView({ block: "start", behavior: reduceMotion ? "auto" : "smooth" });
+  }, [open]);
+  return {
+    target,
+    requestReveal: () => {
+      requested.current = true;
+    },
+  };
+}
+
 function SiteStashDisclosure({ stash }: { stash: SiteStashState }) {
   const { state } = usePlay();
   const regionId = useId();
@@ -93,35 +121,53 @@ function SiteStashDisclosure({ stash }: { stash: SiteStashState }) {
   }, [stash.mountBuilt]);
 
   const open = expanded || welding;
+  const reveal = useRevealOnOpen<HTMLElement>(open);
 
   return (
-    <section data-site-stash-disclosure={stash.locationId} data-stash-stage={summary.stage}>
+    <section
+      className="scroll-mt-[calc(env(safe-area-inset-top)+var(--rs-space-3))]"
+      data-site-stash-disclosure={stash.locationId}
+      data-stash-stage={summary.stage}
+      ref={reveal.target}
+    >
       <p aria-live="polite" className="sr-only" data-site-stash-announcement>
         {announcement}
       </p>
       <button
         aria-controls={regionId}
         aria-expanded={open}
-        className="rs-focus flex min-h-[var(--rs-touch-target)] w-full flex-wrap items-baseline justify-between gap-x-3 gap-y-1 border border-[color:var(--rs-border-structural)] bg-[color:var(--rs-surface-panel)] px-3 py-2 text-left disabled:cursor-not-allowed disabled:opacity-70"
+        className="rs-focus block min-h-[var(--rs-touch-target)] w-full border border-[color:var(--rs-border-structural)] bg-[color:var(--rs-surface-panel)] px-3 py-2 text-left disabled:cursor-not-allowed disabled:opacity-70"
         data-site-stash-toggle
         disabled={welding}
-        onClick={() => setExpanded((current) => !current)}
+        onClick={() => {
+          if (!open) reveal.requestReveal();
+          setExpanded(!open);
+        }}
         type="button"
       >
-        <span className="font-display text-sm font-bold uppercase tracking-[0.16em] text-[color:var(--rs-text-primary)]">
-          {summary.label}
+        {/* Two intentional rows: the title and its control share the first, and
+            the summary, however long, takes the whole second. The summary never
+            decides where the control lands. */}
+        <span className="flex items-center justify-between gap-3">
+          <span
+            className="min-w-0 font-display text-sm font-bold uppercase tracking-[0.16em] text-[color:var(--rs-text-primary)]"
+            data-site-stash-title
+          >
+            {summary.label}
+          </span>
+          <span
+            aria-hidden="true"
+            className="shrink-0 font-display text-xs uppercase tracking-wide text-[color:var(--rs-accent-primary)]"
+            data-site-stash-indicator
+          >
+            {welding ? "Welding" : open ? "Hide" : "Show"}
+          </span>
         </span>
         <span
-          className="min-w-0 flex-1 text-sm text-[color:var(--rs-text-secondary)]"
+          className="mt-1 block text-sm text-[color:var(--rs-text-secondary)]"
           data-site-stash-summary
         >
           {summary.detail}
-        </span>
-        <span
-          aria-hidden="true"
-          className="font-display text-xs uppercase tracking-wide text-[color:var(--rs-accent-primary)]"
-        >
-          {welding ? "Welding" : open ? "Hide" : "Show"}
         </span>
       </button>
       {noticeVisible ? (
@@ -154,6 +200,7 @@ function SiteStashDisclosure({ stash }: { stash: SiteStashState }) {
 function BuiltStash({ stash }: { stash: SiteStashState }) {
   const { acceptState, enqueueForeground, foregroundBusy, releaseCommand, state } = usePlay();
   const [storageOpen, setStorageOpen] = useState(false);
+  const revealStorage = useRevealOnOpen<HTMLDivElement>(storageOpen);
   // Held here, not in the surface, so the phone view survives close and reopen.
   const [storageMode, setStorageMode] = useState<StorageArea>("carried");
   const [chooser, setChooser] = useState<"install" | "swap">();
@@ -268,9 +315,12 @@ function BuiltStash({ stash }: { stash: SiteStashState }) {
             <ActionButton
               data-stash-open
               intent="primary"
-              onClick={() => setStorageOpen((open) => !open)}
+              onClick={() => {
+                if (!storageOpen) revealStorage.requestReveal();
+                setStorageOpen(!storageOpen);
+              }}
             >
-              {storageOpen ? "Close Stash" : "Stash"}
+              {storageOpen ? "Close Stash" : "Open Stash"}
             </ActionButton>
           </div>
           <div className="flex flex-wrap gap-3">
@@ -343,7 +393,11 @@ function BuiltStash({ stash }: { stash: SiteStashState }) {
             </div>
           ) : null}
           {storageOpen ? (
-            <div data-stash-storage>
+            <div
+              className="scroll-mt-[calc(env(safe-area-inset-top)+var(--rs-space-3))]"
+              data-stash-storage
+              ref={revealStorage.target}
+            >
               <StorageTransferSurface
                 labels={SITE_STASH_STORAGE_LABELS}
                 mode={storageMode}

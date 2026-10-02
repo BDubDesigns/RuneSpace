@@ -658,7 +658,7 @@ The server projects `siteStash` only for the character's current site and only
 when the mount is already built or the gate is met. Before that nothing about a
 stash exists to render: no Build Stash Mount panel, locked teaser or disabled
 control. Once qualified the standard `RepairWorkPanel` builds the mount; then
-**Install Container**; then **Stash** (the shared surface) with **Swap
+**Install Container**; then **Open Stash** (the shared surface) with **Swap
 Container** and **Remove Container**.
 
 A stash is secondary to the site's own activity, so it renders as a compact
@@ -672,6 +672,29 @@ time-sensitive Clean Pass are never hidden; it stays open after Stop. When the
 mount completes, the wrapper (not the unmounting construction panel) announces
 it, folds back to the bar, and the bar then asks for a container. `RepairWorkPanel`
 itself is unchanged.
+
+The bar is two fixed rows: the title (**Build Stash Mount**, later **Site
+Stash**) and its Show/Hide control share the first, and the summary takes the
+whole second, so a long recipe can never decide where the control sits. When the
+player themself opens the detail, or **Open Stash** on a built stash, the opened
+content is scrolled to the top of the viewport once rendered (Mining alone can
+fill a phone screen, so it would otherwise open below the fold). Page load,
+background refreshes, Welding opening the detail on its own and collapsing never
+scroll. Reduced motion scrolls without animation.
+
+### Activity ownership of the running action
+
+`state.activeAction` is one global value, and a site's own activity and its
+stash's Welding are both live at once at four sites. Every activity surface
+therefore treats it as its own only when the `actionId` is one of its own: Mining
+by the current `miningSource.actionId`, Refining by `refiningActionIds()`, a
+Welding mount, the Cargo Hold and the Crew Stop by their repair target's action,
+and the Workbench, Work Orders, Tinkering and Fabrication by the server
+projection's own `active` flags and `workpiece`, each of which exists only when
+the running action's ID is that activity's. While another activity's action is running, an activity
+shows no attempt meter, timing label or Stop control, its Start control is
+disabled, and its durable counts (a mount's completed welds, a run's totals) move
+only with the work that earns them.
 
 ### Container authority and lifecycle
 

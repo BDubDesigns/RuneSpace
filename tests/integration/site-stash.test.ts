@@ -6,6 +6,7 @@ import {
   getRepairTargetBalance,
   standardSkillLevelThresholds,
 } from "@/game/config/balance";
+import { BOUNDED_RUN_MAX } from "@/game/domain/bounded-run";
 import {
   ACTION_IDS,
   ITEM_IDS,
@@ -36,6 +37,8 @@ suite("issue #284 character-owned site stashes (real PostgreSQL)", () => {
   let repairs: typeof import("@/server/repair-commands");
   let cargo: typeof import("@/server/cargo-hold");
   let equipment: typeof import("@/server/equipment");
+  let miningCommands: typeof import("@/server/mining-commands");
+  let refiningCommands: typeof import("@/server/refining-commands");
   const createdUsers: string[] = [];
   const balance = getEffectiveGameBalance();
   const random = { nextBasisPoints: () => 0, nextUnit: () => 0 };
@@ -63,6 +66,8 @@ suite("issue #284 character-owned site stashes (real PostgreSQL)", () => {
     repairs = await import("@/server/repair-commands");
     cargo = await import("@/server/cargo-hold");
     equipment = await import("@/server/equipment");
+    miningCommands = await import("@/server/mining-commands");
+    refiningCommands = await import("@/server/refining-commands");
   });
 
   afterEach(async () => {
@@ -1114,6 +1119,135 @@ suite("issue #284 character-owned site stashes (real PostgreSQL)", () => {
       );
       await Promise.all(ids.map((id) => deposit(made, id, 1)));
       expect((await stashRows(made.characterId)).stacks).toHaveLength(3);
+    });
+  });
+
+  describe("a stash's Welding shares the running action with the site's own activity", () => {
+    const SECTIONS_BEFORE_STOP = 2;
+
+    /** Material in and Welding started at the site's mount; returns the start time. */
+    async function startMountWelding(
+      made: { userId: string; characterId: string },
+      site: (typeof SITES)[keyof typeof SITES],
+      materials: readonly (readonly [string, number])[],
+    ) {
+      await moveTo(made.characterId, site.location);
+      for (const [itemId, quantity] of materials)
+        await giveStack(made.characterId, itemId, quantity);
+      await repairs.contributeRepairMaterials(
+        made.userId,
+        made.characterId,
+        {
+          targetId: site.target,
+          expectedMaterials: Object.fromEntries(materials),
+        },
+        now,
+        random,
+      );
+      const started = await repairs.startWelding(
+        made.userId,
+        made.characterId,
+        site.target,
+        now,
+        random,
+      );
+      expect(started.activeAction).toBeDefined();
+    }
+
+    it("projects no other activity as running while the mount's Welding is", async () => {
+      // Rusk holds the Workbench, Work Orders, Tinkering and Fabrication beside
+      // the stash; each reads its own flag, never the global action.
+      const made = await makeCharacter();
+      await setWelding(made.characterId, 5);
+      await startMountWelding(made, SITES.rusk, [
+        [ITEM_IDS.galvanicStock, 3],
+        [ITEM_IDS.mountingBracket, 2],
+      ]);
+      const during = await state(made.userId, made.characterId, new Date(now.getTime() + 1_000));
+      expect(during.activeAction?.actionId).toBe(ACTION_IDS.siteStashRuskRecoveryWelding);
+      expect(during.practice.active).toBe(false);
+      expect(during.workOrders.active?.active ?? false).toBe(false);
+      expect(during.tinkering.active).toBe(false);
+      expect(during.fabricationStation.workpiece).toBeUndefined();
+      expect(during.miningSource).toBeUndefined();
+    });
+
+    it("leaves a mount's welds and Clean Pass alone while Mining runs", async () => {
+      const made = await makeCharacter();
+      await startMountWelding(made, SITES.theJag, [
+        [ITEM_IDS.refinedFerrite, 6],
+        [ITEM_IDS.slag, 3],
+      ]);
+      const stopAt = new Date(now.getTime() + SECTIONS_BEFORE_STOP * SECTION_MS);
+      await repairs.stopWelding(made.userId, made.characterId, SITES.theJag.target, stopAt, random);
+      const afterWelding = await state(made.userId, made.characterId, stopAt);
+      expect(afterWelding.siteStash?.repair.weldingProgress).toBe(SECTIONS_BEFORE_STOP);
+      const xpAfterWelding = await weldingXp(made.characterId);
+
+      const mining = await miningCommands.startMining(
+        made.userId,
+        made.characterId,
+        stopAt,
+        random,
+      );
+      expect(mining.activeAction?.actionId).toBe(mining.miningSource?.actionId);
+      expect(mining.activeAction?.actionId).not.toBe(ACTION_IDS.siteStashTheJagWelding);
+      // Welding cannot be started over Mining.
+      const refused = await repairs.startWelding(
+        made.userId,
+        made.characterId,
+        SITES.theJag.target,
+        new Date(stopAt.getTime() + 1_000),
+        random,
+      );
+      expect(refused.commandError).toBe("another_action_active");
+      expect(refused.activeAction?.actionId).toBe(mining.miningSource?.actionId);
+      // Mining attempts later, the mount has not moved a section.
+      const later = await state(made.userId, made.characterId, new Date(stopAt.getTime() + 60_000));
+      expect(later.run.attempts).toBeGreaterThan(0);
+      expect(later.siteStash?.repair.weldingProgress).toBe(SECTIONS_BEFORE_STOP);
+      expect(later.siteStash?.repair.cleanPass).toBeUndefined();
+      expect(later.siteStash?.repair.complete).toBe(false);
+      expect(await weldingXp(made.characterId)).toBe(xpAfterWelding);
+    });
+
+    it("leaves a mount's welds and Clean Pass alone while Refining runs", async () => {
+      const made = await makeCharacter();
+      await setWelding(made.characterId, 5);
+      await startMountWelding(made, SITES.yard, [
+        [ITEM_IDS.galvanicStock, 3],
+        [ITEM_IDS.mountingBracket, 2],
+      ]);
+      const stopAt = new Date(now.getTime() + SECTIONS_BEFORE_STOP * SECTION_MS);
+      await repairs.stopWelding(made.userId, made.characterId, SITES.yard.target, stopAt, random);
+      expect(
+        (await state(made.userId, made.characterId, stopAt)).siteStash?.repair.weldingProgress,
+      ).toBe(SECTIONS_BEFORE_STOP);
+      const xpAfterWelding = await weldingXp(made.characterId);
+
+      await giveStack(made.characterId, ITEM_IDS.ferriteShale, 6);
+      const refining = await refiningCommands.startRefining(
+        made.userId,
+        made.characterId,
+        ACTION_IDS.refining,
+        stopAt,
+        random,
+        BOUNDED_RUN_MAX,
+      );
+      expect(refining.activeAction?.actionId).toBe(ACTION_IDS.refining);
+      const refused = await repairs.startWelding(
+        made.userId,
+        made.characterId,
+        SITES.yard.target,
+        new Date(stopAt.getTime() + 1_000),
+        random,
+      );
+      expect(refused.commandError).toBe("another_action_active");
+      const later = await state(made.userId, made.characterId, new Date(stopAt.getTime() + 60_000));
+      expect(later.refiningRun.attempts).toBeGreaterThan(0);
+      expect(later.siteStash?.repair.weldingProgress).toBe(SECTIONS_BEFORE_STOP);
+      expect(later.siteStash?.repair.cleanPass).toBeUndefined();
+      expect(await weldingXp(made.characterId)).toBe(xpAfterWelding);
     });
   });
 
