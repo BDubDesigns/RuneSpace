@@ -619,7 +619,7 @@ function WhisperConversation({ peer: initialPeer }: { peer: WhisperPeer }) {
           nested-scroll dead end (#248). */}
       <div
         aria-label={`Whispers with ${peer.name}`}
-        className="h-[min(34dvh,20rem)] overflow-y-auto border border-[color:var(--rs-border-subtle)] bg-[color:var(--rs-surface-panel)] p-2 [[data-docked-utility]_&]:min-h-[7rem] [[data-docked-utility]_&]:grow [[data-docked-utility]_&]:basis-[7rem]"
+        className="relative h-[min(34dvh,20rem)] overflow-y-auto border border-[color:var(--rs-border-subtle)] bg-[color:var(--rs-surface-panel)] p-2 [[data-docked-utility]_&]:min-h-[7rem] [[data-docked-utility]_&]:grow [[data-docked-utility]_&]:basis-[7rem]"
         data-whisper-log={peerId}
         onScroll={(event) => {
           const log = event.currentTarget;
@@ -800,7 +800,7 @@ function SystemConversation() {
       </div>
       <div
         aria-label={`Messages from ${SYSTEM_IDENTITY_NAME}`}
-        className="h-[min(34dvh,20rem)] overflow-y-auto border border-[color:var(--rs-border-subtle)] bg-[color:var(--rs-surface-panel)] p-2 [[data-docked-utility]_&]:min-h-[7rem] [[data-docked-utility]_&]:grow [[data-docked-utility]_&]:basis-[7rem]"
+        className="relative h-[min(34dvh,20rem)] overflow-y-auto border border-[color:var(--rs-border-subtle)] bg-[color:var(--rs-surface-panel)] p-2 [[data-docked-utility]_&]:min-h-[7rem] [[data-docked-utility]_&]:grow [[data-docked-utility]_&]:basis-[7rem]"
         data-system-log=""
         ref={logRef}
         role="log"

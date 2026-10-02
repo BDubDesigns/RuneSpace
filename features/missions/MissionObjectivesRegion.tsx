@@ -50,7 +50,7 @@ export function MissionObjectivesRegion({ state }: { state: PlayGameplayState })
         <div
           // The padding (and its matching negative margin) keeps the strips' exterior
           // glow inside the scrolling box instead of clipping it at the edge.
-          className="-m-1 max-h-[min(24dvh,12rem)] overflow-y-auto overscroll-contain p-1"
+          className="relative -m-1 max-h-[min(24dvh,12rem)] overflow-y-auto overscroll-contain p-1"
           id="objectives-region-body"
         >
           <MissionGuidanceStrips state={state} />

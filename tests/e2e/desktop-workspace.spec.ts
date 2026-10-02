@@ -1,7 +1,7 @@
 import type { Locator, Page } from "@playwright/test";
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
-import { characterMissions, characters, itemInstances } from "@/db/rune-space";
+import { chatMessages, characterMissions, characters, itemInstances } from "@/db/rune-space";
 import { ITEM_IDS, LOCATION_IDS, MISSION_IDS } from "@/game/config/foundations";
 import { REALTIME_STREAM_PATH } from "@/game/schemas/realtime";
 import { expect, preferHomeUtility, test } from "./fixtures";
@@ -156,20 +156,34 @@ for (const viewport of [DESKTOP, WIDE]) {
     await expect(page.getByRole("button", { name: "Sign out" })).toBeVisible();
     await expect(page.getByRole("button", { name: "News" })).toBeVisible();
 
-    // Map is a compact control in the main column's header, upper right — not
-    // in the global header and not in the rail.
-    const map = page.locator("[data-map-open]");
+    // Map is a peer navigation button in Play's top bar, left of News and Sign
+    // out — not in the rail, and with no row of its own above the location art.
+    const banner = page.getByRole("banner");
+    const map = banner.locator("[data-map-open]");
     await expect(map).toBeVisible();
     await expect(map).toHaveAccessibleName("Map");
     const mapBox = (await map.boundingBox())!;
+    const newsBox = (await banner.getByRole("button", { name: "News" }).boundingBox())!;
+    const signOutBox = (await banner.getByRole("button", { name: "Sign out" }).boundingBox())!;
+    const logoBox = (await banner.getByRole("img", { name: "RuneSpace" }).boundingBox())!;
     const railBox = (await rail(page).boundingBox())!;
     const mainBox = (await page.locator("main").boundingBox())!;
-    expect(mapBox.x + mapBox.width).toBeLessThanOrEqual(mainBox.x + mainBox.width + 1);
-    expect(mapBox.x).toBeGreaterThan(mainBox.x + mainBox.width / 2);
-    // The header row is the first thing in the main column, under the global header.
-    expect(mapBox.y - mainBox.y).toBeLessThan(8);
+    const bannerBox = (await banner.boundingBox())!;
+    // Order and fit: logo, then Map, News, Sign out, none crowding or overlapping.
+    expect(logoBox.x + logoBox.width).toBeLessThan(mapBox.x);
+    expect(mapBox.x + mapBox.width).toBeLessThanOrEqual(newsBox.x + 0.5);
+    expect(newsBox.x + newsBox.width).toBeLessThanOrEqual(signOutBox.x + 0.5);
+    expect(signOutBox.x + signOutBox.width).toBeLessThanOrEqual(bannerBox.x + bannerBox.width);
+    expect(newsBox.x - (mapBox.x + mapBox.width)).toBeGreaterThanOrEqual(4);
+    expect(
+      await banner.evaluate((el) => el.scrollWidth <= el.clientWidth),
+      "the top bar does not overflow",
+    ).toBe(true);
+    // The location art follows the header with the ordinary space-4 gap.
+    expect(mainBox.y - (bannerBox.y + bannerBox.height)).toBeLessThanOrEqual(20);
     expect(mapBox.x + mapBox.width).toBeLessThanOrEqual(railBox.x);
     expect(await rail(page).locator("[data-map-open]").count()).toBe(0);
+    expect(await page.locator("main [data-map-open]").count()).toBe(0);
 
     // The rail is the agreed 24rem and the main column keeps the rest.
     expect(Math.round(railBox.width)).toBe(384);
@@ -578,4 +592,105 @@ test("the same shortcut from another home is an explicit open and becomes the ph
   await page.setViewportSize(PHONE);
   await expect(page.getByRole("dialog", { name: "Equipment" })).toBeVisible();
   await expect(dockedPanel(page)).toHaveCount(0);
+});
+
+/**
+ * Geometry that tells a legitimate tall main column from rail-driven page growth:
+ * the document, the rail's own box, and the docked panel/log scroll extents.
+ */
+async function pageGeometry(page: Page) {
+  return page.evaluate(() => {
+    const box = (selector: string) => {
+      const el = document.querySelector<HTMLElement>(selector);
+      if (!el) return null;
+      const rect = el.getBoundingClientRect();
+      return {
+        scrollHeight: el.scrollHeight,
+        clientHeight: el.clientHeight,
+        top: Math.round(rect.top + window.scrollY),
+        bottom: Math.round(rect.bottom + window.scrollY),
+        overflowY: getComputedStyle(el).overflowY,
+      };
+    };
+    return {
+      documentScroll: document.documentElement.scrollHeight,
+      viewport: document.documentElement.clientHeight,
+      main: box("main"),
+      rail: box("[data-play-rail]"),
+      workspace: box("[data-utility-workspace]"),
+      panel: box("[data-docked-utility]"),
+      log: box("[data-chat-log]"),
+    };
+  });
+}
+
+/** Messages by this character, oldest first, a minute or more ago (outside the send window). */
+async function seedFeed(characterId: string, channel: "general" | "trade", count: number) {
+  const [row] = await db
+    .select({ accountId: characters.playerAccountId, name: characters.displayName })
+    .from(characters)
+    .where(eq(characters.id, characterId));
+  const start = Date.now() - 60_000 - count * 1_000;
+  await db.insert(chatMessages).values(
+    Array.from({ length: count }, (_, index) => ({
+      channel,
+      senderPlayerAccountId: row!.accountId,
+      senderCharacterId: characterId,
+      senderCharacterName: row!.name,
+      body: `history line ${index + 1} with enough words to wrap onto a second line in the rail`,
+      createdAt: new Date(start + index * 1_000),
+    })),
+  );
+}
+
+test("a long docked General feed scrolls inside the rail and never lengthens the page", async ({
+  page,
+  testCharacter,
+}) => {
+  await openAt(page, testCharacter.id, DESKTOP);
+  await waitForDock(page);
+  await expect(page.locator("[data-chat-log]")).toBeVisible();
+  const empty = await pageGeometry(page);
+
+  await seedFeed(testCharacter.id, "general", 60);
+  await seedFeed(testCharacter.id, "trade", 60);
+  await page.reload();
+  await waitForDock(page);
+  await expect(page.locator("[data-chat-message]").last()).toBeVisible();
+  const populated = await pageGeometry(page);
+  const note = JSON.stringify({ empty, populated }, null, 1);
+
+  // The feed really overflows, so it is the log that scrolls...
+  expect(populated.log!.scrollHeight, note).toBeGreaterThan(populated.log!.clientHeight + 200);
+  // ...and the document is exactly as long as it was with an empty feed.
+  expect(populated.documentScroll, note).toBe(empty.documentScroll);
+  // The rail is a viewport-high box, whatever it holds.
+  expect(populated.rail!.bottom - populated.rail!.top, note).toBeLessThanOrEqual(DESKTOP.height);
+
+  // Sending more makes the feed longer, not the page.
+  await composer(page).fill("one more for the pile");
+  await composer(page).press("Enter");
+  await expect(composer(page)).toHaveValue("");
+  const after = await pageGeometry(page);
+  expect(after.documentScroll, JSON.stringify(after, null, 1)).toBe(empty.documentScroll);
+
+  // Trade is just as long and just as contained.
+  await page.getByRole("tab", { name: /^Trade/ }).click();
+  await expect(page.locator("[data-chat-message]").last()).toBeVisible();
+  const trade = await pageGeometry(page);
+  expect(trade.log!.scrollHeight, JSON.stringify(trade, null, 1)).toBeGreaterThan(
+    trade.log!.clientHeight + 200,
+  );
+  expect(trade.documentScroll, JSON.stringify(trade, null, 1)).toBe(empty.documentScroll);
+
+  // A genuinely tall main column still scrolls the page, and the rail stays put.
+  await page.evaluate(() => {
+    document.querySelector("main")!.style.minHeight = `${window.innerHeight * 2}px`;
+  });
+  const tall = await pageGeometry(page);
+  expect(tall.documentScroll, JSON.stringify(tall, null, 1)).toBeGreaterThan(DESKTOP.height * 1.8);
+  await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
+  const scrolled = await pageGeometry(page);
+  expect(scrolled.rail!.bottom - scrolled.rail!.top).toBeLessThanOrEqual(DESKTOP.height);
+  await expect(page.locator("[data-chat-composer] textarea")).toBeInViewport();
 });

@@ -493,7 +493,7 @@ export function PublicChat({
           (#248). */}
       <div
         aria-label={`${label} messages`}
-        className="h-[min(38dvh,22rem)] overflow-y-auto border border-[color:var(--rs-border-subtle)] bg-[color:var(--rs-surface-panel)] p-2 [[data-docked-utility]_&]:min-h-[7rem] [[data-docked-utility]_&]:grow [[data-docked-utility]_&]:basis-[7rem]"
+        className="relative h-[min(38dvh,22rem)] overflow-y-auto border border-[color:var(--rs-border-subtle)] bg-[color:var(--rs-surface-panel)] p-2 [[data-docked-utility]_&]:min-h-[7rem] [[data-docked-utility]_&]:grow [[data-docked-utility]_&]:basis-[7rem]"
         data-chat-log={channel}
         onScroll={(event) => {
           const log = event.currentTarget;

@@ -190,12 +190,7 @@ describe("the shell's slots", () => {
         bottomNav: React.createElement("span", null, "nav"),
         floatingAction: React.createElement("span", null, "launcher"),
         children: React.createElement("p", null, "main"),
-        ...(withRail
-          ? {
-              desktopRail: React.createElement("span", null, "rail"),
-              mainHeader: React.createElement("span", null, "header"),
-            }
-          : {}),
+        ...(withRail ? { desktopRail: React.createElement("span", null, "rail") } : {}),
       }),
     );
 
@@ -209,7 +204,7 @@ describe("the shell's slots", () => {
     expect(without).not.toContain("xl:grid-cols-[minmax(0,1fr)_24rem]");
   });
 
-  it("renders the rail and the main header only from the slots, hidden below xl", () => {
+  it("renders the rail only from its slot, hidden below xl", () => {
     const markup = shell(true);
     expect(markup).toContain("data-play-rail");
     expect(markup).toContain("rail");

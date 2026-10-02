@@ -48,11 +48,12 @@ column inside the existing `max-w-7xl` centred shell, and one compact row at the
 top of the main column. The bottom navigation and floating Chat launcher are not
 rendered at this width — they are replaced, not shrunk.
 
-- **Main column header, upper right:** a compact **Map** control (the footer's
-  Map destination, in a form that fits a header). It opens the existing Map
-  surface and, while Map shows, becomes the single "Back to Location" (or "Back
-  to Journey") control; the Map panel does not carry a second one. The global
-  brand header, News and Sign out stay in the global header, never in the rail.
+- **Top bar, left of News and Sign out:** a **Map** control, styled as a peer of
+  them (the footer's Map destination, in a form that fits a header; Play-only,
+  not account navigation). It opens the existing Map surface and, while Map
+  shows, becomes the single "Back to Location" (or "Back to Journey") control;
+  the Map panel does not carry a second one. There is no separate Map row above
+  the location art, and the rail never holds it.
 - **Rail, upper part: Current Missions.** The same authoritative
   `MissionGuidanceStrips`, mounted once, in a region that renders nothing with
   no accepted Mission, caps its height (`min(24dvh, 12rem)`) and scrolls inside

@@ -469,7 +469,7 @@ Hermes host.
   1024 and 1279px (the phone/tablet composition and its modal Drawers are
   unchanged, with no rail, no docked region, and a passive desktop home never
   opening a Chat modal) and at 1280 and 1440px (no bottom navigation or
-  launcher; Map in the main column header's upper right; the objectives once,
+  launcher; Map in the top bar left of News and Sign out; the objectives once,
   in the rail, above the exactly-labelled Chat / Inventory / Character /
   Missions tabs; a 24rem rail; all four utilities rendering). It also proves
   the docked panel is an ordinary region (no dialog, `aria-modal`, scroll lock,

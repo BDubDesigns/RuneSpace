@@ -104,12 +104,11 @@ function FloatingEdgeAnchor({
  *
  * `desktopRail` (#286) turns the shell into the desktop Play composition at
  * `xl` (1280px) and wider: a 24rem right-hand rail beside the main column,
- * independently scrolling, full viewport height and sticky; `mainHeader` is one
- * compact row at the top of `<main>`, above the page content; and the bottom
+ * independently scrolling, full viewport height and sticky; and the bottom
  * navigation and floating action — the phone's way of reaching the same
- * destinations — are hidden. Below `xl` the rail and header render nothing and
- * the shell is the phone/tablet composition it always was. The shell only
- * places these slots with CSS; the feature decides what mounts in them, so no
+ * destinations — are hidden. Below `xl` the rail renders nothing and the shell
+ * is the phone/tablet composition it always was. The shell only places the
+ * rail with CSS; the feature decides what mounts in them, so no
  * interactive feature is ever mounted twice.
  */
 export function GameShell({
@@ -120,7 +119,6 @@ export function GameShell({
   floatingActionPosition = DEFAULT_FLOATING_ACTION_POSITION,
   aside,
   desktopRail,
-  mainHeader,
 }: {
   topBar: ReactNode;
   children: ReactNode;
@@ -129,7 +127,6 @@ export function GameShell({
   floatingActionPosition?: FloatingActionPosition;
   aside?: ReactNode;
   desktopRail?: ReactNode;
-  mainHeader?: ReactNode;
 }) {
   const hasRail = desktopRail !== undefined;
   // Joined from parts, not concatenated: a trailing space inside a string is
@@ -147,10 +144,7 @@ export function GameShell({
     <div className={shellClassName}>
       <div className="min-w-0 space-y-4">
         {topBar}
-        <main>
-          {mainHeader ? <div className="mb-4 hidden justify-end xl:flex">{mainHeader}</div> : null}
-          {children}
-        </main>
+        <main>{children}</main>
       </div>
       {aside ? <aside className="mt-4 lg:mt-0">{aside}</aside> : null}
       {hasRail ? (

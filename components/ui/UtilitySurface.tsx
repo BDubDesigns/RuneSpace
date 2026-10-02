@@ -71,13 +71,17 @@ export function UtilitySurface({
     <section
       aria-labelledby={docked?.labelledBy}
       aria-label={docked?.labelledBy ? undefined : label}
+      // `relative` makes this the containing block of anything absolutely
+      // positioned inside (the screen-reader-only spans in every message row), so
+      // this scroller clips them. Without it the sticky rail is their containing
+      // block, the scroller does not clip them, and a long feed lengthens the page.
       // A column, so a utility that wants the height it is given (Chat's message
       // log, which grows from a minimum when it finds itself under
       // `[data-docked-utility]`) can fill it, while one that does not simply
       // stacks and scrolls the panel. The padding matches the Drawer's, because content written for either
       // presentation (the Character panel's sticky Switch Character bar, for one)
       // is laid out against that inset.
-      className="flex min-h-0 flex-1 flex-col overflow-y-auto border border-[color:var(--rs-border-structural)] bg-[color:var(--rs-surface-raised)] px-4 pb-4 pt-2"
+      className="relative flex min-h-0 flex-1 flex-col overflow-y-auto border border-[color:var(--rs-border-structural)] bg-[color:var(--rs-surface-raised)] px-4 pb-4 pt-2"
       data-docked-utility={label}
       id={docked?.id}
       role="tabpanel"

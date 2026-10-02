@@ -1,6 +1,7 @@
 "use client";
 
 import { Backpack, Mail, Map as MapIcon, ScrollText, User } from "lucide-react";
+import type { ReactNode } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { ActionButton } from "@/components/ui/ActionButton";
 import { ActionLink } from "@/components/ui/ActionLink";
@@ -151,12 +152,13 @@ function NewsControl({ unread }: { unread: boolean }) {
 }
 
 /**
- * The compact Map control in the upper right of the desktop main column's header
- * (#286); the phone's is the footer's Map destination. It opens the same route-
- * backed Map surface — there is no second Map — and while Map is showing it is the
- * way back to the Location (or the Journey, in transit), with the wording and the
- * `router.replace` the panel's own Back control has on a phone. It stays available
- * in transit, as the footer's does. Hidden below desktop width by the shell.
+ * The Map control in Play's own top bar, left of News and Sign out, styled as a
+ * peer of them (#286); the phone's is the footer's Map destination. It opens the
+ * same route-backed Map surface — there is no second Map — and while Map is
+ * showing it is the way back to the Location (or the Journey, in transit), with
+ * the wording and the `router.replace` the panel's own Back control has on a
+ * phone. It stays available in transit, as the footer's does. It is a Play-only
+ * header action, not account navigation, and is hidden below desktop width.
  */
 function PlayMapControl({ mapActive, onMapExit }: { mapActive: boolean; onMapExit: () => void }) {
   const pathname = usePathname();
@@ -219,12 +221,13 @@ function PlayRail({
   );
 }
 
-function PlayTopBar({ newsUnread }: { newsUnread: boolean }) {
+function PlayTopBar({ newsUnread, mapControl }: { newsUnread: boolean; mapControl?: ReactNode }) {
   return (
     <TopBar
       title={<RuneSpaceBrand />}
       trailing={
         <div className="flex items-center gap-2">
+          {mapControl ? <div className="hidden xl:block">{mapControl}</div> : null}
           <NewsControl unread={newsUnread} />
           <SignOutButton />
         </div>
@@ -307,15 +310,19 @@ function PlayWorkspace({
                 />
               }
               floatingAction={<SocialLauncher />}
-              // Not mounted at all below desktop width (where the footer's Map
-              // is the destination); before the browser has answered it renders,
-              // hidden by the shell's CSS below `xl`.
-              mainHeader={
-                desktop === false ? undefined : (
-                  <PlayMapControl mapActive={mapActive} onMapExit={onMapExit} />
-                )
+              // The Map control is not mounted at all below desktop width (where
+              // the footer's Map is the destination); before the browser has
+              // answered it renders, hidden by CSS below `xl`.
+              topBar={
+                <PlayTopBar
+                  mapControl={
+                    desktop === false ? undefined : (
+                      <PlayMapControl mapActive={mapActive} onMapExit={onMapExit} />
+                    )
+                  }
+                  newsUnread={newsUnread}
+                />
               }
-              topBar={<PlayTopBar newsUnread={newsUnread} />}
             >
               <PlayBoundaryTestTrigger />
               <PlayConsole

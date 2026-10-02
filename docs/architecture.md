@@ -131,11 +131,10 @@ below.
 ### Desktop workspace and utility presentation (Issue #286)
 
 At `min-width: 1280px` Play is a second composition of the **same** shell, not a
-second page. `GameShell` takes two optional slots — `mainHeader` and
-`desktopRail` — and places them with CSS only: a 24rem sticky, full-height right
-rail beside the main column, one compact row at the top of the main column, and
-no bottom navigation or floating launcher. Below 1280px both slots render
-nothing and the shell is the phone/tablet composition it has always been, which
+second page. `GameShell` takes one optional `desktopRail` slot and places it with CSS only: a
+24rem sticky, full-height right rail beside the main column, and no bottom
+navigation or floating launcher. Below 1280px the slot renders nothing and the
+shell is the phone/tablet composition it has always been, which
 includes the roughly 1024px laptop width (no cramped forced dock).
 
 - **One mounted instance, decided by state, not hidden by CSS.**
@@ -204,8 +203,8 @@ includes the roughly 1024px laptop width (no cramped forced dock).
 - **Objectives and Map.** `MissionObjectivesRegion` bounds the authoritative
   `MissionGuidanceStrips` for the rail: nothing at all with no accepted
   Mission, a height cap that scrolls inside itself, and a collapse control when
-  there are several (collapsing unmounts the strips). The Map control is the
-  main column header's, opens the same `?surface=map` surface (there is no
+  there are several (collapsing unmounts the strips). The Map control is a
+  Play-only button in the global top bar, left of News and Sign out, and opens the same `?surface=map` surface (there is no
   second Map), and while Map shows it is the one return control (the panel
   drops its own Back at desktop width); Map ↔ Location swaps only the main
   column.
