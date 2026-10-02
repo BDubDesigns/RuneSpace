@@ -3,8 +3,10 @@ import {
   expectKeyboardFocusRingPaints,
   openMapSurface,
   openTestCharacter,
+  openUtility,
   resolvedCssVarColor,
   test,
+  usesDesktopWorkspace,
 } from "./fixtures";
 import { writeFile } from "node:fs/promises";
 import { eq } from "drizzle-orm";
@@ -1050,7 +1052,7 @@ test("travels to the Power Annex and claims independently by Pacific reset date"
   await openMapSurface(page);
   await expectMapStatusPlatesInsideHex(page);
   await captureReviewScreenshot(page, "power-annex-desktop-claimed.png");
-  await page.getByRole("button", { name: /Inventory/ }).click();
+  await openUtility(page, "inventory");
   await expect(page.getByLabel("5 Power Cell", { exact: true })).toHaveCount(2);
 });
 
@@ -1164,12 +1166,18 @@ async function emptyMapPoint(page: import("@playwright/test").Page) {
   });
 }
 
-/** The panel sits wholly on screen, above the fixed bottom navigation. */
+/**
+ * The panel sits wholly on screen, above the fixed bottom navigation — or, at
+ * desktop width, where there is no bottom navigation, above the viewport's own
+ * bottom edge (#286).
+ */
 async function expectPanelAboveBottomNav(page: import("@playwright/test").Page) {
   const panelBox = (await page.locator("[data-map-destination-panel]").boundingBox())!;
-  const navBox = (await page.getByRole("navigation", { name: "Primary" }).boundingBox())!;
+  const floor = usesDesktopWorkspace(page)
+    ? page.viewportSize()!.height
+    : (await page.getByRole("navigation", { name: "Primary" }).boundingBox())!.y;
   expect(panelBox.y).toBeGreaterThanOrEqual(0);
-  expect(panelBox.y + panelBox.height).toBeLessThanOrEqual(navBox.y + 0.5);
+  expect(panelBox.y + panelBox.height).toBeLessThanOrEqual(floor + 0.5);
   return panelBox;
 }
 

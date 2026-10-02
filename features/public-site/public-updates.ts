@@ -7,6 +7,36 @@ export type { PublicUpdate } from "@/game/schemas/public-updates";
 
 const authoredUpdates = [
   {
+    // Issue #286 — the desktop Play workspace.
+    slug: "room-to-spread-out",
+    title: "Room to Spread Out",
+    publishedAt: "2026-10-01T17:30:00-07:00",
+    summary:
+      "On a wide screen, Play now has a sidebar: your current Missions stay in view, and Chat, Inventory, Character, and Missions open beside the game instead of over it.",
+    body: [
+      "RuneSpace started as a game for phones, and on a phone it works exactly the way it did: buttons along the bottom, Chat on its own floating button, and everything else opening over the game. On a wide screen, though, that left a lot of empty room, and every trip to your Inventory or to Chat covered up the thing you were playing.",
+      "Now, on a screen about 1280 pixels wide or more, Play uses that room. A sidebar runs down the right. Your current Missions stay at the top of it, always in view, and under them four tabs — Chat, Inventory, Character, and Missions — open right there, beside the game. Map has moved to the top right of the play area.",
+      "Chat is the tab you start on. If you'd rather start somewhere else, open that tab and choose Set as default; RuneSpace remembers it for that character in that browser. Opening a different tab for a minute doesn't change it, and Back to Chat takes you home. Switching tabs won't lose a message you were halfway through typing, and a new Whisper or a trade request still lights up the Chat tab while you're busy in your Inventory.",
+      "Phones and tablets are unchanged. If you make a window narrower, whatever you had open turns back into the usual panel over the game.",
+    ],
+    patchNotes: [
+      {
+        heading: "Added",
+        items: [
+          "On screens about 1280 pixels wide or more, a right-hand sidebar keeps your current Missions in view and docks Chat, Inventory, Character, and Missions beside the game as tabs.",
+          "Set as default on any of those tabs chooses which one you start on, for that character in that browser. Chat is the default until you choose another.",
+        ],
+      },
+      {
+        heading: "Changed",
+        items: [
+          "On wide screens the Map button sits at the top right of the play area, and the bottom bar and floating Chat button are not shown.",
+          "Unsent Chat messages are kept when you move between tabs.",
+        ],
+      },
+    ],
+  },
+  {
     // Issue #261 — public @mentions, blocked-player placeholders in General and
     // Trade, and hiding a Whisper conversation.
     slug: "heads-up",

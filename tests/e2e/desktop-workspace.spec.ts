@@ -165,7 +165,8 @@ for (const viewport of [DESKTOP, WIDE]) {
     const mainBox = (await page.locator("main").boundingBox())!;
     expect(mapBox.x + mapBox.width).toBeLessThanOrEqual(mainBox.x + mainBox.width + 1);
     expect(mapBox.x).toBeGreaterThan(mainBox.x + mainBox.width / 2);
-    expect(mapBox.y + mapBox.height).toBeLessThanOrEqual(mainBox.y);
+    // The header row is the first thing in the main column, under the global header.
+    expect(mapBox.y - mainBox.y).toBeLessThan(8);
     expect(mapBox.x + mapBox.width).toBeLessThanOrEqual(railBox.x);
     expect(await rail(page).locator("[data-map-open]").count()).toBe(0);
 
@@ -242,7 +243,7 @@ test("the docked panel is an ordinary page region: no modal, scroll lock, trap, 
   expect(scrolls).toBe("auto");
 });
 
-test("many objectives never push Chat's composer out of the viewport; none reserve no height", async ({
+test("many objectives are height-bounded and never push Chat's composer out of the viewport", async ({
   page,
   testCharacter,
 }) => {

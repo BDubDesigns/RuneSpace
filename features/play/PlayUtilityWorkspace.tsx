@@ -11,6 +11,7 @@ import { MissionLogPanel } from "@/features/missions/MissionLogPanel";
 import { usePlayerTrade } from "@/features/player-trade/PlayerTradeContext";
 import { ChatSocialPanel } from "@/features/social/ChatSocialPanel";
 import { chatSocialLauncherLabel } from "@/features/social/ChatSocialLauncher";
+import type { RealtimeStatus } from "@/features/social/realtime-connection";
 import { useSocial } from "@/features/social/SocialContext";
 import type { CharacterPortraitPresentation } from "@/game/domain/character-portrait";
 import { usePlay } from "./PlayContext";
@@ -47,6 +48,7 @@ function UtilityTabBadge({ utility, count }: { utility: PlayUtilityId; count: nu
     <span
       aria-hidden="true"
       className={`${badgeClassName} ${tone}`}
+      data-chat-social-attention={utility === "chat" ? count : undefined}
       data-utility-tab-badge={utility}
       data-utility-tab-badge-count={count}
     >
@@ -70,12 +72,15 @@ function UtilityTabs({
   active,
   attentionCount,
   readyCount,
+  realtimeStatus,
   onSelect,
   tabRefs,
 }: {
   active: PlayUtilityId;
   attentionCount: number;
   readyCount: number;
+  /** Exposed on the Chat tab as a data attribute for diagnostics and browser tests only. */
+  realtimeStatus: RealtimeStatus;
   onSelect: (utility: PlayUtilityId) => void;
   tabRefs: Record<PlayUtilityId, RefObject<HTMLButtonElement | null>>;
 }) {
@@ -113,6 +118,7 @@ function UtilityTabs({
                 ? "border-[color:var(--rs-accent-primary)] bg-[color:var(--rs-accent-primary-subtle)] text-[color:var(--rs-accent-primary)]"
                 : "border-[color:var(--rs-border-structural)] bg-[color:var(--rs-surface-control)] text-[color:var(--rs-text-primary)] hover:border-[color:var(--rs-accent-secondary)]"
             }`}
+            data-realtime-status={utility === "chat" ? realtimeStatus : undefined}
             data-utility-tab={utility}
             id={tabId(utility)}
             key={utility}
@@ -181,7 +187,7 @@ export function PlayUtilityWorkspace({
     openUtilityPanel,
     state,
   } = usePlay();
-  const { attentionCount } = useSocial();
+  const { attentionCount, status } = useSocial();
   const { state: trade } = usePlayerTrade();
   const tabRefs: Record<PlayUtilityId, RefObject<HTMLButtonElement | null>> = {
     chat: useRef<HTMLButtonElement>(null),
@@ -312,6 +318,7 @@ export function PlayUtilityWorkspace({
         attentionCount={attentionCount}
         onSelect={select}
         readyCount={readyCount}
+        realtimeStatus={status}
         tabRefs={tabRefs}
       />
       {active === "inventory" ? (

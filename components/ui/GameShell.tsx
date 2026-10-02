@@ -105,7 +105,7 @@ function FloatingEdgeAnchor({
  * `desktopRail` (#286) turns the shell into the desktop Play composition at
  * `xl` (1280px) and wider: a 24rem right-hand rail beside the main column,
  * independently scrolling, full viewport height and sticky; `mainHeader` is one
- * compact row at the top of the main column's content; and the bottom
+ * compact row at the top of `<main>`, above the page content; and the bottom
  * navigation and floating action — the phone's way of reaching the same
  * destinations — are hidden. Below `xl` the rail and header render nothing and
  * the shell is the phone/tablet composition it always was. The shell only
@@ -147,8 +147,10 @@ export function GameShell({
     <div className={shellClassName}>
       <div className="min-w-0 space-y-4">
         {topBar}
-        {mainHeader ? <div className="hidden justify-end xl:flex">{mainHeader}</div> : null}
-        <main>{children}</main>
+        <main>
+          {mainHeader ? <div className="mb-4 hidden justify-end xl:flex">{mainHeader}</div> : null}
+          {children}
+        </main>
       </div>
       {aside ? <aside className="mt-4 lg:mt-0">{aside}</aside> : null}
       {hasRail ? (

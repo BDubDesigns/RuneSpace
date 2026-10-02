@@ -103,8 +103,10 @@ below.
   The existing server-authoritative Travel state and `ScavengeControl` command
   remain the gameplay authority; Journey does not resolve, persist, or invent
   outcomes.
-- The fixed Play footer has four destinations: **Character · Inventory · Map ·
-  Missions**. Inventory and Equipment are two tabs in one shared overlay owned
+- Below 1280px the fixed Play footer has four destinations: **Character ·
+  Inventory · Map · Missions**; at 1280px and wider the desktop workspace
+  replaces it (see "Desktop workspace and utility presentation" below).
+  Inventory and Equipment are two tabs in one shared overlay owned
   by `features/inventory/InventoryEquipmentPanel.tsx`; their existing
   server-authoritative command and projection boundaries remain unchanged.
   Character (#213) opens the current character's profile in the same shared
@@ -125,6 +127,84 @@ below.
   the footer always calls the same entry point with the Inventory tab.
   Map does not gain MISSION or TURN IN markers; those destination/turn-in
   guidance semantics belong to Issue #143.
+
+### Desktop workspace and utility presentation (Issue #286)
+
+At `min-width: 1280px` Play is a second composition of the **same** shell, not a
+second page. `GameShell` takes two optional slots — `mainHeader` and
+`desktopRail` — and places them with CSS only: a 24rem sticky, full-height right
+rail beside the main column, one compact row at the top of the main column, and
+no bottom navigation or floating launcher. Below 1280px both slots render
+nothing and the shell is the phone/tablet composition it has always been, which
+includes the roughly 1024px laptop width (no cramped forced dock).
+
+- **One mounted instance, decided by state, not hidden by CSS.**
+  `useDesktopWorkspace()` (`features/play/workspace-presentation.ts`) answers
+  `true`, `false`, or `undefined` until the browser has answered. Anything
+  interactive that exists in both compositions mounts in exactly one place at a
+  time: the Current Missions strips (`PlayConsole` below 1280px, the rail above
+  it) and each utility (modal Drawer below, docked panel above). While the
+  answer is `undefined` — the server render and hydration — the dock mounts
+  nothing, and the phone placement of the strips is hidden by CSS at `xl`.
+  `DESKTOP_WORKSPACE_MIN_WIDTH_PX` in `features/play/utility-workspace.ts` is the
+  one constant for the JS query; Tailwind's `xl` and the Map destination
+  panel's media query in `app/globals.css` are the same 1280px, and a unit test
+  pins them together.
+- **One logical open intent.** `PlayContext.openUtilityId` is the single
+  explicitly opened utility (`chat | inventory | character | missions`). The
+  existing `characterOpen` / `inventoryOpen` / `missionsOpen` flags and their
+  setters are views of it, and `SocialProvider` takes its `open` from it, so
+  opening one utility closes the others by construction: no competing invisible
+  Drawer or focus trap, on any width. Callers that open a utility from
+  elsewhere (the Equipment shortcut, a Whisper started from a message, a trade
+  taking the screen) keep calling the same functions.
+- **The presentation seam is `components/ui/UtilitySurface.tsx`.** `"modal"` is
+  the shared `Drawer` exactly as before (portal, `aria-modal`, scroll lock,
+  Escape, focus trap, focus return). `"docked"` is an ordinary tab-panel region:
+  no `aria-modal`, backdrop, portal, scroll lock, Escape handling, or trap.
+  Inventory/Equipment, Character, the Mission Log and Chat/Social each render
+  the same content through it (`InventoryEquipmentPanel`, `CharacterPanel`,
+  `MissionLogPanel`, `features/social/ChatSocialPanel.tsx`), so a new ordinary
+  nonblocking utility reuses the seam instead of adding a desktop overlay.
+  `features/play/PlayUtilityWorkspace.tsx` is the coordinator: it reads the open
+  intent and the viewport and mounts the one presentation of the one utility.
+- **Exclusive interactions stay foreground modals at every width.** An accepted
+  player trade (`PlayerTradeSurface`), the non-dismissible
+  `ScavengeRevealOverlay`, destructive confirmations and the portrait chooser
+  are not utilities and are never constrained to the rail. While a trade
+  session is open the dock does not leave the passive home mounted underneath
+  it. Migrating ordinary NPC conversation and merchant presentation onto the
+  seam is a follow-up, not part of this slice; their behaviour is unchanged.
+- **Desktop home.** Chat is the home until the player chooses **Set as
+  default** on another utility; opening Inventory or Missions never changes it,
+  and **Back to {home}** returns to it. The choice is presentation only, kept
+  per character in this browser (`runespace:play-home-utility:<characterId>` in
+  `localStorage`, with an in-memory fallback when storage is refused); an
+  unrecognised value falls back to Chat and there is no account or database
+  state. Choosing the home tab is the passive state (no open intent), so
+  shrinking to a phone never raises a modal the player did not ask for, while an
+  explicitly opened utility becomes the matching Drawer and back, with focus
+  moved into the Drawer or onto its docked tab.
+- **Chat's state lifetime.** Chat is not hidden while another utility is up; it
+  is unmounted, so a hidden Chat cannot read anything. Unsent drafts live in
+  `ChatProvider` (`features/chat/chat-drafts.ts`, a ref-backed store, so typing
+  re-renders nothing else) and survive every switch and breakpoint crossing.
+  The single realtime stream, the Whisper/System/mention state and the pinned
+  cards stay in `SocialProvider`/`ChatProvider`, above all of it, so utility
+  switches and Map/Travel refreshes never reconnect it. "Seen" decisions read
+  `SocialContext.surfaceVisible` (the Chat surface is mounted, docked or
+  modal) rather than the open intent, since a passive home is visible with no
+  intent at all. The Chat tab carries the attention count in its accessible
+  name, as the phone launcher does, so a pinned trade request is never out of
+  sight just because Inventory is the open utility.
+- **Objectives and Map.** `MissionObjectivesRegion` bounds the authoritative
+  `MissionGuidanceStrips` for the rail: nothing at all with no accepted
+  Mission, a height cap that scrolls inside itself, and a collapse control when
+  there are several (collapsing unmounts the strips). The Map control is the
+  main column header's, opens the same `?surface=map` surface (there is no
+  second Map), and while Map shows it is the one return control (the panel
+  drops its own Back at desktop width); Map ↔ Location swaps only the main
+  column.
 
 The composition is therefore `PlayConsole → Location | Map | Journey`, with
 activity-specific controls and overlays remaining feature-owned. Since issue
@@ -186,11 +266,13 @@ only — never gameplay or social authority.
   actionable-card region (`upsertCard` / `removeCard`), and attention
   (`setAttention`). A pinned card counts toward the launcher's attention unless
   its owner marks it `attention: false` — a seen moderation notice stays pinned
-  without lighting the launcher (#248). `ChatSocialSurface` is the content; today
-  `ChatSocialDrawer` presents it as a Drawer over the current Play surface,
-  opened by the `ChatSocialLauncher` that `GameShell`'s `floatingAction` slot
-  pins to the right edge at a normalized `{ side, y }` position. Open state lives in the context, so a later docked
-  desktop presentation can render the same surface without the launcher.
+  without lighting the launcher (#248). `ChatSocialSurface` is the content;
+  `ChatSocialPanel` presents it through `UtilitySurface` (#286): a Drawer over
+  the current Play surface below 1280px, opened by the `ChatSocialLauncher` that
+  `GameShell`'s `floatingAction` slot pins to the right edge at a normalized
+  `{ side, y }` position, or the docked Chat tab of the desktop rail above it.
+  The open intent is Play's single open utility (passed to `SocialProvider` as a
+  controlled `open`), and `surfaceVisible` says whether the surface is mounted.
   Trade-request cards are domain-owned content placed in the pinned region,
   never chat messages and never gameplay-blocking modals.
 - **Play is unchanged.** PlayContext's bounded boundary refresh still owns

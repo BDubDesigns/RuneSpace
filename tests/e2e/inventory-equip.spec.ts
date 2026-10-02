@@ -1,4 +1,10 @@
-import { test, expect, openEquipmentTab, openTestCharacter } from "./fixtures";
+import {
+  test,
+  expect,
+  openEquipmentTab,
+  openTestCharacter,
+  WIDEST_COMPACT_VIEWPORT,
+} from "./fixtures";
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { equippedItems, itemInstances, inventoryStacks } from "@/db/rune-space";
@@ -167,7 +173,7 @@ test.describe("Inventory equip and compact selected visual", () => {
 
     // Wider desktop layout preserves the compact side-by-side dossier and stays
     // overflow-free.
-    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.setViewportSize(WIDEST_COMPACT_VIEWPORT);
     const desktopDossierBox = await detailsPanel.boundingBox();
     expect(desktopDossierBox).not.toBeNull();
     const desktopTileBox = await detailsPanel.locator("article").first().boundingBox();

@@ -74,8 +74,9 @@ small number of critical mobile player journeys.
   (`public-chat`, #246), Whispers, Block, and Report (`whispers-safety`,
   #247), moderation review, sanctions, notices, and appeals (`moderation`,
   #248), player trading (`player-trading`, #268), and the read-only System
-  conversation for recipe unlocks (`system-notices`, #274), and public `@mentions`,
-  blocked-player placeholders, and Whisper hide (`chat-social-polish`, #261). It intentionally excludes noncanonical `smoke`, `ownership`,
+  conversation for recipe unlocks (`system-notices`, #274), public `@mentions`,
+  blocked-player placeholders, and Whisper hide (`chat-social-polish`, #261), and
+  the desktop Play workspace and its viewport matrix (`desktop-workspace`, #286). It intentionally excludes noncanonical `smoke`, `ownership`,
   `design-system`, `work-orders`, `public-*`, and QC Studio specs. It:
   - requires Node 22.x
   - requires a localhost-only disposable PostgreSQL database (refuses remote)
@@ -450,6 +451,50 @@ Hermes host.
   There is published and links the Player Trading Wiki page (found by name
   since #274 shipped a newer Update). It never waits out the 20-second or 5-minute timers; the
   integration suites own those with injected clocks.
+
+### Issue #286 desktop Play workspace coverage
+
+- `tests/unit/utility-workspace.test.ts` owns the pure rules: the four utility
+  identities and labels (never "Quests"), the per-character home preference's
+  key and its fall-back to Chat for anything unrecognised, what the dock shows
+  and what a tab press opens (choosing the home is the passive state), the tab
+  list's keyboard order, the single open intent (opening one utility replaces
+  another; a stale close never closes a newer one), Chat draft retention, the
+  one-number 1280px contract between the JS query, Tailwind's `xl` and the Map
+  panel's media query, and the shell's slot classes — including a regression
+  for two utilities fusing into one class token, which once left the phone
+  navigation visible at desktop width.
+- `tests/e2e/desktop-workspace.spec.ts` (canonical, focused phase
+  `desktop-workspace`) proves the composition in a real browser at 390, 768,
+  1024 and 1279px (the phone/tablet composition and its modal Drawers are
+  unchanged, with no rail, no docked region, and a passive desktop home never
+  opening a Chat modal) and at 1280 and 1440px (no bottom navigation or
+  launcher; Map in the main column header's upper right; the objectives once,
+  in the rail, above the exactly-labelled Chat / Inventory / Character /
+  Missions tabs; a 24rem rail; all four utilities rendering). It also proves
+  the docked panel is an ordinary region (no dialog, `aria-modal`, scroll lock,
+  trap, or Escape), that many objectives are height-bounded and collapsible
+  while Chat's composer stays in the viewport and a character with no active
+  Mission reserves no height, Chat as home until **Set as default** (a temporary switch never saves; the
+  choice is per character, restores on a new page entry, and an unrecognised
+  value falls back to Chat), that an unsent draft survives utility switches and
+  Map round trips while exactly one realtime stream is opened, Map ↔ Location
+  swapping only the main column (the same objectives element, the selected
+  utility, and a single return control), the keyboard-operable tab list, and an
+  explicitly opened utility crossing the breakpoint as the matching Drawer and
+  back with its focus while Chat is not mounted when another utility is up.
+- Playwright's `chromium` project runs one pixel below the dock breakpoint
+  (`COMPACT_DESKTOP_VIEWPORT` in `playwright.config.ts`, derived from the
+  breakpoint constant), because Desktop Chrome's own 1280px default would put
+  every spec that never sets a viewport in the docked composition. Specs about a
+  feature rather than a composition drive the utilities through the width-aware
+  helpers in `tests/e2e/fixtures.ts` (`openUtility`, `utilitySurface`,
+  `openChatSurface`, `chatEntry`, `dismissChat`, `closeUtility`); the public
+  chat, Whispers, moderation and mentions journeys run both widths this way. A
+  journey about *attention* starts its observer on another home
+  (`preferHomeUtility`), since a docked Chat home reads what it shows. A spec
+  about a modal Drawer's geometry at a wide screen uses
+  `WIDEST_COMPACT_VIEWPORT`.
 
 ## What to test when systems arrive
 For progression-sensitive systems, prioritize:

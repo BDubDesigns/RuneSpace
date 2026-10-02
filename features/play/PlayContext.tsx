@@ -74,7 +74,7 @@ function boundaryKeyForState(state: PlayGameplayState): string | undefined {
  * opening it replaces whatever was open, closing it leaves a different open
  * utility alone.
  */
-function utilityUpdater(
+export function utilityUpdater(
   utility: PlayUtilityId,
   action: SetStateAction<boolean>,
 ): (current: PlayUtilityId | undefined) => PlayUtilityId | undefined {

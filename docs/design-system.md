@@ -38,8 +38,43 @@ XP fill carry the same identity everywhere it appears. Do not add a
 
 ## Play surface chrome (Issue #145)
 
-The Play footer is the fixed four-destination navigation: **Character ·
-Inventory · Map · Missions**. Inventory and Equipment share one Drawer and are
+At `min-width: 1280px` (Tailwind `xl`) Play is the desktop workspace (#286);
+below it, everything in this section is the phone/tablet composition and is
+unchanged, including at the ~1024px laptop width, which keeps the one-column
+composition rather than a cramped dock. The desktop workspace is the same
+`GameShell` with two extra slots, placed by CSS: a **24rem right rail** (sticky,
+full viewport height, scrolling independently of the page) beside the main
+column inside the existing `max-w-7xl` centred shell, and one compact row at the
+top of the main column. The bottom navigation and floating Chat launcher are not
+rendered at this width — they are replaced, not shrunk.
+
+- **Main column header, upper right:** a compact **Map** control (the footer's
+  Map destination, in a form that fits a header). It opens the existing Map
+  surface and, while Map shows, becomes the single "Back to Location" (or "Back
+  to Journey") control; the Map panel does not carry a second one. The global
+  brand header, News and Sign out stay in the global header, never in the rail.
+- **Rail, upper part: Current Missions.** The same authoritative
+  `MissionGuidanceStrips`, mounted once, in a region that renders nothing with
+  no accepted Mission, caps its height (`min(24dvh, 12rem)`) and scrolls inside
+  itself, and offers a collapse control when there are several. It must never
+  push Chat's composer out of the viewport.
+- **Rail, lower part: the utility workspace.** A four-tab list with exactly the
+  player-facing labels **Chat, Inventory, Character, Missions**, and one docked
+  utility at a time in a panel that scrolls on its own. Chat's message log
+  grows to fill the height it is given (minimum 7rem), so the composer stays in
+  view. The tab list is a real ARIA tab list with a roving tab stop. The Chat tab
+  carries the attention count, and the Missions tab the number ready to turn in,
+  as small badges whose counts are also in the accessible name. Chat is the
+  home; a non-home utility shows compact **Set as default** and **Back to
+  {home}** controls above its content.
+- **Docked is not modal.** A docked utility is an ordinary page region: no
+  backdrop, no scroll lock, no focus trap, and Escape is not captured. Anything
+  that is genuinely exclusive — an accepted player trade, a mandatory reveal, a
+  destructive confirmation — stays a foreground overlay at every width and is
+  not squeezed into the rail.
+
+The Play footer below is the phone/tablet fixed four-destination navigation:
+**Character · Inventory · Map · Missions**. Inventory and Equipment share one Drawer and are
 selected with tabs; Equipment is not a fifth footer destination. Character is a
 sibling of Inventory in the same Drawer, with a sticky footer action so Switch
 Character never scrolls out of reach (#213). The surface ownership and state
@@ -62,7 +97,7 @@ focus to the launcher. Attention reuses the News control's unread language — a
 small count badge (`9+` beyond nine) and the static `--rs-glow-news-unread`
 halo on an unclipped wrapper — with the count folded into the accessible name
 ("Chat, 2 items need attention"). A later drag-and-snap would only change the
-stored `{ side, y }`; a docked desktop presentation would render the same
+stored `{ side, y }`; the docked desktop presentation (#286) renders the same
 `ChatSocialSurface` without depending on the floating button.
 
 General and Trade (#246) fill the Drawer's conversation region as two tabs in

@@ -117,10 +117,25 @@ describe("public Updates content boundary", () => {
     });
   });
 
-  it("publishes the Chat/Social polish Update as the newest, linking Safety & Privacy", () => {
-    const latest = getLatestPublishedUpdate();
-    expect(latest.slug).toBe("heads-up");
+  it("publishes the desktop workspace Update as the newest", () => {
     // Newest by instant, so the account news boundary surfaces it (#156).
+    const latest = getLatestPublishedUpdate();
+    expect(latest.slug).toBe("room-to-spread-out");
+    expect(Date.parse(latest.publishedAt)).toBeGreaterThan(
+      Date.parse(getPublicUpdate("heads-up")!.publishedAt),
+    );
+    // Player-facing: names only what a player sees, never the internal contract.
+    const text = JSON.stringify(latest);
+    for (const label of ["Chat", "Inventory", "Character", "Missions", "Set as default"]) {
+      expect(text).toContain(label);
+    }
+    expect(text).not.toMatch(/\bquests?\b/i);
+  });
+
+  it("publishes the Chat/Social polish Update, linking Safety & Privacy", () => {
+    // A newer Update has shipped since (#286), so it is found by slug.
+    const latest = getPublicUpdate("heads-up")!;
+    // Newer than the recipe-unlock Update, so the account news boundary surfaces it (#156).
     expect(Date.parse(latest.publishedAt)).toBeGreaterThan(
       Date.parse(getPublicUpdate("something-new-to-make")!.publishedAt),
     );

@@ -19,7 +19,15 @@ import {
   SKILL_IDS,
   type LocationId,
 } from "@/game/config/foundations";
-import { expect, openEquipmentTab, openNpcConversation, openTestCharacter, test } from "./fixtures";
+import {
+  expect,
+  openEquipmentTab,
+  openNpcConversation,
+  openTestCharacter,
+  openUtility,
+  test,
+  utilitySurface,
+} from "./fixtures";
 import { captureReviewScreenshot } from "./review-screenshot";
 
 /**
@@ -455,8 +463,8 @@ test("the Loadsteel Cutter: Mining 5 to equip, its own charge, and Mining with b
 
   // The stored Loadsteel Cutter keeps exactly its charge, shown against its own ten.
   expect((await instancesOf(characterId, ITEM_IDS.loadsteelCutter))[0]!.currentCharge).toBe(9);
-  await page.getByRole("button", { name: /Inventory/ }).click();
-  const inventory = page.getByRole("dialog", { name: "Inventory" });
+  await openUtility(page, "inventory");
+  const inventory = utilitySurface(page, "Inventory");
   const tile = inventory.locator("button[aria-pressed]").filter({ hasText: "Loadsteel Cutter" });
   await expect(tile).toContainText("9/10");
   await tile.click();
@@ -467,8 +475,13 @@ test("the Loadsteel Cutter: Mining 5 to equip, its own charge, and Mining with b
   await expectArtwork(tile, "loadsteel-cutter.webp");
   await expect(details.getByText("9 of 10 charges remaining").first()).toBeVisible();
   await expectNoHorizontalOverflow(page);
+  // Widening past 1280px turns the open Inventory from the phone's modal Drawer
+  // into the desktop dock (one presentation, never both). A new presentation is
+  // a new instance, so the tile selection is made again there.
   await page.setViewportSize(DESKTOP);
-  await expect(details).toBeVisible();
+  const docked = utilitySurface(page, "Inventory");
+  await docked.locator("button[aria-pressed]").filter({ hasText: "Loadsteel Cutter" }).click();
+  await expect(docked.getByRole("region", { name: "Loadsteel Cutter details" })).toBeVisible();
   await expectNoHorizontalOverflow(page);
   await captureReviewScreenshot(page, "loadsteel-inventory-desktop.png");
   expect(loadsteel.id).toBe((await instancesOf(characterId, ITEM_IDS.loadsteelCutter))[0]!.id);
@@ -496,13 +509,14 @@ test("the Freight Harness equips as a container for six more Inventory slots", a
   await expectNoHorizontalOverflow(page);
   await captureReviewScreenshot(page, "freight-harness-equipment-desktop.png");
   await page.setViewportSize(PHONE);
-  await expect(second).toBeVisible();
-  await expectNoHorizontalOverflow(page);
-  await equipment.getByRole("button", { name: "Close equipment" }).click();
-  await page.getByRole("button", { name: /Inventory/ }).click();
+  // The docked Equipment panel became the phone's Drawer, a new instance.
   await expect(
-    page.getByRole("dialog", { name: "Inventory" }).getByLabel("14 inventory slots"),
+    utilitySurface(page, "Equipment").getByRole("region", { name: "Container attachment 2" }),
   ).toBeVisible();
+  await expectNoHorizontalOverflow(page);
+  await utilitySurface(page, "Equipment").getByRole("button", { name: "Close equipment" }).click();
+  await openUtility(page, "inventory");
+  await expect(utilitySurface(page, "Inventory").getByLabel("14 inventory slots")).toBeVisible();
 });
 
 test("A Cut Above: show Tansy the Loadsteel Cutter in your hand, and keep it", async ({

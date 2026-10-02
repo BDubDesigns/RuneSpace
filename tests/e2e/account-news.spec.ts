@@ -2,7 +2,13 @@ import { db } from "@/db";
 import * as authSchema from "@/db/auth-schema";
 import * as rune from "@/db/rune-space";
 import { cleanupTestUser } from "../integration/fixtures";
-import { establishAuthenticatedSession, expect, test } from "./fixtures";
+import {
+  establishAuthenticatedSession,
+  expect,
+  openUtility,
+  test,
+  utilitySurface,
+} from "./fixtures";
 
 /**
  * Isolated account-level unread-news check (Issue #156).
@@ -82,11 +88,8 @@ test("News indicator starts unread, clears through a real navigation, and stays 
 
     // The boundary is account-level: a second character under the same
     // account sees the already-cleared state without acknowledging again.
-    await page.getByRole("button", { name: "Character", exact: true }).click();
-    await page
-      .getByRole("dialog", { name: "Character" })
-      .getByRole("link", { name: "Switch Character" })
-      .click();
+    await openUtility(page, "character");
+    await utilitySurface(page, "Character").getByRole("link", { name: "Switch Character" }).click();
     await createCharacter(page, uniqueCharacterName("News Two"));
     await expect(banner.getByRole("button", { name: "News", exact: true })).toBeVisible();
     await expect(banner.getByRole("button", { name: /unread/i })).toHaveCount(0);
