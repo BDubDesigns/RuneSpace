@@ -657,30 +657,55 @@ characters who have not earned it.
 The server projects `siteStash` only for the character's current site and only
 when the mount is already built or the gate is met. Before that nothing about a
 stash exists to render: no Build Stash Mount panel, locked teaser or disabled
-control. Once qualified the standard `RepairWorkPanel` builds the mount; then
-**Install Container**; then **Open Stash** (the shared surface) with **Swap
-Container** and **Remove Container**.
+control. Once qualified the standard `RepairWorkPanel` builds the mount; then a
+visible choice of container to install; then the shared storage surface, with
+**Swap Container** and **Remove Container** behind a quiet management
+disclosure.
 
-A stash is secondary to the site's own activity, so it renders as a compact
-disclosure bar (`features/site-stash/SiteStashPanel`) **below** that activity,
-collapsed by default. The bar states the stage and the progress that matters
-(`summarizeSiteStash`): required material counts and welds while building, then
-the installed container and its used/total slots. The full detail opens on
-demand and is a real `aria-expanded` button. While that mount's own Welding is
-running the detail is held open and the bar cannot be collapsed, so Stop and the
-time-sensitive Clean Pass are never hidden; it stays open after Stop. When the
-mount completes, the wrapper (not the unmounting construction panel) announces
-it, folds back to the bar, and the bar then asks for a container. `RepairWorkPanel`
-itself is unchanged.
+A stash is secondary to the site's own activity, so it renders as ONE panel
+(`features/site-stash/SiteStashPanel`) **below** that activity, collapsed by
+default. The compact bar is that panel's header, not a separate control above a
+second card: one frame, one title, one Show/Hide. It states the stage and the
+progress that matters (`summarizeSiteStash`): required material counts and welds
+while building, then the installed container and its used/total slots. Under it
+is the one thing the stage needs:
+
+- **Building:** `RepairWorkPanel` with its optional `embedded` display prop, so
+  the same controls, meters and rules render without a second frame or title.
+- **Built, no container:** **Choose a container**. The server's
+  `carriedContainers` (carried and unequipped; nothing equipped is ever offered)
+  are real item cards, each the item's approved presentation with its slot count.
+  A card only selects; **Install selected container** is the command. A sole
+  candidate starts selected. With none, one explanation in place. Installing
+  swaps the choice for storage in the same open panel, with no second tap.
+- **Installed:** the shared `StorageTransferSurface` immediately (carried and
+  stash tabs on a phone, two regions on desktop). There is no second heading,
+  occupancy line or Open/Close button; the header already says the container and
+  its slots. Collapsing and reopening returns straight to storage.
+- **Container management** (Swap, Remove): a disclosure at the foot of the panel.
+  Opened, it offers the swap candidates the server accepts as cards plus an
+  explicit **Swap to selected container**, or the reason none is valid, and
+  Remove with the reason it is blocked. Every rule is the projection's.
+
+Confirmations are transient (a polite status that clears itself, since the
+header already proves the result); refusals and failures stay until the next
+action. Nothing is confirmed before the server says so.
+
+While that mount's own Welding is running the detail is held open and the bar
+cannot be collapsed, so Stop and the time-sensitive Clean Pass are never hidden;
+it stays open after Stop. When the mount completes, the wrapper (not the
+unmounting construction panel) announces it, folds back to the bar, and the bar
+then asks for a container.
 
 The bar is two fixed rows: the title (**Build Stash Mount**, later **Site
 Stash**) and its Show/Hide control share the first, and the summary takes the
 whole second, so a long recipe can never decide where the control sits. When the
-player themself opens the detail, or **Open Stash** on a built stash, the opened
-content is scrolled to the top of the viewport once rendered (Mining alone can
-fill a phone screen, so it would otherwise open below the fold). Page load,
-background refreshes, Welding opening the detail on its own and collapsing never
-scroll. Reduced motion scrolls without animation.
+player themself opens the panel, installs a container, or opens Container
+management, the start of what they asked for is scrolled to the top of the
+viewport once rendered (Mining alone can fill a phone screen, so it would
+otherwise open below the fold). Page load, background refreshes, Welding opening
+the detail on its own, collapsing, and unrelated actions never scroll. Reduced
+motion scrolls without animation.
 
 ### Activity ownership of the running action
 

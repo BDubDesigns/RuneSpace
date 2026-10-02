@@ -28,7 +28,7 @@ const authoredUpdates = [
         heading: "Added",
         items: [
           "Stash Mounts at The Jag (Welding 1), Rusk Recovery and the Abandoned Processing Yard (Welding 5), and Deep Jag (Welding 8, after its passage is braced open).",
-          "Install Container, Stash, Swap Container and Remove Container at a built mount. Any container you own works, and a stash has as many slots as its container.",
+          "Choose a container to install at a built mount, then use the stash through the same storage screen as the Cargo Hold. Swap Container and Remove Container are under Container management. Any container you own works, and a stash has as many slots as its container.",
         ],
       },
       {

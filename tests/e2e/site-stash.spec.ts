@@ -137,7 +137,10 @@ test("shows nothing before the site's Welding gate, then a collapsed bar once ea
   // is a real keyboard control with an accurate state.
   await toggle(page).click();
   await expect(toggle(page)).toHaveAttribute("aria-expanded", "true");
-  await expect(build.getByRole("heading", { name: /Build Stash Mount/ })).toBeVisible();
+  // The bar is the panel's header: the work sits under it with no second title.
+  await expect(toggle(page)).toContainText("Build Stash Mount");
+  await expect(build).toBeVisible();
+  await expect(build.getByRole("heading")).toHaveCount(0);
   await expect(build).toContainText("Galvanic Stock");
   await expect(build).toContainText("Mounting Bracket");
   await toggle(page).focus();
@@ -246,41 +249,37 @@ test("lives through build, Welding, completion and use at The Jag on a phone", a
   await expectTwoRowBar(page);
   await expect(notice).toHaveCount(0, { timeout: 10_000 });
 
-  // Built stash starts compact and opens to Install Container, disabled until
-  // the character actually carries an unequipped container.
+  // Built: the bar asks for a container, and with none carried that is one quiet
+  // explanation in place — no disabled workflow.
   await page.reload();
   await expect(toggle(page)).toHaveAttribute("aria-expanded", "false");
   await expect(summary).toContainText("Mount built · Install a container");
   await expand(page);
   const stash = page.locator(`[data-site-stash="${LOCATION_IDS.theJag}"]`);
   await expect(stash).toBeVisible();
-  await expect(stash.locator("[data-stash-install]")).toBeDisabled();
+  await expect(stash.locator("[data-stash-hint]")).toContainText("Carry an unequipped container");
+  await expect(stash.locator("[data-stash-install-confirm]")).toHaveCount(0);
 
-  await db.insert(itemInstances).values({ characterId, itemId: ITEM_IDS.scrapBox });
+  await carryContainer(characterId, ITEM_IDS.scrapBox);
+  await db.insert(itemInstances).values({ characterId, itemId: ITEM_IDS.salvageCutter });
   await db
     .insert(inventoryStacks)
     .values({ characterId, itemId: ITEM_IDS.ferriteShale, quantity: 3 });
   await page.reload();
   await expand(page);
-  await expect(stash.locator("[data-stash-install]")).toBeEnabled();
-  await stash.locator("[data-stash-install]").click();
-  await stash.getByRole("button", { name: /Scrap Box · 3 slots/ }).click();
-  await expect(stash.locator("[data-stash-occupancy]")).toContainText("Scrap Box · 0 / 3");
-  // The bar tracks the same state while the detail is open.
-  await expect(summary).toContainText("Scrap Box · 0 / 3 slots");
-  await expectTwoRowBar(page);
-  // Nothing stored: it may be removed, and nothing else is a candidate to swap.
-  await expect(stash.locator("[data-stash-remove]")).toBeEnabled();
-  await expect(stash.locator("[data-stash-swap]")).toBeDisabled();
-
-  // The one shared storage surface, not a second copy of it. The control says
-  // what it does, and opening brings the surface into view.
-  await expect(stash.locator("[data-stash-open]")).toHaveText("Open Stash");
-  await stash.locator("[data-stash-open]").click();
-  await expect(stash.locator("[data-stash-open]")).toHaveText("Close Stash");
+  // The one eligible container is a real card, and installing goes straight to
+  // the shared storage surface in this same panel.
+  await expect(stash.locator("[data-stash-container-card]")).toHaveCount(1);
+  await stash.locator("[data-stash-install-confirm]").click();
   const storage = stash.locator("[data-stash-storage]");
   await expect(storage).toBeVisible();
   await expect(storage).toBeInViewport();
+  await expect(toggle(page)).toHaveAttribute("aria-expanded", "true");
+  // The bar tracks the same state while the detail is open.
+  await expect(summary).toContainText("Scrap Box · 0 / 3 slots");
+  await expectTwoRowBar(page);
+
+  // Real stack and unique deposits through the shared surface.
   await storage
     .locator("[data-storage-area='carried']")
     .getByRole("button", { name: /Ferrite Shale/ })
@@ -290,24 +289,55 @@ test("lives through build, Welding, completion and use at The Jag on a phone", a
     .getByRole("button", { name: "DEPOSIT STACK" })
     .click();
   await expect(stash).toContainText("Stashed.");
-  await expect(stash.locator("[data-stash-occupancy]")).toContainText("1 / 3");
   await expect(summary).toContainText("Scrap Box · 1 / 3 slots");
   await expect(storage.locator("[data-storage-area='stored']")).toContainText("Ferrite Shale");
-  // A non-empty stash cannot give up its container, and says why.
+  await storage
+    .locator("[data-storage-area='carried']")
+    .getByRole("button", { name: /Salvage Cutter/ })
+    .click();
+  await storage
+    .locator("[data-storage-selection]")
+    .getByRole("button", { name: "DEPOSIT ITEM" })
+    .click();
+  await expect(summary).toContainText("Scrap Box · 2 / 3 slots");
+  await expect(storage.locator("[data-storage-area='stored']")).toContainText("Salvage Cutter");
+
+  // Swap and Remove stay out of the way until asked for, then say what is valid
+  // and why anything is not.
+  await expect(stash.locator("[data-stash-remove]")).toHaveCount(0);
+  await expect(stash.locator("[data-stash-management]")).toHaveCount(0);
+  const management = page.locator("[data-stash-management-toggle]");
+  await expect(management).toHaveAttribute("aria-expanded", "false");
+  await management.click();
+  await expect(management).toHaveAttribute("aria-expanded", "true");
   await expect(stash.locator("[data-stash-remove]")).toBeDisabled();
-  await expect(stash.locator("[data-stash-hint]")).toContainText(
+  await expect(stash.locator("[data-stash-management]")).toContainText(
     "only be removed once the stash is empty",
+  );
+  await expect(stash.locator("[data-stash-management]")).toContainText(
+    "To swap, carry a different kind of container",
   );
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
   await captureReviewScreenshot(page, "site-stash-mobile.png");
 
-  // Stored items stay at the site and survive a refresh, which re-collapses.
+  // Collapse and reopen go straight back to storage; a refresh lands collapsed
+  // and reopens to the same stored items, which the server kept.
+  await toggle(page).click();
+  await expect(toggle(page)).toHaveAttribute("aria-expanded", "false");
+  await toggle(page).click();
+  await expect(storage).toBeVisible();
   await page.reload();
   await expect(toggle(page)).toHaveAttribute("aria-expanded", "false");
-  await expect(summary).toContainText("Scrap Box · 1 / 3 slots");
+  await expect(summary).toContainText("Scrap Box · 2 / 3 slots");
+  // Stored items stay at the site when the character is elsewhere and returns.
+  await standAt(characterId, LOCATION_IDS.abandonedProcessingYard);
+  await page.reload();
+  await expect(disclosure(page)).toHaveCount(0);
+  await standAt(characterId, LOCATION_IDS.theJag);
+  await page.reload();
+  await expect(summary).toContainText("Scrap Box · 2 / 3 slots");
   await expand(page);
 
-  await stash.locator("[data-stash-open]").click();
   // A phone shows one region at a time and a reload resets it to the carried one.
   await storage.getByRole("tab", { name: /^STASH/ }).click();
   await storage
@@ -318,12 +348,22 @@ test("lives through build, Welding, completion and use at The Jag on a phone", a
     .locator("[data-storage-selection]")
     .getByRole("button", { name: "WITHDRAW STACK" })
     .click();
-  await expect(stash.locator("[data-stash-occupancy]")).toContainText("0 / 3");
+  await storage
+    .locator("[data-storage-area='stored']")
+    .getByRole("button", { name: /Salvage Cutter/ })
+    .click();
+  await storage
+    .locator("[data-storage-selection]")
+    .getByRole("button", { name: "WITHDRAW ITEM" })
+    .click();
+  await expect(summary).toContainText("Scrap Box · 0 / 3 slots");
 
+  await page.locator("[data-stash-management-toggle]").click();
   await expect(stash.locator("[data-stash-remove]")).toBeEnabled();
   await stash.locator("[data-stash-remove]").click();
-  // The container is carried again and the mount stays built.
-  await expect(stash.locator("[data-stash-install]")).toBeEnabled();
+  // The container is carried again, the mount stays built, and the panel offers
+  // it back as the choice it is.
+  await expect(stash.locator("[data-stash-container-card]")).toHaveCount(1);
   await expect(stash).toContainText("Scrap Box removed.");
   await expect(summary).toContainText("Mount built · Install a container");
 });
@@ -554,7 +594,7 @@ test("opening the stash brings it into view, and nothing else scrolls the page",
   const scrolledBefore = await page.evaluate(() => window.scrollY);
   expect(scrolledBefore).toBeGreaterThan(0);
   await toggle(page).click();
-  await expect(build.getByRole("heading", { name: /Build Stash Mount/ })).toBeInViewport();
+  await expect(toggle(page)).toBeInViewport();
   const contribute = build.locator("[data-repair-contribute]");
   await expect(contribute).toBeInViewport({ ratio: 1 });
   await expect
@@ -616,4 +656,177 @@ test("Deep Jag: the mine and its stash share the site without sharing meters", a
   );
   await expectTwoRowBar(page);
   await exerciseMiningAndStashWelding(page, characterId, REPAIR_TARGET_IDS.siteStashDeepJag);
+});
+
+/**
+ * One interface (#288 UX follow-up): the compact bar is the header of ONE stash
+ * panel, and what is under it is the one thing that stage needs — a visible
+ * container choice, then the shared storage surface, with the rarely used
+ * Swap / Remove behind a quiet management disclosure.
+ */
+async function builtMountAtTheJag(page: Page) {
+  const characterId = page.url().split("/").at(-1)!;
+  await standAt(characterId, LOCATION_IDS.theJag);
+  const recipe = getRepairTargetBalance(REPAIR_TARGET_IDS.siteStashTheJag, balance);
+  await seedRepairTarget(db, rune, characterId, REPAIR_TARGET_IDS.siteStashTheJag, {
+    materials: installedMaterials(recipe),
+    weldingProgress: recipe.repairIncrements,
+    completedAt: new Date(),
+  });
+  return characterId;
+}
+
+async function carryContainer(characterId: string, itemId: string) {
+  const [row] = await db.insert(itemInstances).values({ characterId, itemId }).returning();
+  return row!.id;
+}
+
+/** The control sits wholly on screen, clear of the fixed bottom navigation. */
+async function expectAboveNav(page: Page, locator: Locator) {
+  await expect(locator).toBeInViewport({ ratio: 1 });
+  await expect
+    .poll(async () => {
+      const box = (await locator.boundingBox())!;
+      const nav = (await page.getByRole("navigation", { name: "Primary" }).boundingBox())!;
+      return box.y >= 0 && box.y + box.height <= nav.y;
+    })
+    .toBe(true);
+}
+
+const stashContent = (page: Page) => page.locator("[data-site-stash]");
+
+/** Tap Show the way a player does at the foot of the page. */
+async function showFromTheFoot(page: Page) {
+  await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
+  await toggle(page).click();
+  await expect(toggle(page)).toHaveAttribute("aria-expanded", "true");
+}
+
+test("a built mount without a container is one panel that asks for one in place", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  const characterId = await builtMountAtTheJag(page);
+  await page.reload();
+
+  // Nothing eligible: one quiet explanation in place, no disabled workflow.
+  await showFromTheFoot(page);
+  await expect(stashContent(page).locator("[data-stash-hint]")).toContainText(
+    "Carry an unequipped container",
+  );
+  await expect(page.locator("[data-stash-container-card]")).toHaveCount(0);
+  await expect(page.locator("[data-stash-install-confirm]")).toHaveCount(0);
+  // One frame, one heading: the bar IS the panel's header.
+  await expect(disclosure(page).locator("[data-activity-panel]")).toHaveCount(0);
+  await expect(disclosure(page).getByRole("heading", { name: "Site Stash" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: /^(Open|Close) Stash$/ })).toHaveCount(0);
+  await captureReviewScreenshot(page, "site-stash-choose-none-mobile.png");
+
+  // One eligible container: its real card is on screen at once. The equipped
+  // container is never offered.
+  const scrapBox = await carryContainer(characterId, ITEM_IDS.scrapBox);
+  await page.reload();
+  await showFromTheFoot(page);
+  const cards = page.locator("[data-stash-container-card]");
+  await expect(cards).toHaveCount(1);
+  await expect(cards.first()).toHaveAttribute("data-stash-container-card", scrapBox);
+  await expect(cards.first()).toContainText("Scrap Box");
+  await expect(cards.first()).toContainText("3 slots");
+  await expectAboveNav(page, cards.first());
+  await expectAboveNav(page, page.locator("[data-stash-install-confirm]"));
+  await captureReviewScreenshot(page, "site-stash-choose-one-mobile.png");
+
+  // Several: the player chooses; a card selects and does not install.
+  const harness = await carryContainer(characterId, ITEM_IDS.freightHarness);
+  await page.reload();
+  await showFromTheFoot(page);
+  await expect(cards).toHaveCount(2);
+  const harnessCard = page.locator(`[data-stash-container-card="${harness}"]`);
+  const scrapCard = page.locator(`[data-stash-container-card="${scrapBox}"]`);
+  const install = page.locator("[data-stash-install-confirm]");
+  await expect(install).toBeDisabled();
+  await expect(harnessCard.getByRole("button")).toHaveAttribute("aria-pressed", "false");
+  await expectAboveNav(page, install);
+  await harnessCard.getByRole("button").click();
+  await expect(harnessCard.getByRole("button")).toHaveAttribute("aria-pressed", "true");
+  await expect(scrapCard.getByRole("button")).toHaveAttribute("aria-pressed", "false");
+  await expect(install).toBeEnabled();
+  await expect(toggle(page)).toContainText("Mount built · Install a container");
+
+  // Installing moves straight to storage in the same panel: no second Open Stash,
+  // the panel stays expanded, and the header proves the install.
+  await install.click();
+  await expect(page.locator("[data-stash-storage]")).toBeVisible();
+  await expect(toggle(page)).toHaveAttribute("aria-expanded", "true");
+  await expect(disclosure(page).locator("[data-site-stash-summary]")).toContainText(
+    "Freight Harness · 0 / 6 slots",
+  );
+  await expect(page.getByRole("button", { name: /^(Open|Close) Stash$/ })).toHaveCount(0);
+  await expect(page.locator("[data-stash-container-card]")).toHaveCount(0);
+  await expectAboveNav(page, page.getByRole("tab", { name: /^STASH/ }));
+  // A concise confirmation that does not stay.
+  const feedback = page.locator("[data-stash-feedback]");
+  await expect(feedback).toContainText("Freight Harness installed.");
+  await expect(feedback).toHaveCount(0, { timeout: 10_000 });
+});
+
+test("Container management hides Swap and Remove until asked, and swaps by selecting a card", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  const characterId = await builtMountAtTheJag(page);
+  await carryContainer(characterId, ITEM_IDS.freightHarness);
+  await db
+    .insert(inventoryStacks)
+    .values({ characterId, itemId: ITEM_IDS.ferriteShale, quantity: 2 });
+  await page.reload();
+  await showFromTheFoot(page);
+  await page.locator("[data-stash-install-confirm]").click();
+  const summary = disclosure(page).locator("[data-site-stash-summary]");
+  await expect(summary).toContainText("Freight Harness · 0 / 6 slots");
+
+  // One stored stack, so the replacement has something to hold.
+  const storage = page.locator("[data-stash-storage]");
+  await storage
+    .locator("[data-storage-area='carried']")
+    .getByRole("button", { name: /Ferrite Shale/ })
+    .click();
+  await storage
+    .locator("[data-storage-selection]")
+    .getByRole("button", { name: "DEPOSIT STACK" })
+    .click();
+  await expect(summary).toContainText("Freight Harness · 1 / 6 slots");
+
+  // Only another container of the same kind is carried: not a valid swap, and the
+  // reason is said in place. The same kind is never offered as a card.
+  await carryContainer(characterId, ITEM_IDS.freightHarness);
+  await page.reload();
+  await expand(page);
+  await expect(page.locator("[data-stash-management]")).toHaveCount(0);
+  const management = page.locator("[data-stash-management-toggle]");
+  await management.click();
+  const region = page.locator("[data-stash-management]");
+  await expect(region).toContainText("None of the containers you carry can replace it");
+  await expect(page.locator("[data-stash-swap-card]")).toHaveCount(0);
+  await expect(page.locator("[data-stash-swap-confirm]")).toHaveCount(0);
+  // Opening it brought its heading on screen, above the fixed navigation.
+  await expectAboveNav(page, region.getByRole("heading", { name: "Swap container" }));
+
+  // A different kind with room: one card, selected by the player, then confirmed.
+  const scrapBox = await carryContainer(characterId, ITEM_IDS.scrapBox);
+  await page.reload();
+  await expand(page);
+  await management.click();
+  const card = page.locator(`[data-stash-swap-card="${scrapBox}"]`);
+  await expect(page.locator("[data-stash-swap-card]")).toHaveCount(1);
+  await expect(card).toContainText("3 slots");
+  const confirm = page.locator("[data-stash-swap-confirm]");
+  // With exactly one candidate it starts selected; either way a card never swaps.
+  await expect(card.getByRole("button")).toHaveAttribute("aria-pressed", "true");
+  await expect(summary).toContainText("Freight Harness · 1 / 6 slots");
+  await confirm.click();
+  await expect(summary).toContainText("Scrap Box · 1 / 3 slots");
+  await expect(page.locator("[data-site-stash]")).toContainText("Swapped in Scrap Box");
+  // Everything stashed stayed put.
+  await expect(page.locator("[data-storage-area='stored']")).toContainText("Ferrite Shale");
 });

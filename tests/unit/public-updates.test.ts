@@ -128,7 +128,7 @@ describe("public Updates content boundary", () => {
     expect(Date.parse(latest.publishedAt)).toBeLessThanOrEqual(Date.now());
     // Player-facing: names only what a player sees, never the internal contract.
     const text = JSON.stringify(latest);
-    for (const label of ["Install Container", "Swap Container", "Remove Container", "Welding"]) {
+    for (const label of ["Container management", "Swap Container", "Remove Container", "Welding"]) {
       expect(text).toContain(label);
     }
     expect(text).not.toMatch(/\bquests?\b/i);

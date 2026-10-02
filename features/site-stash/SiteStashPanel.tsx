@@ -4,7 +4,7 @@ import { useEffect, useId, useRef, useState, useTransition } from "react";
 import { ActionButton } from "@/components/ui/ActionButton";
 import { Feedback } from "@/components/ui/Feedback";
 import { getRepairTargetBalance } from "@/game/config/balance";
-import { ActivityPanel } from "@/features/shared/ActivityPanel";
+import { ItemVisual } from "@/components/items/ItemVisual";
 import { usePlay } from "@/features/play/PlayContext";
 import {
   SITE_STASH_STORAGE_LABELS,
@@ -36,17 +36,16 @@ import type { SiteStashContainerState, SiteStashState } from "@/server/play";
  * The server projects a stash only once it is meaningful to this character
  * (its Welding gate is met, or the mount is already built), so a character who
  * has not earned it never reaches this component with anything to render —
- * there is no locked teaser or disabled control to draw. This surface is three
- * stages of one thing: Build Stash Mount (the ordinary repair/Welding panel),
- * Install Container, and the built stash with the shared storage surface.
+ * there is no locked teaser or disabled control to draw.
  *
- * A stash is secondary to the site's own activity, so it is a compact
- * disclosure that sits below that activity and starts collapsed. The bar
- * always says the stage and the progress that matters; the full detail opens on
- * demand. Nothing here is authority. Which containers are offered, which swaps
- * would succeed and whether Remove is enabled all arrive pre-decided in the
- * projection, and every command re-proves location, ownership, mount and
- * capacity on the server.
+ * It is ONE panel: the compact bar is its header, and under the bar is the one
+ * thing the current stage needs — the Build Stash Mount work, then a visible
+ * choice of container to install, then the shared storage surface. A stash is
+ * secondary to the site's own activity, so it sits below that activity and
+ * starts collapsed. Nothing here is authority. Which containers are offered,
+ * which swaps would succeed and whether Remove is enabled all arrive
+ * pre-decided in the projection, and every command re-proves location,
+ * ownership, mount and capacity on the server.
  */
 export function SiteStashPanel() {
   const { state } = usePlay();
@@ -58,27 +57,31 @@ export function SiteStashPanel() {
 }
 
 const COMPLETION_NOTICE_DURATION_MS = 3_600;
+const SCROLL_MARGIN = "scroll-mt-[calc(env(safe-area-inset-top)+var(--rs-space-3))]";
+const SECTION_HEADING =
+  "font-display text-xs uppercase tracking-[0.16em] text-[color:var(--rs-accent-mining)]";
+const HINT = "max-w-2xl text-sm leading-relaxed text-[color:var(--rs-text-secondary)]";
 
 /**
- * Bring newly opened content into view, but only when the player opened it.
+ * Bring newly shown content into view, but only when the player asked for it.
  *
- * Mining alone can fill a phone screen, so a disclosure opened at the bottom
- * would grow below the fold and the tap would look ineffective. `requestReveal`
- * is called from the player's own tap; once React has rendered the opened
- * content the target is scrolled to the top edge, leaving a long panel to scroll
- * normally and the fixed bottom navigation clear of its start. Initial mount,
- * background refreshes, Welding opening the detail by itself and collapsing
- * never request it, so none of them move the page.
+ * Mining alone can fill a phone screen, so content opened at the bottom would
+ * appear below the fold and the tap would look ineffective. `requestReveal` is
+ * called from the player's own action; once React has rendered the result (the
+ * `token` changed while `enabled`) the target is scrolled to the top edge,
+ * leaving a long panel to scroll normally and the fixed bottom navigation clear
+ * of its start. Initial mount, background refreshes, Welding opening the detail
+ * by itself and collapsing never request it, so none of them move the page.
  */
-function useRevealOnOpen<T extends HTMLElement>(open: boolean) {
+function useReveal<T extends HTMLElement>(token: string, enabled = true) {
   const target = useRef<T>(null);
   const requested = useRef(false);
   useEffect(() => {
-    if (!open || !requested.current) return;
+    if (!enabled || !requested.current) return;
     requested.current = false;
     const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     target.current?.scrollIntoView({ block: "start", behavior: reduceMotion ? "auto" : "smooth" });
-  }, [open]);
+  }, [token, enabled]);
   return {
     target,
     requestReveal: () => {
@@ -90,6 +93,7 @@ function useRevealOnOpen<T extends HTMLElement>(open: boolean) {
 function SiteStashDisclosure({ stash }: { stash: SiteStashState }) {
   const { state } = usePlay();
   const regionId = useId();
+  const titleId = useId();
   const [expanded, setExpanded] = useState(false);
   const [noticeVisible, setNoticeVisible] = useState(false);
   const [announcement, setAnnouncement] = useState("");
@@ -106,7 +110,7 @@ function SiteStashDisclosure({ stash }: { stash: SiteStashState }) {
     if (welding) setExpanded(true);
   }, [welding]);
 
-  // The construction panel unmounts the moment the mount is built, taking its
+  // The construction work unmounts the moment the mount is built, taking its
   // local completion feedback with it, so the completion is announced here, and
   // the detail folds back to the compact bar the finished stash lives in.
   useEffect(() => {
@@ -121,11 +125,13 @@ function SiteStashDisclosure({ stash }: { stash: SiteStashState }) {
   }, [stash.mountBuilt]);
 
   const open = expanded || welding;
-  const reveal = useRevealOnOpen<HTMLElement>(open);
+  // Opening, and installing a container (which swaps the choice for storage in
+  // this same panel), keep the panel's start on screen.
+  const reveal = useReveal<HTMLElement>(`${open}:${stash.container?.itemInstanceId ?? ""}`, open);
 
   return (
     <section
-      className="scroll-mt-[calc(env(safe-area-inset-top)+var(--rs-space-3))]"
+      className={`${SCROLL_MARGIN} border border-[color:var(--rs-border-structural)] bg-[color:var(--rs-surface-panel)]`}
       data-site-stash-disclosure={stash.locationId}
       data-stash-stage={summary.stage}
       ref={reveal.target}
@@ -136,7 +142,7 @@ function SiteStashDisclosure({ stash }: { stash: SiteStashState }) {
       <button
         aria-controls={regionId}
         aria-expanded={open}
-        className="rs-focus block min-h-[var(--rs-touch-target)] w-full border border-[color:var(--rs-border-structural)] bg-[color:var(--rs-surface-panel)] px-3 py-2 text-left disabled:cursor-not-allowed disabled:opacity-70"
+        className="rs-focus block min-h-[var(--rs-touch-target)] w-full px-3 py-2 text-left disabled:cursor-not-allowed disabled:opacity-70"
         data-site-stash-toggle
         disabled={welding}
         onClick={() => {
@@ -152,6 +158,7 @@ function SiteStashDisclosure({ stash }: { stash: SiteStashState }) {
           <span
             className="min-w-0 font-display text-sm font-bold uppercase tracking-[0.16em] text-[color:var(--rs-text-primary)]"
             data-site-stash-title
+            id={titleId}
           >
             {summary.label}
           </span>
@@ -172,18 +179,25 @@ function SiteStashDisclosure({ stash }: { stash: SiteStashState }) {
       </button>
       {noticeVisible ? (
         <p
-          className="rs-result-feedback-success mt-2 border border-[color:var(--rs-accent-success)] bg-[color:var(--rs-surface-panel)] p-3 font-display text-sm uppercase tracking-wide"
+          className="rs-result-feedback-success mx-3 mb-3 border border-[color:var(--rs-accent-success)] bg-[color:var(--rs-surface-panel)] p-3 font-display text-sm uppercase tracking-wide"
           data-site-stash-notice
         >
           Stash Mount built — install a container to start using it.
         </p>
       ) : null}
-      <div className="mt-2" hidden={!open} id={regionId}>
+      <div
+        aria-labelledby={titleId}
+        className="border-t border-[color:var(--rs-border-subtle)] p-3"
+        hidden={!open}
+        id={regionId}
+        role="region"
+      >
         {open ? (
           stash.mountBuilt ? (
-            <BuiltStash stash={stash} />
+            <BuiltStash onInstalled={reveal.requestReveal} stash={stash} />
           ) : (
             <RepairWorkPanel
+              embedded
               key={stash.repair.targetId}
               materialsPrompt="A permanent mount for a stash container, welded down at this site. Hand over the material you are carrying and bring the rest when you come back."
               targetId={stash.repair.targetId}
@@ -197,28 +211,41 @@ function SiteStashDisclosure({ stash }: { stash: SiteStashState }) {
   );
 }
 
-function BuiltStash({ stash }: { stash: SiteStashState }) {
+type StashFeedback = { tone: "success" | "danger"; text: string };
+
+/**
+ * The contents of a built stash: choose a container to install, or — once one
+ * is installed — the shared storage surface, with the rarely used Swap and
+ * Remove behind a quiet management disclosure at the foot.
+ */
+function BuiltStash({ onInstalled, stash }: { onInstalled: () => void; stash: SiteStashState }) {
   const { acceptState, enqueueForeground, foregroundBusy, releaseCommand, state } = usePlay();
-  const [storageOpen, setStorageOpen] = useState(false);
-  const revealStorage = useRevealOnOpen<HTMLDivElement>(storageOpen);
-  // Held here, not in the surface, so the phone view survives close and reopen.
+  // Held here, not in the surface, so the phone view survives a mode switch.
   const [storageMode, setStorageMode] = useState<StorageArea>("carried");
-  const [chooser, setChooser] = useState<"install" | "swap">();
-  const [message, setMessage] = useState<string>();
+  const [feedback, setFeedback] = useState<StashFeedback>();
   const [pending, setPending] = useState(false);
   const [, startTransition] = useTransition();
   const busy = pending || foregroundBusy || Boolean(state.activeAction);
   const { container } = stash;
 
+  // A confirmation is passing information (the header already proves the
+  // result), so it goes away by itself; a refusal or failure stays until the
+  // player's next action.
+  useEffect(() => {
+    if (feedback?.tone !== "success") return;
+    const timer = window.setTimeout(() => setFeedback(undefined), COMPLETION_NOTICE_DURATION_MS);
+    return () => window.clearTimeout(timer);
+  }, [feedback]);
+
   /**
    * The shared command path: the foreground gate, pending state, feedback and
    * authoritative-state reconciliation. A refusal still carries fresh state, so
-   * a stale view corrects itself.
+   * a stale view corrects itself. Nothing is confirmed before the server says so.
    */
   function run(
     action: () => Promise<SiteStashActionResult>,
     success: string,
-    hooks?: StorageTransferHooks,
+    options?: { hooks?: StorageTransferHooks; revealPanel?: boolean },
   ) {
     enqueueForeground(() => {
       setPending(true);
@@ -226,17 +253,25 @@ function BuiltStash({ stash }: { stash: SiteStashState }) {
         try {
           const result = await action();
           if ("error" in result) {
-            setMessage(result.error);
+            setFeedback({ tone: "danger", text: result.error });
           } else {
             // Armed only on a confirmed non-error result, immediately before
             // the state that may vacate the selected tile is accepted.
-            hooks?.armFocusReturn();
-            acceptState(result.state);
-            setMessage(result.stash.status === "committed" ? success : result.stash.message);
-            if (result.stash.status === "committed") setChooser(undefined);
+            options?.hooks?.armFocusReturn();
+            if (result.stash.status === "committed") {
+              if (options?.revealPanel) onInstalled();
+              acceptState(result.state);
+              setFeedback({ tone: "success", text: success });
+            } else {
+              acceptState(result.state);
+              setFeedback({ tone: "danger", text: result.stash.message });
+            }
           }
         } catch {
-          setMessage("Comms interruption. Stash status could not be confirmed.");
+          setFeedback({
+            tone: "danger",
+            text: "Comms interruption. Stash status could not be confirmed.",
+          });
         } finally {
           releaseCommand();
           setPending(false);
@@ -248,170 +283,253 @@ function BuiltStash({ stash }: { stash: SiteStashState }) {
   const base = { characterId: state.characterId, locationId: stash.locationId };
   const transfers: StorageTransferAdapter = {
     depositStack: (input, hooks) =>
-      run(() => depositSiteStashStackAction({ ...base, ...input }), "Stashed.", hooks),
+      run(() => depositSiteStashStackAction({ ...base, ...input }), "Stashed.", { hooks }),
     withdrawStack: (input, hooks) =>
-      run(() => withdrawSiteStashStackAction({ ...base, ...input }), "Withdrawn.", hooks),
+      run(() => withdrawSiteStashStackAction({ ...base, ...input }), "Withdrawn.", { hooks }),
     depositUniqueItem: (input, hooks) =>
-      run(() => depositSiteStashUniqueItemAction({ ...base, ...input }), "Stashed.", hooks),
+      run(() => depositSiteStashUniqueItemAction({ ...base, ...input }), "Stashed.", { hooks }),
     withdrawUniqueItem: (input, hooks) =>
-      run(() => withdrawSiteStashUniqueItemAction({ ...base, ...input }), "Withdrawn.", hooks),
+      run(() => withdrawSiteStashUniqueItemAction({ ...base, ...input }), "Withdrawn.", { hooks }),
   };
 
-  function installable(option: SiteStashContainerState) {
-    return (
-      <ActionButton
-        data-stash-install-choice={option.itemInstanceId}
-        disabled={busy}
-        intent="secondary"
-        key={option.itemInstanceId}
-        onClick={() =>
-          run(
-            () =>
-              installSiteStashContainerAction({ ...base, itemInstanceId: option.itemInstanceId }),
-            `${option.name} installed.`,
-          )
-        }
-      >
-        {option.name} · {option.slotCapacity} slots
-      </ActionButton>
-    );
-  }
+  return (
+    <div data-site-stash={stash.locationId}>
+      {!container ? (
+        <div className="space-y-3" data-stash-choose>
+          <h3 className={SECTION_HEADING}>Choose a container</h3>
+          {stash.carriedContainers.length === 0 ? (
+            <p className={HINT} data-stash-hint>
+              The mount is built. Carry an unequipped container here to install it; its slot count
+              becomes the stash&apos;s.
+            </p>
+          ) : (
+            <>
+              <ContainerChoice
+                busy={busy}
+                cardAttribute="data-stash-container-card"
+                confirmAttribute="data-stash-install-confirm"
+                confirmLabel="Install selected container"
+                groupLabel="Containers you can install"
+                onConfirm={(itemInstanceId) =>
+                  run(
+                    () => installSiteStashContainerAction({ ...base, itemInstanceId }),
+                    `${stash.carriedContainers.find((option) => option.itemInstanceId === itemInstanceId)?.name ?? "Container"} installed.`,
+                    { revealPanel: true },
+                  )
+                }
+                options={stash.carriedContainers}
+              />
+              <p className={HINT}>
+                Any container you carry and are not wearing will do. Its slot count becomes the
+                stash&apos;s, and it leaves your Inventory while installed.
+              </p>
+            </>
+          )}
+        </div>
+      ) : (
+        <>
+          <div data-stash-storage>
+            <StorageTransferSurface
+              labels={SITE_STASH_STORAGE_LABELS}
+              mode={storageMode}
+              onModeChange={setStorageMode}
+              onSelectItem={() => setFeedback(undefined)}
+              pending={pending}
+              projection={projectSiteStashStorage(state, stash)}
+              transfers={transfers}
+            />
+          </div>
+          <ContainerManagement
+            base={base}
+            busy={busy}
+            container={container}
+            run={run}
+            stash={stash}
+          />
+        </>
+      )}
+      {feedback ? (
+        <div data-stash-feedback>
+          <Feedback tone={feedback.tone}>{feedback.text}</Feedback>
+        </div>
+      ) : null}
+    </div>
+  );
+}
 
+/**
+ * Real, selectable containers rather than a bare button: each is the item's own
+ * approved presentation with its slot count, a card only selects, and the
+ * command is a separate, explicit action. With exactly one candidate it starts
+ * selected, so the common case is a single confirm.
+ */
+function ContainerChoice({
+  busy,
+  cardAttribute,
+  confirmAttribute,
+  confirmLabel,
+  groupLabel,
+  onConfirm,
+  options,
+}: {
+  busy: boolean;
+  cardAttribute: string;
+  confirmAttribute: string;
+  confirmLabel: string;
+  groupLabel: string;
+  onConfirm: (itemInstanceId: string) => void;
+  options: readonly SiteStashContainerState[];
+}) {
+  const [picked, setPicked] = useState<string>();
+  const selected =
+    options.find((option) => option.itemInstanceId === picked) ??
+    (options.length === 1 ? options[0] : undefined);
+  return (
+    <div className="space-y-3">
+      <div aria-label={groupLabel} className="grid grid-cols-2 gap-2 sm:grid-cols-4" role="group">
+        {options.map((option) => (
+          <div key={option.itemInstanceId} {...{ [cardAttribute]: option.itemInstanceId }}>
+            <ItemVisual
+              accessibleLabel={`${option.name}, ${option.slotCapacity} slots`}
+              badge={`${option.slotCapacity} slots`}
+              interactive
+              itemId={option.itemId}
+              name={option.name}
+              onSelect={() => setPicked(option.itemInstanceId)}
+              selected={selected?.itemInstanceId === option.itemInstanceId}
+            />
+          </div>
+        ))}
+      </div>
+      <ActionButton
+        {...{ [confirmAttribute]: "" }}
+        disabled={busy || selected === undefined}
+        intent="primary"
+        onClick={() => selected && onConfirm(selected.itemInstanceId)}
+      >
+        {confirmLabel}
+      </ActionButton>
+    </div>
+  );
+}
+
+/**
+ * Swap and Remove are rare, so they live in a disclosure at the foot of the
+ * panel instead of a permanent row of controls and disabled-state hints. Opened,
+ * it shows what is valid now and, for anything that is not, why.
+ */
+function ContainerManagement({
+  base,
+  busy,
+  container,
+  run,
+  stash,
+}: {
+  base: { characterId: string; locationId: string };
+  busy: boolean;
+  container: SiteStashContainerState;
+  run: (
+    action: () => Promise<SiteStashActionResult>,
+    success: string,
+    options?: { hooks?: StorageTransferHooks; revealPanel?: boolean },
+  ) => void;
+  stash: SiteStashState;
+}) {
+  const [open, setOpen] = useState(false);
+  const regionId = useId();
+  const reveal = useReveal<HTMLDivElement>(String(open), open);
   const swapChoices = stash.carriedContainers.filter((option) =>
     stash.swappableContainerInstanceIds.includes(option.itemInstanceId),
   );
-
   return (
-    <ActivityPanel data-site-stash={stash.locationId} title="Site Stash">
-      {!container ? (
-        <>
-          <div className="flex flex-wrap items-center gap-3">
-            <ActionButton
-              data-stash-install
-              disabled={busy || stash.carriedContainers.length === 0}
-              intent="primary"
-              onClick={() => setChooser((open) => (open === "install" ? undefined : "install"))}
-            >
-              Install Container
-            </ActionButton>
-          </div>
-          <p className="max-w-2xl text-sm leading-relaxed text-[color:var(--rs-text-secondary)]">
-            {stash.carriedContainers.length === 0
-              ? "The mount is built. Carry an unequipped container here to install it; its slot count becomes the stash's."
-              : "Any container you carry and are not wearing will do. Its slot count becomes the stash's, and it leaves your Inventory while installed."}
-          </p>
-          {chooser === "install" ? (
-            <div className="flex flex-wrap gap-2" data-stash-install-choices>
-              {stash.carriedContainers.map(installable)}
-            </div>
-          ) : null}
-        </>
-      ) : (
-        <>
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <p className="font-display text-sm uppercase tracking-wide" data-stash-occupancy>
-              {container.name} · {stash.slotsUsed} / {stash.capacitySlots} SLOTS OCCUPIED
-            </p>
-            <ActionButton
-              data-stash-open
-              intent="primary"
-              onClick={() => {
-                if (!storageOpen) revealStorage.requestReveal();
-                setStorageOpen(!storageOpen);
-              }}
-            >
-              {storageOpen ? "Close Stash" : "Open Stash"}
-            </ActionButton>
-          </div>
-          <div className="flex flex-wrap gap-3">
-            <ActionButton
-              data-stash-swap
-              disabled={busy || swapChoices.length === 0}
-              intent="secondary"
-              onClick={() => setChooser((open) => (open === "swap" ? undefined : "swap"))}
-            >
-              Swap Container
-            </ActionButton>
-            <ActionButton
-              data-stash-remove
-              disabled={busy || stash.removeBlockedReason !== undefined}
-              intent="secondary"
-              onClick={() =>
-                run(
-                  () =>
-                    removeSiteStashContainerAction({
-                      ...base,
-                      expectedContainerInstanceId: container.itemInstanceId,
-                    }),
-                  `${container.name} removed.`,
-                )
-              }
-            >
-              Remove Container
-            </ActionButton>
-          </div>
-          {stash.removeBlockedReason || swapChoices.length === 0 ? (
-            <p
-              className="max-w-2xl text-sm leading-relaxed text-[color:var(--rs-text-secondary)]"
-              data-stash-hint
-            >
-              {stash.removeBlockedReason === "not_empty"
-                ? "A container can only be removed once the stash is empty. "
-                : stash.removeBlockedReason === "carried_capacity"
-                  ? "Make room in your Inventory to take the container back. "
-                  : ""}
-              {swapChoices.length === 0
-                ? stash.carriedContainers.length > 0
-                  ? "None of the containers you carry can replace it right now: a swap needs a different kind with room for everything stored here, and room in your Inventory for this one."
-                  : "To swap, carry a different kind of container that is not equipped."
-                : ""}
-            </p>
-          ) : null}
-          {chooser === "swap" ? (
-            <div className="flex flex-wrap gap-2" data-stash-swap-choices>
-              {swapChoices.map((option) => (
-                <ActionButton
-                  data-stash-swap-choice={option.itemInstanceId}
-                  disabled={busy}
-                  intent="secondary"
-                  key={option.itemInstanceId}
-                  onClick={() =>
+    <div
+      className={`${SCROLL_MARGIN} mt-4 border-t border-[color:var(--rs-border-subtle)] pt-1`}
+      ref={reveal.target}
+    >
+      <button
+        aria-controls={regionId}
+        aria-expanded={open}
+        className="rs-focus flex min-h-[var(--rs-touch-target)] w-full items-center justify-between gap-3 text-left"
+        data-stash-management-toggle
+        onClick={() => {
+          if (!open) reveal.requestReveal();
+          setOpen(!open);
+        }}
+        type="button"
+      >
+        <span className="font-display text-xs uppercase tracking-[0.16em] text-[color:var(--rs-text-secondary)]">
+          Container management
+        </span>
+        <span
+          aria-hidden="true"
+          className="shrink-0 font-display text-xs uppercase tracking-wide text-[color:var(--rs-accent-primary)]"
+        >
+          {open ? "Hide" : "Show"}
+        </span>
+      </button>
+      <div hidden={!open} id={regionId}>
+        {open ? (
+          <div className="mt-2 space-y-5" data-stash-management>
+            <section className="space-y-3">
+              <h3 className={SECTION_HEADING}>Swap container</h3>
+              {swapChoices.length > 0 ? (
+                <ContainerChoice
+                  busy={busy}
+                  cardAttribute="data-stash-swap-card"
+                  confirmAttribute="data-stash-swap-confirm"
+                  confirmLabel="Swap to selected container"
+                  groupLabel="Containers you can swap in"
+                  onConfirm={(itemInstanceId) =>
                     run(
                       () =>
                         swapSiteStashContainerAction({
                           ...base,
                           expectedContainerInstanceId: container.itemInstanceId,
-                          itemInstanceId: option.itemInstanceId,
+                          itemInstanceId,
                         }),
-                      `Swapped in ${option.name}. Everything stashed stayed put.`,
+                      `Swapped in ${swapChoices.find((option) => option.itemInstanceId === itemInstanceId)?.name ?? "the new container"}. Everything stashed stayed put.`,
                     )
                   }
-                >
-                  {option.name} · {option.slotCapacity} slots
-                </ActionButton>
-              ))}
-            </div>
-          ) : null}
-          {storageOpen ? (
-            <div
-              className="scroll-mt-[calc(env(safe-area-inset-top)+var(--rs-space-3))]"
-              data-stash-storage
-              ref={revealStorage.target}
-            >
-              <StorageTransferSurface
-                labels={SITE_STASH_STORAGE_LABELS}
-                mode={storageMode}
-                onModeChange={setStorageMode}
-                onSelectItem={() => setMessage(undefined)}
-                pending={pending}
-                projection={projectSiteStashStorage(state, stash)}
-                transfers={transfers}
-              />
-            </div>
-          ) : null}
-        </>
-      )}
-      {message ? <Feedback>{message}</Feedback> : null}
-    </ActivityPanel>
+                  options={swapChoices}
+                />
+              ) : (
+                <p className={HINT} data-stash-hint>
+                  {stash.carriedContainers.length > 0
+                    ? "None of the containers you carry can replace it right now: a swap needs a different kind with room for everything stored here, and room in your Inventory for this one."
+                    : "To swap, carry a different kind of container that is not equipped."}
+                </p>
+              )}
+            </section>
+            <section className="space-y-3">
+              <h3 className={SECTION_HEADING}>Remove container</h3>
+              <ActionButton
+                data-stash-remove
+                disabled={busy || stash.removeBlockedReason !== undefined}
+                intent="secondary"
+                onClick={() =>
+                  run(
+                    () =>
+                      removeSiteStashContainerAction({
+                        ...base,
+                        expectedContainerInstanceId: container.itemInstanceId,
+                      }),
+                    `${container.name} removed.`,
+                  )
+                }
+              >
+                Remove Container
+              </ActionButton>
+              <p className={HINT} data-stash-hint>
+                {stash.removeBlockedReason === "not_empty"
+                  ? "A container can only be removed once the stash is empty."
+                  : stash.removeBlockedReason === "carried_capacity"
+                    ? "Make room in your Inventory to take the container back."
+                    : "It returns to your Inventory, and the mount stays built."}
+              </p>
+            </section>
+          </div>
+        ) : null}
+      </div>
+    </div>
   );
 }
