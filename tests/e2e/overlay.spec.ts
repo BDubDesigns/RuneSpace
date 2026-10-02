@@ -1,4 +1,10 @@
-import { expect, openEquipmentTab, test, openTestCharacter } from "./fixtures";
+import {
+  expect,
+  openEquipmentTab,
+  test,
+  openTestCharacter,
+  WIDEST_COMPACT_VIEWPORT,
+} from "./fixtures";
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { inventoryStacks } from "@/db/rune-space";
@@ -385,8 +391,11 @@ test("mobile narrow-width layout remains usable from 320 px upward", async ({ pa
   expect(closeBox!.height).toBeGreaterThanOrEqual(44);
 });
 
-test("desktop modal is centered with backdropped play screen", async ({ page }) => {
-  await page.setViewportSize({ width: 1440, height: 900 });
+// At 1280px and wider an open utility is no longer a modal but the docked
+// workspace (covered by desktop-workspace.spec.ts); this is the modal Drawer at
+// the widest width that still gets it.
+test("wide modal is centered with backdropped play screen", async ({ page }) => {
+  await page.setViewportSize(WIDEST_COMPACT_VIEWPORT);
   const nav = page.getByRole("navigation", { name: "Primary" });
   await nav.getByRole("button", { name: "Inventory" }).click();
   const dialog = page.getByRole("dialog", { name: "Inventory" });

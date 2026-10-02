@@ -15,20 +15,34 @@ type AcceptedMission = MissionProjection & { state: "active" | "ready_for_comple
  * the final handoff does — the phase comes from the Mission projection, never
  * from where the player is standing.
  *
+ * Exactly one instance is mounted in whichever composition is active (#286):
+ * above the main column on a phone or tablet, at the top of the desktop rail.
+ *
  * Informational only: a strip is not a control. The one existing
  * Mission-guidance shortcut, Open Equipment, stays available inside the strip
  * whose Mission currently targets equipment.
  */
-export function MissionGuidanceStrips({ state }: { state: PlayGameplayState }) {
-  const { openInventory } = usePlay();
-  const missions = state.missions.filter(
+export function guidanceMissions(state: PlayGameplayState): AcceptedMission[] {
+  return state.missions.filter(
     (mission): mission is AcceptedMission =>
       mission.state === "active" || mission.state === "ready_for_completion",
   );
+}
+
+export function MissionGuidanceStrips({
+  state,
+  className,
+}: {
+  state: PlayGameplayState;
+  /** Layout only (for example hiding the phone placement at desktop width). */
+  className?: string;
+}) {
+  const { openInventory } = usePlay();
+  const missions = guidanceMissions(state);
   if (missions.length === 0) return null;
 
   return (
-    <section aria-label="Current Missions" data-mission-strips>
+    <section aria-label="Current Missions" className={className} data-mission-strips>
       <ol className="space-y-2">
         {missions.map((mission) => {
           const phase = missionGuidancePhase(mission);

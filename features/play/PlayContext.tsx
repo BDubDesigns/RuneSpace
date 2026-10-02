@@ -14,8 +14,20 @@ import {
 } from "react";
 import type { PlayGameplayState } from "@/server/play";
 import { cancelRefresh, tryAcquire, release, requestRefresh, type GateModel } from "./command-gate";
+import type { PlayUtilityId } from "./utility-workspace";
 
 type PlayContextValue = {
+  /**
+   * The one utility the player has explicitly opened, if any — the logical
+   * open intent every presentation reads (#286). On a phone it is the modal
+   * Drawer; on desktop it is the docked utility, which falls back to the
+   * character's home when this is `undefined`. At most one is ever open, so a
+   * competing invisible Drawer or focus trap cannot exist.
+   */
+  openUtilityId: PlayUtilityId | undefined;
+  openUtilityPanel: (utility: PlayUtilityId) => void;
+  /** Closes whatever is open, or only `utility` when it is the one open. */
+  closeUtilityPanel: (utility?: PlayUtilityId) => void;
   characterOpen: boolean;
   characterTrigger: RefObject<HTMLButtonElement | null>;
   inventoryOpen: boolean;
@@ -57,6 +69,22 @@ function boundaryKeyForState(state: PlayGameplayState): string | undefined {
       : undefined;
 }
 
+/**
+ * One utility's boolean open flag as an update to the single open intent:
+ * opening it replaces whatever was open, closing it leaves a different open
+ * utility alone.
+ */
+export function utilityUpdater(
+  utility: PlayUtilityId,
+  action: SetStateAction<boolean>,
+): (current: PlayUtilityId | undefined) => PlayUtilityId | undefined {
+  return (current) => {
+    const open = typeof action === "function" ? action(current === utility) : action;
+    if (open) return utility;
+    return current === utility ? undefined : current;
+  };
+}
+
 export function PlayProvider({
   children,
   initialState,
@@ -65,10 +93,8 @@ export function PlayProvider({
   initialState: PlayGameplayState;
 }) {
   const [state, setState] = useState(initialState);
-  const [characterOpen, setCharacterOpen] = useState(false);
-  const [inventoryOpen, setInventoryOpen] = useState(false);
+  const [openUtilityId, setOpenUtilityId] = useState<PlayUtilityId | undefined>(undefined);
   const [inventoryTab, setInventoryTab] = useState<"inventory" | "equipment">("inventory");
-  const [missionsOpen, setMissionsOpen] = useState(false);
   const [missionsFocus, setMissionsFocus] = useState<string | undefined>(undefined);
   const [busy, setBusy] = useState(false);
   const [foregroundBusy, setForegroundBusy] = useState(false);
@@ -84,21 +110,41 @@ export function PlayProvider({
   const stateRef = useRef(state);
   stateRef.current = state;
 
-  const openInventory = useCallback((tab: "inventory" | "equipment") => {
-    // These updates are batched together so contextual callers can open the
-    // shared drawer directly on the requested tab without a tab-click relay.
-    setCharacterOpen(false);
-    setMissionsOpen(false);
-    setInventoryTab(tab);
-    setInventoryOpen(true);
+  const openUtilityPanel = useCallback((utility: PlayUtilityId) => {
+    setOpenUtilityId(utility);
   }, []);
 
-  // One overlay at a time, the same single-open rule Inventory and the Mission
-  // Log already follow (#213).
+  const closeUtilityPanel = useCallback((utility?: PlayUtilityId) => {
+    setOpenUtilityId((current) =>
+      utility === undefined || current === utility ? undefined : current,
+    );
+  }, []);
+
+  // The per-utility booleans every existing caller uses are views of the one
+  // open intent, so opening one utility closes the others by construction
+  // (#213's single-open rule, extended to Chat/Social in #286).
+  const setCharacterOpen = useCallback<Dispatch<SetStateAction<boolean>>>(
+    (action) => setOpenUtilityId(utilityUpdater("character", action)),
+    [],
+  );
+  const setInventoryOpen = useCallback<Dispatch<SetStateAction<boolean>>>(
+    (action) => setOpenUtilityId(utilityUpdater("inventory", action)),
+    [],
+  );
+  const setMissionsOpen = useCallback<Dispatch<SetStateAction<boolean>>>(
+    (action) => setOpenUtilityId(utilityUpdater("missions", action)),
+    [],
+  );
+
+  const openInventory = useCallback((tab: "inventory" | "equipment") => {
+    // Batched so contextual callers can open the shared panel directly on the
+    // requested tab without a tab-click relay.
+    setInventoryTab(tab);
+    setOpenUtilityId("inventory");
+  }, []);
+
   const openCharacter = useCallback(() => {
-    setInventoryOpen(false);
-    setMissionsOpen(false);
-    setCharacterOpen(true);
+    setOpenUtilityId("character");
   }, []);
 
   const acquireCommand = useCallback((opts?: { background?: boolean }) => {
@@ -219,12 +265,15 @@ export function PlayProvider({
   return (
     <PlayContext.Provider
       value={{
-        characterOpen,
+        openUtilityId,
+        openUtilityPanel,
+        closeUtilityPanel,
+        characterOpen: openUtilityId === "character",
         characterTrigger,
-        inventoryOpen,
+        inventoryOpen: openUtilityId === "inventory",
         inventoryTrigger,
         inventoryTab,
-        missionsOpen,
+        missionsOpen: openUtilityId === "missions",
         missionsTrigger,
         missionsFocus,
         busy,

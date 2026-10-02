@@ -10,7 +10,19 @@ import { PORTRAIT_IDS } from "@/game/config/foundations";
 import { whisperParticipantKey } from "@/game/domain/chat";
 import { getPublishedUpdates } from "@/features/public-site/public-updates";
 import { cleanupTestUser, createCharacterForUser } from "../integration/fixtures";
-import { establishAuthenticatedSession, expect, openTestCharacter, test } from "./fixtures";
+import {
+  chatAttentionBadge,
+  chatEntry,
+  establishAuthenticatedSession,
+  expect,
+  openChatSurface,
+  openTestCharacter,
+  preferHomeUtility,
+  stepAwayFromChat,
+  test,
+  usesDesktopWorkspace,
+  utilitySurface,
+} from "./fixtures";
 import { captureReviewScreenshot } from "./review-screenshot";
 
 /**
@@ -91,8 +103,9 @@ async function seedPublic(player: Player, body: string) {
   });
 }
 
+/** The control that reaches Chat: the phone's launcher, or the desktop dock's Chat tab. */
 function launcher(page: Page) {
-  return page.locator("[data-chat-social-launcher]");
+  return chatEntry(page);
 }
 
 async function openPlay(page: Page, characterId: string) {
@@ -101,15 +114,21 @@ async function openPlay(page: Page, characterId: string) {
 }
 
 async function openChat(page: Page) {
-  await launcher(page).click();
-  const dialog = page.getByRole("dialog", { name: "Chat" });
-  await expect(dialog).toBeVisible();
-  return dialog;
+  return openChatSurface(page);
 }
 
+/**
+ * Put Chat away: Escape closes a phone's Drawer; at desktop width the dock is not
+ * modal, so another utility takes its place (Chat unmounts, and with it its
+ * reading).
+ */
 async function closeChat(page: Page) {
-  await page.keyboard.press("Escape");
-  await expect(page.getByRole("dialog", { name: "Chat" })).toHaveCount(0);
+  if (usesDesktopWorkspace(page)) {
+    await stepAwayFromChat(page);
+  } else {
+    await page.keyboard.press("Escape");
+  }
+  await expect(utilitySurface(page, "Chat")).toHaveCount(0);
 }
 
 const tab = (dialog: Locator, name: "General" | "Trade" | "Whispers") =>
@@ -120,7 +139,7 @@ function messageRow(dialog: Locator, text: string) {
 }
 
 function attention(page: Page) {
-  return launcher(page).locator("[data-chat-social-attention]");
+  return chatAttentionBadge(page);
 }
 
 async function expectNoHorizontalOverflow(page: Page, dialog: Locator) {
@@ -158,7 +177,10 @@ async function mentionJourney(page: Page, width: number) {
   const bName = b.player.character.displayName;
   await seedPublic(b.player, `anyone selling ore ${tag}`);
 
-  // B is online on two tabs of the same character.
+  // B is online on two tabs of the same character. At desktop width Chat is the
+  // dock's home and reads whatever it shows, so B's home there is Inventory: the
+  // mention has to find B busy elsewhere for Chat's tab to light (#286).
+  await preferHomeUtility(b.context, b.player.character.id, "inventory");
   await openPlay(b.page, b.player.character.id);
   const bOther = await b.context.newPage();
   await openPlay(bOther, b.player.character.id);
@@ -391,21 +413,17 @@ test("Hide removes a Whisper conversation from one side's list until the next Wh
 });
 
 test.describe("Chat/Social polish on the public site", () => {
-  test("Heads Up is the newest Update, on the homepage, and links Safety & Privacy", async ({
+  test("Heads Up is on the Updates index, and its article links Safety & Privacy", async ({
     page,
   }) => {
-    expect(getPublishedUpdates()[0]?.slug).toBe("heads-up");
+    // A newer Update has shipped since (#286), so it is found by name.
+    expect(getPublishedUpdates().map((update) => update.slug)).toContain("heads-up");
     await page.goto("/updates");
-    const newest = page
-      .getByRole("list", { name: "Published Updates" })
-      .getByRole("listitem")
-      .first();
-    await expect(newest.getByRole("link", { name: "Heads Up", exact: true })).toHaveAttribute(
-      "href",
-      "/updates/heads-up",
-    );
-    await page.goto("/");
-    await expect(page.getByRole("heading", { name: "Heads Up", level: 2 })).toBeVisible();
+    await expect(
+      page
+        .getByRole("list", { name: "Published Updates" })
+        .getByRole("link", { name: "Heads Up", exact: true }),
+    ).toHaveAttribute("href", "/updates/heads-up");
 
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto("/updates/heads-up");
@@ -422,8 +440,11 @@ test.describe("Chat/Social polish on the public site", () => {
 
   test("News points a returning player at Heads Up", async ({ browser }, testInfo) => {
     test.skip(testInfo.project.name !== "chromium", "runs once");
-    const [latest, previous] = getPublishedUpdates();
-    expect(latest?.slug).toBe("heads-up");
+    // A newer Update has shipped since (#286): this journey is about Heads Up.
+    const published = getPublishedUpdates();
+    const headsUp = published.findIndex((update) => update.slug === "heads-up");
+    expect(headsUp).toBeGreaterThanOrEqual(0);
+    const previous = published[headsUp + 1];
     const tag = randomUUID().slice(0, 6);
     const { userId, context } = await establishAuthenticatedSession(
       browser,
@@ -442,7 +463,7 @@ test.describe("Chat/Social polish on the public site", () => {
         PORTRAIT_IDS.evaSalvageWelder,
         { seedLegacyStarterCutter: false },
       );
-      // Everything before Heads Up is already read, so only it is news.
+      // Everything before Heads Up is already read, so it (and anything newer) is news.
       await db
         .update(rune.playerAccounts)
         .set({ newsReadThroughAt: new Date(previous!.publishedAt) })
@@ -457,8 +478,6 @@ test.describe("Chat/Social polish on the public site", () => {
       await expect(
         page
           .getByRole("list", { name: "Published Updates" })
-          .getByRole("listitem")
-          .first()
           .getByRole("link", { name: "Heads Up", exact: true }),
       ).toBeVisible();
       await openTestCharacter(page, created.id);

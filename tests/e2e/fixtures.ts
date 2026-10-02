@@ -3,6 +3,7 @@ import {
   expect,
   type Browser,
   type BrowserContext,
+  type Locator,
   type Page,
 } from "@playwright/test";
 import { hashPassword } from "better-auth/crypto";
@@ -263,13 +264,163 @@ export async function openMapSurface(page: Page) {
   await expect(page.getByRole("group", { name: "Local map" })).toBeVisible();
 }
 
-/** Open the shared Inventory/Equipment drawer directly on its Equipment tab. */
+/**
+ * Play has two compositions (#286): below 1280px the phone/tablet one, where a
+ * utility is a modal Drawer reached from the bottom navigation or the floating
+ * Chat launcher, and from 1280px the desktop workspace, where the same four
+ * utilities are docked panels reached from a tab list in the right rail. A spec
+ * that is about a feature, not about the composition, uses these helpers so one
+ * script drives either; a spec about the composition itself says so and sets
+ * its own viewport.
+ */
+export const DESKTOP_WORKSPACE_MIN_WIDTH = 1280;
+
+/**
+ * The widest viewport that still gets the phone/tablet composition: for a spec
+ * about a modal Drawer's geometry at a wide desktop-sized screen, which at 1280px
+ * and beyond is no longer a Drawer but the docked workspace.
+ */
+export const WIDEST_COMPACT_VIEWPORT = {
+  width: DESKTOP_WORKSPACE_MIN_WIDTH - 1,
+  height: 900,
+} as const;
+
+export function usesDesktopWorkspace(page: Page): boolean {
+  return (page.viewportSize()?.width ?? 0) >= DESKTOP_WORKSPACE_MIN_WIDTH;
+}
+
+export type PlayUtility = "chat" | "inventory" | "character" | "missions";
+
+/** The control that reaches Chat: the docked Chat tab, or the phone's floating launcher. */
+export function chatEntry(page: Page): Locator {
+  return usesDesktopWorkspace(page)
+    ? page.getByRole("tablist", { name: "Play utilities" }).getByRole("tab", { name: /^Chat/ })
+    : page.locator("[data-chat-social-launcher]");
+}
+
+/** The count badge on that control, when anything needs attention. */
+export function chatAttentionBadge(page: Page): Locator {
+  return usesDesktopWorkspace(page)
+    ? page.locator('[data-utility-tab-badge="chat"]')
+    : page.locator("[data-chat-social-attention]");
+}
+
+/**
+ * A utility's container as the active composition presents it: its docked
+ * panel at desktop width, its modal dialog below it. `name` is the label the
+ * panel carries — "Chat", "Inventory", "Equipment" (the Inventory panel's other
+ * tab), "Character", or "Mission Log".
+ */
+export function utilitySurface(
+  page: Page,
+  name: "Chat" | "Inventory" | "Equipment" | "Character" | "Mission Log",
+): Locator {
+  return usesDesktopWorkspace(page)
+    ? page.locator(`[data-docked-utility="${name}"]`)
+    : page.getByRole("dialog", { name });
+}
+
+/** Open a utility the way a player does in the active composition. */
+export async function openUtility(page: Page, utility: PlayUtility): Promise<void> {
+  if (usesDesktopWorkspace(page)) {
+    const labels = {
+      chat: /^Chat/,
+      inventory: /^Inventory/,
+      character: /^Character/,
+      missions: /^Missions/,
+    } as const;
+    const tab = page
+      .getByRole("tablist", { name: "Play utilities" })
+      .getByRole("tab", { name: labels[utility] });
+    if ((await tab.getAttribute("aria-selected")) !== "true") await tab.click();
+    await expect(tab).toHaveAttribute("aria-selected", "true");
+    return;
+  }
+  if (utility === "chat") {
+    await page.locator("[data-chat-social-launcher]").click();
+    return;
+  }
+  const names = { inventory: /Inventory/, character: "Character", missions: /Missions/ } as const;
+  await page
+    .getByRole("navigation", { name: "Primary" })
+    .getByRole("button", { name: names[utility] })
+    .click();
+}
+
+/** Open Chat and return its container (a modal dialog below desktop width, the docked panel above). */
+export async function openChatSurface(page: Page): Promise<Locator> {
+  await openUtility(page, "chat");
+  const surface = utilitySurface(page, "Chat");
+  await expect(surface).toBeVisible();
+  return surface;
+}
+
+/**
+ * A phone's Chat Drawer is dismissed with its Close; the desktop dock is not
+ * modal and has nothing to dismiss, so Chat simply stays where it is and the
+ * page has no dialog.
+ */
+export async function dismissChat(page: Page, surface: Locator): Promise<void> {
+  if (usesDesktopWorkspace(page)) {
+    await expect(surface).toBeVisible();
+    await expect(page.getByRole("dialog")).toHaveCount(0);
+    return;
+  }
+  await surface.getByRole("button", { name: "Close chat" }).click();
+  await expect(surface).toHaveCount(0);
+}
+
+/**
+ * Make `utility` this character's desktop home for every page of `context`,
+ * before any page script runs (the saved preference is per character and per
+ * browser, in `localStorage`). With Chat as the home it is the visible utility
+ * from the moment Play loads and reads what it shows, so a journey about
+ * *attention* — a mention, a Whisper arriving while the player is busy elsewhere —
+ * starts its observer on another home. Below desktop width it is harmless: the
+ * preference only chooses what the dock shows.
+ */
+export async function preferHomeUtility(
+  context: BrowserContext,
+  characterId: string,
+  utility: PlayUtility,
+): Promise<void> {
+  await context.addInitScript(
+    ([key, value]) => window.localStorage.setItem(key!, value!),
+    [`runespace:play-home-utility:${characterId}`, utility],
+  );
+}
+
+/**
+ * Get another utility on screen in place of Chat's home, so Chat is not the
+ * visible one — what a player using Inventory looks like to the Chat tab's
+ * attention badge. At phone width Chat is never visible until opened, so this
+ * does nothing.
+ */
+export async function stepAwayFromChat(page: Page): Promise<void> {
+  if (usesDesktopWorkspace(page)) await openUtility(page, "inventory");
+}
+
+/**
+ * Dismiss the open utility the way the active composition does: Escape closes
+ * a phone's modal Drawer; at desktop width a docked utility is not modal, so
+ * "closing" it is its Back-to-home control (nothing is open when the home is).
+ */
+export async function closeUtility(page: Page): Promise<void> {
+  if (!usesDesktopWorkspace(page)) {
+    await page.keyboard.press("Escape");
+    return;
+  }
+  const back = page.locator("[data-utility-return-home]");
+  if (await back.isVisible()) await back.click();
+}
+
+/** Open the shared Inventory/Equipment surface directly on its Equipment tab. */
 export async function openEquipmentTab(page: Page) {
-  await page.getByRole("button", { name: /Inventory/ }).click();
-  const dialog = page.getByRole("dialog", { name: "Inventory" });
-  await expect(dialog).toBeVisible();
-  await dialog.getByRole("tab", { name: "Equipment", exact: true }).click();
-  const equipmentDialog = page.getByRole("dialog", { name: "Equipment" });
+  await openUtility(page, "inventory");
+  const inventory = utilitySurface(page, "Inventory");
+  await expect(inventory).toBeVisible();
+  await inventory.getByRole("tab", { name: "Equipment", exact: true }).click();
+  const equipmentDialog = utilitySurface(page, "Equipment");
   await expect(equipmentDialog).toBeVisible();
   return equipmentDialog;
 }
@@ -277,7 +428,7 @@ export async function openEquipmentTab(page: Page) {
 /** Open Equipment through the active mission's contextual Play entry point. */
 export async function openEquipmentFromMissionGuidance(page: Page) {
   await page.getByRole("button", { name: "Open Equipment", exact: true }).click();
-  const equipmentDialog = page.getByRole("dialog", { name: "Equipment" });
+  const equipmentDialog = utilitySurface(page, "Equipment");
   await expect(equipmentDialog).toBeVisible();
   await expect(
     equipmentDialog.getByRole("tab", { name: "Equipment", exact: true }),

@@ -22,7 +22,7 @@ export function ChatSocialSurface({
   conversations: ReactNode;
 }) {
   return (
-    <div className="mt-4 space-y-4">
+    <div className="mt-4 flex flex-1 flex-col gap-4">
       {cards.length > 0 ? (
         <section aria-label="Needs your attention" data-social-pinned-cards="">
           <ul className="space-y-2">
@@ -34,7 +34,11 @@ export function ChatSocialSurface({
           </ul>
         </section>
       ) : null}
-      <section aria-label="Conversations" data-social-conversations="">
+      <section
+        aria-label="Conversations"
+        className="flex flex-1 flex-col"
+        data-social-conversations=""
+      >
         {conversations}
       </section>
       {/* The published policies (#248), in a new tab so the player keeps their

@@ -9,7 +9,16 @@ import * as ownership from "@/server/ownership";
 import { getEffectiveGameBalance, getItemMaximumCharge } from "@/game/config/balance";
 import { PORTRAIT_IDS } from "@/game/config/foundations";
 import { cleanupTestUser, createCharacterForUser } from "../integration/fixtures";
-import { establishAuthenticatedSession, expect, openTestCharacter, test } from "./fixtures";
+import {
+  chatEntry,
+  establishAuthenticatedSession,
+  expect,
+  openChatSurface,
+  openTestCharacter,
+  openUtility,
+  test,
+  utilitySurface,
+} from "./fixtures";
 import { populationDisclosure } from "./population-disclosure";
 import { captureReviewScreenshot } from "./review-screenshot";
 
@@ -155,8 +164,9 @@ async function creditsOf(player: Player) {
 
 // --- page helpers ---------------------------------------------------------------
 
+/** The control that reaches Chat: the phone's launcher, or the desktop dock's Chat tab (#286). */
 function launcher(page: Page) {
-  return page.locator("[data-chat-social-launcher]");
+  return chatEntry(page);
 }
 
 async function openPlay(page: Page, characterId: string) {
@@ -186,10 +196,7 @@ function profileWaiting(page: Page) {
 }
 
 async function openChat(page: Page) {
-  await launcher(page).click();
-  const dialog = page.getByRole("dialog", { name: "Chat" });
-  await expect(dialog).toBeVisible();
-  return dialog;
+  return openChatSurface(page);
 }
 
 function requestCard(dialog: Locator, fromName: string) {
@@ -394,8 +401,8 @@ journey(
     expect(b.page.url()).toBe(bPlayUrl);
 
     // B's Inventory shows the same Cutter with its charge intact.
-    await b.page.getByRole("button", { name: /^Inventory/ }).click();
-    const inventory = b.page.getByRole("dialog", { name: "Inventory" });
+    await openUtility(b.page, "inventory");
+    const inventory = utilitySurface(b.page, "Inventory");
     await expect(inventory.getByText(`7/${getItemMaximumCharge(SALVAGE)}`)).toBeVisible();
     await aDone.getByRole("button", { name: "Done" }).click();
     expect(page.url()).toBe(aPlayUrl);

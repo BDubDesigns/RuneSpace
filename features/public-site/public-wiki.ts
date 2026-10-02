@@ -440,7 +440,7 @@ const authoredWikiArticles = [
       {
         heading: "Getting a request",
         paragraphs: [
-          "An incoming request never interrupts you. It appears as a card at the top of the Chat/Social panel, and the Chat/Social button lights up so you know it's there. You can keep doing whatever you were doing and answer when you're ready — or let it run out.",
+          "An incoming request never interrupts you. It appears as a card at the top of the Chat/Social panel, and the Chat/Social button — or, on a wide screen, the Chat tab in the sidebar — lights up so you know it's there. You can keep doing whatever you were doing and answer when you're ready — or let it run out.",
           [
             "Choose Accept to start trading or Decline to turn it down. Several requests can wait at once; accepting one ends the others. If one player keeps sending you requests, the card offers Decline & Block, which ",
             { text: "blocks them", articleSlug: COMMUNITY_RULES_SLUG },
@@ -1175,7 +1175,7 @@ const authoredWikiArticles = [
       {
         heading: "Your Character screen",
         paragraphs: [
-          "Character, on the far left of the bottom bar, is the character you're currently playing. It shows your portrait and name, your Character Level, your Credits, and every skill in the game with its current level and how far you are through that level.",
+          "Character, on the far left of the bottom bar (a tab in the right-hand sidebar on a wide screen), is the character you're currently playing. It shows your portrait and name, your Character Level, your Credits, and every skill in the game with its current level and how far you are through that level.",
           "Switch Character is always there at the bottom of that screen, however long the skill list gets, and takes you to the same character selection you already use.",
         ],
       },

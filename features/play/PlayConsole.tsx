@@ -3,17 +3,14 @@
 import { useEffect, useTransition } from "react";
 import { LocationActivity } from "@/features/location-scene/LocationActivity";
 import { LocationSurface } from "@/features/location-scene/LocationSurface";
-import { CharacterPanel } from "@/features/characters/CharacterPanel";
-import { InventoryEquipmentPanel } from "@/features/inventory/InventoryEquipmentPanel";
-import { MissionLogPanel } from "@/features/missions/MissionLogPanel";
 import { MissionGuidanceStrips } from "@/features/missions/MissionGuidanceStrips";
 import { JourneyPanel } from "@/features/travel/JourneyPanel";
 import { LocalMapPanel } from "@/features/travel/LocalMapPanel";
 import { ScavengeRevealOverlay } from "@/features/travel/ScavengeRevealOverlay";
 import { reportClientDiagnostic } from "@/features/diagnostics/client";
 import { refreshPlayAction } from "@/server/actions";
-import type { CharacterPortraitPresentation } from "@/game/domain/character-portrait";
 import { usePlay } from "./PlayContext";
+import { useDesktopWorkspace } from "./workspace-presentation";
 
 export type PlaySurface = "primary" | "map";
 
@@ -32,14 +29,11 @@ export type PlaySurface = "primary" | "map";
  */
 export function PlayConsole({
   characterName,
-  characterPortrait,
   localPlaceId,
   surface = "primary",
   onMapExit,
 }: {
   characterName: string;
-  /** The current character's resolved portrait, for the Character surface. */
-  characterPortrait: CharacterPortraitPresentation;
   /**
    * The Local Place the route currently has open. Presentation state only: it
    * decides which resident and place surface are shown, never what a server
@@ -49,23 +43,8 @@ export function PlayConsole({
   surface?: PlaySurface;
   onMapExit: () => void;
 }) {
-  const {
-    acquireCommand,
-    acceptState,
-    characterOpen,
-    characterTrigger,
-    inventoryOpen,
-    inventoryTrigger,
-    missionsOpen,
-    missionsFocus,
-    missionsTrigger,
-    releaseCommand,
-    setCharacterOpen,
-    setInventoryOpen,
-    setMissionsOpen,
-    setRefreshCallback,
-    state,
-  } = usePlay();
+  const { acquireCommand, acceptState, releaseCommand, setRefreshCallback, state } = usePlay();
+  const desktop = useDesktopWorkspace();
   const inTransit = Boolean(state.travelState);
   const [, startTransition] = useTransition();
 
@@ -105,10 +84,21 @@ export function PlayConsole({
     // Mission strips push everything down, those pixels are clearance under
     // the Workbench's Start control.
     <div className="space-y-3">
-      {/* Mission guidance leads every Play surface, directly under the header. */}
-      <MissionGuidanceStrips state={state} />
+      {/* Mission guidance leads every Play surface, directly under the header
+          on a phone or tablet. At desktop width the same strips live at the
+          top of the rail instead (#286) — mounted there and not here, so there
+          is only ever one interactive copy. Until the browser has answered the
+          phone placement renders, hidden by CSS at desktop width. */}
+      {desktop !== true ? (
+        <MissionGuidanceStrips
+          className={desktop === undefined ? "xl:hidden" : undefined}
+          state={state}
+        />
+      ) : null}
       {surface === "map" ? (
-        <LocalMapPanel onBack={onMapExit} onTravelStarted={onMapExit} />
+        // The return control is the desktop main-column header's while docked
+        // (#286), so the panel does not carry a second one beside it.
+        <LocalMapPanel onBack={desktop ? undefined : onMapExit} onTravelStarted={onMapExit} />
       ) : inTransit ? (
         <JourneyPanel />
       ) : (
@@ -126,29 +116,6 @@ export function PlayConsole({
       )}
 
       <ScavengeRevealOverlay />
-
-      {inventoryOpen ? (
-        <InventoryEquipmentPanel
-          state={state}
-          onClose={() => setInventoryOpen(false)}
-          triggerRef={inventoryTrigger}
-        />
-      ) : missionsOpen ? (
-        <MissionLogPanel
-          focusedMissionId={missionsFocus}
-          onClose={() => setMissionsOpen(false)}
-          state={state}
-          triggerRef={missionsTrigger}
-        />
-      ) : characterOpen ? (
-        <CharacterPanel
-          characterName={characterName}
-          onClose={() => setCharacterOpen(false)}
-          portrait={characterPortrait}
-          state={state}
-          triggerRef={characterTrigger}
-        />
-      ) : null}
     </div>
   );
 }

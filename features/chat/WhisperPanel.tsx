@@ -33,6 +33,7 @@ import {
   type Feed,
   type LocalChatBudget,
 } from "./chat-feed";
+import { whisperDraftKey } from "./chat-drafts";
 import { ChatComposer } from "./ChatComposer";
 import { useChat } from "./ChatContext";
 import { ChatMessageRow, MessageActionButton } from "./ChatMessageRow";
@@ -329,17 +330,23 @@ function WhisperConversation({ peer: initialPeer }: { peer: WhisperPeer }) {
     blocksChanged,
     blocksRevision,
     characterId,
+    drafts,
     refreshInbox,
     refreshNotices,
     setView,
     socialRestricted,
   } = useChat();
+  const draftKey = whisperDraftKey(initialPeer.characterId);
   const [peer, setPeer] = useState(initialPeer);
   const [feed, setFeed] = useState<Feed<WhisperMessageView>>(EMPTY_FEED);
   const [loadError, setLoadError] = useState<string>();
   const [loadingOlder, setLoadingOlder] = useState(false);
   const [budget, setBudget] = useState<LocalChatBudget>({ expiresAt: [] });
-  const [draft, setDraft] = useState("");
+  // Kept across the surface unmounting when another utility is selected (#286).
+  const [draft, setDraft] = useState(() => drafts.read(draftKey).text);
+  useEffect(() => {
+    drafts.write(draftKey, { text: draft, mentions: [], promote: false });
+  }, [draft, draftKey, drafts]);
   const [sending, setSending] = useState(false);
   const [unblocking, setUnblocking] = useState(false);
   const [hiding, setHiding] = useState(false);
@@ -485,12 +492,17 @@ function WhisperConversation({ peer: initialPeer }: { peer: WhisperPeer }) {
   }
 
   async function submit() {
+    const sentText = draft;
     const request = ++requestCounter.current;
     setSending(true);
     setFeedback(undefined);
     let result: WhisperSendResult | { error: string };
     try {
-      result = await sendWhisperAction({ characterId, recipientCharacterId: peerId, text: draft });
+      result = await sendWhisperAction({
+        characterId,
+        recipientCharacterId: peerId,
+        text: sentText,
+      });
     } catch {
       result = { error: "Whisper not sent. Check your connection and try again." };
     }
@@ -509,6 +521,8 @@ function WhisperConversation({ peer: initialPeer }: { peer: WhisperPeer }) {
     }
     stickToBottom.current = true;
     setFeed((current) => insertMessage(current, result.message));
+    // The send can outlive this component: spend the stored draft too.
+    drafts.settle(draftKey, sentText);
     setDraft("");
     refreshInbox();
   }
@@ -575,7 +589,7 @@ function WhisperConversation({ peer: initialPeer }: { peer: WhisperPeer }) {
   const pressure = composerPressure(budget, "whisper", now);
 
   return (
-    <div className="space-y-3" data-whisper-conversation-view={peerId}>
+    <div className="flex flex-1 flex-col gap-3" data-whisper-conversation-view={peerId}>
       <div className="flex flex-wrap items-center gap-2">
         <BackButton onClick={() => setView({ tab: "whispers" })}>All Whispers</BackButton>
         <h3 className="min-w-0 flex-1 truncate font-display text-sm font-bold text-[color:var(--rs-text-primary)]">
@@ -605,7 +619,7 @@ function WhisperConversation({ peer: initialPeer }: { peer: WhisperPeer }) {
           nested-scroll dead end (#248). */}
       <div
         aria-label={`Whispers with ${peer.name}`}
-        className="h-[min(34dvh,20rem)] overflow-y-auto border border-[color:var(--rs-border-subtle)] bg-[color:var(--rs-surface-panel)] p-2"
+        className="relative h-[min(34dvh,20rem)] overflow-y-auto border border-[color:var(--rs-border-subtle)] bg-[color:var(--rs-surface-panel)] p-2 [[data-docked-utility]_&]:min-h-[7rem] [[data-docked-utility]_&]:grow [[data-docked-utility]_&]:basis-[7rem]"
         data-whisper-log={peerId}
         onScroll={(event) => {
           const log = event.currentTarget;
@@ -777,7 +791,7 @@ function SystemConversation() {
   }, [notices.length]);
 
   return (
-    <div className="space-y-3" data-system-conversation-view="">
+    <div className="flex flex-1 flex-col gap-3" data-system-conversation-view="">
       <div className="flex flex-wrap items-center gap-2">
         <BackButton onClick={() => setView({ tab: "whispers" })}>All Whispers</BackButton>
         <h3 className="min-w-0 flex-1 truncate font-display text-sm font-bold text-[color:var(--rs-text-primary)]">
@@ -786,7 +800,7 @@ function SystemConversation() {
       </div>
       <div
         aria-label={`Messages from ${SYSTEM_IDENTITY_NAME}`}
-        className="h-[min(34dvh,20rem)] overflow-y-auto border border-[color:var(--rs-border-subtle)] bg-[color:var(--rs-surface-panel)] p-2"
+        className="relative h-[min(34dvh,20rem)] overflow-y-auto border border-[color:var(--rs-border-subtle)] bg-[color:var(--rs-surface-panel)] p-2 [[data-docked-utility]_&]:min-h-[7rem] [[data-docked-utility]_&]:grow [[data-docked-utility]_&]:basis-[7rem]"
         data-system-log=""
         ref={logRef}
         role="log"

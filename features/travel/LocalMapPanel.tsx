@@ -495,6 +495,11 @@ function LocalMapScrollAffordanceLayer({
 // Main panel
 // ---------------------------------------------------------------------------
 
+/** The Map's return control wording, shared with the desktop header's (#286). */
+export function mapReturnLabel(inTransit: boolean): string {
+  return inTransit ? "Back to Journey" : "Back to Location";
+}
+
 export function LocalMapPanel({
   onBack,
   onTravelStarted,
@@ -678,7 +683,7 @@ export function LocalMapPanel({
         <SectionHeader eyebrow="Local area">Map</SectionHeader>
         {onBack ? (
           <ActionButton className="shrink-0 px-3" intent="secondary" onClick={onBack}>
-            {inTransit ? "Back to Journey" : "Back to Location"}
+            {mapReturnLabel(inTransit)}
           </ActionButton>
         ) : null}
       </div>

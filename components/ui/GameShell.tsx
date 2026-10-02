@@ -22,11 +22,18 @@ export function TopBar({
   );
 }
 
-export function BottomNav({ children }: { children: ReactNode }) {
+export function BottomNav({
+  children,
+  hiddenAtDesktop = false,
+}: {
+  children: ReactNode;
+  /** The shell's desktop rail replaces the bar at `xl` and wider (#286). */
+  hiddenAtDesktop?: boolean;
+}) {
   return (
     <nav
       aria-label="Primary"
-      className="fixed inset-x-0 bottom-0 z-10 border-t border-[color:var(--rs-border-structural)] bg-[color:var(--rs-surface-navigation)] p-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] backdrop-blur-sm"
+      className={`${hiddenAtDesktop ? "xl:hidden" : ""} fixed inset-x-0 bottom-0 z-10 border-t border-[color:var(--rs-border-structural)] bg-[color:var(--rs-surface-navigation)] p-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] backdrop-blur-sm`}
     >
       {children}
     </nav>
@@ -55,15 +62,17 @@ function FloatingEdgeAnchor({
   children,
   position,
   aboveBottomNav,
+  hiddenAtDesktop,
 }: {
   children: ReactNode;
   position: FloatingActionPosition;
   aboveBottomNav: boolean;
+  hiddenAtDesktop: boolean;
 }) {
   const y = Math.min(1, Math.max(0, position.y));
   return (
     <div
-      className={`pointer-events-none fixed top-[env(safe-area-inset-top)] z-20 py-[calc(var(--rs-touch-target)/2)] ${
+      className={`${hiddenAtDesktop ? "xl:hidden" : ""} pointer-events-none fixed top-[env(safe-area-inset-top)] z-20 py-[calc(var(--rs-touch-target)/2)] ${
         aboveBottomNav
           ? "bottom-[var(--rs-bottom-nav-box-height)]"
           : "bottom-[env(safe-area-inset-bottom)]"
@@ -92,6 +101,15 @@ function FloatingEdgeAnchor({
  * Page chrome. `floatingAction` is one compact control the shell pins to a
  * screen edge (by default the right edge, centred in the usable viewport) —
  * the shell only positions it; the feature owns the control.
+ *
+ * `desktopRail` (#286) turns the shell into the desktop Play composition at
+ * `xl` (1280px) and wider: a 24rem right-hand rail beside the main column,
+ * independently scrolling, full viewport height and sticky; and the bottom
+ * navigation and floating action — the phone's way of reaching the same
+ * destinations — are hidden. Below `xl` the rail renders nothing and the shell
+ * is the phone/tablet composition it always was. The shell only places the
+ * rail with CSS; the feature decides what mounts in them, so no
+ * interactive feature is ever mounted twice.
  */
 export function GameShell({
   topBar,
@@ -100,6 +118,7 @@ export function GameShell({
   floatingAction,
   floatingActionPosition = DEFAULT_FLOATING_ACTION_POSITION,
   aside,
+  desktopRail,
 }: {
   topBar: ReactNode;
   children: ReactNode;
@@ -107,22 +126,46 @@ export function GameShell({
   floatingAction?: ReactNode;
   floatingActionPosition?: FloatingActionPosition;
   aside?: ReactNode;
+  desktopRail?: ReactNode;
 }) {
+  const hasRail = desktopRail !== undefined;
+  // Joined from parts, not concatenated: a trailing space inside a string is
+  // trimmed by the class sorter and would fuse two utilities into one.
+  const shellClassName = [
+    "rs-viewport-shell mx-auto max-w-7xl px-3 py-3 sm:px-6",
+    bottomNav ? "pb-[var(--rs-bottom-nav-clearance)]" : "pb-6",
+    bottomNav && hasRail ? "xl:pb-3" : "",
+    "lg:grid lg:grid-cols-[minmax(0,1fr)_20rem] lg:gap-5",
+    hasRail ? "xl:grid-cols-[minmax(0,1fr)_24rem]" : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
   return (
-    <div
-      className={`rs-viewport-shell mx-auto max-w-7xl px-3 py-3 ${bottomNav ? "pb-[var(--rs-bottom-nav-clearance)]" : "pb-6"} sm:px-6 lg:grid lg:grid-cols-[minmax(0,1fr)_20rem] lg:gap-5`}
-    >
+    <div className={shellClassName}>
       <div className="min-w-0 space-y-4">
         {topBar}
         <main>{children}</main>
       </div>
       {aside ? <aside className="mt-4 lg:mt-0">{aside}</aside> : null}
+      {hasRail ? (
+        <aside
+          aria-label="Play workspace"
+          className="hidden min-h-0 flex-col gap-3 xl:sticky xl:top-3 xl:flex xl:h-[calc(100dvh-1.5rem)] xl:self-start"
+          data-play-rail=""
+        >
+          {desktopRail}
+        </aside>
+      ) : null}
       {floatingAction ? (
-        <FloatingEdgeAnchor aboveBottomNav={Boolean(bottomNav)} position={floatingActionPosition}>
+        <FloatingEdgeAnchor
+          aboveBottomNav={Boolean(bottomNav)}
+          hiddenAtDesktop={hasRail}
+          position={floatingActionPosition}
+        >
           {floatingAction}
         </FloatingEdgeAnchor>
       ) : null}
-      {bottomNav ? <BottomNav>{bottomNav}</BottomNav> : null}
+      {bottomNav ? <BottomNav hiddenAtDesktop={hasRail}>{bottomNav}</BottomNav> : null}
     </div>
   );
 }

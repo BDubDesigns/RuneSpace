@@ -19,7 +19,14 @@ import {
 import { reportMessage } from "@/server/player-reports";
 import { cleanupTestUser, createCharacterForUser, createTestUser } from "../integration/fixtures";
 import { ADMIN_USER_ID, seedAdminOperator, seedNonAdminUser } from "./admin-session";
-import { establishAuthenticatedSession, expect, openTestCharacter, test } from "./fixtures";
+import {
+  chatEntry,
+  establishAuthenticatedSession,
+  expect,
+  openChatSurface,
+  openTestCharacter,
+  test,
+} from "./fixtures";
 import { captureReviewScreenshot } from "./review-screenshot";
 
 /**
@@ -254,7 +261,8 @@ async function issue(
 
 // -- Player helpers ------------------------------------------------------------
 
-const launcher = (page: Page) => page.locator("[data-chat-social-launcher]");
+/** The control that reaches Chat: the phone's launcher, or the desktop dock's Chat tab (#286). */
+const launcher = (page: Page) => chatEntry(page);
 
 async function openPlay(page: Page, characterId: string) {
   await openTestCharacter(page, characterId);
@@ -262,10 +270,7 @@ async function openPlay(page: Page, characterId: string) {
 }
 
 async function openChat(page: Page) {
-  await launcher(page).click();
-  const dialog = page.getByRole("dialog", { name: "Chat" });
-  await expect(dialog).toBeVisible();
-  return dialog;
+  return openChatSurface(page);
 }
 
 const noticeCard = (dialog: Locator) =>

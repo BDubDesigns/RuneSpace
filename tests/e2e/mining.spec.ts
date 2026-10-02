@@ -10,7 +10,13 @@ import {
   itemInstances,
 } from "@/db/rune-space";
 import { ACTION_IDS, ITEM_IDS, LOCATION_IDS } from "@/game/config/foundations";
-import { openEquipmentTab, openMapSurface, openTestCharacter, test } from "./fixtures";
+import {
+  openEquipmentTab,
+  openMapSurface,
+  openTestCharacter,
+  test,
+  WIDEST_COMPACT_VIEWPORT,
+} from "./fixtures";
 import { seedLegacyStarterCutter } from "./legacy-starter";
 import { captureReviewScreenshot } from "./review-screenshot";
 
@@ -274,7 +280,7 @@ test("owned character can start, observe, stop, and restore Ferrite Mining at Th
   expect(footerBox).not.toBeNull();
   expect(historyBox!.y + historyBox!.height).toBeLessThanOrEqual(footerBox!.y);
   await captureReviewScreenshot(page, "mining-mobile-page-bottom.png");
-  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.setViewportSize(WIDEST_COMPACT_VIEWPORT);
   await expect(footer).toHaveCSS("position", "fixed");
   await captureReviewScreenshot(page, "mining-desktop-no-yield.png");
   await page.getByRole("button", { name: "Inventory" }).click();
@@ -648,7 +654,7 @@ test("equipment drawer shows and updates the approved Mining loadout", async ({ 
   await inventory.getByRole("button", { name: "Close inventory" }).click();
   await openEquipmentTab(page);
   await captureReviewScreenshot(page, "mining-mobile-equipment.png");
-  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.setViewportSize(WIDEST_COMPACT_VIEWPORT);
   await expect(equipment).toBeVisible();
   await captureReviewScreenshot(page, "mining-desktop-equipment.png");
 });
@@ -866,7 +872,7 @@ test("equipment and inventory rendering shows artwork for illustrated items and 
   await captureReviewScreenshot(page, "mining-mobile-equipment-artwork.png");
 
   // Desktop equipment view
-  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.setViewportSize(WIDEST_COMPACT_VIEWPORT);
   await captureReviewScreenshot(page, "mining-desktop-equipment-artwork.png");
 
   await equipment.getByRole("button", { name: "Close equipment" }).click();

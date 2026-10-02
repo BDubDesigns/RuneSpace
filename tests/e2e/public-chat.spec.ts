@@ -8,7 +8,15 @@ import { PORTRAIT_IDS } from "@/game/config/foundations";
 import * as characters from "@/server/characters";
 import * as ownership from "@/server/ownership";
 import { cleanupTestUser, createCharacterForUser } from "../integration/fixtures";
-import { establishAuthenticatedSession, expect, openTestCharacter, test } from "./fixtures";
+import {
+  chatEntry,
+  dismissChat,
+  establishAuthenticatedSession,
+  expect,
+  openChatSurface,
+  openTestCharacter,
+  test,
+} from "./fixtures";
 import { captureReviewScreenshot } from "./review-screenshot";
 
 /**
@@ -80,11 +88,10 @@ async function signInFreshPlayer(
 
 async function openChat(page: Page, characterId: string) {
   await openTestCharacter(page, characterId);
-  const launcher = page.getByRole("button", { name: "Chat", exact: true });
-  await expect(launcher).toHaveAttribute("data-realtime-status", "live");
-  await launcher.click();
-  const dialog = page.getByRole("dialog", { name: "Chat" });
-  await expect(dialog).toBeVisible();
+  // A modal Drawer opened from the floating launcher below desktop width; the
+  // docked Chat tab of the right rail (Chat is its home) from 1280px (#286).
+  await expect(chatEntry(page)).toHaveAttribute("data-realtime-status", "live");
+  const dialog = await openChatSurface(page);
   await expect(dialog.getByRole("tab", { name: "General" })).toHaveAttribute(
     "aria-selected",
     "true",
@@ -211,8 +218,7 @@ async function tradeAdJourney(page: Page, context: BrowserContext, width: number
   await expect(dialog.getByRole("button", { name: "Post ad · 50 Credits" })).toBeDisabled();
 
   // Closing returns to the same Play context.
-  await dialog.getByRole("button", { name: "Close chat" }).click();
-  await expect(dialog).toHaveCount(0);
+  await dismissChat(page, dialog);
   expect(page.url()).toBe(playUrl);
 }
 
@@ -388,7 +394,7 @@ async function historyJourney(page: Page, context: BrowserContext, width: number
   ).toBe(true);
   await expectNoHorizontalOverflow(page, dialog);
   await captureReviewScreenshot(page, `issue-246-history-${width}.png`);
-  await dialog.getByRole("button", { name: "Close chat" }).click();
+  await dismissChat(page, dialog);
 }
 
 eachWidth(

@@ -8,7 +8,16 @@ import * as characters from "@/server/characters";
 import * as ownership from "@/server/ownership";
 import { LOCATION_IDS, PORTRAIT_IDS } from "@/game/config/foundations";
 import { cleanupTestUser, createCharacterForUser, createTestUser } from "../integration/fixtures";
-import { establishAuthenticatedSession, expect, openTestCharacter, test } from "./fixtures";
+import {
+  chatEntry,
+  dismissChat,
+  establishAuthenticatedSession,
+  expect,
+  openChatSurface,
+  openTestCharacter,
+  test,
+  utilitySurface,
+} from "./fixtures";
 import { populationDisclosure } from "./population-disclosure";
 import { captureReviewScreenshot } from "./review-screenshot";
 
@@ -89,8 +98,9 @@ async function seedPublic(player: Player, body: string) {
   });
 }
 
+/** The control that reaches Chat: the phone's launcher, or the desktop dock's Chat tab. */
 function launcher(page: Page) {
-  return page.locator("[data-chat-social-launcher]");
+  return chatEntry(page);
 }
 
 async function openPlay(page: Page, characterId: string) {
@@ -99,10 +109,7 @@ async function openPlay(page: Page, characterId: string) {
 }
 
 async function openChat(page: Page) {
-  await launcher(page).click();
-  const dialog = page.getByRole("dialog", { name: "Chat" });
-  await expect(dialog).toBeVisible();
-  return dialog;
+  return openChatSurface(page);
 }
 
 const tab = (dialog: Locator, name: "General" | "Trade" | "Whispers") =>
@@ -229,8 +236,7 @@ async function whisperJourney(page: Page, width: number) {
   await captureReviewScreenshot(page, `issue-247-whisper-conversation-${width}.png`);
 
   // Closing returns to the same Play state.
-  await dialog.getByRole("button", { name: "Close chat" }).click();
-  await expect(dialog).toHaveCount(0);
+  await dismissChat(page, dialog);
   expect(page.url()).toBe(playUrl);
 
   // A Whisper also starts from the same-location profile (Nearby Players).
@@ -238,11 +244,11 @@ async function whisperJourney(page: Page, width: number) {
   await page.getByRole("button", { name: new RegExp(`^${bName},`) }).click();
   const profileActions = page.getByRole("group", { name: `Interact with ${bName}` });
   await profileActions.getByRole("button", { name: "Whisper" }).click();
-  const reopened = page.getByRole("dialog", { name: "Chat" });
+  const reopened = utilitySurface(page, "Chat");
   await expect(reopened.getByRole("log", { name: `Whispers with ${bName}` })).toBeVisible();
   await expect(messageRow(reopened, `deal ${tag}`)).toHaveCount(1);
   expect(page.url()).toBe(playUrl);
-  await reopened.getByRole("button", { name: "Close chat" }).click();
+  await dismissChat(page, reopened);
   await populationDisclosure(page).click();
   await b.context.close();
 }
@@ -426,14 +432,14 @@ test("Report Message, Report + Block from a Whisper, and Report Player from a pr
   const bDialog = await openChat(b.page);
   await tab(bDialog, "Whispers").click();
   await expect(bDialog).toContainText("No Whispers yet.");
-  await bDialog.getByRole("button", { name: "Close chat" }).click();
+  await dismissChat(b.page, bDialog);
   await populationDisclosure(b.page).click();
   await b.page.getByRole("button", { name: new RegExp(`^${a.character.displayName},`) }).click();
   await b.page
     .getByRole("group", { name: `Interact with ${a.character.displayName}` })
     .getByRole("button", { name: "Whisper" })
     .click();
-  const bChat = b.page.getByRole("dialog", { name: "Chat" });
+  const bChat = utilitySurface(b.page, "Chat");
   await sendWhisper(bChat, `pay up or else ${tag}`);
 
   // Report + Block from that Whisper.
@@ -462,7 +468,7 @@ test("Report Message, Report + Block from a Whisper, and Report Player from a pr
       ),
     );
   expect(whisperReport).toHaveLength(1);
-  await dialog.getByRole("button", { name: "Close chat" }).click();
+  await dismissChat(page, dialog);
 
   // Report Player from the same-location profile.
   await populationDisclosure(page).click();

@@ -1,4 +1,5 @@
 import { defineConfig, devices } from "@playwright/test";
+import { DESKTOP_WORKSPACE_MIN_WIDTH_PX } from "./features/play/utility-workspace";
 
 const port = process.env.PLAYWRIGHT_PORT ?? "3000";
 const baseURL = process.env.BASE_URL ?? `http://127.0.0.1:${port}`;
@@ -23,8 +24,21 @@ const requestedWorkers = process.env.RUNESPACE_E2E_WORKERS
   ? Number.parseInt(process.env.RUNESPACE_E2E_WORKERS, 10)
   : undefined;
 const canonicalSpecPattern =
-  /.*\/(?:account-news|account-verification|admin-operator|bounded-runs|cargo-hold|character-panel|character-portraits|character-profile|chat-social-polish|cut-your-teeth|deep-jag|fabrication|fabrication-advanced|gameplay-access|holo-hollow|inventory-equip|location-population|mining|moderation|overlay|player-trading|public-chat|refining|rusk-recovery|signout|social-shell|system-notices|travel|walk-it-off|whispers-safety)\.spec\.ts$/;
+  /.*\/(?:account-news|account-verification|admin-operator|bounded-runs|cargo-hold|character-panel|character-portraits|character-profile|chat-social-polish|cut-your-teeth|deep-jag|desktop-workspace|fabrication|fabrication-advanced|gameplay-access|holo-hollow|inventory-equip|location-population|mining|moderation|overlay|player-trading|public-chat|refining|rusk-recovery|signout|social-shell|system-notices|travel|walk-it-off|whispers-safety)\.spec\.ts$/;
 const timingOutput = process.env.RUNESPACE_E2E_TIMING_OUTPUT;
+
+/**
+ * Play's desktop workspace (#286) starts at exactly the width Desktop Chrome
+ * defaults to (1280px). A spec that never sets a viewport is about a feature,
+ * not a composition, and was written against the compact one — footer
+ * navigation, modal Drawers, the floating Chat launcher — so the chromium
+ * project runs one pixel below the dock breakpoint, where the geometry those
+ * specs measure is unchanged. The desktop composition has its own spec
+ * (`desktop-workspace`), and a spec that wants a desktop width sets it
+ * explicitly and drives the utilities through the width-aware helpers in
+ * `tests/e2e/fixtures.ts`.
+ */
+const COMPACT_DESKTOP_VIEWPORT = { width: DESKTOP_WORKSPACE_MIN_WIDTH_PX - 1, height: 720 };
 
 export default defineConfig({
   testDir: "./tests/e2e",
@@ -48,7 +62,7 @@ export default defineConfig({
   projects: [
     {
       name: "chromium",
-      use: { ...devices["Desktop Chrome"] },
+      use: { ...devices["Desktop Chrome"], viewport: COMPACT_DESKTOP_VIEWPORT },
     },
     {
       name: "mobile",
