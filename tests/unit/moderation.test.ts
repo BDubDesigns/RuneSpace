@@ -327,7 +327,11 @@ describe("moderation production command surface (requireAdmin-only)", () => {
     expect(exportedNames.length).toBeGreaterThan(0);
     expect(exportedNames.filter((name) => /As$/.test(name))).toEqual([]);
     expect(exportedNames.filter((name) => /AsAdmin|ForAdmin/.test(name))).toEqual([]);
-  });
+    // Importing the whole server module graph after `resetModules` is real
+    // transform work, and it competes with every other test file for CPU. The
+    // default 5 s timeout failed on every full parallel run, so this test is
+    // given time proportionate to what it does rather than left to race it.
+  }, 60_000);
 
   it("calls requireAdmin( in the body of every exported function", () => {
     const source = readFileSync(SOURCE, "utf8");
