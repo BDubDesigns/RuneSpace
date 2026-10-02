@@ -9,18 +9,14 @@ import {
 } from "@/db/rune-space";
 import { getEffectiveGameBalance, getItemDefinition } from "@/game/config/balance";
 import { ACTION_IDS, LOCATION_IDS, REPAIR_TARGET_IDS } from "@/game/config/foundations";
-import {
-  deriveEquipmentLoadout,
-  type EquipmentAssignmentState,
-  type EquipmentItemInstance,
-} from "@/game/domain/equipment";
 import { planExactStackAddition, type StackState } from "@/game/domain/inventory";
 import type { MiningRandom } from "@/game/domain/mining";
 import { type DatabaseTransaction, withResolvedOwnedCharacter } from "@/server/action-resolution";
 import {
   addStackableItem,
-  loadOwnedItemInstances,
+  loadCarriedCapacity,
   removeFromSelectedStack,
+  siteStashPlacementOf,
 } from "@/server/carried-inventory";
 import {
   createPlayResolver,
@@ -53,6 +49,7 @@ export type CargoHoldRefusalReason =
   | "item_not_found"
   | "equipped_item"
   | "item_already_stored"
+  | "item_in_site_stash"
   | "item_not_stored";
 
 export type CargoHoldRefusal = {
@@ -149,40 +146,6 @@ async function stateAfterCargoCommand(
     undefined,
     now,
   );
-}
-
-async function loadCarriedCapacity(
-  transaction: DatabaseTransaction,
-  characterId: string,
-  now: Date,
-) {
-  const balance = getEffectiveGameBalance();
-  const [stacks, itemState, assignments] = await Promise.all([
-    transaction
-      .select()
-      .from(inventoryStacks)
-      .where(eq(inventoryStacks.characterId, characterId))
-      .orderBy(asc(inventoryStacks.createdAt), asc(inventoryStacks.id))
-      .for("update"),
-    loadOwnedItemInstances(transaction, characterId),
-    transaction
-      .select()
-      .from(equippedItems)
-      .where(eq(equippedItems.characterId, characterId))
-      .for("update"),
-  ]);
-  const loadout = deriveEquipmentLoadout({
-    assignments: assignments as EquipmentAssignmentState[],
-    instances: itemState.carriedInstances as EquipmentItemInstance[],
-    stacks,
-    balance,
-  });
-  void now;
-  return {
-    stacks,
-    availableSlots: Math.max(0, loadout.containerSlotCapacity - loadout.inventorySlotsUsed),
-    availableMassGrams: Math.max(0, loadout.maximumCarryCapacityGrams - loadout.carriedMassGrams),
-  };
 }
 
 async function cargoStackAccess(
@@ -348,7 +311,7 @@ export async function withdrawCargoStack(
       if (!definition || definition.kind !== "stack")
         return refusal("unsupported_stack", "That Cargo item cannot be withdrawn as a stack.");
       const quantity = request.mode === "one" ? 1 : source.quantity;
-      const carry = await loadCarriedCapacity(transaction, context.character.id, now);
+      const carry = await loadCarriedCapacity(transaction, context.character.id);
       const additionResult = planExactStackAddition(
         carry.stacks as StackState<string>[],
         definition.itemId,
@@ -535,6 +498,10 @@ export async function depositCargoUniqueItem(
         return refusal("equipped_item", "Unequip that item before depositing it in Cargo Hold.");
       if (cargoRows.some((row) => row.itemInstanceId === instance.id))
         return refusal("item_already_stored", "That item is already in Cargo Hold.");
+      // An item installed in, or stored at, a site stash is owned but not
+      // carried, so it can never also be deposited here (#284).
+      if (await siteStashPlacementOf(transaction, context.character.id, instance.id))
+        return refusal("item_in_site_stash", "That item is held in a site stash.");
       if (
         cargoRows.length + cargoStackRows.length >=
         getEffectiveGameBalance().cargoHold.capacitySlots
@@ -609,7 +576,7 @@ export async function withdrawCargoUniqueItem(
       const definition = getItemDefinition(instance.itemId);
       if (!definition || definition.kind !== "unique")
         return refusal("item_not_stored", "That Cargo item is not transferable.");
-      const carry = await loadCarriedCapacity(transaction, context.character.id, now);
+      const carry = await loadCarriedCapacity(transaction, context.character.id);
       if (carry.availableSlots < 1)
         return refusal("carried_capacity", "Carried Inventory has no free occupied-item slot.");
       if (carry.availableMassGrams < definition.massGrams)

@@ -4,6 +4,8 @@ import {
   playerAccounts,
   characterMissions,
   cargoHoldItemInstances,
+  siteStashContainers,
+  siteStashItemInstances,
   equippedItems,
   itemInstances,
 } from "@/db/rune-space";
@@ -136,7 +138,10 @@ export type AdminUniqueInstanceView = {
   instanceId: string;
   /** Mutable persistent state (e.g. Cutter charge), when the item exposes one. */
   currentCharge?: number;
-  /** "equipped:<assignmentKind>:<suitSlotId>" | "carried" | "cargo". */
+  /**
+   * "equipped:<assignmentKind>:<suitSlotId>" | "carried" | "cargo" |
+   * "stash:<locationId>" | "stash_container:<locationId>" (#284).
+   */
   location: string;
 };
 
@@ -169,27 +174,43 @@ export async function loadAdminInspectorState(
     characterId,
     createPlayResolver(),
     async (transaction, context) => {
-      const [ownerRows, auditRows, missionRows, instanceRows, equippedRows, cargoItemRows] =
-        await Promise.all([
-          ownerIdentity(transaction, context.character.id),
-          loadCharacterAuditLog(transaction, characterId),
-          transaction
-            .select()
-            .from(characterMissions)
-            .where(eq(characterMissions.characterId, context.character.id)),
-          transaction
-            .select()
-            .from(itemInstances)
-            .where(eq(itemInstances.characterId, context.character.id)),
-          transaction
-            .select()
-            .from(equippedItems)
-            .where(eq(equippedItems.characterId, context.character.id)),
-          transaction
-            .select()
-            .from(cargoHoldItemInstances)
-            .where(eq(cargoHoldItemInstances.characterId, context.character.id)),
-        ]);
+      const [
+        ownerRows,
+        auditRows,
+        missionRows,
+        instanceRows,
+        equippedRows,
+        cargoItemRows,
+        stashContainerRows,
+        stashItemRows,
+      ] = await Promise.all([
+        ownerIdentity(transaction, context.character.id),
+        loadCharacterAuditLog(transaction, characterId),
+        transaction
+          .select()
+          .from(characterMissions)
+          .where(eq(characterMissions.characterId, context.character.id)),
+        transaction
+          .select()
+          .from(itemInstances)
+          .where(eq(itemInstances.characterId, context.character.id)),
+        transaction
+          .select()
+          .from(equippedItems)
+          .where(eq(equippedItems.characterId, context.character.id)),
+        transaction
+          .select()
+          .from(cargoHoldItemInstances)
+          .where(eq(cargoHoldItemInstances.characterId, context.character.id)),
+        transaction
+          .select()
+          .from(siteStashContainers)
+          .where(eq(siteStashContainers.characterId, context.character.id)),
+        transaction
+          .select()
+          .from(siteStashItemInstances)
+          .where(eq(siteStashItemInstances.characterId, context.character.id)),
+      ]);
       const accountAccess = await loadAccountAccessView(transaction, ownerRows.playerAccountId);
       const state = await stateFromTransaction(
         transaction,
@@ -243,6 +264,12 @@ export async function loadAdminInspectorState(
         equippedSlotByInstance.set(row.itemInstanceId, `${row.assignmentKind}:${row.suitSlotId}`);
       }
       const cargoInstanceIds = new Set(cargoItemRows.map((row) => row.itemInstanceId));
+      const stashLocationByInstance = new Map<string, string>([
+        ...stashContainerRows.map(
+          (row) => [row.itemInstanceId, `stash_container:${row.locationId}`] as const,
+        ),
+        ...stashItemRows.map((row) => [row.itemInstanceId, `stash:${row.locationId}`] as const),
+      ]);
       const uniqueInstances: AdminUniqueInstanceView[] = instanceRows
         .map((instance) => {
           const slot = equippedSlotByInstance.get(instance.id);
@@ -250,7 +277,7 @@ export async function loadAdminInspectorState(
             ? `equipped:${slot}`
             : cargoInstanceIds.has(instance.id)
               ? "cargo"
-              : "carried";
+              : (stashLocationByInstance.get(instance.id) ?? "carried");
           return {
             itemId: instance.itemId,
             instanceId: instance.id,

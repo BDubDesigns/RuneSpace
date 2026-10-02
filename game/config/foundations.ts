@@ -335,6 +335,12 @@ export const ACTION_IDS = {
   galvaniteSlagRefining: asContentId("galvanite_slag_refining"),
   // Welding the brace/support assembly into the collapsed Deep Jag passage.
   deepJagWelding: asContentId("deep_jag_welding"),
+  // Welding a site stash mount (#284), one action per mount for the same
+  // durable-identity reason every repair target has its own.
+  siteStashTheJagWelding: asContentId("site_stash_the_jag_welding"),
+  siteStashRuskRecoveryWelding: asContentId("site_stash_rusk_recovery_welding"),
+  siteStashProcessingYardWelding: asContentId("site_stash_abandoned_processing_yard_welding"),
+  siteStashDeepJagWelding: asContentId("site_stash_deep_jag_welding"),
   // Tier-1 Fabrication recipes (#232), one action per authored recipe for the
   // same durable-identity reason Refining recipes have one: the active action
   // IS the recipe of the workpiece on the machine, so refresh and lazy
@@ -413,6 +419,13 @@ export const REPAIR_TARGET_IDS = {
   // authoritative fact that opens the location; there is no second
   // `deep_jag_open` flag anywhere.
   deepJagCaveIn: asContentId("deep_jag_cave_in"),
+  // The permanent local stash mounts (#284), one per authored activity site.
+  // A mount is "built" exactly when its repair target is complete; there is no
+  // second mount table or flag.
+  siteStashTheJag: asContentId("site_stash_the_jag"),
+  siteStashRuskRecovery: asContentId("site_stash_rusk_recovery"),
+  siteStashProcessingYard: asContentId("site_stash_abandoned_processing_yard"),
+  siteStashDeepJag: asContentId("site_stash_deep_jag"),
 } as const satisfies Record<string, ContentId>;
 
 /**

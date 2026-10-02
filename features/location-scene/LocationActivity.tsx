@@ -9,6 +9,7 @@ import { MiningActivity } from "@/features/mining/MiningActivity";
 import { PowerAnnexClaimPanel } from "@/features/power-annex/PowerAnnexClaimPanel";
 import { RuskRecoveryWorkAreas } from "@/features/location-scene/RuskRecoveryWorkAreas";
 import { RefiningConsole } from "@/features/refining/RefiningConsole";
+import { SiteStashPanel } from "@/features/site-stash/SiteStashPanel";
 import { RepairWorkPanel } from "@/features/welding/RepairWorkPanel";
 import { usePlay } from "@/features/play/PlayContext";
 
@@ -63,6 +64,22 @@ export function LocationActivity({
     return activePlace.id === LOCAL_PLACE_IDS.holoHollowCrewStop ? <CrewStopPanel /> : null;
   }
 
+  return (
+    <>
+      {primaryActivity(locationId, characterName, state)}
+      {/* A site stash (#284) is a sibling of the site's own activity, never a
+          replacement for it. It renders nothing until the server projects one,
+          which it does only for a character who has earned the site's mount. */}
+      <SiteStashPanel />
+    </>
+  );
+}
+
+function primaryActivity(
+  locationId: string,
+  characterName: string,
+  state: ReturnType<typeof usePlay>["state"],
+) {
   switch (locationId) {
     case LOCATION_IDS.theJag:
       return <MiningActivity characterName={characterName} />;

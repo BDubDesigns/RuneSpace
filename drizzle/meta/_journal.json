@@ -281,6 +281,13 @@
       "when": 1790837945937,
       "tag": "0039_chat_mentions_whisper_hide",
       "breakpoints": true
+    },
+    {
+      "idx": 40,
+      "version": "7",
+      "when": 1790923772404,
+      "tag": "0040_site_stash_mounts",
+      "breakpoints": true
     }
   ]
 }

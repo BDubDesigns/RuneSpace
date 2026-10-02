@@ -1,6 +1,19 @@
 import { and, asc, eq, inArray } from "drizzle-orm";
-import { cargoHoldItemInstances, inventoryStacks, itemInstances } from "@/db/rune-space";
+import {
+  cargoHoldItemInstances,
+  equippedItems,
+  inventoryStacks,
+  itemInstances,
+  siteStashContainers,
+  siteStashItemInstances,
+} from "@/db/rune-space";
+import { getEffectiveGameBalance } from "@/game/config/balance";
 import type { ItemId } from "@/game/config/foundations";
+import {
+  deriveEquipmentLoadout,
+  type EquipmentAssignmentState,
+  type EquipmentItemInstance,
+} from "@/game/domain/equipment";
 import {
   planExactStackRemoval,
   type ExactStackRemovalPlan,
@@ -246,8 +259,11 @@ export async function removeFromSelectedStack(
 
 /**
  * Owned item instances retain their character ownership in item_instances.
- * The Cargo relation is the authoritative location assignment: an instance
- * with a Cargo row is owned, but it is not currently carried.
+ * Location is the presence of a relation row: an instance with a Cargo row, an
+ * installed-container row, or a stash-stored row (#284) is owned, but it is not
+ * currently carried. Subtracting every such relation here, in the one loader
+ * every carried-capacity, Tinkering, Mission turn-in, trade, and equipment path
+ * reads, is what keeps an installed or stashed item out of all of them.
  */
 export async function loadOwnedItemInstances(
   transaction: DatabaseTransaction,
@@ -256,23 +272,122 @@ export async function loadOwnedItemInstances(
   allInstances: (typeof itemInstances.$inferSelect)[];
   carriedInstances: (typeof itemInstances.$inferSelect)[];
   cargoAssignments: (typeof cargoHoldItemInstances.$inferSelect)[];
+  siteStashContainerRows: (typeof siteStashContainers.$inferSelect)[];
+  siteStashItemRows: (typeof siteStashItemInstances.$inferSelect)[];
 }> {
-  const [allInstances, cargoAssignments] = await Promise.all([
-    transaction
-      .select()
-      .from(itemInstances)
-      .where(eq(itemInstances.characterId, characterId))
-      .for("update"),
-    transaction
-      .select()
-      .from(cargoHoldItemInstances)
-      .where(eq(cargoHoldItemInstances.characterId, characterId))
-      .for("update"),
+  const [allInstances, cargoAssignments, siteStashContainerRows, siteStashItemRows] =
+    await Promise.all([
+      transaction
+        .select()
+        .from(itemInstances)
+        .where(eq(itemInstances.characterId, characterId))
+        .for("update"),
+      transaction
+        .select()
+        .from(cargoHoldItemInstances)
+        .where(eq(cargoHoldItemInstances.characterId, characterId))
+        .for("update"),
+      transaction
+        .select()
+        .from(siteStashContainers)
+        .where(eq(siteStashContainers.characterId, characterId))
+        .for("update"),
+      transaction
+        .select()
+        .from(siteStashItemInstances)
+        .where(eq(siteStashItemInstances.characterId, characterId))
+        .for("update"),
+    ]);
+  const notCarriedInstanceIds = new Set([
+    ...cargoAssignments.map((assignment) => assignment.itemInstanceId),
+    ...siteStashContainerRows.map((row) => row.itemInstanceId),
+    ...siteStashItemRows.map((row) => row.itemInstanceId),
   ]);
-  const cargoInstanceIds = new Set(cargoAssignments.map((assignment) => assignment.itemInstanceId));
   return {
     allInstances,
-    carriedInstances: allInstances.filter((instance) => !cargoInstanceIds.has(instance.id)),
+    carriedInstances: allInstances.filter((instance) => !notCarriedInstanceIds.has(instance.id)),
     cargoAssignments,
+    siteStashContainerRows,
+    siteStashItemRows,
+  };
+}
+
+/**
+ * Where, if anywhere, a unique item instance sits in a site stash (#284).
+ *
+ * `installed` means it is the container serving a mount; `stored` means it is
+ * stashed contents. Either way it is owned but unavailable to every carried
+ * path. The hand-written lookups that cannot go through
+ * `loadOwnedItemInstances` (Cargo deposit, trade offers, the operator tools)
+ * ask this instead of re-deriving the two relations.
+ */
+export async function siteStashPlacementOf(
+  transaction: DatabaseTransaction,
+  characterId: string,
+  itemInstanceId: string,
+): Promise<{ kind: "installed" | "stored"; locationId: string } | undefined> {
+  const [[installed], [stored]] = await Promise.all([
+    transaction
+      .select({ locationId: siteStashContainers.locationId })
+      .from(siteStashContainers)
+      .where(
+        and(
+          eq(siteStashContainers.characterId, characterId),
+          eq(siteStashContainers.itemInstanceId, itemInstanceId),
+        ),
+      )
+      .limit(1),
+    transaction
+      .select({ locationId: siteStashItemInstances.locationId })
+      .from(siteStashItemInstances)
+      .where(
+        and(
+          eq(siteStashItemInstances.characterId, characterId),
+          eq(siteStashItemInstances.itemInstanceId, itemInstanceId),
+        ),
+      )
+      .limit(1),
+  ]);
+  if (installed) return { kind: "installed", locationId: installed.locationId };
+  if (stored) return { kind: "stored", locationId: stored.locationId };
+  return undefined;
+}
+
+/**
+ * The character's carried stacks and remaining carried room, read under lock.
+ *
+ * Shared by every storage host that moves items back into carried Inventory
+ * (the ship Cargo Hold and site stashes, #284): slots come from the equipped
+ * containers, mass from the flat carry cap, and `carriedInstances` already
+ * excludes anything held in Cargo or a stash.
+ */
+export async function loadCarriedCapacity(transaction: DatabaseTransaction, characterId: string) {
+  const balance = getEffectiveGameBalance();
+  const [stacks, itemState, assignments] = await Promise.all([
+    transaction
+      .select()
+      .from(inventoryStacks)
+      .where(eq(inventoryStacks.characterId, characterId))
+      .orderBy(asc(inventoryStacks.createdAt), asc(inventoryStacks.id))
+      .for("update"),
+    loadOwnedItemInstances(transaction, characterId),
+    transaction
+      .select()
+      .from(equippedItems)
+      .where(eq(equippedItems.characterId, characterId))
+      .for("update"),
+  ]);
+  const loadout = deriveEquipmentLoadout({
+    assignments: assignments as EquipmentAssignmentState[],
+    instances: itemState.carriedInstances as EquipmentItemInstance[],
+    stacks,
+    balance,
+  });
+  return {
+    stacks,
+    carriedInstances: itemState.carriedInstances,
+    loadout,
+    availableSlots: Math.max(0, loadout.containerSlotCapacity - loadout.inventorySlotsUsed),
+    availableMassGrams: Math.max(0, loadout.maximumCarryCapacityGrams - loadout.carriedMassGrams),
   };
 }

@@ -359,6 +359,10 @@ weld belongs to that thing**, as a per-target recipe under `repairTargets`:
 | Cargo Hold (Crash Site) | 15 Refined Ferrite + 6 Slag | 12 | 600 |
 | Crew Stop (Holo Hollow) | 20 Refined Ferrite | 10 | 500 |
 | Deep Jag cave-in | 25 Refined Ferrite + 5 Power Cells | 15 | 750 |
+| Stash Mount: The Jag (#284) | 6 Refined Ferrite + 3 Slag | 6 | 300 |
+| Stash Mount: Rusk Recovery (#284) | 3 Galvanic Stock + 2 Mounting Brackets | 10 | 500 |
+| Stash Mount: Abandoned Processing Yard (#284) | 3 Galvanic Stock + 2 Mounting Brackets | 10 | 500 |
+| Stash Mount: Deep Jag (#284) | 2 Galvaferrite + 2 Mounting Brackets + 1 Galvanic Stock | 15 | 750 |
 
 A recipe's materials are an **authored list**, generalized in #209 from the
 original Refined-Ferrite-and-Slag pair. Deep Jag's brace wants Power Cells, and
@@ -377,9 +381,12 @@ by character and target), one domain (`game/domain/welding-repair`), one
 resolver (`server/welding`), and one set of commands
 (`server/repair-commands`). A target is identified at runtime by its own action
 ID, so `active_actions` keeps its narrow shape and carries no per-action
-payload. Which accepted Mission authorizes an incomplete repair, and where the
-work physically happens, are authored content
-(`game/content/repair-targets`).
+payload. What authorizes an incomplete repair, and where the work physically
+happens, are authored content (`game/content/repair-targets`): either an
+accepted Mission, or (#284) the character's **personal Welding level**, with an
+optional prerequisite repair that must already be complete. A level-gated
+target consults no other skill. One predicate (`server/repair-access.ts`) reads
+whichever the target authors, for the commands and the projection alike.
 
 An untouched repair target is simply an absent row, so adding a target needs no
 backfill: play provisioning creates nothing, and the first repair command
@@ -611,6 +618,87 @@ every other kind.
 - Stop and Travel interrupt a Work Order exactly as they interrupt Practice —
   closing any open Clean Pass window as missed and preserving every resolved
   section — never refunding materials and never completing the job early.
+
+## Site stashes (issue #284)
+
+Four authored activity sites let a character permanently build one **stash
+mount** and then install **any ordinary owned container** into it, giving that
+site location-bound storage. The storage surface is the one #282 extracted
+(`features/storage/StorageTransferSurface`); nothing about a stash duplicates
+the Cargo Hold's panel, tile grid or transfer controls, and the ship Cargo Hold
+keeps its own behavior and repair UI.
+
+### The mount: an ordinary repair target
+
+A mount is not a new table. It is a repair target (above) per site, so its
+materials, Welding sections, normal **50 Welding XP per section** (before
+normal Clean Pass effects), durable per-character state and 5-tick / 3-second
+cadence are exactly the existing Welding system's. A mount is "built" exactly
+when its repair target is complete (`game/content/site-stashes` names the
+target per location); one mount per character per site, never rebuilt, with no
+bonus completion XP.
+
+| Site | Welding gate | Materials | Sections | Time | Base XP |
+| --- | --- | --- | ---: | ---: | ---: |
+| The Jag | 1 | 6 Refined Ferrite + 3 Slag | 6 | 18 s | 300 |
+| Rusk Recovery | 5 | 3 Galvanic Stock + 2 Mounting Brackets | 10 | 30 s | 500 |
+| Abandoned Processing Yard | 5 | 3 Galvanic Stock + 2 Mounting Brackets | 10 | 30 s | 500 |
+| Deep Jag | 8, and its cave-in repair complete | 2 Galvaferrite + 2 Mounting Brackets + 1 Galvanic Stock | 15 | 45 s | 750 |
+
+Only the **personal Welding level** gates building; Mining, Refining and
+Fabrication levels are never prerequisites, and every material may be traded
+for. The character must be at the site. The times are derived from the existing
+section cadence, not separate timers. A mount's Welding action is deliberately
+**not** in any location's `availableActionIds`, which would list it to
+characters who have not earned it.
+
+### Progressive presentation
+
+The server projects `siteStash` only for the character's current site and only
+when the mount is already built or the gate is met. Before that nothing about a
+stash exists to render: no Build Stash Mount panel, locked teaser or disabled
+control. Once qualified the standard `RepairWorkPanel` builds the mount; then
+**Install Container**; then **Stash** (the shared surface) with **Swap
+Container** and **Remove Container**.
+
+### Container authority and lifecycle
+
+Installed capacity is exactly the container item's authored equipped slot count
+(MYKEA 8, Freight Harness 6, Scrap Box 3), read from the equipment-definition
+boundary, never the client; stored mass is unlimited. Persistence is
+`site_stash_containers` (one row per character and site; the instance keeps its
+`item_instances` row and mutable state), `site_stash_stacks` and
+`site_stash_item_instances`. Contents reference the installed container by
+composite foreign key, so a container row cannot be deleted while anything is
+stored.
+
+- **Install** needs a built mount, no container already there, and a personally
+  owned, **unequipped, physically carried** container instance. An installed
+  container leaves carried/equipped availability.
+- **Remove** needs a completely empty stash; the returned container must fit
+  carried Inventory by slots and mass.
+- **Swap** replaces the container with a **different item type** without
+  emptying the stash, if its authored capacity holds every occupied slot (equal
+  capacity is fine, heavy to light included). The same type is refused even for
+  a different instance. The returned old container is checked against carried
+  room **after** consuming the replacement. It is one row update: stored
+  contents never move, and the mount is never disassembled.
+- **Deposit and withdraw** keep stack and unique-item semantics and carried
+  slot/mass checks. Every command re-proves, under the character lock, that the
+  character is at that site with no activity running, the mount is built, a
+  container is installed, and slots remain. They never call Cargo Hold handlers,
+  whose access and fixed 32-slot model are ship-specific.
+
+An installed container, and anything stored in a stash, is owned but **not
+carried**: `loadOwnedItemInstances` subtracts both, so carried slots and mass,
+Tinkering, Mission turn-in, trade eligibility and equipment all exclude them,
+and a unique item can only be in one place. Trade offers, Cargo Hold deposit and
+the operator's delete-item tool refuse or handle it explicitly.
+
+### Non-goals
+
+No Circuits, remote telemetry, ship control center or remote inventory reading;
+no Deposit All / Withdraw All; no new container items, art or trading changes.
 
 ## Fabrication and Tinkering (issue #232)
 

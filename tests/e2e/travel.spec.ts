@@ -199,8 +199,11 @@ async function expectMiningDashboardsVisible(page: import("@playwright/test").Pa
   // Since #193 the skill, the carried shale and the run totals are compact rows
   // inside Mining's own panel rather than three standalone cards.
   await expect(page.getByRole("progressbar", { name: "Mining progression XP" })).toBeVisible();
-  await expect(page.locator("[data-activity-context]")).toContainText("Ferrite Shale");
-  await expect(page.locator("[data-activity-context]")).toContainText("slots");
+  // Scoped to Mining's own panel: The Jag can also host a stash mount panel
+  // (#284) with a context row of its own.
+  const miningContext = page.locator("[data-mining-activity] [data-activity-context]");
+  await expect(miningContext).toContainText("Ferrite Shale");
+  await expect(miningContext).toContainText("slots");
   await expect(page.getByText("This mining run", { exact: true })).toBeVisible();
 }
 

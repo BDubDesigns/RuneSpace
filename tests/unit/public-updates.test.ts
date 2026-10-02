@@ -117,15 +117,34 @@ describe("public Updates content boundary", () => {
     });
   });
 
-  it("publishes the desktop workspace Update as the newest", () => {
+  it("publishes the site stash Update as the newest", () => {
     // Newest by instant, so the account news boundary surfaces it (#156).
     const latest = getLatestPublishedUpdate();
-    expect(latest.slug).toBe("room-to-spread-out");
+    expect(latest.slug).toBe("a-stash-of-your-own");
     expect(Date.parse(latest.publishedAt)).toBeGreaterThan(
-      Date.parse(getPublicUpdate("heads-up")!.publishedAt),
+      Date.parse(getPublicUpdate("room-to-spread-out")!.publishedAt),
     );
+    // Never dated in the future: merging is the publication boundary.
+    expect(Date.parse(latest.publishedAt)).toBeLessThanOrEqual(Date.now());
     // Player-facing: names only what a player sees, never the internal contract.
     const text = JSON.stringify(latest);
+    for (const label of ["Install Container", "Swap Container", "Remove Container", "Welding"]) {
+      expect(text).toContain(label);
+    }
+    expect(text).not.toMatch(/\bquests?\b/i);
+    const links = latest.body
+      .flatMap((paragraph) => (typeof paragraph === "string" ? [] : paragraph))
+      .filter((segment) => typeof segment !== "string");
+    expect(links).toContainEqual({ text: "the Wiki", articleSlug: "cargo-hold-and-welding" });
+  });
+
+  it("publishes the desktop workspace Update", () => {
+    // A newer Update has shipped since (#284), so it is found by slug.
+    const update = getPublicUpdate("room-to-spread-out")!;
+    expect(Date.parse(update.publishedAt)).toBeGreaterThan(
+      Date.parse(getPublicUpdate("heads-up")!.publishedAt),
+    );
+    const text = JSON.stringify(update);
     for (const label of ["Chat", "Inventory", "Character", "Missions", "Set as default"]) {
       expect(text).toContain(label);
     }

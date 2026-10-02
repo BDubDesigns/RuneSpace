@@ -86,6 +86,10 @@ describe("welding rules are global; recipes belong to the repair target (#172)",
       ACTION_IDS.cargoHoldWelding,
       ACTION_IDS.crewStopWelding,
       ACTION_IDS.deepJagWelding,
+      ACTION_IDS.siteStashTheJagWelding,
+      ACTION_IDS.siteStashRuskRecoveryWelding,
+      ACTION_IDS.siteStashProcessingYardWelding,
+      ACTION_IDS.siteStashDeepJagWelding,
     ]);
   });
 });

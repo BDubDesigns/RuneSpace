@@ -465,16 +465,17 @@ describe("the new materials and who buys them", () => {
     }
   });
 
-  it("gives Galvaferrite no consumer in this slice", () => {
-    // It is sellable and stockpilable and nothing else: no recipe takes it as
-    // an input, and no repair asks for it.
+  it("gives Galvaferrite exactly one consumer: the Deep Jag stash mount (#284)", () => {
+    // It is sellable and stockpilable; no recipe takes it as an input, and the
+    // only repair that asks for it is the Deep Jag site stash mount.
     for (const recipe of refiningRecipes(balance)) {
       expect(recipe.inputs.map((input) => input.itemId)).not.toContain(ITEM_IDS.galvaferrite);
     }
-    for (const target of Object.values(balance.repairTargets)) {
-      expect(target.materials.map((material) => material.itemId)).not.toContain(
-        ITEM_IDS.galvaferrite,
-      );
-    }
+    const consumers = Object.values(balance.repairTargets)
+      .filter((target) =>
+        target.materials.some((material) => material.itemId === ITEM_IDS.galvaferrite),
+      )
+      .map((target) => target.targetId);
+    expect(consumers).toEqual([REPAIR_TARGET_IDS.siteStashDeepJag]);
   });
 });

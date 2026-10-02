@@ -1,6 +1,7 @@
 "use server";
 
 import { headers } from "next/headers";
+import type { z } from "zod";
 import { redirect } from "next/navigation";
 import {
   ensurePlayerAccount,
@@ -54,6 +55,16 @@ import {
   type CargoHoldStateResult,
   type CargoHoldTransferStatus,
 } from "@/server/cargo-hold";
+import {
+  depositSiteStashStack,
+  depositSiteStashUniqueItem,
+  installSiteStashContainer,
+  removeSiteStashContainer,
+  swapSiteStashContainer,
+  withdrawSiteStashStack,
+  withdrawSiteStashUniqueItem,
+  type SiteStashStateResult,
+} from "@/server/site-stash";
 import {
   contributeRepairMaterials,
   startWelding,
@@ -179,6 +190,13 @@ import {
   WithdrawCargoStackRequestSchema,
   DepositCargoUniqueItemRequestSchema,
   WithdrawCargoUniqueItemRequestSchema,
+  DepositSiteStashStackRequestSchema,
+  WithdrawSiteStashStackRequestSchema,
+  DepositSiteStashUniqueItemRequestSchema,
+  WithdrawSiteStashUniqueItemRequestSchema,
+  InstallSiteStashContainerRequestSchema,
+  RemoveSiteStashContainerRequestSchema,
+  SwapSiteStashContainerRequestSchema,
   ChangeCharacterPortraitRequestSchema,
   AcceptMissionRequestSchema,
   CompleteMissionRequestSchema,
@@ -767,6 +785,101 @@ export async function withdrawCargoUniqueItemAction(
     if (error instanceof OwnershipError) return { error: error.message };
     throw error;
   }
+}
+
+export type SiteStashActionResult = SiteStashStateResult | { error: string };
+
+/**
+ * One wrapper for every site stash command (#284): parse, authenticate, run,
+ * and translate the two refusal exceptions exactly as the Cargo actions do.
+ */
+async function runSiteStashAction<Schema extends z.ZodType<{ characterId: string }>>(
+  schema: Schema,
+  input: unknown,
+  invalidMessage: string,
+  run: (userId: string, request: z.infer<Schema>) => Promise<SiteStashStateResult>,
+): Promise<SiteStashActionResult> {
+  const request = schema.safeParse(input);
+  if (!request.success) return { error: invalidMessage };
+  try {
+    const user = await requireCurrentUser(await headers());
+    return await run(user.id, request.data);
+  } catch (error) {
+    redirectOnGameplayRefusal(error);
+    if (error instanceof OwnershipError) return { error: error.message };
+    throw error;
+  }
+}
+
+export async function depositSiteStashStackAction(input: unknown): Promise<SiteStashActionResult> {
+  return runSiteStashAction(
+    DepositSiteStashStackRequestSchema,
+    input,
+    "Invalid stash deposit command.",
+    (userId, request) => depositSiteStashStack(userId, request.characterId, request),
+  );
+}
+
+export async function withdrawSiteStashStackAction(input: unknown): Promise<SiteStashActionResult> {
+  return runSiteStashAction(
+    WithdrawSiteStashStackRequestSchema,
+    input,
+    "Invalid stash withdrawal command.",
+    (userId, request) => withdrawSiteStashStack(userId, request.characterId, request),
+  );
+}
+
+export async function depositSiteStashUniqueItemAction(
+  input: unknown,
+): Promise<SiteStashActionResult> {
+  return runSiteStashAction(
+    DepositSiteStashUniqueItemRequestSchema,
+    input,
+    "Invalid stash item deposit command.",
+    (userId, request) => depositSiteStashUniqueItem(userId, request.characterId, request),
+  );
+}
+
+export async function withdrawSiteStashUniqueItemAction(
+  input: unknown,
+): Promise<SiteStashActionResult> {
+  return runSiteStashAction(
+    WithdrawSiteStashUniqueItemRequestSchema,
+    input,
+    "Invalid stash item withdrawal command.",
+    (userId, request) => withdrawSiteStashUniqueItem(userId, request.characterId, request),
+  );
+}
+
+export async function installSiteStashContainerAction(
+  input: unknown,
+): Promise<SiteStashActionResult> {
+  return runSiteStashAction(
+    InstallSiteStashContainerRequestSchema,
+    input,
+    "Invalid stash container install command.",
+    (userId, request) => installSiteStashContainer(userId, request.characterId, request),
+  );
+}
+
+export async function removeSiteStashContainerAction(
+  input: unknown,
+): Promise<SiteStashActionResult> {
+  return runSiteStashAction(
+    RemoveSiteStashContainerRequestSchema,
+    input,
+    "Invalid stash container removal command.",
+    (userId, request) => removeSiteStashContainer(userId, request.characterId, request),
+  );
+}
+
+export async function swapSiteStashContainerAction(input: unknown): Promise<SiteStashActionResult> {
+  return runSiteStashAction(
+    SwapSiteStashContainerRequestSchema,
+    input,
+    "Invalid stash container swap command.",
+    (userId, request) => swapSiteStashContainer(userId, request.characterId, request),
+  );
 }
 
 export type LoadPowerCellActionResult = LoadPowerCellResult | { error: string };

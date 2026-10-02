@@ -393,6 +393,15 @@ export async function cleanupTestCharacter(db: Db, rune: Rune, characterId: stri
     await tx
       .delete(rune.characterMerchantDailyPurchases)
       .where(eq(rune.characterMerchantDailyPurchases.characterId, characterId));
+    // Site stash contents hang off the installed container, which in turn hangs
+    // off item_instances, so they go in dependency order before either (#284).
+    await tx
+      .delete(rune.siteStashItemInstances)
+      .where(eq(rune.siteStashItemInstances.characterId, characterId));
+    await tx.delete(rune.siteStashStacks).where(eq(rune.siteStashStacks.characterId, characterId));
+    await tx
+      .delete(rune.siteStashContainers)
+      .where(eq(rune.siteStashContainers.characterId, characterId));
     await tx
       .delete(rune.cargoHoldItemInstances)
       .where(eq(rune.cargoHoldItemInstances.characterId, characterId));

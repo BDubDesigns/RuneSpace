@@ -7,6 +7,39 @@ export type { PublicUpdate } from "@/game/schemas/public-updates";
 
 const authoredUpdates = [
   {
+    // Issue #284 — character-owned site stashes.
+    slug: "a-stash-of-your-own",
+    title: "A Stash of Your Own",
+    publishedAt: "2026-10-02T00:15:00-07:00",
+    summary:
+      "You can now build a stash mount at The Jag, Rusk Recovery, the Abandoned Processing Yard and Deep Jag, install any container you own, and keep your work-site materials right where you use them.",
+    body: [
+      "Hauling ore back to the ship and carrying inputs back out again is a lot of walking. Now four of your work sites can hold a stash of their own, so a mine can keep its ore and a bench can keep its parts.",
+      [
+        "It takes two steps. First you weld a mount down at the site — the standard materials-and-welding job, with Clean Pass as usual. Then you install a container you own and aren't wearing: your starting MYKEA, a Scrap Box, a Freight Harness, whichever you like. The stash gets exactly as many slots as that container has, and what you put in it has no weight limit. The full list of sites, materials and Welding levels is in ",
+        { text: "the Wiki", articleSlug: "cargo-hold-and-welding" },
+        ".",
+      ],
+      "A stash belongs to you and stays where you built it, so what you leave at The Jag is waiting at The Jag. You can only reach it while you're standing there. Nothing about it shows up at a site until you can build it: The Jag asks for Welding 1, Rusk Recovery and the Abandoned Processing Yard for Welding 5, and Deep Jag for Welding 8 once its passage has been braced open. You never need Mining, Refining or Fabrication levels of your own to build one — every material can be bought or traded for.",
+      "When you want a different container, you can swap in another kind without emptying the stash, as long as the new one has room for everything in it and the old one fits back in your Inventory. To take a container out altogether, empty the stash first.",
+    ],
+    patchNotes: [
+      {
+        heading: "Added",
+        items: [
+          "Stash Mounts at The Jag (Welding 1), Rusk Recovery and the Abandoned Processing Yard (Welding 5), and Deep Jag (Welding 8, after its passage is braced open).",
+          "Install Container, Stash, Swap Container and Remove Container at a built mount. Any container you own works, and a stash has as many slots as its container.",
+        ],
+      },
+      {
+        heading: "Changed",
+        items: [
+          "An installed container is not carried or worn, so it can't be traded, taken apart, or put in the Cargo Hold until you take it back out.",
+        ],
+      },
+    ],
+  },
+  {
     // Issue #286 — the desktop Play workspace.
     slug: "room-to-spread-out",
     title: "Room to Spread Out",

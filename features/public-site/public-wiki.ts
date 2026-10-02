@@ -505,7 +505,7 @@ const authoredWikiArticles = [
     title: "Cargo Hold & Welding",
     category: "work",
     summary:
-      "Repairing the ship's Cargo Hold, what it gives you once it's welded shut, and what else you can weld.",
+      "Repairing the ship's Cargo Hold, what it gives you once it's welded shut, what else you can weld, and the stashes you can build at your work sites.",
     sections: [
       {
         paragraphs: [
@@ -568,6 +568,46 @@ const authoredWikiArticles = [
             { text: "Work Orders", articleSlug: "work-orders" },
             " run on the same Workbench and the same welding, for real client jobs and Credits rather than practice.",
           ],
+        ],
+      },
+      {
+        heading: "Site stashes",
+        paragraphs: [
+          "A few of your work sites let you build a stash of your own: somewhere to leave what you were about to carry back and forth. It takes two separate things — a mount welded down at the site, then a container you install in it. Carrying a container to a site never gives you free storage by itself.",
+          "You build one mount per site, and it is yours alone. Each site asks for its own Welding level, and nothing else: you never need Mining, Refining or Fabrication levels of your own to build one, and every material can be bought or traded for. Nothing about a stash shows up at a site until you are able to build it.",
+        ],
+        list: [
+          "The Jag — Welding 1. 6 Refined Ferrite and 3 Slag, six welding passes.",
+          "Rusk Recovery — Welding 5. 3 Galvanic Stock and 2 Mounting Brackets, ten welding passes.",
+          "Abandoned Processing Yard — Welding 5. The same 3 Galvanic Stock and 2 Mounting Brackets, ten welding passes.",
+          "Deep Jag — Welding 8, and only once the collapsed passage has been braced open. 2 Galvaferrite, 2 Mounting Brackets and 1 Galvanic Stock, fifteen welding passes.",
+        ],
+      },
+      {
+        heading: "Building a mount, then installing a container",
+        paragraphs: [
+          [
+            "You build a mount the same way as any other welding job: install the materials, then weld it in passes of about three seconds each. Every pass pays the usual Welding XP, and ",
+            { text: "Clean Pass", articleSlug: "cargo-hold-and-welding" },
+            " works as it always does. There is no bonus for finishing. Once it is built, it stays built.",
+          ],
+          [
+            "To use a built mount, install a ",
+            { text: "container", articleSlug: "inventory-and-equipment" },
+            " you are carrying and are not wearing. Any container works — your starting MYKEA, a Scrap Box or a Freight Harness — and the stash gets exactly as many slots as that container has. Items stored there have no weight limit. The container leaves your Inventory while it is installed, so it stops giving you carrying slots until you take it back out.",
+          ],
+        ],
+      },
+      {
+        heading: "Using a stash",
+        paragraphs: [
+          "You can put things in and take things out only while you are standing at that site, and what you leave there stays there: it does not follow you to another site or to the Cargo Hold. Each site has a separate stash, and every character has their own. You have to stop whatever you are doing to use one, the same as the Cargo Hold.",
+          "Stored items keep their identity, so a Cutter keeps its charge. Moving things back follows the same rules as everything else: whatever you take out has to fit your carried slots and weight.",
+        ],
+        list: [
+          "Remove Container — only when the stash is completely empty. The container comes back to your Inventory, if it fits.",
+          "Swap Container — replace the container with a different kind, without emptying the stash. The new one needs enough slots for everything stored there, and the old one has to fit in your Inventory afterwards, weight included. Swapping for another of the same kind is not allowed. Everything stored stays where it is.",
+          "An installed container cannot be traded, worn, taken apart, or stored in the Cargo Hold while it is installed.",
         ],
       },
       {
@@ -1192,7 +1232,7 @@ const authoredWikiArticles = [
         list: [
           "Mining — a successful Mining attempt at The Jag grants Mining XP.",
           "Refining — a Refining attempt at the Abandoned Processing Yard grants Refining XP, whether it succeeds or not.",
-          "Welding — each completed welding pass grants Welding XP, whether you are repairing the Cargo Hold, repairing the Crew Stop, or practising at Wade's workbench. A practice pass pays a reduced share, because nothing is actually being repaired.",
+          "Welding — each completed welding pass grants Welding XP, whether you are repairing the Cargo Hold, repairing the Crew Stop, building a Stash Mount, or practising at Wade's workbench. A practice pass pays a reduced share, because nothing is actually being repaired.",
           [
             "Fabrication — each finished piece at the ",
             { text: "Fabrication Station", articleSlug: "fabrication-and-tinkering" },

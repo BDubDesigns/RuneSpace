@@ -24,10 +24,21 @@ export function validateRepairTargets(
         `${where} references Local Place "${target.localPlaceId}", which does not belong to "${target.locationId}".`,
       );
     }
-    if (!knownMissionIds.has(target.authorizingMissionId)) {
-      throw new Error(
-        `${where} is authorized by unknown mission "${target.authorizingMissionId}".`,
-      );
+    const { authorization } = target;
+    if (authorization.kind === "mission") {
+      if (!knownMissionIds.has(authorization.missionId)) {
+        throw new Error(`${where} is authorized by unknown mission "${authorization.missionId}".`);
+      }
+    } else {
+      if (!Number.isInteger(authorization.level) || authorization.level < 1) {
+        throw new Error(`${where} has an invalid Welding level gate ${authorization.level}.`);
+      }
+      const prerequisite = authorization.requiresCompletedTargetId;
+      if (prerequisite !== undefined) {
+        if (prerequisite === target.id || !targets.some((other) => other.id === prerequisite)) {
+          throw new Error(`${where} requires unknown or self repair target "${prerequisite}".`);
+        }
+      }
     }
     // Throws when the balance registry authors no recipe for this target.
     const recipe = getRepairTargetBalance(target.id);

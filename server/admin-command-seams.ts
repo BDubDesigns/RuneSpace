@@ -10,6 +10,7 @@ import {
   itemInstances,
   playerAccounts,
   runespaceAccessState,
+  siteStashItemInstances,
 } from "@/db/rune-space";
 import {
   getEffectiveGameBalance,
@@ -59,6 +60,7 @@ import {
   addStackableItem,
   loadOwnedItemInstances,
   removeFromSelectedStack,
+  siteStashPlacementOf,
 } from "@/server/carried-inventory";
 import type { ActiveAction, Character } from "@/db/rune-space";
 
@@ -512,7 +514,7 @@ export type AdminDeleteItemOutcome =
   | {
       kind: "deleted";
       itemInstanceId: string;
-      source: "carried" | "cargo";
+      source: "carried" | "cargo" | "site_stash";
       itemId: string;
     }
   | { kind: "refused"; message: string };
@@ -571,6 +573,29 @@ export async function deleteUniqueItemAsAdmin(
             message: "Item is equipped. Force Unequip it before deleting the unique item.",
           },
         };
+      // A site stash (#284) is a third place a unique item can sit. A stored
+      // item is deleted the way a Cargo one is; an installed container cannot
+      // be, because its mount's contents hang off it.
+      const stashPlacement = await siteStashPlacementOf(transaction, character.id, itemInstanceId);
+      if (stashPlacement?.kind === "installed")
+        return {
+          state: await refreshedState(transaction, character.id, now),
+          outcome: {
+            kind: "refused",
+            message:
+              "Item is the installed container of a site stash. Empty and remove it from the stash first.",
+          },
+        };
+      if (stashPlacement?.kind === "stored") {
+        await transaction
+          .delete(siteStashItemInstances)
+          .where(
+            and(
+              eq(siteStashItemInstances.characterId, character.id),
+              eq(siteStashItemInstances.itemInstanceId, itemInstanceId),
+            ),
+          );
+      }
       if (cargo) {
         await transaction
           .delete(cargoHoldItemInstances)
@@ -581,6 +606,7 @@ export async function deleteUniqueItemAsAdmin(
             ),
           );
       }
+      const deletedSource = stashPlacement ? "site_stash" : cargo ? "cargo" : "carried";
       await transaction
         .delete(itemInstances)
         .where(
@@ -591,14 +617,14 @@ export async function deleteUniqueItemAsAdmin(
         target: { kind: "character", characterId: character.id },
         operation: "removed_unique_item",
         targetIdentity: itemInstanceId,
-        details: { source: cargo ? "cargo" : "carried", itemId: instance.itemId },
+        details: { source: deletedSource, itemId: instance.itemId },
       });
       return {
         state: await refreshedState(transaction, character.id, now),
         outcome: {
           kind: "deleted",
           itemInstanceId,
-          source: cargo ? "cargo" : "carried",
+          source: deletedSource,
           itemId: instance.itemId,
         },
       };
