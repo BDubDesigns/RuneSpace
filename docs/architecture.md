@@ -204,7 +204,8 @@ includes the roughly 1024px laptop width (no cramped forced dock).
   `MissionGuidanceStrips` for the rail: nothing at all with no accepted
   Mission, a height cap that scrolls inside itself, and a collapse control when
   there are several (collapsing unmounts the strips). The Map control is a
-  Play-only button in the global top bar, left of News and Sign out, and opens the same `?surface=map` surface (there is no
+  Play-only Location | Map slide switch (`PlayViewSwitch`) in the global top bar,
+  left of News and Sign out, and opens the same `?surface=map` surface (there is no
   second Map), and while Map shows it is the one return control (the panel
   drops its own Back at desktop width); Map ↔ Location swaps only the main
   column.

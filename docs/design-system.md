@@ -48,12 +48,17 @@ column inside the existing `max-w-7xl` centred shell, and one compact row at the
 top of the main column. The bottom navigation and floating Chat launcher are not
 rendered at this width — they are replaced, not shrunk.
 
-- **Top bar, left of News and Sign out:** a **Map** control, styled as a peer of
-  them (the footer's Map destination, in a form that fits a header; Play-only,
-  not account navigation). It opens the existing Map surface and, while Map
-  shows, becomes the single "Back to Location" (or "Back to Journey") control;
-  the Map panel does not carry a second one. There is no separate Map row above
-  the location art, and the rail never holds it.
+- **Top bar, left of News and Sign out: the Location | Map switch.** A
+  two-position slide switch (`PlayViewSwitch`): a lit thumb rides a recessed
+  track with a scale along its lower edge, and the light fades out of the side it
+  leaves as it fades into the side it arrives at (instant under reduced motion).
+  Both destinations are always on screen and the labels never change — Location
+  (Journey, in transit) and Map; the current side is `aria-current`. Colour carries
+  no meaning here beyond the existing "active" cyan. It opens the existing Map
+  surface and, from the Map, the Location side is the single "Back to Location"
+  (or "Back to Journey") control, so the Map panel does not carry a second one.
+  Play-only, not account navigation. There is no separate Map row above the
+  location art, and the rail never holds it.
 - **Rail, upper part: Current Missions.** The same authoritative
   `MissionGuidanceStrips`, mounted once, in a region that renders nothing with
   no accepted Mission, caps its height (`min(24dvh, 12rem)`) and scrolls inside

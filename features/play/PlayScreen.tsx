@@ -16,7 +16,6 @@ import { PlayerTradeSurface } from "@/features/player-trade/PlayerTradeSurface";
 import { SocialLauncher } from "@/features/social/ChatSocialLauncher";
 import { SocialProvider } from "@/features/social/SocialContext";
 import { MissionObjectivesRegion } from "@/features/missions/MissionObjectivesRegion";
-import { mapReturnLabel } from "@/features/travel/LocalMapPanel";
 import { acknowledgeNewsAction } from "@/server/actions";
 import type { CharacterPortraitPresentation } from "@/game/domain/character-portrait";
 import type { PlayGameplayState } from "@/server/play";
@@ -24,6 +23,7 @@ import { PlayConsole } from "./PlayConsole";
 import { PlayProvider, usePlay } from "./PlayContext";
 import { FooterNavButton, FooterNavLink } from "./PlayFooterNav";
 import { PlayUtilityWorkspace } from "./PlayUtilityWorkspace";
+import { PlayViewSwitch } from "./PlayViewSwitch";
 import { useDesktopWorkspace } from "./workspace-presentation";
 
 function PlayFooter() {
@@ -148,45 +148,6 @@ function NewsControl({ unread }: { unread: boolean }) {
         ) : null}
       </ActionButton>
     </form>
-  );
-}
-
-/**
- * The Map control in Play's own top bar, left of News and Sign out, styled as a
- * peer of them (#286); the phone's is the footer's Map destination. It opens the
- * same route-backed Map surface — there is no second Map — and while Map is
- * showing it is the way back to the Location (or the Journey, in transit), with
- * the wording and the `router.replace` the panel's own Back control has on a
- * phone. It stays available in transit, as the footer's does. It is a Play-only
- * header action, not account navigation, and is hidden below desktop width.
- */
-function PlayMapControl({ mapActive, onMapExit }: { mapActive: boolean; onMapExit: () => void }) {
-  const pathname = usePathname();
-  const { state } = usePlay();
-  if (mapActive) {
-    return (
-      <ActionButton
-        className="px-3"
-        data-map-return=""
-        intent="secondary"
-        onClick={onMapExit}
-        type="button"
-      >
-        {mapReturnLabel(Boolean(state.travelState))}
-      </ActionButton>
-    );
-  }
-  return (
-    <ActionLink
-      aria-label="Map"
-      className="gap-2 px-3"
-      data-map-open=""
-      href={`${pathname}?surface=map`}
-      intent="secondary"
-    >
-      <MapIcon aria-hidden="true" className="h-4 w-4" />
-      Map
-    </ActionLink>
   );
 }
 
@@ -317,7 +278,11 @@ function PlayWorkspace({
                 <PlayTopBar
                   mapControl={
                     desktop === false ? undefined : (
-                      <PlayMapControl mapActive={mapActive} onMapExit={onMapExit} />
+                      <PlayViewSwitch
+                        inTransit={Boolean(state.travelState)}
+                        mapActive={mapActive}
+                        onMapExit={onMapExit}
+                      />
                     )
                   }
                   newsUnread={newsUnread}

@@ -694,3 +694,48 @@ test("a long docked General feed scrolls inside the rail and never lengthens the
   expect(scrolled.rail!.bottom - scrolled.rail!.top).toBeLessThanOrEqual(DESKTOP.height);
   await expect(page.locator("[data-chat-composer] textarea")).toBeInViewport();
 });
+
+test("the Location | Map switch keeps both sides mounted so its light can fade, and is instant under reduced motion", async ({
+  page,
+  testCharacter,
+}) => {
+  await openAt(page, testCharacter.id, DESKTOP);
+  await waitForDock(page);
+  const sw = page.locator("[data-view-switch]");
+  await expect(sw).toHaveAttribute("data-view-switch", "here");
+  await expect(page.locator("[data-view-here]")).toHaveAttribute("aria-current", "page");
+  const here = await page.locator("[data-view-here]").elementHandle();
+  const mapSide = await page.locator("[data-view-map]").elementHandle();
+  const thumb = page.locator("[data-view-switch-thumb]");
+  const thumbBefore = (await thumb.boundingBox())!.x;
+
+  const timing = (selector: string) =>
+    page.locator(selector).evaluate((el) => {
+      const style = getComputedStyle(el);
+      return { property: style.transitionProperty, duration: style.transitionDuration };
+    });
+  expect((await timing("[data-view-here]")).property).toContain("text-shadow");
+  expect((await timing("[data-view-here]")).duration).not.toBe("0s");
+  expect((await timing("[data-view-switch-thumb]")).property).toContain("transform");
+
+  await page.locator("[data-map-open]").click();
+  await expect(sw).toHaveAttribute("data-view-switch", "map");
+  // The thumb has moved to the Map side, and each side is the same element as
+  // before — only its classes changed — so the light faded rather than popped.
+  await expect.poll(async () => (await thumb.boundingBox())!.x).toBeGreaterThan(thumbBefore + 100);
+  expect(await page.locator("[data-view-here]").evaluate((el, h) => el === h, here)).toBe(true);
+  expect(await page.locator("[data-view-map]").evaluate((el, h) => el === h, mapSide)).toBe(true);
+  await expect(page.locator("[data-view-map]")).toHaveAttribute("aria-current", "page");
+  await expect(page.getByRole("button", { name: "Back to Location" })).toHaveCount(1);
+  // Pressing the current side does nothing.
+  await page.locator("[data-view-map]").click();
+  await expect(page).toHaveURL(/surface=map$/);
+
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  // The repo's reduced-motion rule makes durations effectively zero (1e-5s).
+  for (const selector of ["[data-view-here]", "[data-view-switch-thumb]"]) {
+    expect(Number.parseFloat((await timing(selector)).duration)).toBeLessThanOrEqual(0.001);
+  }
+  await page.getByRole("button", { name: "Back to Location" }).click();
+  await expect(sw).toHaveAttribute("data-view-switch", "here");
+});
