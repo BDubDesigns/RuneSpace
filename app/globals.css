@@ -625,6 +625,14 @@ body {
   bottom: calc(var(--rs-bottom-nav-box-height) + var(--rs-space-2));
 }
 
+/* At the docked desktop width (the same 1280px as `DESKTOP_WORKSPACE_MIN_WIDTH_PX`)
+   there is no bottom navigation to clear (#286). */
+@media (min-width: 1280px) {
+  .rs-map-destination-panel {
+    bottom: var(--rs-space-3);
+  }
+}
+
 @keyframes rs-map-scroll-affordance-breathe {
   0%,
   100% {

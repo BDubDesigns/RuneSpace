@@ -30,6 +30,7 @@ import {
   type ChatFeed,
   type LocalChatBudget,
 } from "./chat-feed";
+import { PUBLIC_CHAT_DRAFT_KEY } from "./chat-drafts";
 import { ChatComposer } from "./ChatComposer";
 import { useChat } from "./ChatContext";
 import { ChatMessageRow, MessageActionButton, RedactedChatMessageRow } from "./ChatMessageRow";
@@ -142,6 +143,7 @@ export function PublicChat({
   const { subscribe, onReconcile } = useSocial();
   const {
     blocksRevision,
+    drafts,
     inbox,
     mentions,
     refreshMentions,
@@ -156,14 +158,18 @@ export function PublicChat({
   const [budget, setBudget] = useState<LocalChatBudget>({ expiresAt: [] });
   const [adReadyAt, setAdReadyAt] = useState(0);
   const [adPrice, setAdPrice] = useState<number>(CHAT_POLICY.promotedAd.priceCredits);
-  const [draft, setDraft] = useState("");
-  const [promote, setPromote] = useState(false);
+  // The draft outlives this component: it unmounts whenever another desktop
+  // utility is selected or a Drawer closes (#286), and typing must survive.
+  const [draft, setDraft] = useState(() => drafts.read(PUBLIC_CHAT_DRAFT_KEY).text);
+  const [promote, setPromote] = useState(() => drafts.read(PUBLIC_CHAT_DRAFT_KEY).promote);
   const [sending, setSending] = useState(false);
   const [feedback, setFeedback] = useState<SafetyOutcome>();
   const [actionsFor, setActionsFor] = useState<string>();
   const [safety, setSafety] = useState<SafetyAction>();
   const [now, setNow] = useState(() => Date.now());
-  const [chosenMentions, setChosenMentions] = useState<MentionCandidate[]>([]);
+  const [chosenMentions, setChosenMentions] = useState<MentionCandidate[]>(
+    () => drafts.read(PUBLIC_CHAT_DRAFT_KEY).mentions,
+  );
   const [nearby, setNearby] = useState<MentionCandidate[]>([]);
   const nearbyReadAt = useRef(0);
   const feedsRef = useRef(feeds);
@@ -354,6 +360,9 @@ export function PublicChat({
     setChosenMentions((chosen) => mentionsShown(next, chosen));
   }, []);
   const mentionLimitReached = atMentionLimit(draft, chosenMentions);
+  useEffect(() => {
+    drafts.write(PUBLIC_CHAT_DRAFT_KEY, { text: draft, mentions: chosenMentions, promote });
+  }, [chosenMentions, draft, drafts, promote]);
 
   const loadNearby = useCallback(() => {
     const at = Date.now();
@@ -471,7 +480,7 @@ export function PublicChat({
   const label = CHANNEL_LABEL[channel];
 
   return (
-    <div className="space-y-3" data-public-chat="">
+    <div className="flex flex-1 flex-col gap-3" data-public-chat="">
       {/* The log scrolls inside the Chat/Social panel, which scrolls too. It
           deliberately keeps the browser's default scroll chaining: once the
           log is at its end, the same swipe moves the panel, so with a pinned
@@ -480,7 +489,7 @@ export function PublicChat({
           (#248). */}
       <div
         aria-label={`${label} messages`}
-        className="h-[min(38dvh,22rem)] overflow-y-auto border border-[color:var(--rs-border-subtle)] bg-[color:var(--rs-surface-panel)] p-2"
+        className="h-[min(38dvh,22rem)] overflow-y-auto border border-[color:var(--rs-border-subtle)] bg-[color:var(--rs-surface-panel)] p-2 [[data-docked-utility]_&]:min-h-[7rem] [[data-docked-utility]_&]:grow [[data-docked-utility]_&]:basis-[7rem]"
         data-chat-log={channel}
         onScroll={(event) => {
           const log = event.currentTarget;

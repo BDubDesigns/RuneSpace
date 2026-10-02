@@ -189,10 +189,11 @@ describe("client play shell ownership (#127)", () => {
     const { existsSync } = require("node:fs");
     expect(existsSync("features/mining/InventoryPanel.tsx")).toBe(false);
     expect(existsSync("features/mining/EquipmentPanel.tsx")).toBe(false);
-    // PlayConsole composes the generic Inventory/Equipment drawers, not Mining.
-    const playConsole = readFileSync("features/play/PlayConsole.tsx", "utf8");
+    // The Play utility workspace (#286) composes the generic Inventory/Equipment
+    // panel, docked or modal, not Mining; PlayConsole no longer mounts it.
+    const workspace = readFileSync("features/play/PlayUtilityWorkspace.tsx", "utf8");
     const sharedPanel = readFileSync("features/inventory/InventoryEquipmentPanel.tsx", "utf8");
     expect(sharedPanel).toContain("export function InventoryEquipmentPanel");
-    expect(playConsole).toContain('from "@/features/inventory/InventoryEquipmentPanel"');
+    expect(workspace).toContain('from "@/features/inventory/InventoryEquipmentPanel"');
   });
 });

@@ -23,14 +23,17 @@ import {
   readAcknowledgedNotices,
 } from "@/features/moderation/notice-acknowledgement";
 import { SocialNoticeCard } from "@/features/moderation/SocialNoticeCard";
+import { createChatDraftStore, type ChatDraftStore } from "./chat-drafts";
 import { useSocial } from "@/features/social/SocialContext";
 import { openWhisperAction } from "@/server/actions";
 
 /**
- * Chat state that outlives the Chat/Social Drawer (issue #247). The Drawer
- * unmounts when closed, so this provider — mounted for the whole Play tab —
- * keeps what must stay live while it is closed:
+ * Chat state that outlives the Chat/Social surface (issue #247). The surface
+ * unmounts when its Drawer closes or another desktop utility is selected (#286),
+ * so this provider — mounted for the whole Play tab — keeps what must stay live
+ * while it is gone:
  *
+ * - unsent composer drafts (#286), so switching utility never loses typing;
  * - the Drawer's current view (channel tab, open Whisper conversation, or the
  *   Blocked Players list), so a character-facing surface can open a Whisper
  *   inside Chat/Social without navigating;
@@ -70,6 +73,8 @@ export type ChatView =
 
 type ChatContextValue = {
   characterId: string;
+  /** Unsent composer text, kept across the Chat surface unmounting (#286). */
+  drafts: ChatDraftStore;
   view: ChatView;
   setView: (view: ChatView) => void;
   inbox: WhisperInbox | undefined;
@@ -200,8 +205,16 @@ export function ChatProvider({
   const router = useRouter();
   const routerRef = useRef(router);
   routerRef.current = router;
-  const { open, openSocial, onReconcile, removeCard, setAttention, subscribe, upsertCard } =
-    useSocial();
+  const {
+    surfaceVisible,
+    openSocial,
+    onReconcile,
+    removeCard,
+    setAttention,
+    subscribe,
+    upsertCard,
+  } = useSocial();
+  const [drafts] = useState(createChatDraftStore);
   const [view, setView] = useState<ChatView>({ tab: "general" });
   const [inbox, setInbox] = useState<WhisperInbox>();
   const [system, setSystem] = useState<SystemNoticeInbox>();
@@ -303,17 +316,18 @@ export function ChatProvider({
     noticeCardKeys.current = keys;
   }, [notices, seenNotices]);
 
-  // Opening Chat/Social presents every current notice at the top of the
-  // panel, so each one has now been seen on this device. Whisper unread is a
-  // separate source and is untouched.
+  // Showing Chat/Social — in the Drawer or docked on desktop — presents every
+  // current notice at the top of the panel, so each one has now been seen on
+  // this device. Whisper unread is a separate source and is untouched. A
+  // passive desktop home counts only once the Chat surface is really mounted.
   useEffect(() => {
-    if (!open) return;
+    if (!surfaceVisible) return;
     const unseen = notices
       .filter((notice) => notice.current)
       .map(noticeAcknowledgementKey)
       .filter((key) => !seenNotices.has(key));
     if (unseen.length > 0) setSeenNotices(acknowledgeNotices(seenNotices, unseen));
-  }, [notices, open, seenNotices]);
+  }, [notices, seenNotices, surfaceVisible]);
 
   useEffect(
     () =>
@@ -388,6 +402,7 @@ export function ChatProvider({
   const value = useMemo<ChatContextValue>(
     () => ({
       characterId,
+      drafts,
       view,
       setView,
       inbox,
@@ -407,6 +422,7 @@ export function ChatProvider({
       blocksChanged,
       blocksRevision,
       characterId,
+      drafts,
       inbox,
       mentions,
       refreshInbox,

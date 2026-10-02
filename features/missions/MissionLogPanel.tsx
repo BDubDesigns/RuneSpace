@@ -1,7 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import { Drawer } from "@/components/ui/Drawer";
+import {
+  UtilitySurface,
+  type DockedUtilityRegion,
+  type UtilityPresentation,
+} from "@/components/ui/UtilitySurface";
 import { Feedback } from "@/components/ui/Feedback";
 import type { MissionProjection } from "@/game/domain/missions";
 import type { PlayGameplayState } from "@/server/play";
@@ -167,11 +171,15 @@ export function MissionLogPanel({
   focusedMissionId,
   onClose,
   triggerRef,
+  presentation = "modal",
+  docked,
 }: {
   state: PlayGameplayState;
   focusedMissionId?: string;
   onClose: () => void;
   triggerRef: React.RefObject<HTMLButtonElement | null>;
+  presentation?: UtilityPresentation;
+  docked?: DockedUtilityRegion;
 }) {
   const active = state.missions.filter(
     (mission) => mission.state === "active" || mission.state === "ready_for_completion",
@@ -189,10 +197,12 @@ export function MissionLogPanel({
   }
 
   return (
-    <Drawer
+    <UtilitySurface
+      docked={docked}
       eyebrow="Mission record"
       label="Mission Log"
       onClose={onClose}
+      presentation={presentation}
       title="Mission Log"
       triggerRef={triggerRef}
     >
@@ -256,6 +266,6 @@ export function MissionLogPanel({
           ) : null}
         </section>
       </div>
-    </Drawer>
+    </UtilitySurface>
   );
 }

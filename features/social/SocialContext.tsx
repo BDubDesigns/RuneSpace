@@ -41,8 +41,14 @@ import {
  * - `upsertCard` / `removeCard` — the pinned actionable-card region;
  * - `setAttention(source, count)` — the launcher's attention state.
  *
- * Open/closed state lives here, not in any launcher, so a later docked desktop
- * presentation can render the same surface without the floating button.
+ * Open/closed state lives here, not in any launcher, so the docked desktop
+ * presentation (#286) renders the same surface without the floating button.
+ * `open` is the logical open intent — the modal Drawer on a phone, an explicit
+ * selection in the desktop dock — and Play may own it (`open` + `onOpenChange`)
+ * so Chat and the other utilities share one single-open rule. `surfaceVisible`
+ * is the separate fact that the Chat surface is actually mounted on screen,
+ * docked or modal, which is what "the player has seen this" decisions need: a
+ * passive desktop home shows Chat without any open intent.
  * Nothing here is gameplay authority, and it never drives Play's own bounded
  * refresh.
  */
@@ -53,6 +59,9 @@ type ReconcileHandler = (reason: ReconcileReason) => void;
 type SocialContextValue = {
   status: RealtimeStatus;
   open: boolean;
+  /** The Chat surface is mounted on screen, docked or in the Drawer. */
+  surfaceVisible: boolean;
+  setSurfaceVisible: (visible: boolean) => void;
   openSocial: () => void;
   closeSocial: () => void;
   launcherRef: RefObject<HTMLButtonElement | null>;
@@ -73,16 +82,33 @@ const SocialContext = createContext<SocialContextValue | undefined>(undefined);
 export function SocialProvider({
   characterId,
   children,
+  open: controlledOpen,
+  onOpenChange,
 }: {
   characterId: string;
   children: ReactNode;
+  /** When supplied, the open intent is owned by the caller (Play's utility workspace). */
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
 }) {
   const router = useRouter();
   // Read through a ref so a new router object never tears down the stream.
   const routerRef = useRef(router);
   routerRef.current = router;
   const [status, setStatus] = useState<RealtimeStatus>("connecting");
-  const [open, setOpen] = useState(false);
+  const [ownOpen, setOwnOpen] = useState(false);
+  const [surfaceVisible, setSurfaceVisible] = useState(false);
+  const open = controlledOpen ?? ownOpen;
+  // Read through a ref so a new callback identity never rebuilds the context.
+  const onOpenChangeRef = useRef(onOpenChange);
+  onOpenChangeRef.current = onOpenChange;
+  const setOpen = useCallback(
+    (next: boolean) => {
+      if (controlledOpen === undefined) setOwnOpen(next);
+      onOpenChangeRef.current?.(next);
+    },
+    [controlledOpen],
+  );
   const [shell, dispatch] = useReducer(socialShellReducer, INITIAL_SOCIAL_SHELL_STATE);
   const launcherRef = useRef<HTMLButtonElement>(null);
   const deliveryHandlers = useRef(new Map<string, Set<DeliveryHandler>>());
@@ -151,6 +177,8 @@ export function SocialProvider({
     () => ({
       status,
       open,
+      surfaceVisible,
+      setSurfaceVisible,
       openSocial: () => setOpen(true),
       closeSocial: () => setOpen(false),
       launcherRef,
@@ -162,7 +190,7 @@ export function SocialProvider({
       subscribe,
       onReconcile,
     }),
-    [onReconcile, open, shell, status, subscribe],
+    [onReconcile, open, setOpen, shell, status, subscribe, surfaceVisible],
   );
 
   return <SocialContext.Provider value={value}>{children}</SocialContext.Provider>;

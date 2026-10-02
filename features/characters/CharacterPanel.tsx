@@ -2,7 +2,11 @@
 
 import type { RefObject } from "react";
 import { ActionLink } from "@/components/ui/ActionLink";
-import { Drawer } from "@/components/ui/Drawer";
+import {
+  UtilitySurface,
+  type DockedUtilityRegion,
+  type UtilityPresentation,
+} from "@/components/ui/UtilitySurface";
 import { CharacterPortrait } from "@/components/portraits/CharacterPortrait";
 import { CharacterSkillList } from "@/features/shared/CharacterSkillList";
 import type { CharacterPortraitPresentation } from "@/game/domain/character-portrait";
@@ -11,9 +15,11 @@ import type { PlayGameplayState } from "@/server/play";
 /**
  * The current character's profile and progression (#213).
  *
- * A sibling of Inventory, not a page: it is the same shared `Drawer` overlay,
- * so near-full-screen mobile sizing, scrolling, the backdrop, Escape, focus
- * capture and focus return are the ones every RuneSpace overlay already has.
+ * A sibling of Inventory, not a page: below the desktop breakpoint it is the
+ * same shared `Drawer` overlay, so near-full-screen mobile sizing, scrolling,
+ * the backdrop, Escape, focus capture and focus return are the ones every
+ * RuneSpace overlay already has; at desktop width the same content is docked
+ * (#286) through `UtilitySurface`.
  *
  * Everything shown is server-authoritative projection. The Character Level and
  * the skill list come from `state.progression`, which is the same canonical
@@ -37,18 +43,24 @@ export function CharacterPanel({
   state,
   onClose,
   triggerRef,
+  presentation = "modal",
+  docked,
 }: {
   characterName: string;
   portrait: CharacterPortraitPresentation;
   state: PlayGameplayState;
   onClose: () => void;
   triggerRef: RefObject<HTMLButtonElement | null>;
+  presentation?: UtilityPresentation;
+  docked?: DockedUtilityRegion;
 }) {
   return (
-    <Drawer
+    <UtilitySurface
+      docked={docked}
       eyebrow="Current character"
       label="Character"
       onClose={onClose}
+      presentation={presentation}
       title="Character"
       triggerRef={triggerRef}
     >
@@ -85,6 +97,6 @@ export function CharacterPanel({
           Switch Character
         </ActionLink>
       </div>
-    </Drawer>
+    </UtilitySurface>
   );
 }

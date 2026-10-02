@@ -1,7 +1,11 @@
 "use client";
 
 import type { RefObject } from "react";
-import { Drawer } from "@/components/ui/Drawer";
+import {
+  UtilitySurface,
+  type DockedUtilityRegion,
+  type UtilityPresentation,
+} from "@/components/ui/UtilitySurface";
 import type { PlayGameplayState } from "@/server/play";
 import { usePlay } from "@/features/play/PlayContext";
 import { EquipmentPanel } from "./EquipmentPanel";
@@ -11,19 +15,25 @@ export function InventoryEquipmentPanel({
   state,
   onClose,
   triggerRef,
+  presentation = "modal",
+  docked,
 }: {
   state: PlayGameplayState;
   onClose: () => void;
   triggerRef: RefObject<HTMLButtonElement | null>;
+  presentation?: UtilityPresentation;
+  docked?: DockedUtilityRegion;
 }) {
   const { inventoryTab, setInventoryTab } = usePlay();
   const inventorySelected = inventoryTab === "inventory";
 
   return (
-    <Drawer
+    <UtilitySurface
+      docked={docked}
       eyebrow="MYKEA SCHLEPPRAUM-8"
       label={inventorySelected ? "Inventory" : "Equipment"}
       onClose={onClose}
+      presentation={presentation}
       title={inventorySelected ? "Inventory" : "Equipment"}
       triggerRef={triggerRef}
     >
@@ -69,6 +79,6 @@ export function InventoryEquipmentPanel({
           <EquipmentPanel embedded onClose={onClose} state={state} triggerRef={triggerRef} />
         )}
       </div>
-    </Drawer>
+    </UtilitySurface>
   );
 }

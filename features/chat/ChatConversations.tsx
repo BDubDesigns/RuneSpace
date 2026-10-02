@@ -27,7 +27,7 @@ export function ChatConversations({ characterId }: { characterId: string }) {
     whispers: whispersTabUnread,
   };
   return (
-    <div className="space-y-3">
+    <div className="flex flex-1 flex-col gap-3">
       <div
         aria-label="Chat channels"
         className="grid grid-cols-3 gap-1 border-b border-[color:var(--rs-border-structural)] pb-1"
@@ -72,7 +72,12 @@ export function ChatConversations({ characterId }: { characterId: string }) {
           );
         })}
       </div>
-      <div aria-labelledby={`chat-tab-${view.tab}`} id="chat-panel" role="tabpanel">
+      <div
+        aria-labelledby={`chat-tab-${view.tab}`}
+        className="flex flex-1 flex-col"
+        id="chat-panel"
+        role="tabpanel"
+      >
         {view.tab === "whispers" ? (
           <WhisperPanel />
         ) : (
