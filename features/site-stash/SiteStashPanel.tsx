@@ -1,8 +1,9 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useId, useRef, useState, useTransition } from "react";
 import { ActionButton } from "@/components/ui/ActionButton";
 import { Feedback } from "@/components/ui/Feedback";
+import { getRepairTargetBalance } from "@/game/config/balance";
 import { ActivityPanel } from "@/features/shared/ActivityPanel";
 import { usePlay } from "@/features/play/PlayContext";
 import {
@@ -15,6 +16,7 @@ import {
   type StorageTransferAdapter,
   type StorageTransferHooks,
 } from "@/features/storage/StorageTransferSurface";
+import { summarizeSiteStash } from "@/features/site-stash/site-stash-summary";
 import { RepairWorkPanel } from "@/features/welding/RepairWorkPanel";
 import {
   depositSiteStashStackAction,
@@ -38,8 +40,11 @@ import type { SiteStashContainerState, SiteStashState } from "@/server/play";
  * stages of one thing: Build Stash Mount (the ordinary repair/Welding panel),
  * Install Container, and the built stash with the shared storage surface.
  *
- * Nothing here is authority. Which containers are offered, which swaps would
- * succeed and whether Remove is enabled all arrive pre-decided in the
+ * A stash is secondary to the site's own activity, so it is a compact
+ * disclosure that sits below that activity and starts collapsed. The bar
+ * always says the stage and the progress that matters; the full detail opens on
+ * demand. Nothing here is authority. Which containers are offered, which swaps
+ * would succeed and whether Remove is enabled all arrive pre-decided in the
  * projection, and every command re-proves location, ownership, mount and
  * capacity on the server.
  */
@@ -47,18 +52,103 @@ export function SiteStashPanel() {
   const { state } = usePlay();
   const stash = state.siteStash;
   if (!stash || state.travelState) return null;
-  if (!stash.mountBuilt) {
-    return (
-      <RepairWorkPanel
-        key={stash.repair.targetId}
-        materialsPrompt="A permanent mount for a stash container, welded down at this site. Hand over the material you are carrying and bring the rest when you come back."
-        targetId={stash.repair.targetId}
-        title="Build Stash Mount"
-        weldingPrompt="Everything is on hand. What is left is welding the mount down."
-      />
-    );
-  }
-  return <BuiltStash stash={stash} />;
+  // Keyed by site, so moving between two sites never carries one's disclosure
+  // state over to the other.
+  return <SiteStashDisclosure key={stash.locationId} stash={stash} />;
+}
+
+const COMPLETION_NOTICE_DURATION_MS = 3_600;
+
+function SiteStashDisclosure({ stash }: { stash: SiteStashState }) {
+  const { state } = usePlay();
+  const regionId = useId();
+  const [expanded, setExpanded] = useState(false);
+  const [noticeVisible, setNoticeVisible] = useState(false);
+  const [announcement, setAnnouncement] = useState("");
+  const previousBuilt = useRef(stash.mountBuilt);
+  const summary = summarizeSiteStash(stash);
+  const mountAction = getRepairTargetBalance(stash.repair.targetId).actionId;
+  // The mount's own Welding is running: its Stop control and its time-sensitive
+  // Clean Pass must never be hidden behind a collapsed bar.
+  const welding = !stash.mountBuilt && state.activeAction?.actionId === mountAction;
+
+  // Welding brings the detail open and it stays open afterwards, so pressing
+  // Stop does not make the panel the player was just using vanish.
+  useEffect(() => {
+    if (welding) setExpanded(true);
+  }, [welding]);
+
+  // The construction panel unmounts the moment the mount is built, taking its
+  // local completion feedback with it, so the completion is announced here, and
+  // the detail folds back to the compact bar the finished stash lives in.
+  useEffect(() => {
+    const wasBuilt = previousBuilt.current;
+    previousBuilt.current = stash.mountBuilt;
+    if (wasBuilt || !stash.mountBuilt) return;
+    setExpanded(false);
+    setNoticeVisible(true);
+    setAnnouncement("Stash Mount built. Install a container to start using it.");
+    const timer = window.setTimeout(() => setNoticeVisible(false), COMPLETION_NOTICE_DURATION_MS);
+    return () => window.clearTimeout(timer);
+  }, [stash.mountBuilt]);
+
+  const open = expanded || welding;
+
+  return (
+    <section data-site-stash-disclosure={stash.locationId} data-stash-stage={summary.stage}>
+      <p aria-live="polite" className="sr-only" data-site-stash-announcement>
+        {announcement}
+      </p>
+      <button
+        aria-controls={regionId}
+        aria-expanded={open}
+        className="rs-focus flex min-h-[var(--rs-touch-target)] w-full flex-wrap items-baseline justify-between gap-x-3 gap-y-1 border border-[color:var(--rs-border-structural)] bg-[color:var(--rs-surface-panel)] px-3 py-2 text-left disabled:cursor-not-allowed disabled:opacity-70"
+        data-site-stash-toggle
+        disabled={welding}
+        onClick={() => setExpanded((current) => !current)}
+        type="button"
+      >
+        <span className="font-display text-sm font-bold uppercase tracking-[0.16em] text-[color:var(--rs-text-primary)]">
+          {summary.label}
+        </span>
+        <span
+          className="min-w-0 flex-1 text-sm text-[color:var(--rs-text-secondary)]"
+          data-site-stash-summary
+        >
+          {summary.detail}
+        </span>
+        <span
+          aria-hidden="true"
+          className="font-display text-xs uppercase tracking-wide text-[color:var(--rs-accent-primary)]"
+        >
+          {welding ? "Welding" : open ? "Hide" : "Show"}
+        </span>
+      </button>
+      {noticeVisible ? (
+        <p
+          className="rs-result-feedback-success mt-2 border border-[color:var(--rs-accent-success)] bg-[color:var(--rs-surface-panel)] p-3 font-display text-sm uppercase tracking-wide"
+          data-site-stash-notice
+        >
+          Stash Mount built — install a container to start using it.
+        </p>
+      ) : null}
+      <div className="mt-2" hidden={!open} id={regionId}>
+        {open ? (
+          stash.mountBuilt ? (
+            <BuiltStash stash={stash} />
+          ) : (
+            <RepairWorkPanel
+              key={stash.repair.targetId}
+              materialsPrompt="A permanent mount for a stash container, welded down at this site. Hand over the material you are carrying and bring the rest when you come back."
+              targetId={stash.repair.targetId}
+              title="Build Stash Mount"
+              weldingPrompt="Everything is on hand. What is left is welding the mount down."
+            />
+          )
+        ) : null}
+      </div>
+    </section>
+  );
 }
 
 function BuiltStash({ stash }: { stash: SiteStashState }) {

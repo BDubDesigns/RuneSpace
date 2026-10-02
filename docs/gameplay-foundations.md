@@ -661,6 +661,18 @@ control. Once qualified the standard `RepairWorkPanel` builds the mount; then
 **Install Container**; then **Stash** (the shared surface) with **Swap
 Container** and **Remove Container**.
 
+A stash is secondary to the site's own activity, so it renders as a compact
+disclosure bar (`features/site-stash/SiteStashPanel`) **below** that activity,
+collapsed by default. The bar states the stage and the progress that matters
+(`summarizeSiteStash`): required material counts and welds while building, then
+the installed container and its used/total slots. The full detail opens on
+demand and is a real `aria-expanded` button. While that mount's own Welding is
+running the detail is held open and the bar cannot be collapsed, so Stop and the
+time-sensitive Clean Pass are never hidden; it stays open after Stop. When the
+mount completes, the wrapper (not the unmounting construction panel) announces
+it, folds back to the bar, and the bar then asks for a container. `RepairWorkPanel`
+itself is unchanged.
+
 ### Container authority and lifecycle
 
 Installed capacity is exactly the container item's authored equipped slot count
