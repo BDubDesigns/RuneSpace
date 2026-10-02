@@ -1,7 +1,14 @@
 "use client";
 
 import { Backpack, MessagesSquare, ScrollText, User } from "lucide-react";
-import { useLayoutEffect, useRef, type KeyboardEvent, type ReactNode, type RefObject } from "react";
+import {
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  type KeyboardEvent,
+  type ReactNode,
+  type RefObject,
+} from "react";
 import { ActionButton } from "@/components/ui/ActionButton";
 import type { DockedUtilityRegion, UtilityPresentation } from "@/components/ui/UtilitySurface";
 import { CharacterPanel } from "@/features/characters/CharacterPanel";
@@ -110,7 +117,7 @@ function UtilityTabs({
               : label;
         return (
           <button
-            aria-controls={PANEL_ID}
+            aria-controls={selected ? PANEL_ID : undefined}
             aria-label={accessibleName}
             aria-selected={selected}
             className={`rs-bevel rs-focus relative flex min-h-[var(--rs-touch-target)] flex-col items-center justify-center gap-0.5 border px-1 py-1 text-center outline-none transition duration-[var(--rs-duration-fast)] ${
@@ -215,6 +222,15 @@ export function PlayUtilityWorkspace({
     if ((crossed || openedElsewhere) && openUtilityId) tabRefs[openUtilityId].current?.focus();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [desktop, openUtilityId]);
+
+  // The dock already shows the home, so an open intent naming the home — an
+  // in-Chat action such as starting a Whisper while Chat is the home, or the
+  // Equipment shortcut while Inventory is — adds nothing a phone would have to
+  // honour. Settling it to the passive home keeps a later shrink from raising a
+  // modal the player never asked for, just as choosing the home tab does.
+  useEffect(() => {
+    if (desktop === true && home !== undefined && openUtilityId === home) closeUtilityPanel();
+  }, [closeUtilityPanel, desktop, home, openUtilityId]);
 
   if (desktop === undefined) return null;
 

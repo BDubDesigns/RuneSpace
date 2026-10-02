@@ -1,9 +1,10 @@
 import type { Locator, Page } from "@playwright/test";
+import { eq } from "drizzle-orm";
 import { db } from "@/db";
-import { characterMissions } from "@/db/rune-space";
-import { MISSION_IDS } from "@/game/config/foundations";
+import { characterMissions, characters, itemInstances } from "@/db/rune-space";
+import { ITEM_IDS, LOCATION_IDS, MISSION_IDS } from "@/game/config/foundations";
 import { REALTIME_STREAM_PATH } from "@/game/schemas/realtime";
-import { expect, openTestCharacter, test } from "./fixtures";
+import { expect, preferHomeUtility, test } from "./fixtures";
 import { captureReviewScreenshot } from "./review-screenshot";
 
 /**
@@ -112,7 +113,7 @@ for (const viewport of [PHONE, TABLET, LAPTOP, JUST_BELOW]) {
     await expect(rail(page)).toBeHidden();
     await expect(tabList(page)).toHaveCount(0);
     await expect(dockedPanel(page)).toHaveCount(0);
-    await expect(page.locator("[data-map-open]")).toBeHidden();
+    await expect(page.locator("[data-map-open]")).toHaveCount(0);
     // Current Missions sit above the main gameplay, in the main column.
     await expect(strips(page)).toHaveCount(1);
     await expect(page.locator("main [data-mission-strips]")).toBeVisible();
@@ -142,7 +143,7 @@ for (const viewport of [DESKTOP, WIDE]) {
   test(`${viewport.width}px shows the desktop workspace with all four utilities`, async ({
     page,
     testCharacter,
-  }, testInfo) => {
+  }) => {
     await acceptMissions(testCharacter.id, [MISSION_IDS.walkItOff]);
     await openAt(page, testCharacter.id, viewport);
     await waitForDock(page);
@@ -209,7 +210,6 @@ for (const viewport of [DESKTOP, WIDE]) {
     await tab(page, "Missions").click();
     await expect(dockedPanel(page).locator("[data-mission-log]")).toBeVisible();
     await captureReviewScreenshot(page, `issue-286-desktop-missions-${viewport.width}.png`);
-    void testInfo;
   });
 }
 
@@ -422,8 +422,10 @@ test("the tab list is a keyboard-operable ARIA tab list", async ({ page, testCha
   await page.keyboard.press("ArrowRight");
   await expect(tab(page, "Inventory")).toBeFocused();
   await expect(tab(page, "Inventory")).toHaveAttribute("aria-selected", "true");
-  // One tab stop: only the selected tab is reachable by Tab.
+  // One tab stop: only the selected tab is reachable by Tab, and only it names a
+  // panel (the others' panels are not mounted).
   await expect(tab(page, "Chat")).toHaveAttribute("tabindex", "-1");
+  await expect(tab(page, "Chat")).not.toHaveAttribute("aria-controls");
   await expect(tab(page, "Inventory")).toHaveAttribute("tabindex", "0");
   await page.keyboard.press("End");
   await expect(tab(page, "Missions")).toBeFocused();
@@ -511,20 +513,69 @@ test("Chat is not mounted while another utility is up, so nothing is read behind
   await openAt(page, testCharacter.id, DESKTOP);
   await waitForDock(page);
   await expect(page.locator("[data-public-chat]")).toHaveCount(1);
-  const chatRequests: string[] = [];
-  page.on("request", (request) => {
-    if (new URL(request.url()).pathname === "/api/chat") chatRequests.push(request.url());
-  });
   await tab(page, "Missions").click();
   await expect(page.locator("[data-public-chat]")).toHaveCount(0);
   await expect(page.getByRole("log")).toHaveCount(0);
   // Exactly one Chat region ever exists; there is no hidden duplicate.
   await tab(page, "Chat").click();
   await expect(page.locator("[data-public-chat]")).toHaveCount(1);
-  void chatRequests;
 });
 
-async function tabsOf(page: Page): Promise<Locator> {
-  return tabList(page).getByRole("tab");
+/** Cut Your Teeth accepted with the Cutter carried: its strip offers "Open Equipment". */
+async function seedEquipmentShortcut(characterId: string) {
+  const now = new Date();
+  await db
+    .update(characters)
+    .set({ currentLocationId: LOCATION_IDS.theJag })
+    .where(eq(characters.id, characterId));
+  await db.insert(itemInstances).values({
+    characterId,
+    itemId: ITEM_IDS.salvageCutter,
+    currentCharge: 0,
+  });
+  await db.insert(characterMissions).values([
+    { characterId, missionId: MISSION_IDS.walkItOff, acceptedAt: now, completedAt: now },
+    { characterId, missionId: MISSION_IDS.cutYourTeeth, acceptedAt: now },
+  ]);
 }
-void tabsOf;
+
+test("an open intent that names the home settles to the passive home, so shrinking raises no modal", async ({
+  page,
+  context,
+  testCharacter,
+}) => {
+  await seedEquipmentShortcut(testCharacter.id);
+  await preferHomeUtility(context, testCharacter.id, "inventory");
+  await openAt(page, testCharacter.id, DESKTOP);
+  await waitForDock(page);
+  await expect(tab(page, "Inventory")).toHaveAttribute("aria-selected", "true");
+
+  // The objectives' shortcut opens Equipment in the dock — the home — with no
+  // "Back to" or "Set as default" because nothing temporary is showing.
+  await page.getByRole("button", { name: "Open Equipment", exact: true }).click();
+  await expect(dockedPanel(page)).toHaveAttribute("data-docked-utility", "Equipment");
+  await expect(page.locator("[data-utility-home-actions]")).toHaveCount(0);
+
+  // It was only the home being shown, not something the player opened: a phone
+  // gets no modal.
+  await page.setViewportSize(PHONE);
+  await expect(primaryNav(page)).toBeVisible();
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+});
+
+test("the same shortcut from another home is an explicit open and becomes the phone's modal", async ({
+  page,
+  testCharacter,
+}) => {
+  await seedEquipmentShortcut(testCharacter.id);
+  await openAt(page, testCharacter.id, DESKTOP);
+  await waitForDock(page);
+  await page.getByRole("button", { name: "Open Equipment", exact: true }).click();
+  await expect(dockedPanel(page)).toHaveAttribute("data-docked-utility", "Equipment");
+  // Focus moved to the docked Inventory tab, off the shortcut that opened it.
+  await expect(tab(page, "Inventory")).toBeFocused();
+
+  await page.setViewportSize(PHONE);
+  await expect(page.getByRole("dialog", { name: "Equipment" })).toBeVisible();
+  await expect(dockedPanel(page)).toHaveCount(0);
+});

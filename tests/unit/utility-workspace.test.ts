@@ -142,6 +142,20 @@ describe("Chat drafts", () => {
     expect(drafts.read(whisperDraftKey("other"))).toEqual(EMPTY_CHAT_DRAFT);
   });
 
+  it("spend the draft that was sent, even when the send outlived the surface", () => {
+    const drafts = createChatDraftStore();
+    drafts.write(PUBLIC_CHAT_DRAFT_KEY, { text: "WTS iron", mentions: [], promote: true });
+    drafts.settle(PUBLIC_CHAT_DRAFT_KEY, "WTS iron");
+    expect(drafts.read(PUBLIC_CHAT_DRAFT_KEY)).toEqual(EMPTY_CHAT_DRAFT);
+  });
+
+  it("leave a draft the player has changed since alone when an older send settles", () => {
+    const drafts = createChatDraftStore();
+    drafts.write(PUBLIC_CHAT_DRAFT_KEY, { text: "WTS iron, more", mentions: [], promote: false });
+    drafts.settle(PUBLIC_CHAT_DRAFT_KEY, "WTS iron");
+    expect(drafts.read(PUBLIC_CHAT_DRAFT_KEY).text).toBe("WTS iron, more");
+  });
+
   it("forget a draft that has been sent or cleared", () => {
     const drafts = createChatDraftStore();
     drafts.write(PUBLIC_CHAT_DRAFT_KEY, { text: "hello", mentions: [], promote: false });

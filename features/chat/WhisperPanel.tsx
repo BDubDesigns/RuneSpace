@@ -492,12 +492,17 @@ function WhisperConversation({ peer: initialPeer }: { peer: WhisperPeer }) {
   }
 
   async function submit() {
+    const sentText = draft;
     const request = ++requestCounter.current;
     setSending(true);
     setFeedback(undefined);
     let result: WhisperSendResult | { error: string };
     try {
-      result = await sendWhisperAction({ characterId, recipientCharacterId: peerId, text: draft });
+      result = await sendWhisperAction({
+        characterId,
+        recipientCharacterId: peerId,
+        text: sentText,
+      });
     } catch {
       result = { error: "Whisper not sent. Check your connection and try again." };
     }
@@ -516,6 +521,8 @@ function WhisperConversation({ peer: initialPeer }: { peer: WhisperPeer }) {
     }
     stickToBottom.current = true;
     setFeed((current) => insertMessage(current, result.message));
+    // The send can outlive this component: spend the stored draft too.
+    drafts.settle(draftKey, sentText);
     setDraft("");
     refreshInbox();
   }

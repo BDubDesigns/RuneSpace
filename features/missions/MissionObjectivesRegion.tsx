@@ -31,7 +31,7 @@ export function MissionObjectivesRegion({ state }: { state: PlayGameplayState })
     <div className="shrink-0" data-objectives-region="">
       {collapsible ? (
         <button
-          aria-controls="objectives-region-body"
+          aria-controls={showStrips ? "objectives-region-body" : undefined}
           aria-expanded={showStrips}
           className="rs-focus mb-2 flex min-h-9 w-full items-center justify-between gap-2 border border-[color:var(--rs-border-structural)] bg-[color:var(--rs-surface-control)] px-3 text-left font-display text-[11px] uppercase tracking-[0.14em] text-[color:var(--rs-text-secondary)]"
           data-objectives-toggle=""

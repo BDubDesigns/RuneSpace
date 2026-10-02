@@ -181,14 +181,18 @@ includes the roughly 1024px laptop width (no cramped forced dock).
   per character in this browser (`runespace:play-home-utility:<characterId>` in
   `localStorage`, with an in-memory fallback when storage is refused); an
   unrecognised value falls back to Chat and there is no account or database
-  state. Choosing the home tab is the passive state (no open intent), so
-  shrinking to a phone never raises a modal the player did not ask for, while an
-  explicitly opened utility becomes the matching Drawer and back, with focus
-  moved into the Drawer or onto its docked tab.
+  state. Choosing the home tab is the passive state (no open intent), and an
+  open intent that names the home (an in-Chat action while Chat is the home, the
+  Equipment shortcut while Inventory is) settles back to it, so shrinking to a
+  phone never raises a modal the player did not ask for, while an explicitly
+  opened non-home utility becomes the matching Drawer and back, with focus moved
+  into the Drawer or onto its docked tab.
 - **Chat's state lifetime.** Chat is not hidden while another utility is up; it
   is unmounted, so a hidden Chat cannot read anything. Unsent drafts live in
   `ChatProvider` (`features/chat/chat-drafts.ts`, a ref-backed store, so typing
-  re-renders nothing else) and survive every switch and breakpoint crossing.
+  re-renders nothing else) and survive every switch and breakpoint crossing; a
+  send that finishes after its surface unmounted still spends its draft
+  (`settle`), so the sent text cannot come back and go out twice.
   The single realtime stream, the Whisper/System/mention state and the pinned
   cards stay in `SocialProvider`/`ChatProvider`, above all of it, so utility
   switches and Map/Travel refreshes never reconnect it. "Seen" decisions read

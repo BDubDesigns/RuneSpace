@@ -410,6 +410,7 @@ export function PublicChat({
 
   async function submit() {
     if (promoting && (adWaitMs > 0 || !canAfford)) return;
+    const sentText = draft;
     const request = ++requestCounter.current;
     setSending(true);
     setFeedback(undefined);
@@ -448,6 +449,9 @@ export function PublicChat({
       general: applyMessage(current.general, "general", message),
       trade: applyMessage(current.trade, "trade", message),
     }));
+    // The send can outlive this component (the player switched utility while it
+    // was in flight): spend the stored draft too, or it would come back.
+    drafts.settle(PUBLIC_CHAT_DRAFT_KEY, sentText);
     setDraft("");
     setChosenMentions([]);
     if (message.promoted) {

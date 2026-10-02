@@ -271,6 +271,7 @@ function PlayWorkspace({
   const mapActive = searchParams.get("surface") === "map";
   const localPlaceId = searchParams.get(LOCAL_PLACE_PARAM) ?? undefined;
   const { closeUtilityPanel, openUtilityId, openUtilityPanel, state } = usePlay();
+  const desktop = useDesktopWorkspace();
   const characterId = state.characterId;
   const onMapExit = () => router.replace(pathname);
 
@@ -306,7 +307,14 @@ function PlayWorkspace({
                 />
               }
               floatingAction={<SocialLauncher />}
-              mainHeader={<PlayMapControl mapActive={mapActive} onMapExit={onMapExit} />}
+              // Not mounted at all below desktop width (where the footer's Map
+              // is the destination); before the browser has answered it renders,
+              // hidden by the shell's CSS below `xl`.
+              mainHeader={
+                desktop === false ? undefined : (
+                  <PlayMapControl mapActive={mapActive} onMapExit={onMapExit} />
+                )
+              }
               topBar={<PlayTopBar newsUnread={newsUnread} />}
             >
               <PlayBoundaryTestTrigger />

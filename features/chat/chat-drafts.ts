@@ -31,6 +31,14 @@ export function whisperDraftKey(peerCharacterId: string): string {
 export type ChatDraftStore = {
   read: (key: string) => ChatDraft;
   write: (key: string, draft: ChatDraft) => void;
+  /**
+   * The draft whose text was just sent is spent. A send can finish after the
+   * surface that started it has unmounted — the player switched utility while it
+   * was in flight — and then no component is left to clear the draft, so the
+   * sent text would come back in the composer and could go out twice. A draft
+   * the player has since changed is theirs and is left alone.
+   */
+  settle: (key: string, sentText: string) => void;
 };
 
 export function createChatDraftStore(): ChatDraftStore {
@@ -41,6 +49,9 @@ export function createChatDraftStore(): ChatDraftStore {
       // An empty draft is the absence of one; keep the Map from filling up.
       if (!draft.text && draft.mentions.length === 0 && !draft.promote) drafts.delete(key);
       else drafts.set(key, draft);
+    },
+    settle: (key, sentText) => {
+      if (drafts.get(key)?.text === sentText) drafts.delete(key);
     },
   };
 }
