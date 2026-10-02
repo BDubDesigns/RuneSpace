@@ -15,8 +15,8 @@ const authoredUpdates = [
       "On a wide screen, Play now has a sidebar: your current Missions stay in view, and Chat, Inventory, Character, and Missions open beside the game instead of over it.",
     body: [
       "RuneSpace started as a game for phones, and on a phone it works exactly the way it did: buttons along the bottom, Chat on its own floating button, and everything else opening over the game. On a wide screen, though, that left a lot of empty room, and every trip to your Inventory or to Chat covered up the thing you were playing.",
-      "Now, on a screen about 1280 pixels wide or more, Play uses that room. A sidebar runs down the right. Your current Missions stay at the top of it, always in view, and under them four tabs — Chat, Inventory, Character, and Missions — open right there, beside the game. Map has moved to the top right of the play area.",
-      "Chat is the tab you start on. If you'd rather start somewhere else, open that tab and choose Set as default; RuneSpace remembers it for that character in that browser. Opening a different tab for a minute doesn't change it, and Back to Chat takes you home. Switching tabs won't lose a message you were halfway through typing, and a new Whisper or a trade request still lights up the Chat tab while you're busy in your Inventory.",
+      "Now, on a screen about 1280 pixels wide or more, Play uses that room. A sidebar runs down the right. Your current Missions stay at the top of it, always in view, and under them four tabs — Chat, Inventory, Character, and Missions — open right there, beside the game. Next to News at the top, a Location | Map switch flips between where you are and the map.",
+      "Chat is the tab you start on. If you'd rather start somewhere else, open that tab and choose Set as default; RuneSpace remembers it for that character in that browser. Opening a different tab for a minute doesn't change it, and the Back button on that tab takes you home, to Chat or whichever tab you chose. Switching tabs won't lose a message you were halfway through typing, and a new Whisper or a trade request still lights up the Chat tab while you're busy in your Inventory.",
       "Phones and tablets are unchanged. If you make a window narrower, whatever you had open turns back into the usual panel over the game.",
     ],
     patchNotes: [
@@ -30,7 +30,7 @@ const authoredUpdates = [
       {
         heading: "Changed",
         items: [
-          "On wide screens the Map button sits at the top right of the play area, and the bottom bar and floating Chat button are not shown.",
+          "On wide screens Map is a Location | Map switch at the top, next to News, and the bottom bar and floating Chat button are not shown.",
           "Unsent Chat messages are kept when you move between tabs.",
         ],
       },
