@@ -2,19 +2,19 @@
   "schemaVersion": 1,
   "projectSlug": "runespace",
   "workState": "active",
-  "currentFocus": "Preparing the October 27 Soft Alpha: chat, Whispers, moderation, trading and Chat/Social polish are in; giving desktop players a docked Chat, Inventory, Character and Missions workspace beside the game.",
+  "currentFocus": "Preparing the October 27 Soft Alpha: chat, Whispers, moderation, trading, Chat/Social polish and the desktop Play workspace are in; letting characters build their own stashes at their work sites.",
   "currentChange": {
-    "summary": "Desktop Play workspace: at 1280px and wider a right-hand rail keeps Current Missions in view and docks Chat, Inventory, Character and Missions beside the game, with Map in the header.",
+    "summary": "Site stashes: build a permanent stash mount at The Jag, Rusk Recovery, the Processing Yard or Deep Jag, then install any container you own to keep materials right where you work.",
     "stage": "review",
-    "pullRequestNumber": 287
+    "pullRequestNumber": 288
   },
   "latestCompleted": {
-    "summary": "Chat/Social polish: @mention players in General and Trade, blocked players' messages become placeholders instead of gaps, and Whisper conversations can be hidden.",
+    "summary": "Desktop Play workspace: at 1280px and wider a right-hand rail keeps Current Missions in view and docks Chat, Inventory, Character and Missions beside the game, with Map in the header.",
     "date": "2026-10-01",
-    "url": "https://github.com/BDubDesigns/RuneSpace/pull/276"
+    "url": "https://github.com/BDubDesigns/RuneSpace/pull/287"
   },
-  "nextStep": "Human preview of the desktop workspace at 1280px and 1440px and on a phone: dock tabs, Set as default, Map in the header, and many Missions at once (#286).",
-  "lastMeaningfulUpdate": "2026-10-01",
+  "nextStep": "Human playtest of site stashes (#284): build a mount, install each container, swap and remove, on a phone and at desktop width.",
+  "lastMeaningfulUpdate": "2026-10-02",
   "highlights": [
     {
       "summary": "Deep Jag is playable: brace the cave-in for Tansy, mine Galvanite behind it, and refine Galvanic Stock and Galvaferrite at the Processing Yard.",
