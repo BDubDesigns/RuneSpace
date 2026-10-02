@@ -7,6 +7,14 @@ import { mapReturnLabel } from "@/features/travel/LocalMapPanel";
 
 const CELL_WIDTH = "7.25rem";
 
+/**
+ * Each side's hit area reaches the housing's edge — over its padding and the scale
+ * ticks — so no part of the switch is dead. Each extends only outward from its own
+ * half, so the two meet exactly at the middle.
+ */
+const hereHit = "after:absolute after:-bottom-1 after:-left-1 after:-top-1 after:right-0";
+const mapHit = "after:absolute after:-bottom-1 after:-right-1 after:-top-1 after:left-0";
+
 const labelClass =
   "rs-focus relative z-10 flex h-9 items-center justify-center gap-2 font-display text-[11px] font-bold uppercase tracking-[0.16em] transition-[color,text-shadow,filter] duration-[var(--rs-duration-standard)] ease-out motion-reduce:transition-none";
 
@@ -70,7 +78,7 @@ export function PlayViewSwitch({
       <button
         aria-current={mapActive ? undefined : "page"}
         aria-label={mapActive ? mapReturnLabel(inTransit) : undefined}
-        className={`${labelClass} ${mapActive ? dimClass : litClass}`}
+        className={`${labelClass} ${hereHit} ${mapActive ? dimClass : litClass}`}
         data-map-return={mapActive ? "" : undefined}
         data-view-here=""
         onClick={mapActive ? onMapExit : undefined}
@@ -83,7 +91,7 @@ export function PlayViewSwitch({
       <Link
         aria-current={mapActive ? "page" : undefined}
         aria-label="Map"
-        className={`${labelClass} ${mapActive ? litClass : dimClass}`}
+        className={`${labelClass} ${mapHit} ${mapActive ? litClass : dimClass}`}
         data-map-open={mapActive ? undefined : ""}
         data-view-map=""
         href={`${pathname}?surface=map`}

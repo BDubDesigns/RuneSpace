@@ -739,3 +739,41 @@ test("the Location | Map switch keeps both sides mounted so its light can fade, 
   await page.getByRole("button", { name: "Back to Location" }).click();
   await expect(sw).toHaveAttribute("data-view-switch", "here");
 });
+
+test("the whole unlit half of the switch is its target, edges and scale included", async ({
+  page,
+  testCharacter,
+}) => {
+  await openAt(page, testCharacter.id, DESKTOP);
+  await waitForDock(page);
+  const sw = page.locator("[data-view-switch]");
+  const box = (await sw.boundingBox())!;
+  const mid = box.x + box.width / 2;
+  // Points that used to be dead: the padding strips and the tick scale, in the Map half.
+  for (const [x, y] of [
+    [mid + box.width / 4, box.y + box.height - 2], // over the ticks, bottom edge
+    [mid + box.width / 4, box.y + 2], // top edge
+    [box.x + box.width - 2, box.y + box.height / 2], // outer right edge
+    [mid + 3, box.y + box.height / 2], // just past the middle
+  ] as const) {
+    await page.goto(`/play/${testCharacter.id}`);
+    await expect(sw).toHaveAttribute("data-view-switch", "here");
+    await page.mouse.click(x, y);
+    await expect(page).toHaveURL(/surface=map$/);
+    await expect(sw).toHaveAttribute("data-view-switch", "map");
+  }
+  // And back: the Location half, including its bottom edge and outer left edge.
+  for (const [x, y] of [
+    [box.x + box.width / 4, box.y + box.height - 2],
+    [box.x + 2, box.y + box.height / 2],
+    [mid - 3, box.y + box.height / 2],
+  ] as const) {
+    await page.goto(`/play/${testCharacter.id}?surface=map`);
+    await expect(sw).toHaveAttribute("data-view-switch", "map");
+    await page.mouse.click(x, y);
+    await expect(sw).toHaveAttribute("data-view-switch", "here");
+  }
+  // The lit half stays inert: pressing its edge changes nothing.
+  await page.mouse.click(box.x + 2, box.y + box.height - 2);
+  await expect(sw).toHaveAttribute("data-view-switch", "here");
+});
