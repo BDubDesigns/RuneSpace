@@ -511,8 +511,13 @@ test("shell reserves the fixed footer once and keeps the global background fixed
   // the document is and checks the nav stays fixed with the shared space-3
   // gap, and the global background stays fixed.
   expect(yardGeometry.scrollHeight).toBeGreaterThanOrEqual(yardGeometry.clientHeight);
-  await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
+  // Scroll and measure in ONE synchronous evaluation. The location's
+  // population line loads after the page and is shared with every concurrent
+  // test: when another character stands here, it grows the document by the
+  // trigger's height. Landing between a separate scroll and measure left the
+  // page short of its end and the content under the nav.
   const yardBottomGeometry = await page.evaluate(() => {
+    window.scrollTo(0, document.documentElement.scrollHeight);
     const content = document.querySelector("main");
     const nav = document.querySelector('nav[aria-label="Primary"]');
     return {
@@ -550,8 +555,9 @@ test("shell reserves the fixed footer once and keeps the global background fixed
     scrollHeight: document.documentElement.scrollHeight,
   }));
   expect(crashGeometry.scrollHeight - crashGeometry.clientHeight).toBeGreaterThan(10);
-  await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
+  // One evaluation for the same reason as the Yard above.
   const bottomGeometry = await page.evaluate(() => {
+    window.scrollTo(0, document.documentElement.scrollHeight);
     const content = document.querySelector("main");
     const nav = document.querySelector('nav[aria-label="Primary"]');
     const spacingProbe = document.createElement("div");
@@ -578,8 +584,8 @@ test("shell reserves the fixed footer once and keeps the global background fixed
   // must not create a tail, while the genuinely tall Crash Site state remains
   // scrollable. Real mobile Chrome is the decisive dynamic-viewport check.
   await page.setViewportSize({ width: 844, height: 390 });
-  await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
   const landscapeGeometry = await page.evaluate(() => {
+    window.scrollTo(0, document.documentElement.scrollHeight);
     const content = document.querySelector("main");
     const nav = document.querySelector('nav[aria-label="Primary"]');
     const spacingProbe = document.createElement("div");
