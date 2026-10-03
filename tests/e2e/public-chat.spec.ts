@@ -138,6 +138,41 @@ async function seedHistory(player: ChatPlayer, channel: "general" | "trade", bod
   );
 }
 
+/**
+ * Seed recent sends by this account directly, `agesMs` old each, so their
+ * place in the rolling send window — and when each ages out — is known.
+ */
+async function seedRecentSends(
+  player: ChatPlayer,
+  channel: "general" | "trade",
+  tag: string,
+  agesMs: number[],
+) {
+  const now = Date.now();
+  await db.insert(rune.chatMessages).values(
+    agesMs.map((ageMs, index) => ({
+      channel,
+      senderPlayerAccountId: player.character.playerAccountId,
+      senderCharacterId: player.character.id,
+      senderCharacterName: player.character.displayName,
+      body: `recent ${tag} #${index + 1}`,
+      createdAt: new Date(now - ageMs),
+    })),
+  );
+}
+
+/** Every chat read and server action `page` makes from now on. */
+function recordChatRequests(page: Page): string[] {
+  const requests: string[] = [];
+  page.on("request", (request) => {
+    const url = new URL(request.url());
+    if (url.pathname === "/api/chat" || request.headers()["next-action"]) {
+      requests.push(`${request.method()} ${url.pathname}`);
+    }
+  });
+  return requests;
+}
+
 async function tradeAdJourney(page: Page, context: BrowserContext, width: number) {
   const player = await signInFreshPlayer(context, { credits: 60 });
   const tag = randomUUID().slice(0, 8);
@@ -277,13 +312,7 @@ test("the composer states its length and rate limits, counting down with no poll
   await expect(pressure).toHaveAttribute("data-chat-pressure", "clear");
 
   // From here on, nothing may poll: count every chat read and server action.
-  const requests: string[] = [];
-  page.on("request", (request) => {
-    const url = new URL(request.url());
-    if (url.pathname === "/api/chat" || request.headers()["next-action"]) {
-      requests.push(`${request.method()} ${url.pathname}`);
-    }
-  });
+  const requests = recordChatRequests(page);
 
   // A long unbroken message wraps inside the Drawer instead of overflowing.
   await sendFromComposer(dialog, `${tag}${"W".repeat(260)}`);
@@ -303,10 +332,52 @@ test("the composer states its length and rate limits, counting down with no poll
   await expect(send).toBeDisabled();
   const sendsSoFar = requests.length;
 
-  // The first send ages out locally: Trade reopens, with no request made.
-  await expect(pressure).toHaveAttribute("data-chat-pressure", "high", { timeout: 12_000 });
-  await expect(send).toBeEnabled();
+  // The budget ages out locally: Trade reopens, with no request made. Which
+  // band it reopens to is not this journey's to say: three back-to-back sends
+  // expire within one tick of the one-second local clock, so `high` can last
+  // no tick at all and full goes straight to clear (#293). The staggered
+  // journey below pins full → high.
+  await expect(send).toBeEnabled({ timeout: 12_000 });
+  await expect(pressure).not.toHaveAttribute("data-chat-pressure", "full");
   expect(requests.slice(sendsSoFar)).toEqual([]);
+});
+
+test("a full Trade budget counts down and steps to high locally as its oldest send ages out", async ({
+  page,
+  context,
+}) => {
+  await page.setViewportSize(WIDTHS[0]);
+  const player = await signInFreshPlayer(context);
+  const tag = randomUUID().slice(0, 8);
+  const dialog = await openChat(page, player.character.id);
+  const send = dialog.getByRole("button", { name: "Send" });
+  const pressure = dialog.locator("[data-chat-pressure]");
+  await expect(pressure).toHaveAttribute("data-chat-pressure", "clear");
+
+  // Three recent sends whose expiries are seconds apart, unlike real
+  // back-to-back sends: the oldest ages out in about six seconds and the next
+  // three seconds after it, so `high` spans several ticks of the local clock.
+  // Trade's first read carries them as the authoritative budget.
+  await seedRecentSends(player, "trade", tag, [4_000, 1_000, 0]);
+  await dialog.getByRole("tab", { name: "Trade" }).click();
+  await expect(pressure).toHaveAttribute("data-chat-pressure", "full");
+  await composer(dialog).fill(`waiting ${tag}`);
+  await expect(send).toBeDisabled();
+  const requests = recordChatRequests(page);
+
+  // The countdown runs down in place...
+  const secondsLeft = async () =>
+    Number(/Slow down · (\d+)s/.exec((await pressure.textContent()) ?? "")?.[1]);
+  const first = await secondsLeft();
+  expect(first).toBeGreaterThan(1);
+  await expect.poll(secondsLeft).toBeLessThan(first);
+
+  // ...until the oldest send ages out: Trade steps down to high and reopens,
+  // all on the local clock with no request made.
+  await expect(pressure).toHaveAttribute("data-chat-pressure", "high", { timeout: 10_000 });
+  await expect(pressure).toContainText("2/3 in 10s");
+  await expect(send).toBeEnabled();
+  expect(requests).toEqual([]);
 });
 
 async function otherTabJourney(page: Page, context: BrowserContext) {
