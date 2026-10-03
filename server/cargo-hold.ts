@@ -18,6 +18,7 @@ import {
   removeFromSelectedStack,
   siteStashPlacementOf,
 } from "@/server/carried-inventory";
+import { defaultMiningRandom } from "@/server/mining";
 import {
   createPlayResolver,
   ensurePlayProvisioning,
@@ -161,10 +162,7 @@ export async function depositCargoStack(
   characterId: string,
   request: CargoHoldStackTransferRequest,
   now = new Date(),
-  random: MiningRandom = {
-    nextBasisPoints: () => 0,
-    nextUnit: () => 0,
-  },
+  random: MiningRandom = defaultMiningRandom(),
 ): Promise<CargoHoldStateResult<CargoHoldTransferStatus>> {
   return withResolvedOwnedCharacter(
     userId,
@@ -272,10 +270,7 @@ export async function withdrawCargoStack(
   characterId: string,
   request: CargoHoldStackTransferRequest,
   now = new Date(),
-  random: MiningRandom = {
-    nextBasisPoints: () => 0,
-    nextUnit: () => 0,
-  },
+  random: MiningRandom = defaultMiningRandom(),
 ): Promise<CargoHoldStateResult<CargoHoldTransferStatus>> {
   return withResolvedOwnedCharacter(
     userId,
@@ -441,10 +436,7 @@ export async function depositCargoUniqueItem(
   characterId: string,
   request: CargoHoldUniqueTransferRequest,
   now = new Date(),
-  random: MiningRandom = {
-    nextBasisPoints: () => 0,
-    nextUnit: () => 0,
-  },
+  random: MiningRandom = defaultMiningRandom(),
 ): Promise<CargoHoldStateResult<CargoHoldTransferStatus>> {
   return withResolvedOwnedCharacter(
     userId,
@@ -526,10 +518,7 @@ export async function withdrawCargoUniqueItem(
   characterId: string,
   request: CargoHoldUniqueTransferRequest,
   now = new Date(),
-  random: MiningRandom = {
-    nextBasisPoints: () => 0,
-    nextUnit: () => 0,
-  },
+  random: MiningRandom = defaultMiningRandom(),
 ): Promise<CargoHoldStateResult<CargoHoldTransferStatus>> {
   return withResolvedOwnedCharacter(
     userId,

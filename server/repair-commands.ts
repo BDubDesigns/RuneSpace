@@ -18,6 +18,7 @@ import {
 import type { MiningRandom } from "@/game/domain/mining";
 import { type DatabaseTransaction, withResolvedOwnedCharacter } from "@/server/action-resolution";
 import { consumeStackableItem } from "@/server/carried-inventory";
+import { defaultMiningRandom } from "@/server/mining";
 import {
   createPlayResolver,
   ensurePlayProvisioning,
@@ -64,11 +65,6 @@ export type RepairStateResult<T> = {
 };
 
 const EMPTY_RECENT_RESULT = { successes: 0, failures: 0, awardedXp: 0 } as const;
-
-const SILENT_RANDOM: MiningRandom = {
-  nextBasisPoints: () => 0,
-  nextUnit: () => 0,
-};
 
 async function stateAfterRepairCommand(
   transaction: DatabaseTransaction,
@@ -170,7 +166,7 @@ export async function contributeRepairMaterials(
   characterId: string,
   request: RepairMaterialContributionRequest,
   now = new Date(),
-  random: MiningRandom = SILENT_RANDOM,
+  random: MiningRandom = defaultMiningRandom(),
 ): Promise<RepairStateResult<RepairContributionStatus>> {
   return withResolvedOwnedCharacter(
     userId,
@@ -298,7 +294,7 @@ export async function startWelding(
   characterId: string,
   targetId: RepairTargetId,
   now = new Date(),
-  random: MiningRandom = SILENT_RANDOM,
+  random: MiningRandom = defaultMiningRandom(),
 ): Promise<PlayGameplayState> {
   return withResolvedOwnedCharacter(
     userId,
@@ -376,7 +372,7 @@ export async function stopWelding(
   characterId: string,
   targetId: RepairTargetId,
   now = new Date(),
-  random: MiningRandom = SILENT_RANDOM,
+  random: MiningRandom = defaultMiningRandom(),
 ): Promise<PlayGameplayState> {
   return withResolvedOwnedCharacter(
     userId,
