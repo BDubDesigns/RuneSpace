@@ -5,6 +5,7 @@ import { describe, expect, it } from "vitest";
 import {
   CONVERSATION_TOPIC_IDS,
   DIALOGUE_IDS,
+  EXPRESSION_IDS,
   LOCATION_IDS,
   MISSION_IDS,
   NPC_IDS,
@@ -445,6 +446,7 @@ describe("issue #164 replayable social topics", () => {
   it("authors the approved Wade and Tansy topics as short subjects, never player lines", () => {
     expect(getNpcConversationTopics(NPC_IDS.wadeRusk).map((topic) => topic.label)).toEqual([
       "Recovery work",
+      "Stash mounts",
       "ForceSales",
     ]);
     expect(getNpcConversationTopics(NPC_IDS.tansyRusk).map((topic) => topic.label)).toEqual([
@@ -489,6 +491,48 @@ describe("issue #164 replayable social topics", () => {
       CONVERSATION_TOPIC_IDS.tansyBeyondHoloHollow,
     ]);
     expect(afterCompletion[1]?.label).toBe("Beyond Holo Hollow");
+  });
+
+  it("offers Wade's Stash mounts only after Hold It Together and keeps it replayable", () => {
+    const before = topicEntries(NPC_IDS.wadeRusk, [
+      wio("completed"),
+      cyt("completed"),
+      waste("completed"),
+      hold("active", {
+        requirementsSatisfied: false,
+        turnInAvailable: false,
+        nextObjectiveKind: "repair_target_complete",
+      }),
+    ]);
+    expect(before.map((entry) => entry.id)).toEqual([CONVERSATION_TOPIC_IDS.wadeRecoveryWork]);
+
+    const after = topicEntries(NPC_IDS.wadeRusk, [
+      wio("completed"),
+      cyt("completed"),
+      waste("completed"),
+      hold("completed"),
+    ]);
+    expect(after.map((entry) => entry.id)).toEqual([
+      CONVERSATION_TOPIC_IDS.wadeRecoveryWork,
+      CONVERSATION_TOPIC_IDS.wadeStashMounts,
+    ]);
+
+    const sequence = getDialogue(DIALOGUE_IDS.wadeStashMountsTopic);
+    expect(sequence?.presentsAtCurrentVenue).toBe(true);
+    expect(sequence?.beats.map((beat) => (beat.kind === "npc" ? beat.expressionId : null))).toEqual(
+      [
+        EXPRESSION_IDS.neutral,
+        EXPRESSION_IDS.neutral,
+        EXPRESSION_IDS.scowl,
+        EXPRESSION_IDS.neutral,
+        EXPRESSION_IDS.neutral,
+        EXPRESSION_IDS.scowl,
+        EXPRESSION_IDS.neutral,
+        EXPRESSION_IDS.scowl,
+      ],
+    );
+    expect(sequence?.beats[0]?.text).toMatch(/^You know what wastes more time/);
+    expect(sequence?.beats.at(-1)?.text).toBe("I fix machinery. Not geography.");
   });
 
   it("seeds Tansy's arc with the approved Beyond Holo Hollow beats", () => {

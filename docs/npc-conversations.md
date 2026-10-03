@@ -265,6 +265,7 @@ reuses a Mission-owned sequence.
 | NPC | Subject | Availability |
 | --- | --- | --- |
 | Wade Rusk | Recovery work | always |
+| Wade Rusk | Stash mounts | after **Hold It Together** is completed |
 | Tansy Rusk | Mining | always |
 | Tansy Rusk | Beyond Holo Hollow | after **Hold It Together** is completed |
 
