@@ -267,7 +267,10 @@ Hermes host.
 - `tests/e2e/public-chat.spec.ts` proves at phone and desktop widths: switching
   channels in place, own/long messages without horizontal overflow, the
   promoted ad's treatment and its one record in both feeds, the 280-character
-  and rate states counting down with no request, another tab's sends
+  and rate states counting down with no request (Trade stepping from full to
+  high uses seeded sends with expiries seconds apart: back-to-back sends
+  expire within one tick of the one-second local clock, so their intermediate
+  band may never render, #293), another tab's sends
   correcting the indicator through the server's refusal, load-older, live
   delivery, and a reconnect catching a missed message without duplicates. Each
   journey signs in a fresh account (its own budget) and looks only for its own
