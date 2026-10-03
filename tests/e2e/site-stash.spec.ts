@@ -22,6 +22,7 @@ import { captureReviewScreenshot } from "./review-screenshot";
 import {
   expectDetailsAboveNav,
   expectDetailsBeneathRow,
+  expectFeedbackBeneathStorage,
   expectSelectionMovesAndCloses,
 } from "./storage-row-details";
 
@@ -832,19 +833,22 @@ test("Container management hides Swap and Remove until asked, and swaps by selec
   await confirm.click();
   await expect(summary).toContainText("Scrap Box · 1 / 3 slots");
   await expect(page.locator("[data-site-stash]")).toContainText("Swapped in Scrap Box");
+  // A management result keeps its place at the foot, below the disclosure that
+  // produced it, never moved up beside the storage surface.
+  const swapNotice = (await page.locator("[data-stash-feedback]").boundingBox())!;
+  expect(swapNotice.y).toBeGreaterThanOrEqual(
+    (await page.locator("[data-stash-management-toggle]").boundingBox())!.y,
+  );
   // Everything stashed stayed put.
   await expect(page.locator("[data-storage-area='stored']")).toContainText("Ferrite Shale");
 });
 
-test("opens a stash item's details beneath its own row on phone and desktop (Issue #291)", async ({
-  page,
-}) => {
-  await page.setViewportSize({ width: 390, height: 844 });
-  const characterId = await builtMountAtTheJag(page);
-
-  // An installed Freight Harness filled to its six slots, and seven carried
-  // entries: several rows in both regions at three columns and at four, with a
-  // long-named stack and a charged unique item in each.
+/**
+ * An installed Freight Harness filled to its six slots, and seven carried
+ * entries: several rows in both regions at three columns and at four, with a
+ * long-named stack and a charged unique item in each.
+ */
+async function seedFullStash(characterId: string) {
   const harness = await carryContainer(characterId, ITEM_IDS.freightHarness);
   await db
     .insert(rune.siteStashContainers)
@@ -885,6 +889,15 @@ test("opens a stash item's details beneath its own row on phone and desktop (Iss
     .values(
       [0, 1, 2].map(() => ({ characterId, itemId: ITEM_IDS.salvageCutter, currentCharge: 0 })),
     );
+}
+
+test("opens a stash item's details beneath its own row on phone and desktop (Issue #291)", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  const characterId = await builtMountAtTheJag(page);
+
+  await seedFullStash(characterId);
 
   await page.reload();
   await showFromTheFoot(page);
@@ -946,4 +959,58 @@ test("opens a stash item's details beneath its own row on phone and desktop (Iss
     }
   }
   await captureReviewScreenshot(page, "site-stash-desktop-row-details.png");
+});
+
+test("shows a transfer's result directly beneath the stash, above Container management (Issue #291)", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  const characterId = await builtMountAtTheJag(page);
+  // Full to its six slots: a new kind of item has nowhere to go, an item the
+  // stash already holds merges, so both a refusal and a success are on offer.
+  await seedFullStash(characterId);
+  await page.reload();
+  await showFromTheFoot(page);
+
+  const storage = page.locator("[data-stash-storage]");
+  const feedback = page.locator("[data-stash-feedback]");
+  const management = page.locator("[data-stash-management-toggle]");
+  const carried = storage.locator("[data-storage-area='carried']");
+  const stash = storage.locator("[data-storage-area='stored']");
+  const selection = storage.locator("[data-storage-selection]");
+  await expect(feedback).toHaveCount(0);
+
+  // A successful deposit.
+  await carried.getByRole("button", { name: /Ferrite Shale/ }).click();
+  await selection.getByRole("button", { name: "DEPOSIT 1" }).click();
+  await expect(feedback).toContainText("Stashed.");
+  await expectFeedbackBeneathStorage(storage, feedback, management);
+  await captureReviewScreenshot(page, "site-stash-feedback-success-mobile.png");
+
+  // Choosing another item clears it, as before.
+  await carried.getByRole("button", { name: /Slag/ }).click();
+  await expect(feedback).toHaveCount(0);
+
+  // A refused deposit: the stash has no free slot for a new kind of item.
+  await carried.getByRole("button", { name: /Scrap Metal/ }).click();
+  await selection.getByRole("button", { name: "DEPOSIT STACK" }).click();
+  await expect(feedback).toBeVisible();
+  await expect(feedback).not.toContainText("Stashed.");
+  await expectFeedbackBeneathStorage(storage, feedback, management);
+
+  // A successful withdrawal, at the narrowest phone, from the stash tab.
+  await page.setViewportSize({ width: 320, height: 640 });
+  await storage.getByRole("tab", { name: /^STASH/ }).click();
+  await stash.getByRole("button", { name: /Refined Ferrite/ }).click();
+  await selection.getByRole("button", { name: "WITHDRAW 1" }).click();
+  await expect(feedback).toContainText("Withdrawn.");
+  await expectFeedbackBeneathStorage(storage, feedback, management);
+  await captureReviewScreenshot(page, "site-stash-feedback-narrow.png");
+
+  // Desktop keeps the same order.
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await stash.getByRole("button", { name: /Slag/ }).click();
+  await selection.getByRole("button", { name: "WITHDRAW 1" }).click();
+  await expect(feedback).toContainText("Withdrawn.");
+  await expectFeedbackBeneathStorage(storage, feedback, management);
 });

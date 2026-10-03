@@ -216,3 +216,36 @@ export async function expectSelectionMovesAndCloses(page: Page, region: Locator)
   await panel.getByRole("button", { name: "CLOSE" }).click();
   await expect(panel).toHaveCount(0);
 }
+
+/**
+ * Transfer feedback sits directly beneath the storage surface it came from
+ * (#291 follow-up) — within one gap of the lowest visible region, never at the
+ * distant foot of the activity — and above `before` when the host has more
+ * below the surface (the stash's Container management).
+ */
+export async function expectFeedbackBeneathStorage(
+  host: Locator,
+  feedback: Locator,
+  before?: Locator,
+) {
+  await expect(feedback).toHaveCount(1);
+  await expect(feedback).toBeVisible();
+  const surfaceBottom = await host.evaluate((element) =>
+    Math.max(
+      ...[...element.querySelectorAll("[data-storage-area]")]
+        .filter((region) => region.getClientRects().length > 0)
+        .map((region) => region.getBoundingClientRect().bottom),
+    ),
+  );
+  const notice = (await feedback.boundingBox())!;
+  expect(notice.y, "feedback starts below the storage surface").toBeGreaterThanOrEqual(
+    surfaceBottom - 0.5,
+  );
+  expect(notice.y - surfaceBottom, "feedback is adjacent to the surface").toBeLessThanOrEqual(32);
+  if (before) {
+    const next = (await before.boundingBox())!;
+    expect(next.y, "feedback is above what follows the surface").toBeGreaterThanOrEqual(
+      notice.y + notice.height - 0.5,
+    );
+  }
+}

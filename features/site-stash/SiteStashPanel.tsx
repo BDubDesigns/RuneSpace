@@ -211,7 +211,13 @@ function SiteStashDisclosure({ stash }: { stash: SiteStashState }) {
   );
 }
 
-type StashFeedback = { tone: "success" | "danger"; text: string };
+/**
+ * Where a notice belongs: a transfer result sits directly beneath the storage
+ * surface it came from (#291), while install, swap and remove results stay at
+ * the foot of the panel, where they survive storage unmounting on a removal.
+ */
+type StashFeedbackOrigin = "transfer" | "management";
+type StashFeedback = { tone: "success" | "danger"; text: string; origin: StashFeedbackOrigin };
 
 /**
  * The contents of a built stash: choose a container to install, or — once one
@@ -245,15 +251,16 @@ function BuiltStash({ onInstalled, stash }: { onInstalled: () => void; stash: Si
   function run(
     action: () => Promise<SiteStashActionResult>,
     success: string,
-    options?: { hooks?: StorageTransferHooks; revealPanel?: boolean },
+    options?: { hooks?: StorageTransferHooks; revealPanel?: boolean; origin?: StashFeedbackOrigin },
   ) {
+    const origin = options?.origin ?? "management";
     enqueueForeground(() => {
       setPending(true);
       startTransition(async () => {
         try {
           const result = await action();
           if ("error" in result) {
-            setFeedback({ tone: "danger", text: result.error });
+            setFeedback({ tone: "danger", text: result.error, origin });
           } else {
             // Armed only on a confirmed non-error result, immediately before
             // the state that may vacate the selected tile is accepted.
@@ -261,16 +268,17 @@ function BuiltStash({ onInstalled, stash }: { onInstalled: () => void; stash: Si
             if (result.stash.status === "committed") {
               if (options?.revealPanel) onInstalled();
               acceptState(result.state);
-              setFeedback({ tone: "success", text: success });
+              setFeedback({ tone: "success", text: success, origin });
             } else {
               acceptState(result.state);
-              setFeedback({ tone: "danger", text: result.stash.message });
+              setFeedback({ tone: "danger", text: result.stash.message, origin });
             }
           }
         } catch {
           setFeedback({
             tone: "danger",
             text: "Comms interruption. Stash status could not be confirmed.",
+            origin,
           });
         } finally {
           releaseCommand();
@@ -283,13 +291,25 @@ function BuiltStash({ onInstalled, stash }: { onInstalled: () => void; stash: Si
   const base = { characterId: state.characterId, locationId: stash.locationId };
   const transfers: StorageTransferAdapter = {
     depositStack: (input, hooks) =>
-      run(() => depositSiteStashStackAction({ ...base, ...input }), "Stashed.", { hooks }),
+      run(() => depositSiteStashStackAction({ ...base, ...input }), "Stashed.", {
+        hooks,
+        origin: "transfer",
+      }),
     withdrawStack: (input, hooks) =>
-      run(() => withdrawSiteStashStackAction({ ...base, ...input }), "Withdrawn.", { hooks }),
+      run(() => withdrawSiteStashStackAction({ ...base, ...input }), "Withdrawn.", {
+        hooks,
+        origin: "transfer",
+      }),
     depositUniqueItem: (input, hooks) =>
-      run(() => depositSiteStashUniqueItemAction({ ...base, ...input }), "Stashed.", { hooks }),
+      run(() => depositSiteStashUniqueItemAction({ ...base, ...input }), "Stashed.", {
+        hooks,
+        origin: "transfer",
+      }),
     withdrawUniqueItem: (input, hooks) =>
-      run(() => withdrawSiteStashUniqueItemAction({ ...base, ...input }), "Withdrawn.", { hooks }),
+      run(() => withdrawSiteStashUniqueItemAction({ ...base, ...input }), "Withdrawn.", {
+        hooks,
+        origin: "transfer",
+      }),
   };
 
   return (
@@ -339,6 +359,7 @@ function BuiltStash({ onInstalled, stash }: { onInstalled: () => void; stash: Si
               transfers={transfers}
             />
           </div>
+          {feedback?.origin === "transfer" ? <StashFeedbackNotice feedback={feedback} /> : null}
           <ContainerManagement
             base={base}
             busy={busy}
@@ -348,11 +369,15 @@ function BuiltStash({ onInstalled, stash }: { onInstalled: () => void; stash: Si
           />
         </>
       )}
-      {feedback ? (
-        <div data-stash-feedback>
-          <Feedback tone={feedback.tone}>{feedback.text}</Feedback>
-        </div>
-      ) : null}
+      {feedback?.origin === "management" ? <StashFeedbackNotice feedback={feedback} /> : null}
+    </div>
+  );
+}
+
+function StashFeedbackNotice({ feedback }: { feedback: StashFeedback }) {
+  return (
+    <div data-stash-feedback>
+      <Feedback tone={feedback.tone}>{feedback.text}</Feedback>
     </div>
   );
 }
@@ -431,7 +456,7 @@ function ContainerManagement({
   run: (
     action: () => Promise<SiteStashActionResult>,
     success: string,
-    options?: { hooks?: StorageTransferHooks; revealPanel?: boolean },
+    options?: { hooks?: StorageTransferHooks; revealPanel?: boolean; origin?: StashFeedbackOrigin },
   ) => void;
   stash: SiteStashState;
 }) {

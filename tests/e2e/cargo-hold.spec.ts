@@ -18,6 +18,7 @@ import { captureReviewScreenshot } from "./review-screenshot";
 import {
   expectDetailsAboveNav,
   expectDetailsBeneathRow,
+  expectFeedbackBeneathStorage,
   expectSelectionMovesAndCloses,
 } from "./storage-row-details";
 
@@ -674,4 +675,101 @@ test("opens a stored item's details beneath its own row on phone and desktop (Is
   await expect(cargoSection.locator("[data-storage-selection]")).toBeVisible();
   await expect(carriedSection.locator("[data-storage-selection]")).toHaveCount(0);
   await captureReviewScreenshot(page, "cargo-desktop-row-details.png");
+});
+
+test("shows a transfer's result directly beneath the open Cargo Hold (Issue #291)", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  const characterId = page.url().split("/").at(-1)!;
+  const cargoTarget = getRepairTargetBalance(
+    REPAIR_TARGET_IDS.cargoHold,
+    getEffectiveGameBalance(),
+  );
+  await seedRepairedCargoHold(characterId, cargoTarget);
+  await db.insert(cargoHoldStacks).values([
+    { characterId, itemId: ITEM_IDS.ferriteShale, quantity: 4 },
+    { characterId, itemId: ITEM_IDS.refinedFerrite, quantity: 3 },
+  ]);
+  const [storedCutter] = await db
+    .insert(itemInstances)
+    .values({ characterId, itemId: ITEM_IDS.salvageCutter, currentCharge: 0 })
+    .returning();
+  await db.insert(cargoHoldItemInstances).values({ characterId, itemInstanceId: storedCutter!.id });
+  // Eight carried kinds fill every carried slot (kept small so a stack never
+  // overflows its limit): depositing and withdrawing an existing kind needs no slot, taking the Cutter out has nowhere to go.
+  await db.insert(inventoryStacks).values(
+    [
+      [ITEM_IDS.ferriteShale, 2],
+      [ITEM_IDS.refinedFerrite, 1],
+      [ITEM_IDS.slag, 1],
+      [ITEM_IDS.scrapMetal, 6],
+      [ITEM_IDS.powerCell, 1],
+      [ITEM_IDS.galvanite, 1],
+      [ITEM_IDS.galvanicStock, 1],
+      [ITEM_IDS.galvaferrite, 1],
+    ].map(([itemId, quantity]) => ({
+      characterId,
+      itemId: itemId as string,
+      quantity: quantity as number,
+    })),
+  );
+
+  await page.reload();
+  const cargoPanel = page.locator("[data-cargo-hold]");
+  await cargoPanel.getByRole("button", { name: "OPEN CARGO HOLD" }).click();
+  const storage = cargoPanel.locator("[data-cargo-storage]");
+  const feedback = storage.locator("[data-cargo-transfer-feedback]");
+  const carried = storage.locator("[data-storage-area='carried']");
+  const cargo = storage.locator("[data-storage-area='stored']");
+  const selection = storage.locator("[data-storage-selection]");
+  await expect(feedback).toHaveCount(0);
+  // The same words anywhere else in the panel would be a second visible notice.
+  const visibleNotices = (text: string) =>
+    cargoPanel.evaluate(
+      (panel, wanted) =>
+        [...panel.querySelectorAll("*")].filter(
+          (element) =>
+            element.children.length === 0 &&
+            element.textContent?.trim() === wanted &&
+            element.getBoundingClientRect().width > 2,
+        ).length,
+      text,
+    );
+
+  // A successful deposit.
+  await carried.getByRole("button", { name: /Ferrite Shale/ }).click();
+  await selection.getByRole("button", { name: "DEPOSIT 1" }).click();
+  await expect(feedback).toContainText("Cargo Hold transfer complete.");
+  await expectFeedbackBeneathStorage(storage, feedback);
+  expect(await visibleNotices("Cargo Hold transfer complete.")).toBe(1);
+  await captureReviewScreenshot(page, "cargo-feedback-success-mobile.png");
+
+  // Choosing another item clears it, as before.
+  await carried.getByRole("button", { name: /Slag/ }).click();
+  await expect(feedback).toHaveCount(0);
+
+  // A refused withdrawal: carried has no free slot for the stored Cutter.
+  await cargoPanel.getByRole("tab", { name: /^CARGO/ }).click();
+  await cargo.getByRole("button", { name: "Salvage Cutter" }).click();
+  await selection.getByRole("button", { name: "WITHDRAW ITEM" }).click();
+  await expect(feedback).toBeVisible();
+  await expect(feedback).not.toContainText("transfer complete");
+  await expectFeedbackBeneathStorage(storage, feedback);
+
+  // A successful withdrawal, at the narrowest phone.
+  await page.setViewportSize({ width: 320, height: 640 });
+  await cargo.getByRole("button", { name: /Refined Ferrite/ }).click();
+  await selection.getByRole("button", { name: "WITHDRAW 1" }).click();
+  await expect(feedback).toContainText("Cargo Hold transfer complete.");
+  await expectFeedbackBeneathStorage(storage, feedback);
+  expect(await visibleNotices("Cargo Hold transfer complete.")).toBe(1);
+  await captureReviewScreenshot(page, "cargo-feedback-narrow.png");
+
+  // Desktop keeps it under the two regions.
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await carried.getByRole("button", { name: /Ferrite Shale/ }).click();
+  await selection.getByRole("button", { name: "DEPOSIT 1" }).click();
+  await expect(feedback).toContainText("Cargo Hold transfer complete.");
+  await expectFeedbackBeneathStorage(storage, feedback);
 });
