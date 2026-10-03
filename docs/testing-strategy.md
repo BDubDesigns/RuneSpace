@@ -48,8 +48,8 @@ small number of critical mobile player journeys.
 - Playwright source is type-checked before it is ever run. Every committed
   `.ts` file under `tests/e2e/**` (specs and helpers) is part of the one strict
   `tsconfig.json` program (issue #212), so a stale import, renamed export, or
-  impossible type fails `pnpm typecheck`, and therefore the always-on
-  `fast-checks` CI job, before any PostgreSQL, build, or browser work. There is
+  impossible type fails `pnpm typecheck`, and therefore the `fast-checks` CI
+  job and `Merge gate`, even if every browser shard passes. There is
   no separate E2E typecheck command, and E2E files must not be excluded from
   `tsconfig.json` or silenced with `any` or `@ts-nocheck`. This is a static
   check only: it says nothing about browser behavior, which only the focused and
@@ -106,8 +106,8 @@ small number of critical mobile player journeys.
     regardless of screenshot review
   - runs as three independent GitHub Actions shards, each with its own
     PostgreSQL service, disposable database, migrations, production server, and
-    shard-named diagnostics/timing artifacts; all three are required by Full
-    and Merge gates
+    shard-named diagnostics/timing artifacts; all three are required by
+    `Merge gate`
   - captures the curated review manifest only in a separate deterministic,
     unsharded one-worker job when `RUNESPACE_E2E_SCREENSHOTS=true` is explicitly
     requested through the `e2e-screenshots` label. The ordinary behavioral
@@ -151,12 +151,12 @@ small number of critical mobile player journeys.
   marker matches the selected database name.
 - Agents may not report browser or CI parity as passing unless the canonical
   command actually passed. When a change adds or touches E2E specs, run the
-  new/targeted spec(s) first in isolation and **then** the full
-  `pnpm test:e2e:canonical` suite — `fast-checks` (typecheck/lint/unit/build)
-  intentionally skips PostgreSQL integration and canonical E2E, so a green fast
-  run is not evidence the merge gate will pass. For details see
-  `AGENTS.md` §6 and `docs/development-workflow.md` (§Focused implementation
-  checks, then full canonical parity).
+  new/targeted spec(s) in isolation locally; the PR's CI then runs the full
+  `pnpm test:e2e:canonical` suite on every push. `fast-checks`
+  (typecheck/lint/unit/build) does not run PostgreSQL integration or canonical
+  E2E, so a green fast job alone is not evidence the merge gate will pass. For
+  details see `AGENTS.md` §5 and `docs/development-workflow.md` (§Focused local
+  checks, full remote CI).
 - The canonical command is expensive by design: one invocation performs one
   full production `next build`, one `next start`, and the complete allowlisted
   selection, so it spans several minutes. For focused local iteration, run the
@@ -572,37 +572,31 @@ Before removing or weakening a test, record where the behavior remains protected
 
 ## CI scope and event matrix
 
-The `CI` workflow always runs the fast job (frozen install, typecheck of the app
+The `CI` workflow runs the same full validation for every PR revision, Draft or
+not, and every push to `main`. The fast job (frozen install, typecheck of the app
 and every test including `tests/e2e`, lint, format check, unit tests, and one
-production build) for PR revisions and pushes
-to `main`. PostgreSQL integration and canonical E2E are selected by the explicit
-full-gate policy and start only after the fast job succeeds, so a typecheck, lint,
-unit, or build failure (including in `tests/e2e`) never spends integration or
-browser minutes:
+production build), PostgreSQL integration, and the three canonical E2E shards all
+start together; none waits for or consumes another's output. This optimizes
+elapsed review time: an early fast-job failure no longer saves browser minutes,
+but it still fails `Merge gate`.
 
-| Event | Fast checks | PostgreSQL + canonical E2E | Merge gate |
-| --- | --- | --- | --- |
-| Draft PR opened, reopened, or pushed | Yes | No | Intentionally unsatisfied |
-| `full-ci` applied to a draft | Yes | Yes | Intentionally unsatisfied |
-| Push while `full-ci` remains applied | Yes | Yes | Intentionally unsatisfied while draft |
-| Draft converted to ready | Yes | Yes, without a code push | Required |
-| Push to a ready PR | Yes | Yes | Required |
-| Push to `main` | Yes | Yes | Required |
-| Manual `workflow_dispatch` (`--ref <branch>` plus the `ref` input) | Yes | Yes | Required |
+| Event | Fast checks | PostgreSQL + canonical E2E | Screenshot lane | Merge gate |
+| --- | --- | --- | --- | --- |
+| PR opened, reopened, or pushed (Draft or not) | Yes | Yes | With `e2e-screenshots` | Required |
+| Label added to a PR | Yes | Yes | With `e2e-screenshots` | Required |
+| Push to `main` | Yes | Yes | No | Required |
+| Manual `workflow_dispatch` (`--ref <branch>` plus the `ref` input) | Yes | Yes | No | Required |
 
-Labels on ready PRs request the full gate; adding `e2e-screenshots` also runs the
-separate deterministic screenshot lane without adding its output to behavioral
-shards. PR runs use a per-PR concurrency group so obsolete work is canceled only
-for that PR; main and manual runs use unique groups. The static `Merge gate` is required and
-intentionally fails on draft checkpoints. This is necessary because GitHub
-marks a skipped required job successful; a green draft decision would otherwise
-be reusable when the PR becomes ready without a new commit. Require only the
-fast check and `Merge gate` in the `main` branch protection/ruleset; this
-repository currently has no such protection configured — API-verified for
-Issue #61 on 2026-08-03 (the GitHub REST branch-protection endpoint returns
-`Branch not protected`, and the repository rulesets list is empty) — so a
-maintainer must verify those settings separately. Treat that snapshot as dated
-repository state and re-verify before acting on it.
+`Merge gate` (`scripts/ci-merge-gate.mjs`, covered by
+`tests/unit/ci-gate-policy.test.ts`) needs every lane and passes only when the
+fast job, integration, and all three shards succeeded; a failed, skipped,
+canceled, or missing required lane fails it. The screenshot lane counts only
+when requested, and then it must succeed. Any label event reruns the full
+validation rather than skipping it, because GitHub reports a skipped job as
+passing and a skipped `Merge gate` would otherwise mask the head's real result.
+PR runs use a per-PR concurrency group so obsolete work is canceled only for that
+PR; main and manual runs use unique groups. Branch protection state is recorded
+in `docs/development-workflow.md` (§CI and the merge gate).
 
 CI retains a separate PostgreSQL integration job, a three-shard canonical E2E
 matrix, and an opt-in unsharded screenshot lane. The canonical runner is the

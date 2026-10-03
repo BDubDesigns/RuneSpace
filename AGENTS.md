@@ -148,87 +148,43 @@ Grep for these before re-deriving them from scratch.
 4. Track acceptance criteria against evidence. For boundary, SSOT, concurrency,
    security, test/documentation conflicts, or two failed attempts, seek a
    separate model review when available; otherwise self-review carefully.
-5. Validate proportionally. Use unit, integration, or E2E according to the
-   ownership guide. If E2E specs change, run the targeted spec first and then
-   the full canonical suite; zero retries and deterministic fixtures are part
+5. Validate proportionally with focused local checks: unit, integration, or a
+   targeted E2E spec according to the ownership guide. The PR's automatic CI
+   runs the full canonical suite, so do not duplicate it locally as routine;
+   run it locally to reproduce or diagnose a failure, or for a genuinely
+   high-risk boundary change. Zero retries and deterministic fixtures are part
    of the proof, not problems to hide with sleeps or retries. On the shared
-   Hermes host, prove canonical with a manual GitHub CI run, not locally; both
-   local E2E runners queue on one host-wide lock (see
+   Hermes host, both local E2E runners queue on one host-wide lock (see
    `docs/development-workflow.md`).
 6. Use `./scripts/managed-host-run.sh` for managed-host and Node-22-bound
    commands. On Hermes, every DB-backed command must run through
    `scripts/runespace-db.mjs` after creating a validated disposable database.
-   Run the full CI-parity sequence (canonical on GitHub from Hermes) before
-   marking a PR ready when the environment is available; report unavailable
-   checks as unexecuted.
-7. Open or update exactly one Draft PR, only after completing the final
-   self-review and validation pass. Include `closes #<n>` per finished issue,
+   Report any check you could not run as unexecuted.
+7. Open or update exactly one PR after the final self-review and focused
+   validation pass. Open a normal PR by default; Draft only marks genuinely
+   unfinished work and changes no CI. Include `closes #<n>` per finished issue,
    branch and PR identity, local and remote validation, architectural decisions,
    limitations, unresolved questions, and whether gameplay, persistence, or
    player-facing behavior changed. Stop for human review; do not merge without
    explicit product-owner instruction.
-8. Follow triggered workflows to terminal state. Draft PRs skip
-   PostgreSQL/canonical jobs and the draft-only Merge gate is expected to stay
-   unsatisfied; prove the full gate with the manual `workflow_dispatch` run in
-   `docs/development-workflow.md`. Do not apply `full-ci` or mark a PR Ready;
-   Brandon decides. Inspect failed logs, repair on
-   the same branch, push, and follow replacement runs.
+8. Every PR push runs full CI: fast checks, PostgreSQL integration, and three
+   canonical E2E shards start together, and `Merge gate` passes only when all
+   succeed. Follow the run to a terminal state; inspect failed logs, repair on
+   the same branch, push, and follow the replacement run. The handoff ends at
+   the PR, its observed checks, and owner review.
 
-## Project board status
-
-The GitHub Project board is a live signal of where an issue actually is. Agents
-own exactly these transitions and must keep them truthful:
-
-- **`Ready` → `In Progress`** when substantive work begins — the first real
-  code, content, or documentation change, not reading or planning. Ordinary
-  iterative testing, debugging, and repair *during* implementation stay
-  `In Progress`; running tests never by itself means the work reached `Review`.
-- **`Backlog` → `In Progress`**, same trigger, only when the product owner
-  specifically handed you a well-scoped issue. If its scope genuinely is not
-  ready, leave it in `Backlog`, do not begin implementing, and report what is
-  missing.
-- **`In Progress` → `Review`** when implementation is complete and the
-  deliberate final self-review pass begins: inspecting the full diff, checking
-  every acceptance criterion, running the proportional checks, and fixing
-  whatever that pass finds.
-
-Finish the `Review` pass **before** opening the Draft PR, so the existing
-`Pull request linked to issue` Project workflow can truthfully move the issue to
-`Preview / Playtest`.
-
-Agents set no other status. `Backlog` and `Ready` selection stays with the
-product owner, `Preview / Playtest` belongs to the linked-PR workflow, and
-`Done` belongs to the existing merge/close automation — never set `Done` by
-hand. Do not reconfigure the Project's own workflows or fields. If a transition
-cannot be performed — missing Projects scope, an issue absent from the board, an
-ambiguous project — report the exact blocker and continue the issue rather than
-inventing a workaround. On Hermes the `gh` token lacks `read:project` and
-`RUNESPACE_PROJECT_TOKEN` is unset, so expect that blocker and report it in the
-PR. `docs/development-workflow.md` has the `gh` procedure,
-and `scripts/project-status.mjs` for environments without `gh`.
+Issue and PR state are authoritative. Agents do not move GitHub Project board
+cards; the board is an optional owner tool.
 
 ## QC Failed status manifest
 
-RuneSpace publishes the intentionally public `.qcfailed/status.json`; it must
-never contain secrets, credentials, private account information, internal
-corporate information, unpublished client work, or speculation. It is schema
-version `1`, uses project slug `runespace`, and restricts `workState` to
-`active`, `maintenance`, or `paused`. Status sentences are factual and at
-most 240 characters; dates are real non-future `YYYY-MM-DD` values; URLs are
-absolute public HTTPS URLs; `highlights` has zero to three entries.
-
-- Update the manifest in the same PR only when a meaningful product PR changes
-  current focus, the latest completed milestone, next step, work state, or
-  public highlights. Infrastructure-only, dependency, typo, CI-only, and
-  test-only work must not displace product milestones.
-- A meaningful product PR may add `currentChange` with the actual PR number and
-  stage (`implementation`, `review`, `preview`, or `merge-ready`) after
-  the PR exists. Never store a preview URL in the manifest; qcfailed.com
-  derives it.
-- On the next meaningful product PR, roll the prior merged change into
-  `latestCompleted` when appropriate. Never present a closed-unmerged change
-  as completed. qcfailed.com owns remote validation, PR interpretation, preview
-  probing, and public rendering; RuneSpace only maintains the manifest contract.
+`.qcfailed/status.json` is intentionally public and is still read by
+qcfailed.com's Build Floor until qcfailed.com issue #22 migrates that consumer;
+it is retired afterward. Do not make routine or status-only manifest updates.
+Edit it only when an issue or Brandon asks, and keep it valid
+(`tests/unit/qcfailed-status.test.ts` enforces the schema) and free of secrets,
+credentials, private account information, internal corporate information,
+unpublished client work, or speculation.
 
 ## Public Updates
 
@@ -273,6 +229,6 @@ design as current Wiki behavior.
   canonical E2E uses 3200, focused E2E uses a confirmed-free high port such as
   3310, and cleanup must target only a positively identified RuneSpace PID.
 - Read `docs/development-workflow.md` for exact managed-host, CI, preview,
-  status-manifest, and review procedure. Do not access production or remove
+  and review procedure. Do not access production or remove
   broad services, volumes, networks, credentials, or data without explicit
   approval.
