@@ -19,6 +19,11 @@ import { installedMaterials, seedRepairTarget } from "../integration/fixtures";
 import { expect, openTestCharacter, test } from "./fixtures";
 import { seedLegacyStarterCutter } from "./legacy-starter";
 import { captureReviewScreenshot } from "./review-screenshot";
+import {
+  expectDetailsAboveNav,
+  expectDetailsBeneathRow,
+  expectSelectionMovesAndCloses,
+} from "./storage-row-details";
 
 /**
  * Issue #284 — character-owned site stashes in a real browser.
@@ -829,4 +834,116 @@ test("Container management hides Swap and Remove until asked, and swaps by selec
   await expect(page.locator("[data-site-stash]")).toContainText("Swapped in Scrap Box");
   // Everything stashed stayed put.
   await expect(page.locator("[data-storage-area='stored']")).toContainText("Ferrite Shale");
+});
+
+test("opens a stash item's details beneath its own row on phone and desktop (Issue #291)", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  const characterId = await builtMountAtTheJag(page);
+
+  // An installed Freight Harness filled to its six slots, and seven carried
+  // entries: several rows in both regions at three columns and at four, with a
+  // long-named stack and a charged unique item in each.
+  const harness = await carryContainer(characterId, ITEM_IDS.freightHarness);
+  await db
+    .insert(rune.siteStashContainers)
+    .values({ characterId, locationId: LOCATION_IDS.theJag, itemInstanceId: harness });
+  await db.insert(rune.siteStashStacks).values(
+    [
+      [ITEM_IDS.ferriteShale, 4],
+      [ITEM_IDS.refinedFerrite, 3],
+      [ITEM_IDS.slag, 2],
+    ].map(([itemId, quantity]) => ({
+      characterId,
+      locationId: LOCATION_IDS.theJag,
+      itemId: itemId as string,
+      quantity: quantity as number,
+    })),
+  );
+  const stored = await db
+    .insert(itemInstances)
+    .values(
+      [0, 1, 2].map(() => ({ characterId, itemId: ITEM_IDS.salvageCutter, currentCharge: 0 })),
+    )
+    .returning();
+  await db.insert(rune.siteStashItemInstances).values(
+    stored.map((instance) => ({
+      characterId,
+      locationId: LOCATION_IDS.theJag,
+      itemInstanceId: instance.id,
+    })),
+  );
+  await db.insert(inventoryStacks).values([
+    { characterId, itemId: ITEM_IDS.ferriteShale, quantity: 2 },
+    { characterId, itemId: ITEM_IDS.refinedFerrite, quantity: 5 },
+    { characterId, itemId: ITEM_IDS.slag, quantity: 1 },
+    { characterId, itemId: ITEM_IDS.scrapMetal, quantity: 6 },
+  ]);
+  await db
+    .insert(itemInstances)
+    .values(
+      [0, 1, 2].map(() => ({ characterId, itemId: ITEM_IDS.salvageCutter, currentCharge: 0 })),
+    );
+
+  await page.reload();
+  await showFromTheFoot(page);
+  const storage = page.locator("[data-stash-storage]");
+  const carriedSection = storage.locator("[data-storage-area='carried']");
+  const stashSection = storage.locator("[data-storage-area='stored']");
+  const regions = [
+    { tab: /^CARRIED/, section: carriedSection, tiles: 7 },
+    { tab: /^STASH/, section: stashSection, tiles: 6 },
+  ];
+
+  // Phone, three columns: first, middle and last of each tab.
+  for (const { tab, section, tiles } of regions) {
+    await storage.getByRole("tab", { name: tab }).click();
+    await expect(section.locator("button[aria-pressed]")).toHaveCount(tiles);
+    for (const index of [0, Math.floor(tiles / 2), tiles - 1]) {
+      const measured = await expectDetailsBeneathRow(page, section, index);
+      expect(measured.columns).toBe(3);
+      await expectDetailsAboveNav(page, section);
+    }
+    await expectSelectionMovesAndCloses(page, section);
+  }
+  await captureReviewScreenshot(page, "site-stash-mobile-row-details.png");
+
+  // The long name at the narrowest phone, from a real stack in the stash.
+  await page.setViewportSize({ width: 320, height: 640 });
+  const stashTiles = stashSection.locator("button[aria-pressed]");
+  const refinedIndex = await stashTiles.evaluateAll((tiles) =>
+    tiles.findIndex((tile) => tile.getAttribute("aria-label")?.includes("Refined Ferrite")),
+  );
+  expect(refinedIndex).toBeGreaterThanOrEqual(0);
+  const narrow = await expectDetailsBeneathRow(page, stashSection, refinedIndex);
+  expect(narrow.columns).toBe(3);
+  expect(narrow.name.text).toBe("Refined Ferrite");
+  await expectDetailsAboveNav(page, stashSection);
+  await expect(stashSection.locator("[data-storage-selection]")).toContainText("Quantity 3");
+
+  // A real withdraw from the selected stack: the entry is gone from the stash, the
+  // selection is reconciled with no stale details left behind, and the host's
+  // own feedback shows.
+  await stashSection
+    .locator("[data-storage-selection]")
+    .getByRole("button", {
+      name: "WITHDRAW STACK",
+    })
+    .click();
+  await expect(page.locator("[data-storage-selection]")).toHaveCount(0);
+  await expect(stashSection.locator("button[aria-pressed]")).toHaveCount(5);
+
+  // Desktop, four columns, both regions side by side.
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await expect(carriedSection).toBeVisible();
+  await expect(stashSection).toBeVisible();
+  for (const section of [carriedSection, stashSection]) {
+    const count = await section.locator("button[aria-pressed]").count();
+    for (const index of [0, Math.floor(count / 2), count - 1]) {
+      const measured = await expectDetailsBeneathRow(page, section, index);
+      expect(measured.columns).toBe(4);
+    }
+  }
+  await captureReviewScreenshot(page, "site-stash-desktop-row-details.png");
 });

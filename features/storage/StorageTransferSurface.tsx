@@ -1,12 +1,18 @@
 "use client";
 
-import { useRef, type ReactNode, type RefObject } from "react";
+import { Fragment, useRef, type ReactNode, type RefObject } from "react";
 import { ActionButton } from "@/components/ui/ActionButton";
 import { Feedback } from "@/components/ui/Feedback";
 import { ItemVisual } from "@/components/items/ItemVisual";
 import { InventoryStackVisual } from "@/components/items/InventoryStackVisual";
 import { getItemMaximumCharge } from "@/game/config/balance";
 import { useSelectableDetails } from "@/features/shared/use-selectable-details";
+import {
+  StorageSelectionDetails,
+  type StorageDetailsPlacement,
+} from "@/features/storage/StorageSelectionDetails";
+import { detailsInsertionIndex, tileColumn } from "@/features/storage/storage-grid-layout";
+import { useGridColumnCount } from "@/features/storage/use-grid-column-count";
 import {
   resolveStorageSelection,
   sameStorageSelection,
@@ -127,6 +133,51 @@ function chargeBadge(item: StorageUniqueEntry): string | undefined {
     : undefined;
 }
 
+type StorageTile = { key: string; selected: boolean; node: ReactNode };
+
+/**
+ * One region's tile grid, with the selected item's details inserted into the
+ * grid's own child order right after the selected tile's row (#291). It owns
+ * the measured column count because the row boundary is whatever the grid is
+ * laying out now (three columns on a phone, four from `sm`), so the details
+ * follow the right row at any width and stay in DOM and tab order. The gap is
+ * one custom property so the details' connector can span exactly one gap.
+ */
+function StorageTileGrid({
+  ariaLabel,
+  renderDetails,
+  tiles,
+}: {
+  ariaLabel: string;
+  /** Given only to the region holding the selection. */
+  renderDetails: ((placement: StorageDetailsPlacement) => ReactNode) | undefined;
+  tiles: readonly StorageTile[];
+}) {
+  const gridRef = useRef<HTMLDivElement>(null);
+  const columns = useGridColumnCount(gridRef);
+  const selectedIndex = renderDetails ? tiles.findIndex((tile) => tile.selected) : -1;
+  const insertAfter =
+    selectedIndex < 0 ? -1 : detailsInsertionIndex(selectedIndex, columns, tiles.length);
+  return (
+    <div
+      aria-label={ariaLabel}
+      className="mt-3 grid grid-cols-3 gap-[var(--storage-grid-gap)] [--storage-grid-gap:0.5rem] sm:grid-cols-4"
+      ref={gridRef}
+    >
+      {tiles.flatMap((tile, index) => {
+        const node = <Fragment key={tile.key}>{tile.node}</Fragment>;
+        if (index !== insertAfter) return [node];
+        return [
+          node,
+          <Fragment key="selection-details">
+            {renderDetails?.({ column: tileColumn(selectedIndex, columns), columns })}
+          </Fragment>,
+        ];
+      })}
+    </div>
+  );
+}
+
 function StorageRegionSection({
   area,
   ariaLabel,
@@ -136,6 +187,7 @@ function StorageRegionSection({
   onSelect,
   region,
   regionRef,
+  renderDetails,
   selected,
   title,
 }: {
@@ -149,11 +201,45 @@ function StorageRegionSection({
   // The section root (not the inner tile grid) so a fallback focus target
   // always exists even when the region has no occupied tiles left.
   regionRef: RefObject<HTMLElement | null>;
+  renderDetails: ((placement: StorageDetailsPlacement) => ReactNode) | undefined;
   selected: StorageSelection | undefined;
   title: string;
 }) {
   const isSelected = (kind: StorageSelection["kind"], id: string) =>
     selected?.area === area && selected.kind === kind && selected.id === id;
+  const tiles: StorageTile[] = [
+    ...region.stacks.map((stack) => ({
+      key: `stack:${stack.id}`,
+      selected: isSelected("stack", stack.id),
+      node: (
+        <InventoryStackVisual
+          interactive
+          itemId={stack.itemId}
+          name={stack.name}
+          onSelect={() => onSelect({ area, kind: "stack", id: stack.id })}
+          quantity={stack.quantity}
+          selected={isSelected("stack", stack.id)}
+          stackLimit={stack.stackLimit}
+        />
+      ),
+    })),
+    ...region.uniqueItems.map((item) => ({
+      key: `unique:${item.id}`,
+      selected: isSelected("unique", item.id),
+      node: (
+        <ItemVisual
+          accessibleLabel={item.name}
+          additionalDescription={chargeDescription(item)}
+          badge={chargeBadge(item)}
+          interactive
+          itemId={item.itemId}
+          name={item.name}
+          onSelect={() => onSelect({ area, kind: "unique", id: item.id })}
+          selected={isSelected("unique", item.id)}
+        />
+      ),
+    })),
+  ];
   return (
     <section
       aria-label={ariaLabel}
@@ -169,34 +255,8 @@ function StorageRegionSection({
         </span>
       </div>
       {actions}
-      {region.stacks.length || region.uniqueItems.length ? (
-        <div aria-label={itemsLabel} className="mt-3 grid grid-cols-3 gap-2 sm:grid-cols-4">
-          {region.stacks.map((stack) => (
-            <InventoryStackVisual
-              interactive
-              itemId={stack.itemId}
-              key={stack.id}
-              name={stack.name}
-              onSelect={() => onSelect({ area, kind: "stack", id: stack.id })}
-              quantity={stack.quantity}
-              selected={isSelected("stack", stack.id)}
-              stackLimit={stack.stackLimit}
-            />
-          ))}
-          {region.uniqueItems.map((item) => (
-            <ItemVisual
-              accessibleLabel={item.name}
-              additionalDescription={chargeDescription(item)}
-              badge={chargeBadge(item)}
-              interactive
-              itemId={item.itemId}
-              key={item.id}
-              name={item.name}
-              onSelect={() => onSelect({ area, kind: "unique", id: item.id })}
-              selected={isSelected("unique", item.id)}
-            />
-          ))}
-        </div>
+      {tiles.length ? (
+        <StorageTileGrid ariaLabel={itemsLabel} renderDetails={renderDetails} tiles={tiles} />
       ) : (
         <div className="mt-3">
           <Feedback>{emptyMessage}</Feedback>
@@ -208,10 +268,11 @@ function StorageRegionSection({
 
 /**
  * The one destination-agnostic carried-vs-stored transfer surface (#282): the
- * two inventory grids, the mobile region switcher, the selected-item details,
- * and the Deposit/Withdraw control layout. A host supplies the current
- * authoritative projection, its own wording, and its own transfer commands;
- * the ship Cargo Hold is the first host and a location stash will be the next.
+ * two inventory grids, the mobile region switcher, the selected-item details
+ * (inserted beneath the selected tile's row, #291), and the Deposit/Withdraw
+ * control layout. A host supplies the current authoritative projection, its own
+ * wording, and its own transfer commands; the ship Cargo Hold is the first host
+ * and a location stash will be the next.
  *
  * It owns the interaction a player sees — selection, toggle, reveal and focus
  * restoration, through the shared selectable-details contract — and none of
@@ -320,54 +381,30 @@ export function StorageTransferSurface({
     );
   }
 
-  function renderSelected() {
-    if (!resolved) return null;
-    const area = resolved.area;
-    return (
-      <section
-        aria-label={`${resolved.entry.name} selected`}
-        className="mt-4 border border-[color:var(--rs-border-structural)] bg-[color:var(--rs-surface-panel)] p-3"
-        data-storage-selection
-        ref={detailsRef}
-      >
-        <div className="flex items-center justify-between gap-2">
-          <h3
-            className="font-display text-xs uppercase tracking-[0.16em] text-[color:var(--rs-accent-mining)]"
-            data-storage-selection-heading
-            ref={detailsHeadingRef}
-            tabIndex={-1}
-          >
-            {area === "carried" ? "Carried item" : "Stored item"}
-          </h3>
-          <ActionButton className="px-3" intent="secondary" onClick={clearSelection}>
-            CLOSE
-          </ActionButton>
-        </div>
-        <div className="mt-3 flex items-center gap-3">
-          {resolved.kind === "stack" ? (
-            <InventoryStackVisual
-              className="h-20 w-20 shrink-0"
-              itemId={resolved.entry.itemId}
-              name={resolved.entry.name}
-              quantity={resolved.entry.quantity}
-              stackLimit={resolved.entry.stackLimit}
-            />
-          ) : (
-            <ItemVisual
-              additionalDescription={chargeDescription(resolved.entry)}
-              className="h-20 w-20 shrink-0"
-              itemId={resolved.entry.itemId}
-              name={resolved.entry.name}
-            />
-          )}
-          <div className="min-w-0">
-            <p className="truncate text-sm">{resolved.entry.name}</p>
-            {resolved.kind === "stack"
-              ? renderStackButtons(area, resolved.entry.id, resolved.entry.quantity)
-              : renderUniqueButton(area, resolved.entry.id)}
-          </div>
-        </div>
-      </section>
+  // The details belong to the region holding the selection and render inside
+  // that region's grid, beneath the selected tile's row (#291).
+  function detailsFor(area: StorageArea) {
+    if (!resolved || resolved.area !== area) return undefined;
+    return (placement: StorageDetailsPlacement) => (
+      <StorageSelectionDetails
+        actions={
+          resolved.kind === "stack"
+            ? renderStackButtons(area, resolved.entry.id, resolved.entry.quantity)
+            : renderUniqueButton(area, resolved.entry.id)
+        }
+        area={area}
+        headingRef={detailsHeadingRef}
+        itemId={resolved.entry.itemId}
+        name={resolved.entry.name}
+        onClose={clearSelection}
+        panelRef={detailsRef}
+        placement={placement}
+        summary={
+          resolved.kind === "stack"
+            ? `Quantity ${resolved.entry.quantity}`
+            : chargeDescription(resolved.entry)
+        }
+      />
     );
   }
 
@@ -409,6 +446,7 @@ export function StorageTransferSurface({
             onSelect={toggleSelect}
             region={carried}
             regionRef={carriedRef}
+            renderDetails={detailsFor("carried")}
             selected={selection}
             title="CARRIED"
           />
@@ -423,12 +461,12 @@ export function StorageTransferSurface({
             onSelect={toggleSelect}
             region={destination}
             regionRef={storedRef}
+            renderDetails={detailsFor("stored")}
             selected={selection}
             title={labels.title}
           />
         </div>
       </div>
-      {renderSelected()}
     </section>
   );
 }

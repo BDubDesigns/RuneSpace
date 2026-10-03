@@ -8,8 +8,10 @@
 // Projects v2 is reachable only through the GraphQL API. This script is that
 // second path, and it is deliberately narrower than `gh`:
 //
-//   - `AGENTS.md` grants agents exactly two transitions, `Ready` ->
-//     `In Progress` and `In Progress` -> `Review`. Both the destination *and*
+//   - `AGENTS.md` grants agents exactly these transitions: `Ready` ->
+//     `In Progress`, `Backlog` -> `In Progress` (only for an issue the product
+//     owner specifically handed off and that is well scoped), and
+//     `In Progress` -> `Review`. Both the destination *and*
 //     the source are enforced, so the permitted pairs are the whole contract:
 //     `Done` and `Preview / Playtest` cannot be set, and a card already in one
 //     of them cannot be dragged back into the working columns either. A
@@ -52,12 +54,12 @@ export const AUTHORITY = Object.freeze({
   statusFieldName: "Status",
 });
 
-// The only two transitions AGENTS.md gives agents, as target -> allowed sources.
+// The only transitions AGENTS.md gives agents, as target -> allowed sources.
 // Restricting the destination alone is not enough: without a source check this
 // script would accept `Done` -> `In Progress`, dragging a card owned by the
 // merge/close automation back into the working columns.
 export const ALLOWED_TRANSITIONS = Object.freeze({
-  "In Progress": Object.freeze(["Ready"]),
+  "In Progress": Object.freeze(["Ready", "Backlog"]),
   Review: Object.freeze(["In Progress"]),
 });
 

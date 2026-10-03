@@ -175,12 +175,13 @@ describe("GraphQL failure messages", () => {
 });
 
 describe("transition validation", () => {
-  // AGENTS.md grants exactly two transitions. Restricting the destination is
+  // AGENTS.md grants exactly three transitions. Restricting the destination is
   // not enough on its own, so every source/target pair on the board is pinned
   // here: this matrix is the contract, and widening it has to be deliberate.
   const EXPECTED: Record<string, Record<string, "apply" | "no-op" | "refuse">> = {
     "In Progress": {
-      Backlog: "refuse",
+      // Only for an issue the product owner specifically handed off as well scoped.
+      Backlog: "apply",
       Ready: "apply",
       "In Progress": "no-op",
       Review: "refuse",
@@ -237,7 +238,7 @@ describe("transition validation", () => {
 
   it("derives the accepted targets from the transition table so they cannot drift", () => {
     expect([...AGENT_SETTABLE_STATUSES]).toEqual(Object.keys(ALLOWED_TRANSITIONS));
-    expect(ALLOWED_TRANSITIONS["In Progress"]).toEqual(["Ready"]);
+    expect(ALLOWED_TRANSITIONS["In Progress"]).toEqual(["Ready", "Backlog"]);
     expect(ALLOWED_TRANSITIONS["Review"]).toEqual(["In Progress"]);
   });
 });

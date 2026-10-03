@@ -15,6 +15,11 @@ import {
 import { getEffectiveGameBalance, getRepairTargetBalance } from "@/game/config/balance";
 import { ITEM_IDS, LOCATION_IDS, MISSION_IDS, REPAIR_TARGET_IDS } from "@/game/config/foundations";
 import { captureReviewScreenshot } from "./review-screenshot";
+import {
+  expectDetailsAboveNav,
+  expectDetailsBeneathRow,
+  expectSelectionMovesAndCloses,
+} from "./storage-row-details";
 
 /**
  * Seed an already-finished Cargo Hold repair (#172).
@@ -560,4 +565,113 @@ test("renders a dense Cargo Hold as a compact selectable grid (Issue #151)", asy
       }),
     )
     .toBe(true);
+});
+
+test("opens a stored item's details beneath its own row on phone and desktop (Issue #291)", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  const characterId = page.url().split("/").at(-1)!;
+  const cargoTarget = getRepairTargetBalance(
+    REPAIR_TARGET_IDS.cargoHold,
+    getEffectiveGameBalance(),
+  );
+  await seedRepairedCargoHold(characterId, cargoTarget);
+
+  // Nine Cargo entries and seven carried ones: several rows in both regions at
+  // three columns (3 / 3 / 3 and 3 / 3 / 1) and at four (4 / 4 / 1 and 4 / 3),
+  // each with a long-named stack and a charged unique item in it.
+  await db.insert(cargoHoldStacks).values([
+    { characterId, itemId: ITEM_IDS.ferriteShale, quantity: 4 },
+    { characterId, itemId: ITEM_IDS.refinedFerrite, quantity: 3 },
+    { characterId, itemId: ITEM_IDS.slag, quantity: 2 },
+    { characterId, itemId: ITEM_IDS.powerCell, quantity: 1 },
+  ]);
+  const cargoUnique = await db
+    .insert(itemInstances)
+    .values([
+      { characterId, itemId: ITEM_IDS.mykeaSchleppraum8 },
+      { characterId, itemId: ITEM_IDS.mykeaSchleppraum8 },
+      { characterId, itemId: ITEM_IDS.mykeaSchleppraum8 },
+      { characterId, itemId: ITEM_IDS.salvageCutter, currentCharge: 0 },
+      { characterId, itemId: ITEM_IDS.salvageCutter, currentCharge: 0 },
+    ])
+    .returning();
+  await db
+    .insert(cargoHoldItemInstances)
+    .values(cargoUnique.map((instance) => ({ characterId, itemInstanceId: instance.id })));
+  await db.insert(inventoryStacks).values([
+    { characterId, itemId: ITEM_IDS.ferriteShale, quantity: 2 },
+    { characterId, itemId: ITEM_IDS.refinedFerrite, quantity: 5 },
+    { characterId, itemId: ITEM_IDS.slag, quantity: 1 },
+    { characterId, itemId: ITEM_IDS.scrapMetal, quantity: 6 },
+  ]);
+  await db.insert(itemInstances).values([
+    { characterId, itemId: ITEM_IDS.salvageCutter, currentCharge: 0 },
+    { characterId, itemId: ITEM_IDS.salvageCutter, currentCharge: 0 },
+    { characterId, itemId: ITEM_IDS.salvageCutter, currentCharge: 0 },
+  ]);
+
+  await page.reload();
+  const cargoPanel = page.locator("[data-cargo-hold]");
+  await cargoPanel.getByRole("button", { name: "OPEN CARGO HOLD" }).click();
+  const carriedSection = cargoPanel.locator("[data-storage-area='carried']");
+  const cargoSection = cargoPanel.locator("[data-storage-area='stored']");
+  const regions = [
+    { tab: /^CARRIED/, section: carriedSection, tiles: 7 },
+    { tab: /^CARGO/, section: cargoSection, tiles: 9 },
+  ];
+
+  // Phone, three columns: the first, a middle, and the last tile of each tab.
+  // Switching tabs clears the selection, so each tab starts clean.
+  for (const { tab, section, tiles } of regions) {
+    await cargoPanel.getByRole("tab", { name: tab }).click();
+    await expect(section.locator("button[aria-pressed]")).toHaveCount(tiles);
+    for (const index of [0, Math.floor(tiles / 2), tiles - 1]) {
+      const measured = await expectDetailsBeneathRow(page, section, index);
+      expect(measured.columns).toBe(3);
+      await expectDetailsAboveNav(page, section);
+    }
+    await expectSelectionMovesAndCloses(page, section);
+  }
+  await captureReviewScreenshot(page, "cargo-mobile-row-details.png");
+
+  // The long name from the owner's screenshot: legible at the narrowest phone,
+  // with its quantity and controls clear of the artwork.
+  await page.setViewportSize({ width: 320, height: 640 });
+  const cargoTiles = cargoSection.locator("button[aria-pressed]");
+  const refinedIndex = await cargoTiles.evaluateAll((tiles) =>
+    tiles.findIndex((tile) => tile.getAttribute("aria-label")?.includes("Refined Ferrite")),
+  );
+  expect(refinedIndex).toBeGreaterThanOrEqual(0);
+  const narrow = await expectDetailsBeneathRow(page, cargoSection, refinedIndex);
+  expect(narrow.columns).toBe(3);
+  expect(narrow.name.text).toBe("Refined Ferrite");
+  await expectDetailsAboveNav(page, cargoSection);
+  await expect(cargoSection.locator("[data-storage-selection]")).toContainText("Quantity 3");
+  await captureReviewScreenshot(page, "cargo-narrow-row-details.png");
+  const unique = await cargoTiles.evaluateAll((tiles) =>
+    tiles.findIndex((tile) => tile.getAttribute("aria-label") === "Salvage Cutter"),
+  );
+  await expectDetailsBeneathRow(page, cargoSection, unique);
+  await expect(cargoSection.locator("[data-storage-selection]")).toContainText("charges remaining");
+
+  // Desktop, four columns, both regions side by side: one details area at a
+  // time, and selecting in the other region moves it there.
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await expect(carriedSection).toBeVisible();
+  await expect(cargoSection).toBeVisible();
+  for (const { section, tiles } of regions) {
+    for (const index of [0, Math.floor(tiles / 2), tiles - 1]) {
+      const measured = await expectDetailsBeneathRow(page, section, index);
+      expect(measured.columns).toBe(4);
+    }
+  }
+  await carriedSection.locator("button[aria-pressed]").first().click();
+  await expect(carriedSection.locator("[data-storage-selection]")).toBeVisible();
+  await cargoSection.locator("button[aria-pressed]").first().click();
+  await expect(page.locator("[data-storage-selection]")).toHaveCount(1);
+  await expect(cargoSection.locator("[data-storage-selection]")).toBeVisible();
+  await expect(carriedSection.locator("[data-storage-selection]")).toHaveCount(0);
+  await captureReviewScreenshot(page, "cargo-desktop-row-details.png");
 });
