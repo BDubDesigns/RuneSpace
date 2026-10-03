@@ -79,6 +79,170 @@ repeat the audit and update this record with measured evidence.
   GitHub Project board cards; the board is an optional owner tool, and its
   fields and workflows are not changed as part of an issue.
 
+## Retiring a merged issue's worktree
+
+Each issue gets its own worktree (above). Nothing removes it afterward: merging
+the PR on GitHub, deleting the remote branch, and archiving the agent session
+each leave the laptop-local directory in place, and none of them is proof that
+the directory is disposable. Retire one only through this procedure. It needs no
+daemon or scheduled job; it runs when a session is started or asked to, so a
+laptop that was off at merge time catches up at the next session.
+
+### Lifecycle
+
+1. **PR open:** keep the worktree, including through review and CI repair.
+2. **PR merged:** Brandon merges and may archive the session without saying
+   anything more. Nothing is removed at merge time, and the worktree waits for a
+   later session.
+3. **Next session:** after creating its own fresh worktree, a session removes a
+   previous session's worktree under the standing authorization below, one exact
+   path at a time, but only when every check in "Verify one candidate" passes.
+   It asks Brandon nothing per worktree. Anything that fails or cannot be
+   checked is left alone and reported in its first message, and the assigned
+   issue continues either way.
+4. **Leave it and report** whenever a check is unknown, ambiguous, or fails.
+   Uncertain or inaccessible worktrees stay untouched.
+
+**Standing authorization.** Brandon has authorized routine cleanup of completed
+sessions' worktrees (granted on PR #303), so no per-worktree approval is needed.
+It covers one thing: an agent may remove a previous session's worktree after
+**independently verifying** all of the following for that exact path. The
+agent's own checks supply the evidence; neither Brandon's merge nor an archived
+session does.
+
+- its PR was **merged** on GitHub, matched by repo, branch, and head commit;
+- the session is **finished**: the PR is merged and nothing is using the worktree
+  (below). Where a live session could be running somewhere this machine cannot
+  see, finished is not established;
+- the worktree is **clean**, with no tracked, staged, or untracked changes;
+- it is **unlocked**, and **nothing is actively using it**.
+
+The authorization does not extend to:
+
+- an active or uncertain worktree, including another agent's active worktree on
+  the Hermes host (see "Concurrent agent work on Hermes");
+- the first cleanup of accumulated historical worktrees on Brandon's laptop,
+  which still needs the read-only inventory and his separate approval (see
+  "Inventory");
+- any safety rule in this section: no `--force`, `rm -rf`, `git clean`, bulk
+  branch deletion, or removal of the primary or current worktree.
+
+If any check cannot be completed, leave the worktree alone and report it.
+An agent must not widen this authorization or edit this paragraph to grant
+itself more; only Brandon changes it, and he can revoke it at any time.
+
+Scope: worktrees on the machine you are running on. Never touch another
+repository, a database, Docker volume, preview deployment, or production state.
+
+### Inventory (read-only)
+
+Discover real paths; do not assume any. Nothing here changes anything.
+
+```bash
+git fetch origin main
+git worktree list --porcelain          # path, HEAD, branch, locked, prunable
+git rev-parse --show-toplevel          # the current worktree: never removable
+# per worktree <path>:
+git -C <path> status --porcelain --untracked-files=all
+git -C <path> status --short --ignored          # review ignored files too
+```
+
+Classify each worktree, and report the exact evidence for each:
+
+| Class | Meaning | Action |
+| --- | --- | --- |
+| primary | First `git worktree list` entry (main checkout) | never remove |
+| current | Contains your working directory | never remove |
+| active | Locked, open PR, session in use, or a process has it as its cwd | keep |
+| candidate | Passes every check in "Verify one candidate" | remove under the standing authorization |
+| dirty/unknown | Any modification, staged change, untracked file, detached HEAD, missing or ambiguous PR, or unreadable path | keep, report |
+| stale | Marked `prunable`: its directory is already gone | see "Stale registrations" |
+
+The **initial historical cleanup** on a laptop that has already accumulated
+worktrees starts with this inventory as a table (path, branch, PR and state,
+status, lock, class, proposed action) and stops for Brandon's explicit approval
+of the listed candidates; the standing authorization does not cover it. After
+that approved first cleanup, routine cleanup needs no report beyond the verified
+result.
+
+### Verify one candidate
+
+Run these for the exact path and branch. All must pass; `git branch --merged` and
+"the branch looks old" are not evidence, and squash merges make the former
+useless anyway.
+
+1. **Not protected:** not the primary or current worktree, no `locked` line in
+   the porcelain output, and a `branch refs/heads/<branch>` line (not detached).
+2. **Merged on GitHub, by identity:**
+
+   ```bash
+   gh pr list --repo BDubDesigns/RuneSpace --head <branch> --state all \
+     --json number,state,mergedAt,headRefOid,isCrossRepository,mergeCommit
+   ```
+
+   Require exactly one PR, `state` `MERGED` with `mergedAt` set, and
+   `isCrossRepository` false. `CLOSED` without a merge is not sufficient. Any
+   other PR open on that branch is a stop. Require
+   `git rev-parse <branch>` to equal `headRefOid`: a local commit the PR never
+   carried is unmerged work. Confirm the merge landed on the default branch with
+   `git merge-base --is-ancestor <mergeCommit.oid> origin/main`.
+3. **Clean:** the `status --porcelain --untracked-files=all` output above is
+   empty. In the `--ignored` output only regenerable build or dependency
+   directories (`node_modules`, `.next`, build output, `*.tsbuildinfo`) may
+   appear; env files, notes, local data, or anything else is a stop. Do not
+   stash, reset, or clean to make a worktree pass.
+4. **Not in use:** no process has the path as its working directory
+   (`lsof -d cwd -Fn | grep -E "^n<path>(/|$)"` prints nothing), and on the
+   Hermes host `/tmp/runespace-e2e.lock` is not held from that worktree. These
+   see only this machine. If the worktree might belong to a session running
+   elsewhere, or a check cannot run, the worktree is uncertain: leave it and
+   report.
+
+### Remove and verify
+
+```bash
+git worktree remove <exact-path>       # never --force; never rm -rf; never git clean
+git worktree list --porcelain          # the path must no longer appear
+test ! -e <exact-path>                 # and the directory must be gone
+```
+
+Report a removal only after both checks confirm that exact worktree is gone.
+If `git worktree remove` refuses (it also refuses locked, modified, and
+untracked worktrees), report the error and stop; do not retry with `--force` or
+`-f -f`, and do not delete the directory some other way. Remove candidates one at
+a time and re-run the list after each.
+
+The local branch is a separate decision. Leave it. Delete it only when Brandon
+asks, for that exact branch, after the PR check above passed (a squash-merged
+branch needs `git branch -D`, which is acceptable only under that explicit
+request). Never delete branches in bulk, and do not conflate it with the
+remote branch, which GitHub may already have deleted.
+
+### Stale registrations
+
+`git worktree prune` removes registrations whose directories are already
+missing; it deletes no directory and is not a substitute for `git worktree
+remove`. Inspect first:
+
+```bash
+git worktree prune --dry-run -v        # lists exactly what would be removed
+```
+
+Confirm every listed path is genuinely gone and not merely on an unmounted
+volume or network share, which also reads as missing. Only then run
+`git worktree prune`, and re-list to confirm.
+
+### Not part of this procedure
+
+No GitHub Action or other background job deletes laptop-local files. Other
+repositories (QC Failed, ParkQuest) are never edited from a RuneSpace issue;
+note any wish to adopt this there separately. A helper script is deliberately
+not provided: the inventory is a few read-only commands, removal must stay a
+per-path decision, and a script would be new code to keep safe. Revisit that only
+if the first laptop audit shows the same steps repeated enough to justify it,
+and then test it against disposable temporary repositories, never real
+worktrees.
+
 ## Validate locally and choose the confidence level
 
 ### Managed RuneSpace hosts
