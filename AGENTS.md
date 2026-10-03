@@ -177,12 +177,17 @@ Issue and PR state are authoritative. Agents do not move GitHub Project board
 cards; the board is an optional owner tool.
 
 A merged PR or archived session does not remove its worktree, and neither proves
-it is disposable. Keep an issue's worktree while its PR is open. Remove a
-finished one only with Brandon's explicit authorization and the verification in
-`docs/development-workflow.md` ("Retiring a merged issue's worktree"); otherwise
-list candidates and continue. Never remove a primary, current, locked, dirty,
-untracked, or unverified worktree, and never use `rm -rf`,
-`git worktree remove --force`, or `git clean`.
+it is disposable. Keep an issue's worktree while its PR is open. Brandon has
+given standing authorization to remove a previous session's worktree, without
+per-worktree approval, once you have independently verified that its PR was
+merged, the session is finished, it is clean and unlocked, and nothing is using
+it, per `docs/development-workflow.md` ("Retiring a merged issue's worktree").
+If any check cannot be completed, leave it and report it. Never touch an active
+or uncertain worktree, including another agent's on Hermes. The first cleanup
+of historical worktrees on Brandon's laptop still needs a read-only inventory
+and his separate approval. Never remove a primary, current, locked, dirty, or
+untracked worktree, and never use `rm -rf`, `git worktree remove --force`, or
+`git clean`.
 
 ## QC Failed status manifest
 

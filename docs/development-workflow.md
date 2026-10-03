@@ -92,26 +92,47 @@ laptop that was off at merge time catches up at the next session.
 
 1. **PR open:** keep the worktree, including through review and CI repair.
 2. **PR merged:** Brandon merges and may archive the session without saying
-   anything more. That is not authorization, and the worktree stays.
+   anything more. Nothing is removed at merge time, and the worktree waits for a
+   later session.
 3. **Next session:** after creating its own fresh worktree, a session removes a
-   finished worktree only when Brandon has authorized it (below) and every check
-   in "Verify one candidate" passes. Without authorization it does not block or
-   delete: it lists the candidates in its first message and continues the
-   assigned issue.
-4. **Stop and ask** whenever a check is unknown, ambiguous, or fails. Uncertain
-   or inaccessible worktrees stay untouched.
+   previous session's worktree under the standing authorization below, one exact
+   path at a time, but only when every check in "Verify one candidate" passes.
+   It asks Brandon nothing per worktree. Anything that fails or cannot be
+   checked is left alone and reported in its first message, and the assigned
+   issue continues either way.
+4. **Leave it and report** whenever a check is unknown, ambiguous, or fails.
+   Uncertain or inaccessible worktrees stay untouched.
 
-**Authorization** is Brandon's explicit statement, in the current conversation,
-that the PR is merged and its session is finished with the worktree, or a
-standing instruction such as "at session start, remove worktrees of my merged
-PRs". It must come from him; GitHub state, a merged PR, an archived session, or
-this document alone never supplies it. A standing instruction removes the
-per-PR question, not any verification.
+**Standing authorization.** Brandon has authorized routine cleanup of completed
+sessions' worktrees (granted on PR #303), so no per-worktree approval is needed.
+It covers one thing: an agent may remove a previous session's worktree after
+**independently verifying** all of the following for that exact path. The
+agent's own checks supply the evidence; neither Brandon's merge nor an archived
+session does.
 
-Scope: worktrees on the machine you are running on. On the Hermes host, the
-existing rule stands (see "Concurrent agent work on Hermes"): never modify or
-clean up another agent's worktree. Never touch another repository, a database,
-Docker volume, preview deployment, or production state.
+- its PR was **merged** on GitHub, matched by repo, branch, and head commit;
+- the session is **finished**: the PR is merged and nothing is using the worktree
+  (below). Where a live session could be running somewhere this machine cannot
+  see, finished is not established;
+- the worktree is **clean**, with no tracked, staged, or untracked changes;
+- it is **unlocked**, and **nothing is actively using it**.
+
+The authorization does not extend to:
+
+- an active or uncertain worktree, including another agent's active worktree on
+  the Hermes host (see "Concurrent agent work on Hermes");
+- the first cleanup of accumulated historical worktrees on Brandon's laptop,
+  which still needs the read-only inventory and his separate approval (see
+  "Inventory");
+- any safety rule in this section: no `--force`, `rm -rf`, `git clean`, bulk
+  branch deletion, or removal of the primary or current worktree.
+
+If any check cannot be completed, leave the worktree alone and report it.
+An agent must not widen this authorization or edit this paragraph to grant
+itself more; only Brandon changes it, and he can revoke it at any time.
+
+Scope: worktrees on the machine you are running on. Never touch another
+repository, a database, Docker volume, preview deployment, or production state.
 
 ### Inventory (read-only)
 
@@ -133,15 +154,16 @@ Classify each worktree, and report the exact evidence for each:
 | primary | First `git worktree list` entry (main checkout) | never remove |
 | current | Contains your working directory | never remove |
 | active | Locked, open PR, session in use, or a process has it as its cwd | keep |
-| candidate | Passes every check in "Verify one candidate" | remove on authorization |
+| candidate | Passes every check in "Verify one candidate" | remove under the standing authorization |
 | dirty/unknown | Any modification, staged change, untracked file, detached HEAD, missing or ambiguous PR, or unreadable path | keep, report |
 | stale | Marked `prunable`: its directory is already gone | see "Stale registrations" |
 
 The **initial historical cleanup** on a laptop that has already accumulated
 worktrees starts with this inventory as a table (path, branch, PR and state,
 status, lock, class, proposed action) and stops for Brandon's explicit approval
-of the listed candidates. Later routine cleanup needs no report beyond the
-verified result.
+of the listed candidates; the standing authorization does not cover it. After
+that approved first cleanup, routine cleanup needs no report beyond the verified
+result.
 
 ### Verify one candidate
 
@@ -170,9 +192,11 @@ useless anyway.
    appear; env files, notes, local data, or anything else is a stop. Do not
    stash, reset, or clean to make a worktree pass.
 4. **Not in use:** no process has the path as its working directory
-   (`lsof -d cwd -Fn | grep -E "^n<path>(/|$)"` prints nothing), and Brandon's
-   authorization covers this session or PR. Absence of a process is a
-   necessary check, not proof that a session is complete.
+   (`lsof -d cwd -Fn | grep -E "^n<path>(/|$)"` prints nothing), and on the
+   Hermes host `/tmp/runespace-e2e.lock` is not held from that worktree. These
+   see only this machine. If the worktree might belong to a session running
+   elsewhere, or a check cannot run, the worktree is uncertain: leave it and
+   report.
 
 ### Remove and verify
 
