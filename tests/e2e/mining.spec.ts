@@ -1412,7 +1412,11 @@ test("a full Inventory stack is dropped through inline confirmation and frees on
   await inventory.getByRole("button", { name: "Close inventory" }).click();
 
   // Carried mass updated authoritatively: 7 full stacks (7 kg) + 15 kg loadout.
-  await expect(page.getByText("22 kg / 50 kg", { exact: true })).toBeVisible();
+  // Scoped to Mining's own panel: The Jag can also host a stash mount panel
+  // (#284), whose context row shows the same carried mass.
+  await expect(
+    page.locator("[data-mining-activity]").getByText("22 kg / 50 kg", { exact: true }),
+  ).toBeVisible();
   await expect(footer.getByRole("button", { name: "Inventory" })).toBeVisible();
 });
 

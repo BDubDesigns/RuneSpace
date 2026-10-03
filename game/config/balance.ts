@@ -283,6 +283,49 @@ const balanceSchema = z.object({
       ]),
       repairIncrements: z.literal(15),
     }),
+    /**
+     * Site stash mounts (#284). Same-tier mounts share one recipe, so the two
+     * Tier 2 sites are two entries with identical authored numbers rather than
+     * a hidden shared constant. Six or more sections keeps Clean Pass
+     * available on every mount.
+     */
+    siteStashTheJag: z.object({
+      targetId: z.literal(REPAIR_TARGET_IDS.siteStashTheJag),
+      actionId: z.literal(ACTION_IDS.siteStashTheJagWelding),
+      materials: z.tuple([
+        z.object({ itemId: z.literal(ITEM_IDS.refinedFerrite), quantity: z.literal(6) }),
+        z.object({ itemId: z.literal(ITEM_IDS.slag), quantity: z.literal(3) }),
+      ]),
+      repairIncrements: z.literal(6),
+    }),
+    siteStashRuskRecovery: z.object({
+      targetId: z.literal(REPAIR_TARGET_IDS.siteStashRuskRecovery),
+      actionId: z.literal(ACTION_IDS.siteStashRuskRecoveryWelding),
+      materials: z.tuple([
+        z.object({ itemId: z.literal(ITEM_IDS.galvanicStock), quantity: z.literal(3) }),
+        z.object({ itemId: z.literal(ITEM_IDS.mountingBracket), quantity: z.literal(2) }),
+      ]),
+      repairIncrements: z.literal(10),
+    }),
+    siteStashProcessingYard: z.object({
+      targetId: z.literal(REPAIR_TARGET_IDS.siteStashProcessingYard),
+      actionId: z.literal(ACTION_IDS.siteStashProcessingYardWelding),
+      materials: z.tuple([
+        z.object({ itemId: z.literal(ITEM_IDS.galvanicStock), quantity: z.literal(3) }),
+        z.object({ itemId: z.literal(ITEM_IDS.mountingBracket), quantity: z.literal(2) }),
+      ]),
+      repairIncrements: z.literal(10),
+    }),
+    siteStashDeepJag: z.object({
+      targetId: z.literal(REPAIR_TARGET_IDS.siteStashDeepJag),
+      actionId: z.literal(ACTION_IDS.siteStashDeepJagWelding),
+      materials: z.tuple([
+        z.object({ itemId: z.literal(ITEM_IDS.galvaferrite), quantity: z.literal(2) }),
+        z.object({ itemId: z.literal(ITEM_IDS.mountingBracket), quantity: z.literal(2) }),
+        z.object({ itemId: z.literal(ITEM_IDS.galvanicStock), quantity: z.literal(1) }),
+      ]),
+      repairIncrements: z.literal(15),
+    }),
   }),
   cargoHold: z.object({
     capacitySlots: z.literal(32),
@@ -885,6 +928,43 @@ const defaults = balanceSchema.parse({
       materials: [
         { itemId: ITEM_IDS.refinedFerrite, quantity: 25 },
         { itemId: ITEM_IDS.powerCell, quantity: 5 },
+      ],
+      repairIncrements: 15,
+    },
+    siteStashTheJag: {
+      targetId: REPAIR_TARGET_IDS.siteStashTheJag,
+      actionId: ACTION_IDS.siteStashTheJagWelding,
+      materials: [
+        { itemId: ITEM_IDS.refinedFerrite, quantity: 6 },
+        { itemId: ITEM_IDS.slag, quantity: 3 },
+      ],
+      repairIncrements: 6,
+    },
+    siteStashRuskRecovery: {
+      targetId: REPAIR_TARGET_IDS.siteStashRuskRecovery,
+      actionId: ACTION_IDS.siteStashRuskRecoveryWelding,
+      materials: [
+        { itemId: ITEM_IDS.galvanicStock, quantity: 3 },
+        { itemId: ITEM_IDS.mountingBracket, quantity: 2 },
+      ],
+      repairIncrements: 10,
+    },
+    siteStashProcessingYard: {
+      targetId: REPAIR_TARGET_IDS.siteStashProcessingYard,
+      actionId: ACTION_IDS.siteStashProcessingYardWelding,
+      materials: [
+        { itemId: ITEM_IDS.galvanicStock, quantity: 3 },
+        { itemId: ITEM_IDS.mountingBracket, quantity: 2 },
+      ],
+      repairIncrements: 10,
+    },
+    siteStashDeepJag: {
+      targetId: REPAIR_TARGET_IDS.siteStashDeepJag,
+      actionId: ACTION_IDS.siteStashDeepJagWelding,
+      materials: [
+        { itemId: ITEM_IDS.galvaferrite, quantity: 2 },
+        { itemId: ITEM_IDS.mountingBracket, quantity: 2 },
+        { itemId: ITEM_IDS.galvanicStock, quantity: 1 },
       ],
       repairIncrements: 15,
     },

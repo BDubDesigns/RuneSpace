@@ -460,12 +460,16 @@ describe("the Crew Stop as a place and as a repair target", () => {
     expect(getRepairTarget(REPAIR_TARGET_IDS.crewStop)).toMatchObject({
       locationId: LOCATION_IDS.holoHollow,
       localPlaceId: LOCAL_PLACE_IDS.holoHollowCrewStop,
-      authorizingMissionId: MISSION_IDS.outOfTheWeather,
+      authorization: { kind: "mission", missionId: MISSION_IDS.outOfTheWeather },
     });
     expect(REPAIR_TARGETS.map((target) => target.id)).toEqual([
       REPAIR_TARGET_IDS.cargoHold,
       REPAIR_TARGET_IDS.crewStop,
       REPAIR_TARGET_IDS.deepJagCaveIn,
+      REPAIR_TARGET_IDS.siteStashTheJag,
+      REPAIR_TARGET_IDS.siteStashRuskRecovery,
+      REPAIR_TARGET_IDS.siteStashProcessingYard,
+      REPAIR_TARGET_IDS.siteStashDeepJag,
     ]);
   });
 

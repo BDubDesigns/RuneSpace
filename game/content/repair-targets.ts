@@ -11,14 +11,29 @@ import {
 } from "@/game/config/foundations";
 
 /**
+ * What reveals a repair target's controls (#284 generalized this from the
+ * original Mission-only rule).
+ *
+ * - `mission`: the named Mission has been ACCEPTED. A finished repair stays
+ *   usable regardless of Mission state.
+ * - `welding_level`: the character's personal Welding level has reached
+ *   `level` and, when authored, `requiresCompletedTargetId` is itself
+ *   complete (Deep Jag's stash mount needs the passage open first). No other
+ *   skill ever gates these; a level-gated target never consults Mining,
+ *   Refining, or Fabrication.
+ */
+export type RepairAuthorization =
+  | { kind: "mission"; missionId: MissionId }
+  | { kind: "welding_level"; level: number; requiresCompletedTargetId?: RepairTargetId };
+
+/**
  * The authoritative registry of things Welding can repair (#172).
  *
- * A repair target says where the work happens and which accepted Mission
- * authorizes it. Its recipe (materials, increments) is balance; its durable
+ * A repair target says where the work happens and what authorizes it. Its recipe (materials, increments) is balance; its durable
  * per-character state is `character_repair_targets`. Nothing here is a second
  * copy of either.
  *
- * `authorizingMissionId` is the Mission whose ACCEPTANCE reveals the repair
+ * A Mission authorization is the Mission whose ACCEPTANCE reveals the repair
  * controls — not a completion gate. A finished repair stays usable regardless
  * of Mission state, which is why a player who repaired the Cargo Hold keeps
  * its storage forever.
@@ -30,7 +45,7 @@ export type RepairTargetDefinition = {
   locationId: LocationId;
   /** The Local Place hosting the work, when the target lives inside one. */
   localPlaceId?: LocalPlaceId;
-  authorizingMissionId: MissionId;
+  authorization: RepairAuthorization;
   /**
    * Optional authored flavour for one material row, keyed by item ID (#209).
    *
@@ -49,7 +64,7 @@ export const REPAIR_TARGETS: readonly RepairTargetDefinition[] = [
     id: REPAIR_TARGET_IDS.cargoHold,
     displayName: "Cargo Hold",
     locationId: LOCATION_IDS.crashSite,
-    authorizingMissionId: MISSION_IDS.holdItTogether,
+    authorization: { kind: "mission", missionId: MISSION_IDS.holdItTogether },
     materialNotes: {
       [ITEM_IDS.refinedFerrite]: "replacement plating and braces",
       [ITEM_IDS.slag]: "thermal packing for bulkhead voids",
@@ -60,7 +75,7 @@ export const REPAIR_TARGETS: readonly RepairTargetDefinition[] = [
     displayName: "Crew Stop",
     locationId: LOCATION_IDS.holoHollow,
     localPlaceId: LOCAL_PLACE_IDS.holoHollowCrewStop,
-    authorizingMissionId: MISSION_IDS.outOfTheWeather,
+    authorization: { kind: "mission", missionId: MISSION_IDS.outOfTheWeather },
   },
   {
     // Deep Jag's cave-in (#209). Its completion is the authoritative fact the
@@ -68,10 +83,40 @@ export const REPAIR_TARGETS: readonly RepairTargetDefinition[] = [
     id: REPAIR_TARGET_IDS.deepJagCaveIn,
     displayName: "Collapsed Passage",
     locationId: LOCATION_IDS.deepJag,
-    authorizingMissionId: MISSION_IDS.braceYourself,
+    authorization: { kind: "mission", missionId: MISSION_IDS.braceYourself },
     materialNotes: {
       [ITEM_IDS.refinedFerrite]: "the brace legs and the crown plate",
       [ITEM_IDS.powerCell]: "charge for Tansy's jack, spent setting the brace",
+    },
+  },
+  // Site stash mounts (#284): permanent, per-character, one per authored site.
+  // Same tier, same Welding gate, same recipe wherever it is built.
+  {
+    id: REPAIR_TARGET_IDS.siteStashTheJag,
+    displayName: "Stash Mount",
+    locationId: LOCATION_IDS.theJag,
+    authorization: { kind: "welding_level", level: 1 },
+  },
+  {
+    id: REPAIR_TARGET_IDS.siteStashRuskRecovery,
+    displayName: "Stash Mount",
+    locationId: LOCATION_IDS.ruskRecovery,
+    authorization: { kind: "welding_level", level: 5 },
+  },
+  {
+    id: REPAIR_TARGET_IDS.siteStashProcessingYard,
+    displayName: "Stash Mount",
+    locationId: LOCATION_IDS.abandonedProcessingYard,
+    authorization: { kind: "welding_level", level: 5 },
+  },
+  {
+    id: REPAIR_TARGET_IDS.siteStashDeepJag,
+    displayName: "Stash Mount",
+    locationId: LOCATION_IDS.deepJag,
+    authorization: {
+      kind: "welding_level",
+      level: 8,
+      requiresCompletedTargetId: REPAIR_TARGET_IDS.deepJagCaveIn,
     },
   },
 ] as const satisfies readonly RepairTargetDefinition[];

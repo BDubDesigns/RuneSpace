@@ -992,16 +992,33 @@ suite("issue #207 Work Orders (real PostgreSQL)", () => {
           .update(rune.characters)
           .set({ currentLocationId: target.locationId })
           .where(eq(rune.characters.id, character.id));
-        // Its authorizing Mission accepted and its recipe already in, which is
-        // all a repair needs before the Welding itself can start.
-        await db
-          .insert(rune.characterMissions)
-          .values({
-            characterId: character.id,
-            missionId: target.authorizingMissionId,
-            acceptedAt: start,
-          })
-          .onConflictDoNothing();
+        // Its authorization satisfied and its recipe already in, which is all
+        // a repair needs before the Welding itself can start.
+        if (target.authorization.kind === "mission") {
+          await db
+            .insert(rune.characterMissions)
+            .values({
+              characterId: character.id,
+              missionId: target.authorization.missionId,
+              acceptedAt: start,
+            })
+            .onConflictDoNothing();
+        } else {
+          await setWeldingLevel(character.id, target.authorization.level);
+          const prerequisite = target.authorization.requiresCompletedTargetId;
+          if (prerequisite) {
+            await db
+              .insert(rune.characterRepairTargets)
+              .values({
+                characterId: character.id,
+                targetId: prerequisite,
+                materials: {},
+                weldingProgress: 1,
+                completedAt: start,
+              })
+              .onConflictDoNothing();
+          }
+        }
         await db.insert(rune.characterRepairTargets).values({
           characterId: character.id,
           targetId: target.id,

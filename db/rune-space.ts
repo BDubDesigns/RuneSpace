@@ -959,6 +959,112 @@ export const cargoHoldItemInstances = pgTable(
 );
 
 /**
+ * The ordinary container installed in a character's site stash mount (#284).
+ *
+ * One row per (character, location). The mount itself is not a row: it is
+ * "built" exactly when that location's repair target is complete. The installed
+ * item keeps its original item_instances row; this relation is the location
+ * assignment, so the instance is owned but neither carried nor equipped.
+ * `item_instance_id` is unique per character, so one instance can serve at most
+ * one stash. Swapping a container is an UPDATE of this row, never a delete, so
+ * the stored contents below stay attached to the same mount.
+ */
+export const siteStashContainers = pgTable(
+  "site_stash_containers",
+  {
+    characterId: text("character_id")
+      .notNull()
+      .references(() => characters.id, { onDelete: "restrict" }),
+    locationId: text("location_id").notNull(),
+    itemInstanceId: text("item_instance_id").notNull(),
+    installedAt: timestamp("installed_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    primaryKey({
+      columns: [table.characterId, table.locationId],
+      name: "site_stash_containers_pk",
+    }),
+    unique("site_stash_containers_character_instance_unique").on(
+      table.characterId,
+      table.itemInstanceId,
+    ),
+    foreignKey({
+      columns: [table.characterId, table.itemInstanceId],
+      foreignColumns: [itemInstances.characterId, itemInstances.id],
+      name: "site_stash_containers_owned_instance_fk",
+    }).onDelete("restrict"),
+  ],
+);
+
+/**
+ * Fungible occupied stash slots at one site. Each row is one slot; stack limits
+ * stay content-owned. The composite foreign key to the installed container
+ * means a stash cannot hold anything without a container, and the container row
+ * cannot be deleted while anything is still stored (#284).
+ */
+export const siteStashStacks = pgTable(
+  "site_stash_stacks",
+  {
+    id: text("id")
+      .primaryKey()
+      .default(sql`gen_random_uuid()`),
+    characterId: text("character_id")
+      .notNull()
+      .references(() => characters.id, { onDelete: "restrict" }),
+    locationId: text("location_id").notNull(),
+    itemId: text("item_id").notNull(),
+    quantity: integer("quantity").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    check("site_stash_stacks_quantity_positive", sql`${table.quantity} > 0`),
+    foreignKey({
+      columns: [table.characterId, table.locationId],
+      foreignColumns: [siteStashContainers.characterId, siteStashContainers.locationId],
+      name: "site_stash_stacks_installed_container_fk",
+    }).onDelete("restrict"),
+    index("site_stash_stacks_character_location_idx").on(table.characterId, table.locationId),
+  ],
+);
+
+/**
+ * A unique item stored in a site stash keeps its original item_instances row
+ * and mutable state; this relation is only the storage assignment.
+ */
+export const siteStashItemInstances = pgTable(
+  "site_stash_item_instances",
+  {
+    characterId: text("character_id")
+      .notNull()
+      .references(() => characters.id, { onDelete: "restrict" }),
+    locationId: text("location_id").notNull(),
+    itemInstanceId: text("item_instance_id").notNull(),
+    storedAt: timestamp("stored_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    primaryKey({
+      columns: [table.characterId, table.itemInstanceId],
+      name: "site_stash_item_instances_pk",
+    }),
+    foreignKey({
+      columns: [table.characterId, table.itemInstanceId],
+      foreignColumns: [itemInstances.characterId, itemInstances.id],
+      name: "site_stash_item_instances_owned_instance_fk",
+    }).onDelete("restrict"),
+    foreignKey({
+      columns: [table.characterId, table.locationId],
+      foreignColumns: [siteStashContainers.characterId, siteStashContainers.locationId],
+      name: "site_stash_item_instances_installed_container_fk",
+    }).onDelete("restrict"),
+    index("site_stash_item_instances_character_location_idx").on(
+      table.characterId,
+      table.locationId,
+    ),
+  ],
+);
+
+/**
  * Immutable per-character Power Annex eligibility records. Eligibility is
  * derived by looking up the current Pacific calendar date; nothing is cleared
  * at midnight by a background process.
@@ -2122,6 +2228,9 @@ export type CharacterMerchantDailyPurchase = typeof characterMerchantDailyPurcha
 export type CharacterWorkOrderPosting = typeof characterWorkOrderPostings.$inferSelect;
 export type CargoHoldStack = typeof cargoHoldStacks.$inferSelect;
 export type CargoHoldItemInstance = typeof cargoHoldItemInstances.$inferSelect;
+export type SiteStashContainer = typeof siteStashContainers.$inferSelect;
+export type SiteStashStack = typeof siteStashStacks.$inferSelect;
+export type SiteStashItemInstance = typeof siteStashItemInstances.$inferSelect;
 export type OperatorAuditLog = typeof operatorAuditLogs.$inferSelect;
 export type NewOperatorAuditLog = typeof operatorAuditLogs.$inferInsert;
 export type RuneSpaceAccessState = typeof runespaceAccessState.$inferSelect;

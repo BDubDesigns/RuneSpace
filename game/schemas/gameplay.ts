@@ -283,6 +283,48 @@ export const WithdrawCargoUniqueItemRequestSchema = z.object({
 });
 
 /**
+ * Site stash commands (#284). The location is a stale-view guard, not an
+ * authority: the server proves the character is actually there and that the
+ * location is an authored stash site. Capacity, container type and quantities
+ * are never accepted from the client.
+ */
+const SiteStashLocationField = z.string().min(1).max(100);
+
+const SiteStashStackTransferFields = {
+  characterId: z.string().uuid(),
+  locationId: SiteStashLocationField,
+  stackId: z.string().uuid(),
+  mode: z.enum(["one", "stack"]),
+  expectedQuantity: z.number().int().positive(),
+} as const;
+
+export const DepositSiteStashStackRequestSchema = z.object(SiteStashStackTransferFields);
+export const WithdrawSiteStashStackRequestSchema = z.object(SiteStashStackTransferFields);
+
+const SiteStashUniqueTransferFields = {
+  characterId: z.string().uuid(),
+  locationId: SiteStashLocationField,
+  itemInstanceId: z.string().uuid(),
+} as const;
+
+export const DepositSiteStashUniqueItemRequestSchema = z.object(SiteStashUniqueTransferFields);
+export const WithdrawSiteStashUniqueItemRequestSchema = z.object(SiteStashUniqueTransferFields);
+export const InstallSiteStashContainerRequestSchema = z.object(SiteStashUniqueTransferFields);
+
+export const RemoveSiteStashContainerRequestSchema = z.object({
+  characterId: z.string().uuid(),
+  locationId: SiteStashLocationField,
+  expectedContainerInstanceId: z.string().uuid(),
+});
+
+export const SwapSiteStashContainerRequestSchema = z.object({
+  characterId: z.string().uuid(),
+  locationId: SiteStashLocationField,
+  expectedContainerInstanceId: z.string().uuid(),
+  itemInstanceId: z.string().uuid(),
+});
+
+/**
  * Generic mission commands identify only the owned character plus the narrow
  * command intent: which authored mission and which NPC the player is acting
  * with. Everything else — required items, quantities, requirement

@@ -128,7 +128,12 @@ export function formatAuditSummary(
     }
     case "removed_unique_item": {
       const item = itemLabel(str(d.itemId));
-      const from = d.source === "cargo" ? "the Cargo hold" : "carried inventory";
+      const from =
+        d.source === "cargo"
+          ? "the Cargo hold"
+          : d.source === "site_stash"
+            ? "a site stash"
+            : "carried inventory";
       return `Permanently deleted unique ${item || "item"} from ${from}.`;
     }
     case "added_stackable_item": {

@@ -43,12 +43,19 @@ import {
  * call site.
  */
 export function RepairWorkPanel({
+  embedded = false,
   eyebrow,
   materialsPrompt,
   targetId,
   title,
   weldingPrompt,
 }: {
+  /**
+   * Render the work without its own frame and heading, for a host that already
+   * supplies both (a site stash's disclosure header). Display only: the same
+   * controls, meters and repair rules.
+   */
+  embedded?: boolean;
   /** In-world context above the title, e.g. "Collapsed Passage". */
   eyebrow?: string;
   /** Copy shown under the contribute control while material is outstanding. */
@@ -161,13 +168,8 @@ export function RepairWorkPanel({
     });
   }
 
-  return (
-    <ActivityPanel
-      data-repair-work-panel={targetId}
-      data-repair-complete={repair.complete ? "true" : "false"}
-      title={title}
-      {...(eyebrow ? { eyebrow } : {})}
-    >
+  const body = (
+    <>
       <p aria-live="polite" className="sr-only">
         {completionAnnouncement}
       </p>
@@ -270,6 +272,25 @@ export function RepairWorkPanel({
           quantity: state.carriedByItemId[material.itemId] ?? 0,
         }))}
       />
+    </>
+  );
+
+  return embedded ? (
+    <div
+      className="space-y-3"
+      data-repair-complete={repair.complete ? "true" : "false"}
+      data-repair-work-panel={targetId}
+    >
+      {body}
+    </div>
+  ) : (
+    <ActivityPanel
+      data-repair-work-panel={targetId}
+      data-repair-complete={repair.complete ? "true" : "false"}
+      title={title}
+      {...(eyebrow ? { eyebrow } : {})}
+    >
+      {body}
     </ActivityPanel>
   );
 }

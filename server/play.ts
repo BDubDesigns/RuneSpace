@@ -15,6 +15,9 @@ import {
   equippedItems,
   inventoryStacks,
   itemInstances,
+  siteStashContainers,
+  siteStashItemInstances,
+  siteStashStacks,
 } from "@/db/rune-space";
 import {
   getEffectiveGameBalance,
@@ -67,6 +70,7 @@ import {
 } from "@/game/domain/welding-repair";
 import { resolveLocationState, type LocationStateFacts } from "@/game/domain/location-state";
 import { LOCATIONS } from "@/game/content/locations";
+import { getSiteStash } from "@/game/content/site-stashes";
 import { getRepairTarget } from "@/game/content/repair-targets";
 import { loadLocationStateFacts } from "@/server/location-state";
 import { POWER_ANNEX_REWARD_SOURCE_ID, pacificResetDate } from "@/game/domain/power-annex";
@@ -80,6 +84,11 @@ import {
   unmetEquipRequirement,
   type EquipmentTarget,
 } from "@/game/domain/equipment";
+import {
+  planSiteStashRemoval,
+  planSiteStashSwap,
+  siteStashSlotCapacity,
+} from "@/game/domain/site-stash";
 import {
   deriveCarriedUniqueItems,
   planExactStackAddition,
@@ -190,7 +199,7 @@ import {
 import { loadRepairAccess } from "@/server/repair-access";
 import { recordTrackedActivity, type TrackedActivity } from "@/server/mission-progress";
 import type { MissionProjection } from "@/game/domain/missions";
-import { loadPlaySnapshot } from "@/server/play-state";
+import { loadPlaySnapshot, type PlaySnapshot } from "@/server/play-state";
 import {
   createFabricationResolver,
   defaultOverrideRandom,
@@ -710,6 +719,53 @@ export type CargoHoldState = {
   capacitySlots: number;
 };
 
+/** One ordinary container a stash could take, as the stash surface presents it (#284). */
+export type SiteStashContainerState = {
+  itemInstanceId: string;
+  itemId: string;
+  name: string;
+  slotCapacity: number;
+  massGrams: number;
+};
+
+/**
+ * The character's stash at the site they are standing in (#284).
+ *
+ * Present only when that site is an authored stash site AND the stash is
+ * already meaningful to this character: its Welding gate is met (and any
+ * prerequisite repair is done), or the mount is already built. A character who
+ * has not earned it sees no panel, no teaser and no disabled control, because
+ * there is no `siteStash` for the browser to render one from. (The generic
+ * `repairs` map still carries every repair target's public recipe, as it does
+ * for every target; nothing renders a hidden mount from it.)
+ *
+ * Everything an affordance needs is decided here from the same pure rules the
+ * commands enforce; the browser derives nothing it could get wrong.
+ */
+export type SiteStashState = {
+  locationId: string;
+  /** The mount's construction, projected exactly like every other repair target. */
+  repair: RepairProjection;
+  mountBuilt: boolean;
+  container?: SiteStashContainerState;
+  stacks: readonly CargoHoldStackState[];
+  uniqueItems: readonly CargoHoldUniqueItemState[];
+  slotsUsed: number;
+  /** The installed container's authored slot capacity; 0 until one is installed. */
+  capacitySlots: number;
+  /** Carried, unequipped containers: the candidates for Install or Swap. */
+  carriedContainers: readonly SiteStashContainerState[];
+  /** The subset the server would accept as a swap replacement right now. */
+  swappableContainerInstanceIds: readonly string[];
+  /**
+   * Why Remove Container would be refused right now, from the same pure rule
+   * the command enforces: the stash is not empty, or the returned container
+   * would not fit carried Inventory. Absent means it can be removed (or there
+   * is no container).
+   */
+  removeBlockedReason?: "not_empty" | "carried_capacity";
+};
+
 /**
  * Why an activity stopped on its own, for the surface that owns it (#209).
  *
@@ -883,6 +939,8 @@ export type PlayGameplayState = {
   /** The Work Orders terminal's authoritative visibility and state (#190). */
   workOrders: WorkOrdersProjection;
   cargoHold: CargoHoldState;
+  /** The stash at the character's current site, when one is theirs to see (#284). */
+  siteStash?: SiteStashState;
   recentResult: { successes: number; failures: number; awardedXp: number };
   refiningRecentResult: { successes: number; failures: number; awardedXp: number };
   /**
@@ -1468,6 +1526,147 @@ async function projectWorkOrders(
   };
 }
 
+/**
+ * Project the stash at the character's current site (#284).
+ *
+ * Returns nothing unless the site is an authored stash site and the stash is
+ * already theirs to see; see `SiteStashState`. Reads are unlocked, like the
+ * Cargo projection: every command re-proves everything under its own locks.
+ */
+async function projectSiteStash(
+  transaction: DatabaseTransaction,
+  input: {
+    characterId: string;
+    currentLocationId: string;
+    repairs: Readonly<Record<string, RepairProjection>>;
+    snapshot: PlaySnapshot;
+    balance: EffectiveGameBalance;
+  },
+): Promise<SiteStashState | undefined> {
+  const site = getSiteStash(input.currentLocationId);
+  if (!site) return undefined;
+  const repair = input.repairs[site.mountTargetId];
+  // `repairAvailable` is true exactly when the Welding gate (and any
+  // prerequisite repair) is met or the mount is already built.
+  if (!repair || !repair.repairAvailable) return undefined;
+  const [containerRows, stackRows, itemRows] = await Promise.all([
+    transaction
+      .select()
+      .from(siteStashContainers)
+      .where(
+        and(
+          eq(siteStashContainers.characterId, input.characterId),
+          eq(siteStashContainers.locationId, site.locationId),
+        ),
+      ),
+    transaction
+      .select()
+      .from(siteStashStacks)
+      .where(
+        and(
+          eq(siteStashStacks.characterId, input.characterId),
+          eq(siteStashStacks.locationId, site.locationId),
+        ),
+      )
+      .orderBy(asc(siteStashStacks.createdAt), asc(siteStashStacks.id)),
+    transaction
+      .select()
+      .from(siteStashItemInstances)
+      .where(
+        and(
+          eq(siteStashItemInstances.characterId, input.characterId),
+          eq(siteStashItemInstances.locationId, site.locationId),
+        ),
+      )
+      .orderBy(asc(siteStashItemInstances.storedAt), asc(siteStashItemInstances.itemInstanceId)),
+  ]);
+  const containerOption = (instance: {
+    id: string;
+    itemId: string;
+  }): SiteStashContainerState | undefined => {
+    const slotCapacity = siteStashSlotCapacity(instance.itemId);
+    if (slotCapacity === undefined) return undefined;
+    return {
+      itemInstanceId: instance.id,
+      itemId: instance.itemId,
+      name: resolveItemPresentation(instance.itemId, instance.itemId).displayName,
+      slotCapacity,
+      massGrams: carriedItemMassGrams(instance.itemId, input.balance),
+    };
+  };
+  const installedInstance = containerRows[0]
+    ? input.snapshot.allItemInstances.find(
+        (instance) => instance.id === containerRows[0]!.itemInstanceId,
+      )
+    : undefined;
+  const container = installedInstance ? containerOption(installedInstance) : undefined;
+  const uniqueItems = itemRows
+    .map((row) =>
+      input.snapshot.allItemInstances.find((instance) => instance.id === row.itemInstanceId),
+    )
+    .filter((instance): instance is (typeof input.snapshot.allItemInstances)[number] =>
+      Boolean(instance),
+    )
+    .map((instance) => ({
+      id: instance.id,
+      itemId: instance.itemId,
+      name: resolveItemPresentation(instance.itemId, instance.itemId).displayName,
+      massGrams: carriedItemMassGrams(instance.itemId, input.balance),
+      currentCharge: chargeOf(instance, input.balance),
+    }));
+  const slotsUsed = stackRows.length + uniqueItems.length;
+  const carriedContainers = input.snapshot.carriedInstances
+    .filter((instance) => !input.snapshot.equipmentLoadout.equippedItemInstanceIds.has(instance.id))
+    .map(containerOption)
+    .filter((option): option is SiteStashContainerState => option !== undefined);
+  const carriedRoom = {
+    inventorySlotsUsed: input.snapshot.slotsUsed,
+    slotCapacity: input.snapshot.slotCapacity,
+    carriedMassGrams: input.snapshot.carriedMassGrams,
+    maximumCarryCapacityGrams: input.snapshot.maximumCarryCapacityGrams,
+  };
+  const swappableContainerInstanceIds = container
+    ? carriedContainers
+        .filter(
+          (option) =>
+            planSiteStashSwap({
+              installedItemId: container.itemId,
+              replacementItemId: option.itemId,
+              occupiedSlots: slotsUsed,
+              carried: carriedRoom,
+            }).ok,
+        )
+        .map((option) => option.itemInstanceId)
+    : [];
+  const removal = container
+    ? planSiteStashRemoval({
+        occupiedSlots: slotsUsed,
+        installedItemId: container.itemId,
+        carried: carriedRoom,
+      })
+    : undefined;
+  const removeBlockedReason = removal && !removal.ok ? removal.reason : undefined;
+  return {
+    locationId: site.locationId,
+    repair,
+    mountBuilt: repair.complete,
+    ...(container ? { container } : {}),
+    stacks: stackRows.map((stack) => ({
+      id: stack.id,
+      itemId: stack.itemId,
+      name: resolveItemPresentation(stack.itemId, stack.itemId).displayName,
+      quantity: stack.quantity,
+      stackLimit: itemStackLimit(stack.itemId, input.balance),
+    })),
+    uniqueItems,
+    slotsUsed,
+    capacitySlots: container?.slotCapacity ?? 0,
+    carriedContainers,
+    swappableContainerInstanceIds,
+    ...(removeBlockedReason ? { removeBlockedReason } : {}),
+  };
+}
+
 async function projectRepairTarget(
   transaction: DatabaseTransaction,
   characterId: string,
@@ -1923,6 +2122,13 @@ export async function stateFromTransaction(
       currentCharge: chargeOf(instance, balance),
     }));
   const currentLocationId = character[0]?.currentLocationId ?? LOCATION_IDS.crashSite;
+  const siteStash = await projectSiteStash(transaction, {
+    characterId,
+    currentLocationId,
+    repairs,
+    snapshot,
+    balance,
+  });
   // Work Orders (#207). Projected after the character's location is known,
   // because every posting's acceptability depends on the player genuinely
   // standing in Wade's yard.
@@ -2327,6 +2533,7 @@ export async function stateFromTransaction(
       slotsUsed: cargoStackRows.length + cargoUniqueItems.length,
       capacitySlots: balance.cargoHold.capacitySlots,
     },
+    ...(siteStash ? { siteStash } : {}),
     recentResult,
     refiningRecentResult,
     stop: (() => {

@@ -116,6 +116,17 @@ suite("issue #110 Cut Your Teeth persistence and XP boundary (real PostgreSQL)",
       .values({ characterId, itemId: ITEM_IDS.ferriteShale, quantity });
   }
 
+  /** Every Ferrite Shale the character carries, across all of its stacks. */
+  async function carriedShale(characterId: string) {
+    const stacks = await db
+      .select()
+      .from(rune.inventoryStacks)
+      .where(eq(rune.inventoryStacks.characterId, characterId));
+    return stacks
+      .filter((stack) => stack.itemId === ITEM_IDS.ferriteShale)
+      .reduce((total, stack) => total + stack.quantity, 0);
+  }
+
   async function completeMiningAttempts(userId: string, characterId: string) {
     const start = new Date(now.getTime() + 10_000);
     await miningCommands.startMining(userId, characterId, start, deterministicRandom());
@@ -447,6 +458,7 @@ suite("issue #110 Cut Your Teeth persistence and XP boundary (real PostgreSQL)",
     await equipCutter(userId, character.id);
     await addShale(character.id, 10);
     await completeMiningAttempts(userId, character.id);
+    const shaleBeforeRace = await carriedShale(character.id);
 
     // Two FIRST completion requests race: the mission is accepted and
     // incomplete with every requirement satisfied. Exactly one must win.
@@ -475,12 +487,11 @@ suite("issue #110 Cut Your Teeth persistence and XP boundary (real PostgreSQL)",
     // Exactly +100 Mining XP total, once.
     expect(await miningXp(character.id)).toBe(175);
 
-    // Shale unchanged — shown, never consumed.
-    const stacks = await db
-      .select()
-      .from(rune.inventoryStacks)
-      .where(eq(rune.inventoryStacks.characterId, character.id));
-    expect(stacks.filter((stack) => stack.itemId === ITEM_IDS.ferriteShale)[0]?.quantity).toBe(10);
+    // Shale unchanged — shown, never consumed. Compared as a total before and
+    // after the race: mining leaves Ferrite Shale in more than one stack, and an
+    // unordered SELECT does not promise which stack comes back first.
+    expect(await carriedShale(character.id)).toBe(shaleBeforeRace);
+    expect(shaleBeforeRace).toBeGreaterThanOrEqual(10);
 
     // Persisted completion state is coherent: completedAt present, XP once.
     const rows = await db

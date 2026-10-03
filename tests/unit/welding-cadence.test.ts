@@ -138,7 +138,15 @@ describe("weldingActionIds keeps its narrower repair-target contract (#172, #207
   it("returns exactly the repair-target registry's action IDs", () => {
     expect(weldingActionIds(balance)).toEqual(repairActionIds);
     expect(new Set(weldingActionIds(balance))).toEqual(
-      new Set([ACTION_IDS.cargoHoldWelding, ACTION_IDS.crewStopWelding, ACTION_IDS.deepJagWelding]),
+      new Set([
+        ACTION_IDS.cargoHoldWelding,
+        ACTION_IDS.crewStopWelding,
+        ACTION_IDS.deepJagWelding,
+        ACTION_IDS.siteStashTheJagWelding,
+        ACTION_IDS.siteStashRuskRecoveryWelding,
+        ACTION_IDS.siteStashProcessingYardWelding,
+        ACTION_IDS.siteStashDeepJagWelding,
+      ]),
     );
   });
 

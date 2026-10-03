@@ -209,19 +209,29 @@ export function MiningActivity({ characterName }: { characterName: string }) {
   const observedAttempts = useRef(state.run.attempts);
   const observedSequence = useRef(latestMiningAttempt(state.run.recentAttempts)?.sequence);
   const [feedback, setFeedback] = useState<{ sequence: number; attempts: number }>();
-  const active = state.activeAction;
   // Where Mining happens is the location state's answer, not this surface's
   // (#209): The Jag offers Ferrite Shale, an opened Deep Jag offers Galvanite,
   // and a collapsed one offers neither. The projection resolves which source is
   // reachable, so this panel never names a location.
   const source = state.miningSource;
+  // The one running action is global, and it is only Mining's when it is this
+  // source's own action. A site stash's Welding, say, is also `activeAction` at
+  // The Jag; reading it as Mining would run the attempt meter and timing labels
+  // and offer Stop Mining for work that is not Mining.
+  const active =
+    source !== undefined && state.activeAction?.actionId === source.actionId
+      ? state.activeAction
+      : undefined;
+  const otherActionActive = state.activeAction !== undefined && active === undefined;
   const showMiningActivity = source !== undefined && !state.travelState;
   // Mission guidance is consumed from the ONE derived target set — this activity
   // never inspects mission IDs, objective prose, or drop tables to decide
   // whether Start Mining advances the active mission.
   const missionGuidanceTargets = deriveMissionGuidanceTargets(state.missions);
   const startMiningGuided =
-    showMiningActivity && !active && missionGuidanceTargets.actionIds.has(source.actionId);
+    showMiningActivity &&
+    !state.activeAction &&
+    missionGuidanceTargets.actionIds.has(source.actionId);
   const durationTicks = active?.nextAttemptDurationTicks ?? source?.attemptDurationTicks ?? 0;
   const durationMs = durationTicks * GAME_TICK_MS;
   const elapsed = active ? Math.max(0, now - new Date(active.progressStartedAt).getTime()) : 0;
@@ -344,6 +354,7 @@ export function MiningActivity({ characterName }: { characterName: string }) {
           </ActionButton>
         ) : (
           <MissionActionButton
+            disabled={otherActionActive}
             guidance={startMiningGuided ? "active" : undefined}
             intent="mining"
             loading={foregroundBusy && pendingCommand === "start"}
@@ -407,6 +418,11 @@ export function MiningActivity({ characterName }: { characterName: string }) {
           / {secondsForTicks(source.attemptDurationTicks)} seconds and resolve on the server.
         </Feedback>
       )}
+      {otherActionActive ? (
+        <Feedback tone="muted">
+          Another activity is active. Stop it before starting Mining.
+        </Feedback>
+      ) : null}
       {latestAttempt ? (
         <LatestAttemptResult
           attempt={latestAttempt}

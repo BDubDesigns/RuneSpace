@@ -76,7 +76,7 @@ import {
   requirePlayableOwnedCharacter,
 } from "@/server/gameplay-access";
 import { requireTradeRequestInitiationAllowed } from "@/server/moderation-sanctions";
-import { applyCarriedStackDiff } from "@/server/carried-inventory";
+import { applyCarriedStackDiff, siteStashPlacementOf } from "@/server/carried-inventory";
 import { OwnershipError } from "@/server/ownership";
 import { blockBetween } from "@/server/player-blocks";
 import { findTradeAudit, insertTradeAudit } from "@/server/player-trade-audit";
@@ -1210,7 +1210,16 @@ export async function addTradeOfferItem(
           ),
         ),
     ]);
-    if (!instance || equipped || stored || getItemDefinition(instance.itemId)?.kind !== "unique") {
+    // An item installed in or stored at a site stash is owned but not carried
+    // (#284), so it is as un-offerable as a Cargo Hold item.
+    const stashed = await siteStashPlacementOf(tx, context.character.id, itemInstanceId);
+    if (
+      !instance ||
+      equipped ||
+      stored ||
+      stashed ||
+      getItemDefinition(instance.itemId)?.kind !== "unique"
+    ) {
       return refused("invalid_offer", OFFER_COPY.uniqueItem);
     }
     if (offered) return refused("invalid_offer", OFFER_COPY.uniqueAlready);

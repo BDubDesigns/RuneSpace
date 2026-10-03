@@ -251,7 +251,9 @@ export function RefiningConsole() {
       : undefined,
   );
   const startRefiningGuided =
-    !active && recipe !== undefined && missionGuidanceTargets.actionIds.has(recipe.actionId);
+    !state.activeAction &&
+    recipe !== undefined &&
+    missionGuidanceTargets.actionIds.has(recipe.actionId);
   const durationTicks = active?.nextAttemptDurationTicks ?? recipe?.attemptDurationTicks ?? 0;
   const durationMs = durationTicks * GAME_TICK_MS;
   const elapsed = active ? Math.max(0, now - new Date(active.progressStartedAt).getTime()) : 0;
@@ -475,7 +477,9 @@ export function RefiningConsole() {
               </ActionButton>
             ) : (
               <MissionActionButton
-                disabled={!recipe?.unlocked || recipe.affordableBatches < 1}
+                disabled={
+                  !recipe?.unlocked || recipe.affordableBatches < 1 || Boolean(state.activeAction)
+                }
                 guidance={startRefiningGuided ? "active" : undefined}
                 intent="mining"
                 loading={foregroundBusy && pendingCommand === "start"}

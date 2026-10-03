@@ -359,6 +359,10 @@ weld belongs to that thing**, as a per-target recipe under `repairTargets`:
 | Cargo Hold (Crash Site) | 15 Refined Ferrite + 6 Slag | 12 | 600 |
 | Crew Stop (Holo Hollow) | 20 Refined Ferrite | 10 | 500 |
 | Deep Jag cave-in | 25 Refined Ferrite + 5 Power Cells | 15 | 750 |
+| Stash Mount: The Jag (#284) | 6 Refined Ferrite + 3 Slag | 6 | 300 |
+| Stash Mount: Rusk Recovery (#284) | 3 Galvanic Stock + 2 Mounting Brackets | 10 | 500 |
+| Stash Mount: Abandoned Processing Yard (#284) | 3 Galvanic Stock + 2 Mounting Brackets | 10 | 500 |
+| Stash Mount: Deep Jag (#284) | 2 Galvaferrite + 2 Mounting Brackets + 1 Galvanic Stock | 15 | 750 |
 
 A recipe's materials are an **authored list**, generalized in #209 from the
 original Refined-Ferrite-and-Slag pair. Deep Jag's brace wants Power Cells, and
@@ -377,9 +381,12 @@ by character and target), one domain (`game/domain/welding-repair`), one
 resolver (`server/welding`), and one set of commands
 (`server/repair-commands`). A target is identified at runtime by its own action
 ID, so `active_actions` keeps its narrow shape and carries no per-action
-payload. Which accepted Mission authorizes an incomplete repair, and where the
-work physically happens, are authored content
-(`game/content/repair-targets`).
+payload. What authorizes an incomplete repair, and where the work physically
+happens, are authored content (`game/content/repair-targets`): either an
+accepted Mission, or (#284) the character's **personal Welding level**, with an
+optional prerequisite repair that must already be complete. A level-gated
+target consults no other skill. One predicate (`server/repair-access.ts`) reads
+whichever the target authors, for the commands and the projection alike.
 
 An untouched repair target is simply an absent row, so adding a target needs no
 backfill: play provisioning creates nothing, and the first repair command
@@ -611,6 +618,147 @@ every other kind.
 - Stop and Travel interrupt a Work Order exactly as they interrupt Practice —
   closing any open Clean Pass window as missed and preserving every resolved
   section — never refunding materials and never completing the job early.
+
+## Site stashes (issue #284)
+
+Four authored activity sites let a character permanently build one **stash
+mount** and then install **any ordinary owned container** into it, giving that
+site location-bound storage. The storage surface is the one #282 extracted
+(`features/storage/StorageTransferSurface`); nothing about a stash duplicates
+the Cargo Hold's panel, tile grid or transfer controls, and the ship Cargo Hold
+keeps its own behavior and repair UI.
+
+### The mount: an ordinary repair target
+
+A mount is not a new table. It is a repair target (above) per site, so its
+materials, Welding sections, normal **50 Welding XP per section** (before
+normal Clean Pass effects), durable per-character state and 5-tick / 3-second
+cadence are exactly the existing Welding system's. A mount is "built" exactly
+when its repair target is complete (`game/content/site-stashes` names the
+target per location); one mount per character per site, never rebuilt, with no
+bonus completion XP.
+
+| Site | Welding gate | Materials | Sections | Time | Base XP |
+| --- | --- | --- | ---: | ---: | ---: |
+| The Jag | 1 | 6 Refined Ferrite + 3 Slag | 6 | 18 s | 300 |
+| Rusk Recovery | 5 | 3 Galvanic Stock + 2 Mounting Brackets | 10 | 30 s | 500 |
+| Abandoned Processing Yard | 5 | 3 Galvanic Stock + 2 Mounting Brackets | 10 | 30 s | 500 |
+| Deep Jag | 8, and its cave-in repair complete | 2 Galvaferrite + 2 Mounting Brackets + 1 Galvanic Stock | 15 | 45 s | 750 |
+
+Only the **personal Welding level** gates building; Mining, Refining and
+Fabrication levels are never prerequisites, and every material may be traded
+for. The character must be at the site. The times are derived from the existing
+section cadence, not separate timers. A mount's Welding action is deliberately
+**not** in any location's `availableActionIds`, which would list it to
+characters who have not earned it.
+
+### Progressive presentation
+
+The server projects `siteStash` only for the character's current site and only
+when the mount is already built or the gate is met. Before that nothing about a
+stash exists to render: no Build Stash Mount panel, locked teaser or disabled
+control. Once qualified the standard `RepairWorkPanel` builds the mount; then a
+visible choice of container to install; then the shared storage surface, with
+**Swap Container** and **Remove Container** behind a quiet management
+disclosure.
+
+A stash is secondary to the site's own activity, so it renders as ONE panel
+(`features/site-stash/SiteStashPanel`) **below** that activity, collapsed by
+default. The compact bar is that panel's header, not a separate control above a
+second card: one frame, one title, one Show/Hide. It states the stage and the
+progress that matters (`summarizeSiteStash`): required material counts and welds
+while building, then the installed container and its used/total slots. Under it
+is the one thing the stage needs:
+
+- **Building:** `RepairWorkPanel` with its optional `embedded` display prop, so
+  the same controls, meters and rules render without a second frame or title.
+- **Built, no container:** **Choose a container**. The server's
+  `carriedContainers` (carried and unequipped; nothing equipped is ever offered)
+  are real item cards, each the item's approved presentation with its slot count.
+  A card only selects; **Install selected container** is the command. A sole
+  candidate starts selected. With none, one explanation in place. Installing
+  swaps the choice for storage in the same open panel, with no second tap.
+- **Installed:** the shared `StorageTransferSurface` immediately (carried and
+  stash tabs on a phone, two regions on desktop). There is no second heading,
+  occupancy line or Open/Close button; the header already says the container and
+  its slots. Collapsing and reopening returns straight to storage.
+- **Container management** (Swap, Remove): a disclosure at the foot of the panel.
+  Opened, it offers the swap candidates the server accepts as cards plus an
+  explicit **Swap to selected container**, or the reason none is valid, and
+  Remove with the reason it is blocked. Every rule is the projection's.
+
+Confirmations are transient (a polite status that clears itself, since the
+header already proves the result); refusals and failures stay until the next
+action. Nothing is confirmed before the server says so.
+
+While that mount's own Welding is running the detail is held open and the bar
+cannot be collapsed, so Stop and the time-sensitive Clean Pass are never hidden;
+it stays open after Stop. When the mount completes, the wrapper (not the
+unmounting construction panel) announces it, folds back to the bar, and the bar
+then asks for a container.
+
+The bar is two fixed rows: the title (**Build Stash Mount**, later **Site
+Stash**) and its Show/Hide control share the first, and the summary takes the
+whole second, so a long recipe can never decide where the control sits. When the
+player themself opens the panel, installs a container, or opens Container
+management, the start of what they asked for is scrolled to the top of the
+viewport once rendered (Mining alone can fill a phone screen, so it would
+otherwise open below the fold). Page load, background refreshes, Welding opening
+the detail on its own, collapsing, and unrelated actions never scroll. Reduced
+motion scrolls without animation.
+
+### Activity ownership of the running action
+
+`state.activeAction` is one global value, and a site's own activity and its
+stash's Welding are both live at once at four sites. Every activity surface
+therefore treats it as its own only when the `actionId` is one of its own: Mining
+by the current `miningSource.actionId`, Refining by `refiningActionIds()`, a
+Welding mount, the Cargo Hold and the Crew Stop by their repair target's action,
+and the Workbench, Work Orders, Tinkering and Fabrication by the server
+projection's own `active` flags and `workpiece`, each of which exists only when
+the running action's ID is that activity's. While another activity's action is running, an activity
+shows no attempt meter, timing label or Stop control, its Start control is
+disabled, and its durable counts (a mount's completed welds, a run's totals) move
+only with the work that earns them.
+
+### Container authority and lifecycle
+
+Installed capacity is exactly the container item's authored equipped slot count
+(MYKEA 8, Freight Harness 6, Scrap Box 3), read from the equipment-definition
+boundary, never the client; stored mass is unlimited. Persistence is
+`site_stash_containers` (one row per character and site; the instance keeps its
+`item_instances` row and mutable state), `site_stash_stacks` and
+`site_stash_item_instances`. Contents reference the installed container by
+composite foreign key, so a container row cannot be deleted while anything is
+stored.
+
+- **Install** needs a built mount, no container already there, and a personally
+  owned, **unequipped, physically carried** container instance. An installed
+  container leaves carried/equipped availability.
+- **Remove** needs a completely empty stash; the returned container must fit
+  carried Inventory by slots and mass.
+- **Swap** replaces the container with a **different item type** without
+  emptying the stash, if its authored capacity holds every occupied slot (equal
+  capacity is fine, heavy to light included). The same type is refused even for
+  a different instance. The returned old container is checked against carried
+  room **after** consuming the replacement. It is one row update: stored
+  contents never move, and the mount is never disassembled.
+- **Deposit and withdraw** keep stack and unique-item semantics and carried
+  slot/mass checks. Every command re-proves, under the character lock, that the
+  character is at that site with no activity running, the mount is built, a
+  container is installed, and slots remain. They never call Cargo Hold handlers,
+  whose access and fixed 32-slot model are ship-specific.
+
+An installed container, and anything stored in a stash, is owned but **not
+carried**: `loadOwnedItemInstances` subtracts both, so carried slots and mass,
+Tinkering, Mission turn-in, trade eligibility and equipment all exclude them,
+and a unique item can only be in one place. Trade offers, Cargo Hold deposit and
+the operator's delete-item tool refuse or handle it explicitly.
+
+### Non-goals
+
+No Circuits, remote telemetry, ship control center or remote inventory reading;
+no Deposit All / Withdraw All; no new container items, art or trading changes.
 
 ## Fabrication and Tinkering (issue #232)
 

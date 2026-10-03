@@ -67,7 +67,7 @@ RuneSpace's application-wide play boundary is **Play**, not Mining. Mining was t
   dismissal opt out with `allowDuringTrade`. See "Player trade requests and
   sessions" below.
 - **Generic client Play shell:** `features/play/PlayContext.tsx`, `features/play/PlayScreen.tsx`, `features/play/PlayConsole.tsx`, and `features/play/command-gate.ts` own the Play context, shell composition, command gate, and boundary refresh. They compose every activity surface (Mining, Refining, Travel, Scavenging, Cargo Hold, Power Annex, missions, NPC interactions, location presentation) and host the shared Inventory/Equipment drawers.
-- **Feature-specific UI stays feature-owned:** `features/mining/MiningActivity.tsx`, `features/refining/RefiningConsole.tsx`, `features/travel/*`, `features/cargo/*`, etc. remain owned by their feature. Mining-specific concerns such as Salvage Cutter / Power Cell boosting and run-panel collapse behavior are not Play concerns.
+- **Feature-specific UI stays feature-owned:** `features/mining/MiningActivity.tsx`, `features/refining/RefiningConsole.tsx`, `features/travel/*`, `features/cargo/*`, `features/site-stash/*`, etc. remain owned by their feature. Mining-specific concerns such as Salvage Cutter / Power Cell boosting and run-panel collapse behavior are not Play concerns.
 - **Inventory/Equipment are shared surfaces:** global surfaces and generic helpers live under `features/inventory/` rather than `features/mining/`. The carried-inventory mutation boundary lives in `server/carried-inventory.ts`.
 - **RNG ownership is activity-local:** activity RNG implementations remain activity-owned (Mining RNG, Refining E2E RNG), while Play owns the default wiring so generic callers no longer import Mining merely to obtain a random source.
 - **Server-authoritative state/reconciliation is unchanged:** the generic extraction is an ownership refactor; the browser remains untrusted and all progression resolves server-side in the locked action transaction.
@@ -594,7 +594,8 @@ the state is part of `GET /api/trade`. #268 (next section) is the UI.
   (only equipped containers do, and equipped items are never offerable). A
   trade is refused when it would push a side's slots or mass past capacity —
   or further past it — or take a side from at least one usable Mining Cutter
-  to none, counted across Equipment, carried Inventory, and the Cargo Hold by
+  to none, counted across Equipment, carried Inventory, the Cargo Hold, and any
+  site stash (#284) by
   that character's own Mining level (`usableMiningCutterCount`, the same count
   Tinkering's last-Cutter guard uses). These rules are deliberately "never make
   it worse": a character already over capacity from elsewhere may still trade
@@ -606,7 +607,7 @@ the state is part of `GET /api/trade`. #268 (next section) is the UI.
   offers anything is never committed or audited; a one-sided gift is.
 - **Offers:** only carried Inventory is offerable. A participant may set its
   own Credits and add or remove its own carried stack quantities and carried,
-  unequipped, non-Cargo unique instances; the browser names an id and a
+  unequipped, non-Cargo, non-stash unique instances; the browser names an id and a
   quantity, never an owner, balance, location, or item state. Offers are
   state, not escrow: nothing leaves a character before commit. Credits and
   consent live on `player_trade_sessions`; stack and unique lines live in
@@ -721,4 +722,4 @@ Phaser experiences live in `minigames/`, isolated from the main React tree. They
 
 ## Current status
 
-RuneSpace is a **playable pre-alpha** under active development. The generic Play shell is live and composes the connected early-game loop: Travel/Scavenging, Ferrite Shale Mining at The Jag, Refining at the Abandoned Processing Yard, Welding/Cargo Hold repair at Crash Site, Inventory/Equipment, locations and Power Cells/Power Annex, the Holo Hollow settlement with Local Places, character-scoped Credits, and merchant Trade at both a Local Place (Bix) and a World Location (Wade at Rusk Recovery), repeatable Practice Welding with its Clean Pass opportunities, Work Orders, Deep Jag, Fabrication through level 8 with Manual Override and Tinkering at Rusk Recovery's Fabrication Station (#232, #233), two Mining tools and three containers resolved through one equipment-definition boundary (#233), NPC conversations, and the declarative mission framework (Walk It Off / Cut Your Teeth / Waste Not / Hold It Together / Keep the Change / 10,000 Hours / 10,001 Hours / Return the Favor / Break It Down / Brace Yourself / A Cut Above, plus Out of the Weather and Cutting Costs). The architecture beyond this vertical slice — additional skills, quests, hex exploration, multiplayer, and minigames — remains scoped to future approved issues.
+RuneSpace is a **playable pre-alpha** under active development. The generic Play shell is live and composes the connected early-game loop: Travel/Scavenging, Ferrite Shale Mining at The Jag, Refining at the Abandoned Processing Yard, Welding/Cargo Hold repair at Crash Site, character-owned site stashes at four activity sites (#284), Inventory/Equipment, locations and Power Cells/Power Annex, the Holo Hollow settlement with Local Places, character-scoped Credits, and merchant Trade at both a Local Place (Bix) and a World Location (Wade at Rusk Recovery), repeatable Practice Welding with its Clean Pass opportunities, Work Orders, Deep Jag, Fabrication through level 8 with Manual Override and Tinkering at Rusk Recovery's Fabrication Station (#232, #233), two Mining tools and three containers resolved through one equipment-definition boundary (#233), NPC conversations, and the declarative mission framework (Walk It Off / Cut Your Teeth / Waste Not / Hold It Together / Keep the Change / 10,000 Hours / 10,001 Hours / Return the Favor / Break It Down / Brace Yourself / A Cut Above, plus Out of the Weather and Cutting Costs). The architecture beyond this vertical slice — additional skills, quests, hex exploration, multiplayer, and minigames — remains scoped to future approved issues.

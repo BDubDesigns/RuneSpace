@@ -516,11 +516,20 @@ suite("issue #246 public chat (real PostgreSQL)", () => {
       const [kept] = await db
         .insert(rune.chatMessages)
         .values(row("kept", 89 * DAY_MS))
-        .returning({ id: rune.chatMessages.id });
+        .returning({ id: rune.chatMessages.id, seq: rune.chatMessages.seq });
       const expiredIds = expired.map((entry) => entry.id);
 
-      // Expired rows never render, even before anything prunes them.
-      const before = await chat.readChatHistory(userId, character.id, { channel: "general" }, now);
+      // Expired rows never render, even before anything prunes them. `general`
+      // is shared by every test file running in parallel, and a history page is
+      // only the newest few rows, so a burst of other files' sends after the
+      // inserts above could push this test's rows off the latest page. Paging
+      // from just past `kept` pins the page to the rows this test inserted.
+      const before = await chat.readChatHistory(
+        userId,
+        character.id,
+        { channel: "general", before: kept!.seq + 1 },
+        now,
+      );
       expect(before.messages.some((message) => expiredIds.includes(message.id))).toBe(false);
       expect(before.messages.some((message) => message.id === kept!.id)).toBe(true);
 
