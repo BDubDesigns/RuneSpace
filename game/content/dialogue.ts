@@ -1074,6 +1074,44 @@ const dialogue = {
       wadeLocal(EXPRESSION_IDS.neutral, "No. I'm not going to stop bringing that up."),
     ],
   },
+  [DIALOGUE_IDS.wadeStashMountsTopic]: {
+    id: DIALOGUE_IDS.wadeStashMountsTopic,
+    npcId: NPC_IDS.wadeRusk,
+    // Wade says this wherever Wade currently is (#190), same as his other
+    // replayable topics.
+    presentsAtCurrentVenue: true,
+    beats: [
+      wadeLocal(
+        EXPRESSION_IDS.neutral,
+        "You know what wastes more time than hauling equipment around? Hauling equipment around that you don't even need.",
+      ),
+      wadeLocal(
+        EXPRESSION_IDS.neutral,
+        "You can weld yourself a stash mount out at The Jag. Install a spare container, leave a few extra Power Cells there. Maybe a backup Cutter. Keep what you need, store what you don't.",
+      ),
+      wadeLocal(
+        EXPRESSION_IDS.scowl,
+        "Amazing how much more shale you can carry when you're not hauling half a workshop around with you.",
+      ),
+      wadeLocal(
+        EXPRESSION_IDS.neutral,
+        "Get some more Welding experience and you can put another one at the Processing Yard. That's where it really starts paying off.",
+      ),
+      wadeLocal(
+        EXPRESSION_IDS.neutral,
+        "Bring in a full load of shale, put a couple of stacks in the stash, and leave yourself some room to work. Good batch gets you Refined Ferrite. Bad one gets you Slag. You'll want room for both.",
+      ),
+      wadeLocal(
+        EXPRESSION_IDS.scowl,
+        "Unless you're throwing away the Slag. Your business. Just don't come crying to me when you need some.",
+      ),
+      wadeLocal(
+        EXPRESSION_IDS.neutral,
+        "One thing. Those stashes aren't connected. Whatever you leave at The Jag stays at The Jag. You'll still have to move it yourself.",
+      ),
+      wadeLocal(EXPRESSION_IDS.scowl, "I fix machinery. Not geography."),
+    ],
+  },
   [DIALOGUE_IDS.wadeForceSalesTopic]: {
     id: DIALOGUE_IDS.wadeForceSalesTopic,
     npcId: NPC_IDS.wadeRusk,

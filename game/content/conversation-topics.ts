@@ -57,6 +57,15 @@ export const CONVERSATION_TOPICS = [
     availability: { kind: "always" },
   },
   {
+    // #298: practical advice after the Cargo Hold repair. Replayable forever;
+    // it records nothing and never depends on stash or later Mission progress.
+    id: CONVERSATION_TOPIC_IDS.wadeStashMounts,
+    npcId: NPC_IDS.wadeRusk,
+    label: "Stash mounts",
+    dialogueId: DIALOGUE_IDS.wadeStashMountsTopic,
+    availability: { kind: "mission_completed", missionId: MISSION_IDS.holdItTogether },
+  },
+  {
     id: CONVERSATION_TOPIC_IDS.tansyMining,
     npcId: NPC_IDS.tansyRusk,
     label: "Mining",

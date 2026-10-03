@@ -235,6 +235,9 @@ const dialogueIds = {
   // Replayable social/worldbuilding topics (#164). These are ordinary NPC
   // conversations: they never carry a Mission action and never gate progression.
   wadeRecoveryWorkTopic: asContentId("wade_rusk_topic_recovery_work"),
+  // Stash mounts: optional in-world advice on personal site stashes, after
+  // Hold It Together (#298).
+  wadeStashMountsTopic: asContentId("wade_rusk_topic_stash_mounts"),
   // ForceSales: available once the board is unlocked and Refining 5 exposes
   // the daily refresh (#217).
   wadeForceSalesTopic: asContentId("wade_rusk_topic_force_sales"),
@@ -260,6 +263,7 @@ const dialogueIds = {
  */
 const conversationTopicIds = {
   wadeRecoveryWork: asContentId("wade_rusk_recovery_work"),
+  wadeStashMounts: asContentId("wade_rusk_stash_mounts"),
   wadeForceSales: asContentId("wade_rusk_force_sales"),
   tansyMining: asContentId("tansy_rusk_mining"),
   tansyBeyondHoloHollow: asContentId("tansy_rusk_beyond_holo_hollow"),
