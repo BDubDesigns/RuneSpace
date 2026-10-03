@@ -96,7 +96,12 @@ a rotation or viewport change can never strand the control offscreen; it
 respects the side safe-area insets. It reserves no page space — Play keeps its
 ordinary footer clearance — and simply overlays the content at the edge, like
 any fixed control. That keeps it clear of the Map's sticky selected-destination
-panel (#240), which keeps its own bottom position. The four footer destinations
+panel (#240), which keeps its own bottom position. A panel the shared selectable-details reveal scrolls to (the storage
+details, #291) declares `scroll-margin-bottom: var(--rs-bottom-nav-clearance)`,
+and the hook honors it even when the panel is already on screen, because a browser
+treats content under the fixed footer as visible. It is per panel, not a global
+`scroll-padding`, which shifted unrelated screenshot-measured controls; the `xl`
+desktop rail replaces the footer, so the margin is zero there. The four footer destinations
 and the header are unchanged. The launcher opens the Chat/Social Drawer over
 the current Location, Map, or Journey without navigating; closing it returns
 focus to the launcher. Attention reuses the News control's unread language — a

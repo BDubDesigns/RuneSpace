@@ -76,8 +76,10 @@ repeat the audit and update this record with measured evidence.
 ## Project board status transitions
 
 `AGENTS.md` defines *which* transitions agents own — `Ready` → `In Progress`
-when substantive work starts, and `In Progress` → `Review` when implementation
-is finished and the final self-review pass begins. This section is the
+when substantive work starts (or `Backlog` → `In Progress`, only for a
+well-scoped issue the product owner specifically handed off; an issue that is
+not ready in scope stays in `Backlog` and is not started), and `In Progress` →
+`Review` when implementation is finished and the final self-review pass begins. This section is the
 mechanical procedure for performing them. Two paths are documented: the `gh`
 CLI procedure, and `scripts/project-status.mjs` for environments that have no
 `gh` binary.
@@ -172,15 +174,16 @@ values present there are short placeholders rather than credentials. Projects v2
 is GraphQL-only, so the `gh` procedure above cannot run at all.
 
 `scripts/project-status.mjs` is the second path, for exactly those environments.
-It is plain Node with no dependencies and performs the same two transitions
+It is plain Node with no dependencies and performs the same transitions
 against the same board, selecting the project, the `Status` field, the target
 option, and the issue's card by name and number at runtime — no `PVT_…`,
 `PVTSSF_…`, or `PVTI_…` node ID is recorded anywhere.
 
 It is deliberately narrower than `gh`:
 
-- **Only the two agent-owned transitions are accepted**, source *and* target:
-  `Ready` → `In Progress` and `In Progress` → `Review`. Restricting the
+- **Only the agent-owned transitions are accepted**, source *and* target:
+  `Ready` → `In Progress`, `Backlog` → `In Progress` and `In Progress` →
+  `Review`. Restricting the
   destination alone would not be enough — it would still permit
   `Done` → `In Progress`, dragging a card the merge/close automation owns back
   into the working columns. Forbidden source→target pairs are rejected after

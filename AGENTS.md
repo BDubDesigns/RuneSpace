@@ -99,8 +99,7 @@ boundary.** This file is the repository's normative agent-behavior contract;
 
 ## Where things live
 
-Grep for these before re-deriving them from scratch; a recent session spent
-~16 minutes and ~90 tool calls rediscovering them before its first edit.
+Grep for these before re-deriving them from scratch.
 
 - **Dialogue content has a shadow copy in QC Studio.** `game/content/dialogue.ts`
   defines the authoritative `DialogueBeat` types and every authored beat.
@@ -119,11 +118,9 @@ Grep for these before re-deriving them from scratch; a recent session spent
   `tools/qc-studio/core/validation.ts`.
 
 - **A named mechanic's display name fans out well past its component.** For
-  example, "Clean Pass" appears in `docs/architecture.md`,
-  `docs/game-rules.md`, `docs/gameplay-foundations.md`, the Notion Canon,
-  `features/public-site/public-wiki.ts`, `features/public-site/public-updates.ts`,
-  several feature components, `game/domain/`, `game/config/balance.ts`, and
-  multiple test files — two dozen files for one name. When adding, renaming,
+  example, "Clean Pass" appears in the docs, the Notion Canon, the public Wiki
+  and Updates content (`features/public-site/`), feature components,
+  `game/domain/`, `game/config/balance.ts`, and tests — two dozen files. When adding, renaming,
   or reworking a player-facing mechanic, `grep -rn "<exact display name>"`
   repo-wide before considering the change done; docs, public Wiki/Update
   content, and tests drift silently and none of them will type-error if
@@ -180,12 +177,16 @@ Grep for these before re-deriving them from scratch; a recent session spent
 ## Project board status
 
 The GitHub Project board is a live signal of where an issue actually is. Agents
-own exactly two transitions and must keep both truthful:
+own exactly these transitions and must keep them truthful:
 
 - **`Ready` → `In Progress`** when substantive work begins — the first real
   code, content, or documentation change, not reading or planning. Ordinary
   iterative testing, debugging, and repair *during* implementation stay
   `In Progress`; running tests never by itself means the work reached `Review`.
+- **`Backlog` → `In Progress`**, same trigger, only when the product owner
+  specifically handed you a well-scoped issue. If its scope genuinely is not
+  ready, leave it in `Backlog`, do not begin implementing, and report what is
+  missing.
 - **`In Progress` → `Review`** when implementation is complete and the
   deliberate final self-review pass begins: inspecting the full diff, checking
   every acceptance criterion, running the proportional checks, and fixing

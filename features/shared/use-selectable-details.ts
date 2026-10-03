@@ -48,6 +48,24 @@ export type SelectableDetails<TSelection, TResolved> = {
   detailsHeadingRef: RefObject<HTMLHeadingElement | null>;
 };
 
+/**
+ * Bring the details panel into view. `scrollIntoView({ block: "nearest" })`
+ * ignores a panel's `scroll-margin-bottom` once the panel is already fully on
+ * screen, so a panel sitting under a fixed footer would count as visible. When
+ * the panel declares a bottom margin, scroll just far enough to clear it;
+ * otherwise (or when the panel's top is off screen) defer to the browser.
+ */
+function revealPanel(panel: HTMLElement, behavior: ScrollBehavior) {
+  const margin = Number.parseFloat(getComputedStyle(panel).scrollMarginBottom) || 0;
+  const { top, bottom, height } = panel.getBoundingClientRect();
+  const hidden = bottom + margin - window.innerHeight;
+  if (margin > 0 && top >= 0 && hidden > 0 && height + margin <= window.innerHeight) {
+    window.scrollBy({ top: hidden, behavior });
+    return;
+  }
+  panel.scrollIntoView({ block: "nearest", behavior });
+}
+
 export function useSelectableDetails<TSelection, TResolved>({
   resolve,
   isSameSelection,
@@ -83,7 +101,7 @@ export function useSelectableDetails<TSelection, TResolved>({
     const heading = detailsHeadingRef.current;
     if (!panel || !heading) return;
     const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    panel.scrollIntoView({ block: "nearest", behavior: reduceMotion ? "auto" : "smooth" });
+    revealPanel(panel, reduceMotion ? "auto" : "smooth");
     heading.focus({ preventScroll: true });
   }, [resolved]);
 

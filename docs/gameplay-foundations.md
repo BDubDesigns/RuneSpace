@@ -421,6 +421,18 @@ regardless of Mission state.
   tile empty grid. Cargo Hold has no generic transfer, bank, or multi-container
   abstraction, and no trading of its own: the approved NPC merchant loop
   (below) operates on carried Inventory only.
+- Selecting a tile (Carried or stored, one at a time across both) opens one
+  full-width details/action area inside that region's grid, directly beneath
+  the **selected tile's row**, with the remaining rows after it (#291). The row
+  boundary is the column count the grid is laying out now (three on a phone,
+  four from `sm`), measured rather than assumed, and the area sits in the
+  grid's own DOM order so reading and tab order match what is drawn. A yellow
+  border and a connector under the selected column tie it to its tile. The
+  preview is artwork beside the full item name and its quantity or charge — never
+  a `VisualTile` squeezed into a thumbnail — so a long name wraps instead of
+  clipping. Selecting the same tile or Close dismisses it; the shared
+  selectable-details reveal, reduced-motion handling and focus restoration are
+  unchanged. Cargo Hold and every site stash share this surface.
 
 ### Practice Welding: the repeatable training loop (issues #190 and #229)
 

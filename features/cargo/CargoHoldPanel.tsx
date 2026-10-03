@@ -78,7 +78,16 @@ export function CargoHoldPanel() {
   // Held here, not in the surface, so the phone view survives closing and
   // reopening the hold exactly as it did before the extraction.
   const [storageMode, setStorageMode] = useState<StorageArea>("carried");
-  const [message, setMessage] = useState<string>();
+  // One notice at a time. A deposit/withdraw result belongs directly beneath the
+  // open storage surface (#291); repair and Welding messages keep the foot of the
+  // panel, so each sits beside the interaction that produced it.
+  const [feedback, setFeedback] = useState<{ origin: "panel" | "transfer"; text: string }>();
+  const message = feedback?.origin === "panel" ? feedback.text : undefined;
+  const transferFeedback = feedback?.origin === "transfer" ? feedback.text : undefined;
+  const setMessage = (text: string | undefined) =>
+    setFeedback(text === undefined ? undefined : { origin: "panel", text });
+  const setTransferFeedback = (text: string | undefined) =>
+    setFeedback(text === undefined ? undefined : { origin: "transfer", text });
   const [pending, setPending] = useState<string>();
   const [completionFeedbackVisible, setCompletionFeedbackVisible] = useState(false);
   const [completionAnnouncement, setCompletionAnnouncement] = useState("");
@@ -219,7 +228,7 @@ export function CargoHoldPanel() {
       startTransition(async () => {
         try {
           const result = await action();
-          if ("error" in result) setMessage(result.error);
+          if ("error" in result) setFeedback({ origin: "transfer", text: result.error });
           else {
             // Armed only on a confirmed non-error result, immediately before
             // the authoritative state that may vacate the selected tile is
@@ -227,10 +236,13 @@ export function CargoHoldPanel() {
             // consume the arm before the real reconciliation happens.
             armFocusReturn();
             acceptState(result.state);
-            setMessage(transferMessage(result));
+            setTransferFeedback(transferMessage(result));
           }
         } catch {
-          setMessage("Comms interruption. Cargo status could not be confirmed.");
+          setFeedback({
+            origin: "transfer",
+            text: "Comms interruption. Cargo status could not be confirmed.",
+          });
         } finally {
           releaseCommand();
           setPending(undefined);
@@ -328,6 +340,11 @@ export function CargoHoldPanel() {
                 projection={projectCargoHoldStorage(state)}
                 transfers={cargoTransfers}
               />
+              {transferFeedback ? (
+                <div className="mt-3" data-cargo-transfer-feedback>
+                  <Feedback>{transferFeedback}</Feedback>
+                </div>
+              ) : null}
             </div>
           ) : null}
         </>
@@ -481,7 +498,7 @@ export function CargoHoldPanel() {
         {completionAnnouncement}
       </p>
       <p aria-live="polite" className="sr-only">
-        {message ?? ""}
+        {feedback?.text ?? ""}
       </p>
       {message ? (
         <div className="mt-3">
