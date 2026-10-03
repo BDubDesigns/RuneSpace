@@ -94,7 +94,7 @@ See `.env.example`. Validated at startup by `server/env.ts` (Zod).
 
 Read these before contributing:
 
-- [`AGENTS.md`](./AGENTS.md) — rules for coding agents (scope, SSOT, extraction, testing, draft-PR workflow).
+- [`AGENTS.md`](./AGENTS.md) — rules for coding agents (scope, SSOT, extraction, testing, PR workflow).
 - [`docs/architecture.md`](./docs/architecture.md) — modular monolith, server-authoritative model, boundaries, dependency direction, and Play orchestration.
 - [`docs/game-rules.md`](./docs/game-rules.md) — current design direction (implemented vs. approved vs. future).
 - [`docs/gameplay-foundations.md`](./docs/gameplay-foundations.md) — server-authoritative timing, progression, inventory, and action contracts.
@@ -102,7 +102,7 @@ Read these before contributing:
 - [`docs/component-boundaries.md`](./docs/component-boundaries.md) — extraction rules.
 - [`docs/art-cookbook.md`](./docs/art-cookbook.md) — art direction, generation workflow, asset preparation, and visual QA.
 - [`docs/testing-strategy.md`](./docs/testing-strategy.md) — risk-based testing.
-- [`docs/development-workflow.md`](./docs/development-workflow.md) — one issue/branch/draft-PR workflow.
+- [`docs/development-workflow.md`](./docs/development-workflow.md) — one issue/branch/PR workflow and CI.
 - [`docs/admin-console.md`](./docs/admin-console.md) — admin/operator console authorization, commands, and audit (issue #113).
 
 ## License

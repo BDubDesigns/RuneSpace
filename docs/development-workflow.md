@@ -53,7 +53,7 @@ linked by `AGENTS.md`; do not solve size pressure by weakening critical policy
 or creating a documentation maze. If a harness version or configuration changes,
 repeat the audit and update this record with measured evidence.
 
-## One coherent change, one branch, one draft PR
+## One coherent change, one branch, one PR
 - Fetch `origin`, then create each dedicated branch from the latest `origin/main`.
 - Each PR is **one coherent, bounded change**. Normally that is one issue. Do not
   open multiple PRs for the same issue.
@@ -63,211 +63,21 @@ repeat the audit and update this record with measured evidence.
   evidence, not folded in. Approval covers that bundle only; it does not license
   umbrella PRs or widening feature PRs.
 - A bundle keeps the single-issue discipline: one lead branch and worktree from
-  fresh `origin/main`, one isolated database key (the lead issue's), one Draft
-  PR, and the full required validation once for the combined change. Work each
+  fresh `origin/main`, one isolated database key (the lead issue's), one PR,
+  and the full required validation once for the combined change. Work each
   issue through its own evidence and focused tests, and commit it separately
   where practical.
 - Completion stays truthful per issue. The PR body states each issue's outcome
   and uses `closes #<n>` only for issues whose done-criteria are met; an issue
   that is not resolved stays open with its evidence recorded.
-- Work stops at a draft PR for human review. Do not merge unless the product owner
+- Open a normal PR by default. Draft is optional and only signals genuinely
+  unfinished work; it changes neither which checks run nor whether `Merge gate`
+  can pass.
+- Work stops at the PR for human review. Do not merge unless the product owner
   explicitly instructs it to merge after review.
-
-## Project board status transitions
-
-`AGENTS.md` defines *which* transitions agents own — `Ready` → `In Progress`
-when substantive work starts (or `Backlog` → `In Progress`, only for a
-well-scoped issue the product owner specifically handed off; an issue that is
-not ready in scope stays in `Backlog` and is not started), and `In Progress` →
-`Review` when implementation is finished and the final self-review pass begins. This section is the
-mechanical procedure for performing them. Two paths are documented: the `gh`
-CLI procedure, and `scripts/project-status.mjs` for environments that have no
-`gh` binary.
-
-The reference values below were read back from the live board on 2026-09-16.
-Run the discovery commands anyway rather than trusting a document that a rename
-can outdate. A wrong name is at least safe: `gh` rejects an unknown field or
-option, changes nothing, and prints the valid ones, for example
-`option "Nonexistent Status" not found on field "Status"; available options:
-Backlog, Ready, In Progress, Review, Preview / Playtest, Done`.
-
-### Read-only discovery and auth check
-
-Project commands need a Projects scope that `repo` does **not** include. Check
-that first, because it is the most common failure:
-
-```bash
-gh auth status
-```
-
-`Token scopes` must contain `project` to change a status, or at least
-`read:project` for the read-only steps alone. Without it *every* Project
-command, read and write, fails with
-`INSUFFICIENT_SCOPES ... requires one of the following scopes: ['read:project']`.
-Granting it is an interactive, account-owner action; an agent cannot complete
-the browser flow and must ask Brandon to run:
-
-```bash
-gh auth refresh -s project
-```
-
-Confirm which project to touch, then the `Status` field and its exact options:
-
-```bash
-gh project list --owner BDubDesigns
-gh project field-list 5 --owner BDubDesigns --format json \
-  | jq '.fields[] | select(.name == "Status") | {name, type, options: [.options[].name]}'
-```
-
-RuneSpace is project number **5**, titled `Runespace`, owned by `BDubDesigns`
-(project 3, `QC Failed! Roadmap`, is a different board — do not edit it). `5` is
-the number verified on 2026-09-16, not a constant: if `gh project list` ever
-shows the RuneSpace board under a different number, use the number discovery
-reports and correct this document — never the stale one written here.
-
-`Status` is a single-select field whose options are, in board order: `Backlog`,
-`Ready`, `In Progress`, `Review`, `Preview / Playtest`, `Done`. Several contain
-spaces, so quote every value.
-
-Read the issue's current status before changing it. `item-list` defaults to 30
-items, so raise the limit or a present issue can look absent:
-
-```bash
-gh project item-list 5 --owner BDubDesigns --limit 100 --format json \
-  | jq -r '.items[] | select(.content.number == <issue>) | {status, url: .content.url}'
-```
-
-An empty result means the issue is not on the board. Report that and continue
-the issue; adding or triaging cards is the product owner's call.
-
-### Setting the status
-
-`gh` 2.100.0 selects the project by number, the item by issue URL, and both the
-field and the option by **name**. The project number and owner are deliberately
-concrete, because they are stable and verified; what this avoids is the brittle
-part — no opaque Project, field, item, or option node ID (`PVT_…`, `PVTSSF_…`,
-`PVTI_…`) appears anywhere. Substitute the issue number for `<issue>`:
-
-```bash
-gh project item-edit 5 --owner BDubDesigns \
-  --url https://github.com/BDubDesigns/RuneSpace/issues/<issue> \
-  --field Status --value "In Progress"
-```
-
-Use `--value "Review"` for the second transition. Note that `--url` is the issue
-URL, not a project URL. The command prints nothing on success, so confirm with
-the `item-list` query above instead of assuming it worked.
-
-Only fall back to `--id`/`--field-id`/`--single-select-option-id` if a CLI too
-old for name-based selection is the only option. Those opaque node IDs are the
-brittle values worth avoiding: they are board-specific, unreadable at a glance,
-and go stale silently. Discover them in the same session rather than recording
-them here.
-
-### Environments without `gh` — `scripts/project-status.mjs`
-
-Some harnesses have no `gh` binary and no way to complete an interactive auth
-flow. Claude Code's cloud containers are the current example: `command -v gh`
-finds nothing, the GitHub MCP server covers issues, pull requests, comments, and
-Actions but exposes no Projects v2 tooling, and the `GH_TOKEN`/`GITHUB_TOKEN`
-values present there are short placeholders rather than credentials. Projects v2
-is GraphQL-only, so the `gh` procedure above cannot run at all.
-
-`scripts/project-status.mjs` is the second path, for exactly those environments.
-It is plain Node with no dependencies and performs the same transitions
-against the same board, selecting the project, the `Status` field, the target
-option, and the issue's card by name and number at runtime — no `PVT_…`,
-`PVTSSF_…`, or `PVTI_…` node ID is recorded anywhere.
-
-It is deliberately narrower than `gh`:
-
-- **Only the agent-owned transitions are accepted**, source *and* target:
-  `Ready` → `In Progress`, `Backlog` → `In Progress` and `In Progress` →
-  `Review`. Restricting the
-  destination alone would not be enough — it would still permit
-  `Done` → `In Progress`, dragging a card the merge/close automation owns back
-  into the working columns. Forbidden source→target pairs are rejected after
-  reading the current status but before any mutation, and an illegal transition
-  is never presented as a valid dry run — that covers every other pair,
-  including phase skips like `Ready` → `Review`. A forbidden *target* such as
-  `Done` is rejected earlier still, during argument parsing, before any network
-  call. Either way this path cannot perform a transition `AGENTS.md` reserves
-  for the product owner or for automation. A card already at the requested
-  status is reported and left alone, so a re-run is harmless.
-- **The board is pinned** to project 5, owner `BDubDesigns`, repository
-  `BDubDesigns/RuneSpace`, and the title is checked after resolution. A mistyped
-  argument cannot reach project 3 (`QC Failed! Roadmap`), and a same-numbered
-  issue belonging to another repository's card is not a match.
-- **The default is a read-only dry run**, like the repository's other
-  maintenance scripts. `--execute` performs the update and then reads the value
-  back, because the mutation reports success without echoing what it stored.
-
-#### Credentials
-
-The script reads `RUNESPACE_PROJECT_TOKEN` from the environment at call time. It
-is a **classic** PAT carrying the `project` scope and deliberately no `repo`
-scope, so it can move cards and nothing else. A fine-grained PAT cannot replace
-it: fine-grained tokens expose a Projects permission only for
-*organization*-owned boards, and this board belongs to the personal account
-`BDubDesigns`.
-
-Never print, log, echo, commit, or interpolate that token into a file — read it
-from the environment only. If it ever appears in command output, say so
-immediately so it can be rotated.
-
-#### Usage
-
-```bash
-# Read the card's current status, changing nothing.
-node scripts/project-status.mjs --issue 186
-
-# Preview a transition. This is the default mode and writes nothing.
-node scripts/project-status.mjs --issue 186 --status "In Progress"
-
-# Apply it.
-node scripts/project-status.mjs --issue 186 --status "Review" --execute
-```
-
-On success the script prints the transition it made, for example
-`[project-status] #186 on project 5 (Runespace): "In Progress" -> "Review"`. A
-card already at the target status is reported as such and left alone, so a
-re-run is harmless.
-
-#### Failure modes
-
-Every refusal exits non-zero and names the actual cause rather than failing
-silently:
-
-- **Missing token** — `RUNESPACE_PROJECT_TOKEN is not set.` `GH_TOKEN` and
-  `GITHUB_TOKEN` are not substitutes and are never consulted.
-- **Missing Projects scope** — the `INSUFFICIENT_SCOPES` GraphQL error is
-  reported as such. As with `gh`, *every* Project call fails without the scope,
-  read and write alike, and granting it is an account-owner action.
-- **Forbidden target** — `refusing to set Status to "Done"`, with the two
-  permitted names and who owns the rest. Raised during argument parsing, before
-  any network call.
-- **Forbidden transition** — `refusing to move Status from "Done" to
-  "In Progress"`, naming the current status, the requested one, and the two
-  permitted pairs. Raised after the current status is read and before any
-  mutation, so a dry run refuses it too rather than reporting it as a valid
-  plan.
-- **Unknown option name** — the available options are listed, mirroring `gh`'s
-  own rejection. A renamed board option means this document is out of date:
-  correct it rather than guessing.
-- **Issue not on the board** — reported as a blocker. Adding or triaging cards
-  is the product owner's call; report it and continue the issue.
-
-The pure argument, option, and lookup logic is covered by
-`tests/unit/project-status.test.ts`, which runs in the ordinary `pnpm test`
-suite and makes no network calls.
-
-### What agents must not do
-
-Do not set `Preview / Playtest` or `Done` by hand. Linking the Draft PR with
-`closes #<issue>` lets the existing `Pull request linked to issue` Project
-workflow move the issue to `Preview / Playtest`, and merge/close automation owns
-`Done`. Do not edit the Project's workflow configuration, fields, or options as
-part of an issue.
+- Issue and PR state are authoritative for routine work. Agents do not move
+  GitHub Project board cards; the board is an optional owner tool, and its
+  fields and workflows are not changed as part of an issue.
 
 ## Validate locally and choose the confidence level
 
@@ -379,10 +189,7 @@ Several agents share this host. Keep them from colliding:
 On Hermes, `gh` is at `$HOME/.local/bin/gh`, which is **not** on the default
 `PATH`: prefix each call with `PATH=$HOME/.local/bin:$PATH`. That directory also
 holds a broken `python3` shim (it points at a missing `/app/venv`), so with it on
-`PATH` call `/usr/bin/python3` explicitly for any script. The host's `gh` token
-carries `repo` and `workflow` but not `read:project`, and `RUNESPACE_PROJECT_TOKEN`
-is not set, so the Project-board transitions below cannot be performed there;
-report that exact blocker in the PR and continue the issue.
+`PATH` call `/usr/bin/python3` explicitly for any script.
 
 Run `pnpm exec playwright install --with-deps chromium` through the wrapper before
 the first browser test on a fresh Hermes image. The browser download uses the
@@ -431,10 +238,10 @@ minutes across GitHub's three shards. So on Hermes:
 
 - During implementation, run unit, integration, and focused E2E proportional to
   the touched boundary.
-- Prove the full canonical gate on GitHub. While iterating on a draft, push and
-  start a manual run of the branch. `workflow_dispatch` always selects the full
-  gate, so it needs neither the `full-ci` label nor a draft/Ready change, and it
-  does not re-run on later pushes:
+- Prove the full canonical gate on GitHub: every push to the PR runs it
+  automatically (see "CI and the merge gate").
+- A manual run is optional, for reproducing or debugging a revision outside its
+  PR, for example a pushed branch that has no PR yet:
 
   ```bash
   git push -u origin <branch>          # the run can only see pushed commits
@@ -449,15 +256,8 @@ minutes across GitHub's three shards. So on Hermes:
   tests. Give both. With only the input, GitHub runs the workflow definition from
   the default branch, so a branch that edits `ci.yml` is validated by main's
   workflow (reproduced during #242). Pass the pushed branch name, not a local-only
-  SHA. To confirm the run tested your head, check that `headSha` equals
-  `git rev-parse HEAD`; if it shows main's SHA, `--ref` was omitted. Either way,
-  the checkout step in each job log records the SHA actually tested:
-  `gh run view <run-id> --log | grep -m1 <head-sha-prefix>`. Cancel a run that
-  tested the wrong revision.
-
-  Run `gh run watch` from a background shell so it reports once, when the run
-  finishes. A manual run is evidence for the agent, not the PR's checks: marking
-  the PR Ready remains the product owner's call and the authoritative merge gate.
+  SHA, and confirm that `headSha` equals `git rev-parse HEAD`. A manual run is
+  evidence for the agent; the PR's own run is the authoritative merge gate.
 - Do not start a local canonical run because another worktree is running one.
   Run canonical locally only to reproduce or debug a CI failure; the lock then
   queues it behind every other local run.
@@ -503,8 +303,8 @@ simply an unclaimed port here.
   ./scripts/managed-host-run.sh pnpm test:e2e:focused travel
   ```
 
-  This is focused iteration evidence only; prove CI parity with a manual GitHub
-  run (see "Shared-host E2E" above).
+  This is focused iteration evidence only; the PR's CI run proves canonical
+  parity.
 - In a restricted coding harness, a `listen EPERM` error before Playwright
   starts means the harness blocked the local test-server port. Allow loopback
   server binding and rerun the same command; it is a startup-environment
@@ -600,37 +400,31 @@ screenshot lane runs only when the `e2e-screenshots` label is requested. A local
 skip or unavailable environment is not a pass: report it as unexecuted and wait
 for the corresponding canonical CI result.
 
-### Focused implementation checks, then full canonical parity
+### Focused local checks, full remote CI
 
 During implementation, run checks proportional to the touched boundary: unit
 tests for pure rules, the relevant integration test for a persistence boundary,
 or a focused Playwright spec for a browser change. When a change adds or touches
-E2E specs, validate the new/targeted spec(s) first in isolation
+E2E specs, validate the new/targeted spec(s) in isolation
 (`pnpm test:e2e:focused <phase>`; on hosts without the managed-host lock,
 `pnpm test:e2e -- <spec> --project=chromium` also works — never on Hermes, where
-it bypasses the host-wide lock) to catch fixture errors quickly, then prove the **full** canonical suite — the
-exact `pnpm test:e2e:canonical` command GitHub's Full gate runs — before assuming
-the work will pass. From the shared Hermes host, run it on GitHub rather than
-locally (see "Shared-host E2E"). `fast-checks` (typecheck/lint/unit/build) intentionally skips
-PostgreSQL integration and canonical E2E; a green fast run is not evidence the
-merge gate will pass. Its `pnpm typecheck` step does cover the Playwright source
-under `tests/e2e/` (see `docs/testing-strategy.md` §3), so a type error there
-fails the cheap lane, but a green typecheck is still not browser-behavior proof.
-Run typecheck, lint, and format checks early enough to avoid pushing an
-obviously broken checkpoint. Batch related local commits into a coherent state
-rather than pushing after every tiny edit.
+it bypasses the host-wide lock) to catch fixture errors quickly. Run typecheck,
+lint, format, and unit checks before pushing so a checkpoint is not obviously
+broken, and batch related local commits into a coherent state rather than
+pushing after every tiny edit.
 
-### Draft preview checkpoint
+The full canonical suite, PostgreSQL integration, and the fast checks then run
+on GitHub for every PR push. Do not repeat the complete local suite as a routine
+duplicate of that run. Run `pnpm test:e2e:canonical` locally when reproducing or
+diagnosing a CI failure, or when a change genuinely crosses a high-risk boundary
+and earlier local evidence is worth the cost; from the shared Hermes host, rely
+on GitHub instead (see "Shared-host E2E"). A green fast-checks job alone is not
+evidence the merge gate will pass, and a local skip or unavailable environment
+is reported as unexecuted, never as a pass.
 
-A draft PR push always runs the fast CI job (frozen install, typecheck, lint,
-format check, unit tests, and one production build). It intentionally does not
-run PostgreSQL integration or canonical E2E. An agent proves the full gate for a
-draft with the manual `workflow_dispatch` run in "Shared-host E2E" and does not
-apply the `full-ci` label itself; the product owner decides when to apply it or
-mark the PR Ready. A coherent, focused-validated draft push is therefore allowed before
-full local parity when the purpose is real-device phone/desktop review. The
-Coolify branch preview deploys pushed checkpoints independently of this CI
-split; it is visual-review evidence, not the merge gate.
+The Coolify branch preview deploys pushed revisions independently of CI. It is
+visual-review evidence, not the merge gate, and preview review can proceed while
+CI runs.
 
 ### Exact-preview-revision verification
 
@@ -673,6 +467,11 @@ If the deployment wiring prevents the match, that is the real remaining
 blocker for #75-style preview review — treat it as such rather than claiming
 success because a preview is reachable.
 
+When a PR is backend- or UI-relevant, probe its actual preview hostname
+(`curl -sI https://pr-<n>.runespace.qcfailed.com`) and report the real result in
+the PR body rather than treating a deployment comment alone as reachability
+evidence.
+
 ### Preview test-data discipline
 
 For manual PR-preview review:
@@ -690,74 +489,65 @@ For manual PR-preview review:
 This issue deliberately adds **no** reset-all/delete-all utility. Automated
 preview-data lifecycle is out of scope for #75.
 
-### QC Failed status manifest upkeep
+### QC Failed status manifest
 
-`AGENTS.md` is the normative contract for the `.qcfailed/status.json` manifest
-and its schema-one fields, meaningful-status upkeep, `currentChange`
-active-review upkeep, rollover after merge, and infrastructure-only
-non-displacement rules. This subsection is narrow supporting procedure only and
-does not create competing instructions.
+`.qcfailed/status.json` remains in place only because qcfailed.com's Build Floor
+still reads it; qcfailed.com issue #22 replaces that consumer, after which the
+manifest is retired in a separate RuneSpace change. Until then agents make no
+routine or status-only manifest updates and edit it only when an issue or the
+product owner asks. `pnpm test` keeps it parseable and within its public-safe
+contract through `tests/unit/qcfailed-status.test.ts`.
 
-- A meaningful product PR updates the manifest in the same PR and adds a
-  `currentChange` with the real PR number after the draft PR opens. The PR
-  number becomes known only after the draft PR exists, so the workflow may make
-  one narrow follow-up commit on the same branch that records it.
-- The verified RuneSpace preview pattern is
-  `https://pr-{pullRequestNumber}.runespace.qcfailed.com`. qcfailed.com derives
-  the preview URL locally from the PR number against its allowlisted template;
-  RuneSpace never writes a preview URL into `.qcfailed/status.json`.
-- When a PR is backend- or UI-relevant, probe the actual derived preview
-  hostname (for example `curl -sI https://pr-<n>.runespace.qcfailed.com`) and
-  report the real result in the PR body rather than treating a deployment
-  comment alone as reachability evidence.
-- qcfailed.com remains responsible for remote validation, GitHub PR-state
-  interpretation, preview probing, fallback snapshots, and public rendering.
-  RuneSpace only keeps the committed manifest parseable and internally
-  consistent; `pnpm test` covers that via `tests/unit/qcfailed-status.test.ts`.
+### CI and the merge gate
 
-### Ready-for-review and merge-gate validation
+The `CI` workflow runs the same full validation for every PR opening, reopening,
+and push — Draft or not — and for every push to `main`. Its lanes — five jobs —
+start together, each with its own checkout, runner, and (where needed)
+PostgreSQL service; none waits for or consumes another:
 
-The same workflow requests the full gate when the product owner applies `full-ci`, when a draft
-is marked ready without a code push, on every new commit to a ready PR, on every
-push to `main`, and through `workflow_dispatch` (with an explicit ref or SHA).
-The full gate keeps the PostgreSQL integration and canonical E2E jobs separately
-diagnosable. PR concurrency cancels obsolete runs only for that PR; main and
-manual runs use unique groups and are not canceled by PR activity.
+- `Install, typecheck, lint, test, build` (frozen install, typecheck of the app
+  and every test including `tests/e2e`, lint, format check, unit tests, and one
+  production build);
+- `PostgreSQL integration tests`;
+- `Canonical E2E shard 1/3`, `2/3`, and `3/3`.
 
-Require the stable checks `Install, typecheck, lint, test, build` and `Merge gate`
-in the `main` branch protection/ruleset. `PostgreSQL integration tests`,
-`Canonical E2E browser journeys`, `Full gate`, and `Full gate decision` remain
-independently diagnosable but are not required contexts: they are intentionally
-skipped on ordinary draft checkpoints. `Merge gate` explicitly fails with an
-expected "draft checkpoint" message until the PR is ready, so a skipped full
-job cannot falsely satisfy branch protection on the unchanged head when
-`ready_for_review` triggers the full run. On a ready PR, `Merge gate` succeeds
-only when both full jobs succeed. Do not require the diagnostic job names, and
-verify the exact required names in repository settings after enabling
-protection. This repository currently has no main branch protection configured —
-API-verified for Issue #61 on 2026-08-03 (the GitHub REST branch-protection
-endpoint returns `Branch not protected`, and the repository rulesets list is
-empty) — so settings verification is a maintainer action outside this code
-change. Treat that snapshot as dated repository state and re-verify before
-acting on it.
+`Merge gate` depends on every lane, runs even when one failed, was skipped, or
+was canceled, and passes only when each required lane succeeded (`scripts/ci-merge-gate.mjs`).
+Skipped never counts as success for a required lane, because GitHub would
+otherwise report a skipped job as passing. The opt-in screenshot lane is part of
+the gate only when requested: once it runs, it must succeed.
 
-Before marking ready or requesting final review, run the complete local
-CI-parity sequence once when the managed PostgreSQL and Playwright environment
-is available, request the configured separate-model review, push the merge
-candidate, and follow every full remote job to a terminal state. After a
-correction to a ready PR, run focused checks for that correction and let the
-remote full gate rerun; do not repeat the complete local suite blindly after
-every small fix.
+Adding the `e2e-screenshots` label starts a fresh full run for the same head that
+also includes the one-worker screenshot lane; later pushes keep it while the
+label remains. Any label event reruns the full validation, so a label-triggered
+run can never leave a skipped, falsely passing `Merge gate` on the head. There
+is no Ready-for-review step that changes CI, and the old `full-ci` label no
+longer has any special effect.
+
+A newer run for the same PR cancels the older one. `main` and manual
+`workflow_dispatch` runs use unique concurrency groups and are never canceled by
+PR activity. Check runs attach to the commit they validated, so a green result on
+an older head never satisfies a newer one. `Merge gate` logs the PR head it
+validated.
+
+`main` currently has no branch protection or ruleset: on 2026-10-03 an
+owner-authenticated read returned `Branch not protected` and an empty rulesets
+list. If protection is enabled, require `Merge gate` (which covers every lane);
+the individual lane names stay diagnostic. Treat that snapshot as dated and
+re-verify before acting on it. Changing protection is an owner action.
+
+Before requesting final review, follow every remote job to a terminal state.
+After a correction, run focused checks for that correction and let the remote
+full run repeat; do not repeat the complete local suite blindly after every
+small fix.
 
 ## Self-review the diff
-This pass is the `Review` phase on the Project board: move the issue there
-before starting it, and finish it before the draft PR exists.
-Before opening or updating the draft PR, inspect the final diff for scope,
+Before opening or updating the PR, inspect the final diff for scope,
 duplication, premature abstraction, unjustified dependencies, accidental game
 logic in UI, broken documentation links, and unsupported claims about repository
 behavior.
 
-## Draft PR content
+## PR content
 The PR must include:
 - a clear summary of what changed
 - the exact branch, PR, local validation results, and canonical CI status
@@ -779,11 +569,9 @@ The PR must include:
   classification, sentinel-probe results, and unverified limitations
 
 ## Observe CI and deployment progress
-Keep the PR draft while canonical CI runs, and follow the run to a terminal
-state: continue until every required job reports success, or a genuine external
-blocker is precisely documented. Do not wait for PostgreSQL or canonical jobs
-that intentionally did not trigger on a draft-only checkpoint, but do not claim
-the full gate is green until the PR has a real full run. Do not treat an
+Follow the PR's CI run to a terminal state: continue until every required job
+reports success, or a genuine external blocker is precisely documented. Do not
+treat an
 in-progress job as a pass, and do not claim canonical CI is green until it
 actually reports success. A docs-only change may be *described* as unable to
 introduce an application- or test-code regression — which explains why you
@@ -804,4 +592,4 @@ state. Record optional improvements separately from blockers.
 For difficult reasoning or final review, use a separate model pass when the
 active harness supports it. Manual model switching in OpenCode is allowed.
 Unavailable delegation must not block ordinary issue work: complete a careful
-self-review and document the review approach in the draft PR.
+self-review and document the review approach in the PR.

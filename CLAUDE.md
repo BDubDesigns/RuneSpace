@@ -26,20 +26,12 @@ The same applies to `subscribe_pr_activity`: subscribe only when asked, and
 unsubscribe once the PR is green and waiting on review. The preview bot posts on
 every push (in-progress, then ready) and each post wakes the session.
 
-## CI gates: draft red is correct
+## CI: every PR push runs everything
 
-`scripts/select-ci-gate.mjs` decides both gates:
-
-- **Merge gate** is required only when the PR is **not** a draft. Red on a draft
-  is by design (`Draft checkpoint: merge validation is intentionally
-  unsatisfied.`). It is not a failure, not something to fix, and not worth
-  reporting more than once.
-- **Full gate** turns on automatically for `ready_for_review`. Flipping the PR
-  to Ready runs PostgreSQL integration and canonical E2E with no label needed.
-
-**Do not apply the `full-ci` label.** It only forces the heavy jobs onto a draft,
-where they then re-run on every push. Brandon decides when full CI runs, by
-marking the PR ready.
+Each push to a PR, Draft or not, starts fast checks, PostgreSQL integration, and
+three canonical E2E shards together, and `Merge gate` requires all of them. A red
+`Merge gate` is a real failure to read and fix, never an expected draft state.
+Do not add labels to force CI; `e2e-screenshots` is Brandon's call.
 
 ## Reading PR state cheaply
 

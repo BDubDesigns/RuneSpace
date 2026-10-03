@@ -1,5 +1,8 @@
 name: CI
 
+# Every PR revision, Draft or not, runs the full validation. Each major lane has
+# its own checkout, runner, and database, so all of them start together rather
+# than waiting for the fast job; `Merge gate` then requires every one of them.
 on:
   push:
     branches: [main]
@@ -8,8 +11,9 @@ on:
       - opened
       - reopened
       - synchronize
-      - ready_for_review
-      - converted_to_draft
+      # Adding `e2e-screenshots` must start a run that includes that lane. Any
+      # label event reruns the whole validation for the same head, so a run that
+      # skipped everything can never leave a passing `Merge gate` behind.
       - labeled
   workflow_dispatch:
     inputs:
@@ -19,16 +23,13 @@ on:
         type: string
 
 concurrency:
-  # Pull-request runs replace one another, but main and manual runs each keep a
-  # distinct group. A non-full label (for example e2e-screenshots) does not
-  # cancel an in-flight full gate; its queued run applies the current PR policy.
+  # A newer run for the same PR replaces the older one. Main and manual runs
+  # each keep a unique group, so PR activity never cancels them.
   group: >-
     ${{ github.event_name == 'pull_request'
       && format('ci-pr-{0}', github.event.pull_request.number)
       || format('ci-run-{0}', github.run_id) }}
-  cancel-in-progress: >-
-    ${{ github.event_name == 'pull_request'
-      && (github.event.action != 'labeled' || github.event.label.name == 'full-ci') }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   fast-checks:
@@ -83,34 +84,8 @@ jobs:
           RUNESPACE_RELEASE_ID: ${{ env.CI_CHECKOUT_REF }}
         run: pnpm build
 
-  gate-decision:
-    name: Full gate decision
-    runs-on: ubuntu-latest
-    outputs:
-      full: ${{ steps.select.outputs.full }}
-      merge_required: ${{ steps.select.outputs.merge_required }}
-      screenshots: ${{ steps.select.outputs.screenshots }}
-    env:
-      CI_CHECKOUT_REF: ${{ github.event_name == 'workflow_dispatch' && inputs.ref || github.sha }}
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: ${{ env.CI_CHECKOUT_REF }}
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-
-      - name: Select validation gate
-        id: select
-        run: node scripts/select-ci-gate.mjs
-
   integration:
     name: PostgreSQL integration tests
-    if: ${{ needs.gate-decision.outputs.full == 'true' }}
-    # Expensive jobs start only after the cheap fast-checks job (including the
-    # typecheck of tests/e2e) succeeds.
-    needs: [gate-decision, fast-checks]
     runs-on: ubuntu-latest
     services:
       postgres:
@@ -156,8 +131,6 @@ jobs:
 
   canonical-e2e:
     name: Canonical E2E shard ${{ matrix.shard }}/3
-    if: ${{ needs.gate-decision.outputs.full == 'true' }}
-    needs: [gate-decision, fast-checks]
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -217,8 +190,9 @@ jobs:
 
   canonical-screenshots:
     name: Canonical E2E review screenshots
-    if: ${{ needs.gate-decision.outputs.screenshots == 'true' }}
-    needs: [gate-decision, fast-checks]
+    # Opt-in only: the owner requests frozen review screenshots with the
+    # `e2e-screenshots` label. Main pushes and manual runs never request it.
+    if: ${{ contains(github.event.pull_request.labels.*.name, 'e2e-screenshots') }}
     runs-on: ubuntu-latest
     services:
       postgres:
@@ -268,72 +242,26 @@ jobs:
             .playwright/canonical-timing-*.json
           if-no-files-found: ignore
 
-  full-gate:
-    name: Full gate
-    if: ${{ always() }}
-    needs: [gate-decision, integration, canonical-e2e, canonical-screenshots]
-    runs-on: ubuntu-latest
-    steps:
-      - name: Verify full validation result
-        env:
-          DECISION_RESULT: ${{ needs.gate-decision.result }}
-          FULL: ${{ needs.gate-decision.outputs.full }}
-          SCREENSHOTS_REQUIRED: ${{ needs.gate-decision.outputs.screenshots }}
-          INTEGRATION_RESULT: ${{ needs.integration.result }}
-          E2E_RESULT: ${{ needs.canonical-e2e.result }}
-          SCREENSHOTS_RESULT: ${{ needs.canonical-screenshots.result }}
-        run: |
-          set -euo pipefail
-          if [[ "$DECISION_RESULT" != "success" ]]; then
-            echo "Full gate decision failed."
-            exit 1
-          fi
-          if [[ "$FULL" != "true" ]]; then
-            echo "Full gate not requested for this draft checkpoint."
-            exit 0
-          fi
-          if [[ "$INTEGRATION_RESULT" != "success" || "$E2E_RESULT" != "success" ]]; then
-            echo "Full validation requires successful integration and all canonical E2E shards."
-            exit 1
-          fi
-          if [[ "$SCREENSHOTS_REQUIRED" == "true" && "$SCREENSHOTS_RESULT" != "success" ]]; then
-            echo "The requested screenshot lane did not pass."
-            exit 1
-          fi
-          echo "Full validation passed."
-
   merge-gate:
     name: Merge gate
+    # always(): the gate must run and fail when a lane failed, was skipped, or
+    # was canceled. A gate that is itself skipped reads as passing on GitHub.
     if: ${{ always() }}
-    needs: [gate-decision, integration, canonical-e2e, canonical-screenshots, full-gate]
+    needs: [fast-checks, integration, canonical-e2e, canonical-screenshots]
     runs-on: ubuntu-latest
+    env:
+      CI_CHECKOUT_REF: ${{ github.event_name == 'workflow_dispatch' && inputs.ref || github.sha }}
     steps:
-      - name: Enforce merge validation
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.CI_CHECKOUT_REF }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Require every validation lane
         env:
-          DECISION_RESULT: ${{ needs.gate-decision.result }}
-          FULL: ${{ needs.gate-decision.outputs.full }}
-          MERGE_REQUIRED: ${{ needs.gate-decision.outputs.merge_required }}
-          INTEGRATION_RESULT: ${{ needs.integration.result }}
-          E2E_RESULT: ${{ needs.canonical-e2e.result }}
-          SCREENSHOTS_REQUIRED: ${{ needs.gate-decision.outputs.screenshots }}
-          SCREENSHOTS_RESULT: ${{ needs.canonical-screenshots.result }}
-          FULL_GATE_RESULT: ${{ needs.full-gate.result }}
-        run: |
-          set -euo pipefail
-          if [[ "$DECISION_RESULT" != "success" ]]; then
-            echo "Gate decision failed."
-            exit 1
-          fi
-          if [[ "$MERGE_REQUIRED" != "true" ]]; then
-            echo "Draft checkpoint: merge validation is intentionally unsatisfied."
-            exit 1
-          fi
-          if [[ "$FULL" != "true" ||
-                "$INTEGRATION_RESULT" != "success" ||
-                "$E2E_RESULT" != "success" ||
-                ("$SCREENSHOTS_REQUIRED" == "true" && "$SCREENSHOTS_RESULT" != "success") ||
-                "$FULL_GATE_RESULT" != "success" ]]; then
-            echo "Merge validation requires successful integration and canonical E2E."
-            exit 1
-          fi
-          echo "Merge validation passed."
+          NEEDS_JSON: ${{ toJSON(needs) }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: node scripts/ci-merge-gate.mjs
