@@ -530,6 +530,37 @@ body {
   white-space: nowrap;
 }
 
+/* Inline XP mark (#304): the literal text `XP` in a thin outlined lozenge,
+   keyed to the skill accent (`--rs-xp-accent`, set inline from the canonical
+   skill registry) with a neutral fallback. Every measure is em-relative, so it
+   reads from `text-xs` rows to headings. The box is deliberately under 1em
+   tall (0.7em type + 2 x 0.08em padding + 2 x 0.06em border = 0.98em) with
+   `line-height: 1`, and raised 0.16em (of its own size) so it is optically
+   centred on the digits. That offset was chosen by measuring line-box growth
+   against plain text across 12-20px at line-heights 1 to 1.5 and `normal`:
+   lower offsets grow a `leading-none` row by up to ~1px, this one by none.
+   Plain inline-block, not inline-flex, for the same baseline reason as
+   `.rs-credits-amount`. Square corners: a CSS
+   clip-path chamfer would also clip the outline's diagonals, and a filled
+   backing is not part of the approved style. */
+.rs-xp-mark {
+  display: inline-block;
+  padding: 0.08em 0.3em;
+  border: 0.06em solid currentColor;
+  color: var(--rs-xp-accent, var(--rs-text-secondary));
+  font-size: 0.7em;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  line-height: 1;
+  text-transform: none;
+  vertical-align: 0.16em;
+  white-space: nowrap;
+}
+
+.rs-xp-amount {
+  white-space: nowrap;
+}
+
 /* The layer is a sibling of the native scroll container so its markers stay
    anchored to the visible viewport while the map canvas moves underneath. */
 .rs-map-scroll-affordance-layer {

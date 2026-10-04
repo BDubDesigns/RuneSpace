@@ -8,8 +8,10 @@ import {
   resolveDialogueSpeaker,
 } from "@/game/content/dialogue";
 import { getLocation } from "@/game/content/locations";
+import { SkillXpTile } from "@/components/items/SkillXpTile";
 import { VisualTile } from "@/components/items/VisualTile";
 import { CREDITS_CHIP_SRC, CreditsAmount } from "@/components/ui/CreditsAmount";
+import { XpAmount } from "@/components/ui/XpAmount";
 import type { PresentedDialogueBeat } from "./credits-receipt";
 
 /**
@@ -158,11 +160,10 @@ export function DialogueScene({
             data-dialogue-skill-xp-tile
             data-portrait-transition="fade-in"
           >
-            <VisualTile
-              accessibleLabel={`${beat.amount} ${resolvedSkillXp.presentation.displayName} XP earned`}
-              badge={`+${beat.amount}`}
-              fallbackText="XP"
-              name={resolvedSkillXp.presentation.displayName}
+            <SkillXpTile
+              amount={beat.amount}
+              skillId={resolvedSkillXp.skillId}
+              skillName={resolvedSkillXp.presentation.displayName}
             />
           </div>
         ) : null}
@@ -202,7 +203,14 @@ export function DialogueScene({
             {resolvedItem && beat.kind === "item" ? (
               `${resolvedItem.presentation.displayName}${resolvedItem.quantity > 1 ? ` ×${resolvedItem.quantity}` : ""}`
             ) : resolvedSkillXp && beat.kind === "skill_xp" ? (
-              `${resolvedSkillXp.presentation.displayName} +${resolvedSkillXp.amount} XP`
+              <>
+                {resolvedSkillXp.presentation.displayName}{" "}
+                <XpAmount
+                  amount={resolvedSkillXp.amount}
+                  prefix="+"
+                  skillId={resolvedSkillXp.skillId}
+                />
+              </>
             ) : beat.kind === "credits_receipt" ? (
               <CreditsAmount amount={beat.amount} prefix="+" />
             ) : (

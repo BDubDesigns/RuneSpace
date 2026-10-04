@@ -3,6 +3,8 @@
 import { RunSummary } from "@/features/shared/RunSummary";
 import { BOUNDED_RUN_MAX } from "@/game/domain/bounded-run";
 import type { PracticeRunState, PracticeRunWeld } from "@/server/practice-welding";
+import { XpAmount, XpMark } from "@/components/ui/XpAmount";
+import { SKILL_IDS } from "@/game/config/foundations";
 
 /**
  * Practice's run totals and bounded weld history, in the shared run summary
@@ -22,7 +24,15 @@ export function PracticeRunPanel({ run }: { run: PracticeRunState }) {
         { label: "Scrap used", value: run.scrapConsumed },
         { label: "Slag kept", value: run.slagKept },
         ...(run.slagDiscarded > 0 ? [{ label: "Slag discarded", value: run.slagDiscarded }] : []),
-        { label: "Welding XP", value: run.xpGained },
+        {
+          id: "xp",
+          label: (
+            <>
+              Welding <XpMark skillId={SKILL_IDS.welding} />
+            </>
+          ),
+          value: run.xpGained,
+        },
       ]}
       title="This practice run"
       {...(run.recentWelds.length > 0
@@ -48,8 +58,8 @@ function PracticeWeldRow({ weld }: { weld: PracticeRunWeld }) {
       </p>
       <p>
         {weld.slagKept} Slag kept
-        {weld.slagDiscarded > 0 ? ` | ${weld.slagDiscarded} discarded` : ""} | {weld.xpGained}{" "}
-        Welding XP
+        {weld.slagDiscarded > 0 ? ` | ${weld.slagDiscarded} discarded` : ""} |{" "}
+        <XpAmount amount={weld.xpGained} skillId={SKILL_IDS.welding} skillName="Welding" />
       </p>
     </article>
   );

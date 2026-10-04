@@ -36,6 +36,8 @@ import {
   startFabricationAction,
 } from "@/server/actions";
 import type { PlayGameplayState } from "@/server/play";
+import { XpAmount } from "@/components/ui/XpAmount";
+import { SKILL_IDS } from "@/game/config/foundations";
 
 function describe(
   state: PlayGameplayState,
@@ -163,8 +165,13 @@ export function FabricateMode() {
       {recipe ? (
         <div className="space-y-3" data-fabricate-selected={recipe.actionId}>
           <p className="font-display text-sm uppercase tracking-wide">
-            {recipe.outputName} &middot; {seconds(recipe.durationTicks, GAME_TICK_MS)} &middot; +
-            {recipe.baseXp} Fabrication XP
+            {recipe.outputName} &middot; {seconds(recipe.durationTicks, GAME_TICK_MS)} &middot;{" "}
+            <XpAmount
+              amount={recipe.baseXp}
+              prefix="+"
+              skillId={SKILL_IDS.fabrication}
+              skillName="Fabrication"
+            />
           </p>
           {recipe.unlocked ? (
             <BoundedRunSelector

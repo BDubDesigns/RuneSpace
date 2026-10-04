@@ -6,6 +6,8 @@ import { resolveItemPresentation } from "@/game/content/item-presentation";
 import type { MiningRunAttempt, MiningRunState } from "@/server/mining";
 import type { MiningSourceProjection } from "@/server/play";
 import { remainingChargeLabel } from "./latest-result";
+import { XpAmount, XpMark } from "@/components/ui/XpAmount";
+import { SKILL_IDS } from "@/game/config/foundations";
 
 function percentage(bps: number) {
   return (bps / 100).toFixed(2);
@@ -56,7 +58,15 @@ export function MiningRunPanel({
         { label: "successful", value: run.successes },
         { label: "failed", value: run.failures },
         ...gainedRows,
-        { label: "Mining XP", value: run.xpGained },
+        {
+          id: "xp",
+          label: (
+            <>
+              Mining <XpMark skillId={SKILL_IDS.mining} />
+            </>
+          ),
+          value: run.xpGained,
+        },
       ]}
       title="This mining run"
       {...(priorAttempts.length > 0
@@ -102,7 +112,8 @@ function MiningAttemptRow({
       </p>
       {attempt.success ? (
         <p>
-          {attempt.quantityAwarded} {itemName(attempt.itemId)} | {attempt.xpAwarded} Mining XP
+          {attempt.quantityAwarded} {itemName(attempt.itemId)} |{" "}
+          <XpAmount amount={attempt.xpAwarded} skillId={SKILL_IDS.mining} skillName="Mining" />
         </p>
       ) : (
         <p>

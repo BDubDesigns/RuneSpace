@@ -9,8 +9,8 @@ import { Feedback } from "@/components/ui/Feedback";
 import { MissionActionButton } from "@/components/ui/MissionActionButton";
 import { StatusMeter } from "@/components/ui/StatusMeter";
 import { ItemVisual } from "@/components/items/ItemVisual";
-import { VisualTile } from "@/components/items/VisualTile";
-import { GAME_TICK_MS } from "@/game/config/foundations";
+import { SkillXpTile } from "@/components/items/SkillXpTile";
+import { GAME_TICK_MS, SKILL_IDS } from "@/game/config/foundations";
 import { miningNearMissBasisPoints, type MiningStopReason } from "@/game/domain/mining";
 import { deriveMissionGuidanceTargets } from "@/game/domain/missions";
 import type { MiningRunAttempt } from "@/server/mining";
@@ -154,12 +154,11 @@ function LatestAttemptResult({
               name={itemName}
               quantity={attempt.quantityAwarded}
             />
-            <VisualTile
-              accessibleLabel={`${attempt.xpAwarded} Mining XP earned`}
-              badge={`+${attempt.xpAwarded}`}
+            <SkillXpTile
+              amount={attempt.xpAwarded}
               className={feedback ? "rs-reward-feedback [animation-delay:90ms]" : ""}
-              fallbackText="XP"
-              name="Mining"
+              skillId={SKILL_IDS.mining}
+              skillName="Mining"
             />
           </div>
         </>

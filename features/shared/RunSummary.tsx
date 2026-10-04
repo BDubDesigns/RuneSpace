@@ -36,7 +36,11 @@ export function RunSummary({
   historyLabel: string;
   /** The activity's own history rows. Omit when the activity has none yet. */
   history?: ReactNode;
-  stats: readonly { label: string; value: number | string }[];
+  /**
+   * `label` is text, or a node when it carries a structured XP mark (#304); a
+   * node label needs an `id` for its React key.
+   */
+  stats: readonly { id?: string; label: ReactNode; value: number | string }[];
   /** e.g. "This mining run". */
   title: string;
 }) {
@@ -56,8 +60,8 @@ export function RunSummary({
         </p>
       </div>
       <p className="mt-2 flex flex-wrap items-baseline gap-x-3 gap-y-1 text-sm text-[color:var(--rs-text-secondary)]">
-        {stats.map((stat) => (
-          <span key={stat.label}>
+        {stats.map((stat, index) => (
+          <span key={stat.id ?? (typeof stat.label === "string" ? stat.label : index)}>
             <strong className="font-display text-[color:var(--rs-text-primary)]">
               {typeof stat.value === "number" ? stat.value.toLocaleString() : stat.value}
             </strong>{" "}

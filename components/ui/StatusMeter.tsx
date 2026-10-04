@@ -1,12 +1,20 @@
+import type { ReactNode } from "react";
+
 export function StatusMeter({
   label,
   value,
   detail,
+  detailContent,
   accentColor,
 }: {
   label: string;
   value: number;
   detail: string;
+  /**
+   * The visible detail when it carries a structured XP mark (#304). `detail`
+   * stays the plain-text equivalent and the meter's accessible name.
+   */
+  detailContent?: ReactNode;
   /** Overrides the default `--rs-accent-primary` fill, e.g. a skill's canonical accent (#215). */
   accentColor?: string;
 }) {
@@ -14,7 +22,7 @@ export function StatusMeter({
     <div className="min-w-0">
       <div className="flex items-center justify-between gap-2 text-xs text-[color:var(--rs-text-secondary)]">
         <span>{label}</span>
-        <span>{detail}</span>
+        <span>{detailContent ?? detail}</span>
       </div>
       <div
         aria-label={`${label}: ${detail}`}

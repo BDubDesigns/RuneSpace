@@ -5,6 +5,8 @@ import { RunSummary } from "@/features/shared/RunSummary";
 import { resolveItemPresentation } from "@/game/content/item-presentation";
 import { BOUNDED_RUN_MAX } from "@/game/domain/bounded-run";
 import type { RefiningRunAttempt, RefiningRunState } from "@/server/refining";
+import { XpAmount, XpMark } from "@/components/ui/XpAmount";
+import { SKILL_IDS } from "@/game/config/foundations";
 
 function percentage(bps: number) {
   return (bps / 100).toFixed(2);
@@ -60,7 +62,15 @@ export function RefiningRunPanel({ run }: { run: RefiningRunState }) {
           label: `${itemName(itemId)} discarded`,
           value: quantity,
         })),
-        { label: "Refining XP", value: run.xpGained },
+        {
+          id: "xp",
+          label: (
+            <>
+              Refining <XpMark skillId={SKILL_IDS.refining} />
+            </>
+          ),
+          value: run.xpGained,
+        },
       ]}
       title="This refining run"
       {...(priorAttempts.length > 0
@@ -95,7 +105,7 @@ function RefiningAttemptRow({ attempt }: { attempt: RefiningRunAttempt }) {
       {/* A failure's awards are what it left behind, not a crafted output (#239). */}
       <p>
         {attempt.success ? describeQuantities(attempt.awarded) : describeFailureOutcome(attempt)} |{" "}
-        {attempt.xpAwarded} Refining XP
+        <XpAmount amount={attempt.xpAwarded} skillId={SKILL_IDS.refining} skillName="Refining" />
       </p>
     </article>
   );

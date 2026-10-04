@@ -91,7 +91,8 @@ explicitly and offers no "give item" affordance.
 Skill XP beats are **presentation only** — authoring, previewing, or exporting
 one never grants progression. RuneSpace's server-authoritative mission
 completion transaction owns every XP award; the Studio exposes no "grant XP"
-control.
+control. The preview renders the shared `DialogueScene`, so a `skill_xp` beat shows the
+same `SkillXpTile` (XP medallion, skill name and accent) players see (#304).
 
 There is deliberately **no Credits beat** (#290). The Credits reward tile is a
 runtime-only receipt the conversation surface builds from a payment the server

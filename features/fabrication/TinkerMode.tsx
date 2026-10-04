@@ -18,7 +18,7 @@ import {
 } from "@/features/fabrication/station-copy";
 import { useStationCommand } from "@/features/fabrication/use-station-command";
 import { usePlay } from "@/features/play/PlayContext";
-import { GAME_TICK_MS } from "@/game/config/foundations";
+import { GAME_TICK_MS, SKILL_IDS } from "@/game/config/foundations";
 import {
   BOUNDED_RUN_DEFAULT_QUANTITY,
   BOUNDED_RUN_MAX,
@@ -32,6 +32,7 @@ import {
   stopTinkeringAction,
 } from "@/server/actions";
 import type { PlayGameplayState, TinkeringTargetProjection } from "@/server/play";
+import { XpAmount } from "@/components/ui/XpAmount";
 
 function targetLine(target: TinkeringTargetProjection): string {
   return `${target.batchQuantity} ${target.name} → ${target.scrap} Scrap Metal`;
@@ -206,7 +207,13 @@ export function TinkerMode() {
                   setSelectedActionId(candidate.actionId);
                 }}
                 quantity={candidate.batchQuantity}
-                recipe={`${targetLine(candidate)} · ${candidate.xp} XP · ${seconds(candidate.durationTicks, GAME_TICK_MS)}`}
+                recipe={
+                  <>
+                    {`${targetLine(candidate)} · `}
+                    <XpAmount amount={candidate.xp} skillId={SKILL_IDS.fabrication} />
+                    {` · ${seconds(candidate.durationTicks, GAME_TICK_MS)}`}
+                  </>
+                }
                 requirements={unmet(candidate, state.fabrication.level)}
                 selected={candidate.actionId === target?.actionId}
                 {...(candidate.stackLimit !== undefined

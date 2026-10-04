@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import { SkillXpTile } from "@/components/items/SkillXpTile";
 import { ActionButton } from "@/components/ui/ActionButton";
 import { CreditsAmount } from "@/components/ui/CreditsAmount";
 import { Feedback } from "@/components/ui/Feedback";
@@ -7,9 +8,11 @@ import { GameShell, TopBar } from "@/components/ui/GameShell";
 import { Panel } from "@/components/ui/Panel";
 import { SectionHeader } from "@/components/ui/SectionHeader";
 import { StatusMeter } from "@/components/ui/StatusMeter";
+import { XpAmount, XpMark } from "@/components/ui/XpAmount";
 import { DialogueScene } from "@/features/dialogue/DialogueScene";
 import { creditsReceiptBeat } from "@/features/dialogue/credits-receipt";
-import { CONVERSATION_BACKGROUND_IDS } from "@/game/config/foundations";
+import { CONVERSATION_BACKGROUND_IDS, SKILL_IDS } from "@/game/config/foundations";
+import { SKILL_PRESENTATIONS } from "@/game/content/skill-presentation";
 
 export const metadata = { title: "Design system preview — RuneSpace" };
 
@@ -82,6 +85,64 @@ export default function DesignSystemPage() {
               <Feedback>Empty state: no development fixture selected.</Feedback>
               <Feedback tone="danger">Error state: example validation message.</Feedback>
             </div>
+          </div>
+        </Panel>
+        <Panel id="xp" tone="raised">
+          <h2 className="font-display text-lg font-bold">Skill XP</h2>
+          <p className="mt-2 text-sm text-[color:var(--rs-text-secondary)]">
+            The outlined XP mark is real text sized from the surrounding type and coloured from the
+            skill registry. The medallion is for reward tiles only. Static amounts only.
+          </p>
+          <div className="mt-4 space-y-2" data-xp-specimens>
+            <p className="font-display text-xl font-bold">
+              Heading <XpAmount amount={1250} skillId={SKILL_IDS.mining} skillName="Mining" />
+            </p>
+            <p className="font-display text-sm font-bold text-[color:var(--rs-accent-primary)]">
+              <XpAmount amount={250} prefix="+" skillId={SKILL_IDS.welding} skillName="Welding" />
+            </p>
+            <p className="text-base">
+              Body text{" "}
+              <XpAmount
+                amount={65}
+                prefix="+"
+                skillId={SKILL_IDS.fabrication}
+                skillName="Fabrication"
+              />{" "}
+              in a sentence.
+            </p>
+            <p className="text-xs text-[color:var(--rs-text-secondary)]">
+              Tight row <XpAmount amount={15} skillId={SKILL_IDS.refining} /> each · carried 3
+            </p>
+            <p className="flex items-center gap-2 text-xs">
+              Flex row <XpAmount amount={5} skillId={SKILL_IDS.mining} />
+            </p>
+            <p className="text-sm leading-none" data-xp-tight-specimen>
+              Leading-none <XpAmount amount={5} skillId={SKILL_IDS.welding} />
+            </p>
+            <p className="text-sm">
+              No skill accent <XpAmount amount={40} />, <XpMark /> alone
+            </p>
+          </div>
+          <div className="mt-4 grid max-w-sm grid-cols-2 gap-2 sm:grid-cols-3" data-xp-tiles>
+            {SKILL_PRESENTATIONS.map((skill) => (
+              <SkillXpTile
+                amount={250}
+                key={skill.id}
+                skillId={skill.id}
+                skillName={skill.displayName}
+              />
+            ))}
+          </div>
+          <div className="mt-4 max-w-xl" data-xp-reward-specimen>
+            <DialogueScene
+              beat={{
+                kind: "skill_xp",
+                skillId: SKILL_IDS.mining,
+                amount: 250,
+                backgroundId: CONVERSATION_BACKGROUND_IDS.holoHollowAssistanceCenterInterior,
+                text: "",
+              }}
+            />
           </div>
         </Panel>
         <Panel id="credits" tone="raised">

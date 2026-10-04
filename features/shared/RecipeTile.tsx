@@ -1,6 +1,7 @@
 "use client";
 
 import { InventoryStackVisual } from "@/components/items/InventoryStackVisual";
+import type { ReactNode } from "react";
 import { ItemVisual } from "@/components/items/ItemVisual";
 
 /**
@@ -36,8 +37,8 @@ export function RecipeTile({
   onSelect?: () => void;
   /** Per-batch quantity of the item this tile depicts. */
   quantity: number;
-  /** The recipe line, e.g. "2 Refined Ferrite → 1 Mounting Bracket". */
-  recipe: string;
+  /** The recipe line, e.g. "2 Refined Ferrite → 1 Mounting Bracket"; a node when it carries an XP mark. */
+  recipe: ReactNode;
   /** Unmet requirements, shown under the recipe; empty when it can begin. */
   requirements: readonly string[];
   selected?: boolean;

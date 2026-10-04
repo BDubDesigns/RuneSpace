@@ -19,6 +19,7 @@ import {
 } from "./fixtures";
 import { seedLegacyStarterCutter } from "./legacy-starter";
 import { captureReviewScreenshot } from "./review-screenshot";
+import { expectXpMedallionLoaded } from "./xp-mark";
 
 const RESULT_FEEDBACK_DURATION_MS = 3_600;
 
@@ -310,7 +311,7 @@ test("owned character can start, observe, stop, and restore Ferrite Mining at Th
   await expect(latestResult).toContainText("Latest attempt: Success");
   await expect(latestResult.getByLabel("1 Ferrite Shale earned")).toBeVisible();
   await expect(latestResult.getByLabel("15 Mining XP earned")).toBeVisible();
-  await expect(latestResult.getByText("XP", { exact: true })).toBeVisible();
+  await expectXpMedallionLoaded(latestResult.getByLabel("15 Mining XP earned"));
   await expect(latestResult.getByText("Mining", { exact: true })).toBeVisible();
   await expect(latestResult.getByText("+15", { exact: true })).toBeVisible();
   const reducedMotionDuration = await latestResult.evaluate(

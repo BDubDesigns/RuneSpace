@@ -6,6 +6,8 @@ import { resolveItemPresentation } from "@/game/content/item-presentation";
 import { BOUNDED_RUN_MAX } from "@/game/domain/bounded-run";
 import type { FabricationRunState, FabricationRunWorkpiece } from "@/server/fabrication";
 import type { TinkeringRunBatch, TinkeringRunState } from "@/server/tinkering";
+import { XpAmount, XpMark } from "@/components/ui/XpAmount";
+import { SKILL_IDS } from "@/game/config/foundations";
 
 const named = (totals: Readonly<Record<string, number>>) =>
   Object.entries(totals).map(([itemId, quantity]) => ({
@@ -31,7 +33,15 @@ export function FabricationRunPanel({ run }: { run: FabricationRunState }) {
           : { label: "workpieces", value: `${run.batches} of ${run.selection}` },
         ...(made.length > 0 ? [{ label: "made", value: describeQuantities(made, ", ") }] : []),
         ...(run.busts > 0 ? [{ label: run.busts === 1 ? "bust" : "busts", value: run.busts }] : []),
-        { label: "Fabrication XP", value: run.xpGained },
+        {
+          id: "xp",
+          label: (
+            <>
+              Fabrication <XpMark skillId={SKILL_IDS.fabrication} />
+            </>
+          ),
+          value: run.xpGained,
+        },
       ]}
       title="This fabrication run"
       {...(run.recentWorkpieces.length > 0
@@ -55,9 +65,18 @@ function WorkpieceRow({ workpiece }: { workpiece: FabricationRunWorkpiece }) {
         Workpiece {workpiece.sequence} &middot; {workpiece.result === "success" ? "Made" : "Bust"}
       </p>
       <p className="text-[color:var(--rs-text-secondary)]">
-        {workpiece.result === "bust"
-          ? `Fed ${workpiece.bust?.feed ?? "?"}; the Load went to ${workpiece.bust?.load ?? "?"}. Materials lost, no XP.`
-          : `${workpiece.xpAwarded} Fabrication XP${workpiece.usedOverride ? " with Manual Override" : ""}`}
+        {workpiece.result === "bust" ? (
+          `Fed ${workpiece.bust?.feed ?? "?"}; the Load went to ${workpiece.bust?.load ?? "?"}. Materials lost, no XP.`
+        ) : (
+          <>
+            <XpAmount
+              amount={workpiece.xpAwarded}
+              skillId={SKILL_IDS.fabrication}
+              skillName="Fabrication"
+            />
+            {workpiece.usedOverride ? " with Manual Override" : ""}
+          </>
+        )}
       </p>
       <p className="text-xs text-[color:var(--rs-text-muted)]">
         Resolved {new Date(workpiece.resolvedAt).toLocaleTimeString()}
@@ -84,7 +103,15 @@ export function TinkeringRunPanel({ run }: { run: TinkeringRunState }) {
         ...(run.scrapDiscarded > 0
           ? [{ label: "Scrap discarded", value: run.scrapDiscarded }]
           : []),
-        { label: "Fabrication XP", value: run.xpGained },
+        {
+          id: "xp",
+          label: (
+            <>
+              Fabrication <XpMark skillId={SKILL_IDS.fabrication} />
+            </>
+          ),
+          value: run.xpGained,
+        },
       ]}
       title="This Tinkering run"
       {...(run.recentBatches.length > 0
@@ -107,8 +134,12 @@ function TinkeringRow({ batch }: { batch: TinkeringRunBatch }) {
       </p>
       <p className="text-[color:var(--rs-text-secondary)]">
         {batch.scrapKept} Scrap kept
-        {batch.scrapDiscarded > 0 ? ` | ${batch.scrapDiscarded} discarded` : ""} | {batch.xpAwarded}{" "}
-        Fabrication XP
+        {batch.scrapDiscarded > 0 ? ` | ${batch.scrapDiscarded} discarded` : ""} |{" "}
+        <XpAmount
+          amount={batch.xpAwarded}
+          skillId={SKILL_IDS.fabrication}
+          skillName="Fabrication"
+        />
       </p>
     </article>
   );
