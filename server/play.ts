@@ -96,6 +96,7 @@ import {
 } from "@/game/domain/inventory";
 import {
   miningAttemptDurationTicks,
+  miningSecondaryFindFacts,
   miningSuccessChanceBps,
   miningToolUsable,
   miningYieldRange,
@@ -512,6 +513,11 @@ export type MiningSourceProjection = {
   actionId: string;
   itemId: string;
   itemName: string;
+  /**
+   * The items this source can turn up as Secondary Finds (#308), from its
+   * authored table. The run summary labels these "found"; it never infers them.
+   */
+  secondaryFindItemIds: readonly string[];
   /** An uncharged attempt here with the Mining tool actually equipped (#233). */
   attemptDurationTicks: number;
   /** A charged attempt here with the Mining tool actually equipped (#233). */
@@ -2354,6 +2360,9 @@ export async function stateFromTransaction(
             locationMiningSource.itemId,
             locationMiningSource.itemId,
           ).displayName,
+          secondaryFindItemIds: miningSecondaryFindFacts(balance, locationMiningSource).map(
+            (find) => find.itemId,
+          ),
           attemptDurationTicks: miningAttemptDurationTicks(
             balance,
             locationMiningSource,

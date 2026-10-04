@@ -581,10 +581,11 @@ test("buys and sells against the authoritative balance without leaving the shop"
   await expect(cellRow.locator("[data-trade-owned]")).toHaveText("2");
   await expect(cellRow.locator("[data-trade-daily-allowance]")).toHaveText("10 of 12 left today");
 
-  // Sell: Bix buys the six approved materials — the original four plus the two
-  // Deep Jag ones (#209) — with Shale still at two Credits each.
+  // Sell: Bix buys the nine approved materials — the original four, the two
+  // Deep Jag ones (#209), and the three uncut gems (#308) — with Shale still at
+  // two Credits each.
   await trade.locator('[data-trade-mode="sell"]').click();
-  await expect(trade.locator("[data-trade-row]")).toHaveCount(6);
+  await expect(trade.locator("[data-trade-row]")).toHaveCount(9);
   const shaleRow = trade.locator(`[data-trade-row="${ITEM_IDS.ferriteShale}"]`);
   await expect(shaleRow.locator("[data-trade-unit-price]")).toHaveText("2");
   await expect(shaleRow.locator("[data-trade-owned]")).toHaveText("5");

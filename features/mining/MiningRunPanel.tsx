@@ -47,11 +47,11 @@ export function MiningRunPanel({
   // no keys yet, so the current source stands in at zero rather than the row
   // disappearing.
   const gained = Object.entries(run.itemsGained);
-  // The source's own ore is "gained"; anything else the run produced is a
-  // Secondary Find (#308), which is "found".
+  // The source's own ore is "gained"; an item its authored Secondary Find table
+  // lists is "found" (#308) — read from the source, never inferred from "not the ore".
   const gainedRows = (gained.length > 0 ? gained : [[source.itemId, 0] as const]).map(
     ([itemId, quantity]) => ({
-      label: `${itemName(itemId)} ${itemId === source.itemId ? "gained" : "found"}`,
+      label: `${itemName(itemId)} ${source.secondaryFindItemIds.includes(itemId) ? "found" : "gained"}`,
       value: quantity,
     }),
   );
