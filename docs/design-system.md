@@ -345,8 +345,13 @@ never an inventory item, currency, or an overall "account XP".
   optically centred on the digits; that offset was measured against plain text
   across 12-20px at line-heights 1 to 1.5 and `normal`, and adds no line-box
   height even in a `leading-none` row (`tests/e2e/xp-mark.ts` re-checks this on
-  real surfaces). Corners are square: a CSS chamfer would clip the outline's
-  diagonals, and a filled backing is not part of the approved style.
+  real surfaces). The silhouette is the approved asymmetric lozenge: square
+  top-left and bottom-right corners, clipped top-right and bottom-left corners,
+  outline only. The outline is a ring on `::before` (an evenodd `clip-path`
+  polygon of the outer shape and the same shape inset by the stroke), because
+  clipping the element itself would clip the label and lose the diagonals. The
+  stroke has a 1px floor like a border; there is no filled backing and no
+  rounded pill.
 - **Where to use it** — a structured XP readout: run totals and attempt rows,
   recipe and catalog lines, Work Order and Welding pay lines, the Character and
   nearby-character skill list, the activity progress row, the Mission Log earned

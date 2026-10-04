@@ -534,19 +534,30 @@ body {
    keyed to the skill accent (`--rs-xp-accent`, set inline from the canonical
    skill registry) with a neutral fallback. Every measure is em-relative, so it
    reads from `text-xs` rows to headings. The box is deliberately under 1em
-   tall (0.7em type + 2 x 0.08em padding + 2 x 0.06em border = 0.98em) with
+   tall (0.7em type + 2 x 0.08em padding + 2 x the stroke) with
    `line-height: 1`, and raised 0.16em (of its own size) so it is optically
    centred on the digits. That offset was chosen by measuring line-box growth
    against plain text across 12-20px at line-heights 1 to 1.5 and `normal`:
    lower offsets grow a `leading-none` row by up to ~1px, this one by none.
    Plain inline-block, not inline-flex, for the same baseline reason as
-   `.rs-credits-amount`. Square corners: a CSS
-   clip-path chamfer would also clip the outline's diagonals, and a filled
-   backing is not part of the approved style. */
+   `.rs-credits-amount`.
+
+   The approved silhouette (style B) is asymmetric: square top-left and
+   bottom-right corners, clipped top-right and bottom-left corners, outline
+   only. A clip-path on the element would clip the text and drop the outline's
+   diagonals, so the outline is a ring drawn on `::before`: one evenodd
+   polygon holding the outer shape and the same shape inset by the stroke. The
+   inner points sit 0.414 x stroke along each axis from the chamfer, which keeps
+   the diagonal's stroke the same thickness as the straight edges. The stroke
+   never drops below 1px, as a border would not; the text stays real text and
+   there is no filled backing. */
 .rs-xp-mark {
+  --rs-xp-stroke: max(1px, 0.06em);
+  --rs-xp-cut: 0.32em;
+  --rs-xp-seam: calc(var(--rs-xp-stroke) * 0.414);
+  position: relative;
   display: inline-block;
-  padding: 0.08em 0.3em;
-  border: 0.06em solid currentColor;
+  padding: calc(0.08em + var(--rs-xp-stroke)) calc(0.3em + var(--rs-xp-stroke));
   color: var(--rs-xp-accent, var(--rs-text-secondary));
   font-size: 0.7em;
   font-weight: 700;
@@ -555,6 +566,32 @@ body {
   text-transform: none;
   vertical-align: 0.16em;
   white-space: nowrap;
+}
+
+.rs-xp-mark::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: currentColor;
+  forced-color-adjust: none;
+  pointer-events: none;
+  clip-path: polygon(
+    evenodd,
+    0 0,
+    calc(100% - var(--rs-xp-cut)) 0,
+    100% var(--rs-xp-cut),
+    100% 100%,
+    var(--rs-xp-cut) 100%,
+    0 calc(100% - var(--rs-xp-cut)),
+    0 0,
+    var(--rs-xp-stroke) var(--rs-xp-stroke),
+    calc(100% - var(--rs-xp-cut) - var(--rs-xp-seam)) var(--rs-xp-stroke),
+    calc(100% - var(--rs-xp-stroke)) calc(var(--rs-xp-cut) + var(--rs-xp-seam)),
+    calc(100% - var(--rs-xp-stroke)) calc(100% - var(--rs-xp-stroke)),
+    calc(var(--rs-xp-cut) + var(--rs-xp-seam)) calc(100% - var(--rs-xp-stroke)),
+    var(--rs-xp-stroke) calc(100% - var(--rs-xp-cut) - var(--rs-xp-seam)),
+    var(--rs-xp-stroke) var(--rs-xp-stroke)
+  );
 }
 
 .rs-xp-amount {

@@ -40,11 +40,38 @@ describe("XP artwork (issue #304)", () => {
     const rule = /\.rs-xp-mark\s*\{([^}]*)\}/.exec(css)?.[1] ?? "";
     expect(rule).toMatch(/font-size:\s*0\.7em/);
     expect(rule).toMatch(/line-height:\s*1\s*;/);
-    expect(rule).toMatch(/padding:\s*[\d.]+em/);
-    expect(rule).toMatch(/border:\s*[\d.]+em/);
-    expect(rule).not.toMatch(/\d\s*px/);
-    // No filled backing: the approved style is an outline.
+    expect(rule).toMatch(/padding:\s*calc\([\d.]+em/);
+    // The only pixel value is the 1px floor on the outline stroke, as a border would have.
+    expect(rule.match(/\d\s*px/g)).toEqual(["1px"]);
+    expect(rule).toMatch(/--rs-xp-stroke:\s*max\(1px,/);
+    // The element itself is never filled and has no border: the approved style is an outline.
     expect(rule).not.toMatch(/background/);
+    expect(rule).not.toMatch(/border/);
+  });
+
+  it("draws the approved asymmetric outline: square top-left and bottom-right, clipped top-right and bottom-left", () => {
+    const css = readFileSync("app/globals.css", "utf8");
+    const ring = /\.rs-xp-mark::before\s*\{([^}]*)\}/.exec(css)?.[1] ?? "";
+    // A ring (outer shape minus the same shape inset by the stroke), not a clipped element.
+    expect(ring).toMatch(/clip-path:\s*polygon\(\s*evenodd/);
+    const points = (/polygon\(\s*evenodd,([^;]*)\)/.exec(ring)?.[1] ?? "")
+      .split(/,\s*(?![^()]*\))/)
+      .map((point) => point.replace(/\s+/g, " ").trim());
+    const cut = "var(--rs-xp-cut)";
+    expect(points.slice(0, 7)).toEqual([
+      "0 0", // top-left stays square
+      `calc(100% - ${cut}) 0`, // top-right is clipped...
+      `100% ${cut}`,
+      "100% 100%", // bottom-right stays square
+      `${cut} 100%`, // bottom-left is clipped...
+      `0 calc(100% - ${cut})`,
+      "0 0",
+    ]);
+    // The inner ring has the same six corners, so the diagonals keep their stroke.
+    expect(points).toHaveLength(14);
+    // Outline only: the ring is the one place currentColor fills, and the label is untouched.
+    expect(ring).toMatch(/background:\s*currentColor/);
+    expect(ring).toMatch(/content:\s*""/);
   });
 });
 
