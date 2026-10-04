@@ -77,6 +77,7 @@ export function DialogueScene({
         data-dialogue-presentation={presentationMode}
         data-presentation-mode={presentationMode}
         data-dialogue-subject={beat.kind}
+        data-dialogue-background={beat.backgroundId}
       >
         <Image
           src={background.asset}

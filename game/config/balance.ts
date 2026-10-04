@@ -326,6 +326,20 @@ const balanceSchema = z.object({
       ]),
       repairIncrements: z.literal(15),
     }),
+    /**
+     * Curly's storage mount at HH B&B (#292). Deliberately the same Tier-1
+     * job as The Jag's mount — same materials, same six sections — authored as
+     * its own entry under the same no-hidden-shared-constant rule.
+     */
+    curlyStashMount: z.object({
+      targetId: z.literal(REPAIR_TARGET_IDS.curlyStashMount),
+      actionId: z.literal(ACTION_IDS.curlyStashMountWelding),
+      materials: z.tuple([
+        z.object({ itemId: z.literal(ITEM_IDS.refinedFerrite), quantity: z.literal(6) }),
+        z.object({ itemId: z.literal(ITEM_IDS.slag), quantity: z.literal(3) }),
+      ]),
+      repairIncrements: z.literal(6),
+    }),
   }),
   cargoHold: z.object({
     capacitySlots: z.literal(32),
@@ -967,6 +981,15 @@ const defaults = balanceSchema.parse({
         { itemId: ITEM_IDS.galvanicStock, quantity: 1 },
       ],
       repairIncrements: 15,
+    },
+    curlyStashMount: {
+      targetId: REPAIR_TARGET_IDS.curlyStashMount,
+      actionId: ACTION_IDS.curlyStashMountWelding,
+      materials: [
+        { itemId: ITEM_IDS.refinedFerrite, quantity: 6 },
+        { itemId: ITEM_IDS.slag, quantity: 3 },
+      ],
+      repairIncrements: 6,
     },
   },
   cargoHold: {

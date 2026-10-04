@@ -119,6 +119,17 @@ export const REPAIR_TARGETS: readonly RepairTargetDefinition[] = [
       requiresCompletedTargetId: REPAIR_TARGET_IDS.deepJagCaveIn,
     },
   },
+  {
+    // Curly's storage mount (#292): a commission at HH B&B, revealed only by
+    // accepting Curly Must-Stash. The finished mount holds HIS container. It
+    // is a completed job for an NPC — never a site stash, never storage the
+    // player can open, and never a fifth stash site.
+    id: REPAIR_TARGET_IDS.curlyStashMount,
+    displayName: "Stash Mount",
+    locationId: LOCATION_IDS.holoHollow,
+    localPlaceId: LOCAL_PLACE_IDS.hhBnb,
+    authorization: { kind: "mission", missionId: MISSION_IDS.curlyMustStash },
+  },
 ] as const satisfies readonly RepairTargetDefinition[];
 
 const byId = new Map<string, RepairTargetDefinition>(

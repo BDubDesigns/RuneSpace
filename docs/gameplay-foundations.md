@@ -363,6 +363,14 @@ weld belongs to that thing**, as a per-target recipe under `repairTargets`:
 | Stash Mount: Rusk Recovery (#284) | 3 Galvanic Stock + 2 Mounting Brackets | 10 | 500 |
 | Stash Mount: Abandoned Processing Yard (#284) | 3 Galvanic Stock + 2 Mounting Brackets | 10 | 500 |
 | Stash Mount: Deep Jag (#284) | 2 Galvaferrite + 2 Mounting Brackets + 1 Galvanic Stock | 15 | 750 |
+| Curly's Stash Mount: HH B&B (#292) | 6 Refined Ferrite + 3 Slag | 6 | 300 |
+
+Curly's mount is The Jag's Tier-1 job, authored as its own entry, done for an
+NPC: it is authorized by accepting **Curly Must-Stash**, lives inside HH B&B,
+and its completion is a job finished for Curly. It is not a site stash
+(`game/content/site-stashes` never names it), holds no player storage, and the
+B&B shows its **Build Stash Mount** activity only while the work is authorized
+and unfinished — nothing remains once the last section lands.
 
 A recipe's materials are an **authored list**, generalized in #209 from the
 original Refined-Ferrite-and-Slag pair. Deep Jag's brace wants Power Cells, and
@@ -1209,6 +1217,13 @@ a second geography.
   visible world change stores nothing of its own: the Crew Stop reads repaired
   because `character_repair_targets` says its repair is finished. Module-load
   validation rejects a place presenting a repair target that does not exist.
+  A conversation backdrop follows the same rule (#292): Curly's unfinished room
+  names its finished counterpart (`repaired` in
+  `game/content/conversation-backgrounds`), and every beat set there is shown
+  in whichever state the mount's repair is in.
+- HH B&B is the first place with **two residents** (#292): Mara and her guest
+  Curly, each with their own contact card, both behind the same Keep the
+  Change door. Curly's room is conversation scenery, never a place to enter.
 - Ordinary World Locations are unaffected: a location with no authored Local
   Places renders and behaves exactly as before.
 

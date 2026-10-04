@@ -160,6 +160,24 @@ export const NPCS: readonly NpcDefinition[] = [
       [EXPRESSION_IDS.firm]: "/npc-art/mara-firm-no-nonsense.png",
     },
   },
+  {
+    // Curly (#292): an offworld guest at HH B&B and its second contact, after
+    // Mara in roster order. He shares her Local Place, so he is reachable
+    // exactly when she is — once Keep the Change opens the B&B — and needs no
+    // gate of his own. His conversations play against his own guest room,
+    // which is scenery behind the dialogue and never a place the player enters.
+    id: NPC_IDS.curly,
+    displayName: "Curly",
+    role: "Offworld backpacker",
+    homeLocationId: LOCATION_IDS.holoHollow,
+    localPlaceId: LOCAL_PLACE_IDS.hhBnb,
+    conversationBackgroundId: CONVERSATION_BACKGROUND_IDS.curlyRoomBefore,
+    expressionAssets: {
+      [EXPRESSION_IDS.neutral]: "/npc-art/curly-neutral.png",
+      [EXPRESSION_IDS.smile]: "/npc-art/curly-smile.png",
+      [EXPRESSION_IDS.concerned]: "/npc-art/curly-concerned.png",
+    },
+  },
 ] as const satisfies readonly NpcDefinition[];
 
 const npcById = new Map<string, NpcDefinition>(NPCS.map((npc) => [npc.id, npc]));

@@ -20,6 +20,7 @@ const articleTitles = [
   "Bix Weller",
   "Renn Calder",
   "Mara Kells",
+  "Curly",
   "Work Orders",
   "Fabrication & Tinkering",
   "Chat & Community Rules",

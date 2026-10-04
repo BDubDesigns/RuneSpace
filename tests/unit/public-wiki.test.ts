@@ -224,6 +224,7 @@ describe("public Wiki content boundary", () => {
       "bix-weller",
       "renn-calder",
       "mara-kells",
+      "curly",
     ]);
   });
 

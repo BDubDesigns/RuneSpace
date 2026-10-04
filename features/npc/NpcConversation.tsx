@@ -1,6 +1,14 @@
 "use client";
 
-import { useEffect, useRef, useState, useTransition, type ReactNode, type RefObject } from "react";
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  useTransition,
+  type ReactNode,
+  type RefObject,
+} from "react";
 import { Drawer } from "@/components/ui/Drawer";
 import { Feedback } from "@/components/ui/Feedback";
 import { reportClientDiagnostic } from "@/features/diagnostics/client";
@@ -88,6 +96,17 @@ export function NpcConversation({
   const venueBackgroundId = resolveNpcVenueBackgroundId(
     npc,
     deriveCompletedMissionIds(state.missions),
+  );
+  // Finished repairs, for backgrounds that show a room as the player left it
+  // (#292). Keyed by a string so the set only changes when a repair does.
+  const completedRepairKey = Object.entries(state.repairs)
+    .filter(([, repair]) => repair.complete)
+    .map(([targetId]) => targetId)
+    .sort()
+    .join(" ");
+  const completedRepairTargetIds = useMemo(
+    () => new Set(completedRepairKey ? completedRepairKey.split(" ") : []),
+    [completedRepairKey],
   );
 
   // Selecting an entry (or returning to the hub) replaces the control the
@@ -235,6 +254,7 @@ export function NpcConversation({
             sequence={sequence}
             {...(open?.creditsReceipt ? { receipt: open.creditsReceipt } : {})}
             {...(venueBackgroundId ? { venueBackgroundId } : {})}
+            completedRepairTargetIds={completedRepairTargetIds}
           />
         ) : (
           <div className="mt-4" data-conversation-hub={npc.id}>

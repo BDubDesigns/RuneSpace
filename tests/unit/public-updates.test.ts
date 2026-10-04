@@ -117,10 +117,32 @@ describe("public Updates content boundary", () => {
     });
   });
 
-  it("publishes the site stash Update as the newest", () => {
+  it("publishes the Curly Must-Stash Update as the newest", () => {
     // Newest by instant, so the account news boundary surfaces it (#156).
     const latest = getLatestPublishedUpdate();
-    expect(latest.slug).toBe("a-stash-of-your-own");
+    expect(latest.slug).toBe("curly-must-stash");
+    expect(Date.parse(latest.publishedAt)).toBeGreaterThan(
+      Date.parse(getPublicUpdate("a-stash-of-your-own")!.publishedAt),
+    );
+    // Never dated in the future: merging is the publication boundary.
+    expect(Date.parse(latest.publishedAt)).toBeLessThanOrEqual(Date.now());
+    const text = JSON.stringify(latest);
+    for (const label of ["Curly", "HH B&B", "150 Credits", "Welding 1"]) {
+      expect(text).toContain(label);
+    }
+    // His container is never presented as the player's storage.
+    expect(text).toContain("isn't a stash for you");
+    expect(text).not.toMatch(/\bquests?\b/i);
+    const links = latest.body
+      .flatMap((paragraph) => (typeof paragraph === "string" ? [] : paragraph))
+      .filter((segment) => typeof segment !== "string");
+    expect(links).toContainEqual({ text: "Curly", articleSlug: "curly" });
+    expect(latest.hero?.src).toBe("/updates/curly-must-stash.webp");
+  });
+
+  it("publishes the site stash Update", () => {
+    // A newer Update has shipped since (#292), so it is found by slug.
+    const latest = getPublicUpdate("a-stash-of-your-own")!;
     expect(Date.parse(latest.publishedAt)).toBeGreaterThan(
       Date.parse(getPublicUpdate("room-to-spread-out")!.publishedAt),
     );

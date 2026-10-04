@@ -5,12 +5,16 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { CreditsAmount, CreditsIcon } from "@/components/ui/CreditsAmount";
 import { creditsReceiptBeat } from "@/features/dialogue/credits-receipt";
-import { DialoguePlayer } from "@/features/dialogue/DialoguePlayer";
+import { DialoguePlayer, presentedBeats } from "@/features/dialogue/DialoguePlayer";
 import { DialogueScene } from "@/features/dialogue/DialogueScene";
 import { getConversationBackground } from "@/game/content/conversation-backgrounds";
 import { CONVERSATION_BACKGROUND_IDS, DIALOGUE_IDS, MISSION_IDS } from "@/game/config/foundations";
 import { DIALOGUE_SEQUENCES, getDialogue, type DialogueBeat } from "@/game/content/dialogue";
-import { KEEP_THE_CHANGE_BUDGET_CREDITS, MISSIONS } from "@/game/content/missions";
+import {
+  CURLY_MUST_STASH_PAYMENT_CREDITS,
+  KEEP_THE_CHANGE_BUDGET_CREDITS,
+  MISSIONS,
+} from "@/game/content/missions";
 import { resolveMissionSuccessView } from "@/game/domain/conversation";
 
 const text = (markup: string) =>
@@ -169,6 +173,7 @@ describe("Mission Credits receipts resolve to a reward tile only for a confirmed
   const keepTheChange = MISSIONS.find((mission) => mission.id === MISSION_IDS.keepTheChange)!;
   const tenThousandHours = MISSIONS.find((mission) => mission.id === MISSION_IDS.tenThousandHours)!;
   const cuttingCosts = MISSIONS.find((mission) => mission.id === MISSION_IDS.cuttingCosts)!;
+  const curlyMustStash = MISSIONS.find((mission) => mission.id === MISSION_IDS.curlyMustStash)!;
 
   it("audits every shipped Mission that pays Credits on acceptance or completion", () => {
     const acceptance = MISSIONS.filter((mission) =>
@@ -177,10 +182,14 @@ describe("Mission Credits receipts resolve to a reward tile only for a confirmed
     const completion = MISSIONS.filter((mission) => mission.reward?.kind === "credits").map(
       (mission) => mission.id,
     );
-    expect(acceptance).toEqual([MISSION_IDS.keepTheChange]);
-    expect(completion).toEqual([MISSION_IDS.tenThousandHours, MISSION_IDS.cuttingCosts]);
+    expect(acceptance).toEqual([MISSION_IDS.keepTheChange, MISSION_IDS.curlyMustStash]);
+    expect(completion).toEqual([
+      MISSION_IDS.tenThousandHours,
+      MISSION_IDS.cuttingCosts,
+      MISSION_IDS.curlyMustStash,
+    ]);
     // Each completion that pays has an authored scene the tile can lead.
-    for (const mission of [tenThousandHours, cuttingCosts]) {
+    for (const mission of [tenThousandHours, cuttingCosts, curlyMustStash]) {
       expect(mission.dialogue.completionPresentationDialogueId).toBeDefined();
     }
   });
@@ -296,5 +305,98 @@ describe("Mission Credits receipts resolve to a reward tile only for a confirmed
       mission: { status: "completed" },
     });
     expect(xpView.kind === "dialogue" ? xpView.creditsReceipt : undefined).toBeUndefined();
+  });
+});
+
+describe("Curly Must-Stash payments (#292)", () => {
+  const curly = MISSIONS.find((mission) => mission.id === MISSION_IDS.curlyMustStash)!;
+  const offer = curly.offers[0]!;
+  const amount = CURLY_MUST_STASH_PAYMENT_CREDITS;
+
+  it("pays 150 on acceptance and 150 on turn-in: 300 in total, nothing else", () => {
+    expect(amount).toBe(150);
+    expect(offer.acceptEffect).toEqual({ kind: "credits", amount });
+    expect(curly.reward).toEqual({ kind: "credits", amount });
+  });
+
+  it("a confirmed acceptance plays the accepted continuation with the tile in it", () => {
+    const view = resolveMissionSuccessView({
+      actionKind: "accept_mission",
+      missionId: curly.id,
+      dialogueId: offer.dialogueId,
+      acceptedContinuation: offer.acceptedContinuation!,
+      mission: { status: "accepted", creditsPaid: amount },
+    });
+    expect(view).toEqual({
+      kind: "dialogue",
+      dialogueId: DIALOGUE_IDS.curlyMustStashAccepted,
+      creditsReceipt: { amount, placement: "leads" },
+    });
+  });
+
+  it("a confirmed turn-in plays the completion presentation with the tile in it", () => {
+    const view = resolveMissionSuccessView({
+      actionKind: "complete_mission",
+      missionId: curly.id,
+      dialogueId: curly.turnIn.dialogueId,
+      mission: { status: "completed", creditsPaid: amount },
+    });
+    expect(view).toEqual({
+      kind: "dialogue",
+      dialogueId: DIALOGUE_IDS.curlyMustStashCompletion,
+      creditsReceipt: { amount, placement: "leads" },
+    });
+  });
+
+  it("an unconfirmed or repeated command never presents either payment", () => {
+    for (const status of ["already_accepted", "already_completed"] as const) {
+      const view = resolveMissionSuccessView({
+        actionKind: "accept_mission",
+        missionId: curly.id,
+        dialogueId: offer.dialogueId,
+        acceptedContinuation: offer.acceptedContinuation!,
+        mission: { status },
+      });
+      if (view.kind === "dialogue") expect(view.creditsReceipt).toBeUndefined();
+    }
+    // Without a receipt the continuation is exactly the authored beats.
+    const sequence = getDialogue(DIALOGUE_IDS.curlyMustStashAccepted)!;
+    expect(presentedBeats(sequence, undefined, undefined)).toEqual(sequence.beats);
+  });
+
+  it("places each tile right after the line where Curly hands the money over", () => {
+    for (const dialogueId of [
+      DIALOGUE_IDS.curlyMustStashAccepted,
+      DIALOGUE_IDS.curlyMustStashCompletion,
+    ]) {
+      const sequence = getDialogue(dialogueId)!;
+      expect(sequence.creditsReceiptAfterBeats).toBe(1);
+      const beats = presentedBeats(sequence, { amount, placement: "leads" }, undefined);
+      expect(beats.map((beat) => beat.kind)).toEqual([
+        "npc",
+        "credits_receipt",
+        ...sequence.beats.slice(1).map((beat) => beat.kind),
+      ]);
+      expect(beats[1]).toMatchObject({ amount, backgroundId: sequence.beats[0]!.backgroundId });
+      // Nothing authored is dropped or reordered.
+      expect(beats.filter((beat) => beat.kind !== "credits_receipt")).toEqual(sequence.beats);
+    }
+  });
+
+  it("a sequence that authors no placement still leads with the tile", () => {
+    const sequence = getDialogue(DIALOGUE_IDS.wadeTenThousandHoursCompletion)!;
+    expect(sequence.creditsReceiptAfterBeats).toBeUndefined();
+    const beats = presentedBeats(sequence, { amount: 50, placement: "leads" }, undefined);
+    expect(beats[0]!.kind).toBe("credits_receipt");
+    expect(beats).toHaveLength(sequence.beats.length + 1);
+  });
+
+  it("only places tiles inside the sequence it is authored on", () => {
+    for (const sequence of DIALOGUE_SEQUENCES) {
+      if (sequence.creditsReceiptAfterBeats === undefined) continue;
+      expect(Number.isInteger(sequence.creditsReceiptAfterBeats), sequence.id).toBe(true);
+      expect(sequence.creditsReceiptAfterBeats, sequence.id).toBeGreaterThan(0);
+      expect(sequence.creditsReceiptAfterBeats, sequence.id).toBeLessThan(sequence.beats.length);
+    }
   });
 });
