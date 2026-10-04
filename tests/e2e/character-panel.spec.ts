@@ -6,6 +6,7 @@ import { SKILL_IDS } from "@/game/config/foundations";
 import { getSkillPresentation } from "@/game/content/skill-presentation";
 import { expect, openTestCharacter, resolvedCssVarColor, test } from "./fixtures";
 import { expectCreditsIconTracksText } from "./credits-icon";
+import { expectXpMarkTracksText } from "./xp-mark";
 import { captureReviewScreenshot } from "./review-screenshot";
 
 /**
@@ -109,6 +110,9 @@ test("the Character destination shows identity, canonical level, Credits, and ev
   const refiningRow = skillRows.filter({ hasText: /^Refining — Level 2/ });
   const weldingRow = skillRows.filter({ hasText: /^Welding — Level 1/ });
   await expect(miningRow.locator("p").first()).toHaveCSS("color", miningColor);
+  // The inline XP mark takes the same canonical accent and tracks its text (#304).
+  await expectXpMarkTracksText(miningRow, miningColor);
+  await expectXpMarkTracksText(refiningRow, refiningColor);
   await expect(refiningRow.locator("p").first()).toHaveCSS("color", refiningColor);
   await expect(weldingRow.locator("p").first()).toHaveCSS("color", weldingColor);
   await expect(miningRow.getByRole("progressbar").locator("> div")).toHaveCSS(

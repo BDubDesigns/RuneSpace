@@ -185,6 +185,17 @@ text. The chip's derivative is a trimmed 320 px-wide transparent WebP (see
 `assets/currency/README.md` for the recipe). Show the same art regardless of
 amount until tiered art is approved.
 
+### Skill XP art
+
+One circular industrial XP medallion (worn gunmetal, off-white `XP`, two upward
+chevrons, transparent) serves the skill-XP reward tile for every skill (#304). It
+is neutral on purpose: skill identity is the surrounding tile's name and accent,
+so never bake a skill colour into the image or make per-skill variants. XP is
+not an item or currency, so it does not belong in the item registry. The inline
+treatment is outlined `XP` text, not a shrunken medallion. The derivative is a
+square 320 px transparent WebP cropped to the visible bounds (see
+`assets/xp/README.md`), judged at the 80 px reward-tile artwork zone.
+
 ### Public Update hero images
 
 Public Updates should use a relevant hero when there is an obvious existing
@@ -502,6 +513,8 @@ Current production conventions:
 - item/equipment art -> `public/item-art/`
 - currency art (the Credits chip and inline icon) -> `public/currency/`; the
   owner-supplied chip master is kept in `assets/currency/`
+- skill XP art (the shared XP medallion) -> `public/xp/`; the owner-supplied
+  master is kept in `assets/xp/`
 - map identifiers -> `public/map-icons/`
 - Update-specific heroes -> `public/updates/`
 

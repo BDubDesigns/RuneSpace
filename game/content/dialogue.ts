@@ -264,8 +264,8 @@ function itemBeat(itemId: ItemId, quantity: number, text = ""): DialogueBeat {
 
 /**
  * Skill-XP beats present an already-awarded XP amount; they never grant
- * progression. The tile reuses the production Mining/Refining VisualTile
- * presentation (XP fallback, skill nameplate, +N badge).
+ * progression. The tile is the shared `SkillXpTile` the Mining and Refining
+ * results also use (XP medallion, skill nameplate and accent, +N badge).
  */
 function tansySkillXpBeat(skillId: SkillId, amount: number): DialogueBeat {
   return { kind: "skill_xp", skillId, amount, backgroundId: jag, text: "" };

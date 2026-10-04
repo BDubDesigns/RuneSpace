@@ -8,7 +8,7 @@ import { StatusMeter } from "@/components/ui/StatusMeter";
 import { ActivityPanel } from "@/features/shared/ActivityPanel";
 import { ActivityContextRow, SkillProgressRow } from "@/features/shared/activity-context";
 import { getEffectiveGameBalance } from "@/game/config/balance";
-import { ACTION_IDS, GAME_TICK_MS, REPAIR_TARGET_IDS } from "@/game/config/foundations";
+import { ACTION_IDS, GAME_TICK_MS, REPAIR_TARGET_IDS, SKILL_IDS } from "@/game/config/foundations";
 import type {
   CargoHoldTransferActionResult,
   PlayActionResult,
@@ -34,6 +34,7 @@ import {
   type StorageTransferAdapter,
   type StorageTransferHooks,
 } from "@/features/storage/StorageTransferSurface";
+import { XpAmount } from "@/components/ui/XpAmount";
 
 /**
  * The exact contribution the player is being asked to confirm, keyed by item ID
@@ -377,8 +378,13 @@ export function CargoHoldPanel() {
               ) : null}
               <span className="text-xs uppercase tracking-wide text-[color:var(--rs-text-secondary)]">
                 {balance.welding.attemptDurationTicks} ticks /{" "}
-                {(balance.welding.attemptDurationTicks * GAME_TICK_MS) / 1000}s per weld pass · +
-                {balance.welding.xpPerIncrement} Welding XP
+                {(balance.welding.attemptDurationTicks * GAME_TICK_MS) / 1000}s per weld pass ·{" "}
+                <XpAmount
+                  amount={balance.welding.xpPerIncrement}
+                  prefix="+"
+                  skillId={SKILL_IDS.welding}
+                  skillName="Welding"
+                />
               </span>
             </div>
           ) : (

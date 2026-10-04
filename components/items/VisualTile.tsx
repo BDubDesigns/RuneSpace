@@ -4,6 +4,11 @@ import { useId, type ReactNode } from "react";
 type VisualTileProps = {
   accessibleLabel: string;
   accessibleDescription?: string;
+  /**
+   * Overrides the tile's default Mining-orange outline, for a tile that
+   * belongs to one skill (skill XP, #304). Inventory tiles never pass it.
+   */
+  accentColor?: string;
   artworkSrc?: string;
   /** Omit to render no corner plate (unique items carry no fake stack quantity). */
   badge?: string;
@@ -33,6 +38,7 @@ type VisualTileProps = {
 export function VisualTile({
   accessibleLabel,
   accessibleDescription,
+  accentColor,
   artworkSrc,
   badge,
   background,
@@ -52,6 +58,7 @@ export function VisualTile({
     "aria-label": accessibleLabel,
     "data-mission-guidance": missionGuidance ? "active" : undefined,
     className: rootClassName,
+    style: accentColor ? { borderColor: accentColor } : undefined,
   };
   const content = (
     <>

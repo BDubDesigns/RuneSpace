@@ -6,6 +6,7 @@ import {
   type DockedUtilityRegion,
   type UtilityPresentation,
 } from "@/components/ui/UtilitySurface";
+import { XpAmount } from "@/components/ui/XpAmount";
 import { CreditsAmount } from "@/components/ui/CreditsAmount";
 import { Feedback } from "@/components/ui/Feedback";
 import type { MissionProjection } from "@/game/domain/missions";
@@ -163,7 +164,14 @@ function earnedRewardSummary(reward: NonNullable<MissionProjection["earnedReward
     case "stack_bundle":
       return reward.items.map((entry) => `${entry.itemName} x${entry.quantity}`).join(", ");
     default:
-      return `+${reward.amount} ${reward.skillName} XP`;
+      return (
+        <XpAmount
+          amount={reward.amount}
+          prefix="+"
+          skillId={reward.skillId}
+          skillName={reward.skillName}
+        />
+      );
   }
 }
 

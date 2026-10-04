@@ -14,6 +14,8 @@ import type {
   FabricationRecipeProjection,
   ManualOverrideProjection,
 } from "@/server/play";
+import { XpAmount } from "@/components/ui/XpAmount";
+import { SKILL_IDS } from "@/game/config/foundations";
 
 /**
  * The workpiece on the machine (#232), as one compact live panel: the output's
@@ -220,8 +222,8 @@ function ManualOverrideControls({
           </strong>
         </p>
         <p className="text-xs text-[color:var(--rs-text-secondary)]" data-override-pushes>
-          Push {override.pushes} / {override.maximumPushes} · {override.xpIfLockedIn} XP if locked
-          now
+          Push {override.pushes} / {override.maximumPushes} ·{" "}
+          <XpAmount amount={override.xpIfLockedIn} skillId={SKILL_IDS.fabrication} /> if locked now
         </p>
       </div>
       {last ? (

@@ -1,6 +1,7 @@
 "use client";
 
 import { skillAccentColor, type SkillAccentTone } from "@/components/ui/skill-accent";
+import { XpAmount } from "@/components/ui/XpAmount";
 import { formatMassGrams } from "@/game/domain/mass";
 
 /**
@@ -54,7 +55,16 @@ export function SkillProgressRow({
           {skill} Lv. {level}
         </p>
         <p className="text-xs text-[color:var(--rs-text-secondary)]">
-          {xpToNextLevel ? `${xpToNextLevel.toLocaleString()} XP to next` : "Maximum level"}
+          {xpToNextLevel ? (
+            <>
+              <XpAmount accentTone={tone} amount={xpToNextLevel}>
+                {xpToNextLevel.toLocaleString()}
+              </XpAmount>{" "}
+              to next
+            </>
+          ) : (
+            "Maximum level"
+          )}
         </p>
       </div>
       <div

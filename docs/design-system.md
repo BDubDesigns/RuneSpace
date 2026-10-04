@@ -328,6 +328,52 @@ inventory item.
   headings, body, tight rows and buttons plus the reward tile, for checking both
   at mobile and desktop widths.
 
+## Skill XP (Issue #304)
+
+Skill XP has one visual identity in two forms. XP is skill-specific progression,
+never an inventory item, currency, or an overall "account XP".
+
+- **Inline mark** — `XpMark` / `XpAmount` in `components/ui/XpAmount.tsx` render
+  the literal text `XP` in a thin outlined lozenge (`.rs-xp-mark`), keyed to the
+  skill's canonical accent. The accent comes from `skillAccentColor` through the
+  skill registry (`xpAccentColor(skillId)`, or an `accentTone` where the data
+  carries the tone but not the ID, as character progression does). A skill with
+  no approved accent, or no skill, renders in `--rs-text-secondary`. It is real
+  text: the amount, the skill name where the surface needs it, and `XP` all read
+  with CSS and images off and without colour. Every measure is `em`-relative
+  (0.7em type, under one line high) and the mark is raised 0.16em so it is
+  optically centred on the digits; that offset was measured against plain text
+  across 12-20px at line-heights 1 to 1.5 and `normal`, and adds no line-box
+  height even in a `leading-none` row (`tests/e2e/xp-mark.ts` re-checks this on
+  real surfaces). The silhouette is the approved asymmetric lozenge: square
+  top-left and bottom-right corners, clipped top-right and bottom-left corners,
+  outline only. The outline is a ring on `::before` (an evenodd `clip-path`
+  polygon of the outer shape and the same shape inset by the stroke), because
+  clipping the element itself would clip the label and lose the diagonals. The
+  stroke has a 1px floor like a border; there is no filled backing and no
+  rounded pill.
+- **Where to use it** — a structured XP readout: run totals and attempt rows,
+  recipe and catalog lines, Work Order and Welding pay lines, the Character and
+  nearby-character skill list, the activity progress row, the Mission Log earned
+  reward, and the reward-tile caption. Keep the surface's existing wording
+  (`Mining +250 XP`, `15 XP`); the mark replaces only the word `XP`.
+- **Where not to** — prose and plain strings stay plain: authored dialogue, chat,
+  server and feedback messages, `aria-label`s and live-region announcements,
+  admin tooling, the public Wiki and Updates, and the composite one-line summary
+  strings (`fabricationRunSummary`, the Tinkering, Refining and Practice run
+  summaries, and Fabrication result-beat `details`), which are pure string
+  formatters with unit-tested contracts that mix several units.
+- **Reward tile** — `SkillXpTile` (`components/items/SkillXpTile.tsx`) is the one
+  skill-XP tile: the shared medallion (`public/xp/xp-medallion.webp`) in
+  `VisualTile`, outlined in the skill's accent (`VisualTile`'s `accentColor`,
+  which inventory tiles never pass), the skill name on the plate and `+amount`
+  in the corner. The same neutral medallion shows for every skill; it carries
+  no skill colour and has an `XP` text fallback. The authored `skill_xp` dialogue
+  beat, the Mining result and the Refining result all use it.
+- `/design-system` (development only) has a Skill XP panel with the mark beside
+  headings, body, tight rows and a `leading-none` row, a tile per skill
+  (including Strength, which has no accent), and the dialogue reward scene.
+
 ## Overlay motion
 
 Shared overlay panels (`components/ui/Drawer.tsx`, including the tabbed

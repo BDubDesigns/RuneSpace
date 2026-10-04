@@ -10,7 +10,7 @@ import { ActivityPanel } from "@/features/shared/ActivityPanel";
 import { SkillProgressRow } from "@/features/shared/activity-context";
 import { CleanPassControl } from "@/features/welding/CleanPassControl";
 import { usePlay } from "@/features/play/PlayContext";
-import { ACTION_IDS } from "@/game/config/foundations";
+import { ACTION_IDS, SKILL_IDS } from "@/game/config/foundations";
 import { deriveMissionGuidanceTargets } from "@/game/domain/missions";
 import {
   startWorkOrderWeldingAction,
@@ -18,6 +18,7 @@ import {
   type WorkOrderActionResult,
 } from "@/server/actions";
 import type { ActiveWorkOrderProjection } from "@/server/play";
+import { XpAmount } from "@/components/ui/XpAmount";
 
 /**
  * The customer job on Wade's bench (#207).
@@ -140,8 +141,13 @@ export function WorkOrderBenchPanel({ active }: { active: ActiveWorkOrderProject
       <CleanPassControl cleanPass={active.cleanPass} />
 
       <p className="max-w-2xl text-sm leading-relaxed text-[color:var(--rs-text-secondary)]">
-        {`${active.sections} sections, ${active.xpPerSection} Welding XP each. Pays `}
-        <CreditsAmount amount={active.payoutCredits} /> on completion.
+        {`${active.sections} sections, `}
+        <XpAmount
+          amount={active.xpPerSection}
+          skillId={SKILL_IDS.welding}
+          skillName="Welding"
+        />{" "}
+        each. Pays <CreditsAmount amount={active.payoutCredits} /> on completion.
       </p>
 
       {message ? <Feedback tone="danger">{message}</Feedback> : null}

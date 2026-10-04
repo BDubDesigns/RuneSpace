@@ -12,7 +12,7 @@ import {
   type BoundedRunSelection,
 } from "@/game/domain/bounded-run";
 import { ItemVisual } from "@/components/items/ItemVisual";
-import { VisualTile } from "@/components/items/VisualTile";
+import { SkillXpTile } from "@/components/items/SkillXpTile";
 import { Feedback } from "@/components/ui/Feedback";
 import { MissionActionButton } from "@/components/ui/MissionActionButton";
 import { MissionGuidanceHalo, missionGuidanceClassName } from "@/components/ui/MissionGuidanceHalo";
@@ -28,7 +28,7 @@ import {
   refiningUnmetRequirements,
 } from "@/features/refining/refining-lists";
 import { refiningActionIds } from "@/game/config/balance";
-import { GAME_TICK_MS } from "@/game/config/foundations";
+import { GAME_TICK_MS, SKILL_IDS } from "@/game/config/foundations";
 import { resolveItemPresentation } from "@/game/content/item-presentation";
 import {
   describeFailureOutcome,
@@ -47,6 +47,7 @@ import {
 import { AutoDiscardSlagToggle } from "@/features/shared/AutoDiscardSlagToggle";
 import { reportClientDiagnostic } from "@/features/diagnostics/client";
 import { usePlay } from "@/features/play/PlayContext";
+import { XpAmount } from "@/components/ui/XpAmount";
 
 const RESULT_FEEDBACK_DURATION_MS = 3_600;
 
@@ -443,7 +444,13 @@ export function RefiningConsole() {
               {recipe.deterministic
                 ? "Deterministic: every batch succeeds"
                 : `Success chance: ${percentage(recipe.successChanceBps)}%`}{" "}
-              &middot; +{recipe.successXp} Refining XP
+              &middot;{" "}
+              <XpAmount
+                amount={recipe.successXp}
+                prefix="+"
+                skillId={SKILL_IDS.refining}
+                skillName="Refining"
+              />
             </p>
           ) : null}
           {/* The run (#229): choose how many batches to attempt, or Max to run
@@ -596,16 +603,15 @@ export function RefiningConsole() {
                     quantity={award.quantity}
                   />
                 ))}
-                <VisualTile
-                  accessibleLabel={`${latestAttempt.xpAwarded} Refining XP earned`}
-                  badge={`+${latestAttempt.xpAwarded}`}
+                <SkillXpTile
+                  amount={latestAttempt.xpAwarded}
                   className={
                     feedback?.sequence === latestAttempt.sequence
                       ? "rs-reward-feedback [animation-delay:90ms]"
                       : ""
                   }
-                  fallbackText="XP"
-                  name="Refining"
+                  skillId={SKILL_IDS.refining}
+                  skillName="Refining"
                 />
               </div>
             </section>

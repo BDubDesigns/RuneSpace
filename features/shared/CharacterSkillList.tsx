@@ -1,6 +1,7 @@
 "use client";
 
 import { StatusMeter } from "@/components/ui/StatusMeter";
+import { XpAmount, XpMark } from "@/components/ui/XpAmount";
 import { skillAccentColor } from "@/components/ui/skill-accent";
 import type { CharacterSkillProgression } from "@/game/domain/character-progression";
 
@@ -41,13 +42,20 @@ export function CharacterSkillList({
             </p>
             {skill.xpToNextLevel === undefined ? (
               <p className="mt-1 text-xs text-[color:var(--rs-text-muted)]">
-                Maximum level reached — {skill.totalXp.toLocaleString()} total XP
+                Maximum level reached — {skill.totalXp.toLocaleString()} total{" "}
+                <XpMark accentTone={skill.accentTone} />
               </p>
             ) : (
               <div className="mt-1">
                 <StatusMeter
                   accentColor={accent}
                   detail={`${skill.xpToNextLevel} XP to next level`}
+                  detailContent={
+                    <>
+                      <XpAmount accentTone={skill.accentTone} amount={skill.xpToNextLevel} /> to
+                      next level
+                    </>
+                  }
                   label={`${skill.displayName} XP`}
                   value={Math.min(
                     100,
@@ -55,7 +63,9 @@ export function CharacterSkillList({
                   )}
                 />
                 <p className="mt-1 text-xs text-[color:var(--rs-text-muted)]">
-                  {skill.totalXp.toLocaleString()} total XP · {skill.xpIntoLevel} XP into this level
+                  {skill.totalXp.toLocaleString()} total <XpMark accentTone={skill.accentTone} /> ·{" "}
+                  <XpAmount accentTone={skill.accentTone} amount={skill.xpIntoLevel} /> into this
+                  level
                 </p>
               </div>
             )}

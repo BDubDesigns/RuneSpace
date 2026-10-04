@@ -21,6 +21,7 @@ import {
   itemInstances,
 } from "@/db/rune-space";
 import { GAME_TICK_MS, ITEM_IDS, LOCATION_IDS, SKILL_IDS } from "@/game/config/foundations";
+import { expectXpMarkTracksText, expectXpMedallionLoaded } from "./xp-mark";
 
 /**
  * Seeds the exact post-Walk-It-Off boundary through authoritative rows:
@@ -295,7 +296,8 @@ test("equips the Cutter through Inventory, shows a full stack, and earns Mining 
   await expect(xpTile).toBeVisible();
   await expect(xpTile.locator("[data-nameplate]")).toHaveText("Mining");
   await expect(xpTile).toContainText("+100");
-  await expect(xpTile).toContainText("XP");
+  await expectXpMedallionLoaded(xpTile);
+  await expectXpMarkTracksText(tansy.locator("[data-dialogue-speaker-role]"));
   // Then Tansy returns for the Cut completion and Waste Not assignment beats.
   await tansy.getByRole("button", { name: "Next", exact: true }).click();
   await expect(tansy.locator('[data-dialogue-text] [aria-hidden="true"]')).toContainText(

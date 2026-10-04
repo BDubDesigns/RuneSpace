@@ -5,6 +5,8 @@ import { recipeLine, seconds, unmetRequirements } from "@/features/fabrication/s
 import { learnedRecipes } from "@/features/fabrication/station-lists";
 import { usePlay } from "@/features/play/PlayContext";
 import { GAME_TICK_MS } from "@/game/config/foundations";
+import { XpAmount } from "@/components/ui/XpAmount";
+import { SKILL_IDS } from "@/game/config/foundations";
 
 /**
  * Recipes (#232 human-preview reconciliation): the character's learned
@@ -30,7 +32,12 @@ export function RecipesCatalog() {
             key={recipe.actionId}
             name={recipe.outputName}
             quantity={recipe.outputQuantity}
-            recipe={`${recipeLine(recipe)} · ${seconds(recipe.durationTicks, GAME_TICK_MS)} · ${recipe.baseXp} XP`}
+            recipe={
+              <>
+                {`${recipeLine(recipe)} · ${seconds(recipe.durationTicks, GAME_TICK_MS)} · `}
+                <XpAmount amount={recipe.baseXp} skillId={SKILL_IDS.fabrication} />
+              </>
+            }
             requirements={unmetRequirements(recipe, state.fabrication.level)}
             {...(recipe.outputStackLimit !== undefined
               ? { stackLimit: recipe.outputStackLimit }

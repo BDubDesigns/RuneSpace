@@ -16,7 +16,7 @@ import {
   type BoundedRunSelection,
 } from "@/game/domain/bounded-run";
 import { getEffectiveGameBalance, practiceSectionXp } from "@/game/config/balance";
-import { ACTION_IDS, GAME_TICK_MS } from "@/game/config/foundations";
+import { ACTION_IDS, GAME_TICK_MS, SKILL_IDS } from "@/game/config/foundations";
 import { deriveMissionGuidanceTargets } from "@/game/domain/missions";
 import { CleanPassControl } from "@/features/welding/CleanPassControl";
 import { usePlay } from "@/features/play/PlayContext";
@@ -28,6 +28,7 @@ import {
   type PlayActionResult,
 } from "@/server/actions";
 import type { PlayGameplayState } from "@/server/play";
+import { XpAmount } from "@/components/ui/XpAmount";
 
 const WELD_UNIT = { singular: "weld", plural: "welds" };
 
@@ -311,7 +312,13 @@ export function PracticeWeldingPanel() {
       <CleanPassControl cleanPass={practice.cleanPass} />
 
       <p className="max-w-2xl text-sm leading-relaxed text-[color:var(--rs-text-secondary)]">
-        {`${practice.scrapPerWeld} Scrap Metal, ${practice.sectionsPerWeld} sections, nominal up to ${balance.practiceWelding.slagPerWeld} Slag. Each section is worth ${practiceSectionXp(balance)} Welding XP.`}
+        {`${practice.scrapPerWeld} Scrap Metal, ${practice.sectionsPerWeld} sections, nominal up to ${balance.practiceWelding.slagPerWeld} Slag. Each section is worth `}
+        <XpAmount
+          amount={practiceSectionXp(balance)}
+          skillId={SKILL_IDS.welding}
+          skillName="Welding"
+        />
+        .
       </p>
 
       <AutoDiscardSlagToggle

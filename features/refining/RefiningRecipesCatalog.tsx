@@ -9,6 +9,8 @@ import {
   refiningUnmetRequirements,
 } from "@/features/refining/refining-lists";
 import type { RefiningRecipeProjection } from "@/server/play";
+import { XpAmount } from "@/components/ui/XpAmount";
+import { SKILL_IDS } from "@/game/config/foundations";
 
 /**
  * Recipes (#239): the character's learned Refining recipes — every one their
@@ -38,7 +40,12 @@ export function RefiningRecipesCatalog({
             key={recipe.actionId}
             name={recipe.outputName}
             quantity={recipe.outputQuantity}
-            recipe={`${refiningRecipeLine(recipe)} · ${refiningSeconds(recipe.attemptDurationTicks)} · ${refiningChance(recipe)} · +${recipe.successXp} XP`}
+            recipe={
+              <>
+                {`${refiningRecipeLine(recipe)} · ${refiningSeconds(recipe.attemptDurationTicks)} · ${refiningChance(recipe)} · `}
+                <XpAmount amount={recipe.successXp} prefix="+" skillId={SKILL_IDS.refining} />
+              </>
+            }
             requirements={refiningUnmetRequirements(recipe, level)}
             {...(recipe.outputStackLimit !== undefined
               ? { stackLimit: recipe.outputStackLimit }
