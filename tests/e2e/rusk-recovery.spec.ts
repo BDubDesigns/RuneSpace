@@ -83,7 +83,8 @@ async function playToDialogueText(dialogue: import("@playwright/test").Locator, 
     if (pattern.test((await text.textContent()) ?? "")) return;
     const next = dialogue.getByRole("button", { name: "Next" });
     if (await next.isVisible()) {
-      await text.click();
+      // A reward tile's beat has no visible text, so there is nothing to click.
+      if (await text.isVisible()) await text.click();
       await next.click();
       continue;
     }
@@ -102,7 +103,8 @@ async function playToAction(
     if (await action.isVisible()) return action;
     const next = dialogue.getByRole("button", { name: "Next" });
     if (await next.isVisible()) {
-      await dialogue.locator("[data-dialogue-text]").click();
+      const text = dialogue.locator("[data-dialogue-text]");
+      if (await text.isVisible()) await text.click();
       await next.click();
       continue;
     }
@@ -349,8 +351,18 @@ test("welds for real at the bench, takes a live Clean Pass, and turns the work i
   await conversation.getByRole("button", { name: /10,000 Hours/ }).click();
   const turnIn = await playToAction(conversation, "SHOW HIM THE WORK");
   await turnIn.click();
-  // The completion beats play out in his voice; the Credits land part-way in.
+  // The confirmed payout leads the completion scene as the Credits tile (#290):
+  // the approved chip, the Credits nameplate and the amount the turn-in
+  // actually paid, before Wade says a word.
+  const creditsTile = conversation.locator("[data-dialogue-credits-tile]");
+  await expect(creditsTile).toBeVisible();
+  await expect(creditsTile).toHaveAttribute("data-credits-amount", "50");
+  await expect(creditsTile).toContainText("Credits");
+  await expect(creditsTile).toContainText("+50");
+  await expect(creditsTile.locator('img[src*="credits-chip"]')).toBeVisible();
+  // The completion beats then play out in his voice, none of them replaced.
   await playToDialogueText(conversation, /Fifty credits/i);
+  await expect(creditsTile).toHaveCount(0);
   await page.keyboard.press("Escape");
 
   const creditsAfter = (
