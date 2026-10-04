@@ -509,6 +509,27 @@ body {
   }
 }
 
+/* Inline Credits icon (#290). Sized from the surrounding text, never a fixed
+   pixel size: 1em tall in a heading, a text-xs row, or a button alike. The
+   4:3 box matches the owner-supplied 96x72 viewBox. The em offset keeps the
+   icon inside the text's ascent/descent so it cannot grow the line box, and
+   the end margin is the gap to the number in both inline and flex contexts. */
+.rs-credits-icon {
+  display: inline-block;
+  flex: none;
+  width: 1.3333em;
+  height: 1em;
+  margin-inline-end: 0.3em;
+  vertical-align: -0.15em;
+}
+
+/* Deliberately plain inline, not inline-flex: a flex wrapper takes its
+   baseline from the icon's bottom edge and would lift the whole amount off the
+   text baseline. Inline keeps icon and number on the shared baseline. */
+.rs-credits-amount {
+  white-space: nowrap;
+}
+
 /* The layer is a sibling of the native scroll container so its markers stay
    anchored to the visible viewport while the map canvas moves underneath. */
 .rs-map-scroll-affordance-layer {

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useTransition } from "react";
+import { CreditsAmount } from "@/components/ui/CreditsAmount";
 import { ActionButton } from "@/components/ui/ActionButton";
 import { Feedback } from "@/components/ui/Feedback";
 import { MissionActionButton } from "@/components/ui/MissionActionButton";
@@ -139,7 +140,8 @@ export function WorkOrderBenchPanel({ active }: { active: ActiveWorkOrderProject
       <CleanPassControl cleanPass={active.cleanPass} />
 
       <p className="max-w-2xl text-sm leading-relaxed text-[color:var(--rs-text-secondary)]">
-        {`${active.sections} sections, ${active.xpPerSection} Welding XP each. Pays ${active.payoutCredits} Credits on completion.`}
+        {`${active.sections} sections, ${active.xpPerSection} Welding XP each. Pays `}
+        <CreditsAmount amount={active.payoutCredits} /> on completion.
       </p>
 
       {message ? <Feedback tone="danger">{message}</Feedback> : null}

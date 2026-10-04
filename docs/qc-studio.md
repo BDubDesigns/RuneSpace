@@ -93,6 +93,13 @@ one never grants progression. RuneSpace's server-authoritative mission
 completion transaction owns every XP award; the Studio exposes no "grant XP"
 control.
 
+There is deliberately **no Credits beat** (#290). The Credits reward tile is a
+runtime-only receipt the conversation surface builds from a payment the server
+confirmed (`docs/missions.md` §9.2), so a Studio-authored beat can never imply
+an unconditional payout. The shared `DialogueScene` accepts that runtime beat for
+production, but the Studio adapter, beat editor, validation and export neither
+produce nor accept it.
+
 The skill dropdown lists only the adapter's canonical skill registry (from
 `game/content/skill-presentation.ts` — never a duplicated UI list). Amounts are
 positive integers; unknown skill IDs and non-positive/non-integer amounts fail

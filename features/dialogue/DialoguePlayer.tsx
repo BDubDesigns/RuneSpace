@@ -1,10 +1,12 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { ActionButton } from "@/components/ui/ActionButton";
 import type { ConversationBackgroundId } from "@/game/config/foundations";
-import type { DialogueBeat, DialogueSequence } from "@/game/content/dialogue";
+import type { DialogueSequence } from "@/game/content/dialogue";
+import type { CreditsReceipt } from "@/game/domain/conversation";
 import { resolveDialogueItem, resolveDialogueSpeaker } from "@/game/content/dialogue";
+import { creditsReceiptBeat, type PresentedDialogueBeat } from "./credits-receipt";
 import { DialogueScene } from "./DialogueScene";
 
 const CHARACTER_REVEAL_MS = 20;
@@ -25,6 +27,13 @@ const CHARACTER_REVEAL_MS = 20;
  * venue the speaker is standing in now. It is applied to local NPC beats only,
  * so an authored comms call and every scene that happened somewhere specific
  * keep the background they were written against (#190).
+ *
+ * `receipt` is the confirmed Credits payout the server just reported for the
+ * command that opened this sequence (#290). It is presented as a runtime-only
+ * reward tile in front of the authored beats (`leads`) or as the whole scene
+ * (`stands_alone`), against the neighbouring authored beat's background so the
+ * tile never changes where the conversation is. The authored beats themselves
+ * are never replaced or reordered.
  */
 export function DialoguePlayer({
   sequence,
@@ -35,6 +44,7 @@ export function DialoguePlayer({
   onBack,
   onFinish,
   venueBackgroundId,
+  receipt,
 }: {
   sequence: DialogueSequence;
   /** Present only when this conversation genuinely drives a Mission command now. */
@@ -46,27 +56,47 @@ export function DialoguePlayer({
   onFinish: () => void;
   /** Where this NPC is standing now; only read by `presentsAtCurrentVenue`. */
   venueBackgroundId?: ConversationBackgroundId;
+  receipt?: CreditsReceipt;
 }) {
   const [beatIndex, setBeatIndex] = useState(0);
   const [revealedChars, setRevealedChars] = useState(0);
   const [reducedMotion, setReducedMotion] = useState(false);
   const [restartGeneration, setRestartGeneration] = useState(0);
   const [portraitGeneration, setPortraitGeneration] = useState(0);
-  const [presentedSequenceId, setPresentedSequenceId] = useState(sequence.id);
+  // A receipt is part of what is presented, so the same sequence shown with and
+  // without one (or with a different one) is a different presentation.
+  const presentationKey = receipt
+    ? `${sequence.id}:receipt:${receipt.placement}:${receipt.amount}`
+    : sequence.id;
+  const [presentedSequenceId, setPresentedSequenceId] = useState(presentationKey);
   const viewedBeats = useRef(new Set<number>());
 
   // A new sequence starts at its first beat in the same render that presents
   // it. Resetting from an effect instead let one commit show the previous
   // sequence's beat index against the new sequence's beats (#243).
-  if (presentedSequenceId !== sequence.id) {
-    setPresentedSequenceId(sequence.id);
+  if (presentedSequenceId !== presentationKey) {
+    setPresentedSequenceId(presentationKey);
     setBeatIndex(0);
     setRevealedChars(0);
     setRestartGeneration((generation) => generation + 1);
     setPortraitGeneration((generation) => generation + 1);
   }
 
-  const beat = sequence.beats[beatIndex] ?? sequence.beats[0];
+  const receiptAmount = receipt?.amount;
+  const receiptPlacement = receipt?.placement;
+  // Stable between renders: the reveal effect below depends on the beat object.
+  const beats = useMemo(
+    () =>
+      presentedBeats(
+        sequence,
+        receiptAmount !== undefined && receiptPlacement
+          ? { amount: receiptAmount, placement: receiptPlacement }
+          : undefined,
+        venueBackgroundId,
+      ),
+    [sequence, receiptAmount, receiptPlacement, venueBackgroundId],
+  );
+  const beat = beats[beatIndex] ?? beats[0];
 
   useEffect(() => {
     const media = window.matchMedia("(prefers-reduced-motion: reduce)");
@@ -78,7 +108,7 @@ export function DialoguePlayer({
 
   useEffect(() => {
     viewedBeats.current.clear();
-  }, [sequence.id]);
+  }, [presentationKey]);
 
   const beatCharacters = beat ? Array.from(beat.text) : [];
 
@@ -98,13 +128,15 @@ export function DialoguePlayer({
   }, [beat, beatIndex, reducedMotion, revealedChars, restartGeneration]);
 
   if (!beat) return null;
-  const resolvedSpeaker = resolveDialogueSpeaker(beat);
-  const resolvedItem = resolveDialogueItem(beat);
-  if (!resolvedSpeaker && !resolvedItem && beat.kind !== "skill_xp") return null;
+  if (beat.kind !== "credits_receipt") {
+    const resolvedSpeaker = resolveDialogueSpeaker(beat);
+    const resolvedItem = resolveDialogueItem(beat);
+    if (!resolvedSpeaker && !resolvedItem && beat.kind !== "skill_xp") return null;
+  }
 
   const currentBeatTextLength = beatCharacters.length;
   const isComplete = reducedMotion || revealedChars >= currentBeatTextLength;
-  const isLastBeat = beatIndex === sequence.beats.length - 1;
+  const isLastBeat = beatIndex === beats.length - 1;
   const nextLabel = isComplete && isLastBeat ? "Finish" : "Next";
   const visibleText = reducedMotion ? beat.text : beatCharacters.slice(0, revealedChars).join("");
 
@@ -124,7 +156,7 @@ export function DialoguePlayer({
     const previousIndex = beatIndex - 1;
     viewedBeats.current.add(previousIndex);
     setBeatIndex(previousIndex);
-    setRevealedChars(Array.from(sequence.beats[previousIndex]?.text ?? "").length);
+    setRevealedChars(Array.from(beats[previousIndex]?.text ?? "").length);
   }
 
   function goNext() {
@@ -141,19 +173,11 @@ export function DialoguePlayer({
     setBeatIndex((index) => index + 1);
   }
 
-  const presentedBeat: DialogueBeat =
-    sequence.presentsAtCurrentVenue &&
-    venueBackgroundId &&
-    beat.kind === "npc" &&
-    beat.presentationMode === "local"
-      ? { ...beat, backgroundId: venueBackgroundId }
-      : beat;
-
   return (
     <div className="mt-4" data-dialogue-player={sequence.id}>
       <DialogueScene
         actionMessage={actionMessage}
-        beat={presentedBeat}
+        beat={beat}
         beatIndex={beatIndex}
         controls={
           <>
@@ -199,4 +223,31 @@ export function DialoguePlayer({
       />
     </div>
   );
+}
+
+/**
+ * The beats the player steps through. The venue background is applied to local
+ * NPC beats of a present-tense sequence (#190), and a Credits receipt borrows
+ * the background of the authored beat it sits next to — the first beat when it
+ * leads, the last when it stands alone — so it is always shown where that
+ * conversation is happening.
+ */
+function presentedBeats(
+  sequence: DialogueSequence,
+  receipt: CreditsReceipt | undefined,
+  venueBackgroundId: ConversationBackgroundId | undefined,
+): readonly PresentedDialogueBeat[] {
+  const authored = sequence.beats.map((beat) =>
+    sequence.presentsAtCurrentVenue &&
+    venueBackgroundId &&
+    beat.kind === "npc" &&
+    beat.presentationMode === "local"
+      ? { ...beat, backgroundId: venueBackgroundId }
+      : beat,
+  );
+  if (!receipt) return authored;
+  const neighbour = receipt.placement === "leads" ? authored[0] : authored[authored.length - 1];
+  if (!neighbour) return authored;
+  const tile = creditsReceiptBeat(receipt.amount, neighbour.backgroundId);
+  return receipt.placement === "leads" ? [tile, ...authored] : [tile];
 }

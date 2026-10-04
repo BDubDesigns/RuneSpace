@@ -86,6 +86,8 @@ suite("issue #110 Cut Your Teeth persistence and XP boundary (real PostgreSQL)",
       deterministicRandom(),
     );
     expect(completed.mission.status).toBe("completed");
+    // A skill-XP reward is not a Credits payout (#290).
+    expect(completed.mission).not.toHaveProperty("creditsPaid");
     return completed;
   }
 

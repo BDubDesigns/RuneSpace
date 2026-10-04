@@ -171,6 +171,8 @@ suite("issue #190 10,000 Hours acceptance (real PostgreSQL)", () => {
     const result = await accept(userId, character.id);
 
     expect(result.mission.status).toBe("accepted");
+    // A Scrap grant is not a Credits payout, so no Credits receipt (#290).
+    expect(result.mission).not.toHaveProperty("creditsPaid");
     const scrap = await carriedScrap(character.id);
     expect(scrap.total).toBe(6);
     // Scrap stacks to three (#230): six pieces is two full stacks, two slots.
@@ -393,6 +395,8 @@ suite("issue #190 10,000 Hours acceptance (real PostgreSQL)", () => {
       deterministicRandom(),
     );
     expect(completed.mission.status).toBe("completed");
+    // The receipt reports what this completion actually paid (#290).
+    expect(completed.mission).toMatchObject({ creditsPaid: 50 });
     expect(await credits(character.id)).toBe(creditsBefore + 50);
     expect(await weldingXp(character.id)).toBe(xpBefore);
 
@@ -417,6 +421,8 @@ suite("issue #190 10,000 Hours acceptance (real PostgreSQL)", () => {
     ]);
     expect(again.mission.status).toBe("already_completed");
     expect(alsoAgain.mission.status).toBe("already_completed");
+    expect(again.mission).not.toHaveProperty("creditsPaid");
+    expect(alsoAgain.mission).not.toHaveProperty("creditsPaid");
     expect(await credits(character.id)).toBe(creditsBefore + 50);
   });
 
@@ -432,6 +438,7 @@ suite("issue #190 10,000 Hours acceptance (real PostgreSQL)", () => {
       deterministicRandom(),
     );
     expect(refused.mission).toMatchObject({ status: "refused", reason: "tracked_activity" });
+    expect(refused.mission).not.toHaveProperty("creditsPaid");
   });
 
   it("keeps the bench and the counter open after the Mission is finished", async () => {

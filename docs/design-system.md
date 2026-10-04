@@ -300,6 +300,34 @@ fixed-size tile reserves the same label area at its bottom edge:
   artwork still resolves at full size inside a `min-h-28` tile. Changing either
   token without re-checking that arithmetic will start shrinking item art.
 
+## Credits (Issue #290)
+
+Ordinary currency has one visual treatment, in two forms. Credits are never an
+inventory item.
+
+- **Inline icon** — `CreditsIcon` / `CreditsAmount` in `components/ui/CreditsAmount.tsx`
+  render the owner-supplied simplified SVG (`public/currency/credits-icon.svg`,
+  4:3). `.rs-credits-icon` sizes it from the text: `1em` tall, `1.3333em` wide,
+  `vertical-align: -0.15em`, with a `0.3em` end gap. Never give it a pixel
+  size: it must read at `text-xs` rows, headings and buttons alike, and must not
+  change the line height (the wrapper is plain inline for the same reason — an
+  `inline-flex` wrapper would take its baseline from the icon). It is
+  decorative (`aria-hidden`, empty alt); the visible number and the word
+  `Credits` (or `Cr`) stay as text, so the amount reads identically with images
+  off, and the data hook stays on the element that owns the number. Use it for a
+  structured amount (balance, price, total, offer, fare, payout, reward). Do not
+  put it in prose: authored dialogue, chat, server strings, `aria-label`s,
+  operational feedback sentences and admin or public-site pages stay plain text.
+  In a button, wrap the label in one `<span>` so the button's flex gap does not
+  split the icon from its text.
+- **Reward tile** — `public/currency/credits-chip.webp` is the approved battered
+  chip, used only for a confirmed Mission payout (`docs/missions.md` §9.2) in the
+  same `VisualTile` as item and skill-XP rewards, with a `CR` fallback. The same
+  chip shows regardless of amount; larger-amount art is not approved.
+- `/design-system` (development only) has a Credits panel with the icon beside
+  headings, body, tight rows and buttons plus the reward tile, for checking both
+  at mobile and desktop widths.
+
 ## Overlay motion
 
 Shared overlay panels (`components/ui/Drawer.tsx`, including the tabbed

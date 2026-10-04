@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, type FormEvent, type ReactNode } from "react";
+import { CreditsAmount, CreditsIcon } from "@/components/ui/CreditsAmount";
 import { ActionButton } from "@/components/ui/ActionButton";
 import { Drawer } from "@/components/ui/Drawer";
 import { Feedback } from "@/components/ui/Feedback";
@@ -345,21 +346,31 @@ function CreditsField({
         className="block text-xs font-semibold text-[color:var(--rs-text-primary)]"
         htmlFor="trade-credits"
       >
-        Credits to offer <span className="font-normal">(you have {formatCredits(balance)})</span>
+        Credits to offer{" "}
+        <span className="font-normal">
+          (you have <CreditsAmount amount={balance}>{formatCredits(balance)}</CreditsAmount>)
+        </span>
       </label>
       <div className="flex gap-2">
-        <input
-          aria-invalid={invalid || undefined}
-          className="rs-bevel rs-focus min-h-[var(--rs-touch-target)] w-full min-w-0 border bg-[color:var(--rs-surface-control)] px-3 text-sm tabular-nums text-[color:var(--rs-text-primary)] focus:border-[color:var(--rs-accent-primary)]"
-          id="trade-credits"
-          inputMode="numeric"
-          max={balance}
-          min={0}
-          onChange={(event) => setValue(event.target.value)}
-          step={1}
-          type="number"
-          value={value}
-        />
+        {/* The icon is an adornment: a number input cannot hold one, and the
+            label above already names the field and the balance in words. */}
+        <div className="relative min-w-0 flex-1 text-sm">
+          <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center">
+            <CreditsIcon className="!me-0" />
+          </span>
+          <input
+            aria-invalid={invalid || undefined}
+            className="rs-bevel rs-focus min-h-[var(--rs-touch-target)] w-full min-w-0 border bg-[color:var(--rs-surface-control)] pl-[calc(0.75rem+1.3333em+0.5rem)] pr-3 text-sm tabular-nums text-[color:var(--rs-text-primary)] focus:border-[color:var(--rs-accent-primary)]"
+            id="trade-credits"
+            inputMode="numeric"
+            max={balance}
+            min={0}
+            onChange={(event) => setValue(event.target.value)}
+            step={1}
+            type="number"
+            value={value}
+          />
+        </div>
         <ActionButton
           className="shrink-0 px-3 text-xs"
           disabled={busy && !pending}
@@ -478,7 +489,7 @@ function OfferLinesList({
           className="text-sm font-semibold text-[color:var(--rs-text-primary)]"
           data-offer-credits=""
         >
-          {formatCredits(lines.credits)}
+          <CreditsAmount amount={lines.credits}>{formatCredits(lines.credits)}</CreditsAmount>
         </li>
       ) : null}
       {lines.stacks.map((stack) => (
